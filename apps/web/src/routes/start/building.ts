@@ -28,6 +28,17 @@ export type Said = Proposal['heard'][number];
 
 /** The words this screen adds to the first run's own (`lib/first-run.ts`). */
 export const words = {
+  /** The conversation's page title, and the summary's at its end (1 Nov). */
+  talkTitle: "Let's make your BrainDog",
+  summaryTitle: 'Your BrainDog, ready to make',
+  summaryHead: 'What I will make',
+  factName: 'Name',
+  factFor: 'Set up as',
+  factMoney: 'Money in',
+  factMakes: 'Makes',
+  forYou: 'Your own mix of parts',
+  noCurrency: 'Not chosen yet',
+  tellMore: 'Tell it more',
   /** The conversation's heading, and what the field under it is for. */
   talk: 'In your own words',
   /** Who is speaking in the conversation. */

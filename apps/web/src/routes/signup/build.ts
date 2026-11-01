@@ -48,7 +48,7 @@ export type BuildEnv = { device: CurrencyEnv; today: string; email: string | nul
  * the places said again; then the answer. One function, for the screen and for the build after the link.
  */
 export function settle(p: Proposal, a: Amend, r: Reply | null, s: string): Proposal {
-  const none = a.out.length === 0 && Object.keys(a.to).length === 0 && a.name === undefined;
+  const none = a.out.length === 0 && Object.keys(a.to).length === 0 && a.name === undefined && (a.on ?? []).length === 0 && (a.off ?? []).length === 0;
   const changed = none ? p : amend(p, a, { nameOf: moduleName, caseTitle: caseOf(p.usecase)?.title ?? null });
   const closed = none ? p : { ...changed, modules: closeOver(changed.modules) };
   const placed = none ? p : { ...closed, places: placesOf(closed) };
