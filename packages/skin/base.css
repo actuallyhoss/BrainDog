@@ -104,8 +104,11 @@
    * NOT `button`. A button takes no text, so it triggers no zoom, and putting a floor under every
    * button on a phone would resize the chips, the verbs and the row menus for nothing.
    */
+  /* A FIELD SET LARGER THAN THE FLOOR SAYS SO (`data-own-size`) AND IS LEFT ALONE (design pass, 1 Nov): the floor took
+     Quick add's amount, a 28px figure on a phone, down to 16, so the one number the sheet is for sat at the size of
+     its code beside it. A field may only claim it at a size above 16. */
   @media (pointer: coarse) {
-    input, select, textarea {
+    input:not([data-own-size]), select, textarea {
       font-size: max(16px, var(--fs-body)) !important;
     }
   }
