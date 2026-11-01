@@ -1,0 +1,79 @@
+/**
+ * THE PAGE HEAD'S ROW, FOR ANY SCREEN (1 Nov, ui pass): the one line that says what is true, and the screen's buttons at
+ * its end, on ONE ROW WHENEVER THEY FIT. "11 people besides you" broke onto two lines while "Add a person" sat beside
+ * it with room to spare; a head row never wraps its sentence for want of room it has.
+ *
+ *   <div class="head-row">
+ *     <p class="head-row-said">11 people besides you.</p>
+ *     <div class="head-row-actions"><Button weight="primary">Add a person</Button><Menu …/></div>
+ *   </div>
+ *
+ * HOW IT DECIDES. The sentence asks for 16rem and grows into whatever the buttons leave (`flex: 1 1 16rem`), and the
+ * buttons never shrink (`flex: none`). While 16rem and the buttons fit side by side they share the row, and the
+ * sentence keeps one line until the row itself is too short for it, when it wraps in its own column. Below that (a
+ * phone with two or three buttons) the buttons go to a row of their own under it, at its end. No fixed widths, and
+ * `min-inline-size: 0` on both, so nothing pushes the row past the screen.
+ *
+ * `PageHead` draws this shape for every page that hands it a `sentence` and `actions`; a screen with a head of its
+ * own uses these three classes and gets the same row.
+ */
+/* UNLAYERED, as a component's own sheet is: a rule in a layer loses to every scoped style (`Button.svelte`'s padding
+ and fill), whatever its weight. */
+.head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  min-inline-size: 0;
+}
+
+.head-row-said {
+  flex: 1 1 16rem;
+  min-inline-size: 0;
+  max-inline-size: 75ch;
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-head);
+  line-height: calc(24 / 17);
+  text-wrap: pretty;
+}
+
+.head-row-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  min-inline-size: 0;
+  margin-inline-start: auto;
+}
+
+.head-row-actions :is(.btn, .menu-trigger, .capture-open) {
+  flex: none;
+}
+
+/* ON A PHONE A BUTTON WITH A GLYPH IS THE GLYPH ALONE in a 44px square, its words still its name, as `PageHead` draws
+   it; a quiet one is bare, like the bar's search button. */
+@media (width < 900px) {
+  .head-row-actions {
+    gap: var(--sp-1);
+  }
+
+  .head-row-actions .btn:has(.icon):not(dialog *) {
+    inline-size: var(--tap);
+    min-inline-size: var(--tap);
+    min-block-size: var(--tap);
+    padding: 0;
+    gap: 0;
+    font-size: 0em;
+  }
+
+  .head-row-actions .btn:has(.icon):is([data-weight='quiet'], [data-weight='glass']):not(dialog *) {
+    background: none;
+  }
+
+  .head-row-actions kbd {
+    display: none;
+  }
+}

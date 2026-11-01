@@ -402,7 +402,22 @@
     font: 500 15.5px/1 var(--ui);
     text-decoration: none;
     white-space: nowrap;
-    transition: background var(--d-press, 70ms) ease-out;
+    transition:
+      background var(--d-press) var(--ease-out),
+      scale var(--d-menu) var(--ease-out);
+  }
+
+  /* A PRESS IS A FILL AND A GIVE (ui pass, 1 Nov, as in the app): the button sinks to 98% while held. Under reduced
+     motion only the fill changes. */
+  .btn:active {
+    scale: 0.98;
+    transition-duration: var(--d-press);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn:active {
+      scale: none;
+    }
   }
 
   .btn:hover {
@@ -898,6 +913,63 @@
       to {
         translate: 0 0;
       }
+    }
+  }
+
+  /* ── Motion added in the ui pass of 1 Nov ─────────────────────────────── */
+
+  /**
+   * A PAGE CHANGE IS ONE EVEN CROSS-FADE over `--d-page` (`+layout.svelte` wraps a navigation in a view transition where
+   * the browser has one), and the header holds still through it, so only the page under it changes. The new page is
+   * readable from the first frame it is drawn: nothing waits on the fade. Cut under reduced motion.
+   */
+  ::view-transition-group(root) {
+    animation-duration: var(--d-page);
+    animation-timing-function: var(--ease-standard);
+  }
+
+  ::view-transition-group(site-bar),
+  ::view-transition-old(site-bar),
+  ::view-transition-new(site-bar) {
+    animation: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(root),
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation: none;
+    }
+  }
+
+  /**
+   * EVERY DISCLOSURE OPENS BY ITS HEIGHT (the questions, the docs' sections, the changelog): the content grows to its own
+   * height over `--d-rows` and shuts over `--d-exit`. A browser without `::details-content` snaps as before. The phone's
+   * menu is left out: its panel stands over the page, so it fades and drops in instead (`+layout.svelte`).
+   */
+  details:not(.menu) {
+    interpolate-size: allow-keywords;
+  }
+
+  details:not(.menu)::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    transition:
+      block-size var(--d-exit) var(--ease-in),
+      content-visibility var(--d-exit) var(--ease-in) allow-discrete;
+  }
+
+  details:not(.menu)[open]::details-content {
+    block-size: auto;
+    transition:
+      block-size var(--d-rows) var(--ease-out),
+      content-visibility var(--d-rows) var(--ease-out) allow-discrete;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    details:not(.menu)::details-content,
+    details:not(.menu)[open]::details-content {
+      transition: none;
     }
   }
 }

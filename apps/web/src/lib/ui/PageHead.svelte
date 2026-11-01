@@ -773,12 +773,14 @@
 
   /* A SENTENCE WITH NO BUTTONS BESIDE IT STANDS WHERE ONE WITH BUTTONS DOES (AH34): Today's first line sat 16 under the
      bar's rule while every page with actions had the row's height to sit in. */
-  .page-head[data-titled]:has(.head-actions, .head-said) .head-main {
+  .page-head[data-titled]:has(.head-actions > :not(dialog), .head-said) .head-main {
     min-block-size: var(--ctl-h);
   }
 
-  /* A HEAD WITH NOTHING TO SAY BUT ITS NAME draws no room of its own. */
-  .page-head[data-titled]:not(:has(.head-said, .head-actions)) {
+  /* A HEAD WITH NOTHING TO SAY BUT ITS NAME draws no room of its own. A closed sheet the actions hold (the arranging
+     controls' "Which list to show") is not something to say: the buttons gone to the sentence's row (`PageView`'s
+     `besideLead`) left a 52px band of nothing over the page for it. */
+  .page-head[data-titled]:not(:has(.head-said, .head-actions > :not(dialog))) {
     padding-block-start: 0;
   }
 

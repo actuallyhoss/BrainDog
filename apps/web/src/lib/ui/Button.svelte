@@ -11,7 +11,8 @@
   Radius `--r-ctl` (8), `--ctl-h` tall (32, and 44 under a thumb), the label at `--fs-ctl` 14 medium. `sm` is 28 with 8
   of padding, for a row's verbs and a heading's.
 
-  A PRESS IS A FILL, NOTHING MOVES. The fill changes over `--d-press`; a button never scales or slides.
+  A PRESS IS A FILL AND A GIVE. The fill changes over `--d-press` and the button sinks to 98% while held (ui pass of
+  1 Nov); it never slides, and under reduced motion only the fill changes.
 
   A DELETE THAT IS READY (`tone="bad"` on a primary) wears the primary's look with a 16px bin before its words, so the
   armed form of a destructive verb is told from the screen's ordinary primary by its glyph and its words, never by a
@@ -106,10 +107,12 @@
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
-    /* COLOUR ONLY. A press and a hover are fills; nothing about a button moves. */
+    /* A HOVER IS A FILL; A PRESS IS A FILL AND A GIVE (ui pass, 1 Nov): the button sinks to 98% while it is held and
+       comes back as it lets go, so a press is felt where the finger is. Transform only, so nothing beside it moves. */
     transition:
       background var(--d-press) var(--ease-out),
-      color var(--d-press) var(--ease-out);
+      color var(--d-press) var(--ease-out),
+      scale var(--d-menu) var(--ease-out);
   }
 
   /* ON A TILE, A SHEET OR A PANEL the quiet fill is a step under the surface, `--tile-2`, so it still reads as a thing
@@ -133,9 +136,18 @@
     display: none;
   }
 
-  /* THE PRESS: a step deeper than the fill, while it is held. */
+  /* THE PRESS: a step deeper than the fill, and 98% of its size, while it is held. It goes in over `--d-press` and lets
+     go over `--d-menu`. Under reduced motion only the fill changes. */
   .btn:active:not(:disabled) {
     background: color-mix(in oklab, var(--ink) 8%, var(--btn-fill));
+    scale: 0.98;
+    transition-duration: var(--d-press);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn:active:not(:disabled) {
+      scale: none;
+    }
   }
 
   /* THE RED FILL, the one filled control on a screen, with white words in both schemes. */

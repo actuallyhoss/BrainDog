@@ -132,6 +132,27 @@
     animation: none;
   }
 
+  /* THE TOP BAR'S WHERE-YOU-ARE HANDS OVER IN PLACE (ui pass, 1 Nov; `TopBar.svelte`): the old words leave over the exit's
+     step and then the new ones fade up, in one box of one size, so nothing scales and the two never cross. It snapped
+     with the rest of the bar while the work under it cross-faded. */
+  ::view-transition-group(bar-crumb) {
+    animation-duration: var(--d-page);
+  }
+
+  ::view-transition-old(bar-crumb) {
+    animation: page-out var(--d-exit) var(--ease-in) both;
+  }
+
+  ::view-transition-new(bar-crumb) {
+    animation: crumb-in calc(var(--d-page) - var(--d-exit)) var(--ease-out) var(--d-exit) both;
+  }
+
+  @keyframes crumb-in {
+    from {
+      opacity: 0;
+    }
+  }
+
   /* A DOCKED PANEL STAYS WHERE IT IS THROUGH THE FADE. It is named `dock` for the moment (`Panel.svelte`), so it is not
      painted into the work's two pictures; held on both sides of a navigation, the new picture stands over the old one
      with nothing played, and the panel does not move or dip. One the new screen does not draw fades with the work. */

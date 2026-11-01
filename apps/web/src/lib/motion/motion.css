@@ -1,0 +1,78 @@
+/**
+ * THE MOTION EVERY SHARED PART GETS FOR FREE (ui pass, 1 Nov). Unlayered, as a component's own sheet is, so it is not
+ * outweighed by a scoped style; `a11y.css`'s reduced-motion rules are `!important` in their layer and still win.
+ * Timings are the skin's (`tokens.css`): enter on the emphasis curve, leave on `--ease-in`, nothing over 240ms, no
+ * bounce on chrome.
+ */
+
+/* ── sections opening ──────────────────────────────────────────────────── */
+
+/**
+ * EVERY `<details>` OPENS BY ITS HEIGHT. Fifty-five disclosures in the app snapped open and shut; the content box now
+ * grows from nothing to its own height over `--d-rows` and closes over the exit's step, and a browser without
+ * `::details-content` or `interpolate-size` simply snaps as before. `interpolate-size` is set on the `details` alone,
+ * so nothing else in the app starts animating to `auto`.
+ */
+details {
+  interpolate-size: allow-keywords;
+}
+
+details::details-content {
+  block-size: 0;
+  overflow-y: clip;
+  transition:
+    block-size var(--d-exit) var(--ease-in),
+    content-visibility var(--d-exit) var(--ease-in) allow-discrete;
+}
+
+details[open]::details-content {
+  block-size: auto;
+  transition:
+    block-size var(--d-rows) var(--ease-out),
+    content-visibility var(--d-rows) var(--ease-out) allow-discrete;
+}
+
+/* A DISCLOSURE'S CHEVRON TURNS WITH IT, wherever one is marked (`data-chevron` on the glyph, or `.disclosure-chevron`). */
+:where(details > summary) :where([data-chevron], .disclosure-chevron) {
+  transition: rotate var(--d-rows) var(--ease-out);
+}
+
+:where(details[open] > summary) :where([data-chevron], .disclosure-chevron) {
+  rotate: 90deg;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  details::details-content,
+  details[open]::details-content {
+    transition: none;
+  }
+}
+
+/* ── loading, then the content ─────────────────────────────────────────── */
+
+/**
+ * WHAT ARRIVES IN THE PLACE OF A SKELETON FADES IN (`data-arrive`): the skeleton holds the geometry, so nothing jumps,
+ * and the answer comes up over `--d-swap` instead of switching on. Not while a page change cross-fades
+ * (`data-moving` on the root, `AppFrame.svelte`): the view transition already takes the new picture, and a fade inside
+ * it would take that picture at nothing.
+ */
+[data-arrive] {
+  transition: opacity var(--d-swap) var(--ease-standard);
+}
+
+@starting-style {
+  [data-arrive] {
+    opacity: 0;
+  }
+}
+
+:root[data-moving] [data-arrive] {
+  transition: none;
+}
+
+/* ── where you are, moving ─────────────────────────────────────────────── */
+
+/* THE LIT ROW'S OWN FILL WAITS while the moving one glides to it (`$lib/motion/lit.ts`). */
+[data-lit-moving] {
+  background: transparent !important;
+}

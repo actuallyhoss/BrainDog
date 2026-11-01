@@ -85,9 +85,12 @@
 
   /* THE CRUMB: the place in the quiet ink, a small chevron, where you are in ink at 600. One line; a long name ends in
      an ellipsis rather than pushing Ask off the bar. */
+  /* WHERE YOU ARE HANDS OVER IN PLACE through a page change (`app.css`, `bar-crumb`): the old words go, then the new
+     ones come up, in the same box, so the two never cross. */
   .crumb {
     flex: 1 1 auto;
     min-inline-size: 0;
+    view-transition-name: bar-crumb;
   }
 
   .crumb ol {

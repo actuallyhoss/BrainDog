@@ -19,6 +19,7 @@
   names one. ITS OWN CHUNK, loaded when the shell draws it (`+layout.svelte`), so the shell's entry carries none of it.
 -->
 <script lang="ts">
+  import { litSlide } from '../motion/lit.ts';
   import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import { markOf } from 'braindog-render';
@@ -648,7 +649,7 @@
   </div>
 {:else if mode === 'rail'}
   <!-- THE NARROW RAIL: the places as their glyphs, each named on hover and to a screen reader, never nothing. -->
-  <nav class="s-rail" aria-label={words.nav}>
+  <nav class="s-rail" aria-label={words.nav} {@attach litSlide('.s-ricon[aria-current="page"]')}>
     <div class="s-rhead">
       <Brand bare />
     </div>
@@ -692,7 +693,7 @@
         <svg class="s-side-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.75" y="4.75" width="16.5" height="14.5" rx="3" /><path d="M9.25 4.75v14.5" /></svg>
       </button>
     </div>
-    <nav class="s-scroll" aria-label={words.nav} bind:this={rows}>
+    <nav class="s-scroll" aria-label={words.nav} bind:this={rows} {@attach litSlide('.s-row[aria-current="page"], .s-title[aria-current="page"]', { fill: 'var(--nav-selected)' })}>
       <ul class="s-list">
         {#each model.places as p (p.key)}{@render place(p)}{/each}
       </ul>

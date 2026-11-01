@@ -31,6 +31,9 @@
   import '@braindog/skin/blocks.css';
   import '$lib/ui/rows.css';
   import '$lib/ui/controls.css';
+  /* THE UI PASS OF 1 NOV: the head row every page shares, and the motion every shared control gets for free. */
+  import '$lib/ui/head-row.css';
+  import '$lib/motion/motion.css';
 
   let { data, children } = $props();
 </script>
