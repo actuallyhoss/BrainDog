@@ -586,14 +586,32 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
     pack: 'estate',
     blocks: [
       {
+        /* THE NEXT RENEWAL LEADS, SINCE estate 2.7.0 (the lists review, L28): what it costs is what the next renewal
+           takes, so the figure says so, with the day beside it; it read "Cost" under the amount. */
         kind: 'cards',
         lead: true,
         span: 12,
         source: 'register.services',
-        where: 'seq is {{seq}}',
+        where: 'seq is {{seq}}, cost is set',
         columns: [
           { field: 'name', as: 'title' },
-          { field: 'cost', as: 'figure' },
+          { field: 'cost', label: 'Next renewal', as: 'figure' },
+          { field: 'provider', label: 'With', as: 'fact' },
+          { field: 'points_at', label: 'Points at', as: 'fact' },
+          { field: 'renews', label: 'Renews', as: 'when' },
+        ],
+        limit: 1,
+      },
+      {
+        /* AND A SERVICE WITH NO COST WRITTEN (a Stripe account) HAS NO FIGURE: it drew a bare "—" over "Cost". Its facts and
+           its day, and nothing said of a price nobody wrote. */
+        kind: 'cards',
+        lead: true,
+        span: 12,
+        source: 'register.services',
+        where: 'seq is {{seq}}, cost is empty',
+        columns: [
+          { field: 'name', as: 'title' },
           { field: 'provider', label: 'With', as: 'fact' },
           { field: 'points_at', label: 'Points at', as: 'fact' },
           { field: 'renews', label: 'Renews', as: 'when' },

@@ -984,9 +984,10 @@ const DECLARED: Record<string, Version> = {
       rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
       setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
     `,
-    declares: 'ebb6356be5fc129c',
+    declares: 'b6f775cbf9e609dd',
     history: [
       'Estate 2.7.0 of 1 November (lists review, L36): `metric.points-nowhere` counts domains only, `page.estate` names each domain that points at nothing in a table where a note said "something", and its Next ninety days says each renewal\'s cost where it said who it is with; no id added or taken away -> ebb6356be5fc129c',
+      'Estate 2.7.0, folded before it shipped (lists review, L28): `page.service` leads with what the next renewal takes, labelled so, and a service with no cost written draws no figure; no id added or taken away -> b6f775cbf9e609dd',
     ],
   },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
