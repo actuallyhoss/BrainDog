@@ -125,7 +125,9 @@ function ruleOf(d: Body, names: ReadonlyMap<string, string>): string {
   if (known) return known;
   const on = isMap(d.on) ? d.on : {};
   const written = isMap(on.written) ? on.written : null;
-  if (written) return words.ruleWritten(names.get(str(written.register)) ?? str(written.register));
+  /* A LIST ANOTHER ADD-ON DECLARES IS SAID IN WORDS TOO (design pass, 1 Nov): Zakat's rules read "When something in
+     gold_rates is written", the id of a list Holdings brings. */
+  if (written) return words.ruleWritten(names.get(str(written.register)) ?? idWords(str(written.register)));
   if (on.schedule !== undefined || on.cron !== undefined || on.every !== undefined) return words.ruleScheduled;
   return words.ruleOther;
 }
