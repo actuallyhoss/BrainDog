@@ -27,8 +27,21 @@ export const asksWords = {
   keys: (keys: readonly string[]): string => `Uses your ${keys.length === 1 ? 'key' : 'keys'} ${and(keys)}`,
   scripts: (n: number): string => (n === 1 ? 'Runs 1 script, inside BrainDog' : `Runs ${n} scripts, inside BrainDog`),
   skills: (n: number): string => (n === 1 ? 'Gives your agents 1 skill' : `Gives your agents ${n} skills`),
+  views: (names: readonly string[]): string => `Sees your ${and(names)}`,
   nothing: 'Only its own lists. It sends nothing out.',
 } as const;
+
+/** A view of the whole record in words, as the line "Sees your …" ends; one this build does not know is its id in words. */
+const VIEW_WORDS: Readonly<Record<string, string>> = {
+  activity: 'activity across BrainDog',
+  'governance.open': 'open questions',
+  'handoffs.open': "agents' handoffs",
+  'sessions.working': "agents' sessions",
+  'sessions.live': "agents' sessions",
+  'actions.blocking': 'things waiting on you',
+  deadlines: 'deadlines',
+};
+const viewWords = (id: string): string => VIEW_WORDS[id] ?? id.replaceAll(/[._]+/gu, ' ');
 
 /** The add-on file inside what the page holds: an add-on's own, or a use case file's `pack`. */
 export function packDocOf(doc: unknown): Body | null {
@@ -43,8 +56,8 @@ export const usesIn = (doc: unknown): Use[] => usesOf(packDocOf(doc));
 export type Namer = (id: string) => string;
 
 /**
- * Only the places of yours it uses, one line for each way: the lists it changes, the lists it reads, the figures and the
- * pages it adds to. What the plan sheet draws before Install, beside the calls it already says one by one.
+ * Only the places of yours it uses, one line for each way: the lists it changes, the lists it reads, the figures, the
+ * pages it adds to and the views of the whole record it sees. What the plan sheet draws before Install, beside the calls it already says one by one.
  */
 export function placesLines(doc: unknown, nameOf: Namer): string[] {
   const uses = usesOf(packDocOf(doc));
@@ -59,6 +72,8 @@ export function placesLines(doc: unknown, nameOf: Namer): string[] {
   if (figures.length > 0) lines.push(asksWords.figures(figures));
   const pages = named(uses.filter((u) => u.kind === 'page'));
   if (pages.length > 0) lines.push(asksWords.pages(pages));
+  const views = [...new Set(uses.filter((u) => u.kind === 'view').map((u) => viewWords(u.id)))];
+  if (views.length > 0) lines.push(asksWords.views(views));
   return lines;
 }
 

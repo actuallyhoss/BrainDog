@@ -367,8 +367,9 @@ export const ADMIN_JS = String.raw`'use strict';
     if (uses.length === 0) return 'Uses only its own lists';
     return 'Uses of theirs: ' + uses.map(function (u) {
       var id = String(u.id || '');
-      var name = id.slice(id.indexOf('.') + 1).replace(/[_-]/g, ' ');
-      var what = id.indexOf('metric.') === 0 ? ' (figure)' : id.indexOf('page.') === 0 ? ' (page, adds to it)' : u.writes ? ' (changes it)' : '';
+      var placed = /^(register|metric|page)\./.test(id);
+      var name = (placed ? id.slice(id.indexOf('.') + 1) : id).replace(/[._-]/g, ' ');
+      var what = !placed ? ' (whole-record view)' : id.indexOf('metric.') === 0 ? ' (figure)' : id.indexOf('page.') === 0 ? ' (page, adds to it)' : u.writes ? ' (changes it)' : '';
       return name + what;
     }).join(', ');
   }

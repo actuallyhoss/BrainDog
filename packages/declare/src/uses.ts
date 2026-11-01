@@ -1,5 +1,5 @@
 /**
- * What an add-on asks to use of yours: every list, figure and page it reads or changes that is not its own, read from
+ * What an add-on asks to use of yours: every list, figure, page and record-wide view it reads or changes that is not its own, read from
  * the file as written, and the `uses` line in its manifest where its author says the same thing out loud.
  *
  * WHY A LIST AND NOT A TRUST LEVEL. A pack has no verb that reads a row (`index.ts`), so everything it can see is named
@@ -24,7 +24,7 @@
 import type { Refusal } from '@braindog/ports';
 
 /** One place of yours an add-on uses: a list, a figure or a page, by its declaration id, and whether it changes it. */
-export type Use = { id: string; kind: 'list' | 'figure' | 'page'; writes: boolean };
+export type Use = { id: string; kind: 'list' | 'figure' | 'page' | 'view'; writes: boolean };
 
 /** The most places `uses` may name: past it a file is asking for the whole record, and is said to. */
 export const USES_MOST = 64;
@@ -35,6 +35,11 @@ const LIST = /^[a-z][a-z0-9_]*$/u;
 const REGISTER_ID = /^register\.([a-z][a-z0-9_]*)$/u;
 const METRIC_ID = /^metric\.([a-z0-9][a-z0-9_-]*)$/u;
 const PAGE_ID = /^page\.([a-z0-9][a-z0-9_-]*)$/u;
+/**
+ * A view of the whole record a block may draw from rather than one list: `activity`, `governance.open`,
+ * `sessions.working`, `deadlines`. Each reaches across every list, so it is a place of its own, named as written.
+ */
+const VIEW_ID = /^(?!register\.|metric\.|page\.)[a-z][a-z_]*(?:\.[a-z_]+)?$/u;
 /** Under these keys a list is written to, not only read. */
 const WRITE_KEYS: ReadonlySet<string> = new Set(['writes', 'create']);
 /** How deep the walk goes; a body deeper than this is the declaration lint's to refuse, not this one's to recurse into. */
@@ -92,6 +97,8 @@ export function usesOf(doc: unknown): Use[] {
       const w = writes || WRITE_KEYS.has(k);
       /* A LIST NAMED BARE UNDER `register` (a rule's, a feed's target, a `create`, a page's `for`) OR A REF FIELD'S `to`. */
       if (k === 'register' || (k === 'to' && (v.type === 'ref' || (v.type === 'list' && v.of === 'ref')))) list(x, w);
+      /* A BLOCK DRAWN FROM A VIEW OF THE WHOLE RECORD (the activity, the open questions, the live sessions). */
+      if (k === 'source' && typeof x === 'string' && VIEW_ID.test(x)) note(x, 'view', false);
       walk(x, w, depth + 1);
     }
   };
@@ -132,8 +139,8 @@ export function usesSaid(doc: unknown): { ok: true; value: string[] | null } | {
   if (doc.uses.length > USES_MOST) return bad(`uses names ${doc.uses.length} places, and an add-on names at most ${USES_MOST}. Ask for fewer.`);
   const out: string[] = [];
   for (const u of doc.uses) {
-    if (typeof u !== 'string' || !(REGISTER_ID.test(u) || METRIC_ID.test(u) || PAGE_ID.test(u)))
-      return bad('Each place in uses is a list, a figure or a page by its id: register.<list>, metric.<figure> or page.<page>.');
+    if (typeof u !== 'string' || !(REGISTER_ID.test(u) || METRIC_ID.test(u) || PAGE_ID.test(u) || VIEW_ID.test(u)))
+      return bad('Each place in uses is a list, a figure, a page or a view by its id: register.<list>, metric.<figure>, page.<page>, or a view such as activity.');
     if (!out.includes(u)) out.push(u);
   }
   return { ok: true, value: out };
