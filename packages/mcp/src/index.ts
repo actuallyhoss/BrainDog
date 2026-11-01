@@ -98,6 +98,8 @@ import type { HANDOFF_STATES as RecordHandoffStates } from '@braindog/record';
 import { firewall } from '@braindog/record/sight';
 
 import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
+import { ASKS, catalogue, doorTakes, keyAsk, notADoor, type Ask, type CallRow } from './act.ts';
+export { withCalls, type CallRow } from './act.ts';
 import { ANSWERED_GRAMMAR, AUTOMATION_GRAMMAR } from './automations.ts';
 import {
   activityBrief,
@@ -197,6 +199,14 @@ export type McpSurface<C> = {
   meet?(args: Args, ctx: C): Answer;
   /** Take back one write of the caller's own run by its receipt's batch; the record refuses anyone else's. Optional like `meet`. */
   undoOwn?(args: { batch: string; dry?: boolean }, ctx: C): Answer;
+  /**
+   * One call of the record's table by its name, made as the app's `/api/<call>` makes it (`callRoute` in
+   * `@braindog/host`): what the `act` tool runs. Optional like `undoOwn`: a surface without it answers `act`
+   * `NOT_IN_THIS_BUILD`. Both hosts hand it beside the record (`withCalls`), and the command line sends it through its client.
+   */
+  call?(name: string, args: Args, ctx: C): Answer;
+  /** The record's table of calls (`ROUTES` in `@braindog/host/table`), which `act` and `braindog:calls` are held to. */
+  calls?(): readonly CallRow[];
   /** Hang a page on a thing, or give one it carries a new version (`methods/visuals.ts`). Optional like `undoOwn`. */
   attachVisual?(args: { on: string; page: string; title?: string; draft?: boolean }, ctx: C): Answer;
   sessionsLive?(args: Record<string, never>, ctx: C): Answer;
@@ -822,17 +832,16 @@ export const TOOLS: readonly Tool[] = [
     idempotent: true,
   },
   {
-    name: 'undo',
-    title: 'Undo a change',
-    /* THE LAST ONE, FOR THE RECEIPTS: every write answers a batch and this takes it back. Only the caller's own run's
-       writes go back; the owner's Undo in the app stays the owner's. DESTRUCTIVE IN THE SPEC'S SENSE (door audit D35):
-       undoing a create deletes the row, and a client that runs non-destructive tools without asking would have run it
-       unasked. */
-    description: 'Put back your own write, by its receipt\'s batch.',
-    input: obj({ batch: { type: 'string' }, dry: { type: 'boolean' } }, ['batch']),
+    name: 'act',
+    title: 'Do anything',
+    /* EVERYTHING ELSE THE APP DOES, BY THE CALL IT MAKES (the owner's ask of 1 Nov, `act.ts`): one tool and the list of
+       calls as a resource, so the list pays for one tool. It took `undo`'s place, and `undo` is folded into it: its
+       receipt's batch is `act undoOwn`. Destructive in the spec's sense, as `undo` was: a call may delete. Who may make
+       which call is the record's to say, with the caller's own grant, so nothing here widens what an agent reaches. */
+    description: 'Any app call; braindog:calls lists them. Undo: undoOwn {batch}.',
+    input: obj({ call: { type: 'string' }, args: { type: 'object' } }, ['call']),
     writes: true,
     destructive: true,
-    idempotent: true,
   },
 ];
 
@@ -847,6 +856,16 @@ export const FOLDED_UNTIL = '2026-12-20';
  * `instructions` and the new arguments, so the list's ceiling stayed at 2,760 (`budget.test.ts`).
  */
 export const FOLDED: readonly (Tool & { into: string })[] = [
+  {
+    name: 'undo',
+    title: 'Undo a change',
+    description: 'Put back your own write, by its receipt\'s batch.',
+    input: obj({ batch: { type: 'string' }, dry: { type: 'boolean' } }, ['batch']),
+    writes: true,
+    destructive: true,
+    idempotent: true,
+    into: 'act {call: "undoOwn", args: {batch}}',
+  },
   {
     name: 'schema',
     title: 'See the fields',
@@ -1336,6 +1355,7 @@ const FIXED: readonly Resource[] = [
   resource('grammar/kinds', 'Every kind of block a page draws, a line each, and what to reach for. grammar/kind/<name> says one whole.'),
   resource('grammar/script', 'What a script declaration may contain, what its ctx can reach, its limits, and two that install.'),
   resource('grammar/automations', 'What an automation may say: its triggers, its steps, its limits, what does not run yet, and two that install.'),
+  resource('calls', 'Every call act makes, a line each: what the app does, by name, and how to make one.'),
 ];
 
 /**
@@ -3341,6 +3361,56 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     },
 
     /**
+     * ANY CALL THE APP MAKES, BY ITS NAME (`act.ts`). The name is held to the record's own table and to what this door
+     * never makes; the arguments go to the record as sent, through the handler the app's `/api/<call>` runs, with the
+     * caller's own context, so the record's gates, the ladder and its receipts are the app's. A write the ladder filed is
+     * answered as `create`'s is, the question and its link; a row as a row; anything else as the record said it.
+     *
+     * A CALL ONLY AN OWNER IN A BROWSER MAKES, REFUSED SO, IS ASKED INSTEAD WHERE A QUESTION CAN SAY IT (`ASKS`, and
+     * `keyAsk` for a key), through `propose` with the caller's own context: filed on Decide, or landed at once where his
+     * rung and his switches let it. Nothing is asked for a call refused for any other reason.
+     */
+    act: async (args, ctx, turn) => {
+      const name = typeof args.call === 'string' ? args.call.trim() : '';
+      const sent = args.args === undefined || args.args === null ? {} : args.args;
+      if (!isObject(sent)) return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'args is an object: the call\'s own arguments, as braindog:calls names them.', at: 'args' } } };
+      if (!surface.call || !surface.calls) return { result: unbuilt('act', 'Use the other tools, or ask the owner to do it from the app.') };
+      const rows = surface.calls();
+      const row = rows.find((r) => r.name === name);
+      if (row === undefined || !doorTakes(row)) return { result: { ok: false, refusal: notADoor(name, rows) } };
+      /* `undoOwn` IS `undo`'s, and answered in its words. */
+      if (name === 'undoOwn') return run.undo!(sent, ctx, turn);
+      const out = await surface.call(name, sent, ctx);
+      if (!out.ok) {
+        const refusal = 'refusal' in out ? out.refusal : null;
+        if (refusal?.code === 'NEEDS_BROWSER_SESSION') {
+          let ask: Ask | null = Object.hasOwn(ASKS, name) ? ASKS[name]!(sent) : null;
+          if (ask === null && name === 'revokeGrant' && typeof sent.id === 'string' && sent.id.trim() !== '') {
+            const key = await surface.get({ spoken: sent.id.trim() }, ctx);
+            if (key.ok && isEntry(key.value) && key.value.register === 'credentials') {
+              if (!prefixes.has('credentials')) await learnPrefix('credentials', ctx);
+              const words = titleOf(key.value.fields, decls.get('credentials'));
+              const spoken = key.value.seq === null ? key.value.id : spokenOf('credentials', key.value.seq);
+              ask = keyAsk({ spoken, version: key.value.version, name: words || null });
+            }
+          }
+          if (ask !== null) {
+            const asked = await run.propose!({ question: ask.question, body_kind: ask.body_kind, body: ask.body, cause: ask.cause }, ctx, turn);
+            if (asked.result.ok) return asked;
+          }
+        }
+        return { result: await failed(out, ctx, turn) };
+      }
+      turn.batch = batchIn(out.value);
+      const ruled = ruledOf(out.value);
+      if (ruled !== null && 'filed' in ruled && !isEntry(out.value)) return filedOut(ruled.filed, ctx, turn);
+      if (isEntry(out.value)) return wrote(out, 'Changed', ctx, turn);
+      const value = bare(out.value);
+      const say = isObject(value) && typeof value.say === 'string' ? value.say : null;
+      return { result: { ok: true, value }, ...(say === null ? {} : { say: () => say }) };
+    },
+
+    /**
      * THE ARGUMENTS GO TO THE RECORD AS SENT, and who may triage is the record's to say: a token without the `inbox` reach
      * is refused there in one sentence naming what it lacks, and a field it does not take is named in `FIELD_UNKNOWN`.
      *
@@ -3821,7 +3891,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     /* EVERY WRITE ENDS WITH ITS RECEIPT: what changed in names, and the one call that takes it back. */
     const receipted = (s: Said, line: string | null, short: string | null): Said =>
       line === null ? s : { ...s, ...(short !== null ? { text: `${s.text}\n${short}` } : {}), structured: { ...s.structured, receipt: line } };
-    const receiptOn = (line: string): string | null => (RECEIPTED.has(name) ? line : null);
+    /* `act` IS RECEIPTED WHEN ITS CALL WROTE: a batch came back, or the call is a write in the record's table. */
+    const receiptOn = (line: string): string | null =>
+      RECEIPTED.has(name) || (name === 'act' && (turn.batch !== undefined || turn.asks !== undefined || surface.calls?.().find((r) => r.name === sent.call)?.writes === true)) ? line : null;
     if (full || walled || !done.say) return receipted(said(result), receiptOn(receiptOf(name, '', turn, value)), null);
     const body = done.say(await lookOf(ctx, turn, done.names));
     return receipted(said(result, body), receiptOn(receiptOf(name, body, turn, value)), receiptOf(name, body, turn, value, true));
@@ -4203,6 +4275,13 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
        `version`'s `slash` PICKS WHICH, because it is the one fact about the host this package can read, and the hosts
        set it and the record's `answersSlash` from the same model. A surface whose `version` carries no `slash`, as
        `test/stub.ts`'s does not, is served the grammar that lists `ask_slash` as not running. */
+    /* THE CALLS `act` MAKES, from the record's own table as this surface hands it, and asked of `version` first as the
+       grammars are, so a caller who may read nothing is told so in the record's words. */
+    if (head === 'calls' && !rest) {
+      if (!surface.calls || !surface.call) return unbuilt(uri, 'Use the other tools.');
+      const may = await surface.version(ctx);
+      return may.ok ? { ok: true, value: catalogue(surface.calls()) } : may;
+    }
     if (head === 'grammar' && rest === 'automations') {
       const may = await surface.version(ctx);
       return may.ok ? { ok: true, value: may.value.slash === true ? ANSWERED_GRAMMAR : AUTOMATION_GRAMMAR } : may;
@@ -4405,7 +4484,7 @@ function receiptOf(name: string, said: string, turn: Turn, value: unknown, inTex
   const first = (said.split('\n')[0] ?? '').trim().replace(/[.\s]+$/u, '');
   const did = first === '' ? `Done with ${name}` : first.length > 110 ? `${first.slice(0, 109)}…` : first;
   const head = inText && first !== '' ? 'Receipt:' : `Receipt: ${did}.`;
-  if (turn.batch !== undefined) return `${head} To undo, call undo with batch "${turn.batch}".`;
+  if (turn.batch !== undefined) return `${head} To undo, call act with call "undoOwn" and args {"batch": "${turn.batch}"}.`;
   /* A HANDOFF THAT MOVED ONLY THE RUN'S OWN STEP has nothing undo puts back: the next handoff is how it changes. */
   if (name === 'handoff') return `${head} To change it, call handoff again.`;
   if (turn.asks !== undefined) return `${head} To take it back, call propose with withdraw "${turn.asks}".`;

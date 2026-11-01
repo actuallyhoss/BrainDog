@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type KeychainGrantSeen } from '@braindog/host';
+import { callRoute, ROUTES, engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type KeychainGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
 import { accessHeaders, clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
@@ -33,6 +33,7 @@ import { appleAssociation } from './apple.ts';
 import { CLOSE_RECORDS_MOST, closeDoor } from '@braindog/host/auth';
 import type { AccountClosed } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
+import { withCalls } from '@braindog/mcp';
 /* The oldest command this door still works with, one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
 import { slashTools } from '@braindog/mcp/slash-tools';
@@ -551,13 +552,21 @@ function loggingAcks(api: RecordApi, sql: Sql): void {
 /* `build` IS THIS DEPLOY'S BUILD (`BRAINDOG_BUILD`), sent on every answer as `braindog-build` so the bridge sees a deploy mid-session. */
 /* `caller` IS THE KEY'S OWN ID, because the bearer is taken off the request before the record's object sees it: without
    it every key on a record read as one caller, and a second machine's first call in a minute went uncounted. */
+/* AND THE CALLS `act` MAKES, through the same handlers `/api` serves (`callRoute`), built once for each record's api and
+   kept with it by `withCalls`, so the door's state for a caller outlives one request as it did. */
 const serveMcp = (request: Request, api: RecordApi, ctx: CallContext, origin?: string, build?: string): Promise<Response> =>
-  answerMcp(request, api, ctx, {
+  answerMcp(request, withCalls(api, actCalls(api), () => ROUTES), ctx, {
     session: (c, said) => withSession(c, hintsOf(said)),
     caller: (c) => (c.principal.kind === 'token' ? c.principal.id : undefined),
     ...(origin ? { origin } : {}),
     ...(build ? { build } : {}),
   });
+
+/** One record's calls by name for `act`, over the handler table `/api` serves, built on the first call. */
+function actCalls(api: RecordApi): (name: string, args: Record<string, unknown>, ctx: never) => Promise<Result<unknown>> {
+  let handlers: ReturnType<typeof handlersFor> | null = null;
+  return (name, args, ctx) => callRoute((handlers ??= handlersFor(api)), name, args, ctx);
+}
 
 /** Built once a Worker isolate, not once a record: every record on it is offered the same packs and use cases. */
 const CATALOGUE = seedCatalogue();

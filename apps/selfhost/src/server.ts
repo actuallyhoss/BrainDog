@@ -21,7 +21,7 @@ import { env } from 'node:process';
 
 import {
   grantAad, grantKey, openSealed,
-  engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, hintsOf, mentionsAttached, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveKeychain, servesKeys, servesSlash, servesKeychain, sessionOf, slashRecordMeter, withSession,
+  callRoute, ROUTES, engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, hintsOf, mentionsAttached, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveKeychain, servesKeys, servesSlash, servesKeychain, sessionOf, slashRecordMeter, withSession,
   type Handler, type IngestDoor, type KeysDoor, type SlashAskDoor, type KeychainDoor, type TxtLookup,
 } from '@braindog/host';
 import {
@@ -48,6 +48,7 @@ import {
   type MailNotice,
 } from '@braindog/host/auth';
 import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
+import { withCalls } from '@braindog/mcp';
 /* The oldest command this door still works with, one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
 import { slashTools } from '@braindog/mcp/slash-tools';
@@ -2845,13 +2846,19 @@ async function agent(req: IncomingMessage, url: string, method: string, headers:
   const over = await overLimit(site, { door: 'bearer', ctx: seen.ctx }, '', 'read');
   if (over !== null) return over;
   /* The session headers, then `_meta.session` over them key by key, both checked the same way. */
-  return serveMcp(new Request(url, { method, headers, body: bodyOf(req), duplex: 'half' }), site.api, withSession(seen.ctx, sessionOf(head.headers)), {
+  return serveMcp(new Request(url, { method, headers, body: bodyOf(req), duplex: 'half' }), withCalls(site.api, actCalls(site.api), () => ROUTES), withSession(seen.ctx, sessionOf(head.headers)), {
     session: (ctx, said) => withSession(ctx, hintsOf(said)),
     /* WHERE THIS PROCESS SERVES THE APP (`BRAINDOG_ORIGIN`), so a filed `propose` carries its `decide` link here. */
     origin: site.origin,
     /* AND ITS BUILD, as `serverInfo.version` and the `braindog-build` header, as the Worker says its own (W1-B). */
     ...(site.build === '' ? {} : { build: site.build }),
   });
+}
+
+/** One record's calls by name for the MCP's `act`, over the handler table `/api` serves, built on the first call (as the Worker's). */
+function actCalls(api: Parameters<typeof handlersFor>[0]): (name: string, args: Record<string, unknown>, ctx: never) => Promise<Result<unknown>> {
+  let handlers: ReturnType<typeof handlersFor> | null = null;
+  return (name, args, ctx) => callRoute((handlers ??= handlersFor(api)), name, args, ctx);
 }
 
 /**

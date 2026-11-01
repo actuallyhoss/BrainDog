@@ -6,7 +6,7 @@
  * The one exception is a host that did not answer, whose sentence is the plan's §1.7.
  */
 
-import type { Client } from '@braindog/client';
+import { CALL_TABLE, type Client } from '@braindog/client';
 import type { McpSurface } from '@braindog/mcp';
 import { refused, type Result } from '@braindog/ports';
 
@@ -156,6 +156,10 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
     metric: (args, ctx) => ask(ctx, 'metric', args),
     digestToday: (args, ctx) => ask(ctx, 'digestToday', args),
     ...later,
+    /* `act`'S CALLS, EACH SENT AS THE APP SENDS IT (`client.call`), and the table they are held to, the client's own. The
+       host and the record still decide every one; a name the host does not route is refused in the client's words. */
+    call: (name, args, ctx) => ask(ctx, name, args),
+    calls: () => CALL_TABLE,
     /* THE TOOLS RUN HERE, so the handshake and the tool list answer with the host down: not cut by his settings. */
     onMachine: true,
   };
