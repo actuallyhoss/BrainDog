@@ -518,4 +518,25 @@
       fill: CanvasText;
     }
   }
+
+  /* FIVE APPS ON A PHONE ARE ONE ROW THAT SCROLLS (UI pass 1 Nov), as a page's own tabs do: wrapped, they stood as three
+     rows of two, two and one, Cursor alone and centred under them, which read as a grid of buttons and not one choice. */
+  @media (width < 640px) {
+    .agent :global(.segmented[data-full][data-wrap]) {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+      padding-inline-end: var(--sp-4);
+      mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
+    }
+
+    .agent :global(.segmented[data-full][data-wrap]::-webkit-scrollbar) {
+      display: none;
+    }
+
+    .agent :global(.segmented[data-full][data-wrap] > .segment) {
+      flex: none;
+    }
+  }
 </style>

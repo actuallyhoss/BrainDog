@@ -477,7 +477,9 @@
        asking a question is drawn after the page, not here. -->
   <PageHead icon="decide" title={said('decide')} sentence={headLine} needs={cleared ? undefined : shaped?.sentence.needs || undefined}>
     {#snippet actions()}
-      {#if answerable}
+      <!-- NOT OVER A CLEARED PAGE (UI pass 1 Nov): with no line beside it the "⋯" stood alone on a row of its own above
+           "Nothing needs you", offering Select with nothing to select. -->
+      {#if answerable && !(cleared && !headLine)}
         <Menu label={WORDS.more} align="end">
           {#snippet trigger()}<span class="head-more"><Icon name="more" size="m" /><span class="dsr">{WORDS.more}</span></span>{/snippet}
           <!-- EACH ROW LEADS WITH ITS GLYPH, as every menu's does (VERIFY H47). -->

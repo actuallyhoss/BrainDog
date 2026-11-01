@@ -34,7 +34,7 @@ export const words = {
   you: 'You',
   dog: 'BrainDog',
   /** The field after the first answer, which adds to what was said. */
-  more: 'Tell it more, or correct anything',
+  more: 'Add more, or correct it',
   moreGo: 'Add this',
   /** BrainDog's reply to a later turn: what it added, or that it added nothing. */
   adds: (items: readonly string[]) => `That adds ${firstRun.and(items)}.`,

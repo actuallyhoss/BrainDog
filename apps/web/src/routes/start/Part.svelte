@@ -79,7 +79,8 @@
       {#if meta}<span class="part-meta" data-needs={part.state === 'waiting' ? '' : undefined}>{meta}</span>{/if}
       {@render toggle()}
     {/snippet}
-    {#if part.why.length > 0}<p class="part-why">{words.because(part.why)}</p>{/if}
+    <!-- NO "YOU SAID" LINE (UI pass 1 Nov): "from your words" at the card's head says it, and the phrase itself is beside
+         it twice already, in what was heard and on the build panel; three cards each said it again. -->
     {#if part.entries.length > 0}
       <ul class="entries" aria-label={firstRun.mineEntries}>
         {#each part.entries as e (e.key)}
@@ -123,14 +124,6 @@
   .part-meta[data-needs] {
     color: var(--red);
     font-weight: 500;
-  }
-
-  .part-why {
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: 20px;
-    overflow-wrap: anywhere;
   }
 
   .entries {

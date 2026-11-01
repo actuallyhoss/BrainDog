@@ -1144,6 +1144,8 @@
     font-size: var(--fs-head);
     font-weight: var(--fw-semi);
     line-height: var(--lh-head);
+    /* NO WORD LEFT ALONE ON THE LAST LINE (UI pass 1 Nov): at 390 "…for £14. Keep" broke before a lone "it?". */
+    text-wrap: pretty;
   }
 
   /* COMPACT, A QUESTION IS ITS LINE AND ITS BUTTONS, a step apart, with no by-line above it to sit close under. */
@@ -1524,6 +1526,7 @@
     grid-row: 1;
     grid-column: 2;
     margin: 0;
+    text-wrap: pretty;
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;

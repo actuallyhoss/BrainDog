@@ -303,6 +303,7 @@
   /* WHAT A PAGE WILL HOLD, under one nothing of theirs reaches: a whole sentence, so it wraps rather than cuts. */
   .more-pages {
     justify-self: start;
+    align-self: flex-start;
     padding: 0;
     border: 0;
     background: none;
