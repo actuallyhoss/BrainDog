@@ -487,14 +487,15 @@
     margin-inline: 0;
     gap: var(--sp-2);
     padding: var(--sp-3) var(--sp-4);
-    border: 1px solid var(--rule);
+    /* A WELL, AS ACCOUNTS' CARDS ARE (design pass, 1 Nov): no edge round a card on a tile. */
+    border: 0;
     border-radius: var(--r-pop);
     background: var(--tile-2);
     scroll-snap-align: start;
   }
 
   [data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row + .prop-row {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 0;
   }
 
   [data-money] .block-slot[data-source='metric.cash-by-account'] .prop-row > .prop-label {
