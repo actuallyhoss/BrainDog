@@ -108,6 +108,7 @@
   import NoRecord from './NoRecord.svelte';
   import Frame from './Frame.svelte';
   import Made from './Made.svelte';
+  import { assemble } from '$lib/start/assembling.ts';
   import { MADE_SAID, saidMade, saidMadeOf, type SaidMade } from '$lib/start/made.ts';
   import Making from './Making.svelte';
 
@@ -146,6 +147,8 @@
   let madeAddons = $state.raw<TradeOffer[]>([]);
   /* THE WORDS AND WHAT THEY BUILT (1 Nov), which the end has the model read once more for drafts on Today. */
   let madeSaid = $state.raw<SaidMade | null>(null);
+  /* `/start` IS A BRAINDOG ASSEMBLING for as long as it is open (`assembling.ts`). */
+  onMount(() => assemble());
   onMount(() => {
     /* A SET-UP BRAINDOG GOES TO TODAY (first hour audit, AH31): its address back at /start drew sign-up again over
        "This BrainDog is set up". Only the end of the run (`#made`), an agent's set-up (`?agent=1`) and "Or bring in a

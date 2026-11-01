@@ -72,7 +72,7 @@
     approve: 'It prints a link and six digits. Open the link, type the digits, and the terminal carries on.',
     /* THE MODEL READING THE WORDS ONCE MORE (1 Nov), and what it found: nothing is added, it waits on Today. */
     drafting: 'Reading what you wrote once more for anything else to keep.',
-    drafted: (n: number) => (n === 1 ? 'It found one more thing in what you wrote. It waits on Today for your yes.' : `It found ${n} more things in what you wrote. They wait on Today for your yes.`),
+    drafted: (n: number) => (n === 1 ? 'One more thing from what you wrote waits on Today for your yes.' : `${n} more things from what you wrote wait on Today for your yes.`),
   } as const;
 
   /* THE MODEL READS THE WORDS ONCE MORE, AS THE OWNER NOW (1 Nov): begun here, drawn on Today as drafts. Nothing waits
@@ -97,8 +97,33 @@
     });
   });
   const drafting = $derived(firstDrafts.now !== null && firstDrafts.now.base === apiBase() ? firstDrafts.now : null);
-  /** The line under the lede while the model reads and once it found something; empty, and its place held, otherwise. */
-  const draftLine = $derived(drafting === null ? null : drafting.state === 'reading' ? words.drafting : drafting.found > 0 ? words.drafted(drafting.found) : '');
+  /*
+   * WHAT WAITS ON TODAY, COUNTED AS TODAY WILL DRAW IT: Tell's own reading of the words on this device, read against the
+   * modules' lists, merged with what the model found (`mergeDrafts`), so "It found 3" is the card's three, never just the
+   * model's. Worked out once the model has answered, or at once where there is none.
+   */
+  let waiting = $state<number | null>(null);
+  $effect(() => {
+    const k = drafting;
+    const boot = page.data.live === true ? page.data.index : null;
+    if (k === null || k.state === 'reading' || boot === null) return;
+    let gone = false;
+    void Promise.all([import('$lib/start/first-drafts.ts'), import('$lib/tell/read.ts')]).then(([d, { tellRead }]) => {
+      if (gone) return;
+      const today = k.begin.today;
+      const lists = d.tellListsOf(d.modulesHeld(k.begin.registers), today);
+      const opts = { lists, today, currency: k.begin.currency, me: k.begin.me };
+      const device = d.draftsFromTold(
+        d.clausesOf(k.begin.said).map((c) => ({ said: c.said, told: tellRead(c.text, opts) })),
+        lists,
+        { built: k.begin.built, me: k.begin.me },
+      );
+      waiting = d.mergeDrafts(k.drafts, device).filter((x) => !k.gone.includes(x.key)).length;
+    });
+    return () => (gone = true);
+  });
+  /** The line under the lede while the words are read and once something waits; empty, and its place held, otherwise. */
+  const draftLine = $derived(drafting === null ? null : drafting.state === 'reading' || waiting === null ? words.drafting : waiting > 0 ? words.drafted(waiting) : '');
 
   /* ENTER GOES TO TODAY (1 Nov, keyboard first): from anywhere on the screen that is not a control of its own. */
   function enterToday(e: KeyboardEvent): void {

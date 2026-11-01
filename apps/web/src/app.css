@@ -175,9 +175,12 @@
   }
   /* A BRAINDOG ASSEMBLING (`$lib/motion`): anything marked `data-forming` rises into place as it is drawn, on the
      spring, siblings one after another `--form-gap` apart (by their place among them, or by a `--form-i` a host sets,
-     which `forming(i)` from `$lib/motion` writes). Only the sign-up's first moments mark what they build, so a returning
-     reader's screen never assembles. Under reduced motion the keyframe ends at once (`a11y.css`): simply there. */
-  [data-forming] {
+     which `forming(i)` from `$lib/motion` writes). ONLY UNDER `data-assembling` on the root (`$lib/start/assembling.ts`):
+     the sign-up and `/start` while open, and the first Today after a sign-up for a moment, so a returning reader's
+     project cards and Tell lines (marked `data-forming` for good, with `in:` transitions of their own) never rise in on
+     an open, and an entry added later is not animated twice. Under reduced motion the keyframe ends at once
+     (`a11y.css`): simply there. */
+  [data-assembling] [data-forming] {
     animation: form-in var(--form-in) var(--ease-spring) calc(var(--form-i, 0) * var(--form-gap)) backwards;
   }
 

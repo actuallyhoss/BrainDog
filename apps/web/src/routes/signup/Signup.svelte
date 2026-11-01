@@ -112,6 +112,7 @@
   } from '$lib/signup.ts';
   import { MADE_ADDONS, heardOf, offerOf, readCatalogueOffer, tradeAddons, type CatalogueOffer } from '$lib/start/offer.ts';
   import { MADE_SAID, saidMade } from '$lib/start/made.ts';
+  import { assemble } from '$lib/start/assembling.ts';
   import { becameShown, filledBy, placesOf, proposeFirst, railPlaces, type HeardLine, type Proposal } from '$lib/start/propose.ts';
   import { readAsks } from '$lib/start/ask.ts';
   import { currencyWord } from '$lib/start/place-currency.ts';
@@ -811,6 +812,9 @@
     gone = true;
     dropHuman();
   });
+
+  /* THE SIGN-UP IS A BRAINDOG ASSEMBLING for as long as it is open (`assembling.ts`): what it builds rises into place. */
+  onMount(() => assemble());
 
   onMount(() => {
     void readCatalogueOffer().then((c) => (cat = c));

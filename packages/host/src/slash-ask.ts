@@ -603,7 +603,8 @@ async function pattern<C>(body: Record<string, unknown>, door: SlashAskDoor<C>, 
  * which the first run reads as "use the rules".
  */
 async function firstRun<C>(route: 'setup' | 'mapping', body: Record<string, unknown>, door: SlashAskDoor<C>, ctx: C): Promise<Response> {
-  const takes = route === 'setup' ? ['said', 'offer', 'today'] : ['file', 'columns', 'sample', 'lists'];
+  /* `first` IS THE OWNER'S SIGN-UP WORDS, read once on the house (`FIRST_WORDS` in `packages/slash/src/propose.ts`). */
+  const takes = route === 'setup' ? ['said', 'offer', 'today', 'first'] : ['file', 'columns', 'sample', 'lists'];
   const stray = Object.keys(body).find((k) => !takes.includes(k));
   if (stray !== undefined)
     return refusal(422, { code: 'FIELD_UNKNOWN', fix: `${stray} is not something this call takes. It takes ${takes.join(', ')}.`, at: stray, allowed: takes });

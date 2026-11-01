@@ -50,6 +50,8 @@
     notThis: 'Not this',
     cancel: 'Cancel',
     changeLabel: (list: string) => `What to call it in ${list}`,
+    /* THE ONE THING A DRAFT STILL NEEDS, asked in place (Tell's own words for it, "the day it is due"). */
+    needs: (what: string) => `It needs ${what}`,
     kept: (title: string, list: string) => `Kept “${title}” in ${list}`,
     keptAll: (n: number) => `Kept ${n} things from what you wrote`,
     raced: 'That did not reach your BrainDog. It is back on the card.',
@@ -64,6 +66,7 @@
      what the card opens with while the model reads. Its code and the reader come after the card, as Tell's own do. */
   let rules = $state.raw<FirstDraft[]>([]);
   let merge = $state.raw<((m: readonly FirstDraft[], r: readonly FirstDraft[]) => FirstDraft[]) | null>(null);
+  let fill = $state.raw<((d: FirstDraft, value: string) => FirstDraft) | null>(null);
   $effect(() => {
     const said = kept?.begin.said ?? '';
     const built = kept?.begin.built ?? [];
@@ -74,6 +77,7 @@
     void Promise.all([import('$lib/tell/read.ts'), import('./first-drafts.ts')]).then(([{ tellRead }, d]) => {
       if (gone) return;
       merge = d.mergeDrafts;
+      fill = d.filled;
       rules = d.draftsFromTold(
         d.clausesOf(said).map((c) => ({ said: c.said, told: tellRead(c.text, opts) })),
         opts.lists,
@@ -102,6 +106,21 @@
   $effect(() => {
     if (kept !== null && !reading && merge !== null && drafts.length === 0) closeDrafts(base);
   });
+
+  /** What was typed for a draft's one missing field, by key. */
+  let needVals = $state<Record<string, string>>({});
+  /** The drafts Keep all keeps: every one that needs nothing more. */
+  const ready = $derived(drafts.filter((d) => d.needs === undefined));
+
+  /** A draft with what it needed, kept; with nothing typed yet, its field takes the focus. */
+  function keepNeeded(d: FirstDraft): void {
+    const next = fill === null ? d : fill(d, needVals[d.key] ?? '');
+    if (next.needs !== undefined) {
+      list?.querySelector<HTMLInputElement>(`[data-draft="${CSS.escape(d.key)}"] .draft-needs input`)?.focus();
+      return;
+    }
+    void keep([next]);
+  }
 
   let busy = $state(false);
   let editing = $state<string | null>(null);
@@ -151,6 +170,13 @@
         void reread();
         void invalidateAll();
       },
+      /* THE TOAST'S UNDO TAKES THEM BACK OUT OF THE RECORD AND PUTS THE DRAFTS BACK ON THE CARD: the record's undo reads
+         the screen again through this, and only once it has put them back. */
+      reread: () => {
+        restoreDrafts(base, keys);
+        void invalidateAll();
+        return reread();
+      },
     });
     busy = false;
     focusNext();
@@ -175,9 +201,15 @@
   /** The words as changed, kept as the draft's own, then kept in the record. */
   async function keepChanged(d: FirstDraft): Promise<void> {
     const { retitled } = await import('./first-drafts.ts');
-    const next = retitled(d, editText);
-    if (next !== d) edits = { ...edits, [d.key]: next };
-    await keep([next]);
+    const named = retitled(d, editText);
+    if (named !== d) edits = { ...edits, [d.key]: named };
+    /* STILL NEEDING ITS ONE FIELD: the new words are kept on the draft, and the field is asked for before it goes in. */
+    if (named.needs !== undefined) {
+      editing = null;
+      keepNeeded(named);
+      return;
+    }
+    await keep([named]);
   }
 
   function editKey(e: KeyboardEvent, d: FirstDraft): void {
@@ -193,11 +225,11 @@
 </script>
 
 {#snippet keepAllAction()}
-  <Button size="sm" weight="primary" disabled={busy} onclick={() => void keep(drafts)}>{say.keepAll(drafts.length)}</Button>
+  <Button size="sm" weight="primary" disabled={busy} onclick={() => void keep(ready)}>{say.keepAll(ready.length)}</Button>
 {/snippet}
 
 {#if reading || drafts.length > 0}
-  <Tile icon="slash" title={say.title} class="first-drafts" data-forming="drafts" data-state={reading ? 'reading' : 'ready'} actions={drafts.length > 1 ? keepAllAction : undefined}>
+  <Tile icon="slash" title={say.title} class="first-drafts" data-forming="drafts" data-state={reading ? 'reading' : 'ready'} actions={ready.length > 1 ? keepAllAction : undefined}>
     {#if drafts.length === 0}
       <p class="drafts-line" role="status">{say.reading}</p>
       <div class="bar" aria-hidden="true"><span class="bar-fill"></span></div>
@@ -226,13 +258,37 @@
                       class="draft-amount num"><Money minor={d.amount.minor} currency={d.amount.currency} home={d.amount.currency} /></span
                     >{/if}{/if}
               </p>
+              {#if d.needs}
+                {@const n = d.needs}
+                <label class="draft-needs">
+                  <span class="draft-needs-say">{say.needs(n.label)}</span>
+                  <span class="field"
+                    ><input
+                      class="field-input"
+                      type={n.type === 'day' ? 'date' : n.type === 'number' ? 'number' : 'text'}
+                      bind:value={needVals[d.key]}
+                      onkeydown={(e) => {
+                        if (e.key === 'Enter' && !e.isComposing) {
+                          e.preventDefault();
+                          keepNeeded(d);
+                        }
+                      }}
+                    /></span
+                  >
+                </label>
+              {/if}
             </div>
             <div class="draft-acts">
               {#if editing === d.key}
                 <Button size="sm" weight="primary" disabled={busy} onclick={() => void keepChanged(d)}>{say.keep}</Button>
                 <Button size="sm" weight="bare" onclick={() => (editing = null)}>{say.cancel}</Button>
               {:else}
-                <Button size="sm" weight={drafts.length > 1 ? 'quiet' : 'primary'} disabled={busy} onclick={() => void keep([d])}>{say.keep}</Button>
+                <Button
+                  size="sm"
+                  weight={drafts.length > 1 ? 'quiet' : 'primary'}
+                  disabled={busy || (d.needs !== undefined && (needVals[d.key] ?? '').trim() === '')}
+                  onclick={() => (d.needs === undefined ? void keep([d]) : keepNeeded(d))}>{say.keep}</Button
+                >
                 <Button size="sm" weight="quiet" onclick={() => change(d)}>{say.change}</Button>
                 <Button size="sm" weight="bare" onclick={() => letGo(d)}>{say.notThis}</Button>
               {/if}
@@ -281,9 +337,6 @@
       animation: drafts-fill 9s cubic-bezier(0.15, 0.6, 0.3, 1) both;
     }
 
-    .draft {
-      animation: drafts-in var(--d-page) var(--ease-out) both;
-    }
   }
 
   @keyframes drafts-fill {
@@ -292,12 +345,6 @@
     }
     to {
       transform: scaleX(0.92);
-    }
-  }
-
-  @keyframes drafts-in {
-    from {
-      opacity: 0;
     }
   }
 
@@ -349,6 +396,19 @@
     font-weight: 500;
     line-height: 22px;
     overflow-wrap: anywhere;
+  }
+
+  .draft-needs {
+    display: grid;
+    gap: 4px;
+    margin-block: 4px;
+    max-inline-size: 16rem;
+  }
+
+  .draft-needs-say {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .draft-where {
