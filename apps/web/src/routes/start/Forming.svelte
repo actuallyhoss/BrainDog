@@ -344,6 +344,12 @@
   }
 
   @media (pointer: coarse) {
+    /* UNDER A THUMB, PUT BACK IS AS TALL AS THE ANSWERS TO TAP BESIDE IT (44, Look B's phone target). */
+    .back {
+      min-block-size: var(--tap, 44px);
+      padding-inline: var(--sp-3);
+    }
+
     .out {
       inline-size: 44px;
       block-size: 44px;
