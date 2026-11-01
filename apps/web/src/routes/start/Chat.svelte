@@ -188,7 +188,7 @@
                   {@const on = picked.includes(c.label.toLocaleLowerCase())}
                   <button
                     type="button"
-                    class="tap"
+                    class="pick"
                     data-suggested={current.suggested === c.value ? '' : undefined}
                     aria-pressed={current.many ? on : undefined}
                     disabled={busy}
@@ -363,7 +363,7 @@
 
   /* PLAIN BORDERED BUTTONS (Look B): the tile's own fill, a firm edge, 40 tall (44 under a thumb). A tap fills it; a
      chosen one (several may be) takes the ink edge and a check. */
-  .tap {
+  .pick {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
@@ -382,44 +382,44 @@
       border-color var(--d-press) var(--ease-standard);
   }
 
-  .tap:hover {
+  .pick:hover {
     background: var(--hover);
     border-color: var(--ink-3);
   }
 
-  .tap:active {
+  .pick:active {
     background: var(--tile-2);
   }
 
-  .tap[aria-pressed='true'],
-  .tap[data-suggested] {
+  .pick[aria-pressed='true'],
+  .pick[data-suggested] {
     border-color: var(--ink);
   }
 
-  .tap[aria-pressed='true'] {
+  .pick[aria-pressed='true'] {
     box-shadow: inset 0 0 0 1px var(--ink);
   }
 
-  .tap:disabled {
+  .pick:disabled {
     cursor: default;
     opacity: 0.6;
   }
 
   @media (pointer: coarse) {
-    .tap {
+    .pick {
       min-block-size: var(--tap, 44px);
     }
   }
 
   /* THE TAPS COME IN ONE AFTER ANOTHER, 30 APART, all in under 150ms. */
   @media (prefers-reduced-motion: no-preference) {
-    .asking .tap {
-      animation: tap-in var(--d-swap) var(--ease-emphasis) both;
+    .asking .pick {
+      animation: pick-in var(--d-swap) var(--ease-emphasis) both;
       animation-delay: calc(min(var(--i), 3) * 30ms + 120ms);
     }
   }
 
-  @keyframes tap-in {
+  @keyframes pick-in {
     from {
       opacity: 0;
       translate: 0 4px;
@@ -541,7 +541,7 @@
   }
 
   @media (forced-colors: active) {
-    .tap,
+    .pick,
     .box,
     .bubble {
       border: 1px solid CanvasText;

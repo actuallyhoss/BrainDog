@@ -57,8 +57,9 @@
     addons?: readonly TradeOffer[] | undefined;
     /** The words the BrainDog was made from and what they built: read once more by the model, for drafts on Today. */
     said?: SaidMade | null | undefined;
+    /** The AI tools the person named in the conversation ("Claude", "Cursor"): the first one this screen connects is chosen. */
+    tools?: readonly string[] | undefined;
   } = $props();
-  const madeLine = $derived(firstWords.made(made.places ?? []));
 
   /* This screen's own words for the connect steps; the titles are `firstWords`. */
   const words = {
@@ -172,7 +173,9 @@
 
   /* CLAUDE FIRST AND CHOSEN. */
   let chosenId = $state<string | null>(null);
-  const chosen = $derived(apps.find((a) => a.id === chosenId) ?? apps[0]);
+  /* OR THE FIRST APP THEY SAID THEY USE, where they named one in the conversation (1 Nov). */
+  const named = $derived(apps.find((a) => (made.tools ?? []).some((t) => t.trim().toLowerCase() === a.name.toLowerCase()))?.id ?? null);
+  const chosen = $derived(apps.find((a) => a.id === (chosenId ?? named)) ?? apps[0]);
 
   /** An app's steps: install, then connect, where it needs the command line first; else its one place to paste. */
   const stepsOf = (a: AppLine): { said: string; line: string }[] =>
@@ -225,7 +228,7 @@
 <section class="made" aria-labelledby="made-h">
   <div class="made-tile" data-forming="made-first">
     <header class="head">
-      <p class="made-line">{madeLine}</p>
+      <!-- TITLE FIRST, ONE LINE UNDER IT (T40): "Your BrainDog is made, with …" over it was a third level before the press. -->
       <h1 class="entry-title" id="made-h" tabindex="-1" bind:this={heading}>{firstWords.title}</h1>
       <p class="entry-lede">{firstWords.sub(lists)}</p>
       <!-- NOTHING TO SAY IS NO LINE (AP11): the held line left a hole over Go to Today on the common screen. -->
@@ -397,16 +400,6 @@
     font-size: var(--fs-body);
     font-weight: 600;
     line-height: 22px;
-  }
-
-  /* WHAT WAS MADE, over the title in the body size and ink, so the first thing read is the record, not a command. */
-  .made-line {
-    margin: 0 0 var(--sp-2);
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 500;
-    line-height: 22px;
-    text-wrap: pretty;
   }
 
   /* THE APP'S MARK BEFORE ITS NAME in the segment, 16 at the label's ink, or its maker's colour. */

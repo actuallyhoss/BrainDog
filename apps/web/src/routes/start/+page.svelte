@@ -992,7 +992,7 @@
         </div>
       </section>
     {:else if made}
-      <Made modules={madeModules} places={madePlaces} addons={madeAddons} said={madeSaid} />
+      <Made modules={madeModules} places={madePlaces} addons={madeAddons} said={madeSaid} tools={chatTurns.filter((t) => t.ask.topic === 'tools' && t.answer !== null).flatMap((t) => (t.answer ?? '').split(/,\s*|\s+and\s+/u))} />
     {:else if watched}
       <!-- AFTER THE PRESS: the record being made, tile by tile. Today opens when the call answers; where the record
            refused a part, its tile says why and the way back is one button. -->

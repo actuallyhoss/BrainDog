@@ -329,7 +329,9 @@ export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
 function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): ChatAsk | null {
   if (!m) return null;
   const topic = m.about as Topic;
-  if (asked.has(topic) || settled(topic, w)) return null;
+  /* THE MODEL READ THE WHOLE CONVERSATION, so its question stands over the rules' guesses at what is settled; only a
+     topic asked already, a name known and a currency named are never asked again. */
+  if (asked.has(topic) || ((topic === 'name' || topic === 'currency' || topic === 'closest') && settled(topic, w))) return null;
   const question = m.question.trim();
   if (!fits(question, QUESTION_MOST)) return null;
   /* A CURRENCY IS A CODE THIS DEVICE KNOWS: the model's words, the rules' taps. */
