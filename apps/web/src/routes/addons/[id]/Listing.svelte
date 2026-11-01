@@ -576,7 +576,7 @@
     if (!c) return;
     const out = await c.uninstallPack({ id }).catch(() => null);
     if (out?.ok) toasts.push(copy.uninstalled(title), { intent: 'good' });
-    else toasts.push((out && !out.ok ? out.refusal?.fix : null) ?? copy.writeRaced, { intent: 'warn' });
+    else toasts.push((out && !out.ok && 'refusal' in out ? out.refusal.fix : null) ?? copy.writeRaced, { intent: 'warn' });
     await reread();
     await railAgain();
   }

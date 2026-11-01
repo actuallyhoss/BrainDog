@@ -652,6 +652,8 @@
       {/if}
       <p class="turn-said" role="status">{turnSaid}</p>
       {#if waits}<p class="waits">{waits}</p>{/if}
+      <!-- BRAINDOG'S OWN PARTS ARE ALWAYS ON, AND THEIR PAGES ARE HIS TO HIDE: one line, and the way to Navigation. -->
+      {#if core}<p class="waits">{market.about.alwaysOn} <a class="tap" href={at('/settings/navigation')}>{market.about.hidePages}</a></p>{/if}
       {#if installed && (openAt || !core)}
         <div class="lead-do">
           {#if openAt}<Button size="sm" href={at(openAt)}>{market.about.open(name)}</Button>{/if}
