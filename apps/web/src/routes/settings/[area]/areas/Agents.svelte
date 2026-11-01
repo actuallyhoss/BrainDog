@@ -61,7 +61,10 @@
   import { wrote } from '$lib/record/settings-write.ts';
   import { hostedHere } from '../../billing.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
-  import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed/packs';
+  /* THE AGENTS ADD-ON'S DECLARATION IS ASKED FOR ONLY WHEN IT IS OFFERED (live check, 1 Nov): imported here it rode in
+     the area's chunk, which every visit waited on before anything was drawn. */
+  type SeedPacks = typeof import('@braindog/seed/packs');
+  let seedPacks: SeedPacks | null = null;
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { listenFor } from '$lib/agents/listen.ts';
@@ -155,10 +158,15 @@
    */
   async function listed(): Promise<Result<Held>> {
     const c = clientOf();
-    const devices = await c.listDevices();
+    /* ASKED TOGETHER, NOT ONE AFTER ANOTHER (live check, 1 Nov: the area stood blank for 4 to 6 seconds while five
+       reads went out in turn). His settings rows are among them; a host older than them answers no such method. */
+    const [devices, keys, runs, profiles] = await Promise.all([
+      c.listDevices(),
+      c.listTokens(),
+      c.list({ register: 'session', limit: RUNS_READ, order: [{ field: 'last_seen', dir: 'desc' }] }),
+      c.agentProfiles().catch(() => null),
+    ]);
     if (!devices.ok) return devices;
-    const keys = await c.listTokens();
-    const runs = await c.list({ register: 'session', limit: RUNS_READ, order: [{ field: 'last_seen', dir: 'desc' }] });
     /* THE PROJECTS A RUN WAS PLACED IN, by name, so a row says "on Kiln" and never its ref. The list is read off the
        refs the runs hold (`<list>#<n>`), through the one reader of places (`scope-move.ts`); one it cannot read leaves
        the row with no project, never a refusal. */
@@ -179,16 +187,14 @@
         }
       }
     let places: Place[] | null = null;
-    for (const list of lists) {
-      const got = await placesIn(apiBase(), list).catch(() => null);
+    const gotAll = await Promise.all([...lists].map((list) => placesIn(apiBase(), list).catch(() => null)));
+    for (const got of gotAll) {
       if (got !== null) places = [...(places ?? []), ...got];
       for (const p of got ?? []) {
         projects.set(p.ref, p);
         projects.set(p.spoken, p);
       }
     }
-    /* HIS SETTINGS ROWS. A host older than them answers no such method, and the screen draws what it drew before. */
-    const profiles = await c.agentProfiles().catch(() => null);
     const presence = new Map<number, RunPresence>();
     /* THE RECORD'S CLOCK (`recordNow`), so "3 min ago" is the record's and not this browser's. */
     const now = recordNow();
@@ -203,10 +209,11 @@
       profiles: profiles !== null && profiles.ok ? (profiles.value as unknown as ProfileView[]) : null,
       places,
     };
-    /* THE OFFER IS ASKED INSIDE THE READ, so the screen is not drawn while it is still out (below). */
+    /* THE OFFER IS ASKED ONCE THE LIST IS IN, NOT BEFORE IT IS DRAWN: `offerPack` holds the screen's own mark
+       (`opened`/`closed`) while it is out, so the screen still says it is not done, and the agents draw meanwhile. */
     if (!offerAsked && connected(value.machines, value.tokens, value.runs).some((r) => r.live && r.machine?.status !== 'pending')) {
       offerAsked = true;
-      await offerPack(c);
+      void offerPack(c);
     }
     return { ok: true, value };
   }
@@ -307,6 +314,19 @@
   /* ONE APPROVAL OF THE SIX DIGITS over this screen's own client, made when first asked; a refusal keeps the code
      typed, and an approval reads the list again (`CodeForm.svelte`). */
   const approveCode = (typed: string) => approverOf(clientOf())(typed);
+
+  /**
+   * HOW FAR AN AGENT THE PERMISSIONS PANEL NAMES MAY GO, read off the same rows this page draws (live check, 1 Nov): the
+   * panel said Cursor asked before every change while its row said Write. The ladder names an agent as the record knows
+   * it ("Cursor", or a key's own name), so a row is found by its name, or by the agent's name its own starts with.
+   */
+  const levelOf = (said: string): 'write' | 'propose' | 'read' | null => {
+    const low = said.trim().toLowerCase();
+    const row =
+      agents.find((a) => a.key !== 'default' && a.name.toLowerCase() === low) ??
+      agents.find((a) => a.key.startsWith('kind:') && (low.startsWith(`${a.name.toLowerCase()} `) || low === (a.kind ?? '')));
+    return row?.may ?? null;
+  };
 
   /* ── the page's shape (UI pass 1 Nov): his agents and the owner's switches lead; the rest opens in a side panel ── */
 
@@ -541,7 +561,8 @@
   let offerSaid = $state('');
 
   const packName = (kind: 'register' | 'page' | 'metric', id: string): string => {
-    const named = kind === 'register' ? AGENTS_PACK.registers[id]?.name : kind === 'metric' ? AGENTS_PACK.metrics[id]?.name : AGENTS_PACK.pages[id]?.title;
+    const pack = seedPacks?.AGENTS_PACK;
+    const named = !pack ? undefined : kind === 'register' ? pack.registers[id]?.name : kind === 'metric' ? pack.metrics[id]?.name : pack.pages[id]?.title;
     return typeof named === 'string' && !named.includes('{{') ? named : id.charAt(0).toUpperCase() + id.slice(1);
   };
 
@@ -551,12 +572,13 @@
 
   async function offerPack(c: ReturnType<typeof createClient>) {
     const busy = opened();
-    const packs = await c.packs();
-    if (!packs.ok || packs.value.some((p) => p.id === AGENTS_PACK.manifest.id)) {
+    const [packs, seed] = await Promise.all([c.packs(), seedPacks ? Promise.resolve(seedPacks) : import('@braindog/seed/packs').catch(() => null)]);
+    seedPacks = seed;
+    if (seed === null || !packs.ok || packs.value.some((p) => p.id === seed.AGENTS_PACK.manifest.id)) {
       closed(true, busy);
       return;
     }
-    const planned = await c.planPack({ doc: agentsPackDocument(), source: { kind: 'local' } });
+    const planned = await c.planPack({ doc: seed.agentsPackDocument(), source: { kind: 'local' } });
     closed(true, busy);
     offerSaid = '';
     const diff = planned.ok ? (planned.value as { diff?: { calls_out?: unknown; approve?: unknown } }).diff : undefined;
@@ -566,10 +588,10 @@
   }
 
   async function installOffer() {
-    if (!offer || installing) return;
+    if (!offer || installing || seedPacks === null) return;
     installing = true;
     const busy = opened();
-    const out = wrote(await clientOf().installPack({ doc: agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash, ...(offerApprove.length > 0 ? { approve: offerApprove } : {}) }));
+    const out = wrote(await clientOf().installPack({ doc: seedPacks.agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash, ...(offerApprove.length > 0 ? { approve: offerApprove } : {}) }));
     closed(true, busy);
     installing = false;
     if (out.ok) {
@@ -838,7 +860,7 @@
   <!-- HOW FAR EACH AGENT IS TRUSTED ON ITS OWN (`TrustRows`), in its panel; the panel's title names it, so the tile's
        own heading is not drawn twice. -->
   <Sheet bind:open={trustOpen} title={words.trust} subtitle={words.trustLine}>
-    <div class="flat flat-headless"><TrustRows /></div>
+    <div class="flat flat-headless"><TrustRows {levelOf} /></div>
   </Sheet>
 
   <!-- CONNECT AN AGENT is the first tile's one primary; the sheet it opens is a chunk of its own, asked for on the first

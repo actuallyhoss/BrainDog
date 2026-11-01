@@ -71,7 +71,19 @@ const kindSaid = (who: string, k: Kind, now: number): string => {
  * Every line of the ladder, in the record's order: agents oldest first, and each one's kinds by their words. An agent
  * with no rung yet is one line, since everything it does asks.
  */
-export function trustLines(standing: TrustStanding, now: number, plain?: (i: number) => boolean): TrustLine[] {
+/**
+ * HOW FAR AN AGENT MAY GO, BY ITS SETTINGS ROW (Settings > Agents, `lib/agents/profile.ts`), so a line here and the
+ * level the page draws beside the agent are one fact (live check, 1 Nov: Permissions said Cursor "asks before every
+ * change" over a page that drew Cursor at Write). Without it, an agent with no rung climbed asks, as before.
+ */
+export type LevelOf = (agent: string) => 'write' | 'propose' | 'read' | null;
+
+const NO_RUNG: Record<'write' | 'read', string> = {
+  write: 'makes changes itself; money, keys and deletes still wait',
+  read: 'changes nothing',
+};
+
+export function trustLines(standing: TrustStanding, now: number, plain?: (i: number) => boolean, level?: LevelOf): TrustLine[] {
   const alike = new Map<string, number>();
   for (const a of standing.agents) alike.set(fold(a.agent), (alike.get(fold(a.agent)) ?? 0) + 1);
   const out: TrustLine[] = [];
@@ -80,7 +92,9 @@ export function trustLines(standing: TrustStanding, now: number, plain?: (i: num
     /* The day sits between commas, so the sentence reads on past it. */
     const who = twice ? `${a.agent}, connected ${dayOf(a.connected!, now)},` : a.agent;
     if (a.kinds.length === 0) {
-      out.push({ key: `${i}`, text: `${who} asks before every change`, back: false, why: null, take: null });
+      const at = level?.(a.agent) ?? null;
+      const text = at === 'write' || at === 'read' ? `${who} ${NO_RUNG[at]}` : `${who} asks before every change`;
+      out.push({ key: `${i}`, text, back: false, why: null, take: null });
       return;
     }
     a.kinds.forEach((k, j) => {
@@ -93,7 +107,12 @@ export function trustLines(standing: TrustStanding, now: number, plain?: (i: num
   /* EVERY AGENT THAT ASKS BEFORE EVERY CHANGE IS ONE LINE, where `plain` says nothing more is said under it (UI audit
      of 22 October, 11): five keys made one line each, "… asks before every change", five times. The line stands where
      the first of them stood, keyed by it, so whatever follows that agent still follows the line. */
-  const asks = standing.agents.map((a, i) => (a.kinds.length === 0 && plain(i) ? i : -1)).filter((i) => i >= 0);
+  const asks = standing.agents
+    .map((a, i) => {
+      const at = level?.(a.agent) ?? null;
+      return a.kinds.length === 0 && at !== 'write' && at !== 'read' && plain(i) ? i : -1;
+    })
+    .filter((i) => i >= 0);
   if (asks.length < 2) return out;
   const folded = new Set(asks.slice(1).map(String));
   /* IN A LIST THE DAY GOES IN BRACKETS: the commas round it in a sentence of its own read as ",," once the names were

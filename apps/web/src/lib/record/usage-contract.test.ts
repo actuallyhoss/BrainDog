@@ -125,7 +125,7 @@ test("THE READER DRAWS THE DIRECTORY'S OWN ANSWER: the plan line and the Slash l
     [['the-studio · Kiln', 2], [words.everywhereUsage, 1]],
   );
   assert.equal(side?.plan, 'Free');
-  assert.equal(side?.slash, 'Slash was not asked anything this month.');
+  assert.equal(side?.slash, 'Slash has no questions counted this month.');
 });
 
 test('THE WHOLE READ, OVER THE WIRE: the Directory\'s answer from `/account/usage` draws a month, never a fault', async () => {

@@ -78,7 +78,7 @@
 {#if waiting.length}
   <Tile icon="lock" title={w.askTitle} count={waiting.length > 1 ? waiting.length : undefined} data-part="key-asks">
     <ul class="ledger asks">
-      {#each waiting as a (a.id)}
+      {#each waiting as a, i (a.id)}
         <li id={`ask-${a.id}`} data-intent="warn" data-needs data-focus={focus === a.id ? '' : undefined}>
           <div class="ask">
             <span class="ask-mark"><IconWell name="key" size="l" /></span>
@@ -89,7 +89,8 @@
             <span class="ask-when">{since(a.expires, now)}</span>
             {#if acts}
               <span class="ask-verbs">
-                <Button size="sm" weight="primary" disabled={busy !== null} onclick={() => void answer(a, 'once')}>{w.allowOnce}</Button>
+                <!-- ONE RED ON THE SCREEN: the first request's Allow once; any under it answers in ink. -->
+                <Button size="sm" weight={i === 0 ? 'primary' : 'ink'} disabled={busy !== null} onclick={() => void answer(a, 'once')}>{w.allowOnce}</Button>
                 <Button size="sm" disabled={busy !== null} onclick={() => void answer(a, 'always')}>{w.allowAlways}</Button>
                 <Button size="sm" weight="quiet" disabled={busy !== null} onclick={() => void answer(a, 'deny')}>{w.deny}</Button>
               </span>

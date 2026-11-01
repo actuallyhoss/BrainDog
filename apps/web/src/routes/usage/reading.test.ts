@@ -51,7 +51,7 @@ test('the per-day array keeps the month up to today, drops days with nothing, an
 
 test('the sentence names the busiest meter, and only waiting actions are the red phrase', () => {
   const calm = sentenceOf(usageFromLedger(ledger(100), '2026-09', '2026-09-15'));
-  assert.deepEqual(calm, { text: 'Everything ran, and the busiest meter is at 10%.' });
+  assert.deepEqual(calm, { text: "Well within the month's allowance; the busiest meter is at 10%." });
 
   const near = sentenceOf(usageFromLedger(ledger(850), '2026-09', '2026-09-15'));
   assert.equal(near?.text, "Runs is at 85% of the month's allowance; at the limit, actions wait until 1 October.");

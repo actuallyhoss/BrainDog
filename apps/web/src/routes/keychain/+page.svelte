@@ -748,7 +748,9 @@
          while a request waiting for its digits holds the screen's one primary. At a desk it is the list's own pill. -->
     {#if acts && index.kind === 'held'}
       <span class="add-phone">
-        <Button weight={waiting.length ? 'glass' : 'primary'} aria-label={tileWords.addKey} title={tileWords.addKey} onclick={openAdd}>
+        <!-- INK, NEVER THE RED (live check, 1 Nov): with Unlock, an empty list's Add a key or a request's Allow once on the
+             screen, the circle made two red buttons on a phone. The screen's one red is the one that needs him. -->
+        <Button weight={waiting.length ? 'glass' : 'ink'} aria-label={tileWords.addKey} title={tileWords.addKey} onclick={openAdd}>
           <Icon name="plus" size="l" />
         </Button>
       </span>
@@ -1863,6 +1865,23 @@
 
     .code-row :global(.btn) {
       flex: 1 1 auto;
+    }
+  }
+
+  /* ON A PHONE THE SENTENCE TAKES ITS OWN LINE (G24): "6 keys. 3 have no value yet." wrapped in a third of the row beside
+     Keys | List | +; the views and the circle stand under it, at the row's end. */
+  @media (width < 640px) {
+    :global(.page-head .head-main:has(.add-phone)) {
+      flex-wrap: wrap;
+      row-gap: var(--sp-2);
+    }
+
+    :global(.page-head .head-main:has(.add-phone) > :first-child) {
+      flex: 1 1 100%;
+    }
+
+    :global(.page-head .head-main:has(.add-phone) > .head-actions) {
+      margin-inline-start: auto;
     }
   }
 </style>

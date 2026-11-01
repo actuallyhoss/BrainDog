@@ -29,11 +29,14 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient, type TrustStanding } from '@braindog/client';
-  import { readTrust, takeBack, trustLines, words, type TrustLine } from '$lib/record/trust.ts';
+  import { readTrust, takeBack, trustLines, words, type LevelOf, type TrustLine } from '$lib/record/trust.ts';
   import Button from '$lib/ui/Button.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { markedLine, readImports, type ImportRow } from './imports.ts';
   import { keptSentence } from '$lib/record/kept.ts';
+
+  /* `levelOf` (additive): how far each agent may go by its settings row, so a line with no rung says the page's level. */
+  let { levelOf }: { levelOf?: LevelOf } = $props();
 
   let standing = $state<TrustStanding | null>(null);
   /** The line whose press is on its way, so it is not sent twice. */
@@ -48,7 +51,7 @@
   const kept = $derived(standing ? standing.agents.map((a) => (a.kept ? keptSentence(a.kept) : null)) : []);
 
   /* THE AGENTS THAT ASK BEFORE EVERY CHANGE ARE ONE LINE, unless a marked line or a share is said under one of them. */
-  const lines = $derived(standing ? trustLines(standing, Date.now(), (i) => !marked[i] && !kept[i]) : []);
+  const lines = $derived(standing ? trustLines(standing, Date.now(), (i) => !marked[i] && !kept[i], levelOf) : []);
   /** The imports the record holds, or `null` when it sent none or has no such call. */
   let imports = $state<ImportRow[] | null>(null);
 

@@ -70,7 +70,8 @@ export function sentenceOf(view: UsageView): Sentence | null {
     if (extraOn && top.share >= 1) return { text: `${name} is past the month's allowance, and extra usage carries on under its cap.` };
     if (extraOn && top.share >= NEAR) return { text: `${name} is at ${lower(share)} of the month's allowance; past it, extra usage carries on under its cap.` };
     if (top.share >= NEAR) return { text: `${name} is at ${lower(share)} of the month's allowance; at the limit, actions wait until ${r.resets}.` };
-    return { text: `Everything ran, and the busiest meter is at ${lower(share)}.` };
+    /* NOT "EVERYTHING RAN" (live check, 1 Nov): it stood over runs that had failed. What the meters know is the allowance. */
+    return { text: `Well within the month's allowance; the busiest meter is at ${lower(share)}.` };
   }
   /* A MONTH WITH NO RUNS SAYS SO IN THE HEAD TOO (money F14), by the month's name, over the empty tile that says what
      would be counted. */

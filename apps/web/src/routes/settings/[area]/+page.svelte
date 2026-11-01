@@ -39,6 +39,7 @@
   import { hostedHere } from '../billing.ts';
   import { createClient } from '@braindog/client';
   import Tile from '$lib/ui/Tile.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import {
     daysLeft,
     healthSaid,
@@ -550,7 +551,12 @@
       <!-- AGENTS BY `import()`: its tiles are the panels a page may host too (trust, Slash reads, the reader's keys), so
            drawn from both places their styles are chunks of their own, and listed here they pushed the entry script
            past its ceiling. -->
-      {#await import('./areas/Agents.svelte') then { default: Agents }}<Agents {shell} {area} />{/await}
+      <!-- A SKELETON AT ONCE (live check, 1 Nov): the area stood blank while its chunk came. The tiles' own shapes, bars
+           and no words of any record (`Waiting`). -->
+      {#await import('./areas/Agents.svelte')}
+        <Tile icon="session" title={agentParam === undefined ? 'Your agents' : (agentHead.name || nameOfSlug(agentParam, KIND_NAMES))}><Waiting rows={4} /></Tile>
+        {#if agentParam === undefined}<Tile icon="decide" title="Answering"><Waiting rows={3} /></Tile>{/if}
+      {:then { default: Agents }}<Agents {shell} {area} />{/await}
     {:else if area === 'ingest'}
       <Ingest {shell} {area} />
     {:else if area === 'addons'}
