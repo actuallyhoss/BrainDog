@@ -18,7 +18,7 @@
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { inField } from '$lib/a11y/typed.ts';
   import Icon from '$lib/ui/Icon.svelte';
-  import { words } from './quick.ts';
+  import { words } from './quick-words.ts';
   import { quick } from './quick.svelte.ts';
 
   let {

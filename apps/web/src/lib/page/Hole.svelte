@@ -45,7 +45,7 @@
   import { page as route } from '$app/state';
   import { apiBase, at, here } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { handFor } from '$lib/record/hand.ts';
+  import { handFor } from '$lib/record/hand-of.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { may } from '$lib/record/may.ts';
   import { holePlace, holeSentence } from '$lib/record/row-href.ts';
