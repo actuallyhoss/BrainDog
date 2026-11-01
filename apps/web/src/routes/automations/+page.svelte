@@ -32,8 +32,20 @@
   import ScriptsTab from './ScriptsTab.svelte';
   import { newOf, tabOf, withoutNew } from './hub.ts';
   import { hubHead } from './hub-head.ts';
+  import { tick } from 'svelte';
+  import { swapUp } from '$lib/page/swap-up.ts';
 
   const tab = $derived(tabOf(page.url.searchParams));
+
+  /* THE TAB LAST DRAWN, so a press fades the new one up and the first draw does not (`swapUp`). */
+  let tabBody = $state<HTMLElement>();
+  let tabSeen: string | null = null;
+  $effect(() => {
+    const now = tab;
+    const was = tabSeen;
+    tabSeen = now;
+    if (was !== null && was !== now) void tick().then(() => swapUp(tabBody));
+  });
   const ask = $derived(newOf(page.url.searchParams));
 
   /* THE HEAD IS THE LAYOUT'S (`+layout.svelte`), so the tabs stay while this page and Runs change under them. It counts
@@ -63,6 +75,9 @@
 <svelte:head><title>{titleOf(words.heading)}</title></svelte:head>
 
 <div class="page">
+  <!-- A TAB PRESSED FADES ITS TILES UP where the last tab's stood (`swapUp`, skills pass 2 Nov), where they changed in one
+       frame. The head and its tabs stay. -->
+  <div class="tab-body" bind:this={tabBody}>
   {#key drawn}
     {#if tab === 'automations'}
       <AutomationsTab {owner} oncount={(n) => (head.automations = n)} onsentence={(s) => (head.said = s)} />
@@ -74,6 +89,7 @@
       <WebhookDoors {owner} />
     {/if}
   {/key}
+  </div>
 </div>
 
 <NewAction open={ask !== null} kind={ask?.kind ?? 'action'} preset={ask?.preset ?? null} onclose={shut} />
@@ -87,5 +103,12 @@
     gap: var(--tile-gap);
     min-inline-size: 0;
     padding: var(--sp-4) var(--gutter) var(--sp-9);
+  }
+
+  .tab-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tile-gap);
+    min-inline-size: 0;
   }
 </style>

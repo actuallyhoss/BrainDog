@@ -94,9 +94,13 @@
   });
   const shownMonth = $derived(plan.months[at]?.month ?? '');
   const rest = $derived(plan.days.some((d) => d.day.slice(0, 7) !== shownMonth));
+  /* WHICH WAY THE LAST ARROW WENT, so the month it moved to comes in from that side (`data-moved`, skills pass 2 Nov). */
+  let went = $state<'next' | 'prev'>('next');
   const step = (by: number): void => {
     const to = plan.months[at + by];
-    if (to) picked = to.month;
+    if (!to) return;
+    went = by > 0 ? 'next' : 'prev';
+    picked = to.month;
   };
 
   /* THE MARKED DAY IN VIEW, once for each day asked: a re-read of the page draws the same day again and does not move
@@ -174,7 +178,7 @@
       </div>
     {/if}
     {#each plan.months as m, i}
-      <table class="calendar-month" hidden={i !== at} data-moved={picked !== null && i === at ? '' : undefined}>
+      <table class="calendar-month" hidden={i !== at} data-moved={picked !== null && i === at ? went : undefined}>
         <caption class="calendar-caption">{m.label}</caption>
         <thead>
           <tr>

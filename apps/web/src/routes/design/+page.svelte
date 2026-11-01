@@ -23,6 +23,7 @@
   import SheetWidgets from '$lib/board/SheetWidgets.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
+  import Swap from '$lib/motion/Swap.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -80,6 +81,8 @@
   <PageHead icon="eye" kicker={words.back} back="/settings" title={words.title} sentence={words.lead} below={sheets} />
 
   <div class="look">
+    <!-- A SHEET PICKED HANDS OVER IN PLACE (`Swap`, skills pass 2 Nov), where it changed in one frame. -->
+    <Swap key={sheet}>
     {#if sheet === 'charts'}
       <SheetCharts {shell} />
     {:else if sheet === 'design'}
@@ -89,6 +92,7 @@
     {:else}
       <SheetControls />
     {/if}
+    </Swap>
   </div>
 {/if}
 

@@ -13,6 +13,7 @@
 -->
 <script lang="ts">
   import { flip } from 'svelte/animate';
+  import Swap from '$lib/motion/Swap.svelte';
   import { dismiss, lineIn, listMotion, springy } from '$lib/motion/index.ts';
   import { at } from '$lib/at.ts';
   import { display, iconFor } from '$lib/record/api.ts';
@@ -142,6 +143,10 @@
       <li>{@render person(you, orgOf(you))}</li>
     </ul>
   {/if}
+  <!-- RECENT AND A TO Z ARE TWO DIFFERENT LISTS (bands, then letters), so nobody can slide from one to the other: the old
+       one fades out and the new one up in its place (`Swap`, skills pass 2 Nov), where they swapped in one frame. -->
+  <Swap key={order}>
+  <div class="bands">
   {#if order === 'az'}
     {#each letters as l (l.letter)}
       <section class="band" aria-labelledby="letter-{l.letter}">
@@ -201,6 +206,8 @@
     </section>
   {/each}
   {/if}
+  </div>
+  </Swap>
 </div>
 
 <!-- A SENTINEL MEANS "THERE MAY BE MORE", as it does under the cards: the page's observer asks for the next page. -->
@@ -211,6 +218,13 @@
 <style>
   /* THE BANDS, 24 APART, each a quiet heading over its rows. The tile's own padding is the list's edge. */
   .people {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+  }
+
+  .bands {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);

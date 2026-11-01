@@ -96,17 +96,30 @@
     }
   }
 
-  /* A MONTH AN ARROW MOVED TO comes in with a short fade and lift; nothing moves on a first draw. */
+  /* A MONTH AN ARROW MOVED TO comes in from the side the arrow points, 8px and a fade over 180ms (skills pass 2 Nov: it
+     rose the same way for both arrows, so the eye could not tell back from on); nothing moves on a first draw. Under
+     reduced motion the month simply changes. */
   @media (prefers-reduced-motion: no-preference) {
     .calendar-month[data-moved] {
       animation: calendar-month-in 180ms var(--ease-out, ease-out);
+    }
+
+    .calendar-month[data-moved='prev'] {
+      animation-name: calendar-month-back;
     }
   }
 
   @keyframes calendar-month-in {
     from {
       opacity: 0;
-      translate: 0 4px;
+      translate: 8px 0;
+    }
+  }
+
+  @keyframes calendar-month-back {
+    from {
+      opacity: 0;
+      translate: -8px 0;
     }
   }
 
