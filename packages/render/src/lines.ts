@@ -122,16 +122,28 @@ export function linesPlan(rows: readonly (readonly string[])[], home?: string | 
   const y = (v: number) => (span > 0 ? ((hi - v) / span) * 100 : 50);
 
   const lines: LinesLine[] = named.map((line, k) => {
+    /* A MEASURE READ NOW AND THEN IS ONE LINE THROUGH ITS READINGS. Weekly readings on a chart of days left every value
+       between two gaps, so the path was all moves and nothing drew (the Dashboard's "Sprint hours", 1 Nov): where no two
+       readings stand side by side, the gaps are the days between readings and the line runs through them. Where some
+       do, a gap still breaks the line, and a reading alone between two gaps is a dot. */
+    const row = values[k]!;
+    const runs = row.some((v, i) => v !== null && i > 0 && row[i - 1] !== null);
     let d = '';
     let open = false;
-    values[k]!.forEach((v, i) => {
+    let alone = false;
+    row.forEach((v, i) => {
       if (v === null) {
-        open = false;
+        if (runs) {
+          if (open && alone) d += 'h0';
+          open = false;
+        }
         return;
       }
+      alone = !open;
       d += `${d ? ' ' : ''}${open ? 'L' : 'M'}${at(x(i))} ${at(y(v))}`;
       open = true;
     });
+    if (open && alone && runs) d += 'h0';
     const last = lastOf(values[k]!);
     const end = last < 0 ? '' : `M${at(x(last))} ${at(y(values[k]![last]!))}h0`;
     return { ...line, d, end };
