@@ -760,6 +760,8 @@
           live = p;
           liveFor = s;
         }
+        /* THE FIRST ANSWER SETTLES WHAT KIND OF BRAINDOG IT IS, so a later answer adds parts and never swaps it. */
+        if (q.topic === 'what' && chosen === null && p.usecase !== null) chosen = p.usecase;
         /* THE PART THE QUESTION WAS ABOUT COMES ON with any answer that is not a no (`TURNS_ON`). */
         const part = TURNS_ON[q.topic];
         if (part !== undefined && !(q.topic === 'people' && /^just me$/iu.test(text ?? '')) && !modules.includes(part)) {

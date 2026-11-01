@@ -369,6 +369,9 @@
         if (mine !== readings) return;
         sentence = said;
         take(p);
+        /* THE FIRST ANSWER SETTLES WHAT KIND OF BRAINDOG IT IS: a later answer read with it adds parts, and never swaps
+           the use case under the person (a founder's money answer read the whole as a small business). */
+        if (q.topic === 'what' && chosen !== null) caseByHand = true;
         /* THE PART THE QUESTION WAS ABOUT COMES ON with any answer that is not a no (`TURNS_ON`), kept as by hand. */
         const part = TURNS_ON[q.topic];
         if (part !== undefined && adds !== '' && !(q.topic === 'people' && /^just me$/iu.test(text ?? '')) && !kept.includes(part) && offered.includes(part)) {
