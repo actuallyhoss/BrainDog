@@ -2539,8 +2539,42 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.3",
+      "latest": "2.0.4",
       "versions": [
+        {
+          "version": "2.0.4",
+          "checksum": "17dffb2d3b11ab0a06567b6a713f72061ff143e487b74abd3e6c4df6979baf67",
+          "bytes": 35348,
+          "published_at": "2026-11-01T01:36:00.415Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Policies",
+              "Illustration years"
+            ],
+            "pages": [
+              "Insurance",
+              "{{name}}"
+            ],
+            "rules": [
+              "insurance_figures"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Says what to add when there are no policies yet, with a link to add the first, and no longer shows a fund value line before there is one.",
+          "preview": true
+        },
         {
           "version": "2.0.3",
           "checksum": "c438bab9a37fc5b53913bb28cabd56770ca03463dc697688d215cda542ee0198",

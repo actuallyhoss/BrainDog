@@ -1,10 +1,10 @@
 {
   "pack": "insurance",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "icon": "shield",
   "title": "Insurance",
   "summary": "Your life and savings policies: who the insurer is, what the premium is and where it is paid, the cover, what the fund is worth and from when, and when it matures.",
-  "changes": "Says what to add when there are no policies yet, and no longer shows a fund value line before there is one.",
+  "changes": "Says what to add when there are no policies yet, with a link to add the first, and no longer shows a fund value line before there is one.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -605,7 +605,7 @@
             "metric": "policies-live",
             "lt": 1
           },
-          "body": "No policies yet. Add one below with its cover, its premium and when it matures."
+          "body": "No policies yet. [Add one](/r/policies?new=1) with its cover, its premium and when it matures."
         },
         {
           "kind": "stat",
