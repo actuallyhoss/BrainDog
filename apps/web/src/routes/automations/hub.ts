@@ -760,14 +760,14 @@ const BAD = new Set(['failed', 'refused']);
 const outcomeOf = (state: string): string => ((Object.hasOwn(hubWords.ended, state) ? hubWords.ended[state] : undefined) ?? hubWords.ended.done!)('').split(' ')[0]!.replace(/[.,]$/u, '');
 
 /** A run's ending and its own sentence after it, when it said one. */
-function saidOf(outcome: string, at: string, say: string | null, now: number): string {
+function saidOf(outcome: string, at: string, say: string | null, now: number, own = ''): string {
   const when = since(at, now);
   const ended = Object.hasOwn(hubWords.ended, outcome) ? hubWords.ended[outcome] : undefined;
   /* A HELD RUN THAT SAID ITS OWN REASON is not held by the month's limit: the limit's words stay only when it gave none. */
-  if (outcome === 'held' && say) return `${hubWords.heldSaid(when)} ${plainSay(say)}`;
+  if (outcome === 'held' && say) return `${hubWords.heldSaid(when)} ${plainSay(say, own)}`;
   const line = (ended ?? hubWords.ended.done!)(when);
   /* THE REASON IN PLAIN WORDS (L46): the run's own sentence names `rule.x` and `script.y`; the run's page keeps it. */
-  return say ? `${line} ${plainSay(say)}` : line;
+  return say ? `${line} ${plainSay(say, own)}` : line;
 }
 
 /**
@@ -790,10 +790,10 @@ export function runLines(
     const own = runs.get(a.id);
     if (own && own.length > 0) {
       for (const r of own) {
-        out.push({ key: `a:${r.id}`, kind: 'automation', name: ruleNameSaid(a.name, true), at: r.started, said: saidOf(r.state, r.finished ?? r.started, r.say, now), bad: BAD.has(r.state), path, outcome: outcomeOf(r.state) });
+        out.push({ key: `a:${r.id}`, kind: 'automation', name: ruleNameSaid(a.name, true), at: r.started, said: saidOf(r.state, r.finished ?? r.started, r.say, now, a.name), bad: BAD.has(r.state), path, outcome: outcomeOf(r.state) });
       }
     } else if (a.last) {
-      out.push({ key: `a:${a.id}:last`, kind: 'automation', name: ruleNameSaid(a.name, true), at: a.last.at, said: saidOf(a.last.state, a.last.at, a.last.say, now), bad: BAD.has(a.last.state), path, outcome: outcomeOf(a.last.state) });
+      out.push({ key: `a:${a.id}:last`, kind: 'automation', name: ruleNameSaid(a.name, true), at: a.last.at, said: saidOf(a.last.state, a.last.at, a.last.say, now, a.name), bad: BAD.has(a.last.state), path, outcome: outcomeOf(a.last.state) });
     } else {
       /* A RULE THE RECORD COUNTS AND KEEPS NO RUN OF STILL RAN (agents F2): "Ran 17 times, last on 3 Sep" on its row
          beside "Nothing has run yet" here was two answers to one question. Its last firing is its line, with the count. */

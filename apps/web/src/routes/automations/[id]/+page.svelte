@@ -907,8 +907,11 @@
             {/if}
 
             <ol class="runs ledger ledger-lead">
-              {#each runs as r (r.id)}
+              {#each runs as r, i (r.id)}
                 {@const took = durationOf(r)}
+                <!-- A REASON IS SAID ONCE FOR A RUN OF ALIKE ROWS (L48): ten rows of the same sentence read as a wall. -->
+                {@const why = r.say ? plainSay(r.say, row.name) : ''}
+                {@const sameAsAbove = i > 0 && why !== '' && plainSay(runs[i - 1]!.say, row.name) === why}
                 {@const mark = runMark(r.state)}
                 <!-- THE STATE AS ITS WELL AND ITS WORD, THEN WHEN, HOW LONG AND WHAT STARTED IT, and no id: a run is opened
                      by the whole row, and its detail is the canvas it ran on (`RunView.svelte`). Stop sits beside the row,
@@ -919,10 +922,10 @@
                     <span class="line-main">
                       <span class="line-title">{cap(words.runState[r.state] ?? r.state)}, {since(r.started, now)}</span>
                       <span class="line-detail run-meta">
-                        {#if took !== null}<span>{editWords.took(took)}</span>{/if}
+                        {#if took !== null}<span>{cap(editWords.took(took))}</span>{/if}
                         {#if r.trigger !== null && editWords.startedBy[r.trigger]}<span>{editWords.startedBy[r.trigger]}</span>{/if}
                       </span>
-                      {#if r.say}<span class="run-say">{plainSay(r.say, row.name)}</span>{/if}
+                      {#if why && !sameAsAbove}<span class="run-say">{why}</span>{/if}
                     </span>
                   </button>
                   {#if r.state === 'pending' || r.state === 'running' || r.state === 'waiting'}
