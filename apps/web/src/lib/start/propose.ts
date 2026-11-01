@@ -1330,3 +1330,72 @@ export async function proposeFirst(sentence: string, ctx: ProposeContext, ask: A
   }
   return out.ok ? { ...fromModel(out.value, sentence, ctx, rules), ask: askOf(out.value) } : { ...rules, fell: out.refusal.code };
 }
+
+/* ── the conversation, one turn at a time (1 Nov, lane onboard-speed) ──────── */
+
+/**
+ * WHAT THE CONVERSATION'S READINGS HAVE SAID SO FAR, WITH ONE MORE LAID ON. A turn (`quick`) answers only what the answers
+ * point at and the next question, so it is laid over what came before it: the parts and the phrases are both readings',
+ * a currency or a use case the later one names stands, and names, entries, a summary and a draft are the whole
+ * reading's (`setup`), which a turn never carries. `next` asks the next question; `base` never does.
+ */
+export function mergeReplies(base: SetupReply | null, next: SetupReply): SetupReply {
+  if (base === null) return next;
+  const heard = [...base.heard];
+  for (const h of next.heard) if (!heard.some((x) => x.phrase.toLocaleLowerCase() === h.phrase.toLocaleLowerCase())) heard.push(h);
+  const whole = next.quick === true ? base : next;
+  return {
+    name: whole.name ?? base.name ?? next.name,
+    summary: whole.summary !== '' ? whole.summary : base.summary,
+    usecase: base.usecase ?? next.usecase,
+    also: [...new Set([...base.also, ...next.also])],
+    modules: [...new Set([...base.modules, ...next.modules])],
+    currency: next.currency ?? base.currency,
+    heard,
+    names: whole.names.length > 0 ? whole.names : base.names,
+    rows: whole.rows.length > 0 ? whole.rows : base.rows,
+    draft: whole.draft ?? base.draft,
+    by: next.by,
+    ask: next.ask ?? null,
+    ...(base.quick === true && next.quick === true ? { quick: true as const } : {}),
+  };
+}
+
+/** A reading of the words from what the model said (`reply`), over the rules' reading of the same words. */
+export function proposalOf(reply: SetupReply, sentence: string, ctx: ProposeContext): Proposal {
+  return { ...fromModel(reply, sentence, ctx, propose(sentence, ctx)), ask: askOf(reply) };
+}
+
+/** What the door answered for these words, whole or one quick turn, as a result and never a throw. */
+export async function askReply(sentence: string, ctx: ProposeContext, ask: AskSetup, asked: string | undefined, quick: boolean): Promise<Awaited<ReturnType<AskSetup>>> {
+  try {
+    return await ask({
+      said: sentence,
+      offer: ctx.offer ?? setupOffer(),
+      today: todayIn(ctx.zone) ?? new Date().toISOString().slice(0, 10),
+      ...(asked ? { asked } : {}),
+      ...(quick ? { quick: true } : {}),
+    });
+  } catch (e) {
+    return { ok: false, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } };
+  }
+}
+
+/**
+ * ONE TURN OF THE CONVERSATION, READ QUICKLY: the model's short answer for the answers so far (`quick`, about two seconds),
+ * laid over what the conversation's readings already said (`base`, `mergeReplies`), and the reading that makes. `turn` is
+ * the model's own answer, for the caller to lay on its base whenever it lands; `null` where the rules read it.
+ */
+export async function proposeTurn(
+  sentence: string,
+  ctx: ProposeContext,
+  ask: AskSetup | null,
+  asked: string | undefined,
+  base: SetupReply | null,
+): Promise<{ proposal: Proposal; turn: SetupReply | null }> {
+  if (ask === null || sentence.trim() === '') return { proposal: propose(sentence, ctx), turn: null };
+  const out = await askReply(sentence, ctx, ask, asked, true);
+  if (!out.ok) return { proposal: { ...propose(sentence, ctx), fell: out.refusal.code }, turn: null };
+  const merged = mergeReplies(base, out.value);
+  return { proposal: proposalOf(merged, sentence, ctx), turn: out.value };
+}

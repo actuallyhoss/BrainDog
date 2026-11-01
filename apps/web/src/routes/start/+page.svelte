@@ -8,10 +8,13 @@
   with, their AI tools, what to keep first. A topic already answered is skipped; three to five questions as a rule, six
   at most, each one skippable, and "That's enough, build it" at any time.
 
-  EACH ANSWER IS ONE MODEL READ of the whole conversation (`proposeFirst` with the questions asked, `askedLines`), six
-  at most, and it waits `QUICK_MS` at most: the rules read it at once after that, BrainDog's next question is the
-  rules', and the model's reading lands on the build when it comes. Its question back is the next one asked where its
-  topic is still open. Where there is no model, or the reads are spent, the rules read every answer.
+  EACH ANSWER IS ONE QUICK MODEL TURN (`proposeTurn`, `quick` at the door, 1 Nov lane onboard-speed): what the answers
+  point at and the next question, about fifty tokens on a fast model, about two seconds, six at most, laid over what the
+  conversation's readings said before it (`mergeReplies`). It waits `QUICK_MS` at most: the rules read it at once after
+  that, and the turn lands on the build when it comes, its question kept for the next answer. THE WHOLE READING (names,
+  entries, a summary, a draft) is asked in the background after the second answer and again at the end (`readWhole`),
+  once for each conversation, and lands on the build when it comes; Make it mine never waits on it. Where there is no
+  model, or the reads are spent, the rules read every answer.
 
   BESIDE IT, YOUR BRAINDOG FORMS (`Forming.svelte`): Today, then each part as an answer turns it on, each saying where
   in the answers it came from, each one press from being taken out. At the end the summary stands where the field was
@@ -58,7 +61,21 @@
   import { landing } from '$lib/record/landing.ts';
   import { INSTALL_ORDER, LEANS_ON } from '$lib/shape.ts';
   import { byRules, draftChange, type Drafted, type SlashClient } from '$lib/record/slash.ts';
-  import { becameShown, draftBrief, filledBy, outsideCatalogue, propose, proposeFirst, railPlaces, type Proposal } from '$lib/start/propose.ts';
+  import {
+    askReply,
+    becameShown,
+    draftBrief,
+    filledBy,
+    mergeReplies,
+    outsideCatalogue,
+    propose,
+    proposalOf,
+    proposeFirst,
+    proposeTurn,
+    railPlaces,
+    type Proposal,
+  } from '$lib/start/propose.ts';
+  import type { SetupReply } from '$lib/start/ask.ts';
   import { slashAsks } from '$lib/start/ask.ts';
   import { MADE_ADDONS, heardOf, offerOf, readCatalogueOffer, tradeAddons, tradesKept, type CatalogueOffer, type TradeOffer } from '$lib/start/offer.ts';
   import { BYTES_MOST, drawnWith, entriesOf, EXPORTS_MOST, leftSaid, mapExport, newListDeclarations, ownList, readExports, type Export, type Mapping } from '$lib/start/export.ts';
@@ -313,25 +330,63 @@
   let modelReads = 0;
   /** A model's question that came after the rules had already asked: offered for the next turn, if still open. */
   let lateAsk: ModelAsk | null = null;
+  /**
+   * WHAT THE CONVERSATION'S MODEL READINGS HAVE SAID SO FAR, each turn and whole reading laid on as it lands
+   * (`mergeReplies`): the next turn's reading is drawn over it, so a part one answer turned on is not lost by the next.
+   */
+  let modelSaid: SetupReply | null = null;
+
+  const readCtx = () => ({ zone, locale, currency: deviceCurrency, catalogue: heardOf(cat), offer: offerOf(cat) });
 
   /**
-   * ONE ANSWER, READ: by the model where there is one and reads are left, for at most `QUICK_MS`; the rules' reading
-   * answers at once after that, and the model's lands on the build when it comes (its question kept for the next turn).
+   * ONE ANSWER, READ: one quick turn of the model's where there is one and reads are left (`proposeTurn`), for at most
+   * `QUICK_MS`; the rules' reading answers at once after that, and the turn lands on the build when it comes (its
+   * question kept for the next answer).
    */
   async function readTurn(said: string, asked: string): Promise<Proposal> {
-    const ctx = { zone, locale, currency: deviceCurrency, catalogue: heardOf(cat), offer: offerOf(cat) };
+    const ctx = readCtx();
     const ask = door?.setup ?? null;
     if (ask === null || modelReads >= READS_MOST || said.trim() === '') return proposeFirst(said, ctx, null);
     modelReads += 1;
-    const read = proposeFirst(said, ctx, ask, asked);
+    const read = proposeTurn(said, ctx, ask, asked, modelSaid);
     const quick = await within(read, QUICK_MS);
-    if (quick !== null) return quick;
-    void read.then((p) => {
-      if (p.by === undefined || p.by === 'rules' || sentence !== said || busy || made) return;
+    if (quick !== null) {
+      if (quick.turn !== null) modelSaid = mergeReplies(modelSaid, quick.turn);
+      return quick.proposal;
+    }
+    void read.then(({ turn }) => {
+      if (turn === null) return;
+      modelSaid = mergeReplies(modelSaid, turn);
+      if (busy || made) return;
+      /* LATE, IT IS DRAWN OVER THE WORDS AS THEY STAND NOW, which hold the words it read. */
+      const p = proposalOf(modelSaid, sentence, readCtx());
       take(p);
       lateAsk = p.ask ?? null;
     });
     return proposeFirst(said, ctx, null);
+  }
+
+  /**
+   * THE WHOLE READING, IN THE BACKGROUND: names, entries, a summary and a draft, which a turn never carries, asked of the
+   * included model (`setup`) after the second answer and again when the talk ends, once for each conversation (`wholes`
+   * by its words and questions). It lands on the build when it comes, keeping the question being asked; nobody waits on
+   * it, and Make it mine reads what stands.
+   */
+  const wholes = new Set<string>();
+  /** The most whole readings in one conversation: after the second answer, at the end, and once more after more talk. */
+  const WHOLE_MOST = 3;
+  function readWhole(said: string, asked: string) {
+    const ask = wholeDoor?.setup ?? null;
+    const key = `${said}\u0000${asked}`;
+    if (ask === null || said.trim() === '' || wholes.has(key) || wholes.size >= WHOLE_MOST) return;
+    wholes.add(key);
+    void askReply(said, readCtx(), ask, asked, false).then((out) => {
+      if (!out.ok) return;
+      modelSaid = mergeReplies(modelSaid, out.value);
+      if (busy || made) return;
+      const p = proposalOf(modelSaid, sentence, readCtx());
+      take({ ...p, ask: proposal?.ask ?? null });
+    });
   }
 
   /** The names of the places that will be made, for BrainDog's "That adds …" and "What first". */
@@ -398,6 +453,8 @@
     }
     const next = nextAsk(where());
     lateAsk = null;
+    /* THE WHOLE READING, ONCE TWO ANSWERS ARE IN: by the end it has usually landed. */
+    if (next !== null && chatTurns.filter((t) => t.answer !== null).length === 2) readWhole(sentence, askedLines(chatTurns));
     if (next === null) finishTalk();
     else asking = next;
   }
@@ -432,6 +489,7 @@
   function finishTalk() {
     asking = null;
     talkDone = true;
+    readWhole(sentence, askedLines(chatTurns));
     draftIfOutside();
     void tick().then(() => document.getElementById('summary-h')?.focus());
   }
@@ -477,6 +535,8 @@
   const model = $derived(page.data.slash === true);
   /** The first run's two asks of Slash (`ask.ts`), `null` where no model is behind it and the rules read everything. */
   const door = $derived(model && typeof location !== 'undefined' ? slashAsks(apiBase()) : null);
+  /* THE WHOLE READING'S OWN DOOR, which waits a minute: nobody watches it, and on 1 November it took up to 42 seconds. */
+  const wholeDoor = $derived(model && typeof location !== 'undefined' ? slashAsks(apiBase(), undefined, 60_000) : null);
   /** What Slash drafted for the sentence, `null` when it drafted nothing or was not asked. */
   let draft = $state.raw<Drafted | null>(null);
   let drafting = $state(false);

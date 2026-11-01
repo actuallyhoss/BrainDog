@@ -32,6 +32,8 @@ export type SetupReply = {
   by: string;
   /** The one question the reading could not answer, where the read asks one (first-read-setup's answer). */
   ask?: ModelAsk | null;
+  /** One turn's quick answer (`quick` on the ask): parts, phrases, a currency and the next question, no names or entries. */
+  quick?: true;
 };
 
 /** What `proposeMapping` answers (`MappingAnswer` in `@braindog/slash`). */
@@ -50,7 +52,8 @@ export type SetupOffer = {
 };
 /** `first`: the owner's sign-up words, read once after the build on the house, never one of the month's asks. */
 /** `asked`: the conversation's questions so far, one a line as `about: question` (`lib/start/chat.ts` `askedLines`). */
-export type SetupAsked = { said: string; offer: SetupOffer; today: string; first?: boolean; asked?: string };
+/** `quick`: one turn of the conversation, read short and fast (`turn`), never the whole reading. */
+export type SetupAsked = { said: string; offer: SetupOffer; today: string; first?: boolean; asked?: string; quick?: boolean };
 export type MappingAsked = {
   file: string;
   columns: string[];
@@ -105,7 +108,7 @@ export type FirstAsked = SetupAsked & { zone: string; locale: string; turnstile:
  */
 export function readAsks(origin: string, send: typeof fetch = (...a) => globalThis.fetch(...a), wait = WAIT_MS): { setup: (ask: FirstAsked) => Promise<Asked<SetupReply>> } {
   return {
-    setup: ({ said, today, zone, locale, turnstile, asked }) =>
-      door<SetupReply>(send, `${origin}/auth/signup/read`, { said, today, zone, locale, turnstile, ...(asked === undefined ? {} : { asked }) }, wait),
+    setup: ({ said, today, zone, locale, turnstile, asked, quick }) =>
+      door<SetupReply>(send, `${origin}/auth/signup/read`, { said, today, zone, locale, turnstile, ...(asked === undefined ? {} : { asked }), ...(quick === true ? { quick } : {}) }, wait),
   };
 }

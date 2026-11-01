@@ -120,7 +120,8 @@
   import { MADE_ADDONS, heardOf, offerOf, readCatalogueOffer, tradeAddons, type CatalogueOffer } from '$lib/start/offer.ts';
   import { MADE_SAID, saidMade } from '$lib/start/made.ts';
   import { assemble } from '$lib/start/assembling.ts';
-  import { becameShown, filledBy, placesOf, proposeFirst, railPlaces, type HeardLine, type Proposal } from '$lib/start/propose.ts';
+  import { becameShown, filledBy, mergeReplies, placesOf, proposeFirst, proposeTurn, railPlaces, type HeardLine, type Proposal } from '$lib/start/propose.ts';
+  import type { SetupReply } from '$lib/start/ask.ts';
   import { readAsks } from '$lib/start/ask.ts';
   import { currencyWord, keepCurrencyGuess } from '$lib/start/place-currency.ts';
   import { placeZone, zoneGroups, zonePlace } from '$lib/start/place-zone.ts';
@@ -446,6 +447,14 @@
    * THE WORDS, READ FOR ONE CAUSE: by the rules on this device for a key or a pause, and by the model only for the
    * person's press (`readerFor`). `ask` is told the model's one question, where its answer carried one.
    */
+  /**
+   * WHAT THE CONVERSATION'S TURNS HAVE SAID SO FAR (1 Nov, lane onboard-speed): each answer is one quick turn (`quick`,
+   * about two seconds) laid over the ones before it (`mergeReplies`). No whole reading is asked here: each read needs its
+   * own bot-check answer, and the record reads the words whole once it is made (`first`, on the house), so the reads a
+   * conversation spends at this door stay six.
+   */
+  let turnsSaid: SetupReply | null = null;
+
   function reading(s: string, cause: ReadCause = 'key', ask?: (q: ModelAsk | null) => void, asked?: string): Promise<Proposal> {
     const reader = readerFor(cause, door, {
       zone: here,
@@ -459,7 +468,13 @@
         ask?.(out.ok ? askOf(out.value) : null);
       },
     });
-    return proposeFirst(s, { zone: here, locale, currency: zoneCurrency(here), catalogue: heardOf(cat), offer: offerOf(cat) }, reader, asked);
+    const ctx = { zone: here, locale, currency: zoneCurrency(here), catalogue: heardOf(cat), offer: offerOf(cat) };
+    /* IN THE CONVERSATION (`asked`), ONE QUICK TURN; the describe step's press is still the whole reading. */
+    if (asked === undefined || reader === null) return proposeFirst(s, ctx, reader, asked);
+    return proposeTurn(s, ctx, reader, asked, turnsSaid).then(({ proposal, turn }) => {
+      if (turn !== null) turnsSaid = mergeReplies(turnsSaid, turn);
+      return proposal;
+    });
   }
 
   $effect(() => {

@@ -555,7 +555,7 @@ export function readerFor(cause: ReadCause, door: ReadDoor | null, env: ReadEnv)
       out =
         turnstile === null
           ? { ok: false, refusal: { code: 'FORBIDDEN', fix: 'The check that you are a person did not answer, so simple rules read this.' } }
-          : await door({ said: ask.said, offer: ask.offer, today: ask.today, zone: env.zone ?? 'UTC', locale: env.locale, turnstile, ...(ask.asked === undefined ? {} : { asked: ask.asked }) });
+          : await door({ said: ask.said, offer: ask.offer, today: ask.today, zone: env.zone ?? 'UTC', locale: env.locale, turnstile, ...(ask.asked === undefined ? {} : { asked: ask.asked }), ...(ask.quick === true ? { quick: true } : {}) });
     } catch (e) {
       out = { ok: false, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } };
     }
