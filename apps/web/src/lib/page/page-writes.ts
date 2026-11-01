@@ -356,7 +356,7 @@ export function pageWrites(deps: WritesDeps) {
     ref: RowRef | undefined,
     change: Change,
     title: string,
-    hold: { at: number; before: readonly Row[]; what: Kept; back: Back; undone: Kept; said: (w: PageWrite['words']) => string; early?: boolean; mark?: string },
+    hold: { at: number; before: readonly Row[]; what: Kept; back: Back; undone: Kept; said: (w: PageWrite['words'], patch: Record<string, unknown>) => string; early?: boolean; mark?: string | ((patch: Record<string, unknown>, m: PageWrite) => string) },
   ): Promise<boolean> {
     if (!ref) return (toasts.push(copy.pageRowUnknown, { intent: 'warn' }), false);
     /* THE PAGE THE GESTURE WAS MADE ON. A write that lands after the reader has opened another page holds nothing,
@@ -384,8 +384,8 @@ export function pageWrites(deps: WritesDeps) {
     if (out.from === 'written') {
       if (on === deps.slug()) holdRow(m, hold.at, hold.before, ref, { ...hold.what, version: out.version, pending: Boolean(hold.early) });
       const made: RowRef = { ...ref, version: out.version ?? ref.version };
-      if (hold.mark) deps.touched?.(ref, hold.mark, title);
-      toasts.push(hold.said(m.words), { intent: 'good', undo: () => void putBack(m, made, decl, title, hold), life: UNDO_MS });
+      if (hold.mark) deps.touched?.(ref, typeof hold.mark === 'function' ? hold.mark(patch, m) : hold.mark, title);
+      toasts.push(hold.said(m.words, patch), { intent: 'good', undo: () => void putBack(m, made, decl, title, hold), life: UNDO_MS });
     }
     if (out.from === 'written' || out.from === 'conflict') await deps.reread();
     if (out.from === 'written' && hold.early && on === deps.slug()) settleRow(m, hold.at, ref);
@@ -614,9 +614,10 @@ export function pageWrites(deps: WritesDeps) {
       what: { done },
       back: async (_m, ref, decl) => (await import('./tick-undo.ts')).tickBackOf(ref, done, decl, held),
       undone: { done: !done },
-      said: (w) => w.ticked(title, done),
+      said: (w, patch) => w.ticked(title, done, patch),
       early: true,
-      mark: done ? words.markDone : words.markReopened,
+      /* THE MARK SAYS THE RECEIPT'S WORD: "Paid" on a bill, "Done" on a task. */
+      mark: done ? (patch, m) => (m.doneWord(patch) === 'done' ? words.markDone : m.doneWord(patch).replace(/^./u, (c) => c.toUpperCase())) : words.markReopened,
     });
   }
 

@@ -26,11 +26,11 @@
  * glides the last `GLIDE` pixels and fades in rather than crossing the board, and two answers drawn in one breath are
  * one recomposition from what the reader last saw, so no block is ever given two animations at once.
  *
- * A HEADLINE WRITTEN AGAIN CROSSFADES (`swap`): the block stays where it is and its old words fade out over the new
- * ones fading in, rather than changing in one frame under the reader's eye.
+ * A HEADLINE WRITTEN AGAIN HANDS OVER (`swap`): the block stays where it is, its old words go and the new ones come up
+ * as they are gone, rather than changing in one frame under the reader's eye or crossing each other.
  *
  * WITHIN THE SKIN'S MOTION AND UNDER 300ms, ON ITS OWN TWO STEPS: a block that moves, arrives or leaves takes
- * `--d-recompose` (220) and a headline written again `--d-swap` (160), so a skin or `a11y.css` that changes the scale
+ * `--d-recompose` (220) and a headline written again `--d-exit` out then `--d-enter` in (90 + 110), so a skin or `a11y.css` that changes the scale
  * changes this with it. Where the skin has its spring (`--ease-spring`), a block arriving and the blocks moving for it
  * take the record-forming steps instead (`--form-in` 320, `--form-settle` 380, held under 420). A reader who asked for less motion sees only opacity: a new block fades in, one that left fades
  * out, and one that moved is simply where it is.
@@ -404,7 +404,6 @@ export function recomposer(): {
     const enter = spring ? { duration: formMs(style, '--form-in', 320), easing: spring } : { duration: recompose, easing: ease('--ease-emphasis', 'ease-out') };
     /* LEAVING IS SHORTER THAN ARRIVING: the exit step, accelerating away. */
     const leave = { duration: ms(style, '--d-exit', 90), easing: ease('--ease-in', 'ease-in') };
-    const swapped = { duration: ms(style, '--d-swap', 160), easing: ease('--ease-standard', 'ease-in-out') };
     try {
       /* SHORT, AND ONE ANIMATION A BLOCK: a block that moved further than `SLIDE_MAX` glides the last stretch and
          fades in, in the same animation, rather than crossing the board (`slideOf`). */
@@ -433,7 +432,9 @@ export function recomposer(): {
          step and front-loaded, gone before the block moving in has landed; for a reader who asked for less motion,
          where the block is simply there, it is not drawn at all. */
       const drawn = [...now.values()].map((v) => v.box);
-      const quick = { duration: swapped.duration, easing: ease('--ease-out', 'ease-out') };
+      /* ON THE EXIT'S STEP, NOT THE SWAP'S (skills pass 2 Nov): over `--d-swap` a ticked last bill's "Bills and invoices"
+         was still a third there when "Repeating, a month" slid into its place, and the two tiles' words read as one. */
+      const quick = { duration: leave.duration, easing: ease('--ease-out', 'ease-out') };
       for (const { key, box } of plan.leaves) {
         const copy = copies.get(key);
         if (!copy) continue;
@@ -447,13 +448,29 @@ export function recomposer(): {
 
          THE WORDS CROSSFADE AND THE TILE STAYS. The copy carries no surface of its own and the tile is not faded,
          only what is in it: a copy with the tile's ground would dim the tile for the length of the fade and lie over
-         the page's head, which rides over the top of the headline's tile (`PageHead`'s `over`). */
+         the page's head, which rides over the top of the headline's tile (`PageHead`'s `over`).
+
+         AND THEY HAND OVER, THEY NEVER CROSS (Look B's motion rule, skills pass 2 Nov): faded over each other on one
+         step, Reports' "Since 1 Aug: $45,862 in…" and "The last 3 months: $33,374 in…" stood at half strength on the
+         same line for a moment, two sentences in one. The old words go on the exit's step (`--d-exit`, accelerating
+         away), and the new ones come up on the arrival's (`--d-enter`) as the old are gone: 200ms in all. */
+      const handOut = { duration: leave.duration, easing: ease('--ease-in', 'ease-in') };
+      const handIn = { duration: ms(style, '--d-enter', 110), easing: ease('--ease-out', 'ease-out'), delay: leave.duration };
+      /* ONLY THE WORDS HAND OVER. A page's lead slot holds its head's buttons and its filter strip beside the sentence, and
+         faded with it the chip just pressed went out and came back; they are the same before and after, so they stand. */
+      const wordsOf = (node: Element): Element[] => {
+        const all = [...node.children];
+        const words = all.filter((c) => c.matches('.block'));
+        return words.length > 0 ? words : all;
+      };
       for (const [key, copy] of swaps) {
         const el = now.get(key)?.el;
         const box = was.get(key)?.box;
         if (!el || !box) continue;
-        ghost(page, { node: copy.node, style: { ...copy.style, background: 'transparent', boxShadow: 'none' } }, box, swapped, false);
-        for (const child of el.children) running.push(child.animate({ opacity: [0, 1] }, { ...swapped, fill: 'backwards' }));
+        const kept = wordsOf(copy.node);
+        for (const child of copy.node.children) if (!kept.includes(child)) (child as HTMLElement).style.visibility = 'hidden';
+        ghost(page, { node: copy.node, style: { ...copy.style, background: 'transparent', boxShadow: 'none' } }, box, handOut, false);
+        for (const child of wordsOf(el)) running.push(child.animate({ opacity: [0, 1] }, { ...handIn, fill: 'backwards' }));
       }
     } catch {
       /* A timing a browser cannot read is a page that changes in one frame, which is what it did before. */

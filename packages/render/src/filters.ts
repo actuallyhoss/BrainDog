@@ -68,7 +68,12 @@ export function filtersPlan(filters: readonly Filter[], chosen: Readonly<Record<
       hue: typeof v.hue === 'number' && Number.isInteger(v.hue) && v.hue >= 0 && v.hue < 360 ? v.hue : null,
     }));
     if (picked !== undefined && !values.some((v) => v.on)) values.push({ value: picked, label: picked, count: 0, on: true, hue: null });
-    if (values.length < 2 && picked === undefined) continue;
+    /* A FIELD WITH ONE VALUE SAYS NOTHING ON ITS OWN, so it is left out; BUT NOT WHILE THE PAGE IS NARROWED BY ANOTHER
+       (skills pass 2 Nov): picking "Coffee" on the Ledger left every line in one account, so the Account row went and
+       the whole page jumped up a row under the reader's pointer, and came back down on "All". Its row stays while any
+       choice is in force, "All" and its one value, which is also the fact that every line shown is in that account. */
+    const narrowed = Object.values(chosen).some((v) => v !== undefined);
+    if (values.length === 0 || (values.length < 2 && picked === undefined && !narrowed)) continue;
     const control = f.control ?? (values.length <= SEGMENTED_MOST ? 'segmented' : 'chips');
     let shown = values.slice(0, FILTER_CHIPS);
     let rest = values.slice(FILTER_CHIPS);

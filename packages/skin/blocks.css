@@ -685,11 +685,13 @@
     color: var(--ink);
   }
 
-  /* A TICKED BOX IS THE ACCENT'S FILL, as every checked control in the product is (`controls.css`). Red means late and
-     nothing else, and a done task is not late. */
+  /* A TICKED BOX IS THE INK FILL WITH THE MARK IN THE TILE'S COLOUR, as every checked control in the product is
+     (`controls.css`, Look B: "red is never selected, on or focused; those are ink"). It was still the red fill, so a
+     bill ticked paid on Coming up wore the colour of a late one (skills pass 2 Nov). */
   .item-marker[data-done='yes'] {
-    background-color: var(--red-fill);
-    border-color: var(--red-fill);
+    background-color: var(--ink);
+    border-color: var(--ink);
+    color: var(--tile);
   }
 
   /* ── table: comparison, and the register grid's body ────────────────────── */

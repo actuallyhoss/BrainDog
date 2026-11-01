@@ -144,9 +144,21 @@ export async function updateRow(base: string, ref: RowRef, patch: Record<string,
  * landed. Kept here beside the write rather than in `copy.ts`.
  */
 export const words = {
-  ticked: (title: string, done: boolean) => `Marked ${title} ${done ? 'done' : 'not done'}.`,
+  /* THE STATE THE TICK WROTE, SAID AS ITS WORD (skills pass 2 Nov): a bill ticked on Coming up is written `paid`, and the
+     receipt said "Marked Invoice from Dana Reyes done." A list whose done state is its own word is said by it ("paid",
+     "written off"); a plain `done`, or a patch that names no word, is "done". */
+  ticked: (title: string, done: boolean, patch?: Record<string, unknown>) => `Marked ${title} ${done ? doneWord(patch) : 'not done'}.`,
   moved: (title: string, to: string) => `Moved ${title} to ${to}.`,
 };
+
+/**
+ * THE WORD FOR THE STATE A TICK WROTE: "paid" for a bill, "written off", and "done" for a plain `done` or a patch that
+ * names no word. The receipt and the row's Just changed mark say the same word (skills pass 2 Nov).
+ */
+export function doneWord(patch?: Record<string, unknown>): string {
+  const value = Object.values(patch ?? {})[0];
+  return typeof value === 'string' && /^[a-z][a-z_]*$/u.test(value) ? value.replaceAll('_', ' ') : 'done';
+}
 
 /** Which row a drawn row is, by what the page answer named it with. A page's rows carry no other identity. */
 export const rowKey = (ref: RowRef): string => `${ref.register}#${ref.seq}`;
