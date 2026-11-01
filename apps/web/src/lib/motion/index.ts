@@ -197,7 +197,7 @@ export const settleOn =
  * reduced motion an arrival fades and a leaving item is simply gone.
  */
 export const listMotion =
-  (match: string) =>
+  (match: string, { leave = true }: { leave?: boolean } = {}) =>
   (box: HTMLElement): (() => void) | void => {
     if (typeof MutationObserver === 'undefined') return;
     const seen = new MutationObserver((records) => {
@@ -206,8 +206,9 @@ export const listMotion =
       for (const r of records) for (const n of r.removedNodes) out.add(n);
       for (const r of records) {
         for (const n of r.addedNodes) if (n instanceof HTMLElement && !out.has(n) && n.matches(match) && !n.hasAttribute('data-leaving')) arriveNow(n);
-        for (const n of r.removedNodes)
-          if (n instanceof HTMLElement && !n.isConnected && !n.inert && n.matches(match) && !n.hasAttribute('data-leaving')) leaveFrom(box, n, r.nextSibling, r.previousSibling);
+        if (leave)
+          for (const n of r.removedNodes)
+            if (n instanceof HTMLElement && !n.isConnected && !n.inert && n.matches(match) && !n.hasAttribute('data-leaving')) leaveFrom(box, n, r.nextSibling, r.previousSibling);
       }
     });
     seen.observe(box, { childList: true });
