@@ -12,6 +12,8 @@
   record has not named yet is said as one.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn, listMotion, springy } from '$lib/motion/index.ts';
   import { at } from '$lib/at.ts';
   import { display, iconFor } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
@@ -154,7 +156,7 @@
         <h2 class="band-head" id="letter-{l.letter}">{l.letter}</h2>
         <ul class="ledger ledger-lead">
           {#each l.members as m (m.entry.seq)}
-            <li>{@render person(m, orgOf(m))}</li>
+            <li in:lineIn out:dismiss animate:flip={springy()}>{@render person(m, orgOf(m))}</li>
           {/each}
         </ul>
       </section>
@@ -163,7 +165,8 @@
   {#each bands as b (b.band)}
     <section class="band" aria-labelledby="band-{b.band}">
       <h2 class="band-head" id="band-{b.band}">{seenWords.bands[b.band]}</h2>
-      <ul class="ledger ledger-lead">
+      <!-- A PERSON OR AN ORGANISATION ARRIVING OR LEAVING HERE moves from the list (`listMotion`): each sits in an `{#if}`. -->
+      <ul class="ledger ledger-lead" {@attach listMotion('li')}>
         {#each b.items as item (item.key)}
           {#if item.kind === 'person'}
             <li>{@render person(item.member, item.org)}</li>
@@ -184,7 +187,7 @@
               </a>
               <ul class="ledger ledger-lead members" aria-label={name}>
                 {#each shown as m (m.entry.seq)}
-                  <li>{@render person(m, null)}</li>
+                  <li in:lineIn out:dismiss animate:flip={springy()}>{@render person(m, null)}</li>
                 {/each}
               </ul>
               {#if folds(item.members.length)}

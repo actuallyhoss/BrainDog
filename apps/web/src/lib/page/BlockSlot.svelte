@@ -84,7 +84,7 @@
   import { valueSaid } from '$lib/voice.ts';
   import { seenWords } from '$lib/record/blocks.ts';
   import { flip } from 'svelte/animate';
-  import { arrive, depart, listMotion, springy } from '$lib/motion/index.ts';
+  import { arrive, depart, dismiss, lineIn, listMotion, springy } from '$lib/motion/index.ts';
   import { isProject } from '$lib/record/project.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
   import { deskCards, type Desk } from '$lib/home/desk-part.ts';
@@ -943,7 +943,7 @@
   {:else}
   <!-- AND THE LEDGER VIEW SAYS WHO WAS PAID AS THE CARDS DO (`ledger-lines.ts`): words, not the bank's capitals. -->
   {@const shown = folded ? all.slice(0, folded.shown) : all}
-  <Table columns={block.columns} rows={linesPlan ? linesSaid(shown, linesPlan.title) : shown} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} rowActions={tableActions} act={tableActions ? tableAct : undefined} />
+  <Table columns={block.columns} rows={linesPlan ? linesSaid(shown, linesPlan.title) : shown} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} rowin={lineIn} rowout={dismiss} settle={springy} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} rowActions={tableActions} act={tableActions ? tableAct : undefined} />
   {/if}
   {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}

@@ -22,24 +22,16 @@
  *     short fade and everything else is at once.
  */
 
-import { cubicIn, cubicOut } from 'svelte/easing';
+import { cubicIn } from 'svelte/easing';
 import type { TransitionConfig } from 'svelte/transition';
 
-import { FADE, ms, still } from '../ui/motion.ts';
+import { FADE, ms, rowIn, rowOut, still } from '../ui/motion.ts';
 
 export { ms, still };
 
-/* ── the spring ───────────────────────────────────────────────────────────── */
+import { spring } from './spring.ts';
 
-const DAMP = 6.5;
-const RING = (DAMP / 0.75) * Math.sqrt(1 - 0.75 * 0.75);
-
-/**
- * THE RESTRAINED SPRING, as an easing: a damped spring from rest, most of the way in the first third, 2.8% past at about
- * half way and back by the end. The same curve the skin writes as `--ease-spring`, so a CSS animation and a Svelte one
- * land alike.
- */
-export const spring = (t: number): number => (t >= 1 ? 1 : t <= 0 ? 0 : 1 - Math.exp(-DAMP * t) * (Math.cos(RING * t) + (DAMP / RING) * Math.sin(RING * t)));
+export { spring };
 
 /* ── the first second of a screen ────────────────────────────────────────── */
 
@@ -87,6 +79,15 @@ export function arrive(_node: Element, { delay = 0, rise = 10, from = 0.97 }: { 
   };
 }
 
+/**
+ * A LINE ARRIVING IN A LIST: a payment, a person, a to-do. Its row opens, so the lines under it glide down to make room,
+ * while it rises into place on the spring and fades in (`ui/motion.ts` `rowIn`, which every list shares). A fade under
+ * reduced motion; still in a screen's first second.
+ */
+export function lineIn(node: Element, { delay = 0 }: { delay?: number } = {}): TransitionConfig {
+  return calm() ? NONE : { ...rowIn(node), delay };
+}
+
 /** A THING THROWN AWAY: it sinks to 97% and fades over `--form-out`, accelerating away. */
 export function depart(_node: Element): TransitionConfig {
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
@@ -94,24 +95,11 @@ export function depart(_node: Element): TransitionConfig {
 }
 
 /**
- * A THING ANSWERED, LEAVING ITS PLACE IN A LIST: it lets go first (sinks and fades in the first half), then the gap it
- * held closes on the spring, so what is under it rises into the room smoothly rather than jumping. The one size that
- * animates, because the closing gap is the point. A fade under reduced motion, and the gap simply gone.
+ * A THING ANSWERED, LEAVING ITS PLACE IN A LIST: it lets go first (sinks and fades), then the gap it held closes on the
+ * spring, so what is under it rises into the room smoothly rather than jumping (`ui/motion.ts` `rowOut`). The one size
+ * that animates, because the closing gap is the point. A fade under reduced motion, and the gap simply gone.
  */
-export function dismiss(node: Element): TransitionConfig {
-  if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
-  const h = (node as HTMLElement).offsetHeight;
-  const out = ms('--form-out', 180);
-  return {
-    duration: out + ms('--form-settle', 380) / 2,
-    css: (t) => {
-      const u = 1 - t;
-      const gone = Math.min(1, u / 0.45);
-      const close = spring(Math.max(0, (u - 0.3) / 0.7));
-      return `opacity:${(1 - cubicOut(gone)).toFixed(3)};transform:scale(${(1 - 0.03 * gone).toFixed(4)});block-size:${(h * (1 - close)).toFixed(1)}px;overflow:clip`;
-    },
-  };
-}
+export const dismiss = rowOut;
 
 /**
  * A PLACE COMING INTO THE SIDEBAR or the tab bar (an add-on turned on, a list that now has something): it slides in from
@@ -227,8 +215,12 @@ export const listMotion =
   };
 
 function arriveNow(el: HTMLElement): void {
-  if (still()) void play(el, { opacity: [0, 1] }, { duration: FADE });
-  else play(el, { opacity: [0, 1], transform: ['translateY(10px) scale(0.97)', 'none'] }, { duration: ms('--form-in', 320) });
+  if (still()) return void play(el, { opacity: [0, 1] }, { duration: FADE });
+  const h = el.offsetHeight;
+  const long = ms('--form-in', 320);
+  /* ITS ROOM OPENS while it rises, so what is under it glides down rather than jumping. */
+  el.animate({ blockSize: ['0px', `${h}px`], overflow: ['clip', 'clip'] }, { duration: long * 0.6, easing: 'cubic-bezier(0.2, 0, 0, 1)' });
+  play(el, { opacity: [0, 1], transform: ['translateY(10px) scale(0.97)', 'none'] }, { duration: long });
 }
 
 function leaveFrom(box: HTMLElement, el: HTMLElement, next: Node | null, prev: Node | null): void {

@@ -16,6 +16,7 @@
   Safe-area insets are paid exactly once, on the fixed element only. Paying twice is a real, easy bug.
 -->
 <script lang="ts">
+  import { arrive } from '$lib/motion/index.ts';
   import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy/frame.ts';
@@ -45,7 +46,7 @@
 
 <nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length + 1}`}>
   {#each tabs as tab (tab.key)}
-    <a class="tab tap" href={at(tab.href)} aria-current={lit === tab.key ? 'page' : undefined}>
+    <a class="tab tap" href={at(tab.href)} aria-current={lit === tab.key ? 'page' : undefined} in:arrive>
       <span class="badge-slot">
         <Icon name={tab.icon as IconName} size="xl" />
         {#if tab.count && tab.key === 'decide'}<span class="badge"><Count n={tab.count} size="s" label={`${tab.count} ${copy.openQuestions}`} /></span>{/if}

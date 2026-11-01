@@ -13,11 +13,16 @@
  *
  * ROW HEIGHT IS THE ONE LAYOUT PROPERTY THAT ANIMATES ANYWHERE: a row opening is the point of the motion, and the row
  * is the only thing laid out. Under reduced motion it is a 120ms fade and nothing moves.
+ *
+ * SINCE 1 NOVEMBER THE THREE RIDE THE RECORD FORMING'S SPRING AND STEPS (`$lib/motion`, `--form-in`, `--form-out`,
+ * `--form-settle`), so a line arriving in any list is the same satisfying motion as a card or a widget arriving.
  */
 
 import { tick } from 'svelte';
-import { cubicIn, quartOut } from 'svelte/easing';
+import { cubicOut } from 'svelte/easing';
 import type { TransitionConfig } from 'svelte/transition';
+
+import { spring } from '../motion/spring.ts';
 
 /** Whether the reader asked for less motion. */
 export const still = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -65,21 +70,38 @@ export const ms = (name: string, fallback: number): number => {
   return msIn(getComputedStyle(document.documentElement).getPropertyValue(name), fallback);
 };
 
-/** A row arriving: its height opens and it fades in. `quartOut` stands for `--ease-out`. */
+/**
+ * A ROW ARRIVING (the record forming of 1 November): its height opens on the even curve, so the rows under it glide down
+ * to make room, while it rises 8px into place on the spring (`--ease-spring`) and fades in, over `--form-in`.
+ */
 export function rowIn(node: Element): TransitionConfig {
   if (swapping) return { duration: 0 };
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
-  return { duration: ms('--d-rows', 180), easing: quartOut, css: (t) => `opacity:${t};block-size:${t * h}px;overflow:clip` };
+  return {
+    duration: ms('--form-in', 320),
+    css: (p) => `opacity:${Math.min(1, p * 3).toFixed(3)};transform:translateY(${((1 - spring(p)) * 8).toFixed(2)}px);block-size:${(h * cubicOut(Math.min(1, p / 0.6))).toFixed(1)}px;overflow:clip`,
+  };
 }
 
-/** A row leaving: the same height closing, accelerating away (`cubicIn` stands for `--ease-in`). */
+/**
+ * A ROW LEAVING: it lets go first, sinking a little and fading, and then the room it held closes on the spring, so the
+ * rows under it rise into place. Over `--form-out` and half of `--form-settle`.
+ */
 export function rowOut(node: Element): TransitionConfig {
   if (swapping) return { duration: 0 };
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
-  return { duration: ms('--d-rows', 180), easing: cubicIn, css: (t) => `opacity:${t};block-size:${t * h}px;overflow:clip` };
+  return {
+    duration: ms('--form-out', 180) + ms('--form-settle', 380) / 2,
+    css: (t) => {
+      const u = 1 - t;
+      const gone = Math.min(1, u / 0.45);
+      const close = spring(Math.max(0, (u - 0.3) / 0.7));
+      return `opacity:${(1 - cubicOut(gone)).toFixed(3)};transform:scale(${(1 - 0.03 * gone).toFixed(4)});block-size:${(h * (1 - close)).toFixed(1)}px;overflow:clip`;
+    },
+  };
 }
 
-/** Neighbours closing the gap: pass to `animate:flip`. Instant under reduced motion. */
-export const settle = (): { duration: number; easing: (t: number) => number } => ({ duration: swapping || still() ? 0 : ms('--d-rows', 180), easing: quartOut });
+/** Neighbours closing the gap, on the spring over `--form-settle`: pass to `animate:flip`. Instant under reduced motion. */
+export const settle = (): { duration: number; easing: (t: number) => number } => ({ duration: swapping || still() ? 0 : ms('--form-settle', 380), easing: spring });
