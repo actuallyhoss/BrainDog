@@ -966,6 +966,24 @@
   font-weight: var(--fw-medium);
 }
 
+/* A BILL READS AS A ROW, ITS AMOUNT AT THE RIGHT (design pass, 1 Nov; Look B "subject, then detail, then figure"):
+   Coming up stacked each bill's name, its amount and its day on three lines, so seventeen bills ran three screens on a
+   phone and no two amounts stood in a column. The amount takes the row's end, level with the name; the day and who
+   stay under the name. */
+[data-money] .list[data-kind='todo'] > .item:has(> .item-detail) {
+  grid-template-columns: 20px minmax(0, 1fr) auto auto 28px;
+  grid-template-areas:
+    'marker title state detail more'
+    '. meta meta meta .';
+}
+
+[data-money] .list[data-kind='todo'] > .item > .item-detail {
+  justify-self: end;
+  padding-inline-start: var(--sp-3);
+  text-align: end;
+  white-space: nowrap;
+}
+
 [data-money] .list > .item > .item-detail[data-sign='in'],
 [data-money] .amount[data-sign='in'] {
   color: var(--good);

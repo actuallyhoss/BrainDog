@@ -16,6 +16,7 @@
   import { page } from '$app/state';
   import { apiBase, at } from '$lib/at.ts';
   import { money, symbolFigure } from 'braindog-render';
+  import { arrive } from '$lib/motion/index.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import { loadCounter, writeCount, type Counted, type Loaded } from '$lib/money/cash-count-live.ts';
   import {
@@ -215,7 +216,10 @@
       {#snippet actions()}<Button href={at('/p/money-accounts', page.url.pathname)}>{words.toAccounts}</Button>{/snippet}
     </Empty>
   {:else if step === 'done'}
-    <div class="cc-done" role="status">
+    <!-- A COUNT SAVED RISES INTO PLACE (design pass, 1 Nov): the one rare, finished moment on this screen, where the
+         counter itself swapped for two lines with nothing between. `arrive` is still in a screen's first second and a
+         fade under reduced motion. -->
+    <div class="cc-done" role="status" in:arrive>
       <h2>{words.saved}</h2>
       <p>{words.savedBody}</p>
       <div class="cc-actions">
