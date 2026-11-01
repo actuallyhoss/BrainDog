@@ -1758,8 +1758,25 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "bd3b86c36cc0ed09de2cc5f3d4bdd90c3da4e1bb42562261f8d3e03e40a5b6b6",
+          "bytes": 521,
+          "published_at": "2026-11-01T00:57:39.276Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Wears its own icon in the store and in your add-ons."
+        },
         {
           "version": "1.0.0",
           "checksum": "f8d80cbfcd6ec05b2eca12d1c7710b407656ad8be4818af3ece87fba61359fb1",
@@ -1787,7 +1804,8 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "shelf": "looks"
+      "shelf": "looks",
+      "icon": "eye"
     },
     {
       "kind": "pack",
