@@ -289,6 +289,7 @@ export {
   axisFigure,
   barFigure,
   barFigures,
+  totalSaid,
   zeroFigure,
   type Home,
 } from './format.ts';

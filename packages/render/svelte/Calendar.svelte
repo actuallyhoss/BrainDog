@@ -74,7 +74,7 @@
   const skippedOf = (at: readonly number[]): string => (at.length ? calendarSkipped(at.map((i) => said(block.rows[i]!, 0) || MISSING)) : '');
   const skipped = $derived(skippedOf(strip ? strip.skipped : plan.skipped));
   /* EACH ROW'S AMOUNT, its third cell, as one set (`barFigures`), said in the agenda after its title. */
-  const amounts = $derived(barFigures(block.rows.map((r) => (r.cells[2] ?? '').trim()), opts.home));
+  const amounts = $derived(barFigures(block.rows.map((r) => (r.cells[2] ?? '').trim()), opts.home, true));
   const amountOf = (r: Row): string => amounts[block.rows.indexOf(r)] ?? '';
   /* A FEW ENTRIES ARE A LIST (`CALENDAR_FEW`), and where the host can act the reader may ask for the month instead. The
      choice is this drawing's alone, so the tree with nothing chosen is the twin's. */

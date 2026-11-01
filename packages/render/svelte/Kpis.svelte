@@ -108,7 +108,8 @@
 {#snippet figure(k: KpiView)}
   {#if k.figure}
     <p class="kpi-figure num">
-      {#if k.figure.before}<span class="kpi-code">{k.figure.before}</span>{/if}<span class="kpi-main">{k.figure.main}</span>{#if k.figure.after}<span
+      <!-- A PERCENT OR A DEGREE HUGS ITS FIGURE (coordinator's live check, 1 Nov): "1.8 %" stood with the unit a step away. -->
+      {#if k.figure.before}<span class="kpi-code">{k.figure.before}</span>{/if}<span class="kpi-main">{k.figure.main}{#if k.figure.after === '%' || k.figure.after === '°'}{k.figure.after}{/if}</span>{#if k.figure.after && k.figure.after !== '%' && k.figure.after !== '°'}<span
           class={/^[A-Z]{3}$/u.test(k.figure.after) ? 'kpi-code' : 'kpi-unit'}>{k.figure.after}</span
         >{/if}
     </p>

@@ -8,7 +8,7 @@
  * Eastern Arabic digits break tabular alignment: prose may use the locale's digits, a ledger may not.
  */
 
-import { amountsIn, currencyOfSign, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
+import { amountsIn, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
 
 const MINUS = '−';
 const NUM = 'en-u-nu-latn';
@@ -310,44 +310,32 @@ export function barFigure(text: string, home?: Home): string {
 }
 
 /**
- * A BAR CHART'S FIGURES AS ONE SET (2.A.7, the money review's S3): each through `barFigure`, then, when any of them
- * keeps a fraction, every figure is written with the same number of places, so "£6,140" never stands over "£2,473.33"
- * and the digits line up down the column. Whole sets stay whole. Never rounded; a cell that is not one figure is left
- * as it was.
+ * A BAR CHART'S FIGURES, OR A COLUMN'S, AS ONE SET (2.A.7, the money review's S3, changed 1 Nov): each through
+ * `barFigure`, then said by the one rule for cents below. A cell that is not one figure is left as it was.
  */
-/**
- * THE PLACES A CURRENCY IS WRITTEN TO, for a figure that names one: 2 for the pound, 0 for the yen, 3 for the dinar, by
- * the code where the figure carries one and by its sign where it does not (only `¥` and `₩` are whole). 0 for a figure
- * that names no currency, which is not money. A host may hand a cell already said in whole units ("−£2,500"), so the
- * places it was written with are not always there to keep.
- */
-function minorPlaces(text: string): number {
-  const p = figureParts(text);
-  if (!p) return 0;
-  const code = (p.code || p.unit).trim();
-  /* BY ISO 4217, as a record stores it, never by CLDR (Intl), which differs on IQD and MGA. */
-  if (/^[A-Z]{3}$/u.test(code)) return exponentOf(code);
-  if (code === '') return 0;
-  /* A SIGN ALONE BY THE WRITER'S OWN TABLE (`currencyOfSign`): `$` is the dollar's two places, `₫` the dong's none. */
-  const owner = currencyOfSign(code, null);
-  if (owner !== null) return exponentOf(owner);
-  return /[¥₩]/u.test(code) ? 0 : 2;
+export function barFigures(texts: readonly string[], home?: Home, written = false): string[] {
+  /* ONE RULE FOR CENTS, EVERYWHERE (coordinator's live check of 1 Nov): some money showed cents and some did not, "$3,200"
+     over "+$3,200.00". Now an amount shows its cents only where they say something: never ".00", and a total of a
+     thousand or more is said whole (`totalSaid`). `written`, a set of exact amounts (a ledger's lines, a list's rows),
+     keeps every cent that is not nought, whatever its size. Nothing is padded to line up any more. */
+  return texts.map((t) => {
+    const said = barFigure(t, home);
+    return written || !figureParts(t) ? said : totalSaid(said);
+  });
 }
 
-export function barFigures(texts: readonly string[], home?: Home, written = false): string[] {
-  const out = texts.map((t) => barFigure(t, home));
-  /* `written`: A SET SAID TO ITS CURRENCY'S PLACES, zeros too, as a ledger's lines are (`timelineDetails`). */
-  const drawnPlaces = (t: string, s: string): number => (figureParts(t) ? (/\d\.(\d+)/u.exec(s)?.[1]?.length ?? 0) : 0);
-  const placesOf = (t: string, s: string): number =>
-    written ? Math.max(drawnPlaces(t, s), figureParts(t)?.minor.length ?? 0, minorPlaces(t)) : drawnPlaces(t, s);
-  /* ONE CURRENCY TO A SET: a figure's mark, its words with the numerals taken out, says which set it is in. */
-  const markOf = (s: string): string => s.replace(/[\d.,−+-]/gu, '').trim();
-  const places = new Map<string, number>();
-  out.forEach((s, i) => places.set(markOf(s), Math.max(places.get(markOf(s)) ?? 0, placesOf(texts[i]!, s))));
-  return out.map((s, i) => {
-    const want = places.get(markOf(s)) ?? 0;
-    if (want === 0 || !figureParts(texts[i]!) || drawnPlaces(texts[i]!, s) === want) return s;
-    return s.replace(/(\d)(?![\d,])/u, `$1.${'0'.repeat(want)}`);
+/**
+ * A TOTAL AS IT IS SAID: whole from a thousand up ("$17,040" for $17,039.87), to the cent under a thousand where the cents
+ * are not nought ("$884.59"), and never ".00". Half a unit rounds away from nought. Text that holds no amount with
+ * cents comes back as it was. A single exact amount (a ledger line, a bill) is not a total and keeps its cents.
+ */
+export function totalSaid(text: string): string {
+  return text.replace(/(\d{1,3}(?:,\d{3})*|\d+)\.(\d+)(?!\d)/u, (found: string, whole: string, minor: string) => {
+    if (/^0+$/u.test(minor)) return whole;
+    const units = Number(whole.replaceAll(',', ''));
+    if (units < 1000) return found;
+    const up = Number(minor[0]) >= 5 ? 1 : 0;
+    return (units + up).toLocaleString('en');
   });
 }
 
@@ -366,7 +354,7 @@ export function barFigures(texts: readonly string[], home?: Home, written = fals
 export function headlineFigure(text: string, home?: Home): string {
   return text
     .split(/(\s·\s)/u)
-    .map((part, i) => (i % 2 === 1 ? part : (writtenOnce(part, home, 'read')?.text ?? headlineOne(part))))
+    .map((part, i) => (i % 2 === 1 ? part : totalSaid(writtenOnce(part, home, 'read')?.text ?? headlineOne(part))))
     .join('');
 }
 
