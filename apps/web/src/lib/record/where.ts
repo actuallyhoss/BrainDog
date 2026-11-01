@@ -303,7 +303,9 @@ function clausesOfNode(node: Predicate, schema: Schema, text: string, now: numbe
  */
 export function compile(register: string, where: string | undefined, now: number = Date.now()): Where {
   const schema = schemaOf(register);
-  const parsed = parseWhere(where, schema, { nowMs: now, refByTitle: (to, title) => rowNamed(to, title) });
+  /* `someone else` IS THE RECORD'S TO SAY (who else is on it), so this tab reads it as nobody: a task is yours unless
+     it says whose, which is how a record with one person reads it too. */
+  const parsed = parseWhere(where, schema, { nowMs: now, refByTitle: (to, title) => (title.trim().toLowerCase() === 'someone else' ? ['e_nobody'] : rowNamed(to, title)) });
   const predicate = parsed.predicate;
   /* AND WHAT THE RECORD'S COMPILER REFUSES ONCE THE SENTENCE HAS PARSED, a `contains` past its ceiling or a text test
      over a series among them: the record runs both before it reads a row, so between them they are every refusal it

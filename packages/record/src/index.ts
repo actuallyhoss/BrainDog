@@ -16377,7 +16377,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     fileHeld(sha256: string, ctx: CallContext): boolean {
       if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/u.test(sha256)) return true;
+      /* AND ANYBODY WHO DOES NOT READ EVERY LIST (`readsEveryList`): an Admin, a Viewer and a key are kept from the runs, a
+         personal list and a list kept for owners, and the hash of a file on one of those was a way round that. */
       const narrowed =
+        !readsEveryList(ctx) ||
         Array.isArray(ctx.registers) ||
         Object.values(ctx.levels ?? {}).some((level) => level === 'append') ||
         Object.keys(ctx.wheres ?? {}).length > 0 ||

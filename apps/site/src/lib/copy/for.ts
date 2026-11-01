@@ -140,11 +140,14 @@ export const forPages = {
         nav: 'For teams and agencies',
         title: 'For teams and agencies · BrainDog',
         description:
-          "Give each client a project. Everyone sees what's next and what's waiting, and every change says who made it.",
+          'Invite your team, each with their own sign-in and a role. Everyone sees what is theirs, and every change says who made it.',
         tag: 'For teams and agencies',
         said: "We run projects for clients. What's open, who has it, and what's late?",
-        /* "Colleagues are free" is dropped until early access says who may invite. Every change keeps who made it: docs/20. */
-        sub: "Give each client a project. Everyone sees what's next and what's waiting, and every change says who made it.",
+        /* THE DOCS' WORDS (`docs/02-use/09-sharing.md`): a second person joins with their own sign-in, at a role or on the
+           parts they are given; an agent sees what its person sees. Cloud Plus is not named while billing is off. */
+        sub:
+          'Give each client a project and invite your team, each with their own sign-in: Viewer, Member or Admin, or ' +
+          'only the parts you choose, so Money can stay yours. Everyone sees what is next, and every change says who made it.',
         rows: [
           {
             head: 'The board and the numbers together',

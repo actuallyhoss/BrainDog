@@ -151,6 +151,13 @@ export function methods(deps: RecordDeps) {
     return out;
   };
 
+  /**
+   * WHETHER A SHARE HIDES A FIELD OF THIS LIST FROM HER. An alias, an address and the words found in a row's text may each
+   * be a hidden field's, so on such a list she is told the row's name and nothing it was also called, and a row is found
+   * for her by its name alone.
+   */
+  const masked = (ctx: CallContext, register: string): boolean => sight.hidden(ctx, register).size > 0;
+
   /** A row as a caller is answered it, or `null` when it is not hers to read or is nothing the kernel's read knows. */
   const said = (ctx: CallContext, about: AboutDeps, id: string): AboutSaid | null => {
     const row = kernel.get(id);
@@ -166,7 +173,7 @@ export function methods(deps: RecordDeps) {
     const places = new Map<string, AboutSeen>();
     for (const s of [...kept, ...namedIn(ctx, row, names), ...askedOf(ctx, names)]) if (!places.has(s.where)) places.set(s.where, s);
     const seen = [...places.values()].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : a.where < b.where ? -1 : 1)).slice(0, SEEN);
-    return { ...what, seen, register: row.register, seq: row.seq };
+    return { ...what, ...(masked(ctx, row.register) ? { also: [] } : {}), seen, register: row.register, seq: row.seq };
   };
 
   return {
@@ -198,6 +205,8 @@ export function methods(deps: RecordDeps) {
         const row = handed.rows.get(c.h);
         const entry = row === undefined ? null : kernel.get(row.id);
         if (row === undefined || entry === null || !sight.admits(ctx, entry)) return [];
+        /* FOUND BY ITS NAME ALONE where a field of its list is hidden from her: an address, an alias or a note's words may be that field. */
+        if (row.how !== 'name' && masked(ctx, row.register)) return [];
         return [{ c, row, seq: entry.seq }];
       });
       const sure = found.filter((f) => f.row.how !== 'text');
@@ -205,7 +214,7 @@ export function methods(deps: RecordDeps) {
       const whole = deps.readsEveryList?.(ctx) === true;
       const candidates = found
         .filter((f) => is === null || f.row.id !== sure[0]!.row.id)
-        .map((f): AboutProposed => ({ kind: f.c.kind, name: f.c.name, also: f.c.also, seen: whole ? f.c.seen : [], register: f.row.register, seq: f.seq }));
+        .map((f): AboutProposed => ({ kind: f.c.kind, name: f.c.name, also: masked(ctx, f.row.register) ? [] : f.c.also, seen: whole ? f.c.seen : [], register: f.row.register, seq: f.seq }));
       return { ok: true, value: { is, candidates } };
     },
   };

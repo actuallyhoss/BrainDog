@@ -295,7 +295,8 @@ export const WORK_REGISTERS: Record<string, WorkRegister> = {
          an agent that sets a tier says what it weighed. Optional, and not indexed, for the same reason as the tier. */
       { id: 'why', label: 'Why this tier', type: 'text' },
       /* WHO HOLDS IT, a person. Empty is you. A link, so Work installs on a record with no People and leaves it out. */
-      { id: 'owner', label: 'Owner', type: 'ref', to: 'people', index: true },
+      /* ASSIGNED TO (work 1.21.0): "Owner" read as the BrainDog's owner on a team. The id stays. */
+      { id: 'owner', label: 'Assigned to', type: 'ref', to: 'people', index: true },
       /* THE AGENT THAT TOOK IT, by the name it signs its runs with (claude, codex, cursor). An agent is a delegate, never
          the owner, so the two are separate fields. */
       { id: 'agent', label: 'Agent', type: 'text', index: true },
@@ -354,7 +355,11 @@ const WAITING = 'state is review or blocked';
  * the undated and the far off. `by is empty` is read by the record and by the app's sample engine alike.
  */
 const IN_HAND = 'state is open or doing';
-const YOURS = `${IN_HAND}, agent is empty`;
+/* AND NOT SOMEBODY ELSE'S (work 1.21.0, teams): on a record more than one person holds, a task assigned to a colleague
+   is theirs, so yours is unassigned or assigned to you (`owner is not someone else`, read for whoever is looking). On a
+   record of one, or without People's Owner field, nobody else holds anything and yours is what it was. */
+const NOT_THEIRS = 'owner is not someone else';
+const YOURS = `${IN_HAND}, agent is empty, ${NOT_THEIRS}`;
 
 /**
  * WORK'S FIGURES, as documents a page names. Counts of tasks, never a score: how much is open, what is due soon or past
@@ -882,7 +887,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         /* AND YOURS AND AGENTS COUNT WHAT OPEN COUNTS TOO (recheck of 30 October, N7): 12 and 4 stood under "Work 15". */
         counts: OPEN,
         options: [
-          { value: 'yours', label: 'Yours', where: 'agent is empty' },
+          { value: 'yours', label: 'Yours', where: `agent is empty, ${NOT_THEIRS}` },
           { value: 'agents', label: 'Agents', where: 'agent is set' },
         ],
       },
@@ -1322,7 +1327,7 @@ export const WORK_WIDGETS = {
         /* TODAY'S OWN THIS WEEK, clause for clause (`work-due` in the app's `default-home.ts`), since the gallery says Today
            shows this as Your work this week (`alike`): yours, open, from today to a week out. It read every task not done
            before a week out, late and agents' ones too, and listed 7 beside Today's 2 (audit of 31 October, A35). */
-        where: 'state is open or doing, agent is empty, by after yesterday, by before +8d',
+        where: `${YOURS}, by after yesterday, by before +8d`,
         columns: [{ field: 'what' }, { field: 'by' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,

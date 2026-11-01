@@ -299,7 +299,13 @@
   }
 
   /* THE PLACES, each with the lists in it (`invite-places.ts`), and which of them are opened list by list. */
-  const groups = $derived(placeGroups(lists, shell.lists ?? [], shell.nav ?? []));
+  const groups = $derived(
+    placeGroups(
+      lists,
+      (shell.lists ?? []).map((l) => ({ ...l, icon: shell.index.registers.find((r) => r.id === l.id)?.icon })),
+      shell.nav ?? [],
+    ),
+  );
   let openGroups = $state<string[]>([]);
   const MIXED = 'mixed';
   /** One level when every list of a place is at it, else `mixed`, which the select says as "Some lists". */

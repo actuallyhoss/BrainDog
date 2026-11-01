@@ -2,11 +2,10 @@ import { cases } from './copy/cases.ts';
 import { DESKTOP_NOTARIZED } from './desktop.ts';
 
 /**
- * The one page written for one kind of person that a visitor reaches; the rest are in `HELD`. /for/teams IS HELD
- * TOO (his call 10 taken as suggested): it sold working as a team while brain.dog
- * holds invitations, so a team that signed up from it could not do what it showed.
+ * The pages written for one kind of person that a visitor reaches; the rest are in `HELD`. /for/teams IS BACK (1 Nov):
+ * it was held from 23 October while brain.dog held invitations, and teams are open now, on any plan while billing is off.
  */
-export const FOR_SHOWN: readonly string[] = ['/for/founders'];
+export const FOR_SHOWN: readonly string[] = ['/for/founders', '/for/teams'];
 
 /**
  * What is true on launch day and not before, one flag per fact.

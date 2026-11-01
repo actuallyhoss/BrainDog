@@ -474,8 +474,15 @@ export function quietTile(): PageBlock {
  * block a page hides is, and each write still finds its block by index. Every other block is handed back as it came.
  */
 export function quietHeld<B extends { source?: string | undefined; refusals: readonly unknown[]; drawn: boolean }>(blocks: readonly B[]): B[] {
-  return blocks.map((b) => ((b.source === QUIET || b.source === NUMBERS) && b.drawn && b.refusals.length > 0 ? { ...b, drawn: false } : b));
+  return blocks.map((b) => (b.drawn && ((b.source === QUIET || b.source === NUMBERS) && b.refusals.length > 0 || b.refusals.some(heldFrom)) ? { ...b, drawn: false } : b));
 }
+
+/**
+ * A REFUSAL THAT SAYS THE TILE IS HELD FROM THIS READER, which a colleague given part of the BrainDog meets on every
+ * tile over a list she was not given: not drawn, so it takes no cell on the board and leaves no hole where it stood, and
+ * Today is the tiles she can use. The owner's own Today has none.
+ */
+const heldFrom = (r: unknown): boolean => r !== null && typeof r === 'object' && ['FORBIDDEN', 'LEVEL_REQUIRED'].includes(String((r as { code?: unknown }).code));
 
 /** The source the few key numbers that lead Today are read from (the kernel's `sources/kpis.ts`), named as its kind is. */
 export const NUMBERS: string = KPIS_KIND;
@@ -661,7 +668,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
             source: `register.${TASKS}`,
             /* WORK'S OWN THIS WEEK (audit of 30 October, 16): yours, from today to a week out, as Work's This week counts
                it (`tasks-this-week-yours`), so the tile and Work say one number. */
-            where: 'state is open or doing, agent is empty, by after yesterday, by before +8d',
+            where: 'state is open or doing, agent is empty, owner is not someone else, by after yesterday, by before +8d',
             columns: [{ field: 'what' }, { field: 'by' }],
             order: [{ field: 'by', dir: 'asc' }],
             limit: COMING_UP_LIMIT,

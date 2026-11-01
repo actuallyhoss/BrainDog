@@ -659,14 +659,14 @@ function namesSaid(names: readonly string[]): string {
 /** Where the names in one question were read: notes by what they are kept on, runs by the project each ran in. */
 type Source = { run: boolean; about: string };
 
-/** "your note on Oxbow", "your notes on Oxbow and Jo and a run on Fanline", and whether that is more than one. */
+/** "the note on Oxbow", "the notes on Oxbow and Jo and a run on Fanline" (said the same to a colleague as to the owner), and whether that is more than one. */
 function sourcesSaid(sources: readonly Source[]): { said: string; many: boolean } {
   const notes = [...new Set(sources.filter((s) => !s.run).map((s) => s.about))];
   const runs = sources.filter((s) => s.run);
   const placed = [...new Set(runs.map((s) => s.about).filter((a) => a !== ''))];
   const parts: string[] = [];
-  if (notes.length === 1) parts.push(`your note on ${notes[0]}`);
-  else if (notes.length > 1) parts.push(`your notes on ${namesSaid(notes)}`);
+  if (notes.length === 1) parts.push(`the note on ${notes[0]}`);
+  else if (notes.length > 1) parts.push(`the notes on ${namesSaid(notes)}`);
   if (runs.length === 1) parts.push(placed.length === 1 ? `a run on ${placed[0]}` : 'a run');
   else if (runs.length > 1) parts.push(placed.length === 0 ? `${runs.length} runs` : `runs on ${namesSaid(placed)}`);
   return { said: parts.join(' and '), many: notes.length + runs.length > 1 };
@@ -1200,7 +1200,7 @@ export function serveOffers(kernel: OffersKernel, deps: OffersDeps): OffersServe
   const offers: Offer[] = [];
   const said = (from: ReadonlySet<string>): string => {
     const notes = [...from];
-    return notes.length === 1 ? `Your note on ${notes[0]} says so.` : `Your notes on ${namesSaid(notes)} say so.`;
+    return notes.length === 1 ? `The note on ${notes[0]} says so.` : `The notes on ${namesSaid(notes)} say so.`;
   };
   const patchOf = (plan: Plan): Record<string, unknown> => {
     const f = plan.person.row.fields;

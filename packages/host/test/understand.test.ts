@@ -380,7 +380,7 @@ test('THE NOTES PASS ASKS, NEVER WRITES: one question for the one relation, with
   assert.ok(!JSON.stringify(asked[0]).includes('@'), 'an address went to the model');
 
   assert.equal(r.filed.length, 1);
-  assert.equal(r.filed[0]!.question, 'Add Ahmed to People? Your note on Oxbow names them.');
+  assert.equal(r.filed[0]!.question, 'Add Ahmed to People? The note on Oxbow names them.');
   assert.ok(!r.filed[0]!.question.includes('—'));
   assert.deepEqual(r.filed[0]!.body, {
     register: 'people',
@@ -545,7 +545,7 @@ test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT
   assert.deepEqual(out, { ran: true, asked: 2 });
   assert.deepEqual(
     r.filed.map((f) => f.question),
-    ['Add an address at gmail.com and a GitHub login to Quill? Your note on Quill says so.', 'Link Jo Okonkwo to Oxbow? Your note on Oxbow says so.'],
+    ['Add an address at gmail.com and a GitHub login to Quill? The note on Quill says so.', 'Link Jo Okonkwo to Oxbow? The note on Oxbow says so.'],
   );
   for (const f of r.filed) assert.ok(!f.question.includes('@') && !f.question.includes('—'), f.question);
   /* THE KERNEL'S OWN SHAPE FOR AN OFFER: the row as a person says it, and the keys, so a later meeting brings it up to date. */
@@ -563,7 +563,7 @@ test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT
   assert.equal(held?.fields.email ?? null, null);
   assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0 + 60_000, log: () => {} }), { ran: false, asked: 0, why: 'not yet' });
   assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0 + NOTES_EVERY_MS + 60_000, log: () => {} }), { ran: true, asked: 1 });
-  assert.equal(r.filed[2]!.question, 'Link Quill to Oxbow? Your note on Quill says so.');
+  assert.equal(r.filed[2]!.question, 'Link Quill to Oxbow? The note on Quill says so.');
   assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0 + 2 * NOTES_EVERY_MS + 120_000, log: () => {} }), { ran: true, asked: 0 });
 
   /* MET AGAIN BEFORE THE OWNER ANSWERS, the offer is brought up to Quill as they are now, and still accepted. */
@@ -628,7 +628,7 @@ test("NEVER THE OWNER'S ADDRESS, AN ORGANISATION'S KEY OR A SHARED INBOX, and on
   assert.ok(r.api.kernel.create('people', { name: 'Cleo', note: 'Her email is cleo@kiln.example' }, { actor: 'p_member' }).ok);
 
   assert.deepEqual(serveOffers(r.kernel, { store, now: () => T0, log: () => {} }), { ran: true, asked: 2 });
-  assert.equal(r.filed[0]!.question, 'Add an address at kiln.example to Ann Lee? Your note on Ann Lee says so.');
+  assert.equal(r.filed[0]!.question, 'Add an address at kiln.example to Ann Lee? The note on Ann Lee says so.');
   assert.deepEqual(r.filed[0]!.body.offer, { keys: ['email:ann@kiln.example'] });
   assert.ok(!r.filed.some((f) => f.question.includes('Cleo')), 'a member\'s note was offered from');
 });
@@ -670,7 +670,7 @@ test("A RUN'S HANDOFF IS READ FOR NAMES: one is a question linked to the run's p
   assert.deepEqual(out, { ran: true, read: 3, asked: 1 });
   const runs = asked[0]!.notes.filter((n) => n.kind === 'run');
   assert.deepEqual(runs.map((n) => [n.about, n.text]), [['Oxbow', 'Menu proofs Send the proofs to Mateo once he signs off.']]);
-  assert.equal(r.filed[0]!.question, 'Add 2 names to People? Ahmed and Mateo, named in your note on Oxbow and a run on Oxbow.');
+  assert.equal(r.filed[0]!.question, 'Add 2 names to People? Ahmed and Mateo, named in the note on Oxbow and a run on Oxbow.');
   assert.deepEqual((r.filed[0]!.body.rows as unknown[])[1], {
     name: 'Mateo',
     met: ['2026-10-06 · a run on Oxbow: "Send the proofs to Mateo once he signs off."'],

@@ -4039,7 +4039,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        its caller may not open or sees narrowed. A declared page's read passes no `reads`; reach checked its lists. */
     const whole = readerSchemaOf(q.hops ?? q.reads)(q.register)!;
     const schema: Schema = hidden.size === 0 ? whole : { ...whole, fields: Object.fromEntries(Object.entries(whole.fields).filter(([id]) => !hidden.has(id))) };
-    const said = predicateOf(q.where, schema, q.reads === undefined ? evalContext() : { ...evalContext(), reads: q.reads });
+    const said = predicateOf(q.where, schema, q.reads === undefined ? evalContext([], undefined, q.reader) : { ...evalContext([], undefined, q.reader), reads: q.reads });
     if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
 
     /* A PREDICATE THAT COULD NOT BE READ RUNS NOTHING. Returning the register would be a list that
@@ -7393,11 +7393,29 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   const readingHeld = (decl: MetricDecl, ctx: EvalContext, how: string, read: (sql: Sql, ctx: EvalContext) => Result<Reading>, once: Stamps = { rows: new Map() }): Result<Reading> => {
     if (ctx.asOfMs !== undefined || ctx.point === true || ctx.reads !== undefined) return read(sql, ctx);
     const tz = readableZone(ctx.tz);
-    return holdAcross(readingsHeld, JSON.stringify([how, ctx.viewer ?? null, tz, decl]), tz, ctx.nowMs, once, () => read(sql, ctx));
+    /* A FIGURE THAT SAYS `someone else` IS EACH READER'S OWN, and is held for each. */
+    const whose = ctx.reader !== undefined && JSON.stringify(decl).toLowerCase().includes(SOMEONE_ELSE) ? ctx.reader : null;
+    return holdAcross(readingsHeld, JSON.stringify([how, ctx.viewer ?? null, whose, tz, decl]), tz, ctx.nowMs, once, () => read(sql, ctx));
   };
 
-  const evalContext = (staged: readonly Declaration[] = [], viewer?: string): EvalContext => withViewer(viewer, {
+  /**
+   * THE PEOPLE ROWS OF EVERYBODY ON THE RECORD BUT `reader`, for a `where` that says `someone else` (a task's Owner is
+   * not someone else: it is unassigned or it is yours). Read through the address each signs in with (`meOf`), so a
+   * person nobody invited is nobody's. With no reader, or nobody else, it is a row id no row has, which `is not` passes.
+   */
+  const SOMEONE_ELSE = 'someone else';
+  const NOBODY_ROW = 'e_nobody';
+  const othersOf = (reader: string | undefined, people: string): string[] => {
+    if (reader === undefined) return [NOBODY_ROW];
+    const others = sql
+      .all<{ person_id: string }>('SELECT DISTINCT person_id FROM member WHERE person_id <> ?', reader)
+      .flatMap((m) => meOf(sql, m.person_id, people));
+    return others.length === 0 ? [NOBODY_ROW] : [...new Set(others)];
+  };
+
+  const evalContext = (staged: readonly Declaration[] = [], viewer?: string, reader: string | undefined = viewer): EvalContext => withViewer(viewer, {
     nowMs: clock.now(),
+    ...(reader === undefined ? {} : { reader }),
     /* THE RECORD'S ZONE, SO A LIVE READ NAMES THE DAY THE NIGHT POINT WILL BE STORED UNDER. Without it
        `metric`, `list` and every page block dated `today` by UTC while `snapshot` dated it locally: in
        `Asia/Tokyo` at 00:05 on the 6th, `created_at is today` read 1100 live and 110 in the point
@@ -7419,6 +7437,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     refByTitle: (register, title) => {
       const decl = registers.get(register);
       if (!decl) return null;
+      if (title.trim().toLowerCase() === SOMEONE_ELSE && register === meetsRole(registers.values())?.register) return othersOf(reader, register);
       return sql
         .all<{ id: string }>(`SELECT id FROM entry WHERE register = ? AND json_extract(fields, '$.${decl.title}') = ?`, register, title)
         .map((r) => r.id);
@@ -8014,6 +8033,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         ...(q.limit ? { limit: q.limit } : {}),
         ...(q.order?.length ? { order: q.order } : {}),
         ...(q.cursor ? { cursor: q.cursor } : {}),
+        ...(viewer === undefined ? {} : { reader: viewer }),
       }, scopeFor(undefined, q.register, viewer, anyHiddenFrom(viewer, q.register)));
       return out.ok ? ok({ rows: out.value.rows, matched: out.value.matched, cursor: out.value.cursor }) : out;
     },
