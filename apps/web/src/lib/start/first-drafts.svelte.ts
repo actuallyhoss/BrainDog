@@ -168,7 +168,10 @@ export function settleDrafts(base: string, keys: readonly string[]): void {
   set({ ...k, gone: [...new Set([...k.gone, ...keys])], back: (k.back ?? []).filter((b) => !keys.includes(b)) });
 }
 
-/** Drafts put back on the card: the record said no to keeping them, or the toast's Undo took them back out of it. */
+/**
+ * Drafts put back on the card: the record said no to keeping them, or the toast's Undo took them back out of it.
+ * The keys may name every entry a draft wrote (`list:title`), each read as nobody kept yet until kept again.
+ */
 export function restoreDrafts(base: string, keys: readonly string[]): void {
   const k = draftsFor(base);
   if (k === null) return;

@@ -22,7 +22,7 @@
 
   import { apiBase } from '$lib/at.ts';
   import { reread } from '$lib/data/live.svelte.ts';
-  import type { TellOptions } from '$lib/tell/read.ts';
+  import type { TellList, TellOptions } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import Money from '$lib/ui/Money.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -67,6 +67,8 @@
   let rules = $state.raw<FirstDraft[]>([]);
   let merge = $state.raw<((m: readonly FirstDraft[], r: readonly FirstDraft[]) => FirstDraft[]) | null>(null);
   let fill = $state.raw<((d: FirstDraft, value: string) => FirstDraft) | null>(null);
+  /** The lists the words were last read against, so a kept draft's every entry can be named by its list's title. */
+  let readLists: readonly TellList[] = [];
   $effect(() => {
     const said = kept?.begin.said ?? '';
     const built = kept?.begin.built ?? [];
@@ -95,6 +97,7 @@
          names and people; each list the modules declare that Today has not learned yet beside them. */
       const own = new Set(opts.lists.map((l) => l.id));
       const lists = [...opts.lists, ...d.tellListsOf(d.modulesHeld(registers), today).filter((l) => !own.has(l.id))];
+      readLists = lists;
       const read = { ...opts, lists, currency: opts.currency ?? kept?.begin.currency ?? null };
       merge = d.mergeDrafts;
       fill = d.filled;
@@ -171,6 +174,16 @@
     }
     const client = createClient({ base });
     const keys = these.map((d) => d.key);
+    /* EVERY ENTRY A DRAFT WRITES, by its list and title ("people:salma" beside "obligations:salma owes you"): an Undo
+       takes all of them out, and each must read as nobody kept yet, or the draft kept again points at the person the
+       Undo deleted. */
+    const written = these.flatMap((d) =>
+      d.rows.flatMap((r) => {
+        const title = readLists.find((l) => l.id === r.register)?.title;
+        const v = title ? r.fields[title] : undefined;
+        return typeof v === 'string' && v.trim() !== '' ? [`${r.register}:${v.replace(/\s+/gu, ' ').trim().toLowerCase()}`] : [];
+      }),
+    );
     /* EACH DRAFT'S ENTRIES IN ONE CAPTURE, each `$row` pointed again past the drafts before it. */
     const sent: { register: string; fields: Record<string, unknown> }[] = [];
     for (const d of these) {
@@ -185,8 +198,8 @@
     }
     await run({
       /* OFF THE CARD AT ONCE, back on it if the record says no. */
-      apply: () => settleDrafts(base, keys),
-      revert: () => restoreDrafts(base, keys),
+      apply: () => settleDrafts(base, [...keys, ...written]),
+      revert: () => restoreDrafts(base, [...keys, ...written]),
       send: async () => {
         const answer = await client.capture({ rows: sent });
         if (answer.ok) return { ok: true as const, value: answer.value };
@@ -200,7 +213,7 @@
       /* THE TOAST'S UNDO TAKES THEM BACK OUT OF THE RECORD AND PUTS THE DRAFTS BACK ON THE CARD: the record's undo reads
          the screen again through this, and only once it has put them back. */
       reread: () => {
-        restoreDrafts(base, keys);
+        restoreDrafts(base, [...keys, ...written]);
         void invalidateAll();
         return reread();
       },
