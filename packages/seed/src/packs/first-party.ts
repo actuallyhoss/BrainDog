@@ -938,11 +938,14 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   organisations, `LINKS` below); open work with a client and no project is no longer counted or listed as needing a
  *   project (`metric.tasks-no-project`, `page.work`), and Work's bands say the client beside the task. A field added,
  *   no id taken away, so a minor step.
+ * - people 4.3.0 (client-link, 2 Nov): People's line counts people and organisations apart and names the clients while
+ *   there are three or fewer (`page.people`), over four figures added (`metric.organisations-clients`,
+ *   `metric.organisations-not-clients`, `metric.people-clients`, `metric.people-not-clients`). Ids added, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.30.2',
-  people: '4.2.2',
+  people: '4.3.0',
   'money-core': '3.34.0',
   estate: '2.7.0',
   work: '1.23.0',

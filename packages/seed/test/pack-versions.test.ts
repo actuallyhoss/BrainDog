@@ -3327,6 +3327,21 @@ const DECLARED: Record<string, Version> = {
       'Work 1.23.0 of 2 November (client-link): `register.tasks` gains Client, a link to the organisations; `metric.tasks-no-project` and `page.work`\'s Needs a project leave out a task with a client, and the bands of `page.work` say the client, with Client beside Project in a list of tasks; no id added or taken away -> 3ada74ddfab871db',
     ],
   },
+  /* A VERSION AND NOT A RESET: people's last version is on `origin/master`. */
+  'people@4.3.0': {
+    holds: `
+      metric.organisations-clients metric.organisations-count metric.organisations-from-card-texts metric.organisations-known
+      metric.organisations-not-clients metric.people-clients metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d
+      metric.people-in-touch-90d metric.people-not-clients metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '380d19ff5d15f860',
+    history: [
+      'People 4.3.0 of 2 November (client-link): `page.people` counts people and organisations apart and names the clients while there are few, over `metric.organisations-clients`, `metric.organisations-not-clients`, `metric.people-clients` and `metric.people-not-clients`, four ids added -> 380d19ff5d15f860',
+    ],
+  },
 
 };
 

@@ -147,6 +147,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '4.3.0', notes: 'People\'s first line counts people and organisations apart, and names your clients while there are a few: "Fenwick and Acme, 2 clients".' },
     { version: '4.2.2', notes: 'People says who may be listed twice in plainer words.' },
     { version: '4.2.1', notes: 'People says how many organisations and shops you deal with in one count, the one their list shows.' },
     { version: '4.2.0', notes: 'People says how many organisations you work with, apart from the shops your card texts named.' },

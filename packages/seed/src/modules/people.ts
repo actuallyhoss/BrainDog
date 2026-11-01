@@ -477,6 +477,57 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  /* THE CLIENTS, SINCE People 4.3.0 (2 Nov, the first run: "2 people besides you" stood over Fenwick and Acme, two
+     companies kept as organisations, and with no person in People the line said nothing at all). Each list counts its
+     own, since a figure reads one list: the organisations kept as a client, and the people whose role is client. The
+     page's line names them while there are few (`.names`) and counts them past that. */
+  'organisations-clients': {
+    metric: 'organisations-clients',
+    name: 'Client organisations',
+    source: 'register.organisations',
+    where: 'merged_into is empty, retired_on is empty, kind is client',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* THE ORGANISATIONS THAT ARE NOT CLIENTS, so the line counts the rest apart: "Fenwick and Acme, 2 clients, 3 other
+     organisations". A shop from a card text, with no kind, is one of them. */
+  'organisations-not-clients': {
+    metric: 'organisations-not-clients',
+    name: 'Other organisations',
+    source: 'register.organisations',
+    where: 'merged_into is empty, retired_on is empty, kind is not client',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  'people-clients': {
+    metric: 'people-clients',
+    name: 'Clients',
+    source: 'register.people',
+    where: 'merged_into is empty, self is not true, role is client',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* EVERYBODY BESIDES YOU WHO IS NOT A CLIENT, so a line that has named the clients counts the others once. */
+  'people-not-clients': {
+    metric: 'people-not-clients',
+    name: 'Other people',
+    source: 'register.people',
+    where: 'merged_into is empty, self is not true, role is not client',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
   /* NOT A VERDICT: an accountant you speak to once a year is quiet and fine. The line names how many, and the cards say who. */
   'people-quiet': {
     metric: 'people-quiet',
@@ -548,7 +599,26 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         /* A QUESTION THAT ADDS OR CHANGES SOMEBODY IS ABOUT THEM: "Add Priya to People?"
            names no row of its own, and the line said no question was open while it waited in Needs you. The kernel
            counts a rowset on People here now (`openOnList`), and Waiting on you lists it. */
-        body: '{{questions-open-in:people}} question(s) for you, {{people-count}} person(s) besides you',
+        /* PEOPLE AND ORGANISATIONS COUNTED APART, AND THE CLIENTS NAMED WHILE THEY ARE FEW, SINCE People 4.3.0 (2 Nov,
+           the first run: a freelancer with Fenwick and Acme, both organisations, read "2 people besides you", and once
+           they were kept as organisations the line said nothing). Three or fewer clients, all in one list, are named
+           ("Fenwick and Acme, 2 clients"); more, or clients in both lists, are counted. A clause at nought is left out,
+           so a record of people alone reads as it did. */
+        says: [
+          {
+            when: { all: [{ metric: 'organisations-clients', gt: 0 }, { metric: 'organisations-clients', lte: 3 }, { metric: 'people-clients', is: 0 }] },
+            body: '{{questions-open-in:people}} question(s) for you, {{organisations-clients.names}}, {{organisations-clients}} client(s), {{people-count}} person(s) besides you, {{organisations-not-clients}} other organisation(s)',
+          },
+          {
+            when: { all: [{ metric: 'people-clients', gt: 0 }, { metric: 'people-clients', lte: 3 }, { metric: 'organisations-clients', is: 0 }] },
+            body: '{{questions-open-in:people}} question(s) for you, {{people-clients.names}}, {{people-clients}} client(s), {{people-not-clients}} other person(s) besides you, {{organisations-count}} organisation(s)',
+          },
+          {
+            when: { any: [{ metric: 'organisations-clients', gt: 0 }, { metric: 'people-clients', gt: 0 }] },
+            body: '{{questions-open-in:people}} question(s) for you, {{organisations-clients}} client organisation(s), {{people-clients}} client(s) in People, {{people-not-clients}} other person(s) besides you, {{organisations-not-clients}} other organisation(s)',
+          },
+          { body: '{{questions-open-in:people}} question(s) for you, {{people-count}} person(s) besides you, {{organisations-count}} organisation(s)' },
+        ],
       },
       {
         /* WHO HAS GONE QUIET, BY NAME, SINCE People 2.7.0 (the visual review of October 2nd), where the line said "1 quiet
