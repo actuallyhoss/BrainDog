@@ -8,6 +8,7 @@
 
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
+  import { handOver } from '$lib/motion/open.ts';
   import { ON_WORD_PREF, onWordOn, onWordSaid, onWordWords as words } from './on-word.ts';
 
   let { prefs }: { prefs?: Record<string, unknown> | undefined } = $props();
@@ -38,13 +39,13 @@
   <div class="switch-row">
     <div class="switch-row-words">
       <span class="switch-row-title">{words.title}</span>
-      <p class="switch-row-line" id="on-word-said">{onWordSaid(on)}</p>
+      {#key on}<p class="switch-row-line" in:handOver id="on-word-said">{onWordSaid(on)}</p>{/key}
     </div>
-    <button type="button" class="switch" role="switch" aria-checked={on} aria-label={words.title} aria-describedby="on-word-said" disabled={busy} onclick={() => void flip()}
+    <button type="button" class="switch" role="switch" aria-checked={on} aria-label={words.title} aria-describedby="on-word-said" aria-busy={busy} onclick={() => void flip()}
       ><span class="switch-track"></span></button
     >
   </div>
-  {#if refusal}<p class="on-word-refused" role="status">{refusal}</p>{/if}
+  {#if refusal}<p class="on-word-refused" role="status" in:handOver>{refusal}</p>{/if}
 </div>
 
 <style>

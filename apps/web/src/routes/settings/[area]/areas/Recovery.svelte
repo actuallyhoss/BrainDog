@@ -2,6 +2,9 @@
   Settings > Recovery: the passkeys that get you back in, and the ways in without one.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn } from '$lib/motion';
+  import { settle } from '$lib/ui/motion.ts';
   import { copy } from '$lib/copy.ts';
   import { signinFor } from '$lib/at.ts';
   import { page } from '$app/state';
@@ -105,7 +108,7 @@
       {:else}
         <ul class="ledger ledger-lead">
           {#each liveKeys as k (k.id)}
-            <li>
+            <li in:lineIn out:dismiss animate:flip={settle()}>
               <div class="line line-tall">
                 <span class="line-mark"><IconWell name="key" size="l" /></span>
                 <span class="line-main">

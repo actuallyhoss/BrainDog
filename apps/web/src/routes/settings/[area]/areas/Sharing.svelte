@@ -16,6 +16,9 @@
   rung), "Share on" beside it opens the onward sheet (`OnwardSheet.svelte`).
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn } from '$lib/motion';
+  import { settle } from '$lib/ui/motion.ts';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { day } from 'braindog-render';
@@ -231,7 +234,7 @@
     <ul class="shares">
       {#each b.rows as r (r.id)}
         {@const said = stopWords(r)}
-        <li class="share" data-ended={ended ? '' : undefined}>
+        <li class="share" data-ended={ended ? '' : undefined} in:lineIn out:dismiss animate:flip={settle()}>
           {#if ended}
             <p class="share-said">{r.sentence}</p>
             <p class="share-when">{copy.sharingEndedOn(dayOf(endedAt(r)))}</p>
@@ -351,13 +354,13 @@
     {:else}
       <ul class="bunches">
         {#each groups ?? [] as g (g.id)}
-          <li class="bunch group">
+          <li class="bunch group" in:lineIn out:dismiss animate:flip={settle()}>
             <h3 class="bunch-name" dir="auto"><Icon name="user-plus" size="s" /><span>{g.name}</span></h3>
             <p class="share-when">{copy.sharingGroupSize(g.people.length)} · {copy.sharingGroupHolds(g.shares)}</p>
             {#if g.people.length > 0}
               <ul class="shares">
                 {#each g.people as p (p.id)}
-                  <li class="share">
+                  <li class="share" in:lineIn out:dismiss animate:flip={settle()}>
                     <span class="share-said" dir="auto">{p.name ?? copy.sharingSomeone}</span>
                     <Button weight="bare" disabled={busy} aria-label={copy.sharingGroupOutLabel(p.name ?? copy.sharingSomeone, g.name)} onclick={() => void takeOut(g, p)}
                       >{copy.sharingGroupOut}</Button

@@ -3,6 +3,9 @@
   every other sender's door.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn } from '$lib/motion';
+  import { settle } from '$lib/ui/motion.ts';
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
@@ -272,7 +275,7 @@
     <ul class="doors">
       {#each doorList as door (door.id)}
         {@const lit = doorState(door)}
-        <li class="door">
+        <li class="door" in:lineIn out:dismiss animate:flip={settle()}>
           <IconWell name="plug" size="l" />
           <span class="door-words">
             <span class="door-name" dir="auto">{door.name}</span>

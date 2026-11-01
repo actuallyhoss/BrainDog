@@ -15,6 +15,9 @@
   OWNERS ONLY, and the area mounts it only for one. The record is the check: anybody else is refused with its sentence.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn } from '$lib/motion';
+  import { settle } from '$lib/ui/motion.ts';
   import { apiBase } from '$lib/at.ts';
   import { since, dateSaid } from 'braindog-render';
   import { recordNow } from '$lib/record/boot-live.ts';
@@ -94,7 +97,7 @@
   <ul class="links">
     {#each sorted as l (l.id)}
       {@const open = linkState(l, now) === 'open'}
-      <li class="link" data-open={open ? '' : undefined}>
+      <li class="link" data-open={open ? '' : undefined} in:lineIn out:dismiss animate:flip={settle()}>
         <IconWell name="link" size="l" />
         <div class="link-text">
           <span class="link-title">{l.title}</span>

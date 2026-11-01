@@ -30,6 +30,9 @@
   what it opens and where it applies, the count at the end, and the verbs on hover.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn } from '$lib/motion';
+  import { settle } from '$lib/ui/motion.ts';
   import { apiBase, at, signInFirst } from '$lib/at.ts';
   import { onDestroy, onMount } from 'svelte';
   import { page } from '$app/state';
@@ -768,7 +771,7 @@
     <Tile icon="lock" title={tileWords.askingTitle} count={waiting.length > 1 ? waiting.length : undefined} data-part="asking">
       <ul class="ledger ledger-lead whos">
         {#each waiting as d (d.handle)}
-          <li class="who" data-intent="warn" data-needs>
+          <li class="who" data-intent="warn" data-needs in:lineIn out:dismiss animate:flip={settle()}>
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="session" size="l" /></span>
               <span class="line-main">
@@ -925,7 +928,7 @@
           {@const origin = cameFrom.get(k.id)}
           {@const href = rowPath(k)}
           {@const u = lastBy.get(k.id)}
-          <li class="who key" data-selected={shown && shown.id === k.id ? '' : undefined}>
+          <li class="who key" data-selected={shown && shown.id === k.id ? '' : undefined} in:lineIn out:dismiss animate:flip={settle()}>
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="key" size="l" /></span>
               <span class="line-main">
@@ -1042,7 +1045,7 @@
         {#each holding as d (d.handle)}
           <!-- THE KEYS' ROW SHAPE, so a machine and a key read as one kind of list: its well, its name, where it may open
                keys and when it was last used, when its grant ends, and Revoke on hover. -->
-          <li class="who">
+          <li class="who" in:lineIn out:dismiss animate:flip={settle()}>
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="session" size="l" /></span>
               <span class="line-main">

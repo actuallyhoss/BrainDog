@@ -613,7 +613,8 @@
 -->
 <!-- THE ONE PRIMARY ON THIS SCREEN, in the first tile's head (agents F21). -->
 {#snippet connectButton()}
-  <Button weight="primary" size="sm" disabled={loadingSheet} onclick={() => void openSheet()}>{copy.connectTitle}</Button>
+  <!-- ONE RED ON THE SCREEN (Look B): while a machine waits, Approve is the screen's one main action and this goes ink. -->
+  <Button weight={first ? 'ink' : 'primary'} size="sm" disabled={loadingSheet} onclick={() => void openSheet()}>{copy.connectTitle}</Button>
 {/snippet}
 
 {#if anOwner}
@@ -627,7 +628,9 @@
     <CodeForm id="user-code" approve={approveCode} onchanged={() => held.reread()} />
   {/snippet}
 
-  {#if first}
+  {#if first && agentParam === undefined}
+    <!-- NOT ON ONE AGENT'S PAGE (skills pass 2 Nov): a machine waiting is about the list, one Back away, and over an
+         agent's settings it put a second red beside Save and pushed the agent's own parts under the fold. -->
     <!-- WHO IS WAITING, NAMED ABOVE THE BOXES (`lib/agents/approve.ts`), so the owner reads what the code would approve
          before the sixth digit sends it. -->
     <Tile icon="key" title={copy.approveTitle}>

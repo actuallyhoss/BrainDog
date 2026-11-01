@@ -3,6 +3,9 @@
   this record, and the other records you can open. Your name and your sign-in email change here.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn } from '$lib/motion';
+  import { settle } from '$lib/ui/motion.ts';
   import { BASE, apiBase, at, signinFor } from '$lib/at.ts';
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -460,7 +463,7 @@
           <!-- EACH PASSKEY BY ITS NAME, with Rename on its own line; the form takes the line's place while open. -->
           {#each s.liveKeys ?? [] as k (k.id)}
             {@const name = k.label ?? copy.passkeyUnnamed}
-            <li class="fact-act">
+            <li class="fact-act" in:lineIn out:dismiss animate:flip={settle()}>
               <IconWell name="key" /><span class="fact-key">{copy.identityPasskeyWay}</span>
               {#if keyRenaming === k.id}
                 <form class="rename key-form" onsubmit={saveKeyName}>

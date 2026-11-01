@@ -499,8 +499,13 @@
     border-block-start: 0;
   }
 
+  /* ON A PAGE THE NOTE IS THE PAGE'S SECOND SENTENCE, on the board under the first (skills pass 2 Nov): drawn as a white
+     bar it was a tile with no heading row, the one box on the page that did not start like every other. */
   .prof[data-page] > .pf-note {
-    background: var(--tile);
+    padding: 0;
+    background: none;
+    color: var(--ink-2);
+    max-inline-size: var(--measure);
   }
 
   .part-head {
@@ -510,8 +515,10 @@
     margin-block-end: var(--sp-1);
   }
 
+  /* A TILE'S TITLE, AS EVERY OTHER TILE IN SETTINGS DRAWS IT: 15/600 on a 22 line (`Tile.svelte`). It was the sheet's
+     17, so an agent's page read a size louder than the list it opened from (skills pass 2 Nov). */
   .part-head .part-title {
-    font-size: var(--fs-head);
+    line-height: 22px;
   }
 
   .pf-sub {
@@ -653,6 +660,16 @@
     font-size: var(--fs-body);
     line-height: 22px;
     resize: vertical;
+  }
+
+  /* THE BRIEF GROWS WITH WHAT IS TYPED, SO NO GRIP, as New job's fields do (G30); where field-sizing is not known the grip
+     stays (skills pass 2 Nov). */
+  @supports (field-sizing: content) {
+    .pf-text {
+      field-sizing: content;
+      min-block-size: calc(4 * 22px + 2 * var(--sp-2));
+      resize: none;
+    }
   }
 
   .pf-text::placeholder,

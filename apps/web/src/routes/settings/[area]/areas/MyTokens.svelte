@@ -16,6 +16,9 @@
   THE BEARER LIVES IN `minted` AND NOWHERE ELSE, until Done or leaving the area, which unmounts this component.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn } from '$lib/motion';
+  import { settle } from '$lib/ui/motion.ts';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
@@ -164,7 +167,7 @@
       {@const nowMs = Date.now()}
       <ul class="mine-list">
         {#each rows as t (t.id)}
-          <li class="mine-card">
+          <li class="mine-card" in:lineIn out:dismiss animate:flip={settle()}>
             <IconWell name="key" size="l" />
             <div class="mine-main">
               <span class="mine-name" dir="auto">{t.label ?? words.unnamed}</span>

@@ -55,6 +55,7 @@
   import { onMount, tick, untrack } from 'svelte';
 
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
+  import { opens, shuts } from '$lib/motion/open.ts';
   /* WHO, IN WORDS. This screen's three person-shaped slots (the actor on a line, the `by` filter, and
      the target of an access row) all printed raw `p_` ids on a record with more than one person on
      it. `who.ts` holds the reason and the measurement. */
@@ -786,7 +787,7 @@
         >
       </div>
       {#if open}
-        <ul class="ledger steps">
+        <ul class="ledger steps" in:opens out:shuts>
           {#each t.fold as s (s.key)}{@render entry(s)}{/each}
         </ul>
       {/if}
@@ -798,7 +799,7 @@
         >
       </div>
       {#if open}
-        <ul class="ledger steps">
+        <ul class="ledger steps" in:opens out:shuts>
           {#each pass.steps as s (s.key)}{@render entry(s)}{/each}
         </ul>
       {/if}
@@ -1341,6 +1342,14 @@
     .line-when time {
       color: var(--ink-3);
       font-family: var(--font-mono);
+    }
+
+    /* "SHOW ALL 7" STARTS ON THE WORDS' EDGE (skills pass 2 Nov): its indent counted the well and not the time column
+       before it, so at a desk it stood in the minutes' column, half under the hour. The row's own font, so its `6ch` is
+       the lines' `6ch`; the button's own padding is taken back, so its words and the lines' start on one x. */
+    .fold-row {
+      font-size: var(--fs-body);
+      padding-inline-start: calc(6ch + var(--well-l) + 2 * var(--sp-3) - var(--sp-2));
     }
   }
 

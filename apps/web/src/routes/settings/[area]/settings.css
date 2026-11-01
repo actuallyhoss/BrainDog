@@ -357,3 +357,34 @@
 .settings-place :is(p, .line-detail, .switch-row-line, .setting-help, .hint, .state-line, .agent-says) {
   text-wrap: pretty;
 }
+
+/* THE CHOOSER HOLDS STILL WHILE THE AREA BESIDE IT CHANGES (skills pass 2 Nov). Every move between areas, and from the
+   agents to one agent's page and back, cross-fades the whole work (`AppFrame.svelte`, `app.css`), and the chooser went
+   with it: for the exit's 90ms the list of areas was gone, a blink on every press. Named for the move, it is its own
+   picture; where it is on both sides it plays nothing, so it simply stays, and the current row changes in place. Where it
+   is on one side only (the index, another place) it leaves and arrives with the page, on the page's own steps. */
+:root[data-moving] .settings-place .chooser {
+  view-transition-name: settings-chooser;
+}
+
+::view-transition-group(settings-chooser) {
+  animation: none;
+}
+
+/* THE NEW PICTURE ALONE, at once: the old one under it would show its own current row through the new one's. */
+::view-transition-old(settings-chooser):not(:only-child) {
+  animation: none;
+  opacity: 0;
+}
+
+::view-transition-new(settings-chooser):not(:only-child) {
+  animation: none;
+}
+
+::view-transition-old(settings-chooser):only-child {
+  animation: page-out var(--d-exit) var(--ease-in) both;
+}
+
+::view-transition-new(settings-chooser):only-child {
+  animation: page-in calc(var(--d-page) - var(--d-exit)) var(--ease-out) var(--d-exit) both;
+}

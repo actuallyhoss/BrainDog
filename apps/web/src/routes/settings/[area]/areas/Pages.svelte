@@ -50,7 +50,7 @@
   import type { AreaProps } from '../settings-state.svelte.ts';
   import { ownsRecord } from '../../levels.ts';
   import { foldSaid } from './pages-fold.ts';
-  import { lineIn } from '$lib/motion';
+  import { glide, lineIn } from '$lib/motion';
 
   /**
    * PAGES IS FOLDED INTO NAVIGATION (UI pass 20 Oct, agents F14): Navigation draws this file three times, one `part` each,
@@ -149,8 +149,20 @@
     const at = list.findIndex((e) => e.href === href);
     return at < 0 || (step === -1 ? at <= 0 : at >= list.length - 1);
   };
+  /* A PAGE MOVED OR HIDDEN GLIDES TO ITS NEW PLACE, and the rows it passes glide to theirs (skills pass 2 Nov): the order is
+     written at once (`setOrder`), so the rows were measured before and played from there after the next draw, on the
+     spring over `--form-settle`; nothing in a screen's first second and nothing under reduced motion (`glide`). */
+  let pagesBox = $state<HTMLElement | undefined>();
+  const glideRows = (): (() => void) => {
+    const land = glide(pagesBox?.closest<HTMLElement>('.settings-place'), '.page-row');
+    return () => void tick().then(land);
+  };
+
   function move(href: string, step: -1 | 1) {
-    void navPrefs.move(arranged, href, step)?.then((saved) => {
+    const land = glideRows();
+    const saving = navPrefs.move(arranged, href, step);
+    land();
+    void saving?.then((saved) => {
       if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
     });
   }
@@ -373,6 +385,15 @@
   /* ── one page's presses ── */
 
   function toggleHidden(p: Listed, title: string) {
+    const land = glideRows();
+    try {
+      hideOrShow(p, title);
+    } finally {
+      land();
+    }
+  }
+
+  function hideOrShow(p: Listed, title: string) {
     if (navPrefs.isHidden(p.href)) {
       void navPrefs.show(p.href).then((saved) => said(saved, copy.shownInNav(title), () => void navPrefs.hide(p.href)));
     } else {
@@ -569,7 +590,7 @@
     {:else}
       <!-- ONE LIST, ONE RHYTHM: a hairline between every row, the nav's order, and a page under a section named
            otherwise says where it is ("In Work"). -->
-      <ul class="ledger ledger-lead pages">
+      <ul class="ledger ledger-lead pages" bind:this={pagesBox}>
         {#each navRuns as r (r.kind === 'row' ? r.p.href : `fold:${r.section}`)}
           {#if r.kind === 'row'}
             {@render pageRow(r.p)}

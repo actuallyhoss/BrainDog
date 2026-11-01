@@ -33,6 +33,8 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import Swap from '$lib/motion/Swap.svelte';
+  import { arrive } from '$lib/motion';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from '../../signin/Entry.svelte';
   import { ownsRecord } from '../../settings/levels.ts';
@@ -93,10 +95,14 @@
 <svelte:head><title>{titleOf(title)}</title></svelte:head>
 
 <Entry>
+  <!-- THE SIX DIGITS HAND OVER TO APPROVED IN PLACE (skills pass 2 Nov): the card faded down and up again over the exit's
+       and the swap's steps, where it had switched in one frame, and the green tick arrives on the spring, the one moment
+       here worth a beat. At once under reduced motion. -->
+  <Swap key={done !== null}>
   <div class="approve">
     {#if done !== null}
       <header class="who">
-        <span class="done-well" aria-hidden="true"><Icon name="check" size="l" /></span>
+        <span class="done-well" aria-hidden="true" in:arrive|global={{ rise: 0, from: 0.8 }}><Icon name="check" size="l" /></span>
         <h1 class="entry-title" tabindex="-1" bind:this={heading}>{copy.approvedTitle}</h1>
       </header>
 
@@ -159,6 +165,7 @@
       {/if}
     {/if}
   </div>
+  </Swap>
 </Entry>
 
 <style>
