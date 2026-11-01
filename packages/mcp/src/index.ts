@@ -1000,6 +1000,38 @@ const LIST_WHOLE = 60;
 const CLIP = 280;
 /** The longest note `log` takes, the ledger's own ceiling (`log` in the record). */
 const NOTE_MOST = 280;
+/** The longest note `log` takes in one call, kept as consecutive notes of `NOTE_MOST` each: a run's summary fits. */
+const NOTE_LONG = NOTE_MOST * 5;
+
+/**
+ * A long note as the notes it is kept as, each at most `NOTE_MOST`, cut between sentences where it can and between words
+ * where a sentence is longer than one note, never inside a word that fits.
+ */
+export function notesOf(note: string): string[] {
+  const out: string[] = [];
+  let at = '';
+  const words = (text: string): void => {
+    for (const word of text.split(/\s+/u)) {
+      const piece = word.length > NOTE_MOST ? word.match(new RegExp(`.{1,${NOTE_MOST}}`, 'gu')) ?? [] : [word];
+      for (const w of piece) {
+        if (at !== '' && at.length + 1 + w.length > NOTE_MOST) {
+          out.push(at);
+          at = '';
+        }
+        at = at === '' ? w : `${at} ${w}`;
+      }
+    }
+  };
+  for (const sentence of note.split(/(?<=[.!?])\s+/u)) {
+    if (at !== '' && at.length + 1 + sentence.length <= NOTE_MOST) at = `${at} ${sentence}`;
+    else if (sentence.length <= NOTE_MOST) {
+      if (at !== '') out.push(at);
+      at = sentence;
+    } else words(sentence);
+  }
+  if (at !== '') out.push(at);
+  return out;
+}
 
 /**
  * A compact row as `list` answers it: what an agent reads to choose a row, and not the whole of each one.
@@ -3180,48 +3212,26 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (!note) return { result: { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'A note is one sentence, and this one is empty.', at: 'note' } } };
       /* THE LEDGER'S CEILING, AS THE RECORD'S OWN `log` HOLDS IT (audit 10k, AK9). This door goes through `update` and
          `handoff`, which took a note of any length, so the 280 the docs promise held over HTTP and not here. */
-      if (note.length > NOTE_MOST)
-        return { result: { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: `A note is at most ${String(NOTE_MOST)} characters, and this one is ${String(note.length)}.`, at: 'note' } } };
-      /**
-       * NO ROW IS THE CALLER'S OWN SESSION, AND IT IS THE RECORD'S `handoff` WITH THE NOTE ALONE. That is the one method
-       * that finds a token's run, or opens it on its first write, inside the same transaction as the write, so a note is
-       * one call whether or not the run exists yet. It appends the line to the run's notes and keeps it in the run's
-       * history, which is where a note about nothing in particular was always taught to go (`teach` in `briefing.ts`). A
-       * person names a run from the app, so the record refuses one here in its own sentence, as `handoff` does.
-       */
-      let out: Result<unknown>;
-      if (args.spoken === undefined || args.spoken === null) {
-        if (!surface.handoff) return { result: unbuilt('log with no row', 'Name the row the note is about in spoken.') };
-        out = await surface.handoff({ note }, ctx);
-      } else {
-        const at = await locate(args.spoken, ctx, { tool: 'log', args });
-        if (!at.ok) return { result: at };
-        out = noRow(await surface.update({ ...at.value, patch: {}, note }, ctx), args.spoken);
+      /* A LONGER NOTE IS KEPT AS SEVERAL, IN ORDER (the 1 Nov cleanup run: a run's summary could not be logged at all), up
+         to `NOTE_LONG`; past that it is a page, which `log` with `page` hangs on the same row. */
+      if (note.length > NOTE_LONG)
+        return {
+          result: {
+            ok: false,
+            refusal: {
+              code: 'OUT_OF_BOUNDS',
+              fix: `A note is at most ${String(NOTE_LONG)} characters, kept as notes of ${String(NOTE_MOST)}, and this one is ${String(note.length)}. Split it into calls, or send the whole as page (HTML) on log.`,
+              at: 'note',
+            },
+          },
+        };
+      const parts = note.length > NOTE_MOST ? notesOf(note) : [note];
+      for (const part of parts.slice(0, -1)) {
+        const first = await logOne(args, part, ctx, turn);
+        if (!first.result.ok) return first;
       }
-      if (!out.ok) return { result: await failed(out, ctx, turn) };
-      turn.batch = batchIn(out.value);
-      const ruled = ruledOf(out.value);
-      if (!isEntry(out.value)) {
-        if (ruled !== null && 'filed' in ruled) return filedOut(ruled.filed, ctx, turn);
-        return { result: { ok: true, value: bare(out.value) } };
-      }
-      const entry = out.value;
-      if (!prefixes.has(entry.register)) await learnPrefix(entry.register, ctx);
-      const row = compact(entry, prefixOf(entry.register));
-      /* AND `deleted_at` WHEN THE ROW HAS ONE. The record takes a note on a deleted row, and cutting the answer to three
-         fields cut the one that said so: an agent logging on an id carried from another session was told `ok` and
-         nothing else, which is the case where it did not already have the row. */
-      const { spoken, version, updated_at, deleted_at } = row;
-      const value = { spoken, version, ...(updated_at === undefined ? {} : { updated_at }), ...(deleted_at === undefined ? {} : { deleted_at }) };
-      const words = titleOf(entry.fields, decls.get(entry.register));
-      if (ruled === null || !('rung' in ruled)) return { result: { ok: true, value }, say: (look) => loggedBrief(String(spoken), words, version, deleted_at !== undefined, look) };
-      return {
-        result: { ok: true, value: ruled.rung === null ? value : { ...value, rung: ruled.rung } },
-        say: (look) => [loggedBrief(String(spoken), words, version, deleted_at !== undefined, look), ruledBrief(ruled, [entry.register], look)].join('\n'),
-        names: { people: true },
-      };
+      return logOne(args, parts.at(-1)!, ctx, turn);
     },
-
     /* The arguments go through whole: which fields a session may set, and how `tried` appends, are
        the record's rules, and it names the field when one is wrong.
        ITS RECEIPT OFFERS AN UNDO ONLY WHEN ONE WOULD PUT SOMETHING BACK (audit 10k, AK10): a run's own step, doing and
@@ -3433,6 +3443,48 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       return { result: { ok: true, value }, say: (look) => triagedBrief(value, entry as Shaped, filed.register, look) };
     },
   };
+
+  /** One note of at most `NOTE_MOST`, on the row `spoken` names or on the caller's own run: what `log` writes, once a part. */
+  async function logOne(args: Args, note: string, ctx: C, turn: Turn): Promise<Done> {
+      /**
+       * NO ROW IS THE CALLER'S OWN SESSION, AND IT IS THE RECORD'S `handoff` WITH THE NOTE ALONE. That is the one method
+       * that finds a token's run, or opens it on its first write, inside the same transaction as the write, so a note is
+       * one call whether or not the run exists yet. It appends the line to the run's notes and keeps it in the run's
+       * history, which is where a note about nothing in particular was always taught to go (`teach` in `briefing.ts`). A
+       * person names a run from the app, so the record refuses one here in its own sentence, as `handoff` does.
+       */
+      let out: Result<unknown>;
+      if (args.spoken === undefined || args.spoken === null) {
+        if (!surface.handoff) return { result: unbuilt('log with no row', 'Name the row the note is about in spoken.') };
+        out = await surface.handoff({ note }, ctx);
+      } else {
+        const at = await locate(args.spoken, ctx, { tool: 'log', args });
+        if (!at.ok) return { result: at };
+        out = noRow(await surface.update({ ...at.value, patch: {}, note }, ctx), args.spoken);
+      }
+      if (!out.ok) return { result: await failed(out, ctx, turn) };
+      turn.batch = batchIn(out.value);
+      const ruled = ruledOf(out.value);
+      if (!isEntry(out.value)) {
+        if (ruled !== null && 'filed' in ruled) return filedOut(ruled.filed, ctx, turn);
+        return { result: { ok: true, value: bare(out.value) } };
+      }
+      const entry = out.value;
+      if (!prefixes.has(entry.register)) await learnPrefix(entry.register, ctx);
+      const row = compact(entry, prefixOf(entry.register));
+      /* AND `deleted_at` WHEN THE ROW HAS ONE. The record takes a note on a deleted row, and cutting the answer to three
+         fields cut the one that said so: an agent logging on an id carried from another session was told `ok` and
+         nothing else, which is the case where it did not already have the row. */
+      const { spoken, version, updated_at, deleted_at } = row;
+      const value = { spoken, version, ...(updated_at === undefined ? {} : { updated_at }), ...(deleted_at === undefined ? {} : { deleted_at }) };
+      const words = titleOf(entry.fields, decls.get(entry.register));
+      if (ruled === null || !('rung' in ruled)) return { result: { ok: true, value }, say: (look) => loggedBrief(String(spoken), words, version, deleted_at !== undefined, look) };
+      return {
+        result: { ok: true, value: ruled.rung === null ? value : { ...value, rung: ruled.rung } },
+        say: (look) => [loggedBrief(String(spoken), words, version, deleted_at !== undefined, look), ruledBrief(ruled, [entry.register], look)].join('\n'),
+        names: { people: true },
+      };
+  }
 
   /**
    * What `create`, `update` and `log` on a run answer: the row compact, or the conflict with its row in that shape.
