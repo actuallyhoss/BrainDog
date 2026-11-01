@@ -44,7 +44,7 @@
   "0043_share.ts": {"checksum":"5cbc45a76a0cd39f93608139ad71e01d81743950b52d57cc0529578ce0296e5c","applied":true,"rehearsed":{"at":"2026-10-21T11:17:15.264Z","records":1,"rows":4603,"pass":true}},
   "0044_seat.ts": {"checksum":"ca4c846cd796b620b1a62ddc8d32412fd55fe13a4032990af6094e097b307117","applied":true,"rehearsed":{"at":"2026-10-22T14:11:44.749Z","records":1,"rows":4622,"pass":true}},
   "0045_sealed.ts": {"checksum":"f1ef4ba3b49675bb1f2282f2e2238e27ce2660cfd26b8be9dd93e108e9120393","applied":true,"rehearsed":{"at":"2026-10-22T14:11:44.749Z","records":1,"rows":4622,"pass":true}},
-  "0046_key_access.ts": {"checksum":"9e39c3b4eeb9e2487d0c19ba934ae3a942601b213e39f2709121e3caa6edb898","applied":false,"rehearsed":{"at":"2026-10-26T23:58:20.340Z","records":1,"rows":4781,"pass":true}},
-  "0047_observation_who.ts": {"checksum":"0c35a6495cac2bb2545f1125b8c366b12f400d202f4902143a7293caf4841c0e","applied":false,"rehearsed":{"at":"2026-10-29T19:28:26.568Z","records":1,"rows":4855,"pass":true}},
-  "0048_rule_month.ts": {"checksum":"92ae88639bfbd388e798170f8c371e5940c467d507e85e60f05be1f246fe2013","applied":false,"rehearsed":{"at":"2026-11-01T02:15:31.880Z","records":1,"rows":4867,"pass":true}}
+  "0046_key_access.ts": {"checksum":"9e39c3b4eeb9e2487d0c19ba934ae3a942601b213e39f2709121e3caa6edb898","applied":true,"rehearsed":{"at":"2026-10-26T23:58:20.340Z","records":1,"rows":4781,"pass":true}},
+  "0047_observation_who.ts": {"checksum":"0c35a6495cac2bb2545f1125b8c366b12f400d202f4902143a7293caf4841c0e","applied":true,"rehearsed":{"at":"2026-10-29T19:28:26.568Z","records":1,"rows":4855,"pass":true}},
+  "0048_rule_month.ts": {"checksum":"92ae88639bfbd388e798170f8c371e5940c467d507e85e60f05be1f246fe2013","applied":true,"rehearsed":{"at":"2026-11-01T02:15:31.880Z","records":1,"rows":4867,"pass":true}}
 }
