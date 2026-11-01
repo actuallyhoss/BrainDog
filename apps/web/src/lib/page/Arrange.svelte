@@ -66,7 +66,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import type BlockEditorView from './BlockEditor.svelte';
-  import { composeWords, type Composed } from './compose.ts';
+  import type { Composed } from './compose.ts';
+  import { composeWords } from './compose-words.ts';
   import type MakeComponentView from './MakeComponent.svelte';
   import { askedIn, CHANGE_EVENT, CHANGE_PAGE_EVENT, holdLine, keyInFocus, slashEntryWords, withoutEntry } from './slash-entry.ts';
   import { listOf, shelfWords, type Declared, type Shelved } from './shelf.ts';

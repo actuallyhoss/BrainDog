@@ -18,7 +18,7 @@
 
 import { FIGURES_KNOWN as METRICS } from './figures-known.ts';
 import { REGISTERS } from './held.ts';
-import { hrefFor } from './metrics.ts';
+import { hrefFor } from './figure-href.ts';
 
 /** A page as `boot` lists it, as far as this file reads it: its slug and the row a template made it for. */
 export type PageAbout = { slug: string; about?: { register: string; seq: number | null } | null | undefined; opens?: string | null | undefined };

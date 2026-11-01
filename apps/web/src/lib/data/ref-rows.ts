@@ -20,6 +20,7 @@ import { wrote, type Client } from '@braindog/client';
 
 import type { RecordRow } from '../record/remote.ts';
 import { keptToken, versionKept } from './local-tab.ts';
+import { forgetRowsWith } from './rows-forget.ts';
 
 /** How long a walk is drawn from without asking again, whatever the log says. */
 export const ROWS_KEPT_MS = 300_000;
@@ -108,3 +109,5 @@ export async function rowsOf(client: Pick<Client, 'list'>, base: string, registe
 export function forgetRows(): void {
   byFetch = new WeakMap();
 }
+/* A FORGET FROM `boot-live.ts` REACHES THIS THROUGH `rows-forget.ts`, which never loads this file. */
+forgetRowsWith(forgetRows);

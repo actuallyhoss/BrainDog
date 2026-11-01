@@ -28,6 +28,7 @@ import { copy } from '../copy.ts';
 import { humanize, titleOf } from './names.ts';
 import { keptRead, wroteOutside } from '@braindog/client';
 import type { RECONNECT_STATE, ReconnectState } from './keychain.ts';
+import { often } from './actions-plain.ts';
 
 /* ── the shapes ─────────────────────────────────────────────────────────── */
 
@@ -303,14 +304,8 @@ export const dayWords = (iso: string): string => {
   return `${Number(d)} ${MONTHS[Number(m) - 1] ?? ''}`;
 };
 
-/** `15m`, `1h`, `6h`, `1d` as a person says them. Anything else is printed as it was declared. */
-export function often(every: string): string {
-  const m = /^(\d+)\s*(m|h|d|w)$/u.exec(every.trim());
-  if (!m) return every;
-  const n = Number(m[1]);
-  const unit = { m: 'minute', h: 'hour', d: 'day', w: 'week' }[m[2] as 'm' | 'h' | 'd' | 'w'];
-  return n === 1 ? `every ${unit}` : `every ${n} ${unit}s`;
-}
+/* `often` IS `actions-plain.ts`'s, so a list of scripts can say how often one runs without this file. */
+export { often };
 
 export type Tone = 'warn' | undefined;
 
@@ -378,35 +373,8 @@ export function stateOf(row: ActionRow, now: number): Said {
 export const whatOf = (row: ActionRow): string =>
   [`${words.verb[row.channel]} ${row.host ?? row.ingest}`, often(row.every), row.key ? words.key(row.key) : ''].filter(Boolean).join(', ');
 
-/** The project a page is drawn for, as `forProject` matches an action to it: its row as a person says it, and its title. */
-export type ForProject = { spoken: string; title: string };
-
-/**
- * A project's actions, its own first and then the ones for every project.
- *
- * MATCHED BY THE ROW, as the record resolves the project an action's declaration names (`listActions`,
- * `project_row`): a declaration holds a row id, which is no name, so matching it against the project's title found
- * nothing and an action declared for a project showed on no page. An action the record could not resolve,
- * or one from a host that does not resolve, is matched by what it holds: the spoken id, or the name case-blind,
- * because a declaration typed `kiln` and a project called Kiln are the same project to a person.
- *
- * `null` is no project: Settings, ingest lists every action as its own, none of them faint.
- */
-export function forProject(rows: readonly ActionRow[], project: ForProject | null): { own: ActionRow[]; everywhere: ActionRow[] } {
-  const name = (r: ActionRow) => r.ingest;
-  const by = (a: ActionRow, b: ActionRow) => name(a).localeCompare(name(b));
-  if (project === null) return { own: [...rows].sort(by), everywhere: [] };
-  const want = project;
-  const fold = (s: string) => s.trim().toLowerCase();
-  const mine = (r: ActionRow): boolean => {
-    if (r.project_row) return r.project_row.spoken === want.spoken;
-    return r.project !== null && (r.project === want.spoken || fold(r.project) === fold(want.title));
-  };
-  return {
-    own: rows.filter(mine).sort(by),
-    everywhere: rows.filter((r) => r.project === null || r.project === 'global').sort(by),
-  };
-}
+/* WHICH PROJECT AN ACTION IS FOR IS `actions-plain.ts`'s, so a page can ask it without this file. */
+export { forProject, type ForProject } from './actions-plain.ts';
 
 /** After a resume: the row is pending and due now, as `resumeAction` leaves it. */
 export const afterResume = (rows: readonly ActionRow[], ingest: string, at: string): ActionRow[] =>

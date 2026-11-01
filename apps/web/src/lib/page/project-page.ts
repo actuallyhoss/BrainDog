@@ -14,7 +14,7 @@
 
 import { KINDS, isKind } from 'braindog-render';
 import { REGISTERS } from '../record/held.ts';
-import { handFor } from '../record/hand.ts';
+import { handFor } from '../record/hand-of.ts';
 
 type Block = {
   kind: string;

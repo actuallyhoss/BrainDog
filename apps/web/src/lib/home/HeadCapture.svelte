@@ -10,8 +10,8 @@
   it looks and focuses as every other capture line does. Add shows once there is text; Enter sends too.
 -->
 <script lang="ts">
-  import { CAPTURE_ADD, capturePlan, captureSubmit, inline, text as plain } from 'braindog-render';
-  import { draw } from '$lib/record/blocks.ts';
+  import { CAPTURE_ADD, capturePlan, captureSubmit, inline, text as plain, type CapturePlan } from 'braindog-render';
+  import { capturePlanOf } from '$lib/record/capture-plan.ts';
   import type { LiveBlock } from '$lib/record/page-live.ts';
   import Icon from '$lib/ui/Icon.svelte';
 
@@ -25,10 +25,19 @@
     oncapture: (register: string, text: string, inherited: Record<string, string>) => void;
   } = $props();
 
-  const plan = $derived.by(() => {
-    const seg = draw(block, undefined).segments.find((s) => s.type === 'block');
-    return seg?.type === 'block' ? capturePlan(seg.rows) : null;
+  /* THE PLAN WITHOUT THE PAGE'S RENDERER for a plain capture (`capture-plan.ts`), so Today's first load does not carry
+     `blocks.ts` for one field; anything else is drawn by `draw` itself, asked by `import()` the once it is needed. */
+  const quick = $derived(capturePlanOf(block));
+  let drawn = $state<{ of: LiveBlock; plan: CapturePlan | null } | null>(null);
+  $effect(() => {
+    if (quick !== undefined) return;
+    const of = block;
+    void import('$lib/record/blocks.ts').then(({ draw }) => {
+      const seg = draw(of, undefined).segments.find((s) => s.type === 'block');
+      drawn = { of, plan: seg?.type === 'block' ? capturePlan(seg.rows) : null };
+    });
   });
+  const plan = $derived(quick !== undefined ? quick : drawn?.of === block ? drawn.plan : null);
   const prompt = $derived(plain(inline(block.heading ?? '')).trim() || (plan?.label ?? ''));
 
   let typed = $state('');

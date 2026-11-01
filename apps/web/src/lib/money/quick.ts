@@ -13,66 +13,14 @@
 import { exponentOf } from 'braindog-render';
 
 import type { Ledger } from './ledger.ts';
+import { words } from './quick-words.ts';
 
 /** The three things the sheet adds. */
 export type Way = 'out' | 'in' | 'move';
 export const WAYS: readonly Way[] = ['out', 'in', 'move'];
 
-/** Kept here, so the sheet owns its words. Plain, sentence case, and never a sum of two currencies. */
-export const words = {
-  title: 'Add a movement',
-  ways: { out: 'Money out', in: 'Money in', move: 'Move money' } as Record<Way, string>,
-  short: { out: 'Out', in: 'In', move: 'Move' } as Record<Way, string>,
-  /* THE BOX UNDER THE CHIPS SAYS WHAT IT IS FOR (design pass, 1 Nov): it was a blank bar under five names. */
-  payeeType: 'Or type a name',
-  amount: 'Amount',
-  currency: 'Currency',
-  paidTo: { out: 'Paid to', in: 'From', move: 'What for' } as Record<Way, string>,
-  payeeHint: 'a person or a shop',
-  asWritten: (typed: string) => `Use “${typed}” as written`,
-  usual: (n: number, category: string | null) => `${n === 1 ? '1 line' : `${n.toLocaleString('en')} lines`}${category ? ` · files as ${category}` : ''}`,
-  category: 'Category',
-  categoryFrom: (name: string) => `${name}, as before`,
-  noCategory: 'No category',
-  from: 'From',
-  to: 'To',
-  into: 'Into',
-  account: 'Account',
-  when: 'When',
-  today: (said: string) => `Today, ${said}`,
-  note: 'Note',
-  notePlaceholder: 'Anything to remember',
-  split: 'Split',
-  splitStart: 'Split into categories',
-  addNote: 'Add a note',
-  fewer: 'Fewer',
-  all: (n: number) => `All ${n}`,
-  splitAdd: 'Add a category',
-  splitLeft: (left: string) => `${left} left to place`,
-  splitOver: (over: string) => `${over} more than the amount`,
-  splitDrop: 'Take this part out',
-  received: (code: string) => `Arrives as (${code})`,
-  receivedHint: 'what the second account shows, when the currencies differ',
-  add: 'Add',
-  adding: 'Adding…',
-  cancel: 'Cancel',
-  close: 'Close',
-  loading: 'Reading your accounts…',
-  noAccounts: (one: string) => `There is no open account to add a ${one} to yet.`,
-  noLedger: 'There is no ledger to add to yet.',
-  needAmount: 'Type an amount first.',
-  needAccount: 'Choose the account it moved through.',
-  needTwo: 'Choose two different accounts.',
-  needPayee: { out: 'Say who it was paid to.', in: 'Say who it came from.', move: 'Say what the move was for.' } as Record<Way, string>,
-  needSplit: 'The parts must add up to the amount.',
-  needReceived: (code: string) => `Say how much arrived in ${code}.`,
-  moveTitle: (from: string, to: string) => `${from} to ${to}`,
-  added: (title: string, said: string) => `Added “${title}”, ${said}.`,
-  addedSplit: (title: string, n: number, said: string) => `Added “${title}” in ${n} parts, ${said}.`,
-  moved: (said: string, from: string, to: string) => `Moved ${said} from ${from} to ${to}.`,
-  fab: 'Add a movement',
-  approx: (said: string) => `≈ ${said}`,
-} as const;
+/* THE SHEET'S WORDS ARE `quick-words.ts`'s, so the floating + every page mounts says its name without this file. */
+export { words };
 
 /* ---- the amount ---------------------------------------------------------------------------------------------- */
 

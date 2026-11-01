@@ -26,6 +26,7 @@ import { copy } from '../copy.ts';
 import { list } from '../copy/english.ts';
 import { answerOf, codeOf, reachKey, type Answer, type Refusal } from './device.ts';
 import { REGISTERS } from './held.ts';
+import { KEYS_REGISTER } from './keys-register.ts';
 import type { Scope } from './scope-move.ts';
 
 /** The scope a keychain access names when it opens the keys of no project. */
@@ -430,8 +431,8 @@ export function keysOf(
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-/** The list the Keys index reads, which `usedBy` names a key's row in. */
-export const KEYS_REGISTER = 'credentials';
+/** The list the Keys index reads, which `usedBy` names a key's row in (`keys-register.ts`). */
+export { KEYS_REGISTER };
 
 /* ── every page of a list ─────────────────────────────────────────────── */
 

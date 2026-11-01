@@ -50,6 +50,7 @@ import { proposer } from '../page/queue-answer.ts';
 import { REGISTERS } from './held.ts';
 import { splitAtOf } from './split.ts';
 import { draftOf } from './field-draft.ts';
+import { captureRows, escapeCell } from './capture-plan.ts';
 import { citedWords } from '../cite.ts';
 import { moneyInText } from './money.ts';
 /* THE KINDS THAT DRAW THEMSELVES, asked first in `draw`. */
@@ -721,10 +722,8 @@ export function trendCell(trend: readonly (number | null)[] | undefined, money =
 }
 
 /* AND A VALUE'S OWN LINE BREAKS ARE SPACES: a row is one line of the dialect, so a note of two paragraphs broke its row,
-   and the rest of the note was drawn as a card of its own. */
-const escapeCell = (c: string): string =>
-  /* AND A FIRST CELL OF THREE BACKTICKS NEVER CLOSES THE FENCE (RH15): an invisible space goes after the first. */
-  c.replace(/\s*[\r\n]+\s*/gu, ' ').replaceAll('\\', '\\\\').replaceAll('|', '\\|').replace(/^`(?=``)/u, '`\u200b');
+   and the rest of the note was drawn as a card of its own. `escapeCell` is `capture-plan.ts`'s, which Today's capture
+   line reads without this file. */
 
 /**
  * A chips row over a register: GROUP AND COUNT.
@@ -1129,27 +1128,6 @@ function queueRows(block: BlockResult): string[] {
      questions and stranded them; Decide is where every open question lives, and the address is written
      HERE rather than in the renderer, which knows no routes. */
   return more > 0 ? [...rows, `more | ${more} | /decide`] : rows;
-}
-
-/**
- * A capture's rows: `into` the list, then `set` for each value a new row is filled with (`render/src/capture.ts`).
- *
- * THE BLOCK WAS DRAWN AS A DEGRADED FENCE until this existed. `4cff0163` taught both engines to answer a capture
- * with `register` and `fills`, and nothing here wrote the rows the renderer reads, so the generic branch wrote a
- * fence with none and the parser refused it with "no into row", on every page that declared one.
- *
- * THE LIST'S ADDRESS IS THE BLOCK'S OWN SLICE, `registerHref` over its `where:`, because a reader who cannot add
- * from here is sent to the list to add there, and the grid's line under the same filter fills the same values.
- * The name is the register's, the one the block bar above already prints.
- *
- * NO LIST, NO ROWS, so a capture with nothing to add to still degrades rather than drawing a field that writes
- * nowhere. Both engines refuse that declaration first, so this is only reached by a block built by hand.
- */
-function captureRows(block: BlockResult): string[] {
-  const register = block.register;
-  if (!register) return [];
-  const into = ['into', register, REGISTERS[register]?.name ?? register, registerHref(register, block.where)];
-  return [into, ...Object.entries(block.fills ?? {}).map(([field, value]) => ['set', field, value])].map((cells) => cells.map(escapeCell).join(' | '));
 }
 
 /**

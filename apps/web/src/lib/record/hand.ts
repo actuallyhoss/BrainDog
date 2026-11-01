@@ -36,8 +36,8 @@ export type Holder =
 /** A member of the record, as `members` answers for the owner or `boot`'s names say for anybody who may read People. */
 export type Member = { person_id: string; name: string | null; email: string | null };
 
-/** The list's `hand:`, read from the declaration a screen holds. `RegisterDecl` keeps every key the record sent. */
-export const handFor = (decl: RegisterDecl | undefined): Hand | null => handOf(decl as unknown as Record<string, unknown> | undefined);
+/** The list's `hand:`, read from the declaration a screen holds (`hand-of.ts`). */
+export { handFor } from './hand-of.ts';
 
 /* ── who ─────────────────────────────────────────────────────────────── */
 

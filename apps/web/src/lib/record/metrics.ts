@@ -26,7 +26,8 @@ import { copy } from '../copy.ts';
 import { REGISTERS } from './held.ts';
 import { BARE, amountOf, currencyOf, mixedFix } from './money.ts';
 import { homeCurrency } from './api.ts';
-import { joinsWithOr, registerHref, schemaOf } from './where.ts';
+import { joinsWithOr, schemaOf } from './where.ts';
+import { hrefFor, registerOf } from './figure-href.ts';
 import type { Entry } from './schema.ts';
 
 /** A noun's many: an s, except "person(s)", which is people and never "persons" (AN16). */
@@ -311,8 +312,6 @@ export function windowMs(w: string): number | null {
   return n * (m[2] === 'd' ? DAY_MS : m[2] === 'w' ? 7 * DAY_MS : 30 * DAY_MS);
 }
 
-const registerOf = (source: string): string | null =>
-  source.startsWith('register.') ? source.slice('register.'.length) : null;
 
 /**
  * The currencies the field an aggregation reads is written in.
@@ -439,25 +438,8 @@ export function format(shape: string | undefined, n: number | string | null, now
   }
 }
 
-/**
- * The URL that opens the rows a figure was computed over.
- *
- * A negation becomes `not-in` rather than the enum's complement: the complement is only writable
- * when the field declares its values, and a URL that silently lists them is a URL that breaks when
- * a pack adds one.
- */
-export function hrefFor(decl: MetricDecl): string | null {
-  const register = registerOf(decl.source);
-  /* A FIGURE THAT READS NO LIST HAS NO ROWS TO OPEN, SO IT HAS NO DOOR. This answered `/p/money`, which is a page only
-     money-core declares: on a record without Money the door opened nothing, and on one with it the door opened a page
-     about something else. Every caller leaves `href` off on `null`, as they already did for a figure over no rows. */
-  if (!register) return null;
-  /* THE SAME BUILDER A PAGE BLOCK USES. It lived here, so a figure's link was derived from its
-     predicate and a block's link was not derived from anything — the block just went to the
-     register. Two surfaces asking the same question of the same sentence now get the same answer
-     from the same function, which is the only arrangement under which they cannot drift. */
-  return registerHref(register, decl.where);
-}
+/* A FIGURE'S DOOR IS `figure-href.ts`'s, so a row's address can name it without this file. */
+export { hrefFor };
 
 /**
  * A metric id, with its parameter: `project-owed:Kiln`.
