@@ -81,8 +81,8 @@ export const words = {
   makeNow: 'Make my BrainDog',
   edit: firstRun.whoEdit,
   /** Under "Email me a link": where to open it, and the lock that signs her in after (use case 6, step 4). */
-  openHere: 'Open it on this phone. From then on its lock signs you in.',
-  openHereWide: 'Open it on this device. From then on its lock signs you in.',
+  openHere: "Open the link on this phone. After that, this phone's lock signs you in.",
+  openHereWide: "Open the link on this device. After that, this device's lock signs you in.",
   /** While the mail travels, beside the build that waits for it. What was said rides in the link. */
   sentWhy: 'The link builds what you see here, on this device or another.',
   /** And when what was said was too long for a link to carry whole: said on the device that sent it. */

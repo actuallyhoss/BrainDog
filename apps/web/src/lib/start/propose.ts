@@ -1318,12 +1318,13 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
  * What the words propose, read by the model where the host has one and by the rules where it has not, where the month's
  * asks are spent, or where the model did not answer in time. `ask` is `null` on a host with no model behind Slash.
  */
-export async function proposeFirst(sentence: string, ctx: ProposeContext, ask: AskSetup | null): Promise<Proposal> {
+export async function proposeFirst(sentence: string, ctx: ProposeContext, ask: AskSetup | null, asked?: string): Promise<Proposal> {
   const rules = propose(sentence, ctx);
   if (ask === null || sentence.trim() === '') return rules;
   let out: Awaited<ReturnType<AskSetup>>;
   try {
-    out = await ask({ said: sentence, offer: ctx.offer ?? setupOffer(), today: todayIn(ctx.zone) ?? new Date().toISOString().slice(0, 10) });
+    /* `asked`, IN A CONVERSATION (`chat.ts`): the questions so far, so the model reads each answer against its question. */
+    out = await ask({ said: sentence, offer: ctx.offer ?? setupOffer(), today: todayIn(ctx.zone) ?? new Date().toISOString().slice(0, 10), ...(asked ? { asked } : {}) });
   } catch (e) {
     out = { ok: false, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } };
   }

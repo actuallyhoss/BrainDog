@@ -49,7 +49,8 @@ export type SetupOffer = {
   modules: { id: string; name: string; lists: { id: string; name: string; fields: string[] }[] }[];
 };
 /** `first`: the owner's sign-up words, read once after the build on the house, never one of the month's asks. */
-export type SetupAsked = { said: string; offer: SetupOffer; today: string; first?: boolean };
+/** `asked`: the conversation's questions so far, one a line as `about: question` (`lib/start/chat.ts` `askedLines`). */
+export type SetupAsked = { said: string; offer: SetupOffer; today: string; first?: boolean; asked?: string };
 export type MappingAsked = {
   file: string;
   columns: string[];
@@ -97,13 +98,14 @@ export type FirstAsked = SetupAsked & { zone: string; locale: string; turnstile:
  * THE READING BEFORE THERE IS AN ACCOUNT, at the host's `POST /auth/signup/read` (`packages/host/src/first-read.ts`).
  * The same reply and the same twenty seconds as the record's door, over the page's own origin and no session.
  *
- * THE HOST BUILDS ITS OWN OFFER from its catalogue, and the door takes exactly `said`, `today`, `zone`, `locale` and
- * `turnstile`, refusing any other key by name, so the offer the page holds is never sent. A host with the door switched
+ * THE HOST BUILDS ITS OWN OFFER from its catalogue, and the door takes exactly `said`, `today`, `zone`, `locale`,
+ * `turnstile` and `asked`, refusing any other key by name, so the offer the page holds is never sent. A host with the door switched
  * off, no model or no bot check answers 501 `NOT_IN_THIS_BUILD`, a silence is `UNREACHABLE`, and each is the page's
  * own rules reading instead.
  */
 export function readAsks(origin: string, send: typeof fetch = (...a) => globalThis.fetch(...a), wait = WAIT_MS): { setup: (ask: FirstAsked) => Promise<Asked<SetupReply>> } {
   return {
-    setup: ({ said, today, zone, locale, turnstile }) => door<SetupReply>(send, `${origin}/auth/signup/read`, { said, today, zone, locale, turnstile }, wait),
+    setup: ({ said, today, zone, locale, turnstile, asked }) =>
+      door<SetupReply>(send, `${origin}/auth/signup/read`, { said, today, zone, locale, turnstile, ...(asked === undefined ? {} : { asked }) }, wait),
   };
 }

@@ -236,8 +236,12 @@ async function shellOf({ url, fetch, depends }: Event): Promise<FrameData> {
 
      THE KERNEL'S OWN `session` LIST IS NOT ONE OF THEM. Every record declares it at open (migration 0002), so a count
      that included it was never zero and this redirect never fired: a fresh record opened on an empty Home instead of
-     the prompt. What is counted is the lists a person or a pack declared. */
-  const declared = booted.from === 'live' ? booted.boot.registers.filter((r) => r.id !== 'session').length : null;
+     the prompt. What is counted is the lists a person or a pack declared.
+
+     NOR ANY LIST THE KERNEL DECLARES (`kernel: true`, 1 Nov): the kernel came to declare `instructions` at open too, so
+     a record made at the operator door (`/auth/provision`, a claim link) counted one list and opened on a bare Today
+     instead of the conversation. A host older than the flag still has `session` left out by its id. */
+  const declared = booted.from === 'live' ? booted.boot.registers.filter((r) => r.id !== 'session' && r.kernel !== true).length : null;
   if (declared === 0 && !spared) redirect(307, at('/start', url.pathname));
 
   /* AND THE RECORDS THIS PERSON CAN REACH, WHICH `boot` CANNOT ANSWER: it names the record you are

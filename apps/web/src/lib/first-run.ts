@@ -227,7 +227,11 @@ export function litIn(sentence: string, heard: readonly Line[]): Lit[] {
  * phrase into another part (by pack id), and `name` is the name changed (`null`, taken out). Kept beside the sentence
  * and laid over every reading of it, so the build makes what the screen showed.
  */
-export type Amend = { out: readonly string[]; to: Readonly<Record<string, string>>; name?: string | null };
+/**
+ * `on` and `off` ARE PARTS TURNED ON OR TAKEN OUT IN THE CONVERSATION (1 Nov): an answer about money keeps Money, and a
+ * part taken out on the build is off whatever the words said. Absent on what was kept before there was a conversation.
+ */
+export type Amend = { out: readonly string[]; to: Readonly<Record<string, string>>; name?: string | null; on?: readonly string[]; off?: readonly string[] };
 export const NO_AMEND: Amend = { out: [], to: {} };
 
 /** The parts a line became: "People and Money" is People and Money. */
@@ -271,7 +275,7 @@ export function amend<P extends { name: string | null; usecase: string | null; m
     name,
     title,
     usecase: caseGone ? null : p.usecase,
-    modules: [...new Set([...p.modules.filter((id) => !dropped.has(id)), ...moved.map((m) => m.to)])],
+    modules: [...new Set([...p.modules.filter((id) => !dropped.has(id)), ...moved.map((m) => m.to), ...(a.on ?? [])])].filter((id) => !(a.off ?? []).includes(id)),
     heard: heard as P['heard'],
   };
 }
@@ -307,7 +311,9 @@ export function amendKept(storage: Pick<Storage, 'getItem'> | null | undefined, 
     const strs = (x: unknown): string[] => (Array.isArray(x) ? x.filter((y): y is string => typeof y === 'string') : []);
     const to = typeof o.amend?.to === 'object' && o.amend.to !== null ? Object.fromEntries(Object.entries(o.amend.to).filter((e): e is [string, string] => typeof e[1] === 'string')) : {};
     const name = o.amend?.name;
-    const amend: Amend = { out: strs(o.amend?.out), to, ...(typeof name === 'string' || name === null ? { name } : {}) };
+    const on = strs((o.amend as { on?: unknown } | undefined)?.on);
+    const off = strs((o.amend as { off?: unknown } | undefined)?.off);
+    const amend: Amend = { out: strs(o.amend?.out), to, ...(typeof name === 'string' || name === null ? { name } : {}), ...(on.length > 0 ? { on } : {}), ...(off.length > 0 ? { off } : {}) };
     const about = o.reply?.about;
     const value = o.reply?.value;
     const reply: Reply | null = (about === 'arrivesBy' || about === 'currency' || about === 'name') && (typeof value === 'string' || value === null) ? { about, value } : null;

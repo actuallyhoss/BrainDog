@@ -1,30 +1,27 @@
 <!--
   The first run: a conversation on the left, and the BrainDog building beside it.
 
-  ONE QUESTION, ONE FIELD, FOUR CHIPS, AND IT LISTENS WHILE YOU TYPE. "Who are you?", answered in a sentence, with a chip
-  for each of the four people the product is for. As it is typed, simple rules read it on this device
-  (`lib/start/propose.ts`, `propose`): the parts it would make light up beside the field, and each phrase heard is said
-  under it. The press asks Slash's model (`proposeFirst`), which reads any language and names things in the person's own
-  words; where a host has none, or the month's asks are spent, the rules' reading is the answer. Nothing is refused.
+  A CONVERSATION, NOT A FIELD (1 Nov, the owner: "i need the who are you to be a conversation with questions"). BrainDog
+  says hello and asks "What do you do?", then the follow-ups that matter for this person's build, one at a time, chosen
+  from what they said (`$lib/start/chat.ts`, drawn by `Chat.svelte`): what they work on, the money side, the currency
+  (guessed from this device or their words, and asked to confirm; asked outright when they named two), who they work
+  with, their AI tools, what to keep first. A topic already answered is skipped; three to five questions as a rule, six
+  at most, each one skippable, and "That's enough, build it" at any time.
+
+  EACH ANSWER IS ONE MODEL READ of the whole conversation (`proposeFirst` with the questions asked, `askedLines`), six
+  at most, and it waits `QUICK_MS` at most: the rules read it at once after that, BrainDog's next question is the
+  rules', and the model's reading lands on the build when it comes. Its question back is the next one asked where its
+  topic is still open. Where there is no model, or the reads are spent, the rules read every answer.
+
+  BESIDE IT, YOUR BRAINDOG FORMS (`Forming.svelte`): Today, then each part as an answer turns it on, each saying where
+  in the answers it came from, each one press from being taken out. At the end the summary stands where the field was
+  (what it is set up as, the money's currency, what it makes, each with Change) over one "Make it mine".
 
   OR POINT AT AN EXPORT. A CSV or JSON file from another app, dropped on the screen or picked, is read on this device
   (`lib/start/export.ts`); the model reads its first entries and says which list it goes into and which column fills
   what, and the pages below are drawn over the file's own entries. A file no list holds becomes a list of its own. A
   zip, as Notion exports a workspace, is one tile for each table inside, each mapped and left out on its own, and the
   pages of notes it held are counted and said once under them, never written.
-
-  THEN A CONVERSATION, AND NOTHING WRITTEN. The words come back marked with what each phrase became, then BrainDog's
-  reply: what it heard, what it is for, the one question the words cannot answer (the currency, with the ones worth
-  offering numbered and one suggested with its reason), and a field to tell it more. Each later turn is read with the
-  first, and BrainDog says what it added. Beside it, the BrainDog builds: its parts, each lighting up as a phrase asks
-  for it, and the reading itself, phrase by phrase as it is typed and "Reading" while the model reads; then a tile for
-  each part with why it is on and the entries the words filled, and every page it makes, drawn by the record over the
-  person's own entries and file rows, never saved (`PagesPreview.svelte`).
-
-  ONE BUTTON FAMILY, `Button`, in three weights by what each does: the one ink primary, quiet pills for the choices,
-  and bare words for the other way in (a file). The primary sits at the end of the row under the field, where the eye
-  lands when the sentence is done, and it is never drawn disabled before anything is typed: pressed then, it puts the
-  caret in the field.
 
   A BUSINESS NO USE CASE FITS IS DRAFTED FOR, where a model answers. Slash drafts lists,
   figures and pages made for what was said (`slashDraft`), which files nothing; they are drawn over its sample rows, and
@@ -111,6 +108,29 @@
   import { assemble } from '$lib/start/assembling.ts';
   import { MADE_SAID, saidMade, saidMadeOf, type SaidMade } from '$lib/start/made.ts';
   import Making from './Making.svelte';
+  import { arrive } from '$lib/motion';
+  import Chat from './Chat.svelte';
+  import Forming from './Forming.svelte';
+  import {
+    ackOf,
+    askedLines,
+    atLeast,
+    chatWords,
+    currencyUnclear,
+    firstAsk,
+    namedCurrency,
+    nextAsk,
+    QUICK_MS,
+    READS_MOST,
+    saidOf,
+    TURNS_ON,
+    valueOf,
+    withName,
+    within,
+    type ChatAsk,
+    type ChatTurn,
+  } from '$lib/start/chat.ts';
+  import type { ModelAsk } from '$lib/signup.ts';
 
   /**
    * A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS NEVER ASKED TO SET ONE UP. A record's shape is its owner's, and
@@ -132,7 +152,12 @@
    * an empty record here, which is what lets somebody open it again on a record with pages and lists; they are told so
    * before the question, with the door back.
    */
-  const alreadyMade = $derived(Boolean(page.data.live) && (page.data.pages.length > 0 || page.data.index.registers.length > 0));
+  /* BY THE LISTS A PERSON OR A PACK DECLARED, as the root layout counts them (1 Nov): a record the operator door made
+     holds a page or the kernel's own lists and nothing of his, and counting those sent it back and forth between here and
+     a bare Today. */
+  const alreadyMade = $derived(
+    Boolean(page.data.live) && ((page.data as unknown as Shell).lists ?? []).some((l) => l.id !== 'session' && (l as { kernel?: true }).kernel !== true),
+  );
 
   /**
    * THE END OF THE FIRST RUN: the BrainDog is made, and `Made` offers an agent and a source before Home. Set by a "Make it
@@ -202,29 +227,11 @@
     void readCatalogueOffer().then((c) => (cat = c));
   });
 
-  /* "09:38", in the person's own clock, beside each turn of the conversation. */
-  const clock = (() => {
-    try {
-      return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return null;
-    }
-  })();
-  const timeOf = (ms: number): string => clock?.format(ms) ?? '';
-
   /* ── the prompt ─────────────────────────────────────────────────────────── */
 
   /* The sentence stays in memory and never in the address, so it is nowhere a link or a history entry can carry it. */
   let sentence = $state('');
-  let field = $state<HTMLTextAreaElement | undefined>(undefined);
-  let heardHeading = $state<HTMLHeadingElement | undefined>(undefined);
 
-  /* ENTER READS THE SENTENCE AND SHIFT+ENTER STARTS A NEW LINE, as a chat box does, because the field is one answer. */
-  function enter(e: KeyboardEvent) {
-    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
-    e.preventDefault();
-    read();
-  }
 
   /**
    * WHAT IT HEARS WHILE THE SENTENCE IS TYPED, read a beat after the last key so a fast typist is not slowed. It draws
@@ -260,27 +267,192 @@
   let onByHand = $state.raw<Set<string>>(new Set());
   let offByHand = $state.raw<Set<string>>(new Set());
   let caseByHand = $state(false);
+  /** The use case the first answer read, kept through later readings without saying the person chose it. */
+  let caseKept = false;
 
-  /** One turn of the conversation: what was said, when, and what it added to what was heard before (none for the first). */
-  type Turn = { said: string; at: number; adds: Said[] | null };
-  let turns = $state.raw<Turn[]>([]);
 
   /** Take a reading, keeping what the person decided by hand. */
   function take(p: Proposal) {
-    const handCurrency = currency !== null && currency !== (proposal?.currency ?? null);
+    const handCurrency = currencyByHand || (currency !== null && currency !== (proposal?.currency ?? null));
+    /* A NAME ANSWERED IN THE CONVERSATION STANDS OVER EVERY LATER READING. */
+    if (nameAnswer !== null) p = withName(p, nameAnswer);
     proposal = p;
     owed = undefined;
-    if (!caseByHand) chosen = p.usecase;
+    if (!caseByHand && !caseKept) chosen = p.usecase;
     kept = [...new Set([...p.modules.filter((id) => !offByHand.has(id)), ...onByHand])];
     /* A CURRENCY TYPED IS THE ANSWER; one chosen by hand stands until a later turn types one. */
-    currency = p.currency ?? (handCurrency ? currency : null);
+    currency = handCurrency && currency !== null ? currency : (namedCurrency(sentence, deviceOf()) ?? p.currency ?? null);
     failed = null;
     draft = null;
     drafting = false;
     drafts += 1;
     /* A FILE ALONE, WITH NOTHING SAID, IS NOT A BUSINESS TO DRAFT FOR: its own list is what it makes. */
+    /* ONLY ONCE THE TALK IS DONE: a draft is a model ask of its own, and the conversation asks one per answer already. */
+    if (talkDone) draftIfOutside();
+  }
+
+  function draftIfOutside() {
+    const p = proposal;
+    if (p === null) return;
     const brief = draftBrief(p, sentence).trim();
-    if (model && outsideCatalogue(p) && brief !== '') void draftFor(brief);
+    if (model && outsideCatalogue(p) && brief !== '' && draft === null && !drafting) void draftFor(brief);
+  }
+
+  /* ── the conversation ───────────────────────────────────────────────────── */
+
+  /** The questions asked and answered, and the one being asked now (`$lib/start/chat.ts`). */
+  let chatTurns = $state.raw<ChatTurn[]>([]);
+  let asking = $state.raw<ChatAsk | null>(firstAsk());
+  /** The talk is over: the summary and Make it mine stand where the field was. */
+  let talkDone = $state(false);
+  /** A name answered in the conversation, laid over every reading (`withName`). */
+  let nameAnswer = $state<string | null>(null);
+  /** A currency answered in the conversation, which no reading replaces. */
+  let currencyByHand = $state(false);
+  /** The model reads this conversation has spent, `READS_MOST` at most; the rules read after that. */
+  let modelReads = 0;
+  /** A model's question that came after the rules had already asked: offered for the next turn, if still open. */
+  let lateAsk: ModelAsk | null = null;
+
+  /**
+   * ONE ANSWER, READ: by the model where there is one and reads are left, for at most `QUICK_MS`; the rules' reading
+   * answers at once after that, and the model's lands on the build when it comes (its question kept for the next turn).
+   */
+  async function readTurn(said: string, asked: string): Promise<Proposal> {
+    const ctx = { zone, locale, currency: deviceCurrency, catalogue: heardOf(cat), offer: offerOf(cat) };
+    const ask = door?.setup ?? null;
+    if (ask === null || modelReads >= READS_MOST || said.trim() === '') return proposeFirst(said, ctx, null);
+    modelReads += 1;
+    const read = proposeFirst(said, ctx, ask, asked);
+    const quick = await within(read, QUICK_MS);
+    if (quick !== null) return quick;
+    void read.then((p) => {
+      if (p.by === undefined || p.by === 'rules' || sentence !== said || busy || made) return;
+      take(p);
+      lateAsk = p.ask ?? null;
+    });
+    return proposeFirst(said, ctx, null);
+  }
+
+  /** The names of the places that will be made, for BrainDog's "That adds …" and "What first". */
+  const placeNames = (): string[] => onParts.map((p) => p.name);
+
+  async function answerChat(text: string | null) {
+    const q = asking;
+    if (q === null || thinking || busy) return;
+    const since = Date.now();
+    thinking = true;
+    asking = null;
+    const adds = text === null ? '' : saidOf(q, text);
+    const value = text === null ? null : valueOf(q, text);
+    const before = placeNames();
+    const said = adds === '' ? sentence : joinTurns(sentence, adds);
+    const turned: ChatTurn = { ask: q, answer: text, at: Date.now(), ack: null };
+    const all = [...chatTurns, turned];
+    const laid: { currency?: string | null; usecase?: string | null; name?: string | null } = {};
+    if (q.topic === 'currency' && value !== null) {
+      currency = value;
+      currencyByHand = true;
+      laid.currency = currencyName(value);
+    }
+    if (q.topic === 'closest' && value !== null) {
+      caseByHand = true;
+      chosen = value;
+      laid.usecase = caseOf(value)?.title ?? null;
+    }
+    if (q.topic === 'name' && value !== null) {
+      nameAnswer = value;
+      laid.name = value;
+    }
+    try {
+      if (adds !== '' || proposal === null) {
+        const mine = ++readings;
+        const p = await readTurn(said, askedLines(all));
+        if (mine !== readings) return;
+        sentence = said;
+        take(p);
+        /* THE FIRST ANSWER SETTLES WHAT KIND OF BRAINDOG IT IS: a later answer read with it adds parts, and never swaps
+           the use case under the person (a founder's money answer read the whole as a small business). */
+        if (q.topic === 'what' && chosen !== null) caseKept = true;
+        /* THE PART THE QUESTION WAS ABOUT COMES ON with any answer that is not a no (`TURNS_ON`), kept as by hand. */
+        const part = TURNS_ON[q.topic];
+        if (part !== undefined && adds !== '' && !(q.topic === 'people' && /^just me$/iu.test(text ?? '')) && !kept.includes(part) && offered.includes(part)) {
+          onByHand = new Set([...onByHand, part]);
+          offByHand = new Set([...offByHand].filter((x) => x !== part));
+          kept = [...kept, part];
+          /* MONEY COMES ON IN THE CURRENCY THIS DEVICE POINTS AT, which the next question confirms. */
+          if (keepsCurrency(part) && currency === null) currency = currencyChoices(sentence, deviceOf()).suggested;
+        }
+      } else if (nameAnswer !== null && proposal !== null && laid.name) {
+        proposal = withName(proposal, nameAnswer);
+      }
+      if (!currencyByHand) {
+        const named = namedCurrency(sentence, deviceOf());
+        if (named !== null) currency = named;
+      }
+      await tick();
+      chatTurns = [...chatTurns, { ...turned, ack: ackOf(q, text, before, placeNames(), all.length, laid) }];
+      await atLeast(since);
+    } finally {
+      thinking = false;
+    }
+    const next = nextAsk(where());
+    lateAsk = null;
+    if (next === null) finishTalk();
+    else asking = next;
+  }
+
+  /** What the next question is chosen from (`nextAsk`). */
+  function where() {
+    const guessed = !currencyByHand && (currencyUnclear(sentence, deviceOf()) || (namedCurrency(sentence, deviceOf()) === null && (proposal?.currencyBy === 'device' || proposal?.currency == null)));
+    return {
+      said: sentence,
+      turns: chatTurns,
+      proposal,
+      usecase: u?.usecase ?? null,
+      placed: !(u === null && modules.length === 0 && using === null && !drafting),
+      money: { kept: money !== null, currency, guessed },
+      name: proposal?.name ?? nameAnswer,
+      env: deviceOf(),
+      places: [...new Set(onParts.flatMap((p) => (p.id.startsWith('usecase-') ? p.lists.slice(0, 2) : [p.name])))],
+      model: proposal?.ask ?? lateAsk,
+    };
+  }
+
+  /** The currency's name as this device says it ("US dollars"), or its code. */
+  function currencyName(code: string): string {
+    try {
+      return new Intl.DisplayNames([locale], { type: 'currency' }).of(code) ?? code;
+    } catch {
+      return code;
+    }
+  }
+
+  /** The talk ends: the summary and Make it mine, with the press in reach. */
+  function finishTalk() {
+    asking = null;
+    talkDone = true;
+    draftIfOutside();
+    void tick().then(() => document.getElementById('summary-h')?.focus());
+  }
+
+  /** Whether the summary's currency is open to change. */
+  let currencyOpen = $state(false);
+
+  /** A part taken out on the build: a use case is put down, a module turned off (`flip` brings it back). */
+  function leaveOut(p: PartOf) {
+    if (p.id.startsWith('usecase-')) {
+      caseByHand = true;
+      if (chosen === p.id.slice('usecase-'.length)) chosen = null;
+      return;
+    }
+    if (kept.includes(p.id)) flip(p.id);
+  }
+
+  /** Back to talking from the summary: one open question, typed. */
+  function talkMore() {
+    talkDone = false;
+    asking = nextAsk(where()) ?? { topic: 'things', question: 'What else should it know?', choices: [], by: 'rules' };
   }
 
   /**
@@ -293,56 +465,11 @@
   /** The model's reading, or the rules' where there is no model, for the words as they stand. */
   const readingOf = (said: string): Promise<Proposal> => proposeFirst(said, { zone, locale, currency: deviceCurrency, catalogue: heardOf(cat), offer: offerOf(cat) }, door?.setup ?? null);
 
-  async function read() {
-    if (thinking) return;
-    /* NOTHING SAID YET: the press puts the caret where the answer goes, rather than the button sitting greyed out. */
-    if (sentence.trim() === '' && brought.length === 0) {
-      field?.focus();
-      return;
-    }
-    const mine = ++readings;
-    thinking = true;
-    const said = sentence.trim();
-    const p = await readingOf(sentence);
-    if (mine !== readings) return;
-    thinking = false;
-    /* A FILE ALONE IS AN ANSWER TOO, and its name stands where the words would. */
-    turns = [{ said: said === '' ? source : said, at: Date.now(), adds: null }];
-    take(p);
-    void tick().then(() => heardHeading?.focus());
-  }
 
   /* ── telling it more ────────────────────────────────────────────────────── */
 
-  let extra = $state('');
 
-  /**
-   * A LATER TURN IS READ WITH EVERYTHING BEFORE IT, as one sentence, and BrainDog's answer to it is what it added. Focus
-   * stays in the field, so a person can keep talking.
-   */
-  async function more() {
-    const t = extra.trim();
-    if (t === '' || proposal === null || busy || thinking) return;
-    const was = proposal.heard;
-    const joined = joinTurns(sentence, t);
-    const mine = ++readings;
-    thinking = true;
-    const p = await readingOf(joined);
-    if (mine !== readings) return;
-    thinking = false;
-    sentence = joined;
-    turns = [...turns, { said: t, at: Date.now(), adds: added(was, p.heard) }];
-    extra = '';
-    take(p);
-  }
 
-  function moreKey(e: KeyboardEvent) {
-    /* CTRL ENTER FINISHES FROM HERE TOO, and is not also a turn. */
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      void make();
-    }
-  }
 
   /* ── what Slash drafts for a business outside the catalogue ─────────────── */
 
@@ -375,24 +502,6 @@
     }
   }
 
-  /* THE SENTENCE AGAIN, AS A FIELD. The preview goes with it, so nothing on screen describes words that changed. */
-  function edit() {
-    /* AN ANSWER STILL ON ITS WAY IS FOR THE WORDS BEING EDITED, so it is let go. */
-    readings += 1;
-    thinking = false;
-    /* WHAT WAS READ STANDS BESIDE THE FIELD until the words are read again as they are typed. */
-    live = proposal;
-    proposal = null;
-    owed = undefined;
-    failed = null;
-    draft = null;
-    drafting = false;
-    drafts += 1;
-    void tick().then(() => {
-      field?.focus();
-      field?.setSelectionRange(sentence.length, sentence.length);
-    });
-  }
 
   const u = $derived(caseOf(chosen));
   /* THE USE CASES BESIDE IT belong to the proposal they were heard with, so choosing another use case leaves them out. */
@@ -632,7 +741,6 @@
   const steps = $derived(stepsOf(allParts));
   /** Whether anything is on at all: a yes or a no, never how many. */
   const anyOn = $derived(steps.length > 0);
-  const status = $derived(proposal ? statusOf(waitingOn, !anyOn) : null);
 
   /**
    * WHAT THE LAST THING SAID ADDED TAKES THE ARRIVAL TINT for a second and a half: a part that came on
@@ -760,31 +868,14 @@
   /* ── the keys ───────────────────────────────────────────────────────────── */
 
   /**
-   * CTRL ENTER FINISHES, AND 1 TO 9 ANSWER THE QUESTION, from anywhere on the page once there is something to finish. A
-   * digit is a character a person may be typing, so it answers only when no field has focus and character keys are on;
-   * nothing answers through a page opened over this one.
+   * CTRL ENTER FINISHES from anywhere on the page once the talk is done and the summary stands; never through a page
+   * opened over this one. While BrainDog asks, Enter is the conversation's own (`Chat.svelte`).
    */
   function onkeydown(e: KeyboardEvent) {
-    if (e.defaultPrevented || covered() || proposal === null) return;
-    const mod = e.metaKey || e.ctrlKey;
-    if (mod && e.key === 'Enter' && !e.shiftKey && !e.altKey) {
+    if (e.defaultPrevented || covered() || proposal === null || !talkDone) return;
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       void make();
-      return;
-    }
-    if (typing() || mod || e.altKey || silenced(e) || busy) return;
-    if (!/^[1-9]$/u.test(e.key)) return;
-    const n = Number(e.key) - 1;
-    if (ask) {
-      const c = ask.choices[n];
-      if (!c) return;
-      e.preventDefault();
-      currency = c.code;
-    } else if (closest) {
-      const one = USE_CASES[n];
-      if (!one) return;
-      e.preventDefault();
-      pickCase(one.usecase);
     }
   }
 
@@ -794,7 +885,6 @@
   /* THE PHRASES MISSING A FACT, said by BrainDog only where Money is kept to hold the entry they began. */
   const missing = $derived(proposal !== null && money !== null ? missingIn(sentence, today) : []);
   /** How many answers the number keys reach, printed beside the conversation's heading: at most three caps. */
-  const answers = $derived(Math.min(3, ask ? ask.choices.length : closest ? USE_CASES.length : 0));
   const onParts = $derived(allParts.filter((p) => p.on));
   const offParts = $derived(moduleParts.filter((p) => !p.on));
 </script>
@@ -802,13 +892,7 @@
 <svelte:head><title>{titleOf('Start')}</title></svelte:head>
 <svelte:window {onkeydown} ondragover={dragover} ondrop={drop} ondragleave={(e) => (e.relatedTarget === null ? (dragging = false) : undefined)} />
 
-{#snippet you(at: number)}
-  <div class="who"><span class="who-name">{proposal?.name ?? words.you}</span><time class="who-time num" datetime={new Date(at).toISOString()}>{timeOf(at)}</time></div>
-{/snippet}
 
-{#snippet dog(at: number)}
-  <div class="who"><span class="who-name">{words.dog}</span><time class="who-time num" datetime={new Date(at).toISOString()}>{timeOf(at)}</time></div>
-{/snippet}
 
 {#snippet bringer()}
   <!-- ONE QUIET CONTROL, AND ITS HINT ONLY ON HOVER OR FOCUS: the screen asks one question, and a file is the other way
@@ -822,18 +906,80 @@
   {/if}
 {/snippet}
 
-{#snippet keys()}
-  {#if proposal}
-    <span class="keys" aria-hidden="true">
-      {#if answers > 0}{#each { length: answers } as _, n (n)}<Kbd keys={String(n + 1)} />{/each}<span class="keys-word">{words.answerKeys}</span>{/if}
-      <Kbd keys="⌘↵" /><span class="keys-word">{words.finishKeys}</span>
-    </span>
-  {/if}
+{#snippet summary()}
+  <!-- THE SUMMARY, WHERE THE FIELD WAS: what it will be for, the money's currency, what it makes, each with Change, and
+       the one press. The parts themselves are taken out on the build beside (under it on a phone). -->
+  <section class="summary" aria-labelledby="summary-h" in:arrive={{ rise: 8, delay: 80 }}>
+    <h2 class="summary-h" id="summary-h" tabindex="-1">{words.summaryHead}</h2>
+    <dl class="facts">
+      {#if proposal?.name}
+        <div class="fact"><dt>{words.factName}</dt><dd>{proposal.name}</dd></div>
+      {/if}
+      <div class="fact">
+        <dt>{words.factFor}</dt>
+        <dd>
+          <span>{u ? u.title : using ? drawing.drafted : drafting ? drawing.drafting : words.forYou}</span>
+          <button type="button" class="change" disabled={busy} aria-expanded={picking} onclick={() => (picking = !picking)}>{words.changeCase}</button>
+        </dd>
+      </div>
+      {#if money}
+        <div class="fact">
+          <dt>{words.factMoney}</dt>
+          <dd>
+            <span>{currency ? currencyName(currency) : words.noCurrency}</span>
+            <button type="button" class="change" disabled={busy} aria-expanded={currencyOpen} onclick={() => ((currencyOpen = !currencyOpen), (currencyByHand = true))}>{words.changeCase}</button>
+          </dd>
+        </div>
+      {/if}
+      <div class="fact">
+        <dt>{words.factMakes}</dt>
+        <dd><span>{firstRun.and(['Today', ...onParts.map((p) => p.name)])}</span></dd>
+      </div>
+    </dl>
+    {#if picking}
+      <div class="chips" role="group" aria-label={firstRun.mineFor}>
+        {#each USE_CASES as one (one.usecase)}
+          <Button size="sm" aria-pressed={chosen === one.usecase} disabled={busy} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
+        {/each}
+      </div>
+    {/if}
+    {#if money && (currencyOpen || currency === null)}
+      <Currency bind:value={currency} {locale} choices={ask?.choices ?? currencyChoices(sentence, deviceOf()).choices} suggested={ask?.suggested ?? null} find={ask?.find ?? null} />
+    {/if}
+    {#each missing as m (m.title)}<p class="quiet">{words.missing(m.title, m.missing)}</p>{/each}
+    {#if ring}<Remind />{/if}
+    {#if nothing}<p class="quiet" id="make-why">{firstRun.makeSomething}</p>{/if}
+    {#if failed}
+      <section class="failed-part" aria-labelledby="failed-h" role="status">
+        <h3 class="reply-h" id="failed-h">{firstRun.notAllMade}</h3>
+        <ul class="failed">
+          {#each failed as f, i (i)}
+            <li>
+              {f.said}
+              {#if f.why !== ''}
+                <details class="why"><summary>{firstRun.whyDetails}</summary><p class="quiet">{f.why}</p></details>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+        <div class="actions"><Button href="/">{firstRun.openHome}</Button></div>
+      </section>
+    {/if}
+    <div class="summary-go">
+      <div class="make-bar">
+        <Button weight="primary" kbd={ready ? '⌘↵' : undefined} disabled={!ready} aria-busy={busy} onclick={() => void make()} aria-describedby={nothing ? 'make-why' : undefined}>
+          {busy ? firstRun.makingIt : firstRun.makeIt}
+        </Button>
+      </div>
+      <Button weight="bare" size="sm" disabled={busy} onclick={talkMore}>{words.tellMore}</Button>
+    </div>
+  </section>
 {/snippet}
+
 
 <!-- THE WHOLE WINDOW (`Frame.svelte`): the conversation on the ground at the left, the build in tiles at the right. -->
 <Frame>
-  <div class="frame" data-making={proposal !== null ? '' : undefined}>
+  <div class="frame" data-making={talkDone ? '' : undefined}>
     {#if noRecord}
       <div class="alone">
         <NoRecord title={copy.noRecordTitle} why={firstRun.noRecordWhy} describe />
@@ -851,7 +997,7 @@
         </div>
       </section>
     {:else if made}
-      <Made modules={madeModules} places={madePlaces} addons={madeAddons} said={madeSaid} />
+      <Made modules={madeModules} places={madePlaces} addons={madeAddons} said={madeSaid} tools={chatTurns.filter((t) => t.ask.topic === 'tools' && t.answer !== null).flatMap((t) => (t.answer ?? '').split(/,\s*|\s+and\s+/u))} />
     {:else if watched}
       <!-- AFTER THE PRESS: the record being made, tile by tile. Today opens when the call answers; where the record
            refused a part, its tile says why and the way back is one button. -->
@@ -878,247 +1024,46 @@
         </section>
       {/if}
 
-      <!-- THE TITLE ROW: the question, and once it is read, the sentence that says where the build stands. -->
+      <!-- THE TITLE ROW: one plain line; the conversation under it does the asking. -->
       <header class="title">
-        <h1 class="entry-title" id="who-h">{firstRun.whoQuestion}</h1>
-        {#if status}
-          <p class="sentence">{status.before}{#if status.needs}<span class="needs" data-needs>{status.needs}</span>{/if}{status.after}</p>
-        {/if}
+        <h1 class="entry-title" id="who-h">{talkDone ? words.summaryTitle : words.talkTitle}</h1>
       </header>
 
       <div class="board">
         <!-- ── THE CONVERSATION ──────────────────────────────────────────── -->
-        <!-- IN A TILE, AS ON /signup (first F5): its field sits on white, never on the bare ground. -->
-        <section class="talk" aria-label={words.talk} data-dragging={dragging ? '' : undefined}>
+        <section class="talk" aria-labelledby="who-h" data-dragging={dragging ? '' : undefined}>
           {#if dragging}<p class="drop" aria-hidden="true">{firstRun.exportDrop}</p>{/if}
-          {#if proposal === null}
-            <form
-              class="prompt"
-              onsubmit={(e) => {
-                e.preventDefault();
-                read();
-              }}
-            >
-              <textarea
-                class="prompt-field"
-                rows="3"
-                autocomplete="off"
-                aria-labelledby="who-h"
-                placeholder={firstRun.whoPlaceholder}
-                bind:this={field}
-                bind:value={sentence}
-                onkeydown={enter}
-              ></textarea>
-              <!-- THE OTHER WAY IN AT THE START OF THE ROW, AND THE PRIMARY AT ITS END, under the field's own edge, where
-                   the eye is when the sentence is done. What it hears as it is typed is drawn beside, in the build. -->
-              <div class="actions go">
-                {@render bringer()}
-                <!-- THE CAP ONLY WHILE THE KEY WORKS: a cap on a press that only moves the caret would promise more. -->
-                <Button weight="primary" type="submit" kbd={sentence.trim() === '' || thinking ? undefined : '↵'} disabled={thinking} aria-busy={thinking}
-                  >{thinking ? firstRun.whoReading : firstRun.whoGo}</Button
-                >
-              </div>
-              {#if fileWhy}<p class="nudge" role="status">{fileWhy}</p>{/if}
-            </form>
-          {:else}
-            <ol class="log">
-              {#each turns as t, i (i)}
-                <li class="turn">
-                  <Face name={proposal.name ?? words.you} you size="l" />
-                  <div class="turn-main">
-                    {@render you(t.at)}
-                    <!-- THE WORDS, MARKED WITH WHAT EACH PHRASE BECAME, and pressing them opens the whole of what was
-                         said for editing. -->
-                    <button type="button" class="said-line" disabled={busy} onclick={edit}>
-                      <span class="said-text">
-                        {#each marksIn(t.said, proposal.heard, i === 0 ? proposal.name : null) as r, j (j)}
-                          {#if r.became}<mark class="said-mark" title={r.became}>{r.text}</mark>{:else}{r.text}{/if}
-                        {/each}
-                      </span>
-                      <span class="said-edit">{firstRun.whoEdit}</span>
-                    </button>
-                  </div>
-                </li>
-
-                {#if i === 0}
-                  <li class="turn">
-                    <Face name={words.dog} kind="system" size="l" />
-                    <div class="turn-main">
-                      {@render dog(t.at)}
-                      <section class="reply" aria-labelledby="heard-h">
-                        <h3 class="reply-h" id="heard-h" tabindex="-1" bind:this={heardHeading}>{firstRun.heardTitle}</h3>
-                        {#if proposal.name}<p class="heard-name">{firstRun.heardName(proposal.name)}</p>{/if}
-                        {#if proposal.heard.some((h) => h.you !== true)}
-                          <ul class="heard">
-                            {#each proposal.heard.filter((h) => h.you !== true) as h, k (k)}
-                              <li class="heard-one">
-                                <IconWell name={iconOfBecame(h.became, proposal.names)} size="l" />
-                                <span class="heard-main">
-                                  <q class="phrase">{h.phrase}</q>
-                                  <span class="became"><span class="sr">: </span>{becameShown(h, proposal)}</span>
-                                </span>
-                              </li>
-                            {/each}
-                          </ul>
-                        {:else if tiled.length > 0}
-                          {#each tiled as t (t.key)}<p class="quiet">{t.said}</p>{/each}
-                        {:else}
-                          <p class="quiet">{firstRun.heardNone}</p>
-                          {#if proposal.name && modules.includes(PEOPLE)}<p class="quiet">{firstRun.heardNote}</p>{/if}
-                        {/if}
-                        {#if proposal.name && !modules.includes(PEOPLE)}<p class="quiet">{firstRun.nameNotKept}</p>{/if}
-                        {#if proposal.fell === 'SLASH_BUDGET_SPENT'}<p class="quiet">{firstRun.readByRules}</p>{:else if proposal.by === undefined || proposal.by === 'rules'}<p class="quiet">{firstRun.readByRulesAny}</p>{/if}
-                        {#each missing as m (m.title)}
-                          <p class="nudge">{words.missing(m.title, m.missing)}</p>
-                        {/each}
-                      </section>
-
-                      <section class="reply" aria-labelledby="mine-h">
-                        <h3 class="reply-h" id="mine-h">{firstRun.mineTitle}</h3>
-                        {#if u}
-                          <p class="mine-title">
-                            <span>{u.title}{#if also.length > 0}<span class="quiet">, {firstRun.and(also.map((a) => a.title))}</span>{/if}</span>
-                            {#if !picking && !closest}<button type="button" class="change" disabled={busy} onclick={() => (picking = true)}>{words.changeCase}</button>{/if}
-                          </p>
-                          <p class="quiet">{proposal.summary ?? u.summary}</p>
-                        {:else if using}
-                          <p class="mine-title">{drawing.drafted}</p>
-                          <p class="quiet">{using.question}</p>
-                        {:else if drafting}
-                          <p class="quiet drafting" role="status"><span class="live-dot" aria-hidden="true"></span>{drawing.drafting}</p>
-                        {:else if proposal.summary}
-                          <p class="quiet">{proposal.summary}</p>
-                        {/if}
-                        <!-- THE OTHER USE CASES ONLY WHEN ASKED FOR: one line says what it is, and Change opens the rest. -->
-                        {#if !closest && (picking || u === null)}
-                          <div class="chips" role="group" aria-label={firstRun.mineFor}>
-                            {#each USE_CASES as one (one.usecase)}
-                              <Button size="sm" aria-pressed={chosen === one.usecase} disabled={busy} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
-                            {/each}
-                          </div>
-                        {/if}
-                      </section>
-                    </div>
-                  </li>
-                {:else}
-                  <li class="turn">
-                    <Face name={words.dog} kind="system" size="l" />
-                    <div class="turn-main">
-                      {@render dog(t.at)}
-                      <!-- THE NEWEST ANSWER IS SAID ALOUD; the older ones stay quiet. -->
-                      <p class="reply-line" role={i === turns.length - 1 ? 'status' : undefined}>
-                        {#if t.adds && t.adds.length > 0}{words.adds(t.adds.map((h) => firstRun.mineIn(`“${h.phrase}”`, h.became)))}{:else}{words.addsNothing}{/if}
-                      </p>
-                    </div>
-                  </li>
-                {/if}
-              {/each}
-            </ol>
-
-            <!-- ── THE ONE QUESTION ─────────────────────────────────────── -->
-            {#if asksCurrency || closest}
-              <section class="ask" aria-labelledby={asksCurrency ? 'currency-q' : 'closest-q'} data-open={waitingOn ? '' : undefined}>
-                <p class="ask-label"><IconWell name="ask" size="m" tone={waitingOn ? 'danger' : undefined} /><span class="ask-word">{words.oneQuestion}</span><span class="ask-meta">{words.cannotTell}</span></p>
-                {#if asksCurrency}
-                  <Currency bind:value={currency} {locale} choices={ask?.choices ?? []} suggested={ask?.suggested ?? null} find={ask?.find ?? null} />
-                {:else}
-                  <h3 class="ask-q" id="closest-q">{words.closest}</h3>
-                  <p class="quiet">{words.closestWhy}</p>
-                  <div class="chips" role="group" aria-label={firstRun.mineFor}>
-                    {#each USE_CASES as one, n (one.usecase)}
-                      <Button weight="quiet" kbd={n < 9 ? String(n + 1) : undefined} aria-pressed={chosen === one.usecase} disabled={busy} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
-                    {/each}
-                  </div>
-                {/if}
-              </section>
-            {/if}
-
-            {#if ring}<Remind />{/if}
-
-            <!-- ── TELL IT MORE ────────────────────────────────────────── -->
-            <form
-              class="more"
-              onsubmit={(e) => {
-                e.preventDefault();
-                more();
-              }}
-            >
-              <div class="field more-field">
-                <input class="field-input" id="start-more" type="text" autocomplete="off" aria-label={words.more} placeholder={words.more} disabled={busy} bind:value={extra} onkeydown={moreKey} />
-                <Button weight="quiet" size="sm" type="submit" kbd="↵" disabled={busy || thinking || extra.trim() === ''} aria-busy={thinking}>{thinking ? firstRun.whoReading : words.moreGo}</Button>
-              </div>
-              <div class="actions">{@render bringer()}</div>
-              {#if fileWhy}<p class="nudge" role="status">{fileWhy}</p>{/if}
-            </form>
-
-            {#if failed}
-              <section class="failed-part" aria-labelledby="failed-h" role="status">
-                <h3 class="reply-h" id="failed-h">{firstRun.notAllMade}</h3>
-                <ul class="failed">
-                  {#each failed as f, i (i)}
-                    <li>
-                      {f.said}
-                      {#if f.why !== ''}
-                        <details class="why"><summary>{firstRun.whyDetails}</summary><p class="quiet">{f.why}</p></details>
-                      {/if}
-                    </li>
-                  {/each}
-                </ul>
-                <div class="actions">
-                  <Button href="/">{firstRun.openHome}</Button>
-                </div>
-              </section>
-            {/if}
-            {@render keys()}
-          {/if}
+          <Chat
+            turns={chatTurns}
+            current={asking}
+            {thinking}
+            done={talkDone}
+            {busy}
+            closing={talkDone ? chatWords.done : null}
+            onanswer={(a) => void answerChat(a)}
+            onskip={() => void answerChat(null)}
+            onenough={finishTalk}
+          >
+            {#snippet tools()}{@render bringer()}{/snippet}
+            {#snippet after()}{@render summary()}{/snippet}
+          </Chat>
+          {#if fileWhy}<p class="nudge" role="status">{fileWhy}</p>{/if}
         </section>
 
         <!-- ── THE BUILD ─────────────────────────────────────────────────── -->
         <div class="build">
-          <Tile icon="home" title={waitingOn || !anyOn || proposal === null ? words.building : words.ready}>
-            <!-- NO ROW OF INK SQUARES (first F6): they cut the parts' names short ("Photograp…"), and the sentence under the
-                 reading says the same parts aloud, once, whole. -->
-            <!-- THE READING ITSELF, BUILDING AS IT IS TYPED: each phrase heard and what it became, then "Reading" while the
-                 model reads the whole. Not a live region while typing, or a screen reader would be told on every key; the
-                 press says it all in the conversation. -->
-            {#if thinking}
-              <p class="reading drafting" role="status"><span class="live-dot" aria-hidden="true"></span>{words.readingNow}</p>
-            {:else if proposal === null && live && live.heard.length > 0}
-              <ul class="heard-live">
-                {#each live.heard as h, i (i)}
-                  <li class="heard-one">
-                    <IconWell name={iconOfBecame(h.became, live?.names)} />
-                    <span class="heard-main">
-                      <q class="phrase">{h.phrase}</q>
-                      <span class="became"><span class="sr">: </span>{becameShown(h, live)}</span>
-                    </span>
-                  </li>
-                {/each}
-              </ul>
-            {:else if proposal === null && !anyOn}
-              <p class="reading">{words.beforeTyping}</p>
-            {/if}
-            <!-- NOTHING SAVED IS SAID ONCE THERE IS SOMETHING TO SAVE, so the empty tile is one line. -->
-            {#if anyOn}
-              <p class="reading">
-                {words.onReading(
-                  steps.filter((p) => p.state !== 'waiting').map((p) => p.name),
-                  steps.find((p) => p.state === 'waiting')?.name ?? null,
-                )}
-                {words.nothingSaved}
-              </p>
-            {/if}
-            {#if proposal}
-              <!-- WHY THE PRIMARY IS OFF sits above the bar, not in it, so the bar a phone keeps on screen stays one button tall. -->
-              {#if nothing}<p class="quiet" id="make-why">{firstRun.makeSomething}</p>{/if}
-              <!-- ONE PRIMARY, AND ON A PHONE IT RIDES THE BOTTOM EDGE, clear of the home indicator. -->
-              <div class="make-bar">
-                <Button weight="primary" kbd={ready ? '⌘↵' : undefined} disabled={!ready} aria-busy={busy} onclick={() => void make()} aria-describedby={nothing ? 'make-why' : undefined}>
-                  {busy ? firstRun.makingIt : firstRun.makeIt}
-                </Button>
-              </div>
-            {/if}
-          </Tile>
+          <Forming
+            parts={steps}
+            left={proposal ? offParts.map((p) => ({ id: p.id, name: p.name })) : []}
+            said={sentence}
+            title={proposal?.title ?? null}
+            ghost={proposal === null && brought.length === 0}
+            {busy}
+            {locale}
+            pages={proposal ? pages.reduce((n, s) => n + s.pages.length, 0) || null : null}
+            onremove={leaveOut}
+            onrestore={flip}
+          />
 
           {#each tiled as t (t.key)}
             <FromFile
@@ -1136,27 +1081,7 @@
           <!-- WHAT THE FILE HELD AND NOTHING WRITES, said once under its tiles, never as a tile of its own. -->
           {#if tiled.length > 0 && leftLine}<p class="quiet">{leftLine}</p>{/if}
 
-          {#if onParts.length > 0}
-            <div class="parts" role="group" aria-label={firstRun.mineKeeps} data-live={proposal === null ? '' : undefined}>
-              {#each onParts as p (p.id)}
-                <Part part={p} live={proposal === null || p.id.startsWith('usecase-')} {busy} {locale} arrived={fresh.has(`part:${p.id}`)} {fresh} onflip={flip} />
-              {/each}
-            </div>
-          {/if}
-
-          {#if proposal && offParts.length > 0}
-            <Tile class="section" data-surface="tile" title={words.alsoHere} count={offParts.length || undefined}>
-              <div class="section-body">
-                <div class="keeps">
-                  {#each offParts as p (p.id)}
-                    <Part part={p} {busy} {locale} onflip={flip} />
-                  {/each}
-                </div>
-              </div>
-            </Tile>
-          {/if}
-
-          {#if proposal}
+          {#if proposal && talkDone}
             <!-- EVERY PAGE IT MAKES, one row a page, each opening as the record would draw it. -->
             <PagesPreview asked={drawAsked} {rail} typed={proposal.rows} name={proposal.name} />
           {/if}
@@ -1199,20 +1124,6 @@
     min-inline-size: 0;
   }
 
-  /* THE SENTENCE: 16/24 in the second ink, and the phrase that needs him in red. */
-  .sentence {
-    margin: 0;
-    max-inline-size: var(--measure);
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: 24px;
-  }
-
-  .needs {
-    color: var(--red);
-    font-weight: 500;
-  }
-
   /* ── the board ─────────────────────────────────────────────────────────── */
 
   /* ONE COLUMN ON A PHONE; FROM 900PX THE CONVERSATION AND THE BUILD SIDE BY SIDE, 12 apart. */
@@ -1225,23 +1136,21 @@
 
   @media (width >= 900px) {
     .board {
-      grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1.45fr) minmax(20rem, 1fr);
     }
-  }
 
-  .build,
-  .parts {
+    /* THE BUILD STAYS IN VIEW BESIDE A LONG CONVERSATION, under the frame's own top edge. */
+    .build {
+      position: sticky;
+      inset-block-start: var(--sp-5);
+    }
+  }.build {
     display: grid;
     gap: var(--inset);
     min-inline-size: 0;
   }
 
   /* WHILE TYPING ON A PHONE the build tile alone says what lit up; the part tiles arrive once the sentence is read. */
-  @media (width < 900px) {
-    .parts[data-live] {
-      display: none;
-    }
-  }
 
   /* A TILE THAT JUST CAME ON takes the arrival tint and fades back to the tile over a second and a half. */
   @media (prefers-reduced-motion: no-preference) {
@@ -1253,35 +1162,6 @@
   .build :global(.tile[data-arrived]) {
     background: var(--arrived);
     transition: none;
-  }
-
-  /* ── the prompt ────────────────────────────────────────────────────────── */
-
-  .prompt {
-    display: grid;
-    gap: var(--sp-3);
-  }
-
-  /* THE ONE FIELD, drawn at the size of a sentence rather than a form row, in the tile's well, and
-     16px so a phone does not zoom it. Its focus is the a11y layer's 2px ink ring. */
-  .prompt-field {
-    inline-size: 100%;
-    box-sizing: border-box;
-    padding: var(--sp-3) var(--sp-4);
-    background: var(--tile-2);
-    border: 0;
-    border-radius: var(--r-ctl);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--fs-body);
-    line-height: 24px;
-    resize: vertical;
-    /* IT SCROLLS CLEAR OF THE PHONE'S KEYBOARD with the chips and the press under it still in view. */
-    scroll-margin-block: var(--sp-6) var(--sp-9);
-  }
-
-  .prompt-field::placeholder {
-    color: var(--ink-3);
   }
 
   .chips {
@@ -1302,16 +1182,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
-  }
-
-  /* THE ROW UNDER THE FIELD: the other way in at its start, the primary at its end. */
-  .actions.go {
-    justify-content: space-between;
-    padding-block-start: var(--sp-1);
-  }
-
-  .actions.go > :global(.btn[data-weight='primary']) {
-    margin-inline-start: auto;
   }
 
   /* ── a file ────────────────────────────────────────────────────────────── */
@@ -1396,7 +1266,7 @@
     gap: var(--sp-4);
     align-content: start;
     min-inline-size: 0;
-    padding: var(--sp-5);
+    padding: var(--sp-6);
     background: var(--tile);
     border-radius: var(--r-tile);
   }
@@ -1405,109 +1275,6 @@
     .talk {
       padding: 20px;
     }
-  }
-
-  .talk > .keys {
-    justify-self: end;
-  }
-
-  .log {
-    display: grid;
-    gap: var(--sp-5);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .turn {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-    gap: var(--sp-3);
-  }
-
-  .turn-main {
-    display: grid;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-  }
-
-  .who {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
-    min-block-size: 20px;
-  }
-
-  .who-name {
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 600;
-  }
-
-  /* TIMES IN A FEED ARE GEIST MONO. */
-  .who-time {
-    color: var(--ink-3);
-    font-family: var(--font-mono);
-    font-size: var(--fs-meta);
-  }
-
-  /* HIS WORDS IN THE TILE'S WELL, whole, with each phrase heard lifted onto the tile's own fill. The whole of it is one
-     press away from editing. */
-  .said-line {
-    display: grid;
-    gap: var(--sp-2);
-    inline-size: 100%;
-    min-block-size: var(--tap);
-    padding: var(--sp-3) var(--sp-4);
-    background: var(--tile-2);
-    border: 0;
-    border-radius: var(--r-pop);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-    text-align: start;
-    cursor: text;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .said-line:hover:not(:disabled) {
-      background: var(--tile-2);
-    }
-  }
-
-  .said-text {
-    min-inline-size: 0;
-    overflow-wrap: anywhere;
-  }
-
-  /* THE LIFT REACHES PAST THE WORD AND THE WORD DOES NOT MOVE: a padding and the same margin back, so a phrase before
-     a comma keeps its comma against it. */
-  .said-mark {
-    margin-inline: -3px;
-    padding: 1px 3px;
-    background: var(--tile);
-    border-radius: var(--r-xs);
-    color: var(--ink);
-    font-weight: 500;
-    box-decoration-break: clone;
-  }
-
-  .said-edit {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
-  .reply {
-    display: grid;
-    gap: var(--sp-3);
-    min-inline-size: 0;
-  }
-
-  .reply + .reply {
-    margin-block-start: var(--sp-3);
   }
 
   /* THE HEADING FOCUS LANDS ON AFTER A READ is a place, not a control: focus-ok: it is `tabindex="-1"`, reached only
@@ -1522,28 +1289,6 @@
     font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
-  }
-
-  .reply-line {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-  }
-
-  .heard-name,
-  .mine-title {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 500;
-  }
-
-  .mine-title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--sp-1) var(--sp-3);
   }
 
   /* CHANGE IS A WORD IN THE LINK INK, not another pill: the line says what was chosen, and this opens the rest. Ink and
@@ -1567,53 +1312,6 @@
     cursor: default;
   }
 
-  /* WHAT IT FOUND, one phrase to a cell, two a row where there is room (the board's grid of found things). */
-  .heard {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
-    gap: var(--sp-2) var(--sp-4);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .heard-one {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    min-inline-size: 0;
-  }
-
-  .heard-main {
-    display: grid;
-    min-inline-size: 0;
-  }
-
-  .phrase {
-    overflow: hidden;
-    color: var(--ink-2);
-    font-weight: 400;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* WHAT A PHRASE BECAME, in ink: a place is not an alarm, so never red (first F6). */
-  .became {
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 500;
-  }
-
-  /* A SCREEN READER HEARS "BECAME" AS AN ARROW between the phrase and what it became; the eye reads the two lines. */
-  .sr {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
   .nudge {
     margin: 0;
     color: var(--ink);
@@ -1629,71 +1327,7 @@
     line-height: var(--lh-body);
   }
 
-  .drafting {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  /* SLASH AT WORK WEARS THE ONE HUE THAT MEANS ALIVE (`live`). Still, never pulsing. */
-  .live-dot {
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    flex: none;
-    border-radius: var(--r-ctl);
-    background: var(--live);
-  }
-
   /* ── the question ──────────────────────────────────────────────────────── */
-
-  /* THE ONE QUESTION, set off from the conversation by a hairline above it, not a box. */
-  .ask {
-    display: grid;
-    gap: var(--sp-3);
-    padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--rule);
-  }
-
-  .ask-label {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-3);
-    margin: 0;
-  }
-
-  .ask-word {
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 600;
-  }
-
-  .ask[data-open] .ask-word {
-    color: var(--red);
-  }
-
-  .ask-meta {
-    margin-inline-start: auto;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
-  .ask-q {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 600;
-  }
-
-  /* ── telling it more ───────────────────────────────────────────────────── */
-
-  .more-field {
-    padding-inline-end: var(--sp-1);
-  }
-
-  .more-field .field-input {
-    font-size: var(--fs-body);
-  }
 
   .failed-part {
     display: grid;
@@ -1716,30 +1350,6 @@
     cursor: pointer;
   }
 
-  /* ── the keys, at the conversation's heading ───────────────────────────── */
-
-  .keys {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-  }
-
-  .keys-word {
-    margin-inline: 2px var(--sp-2);
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
-  .keys-word:last-child {
-    margin-inline-end: 0;
-  }
-
-  /* THE KEYS ARE PRINTED WHEN ASKED FOR: while the conversation is pointed at or has focus, and never
-     as standing chrome over the one question. Hidden and not removed, so the head does not move when they come. */
-  .talk:not(:hover, :focus-within) .keys {
-    visibility: hidden;
-  }
-
   /* AND A BUTTON'S OWN CAP the same way: under the pointer or with keyboard focus. Without its cap a pill takes its
      even padding back, so it reads as every other pill on the screen. */
   .frame :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
@@ -1756,30 +1366,10 @@
 
   /* ── the build ─────────────────────────────────────────────────────────── */
 
-  /* WHAT IT HEARD SO FAR, one phrase to a line, each with the glyph of what it became. */
-  .heard-live {
-    display: grid;
-    gap: var(--sp-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .reading {
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-  }
-
   /* THE ONE PRIMARY, AT THE END OF THE BUILD at 1440. */
   .make-bar {
     display: flex;
     justify-content: flex-start;
-  }
-
-  .keeps {
-    display: grid;
   }
 
   /* ── the again note ────────────────────────────────────────────────────── */
@@ -1837,6 +1427,80 @@
     line-height: 24px;
   }
 
+  /* ── the summary, where the field was ─────────────────────────────────── */
+
+  .summary {
+    display: grid;
+    gap: var(--sp-4);
+    padding-inline-start: calc(28px + var(--sp-3));
+  }
+
+  .summary-h {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+  }
+
+  .summary-h:focus {
+    outline: none;
+  }
+
+  /* THE FACTS, ONE A ROW: what it is in the second ink at the left, the answer and its Change at the right. */
+  .facts {
+    display: grid;
+    margin: 0;
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: var(--sp-3);
+    padding-block: var(--sp-3);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .fact:first-child {
+    border-block-start: 0;
+    padding-block-start: 0;
+  }
+
+  .fact dt {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 24px;
+  }
+
+  .fact dd {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-1) var(--sp-3);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 24px;
+  }
+
+  .summary-go {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+    padding-block-start: var(--sp-2);
+  }
+
+  @media (width < 640px) {
+    .summary {
+      padding-inline-start: 0;
+    }
+
+    .fact {
+      grid-template-columns: 5.5rem minmax(0, 1fr);
+    }
+  }
+
   /* ── a phone ───────────────────────────────────────────────────────────── */
 
   @media (width < 900px) {
@@ -1872,17 +1536,12 @@
   }
 
   /* NO KEY CAPS UNDER A THUMB OR ON A PHONE: there is no keyboard to press them with. */
-  @media (width < 900px), (pointer: coarse) {
-    .keys,
-    .frame :global(.btn-kbd) {
+  @media (width < 900px), (pointer: coarse) {.frame :global(.btn-kbd) {
       display: none;
     }
   }
 
   @media (forced-colors: active) {
-    .said-mark {
-      border: 1px solid CanvasText;
-    }
 
     .make-bar {
       border-block-start: 1px solid CanvasText;

@@ -7,6 +7,13 @@
 
   USE CASE 6, STEPS 1 TO 4 (set 9 October, "The onboarding target").
 
+  SINCE 1 NOVEMBER STEPS 1 TO 3 ARE ONE CONVERSATION (`../start/Chat.svelte`, `$lib/start/chat.ts`), as on `/start`:
+  BrainDog asks "What do you do?" and the follow-ups the answers call for, each answer read at the reading door with
+  the questions asked (`readPressed` with `askedLines`, a fresh bot-check answer each, six reads at most, `QUICK_MS`
+  each before the rules answer), and the build beside it forms (`../start/Forming.svelte`), each part one press from
+  being taken out (`Amend.off`, kept beside the words). The end of the talk is the keep step. What follows describes the
+  reading the conversation stands on; the one-field describe step and its one question are no longer drawn.
+
   1. DESCRIBE. "Who are you?", one field with one example in it, and three promises under it. As it is typed, the
      rules read it on this device, a beat after each key (`proposeFirst` with no model, `lib/start/propose.ts`), and
      nothing typed leaves the device. ON THE PERSON'S PRESS OF NEXT, AND ONLY THEN (`readerFor` in
@@ -141,7 +148,26 @@
     currencyChoices,
   } from '../start/building.ts';
   import { caseOf, keepsCurrency } from '../start/preview.ts';
-  import Building from '../start/Building.svelte';
+  import Chat from '../start/Chat.svelte';
+  import Forming from '../start/Forming.svelte';
+  import {
+    ackOf,
+    askedLines,
+    atLeast,
+    chatWords,
+    currencyUnclear,
+    firstAsk,
+    namedCurrency,
+    nextAsk,
+    QUICK_MS as CHAT_QUICK_MS,
+    READS_MOST,
+    saidOf,
+    TURNS_ON,
+    valueOf,
+    type ChatAsk,
+    type ChatTurn,
+  } from '$lib/start/chat.ts';
+  import { joinTurns, type Part as PartOf } from '../start/building.ts';
   import Currency from '../start/Currency.svelte';
   import Frame from '../start/Frame.svelte';
   import Entry from '../signin/Entry.svelte';
@@ -420,7 +446,7 @@
    * THE WORDS, READ FOR ONE CAUSE: by the rules on this device for a key or a pause, and by the model only for the
    * person's press (`readerFor`). `ask` is told the model's one question, where its answer carried one.
    */
-  function reading(s: string, cause: ReadCause = 'key', ask?: (q: ModelAsk | null) => void): Promise<Proposal> {
+  function reading(s: string, cause: ReadCause = 'key', ask?: (q: ModelAsk | null) => void, asked?: string): Promise<Proposal> {
     const reader = readerFor(cause, door, {
       zone: here,
       locale,
@@ -433,7 +459,7 @@
         ask?.(out.ok ? askOf(out.value) : null);
       },
     });
-    return proposeFirst(s, { zone: here, locale, currency: zoneCurrency(here), catalogue: heardOf(cat), offer: offerOf(cat) }, reader);
+    return proposeFirst(s, { zone: here, locale, currency: zoneCurrency(here), catalogue: heardOf(cat), offer: offerOf(cat) }, reader, asked);
   }
 
   $effect(() => {
@@ -476,18 +502,19 @@
   let landed = $state<string | null>(null);
 
   /** THE PRESS'S READ: the model once for these words (or the reading it already gave them), else the rules'. */
-  async function readPressed(s: string): Promise<Proposal> {
+  async function readPressed(s: string, asked?: string, quickMs = QUICK_MS): Promise<Proposal> {
     if (pressed !== null && pressed.said === s) return pressed.proposal;
     let ask: ModelAsk | null = null;
     let late = false;
-    const model = reading(s, 'press', (q) => (ask = q)).then(
+    const model = reading(s, 'press', (q) => (ask = q), asked).then(
       (p) => {
         if (lateFor === s) lateFor = null;
         if (p.by === undefined || p.by === 'rules' || sentence !== s) return p;
         /* LATE, ITS QUESTION IS NOT ASKED: the person has gone on, and the rules' question (or none) stood. While the one
            question is on screen the reading waits, so the question does not change under the person's thumb. */
         if (late && step === 'question') lateHeld = { said: s, proposal: p };
-        else pressed = { said: s, proposal: p, ask: late ? null : ask };
+        /* IN THE CONVERSATION A LATE QUESTION IS KEPT, for the next turn, where its topic is still open (`nextAsk`). */
+        else pressed = { said: s, proposal: p, ask: late && step !== 'describe' ? null : ask };
         if (late) landed = s;
         return p;
       },
@@ -500,7 +527,7 @@
     readingNow = true;
     let quick: Proposal | 'failed' | null;
     try {
-      quick = await Promise.race([model, new Promise<null>((done) => setTimeout(() => done(null), QUICK_MS))]);
+      quick = await Promise.race([model, new Promise<null>((done) => setTimeout(() => done(null), quickMs))]);
     } finally {
       /* NEVER STUCK ON "Reading": a read that threw leaves Next pressable again. */
       readingNow = false;
@@ -657,6 +684,117 @@
     await keep();
   }
 
+  /* ── the conversation (1 Nov) ────────────────────────────────────────────── */
+
+  /** The questions asked and answered, and the one being asked now (`$lib/start/chat.ts`). */
+  let chatTurns = $state.raw<ChatTurn[]>([]);
+  let asking = $state.raw<ChatAsk | null>(firstAsk());
+  /** BrainDog is reading the last answer. */
+  let talking = $state(false);
+  /** The model reads this conversation has spent; the rules read once `READS_MOST` are. */
+  let modelReads = 0;
+
+  const placeNames = (): string[] => parts.filter((p) => p.on).map((p) => p.name);
+
+  /** What the next question is chosen from (`nextAsk`). */
+  function where() {
+    const said = sentence;
+    const cur = currencyPick ?? read?.currency ?? null;
+    const guessed = currencyPick === null && (currencyUnclear(said, deviceOf()) || (namedCurrency(said, deviceOf()) === null && (read?.currencyBy === 'device' || read?.currency == null)));
+    return {
+      said,
+      turns: chatTurns,
+      proposal: read,
+      usecase: u?.usecase ?? null,
+      placed: placed,
+      money: { kept: money !== null, currency: cur, guessed },
+      name: read?.name ?? null,
+      env: deviceOf(),
+      places: [...new Set(parts.filter((p) => p.on).flatMap((p) => (p.id.startsWith('usecase-') ? p.lists.slice(0, 2) : [p.name])))],
+      model: pressed !== null && pressed.said === said ? pressed.ask : null,
+    };
+  }
+
+  function currencyName(code: string): string {
+    try {
+      return new Intl.DisplayNames([locale], { type: 'currency' }).of(code) ?? code;
+    } catch {
+      return code;
+    }
+  }
+
+  /**
+   * ONE ANSWER: its words joined to what was said and read (by the model while reads are left, for at most
+   * `CHAT_QUICK_MS`, else by the rules), a currency, a use case or a name laid on, then the next question or the end.
+   */
+  async function answerChat(text: string | null): Promise<void> {
+    const q = asking;
+    if (q === null || talking || busy) return;
+    const since = Date.now();
+    talking = true;
+    asking = null;
+    const adds = text === null ? '' : saidOf(q, text);
+    const value = text === null ? null : valueOf(q, text);
+    const before = placeNames();
+    const s = adds === '' ? sentence : joinTurns(sentence, adds);
+    const turned: ChatTurn = { ask: q, answer: text, at: Date.now(), ack: null };
+    const all = [...chatTurns, turned];
+    const laid: { currency?: string | null; usecase?: string | null; name?: string | null } = {};
+    if (q.topic === 'currency' && value !== null) {
+      currencyPick = value;
+      laid.currency = currencyName(value);
+    }
+    if (q.topic === 'closest' && value !== null) {
+      chosen = value;
+      laid.usecase = USE_CASES.find((x) => x.usecase === value)?.title ?? null;
+    }
+    if (q.topic === 'name' && value !== null) {
+      amends = { ...amends, name: value };
+      laid.name = value;
+    }
+    try {
+      if (adds !== '') {
+        sentence = s;
+        const p = door !== null && modelReads < READS_MOST ? ((modelReads += 1), await readPressed(s, askedLines(all), CHAT_QUICK_MS)) : await reading(s);
+        if (sentence === s) {
+          live = p;
+          liveFor = s;
+        }
+        /* THE FIRST ANSWER SETTLES WHAT KIND OF BRAINDOG IT IS, so a later answer adds parts and never swaps it. */
+        if (q.topic === 'what' && chosen === null && p.usecase !== null) chosen = p.usecase;
+        /* THE PART THE QUESTION WAS ABOUT COMES ON with any answer that is not a no (`TURNS_ON`). */
+        const part = TURNS_ON[q.topic];
+        if (part !== undefined && !(q.topic === 'people' && /^just me$/iu.test(text ?? '')) && !modules.includes(part)) {
+          amends = { ...amends, on: [...new Set([...(amends.on ?? []), part])], off: (amends.off ?? []).filter((x) => x !== part) };
+        }
+      }
+      if (currencyPick === null) {
+        const named = namedCurrency(sentence, deviceOf());
+        if (named !== null) currencyPick = named;
+      }
+      await tick();
+      chatTurns = [...chatTurns, { ...turned, ack: ackOf(q, text, before, placeNames(), all.length, laid) }];
+      await atLeast(since);
+    } finally {
+      talking = false;
+    }
+    const next = nextAsk(where());
+    if (next === null) await keep();
+    else asking = next;
+  }
+
+  /** A part taken out on the build, or put back: kept beside the words as the other changes are (`keepAmend`). */
+  function partOut(p: PartOf): void {
+    if (p.id.startsWith('usecase-')) {
+      amends = { ...amends, out: [...new Set([...amends.out, ...p.why])] };
+      return;
+    }
+    amends = { ...amends, off: [...new Set([...(amends.off ?? []), p.id])], on: (amends.on ?? []).filter((x) => x !== p.id) };
+  }
+  function partBack(id: string): void {
+    amends = { ...amends, on: [...new Set([...(amends.on ?? []), id])], off: (amends.off ?? []).filter((x) => x !== id) };
+  }
+
   async function keep(): Promise<void> {
     step = 'keep';
     said = null;
@@ -753,6 +891,8 @@
   function edit() {
     dropHuman();
     step = 'describe';
+    /* BACK TO THE CONVERSATION, with one open question to tell it more. */
+    if (asking === null) asking = { topic: 'things', question: chatWords.tellMore, choices: [], by: 'rules' };
     /* THE WORDS ARE HERS TO FINISH NOW, so the line about what the link left out has said its piece. */
     linkCut = false;
     said = null;
@@ -1388,81 +1528,10 @@
   {:else if step === 'invite-only'}
     <Apply {siteKey} />
   {:else if step === 'describe'}
-    <h1 class="entry-title" id="who-h">{firstRun.whoQuestion}</h1>
-    <p class="entry-lede">{words.lede}</p>
-    <form
-      class="form"
-      onsubmit={(e) => {
-        e.preventDefault();
-        void next();
-      }}
-    >
-      <!-- HER WORDS LIGHT UP AS SHE TYPES: the marks sit under the field, cut where each line heard says it is. -->
-      <div class="lit-field">
-        <!-- ONE LINE OF MARKUP: any space between these tags would be drawn, and the marks would drift off the words. -->
-        <div class="lit" aria-hidden="true" bind:this={marks}>{#each lit as r, i (i)}{#if r.became}<mark>{r.text}</mark>{:else}{r.text}{/if}{/each}{'\n'}</div>
-        <textarea
-          class="prompt"
-          rows="4"
-          autocomplete="off"
-          maxlength="2000"
-          aria-labelledby="who-h"
-          placeholder={firstRun.whoPlaceholder}
-          bind:this={field}
-          bind:value={sentence}
-          onkeydown={enter}
-          onscroll={scrolled}
-        ></textarea>
-      </div>
-      <!-- WHAT THE PRESS DOES WITH THE WORDS, said before it, until the host says it has no model to read them. -->
-      {#if !readsOff}<p class="quiet" data-reads-on-press>{firstRun.readOnPress}</p>{/if}
-
-      {#if read !== null && read.heard.length > 0}
-        <section class="heard" aria-labelledby="heard-h">
-          <div class="heard-head">
-            <h2 class="heard-title" id="heard-h">{firstRun.heardTitle}</h2>
-            <span class="quiet">{words.heardTap}</span>
-          </div>
-          <ul class="lines">
-            {#each read.heard as h, i (i)}
-              <li>
-                <!-- `heard-line`, NEVER `line`: the ledger's global `.line` is a grid, and it took this row over. -->
-                <button type="button" class="heard-line" aria-expanded={opened === lineOf(h)} onclick={() => openLine(h)}>
-                  <span class="line-said">{h.you === true ? (read.name ?? h.phrase) : saidAll(h)}</span>
-                  <!-- SAID AS THE PLACES IT MAKES (`becameShown`); `h.became` itself is what a change to the line is read back by. -->
-                  <span class="line-became">{h.you === true ? words.you : becameShown(h, read)}<Icon name="chevron" size="s" /></span>
-                </button>
-                {#if opened === lineOf(h)}
-                  <div class="line-edit">
-                    {#if h.you === true}
-                      <label class="field-label" for="up-you">{words.nameLabel}</label>
-                      <span class="field"><input id="up-you" class="field-input" type="text" autocomplete="name" maxlength="60" bind:value={nameDraft} /></span>
-                      <div class="chips">
-                        <Button weight="primary" onclick={rename}>{words.keepLine}</Button>
-                        <Button weight="quiet" onclick={() => takeOut(h)}>{words.takeOut}</Button>
-                      </div>
-                    {:else}
-                      <p class="quiet">{words.becomeInstead}</p>
-                      <div class="chips" role="group" aria-label={words.becomeInstead}>
-                        {#each insteadOf(h) as id (id)}
-                          <Button size="sm" weight="quiet" onclick={() => turnInto(h, id)}>{moduleName(id)}</Button>
-                        {/each}
-                      </div>
-                      <div class="chips"><Button weight="quiet" onclick={() => takeOut(h)}>{words.takeOut}</Button></div>
-                    {/if}
-                  </div>
-                {/if}
-              </li>
-            {/each}
-          </ul>
-        </section>
-      {/if}
-
-      <div class="go sticky">
-        <Button weight="primary" type="submit" disabled={readingNow} kbd={sentence.trim() === '' || readingNow ? undefined : '↵'}>{readingNow ? firstRun.whoReading : words.next}</Button>
-      </div>
-    </form>
-
+    <h1 class="entry-title" id="who-h">{chatWords.title}</h1>
+    <!-- THE CONVERSATION (1 Nov): BrainDog asks, one question at a time, and the build beside it forms with each answer.
+         Each answer is read by the model at this host's reading door while reads are left (`readPressed`), else here. -->
+    <Chat turns={chatTurns} current={asking} thinking={talking} {busy} onanswer={(a) => void answerChat(a)} onskip={() => void answerChat(null)} onenough={() => void keep()} />
     <ul class="promises">
       {#each words.promises as line, i (line)}
         {#if i > 0 || plan === 'free'}<li><Icon name="check" size="s" />{line}</li>{/if}
@@ -1731,7 +1800,18 @@
 
         {#if showBuild}
           <aside class="build" aria-label={firstRun.mineTitle} data-forming="build">
-            <Building {parts} title={read?.title ?? null} {places} {locale} readBy={read} settled={step !== 'describe'} />
+            <Forming
+              parts={stepsOf(parts)}
+              left={read ? parts.filter((p) => !p.on && !p.id.startsWith('usecase-')).map((p) => ({ id: p.id, name: p.name })) : []}
+              said={sentence}
+              title={read?.title ?? null}
+              ghost={read === null}
+              settled={step !== 'describe'}
+              {busy}
+              {locale}
+              onremove={step === 'describe' || step === 'keep' ? partOut : undefined}
+              onrestore={step === 'describe' || step === 'keep' ? partBack : undefined}
+            />
             <!-- THE MODEL STILL READING AFTER THE PRESS WENT ON (1 Nov): said, so a build that changes in a moment is expected;
                  and once it lands, that it did. One slot, so the line coming and going moves nothing above it. -->
             <p class="late" role="status" data-late={lateFor !== null && lateFor === sentence ? 'reading' : landed === sentence ? 'landed' : undefined}>

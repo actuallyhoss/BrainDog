@@ -6,11 +6,12 @@
  * the sentences are the same on both. The reader is a port: this package does not depend on `@braindog/slash`.
  *
  * THE SAME CHECKS THE SIGN-UP DOORS MAKE, in their order: a POST, from a page on this origin, as JSON, of 8 KB at most.
- * Then the body's keys, exactly `said`, `today`, `zone`, `locale` and `turnstile`; another is refused by name.
+ * Then the body's keys, exactly `said`, `today`, `zone`, `locale`, `turnstile` and `asked` (what BrainDog asked her so
+ * far, in the conversation of 1 Nov); another is refused by name.
  *
  * SWITCHED OFF UNLESS ALL THREE ARE THERE. A model reads a stranger's words only when the owner turned it `on`, a
  * reader is bound, and a bot check is keyed; otherwise a 200 saying so, which the page reads as "simple rules read it". Then the bot
- * check, then the meter (six readings for one address a day, and one ceiling for all strangers), and only then the
+ * check, then the meter (eighteen readings for one address a day, three conversations, and one ceiling for all strangers), and only then the
  * reader, whose own refusal comes back with its code kept (`UNREACHABLE`, `PROPOSAL_SCHEMA`, `SLASH_BUDGET_SPENT`).
  *
  * WHAT SHE SAID IS NEVER KEPT. It is handed to the reader and nowhere else: not logged, not put in a header, not
@@ -32,20 +33,26 @@ export type FirstReadDoor = {
   meter: { take(ip: string, day: string): Promise<'ok' | 'address' | 'day'> };
   /** What is on offer to be read into: the host's use cases and modules, as the reader takes them. */
   offer(): Promise<unknown>;
-  read: ((ask: { said: string; offer: unknown; today: string }) => Promise<{ ok: true; value: unknown } | { ok: false; refusal: { code: string; fix: string } }>) | null;
+  read: ((ask: { said: string; offer: unknown; today: string; asked?: string }) => Promise<{ ok: true; value: unknown } | { ok: false; refusal: { code: string; fix: string } }>) | null;
 };
 
 /** The most a body may be, as the sign-up doors hold it (`SIGNUP_BODY_MAX` in the Worker). */
 export const FIRST_READ_BODY_MAX = 8_192;
 
-/** The most of what she said that is read, in characters: what the mailed link carries (`SIGNUP_SAID_MOST`). */
-export const FIRST_READ_SAID_MOST = 1_000;
+/**
+ * The most of what she said that is read, in characters. A conversation's answers together (1 Nov), so twice what the
+ * mailed link carries (`SIGNUP_SAID_MOST`): the link carries the start, and this device keeps the whole.
+ */
+export const FIRST_READ_SAID_MOST = 2_000;
 
-const KEYS = ['said', 'today', 'zone', 'locale', 'turnstile'] as const;
+/** What BrainDog asked her so far (`asked`, one question a line), in characters at most. */
+export const FIRST_READ_ASKED_MOST = 1_200;
+
+const KEYS = ['said', 'today', 'zone', 'locale', 'turnstile', 'asked'] as const;
 
 export const FIRST_READ_OFF = 'This BrainDog does not read a sign-up with a model, so simple rules read it.';
 export const FIRST_READ_NOT_PERSON = 'The check that you are a person did not pass.';
-export const FIRST_READ_ADDRESS_SPENT = 'Six readings a day is the most for one address. Simple rules read it now.';
+export const FIRST_READ_ADDRESS_SPENT = 'Eighteen readings a day is the most for one address. Simple rules read it now.';
 export const FIRST_READ_DAY_SPENT = 'Today’s readings for new people are all used. Simple rules read it now.';
 const UNANSWERED = 'The reader did not answer. Simple rules read it now.';
 const UNCOUNTED = 'Readings cannot be counted just now. Simple rules read it now.';
@@ -98,7 +105,8 @@ export async function serveFirstRead(request: Request, door: FirstReadDoor, now 
   const said = typeof body['said'] === 'string' ? body['said'] : '';
   const today = typeof body['today'] === 'string' ? body['today'] : '';
   if (said.trim() === '') return refused(400, 'BODY_MALFORMED', 'Say a sentence first, then it can be read.', 'said');
-  if (said.length > FIRST_READ_SAID_MOST) return refused(400, 'BODY_MALFORMED', 'At most 1,000 characters are read. Shorten it, or leave the rest for later.', 'said');
+  if (said.length > FIRST_READ_SAID_MOST) return refused(400, 'BODY_MALFORMED', 'At most 2,000 characters are read. Shorten it, or leave the rest for later.', 'said');
+  const asked = typeof body['asked'] === 'string' ? body['asked'].slice(0, FIRST_READ_ASKED_MOST) : '';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) return refused(400, 'BODY_MALFORMED', 'today is the date where you are, written as 2026-10-14.', 'today');
 
   const read = door.read;
@@ -122,7 +130,7 @@ export async function serveFirstRead(request: Request, door: FirstReadDoor, now 
   }
 
   try {
-    const out = await read({ said, offer: await door.offer(), today });
+    const out = await read({ said, offer: await door.offer(), today, ...(asked.trim() === '' ? {} : { asked }) });
     if (out.ok) return reply(200, { ok: true, value: out.value });
     return reply(statusOf(out.refusal.code), { ok: false, refusal: { code: out.refusal.code, fix: out.refusal.fix } });
   } catch {

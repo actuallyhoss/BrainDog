@@ -555,7 +555,7 @@ export function readerFor(cause: ReadCause, door: ReadDoor | null, env: ReadEnv)
       out =
         turnstile === null
           ? { ok: false, refusal: { code: 'FORBIDDEN', fix: 'The check that you are a person did not answer, so simple rules read this.' } }
-          : await door({ said: ask.said, offer: ask.offer, today: ask.today, zone: env.zone ?? 'UTC', locale: env.locale, turnstile });
+          : await door({ said: ask.said, offer: ask.offer, today: ask.today, zone: env.zone ?? 'UTC', locale: env.locale, turnstile, ...(ask.asked === undefined ? {} : { asked: ask.asked }) });
     } catch (e) {
       out = { ok: false, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } };
     }
@@ -565,8 +565,8 @@ export function readerFor(cause: ReadCause, door: ReadDoor | null, env: ReadEnv)
 }
 
 /** What a question back may be about, as the reading door says it (`SetupAbout` in `@braindog/slash`). */
-export type AskAbout = 'name' | 'kind' | 'things' | 'who_for' | 'currency';
-const ABOUTS: ReadonlySet<string> = new Set<AskAbout>(['name', 'kind', 'things', 'who_for', 'currency']);
+export type AskAbout = 'name' | 'kind' | 'things' | 'who_for' | 'currency' | 'work' | 'money' | 'people' | 'tools' | 'first';
+const ABOUTS: ReadonlySet<string> = new Set<AskAbout>(['name', 'kind', 'things', 'who_for', 'currency', 'work', 'money', 'people', 'tools', 'first']);
 
 /** The one question the model would ask back: one line, and up to four short choices to tap. */
 export type ModelAsk = { about: AskAbout; question: string; choices: string[] };

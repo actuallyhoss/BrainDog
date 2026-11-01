@@ -54,7 +54,7 @@ export type SelfhostFirstReadDeps = {
 };
 
 /** Readings one address may have in a UTC day. */
-export const FIRST_READ_PER_ADDRESS = 6;
+export const FIRST_READ_PER_ADDRESS = 18;
 
 /** `FIRST_READ_DAILY` as a whole number above 0, or 0 for off: unset, 0, a fraction, a sign or a word. */
 export function dailyOf(value: string | undefined): number {
@@ -203,8 +203,8 @@ export function selfhostFirstReadDoor(env: Record<string, string | undefined>, d
     read:
       readSetup === null || model === undefined
         ? null
-        : async ({ said, offer, today }) => {
-            const out = await readSetup({ said, offer: offer as SetupOffer, today }, model);
+        : async ({ said, offer, today, asked }) => {
+            const out = await readSetup({ said, offer: offer as SetupOffer, today, ...(asked === undefined ? {} : { asked }) }, model);
             if (out.ok) return { ok: true, value: out.value };
             if (!('refusal' in out)) return { ok: false, refusal: { code: 'PROPOSAL_SCHEMA', fix: 'The reader answered something that is not a reading.' } };
             return { ok: false, refusal: { code: out.refusal.code, fix: out.refusal.fix } };
