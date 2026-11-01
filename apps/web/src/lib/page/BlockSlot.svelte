@@ -1167,7 +1167,12 @@
     border-block-end: 1px solid var(--rule);
   }
 
+  /* IT NEVER GIVES WAY TO WHAT IS BESIDE IT, ONLY TO THE ROW ITSELF: shrunk with the door by a fraction of a pixel,
+     "Your work this week 2" broke over two lines in a quarter of the board. It keeps its words' width up to the row's,
+     less its well, and wraps only past that. */
   .block-name {
+    flex: 1 0 auto;
+    max-inline-size: calc(100% - var(--well) - var(--sp-3));
     min-inline-size: 0;
     margin: 0;
     /* A NAME THAT WRAPS TAKES ITS COUNT WITH ITS LAST WORDS (audit 6f AF21): "Your work this week" in a quarter of the
@@ -1191,9 +1196,15 @@
 
   /* Every block header names its source, and `o` opens that list PRE-FILTERED to the block's own `where:`. That is the
      down half of the two-altitude ladder, and nothing may break it. */
+  /* IT GIVES WAY BEFORE THE NAME DOES (1 Nov): the door waits unseen for the pointer, yet it held its width, so in a
+     narrow tile "Your work this week" broke over two lines beside a gap. It shrinks first, clipped, and the name keeps
+     its one line. */
   .block-source {
     display: flex;
-    flex: none;
+    flex: 0 1000 auto;
+    min-inline-size: 0;
+    overflow: hidden;
+    white-space: nowrap;
     align-items: center;
     gap: var(--sp-1);
     margin-inline-start: auto;

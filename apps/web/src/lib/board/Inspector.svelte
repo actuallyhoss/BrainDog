@@ -464,7 +464,7 @@
   .in-chip {
     padding: 6px 10px;
     border: 1px solid var(--rule);
-    border-radius: 999px;
+    border-radius: var(--r-ctl);
     background: var(--tile);
     color: var(--ink);
     font: inherit;

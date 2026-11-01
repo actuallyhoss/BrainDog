@@ -76,63 +76,71 @@ const area = (address: string, label: string, icon: IconName, line: string): Are
  * scheme.
  */
 export const DEFAULT_GROUPS: readonly AreaGroup[] = [
-  /* THREE GROUPS SINCE 24 OCTOBER: You, This BrainDog and Data. You and This BrainDog stand side by side, six
-     rows each, so both columns end together and no hole is left under the shorter; Data runs the whole width under them,
-     with Delete its last row. Keys, Add-ons and Usage, pages of their own, are listed here too, where they were in no
-     group at all. */
+  /* FIVE GROUPS SINCE 1 NOVEMBER ("perfect the ui"): three groups of six read as three long lists, and This BrainDog
+     held agents, people, mail, keys, add-ons and the vital signs under one name that said none of them. Now each group
+     is named by what it holds: you, how it looks, agents and add-ons, people and billing, and your data. The first four
+     stand two by two, three or four rows each; Your data runs the whole width under them, with Delete its last row. No
+     area moved address, so every link still lands. */
   {
     title: 'You',
+    icon: 'user',
+    areas: [
+      area('/settings/signing-in', 'Signing in', 'key', 'Passkeys, devices'),
+      area('/settings/notifications', 'Notifications', 'bell', 'Quiet hours, summaries, time zone'),
+      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Shortcuts'),
+    ],
+  },
+  {
+    title: 'How it looks',
     icon: 'sliders-horizontal',
     areas: [
       area('/settings/appearance', 'Appearance', 'sun', 'Theme, density, phone bar'),
       area('/settings/navigation', 'Pages', 'rows', 'Sidebar and bar'),
       area('/settings/words', 'Words and money', 'tag', 'List names, currency'),
-      area('/settings/notifications', 'Notifications', 'bell', 'Quiet hours, summaries, time zone'),
-      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Shortcuts'),
-      area('/settings/signing-in', 'Signing in', 'key', 'Passkeys, devices'),
     ],
   },
-  /* WHAT THIS BRAINDOG HOLDS AND WHO WORKS IN IT: the agents, the people it is shared with, what comes in, the keys and
-     add-ons, and the record's own housekeeping (Health came off Today on 23 October). */
+  /* WHAT PLUGS INTO THIS BRAINDOG: the agents, the keys they are given, what comes in by mail and feed, and the add-ons. */
   {
-    title: 'This BrainDog',
-    icon: 'settings',
+    title: 'Agents and add-ons',
+    icon: 'plug',
     areas: [
       area('/settings/agents', 'Agents', 'session', 'Connections, permissions, Slash'),
-      /* PEOPLE & SHARING HOLDS WHAT PEOPLE DID, roles and invites, and every share beside them. The
-         sharing address opens it too (`MOVED`). */
-      area('/settings/people', 'People & sharing', 'user-plus', 'Colleagues, invites, shares'),
       area('/settings/ingest', 'What comes in', 'inbox', 'Mail and feeds'),
       /* ADD-ONS IS AN AREA OF SETTINGS, with the rail beside it, as the store is the place to find more (`/addons`). It
          was a row opening `/packs`, a page of its own with no Settings rail. */
       area('/settings/addons', 'Add-ons', 'packs', 'Installed, updates'),
     ],
-    /* ONE HEALTH: the record's vital signs, its Health page, with the count Today and the
-       sentence above this index say. An area here called Health said "32 things went stale" while that page said 9. */
-    outside: [
-      /* ONE NAME FOR IT: the page is Keychain, and this row said Keys. */
-      { label: 'Keychain', href: '/keychain', icon: 'vault', line: 'Keys for agents', before: 'addons' },
-      { label: 'Health', href: '/p/health', icon: 'heart-pulse', line: 'Vital signs' },
-    ],
+    /* ONE NAME FOR IT: the page is Keychain, and this row said Keys. */
+    outside: [{ label: 'Keychain', href: '/keychain', icon: 'vault', line: 'Keys for agents', before: 'ingest' }],
   },
-  /* WHAT THE RECORD KEEPS AND COSTS, AND THE ONE IRREVERSIBLE ACT AS ITS LAST ROW, drawn in red. It stood in a
-     group of its own, one row under a heading, and left a hole beside it the height of a tile. */
+  /* WHO IS IN IT AND WHAT IT COSTS. PEOPLE & SHARING HOLDS WHAT PEOPLE DID, roles and invites, and every share beside
+     them; the sharing address opens it too (`MOVED`). */
   {
-    title: 'Data',
+    title: 'People and billing',
+    icon: 'users',
+    areas: [
+      area('/settings/people', 'People & sharing', 'user-plus', 'Colleagues, invites, shares'),
+      area('/settings/billing', 'Billing', 'money', 'Plan'),
+    ],
+    outside: [{ label: 'Usage', href: '/usage', icon: 'observe', line: 'This month', before: 'billing' }],
+  },
+  /* WHAT THE RECORD KEEPS, AND THE ONE IRREVERSIBLE ACT AS ITS LAST ROW, drawn in red. ONE HEALTH: the record's vital
+     signs, its Health page, with the count Today and the sentence above this index say. */
+  {
+    title: 'Your data',
     icon: 'archive',
     span: 12,
     areas: [
-      /* THE RECORD'S HOUSEKEEPING, WHICH LEFT TODAY: what it found wrong in its own pages
-         and notes, what went stale, what is here twice, what it matched and learned. Read only when it is opened. Called
-         Health until 25 October, beside a Health page that counted something else; `/settings/health` still lands. */
+      /* THE RECORD'S HOUSEKEEPING, WHICH LEFT TODAY: what it found wrong in its own pages and notes, what went stale,
+         what is here twice. Called Health until 25 October, beside a Health page that counted something else;
+         `/settings/health` still lands. */
       area('/settings/tidy', 'Tidy up', 'filter', 'Stale and doubled'),
       /* ITS OWN GLYPH, NOT ITS GROUP'S: a copy to go back to is the clock turned back. */
       area('/settings/backups', 'Backups', 'history', 'Nightly copies'),
-      area('/settings/billing', 'Billing', 'money', 'Plan'),
       area('/settings/export', 'Export', 'download', 'A signed copy'),
       area('/settings/delete', 'Delete my BrainDog', 'trash', 'For good'),
     ],
-    outside: [{ label: 'Usage', href: '/usage', icon: 'observe', line: 'This month', before: 'billing' }],
+    outside: [{ label: 'Health', href: '/p/health', icon: 'heart-pulse', line: 'Vital signs', before: 'tidy' }],
   },
 ];
 

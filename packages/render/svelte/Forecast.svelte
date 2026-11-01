@@ -383,7 +383,7 @@
     </svg>
     <!-- TODAY'S BALANCE BESIDE TODAY'S DOT, where the line starts, hidden like the axis: the chart's name says it. -->
     <!-- A CROSSING NEAR TODAY SETS THE TWO LABELS APART: the balance under its dot, the flag's day after its rule. -->
-    <span class="forecast-now-label num" data-near-flag={p.cross?.near ? '' : undefined} data-place={nowPlaced(p) ?? undefined} style="--at:{p.now.at};--y:{p.now.y}" aria-hidden="true"
+    <span class="forecast-now-label num" data-near-flag={p.cross?.near ? '' : undefined} data-place={nowPlaced(p) ?? undefined} data-over={p.now.over ? '' : undefined} style="--at:{p.now.at};--y:{p.now.y}" aria-hidden="true"
       ><span class="forecast-now-word">{FORECAST_NOW}</span><span class="forecast-now-figure">{p.now.label}</span></span
     >
     <!-- THE VALUE AXIS, its round steps down one side, zero among them; hidden, because the chart's name says the walk.

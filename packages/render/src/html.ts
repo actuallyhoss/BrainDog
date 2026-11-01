@@ -1831,7 +1831,7 @@ function forecast(b: Block, o: RenderOptions): string {
   const said = plan.legend ? `<p class="forecast-said"${plan.warn ? ' data-intent="warn"' : ''}>${plan.warn ? toneGlyph('warn') : ''}${escape(plan.said)}</p>` : '';
   /* A CROSSING NEAR TODAY SETS THE TWO LABELS APART: today's balance under its dot, the flag's day after its rule. */
   const placed = nowPlaced(plan);
-  const near = `${plan.cross?.near ? ' data-near-flag=""' : ''}${placed ? ` data-place="${placed}"` : ''}`;
+  const near = `${plan.cross?.near ? ' data-near-flag=""' : ''}${placed ? ` data-place="${placed}"` : ''}${plan.now.over ? ' data-over=""' : ''}`;
   /* THE END OF THE AXIS NEAREST ZERO, WHERE ZERO IS OFF IT, carries a break beside its real amount (`cut`), and the
      chart's name says where the axis starts, as `Forecast.svelte` draws it. */
   const axis = `<ol class="forecast-axis" aria-hidden="true">${plan.axis

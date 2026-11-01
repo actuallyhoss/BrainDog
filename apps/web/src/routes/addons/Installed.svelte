@@ -42,7 +42,7 @@
   import { blocked, choose, words as packWords, type Blocked, type PackState, type Refusal, type Source } from '$lib/record/packs.ts';
   import { read } from '$lib/data/record.ts';
   import { describe, listingHolds, moduleHolds } from '$lib/market/describe.ts';
-  import { listingsOf, type ListingKind } from '$lib/market/listing.ts';
+  import { listingsOf, STARTER_ICONS, type ListingKind } from '$lib/market/listing.ts';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import { handsOf, holderFirst, inOrder, marked, orderWords } from '$lib/market/update-order.ts';
   import { words as market } from '$lib/market/words.ts';
@@ -584,7 +584,7 @@
   const listed = $derived(listingsOf({ kennel, counts: null }));
   /* ITS OWN ICON, when its manifest names one the app draws: a built-in's, else the one its catalogue entry carries. */
   const iconFor = (id: string): IconName | null => {
-    const named = byId.get(id)?.icon ?? catalogueIcons.get(id);
+    const named = byId.get(id)?.icon ?? catalogueIcons.get(id) ?? (id.startsWith('usecase-') ? STARTER_ICONS[id.slice('usecase-'.length)] : undefined);
     return named !== undefined && isGlyph(named) ? named : null;
   };
   /* THE STARTER THIS RECORD RUNS ON is one tile, never an add-on row, and BrainDog's own parts are one folded line. */

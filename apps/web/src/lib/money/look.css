@@ -9,7 +9,7 @@
  *   the second ink, so the first tile under it is the money itself.
  * - ONE HERO NUMBER: the cash at display size with its code faint in front of it, its change as a calm line with a
  *   triangle (green only when it rose), and the walk ahead as a wider line over a pale wash in the money accent.
- * - ONE CARD GRAMMAR: every tile's head over a hairline; rows of equal height; amounts at the right in tabular figures.
+ * - ONE CARD GRAMMAR: every tile's head as every page draws it; rows of equal height; amounts at the right in tabular figures.
  * - BARS READ AS ROWS: the name and its amount on one line, a thin bar under them across the row, as a phone draws them.
  * - LEDGER ROWS: the chip in the category's own colour, the payee in ink, "Category · Account" under it, the amount at
  *   the right; money in green with its plus, money out in ink, red only for what is late.
@@ -72,27 +72,10 @@
 
 /* ── tiles ────────────────────────────────────────────────────────────────── */
 
-/* A TILE IS A CARD: the tile fill, a hairline edge and the faintest lift, so tiles read as cards on the board in both
-   themes rather than as patches of a lighter grey. */
-[data-money] .page > .block-slot:not([data-lead]),
-[data-money] .page > .box {
-  border: 1px solid color-mix(in oklab, var(--rule) 70%, transparent);
-  box-shadow: 0 1px 2px color-mix(in oklab, var(--ink) 4%, transparent), 0 8px 20px -14px color-mix(in oklab, var(--ink) 18%, transparent);
-}
-
-/* EVERY TILE'S HEAD OVER A HAIRLINE, the name at the body size and the count quiet beside it. */
-[data-money] .block-slot > .block-bar:not([data-quiet]) {
-  margin-inline: calc(-1 * var(--slot-pad, var(--tile-pad)));
-  margin-block-end: var(--sp-2);
-  padding-inline: var(--slot-pad, var(--tile-pad));
-  padding-block-end: var(--sp-3);
-  border-block-end: 1px solid var(--rule);
-}
-
-[data-money] .block-slot > .block-bar .well {
-  display: none;
-}
-
+/* A TILE IS A TILE, AS ON EVERY OTHER PAGE (1 Nov, "perfect the ui"): Money drew its tiles as cards with a hairline
+   edge and a lift, hid each heading's well and ruled a line under every head, so it read as another app beside Today
+   and Agents. The tile fill alone tells a tile from the board, and the heading row is the one every tile starts with.
+   Only the name keeps Money's medium weight. */
 [data-money] .block-slot > .block-bar .block-name {
   font-weight: var(--fw-medium);
 }
@@ -790,7 +773,7 @@
   min-block-size: 32px;
   padding-inline: var(--sp-3);
   border: 1px solid color-mix(in oklab, var(--red) 28%, var(--rule));
-  border-radius: var(--r-round);
+  border-radius: var(--r-ctl);
   background: var(--red-tint);
   color: var(--ink);
   font-size: var(--fs-ctl);
@@ -995,9 +978,10 @@
   content: none;
 }
 
+/* A CHOICE IS A RECTANGLE, AS EVERY CHIP IS (1 Nov): Money's were the last pills in the app. */
 [data-money] .filters-group:not([data-control='segmented']) .filters-choice {
   border: 1px solid var(--rule);
-  border-radius: var(--r-round);
+  border-radius: var(--r-ctl);
   background: var(--tile);
   color: var(--ink-2);
 }

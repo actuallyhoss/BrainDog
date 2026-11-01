@@ -192,7 +192,7 @@ export const dateLine = (today: string): string => {
   const d = new Date(noonOf(today));
   return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 };
-/** "30 min ago", "6 h ago", "3 days ago". */
+/** "30 min ago", "6h ago", "3 days ago": the hours as every other line in the app writes them ("2h ago"). */
 export function ago(at: string, now: number): string {
   const t = Date.parse(at);
   if (!Number.isFinite(t)) return '';
@@ -200,7 +200,7 @@ export function ago(at: string, now: number): string {
   if (min < 2) return 'just now';
   if (min < 60) return `${min} min ago`;
   const h = Math.round(min / 60);
-  if (h < 24) return `${h} h ago`;
+  if (h < 24) return `${h}h ago`;
   const d = Math.round(h / 24);
   return d === 1 ? 'yesterday' : `${d} days ago`;
 }

@@ -246,7 +246,7 @@
             <li>
               <a class="bell-row" data-bell-item href={at(l.href)}>
                 <span class="bell-new" aria-hidden="true"></span>
-                <span class="bell-kind" aria-hidden="true"><Icon name={l.icon} size="s" /></span>
+                <span class="bell-kind" aria-hidden="true"><Icon name={l.icon} size="m" /></span>
                 <span class="bell-said">{l.text}</span>
                 <span></span>
               </a>
@@ -268,7 +268,7 @@
             <li>
               <a class="bell-row" data-bell-item data-unread={isNew ? '' : undefined} href={at(l.href)}>
                 <span class="bell-new" aria-hidden="true"></span>
-                <span class="bell-kind" aria-hidden="true"><Icon name={kindOf(l.href, l.tone, glyphOf)} size="s" /></span>
+                <span class="bell-kind" aria-hidden="true"><Icon name={kindOf(l.href, l.tone, glyphOf)} size="m" /></span>
                 <span class="bell-said" dir="auto">{#if isNew}<span class="sr-only">{words.unread}</span>{/if}{l.text}{#if l.n > 1}<span class="bell-times">{` · ${words.times(l.n)}`}</span>{/if}</span>
                 <time class="bell-ago num" datetime={l.at}>{agoOf(l.at, now)}</time>
               </a>
@@ -573,8 +573,8 @@
    */
   .bell-row {
     display: grid;
-    grid-template-columns: 6px 16px minmax(0, 1fr) auto;
-    align-items: start;
+    grid-template-columns: 6px 28px minmax(0, 1fr) auto;
+    align-items: center;
     column-gap: var(--sp-2);
     padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-1);
     border-radius: var(--r-ctl);
@@ -603,10 +603,8 @@
 
   /* NEW IS A DOT, 6 round in the red, level with the first line; read is the same slot empty. */
   .bell-new {
-    align-self: start;
     inline-size: 6px;
     block-size: 6px;
-    margin-block-start: 7px;
     border-radius: var(--r-round);
   }
 
@@ -614,11 +612,16 @@
     background: var(--red);
   }
 
+  /* THE GLYPH IN ITS WELL, as a row's is everywhere else (1 Nov): bare 16px marks in the quiet ink read as specks,
+     and the panel as a list of loose lines. Neutral: what a line means is in its words. */
   .bell-kind {
     display: grid;
     place-items: center;
-    block-size: 20px;
-    color: var(--ink-3);
+    inline-size: 28px;
+    block-size: 28px;
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink-2);
   }
 
   .bell-said {

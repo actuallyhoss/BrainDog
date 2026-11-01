@@ -235,6 +235,12 @@ export type UseCase = {
   over: Record<string, Over>;
   /** What this version changed, in its author's words, when the file says (`readChanges`). It travels on the carried pack. */
   changes?: string;
+  /**
+   * The icon its card wears in the store and on its own page, a name from the app's icon set, such as `wallet` or
+   * `graduation-cap`, as an add-on's manifest says it (`MANIFEST_KEYS`). Left out, the app draws BrainDog's own pick for
+   * a starter it ships, else the generic one. The catalogue checks the name against the set (`glyphFault`).
+   */
+  icon?: string;
 };
 
 /** What a person calls a list: many of it and one of it. An add-on's manifest says both for each list a person can rename. */
@@ -246,7 +252,9 @@ export type Over = { words?: Record<string, Partial<ListWords>>; config?: Record
 /** One link between two example rows, by their titles. `list` when the field holds a list of refs. */
 export type ExampleLink = { register: string; title: string; field: string; to: string; target: string; list?: true };
 
-const KEYS = ['usecase', 'version', 'title', 'summary', 'changes', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'needs', 'voice', 'labels', 'over', 'pack', 'skills', 'nav', 'links'];
+const KEYS = ['usecase', 'version', 'title', 'summary', 'changes', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'needs', 'voice', 'labels', 'over', 'pack', 'skills', 'nav', 'links', 'icon'];
+/** An icon's name as a file writes it: a lower-case word or words joined by hyphens. Whether the set holds it is the catalogue's to say. */
+const ICON_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u;
 const OVER_KEYS = ['words', 'config', 'hide'];
 const WORD_KEYS = ['name', 'one'];
 /** A page id, as `index.ts` reads one in a pack file, for a page a use case hides. */
@@ -582,6 +590,9 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     return no('VALUE_MALFORMED', `A use case's voice and labels are its pack's settings, and a pack has at most ${SETTINGS_CEILING}.`, { at: laid > 0 ? 'over' : 'labels' });
   const changes = readChanges(doc.changes);
   if (!changes.ok) return changes as Result<UseCase>;
+  const icon = doc.icon;
+  if (icon !== undefined && (typeof icon !== 'string' || icon.length > 40 || !ICON_NAME.test(icon)))
+    return no('VALUE_MALFORMED', "icon is the name of one icon from the app's icon set, such as wallet or people. Write it as a word, or take it out.", { at: 'icon' });
 
   const nav = doc.nav ?? [];
   if (!Array.isArray(nav) || nav.length > NAV_CEILING || nav.some((a) => typeof a !== 'string' || !NAV_ADDRESS.test(a)))
@@ -644,6 +655,7 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     links: (links as ExampleLink[]).map((l) => ({ register: l.register, title: l.title, field: l.field, to: l.to, target: l.target, ...(l.list ? { list: true as const } : {}) })),
     over: over.value,
     ...(changes.value === null ? {} : { changes: changes.value }),
+    ...(typeof icon === 'string' ? { icon } : {}),
   });
 }
 

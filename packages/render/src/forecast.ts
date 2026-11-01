@@ -889,7 +889,7 @@ export type ForecastPlan = {
   area: string;
   below: string;
   /** Today's dot, where its balance is said (shares across and down), and the balance as a headline says it. */
-  now: { d: string; at: string; y: string; label: string; place: NowPlace; rule: string };
+  now: { d: string; at: string; y: string; label: string; place: NowPlace; over?: true; rule: string };
   base: string;
   /** Where the solid rule is drawn: zero where the axis holds it, and else the end of the axis nearest zero. */
   zero: string;
@@ -1188,6 +1188,25 @@ const NOW_WIDE_FAR = 0.2;
  */
 export function nowPlace(points: readonly { x: number; y: number }[], dot: { x: number; y: number }, near: boolean): NowPlace | 'start-far' {
   const order: NowPlace[] = near ? ['under', 'start-under'] : ['above', 'under', 'start', 'start-under'];
+  const crossed = nowCrossings(points, dot);
+  /* THE FIRST CORNER THE LINE LEAVES FREE, else the one it crosses least, else where the label always sat. */
+  let best: { place: NowPlace | 'start-far'; n: number } | null = null;
+  /* STANDING OFF THE DOT is the last resort: a dot at the foot of a line that falls into it has no free corner beside it. */
+  for (const place of [...order, ...(near ? [] : (['start-far'] as const))]) {
+    const n = crossed(place);
+    if (n !== null && (best === null || n < best.n)) best = { place, n };
+    if (n === 0) break;
+  }
+  return best !== null && (best.n === 0 || best.place !== 'start-far') ? best.place : (order[0] ?? 'above');
+}
+
+/**
+ * HOW MUCH OF THE LINE EACH CORNER OF TODAY'S DOT HOLDS, or `null` for a corner that would hang outside the plot. Read by
+ * `nowPlace` to choose, and by the plan to say whether the corner chosen is crossed all the same (`over`, A23): a dot
+ * near the top of a walk that falls away from it, in the six-month and one-year views, had no free corner, and the line
+ * ran through "Today £33,850".
+ */
+export function nowCrossings(points: readonly { x: number; y: number }[], dot: { x: number; y: number }): (place: NowPlace | 'start-far') => number | null {
   const boxOf = (place: NowPlace | 'start-far') => {
     const far = place === 'start-far';
     const start = place === 'start' || place === 'start-under' || far;
@@ -1207,21 +1226,11 @@ export function nowPlace(points: readonly { x: number; y: number }[], dot: { x: 
     const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / 0.01));
     return Array.from({ length: n }, (_, k) => ({ x: p.x + ((q.x - p.x) * k) / n, y: p.y + ((q.y - p.y) * k) / n }));
   });
-  /* HOW MUCH OF THE LINE A CORNER HOLDS, or `null` for one that would hang outside the plot. */
-  const crossed = (place: NowPlace | 'start-far'): number | null => {
+  return (place) => {
     const b = boxOf(place);
     if (b.x0 < 0 || b.x1 > 1 || b.y0 < 0 || b.y1 > 1) return null;
     return along.filter((p) => p.x > b.x0 && p.x < b.x1 && p.y > b.y0 && p.y < b.y1).length;
   };
-  /* THE FIRST CORNER THE LINE LEAVES FREE, else the one it crosses least, else where the label always sat. */
-  let best: { place: NowPlace | 'start-far'; n: number } | null = null;
-  /* STANDING OFF THE DOT is the last resort: a dot at the foot of a line that falls into it has no free corner beside it. */
-  for (const place of [...order, ...(near ? [] : (['start-far'] as const))]) {
-    const n = crossed(place);
-    if (n !== null && (best === null || n < best.n)) best = { place, n };
-    if (n === 0) break;
-  }
-  return best !== null && (best.n === 0 || best.place !== 'start-far') ? best.place : (order[0] ?? 'above');
 }
 
 /** The lowest point's label as a share of the plot's height on a phone: "Lowest" over its figure, two lines of 16px. */
@@ -1350,6 +1359,9 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     });
   const nearFlag = c !== null && Math.abs(daysBetween(start, c.day) / span - nowAt) <= FLAG_NEAR;
   const placed = nowPlace(traced, shareOf(model.today, model.opening), nearFlag);
+  /* AND WHETHER THE LINE RUNS THROUGH IT ALL THE SAME, or the corner hangs past the plot: then the words stand on the tile's
+     own colour, so the line passes behind them and never through them (A23). */
+  const nowOver = nowCrossings(traced, shareOf(model.today, model.opening))(placed) !== 0;
   /* STANDING OFF THE DOT is the start side's words, moved left along the plot. */
   const place: NowPlace = placed === 'start-far' ? 'start' : placed;
   const figure = (v: number) => forecastFigure(model, v);
@@ -1417,6 +1429,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
       y: String(Math.round(Number(y(model.opening)) * 100) / 10_000),
       label: forecastFigure(model, model.opening, 'read'),
       place,
+      ...(nowOver ? { over: true as const } : {}),
       /* TODAY IS A HAIRLINE DOWN THE WHOLE CHART as well as a dot, named "Today" with the balance under the word, so the
          eye finds where the remembered line ends and the walk begins (the money review). */
       rule: `M${x(model.today)} 0V100`,

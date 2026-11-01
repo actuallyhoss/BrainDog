@@ -127,6 +127,7 @@
   import { toldNow } from '$lib/home/told-now.svelte.ts';
   import { answeredBy, doneToday, toldNeedOf } from '$lib/record/told-live.ts';
   import { words } from '$lib/home/words.ts';
+  import { keptWordsNow } from '$lib/home/kept-words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
   import Board from '$lib/board/Board.svelte';
   import type EditCoverOf from '$lib/board/EditCover.svelte';
@@ -628,7 +629,9 @@
     let version: number | undefined;
     let answered: unknown = null;
     const drawn = await m.drawnOf({ page: slug, blocks: [] }, base, undefined, async (client) => {
-      const out = await t.askToday(client, base, {}, fresh, slug, [], untrack(() => narrow.current) ? 'phone' : 'wide');
+      const asked = await t.askToday(client, base, {}, fresh, slug, [], untrack(() => narrow.current) ? 'phone' : 'wide');
+      /* IN TODAY'S WORDS, where it was kept with older ones (`kept-words.ts`, A5). */
+      const out = asked.ok ? { ...asked, value: keptWordsNow(asked.value) } : asked;
       if (out.ok) {
         tiles.askTiles((out.value as { blocks?: unknown }).blocks);
         answered = (out.value as { blocks?: unknown }).blocks;

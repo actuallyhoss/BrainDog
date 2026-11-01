@@ -586,7 +586,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         kind: 'note',
         key: 'brain-link',
         span: 12,
-        body: '[How the brain changed](/p/brain) · [Learnings](/r/learnings) · [Skills](/r/skills) · [Tools](/r/tools) · [Keys](/r/credentials)',
+        body: '[How the brain changed](/p/brain) · [Learnings](/r/learnings) · [Skills](/r/skills) · [Tools](/r/tools) · [Keys](/keychain)',
       },
       /* WHAT TO PUT RIGHT IN THE KEYS AND TOOLS, each line drawn only while its figure is above nought, so
          a record with nothing wrong draws none. Loose at the foot since 1.17.0 and no longer a tile headed Needs a look,
@@ -877,8 +877,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      heads the same runs, where they were headed Open now. No list, field or figure goes.
      1.28.0 IS WORDS, SO IT IS MINOR (words-e, 30 October): a tool says how it runs, "Runs on your machine" or "Reached
      over the web", where it said Transport: Stdio or Http, and its kind as MCP server or Command line; a key says its
-     kind as the Keychain does, API token or SSH key. Only labels change: no value, list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.28.0', requires: ['register.things'] },
+     kind as the Keychain does, API token or SSH key. Only labels change: no value, list, field or figure goes.
+     1.29.0 IS A DOOR, SO IT IS MINOR (AG16, 1 Nov): the foot's Keys opens the Keychain, the one Keys place, where it
+     opened the list of keys, which is the Keychain's List view. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.29.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,
