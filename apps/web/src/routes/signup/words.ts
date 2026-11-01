@@ -24,7 +24,7 @@ export const words = {
   promises: ['Free, with no card', 'Nothing is saved until you keep it', 'Yours to export or move, any time'],
 
   /** Over the lines heard, and the one press that says they are right. */
-  heardTap: 'Tap one to change it',
+  heardTap: 'Pick one to change it',
   /** What the name heard became, said on its line. */
   you: 'you',
   /** A line opened to change: what it can become instead, and the way to take it out. */

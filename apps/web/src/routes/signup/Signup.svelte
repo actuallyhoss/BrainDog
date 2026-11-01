@@ -1801,6 +1801,8 @@
     color: var(--ink-3);
     font-size: var(--fs-body);
     line-height: 22px;
+    /* NO WORD LEFT ALONE ON A PHONE'S LAST LINE ("wrote." under a full line at 390). */
+    text-wrap: pretty;
   }
 
   /* THE TERMS LINE IS THE FORM'S SMALL PRINT, one line on a phone. */
