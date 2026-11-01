@@ -76,6 +76,8 @@ export const chatWords = {
   currencyIs: (name: string) => `Money will be kept in ${name}.`,
   caseIs: (title: string) => `I'll set it up as ${title}.`,
   callYou: (name: string) => `Nice to meet you, ${name}.`,
+  /** The business use case as a freelancer hears it (`caseTitle`). */
+  freelance: 'Freelance',
   /** The end, before the summary. */
   done: "That's enough to start. Here is what I'll make. Take out anything you don't want.",
   doneShort: 'Here is what I will make. Take out anything you do not want.',
@@ -101,7 +103,7 @@ export type Kind = 'freelance' | 'founder' | 'student' | 'shop' | 'team' | 'busi
 
 export function kindOf(said: string, usecase: string | null): Kind {
   const s = said.toLowerCase();
-  if (/\b(freelanc\w*|consult\w*|contractor|self-employed|my clients|a client)\b/u.test(s)) return 'freelance';
+  if (/\b(freelanc\w*|consult\w*|contractor|self-employed|independent|my clients|a client|\d+ clients|clients in)\b/u.test(s)) return 'freelance';
   if (usecase === 'founder' || /\b(start-?up|saas|founder|co-?founder|our product|my product|an app|our app)\b/u.test(s)) return 'founder';
   if (usecase === 'student' || /\b(student|studying|study|university|uni|college|school|degree|thesis|course(work|s)?)\b/u.test(s)) return 'student';
   if (usecase === 'shop' || /\b(shop|store|etsy|orders|sell)\b/u.test(s)) return 'shop';
@@ -357,6 +359,13 @@ export function nextAsk(w: Where): ChatAsk | null {
   /* THE LAST QUESTION LEFT IS "WHAT FIRST", so the conversation ends on what it will keep. */
   const room = ASKS_MOST - w.turns.length;
   if (open.includes('closest')) return rulesAsk('closest', w);
+  /* TWO CURRENCIES NAMED MAKE THE NEXT QUESTION WHICH ONE (1 Nov, a live run: "paid in dollars and some in pounds" was
+     followed by the model's question about clients, and the currency was never asked). The rules stand over the model's
+     question here, and over whether Money is on yet, since an answer that names two currencies is about money. */
+  if (!asked.has('currency') && w.money.guessed && currencyUnclear(w.said, w.env)) {
+    const c = rulesAsk('currency', w);
+    if (c !== null && c.choices.length > 1) return c;
+  }
   const m = modelAsk(w.model, w, asked);
   if (m !== null && (room > 1 || m.topic === 'first')) return m;
   for (const t of open) {
@@ -406,8 +415,11 @@ export function saidOf(ask: ChatAsk, answer: string): string {
       return /^just me$/iu.test(a) ? 'I work on my own.' : `I work with ${low}.`;
     case 'tools':
       return `I use ${a}.`;
-    case 'first':
-      return `First I want to keep track of ${low}.`;
+    case 'first': {
+      /* "Invoices and deadlines first" is said once: the "first" the sentence already says is not said again. */
+      const what = low.replace(/^(?:first(?:ly)?|to start)[,:]?\s+/iu, '').replace(/[,\s]+(?:first|to start with|to start)$/iu, '');
+      return what === '' ? '' : `First I want to keep track of ${what}.`;
+    }
     default:
       return sentence(a);
   }
@@ -518,4 +530,58 @@ export function within<T>(p: Promise<T>, ms: number): Promise<T | null> {
 export function atLeast(since: number, ms = TYPING_MS): Promise<void> {
   const left = since + ms - Date.now();
   return left <= 0 ? Promise.resolve() : new Promise((done) => setTimeout(done, left));
+}
+
+/* ── the use case, as they would say it ────────────────────────────────── */
+
+/**
+ * THE USE CASE'S NAME AS THIS PERSON WOULD SAY IT (1 Nov, a live run: a freelance UX designer was told "That adds Small
+ * business"). A freelancer, contractor or solo consultant keeps what a small business keeps (clients, invoices, the work),
+ * so the use case is the business one, said as Freelance. Every other use case is its own title.
+ */
+export function caseTitle(u: { usecase: string; title: string }, said: string): string {
+  return u.usecase === 'business' && kindOf(said, null) === 'freelance' ? chatWords.freelance : u.title;
+}
+
+/* ── the tools they named ──────────────────────────────────────────────── */
+
+/** The AI apps BrainDog connects on Made (`Made.svelte`), which are agents and not tools to keep. */
+const AI_APPS = /^(?:claude(?: code| desktop)?|chatgpt|gpt(?:-?\d.*)?|openai|cursor|codex|copilot|github copilot|gemini|windsurf|perplexity|ai tools?|none(?: yet)?|no|nothing|not yet|n\/a)$/iu;
+
+/**
+ * THE TOOLS A PERSON NAMED THAT ARE NOT AI APPS, as rows of Agents' Tools list (1 Nov, a live run: "Claude and Figma"
+ * picked Claude on Made and left Figma nowhere). Each is an integration by its name, as typed; Claude, ChatGPT, Cursor and
+ * the like are the apps Made connects and are left out. At most four.
+ */
+export function toolRows(answer: string): { register: string; fields: Record<string, unknown> }[] {
+  const names = plain(answer)
+    .replace(/^(?:i\s+(?:also\s+)?use|we\s+use|mostly|just|only)\s+/iu, '')
+    .split(/\s*(?:,|\band\b|&|\+|\/|\bplus\b)\s*/iu)
+    .map((x) => x.trim().replace(/^(?:the|a|an)\s+/iu, ''))
+    .filter((x) => x !== '' && [...x].length <= 40 && !AI_APPS.test(x));
+  const out: { register: string; fields: Record<string, unknown> }[] = [];
+  for (const n of names) {
+    const name = n.charAt(0).toUpperCase() + n.slice(1);
+    if (!out.some((r) => String(r.fields['name']).toLowerCase() === name.toLowerCase())) out.push({ register: 'tools', fields: { name, kind: 'integration', state: 'active', origin: 'Said when this BrainDog was made' } });
+  }
+  return out.slice(0, 4);
+}
+
+/* ── the words read again for Today ────────────────────────────────────── */
+
+/** The topics whose answers are how they work and what to set up, never a thing to do (`draftsSaid`). */
+const NOT_TODO: ReadonlySet<Topic> = new Set(['closest', 'currency', 'tools', 'name', 'first', 'kind']);
+
+/**
+ * WHAT THE CONVERSATION SAID THAT MAY HOLD A THING TO DO, for the drafts read again on Today (1 Nov, a live run: Today
+ * offered "A spreadsheet and invoices by email" and "First I want to keep track of invoices and deadlines first" as tasks).
+ * The answers to the setup questions (the currency, the tools, a name, what to keep first) are left out; the rest are
+ * said as they were added to the conversation.
+ */
+export function draftsSaid(turns: readonly ChatTurn[]): string {
+  return turns
+    .filter((t) => t.answer !== null && !NOT_TODO.has(t.ask.topic))
+    .map((t) => saidOf(t.ask, t.answer ?? ''))
+    .filter((x) => x !== '')
+    .join(' ');
 }

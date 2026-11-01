@@ -29,14 +29,16 @@ const GREETING = /^(?:hi|hello|hey)\b[\s,.!]*/iu;
 /* Case spelled out rather than the `i` flag, which would let `\p{Lu}` match lowercase letters and
    read "I'm part of a team" as somebody called Part. */
 const SAYS_NAME = new RegExp(`^(?:[Ii]['’]?m|[Ii] am|[Mm]y name is|[Tt]his is)\\s+(${NAME})(?=$|[\\s,.;:!])`, 'u');
-const BEFORE_COMMA = new RegExp(`^(${WORD}(?:\\s+${WORD}){0,2})\\s*[,;:–-]\\s*`, 'u');
+/* A DASH PARTS A NAME FROM THE REST ONLY WITH A SPACE BEFORE IT ("Nour - designer"): inside a word it joins ("We're a
+   two-person startup" named somebody "We're a two", 1 Nov). */
+const BEFORE_COMMA = new RegExp(`^(${WORD}(?:\\s+${WORD}){0,2})(?:\\s*[,;:]|\\s+[–-])\\s*`, 'u');
 const BEFORE_I = new RegExp(`^(${NAME})\\s+(?=I\\b)`, 'u');
 const ALONE = new RegExp(`^(${NAME})[.!]?$`, 'u');
 
 /* Words that open a sentence without being anybody's name. Checked on the first word only. */
 /** The words a sentence opens with to greet, never a name: `tell/read.ts` leaves them out of its names too. */
 export const GREETINGS = ['hi', 'hello', 'hey'] as const;
-const NOT_A_NAME = new Set(['i', "i'm", 'im', 'we', 'me', 'my', 'our', 'so', 'well', 'yes', 'yeah', 'no', 'ok', 'okay', 'sure', 'and', 'but', 'also', 'just', 'currently', 'basically', 'honestly', "don't", 'dont', 'do', 'never', 'not', 'without', 'zero', "doesn't", "haven't", "hasn't", "hadn't", ...GREETINGS]);
+const NOT_A_NAME = new Set(['i', "i'm", 'im', 'we', "we're", 'were', "we've", "i've", "i'd", "they're", 'they', "it's", 'it', 'this', 'that', 'a', 'an', 'the', 'me', 'my', 'our', 'so', 'well', 'yes', 'yeah', 'no', 'ok', 'okay', 'sure', 'and', 'but', 'also', 'just', 'currently', 'basically', 'honestly', "don't", 'dont', 'do', 'never', 'not', 'without', 'zero', "doesn't", "haven't", "hasn't", "hadn't", ...GREETINGS]);
 
 const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim();
 const lead = (s: string): string => s.replace(/^[\s,.;:!–-]+/u, '');

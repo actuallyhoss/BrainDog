@@ -38,12 +38,15 @@
   let {
     asked,
     rail = [],
+    count = null,
     typed = [],
     name = null,
   }: {
     asked: readonly Record<string, unknown>[];
     /** The sections of the side of the screen and the pages under each, as the declarations say them. */
     rail?: readonly { section: string; pages: readonly string[] }[];
+    /** How many pages it makes, the one number the build beside says too; else counted from `rail`. */
+    count?: number | null;
     /** The entries the person's sentence filled (`Proposal.rows`). */
     typed?: readonly Own[];
     /** The person's name, where they gave one: drawn as their own entry in People. */
@@ -76,10 +79,8 @@
     if (key === sentKey) return;
     sentKey = key;
     const mine = ++turn;
-    drawn = null;
-    short = false;
+    /* THE PAGES DRAWN STAY UNTIL THE NEW ONES LAND, so a reading that lands in the background never empties the tile. */
     shown = null;
-    lines = new Map();
     if (all.length === 0) {
       drawn = [];
       return;
@@ -113,14 +114,15 @@
   /** The name of the section a page sits under in the rail, or `null` for the one it opens on. */
   const sectionOf = (p: Tried): string | null => p.got.page.page.nav?.section ?? null;
 
-  /* WHERE THE PAGES SIT, from what the record drew where it drew them, else from the declarations. */
+  /* WHERE THE PAGES SIT, AND HOW MANY, FROM ONE SOURCE: the rail it will install, which the build beside counts too (1 Nov,
+     a live run: this tile said 16, then 8 once the record's drawing landed, while the build said 15). What the record
+     drew is which pages open; it never changes the count. */
   const places = $derived.by(() => {
     const out = new Map<string, number>();
-    if (drawn && drawn.length > 0) for (const p of drawn) out.set(sectionOf(p) ?? words.home, (out.get(sectionOf(p) ?? words.home) ?? 0) + 1);
-    else for (const r of rail) out.set(r.section, (out.get(r.section) ?? 0) + r.pages.length);
+    for (const r of rail) out.set(r.section, (out.get(r.section) ?? 0) + r.pages.length);
     return [...out].map(([label, value]) => ({ label, value }));
   });
-  const total = $derived(places.reduce((n, p) => n + p.value, 0));
+  const total = $derived(count ?? places.reduce((n, p) => n + p.value, 0));
 
   $effect(() => {
     if (!el) return;
@@ -202,7 +204,7 @@
         {/each}
       </ul>
       {#if !allPages && drawn.length > FIRST_PAGES}<button type="button" class="more-pages tap" onclick={() => (allPages = true)}>{words.morePages(drawn.length - FIRST_PAGES)}</button>{/if}
-      <p class="reading">{said.pagesIn(drawn.length, places.length)}</p>
+      <p class="reading">{said.pagesIn(total, places.length)}</p>
     {:else}
       <ul class="pages">
         {#each rail as r (r.section)}

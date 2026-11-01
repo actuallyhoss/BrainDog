@@ -132,14 +132,17 @@
     ackOf,
     askedLines,
     atLeast,
+    caseTitle,
     chatWords,
     currencyUnclear,
+    draftsSaid,
     firstAsk,
     namedCurrency,
     nextAsk,
     QUICK_MS,
     READS_MOST,
     saidOf,
+    toolRows,
     TURNS_ON,
     valueOf,
     withName,
@@ -288,15 +291,26 @@
   let caseKept = false;
 
 
-  /** Take a reading, keeping what the person decided by hand. */
-  function take(p: Proposal) {
+  /**
+   * Take a reading, keeping what the person decided by hand. `merge`: a reading that landed in the background (the whole
+   * reading, a late turn) is laid over what stands and takes nothing away, so the build and its count of pages never
+   * shrink under the person while they talk (1 Nov, a live run: "Its pages" went from 16 to 8 as the whole reading landed).
+   */
+  function take(p: Proposal, merge = false) {
     const handCurrency = currencyByHand || (currency !== null && currency !== (proposal?.currency ?? null));
     /* A NAME ANSWERED IN THE CONVERSATION STANDS OVER EVERY LATER READING. */
     if (nameAnswer !== null) p = withName(p, nameAnswer);
+    /* THE TOOLS THEY NAMED ARE KEPT IN AGENTS' TOOLS, whichever reading stands (`toolRows`). */
+    if (toolsSaid.length > 0 && p.modules.includes('agents')) p = { ...p, rows: [...p.rows, ...toolsSaid.filter((t) => !p.rows.some((r) => r.register === 'tools' && String(r.fields['name']).toLowerCase() === String(t.fields['name']).toLowerCase()))] };
+    if (merge && proposal !== null) {
+      const was = proposal;
+      p = { ...p, rows: p.rows.length > 0 ? p.rows : was.rows, heard: p.heard.length > 0 ? p.heard : was.heard, ...(p.names ? {} : was.names ? { names: was.names } : {}) };
+    }
+    const before = merge ? kept : [];
     proposal = p;
     owed = undefined;
     if (!caseByHand && !caseKept) chosen = p.usecase;
-    kept = [...new Set([...p.modules.filter((id) => !offByHand.has(id)), ...onByHand])];
+    kept = [...new Set([...before, ...p.modules.filter((id) => !offByHand.has(id)), ...onByHand])];
     /* A CURRENCY TYPED IS THE ANSWER; one chosen by hand stands until a later turn types one. */
     currency = handCurrency && currency !== null ? currency : (namedCurrency(sentence, deviceOf()) ?? p.currency ?? null);
     failed = null;
@@ -324,6 +338,14 @@
   let talkDone = $state(false);
   /** A name answered in the conversation, laid over every reading (`withName`). */
   let nameAnswer = $state<string | null>(null);
+  /**
+   * THE NAME THIS BRAINDOG ALREADY KNOWS FOR THEM (1 Nov, a live run asked "And what should I call you?" of a record made
+   * for Layla Hassan): `boot`'s own name for the reader, on a record provisioned for them or a person signed in. Then the
+   * name is never asked.
+   */
+  const knownName = $derived(page.data.live ? ((page.data as unknown as Shell).me?.name ?? '').trim() || null : null);
+  /** The tools they named that are not AI apps, kept in Agents' Tools (`toolRows`). */
+  let toolsSaid = $state.raw<{ register: string; fields: Record<string, unknown> }[]>([]);
   /** A currency answered in the conversation, which no reading replaces. */
   let currencyByHand = $state(false);
   /** The model reads this conversation has spent, `READS_MOST` at most; the rules read after that. */
@@ -358,9 +380,9 @@
       if (turn === null) return;
       modelSaid = mergeReplies(modelSaid, turn);
       if (busy || made) return;
-      /* LATE, IT IS DRAWN OVER THE WORDS AS THEY STAND NOW, which hold the words it read. */
+      /* LATE, IT IS DRAWN OVER THE WORDS AS THEY STAND NOW, which hold the words it read, and laid on what stands. */
       const p = proposalOf(modelSaid, sentence, readCtx());
-      take(p);
+      take(p, true);
       lateAsk = p.ask ?? null;
     });
     return proposeFirst(said, ctx, null);
@@ -385,12 +407,12 @@
       modelSaid = mergeReplies(modelSaid, out.value);
       if (busy || made) return;
       const p = proposalOf(modelSaid, sentence, readCtx());
-      take({ ...p, ask: proposal?.ask ?? null });
+      take({ ...p, ask: proposal?.ask ?? null }, true);
     });
   }
 
   /** The names of the places that will be made, for BrainDog's "That adds …" and "What first". */
-  const placeNames = (): string[] => onParts.map((p) => p.name);
+  const placeNames = (): string[] => madeParts.map((p) => p.name);
 
   async function answerChat(text: string | null) {
     const q = asking;
@@ -404,12 +426,22 @@
     const said = adds === '' ? sentence : joinTurns(sentence, adds);
     const turned: ChatTurn = { ask: q, answer: text, at: Date.now(), ack: null };
     const all = [...chatTurns, turned];
+    /* HER ANSWER STAYS WHERE SHE SENT IT, under its question, while BrainDog reads it (1 Nov: both went for the dots and
+       came back with the reply). BrainDog's line back is laid on the same turn when the reading lands. */
+    chatTurns = all;
     const laid: { currency?: string | null; usecase?: string | null; name?: string | null } = {};
     if (q.topic === 'currency' && value !== null) {
       currency = value;
       currencyByHand = true;
       laid.currency = currencyName(value);
+      /* A CURRENCY CHOSEN IS MONEY KEPT, where no answer had turned Money on yet. */
+      if (money === null && offered.includes('money-core') && !kept.includes('money-core')) {
+        onByHand = new Set([...onByHand, 'money-core']);
+        offByHand = new Set([...offByHand].filter((x) => x !== 'money-core'));
+        kept = [...kept, 'money-core'];
+      }
     }
+    if (q.topic === 'tools' && text !== null) toolsSaid = toolRows(text);
     if (q.topic === 'closest' && value !== null) {
       caseByHand = true;
       chosen = value;
@@ -425,7 +457,8 @@
         const p = await readTurn(said, askedLines(all));
         if (mine !== readings) return;
         sentence = said;
-        take(p);
+        /* LAID ON WHAT STANDS: a part an earlier answer turned on is not taken away by a reading of the next one. */
+        take(p, true);
         /* THE FIRST ANSWER SETTLES WHAT KIND OF BRAINDOG IT IS: a later answer read with it adds parts, and never swaps
            the use case under the person (a founder's money answer read the whole as a small business). */
         if (q.topic === 'what' && chosen !== null) caseKept = true;
@@ -446,7 +479,7 @@
         if (named !== null) currency = named;
       }
       await tick();
-      chatTurns = [...chatTurns, { ...turned, ack: ackOf(q, text, before, placeNames(), all.length, laid) }];
+      chatTurns = [...chatTurns.filter((t) => t !== turned), { ...turned, ack: ackOf(q, text, before, placeNames(), all.length, laid) }];
       await atLeast(since);
     } finally {
       thinking = false;
@@ -469,7 +502,7 @@
       usecase: u?.usecase ?? null,
       placed: !(u === null && modules.length === 0 && using === null && !drafting),
       money: { kept: money !== null, currency, guessed },
-      name: proposal?.name ?? nameAnswer,
+      name: proposal?.name ?? nameAnswer ?? knownName,
       env: deviceOf(),
       places: [...new Set(onParts.flatMap((p) => (p.id.startsWith('usecase-') ? p.lists.slice(0, 2) : [p.name])))],
       model: proposal?.ask ?? lateAsk,
@@ -733,6 +766,8 @@
   });
   /** The rail with each file's own page on it. */
   const rail = $derived([...pages, ...tiled.flatMap((t) => (t.own ? [{ section: t.own.name, pages: [t.own.name] }] : []))]);
+  /** HOW MANY PAGES IT MAKES, ONE NUMBER FROM ONE SOURCE (the rail it will install), said by the build and by its pages. */
+  const pageCount = $derived(rail.reduce((n, s) => n + s.pages.length, 0));
 
   /* THE DRAFT STANDS ONLY WHILE NO USE CASE IS CHOSEN: choosing one from the chips is choosing its pages instead. */
   const using = $derived(chosen === null ? draft : null);
@@ -787,9 +822,9 @@
    */
   const reading = $derived(proposal ?? live);
   const caseParts = $derived.by<PartOf[]>(() => {
-    if (proposal !== null) return cases.map((c) => casePart(c, proposal?.heard ?? [], caseByHand));
+    if (proposal !== null) return cases.map((c) => casePart({ ...c, title: caseTitle(c, sentence) }, proposal?.heard ?? [], caseByHand));
     if (live === null) return [];
-    return [live.usecase, ...live.also].flatMap((id) => caseOf(id) ?? []).map((c) => casePart(c, live?.heard ?? [], false));
+    return [live.usecase, ...live.also].flatMap((id) => caseOf(id) ?? []).map((c) => casePart({ ...c, title: caseTitle(c, sentence) }, live?.heard ?? [], false));
   });
   const moduleParts = $derived.by<PartOf[]>(() => {
     if (proposal !== null)
@@ -905,7 +940,9 @@
         madeModules = asked.modules;
         madePlaces = railPlaces(asked.proposal.places, filledBy(asked.proposal.rows)).filter((x) => x.kind !== 'today').map((x) => x.name);
         madeAddons = tradeAddons(sentence, cat).map((u) => ({ id: u.id, title: u.title, summary: u.summary }));
-        madeSaid = sentence.trim() === '' ? null : saidMade(sentence, asked.proposal.rows);
+        /* ONLY WHAT MAY HOLD A THING TO DO is read again for Today (`draftsSaid`): never the answers that set it up. */
+        const forDrafts = chatTurns.length > 0 ? draftsSaid(chatTurns) : sentence;
+        madeSaid = forDrafts.trim() === '' ? null : saidMade(forDrafts, asked.proposal.rows);
         made = true;
         globalThis.scrollTo?.({ top: 0 });
         return;
@@ -943,9 +980,21 @@
   $effect(() => drew('ready'));
 
   /* THE PHRASES MISSING A FACT, said by BrainDog only where Money is kept to hold the entry they began. */
-  const missing = $derived(proposal !== null && money !== null ? missingIn(sentence, today) : []);
+  /** Words that say an amount comes round again: "every month", "monthly", "rent", "a retainer", "400 a month". */
+  const REPEATS = /\b(?:(?:every|each|a|per)\s+(?:month|week|year|quarter)|monthly|weekly|yearly|annually|retainer|rent|salary|subscriptions?)\b|\d[\d,.]*\s*(?:a|per|\/)\s*(?:month|mo|week|year)\b/iu;
+  /* AND ONLY WHERE A REPEATING AMOUNT WAS SAID (1 Nov): "invoices" alone is what she keeps, not an amount half told. */
+  const missing = $derived(proposal !== null && money !== null && REPEATS.test(sentence) ? missingIn(sentence, today) : []);
   /** How many answers the number keys reach, printed beside the conversation's heading: at most three caps. */
   const onParts = $derived(allParts.filter((p) => p.on));
+  /**
+   * WHAT THE SUMMARY SAYS IS MADE IS WHAT THE SIDE OF THE SCREEN WILL SHOW (1 Nov, a live run: the summary said Projects,
+   * and after Make it mine the sidebar had none). Projects with no project in it is made but shows on the side only from
+   * its first project (`holdsProjects`), so it is not said as made; its tile on the build says what it waits for.
+   */
+  const holdsProject = $derived((proposal?.rows ?? []).some((r) => r.register === 'things'));
+  /* AND THE USE CASE IS WHAT IT IS SET UP AS, said on its own line: its page is Today, never a place on the side called
+     Freelance or Small business. */
+  const madeParts = $derived(onParts.filter((p) => !p.id.startsWith('usecase-') && (p.id !== 'portfolio' || holdsProject)));
   const offParts = $derived(moduleParts.filter((p) => !p.on));
 </script>
 
@@ -978,7 +1027,7 @@
       <div class="fact">
         <dt>{words.factFor}</dt>
         <dd>
-          <span>{u ? u.title : using ? drawing.drafted : drafting ? drawing.drafting : words.forYou}</span>
+          <span>{u ? caseTitle(u, sentence) : using ? drawing.drafted : drafting ? drawing.drafting : words.forYou}</span>
           <button type="button" class="change" disabled={busy} aria-expanded={picking} onclick={() => (picking = !picking)}>{words.changeCase}</button>
         </dd>
       </div>
@@ -993,7 +1042,7 @@
       {/if}
       <div class="fact">
         <dt>{words.factMakes}</dt>
-        <dd><span>{firstRun.and(['Today', ...onParts.map((p) => p.name)])}</span></dd>
+        <dd><span>{firstRun.and(['Today', ...madeParts.map((p) => p.name)])}</span></dd>
       </div>
     </dl>
     {#if picking}
@@ -1113,14 +1162,14 @@
         <!-- ── THE BUILD ─────────────────────────────────────────────────── -->
         <div class="build">
           <Forming
-            parts={steps}
+            parts={steps.map((p) => (p.id === 'portfolio' && !holdsProject ? { ...p, waits: words.projectsWait } : p))}
             left={proposal ? offParts.map((p) => ({ id: p.id, name: p.name })) : []}
             said={sentence}
             title={proposal?.title ?? null}
             ghost={proposal === null && brought.length === 0}
             {busy}
             {locale}
-            pages={proposal ? pages.reduce((n, s) => n + s.pages.length, 0) || null : null}
+            pages={proposal ? pageCount || null : null}
             onremove={leaveOut}
             onrestore={flip}
           />
@@ -1143,7 +1192,7 @@
 
           {#if proposal && talkDone}
             <!-- EVERY PAGE IT MAKES, one row a page, each opening as the record would draw it. -->
-            <PagesPreview asked={drawAsked} {rail} typed={proposal.rows} name={proposal.name} />
+            <PagesPreview asked={drawAsked} {rail} count={pageCount} typed={proposal.rows} name={proposal.name} />
           {/if}
         </div>
       </div>

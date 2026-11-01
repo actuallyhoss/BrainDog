@@ -754,6 +754,8 @@
     const s = adds === '' ? sentence : joinTurns(sentence, adds);
     const turned: ChatTurn = { ask: q, answer: text, at: Date.now(), ack: null };
     const all = [...chatTurns, turned];
+    /* HER ANSWER STAYS WHERE SHE SENT IT, under its question, while BrainDog reads it; the line back is laid on it after. */
+    chatTurns = all;
     const laid: { currency?: string | null; usecase?: string | null; name?: string | null } = {};
     if (q.topic === 'currency' && value !== null) {
       currencyPick = value;
@@ -788,7 +790,7 @@
         if (named !== null) currencyPick = named;
       }
       await tick();
-      chatTurns = [...chatTurns, { ...turned, ack: ackOf(q, text, before, placeNames(), all.length, laid) }];
+      chatTurns = [...chatTurns.filter((t) => t !== turned), { ...turned, ack: ackOf(q, text, before, placeNames(), all.length, laid) }];
       await atLeast(since);
     } finally {
       talking = false;

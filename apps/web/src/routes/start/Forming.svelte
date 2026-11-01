@@ -82,6 +82,8 @@
 
   /** Why a part is here, in a few words. */
   function why(p: PartOf): { lead: string; words: string } | null {
+    /* MADE, BUT ON THE SIDE ONLY ONCE IT HOLDS SOMETHING (`Part.waits`): said so, never as a place made now. */
+    if (p.waits) return { lead: '', words: p.waits };
     if (p.why.length > 0) return { lead: words.from, words: clauseOf(said, p.why[0] ?? '') };
     if (p.held) return { lead: '', words: words.needs(p.held) };
     if (p.state === 'hand') return { lead: '', words: words.byHand };

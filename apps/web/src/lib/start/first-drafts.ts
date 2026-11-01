@@ -175,6 +175,8 @@ export function draftsOf(reply: Pick<SetupReply, 'rows'>, from: DraftsFrom): Fir
     const title = String(fields[list.title] ?? '').trim();
     const key = `${list.id}:${plain(title)}`;
     if (title === '' || seen.has(key) || (me !== '' && plain(title) === me)) continue;
+    /* A TASK IS A THING TO DO, written as one: an answer the model took for one is no draft. */
+    if (list.id === 'tasks' && !readsAsTodo(title)) continue;
     seen.add(key);
     const money = Object.values(fields).find(isMoney) ?? null;
     out.push({
@@ -221,8 +223,15 @@ export function clausesOf(said: string): { said: string; text: string }[] {
 
 /** A sentence about who the person is, which Tell would read as a to-do ("I run a small candle shop"). */
 const ABOUT_ME = /^(?:hi|hello|hey)?[\s,!]*(?:i'?m|i am|i run|i own|i work|i have|i've|i do|i'm a|we are|we're|we run|my name|this is)\b/iu;
-/** Words a to-do starts with, so "need to call the bank" is a to-do and "a solo founder building Tallow" is not. */
-const DOING = /\b(?:need to|have to|must|got to|remember to|want to|going to|call|email|text|send|book|buy|pay|finish|fix|file|renew|cancel|chase|ask|meet|pick up|drop off)\b/iu;
+/**
+ * Words a to-do starts with, so "need to call the bank" is a to-do and "a solo founder building Tallow" is not. A VERB OF
+ * DOING COUNTS AT THE FRONT OF THE CLAUSE (1 Nov, a live run: "A spreadsheet and invoices by email", an answer about how
+ * she works, was offered as a task for its "email"), and "want to" is a wish, not a thing to do.
+ */
+const DOING = /\b(?:need to|have to|must|got to|remember to|going to)\b|^(?:(?:and|also|then)\s+)?(?:(?:i|we)\s+(?:also\s+)?(?:should|will|'ll|must)\s+)?(?:call|email|text|send|book|buy|pay|finish|fix|file|renew|cancel|chase|ask|meet|pick up|drop off|submit|reply to|follow up|invoice|sign|post|ship|review|update|prepare|write)\b/iu;
+
+/** Whether an entry's title reads as a thing to do ("Send Fenwick's invoice"), for the drafts that land in Tasks. */
+export const readsAsTodo = (title: string): boolean => DOING.test(title.trim());
 
 /** One name as a person writes it: "Karim", "Hana", "Lina Haddad". */
 const NAME = String.raw`\p{Lu}\p{Ll}+(?:\s\p{Lu}\p{Ll}+)?`;

@@ -85,8 +85,14 @@ export const words = {
   changeCase: 'Change',
   /** The parts not on, as a group on the ground. */
   alsoHere: 'More it can keep',
-  /** What an entry from the sentence is, beside its name. */
+  /** What an entry from the sentence is, beside its name, by the list it goes in. */
   project: 'A project you are building',
+  organisation: 'An organisation',
+  client: 'Client',
+  tool: 'A tool you use',
+  task: 'To do',
+  /** Projects made with nothing in it yet, which the side of the screen shows from the first project on. */
+  projectsWait: 'on the side once you add a project',
   /** Which way a bill's money goes, in the words Money's own list says it (`direction` on its bills). */
   moneyIn: 'Money in',
   moneyOut: 'Money out',
@@ -110,11 +116,17 @@ export const words = {
   whichOf: (said: readonly string[]) => `which of ${firstRun.and(said)} is home`,
   whichCurrency: 'which currency your money is in',
   whatClosest: 'what it is closest to',
-  /** A fact the sentence left out of an entry it began. */
+  /**
+   * A FACT THE WORDS LEFT OUT OF A REPEATING AMOUNT THEY BEGAN, asked as a plain question (1 Nov: "Tell me how much, and on
+   * which day of the month, and I will add Invoice." stood under a freelancer's summary for the word "invoices").
+   */
   missing: (title: string, missing: readonly string[]) => {
-    const both = missing.includes('amount') && missing.includes('due');
-    const what = both ? 'how much, and on which day of the month' : missing.includes('amount') ? 'how much' : 'which day of the month it falls due';
-    return `Tell me ${what}, and I will add ${title}.`;
+    /* A KIND OF THING IS SAID WITH "the" ("the monthly invoice", "the rent"); a name stays as typed ("Netflix"). */
+    const t = title.trim();
+    const kind = /\s/u.test(t) || /^(?:rent|salary|invoice|retainer|subscription|mortgage|loan|bill|insurance|pay|wage)s?$/iu.test(t);
+    const what = t === '' ? 'it' : kind ? `the ${t.charAt(0).toLowerCase()}${t.slice(1)}` : t;
+    if (missing.includes('amount') && missing.includes('due')) return `How much is ${what}, and on which day of the month is it due?`;
+    return missing.includes('amount') ? `How much is ${what} each time?` : `On which day of the month is ${what} due?`;
   },
   /** The page a record opens on, among the pages it makes. */
   opensFirst: 'opens first',
@@ -181,6 +193,11 @@ export type Part = {
   why: string[];
   /** Where the first of them stands among everything heard, from 0; absent for a part no phrase turned on. */
   heardAt?: number;
+  /**
+   * WHERE A PART IS MADE BUT NOT YET A PLACE ON THE SIDE, what it waits for ("on the side once you add a project"):
+   * Projects with no project in it, which the sidebar leaves out until the first one (`holdsProjects`).
+   */
+  waits?: string;
   entries: Entry[];
   /** What its lists are called. */
   lists: string[];
@@ -210,7 +227,16 @@ export function entryOf(row: Proposal['rows'][number]): Entry {
     const role = typeof f.role === 'string' ? capital(f.role) : '';
     return { key: `${row.register}:${title}`, title, kind: 'person', detail: role, amount: null, due: null };
   }
-  return { key: `${row.register}:${title}`, title, kind: 'project', detail: words.project, amount: null, due: null };
+  /* AN ORGANISATION IS SOMEBODY THEY WORK WITH, never a project (1 Nov: clients the model wrote as organisations stood
+     under People as "a project you are building"); a client where the words said so. A TOOL IS ONE THEY USE, and a task
+     a thing to do. Only the projects list says project. */
+  if (row.register === 'organisations') {
+    const role = typeof f.role === 'string' ? capital(f.role) : typeof f.kind === 'string' ? capital(f.kind) : words.organisation;
+    return { key: `${row.register}:${title}`, title, kind: 'person', detail: role, amount: null, due: null };
+  }
+  if (row.register === 'tools') return { key: `${row.register}:${title}`, title, kind: 'project', detail: words.tool, amount: null, due: null };
+  if (row.register === 'tasks') return { key: `${row.register}:${title}`, title, kind: 'project', detail: words.task, amount: null, due: null };
+  return { key: `${row.register}:${title}`, title, kind: 'project', detail: row.register === 'things' ? words.project : '', amount: null, due: null };
 }
 
 /**

@@ -1094,6 +1094,9 @@ export function businessNotProject<P extends Pick<Proposal, 'usecase' | 'also' |
 }
 
 /** What one sentence proposes. `ctx.locale` is carried for the catalogue's reading; these rules read English. */
+/** Somebody who works for themselves by another name than freelance: "a solo consultant", "self-employed", "a contractor". */
+const SOLO = /\b(?:(?:solo|independent|freelance|self-employed)\s+(?:consultant|contractor|designer|developer|writer|translator|marketer)|consultant|self-employed|sole trader|independent contractor|i(?:'m| am) an? contractor|work for myself)\b/iu;
+
 export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const name = who(sentence);
   /* THE REST OF THE SENTENCE IS READ WITHOUT THE NAME, so "Kiln, I run a studio" is not a project called Kiln. */
@@ -1107,7 +1110,9 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const no = refusedIn(said, [...all.heard, ...all.packs.flatMap((p) => p.why), ...turns.ranked.flatMap((r) => r.why)]);
   const read = unrefused(all, no);
   const arranged = unrefusedCases(turns, no);
-  const u = read.declined === 'language' ? null : arranged.pick;
+  /* A SOLO CONSULTANT, A CONTRACTOR OR THE SELF-EMPLOYED KEEP WHAT A FREELANCER KEEPS (1 Nov), where no use case's own
+     words were heard: the business one, which the conversation says as Freelance (`caseTitle`). */
+  const u = read.declined === 'language' ? null : (arranged.pick ?? (SOLO.test(said) ? (useCase('business') ?? null) : null));
   const beside = u ? alongside(arranged, u).filter((b) => !moneyAlone(b, arranged)) : [];
   const modules = modulesOf(read, said, name.name !== null, u, beside, offers);
 
@@ -1206,6 +1211,28 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   });
 }
 
+/* ── a client is somebody, never a project ──────────────────────────────── */
+
+/** Whether the words call this name a client: "clients Fenwick and Acme", "Acme, a client", "for my client Fenwick". */
+function calledClient(name: string, sentence: string): boolean {
+  const n = name.trim().replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  if (n === '') return false;
+  return new RegExp(`\\b(?:clients?|customers?)\\b[^.!?\\n]{0,60}?\\b${n}\\b|\\b${n}\\b[^.!?\\n]{0,24}?\\b(?:clients?|customers?)\\b`, 'iu').test(sentence);
+}
+
+/**
+ * AN ENTRY FOR SOMEBODY THEY CALLED A CLIENT IS THAT CLIENT (1 Nov, a live run: "clients Fenwick and Acme" came back as
+ * projects and as organisations drawn as "a project you are building"). A project so named becomes a person in People
+ * with the role client, where People is kept; an organisation so named is kept as one, marked a client.
+ */
+export function clientNotProject(row: Proposal['rows'][number], sentence: string, modules: readonly string[]): Proposal['rows'][number] {
+  const name = String(row.fields['name'] ?? '').trim();
+  if (name === '' || !calledClient(name, sentence)) return row;
+  if (row.register === 'things' && listById(PEOPLE, modules)) return { register: PEOPLE, fields: { name, role: 'client' } };
+  if (row.register === 'organisations' && row.fields['kind'] === undefined) return { ...row, fields: { ...row.fields, kind: 'client' } };
+  return row;
+}
+
 /* ── the model, first ──────────────────────────────────────────────────── */
 
 /**
@@ -1276,10 +1303,12 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
   const heard = typed || ruled !== null ? lines : sayCurrency(lines, modules, currency);
 
   const rows: Proposal['rows'] = [];
-  for (const r of reply.rows.slice(0, 5)) {
+  for (const one of reply.rows.slice(0, 5)) {
+    /* A CLIENT IS SOMEBODY BEFORE ITS LIST IS LOOKED FOR (`clientNotProject`): Projects may not be kept at all. */
+    const r = one.list === 'things' ? ((c) => ({ list: c.register, fields: c.fields }))(clientNotProject({ register: one.list, fields: one.fields }, sentence, modules)) : one;
     const list = listById(r.list, modules);
     const fields = list ? entryOf(list, r.fields, currency) : null;
-    if (list && fields) rows.push({ register: list.id, fields });
+    if (list && fields) rows.push(clientNotProject({ register: list.id, fields }, sentence, modules));
   }
 
   const names: Record<string, string> = {};
