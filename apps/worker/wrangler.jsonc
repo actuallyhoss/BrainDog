@@ -653,7 +653,7 @@
            admin.brain.dog or by an application the owner invites, and the site still says "Start free". */
         "SIGNUP": "invite",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET, as alpha's comment says. */
-        "TURNSTILE_SITE_KEY": "",
+        "TURNSTILE_SITE_KEY": "0x4AAAAAAFvL6vpxsuMhToz5",
         /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and the operator's yes to them. Unset is off, and the page reads by rules. 300, his yes to C7 (1 Nov, "i need it highly intelligent"). Still off in effect until `TURNSTILE_SECRET` is set: the door reads nothing behind no bot check. */
         "FIRST_READ_DAILY": "300",
         /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made, and every open link stops answering. On since 1 Nov (his ask of 20 Oct, sharing finished). */
