@@ -12,16 +12,15 @@
 <script lang="ts">
   import '@braindog/skin/blocks-kinds.css';
   import { createClient } from '@braindog/client';
-  import { exponentOf } from 'braindog-render';
   import { Kpis, type KpiInput } from 'braindog-render/svelte';
   import { apiBase, at } from '$lib/at.ts';
   import { rowsSaid } from '$lib/data/ref-rows.ts';
-  import { pastOf } from '$lib/kpis/past.ts';
   import { homeCurrency, identityOf } from '$lib/record/api.ts';
   import { READINGS } from '$lib/record/reporting.ts';
   import { entryOf, type Names, type RecordRow } from '$lib/record/remote.ts';
-  import { isMoney, type Entry, type RegisterDecl } from '$lib/record/schema.ts';
+  import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
   import { slotOf } from '$lib/ui/face.ts';
+  import { kpiInputOf } from './kpi-input.ts';
 
   let {
     register,
@@ -51,13 +50,6 @@
     };
   });
 
-  /* MONEY AS THE RECORD STORES IT, "USD 8,420.00", which is the one shape the drawer reads an amount in. */
-  const storedOf = (m: { amount: number; currency: string }): string => {
-    const e = exponentOf(m.currency);
-    const said = Math.abs(m.amount / 10 ** e).toLocaleString('en-US', { minimumFractionDigits: e, maximumFractionDigits: e });
-    return `${m.currency} ${m.amount < 0 ? '−' : ''}${said}`;
-  };
-  const text = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined);
   /* THE PROJECT'S ROW ID, which a reading names it by: the list's row holds the project's number, and the names the page
      carries map each id the record answered back to its number. */
   const projectIdOf = (seq: unknown): string | null => {
@@ -69,32 +61,9 @@
 
   const inputs = $derived.by((): { k: KpiInput; seq: number }[] =>
     entries.map((e) => {
-      const f = e.fields;
-      const ident = identityOf(register, 'thing', f.thing, names);
-      const name = text(f.name) ?? '';
-      const project = { id: projectIdOf(f.thing) ?? '', name: ident?.name ?? '' };
-      const past = readings && project.id !== '' ? pastOf(readings, { name, measure: text(f.measure) ?? null }, project, 'thing') : [];
-      const points = [...past].reverse().map((p) =>
-        p.money ? { at: p.at, amount: storedOf(p.money) } : { at: p.at, value: p.value },
-      );
-      const k: KpiInput = {
-        kpi: e.id ?? `${register}#${e.seq}`,
-        name,
-        ...(ident ? { project: ident.name, slot: slotOf(ident.hue) } : {}),
-        ...(text(f.measures) ? { measures: text(f.measures)! } : {}),
-        ...(text(f.unit) ? { unit: text(f.unit)! } : {}),
-        ...(f.good === 'up' || f.good === 'down' ? { good: f.good } : {}),
-        ...(typeof f.target === 'number' || typeof f.target === 'string'
-          ? { target: f.target }
-          : isMoney(f.target_amount)
-            ? { target: storedOf(f.target_amount) }
-            : {}),
-        ...(text(f.target_by) ? { target_by: text(f.target_by)! } : {}),
-        ...(f.every === '1h' || f.every === '1d' || f.every === '1w' || f.every === '1m' ? { every: f.every } : {}),
-        ...(typeof f.kind === 'string' && ['level', 'flow', 'share', 'progress', 'count'].includes(f.kind) ? { kind: f.kind as KpiInput['kind'] } : {}),
-        points,
-      };
-      return { k, seq: e.seq };
+      const ident = identityOf(register, 'thing', e.fields.thing, names);
+      const project = { id: projectIdOf(e.fields.thing) ?? '', name: ident?.name ?? '', slot: ident ? slotOf(ident.hue) : undefined };
+      return { k: kpiInputOf(e.id ?? `${register}#${e.seq}`, e.fields, readings, project), seq: e.seq };
     }),
   );
   const seqOf = $derived(new Map(inputs.map((x) => [x.k.kpi, x.seq])));
