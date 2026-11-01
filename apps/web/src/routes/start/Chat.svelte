@@ -525,6 +525,13 @@
     scroll-margin-block: var(--sp-6) var(--sp-8);
   }
 
+  /* UNDER A THUMB THE FIELD ITSELF IS 44 TALL, so a tap anywhere on its line lands in it. */
+  @media (pointer: coarse) {
+    .field {
+      padding-block: 10px;
+    }
+  }
+
   .field::placeholder {
     color: var(--ink-3);
   }

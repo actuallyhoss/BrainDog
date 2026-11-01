@@ -344,12 +344,6 @@
   }
 
   @media (pointer: coarse) {
-    /* UNDER A THUMB, PUT BACK IS AS TALL AS THE ANSWERS TO TAP BESIDE IT (44, Look B's phone target). */
-    .back {
-      min-block-size: var(--tap, 44px);
-      padding-inline: var(--sp-3);
-    }
-
     .out {
       inline-size: 44px;
       block-size: 44px;
@@ -378,6 +372,15 @@
     font: inherit;
     font-size: var(--fs-meta);
     cursor: pointer;
+  }
+
+  /* UNDER A THUMB, PUT BACK IS AS TALL AS THE ANSWERS TO TAP BESIDE IT (44, Look B's phone target). After the rule
+     above, which it overrides. */
+  @media (pointer: coarse) {
+    .back {
+      min-block-size: var(--tap, 44px);
+      padding-inline: var(--sp-3);
+    }
   }
 
   @media (hover: hover) {
