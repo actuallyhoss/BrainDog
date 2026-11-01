@@ -18,8 +18,8 @@ test('A WALK AHEAD OF WHOLE WEEKS IS SAID IN WEEKS, any other in days', () => {
   assert.equal(aheadWindowSaid(1), '1 day');
 });
 
-test('THE LOWEST NAMES ITS WINDOW', () => {
-  assert.equal(copy.cashLowest('−£16,200', 'on 7 Nov', '12 weeks'), 'Lowest in the next 12 weeks: {{bad:−\u2060£16,200}} on 7 Nov');
+test('THE LOWEST IS TWO WORDS AND A DAY, HELD WHOLE', () => {
+  assert.equal(copy.cashLowest('−£16,200', 'on 7 Nov', '12 weeks'), 'Lowest\u00a0{{bad:−\u2060£16,200}}\u00a0on\u00a07\u00a0Nov');
   /* THE MINUS IS HELD TO ITS FIGURE, so a wrapped line never leaves "−" at its end (finish F49). */
-  assert.equal(copy.cashLowest('£16,200', 'today', '12 weeks'), 'Lowest in the next 12 weeks: £16,200 today');
+  assert.equal(copy.cashLowest('£16,200', 'today', '12 weeks'), 'Lowest\u00a0£16,200\u00a0today');
 });

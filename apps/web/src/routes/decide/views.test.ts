@@ -363,16 +363,16 @@ test('money questions go to Money and the rest to Quick, each once, five showing
   assert.equal(three.blocks[3]?.drawn, false);
 });
 
-test('the board puts Money, Quick and Handled a third each, a half each, or the row, by what holds something', () => {
-  assert.deepEqual(boardOf({ money: true, quick: true, handled: true }), { money: '1 / span 4', quick: '5 / span 4', handled: '9 / span 4' });
-  assert.deepEqual(boardOf({ money: false, quick: true, handled: true }), { money: null, quick: '1 / span 6', handled: '7 / span 6' });
+test('the board puts Money and Quick a half each or the row, and Handled across the row under them', () => {
+  assert.deepEqual(boardOf({ money: true, quick: true, handled: true }), { money: '1 / span 6', quick: '7 / span 6', handled: '1 / -1' });
+  assert.deepEqual(boardOf({ money: false, quick: true, handled: true }), { money: null, quick: '1 / span 12', handled: '1 / -1' });
   assert.deepEqual(boardOf({ money: true, quick: false, handled: false }), { money: '1 / span 12', quick: null, handled: null });
   assert.deepEqual(boardOf({ money: false, quick: false, handled: false }), { money: null, quick: null, handled: null });
 });
 
 test('the screen shows Handled as the third column and switches between the three on a phone', () => {
   assert.match(screen, /loadHandled\(apiBase\(\)\)/u);
-  assert.match(screen, /<Handled found=\{handled\} heading=\{GROUP_WORDS\.handled\} head="column" \/>/u);
+  assert.match(screen, /<Handled found=\{handled\} heading=\{GROUP_WORDS\.handled\} head="strip" \/>/u);
   assert.match(screen, /<Segmented role="group" aria-label=\{WORDS\.columns\} full>/u);
   assert.match(screen, /\.block-slot\[data-key='decide-money'\]/u);
   assert.match(screen, /\.block-slot\[data-key='decide-quick'\]/u);

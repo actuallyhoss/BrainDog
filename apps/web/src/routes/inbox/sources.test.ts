@@ -99,7 +99,7 @@ test('X25: the empty Inbox says how to get the address, never "this BrainDog\'s 
   const self = quietOf('self-host', cmd);
   assert.equal(self.command, cmd);
   assert.match(self.why, /address/u);
-  assert.equal(self.show, 'Print the address', 'the command is folded behind one press');
+  assert.equal(self.show, 'Print the address');
   assert.equal(cloud.show, null, 'a hosted record is never shown the command');
   /* A HOST THAT DID NOT SAY WHICH IT IS IS TOLD THE CLOUD'S WAY, which needs no command. */
   assert.equal(quietOf(undefined, cmd).command, null);

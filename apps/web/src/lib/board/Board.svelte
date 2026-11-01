@@ -241,7 +241,7 @@
       <button type="button" class="ico" aria-label={boardWords.undo} title="{boardWords.undo} ({mod}Z)" disabled={model.past.length === 0} onclick={() => model.undo()}><Icon name="undo-2" size="s" /></button>
       <button type="button" class="ico" aria-label={boardWords.redo} title="{boardWords.redo} ({mod}{shift}Z)" disabled={model.future.length === 0} onclick={() => model.redo()}><Icon name="redo-2" size="s" /></button>
       {#if four.current}
-        <span class="seg" role="group" aria-label="Which board">
+        <span class="seg" role="group" aria-label={boardWords.showing(model.phoneView)}>
           <button type="button" aria-pressed={!model.phoneView} onclick={() => (model.phoneView = false)}><Icon name="monitor" size="s" />{boardWords.laptop}</button>
           <button type="button" aria-pressed={model.phoneView} onclick={() => (model.phoneView = true)}><Icon name="rows-3" size="s" />{boardWords.phone}</button>
         </span>
@@ -297,7 +297,7 @@
     {#if mayEdit && !model.editing && todayOffer.offer !== null}
       <!-- ONE QUIET SUGGESTION AT THE BOARD'S END (§6.3), its widget drawn at the board's own cell. ITS CODE ONLY ONCE
            THERE IS ONE: it is asked after Today has drawn, and loading the cell before then put it on a cold open's path. -->
-      <div class="suggest">{#await suggestPart() then { default: SuggestCell }}<SuggestCell onadd={added} {onremove} />{/await}</div>
+      <div class="suggest">{#await suggestPart() then { default: SuggestCell }}<SuggestCell line onadd={added} {onremove} />{/await}</div>
     {/if}
   </div>
 
@@ -452,6 +452,33 @@
 
   .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key]:is([data-size='tall'], [data-size='large'])) {
     --most: calc(2 * var(--row) + var(--gap));
+  }
+
+  /* AND ON A LAPTOP AT REST A TILE CLOSES UP UNDER WHAT IT SHOWS TOO (next steps 1 Nov, T5): a row's tiles stretched to
+     the tallest, so Your work and People ended in 150px of nothing beside Coming up, and Late with one invoice stood as
+     tall as Needs you. The packer's grid is the same and editing still shows each size whole; at rest the rows are as
+     tall as the tallest thing that starts in them, and each frame as tall as what it draws, the rows it was laid across
+     at most (`--span`, by its size here and by its laid rows in `fit.ts`, which still cuts what runs past them). */
+  .board-root:not([data-editing]) .board:not([data-cols='2']) {
+    grid-auto-rows: auto;
+  }
+
+  .board-root:not([data-editing]) .board:not([data-cols='2']) :global([data-board-key][data-board-key]) {
+    --span: 1;
+    align-self: start;
+    max-block-size: calc(var(--span) * var(--row) + (var(--span) - 1) * var(--gap));
+  }
+
+  .board-root:not([data-editing]) .board:not([data-cols='2']) :global([data-board-key][data-board-key]:is([data-size='tall'], [data-size='large'])) {
+    --span: 2;
+  }
+
+  .board-root:not([data-editing]) .board:not([data-cols='2']) .reserve {
+    min-block-size: var(--row);
+  }
+
+  .board-root:not([data-editing]) .board:not([data-cols='2']) .reserve:is([data-size='tall'], [data-size='large']) {
+    min-block-size: calc(2 * var(--row) + var(--gap));
   }
 
   /* A DRAFT TAKES A ROW MORE (`grow` in `board.svelte.ts`), so its Keep bar sits under the widget it asks about. */

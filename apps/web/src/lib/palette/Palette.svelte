@@ -75,6 +75,7 @@
   import { listName } from '../record/names.ts';
   import { commands, ranked, type Act, type Creation } from './admit.ts';
   import { addRow, creation, homeCapture, moneyWay, offered, plainAdd, words as createWords, type Into, type Plain } from './create.ts';
+  import { addTold, offersFor, warm as warmTell, type TellOffer, type TellShell } from './tell-row.ts';
   import { letGo, photoFields, shared } from '$lib/phone/shared.svelte.ts';
   import { quick } from '$lib/money/quick.svelte.ts';
   import { tokensOf as lineTokens, untoken, type Chip } from './tokens.ts';
@@ -157,6 +158,8 @@
     paging?: Paging | undefined;
     /** Set on the row a plain line makes, which is ranked after every match. */
     plain?: true | undefined;
+    /** What Tell's rules read the line as (`tell-row.ts`): only that row carries it, and it is drawn first. */
+    told?: TellOffer | undefined;
     /** How many rows of one title this line stands for, past the first. */
     folded?: number | undefined;
     /** The group a row was found in before it was drawn as the best match, so its count still says what it counts. */
@@ -741,6 +744,21 @@
   });
   const plainMade = $derived<Plain | null>(plainLine && plainRead ? { ...plainLine, title: plainRead.text, chips: [...held, ...plainRead.chips] } : null);
 
+  /* TELL'S READING OF THE LINE (T27): its rules and the lists' declarations come with the first line typed, and the line
+     is read again once they are in (`tellReady`). Offered first where it places the line beyond the plain add. */
+  let tellReady = $state(0);
+  let tellWarm = false;
+  $effect(() => {
+    if (tellWarm || !isLive || parsed.prefix !== null || parsed.text.trim() === '') return;
+    tellWarm = true;
+    warmTell(shell as unknown as TellShell, () => (tellReady += 1));
+  });
+  const tellOffers = $derived.by<TellOffer[]>(() => {
+    void tellReady;
+    if (!isLive || parsed.prefix !== null || live.creation !== null || held.length > 0) return [];
+    return offersFor(parsed.text, shell as unknown as TellShell, plainLine?.register ?? into?.register ?? null);
+  });
+
   /** A space after a tag takes it out of the field as a chip; the words left are the field. */
   function oninput() {
     moved = false;
@@ -760,7 +778,7 @@
   /** Whether the arrows or the pointer picked a row since the last keystroke, so Enter runs what was chosen. */
   let moved = $state(false);
   /** A row Enter does not run for a sentence with no model until it is picked: any but a command or the add line. */
-  const looseFor = (r: Row): boolean => askless && !moved && r.plain !== true && r.group !== copy.commands;
+  const looseFor = (r: Row): boolean => askless && !moved && r.plain !== true && r.told === undefined && r.group !== copy.commands;
 
   /** Whether this query is one the record's search answers: `#`, `@` or no prefix, and two characters or more. */
   const searching = $derived((parsed.prefix === null || parsed.prefix === '#' || parsed.prefix === '@') && parsed.text.length > 1);
@@ -1160,6 +1178,8 @@
      * exist, which is `23 §8`'s absent rather than disabled, and the only way the word Slash reaches this panel.
      */
     const kept = out.slice(0, CAP);
+    /* WHAT TELL HEARD LEADS (T27): "Paid Ada 300 for the logo" is money out to Ada before it is anything else. */
+    kept.unshift(...tellOffers.map((o, i) => ({ id: `c-tell-${i}`, title: o.title, detail: o.detail, href: null, group: '', icon: 'plus' as IconName, told: o })));
     /* THE PLAIN LINE'S ROW, LAST, AFTER EVERY MATCH. It is made out of the query like the sentence's add row,
        so `commands` is asked for it, which is asking the standing rule. Last, so it is never the row Enter runs while
        any place or command matched: "Add as a task" on every line would make Enter a way to file stray tasks. With
@@ -1405,6 +1425,12 @@
       lookKept = keptNow();
       pageHere = pageMenu() !== null;
       if (slashHere) warm();
+      /* A QUESTION THE SLASH PAGE'S FIELD ASKED (`askNow`), taken once: asked at once, in a new conversation. */
+      const question = untrack(() => opener.question);
+      if (question !== '') {
+        untrack(() => (opener.question = ''));
+        askSlash(question);
+      }
       queueMicrotask(() => input?.focus());
     } else if (!open && el.open) {
       el.close();
@@ -1505,6 +1531,10 @@
     }
     if (row.act === 'add') {
       if (row.creation) void add(row.creation);
+      return;
+    }
+    if (row.told) {
+      void addTold(row.told, shell as unknown as TellShell, (text) => toasts.push(text, { intent: 'warn' })).then((ok) => void (ok && invalidateAll()));
       return;
     }
     if (row.act === 'page') {

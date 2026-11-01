@@ -179,6 +179,6 @@ export type Quiet = { title: string; why: string; add: string; command: string |
 export function quietOf(host: 'cloud' | 'self-host' | undefined, command: string | null): Quiet {
   const title = 'Nothing has come in yet';
   if (host === 'self-host' && command)
-    return { title, why: 'Forward mail to your BrainDog address.', add: 'Other ways in', command, show: 'Print the address' };
+    return { title, why: 'Forward mail to your BrainDog address. This prints it, on the machine BrainDog runs on:', add: 'Other ways in', command, show: 'Print the address' };
   return { title, why: 'Make an address in What comes in, then forward mail to it.', add: 'Set up an address', command: null, show: null };
 }

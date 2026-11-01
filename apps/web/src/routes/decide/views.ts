@@ -209,16 +209,17 @@ export const GROUP_WORDS: Readonly<Record<Column, string>> = { money: 'Money', q
 export const aboutMoney = (q: QueueQuestion): boolean => (Array.isArray(q.money) && q.money.length > 0) || namesAmount(q.question);
 
 /**
- * WHERE EACH COLUMN SITS ON THE TWELVE-COLUMN BOARD, as a `grid-column`, or `null` for one with nothing in it: three
- * columns a third each, two a half each, one the whole row, in the order Money, Quick, Handled. One board row, so the
- * three line up at the top and what was put off and decided follows under all of them.
+ * WHERE EACH COLUMN SITS ON THE TWELVE-COLUMN BOARD, as a `grid-column`, or `null` for one with nothing in it: Money and
+ * Quick a half each, or one the whole row, and Handled the whole row under them. What was put off and decided follows.
  */
 export function boardOf(has: Readonly<Record<Column, boolean>>, first: Group = 'money'): Record<Column, string | null> {
   /* QUICK FIRST when the kept page puts that queue ahead (`decideDrawn`'s `first`), as said: "show quick questions first". */
-  const order: Column[] = first === 'quick' ? ['quick', 'money', 'handled'] : ['money', 'quick', 'handled'];
+  const order: Column[] = first === 'quick' ? ['quick', 'money'] : ['money', 'quick'];
   const shown = order.filter((c) => has[c]);
   const span = shown.length === 0 ? 12 : 12 / shown.length;
-  const out: Record<Column, string | null> = { money: null, quick: null, handled: null };
+  /* HANDLED IS A STRIP UNDER THE QUESTIONS, ACROSS THE ROW (next steps 1 Nov, T16): as a third column it took a third of
+     the page for one line, and Money's cards wrapped their titles beside it. Money and Quick share the row half each. */
+  const out: Record<Column, string | null> = { money: null, quick: null, handled: has.handled ? '1 / -1' : null };
   shown.forEach((c, n) => (out[c] = `${String(n * span + 1)} / span ${String(span)}`));
   return out;
 }

@@ -467,7 +467,7 @@
     border-radius: var(--r-ctl);
     background: var(--tile-2);
     box-shadow: 0 0 0 3px var(--tile);
-    color: var(--ink-2);
+    color: var(--ink-3);
     font-size: var(--fs-cap);
     font-weight: var(--fw-medium);
     line-height: 18px;
@@ -540,9 +540,20 @@
     align-items: start;
   }
 
+  /* ON A PHONE ONE COLUMN, EACH PREVIEW AT THE PHONE TILE'S REAL SIZE (T13): two across, every preview was a quarter of
+     a phone's tile. A Small or a Tall is drawn a phone column wide with its name beside it; a Wide, a Large or a Full is
+     the phone's full width. */
   @container (width < 560px) {
     .ws-grid {
-      --cols: 2;
+      --cols: 1;
+      --u: calc((100cqi - var(--ws-gap)) / 2);
+      gap: var(--sp-4);
+    }
+
+    .ws-card:is([data-size='small'], [data-size='tall']) .ws-open {
+      grid-template-columns: var(--u) minmax(0, 1fr);
+      align-items: center;
+      column-gap: var(--ws-gap);
     }
   }
 

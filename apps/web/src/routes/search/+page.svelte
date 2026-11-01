@@ -71,6 +71,7 @@
     lists: 'Lists',
     projects: 'Projects',
     recent: 'Changed lately',
+    changes: (n: number) => `${n} changes`,
     entries: (n: number) => n.toLocaleString('en'),
   } as const;
 
@@ -115,11 +116,19 @@
      fold into the newest with how many; one name in two lists says which list each is. */
   const lately = $derived.by(() => {
     const out: { r: Recent; n: number; twice: boolean }[] = [];
+    /* AND ONE LINE A SERIES (T25): "Halden licence, 4 of 4", "3 of 4" … and "Halden licence" itself were five rows for
+       one thing changed. They fold into one, named for the series, opening the series itself where it is among them. */
+    const seriesOf = (title: string): string => title.replace(/,\s*\d+\s+of\s+\d+$/u, '');
     for (const r of recent) {
-      const same = out.find((x) => x.r.title === r.title && x.r.list === r.list);
-      if (same) same.n += 1;
-      else out.push({ r, n: 1, twice: false });
+      const key = seriesOf(r.title);
+      const same = out.find((x) => seriesOf(x.r.title) === key && (x.r.list === r.list || x.r.title !== r.title));
+      if (same) {
+        same.n += 1;
+        /* THE SERIES ITSELF OPENS, where it is among them, at the newest change's day. */
+        if (r.title === key) same.r = { ...r, at: same.r.at };
+      } else out.push({ r, n: 1, twice: false });
     }
+    for (const x of out) if (x.n > 1) x.r = { ...x.r, title: seriesOf(x.r.title) };
     for (const x of out) x.twice = out.some((y) => y !== x && y.r.title === x.r.title);
     return out;
   });
@@ -365,6 +374,24 @@
       <section class="jump" aria-labelledby="jump-title">
         <h2 class="jump-title" id="jump-title">{words.jumpTo}</h2>
         <div class="jump-grid">
+          {#if recent.length > 0}
+            <!-- WHAT HE WAS JUST DOING LEADS (T26), two columns wide, then Money, Projects, People and the lists. -->
+            <div class="lately">
+            <Tile icon="clock" title={words.recent}>
+              <ul class="places">
+                {#each lately as { r, n, twice } (r.href)}
+                  <li>
+                    <a class="place" href={at(r.href)}>
+                      <span class="place-lead" aria-hidden="true"><Icon name={r.icon} size="m" /></span>
+                      <span class="place-name">{readable(r.title)}{#if n > 1}<span class="place-list">{' · '}{words.changes(n)}</span>{:else if twice}<span class="place-list">{' · '}{r.list}</span>{/if}</span>
+                      <span class="place-n">{daySaid(r.at.slice(0, 10), recordNow())}</span>
+                    </a>
+                  </li>
+                {/each}
+              </ul>
+            </Tile>
+            </div>
+          {/if}
           {#each things as t (t.section)}
             <!-- A SECTION'S THINGS, EACH IN ITS OWN COLOUR, the dot the rail draws beside it. -->
             <Tile icon={t.icon} title={t.section}>
@@ -406,21 +433,6 @@
                       <span class="place-lead" aria-hidden="true"><Icon name={l.icon ?? 'rows'} size="m" /></span>
                       <span class="place-name">{l.title}</span>
                       <span class="place-n num">{words.entries(l.count)}</span>
-                    </a>
-                  </li>
-                {/each}
-              </ul>
-            </Tile>
-          {/if}
-          {#if recent.length > 0}
-            <Tile icon="clock" title={words.recent}>
-              <ul class="places">
-                {#each lately as { r, n, twice } (r.href)}
-                  <li>
-                    <a class="place" href={at(r.href)}>
-                      <span class="place-lead" aria-hidden="true"><Icon name={r.icon} size="m" /></span>
-                      <span class="place-name">{readable(r.title)}{#if n > 1}<span class="place-list">{' · '}{n}</span>{:else if twice}<span class="place-list">{' · '}{r.list}</span>{/if}</span>
-                      <span class="place-n">{daySaid(r.at.slice(0, 10), recordNow())}</span>
                     </a>
                   </li>
                 {/each}
@@ -553,6 +565,26 @@
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
     gap: var(--tile-gap);
     align-items: start;
+  }
+
+  /* FOUR ACROSS ON A WIDE PAGE, Changed lately two of them, and no tile left alone on the second row: with five tiles the
+     last two take half the row each (T26). */
+  .jump {
+    container-type: inline-size;
+  }
+
+  @container (inline-size >= 1100px) {
+    .jump-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .lately {
+      grid-column: span 2;
+    }
+
+    .jump-grid:has(> .lately):has(> :global(:nth-child(5):last-child)) > :global(:nth-child(n + 4)) {
+      grid-column: span 2;
+    }
   }
 
   /* A PLACE IS A 36PX ROW, the rail's own height: its colour, face or glyph, its name, and what it holds at the end. */

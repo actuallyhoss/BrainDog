@@ -29,6 +29,7 @@
     onadd,
     onremove,
     home = homeCurrency(),
+    line = false,
   }: {
     /** The offer to show. Absent, the one Today's own read carried (`offer.svelte.ts`), so the board need pass none. */
     offer?: WidgetOffer | null;
@@ -37,6 +38,9 @@
     /** The board takes the widget with this key off (S6). Absent, a suggestion to take one off is not drawn. */
     onremove?: ((key: string) => unknown) | undefined;
     home?: string | null;
+    /** At Today's foot (T6): its name and one line, with Add, Not now and Never beside them, and no preview. The
+     *  preview drew two 12px lines in a 185-tall card. */
+    line?: boolean;
   } = $props();
 
   /** The cell's own words. */
@@ -83,8 +87,8 @@
 </script>
 
 {#if !hidden && offer !== null}
-  <aside class="sc" data-removal={removal ? '' : undefined} style:--cols={cols} style:--rows={rows} aria-label="{words.noticed}: {offer.title}">
-    {#if !removal}
+  <aside class="sc" data-removal={removal ? '' : undefined} data-line={line ? '' : undefined} style:--cols={cols} style:--rows={rows} aria-label="{words.noticed}: {offer.title}">
+    {#if !removal && !line}
       <div class="sc-frame" data-size={offer.size}>
         <WidgetPreview widget={{ title: offer.title, icon: String(offer.block.icon ?? 'grid'), example: {}, ready: true }} size={offer.size} reading={offer.reading ?? null} {home} waiting={offer.reading === undefined} />
       </div>
@@ -93,15 +97,20 @@
       <p class="sc-who"><Icon name="zap" size="s" /><span>{words.noticed}</span></p>
       <p class="sc-title">{removal ? offer.why.split('.')[0] : offer.title}</p>
       <p class="sc-why">{removal ? offer.why.slice(offer.why.indexOf('.') + 1).trim() : offer.why}</p>
-      <div class="sc-acts">
-        <!-- INK, NOT THE RED: an offer is never the screen's one primary, and Today's answers already wear the ink. -->
-        <Button weight="ink" disabled={busy} onclick={() => press('add')}>{removal ? words.remove : words.add}</Button>
-        <Button weight="quiet" disabled={busy} onclick={() => press('notNow')}>{words.notNow}</Button>
-        <Button weight="bare" disabled={busy} onclick={() => press('never')}>{words.never}</Button>
-      </div>
+      {#if !line}{@render acts()}{/if}
     </div>
+    {#if line}{@render acts()}{/if}
   </aside>
 {/if}
+
+{#snippet acts()}
+  <div class="sc-acts">
+    <!-- INK, NOT THE RED: an offer is never the screen's one primary, and Today's answers already wear the ink. -->
+    <Button weight="ink" disabled={busy} onclick={() => press('add')}>{removal ? words.remove : words.add}</Button>
+    <Button weight="quiet" disabled={busy} onclick={() => press('notNow')}>{words.notNow}</Button>
+    <Button weight="bare" disabled={busy} onclick={() => press('never')}>{words.never}</Button>
+  </div>
+{/snippet}
 
 <style>
   /* A DASHED FRAME ON THE BOARD, NOT A TILE: what is offered is told from what is his by its edge alone. Its widget is
@@ -167,6 +176,31 @@
     flex-wrap: wrap;
     gap: var(--sp-2);
     margin-block-start: var(--sp-2);
+  }
+
+  /* ONE LINE AT TODAY'S FOOT (T6): what Slash suggests and why on the left, its three answers on the right; under a
+     narrow width the answers go under the words. */
+  .sc[data-line] {
+    padding: var(--sp-3) var(--sp-4);
+  }
+
+  .sc[data-line] .sc-say {
+    flex: 1 1 320px;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    column-gap: var(--sp-2);
+  }
+
+  .sc[data-line] .sc-why {
+    grid-column: 1 / -1;
+  }
+
+  .sc[data-line] .sc-acts {
+    margin-block-start: 0;
+  }
+
+  .sc[data-line] > .sc-acts {
+    flex: none;
   }
 
   /* ON THE PHONE THE BOARD IS TWO COLUMNS, so the frame is the phone's (a Full is drawn as a Wide) and the words go under. */

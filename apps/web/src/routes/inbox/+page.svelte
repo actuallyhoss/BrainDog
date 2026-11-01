@@ -798,14 +798,13 @@
     <div class="clear">
       <Empty kind="no-data-yet" glyph="mail" title={quiet.title} body={quiet.why}>
         {#snippet actions()}
-          <Button weight="primary" href="/settings/ingest">{quiet.add}</Button>
-          <!-- A SELF-HOST ONLY, FOLDED: the command that prints its address is a press away, so the tile is one line and
-               one button, and the command is never drawn on a hosted record. -->
-          {#if quiet.command && quiet.show}
-            <details class="quiet-how">
-              <summary class="tap">{quiet.show}</summary>
-              <CodeLine text={quiet.command} />
-            </details>
+          {#if quiet.command}
+            <!-- A SELF-HOST'S ONE THING TO DO IS THE ADDRESS (T22): what prints it is the tile's hero, in mono with its
+                 Copy, and the other ways in are a quiet press under it, never the red. Never drawn on a hosted record. -->
+            <div class="quiet-how"><CodeLine text={quiet.command} /></div>
+            <Button weight="quiet" href="/settings/ingest">{quiet.add}</Button>
+          {:else}
+            <Button weight="primary" href="/settings/ingest">{quiet.add}</Button>
           {/if}
         {/snippet}
       </Empty>
@@ -1193,7 +1192,7 @@
   /* ITS OWN LINE UNDER THE BUTTON: the empty tile's actions take the tile's width here, so the fold wraps under them. */
   .clear :global(.empty-actions) {
     align-self: stretch;
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   .quiet-how {
@@ -1202,13 +1201,6 @@
     font-size: var(--fs-meta);
   }
 
-  .quiet-how > summary {
-    cursor: pointer;
-  }
-
-  .quiet-how[open] > summary {
-    margin-block-end: var(--sp-2);
-  }
 
   .page {
     container-type: inline-size;
@@ -1518,8 +1510,16 @@
 
   /* AN EMPTY INBOX IS A TILE ON THE BOARD like everything else on it: `Empty`'s own, at most 640 wide on the start
      edge. A second tile round it stretched it across the page and dropped its own. */
+  /* THE EMPTY TILE STARTS AT THE TOP LEFT (T23), at the page's gutter like every page's first tile, not floating in
+     the middle of a blank page. */
   .clear {
     display: contents;
+  }
+
+  .clear :global(.empty:not(.compact)) {
+    align-items: flex-start;
+    margin-inline: 0;
+    text-align: start;
   }
 
   .main,

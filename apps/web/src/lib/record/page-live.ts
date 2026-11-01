@@ -973,7 +973,8 @@ export function tileOf(
         : quantity(r.value, r.unit),
     /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared, and a converted
        figure says as of which day's rates. */
-    note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), lowest, across].filter(Boolean).join(' · '),
+    /* THE DOT STAYS WITH THE FACT BEFORE IT (T1), so a wrapped note starts its second line with a fact, not a dot. */
+    note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), lowest, across].filter(Boolean).join('\u00a0· '),
     /* A MISSED TARGET IS AMBER, and red only on a tile its page declared `bad`: the day the cash runs out. AND CASH NOW
        UNDER NOTHING, the one figure that is red wherever it is drawn: money below nought is the thing that needs the person. */
     tone: met === null ? undefined : met ? 'good' : cell.metric === 'cash-now' && r.value < 0 ? 'bad' : missed,

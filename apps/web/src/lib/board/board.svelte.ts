@@ -48,6 +48,10 @@ export const boardWords = {
   undo: 'Undo',
   redo: 'Redo',
   addWidget: 'Add widget',
+  /** Said on Needs you's and Late's corner while editing, where the others have a remove dot (T11). */
+  alwaysOn: 'Always on Today',
+  /** The board switch's name to a screen reader, with what it shows now (T10). */
+  showing: (phone: boolean) => `Which board. Showing: ${phone ? 'Phone' : 'Laptop'}`,
   laptop: 'Laptop',
   phone: 'Phone',
   asList: 'Arrange as a list',

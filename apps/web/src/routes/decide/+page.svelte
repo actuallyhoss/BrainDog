@@ -525,8 +525,8 @@
           </Segmented>
         </div>
       {/if}
-      <!-- THE BOARD'S FIRST ROW IS MONEY, QUICK AND HANDLED SIDE BY SIDE, each where `boardOf` puts it, and what was put
-           off and decided folds under all three. -->
+      <!-- THE BOARD'S FIRST ROW IS MONEY AND QUICK SIDE BY SIDE, each where `boardOf` puts it, Handled a strip under them,
+           and what was put off and decided folds under all of it. -->
       <div
         class="body"
         data-board={columns.length > 0 ? '' : undefined}
@@ -541,7 +541,7 @@
         <PageView slug="decide" got={drawn} mode="home" select whole {reread} opens={handled ? handledColumn : undefined} />
       </div>
     {/if}
-    {#if cleared && handled}<div class="handled-alone" id="handled"><Handled found={handled} heading={GROUP_WORDS.handled} head="column" /></div>{/if}
+    {#if cleared && handled}<div class="handled-alone" id="handled"><Handled found={handled} heading={GROUP_WORDS.handled} head="strip" /></div>{/if}
 
     <!-- BRAINDOG'S OWN PAGE UPDATES, one card under the questions, for the owner. Loaded only when something waits. -->
     {#if improved && improving > 0}
@@ -601,7 +601,7 @@
   <AskSheet open={asking} onclose={() => (asking = false)} onfiled={filed} />
 
 {#snippet handledColumn()}
-  {#if handled}<div class="handled-col" id="handled"><Handled found={handled} heading={GROUP_WORDS.handled} head="column" /></div>{/if}
+  {#if handled}<div class="handled-col" id="handled"><Handled found={handled} heading={GROUP_WORDS.handled} head="strip" /></div>{/if}
 {/snippet}
 
 <style>
@@ -633,8 +633,9 @@
       grid-column: var(--col-quick);
     }
 
+    /* HANDLED IS THE STRIP UNDER THEM (T16), across the row, one line a thing with its Undo at the end. */
     .body[data-board] :global(.page:not([data-narrow]) > .page-strip[data-opens]) {
-      grid-row: 1;
+      grid-row: 2;
       grid-column: var(--col-handled);
       align-self: start;
     }
@@ -646,9 +647,12 @@
     }
 
     .body[data-board][data-led] :global(.page:not([data-narrow]) .block-slot[data-key='decide-money']),
-    .body[data-board][data-led] :global(.page:not([data-narrow]) .block-slot[data-key='decide-quick']),
-    .body[data-board][data-led] :global(.page:not([data-narrow]) > .page-strip[data-opens]) {
+    .body[data-board][data-led] :global(.page:not([data-narrow]) .block-slot[data-key='decide-quick']) {
       grid-row: 2;
+    }
+
+    .body[data-board][data-led] :global(.page:not([data-narrow]) > .page-strip[data-opens]) {
+      grid-row: 3;
     }
   }
 
@@ -656,6 +660,18 @@
      asked and its answers. */
   .body :global(.block-slot[data-key='decide-lead']) {
     padding: 0;
+  }
+
+  /* THE LEAD READS AT THE MEASURE (T17): across the page its amount stood 900px from its title. The tile still spans the
+     row; what is in it stops at 72ch, so the amount is read with the question it belongs to. */
+  .body :global(.block-slot[data-key='decide-lead'] .dc-row) {
+    max-inline-size: var(--measure, 72ch);
+  }
+
+  /* A MONEY QUESTION'S TITLE IS A QUESTION'S SIZE HERE (T18): 15 beside Quick's 17. Today's tile keeps its 15. */
+  .body :global(.dc-row > .dr-title) {
+    font-size: var(--fs-head);
+    line-height: 24px;
   }
 
   /* THE PHONE'S SWITCH: one column at a time, the others out of the way until they are chosen. On a wide board the
