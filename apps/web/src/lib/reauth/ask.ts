@@ -118,20 +118,9 @@ export async function stepUp(refusal: { fix?: string | undefined; at?: string | 
 }
 
 /**
- * For a door the client does not carry (a host route the app fetches itself): send, and on a stale-proof refusal ask
- * and send once more. `refusalOf` reads the refusal out of what `send` answered, or `null` when there is none.
- */
-export async function proving<T>(send: () => Promise<T>, refusalOf: (out: T) => { code?: unknown; at?: unknown; fix?: unknown } | null | undefined): Promise<T> {
-  const out = await send();
-  const refusal = refusalOf(out);
-  if (!isProof(refusal)) return out;
-  const said = await stepUp({ fix: typeof refusal?.fix === 'string' ? refusal.fix : undefined, at: typeof refusal?.at === 'string' ? refusal.at : undefined }, true);
-  return said.proved ? send() : out;
-}
-
-/**
- * `proving` for a door the app fetches itself and reads as a `Response`: a stale-proof refusal in its JSON is asked for
- * and the request sent once more; the caller reads whichever response came last, as it read the first.
+ * For a door the client does not carry (a host route the app fetches itself, read as a `Response`): a stale-proof
+ * refusal in its JSON is asked for and the request sent once more; the caller reads whichever response came last, as
+ * it read the first.
  */
 export async function provingFetch(send: () => Promise<Response>): Promise<Response> {
   const res = await send();
