@@ -425,8 +425,10 @@ export function methods(deps: RecordDeps) {
       (who.kind === 'person' && who.id === p.id) || (who.kind === 'group' && (kernel.groupKept(who.id)?.people ?? []).includes(p.id));
     if ((s !== null && aboutMe(s.who)) || (was !== null && aboutMe(was.who))) return { code: 'FORBIDDEN', fix: 'Only an owner can change what you can do here.', at: 'who' };
     if (s === null || s.effect !== 'allow') return null;
-    for (const l of reachOf(s, kernel.catalog()))
-      if (deps.readable(ctx, l.list) !== null || ctx.wheres?.[l.list] !== undefined || (ctx.hides?.[l.list]?.length ?? 0) > 0)
+    const catalog = kernel.catalog();
+    const kept = new Set(catalog.lists.filter((l) => l.ownerOnly === true || l.role === 'keys' || l.role === 'meets').map((l) => l.id));
+    for (const l of reachOf(s, catalog))
+      if (kept.has(l.list) || deps.readable(ctx, l.list) !== null || ctx.wheres?.[l.list] !== undefined || (ctx.hides?.[l.list]?.length ?? 0) > 0)
         return { code: 'FORBIDDEN', fix: `You can share only what you can see all of. Ask an owner to share ${l.name}.`, at: 'what' };
     return null;
   };

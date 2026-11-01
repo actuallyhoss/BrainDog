@@ -3251,10 +3251,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        gave an Admin the runs and instructions the record keeps from everybody but an owner. */
     if (args.person !== undefined && args.person === ctx.principal.id)
       return { code: 'FORBIDDEN', fix: 'Only an owner can change what you can do here.', at: 'person' };
-    /* NOR HANDS OUT A LIST THEY DO NOT READ THEMSELVES (Keys, the runs, a personal list, one the owner held from them),
-       at any level: what an Admin gives is a part of what they were given. */
+    /* NOR HANDS OUT A LIST THEY DO NOT READ THEMSELVES (the runs, a personal list, one the owner held from them), nor
+       one kept for owners (Keys, People, `owner_only`), at any level: what an Admin gives is a part of what they were given. */
     for (const list of Object.keys(args.registers ?? {}))
-      if (readable(ctx, list) !== null) return { code: 'FORBIDDEN', fix: `Only an owner can give somebody ${listName(list)}.`, at: 'registers' };
+      if (readable(ctx, list) !== null || ownerOnly(list)) return { code: 'FORBIDDEN', fix: `Only an owner can give somebody ${listName(list)}.`, at: 'registers' };
     /* AND ALL OF THIS BRAINDOG ONLY FROM AN ADMIN WHO READS ALL OF IT: one the owner held off a list, a field or some rows
        would hand that part to whoever they invited at a whole level. */
     if (args.level !== undefined && !readsAcross(ctx))
