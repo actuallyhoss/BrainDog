@@ -105,7 +105,7 @@
     <Icon name="search" size="s" />
     <input class="field-input" type="search" aria-label={words.find} placeholder={words.findHint} autocomplete="off" spellcheck="false" bind:value={query} />
   </div>
-  <Keymap silenced={!chars} only={MOST} {query} />
+  <Keymap silenced={!chars} only={MOST} {query} columns />
 </Tile>
 
 <style>

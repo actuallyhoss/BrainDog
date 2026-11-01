@@ -27,7 +27,14 @@
      the cookie is the right default. */
   /* `only` NARROWS THE SHEET TO THE KEYS NAMED, and `query` TO THE KEYS WHOSE WORDS, KEY, PLACE OR ID HOLD IT: the
      Keyboard area draws the twenty used most and finds the rest by typing. A query wins over `only`. */
-  let { silenced = pref.read().chars === false, only, query = '' }: { silenced?: boolean; only?: readonly string[] | undefined; query?: string } = $props();
+  /* `columns` (G7, additive): each place its own table, the tables in two columns where the space holds two, so the
+     Keyboard area is half as tall. Without it the sheet is the one table it was, which `?` draws. */
+  let {
+    silenced = pref.read().chars === false,
+    only,
+    query = '',
+    columns = false,
+  }: { silenced?: boolean; only?: readonly string[] | undefined; query?: string; columns?: boolean } = $props();
 
   const TITLE: Record<Scope, string> = {
     document: copy.scopeDocument,
@@ -91,30 +98,62 @@
   one x from the first row to the last. A scope's name is a header row over its rows (`scope="rowgroup"`), so a screen
   reader still hears which place a key belongs to.
 -->
-<table class="keys" aria-label={copy.keymap}>
-  {#each groups as [scope, bindings]}
-    <tbody class="scope">
-      <tr>
-        <th class="scope-title" colspan="2" scope="rowgroup"><span class="scope-name"><Icon name={GLYPH[scope]} size="s" />{TITLE[scope]}</span></th>
-      </tr>
-      {#each bindings as binding}
-        {#each rowsOf(binding) as row}
-          <tr>
-            <td class="key" class:off={silenced && binding.bare}><Kbd keys={row.key} /></td>
-            <td class="does">
-              {row.label}{#if silenced && binding.bare}<span class="tag">{copy.keymapRowOff}</span>{/if}
-            </td>
-          </tr>
-        {/each}
+{#snippet scopeRows(scope: Scope, bindings: (typeof BINDINGS)[number][])}
+  <tbody class="scope">
+    <tr>
+      <th class="scope-title" colspan="2" scope="rowgroup"><span class="scope-name"><Icon name={GLYPH[scope]} size="s" />{TITLE[scope]}</span></th>
+    </tr>
+    {#each bindings as binding}
+      {#each rowsOf(binding) as row}
+        <tr>
+          <td class="key" class:off={silenced && binding.bare}><Kbd keys={row.key} /></td>
+          <td class="does">
+            {row.label}{#if silenced && binding.bare}<span class="tag">{copy.keymapRowOff}</span>{/if}
+          </td>
+        </tr>
       {/each}
-    </tbody>
-  {/each}
-</table>
+    {/each}
+  </tbody>
+{/snippet}
+
+{#if columns}
+  <!-- A TABLE A PLACE, IN TWO COLUMNS THAT FILL DOWN: the key column keeps one width (`--key-w`) so the words in a
+       column still start at one x. -->
+  <div class="key-cols" role="group" aria-label={copy.keymap}>
+    {#each groups as [scope, bindings]}
+      <table class="keys">{@render scopeRows(scope, [...bindings])}</table>
+    {/each}
+  </div>
+{:else}
+  <table class="keys" aria-label={copy.keymap}>
+    {#each groups as [scope, bindings]}
+      {@render scopeRows(scope, [...bindings])}
+    {/each}
+  </table>
+{/if}
 
 <style>
   .keys {
     inline-size: 100%;
     border-collapse: collapse;
+  }
+
+  .key-cols {
+    columns: 2 22rem;
+    column-gap: var(--sp-7);
+  }
+
+  .key-cols > .keys {
+    break-inside: avoid;
+    margin-block-end: var(--sp-5);
+  }
+
+  .key-cols > .keys .scope-title {
+    padding-block-start: 0;
+  }
+
+  .key-cols .key {
+    min-inline-size: 5.5rem;
   }
 
   /* The space between scopes is the header row's own, above its name, so the first scope starts at the table's top. */
