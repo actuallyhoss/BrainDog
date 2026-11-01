@@ -539,7 +539,9 @@
   :global(.cards-all) {
     display: block;
     min-block-size: var(--tap);
-    margin: var(--sp-2) 0 0;
+    /* HUNG A STEP INTO THE TILE'S PADDING, as every list's rows are, so its words start on the cards' edge and only its
+       wash reaches past it. */
+    margin: var(--sp-2) 0 0 calc(-1 * var(--sp-3));
     padding: 0 var(--sp-3);
     border: 0;
     border-radius: var(--r-ctl);

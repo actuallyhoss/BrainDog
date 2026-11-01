@@ -729,10 +729,12 @@
     padding-inline: var(--gutter);
   }
 
+  /* AN AREA'S TILES SIT THE BOARD'S GAP APART, as every board's do (Look B: 12): at 24 and 32 the area read as loose
+     cards on a page rather than one board. */
   .body {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--inset);
     min-inline-size: 0;
   }
 
@@ -751,10 +753,6 @@
       grid-template-columns: 200px minmax(0, 1fr);
       column-gap: var(--sp-6);
       align-items: start;
-    }
-
-    .body {
-      gap: var(--sp-6);
     }
 
     /* THE LIST STANDING IN FOR THE INDEX HAS NO AREA BESIDE IT, so it takes the column an area would have. */
