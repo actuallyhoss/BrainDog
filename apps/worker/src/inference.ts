@@ -377,6 +377,125 @@ const unhonoured = (value: unknown, schema: JsonSchema): string | null => {
   return null;
 };
 
+/**
+ * WHETHER A VALUE KEEPS ITS SCHEMA ALL THE WAY DOWN: type, `required`, closed objects, and an array's `minItems`,
+ * `maxItems` and `items`. Only for `mendCut` below, which must hand on nothing `@braindog/slash`'s own check would refuse
+ * (`checkSchema`); `unhonoured` above stays the top-level check every whole answer gets.
+ */
+const keeps = (v: unknown, schema: JsonSchema): boolean => {
+  const t = schema['type'];
+  const kinds = typeof t === 'string' ? [t] : Array.isArray(t) ? t.filter((k): k is string => typeof k === 'string') : [];
+  if (kinds.length > 0 && !kinds.some((k) => (k === 'integer' ? typeof v === 'number' && Number.isInteger(v) : kindOf(v) === k))) return false;
+  if (Array.isArray(v)) {
+    if (typeof schema['minItems'] === 'number' && v.length < schema['minItems']) return false;
+    if (typeof schema['maxItems'] === 'number' && v.length > schema['maxItems']) return false;
+    const items = schema['items'];
+    return items === null || typeof items !== 'object' || Array.isArray(items) ? true : v.every((x) => keeps(x, items as JsonSchema));
+  }
+  if (v === null || typeof v !== 'object') return true;
+  const o = v as Record<string, unknown>;
+  const props = schema['properties'] !== null && typeof schema['properties'] === 'object' ? (schema['properties'] as Record<string, JsonSchema>) : {};
+  const required = Array.isArray(schema['required']) ? schema['required'].filter((k): k is string => typeof k === 'string') : [];
+  if (required.some((k) => !Object.hasOwn(o, k))) return false;
+  if (schema['additionalProperties'] === false && Object.keys(o).some((k) => !Object.hasOwn(props, k))) return false;
+  return Object.entries(props).every(([k, sub]) => !Object.hasOwn(o, k) || keeps(o[k], sub));
+};
+
+/** What a required key that never arrived is taken as: `null` where its schema allows it, `[]` for an array, else nothing. */
+const emptyOf = (schema: JsonSchema | undefined): { v: unknown } | null => {
+  const t = schema?.['type'];
+  const kinds = typeof t === 'string' ? [t] : Array.isArray(t) ? t : [];
+  if (kinds.includes('null')) return { v: null };
+  if (kinds.includes('array')) return { v: [] };
+  return null;
+};
+
+/**
+ * A REPLY CUT OFF AT ITS CEILING, MENDED WHERE WHAT ARRIVED IS WHOLE UP TO A VALUE (1 Nov, a live first run): the
+ * conversation's turn stopped at its ceiling one key short of the end, and the whole answer was refused for the half
+ * question at its tail. The text is cut back to the last value that closed (never a half string: a question cut mid-word
+ * is no question), the open objects and arrays are closed, a required key that never came is taken as `null` or `[]`
+ * where its schema allows that, and the result is kept only if it keeps the schema all the way down (`keeps`). Earlier
+ * cuts are tried in turn, so a pair cut after its first half falls back to the pair before it. `null` where nothing
+ * whole can be made, and then the refusal stands as before.
+ */
+export function mendCut(text: string, schema: JsonSchema): string | null {
+  type Open = { kind: 'obj' | 'arr'; key: boolean };
+  const stack: Open[] = [];
+  const cuts: { at: number; close: string }[] = [];
+  const closers = (): string => stack.map((o) => (o.kind === 'obj' ? '}' : ']')).reverse().join('');
+  /* A VALUE CLOSED INSIDE A CONTAINER IS A PLACE THE TEXT MAY BE CUT. */
+  const closed = (at: number): void => {
+    const top = stack.at(-1);
+    if (top === undefined) return;
+    if (top.kind === 'obj') top.key = false;
+    cuts.push({ at, close: closers() });
+  };
+  let i = 0;
+  while (i < text.length) {
+    const c = text.charAt(i);
+    if (c === '"') {
+      let j = i + 1;
+      while (j < text.length && text.charAt(j) !== '"') j += text.charAt(j) === '\\' ? 2 : 1;
+      if (j >= text.length) break;
+      const top = stack.at(-1);
+      /* A KEY IS NO VALUE: the colon and its value are still to come. */
+      if (top?.kind === 'obj' && top.key) top.key = false;
+      else closed(j + 1);
+      i = j + 1;
+      continue;
+    }
+    if (c === '{' || c === '[') {
+      stack.push({ kind: c === '{' ? 'obj' : 'arr', key: c === '{' });
+      cuts.push({ at: i + 1, close: closers() });
+      i += 1;
+      continue;
+    }
+    if (c === '}' || c === ']') {
+      stack.pop();
+      if (stack.length === 0) return null;
+      closed(i + 1);
+      i += 1;
+      continue;
+    }
+    if (c === ',') {
+      const top = stack.at(-1);
+      if (top?.kind === 'obj') top.key = true;
+      i += 1;
+      continue;
+    }
+    if (/[-0-9tfn]/u.test(c)) {
+      const m = /^(?:-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)/u.exec(text.slice(i));
+      if (m === null || i + m[0].length >= text.length) break;
+      i += m[0].length;
+      closed(i);
+      continue;
+    }
+    i += 1;
+  }
+  const props = schema['properties'] !== null && typeof schema['properties'] === 'object' ? (schema['properties'] as Record<string, JsonSchema>) : {};
+  const required = Array.isArray(schema['required']) ? schema['required'].filter((k): k is string => typeof k === 'string') : [];
+  for (const cut of cuts.reverse().slice(0, 64)) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text.slice(0, cut.at).replace(/,\s*$/u, '') + cut.close);
+    } catch {
+      continue;
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+    const o = { ...(parsed as Record<string, unknown>) };
+    let whole = true;
+    for (const k of required) {
+      if (Object.hasOwn(o, k)) continue;
+      const e = emptyOf(props[k]);
+      if (e === null) whole = false;
+      else o[k] = e.v;
+    }
+    if (whole && keeps(o, schema)) return JSON.stringify(o);
+  }
+  return null;
+}
+
 /** A count the platform may have omitted. Absent is zero, and zero makes no claim about truncation. */
 const count = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
@@ -627,11 +746,18 @@ export function aiInference(env: AiEnv, deps: AiDeps = {}): StreamingInference {
        OF THE CEILING WAS THINKING where the platform counted it (`Effort`): a reasoning row spends
        its ceiling on both, and the two send a reader to different places again, the effort or the
        size of what was asked for. */
-    if (cutOff ?? (usage.out > 0 && usage.out >= req.maxTokens))
+    if (cutOff ?? (usage.out > 0 && usage.out >= req.maxTokens)) {
+      /* MENDED WHERE IT CAN BE (`mendCut`), and said once in the log, so a ceiling that keeps being reached is still seen. */
+      const mended = mendCut(text, req.schema);
+      if (mended !== null) {
+        deps.log?.(`ai: ${req.model} stopped at the ${req.maxTokens}-token ceiling and was mended to the last whole value`);
+        return ok({ text: mended, model: rate.provider, usage });
+      }
       return schemaFailed<Completion>(
         req.model,
         `it stopped at the ${req.maxTokens}-token ceiling${thought > 0 ? `, ${thought} of them its reasoning` : ''}, so what came back is the beginning of a document rather than one`,
       );
+    }
 
     let parsed: unknown;
     try {

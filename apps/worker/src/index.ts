@@ -666,6 +666,12 @@ export class Record$ extends DurableObject<Env> {
    */
   /** Slash's door, built on the first ask and kept, because the engine it holds writes its own tables. */
   #slash: SlashAskDoor<CallContext> | undefined;
+  /**
+   * THE SLASH CALLS IN FLIGHT, as `POST /api/slash/setup`, newest last: a model that failed under one is logged against it
+   * (`#modelFailed`). Workers Logs files a line by the request the object was serving when it was written, and on 1 November
+   * the first run's turn that broke its ceiling was filed under `GET /api/version`, the poll that woke the object meanwhile.
+   */
+  #slashRoutes: string[] = [];
 
   /**
    * What answers an automation's question to Slash from this object's alarm, or `undefined` where there is no model.
@@ -1434,6 +1440,8 @@ export class Record$ extends DurableObject<Env> {
       {
         op: 'model',
         rec,
+        /* THE SLASH CALL IT FAILED UNDER, where one is in flight; a model job's failure from the alarm has none. */
+        route: this.#slashRoutes.at(-1) ?? null,
         model: fail.model,
         provider: fail.provider || null,
         why: fail.why,
@@ -2458,7 +2466,14 @@ export class Record$ extends DurableObject<Env> {
       );
       /* `GET /api/slash/health` READS THE SAME LEDGER THE RECORD'S `engineHealth` DOES, so Settings and a read token are
          told one thing. Handed per request, since `#open` sets it and the door is built before it may be read. */
-      return serveSlash(request, { ...this.#slash, health: this.#engineHealth }, ctx);
+      const asking = `${request.method} ${new URL(request.url).pathname}`;
+      this.#slashRoutes.push(asking);
+      try {
+        return await serveSlash(request, { ...this.#slash, health: this.#engineHealth }, ctx);
+      } finally {
+        const at = this.#slashRoutes.lastIndexOf(asking);
+        if (at >= 0) this.#slashRoutes.splice(at, 1);
+      }
     }
 
     /* SLASH'S DAILY LOOK, beside the answer and not in its way: the record says whether it is due, at most once a UTC day.
