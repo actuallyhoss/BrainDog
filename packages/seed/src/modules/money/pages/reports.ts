@@ -30,12 +30,17 @@ const BACK = 'on after -13m, on before +1d';
 
 /** Reports' Health tile, drawn with its "In other currencies" cell only while some cash is in another currency. */
 const HEALTH = { kind: 'stat', heading: 'Health', icon: 'heart-pulse', span: 12 };
-const HEALTH_CELLS = [
-  { metric: 'kept-share-90d', label: 'Kept, 90 days' },
-  { metric: 'spent-30d', label: 'Spent, last 30 days' },
-  { metric: 'received-30d', label: 'Received, last 30 days' },
-  { metric: 'lasts-no-income', label: 'Lasts with no income' },
-];
+/**
+ * HOW LONG IT LASTS AND WHAT WAS KEPT, SINCE money-core 3.34.0 (next-money, M25, M26): four figures in a grid, two of them
+ * the 30 days spent and received that the Ledger heads its page with, and the kept rate's "At least 20%" in grey under a
+ * −43.9% drawn in amber. Now the two figures this page alone says, the kept rate's line said as a sentence, and below
+ * nought the kept rate is red: the tile's tone is bad only while it is, so a rate between nought and a fifth stays amber.
+ */
+const KEPT = { metric: 'kept-share-90d', label: 'Kept, 90 days', note: 'Keep at least a fifth of what comes in' };
+const LASTS_CELL = { metric: 'lasts-no-income', label: 'Lasts with no income' };
+const HEALTH_CELLS = [KEPT, LASTS_CELL];
+const KEPT_BELOW_NOUGHT = { metric: 'kept-share-90d', lt: 0 };
+const KEPT_NOUGHT_OR_MORE = { any: [{ metric: 'kept-share-90d', gte: 0 }, { metric: 'kept-share-90d', empty: true }] };
 
 /**
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: where the money came from and where it went.
@@ -112,11 +117,18 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       when: { all: [{ metric: 'out-by-month', gt: 0 }, { metric: 'cash-foreign-share', gt: 0 }] },
     },
     {
+      /* AND KEPT BELOW NOUGHT, IN THE DANGER COLOUR (next-money, M25): more went out than came in over the quarter. */
+      ...HEALTH,
+      tone: 'bad',
+      cells: HEALTH_CELLS,
+      when: { all: [{ metric: 'out-by-month', gt: 0 }, { any: [{ metric: 'cash-foreign-share', lte: 0 }, { metric: 'cash-foreign-share', empty: true }] }, KEPT_BELOW_NOUGHT] },
+    },
+    {
       /* AND WITH NOTHING IN ANOTHER CURRENCY, NO "In other currencies 0%", BEFORE money-core 3.33.0 SHIPPED (design pass
          of 1 November, M24): a share of nothing is no figure. The same tile, its last cell left off. */
       ...HEALTH,
       cells: HEALTH_CELLS,
-      when: { all: [{ metric: 'out-by-month', gt: 0 }, { any: [{ metric: 'cash-foreign-share', lte: 0 }, { metric: 'cash-foreign-share', empty: true }] }] },
+      when: { all: [{ metric: 'out-by-month', gt: 0 }, { any: [{ metric: 'cash-foreign-share', lte: 0 }, { metric: 'cash-foreign-share', empty: true }] }, KEPT_NOUGHT_OR_MORE] },
     },
     {
       /* WHAT IS ALREADY PROMISED, IN ONE PLAIN LINE UNDER HEALTH (round 1030): repeating bills and instalments as a share

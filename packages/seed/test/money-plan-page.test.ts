@@ -350,19 +350,19 @@ test('the summary says paid in, left and what is late, and the track the next pa
   assert.deepEqual((cellOf(blocks, 'plan-late') as Cell & { target?: unknown }).target, { lte: 0 });
 });
 
-test('the chart adds up what was paid each quarter as it goes', async () => {
+/* NO CHART OF WHAT WAS PAID IN ALL, SINCE money-core 3.34.0: Where it stands and its track say what is paid, so the
+   chart said one figure a third time. The figure it read stays declared. */
+test('no chart adds up what was paid each quarter: the summary and its track say what is paid', async () => {
   const k = await moneyCore();
   value(k.create('plans', { name: 'Flat' }, OWNER));
   const days = ['2025-11-01', '2026-02-01', '2026-03-01', '2026-08-01', '2026-11-01'];
   days.forEach((day, i) =>
     value(k.create('installments', { what: `Flat, part ${i + 1}`, plan: 'Flat', number: i + 1, direction: 'out', amount: egp(PART), due: day, state: i < 4 ? 'paid' : 'open' }, OWNER)),
   );
-  const chart = headed(drawn(pageOf(k, 'Flat')), 'Paid in all, over time') as Block & { bars?: { keys: string[]; values: (number | null)[][]; unit: string } };
-  assert.equal(chart.kind, 'series');
-  assert.deepEqual(chart.bars!.keys, ['2025-Q4', '2026-Q1', '2026-Q2', '2026-Q3']);
-  /* ONE, THEN TWO MORE, NOTHING IN THE SECOND QUARTER, AND ONE MORE: the total so far, never what one quarter paid. */
-  assert.deepEqual(chart.bars!.values, [[PART, 3 * PART, 3 * PART, 4 * PART]]);
-  assert.equal(chart.bars!.unit, 'EGP');
+  const blocks = drawn(pageOf(k, 'Flat'));
+  assert.equal(blocks.some((b) => b.kind === 'series'), false, 'a chart of what was paid in all is drawn');
+  assert.equal((MONEY_PLAN_PAGE.blocks as { kind?: string }[]).some((b) => b.kind === 'series'), false);
+  assert.ok('plan-paid-by-quarter' in PLAN_PAGE_FIGURES);
 });
 
 test('where the Property add-on holds the plan, the lead sends to it, and nothing here says its worth', () => {

@@ -57,7 +57,8 @@ const lastWeekday = (day, wd) => {
   while (weekday(d) !== wd) d = plus(d, -1);
   return d;
 };
-const said = (day) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(toMs(day)));
+/* "SEP", NEVER THE "SEPT" en-GB WRITES (next-money, M42): every other screen says "27 Sep". */
+const said = (day) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(toMs(day))).replace('Sept', 'Sep');
 /** Today in a zone, as the record's own day. */
 export const todayIn = (tz, now = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 

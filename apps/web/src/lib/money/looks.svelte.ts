@@ -7,7 +7,6 @@
 import { page } from '$app/state';
 
 import { apiBase } from '../at.ts';
-import { wordSlot } from 'braindog-render';
 
 import { createClient } from '@braindog/client';
 
@@ -103,11 +102,17 @@ class Held {
     return categoryLook(n, held);
   }
 
-  /** Who was paid, as an initial on their own steady colour; money with no name keeps no chip. */
+  /**
+   * Who was paid, as a shop's glyph in the quiet ink; money with no name keeps no chip.
+   *
+   * NOT AN INITIAL IN A CATEGORY'S HUE (next-money, M27): Paid most and Money in by who paid drew "G", "N", "H" on the
+   * colours that mean a category everywhere else in Money, so a payee read as a category it was not, and the letters as
+   * decoration. A payee has no colour of its own; the glyph says the row is somebody paid.
+   */
   payee(name: string): Look | null {
     const n = name.trim();
-    if (n === '' || /^no name/iu.test(n)) return null;
-    return { glyph: '', slot: wordSlot(n) };
+    if (n === '' || /^no name|^not named/iu.test(n)) return null;
+    return { glyph: 'store', slot: null };
   }
 
   /** An account's chip by its name, where the record holds that account; null for any other label. */

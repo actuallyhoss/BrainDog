@@ -51,7 +51,17 @@ test('EACH PAGE OPENS ON ITS LINE, holds no more than a page may, and stands six
     /* THE BUDGETS BY PERIOD ARE ONE TILE (money-core 3.31.0): a week's and a year's draw only while such a budget is set,
        beside the month's, as one list of budgets cut by its period. */
     const period = (b: Block) => b.kind === 'progress' && /^This (week|year)'s budgets$/u.test(b.heading ?? '');
-    const above = (fold < 0 ? blocks : blocks.slice(0, fold)).filter((b) => !b.lead && b.kind !== 'section' && !period(b));
+    /* AND A STAT DECLARED SEVERAL WAYS UNDER ONE HEADING IS ONE TILE: Reports' Health is drawn one of three ways (since
+       money-core 3.34.0), by whether some cash is in another currency and whether the kept rate is below nought, and
+       only one is ever drawn. */
+    const seen = new Set<string>();
+    const once = (b: Block): boolean => {
+      if (b.kind !== 'stat' || b.heading === undefined) return true;
+      if (seen.has(b.heading)) return false;
+      seen.add(b.heading);
+      return true;
+    };
+    const above = (fold < 0 ? blocks : blocks.slice(0, fold)).filter((b) => !b.lead && b.kind !== 'section' && !period(b)).filter(once);
     assert.ok(above.length <= 6, `${slug} stands ${above.length} tiles before its fold`);
     for (const b of blocks) if (b.heading !== undefined) assert.match(String(b.icon), /^[a-z][a-z0-9-]*$/u, `${slug}: ${b.heading} wears no glyph`);
     const read = blocks.flatMap((b) => [b.heading, b.body, b.empty, b.unset, ...(b.cells ?? []).flatMap((c) => [c.label, c.note])]).filter((t): t is string => typeof t === 'string');
@@ -104,7 +114,7 @@ test('A BUDGET IS OFFERED FROM LAST MONTH, rounded up to a step a person types, 
   )!;
   assert.equal(ask.cause, 'money.budgets.2026-10');
   assert.equal(ask.about, 'Budgets');
-  assert.equal(ask.question, 'Use these monthly budgets? Groceries EGP 4,500 and Outings EGP 2,000.');
+  assert.equal(ask.question, 'Use 2 monthly budgets, EGP 6,500 a month in all? Groceries EGP 4,500 and Outings EGP 2,000.');
   assert.deepEqual(ask.options.map((o) => o.label), ['Use these', 'Not now']);
   assert.match(ask.options[0]!.because, /1 spent in another currency is left for you to set/u);
   assert.deepEqual(ask.options[0]!.patches, [
@@ -200,7 +210,9 @@ async function spending() {
 test('BUDGETS SETS EACH BUDGET AGAINST THIS MONTH, and names the money no category holds with the way to file it', async () => {
   const m = await spending();
   const lead = m.page('money-budgets').find((b) => b.lead && b.drawn !== false)!;
-  assert.equal(lead.body, '{{budgets-total}} a month across {{budgets-set}} categories.');
+  /* AND THE MONTH SO FAR SINCE money-core 3.34.0, where a This month stat said the two figures under the bars. */
+  assert.equal(lead.body, '{{budgets-total}} a month across {{budgets-set}} categories. {{spent-by-category-month}} spent this month, {{spent-last-month}} last month.');
+  assert.equal(m.page('money-budgets').some((b) => b.heading === 'This month'), false, 'a This month stat says the line again');
   assert.deepEqual(lead.values?.['budgets-total'], egp(5_000));
 
   /* HEADED BY ITS PERIOD SINCE money-core 3.32.0: a monthly budget is under This month's budgets. */

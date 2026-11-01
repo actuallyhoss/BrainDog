@@ -817,6 +817,14 @@
   /* THE TITLE IS THE HEAD, SO IT IS NOT A FACT AS WELL. It is listed only while it is empty, when "Add a field" is the
      way to it, or while the head's Edit has it open, when its row holds the box. */
   const titled = $derived(Boolean(decl && row && !unsetValue(row.fields[decl.title])));
+  /* A LEDGER LINE IS HEADED BY WHO IT WAS PAID TO OR FROM (next-money, M38), as the Ledger draws it: its page said
+     "Rent", the line's description, over "As the bank wrote it HARBOR PROPERTY MGMT". The description is still a field
+     under it; a line nobody named keeps its description. */
+  const lineHead = $derived.by(() => {
+    if (id !== 'transactions' || !row) return null;
+    const payee = row.fields.payee;
+    return typeof payee === 'string' && payee.trim() !== '' ? rowNameSaid(id, payee) : null;
+  });
   const listed = $derived(shortFields.filter((f) => !leadIds.has(f.id) && (f.id !== decl?.title || !titled || editing === f.id)));
 
   /* AN EMPTY FIELD IS NOT DRAWN. A person with four unset fields was a column of four "Not set" rows, then a row of
@@ -1402,7 +1410,7 @@
        person's name read as a crowd. -->
   {#snippet personWell()}<Face name={String(row?.fields[decl?.title ?? ''] ?? '')} kind="person" you={self && owner} size="l" />{/snippet}
   <div class="row-head">
-  <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : rowNameSaid(id, String(row.fields[decl.title] ?? ''))} sentence={headLine} well={meets ? personWell : undefined}>
+  <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : (lineHead ?? rowNameSaid(id, String(row.fields[decl.title] ?? '')))} sentence={headLine} well={meets ? personWell : undefined}>
     {#snippet actions()}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER. A row's page led with a developer verb: the first control a
            person saw on an invoice was the one that puts `obligations#1` on the clipboard, ahead of anything that does

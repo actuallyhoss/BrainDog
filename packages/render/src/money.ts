@@ -361,6 +361,9 @@ export function moneyWhole(minor: bigint | number, currency: string, home: strin
   const unit = 10n ** BigInt(exponentOf(currency));
   const m = BigInt(minor);
   const size = m < 0n ? -m : m;
+  /* UNDER A THOUSAND THE CENTS ARE SAID WHERE THEY ARE NOT NOUGHT (the one rule for cents, 1 Nov): "$148.85 to pay on the
+     card", where "$149" stood beside the card's own $148.85. From a thousand up the figure is whole. */
+  if (size < 1000n * unit && size % unit !== 0n) return writeAmount({ minor: m, currency }, home, 'exact');
   const rounded = ((size + unit / 2n) / unit) * unit;
   return writeAmount({ minor: m < 0n ? -rounded : rounded, currency }, home, 'read');
 }

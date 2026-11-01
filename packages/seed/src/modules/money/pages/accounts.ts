@@ -11,6 +11,10 @@ import { CONFIRMED_COLUMN, CONFIRMED_STALE } from './parts/ages.ts';
  */
 const ACCOUNT_CARD = [
   { field: 'name', as: 'title' },
+  /* WHAT IT HOLDS, ON ITS OWN CARD, SINCE money-core 3.34.0 (next-money, M12): the balances were one tile and these cards,
+     with no balance, another, so the same three accounts were listed twice. The card says its balance, its last four and
+     the day the bank last said it, as a book's account card does (`book.ts`). */
+  { field: 'balance', as: 'figure' },
   { field: 'last4', label: 'Ending in', as: 'fact' },
   { field: 'book', label: 'Book', as: 'fact' },
   CONFIRMED_COLUMN,
@@ -48,7 +52,9 @@ export const accountsPage = (_declared: (figure: string) => boolean): SeedPage =
         kind: 'note',
         lead: true,
         span: 12,
-        body: '{{accounts-open}} open account(s), with {{cash-now.apart}} in cash.',
+        /* AND WHAT IS TO PAY ON THE CARD, SINCE money-core 3.34.0 (next-money, M13): it was a cell of a stat drawn on every
+           record, beside "Out of date 0". The clause goes whole while no card says it (`leadOf`). */
+        body: '{{accounts-open}} open account(s), with {{cash-now.apart}} in cash. {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.',
       },
       {
         /* A STRIPE BALANCE BELOW ZERO, SAID (audit Z18): what it is and what happens to it, one line, only while one is. */
@@ -66,27 +72,16 @@ export const accountsPage = (_declared: (figure: string) => boolean): SeedPage =
         heading: 'All accounts',
         icon: 'landmark',
         span: 12,
+        /* ONLY WHILE A BALANCE IS OUT OF DATE, SINCE money-core 3.34.0 (next-money, M13): with every balance current it
+           was a grid saying "Out of date 0", and the card's amount is the line's. Amber, as a thing to look at. */
+        tone: 'warn',
         cells: [
-          { metric: 'card-to-pay', label: 'To pay on the card' },
-          { metric: 'cash-as-of', label: 'Oldest balance' },
           { metric: 'balances-stale', label: 'Out of date', note: 'Balances older than a week' },
+          { metric: 'cash-as-of', label: 'Oldest balance' },
         ],
+        when: { metric: 'balances-stale', gt: 0 },
       },
-      {
-        /* WHAT EACH HOLDS NOW, by the bank's newest word and every line after it, each in its own currency.
-
-           ONE TILE OF ACCOUNTS, BEFORE money-core 3.33.0 SHIPPED (design pass of 1 November, M26): a Ledger total tile
-           listed the same accounts beside this one, and a whole tile of prose said why the two could differ. What an
-           account's lines add up to, and what the bank counted that the Ledger has no line for, is the account's own
-           page (`account.ts`), which says it by how much. */
-        kind: 'bar',
-        heading: 'Balance',
-        icon: 'wallet',
-        span: 12,
-        source: 'metric.cash-by-account',
-        limit: 12,
-        when: { metric: 'cash-accounts', gt: 0 },
-      },
+      /* NO "BALANCE" BAR, SINCE money-core 3.34.0 (next-money, M12): each account's card says what it holds. */
       {
         /* EVERY OPEN ACCOUNT, BY KIND: Bank, Cash and Card, each card opening the account's own page. */
         kind: 'cards',

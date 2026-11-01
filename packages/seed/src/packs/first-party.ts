@@ -928,12 +928,18 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   figure, `metric.tasks-this-week-yours` among them, and on `page.work`), and the field reads "Assigned to" where it
  *   read "Owner" (`register.tasks`). A condition and words, nothing added or taken away; a minor step, since what a
  *   figure counts changes on a record more than one person holds.
+ * - money-core 3.34.0 (next-money, 1 Nov, every Money NEXT item of the pages plan): what is late is said both ways in
+ *   Money's first line and Heads up's lines stand under the hero (`page.money`); Coming up is one table grouped by
+ *   stretch (`page.money-coming`, `group: when` over deadlines); Accounts one card an account (`page.money-accounts`);
+ *   the account, bill, book, plan, budgets, forecast, reports, payees and filing rules pages say each figure once; and a
+ *   payee names list (`register.payee_names`, `rule.payee-named-back`, `script.name_payees`). Ids added, none taken
+ *   away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.30.2',
   people: '4.2.2',
-  'money-core': '3.33.0',
+  'money-core': '3.34.0',
   estate: '2.7.0',
   work: '1.22.0',
 };

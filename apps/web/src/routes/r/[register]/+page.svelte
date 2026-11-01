@@ -1262,9 +1262,23 @@
        it the stored set means the reverse: in the set, drawn. */
     columnsFor(id, decl, hidden.has('seq'))
       .filter((c) => c.field === 'seq' || !hidden.has(c.field))
+      .filter((c) => !sameOnEvery(c.field))
       .map((c) => weighed(c, c.field === decl?.title, result.entries))
       .map((c) => ((anyLate || lateSeen) && c.field === deadlineOf(decl) ? { ...c, width: '27ch' } : c)),
   );
+
+  /**
+   * A CHOICE THAT SAYS THE SAME ON EVERY ROW IS NOT DRAWN AS A COLUMN (next-money, M39): Repeating and Categories drew
+   * "Live" down every row, a column that told nothing apart. Only a choice field (its status among them), never the
+   * title, and only over three rows or more in hand, so a short list keeps its columns. Display still lists it.
+   */
+  function sameOnEvery(field: string): boolean {
+    if (!decl || field === decl.title || result.entries.length < 3) return false;
+    const spec = decl.fields.find((f) => f.id === field);
+    if (spec?.type !== 'enum') return false;
+    const first = result.entries[0]?.fields[field];
+    return typeof first === 'string' && first !== '' && result.entries.every((e) => e.fields[field] === first);
+  }
 
   /* THE MONEY COLUMNS WHERE EVERY AMOUNT IN HAND IS WHOLE, which the table draws without their ".00" (`wholeMoney`). */
   const wholeColumns = $derived(wholeMoney(decl, result.entries));

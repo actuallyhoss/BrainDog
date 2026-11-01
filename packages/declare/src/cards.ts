@@ -67,6 +67,9 @@ export function cardsFault(page: string, body: unknown, registers: ReadonlyMap<s
     if (typeof field !== 'string' || !FIELD_ID.test(field))
       return no<never>('DECLARATION_INVALID', `${said} groups by ${JSON.stringify(field)}. Group names one field of the list, such as group: client.`, { at: `${at}.group` });
     const source = typeof block.source === 'string' ? block.source : '';
+    /* A TABLE OVER WHAT FALLS DUE GROUPS BY ITS ONE WORD, `when`, the stretch each day is in (the kernel's
+       `sources/deadlines.ts`), which the record checks where it reads the block. */
+    if (!cards && source === 'deadlines' && field === 'when') continue;
     if (!source.startsWith('register.'))
       return no<never>(
         'DECLARATION_INVALID',

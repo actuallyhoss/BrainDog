@@ -2121,7 +2121,7 @@ function calendar(b: Block, o: RenderOptions): string {
   const skipped = plan.skipped.length ? `<p class="calendar-skipped">${escape(calendarSkipped(plan.skipped.map((i) => said(b.rows[i]!, 0) || MISSING)))}</p>` : '';
   if (plan.empty) return `<div class="calendar"><p class="calendar-empty">${escape(CALENDAR_NONE)}</p>${skipped}</div>`;
   /* EACH ROW'S AMOUNT, its third cell, as one set (`barFigures`), said in the agenda after its title. */
-  const amounts = barFigures(b.rows.map((r) => (r.cells[2] ?? '').trim()), o.home);
+  const amounts = barFigures(b.rows.map((r) => (r.cells[2] ?? '').trim()), o.home, true);
   const amount = (r: Row): string => {
     const a = amounts[b.rows.indexOf(r)];
     return a ? `<span class="calendar-amount num">${escape(a)}</span>` : '';
@@ -2164,7 +2164,7 @@ function calendar(b: Block, o: RenderOptions): string {
 function calendarStrip(b: Block, o: RenderOptions, weeks: number): string {
   const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
   const plan = calendarStripPlan(b.rows, roadmapToday(o.now), weeks, o.day);
-  const amounts = barFigures(b.rows.map((r) => (r.cells[2] ?? '').trim()), o.home);
+  const amounts = barFigures(b.rows.map((r) => (r.cells[2] ?? '').trim()), o.home, true);
   const amount = (r: Row): string => {
     const a = amounts[b.rows.indexOf(r)];
     return a ? `<span class="calendar-amount num">${escape(a)}</span>` : '';

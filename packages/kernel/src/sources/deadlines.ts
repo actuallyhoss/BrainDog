@@ -46,6 +46,29 @@ const DEADLINES: Schema = {
   },
 };
 
+/**
+ * THE ONE WORD A TABLE OVER WHAT FALLS DUE MAY GROUP BY: `when`, the stretch a row's day is in, counted from the record's
+ * own today. Late, the next seven days, the seven after them, and later. Coming up drew those as four tables that said
+ * "What When Amount" four times (next-money, M17); grouped, they are one table with a heading each, in that order,
+ * which is the order the rows are read in (overdue first and then by day), so a group stands where its first row does.
+ */
+export const DEADLINES_GROUP = 'when' as const;
+
+/** Each stretch's value and words, and the first day after it, in days from today (`null`: no end). */
+const STRETCHES: readonly { value: string; name: string; before: number | null }[] = [
+  { value: 'late', name: 'Late', before: 0 },
+  { value: 'week', name: 'Next 7 days', before: 7 },
+  { value: 'after', name: 'The 7 days after', before: 14 },
+  { value: 'later', name: 'Later', before: null },
+];
+
+/** The stretch a day is in, counted from `today` (both `YYYY-MM-DD`). */
+function stretchOf(day: string, today: string): { value: string; name: string } {
+  const ahead = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  const s = STRETCHES.find((x) => x.before === null || ahead < x.before)!;
+  return { value: s.value, name: s.name };
+}
+
 /** Which field of a list is what falls due in money, and which way a row of it moves. */
 type MoneyWay = { amount: string | null; way: (fields: Record<string, Json>) => 'in' | 'out' | null };
 
@@ -245,7 +268,11 @@ function deadlinesBlock(deps: PageDeps, block: PageBlock, base: BlockResult, als
   found.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.list < b.list ? -1 : a.list > b.list ? 1 : a.seq - b.seq));
   const kept = found.map((f) => f.entry).filter((e) => evaluate(said.predicate, e.fields, DEADLINES));
   /* WITH NO `where` THE COUNT IS EVERY ROW DUE, as each list counted them; with one it is the rows read that it kept. */
-  return { ...base, rows: kept.slice(0, limit), matched: said.predicate === undefined ? counted : kept.length };
+  const rows = kept.slice(0, limit);
+  /* GROUPED BY THE STRETCH EACH DAY IS IN, where the block says `group: when` (`DEADLINES_GROUP`), each row saying its
+     own as a grouped table's row does (`PageRow.group`), so a host draws the headings where it draws any table's. */
+  const grouped = block.group === DEADLINES_GROUP ? rows.map((r) => ({ ...r, group: stretchOf(String(r.fields.day), today) })) : rows;
+  return { ...base, rows: grouped, matched: said.predicate === undefined ? counted : kept.length };
 }
 
 export const deadlines: Source = { first: true, read: deadlinesBlock };

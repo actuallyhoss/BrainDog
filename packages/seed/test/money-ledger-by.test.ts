@@ -144,10 +144,13 @@ test('THE WRITTEN LINE COUNTS THE DAY, from the two figures over who made the en
   assert.doesNotMatch(text, /[—–]/u);
   assert.doesNotMatch(text, /\b(rows?|entity|entities|list items?)\b/iu);
 
-  const { tile } = await sample();
-  const drawn = tile();
+  const { k, tile } = await sample();
+  /* MONEY'S HOME DRAWS THE TILE WITH NO WRITTEN LINE, SINCE money-core 3.34.0: the line stays declared on the part, for a
+     page that wants the day's count, so it is the part that is drawn here. */
+  assert.notEqual(tile().drawn, false);
+  assert.equal((tile() as { body?: unknown }).body, undefined, "Money's home says how many came in today again");
+  const drawn = k.block(LEDGER[0] as never) as unknown as Tile;
   assert.deepEqual(drawn.refusals, []);
-  assert.notEqual(drawn.drawn, false);
   /* THREE WERE MADE TODAY, AND TWO OF THEM FOR HER: the bank add-on's two. The one a rule filed after is the bank
      add-on's still, because an entry counts once, under whoever made it. */
   assert.deepEqual(drawn.values, { 'filed-today': 3 });

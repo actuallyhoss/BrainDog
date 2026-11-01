@@ -77,10 +77,15 @@ export function budgetOffer(categories, entries, home, month, last) {
   const each = kept.map((o) => `${o.name} ${said(o.limit, o.currency, exp(o.currency))}`);
   const listed = each.length > 4 ? `${each.slice(0, 4).join(', ')} and ${each.length - 4} more` : each.length > 1 ? `${each.slice(0, -1).join(', ')} and ${each.at(-1)}` : each[0];
   const one = kept.length === 1;
+  /* HOW MANY AND WHAT THEY COME TO, FIRST, SINCE money-core 3.34.0 (next-money, M21): Budgets drew the question cut short,
+     "Use these monthly budgets? Supplies USD 3,500,…" and then "Read all", so the count and the total were never read. They
+     lead now, and the list follows. Every offer is in one currency (a category spent in another is left out above). */
+  const total = kept.reduce((n, o) => n + o.limit, 0);
+  const all = said(total, kept[0].currency, exp(kept[0].currency));
   const left = apart === 0 ? '' : ` ${apart} spent in another currency ${apart === 1 ? 'is' : 'are'} left for you to set.`;
   return {
     cause: `money.budgets.${month}`,
-    question: one ? `Give ${kept[0].name} a budget of ${each[0].slice(kept[0].name.length + 1)} a month?` : `Use these monthly budgets? ${listed}.`,
+    question: one ? `Give ${kept[0].name} a budget of ${each[0].slice(kept[0].name.length + 1)} a month?` : `Use ${kept.length} monthly budgets, ${all} a month in all? ${listed}.`,
     about: 'Budgets',
     options: [
       {

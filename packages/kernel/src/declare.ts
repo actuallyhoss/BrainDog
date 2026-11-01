@@ -77,6 +77,7 @@ import { restatesFault } from './restates.ts';
 import { WALKS, WALK_SOURCE, crosscheckFault, isCrosscheck, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
 import { INDEX_CEILING } from './observe.ts';
 import { SOURCE_MODULES, sourceModule } from './sources/index.ts';
+import { DEADLINES_GROUP } from './sources/deadlines.ts';
 import { cardFactFault } from './card-facts.ts';
 
 /**
@@ -1568,6 +1569,11 @@ function cardGroupFault(id: string, at: string, block: Readonly<Record<string, u
   }
   if (typeof group !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/u.test(group))
     return bad('DECLARATION_INVALID', `${id}.${at}'s group is ${JSON.stringify(group)}; it names one link, choice or the state of the list the ${what} are over.`, `${at}.group`);
+  /* A TABLE OVER WHAT FALLS DUE GROUPS BY ITS ONE WORD, the stretch each day is in (`sources/deadlines.ts`). */
+  if (!cards && source === 'deadlines') {
+    if (group === DEADLINES_GROUP) return null;
+    return bad('DECLARATION_INVALID', `${id}.${at} groups what falls due by ${group}; it groups by ${DEADLINES_GROUP}, the stretch each day is in.`, `${at}.group`, [DEADLINES_GROUP]);
+  }
   const list = typeof source === 'string' && source.startsWith('register.') ? source.slice('register.'.length) : null;
   if (list === null)
     return bad('DECLARATION_INVALID', `${id}.${at} groups by ${group}, and only ${what} over a list are grouped: give it source: register.<id>.`, `${at}.group`);

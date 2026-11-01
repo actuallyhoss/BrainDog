@@ -109,6 +109,21 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
         { metric: 'received-30d', label: 'Received' },
         { metric: 'filed-for-you-30d', label: 'Added for you' },
       ],
+      /* "ADDED FOR YOU" ONLY ABOVE NOUGHT, SINCE money-core 3.34.0 (next-money, M7): "Added for you 0" stood beside Spent
+         and Received on every record nothing brought lines into, a third of the tile saying nothing happened. A stat's
+         `when:` is the block's, so it is one tile for each case, as a plan's summary is. */
+      when: { metric: 'filed-for-you-30d', gt: 0 },
+    },
+    {
+      kind: 'stat',
+      heading: 'Last 30 days',
+      icon: 'coins',
+      span: 12,
+      cells: [
+        { metric: 'spent-30d', label: 'Spent' },
+        { metric: 'received-30d', label: 'Received' },
+      ],
+      when: { any: [{ metric: 'filed-for-you-30d', lte: 0 }, { metric: 'filed-for-you-30d', empty: true }] },
     },
     {
       /* NOT FILED YET, ON ITS OWN AND FIRST, newest first, only while there is any: the lines with no category that are
@@ -153,13 +168,11 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
       order: [{ field: 'on', dir: 'desc' }],
       limit: LEDGER_PAGE_LINES,
       empty: 'No lines match.',
-    },
-    {
-      /* THE DOOR TO THE FILING RULES (audit of 30 October, 40): they left Money's More in the sidebar, where a person
-         looking for their money read "Filing rules" and "Snapshots" among the pages, so the page they shape opens them. */
-      kind: 'note',
-      span: 12,
+      /* THE DOOR TO THE FILING RULES OVER THE LINES THEY FILE, SINCE money-core 3.34.0 (next-money, M8): it was a tile of
+         its own after the last line, and the list folds at thirty, so a one-line tile under "Show 30 more" was never
+         reached. The line over the lines is the tile's own (`writtenLine` in the app's `record/blocks.ts`). */
       body: 'Your [filing rules](/p/money-rules) file lines like these as they come in.',
     },
   ],
 };
+

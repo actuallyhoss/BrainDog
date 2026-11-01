@@ -101,11 +101,11 @@ const CARD = '{{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
 const LOW = 'Cash falls to {{runway-days.low}} by {{runway-days.low_on}}.';
 /* NO WORD OF WHERE THE MONEY IS KEPT SINCE money-core 3.29.1: the Accounts tile draws a row for each, so the line is only
    what needs doing, and on one book with nothing late and no card it says nothing. */
-const ACCOUNTS = '{{cash-by-account.groups}} account(s)';
 const WHAT_THERE_IS = `${LOW} ${CARD}`;
 const LASTS = `Lasts the year on what is due. ${CARD}`;
-/* SPREAD OVER HOW MANY ACCOUNTS SINCE money-core 3.30.0, and no longer how many books. */
-const BOOKS = `Spread over ${ACCOUNTS}. ${CARD}`;
+/* SPREAD OVER HOW MANY ACCOUNTS SINCE money-core 3.30.0, AND KEPT IN HOW MANY BOOKS SINCE 3.34.0: the count was of
+   books all along, and the line is said only with two or more. */
+const BOOKS = `Kept in {{books-held}} books. ${CARD}`;
 const bodies = (k: Kernel, page = LINE): (string | undefined)[] => leads(k, page).map((b) => b.body);
 
 test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that it lasts the year', async () => {
@@ -117,10 +117,14 @@ test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that 
 
 test('MONEY IS ONE HERO AND A BOARD: well under the most a page declares, no word on categories marked the other way, and its figure still declared', async () => {
   const blocks = MONEY_PAGE.blocks as Record<string, unknown>[];
-  /* 19 SINCE money-core 3.31.0: Over time (two, one drawn), the budgets at a glance and its note joined the board. */
+  /* 19 SINCE money-core 3.31.0: Over time (two, one drawn) and the budgets at a glance joined the board. */
   assert.ok(blocks.length <= 19, 'a front door, not the most a page declares');
   assert.deepEqual(blocks.filter((b) => JSON.stringify(b).includes('categories-against-direction')), []);
-  assert.equal(blocks.filter((b) => b.kind === 'note' && b.lead === true).length, 3, 'what there is, that it lasts, and the line for two books');
+  assert.equal(
+    blocks.filter((b) => b.kind === 'note' && b.lead === true).length,
+    5,
+    'the line asking for a first account, what there is, that it lasts, the line asking for a bill, and the line for two books',
+  );
   const k = await record();
   assert.ok(k.metricDecl('categories-against-direction'), 'the figure is still there to be read');
   /* A BILL PAST THE CASH TAKES THE YEAR BACK OUT OF MONEY'S LINE, and the cash is still said once. */
@@ -171,7 +175,7 @@ test('A RECORD WITH NO ACCOUNT IS NOT TOLD ITS MONEY LASTS', async () => {
   assert.deepEqual(bodies(k).filter((b) => /lasts the year/u.test(b ?? '')), [], 'there is no money to last');
 });
 
-test('WITH TWO BOOKS, the line says how many accounts the money is spread over, whether it lasts or not', async () => {
+test('WITH TWO BOOKS, the line says how many books the money is kept in, whether it lasts or not', async () => {
   const k = await record();
   const book = (name: string): string => value<{ id: string }>(k.create('books', { name }, OWNER)).id;
   account(k, 'Company account', gbp(500_000), { book: book('Northwind Ltd') });
@@ -181,7 +185,7 @@ test('WITH TWO BOOKS, the line says how many accounts the money is spread over, 
   assert.deepEqual(bodies(k), [`${LOW} ${BOOKS}`]);
 });
 
-test('A PART OF A PLAN PAST ITS DAY IS NAMED IN THE LINE, the one late longest, and Heads up says it first', async () => {
+test('A PART OF A PLAN PAST ITS DAY IS NAMED IN THE LINE, the one late longest, and the line says it first', async () => {
   const k = await record();
   account(k, 'Current account', gbp(500_000));
   const part = (what: string, due: number, state = 'open'): void =>
@@ -195,7 +199,6 @@ test('A PART OF A PLAN PAST ITS DAY IS NAMED IN THE LINE, the one late longest, 
   assert.equal(lead?.values?.['installments-late.first'], 'Harbourview part 2', 'the part late longest leads');
   assert.deepEqual(lead?.values?.['installments-late.first_amount'], gbp(48_000));
   assert.equal(lead?.values?.['installments-late.first_due'], day(-10));
-  type Said = Drawn & { says_at?: number };
-  const heads = value<{ blocks: Said[] }>(k.page('money')).blocks.find((b) => typeof b.says_at === 'number' && b.lead !== true);
-  assert.match(heads?.body ?? '', /^\{\{installments-late\.first\}\} is \{\{bad:late\}\}/u, 'Heads up says the late part first');
+  /* THE PART RIDES AT THE START OF THE SENTENCE ABOUT WHAT IS LATE, SINCE money-core 3.34.0, and Heads up is gone. */
+  assert.match(lead?.body ?? '', /^\{\{installments-late\.first\}\} is \{\{bad:late\}\}/u, 'the line does not say the late part first');
 });

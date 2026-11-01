@@ -1,5 +1,5 @@
 /**
- * MONEY-CORE 3.30.0 (taken back from 3.32.2: the live check's patch, whose one page outside the round is `page.money-rules`, and file-paid, which adds `rule.payment-files-paid` and `script.file_paid` and changes `script.learn_category`; and round 1031, which adds the correction rules, `script.ledger_twice`, the figures by range, and changes the spending figures and pages), PEOPLE 4.0.0 AND PORTFOLIO 1.30.0 AS c78754bdd (master before round 1030) DECLARED THEM, as the parts this build changed or
+ * MONEY-CORE 3.30.0 (taken back from 3.32.2: the live check's patch, whose one page outside the round is `page.money-rules`, and file-paid, which adds `rule.payment-files-paid` and `script.file_paid` and changes `script.learn_category`; and round 1031, which adds the correction rules, `script.ledger_twice`, the figures by range, and changes the spending figures and pages; and 3.34.0, which adds `register.payee_names`, `rule.payee-named-back` and `script.name_payees`, and changes the Money pages and `script.offer_budgets`, so `page.money-bill` and `script.offer_budgets` are held here too, as 3.33.0 declared them unchanged since 3.30.0), PEOPLE 4.0.0 AND PORTFOLIO 1.30.0 AS c78754bdd (master before round 1030) DECLARED THEM, as the parts this build changed or
  * added, so every rebuild of an older version starts from what a record held before the round (`before1030`).
  *
  * GENERATED, NOT HAND-WRITTEN, as `founder-shipped.ts` is: at that commit, `firstPartyDocument(id, { seeds: [] })` for each
@@ -16,7 +16,7 @@ type Before = { version: string; now: string; added: readonly string[]; was: Rea
 const BEFORE_1030: Readonly<Record<string, Before>> = {
  "money-core": {
   "version": "3.30.0",
-  "now": "3.33.0",
+  "now": "3.34.0",
   "added": [
    "metric.balance-by-account#0",
    "metric.accounts-open#0",
@@ -74,7 +74,10 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
    "metric.bills-open#0",
    "metric.repeating-held#0",
    "metric.bills-held#0",
-   "metric.settled-out-7d#0"
+   "metric.settled-out-7d#0",
+   "register.payee_names#0",
+   "rule.payee-named-back#0",
+   "script.name_payees#0"
   ],
   "was": {
    "script.learn_category#0": {
@@ -5553,6 +5556,152 @@ const BEFORE_1030: Readonly<Record<string, Before>> = {
       }
      }
     ]
+   },
+   "page.money-bill#0": {
+    "page": "money-bill",
+    "title": "{{what}}",
+    "for": {
+     "register": "obligations",
+     "fleeting": true
+    },
+    "icon": "obligation",
+    "requires": [
+     "register.obligations",
+     "register.transactions"
+    ],
+    "pack": "money-core",
+    "blocks": [
+     {
+      "kind": "cards",
+      "lead": true,
+      "span": 12,
+      "source": "register.obligations",
+      "where": "seq is {{seq}}",
+      "columns": [
+       {
+        "field": "what",
+        "as": "title"
+       },
+       {
+        "field": "amount",
+        "as": "figure"
+       },
+       {
+        "field": "party",
+        "label": "Who",
+        "as": "fact"
+       },
+       {
+        "field": "state",
+        "label": "Status",
+        "as": "fact"
+       },
+       {
+        "field": "due",
+        "label": "Due",
+        "as": "when"
+       }
+      ],
+      "limit": 1
+     },
+     {
+      "kind": "table",
+      "heading": "Still to pay",
+      "icon": "calendar-clock",
+      "span": 12,
+      "source": "register.obligations",
+      "where": "seq is {{seq}}, state is open or part",
+      "columns": [
+       {
+        "field": "due",
+        "label": "Due",
+        "width": "13ch"
+       },
+       {
+        "field": "amount",
+        "label": "Amount",
+        "width": "15ch",
+        "align": "end"
+       },
+       {
+        "field": "paid_so_far",
+        "label": "Paid so far",
+        "width": "15ch",
+        "align": "end"
+       },
+       {
+        "field": "state",
+        "label": "Status",
+        "width": "11ch"
+       }
+      ],
+      "limit": 1
+     },
+     {
+      "kind": "timeline",
+      "heading": "Parts paid",
+      "icon": "receipt",
+      "span": 12,
+      "source": "register.transactions",
+      "where": "settles is {{spoken}}, state is not void",
+      "columns": [
+       {
+        "field": "on"
+       },
+       {
+        "field": "payee",
+        "or": "what"
+       },
+       {
+        "field": "amount",
+        "sign": {
+         "field": "direction",
+         "minus": "out"
+        }
+       },
+       {
+        "field": "category"
+       },
+       {
+        "field": "account"
+       },
+       {
+        "field": "category",
+        "as": "chip"
+       }
+      ],
+      "order": [
+       {
+        "field": "on",
+        "dir": "desc"
+       }
+      ],
+      "limit": 12
+     }
+    ]
+   },
+   "script.offer_budgets#0": {
+    "script": "offer_budgets",
+    "title": "Offer a budget for each category from last month's spending",
+    "pack": "money-core",
+    "runs": {
+     "every": "1d",
+     "rule": true
+    },
+    "egress": [],
+    "keys": [],
+    "reads": [
+     "categories",
+     "transactions"
+    ],
+    "writes": [
+     "categories"
+    ],
+    "limits": {
+     "cpu_ms": 1000,
+     "wall_ms": 30000
+    },
+    "source": "function roundUp(minor, exp) {\n  const unit = 10 ** exp;\n  const major = minor / unit;\n  if (!(major > 0)) return 0;\n  const mag = 10 ** Math.floor(Math.log10(major));\n  const lead = major / mag;\n  const step = Math.max(1, lead <= 2 ? mag / 5 : lead <= 5 ? mag / 2 : mag);\n  return Math.round(Math.ceil(major / step - 1e-9) * step * unit);\n}\nfunction said(minor, currency, exp) {\n  const major = Math.round(minor / 10 ** exp);\n  return `${currency} ${String(major).replace(/\\B(?=(\\d{3})+(?!\\d))/gu, ',')}`;\n}\nfunction budgetOffer(categories, entries, home, month, last) {\n  const EXP = { JPY: 0, KRW: 0, VND: 0, CLP: 0, ISK: 0, HUF: 0, KWD: 3, BHD: 3, OMR: 3, JOD: 3, TND: 3 };\n  const exp = (c) => (Object.hasOwn(EXP, c) ? EXP[c] : 2);\n  const spent = new Map();\n  for (const e of entries) {\n    const by = e.fields.category;\n    const amount = e.fields.amount;\n    if (typeof by !== 'string' || by === '' || !amount || typeof amount.amount !== 'number' || typeof amount.currency !== 'string') continue;\n    const per = spent.get(by) ?? new Map();\n    per.set(amount.currency, (per.get(amount.currency) ?? 0) + amount.amount);\n    spent.set(by, per);\n  }\n  const offered = [];\n  let apart = 0;\n  for (const c of categories) {\n    const per = spent.get(c.id);\n    if (!per) continue;\n    const currencies = [...per.keys()];\n    const currency = currencies.length === 1 ? currencies[0] : null;\n    if (currency === null || (home && currency !== home)) {\n      apart += 1;\n      continue;\n    }\n    const minor = per.get(currency);\n    if (!(minor > 0)) continue;\n    const limit = roundUp(minor, exp(currency));\n    const name = typeof c.fields.name === 'string' && c.fields.name.trim() !== '' ? c.fields.name.trim() : 'A category';\n    offered.push({ c, name, limit, currency, minor });\n  }\n  if (offered.length === 0) return null;\n  offered.sort((a, b) => b.minor - a.minor || (a.name < b.name ? -1 : 1));\n  const MOST = 20;\n  const kept = offered.slice(0, MOST);\n  const each = kept.map((o) => `${o.name} ${said(o.limit, o.currency, exp(o.currency))}`);\n  const listed = each.length > 4 ? `${each.slice(0, 4).join(', ')} and ${each.length - 4} more` : each.length > 1 ? `${each.slice(0, -1).join(', ')} and ${each.at(-1)}` : each[0];\n  const one = kept.length === 1;\n  const left = apart === 0 ? '' : ` ${apart} spent in another currency ${apart === 1 ? 'is' : 'are'} left for you to set.`;\n  return {\n    cause: `money.budgets.${month}`,\n    question: one ? `Give ${kept[0].name} a budget of ${each[0].slice(kept[0].name.length + 1)} a month?` : `Use these monthly budgets? ${listed}.`,\n    about: 'Budgets',\n    options: [\n      {\n        id: 'use',\n        label: 'Use these',\n        because: `Each is what ${one ? 'it' : 'the category'} spent in ${last}, rounded up, and you can change any of them later.${left}`,\n        patches: kept.map((o) => ({ id: o.c.spoken, version: o.c.version, fields: { budget: { amount: o.limit, currency: o.currency } } })),\n      },\n      { id: 'not-now', label: 'Not now', because: 'No budget is set, and this is not offered again this month.' },\n    ],\n  };\n}\nexport default async function run(ctx) {\n  const today = typeof ctx.today === 'function' ? ctx.today() : String(ctx.now()).slice(0, 10);\n  const [y, m] = today.split('-').map(Number);\n  const first = (yy, mm) => `${yy}-${String(mm).padStart(2, '0')}-01`;\n  const month = today.slice(0, 7);\n  const lastY = m === 1 ? y - 1 : y;\n  const lastM = m === 1 ? 12 : m - 1;\n  const from = first(lastY, lastM);\n  const to = first(y, m);\n  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];\n\n  const PAGE = 50;\n  const every = async (list, tests) => {\n    const rows = [];\n    let below = null;\n    for (;;) {\n      const all = [...tests, ...(below === null ? [] : [{ field: 'seq', lt: below }])];\n      const page = await ctx.record.list(list, { all });\n      for (const r of page) rows.push({ id: r.id, spoken: `${list}#${r.seq}`, version: r.version, fields: r.fields });\n      if (page.length < PAGE) return rows;\n      below = Math.min(...page.map((r) => r.seq));\n    }\n  };\n\n  const categories = (await every('categories', [{ field: 'state', is: 'live' }, { field: 'direction', is: 'out' }])).filter(\n    (c) => c.fields.budget === null || c.fields.budget === undefined || c.fields.budget === '',\n  );\n  if (categories.length === 0) {\n    ctx.log('Every category money goes out on has a budget, so none was offered.');\n    return null;\n  }\n  const entries = await every('transactions', [\n    { field: 'state', is: 'cleared' },\n    { field: 'transfer', is: false },\n    { field: 'direction', is: 'out' },\n    { field: 'on', gte: from },\n    { field: 'on', lt: to },\n  ]);\n  const config = ctx.config && typeof ctx.config === 'object' ? ctx.config : {};\n  const home = typeof config.home_currency === 'string' && /^[A-Z]{3}$/u.test(config.home_currency.trim()) ? config.home_currency.trim() : null;\n  const ask = budgetOffer(categories, entries, home, month, MONTHS[lastM - 1]);\n  if (ask === null) {\n    ctx.log(`Nothing was spent in ${MONTHS[lastM - 1]} on a category with no budget, so none was offered.`);\n    return null;\n  }\n  ctx.log(`${ask.options[0].patches.length} budget(s) offered from ${MONTHS[lastM - 1]}'s spending, waiting on your answer.`);\n  return { offered: ask.options[0].patches.length, ask };\n}"
    }
   }
  },

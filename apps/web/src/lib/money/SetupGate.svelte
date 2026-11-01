@@ -18,7 +18,7 @@
   }: {
     /** What the screen knows; `null` where it is not a page this gate can be about. */
     facts: SetupFacts | null;
-    /** The page holds what was told before there is an account (AM3): it stays drawn, above the setup. */
+    /** The page holds what was told before there is an account (AM3): it stays drawn, under the setup. */
     keep?: boolean;
     /** The setup, handed the press that lets it go. */
     setup: Snippet<[() => void]>;
@@ -37,16 +37,17 @@
 </script>
 
 {#if showing}
-  {#if keep}<div class="kept">{@render children()}</div>{/if}
+  <!-- THE SETUP FIRST, WHAT WAS TOLD UNDER IT (coordinator's live check, 1 Nov): "Set up Money" came a second or two
+       late under the bills already drawn, so the first look was a page that then moved. It is the page's first thing. -->
   {@render setup(() => (closed = true))}
+  {#if keep}<div class="kept">{@render children()}</div>{/if}
 {:else}
   {@render children()}
 {/if}
 
 <style>
-  /* THE PAGE KEPT ABOVE THE SETUP ENDS WHERE ITS LAST TILE DOES: the room a page leaves at its foot stood as a gap
-     between what was told and the setup under it. */
+  /* THE PAGE KEPT UNDER THE SETUP STARTS WHERE ITS FIRST TILE DOES: no room above it between the setup and what was told. */
   .kept :global(.page) {
-    padding-block-end: 0;
+    padding-block-start: 0;
   }
 </style>

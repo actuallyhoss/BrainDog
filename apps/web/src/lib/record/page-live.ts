@@ -81,9 +81,28 @@ import type { BlockResult as Answer } from '@braindog/kernel';
  * £3,655.20 a month that came in". Lists and tables keep the pence the record holds; a note's sentence rounds each
  * amount it carries to the whole pound, "£3,655", and leaves every other number as it is.
  */
+/**
+ * ONE MARK OF CURRENCY IN A SENTENCE (coordinator's live check of 1 Nov): Budgets' line read "USD $952 a month", the
+ * code and the symbol both. A code standing just before its own symbol and a figure is left out, the symbol kept.
+ */
+function oneMarkIn(text: string): string {
+  return text.replace(/\b([A-Z]{3})[ \u00a0]((?:[A-Z]{1,2})?[$£€¥₹])(?=[−-]?\d)/gu, (found: string, code: string, symbol: string) => {
+    try {
+      const parts = (display: 'symbol' | 'narrowSymbol') => new Intl.NumberFormat('en', { style: 'currency', currency: code, currencyDisplay: display }).formatToParts(0).find((x) => x.type === 'currency')?.value;
+      return symbol === parts('symbol') || symbol === parts('narrowSymbol') ? symbol : found;
+    } catch {
+      return found;
+    }
+  });
+}
+
 export function wholeMoneyIn(text: string): string {
+  text = oneMarkIn(text);
   /* A RATE IS NOT AN AMOUNT: "USD 1 = EGP 50.50" keeps its pence, or "GBP 1 = USD 1.35" would read as one to one. */
-  return text.replace(/(?<!\b1 = )((?:[£$€¥₹]|\b[A-Z]{3}\s)[−-]?)(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})(?!\d)/gu, (_, lead: string, units: string, cents: string) => {
+  return text.replace(/(?<!\b1 = )((?:[£$€¥₹]|\b[A-Z]{3}\s)[−-]?)(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})(?!\d)/gu, (found: string, lead: string, units: string, cents: string) => {
+    /* THE ONE RULE FOR CENTS (1 Nov): under a thousand the cents stay where they are not nought, "$148.85 to pay on the
+       card"; from a thousand up, and ".00" at any size, the amount is whole. */
+    if (Number(units.replace(/,/gu, '')) < 1000 && cents !== '00') return found;
     const whole = Number(units.replace(/,/gu, '')) + (Number(cents) >= 50 ? 1 : 0);
     return `${lead}${whole.toLocaleString('en')}`;
   });
@@ -1013,7 +1032,7 @@ function moneySets(register: string, columns: readonly { field?: unknown }[], ro
     /* A LIST'S MONEY FIELD, OR A COLUMN NO LIST DECLARES (what falls due, across lists) whose every cell is money. */
     const money = type === 'money' || (type === undefined && at.length > 0 && at.every((n) => /\p{Sc}|\b[A-Z]{3}\b/u.test(rows[n]!.cells[i] as string) && /\d/u.test(rows[n]!.cells[i] as string)));
     if (!money) return;
-    const said = barFigures(at.map((n) => rows[n]!.cells[i] as string));
+    const said = barFigures(at.map((n) => rows[n]!.cells[i] as string), undefined, true);
     at.forEach((n, k) => (rows[n]!.cells[i] = said[k]!));
   });
 }
@@ -2055,17 +2074,24 @@ export function blockOf(
           /* NO AMOUNT OF NOTHING (30 October): "Wildcard certificate £0.00" said a payment that is none; Today drew it
              with no amount, and so does every list now. */
           if (!isObject(v) || typeof v.amount !== 'number' || typeof v.currency !== 'string' || v.amount === 0) return null;
-          const said = money(v.amount, v.currency);
+          /* BY THE ONE RULE FOR CENTS (next-money, M18): what falls due is a plan read at a glance, so from a thousand up
+             it is whole, and Coming up's "$1,400" is never "$1,400.00" because another bill in the table has cents. */
+          const unit = 10 ** exponentOf(v.currency);
+          const said = money(Math.abs(v.amount) < 1000 * unit ? v.amount : Math.sign(v.amount) * Math.round(Math.abs(v.amount) / unit) * unit, v.currency);
           const out = c.sign ? r.fields[c.sign.field] === c.sign.minus : false;
           return `${out ? '−' : '+'}${said}`;
         }
         return typeof v === 'string' ? v : v === null || v === undefined ? null : String(v);
       });
+      /* THE STRETCH IT FALLS DUE IN, where the block groups by it (`group: when`): the record puts it on the row, as a
+         grouped table's group is, and the table heads each stretch once. */
+      const group = isObject(r.group) && typeof r.group.name === 'string' && r.group.name.trim() !== '' ? r.group.name.trim() : null;
       return {
         key: typeof r.fields.row === 'string' ? r.fields.row : String(r.id),
         cells,
         ...(late ? { tone: 'bad' as const } : {}),
         ...(at ? { href: `/r/${at[1]}/${at[2]}` } : {}),
+        ...(group ? { group } : {}),
       };
     });
     /* AND ITS AMOUNTS AS ONE SET, as every table's money column is (`moneySets`): no ".00" down whole amounts. */
@@ -2349,6 +2375,17 @@ export function blockOf(
   const short = marks !== null && typeof rest.first === 'number';
   /* AND HOW MANY STEPS ARE OPEN, which the short view's "N more" is counted from: `matched` holds the done ones too. */
   const open = short && typeof openSteps === 'number' && Number.isInteger(openSteps) && openSteps >= 0 ? { open: openSteps } : {};
+  /* A TABLE'S COLUMN WITH NOTHING IN ANY ROW IS NOT DRAWN (next-money, M37): a plan's Paid table headed "Paid by" over a
+     column empty on every row, the width of a word nobody filled. Last, once every rule that reads a column by its place
+     has run, and only while some column still says something. */
+  if (kind === 'table' && rows.length > 0) {
+    const said = (c: unknown) => typeof c === 'string' && c.trim() !== '' && c !== MISSING;
+    const keep = columns.map((_c, i) => rows.some((r) => said(r.cells[i])));
+    if (keep.includes(false) && keep.includes(true)) {
+      columns = columns.filter((_c, i) => keep[i]) as typeof columns;
+      for (const r of rows) r.cells = r.cells.filter((_c, i) => keep[i]);
+    }
+  }
   return {
     ...shell,
     ...(columns === shell.columns ? {} : { columns }),

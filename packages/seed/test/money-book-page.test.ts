@@ -66,9 +66,8 @@ const OWED_CELLS = [
   ['book-owed-by', 'Due to go out'],
   ['book-lasts-until', 'Money lasts until'],
 ] as const;
-/** The line under What is due on a book whose money never goes under in the year its walk looks. */
+/** The line that stood under What is due on a book whose money never goes under, until money-core 3.34.0. */
 const LASTS = 'Lasts the year on what is due.';
-const LASTS_WHEN = { metric: 'book-lasts-until:{{name}}', beyond: true };
 
 /** One book's cleared entries of the last thirteen months, and no transfer: `in-by-month`'s clauses, narrowed to a book. */
 const MONTHS = 'state is cleared, transfer is false, on after -13m';
@@ -200,20 +199,22 @@ test('THE PAGE DECLARES ONE ROW OF THREE, under what the book has and its walk, 
     row.cells,
     CELLS.map(([id, label]) => ({ metric: `${id}:{{name}}`, label })),
   );
-  /* THE WHOLE WIDTH, so the three stand in one row and the tile of cash keeps its walk beside it. */
+  /* THE WHOLE WIDTH, so the three stand in one row under the walk. */
   assert.equal(row.span, 12);
+  /* NO WHAT YOU HAVE TILE SINCE money-core 3.34.0: Cash ahead said the same cash from today beside it, so Cash ahead is
+     the book's hero, the whole row. */
   assert.deepEqual(
-    blocks.filter((b) => !(b.kind === 'note' && b.lead === true)).slice(0, 3).map((b) => b.heading),
-    ['What you have', 'Cash ahead', ROW],
+    blocks.filter((b) => !(b.kind === 'note' && b.lead === true)).slice(0, 2).map((b) => b.heading),
+    ['Cash ahead', ROW],
   );
   /* AND WITH NO OTHER FIGURE OF A BOOK DECLARED THE ACCOUNTS COME NEXT, as they did. */
   const bare = bookPage((id) => CELLS.some(([had]) => had === id)).blocks as Declared[];
   assert.deepEqual(
-    bare.filter((b) => !(b.kind === 'note' && b.lead === true)).slice(0, 4).map((b) => b.heading),
-    ['What you have', 'Cash ahead', ROW, 'Accounts'],
+    bare.filter((b) => !(b.kind === 'note' && b.lead === true)).slice(0, 3).map((b) => b.heading),
+    ['Cash ahead', ROW, 'Accounts'],
   );
-  /* CASH STILL LEADS, and nothing else does. */
-  assert.deepEqual(blocks.filter((b) => b.lead === true && b.kind !== 'note').map((b) => b.heading), ['What you have']);
+  /* NO TILE LEADS BUT THE LINES ON CATEGORIES: the walk is first, and is not a lead. */
+  assert.deepEqual(blocks.filter((b) => b.lead === true && b.kind !== 'note').map((b) => b.heading), []);
   /* DRAWN ON A FIGURE OF THIS BOOK: the page fills the name in, as every cell does. */
   assert.match(String(row.when?.metric), /^book-(in|out|net)-month:\{\{name\}\}$/);
 });
@@ -221,12 +222,13 @@ test('THE PAGE DECLARES ONE ROW OF THREE, under what the book has and its walk, 
 test('THE PAGE STAYS WITHIN THE CEILING OF 24 BLOCKS, with nothing folded away to make room', () => {
   const blocks = MONEY_BOOK_PAGE.blocks as unknown as Declared[];
   assert.ok(blocks.length <= 24, `${blocks.length} blocks`);
-  /* TWELVE BARE, WITH THE TWO LINES ON CATEGORIES MARKED AGAINST THE LEDGER, AND FIFTEEN WITH ITS OWED ROW, THE LINE
-     THAT ITS MONEY LASTS AND ITS MONTHS, whatever the tree declares: well under the ceiling. */
+  /* ELEVEN BARE, WITH THE TWO LINES ON CATEGORIES MARKED AGAINST THE LEDGER, AND THIRTEEN WITH ITS OWED ROW AND ITS
+     MONTHS, whatever the tree declares: well under the ceiling. One fewer each since money-core 3.34.0 took What you
+     have off, and the line that its money lasts went from the full page. */
   const full = bookPage(() => true).blocks as Declared[];
-  assert.equal((bookPage(() => false).blocks as Declared[]).length, 12);
-  assert.equal(full.length, 15);
-  assert.ok(blocks.length >= 12 && blocks.length <= full.length, `${blocks.length} blocks`);
+  assert.equal((bookPage(() => false).blocks as Declared[]).length, 11);
+  assert.equal(full.length, 13);
+  assert.ok(blocks.length >= 11 && blocks.length <= full.length, `${blocks.length} blocks`);
   for (const heading of ['Accounts', 'Add an account', 'Coming and going', 'Due in the next 30 days', 'The next 30 days', "Where this month's money went", 'What moved'])
     for (const page of [blocks, full]) assert.ok(page.some((b) => b.heading === heading), `${heading} was taken off the page to make room`);
 });
@@ -234,8 +236,8 @@ test('THE PAGE STAYS WITHIN THE CEILING OF 24 BLOCKS, with nothing folded away t
 test('WITH ITS FIGURES DECLARED THE PAGE HOLDS WHAT IS OWED AND ITS MONTHS, under This month and above the accounts', () => {
   const blocks = bookPage(() => true).blocks as Declared[];
   assert.deepEqual(
-    blocks.filter((b) => !(b.kind === 'note' && b.lead === true)).slice(0, 7).map((b) => b.heading ?? b.body),
-    ['What you have', 'Cash ahead', ROW, OWED, LASTS, CHART, 'Accounts'],
+    blocks.filter((b) => !(b.kind === 'note' && b.lead === true)).slice(0, 5).map((b) => b.heading ?? b.body),
+    ['Cash ahead', ROW, OWED, CHART, 'Accounts'],
   );
   const owed = blocks.find((b) => b.heading === OWED)!;
   assert.equal(owed.kind, 'stat');
@@ -443,52 +445,38 @@ test('WHAT IS DUE IS READ ABOUT THIS BOOK, each cell by its own words and none r
   assert.equal(blockOf(r.k, OWED, 'Household').drawn, false, "another book's bill drew a row here");
 });
 
-/* THAT A BOOK'S MONEY LASTS THE YEAR IS SAID (book-lasts-year-78). The cell Money lasts until holds a
-   day only while the walk goes under, so a book whose money lasts read nothing of how long: the good news was a gap in
-   a row, or no row at all. One line under What is due says it, drawn on the reading carrying `beyond`, the walk having
-   reached its last day above zero, and never on the figure being empty, which a book nobody put money in is too. */
-test('THE PAGE DECLARES ONE LINE THAT THE MONEY LASTS, under What is due, drawn on the walk never going under', () => {
+/* THAT A BOOK'S MONEY LASTS THE YEAR WAS SAID IN A LINE UNDER WHAT IS DUE (book-lasts-year-78), drawn on the walk never
+   going under. SINCE money-core 3.34.0 IT IS NOT: Cash ahead's own summary says how far the book stays above nought, so
+   the line said it a second time. The cell Money lasts until stays, a day only while the walk goes under. */
+test('THE PAGE DECLARES NO LINE THAT THE MONEY LASTS, and keeps the cell of the day it runs out', () => {
   const blocks = bookPage(() => true).blocks as Declared[];
-  const notes = blocks.filter((b) => b.kind === 'note' && b.lead !== true);
-  assert.equal(notes.length, 1, 'one line, and no second');
-  const note = notes[0]!;
-  assert.equal(note.body, LASTS);
-  assert.equal(note.span, 12);
-  assert.deepEqual(note.when, LASTS_WHEN);
-  /* A LINE OF THE BOOK AND NOT THE PAGE'S HEADLINE: cash still leads, alone. */
-  assert.notEqual(note.lead, true);
-  assert.equal(blocks[blocks.indexOf(note) - 1]?.heading, OWED, 'the line is not under What is due');
-  /* IT WAITS FOR ITS FIGURE, as the cell does: a `when:` naming a figure nobody declared draws nothing for ever. */
-  const without = bookPage((id) => id !== 'book-lasts-until').blocks as Declared[];
-  assert.equal(without.some((b) => b.kind === 'note' && b.lead !== true), false);
-  assert.equal((bookPage((id) => id === 'book-lasts-until').blocks as Declared[]).filter((b) => b.kind === 'note' && b.lead !== true).length, 1);
-  /* NO DASH, NO ADDRESS AND NO NAME OF A FIGURE IN WHAT A PERSON READS. */
-  assert.doesNotMatch(LASTS, /—|register\.|book-|\{\{/u);
+  assert.deepEqual(blocks.filter((b) => b.kind === 'note' && b.lead !== true), [], 'a line under What is due says the money lasts again');
+  assert.equal(blocks.some((b) => b.body === LASTS), false);
+  assert.ok(blocks.find((b) => b.heading === OWED)?.cells?.some((c) => c.metric === 'book-lasts-until:{{name}}'), 'the day the book runs out is not a cell');
+  assert.equal((bookPage((id) => id === 'book-lasts-until').blocks as Declared[]).filter((b) => b.kind === 'note' && b.lead !== true).length, 0);
 });
 
 const LASTS_IN_TREE = IN_TREE.has('book-lasts-until');
-/** The line that the money lasts, on a book's page, drawn or not. */
-function lastsOf(k: Kernel, name = 'Studio'): Block {
-  const got = pageOf(k, name).find((b) => b.kind === 'note' && b.body === LASTS);
-  assert.ok(got, `${name}'s page has no line that its money lasts`);
-  return got;
+/** That a book's page holds no line that its money lasts, since money-core 3.34.0. */
+function noLasts(k: Kernel, name = 'Studio'): void {
+  assert.equal(pageOf(k, name).some((b) => b.kind === 'note' && b.body === LASTS), false, `${name}'s page says its money lasts in a line again`);
 }
 /** The cell Money lasts until as a book's page read it, or nothing where the row has no such cell. */
 const untilOf = (k: Kernel, name = 'Studio'): Reading | null => (blockOf(k, OWED, name).readings ?? []).find((c) => c.metric.startsWith('book-lasts-until:'))?.reading ?? null;
 const bill = (r: Kept, what: string, amount: number, due: string, book = r.studio): Entry =>
   value<Entry>(r.k.create('obligations', { what, direction: 'owed_by_me', amount: { amount, currency: 'EGP' }, due, state: 'open', book: book.id }, OWNER));
 
-test('A BOOK WHOSE MONEY NEVER GOES UNDER READS THAT IT LASTS THE YEAR, with a bill it can pay and with none', { skip: !LASTS_IN_TREE && 'the day a book runs out is not declared' }, async () => {
+test('A BOOK WHOSE MONEY NEVER GOES UNDER IS GIVEN NO DAY IT RUNS OUT, with a bill it can pay and with none, and no line', { skip: !LASTS_IN_TREE && 'the day a book runs out is not declared' }, async () => {
   const r = await fresh();
-  /* MONEY HELD AND NOTHING DUE: the row of what is due is not drawn, and the line still is. */
+  /* MONEY HELD AND NOTHING DUE: the row of what is due is not drawn, and since money-core 3.34.0 no line is either. */
   assert.equal(blockOf(r.k, OWED).drawn, false);
-  assert.notEqual(lastsOf(r.k).drawn, false, `the line is not drawn: ${lastsOf(r.k).why}`);
-  /* A BILL THE BOOK CAN PAY: the row is drawn, its cell of the day holds none, and the line says why. */
+  noLasts(r.k);
+  /* A BILL THE BOOK CAN PAY: the row is drawn, and its cell of the day holds none. */
   bill(r, 'Studio rent', 300_000, '2026-09-25');
   assert.notEqual(blockOf(r.k, OWED).drawn, false);
   assert.equal(untilOf(r.k)?.value ?? null, null, 'a book that pays its bill was given a day it runs out');
-  assert.notEqual(lastsOf(r.k).drawn, false);
-  assert.notEqual(lastsOf(r.k, 'Household').drawn, false);
+  noLasts(r.k);
+  noLasts(r.k, 'Household');
 });
 
 test('A BOOK THAT GOES UNDER DRAWS THE DAY AND NO LINE, and the book beside it keeps its own', { skip: !LASTS_IN_TREE && 'the day a book runs out is not declared' }, async () => {
@@ -497,14 +485,14 @@ test('A BOOK THAT GOES UNDER DRAWS THE DAY AND NO LINE, and the book beside it k
   const until = untilOf(r.k);
   assert.ok(until && until.value !== null, 'a book that cannot pay its bill has no day it runs out');
   assert.equal(new Date(until.value * 86_400_000).toISOString().slice(0, 10), '2026-10-10');
-  assert.equal(lastsOf(r.k).drawn, false, 'a book that goes under on 10 October reads that its money lasts the year');
+  noLasts(r.k);
   /* THE OTHER BOOK'S BILL IS NOT THIS BOOK'S. */
-  assert.notEqual(lastsOf(r.k, 'Household').drawn, false, "another book's bill took the line off this page");
+  assert.equal(untilOf(r.k, 'Household')?.value ?? null, null, "another book's bill gave this book a day it runs out");
 });
 
 test('A BOOK NOBODY PUT MONEY IN DRAWS NEITHER: no day, and no word that nothing lasts a year', { skip: !LASTS_IN_TREE && 'the day a book runs out is not declared' }, async () => {
   const r = await fresh();
   value<Entry>(r.k.create('books', { name: 'Spare' }, OWNER));
   assert.equal(blockOf(r.k, OWED, 'Spare').drawn, false);
-  assert.equal(lastsOf(r.k, 'Spare').drawn, false, 'a book with no money and nothing due reads that its money lasts');
+  noLasts(r.k, 'Spare');
 });

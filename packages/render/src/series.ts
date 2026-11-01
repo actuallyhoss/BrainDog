@@ -12,7 +12,7 @@
  * everything they print comes back from here.
  */
 
-import { MISSING, axisFigure, exponentOf } from './format.ts';
+import { MISSING, axisFigure, exponentOf, totalSaid } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike, wholeMinor, wholeShape } from './figure.ts';
 import { type AmountSetting, currencyOfFigure, writeAmount } from './money.ts';
@@ -351,17 +351,9 @@ export const SERIES_UNDER = 'More out than in';
  * `barFigures` tells one, and a cell with no digits (`—`) or no mark of a currency (an hour count) is left as it is.
  */
 export function evenPlaces(cells: readonly string[]): string[] {
-  const markOf = (c: string): string => c.replace(/[\d.,−+\-\s\u00a0]/gu, '');
-  const placesOf = (c: string): number => /\d\.(\d+)(?!\d)/u.exec(c)?.[1]?.length ?? 0;
-  const want = new Map<string, number>();
-  for (const c of cells) if (/\d/u.test(c) && markOf(c) !== '') want.set(markOf(c), Math.max(want.get(markOf(c)) ?? 0, placesOf(c)));
-  return cells.map((c) => {
-    const n = /\d/u.test(c) && markOf(c) !== '' ? (want.get(markOf(c)) ?? 0) : 0;
-    if (n === 0 || placesOf(c) === n) return c;
-    if (placesOf(c) > 0) return c;
-    /* AFTER THE LAST DIGIT OF THE NUMBER, so `£8,467` is `£8,467.00` and `8,467 EGP` is `8,467.00 EGP`. */
-    return c.replace(/(\d)(?![\d,])/u, `$1.${'0'.repeat(n)}`);
-  });
+  /* NO LONGER PADDED, SINCE 1 NOV: a table of months is totals, said by the one rule for cents (`totalSaid`): whole from a
+     thousand up, to the cent under it, never ".00". The name stays for its callers. */
+  return cells.map((c) => (/\d/u.test(c) ? totalSaid(c) : c));
 }
 /** The key for a bar drawn at half strength: a month not over yet, or still to come. */
 export const SERIES_PALER = 'Paler: not over yet';

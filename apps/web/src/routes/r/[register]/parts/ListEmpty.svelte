@@ -56,6 +56,9 @@
     adds?: boolean | undefined;
   } = $props();
 
+  /* WHAT THE LIST IS FOR, UNDER "NOTHING IN IT YET" (next-money, M41): Exchange rates said "Nothing in Exchange rates
+     yet." and nothing of what a rate does. Its own `holds:`, as a sentence. */
+  const heldSaid = $derived(typeof decl.holds === 'string' && decl.holds.trim() !== '' ? `It holds ${decl.holds.trim().replace(/\.$/u, '')}.` : undefined);
   /* "Add a bill or invoice": the list's own word for one entry. */
   const addOne = $derived(`Add ${/^[aeiou]/iu.test(decl.one ?? '') ? 'an' : 'a'} ${(decl.one ?? 'entry').toLowerCase()}`);
 </script>
@@ -69,7 +72,7 @@
       ? 'Nothing outstanding.'
       : `Nothing in ${decl.name} yet.`}
   query={kind === 'no-results' ? [q, saidPlainly(register, whereOf(filters))].filter(Boolean).join(' · ') : undefined}
-  body={kind === 'no-results' && q ? copy.searchesOnly(searched) : undefined}
+  body={kind === 'no-results' && q ? copy.searchesOnly(searched) : kind === 'no-data-yet' ? heldSaid : undefined}
 >
   {#snippet actions()}
     <!-- NO "Add the first row" AND NO EXAMPLE ROW. The capture line sits directly above and the New button beside the

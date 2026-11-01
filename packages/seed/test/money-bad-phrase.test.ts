@@ -65,9 +65,11 @@ test('BILLS LATE ARE SAID ONCE, ON THE FIRST LINE, THE FIGURE THE LINK TO THEM (
   const bills = says.find((s) => JSON.stringify(s.when) === JSON.stringify({ metric: 'overdue', gt: 0 }));
   assert.ok(bills, 'the first line has a sentence for bills late');
   const nodes = inline(bills.body, { resolve: () => '3' });
-  assert.equal(bads(nodes).length, 1, 'late in the danger colour');
-  const link = nodes.find((n): n is Extract<Inline, { type: 'link' }> => n.type === 'link');
-  assert.ok(link?.href.startsWith('/r/obligations?'), 'the figure late opens the bills that are late');
-  assert.equal(text(link!.body), '3', 'the figure alone, so a phone\'s tap target keeps the space after it');
-  assert.equal(text(nodes), 'Bills late: 3 to pay.');
+  /* THE PART OF A PLAN THAT IS LATE RIDES FIRST IN THE SAME SENTENCE, SINCE money-core 3.34.0, so two phrases are late:
+     the part's and the bills'. */
+  assert.equal(bads(nodes).length, 2, 'late in the danger colour');
+  const link = nodes.find((n): n is Extract<Inline, { type: 'link' }> => n.type === 'link' && n.href.startsWith('/r/obligations?'));
+  assert.ok(link, 'the figure late opens the bills that are late');
+  assert.equal(text(link.body), '3', 'the figure alone, so a phone\'s tap target keeps the space after it');
+  assert.ok(text(nodes).includes('Bills late: 3 to pay.'), text(nodes));
 });

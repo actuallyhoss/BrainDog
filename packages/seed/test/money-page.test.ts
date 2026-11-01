@@ -3,7 +3,7 @@
  * declaration and then off the page a record draws.
  *
  * SINCE money-core 3.29.0 the home is a front door: one line, the hero (Cash now with the walk ahead drawn small and
- * four answers), then a board of tiles built the same way, and Heads up. What repeats every month, the months in and
+ * four answers), what needs a look under it, then a board of tiles built the same way. What repeats every month, the months in and
  * out and the chart of Cash ahead have a page of their own, so the tests that held their blocks read each block on its
  * own declaration (`Kernel.block`) and not through this page.
  */
@@ -87,8 +87,8 @@ function drawn(k: Kernel, only?: readonly string[]): Drawn[] {
   return blocks;
 }
 
-test('MONEY OPENS ON ITS LINE AND ITS HERO, then one board, then Heads up, with no side column and no walk of its own', () => {
-  /* 19 SINCE money-core 3.31.0: Over time (two, one drawn), the budgets at a glance and its note joined the board. */
+test('MONEY OPENS ON ITS LINE AND ITS HERO, then what needs a look, then one board, with no side column and no walk of its own', () => {
+  /* 19 SINCE money-core 3.31.0: Over time (two, one drawn) and the budgets at a glance joined the board. */
   assert.ok(BLOCKS.length <= 19, `Money declares ${BLOCKS.length} blocks, and a front door is not a page of them`);
   assert.ok(!BLOCKS.some((b) => b.kind === 'bridge' || b.kind === 'forecast'), 'a walk is drawn as a chart on Money again');
   assert.deepEqual(BLOCKS.filter((b) => b.area !== undefined).map((b) => b.heading ?? b.kind), [], 'Money has a side column again');
@@ -98,7 +98,10 @@ test('MONEY OPENS ON ITS LINE AND ITS HERO, then one board, then Heads up, with 
   assert.deepEqual(hero.when, { metric: 'cash-accounts', gt: 0 });
   assert.deepEqual(hero.cells!.map((c) => c.label), ['Cash now', 'In, next 30 days', 'Out, next 30 days']);
   assert.deepEqual([hero.cells![0]!.metric, (hero.cells![0] as { ahead?: string }).ahead], ['cash-now', 'runway-days']);
-  assert.ok(at('Heads up') > at('Instalments') && at('Instalments') > at('Accounts'), 'Heads up does not close the board');
+  /* NO HEADS UP SINCE money-core 3.34.0: whether Cash now adds up stands straight under the hero, before Over time. */
+  assert.equal(at('Heads up'), -1, 'Heads up is back on Money');
+  assert.equal(at('Cash now does not add up'), BLOCKS.indexOf(hero) + 1, 'what needs a look is not straight under the hero');
+  assert.ok(at('Cash now does not add up') < at('Over time') && at('Instalments') > at('Accounts'), 'what needs a look is not above the board');
   assert.deepEqual(['Coming up', 'Spent this month', 'Accounts', 'Ledger', 'Instalments'].filter((h) => at(h) < 0), [], 'a tile of the board is missing');
 });
 

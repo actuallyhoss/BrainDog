@@ -472,7 +472,12 @@ function partsRows(block: BlockResult): string[] {
   const register = decl?.source?.startsWith('register.') ? decl.source.slice('register.'.length) : '';
   const field = decl?.group_by ?? '';
   const currency = parts.unit ?? (decl?.format?.startsWith('money.') ? decl.format.slice('money.'.length) : null);
-  const said = (v: number) => (currency ? money(Math.round(v), currency) : format(decl?.format, v));
+  /* A FIGURE'S PARTS ARE TOTALS (next-money, M6, and the one rule for cents): from a thousand up said whole, as the hero
+     and Due soon say their money, so Money's Accounts reads "$41,380" where it read "$41,380.00"; under a thousand to
+     the cent, "−$148.85". Half a unit rounds away from nought. */
+  const unit = currency ? 10 ** exponentOf(currency) : 1;
+  const whole = (v: number) => (Math.abs(v) < 1000 * unit ? Math.round(v) : Math.sign(v) * Math.round(Math.abs(v) / unit) * unit);
+  const said = (v: number) => (currency ? money(whole(v), currency) : format(decl?.format, v));
   const limit = block.limit ?? parts.groups.length;
   const rows = parts.groups
     .filter((g): g is { key: string; label?: string; value: number } => g.value !== null)

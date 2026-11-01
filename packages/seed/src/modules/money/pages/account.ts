@@ -64,6 +64,21 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
     /* THE ACCOUNT'S LINES NARROWED AS THE LEDGER'S ARE: by what each was for, by month and by kind of line. */
     filters: [{ field: 'category', control: 'chips' }, MONTH_FILTER, SHOW_FILTER],
     blocks: [
+      ...(both && has(GAP)
+        ? [
+            {
+              /* ONE FIGURE WHILE THE TWO AGREE, SINCE money-core 3.34.0 (next-money, M14): "The bank says $41,380" beside
+                 "The lines add up to $41,380" said one amount twice on most days. While the gap is nought the hero is the
+                 balance once, with "Matches the bank" under it; the two figures come back the day they differ. */
+              kind: 'stat',
+              heading: '{{name}}',
+              icon: 'wallet',
+              span: 12,
+              cells: [{ metric: NOW, label: 'Balance', note: 'Matches the bank' }],
+              when: { metric: GAP, is: 0 },
+            },
+          ]
+        : []),
       ...(both
         ? [
             {
@@ -79,9 +94,26 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
                 { metric: NOW, label: 'The bank says' },
                 { metric: LINES, label: 'The lines add up to' },
               ],
+              ...(has(GAP) ? { when: { any: [{ metric: GAP, not: 0 }, { metric: GAP, empty: true }] } } : {}),
             },
           ]
         : []),
+      {
+        /* WHAT IT HOLDS TODAY WRITES A BALANCE CHECK FOR THIS ACCOUNT, never the account itself (`parts/ages.ts`). The
+           account is preset by its spoken id, as a book's capture presets its book.
+
+           THE HERO'S QUIET ACTION, SINCE money-core 3.34.0 (next-money, M15): straight under the balance it checks, where
+           it stood as a tile of its own under About this account. The app draws a box that follows a page's first
+           figure as that tile's foot (Money's look, `look.css`). */
+        kind: 'capture',
+        /* SAID AS WHAT TO TYPE (live check of 30 October, 14): the heading is the box's own words, and "What it holds
+           today" in a grey box read as a bar stuck loading. */
+        heading: 'Type what the bank says it holds today',
+        icon: 'check',
+        span: 12,
+        register: 'balances',
+        where: 'account is {{spoken}}',
+      },
       {
         /* WHICH ACCOUNT, AND HOW OLD WHAT IT HOLDS IS: the digits the bank prints, its book, and the day the bank or a
            check last said what it held, marked out of date past a week (`CONFIRMED_STALE`). The head while the two
@@ -125,18 +157,6 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
             },
           ]
         : []),
-      {
-        /* WHAT IT HOLDS TODAY WRITES A BALANCE CHECK FOR THIS ACCOUNT, never the account itself (`parts/ages.ts`). The
-           account is preset by its spoken id, as a book's capture presets its book. */
-        kind: 'capture',
-        /* SAID AS WHAT TO TYPE (live check of 30 October, 14): the heading is the box's own words, and "What it holds
-           today" in a grey box read as a bar stuck loading. */
-        heading: 'Type what the bank says it holds today',
-        icon: 'check',
-        span: 12,
-        register: 'balances',
-        where: 'account is {{spoken}}',
-      },
       ...(has(IN_BY_MONTH, OUT_BY_MONTH)
         ? [
             {
@@ -209,7 +229,9 @@ export const MONEY_BILL_PAGE: SeedPage = {
         { field: 'amount', as: 'figure' },
         { field: 'party', label: 'Who', as: 'fact' },
         { field: 'state', label: 'Status', as: 'fact' },
-        { field: 'due', label: 'Due', as: 'when' },
+        /* THE DAY NAMED, SINCE money-core 3.34.0 (next-money, M34): as a card's `when` it was a bare "30 Jul" beside the
+           status, a day of nothing. "Due 30 Jul", beside its status, which says whether it is paid. */
+        { field: 'due', label: 'Due', as: 'fact' },
       ],
       limit: 1,
     },

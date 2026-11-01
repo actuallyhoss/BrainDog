@@ -14,6 +14,7 @@
   import { symbolOf } from '$lib/record/money.ts';
   import { updateRow } from '$lib/record/page-write.ts';
   import { rowWriter } from '$lib/record/rows-write.ts';
+  import Button from '$lib/ui/Button.svelte';
   import type { Fields } from '$lib/record/schema.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -36,6 +37,7 @@
     per: 'For',
     periods: { week: 'A week', month: 'A month', year: 'A year' } satisfies Record<Period, string>,
     none: 'No budget',
+    another: (n: number) => `Set another (${n} more ${n === 1 ? 'category' : 'categories'})`,
     saved: (name: string) => `${name}'s budget is saved.`,
     cleared: (name: string) => `${name} has no budget now.`,
     empty: 'No category you spend in yet.',
@@ -163,6 +165,19 @@
     void save(l, { budget: { amount: minor, currency: l.currency } }, words.saved(l.name));
   }
 
+  /* THE BUDGETS SET, AND "SET ANOTHER" FOR THE REST (next-money, M19): 13 categories stood here, 10 of them saying "No
+     budget", so the three that are set were hard to find among them. With none set every line is shown, as the first
+     budget is set here; a line set while open stays shown (`kept`), so a budget never vanishes under the hand typing it. */
+  let openAll = $state(false);
+  const kept = new Set<number>();
+  const shownLines = $derived.by(() => {
+    const all = lines ?? [];
+    if (openAll || all.every((l) => l.minor === null)) return all;
+    for (const l of all) if (l.minor !== null) kept.add(l.key);
+    return all.filter((l) => kept.has(l.key));
+  });
+  const hiddenCount = $derived((lines?.length ?? 0) - shownLines.length);
+
   function setPeriod(l: Line, v: string) {
     if (!isPeriod(v) || v === l.period) return;
     l.period = v;
@@ -184,7 +199,7 @@
     {:else}
       {#if lines.every((l) => l.seq < 0)}<p class="bset-lede">{words.starters}</p>{/if}
       <ul class="bset-lines">
-        {#each lines as l (l.key)}
+        {#each shownLines as l (l.key)}
           <li class="bset-line">
             <span class="bset-name" dir="auto">{l.name}</span>
             <label class="bset-most">
@@ -209,11 +224,18 @@
           </li>
         {/each}
       </ul>
+      {#if hiddenCount > 0}
+        <span class="bset-more"><Button weight="quiet" onclick={() => (openAll = true)}>{words.another(hiddenCount)}</Button></span>
+      {/if}
     {/if}
   </section>
 {/if}
 
 <style>
+  .bset-more {
+    justify-self: start;
+  }
+
   .bset {
     display: grid;
     gap: var(--sp-3);

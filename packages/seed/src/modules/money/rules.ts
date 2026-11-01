@@ -14,6 +14,7 @@ import { BOOK_FROM_ACCOUNT_SCRIPT } from './scripts/book-from-account.js';
 import { BUDGET_WATCH_SCRIPT } from './scripts/budget-watch.js';
 import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
 import { FILE_BACK_SCRIPT } from './scripts/file-back.js';
+import { NAME_PAYEES_SCRIPT } from './scripts/name-payees.js';
 import { FILE_PAID_RULE, FILE_PAID_SCRIPT } from './scripts/file-paid.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
 import { LEARN_CATEGORY_SCRIPT } from './scripts/learn-category.js';
@@ -499,6 +500,18 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'file_back', as: 'filing', input: {} } }],
   },
   FILE_BACK_SCRIPT,
+  /**
+   * PAYEE NAMES, SINCE money-core 3.34.0 (next-money, M9): a payee name written or changed names the Ledger lines of the
+   * last 400 days its bank words fit, and the script names the lines that came in once a day (`scripts/name-payees.js`).
+   */
+  {
+    rule: 'payee-named-back',
+    name: 'Name the lines a payee name fits',
+    pack: 'money-core',
+    on: { written: { register: 'payee_names', op: ['create', 'update'], fields: ['name', 'match'] } },
+    steps: [{ script: { id: 'name_payees', as: 'naming', input: {} } }],
+  },
+  NAME_PAYEES_SCRIPT,
   /**
    * A CATEGORY SET BY HAND ASKS ONCE WHETHER THE PAYEE ALWAYS GOES THERE: "File every Talabat under
    * Outing from now on? 14 more like it have no category." (`scripts/learn-category.js`). Yes is `category-taught`,

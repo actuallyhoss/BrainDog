@@ -199,11 +199,12 @@ test('MONEY WITH TWO BOOKS OPENS ON WHERE ITS MONEY IS KEPT, and with one book o
 
   account('Studio dollars', book('Studio'), 'USD');
   const two = leads();
-  assert.deepEqual(two.map((b) => b.body), [`Spread over {{cash-by-account.groups}} account(s). ${LATE}`], 'one lead');
+  /* KEPT IN HOW MANY BOOKS, SINCE money-core 3.34.0: it said how many accounts, and counted the books. */
+  assert.deepEqual(two.map((b) => b.body), [`Kept in {{books-held}} books. ${LATE}`], 'one lead');
   /* NO CARD SAYS WHAT IS TO PAY ON IT: the sum reads nought and its day reads nothing, so the card's sentence goes whole. */
   assert.deepEqual(two[0]!.values, {
     'card-to-pay': 0,
-    'cash-by-account.groups': 2,
+    'books-held': 2,
   });
   /* AND THE PAGE IS STILL WITHIN WHAT A PAGE DECLARES. */
   assert.ok(value<{ blocks: unknown[] }>(k.page('money')).blocks.length <= 24);

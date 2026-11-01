@@ -42,6 +42,7 @@ import { sourceReadsWhole, sourceModule } from './sources/index.ts';
 import { ACTIONS_BLOCKING } from './sources/actions-blocking.ts';
 import { FEED_BY } from './sources/activity.ts';
 import { RUNS_ON_LISTS } from './sources/runs-on.ts';
+import { DEADLINES_GROUP } from './sources/deadlines.ts';
 import { DOING_SAID, withSaid } from './sources/sessions-working.ts';
 import { fileLists } from './kinds/gallery.ts';
 import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
@@ -3024,7 +3025,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   if (worded) return { ...base, refusals: also(worded) };
   /* CARDS AND TABLES ARE GROUPED BY A FIELD OF THEIR LIST, so over anything but a list they draw no groups, and say so
      rather than drawing ungrouped under a `group:` the author wrote. The field itself is checked where the list is in hand. */
-  if (GROUPED_BY_FIELD.has(block.kind) && block.group !== undefined && !(typeof block.source === 'string' && block.source.startsWith('register.'))) {
+  /* BUT A TABLE OVER WHAT FALLS DUE GROUPS BY THE STRETCH EACH DAY IS IN, its one word (`DEADLINES_GROUP`), which its own
+     read puts on each row (`sources/deadlines.ts`). */
+  const dueGrouped = block.kind === 'table' && block.source === 'deadlines' && block.group === DEADLINES_GROUP;
+  if (GROUPED_BY_FIELD.has(block.kind) && block.group !== undefined && !dueGrouped && !(typeof block.source === 'string' && block.source.startsWith('register.'))) {
     const what = block.kind === 'cards' ? 'cards' : 'rows';
     return {
       ...base,
