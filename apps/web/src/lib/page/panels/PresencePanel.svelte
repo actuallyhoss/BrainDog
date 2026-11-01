@@ -78,7 +78,8 @@
     open: 'Open its page',
     none: 'No agent has a run open.',
     quiet: 'Quiet',
-    on: (said: string) => `On ${said}`,
+    /* WHERE THEY RUN, said as a sentence (1 Nov): "On MacBook Pro" stood alone under the runs and read as a stray label. */
+    on: (said: string) => `Running on ${said}`,
   } as const;
 
   const io = control(apiBase());
