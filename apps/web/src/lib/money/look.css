@@ -1591,3 +1591,19 @@
     max-inline-size: none;
   }
 }
+
+/* ON A PHONE THE PAGE'S SENTENCE TAKES THE WHOLE ROW, ITS BUTTONS THE ROW UNDER IT (UI pass, 1 Nov): beside Mark paid,
+   Share and More a plan's "3 of 12 parts paid, the last due on 9 Jul 2027." had 150px and ran four lines with "2027."
+   alone on the last, and Money's own sentence ran three. The buttons keep their order, at the row's start. */
+@media (width < 640px) {
+  .hosted[data-money] .block-slot[data-lead]:has(> .lead-head[data-barred]):has(> .block[data-kind='note'][data-form='lead']) {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--sp-2);
+  }
+
+  .hosted[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) > .lead-head[data-barred] {
+    grid-row: 2;
+    grid-column: 1;
+    justify-self: start;
+  }
+}
