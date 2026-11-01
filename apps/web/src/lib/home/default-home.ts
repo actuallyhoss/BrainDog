@@ -473,8 +473,8 @@ export function quietTile(): PageBlock {
  * neither is anything a person can act on from Today, so the block is marked not drawn and left at its place, as every
  * block a page hides is, and each write still finds its block by index. Every other block is handed back as it came.
  */
-export function quietHeld<B extends { source?: string | undefined; refusals: readonly unknown[]; drawn: boolean }>(blocks: readonly B[]): B[] {
-  return blocks.map((b) => (b.drawn && ((b.source === QUIET || b.source === NUMBERS) && b.refusals.length > 0 || b.refusals.some(heldFrom)) ? { ...b, drawn: false } : b));
+export function quietHeld<B extends { source?: string | undefined; refusals: readonly unknown[]; drawn: boolean; held?: true | undefined }>(blocks: readonly B[]): B[] {
+  return blocks.map((b) => (b.drawn && (((b.source === QUIET || b.source === NUMBERS) && b.refusals.length > 0) || heldFrom(b)) ? { ...b, drawn: false } : b));
 }
 
 /**
@@ -482,7 +482,7 @@ export function quietHeld<B extends { source?: string | undefined; refusals: rea
  * tile over a list she was not given: not drawn, so it takes no cell on the board and leaves no hole where it stood, and
  * Today is the tiles she can use. The owner's own Today has none.
  */
-const heldFrom = (r: unknown): boolean => r !== null && typeof r === 'object' && ['FORBIDDEN', 'LEVEL_REQUIRED'].includes(String((r as { code?: unknown }).code));
+const heldFrom = (b: { held?: unknown }): boolean => b.held === true;
 
 /** The source the few key numbers that lead Today are read from (the kernel's `sources/kpis.ts`), named as its kind is. */
 export const NUMBERS: string = KPIS_KIND;

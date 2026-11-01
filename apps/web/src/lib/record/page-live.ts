@@ -339,6 +339,8 @@ type AnsweredPage = LivePageDecl & { blocks?: Answered[]; [key: string]: unknown
 
 /** A block the page draws: the app's `BlockResult`, with what only a live answer carries. */
 export type LiveBlock = BlockResult & {
+  /** A block the record holds from this reader (refused FORBIDDEN or LEVEL_REQUIRED): Today gives it no cell. */
+  held?: true;
   /** A queue of questions narrowed to the page's own by its `where`, which the clause itself never reaches the page as. */
   narrowed?: true;
   /** A lead note's: its sentence is the line the model wrote, not the rules' (`said`), so a hero can say who wrote it. */
@@ -1734,6 +1736,8 @@ export function blockOf(
     entries: [],
     matched: [],
     refusals: refusals.map((r) => r.fix),
+    /* AND WHETHER IT IS HELD FROM THIS READER, which Today leaves out of the board rather than saying (`quietHeld`). */
+    ...(refusals.some((r) => (r as { code?: unknown }).code === 'FORBIDDEN' || (r as { code?: unknown }).code === 'LEVEL_REQUIRED') ? { held: true as const } : {}),
     rows: [],
     shown: 0,
     total: 0,
