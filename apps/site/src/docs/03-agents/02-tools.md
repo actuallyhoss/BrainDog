@@ -47,7 +47,7 @@ governance {"register": "decision", "id": "D12"}
 
 ## Changing things
 
-`create` adds a row and answers with the number it was given. `update` changes a row and sends the version it read; a field set to null is cleared, and `deleted_at: true` deletes the row. `log` adds a note to a row and changes nothing else, and with no row named the note goes on the agent's own session. A note is one sentence, at most 280 characters.
+`create` adds a row and answers with the number it was given. `update` changes a row and sends the version it read; a field set to null is cleared, and `deleted_at: true` deletes the row. `log` adds a note to a row and changes nothing else, and with no row named the note goes on the agent's own session. A note longer than 280 characters is kept as several notes, in order, up to 1,400; a longer one goes on the row as a page.
 
 ```code | text
 create {"register": "tasks", "fields": {"what": "Send the March invoices"}, "note": "Asked for in today's call."}
@@ -61,7 +61,16 @@ log {"spoken": "tasks#41", "note": "Waiting on the client's reply."}
 propose {"question": "Which client should we chase first?", "body_kind": "options", "body": {"options": [{"id": "a", "label": "Northwind", "because": "Two invoices are overdue."}, {"id": "b", "label": "Contoso", "because": "The larger balance."}]}}
 ```
 
-`undo` takes back one of the agent's own writes. Every write ends in a receipt line that names what was done and the batch to undo it with, and `undo {"batch": "..."}` puts that write back. It will not touch anybody else's writes, and `dry` shows what would go back without doing it.
+## Anything else the app does
+
+`act` makes any call the app makes, by its name, with the agent's own grant: settings, add-ons and their settings, automations, boards, books, sharing, Needs you, export. `braindog:calls` lists every call it makes and what each takes. The record decides who may make each one, as it does in the app, and a change the agent's rung asks about waits on Needs you. What only you do in a browser (an add-on on or off, its settings, a declaration, taking a key out of service) is asked instead, and lands when you say yes. A key's value never passes through it either way.
+
+```code | text
+act {"call": "setZone", "args": {"tz": "Africa/Cairo"}}
+act {"call": "sameValues", "args": {"register": "datapoints", "fields": ["name", "thing", "at", "value"]}}
+```
+
+Every write ends in a receipt line that names what was done and the batch to undo it with, and `act {"call": "undoOwn", "args": {"batch": "..."}}` puts that write back. It will not touch anybody else's writes, and `dry` shows what would go back without doing it.
 
 ## Keeping the session
 
