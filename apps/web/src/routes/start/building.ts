@@ -49,6 +49,8 @@ export const words = {
   asYouType: 'builds as you type',
   /** Under the places: nothing is drawn in them that the person did not say. */
   startsEmpty: 'Each place starts empty and fills with what you tell it. No sample entries.',
+  /** Under a place the words named that waits for its first entry (Projects, Work): in the sidebar once it holds one. */
+  forming: 'In your sidebar once you add the first',
   /** The build's reading line: what is on, and what waits. */
   onReading: (on: readonly string[], waiting: string | null) =>
     on.length === 0
