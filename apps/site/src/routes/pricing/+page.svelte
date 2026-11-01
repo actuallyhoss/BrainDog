@@ -136,11 +136,12 @@
     padding-block-start: 96px;
   }
 
+  /* THE TWO TILES END LEVEL, as a bento row does: they stood 16px apart at their feet, a near miss that read as a slip. */
   .pair {
     display: grid;
     grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
   }
 
   /* THE ONE PLAN, on the night: its name and $0, what it holds, and the start button. */

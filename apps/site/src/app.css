@@ -5,8 +5,8 @@
  * THE LOOK IS THE SITE DESIGN OF 17 OCTOBER as the redesign rebuilt it: a dark night band at the top of every page (the header, then the page's own head), then
  * full-bleed colour bands, each on its own ground in both schemes, with flat radius-16 tiles inside, and a dark
  * footer. No glass, no gradients, no glows, no shadows. Titles are Lexend 600 set tight, every other word is Geist.
- * Red is the app's two tokens: `--red-fill` under white words (the start button, an answer, a count, the chores
- * band) and `--red` for red words and marks (late, needs you, links).
+ * Red is the app's two tokens: `--red-fill` under white words (the start button, and in the drawn app a count) and
+ * `--red` for red words and marks (late, needs you, links). The only solid red button on a page is Start free (1 Nov).
  *
  * WHAT EVERY PAGE DRAWS THE SAME WAY IS HERE, and a page's own sheet only places it: the column (`.wrap`), the night
  * ground, the buttons, the cards, the tables, the questions and the key cap, beside the older tile grid the kept
@@ -446,6 +446,18 @@
     color: var(--ink);
   }
 
+  /* AN ANSWER IN A DRAWING OF THE APP: ink, as the app draws a suggested answer, so the one solid red on a page stays
+     Start free (1 Nov). */
+  .btn.ink {
+    background: var(--ink);
+    box-shadow: none;
+    color: var(--page);
+  }
+
+  .btn.ink:hover {
+    background: var(--ink2);
+  }
+
   /* THE OLD FILLED BUTTON, ink, which a kept page may still draw until its own builder moves it to `Start`. */
   .btn-primary {
     background: var(--ink);
@@ -739,9 +751,13 @@
     color: var(--ink);
   }
 
+  /* THE CHORES BAND IS THE QUIET GREY, not red (1 Nov, his rule: solid red only on Start free). */
   .band--chores {
-    background: var(--red-fill);
-    color: var(--on-red);
+    background: var(--band-yours);
+    color: var(--ink);
+    /* IN DARK ITS GREY AND THE AI BAND'S UNDER IT ARE A STEP APART, so the seam is drawn: the footer's hairline, which is
+       the night itself in light and so not seen there. */
+    border-block-end: 1px solid var(--foot-rule);
   }
 
   .band--tools {
@@ -787,7 +803,7 @@
   }
 
   .band--chores .band-say {
-    color: var(--on-red);
+    color: var(--ink2);
   }
 
   /* TWELVE COLUMNS, 16 apart; at 1059 and under, every part takes the row. A tile is as tall as what it holds, so

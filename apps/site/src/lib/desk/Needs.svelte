@@ -30,7 +30,7 @@
           {#each ev.rows as [label, value]}<p><span>{label}</span><b class="num">{value}</b></p>{/each}
         </div>
         <div class="acts desk-js">
-          <button type="button" class="dbtn red" onclick={() => needs.answer(n.id, true)}>{n.yes}</button>
+          <button type="button" class="dbtn ink" onclick={() => needs.answer(n.id, true)}>{n.yes}</button>
           <button type="button" class="dbtn" onclick={() => needs.answer(n.id, false)}>{n.no}</button>
         </div>
       </div>

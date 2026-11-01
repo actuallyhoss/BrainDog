@@ -53,7 +53,7 @@
         </div>
         <div class="end">
           <span class="fig">{n.amount}</span>
-          <button type="button" class="dbtn red desk-js" onclick={() => needs.answer(n.id, true)}>{n.yes}</button>
+          <button type="button" class="dbtn ink desk-js" onclick={() => needs.answer(n.id, true)}>{n.yes}</button>
         </div>
       </div>
     {/each}
@@ -115,7 +115,7 @@
       <p class="sub">{TODAY.draft.weeks.map((w) => `${w.label} ${usd(w.cents)}`).join(' · ')}</p>
       {#if draft === 'draft'}
         <div class="acts desk-js">
-          <button type="button" class="dbtn red" onclick={() => (draft = 'kept')}>{DESK.board.keep}</button>
+          <button type="button" class="dbtn ink" onclick={() => (draft = 'kept')}>{DESK.board.keep}</button>
           <button type="button" class="dbtn" onclick={() => (draft = 'gone')}>{DESK.board.toss}</button>
         </div>
       {/if}
