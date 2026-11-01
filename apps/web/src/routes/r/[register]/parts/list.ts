@@ -324,7 +324,10 @@ export type View = 'table' | 'board' | 'cards' | 'groups';
  * twenty-four. That list's table is then `?view=table`, so a link to it still opens the table.
  */
 /** A list that draws in groups: people by organisation, and since 29 October organisations by kind. */
-export const groupsOf = (decl: RegisterDecl | undefined): boolean => orgFieldOf(decl) !== null || orgRoleOf(decl) !== null;
+export const groupsOf = (decl: RegisterDecl | undefined): boolean => orgFieldOf(decl) !== null || orgRoleOf(decl) !== null || runsList(decl);
+
+/** The list of agent runs, which opens as one ledger of faces (`ListRuns`), its "List" in the switch where People's says Groups (L17). */
+export const runsList = (decl: RegisterDecl | undefined): boolean => decl?.id === RUNS;
 
 export const homeViewOf = (decl: RegisterDecl | undefined): View => (groupsOf(decl) ? 'groups' : 'table');
 
@@ -588,10 +591,24 @@ export function atWorkIn(entries: readonly Entry[], now: number): number {
   return working.filter((e) => !(typeof e.fields.parent === 'string' && runs.has(e.fields.parent))).length;
 }
 
+/**
+ * WHAT THE LIST OF RUNS SAYS, COUNTING WHAT ITS ROWS SHOW (1 Nov, L16): "2 at work, 2 open" stood over two working runs
+ * and one finished, the open two being the working two. Now each run is counted once, by what its line says: at work,
+ * quiet, finished.
+ */
+function runsSaid(entries: readonly Entry[], open: number, now: number): string {
+  const working = atWorkIn(entries, now);
+  const quiet = Math.max(0, open - working);
+  const done = entries.length - open;
+  return [words.atWork(working), quiet > 0 ? words.quietRuns(quiet) : '', done > 0 ? words.finished(done) : ''].filter(Boolean).join(', ');
+}
+
 /* This module's own words, the sentence and the tile's reading lines. */
 const words = {
   open: (n: number) => `${n} open`,
   atWork: (n: number) => `${n} at work`,
+  quietRuns: (n: number) => `${n} quiet`,
+  finished: (n: number) => `${n} finished`,
   toSettle: (n: number) => `${n} to settle`,
   toShip: (n: number) => `${n} to ship`,
   renew: (n: number) => `${n} renew`,
@@ -602,6 +619,11 @@ const words = {
   nextDue: (when: string) => `the next due ${when}`,
   newest: (when: string) => `newest ${when}`,
   besidesYou: 'besides you',
+  thisWeek: (n: number) => `${n} added this week`,
+  allThisWeek: (n: number) => `All ${n} added this week`,
+  newestNamed: (name: string) => `the newest ${name}`,
+  lastCame: (name: string, when: string) => `Nothing new this week; the last added was ${name}, ${when}.`,
+  noneThisWeek: 'Nothing new this week',
   match: (n: number, of: number) => `${n} of ${of} ${n === 1 ? 'matches' : 'match'}.`,
   today: 'today',
   tomorrow: 'tomorrow',
@@ -653,11 +675,18 @@ export function readingOf(
   if (!at.whole || entries.length === 0) return null;
   const dated = deadlineOf(decl);
   if (!decl.state && !dated) {
-    const newest = entries.reduce<string>((best, e) => (e.created > best ? e.created : best), '');
-    /* "1 PERSON" OVER TWO NAMES (audit 31 Oct m, AM17): you are on the list, marked You, and never counted, so the count
-       says whom it is besides. */
-    const many = `${counted(decl, entries.length)}${at.besides ? ` ${words.besidesYou}` : ''}`;
-    return plain(newest ? `${many}, ${words.newest(since(newest, now))}.` : `${many}.`);
+    /* WHAT IS NEW, NOT HOW MANY (1 Nov, L1): the bar beside the title already counts the list ("People 7"), so "7 people
+       besides you, newest 2 min ago" said the count twice. The line says what came in this week and which came last,
+       by name, which no other part of the screen says. */
+    const newestE = entries.reduce<Entry | null>((best, e) => (!best || e.created > best.created ? e : best), null);
+    const name = newestE && decl.title ? String(newestE.fields[decl.title] ?? '').trim() : '';
+    const week = entries.filter((e) => now - Date.parse(e.created) < 7 * DAY_MS).length;
+    if (!newestE) return null;
+    if (week > 0) {
+      const lead = week === entries.length && week > 1 ? words.allThisWeek(week) : words.thisWeek(week);
+      return plain(name && week > 1 ? `${lead}, ${words.newestNamed(name)}.` : name ? `${lead}: ${name}.` : `${lead}.`);
+    }
+    return plain(name ? words.lastCame(name, since(newestE.created, now)) : `${words.noneThisWeek}.`);
   }
   const open = entries.filter((e) => !isDone(decl, e));
   if (open.length === 0) return plain(`${words.nothingOpen}.`);
@@ -675,7 +704,7 @@ export function readingOf(
     renews
       ? words.renew(open.length)
       : decl.id === RUNS
-      ? `${words.atWork(atWorkIn(entries, now))}, ${words.open(open.length)}`
+      ? runsSaid(entries, open.length, now)
       : decl.state && staged
         ? settles && dated
           ? /* ORDERS ARE SHIPPED, NOT SETTLED (audit 31 Oct o, AO16): the list said "3 to settle" where the Orders page
@@ -683,8 +712,17 @@ export function readingOf(
             (/^orders?$/iu.test(decl.one ?? '') || /^orders?$/iu.test(decl.name) ? words.toShip : words.toSettle)(open.length)
           : words.open(open.length)
         : counted(decl, open.length);
-  /* A LINE THAT IS ONLY THE COUNT IS NOT SAID: the head beside the title already draws it ("Projects 4" over "4 projects."). */
-  if (!dated) return lead === counted(decl, entries.length) ? null : plain(`${lead}.`);
+  /* A LINE THAT IS ONLY THE COUNT IS NOT SAID: the head beside the title already draws it ("Projects 4" over "4 projects.").
+     A LIST OF KINDS SAYS HOW IT SPLITS INSTEAD (1 Nov, L18): Projects' lane is Building, Earning, Parked or Finished, so
+     its line is "2 building, 1 earning, 1 parked.", what the sidebar's "4 in play" is made of. */
+  if (!dated) {
+    if (lead !== counted(decl, entries.length)) return plain(`${lead}.`);
+    const f = decl.state ? decl.fields.find((x) => x.id === decl.state) : undefined;
+    const parts = (f?.type === 'enum' ? (f.values ?? []) : [])
+      .map((v) => ({ v, n: entries.filter((e) => String(e.fields[f!.id] ?? '') === v).length }))
+      .filter((x) => x.n > 0);
+    return parts.length >= 2 ? plain(`${parts.map((x) => `${x.n} ${labelOfValue(f!, x.v).toLowerCase()}`).join(', ')}.`) : null;
+  }
   const late = open.filter((e) => isLate(decl, e, now)).length;
   const coming = open
     .map((e) => ({ e, v: e.fields[dated] }))
