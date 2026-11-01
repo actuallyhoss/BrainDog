@@ -67,6 +67,7 @@
   import AddStep from './AddStep.svelte';
   import Hole from './Hole.svelte';
   import { foldOf } from './home.ts';
+  import { LONG_AT, LONG_STEP, longFoldOf, longWords } from './fold.ts';
   import { headCount, headIcon } from './tile-head.ts';
   import HomeRows from '$lib/home/HomeRows.svelte';
   import { lateDoors, lateWhere, lateWords, linesIn, moneyListOf, type WithRows } from '$lib/home/home-rows.ts';
@@ -81,7 +82,7 @@
   import { valueSaid } from '$lib/voice.ts';
   import { seenWords } from '$lib/record/blocks.ts';
   import { flip } from 'svelte/animate';
-  import { arrive, depart, dismiss, lineIn, listMotion, settleOn, springy } from '$lib/motion/index.ts';
+  import { arrive, depart, dismiss, lineIn, listMotion, ms, play, settleOn, springy, still } from '$lib/motion/index.ts';
   import { isProject } from '$lib/record/project.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
   import { deskCards, type Desk } from '$lib/home/desk-part.ts';
@@ -102,6 +103,7 @@
     now,
     level = 2,
     fold = false,
+    long = false,
     rows = null,
     verbs = null,
     pick = null,
@@ -129,6 +131,8 @@
     level?: 2 | 3;
     /** Whether a long list folds in place under "N more", as it does on a home (`home.ts` `foldOf`). */
     fold?: boolean;
+    /** Whether a list of many rows shows thirty and adds thirty a press, on a page at its own address (`fold.ts` `longFoldOf`). */
+    long?: boolean;
     /**
      * The row cursor a home walks, handed to the renderer (`braindog-render`'s `cursor.ts`): the key of the row it is on
      * in this block, or `null`, and the call a primitive makes when Tab or a click lands in one of its rows. `null`
@@ -185,7 +189,22 @@
      A LONG LIST ON A HOME SHOWS ITS FIRST ROWS AND FOLDS THE REST in place, one press away, as Today folds what needs
      you; nothing is cut and nobody is sent to another screen for the ninth row. Once opened it stays open. */
   let open = $state(false);
-  const folded = $derived(fold ? foldOf(block.kind, block.rows.length, open) : null);
+  /* AND A LONG ONE ON A PAGE, thirty at a time (`fold.ts`): the Ledger drew 142 lines, 12,400px, at once. */
+  let longShown = $state(LONG_AT);
+  const folded = $derived(fold ? foldOf(block.kind, block.rows.length, open) : long ? longFoldOf(block.kind, block.rows.length, longShown) : null);
+  /**
+   * "Show 30 more" pressed: the next thirty open under the last row read, and the focus goes to the first of them. THEY
+   * COME IN, NOT APPEAR (UI pass, 1 Nov): the rows a press adds fade up 4px over `--d-rows` together, so the eye reads
+   * where the old list ended and the new rows began; nothing waits on it, and under reduced motion they are simply there.
+   */
+  const longer = (e: MouseEvent, from: number) => {
+    const list = (e.currentTarget as HTMLElement).previousElementSibling;
+    void unfold(e, from, () => (longShown += LONG_STEP)).then(() => {
+      if (!list || still()) return;
+      const all = [...list.querySelectorAll<HTMLElement>(ROWS)].filter((el, _, every) => !every.some((o) => o !== el && o.contains(el)));
+      for (const row of all.slice(from)) play(row, { opacity: [0, 1], transform: ['translateY(4px)', 'none'] }, { duration: ms('--d-rows', 180) });
+    });
+  };
 
   /* THE ROWS OF A LIST OR A TABLE as drawn: the renderer's rows, a plain list's items, a table's body rows, and cards. */
   const ROWS = '[data-row], .list > li.item, .rowgroup > [role="row"], .cards-item';
@@ -951,7 +970,7 @@
   {@const shown = folded ? all.slice(0, folded.shown) : all}
   <Table columns={block.columns} rows={linesPlan ? linesSaid(shown, linesPlan.title) : shown} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} rowin={lineIn} rowout={dismiss} settle={springy} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} rowActions={tableActions} act={tableActions ? tableAct : undefined} />
   {/if}
-  {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
+  {#if folded}<button type="button" class="block-more tap" data-long={long && !fold ? '' : undefined} onclick={(e) => (fold ? void unfold(e, folded?.shown ?? 0) : longer(e, folded?.shown ?? 0))}>{fold ? words.more(folded.more) : longWords(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
   <!-- COMPACT, AT MOST THREE (`queue-answer.ts` `compactOf`): the question and its answers, and the rest a count on Decide. -->
@@ -1034,7 +1053,7 @@
       <!-- `w` IS A CONSTANT so each callback below keeps the narrowing it was built under. -->
       {@const w = writes}
       {@const shown = w ? w.keptSegment(i, segment, block, runAt(run)) : segment}
-      {@const more = fold ? foldOf(segment.kind, shown.rows.length, open) : null}
+      {@const more = fold ? foldOf(segment.kind, shown.rows.length, open) : long ? longFoldOf(segment.kind, shown.rows.length, longShown) : null}
       <Block
         cursor={rows?.cursor ?? null}
         onrowfocus={rows?.onrowfocus}
@@ -1050,7 +1069,7 @@
         onmenu={w ? verbs?.onmenu : undefined}
         act={w ? (action, row, value) => w.act(action, row, value, { block, at: i, before: shown.rows }) : undefined}
       />
-      {#if more}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, more.shown)}>{words.more(more.more)}</button>{/if}
+      {#if more}<button type="button" class="block-more tap" data-long={long && !fold ? '' : undefined} onclick={(e) => (fold ? void unfold(e, more.shown) : longer(e, more.shown))}>{fold ? words.more(more.more) : longWords(more.more)}</button>{/if}
       {#if w && segment.kind === 'steps' && w.stepable(block)}<AddStep {block} writes={w} />{/if}
       <!-- WHAT THE RECORD REFUSED ABOUT A FIELD IS SAID UNDER ITS BLOCK, named by the field's label, until that field is
            written. -->
@@ -1375,6 +1394,39 @@
   .block-more:hover {
     color: var(--ink);
     text-decoration-color: currentColor;
+  }
+
+  /* "SHOW 30 MORE" UNDER A LONG LIST IS A CONTROL, NOT A FOOTNOTE (UI pass, 1 Nov): the list's width, a quiet fill, the
+     control's height, so a thumb finds it and the eye reads where the list stops. A press is a fill change. */
+  .block-more[data-long] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    margin-block-start: var(--sp-3);
+    padding: 0 var(--sp-4);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
+    transition: background-color var(--d-press, 70ms) ease-out;
+  }
+
+  .block-more[data-long]:hover {
+    background: var(--hover);
+  }
+
+  .block-more[data-long]:active {
+    background: var(--rule);
+  }
+
+  @media (pointer: coarse) {
+    .block-more[data-long] {
+      min-block-size: 44px;
+    }
   }
 
   /* An input's refusal, under the inputs it is about, in the size the slice line under a block is said in. */

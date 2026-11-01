@@ -489,6 +489,13 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: var(--sp-7);
   }
+
+  /* TWO COLUMNS OF ACCOUNTS RULE BETWEEN ROWS, NOT BETWEEN COLUMNS (UI pass, 1 Nov): the hairline every account after the
+     first wears ran over the second column's first row, a line 9px lower than the first column's top and nowhere
+     else, so Accounts' Balance tile read as two misaligned halves. */
+  [data-money] .block-slot[data-full][data-source='metric.cash-by-account'] .prop > .prop-row:nth-child(2 of .prop-row) {
+    border-block-start: 0;
+  }
 }
 
 /* ── where the money is kept: rows, not bars ─────────────────────────────── */
@@ -587,8 +594,9 @@
 }
 
 /* ITS FACTS UNDER ITS NAME, NOT UNDER ITS ICON: the date under the head already stood in the name's column, and
-   "Ending in 2044" a step to the left of it. */
-[data-money] .cards-item:has(> .cards-head > .part-chip) > .cards-facts {
+   "Ending in 2044" a step to the left of it. AND ITS BALANCE TOO (UI pass, 1 Nov): a book's account card drew
+   "$41,380 Balance" at the icon's edge and "Type Bank" under the name, two left edges in one 240px card. */
+[data-money] .cards-item:has(> .cards-head > .part-chip) > :is(.cards-facts, .cards-body) {
   padding-inline-start: 44px;
 }
 
@@ -1023,17 +1031,28 @@
    phone and no two amounts stood in a column. The amount takes the row's end, level with the name; the day and who
    stay under the name. */
 [data-money] .list[data-kind='todo'] > .item:has(> .item-detail) {
-  grid-template-columns: 20px minmax(0, 1fr) auto auto 28px;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
   grid-template-areas:
-    'marker title state detail more'
-    '. meta meta meta .';
+    'marker title state detail'
+    '. meta meta more';
 }
 
+/* THE AMOUNT AT THE TILE'S EDGE, IN THE COLUMN EVERY TABLE ON THE PAGE ENDS ON, AT THE SIZE THEY SAY THEIRS (UI pass,
+   1 Nov): the row's menu held the last 28px, hidden until a pointer came near, so Coming up's two bills ended their
+   amounts 40px short of Late's and Next 7 days' right above and below, and at 13px against their 15. The menu moves
+   under the amount, on the day's line, where it still opens the same menu. */
 [data-money] .list[data-kind='todo'] > .item > .item-detail {
   justify-self: end;
   padding-inline-start: var(--sp-3);
+  font-size: var(--fs-body);
   text-align: end;
   white-space: nowrap;
+}
+
+[data-money] .list[data-kind='todo'] > .item:has(> .item-detail) > .item-more {
+  grid-area: more;
+  justify-self: end;
+  align-self: center;
 }
 
 [data-money] .list > .item > .item-detail[data-sign='in'],
@@ -1195,6 +1214,34 @@
   }
 }
 
+/* THE LEGEND TAKES THE TILE'S WIDTH BESIDE THE RING, IN TWO COLUMNS ON A DESK (UI pass, 1 Nov): sized to its words,
+   thirteen categories stood in one narrow column by the ring and the right 60% of Reports' widest tile was empty board,
+   and stretched to the width a name stood 500px from its amount. Two columns, each a name, its amount and its share
+   right-aligned at the column's end, so a name and its amount are one glance apart and the tile is half as tall. */
+@media (width >= 1100px) {
+  [data-money] .split[data-form='donut'] .split-legend,
+  [data-money] .split[data-form='donut'] .split-legend:has(> .split-item > .part-chip) {
+    flex: 1 1 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-1) var(--sp-7);
+    max-inline-size: none;
+  }
+
+  [data-money] .split[data-form='donut'] .split-legend > .split-item {
+    grid-column: auto;
+    grid-template-columns: 28px minmax(0, 1fr) max-content 3.25rem;
+    column-gap: var(--sp-3);
+  }
+
+  [data-money] .split[data-form='donut'] .split-legend:not(:has(> .split-item > .part-chip)) > .split-item {
+    grid-template-columns: 8px minmax(0, 1fr) max-content 3.25rem;
+  }
+
+  [data-money] .split[data-form='donut'] .split-legend > .split-item > :is(.split-note, .glyph) {
+    grid-column: 2 / -1;
+  }
+}
+
 [data-money] .split[data-form='donut'] .split-item > .part-chip {
   grid-column: 1;
 }
@@ -1305,6 +1352,13 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: var(--sp-7);
   }
+
+  /* ALL BUDGETS IS THE TILE'S TOTAL, ACROSS BOTH COLUMNS OVER THE CATEGORIES (UI pass, 1 Nov): laid as the first cell
+     of two, it sat beside Groceries with no chip, its name 48px left of every category's, and Eating out fell to the
+     next row alone. */
+  [data-money] .block-slot[data-full] .progress:not([data-form='range']) > .progress-row[data-total] {
+    grid-column: 1 / -1;
+  }
 }
 
 /* AN ACCOUNT'S CARD LEADS WITH ITS CHIP (a bank, cash, a card), as a bank's app lists what you hold. */
@@ -1351,4 +1405,120 @@
   display: flex;
   justify-content: flex-end;
   margin-block: calc(-1 * var(--sp-1)) var(--sp-2);
+}
+
+/* ── the head of a page with no sentence (UI pass, 1 Nov) ────────────────── */
+
+/* THE SEARCH ON THE HEAD'S ROW, BESIDE SHARE AND MORE, NOT UNDER A ROW THAT HELD THEM ALONE. The Ledger says nothing
+   above its search until a line waits to be filed, so its head drew Share and More on a row of their own: 52px of board
+   at a desk, 56 on a phone, before the search. The search rises into that row, as wide as it was on a desk and as wide
+   as the row leaves it beside the buttons on a phone; the row under it no longer catches a press meant for Share. */
+.hosted[data-money] > .page-head[data-titled]:has(.name-unseen):has(+ .head-below) + .head-below {
+  margin-block-start: -48px;
+  pointer-events: none;
+}
+
+.hosted[data-money] > .page-head[data-titled]:has(.name-unseen):has(+ .head-below) + .head-below > * {
+  pointer-events: auto;
+}
+
+.hosted[data-money] > .page-head[data-titled]:has(.name-unseen):has(+ .head-below) + .head-below .head-search {
+  flex: 0 1 auto;
+  inline-size: 384px;
+  max-inline-size: calc(100% - 156px);
+}
+
+@media (width < 900px) {
+  .hosted[data-money] > .page-head[data-titled]:has(.name-unseen):has(+ .head-below) + .head-below {
+    margin-block-start: -54px;
+  }
+}
+
+/* ── a line that has not started yet ─────────────────────────────────────── */
+
+/* OVER TIME WAITS UNTIL IT HAS A LINE (UI pass, 1 Nov): on a record a few days old the tile was the whole row under the
+   hero saying the hero's own $48,210 again, "The line fills in from tonight" and "Net worth takes this line after its
+   first week", 220px between the cash and what is due. The hero already draws the cash and where it goes; the tile
+   comes in with its first week of line, when it has something of its own to say. */
+[data-money] .block-slot:has(> .block[data-kind='stat']:not([data-form='lead']) > .grid > .cell:only-child > .cell-trend-wait) {
+  display: none;
+}
+
+/* A BOOK'S PAGE AND AN ACCOUNT'S HAVE NO SENTENCE ABOVE THEIR FILTERS, so the book tabs (Everything, Household,
+   Tidepool LLC) or the account's chips rise into the head's row beside Show the data, Share and More, as the Ledger's
+   search does, rather than under a row that held the three buttons and nothing else. */
+.hosted[data-money] > .page-head[data-titled]:has(.name-unseen) + .page-filters {
+  margin-block-start: -54px;
+  padding-inline-end: 320px;
+  pointer-events: none;
+}
+
+.hosted[data-money] > .page-head[data-titled]:has(.name-unseen) + .page-filters > * {
+  pointer-events: auto;
+}
+
+@media (width < 900px) {
+  .hosted[data-money] > .page-head[data-titled]:has(.name-unseen) + .page-filters {
+    margin-block-start: 0;
+    padding-inline-end: 0;
+  }
+}
+
+/* THE FACTS OF THE ROW A PAGE IS ABOUT, AS LINES OF THE TILE (UI pass, 1 Nov): the card kept its chip with its name
+   hidden (the page and the tile already say "Business checking"), so a lone bank glyph stood on a line of its own over
+   the facts, and the facts kept the 44px they step in by beside a name that was not there, wrapped in a 279px column
+   of a 1,150px tile. The chip goes, the facts start at the tile's edge and run its width. */
+[data-money] .block-slot[data-self] .cards-grid {
+  grid-template-columns: minmax(0, 1fr);
+  margin-block-end: 0;
+}
+
+[data-money] .block-slot[data-self] .cards-item {
+  min-block-size: 0;
+}
+
+[data-money] .block-slot[data-self] .cards-head > .part-chip,
+[data-money] .block-slot[data-self] .cards-head:not(:has(> :not(.part-chip, .cards-title))) {
+  display: none;
+}
+
+[data-money] .block-slot[data-self] .cards-item > :is(.cards-facts, .cards-body) {
+  padding-inline-start: 0;
+}
+
+[data-money] .block-slot[data-self] .cards-facts {
+  gap: var(--sp-2) var(--sp-5);
+}
+
+/* "12 MORE" IS AS WIDE AS ITS WORDS (UI pass, 1 Nov): the native select took the width of its longest hidden category,
+   so the Ledger's and an account's "12 more" stood 60px before its own chevron, a gap read as a missing chip. */
+[data-money] select.filters-more {
+  field-sizing: content;
+}
+
+/* A BILL'S OWN PAGE OPENS ON ITS AMOUNT, THEN ITS DAY AND ITS FACTS IN ONE COLUMN (UI pass, 1 Nov): with its name in the
+   bar the card's head held a 6px state dot alone at the left and the day alone 1,100px away at the right, over the
+   amount. The amount leads, the day sits under it as meta, and the dot goes where "Status Paid" says the same. */
+[data-money] .block-slot[data-self] .cards-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+[data-money] .block-slot[data-self] .cards-item > .cards-body {
+  order: -1;
+}
+
+[data-money] .block-slot[data-self] .cards-head:has(> .cards-when) {
+  display: flex;
+  justify-content: flex-start;
+}
+
+[data-money] .block-slot[data-self] .cards-head > .glyph {
+  display: none;
+}
+
+[data-money] .block-slot[data-self] .cards-head > .cards-when {
+  margin-inline-start: 0;
+  color: var(--ink-3);
 }
