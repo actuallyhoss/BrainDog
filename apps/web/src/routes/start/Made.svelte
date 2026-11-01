@@ -12,7 +12,7 @@
   address in its own block with its own Copy (`CodeLine`). Under them the live sign: "Waiting for your agent…" beside a
   grey dot until the record hears its first session, then "Connected: Claude Code on MacBook" beside a green one. It asks
   the way the connect sheet does (`listenFor`, `poll`, every two seconds while the tab is shown), and stops asking once
-  it has heard. Both tiles at most 720 wide, on the frame's start edge.
+  it has heard. One column of tiles at most 720 wide on a narrow window; two columns across a wide one.
 
   `.cmd`, NEVER `.line`: the ledger's global `.line` (`rows.css`) is a four-column grid, and it broke every command
   into a 120px column with its Copy a whole window away.
@@ -226,6 +226,7 @@
 <!-- THE TILES RISE ON THEIR OWN, never inside a wrapper rising too (AP12): two fades multiplied left the screen blank
      for the first quarter second. -->
 <section class="made" aria-labelledby="made-h">
+  <div class="made-lead">
   <div class="made-tile" data-forming="made-first">
     <header class="head">
       <!-- TITLE FIRST, ONE LINE UNDER IT (T40): "Your BrainDog is made, with …" over it was a third level before the press. -->
@@ -261,6 +262,7 @@
       </ul>
     </section>
   {/if}
+  </div>
 
   <section class="made-tile agent" aria-labelledby="agent-h" data-forming="made-agent">
     <header class="head">
@@ -302,19 +304,38 @@
 </section>
 
 <style>
+  /* ONE COLUMN UP TO 1100, the tiles at most 720 on the frame's start edge; WIDER, TWO COLUMNS ACROSS THE FRAME (1 Nov, a
+     live run: at 1568 both tiles sat in the left 40% and the rest of the window was empty). Today's step and the add-ons
+     at the left, the connect step at the right, their tops level, across the same width the conversation and its build
+     took on the screen before. */
   .made {
     display: grid;
-    justify-items: start;
+    grid-template-columns: minmax(0, min(720px, 100%));
+    align-items: start;
     gap: var(--sp-4);
     min-inline-size: 0;
   }
 
-  /* ONE TILE, AT MOST 720, on the frame's start edge: 24 in, 20 on a phone. */
+  .made-lead {
+    display: grid;
+    align-content: start;
+    gap: var(--sp-4);
+    min-inline-size: 0;
+  }
+
+  @media (width >= 1100px) {
+    .made {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    }
+  }
+
+  /* ONE TILE, THE WIDTH OF ITS COLUMN: 24 in, 20 on a phone. */
   .made-tile {
     display: grid;
+    align-content: start;
     gap: var(--sp-5);
     box-sizing: border-box;
-    inline-size: min(720px, 100%);
+    inline-size: 100%;
     min-inline-size: 0;
     padding: var(--sp-5);
     background: var(--tile);
