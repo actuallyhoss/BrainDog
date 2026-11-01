@@ -49,6 +49,7 @@
   import { INSTALLED_AT } from './moved.ts';
   import { miniOf } from './mini.ts';
   import { readHostCatalogue } from './catalogue.ts';
+  import { addonHref } from './share/addon-from.ts';
 
   const store = words.store;
 
@@ -186,7 +187,11 @@
 <svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
 <PageHead icon="packs" title={copy.packs} sentence={store.sentence}>
-  {#snippet actions()}<Button size="sm" href={INSTALLED_AT}>{words.yours}</Button>{/snippet}
+  {#snippet actions()}
+    <Button size="sm" href={INSTALLED_AT}>{words.yours}</Button>
+    <!-- ANYBODY SIGNED IN MAY PUBLISH ONE: the form makes it from what they built, and it waits for review. -->
+    <Button size="sm" weight="bare" href={addonHref}>{words.publish}</Button>
+  {/snippet}
 </PageHead>
 
 {#snippet card(l: Listing, hue: (typeof SHELF_SLOTS)[keyof typeof SHELF_SLOTS], note: string | null = null)}

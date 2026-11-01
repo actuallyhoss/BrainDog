@@ -66,9 +66,29 @@ function ownIds(doc: Map): Set<string> {
  * nothing.
  */
 export function usesOf(doc: unknown): Use[] {
-  if (!isMap(doc)) return [];
+  return readUses(doc).uses;
+}
+
+/**
+ * The places in the file filled from a setting (`{{config:…}}`) rather than named: a block's `source`, a `register`, a
+ * script's `reads` or `writes`, each by the key that holds it. A place a person picks at install is one nobody could be
+ * shown before it, so a file that asks to be held to `uses` names every place outright.
+ */
+export function usesFilled(doc: unknown): string[] {
+  return readUses(doc).filled;
+}
+
+function readUses(doc: unknown): { uses: Use[]; filled: string[] } {
+  if (!isMap(doc)) return { uses: [], filled: [] };
   const own = ownIds(doc);
   const found = new globalThis.Map<string, Use>();
+  const filled: string[] = [];
+  const placeholder = (v: unknown, at: string): boolean => {
+    /* A SETTING, AND IN A PLACE'S SHAPE: a row's text that quotes the trigger (`mail from {{trigger.…}}`) is no place. */
+    if (typeof v !== 'string' || !v.includes('{{config:') || /\s/u.test(v)) return false;
+    if (!filled.includes(at)) filled.push(at);
+    return true;
+  };
   const note = (id: string, kind: Use['kind'], writes: boolean) => {
     if (own.has(id) || id.includes('{{')) return;
     if (kind === 'list' && KERNEL_LISTS.has(id.slice('register.'.length))) return;
@@ -76,8 +96,8 @@ export function usesOf(doc: unknown): Use[] {
     if (had) had.writes ||= writes;
     else found.set(id, { id, kind, writes });
   };
-  const list = (name: unknown, writes: boolean) => {
-    if (typeof name !== 'string') return;
+  const list = (name: unknown, writes: boolean, at = 'register') => {
+    if (typeof name !== 'string' || placeholder(name, at)) return;
     const bare = name.replace(/^register\./u, '');
     if (LIST.test(bare)) note(`register.${bare}`, 'list', writes);
   };
@@ -96,9 +116,9 @@ export function usesOf(doc: unknown): Use[] {
     for (const [k, x] of Object.entries(v)) {
       const w = writes || WRITE_KEYS.has(k);
       /* A LIST NAMED BARE UNDER `register` (a rule's, a feed's target, a `create`, a page's `for`) OR A REF FIELD'S `to`. */
-      if (k === 'register' || (k === 'to' && (v.type === 'ref' || (v.type === 'list' && v.of === 'ref')))) list(x, w);
+      if (k === 'register' || (k === 'to' && (v.type === 'ref' || (v.type === 'list' && v.of === 'ref')))) list(x, w, k);
       /* A BLOCK DRAWN FROM A VIEW OF THE WHOLE RECORD (the activity, the open questions, the live sessions). */
-      if (k === 'source' && typeof x === 'string' && VIEW_ID.test(x)) note(x, 'view', false);
+      if (k === 'source' && typeof x === 'string' && !placeholder(x, 'source') && VIEW_ID.test(x)) note(x, 'view', false);
       walk(x, w, depth + 1);
     }
   };
@@ -109,8 +129,8 @@ export function usesOf(doc: unknown): Use[] {
     if (kind === undefined) continue;
     /* A SCRIPT SAYS WHAT IT READS AND WRITES IN ITS HEADER, BARE, and the kernel holds every run to it. */
     if (kind === 'script') {
-      for (const r of Array.isArray(d.reads) ? d.reads : []) list(r, false);
-      for (const r of Array.isArray(d.writes) ? d.writes : []) list(r, true);
+      for (const r of Array.isArray(d.reads) ? d.reads : []) list(r, false, 'reads');
+      for (const r of Array.isArray(d.writes) ? d.writes : []) list(r, true, 'writes');
     }
     /* A RULE CHANGES THE ROWS OF THE LIST IT IS ABOUT. */
     if (kind === 'rule') list(d.register, true);
@@ -128,7 +148,7 @@ export function usesOf(doc: unknown): Use[] {
     walk(a, false, 1);
   }
   walk(doc.widgets, false, 1);
-  return [...found.values()];
+  return { uses: [...found.values()], filled };
 }
 
 /** What a file's `uses` line says, read: the ids it names, `null` when it says none, or why it cannot be read. */
@@ -156,7 +176,15 @@ export function usesFault(doc: unknown, strict = false): Refusal | null {
   if (!said.ok) return said.refusal;
   if (said.value === null && !strict) return null;
   const named = new Set(said.value ?? []);
-  const missing = usesOf(doc).filter((u) => !named.has(u.id));
+  const read = readUses(doc);
+  const from = read.filled[0];
+  if (from !== undefined)
+    return {
+      code: 'PACK_MALFORMED',
+      fix: `This add-on fills a ${from} from a setting, so nobody could be shown that place before installing it. Name the list, figure or view in the file and in uses.`,
+      at: 'uses',
+    };
+  const missing = read.uses.filter((u) => !named.has(u.id));
   if (missing.length === 0) return null;
   const ids = missing.map((u) => u.id);
   const first = ids.slice(0, 3).join(', ');

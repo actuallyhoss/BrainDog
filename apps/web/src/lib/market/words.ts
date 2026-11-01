@@ -10,6 +10,8 @@ export const words = {
   searchLabel: 'Search add-ons and starters',
   /* THE WAY FROM THE STORE TO WHAT THIS RECORD HOLDS, Settings › Add-ons. */
   yours: 'Your add-ons',
+  /* THE WAY TO PUBLISH ONE, for anybody signed in: it waits for review before anyone else sees it. */
+  publish: 'Publish an add-on',
   searchHint: 'Search add-ons and starters',
   /* THE STORE: starters first, then the shelves, and what the record suggests itself. */
   store: {

@@ -37,7 +37,7 @@ export { addressFault, addressFaults, listingFault } from './address.ts';
 import { holdsOf, resolveWhen, settleWhen } from './when.ts';
 import { scriptSources, type ScriptSource } from './script-source.ts';
 import { usesFault, usesSaid } from './uses.ts';
-export { USES_MOST, usesFault, usesOf, usesSaid, type Use } from './uses.ts';
+export { USES_MOST, usesFault, usesFilled, usesOf, usesSaid, type Use } from './uses.ts';
 import { namerOf, writesLine, writesOf, type Writes } from './calls-out-writes.ts';
 export { holdsIn, holdsOf, resolveWhen, settleWhen, type Waiting } from './when.ts';
 import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, intervalMs, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';

@@ -66,3 +66,10 @@ test('normalise holds a file that says uses to it, and keeps it in the manifest'
   assert.ok(said.ok);
   if (said.ok) assert.deepEqual(said.value.manifest.uses, ['register.transactions']);
 });
+
+test('a place filled from a setting is refused where uses is held, and a row quoting the trigger is no place', () => {
+  const filled = { ...base, uses: [], config: { list: { type: 'text', default: 'register.transactions' } }, declarations: [books, { page: 'any', title: 'Any', blocks: [{ kind: 'table', source: '{{config:list}}' }] }] };
+  assert.match(usesFault(filled)?.fix ?? '', /from a setting/u);
+  const quoted = { ...base, uses: ['register.transactions'], declarations: [books, { rule: 'note', register: 'books', then: [{ create: { register: 'books', fields: { title: 'x' }, source: 'mail from {{trigger.body.from}}' } }] }] };
+  assert.equal(usesFault(quoted), null);
+});
