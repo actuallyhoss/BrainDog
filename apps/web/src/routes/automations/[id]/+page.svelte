@@ -95,7 +95,8 @@
     type TryRun,
     type Version,
   } from '$lib/flow/source.ts';
-  import { canvasWords, lastRunReading, pageSentence, runDurations, runMark, runParts, triggerIcon } from '../hub.ts';
+  import { canvasWords, lastRunReading, pageSentence, runDurations, runGroups, runMark, runParts, triggerIcon } from '../hub.ts';
+  import { plainSay } from '$lib/flow/plain-fail.ts';
   import { contestLines, contestOf, fieldOf, nameFor } from './run-again.ts';
   import { actorOf, mutedAfter, mutedOf, tellsQuietly } from '../../settings/[area]/muted.ts';
 
@@ -866,12 +867,19 @@
             <Tile icon="history" title={words.runs} count={runs.length}>
               {#snippet actions()}<Button weight="bare" size="sm" onclick={() => (tab = 'runs')}>{canvasWords.allRuns}</Button>{/snippet}
               <ol class="runs ledger">
-                {#each runs.slice(0, 5) as r (r.id)}
+                <!-- ALIKE RUNS ARE ONE ROW (L48): "Failed 10 times, the last 9 min ago", and why in plain words under it. -->
+                {#each runGroups(runs, 5, row.name) as g, i (g.run.id)}
+                  {@const r = g.run}
+                  <!-- THE NEWEST'S REASON IS THE HEAD'S SENTENCE ALREADY when it failed, so it is not said twice. -->
+                  {@const why = i === 0 && said?.needs ? '' : g.why}
                   {@const mark = runMark(r.state)}
                   <li class="run">
-                    <button type="button" class="run-open line" onclick={() => openRun(r)}>
+                    <button type="button" class="run-open line" class:line-tall={why !== ''} onclick={() => openRun(r)}>
                       <IconWell name={mark.icon} size="l" tone={mark.tone} />
-                      <span class="line-main"><span class="line-title">{cap(words.runState[r.state] ?? r.state)}, {since(r.started, now)}</span></span>
+                      <span class="line-main">
+                        <span class="line-title">{g.times > 1 ? editWords.runTimes(cap(words.runState[r.state] ?? r.state), g.times, since(r.started, now)) : `${cap(words.runState[r.state] ?? r.state)}, ${since(r.started, now)}`}</span>
+                        {#if why}<span class="run-say">{why}</span>{/if}
+                      </span>
                     </button>
                   </li>
                 {/each}
@@ -914,7 +922,7 @@
                         {#if took !== null}<span>{editWords.took(took)}</span>{/if}
                         {#if r.trigger !== null && editWords.startedBy[r.trigger]}<span>{editWords.startedBy[r.trigger]}</span>{/if}
                       </span>
-                      {#if r.say}<span class="run-say">{r.say}</span>{/if}
+                      {#if r.say}<span class="run-say">{plainSay(r.say, row.name)}</span>{/if}
                     </span>
                   </button>
                   {#if r.state === 'pending' || r.state === 'running' || r.state === 'waiting'}
