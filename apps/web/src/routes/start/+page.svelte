@@ -1249,6 +1249,7 @@
             said={sentence}
             title={proposal?.title ?? null}
             ghost={proposal === null && brought.length === 0}
+            settled={talkDone}
             {busy}
             {locale}
             pages={proposal ? pageCount || null : null}
@@ -1405,7 +1406,8 @@
     position: absolute;
     inset-block-start: calc(100% + 2px);
     inset-inline-start: var(--sp-2);
-    max-inline-size: 60ch;
+    /* NEVER PAST THE WINDOW: at 320 the hint ran 200px off the screen's edge, its end cut. */
+    max-inline-size: min(60ch, calc(100vw - 6rem));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

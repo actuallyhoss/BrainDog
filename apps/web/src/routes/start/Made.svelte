@@ -234,12 +234,11 @@
       <!-- TITLE FIRST, ONE LINE UNDER IT (T40): "Your BrainDog is made, with …" over it was a third level before the press. -->
       <h1 class="entry-title" id="made-h" tabindex="-1" bind:this={heading}>{firstWords.title}</h1>
       <p class="entry-lede">{firstWords.sub(lists)}</p>
-      <!-- NOTHING TO SAY IS NO LINE (AP11): the held line left a hole over Go to Today on the common screen. -->
-      {#if draftLine}
-        <!-- THE LINE CHANGES IN PLACE (skills pass, 2 Nov): "Reading what you wrote" hands over to what it found with a
-             short rise, inside the same live region, so a reader hears the new words and the eye sees them change. -->
-        <p class="draft-line" role="status" data-forming="drafts-line" data-state={drafting?.state}>{#key draftLine}<span class="draft-words" in:arrive={{ rise: 4, from: 1 }}>{draftLine}</span>{/key}</p>
-      {/if}
+      <!-- NOTHING TO SAY IS NO LINE (AP11): the held line left a hole over Go to Today on the common screen. THE REGION
+           IS THERE FROM THE FIRST DRAW, empty and out of the flow (`:empty`), so a screen reader hears the words when
+           they come; one mounted with its words may never be read (skills pass, 2 Nov). The words hand over in place with
+           a short rise. -->
+      <p class="draft-line" role="status" data-forming="drafts-line" data-state={drafting?.state}>{#if draftLine}{#key draftLine}<span class="draft-words" in:arrive={{ rise: 4, from: 1 }}>{draftLine}</span>{/key}{/if}</p>
     </header>
     <div class="go">
       <Button weight="primary" href="/" kbd="↵">{firstWords.go}</Button>
@@ -370,6 +369,15 @@
     font-size: var(--fs-body);
     line-height: 22px;
     text-wrap: pretty;
+  }
+
+  /* EMPTY, OUT OF THE FLOW: no gap held over Go to Today, and the live region still there for its first words. */
+  .draft-line:empty {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   /* A BOX, so the line's handover rise moves it (a transform does not move an inline run). */

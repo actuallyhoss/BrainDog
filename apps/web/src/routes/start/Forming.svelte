@@ -14,7 +14,7 @@
   BEFORE A WORD (`ghost`), the four places a BrainDog usually has, greyed, so the tile is a picture from the first second,
   rising in one after another as the screen opens (`data-forming`). THE GREYED ROWS AND THE PARTS ARE ONE LIST (skills
   pass, 2 Nov): the first answer used to swap the whole list at once, so the moment the BrainDog first formed was a cut.
-  Now a greyed place the answer turned on stays where it is and comes up to full ink (`--form-in`), the ones it did not
+  Now a greyed place the answer turned on moves to its place and comes up to full ink (`--form-in`), the ones it did not
   sink away, and the parts it added rise in under them. An entry the words fill later (a client named in a second
   answer) rises into its part the same way, and the tile settles when it takes its name.
 
@@ -220,9 +220,7 @@
     padding: var(--sp-3) var(--sp-2);
     margin-inline: calc(-1 * var(--sp-2));
     border-radius: var(--r-ctl);
-    transition:
-      background-color 1500ms var(--ease-out),
-      opacity var(--form-in) var(--ease-out);
+    transition: background-color 1500ms var(--ease-out);
   }
 
   .row + .row {
@@ -231,12 +229,26 @@
 
   .row[data-arrived] {
     background: var(--arrived);
-    transition: opacity var(--form-in) var(--ease-out);
+    transition: none;
   }
 
-  /* GREYED UNTIL HEARD: a place the answer turned on comes up to full ink over `--form-in` where it stands. */
-  .row[data-ghost] {
-    opacity: 0.45;
+  /* A GREYED PLACE COMING UP TO FULL INK: its name's colour and its well, where it stands. */
+  .name,
+  .well {
+    transition:
+      color var(--form-in) var(--ease-out),
+      opacity var(--form-in) var(--ease-out);
+  }
+
+  /* GREYED UNTIL HEARD, IN THE QUIET INK, NOT SEE-THROUGH: at 45% opacity the name read at 3:1 and its line at 1.9:1
+     (axe, skills pass 2 Nov). The words take `--ink-3` (4.5:1 on the tile) and the well fades back; a place the answer
+     turns on comes up to full ink over `--form-in` where it stands. */
+  .row[data-ghost] .name {
+    color: var(--ink-3);
+  }
+
+  .row[data-ghost] .well {
+    opacity: 0.5;
   }
 
   .well {
@@ -313,9 +325,11 @@
     cursor: pointer;
   }
 
-  .out:hover {
-    background: var(--hover);
-    color: var(--ink);
+  @media (hover: hover) {
+    .out:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -360,8 +374,10 @@
     cursor: pointer;
   }
 
-  .back:hover {
-    color: var(--ink);
-    border-color: var(--ink-3);
+  @media (hover: hover) {
+    .back:hover {
+      color: var(--ink);
+      border-color: var(--ink-3);
+    }
   }
 </style>
