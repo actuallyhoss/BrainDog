@@ -71,16 +71,25 @@
     const said = kept?.begin.said ?? '';
     const built = kept?.begin.built ?? [];
     const me = kept?.begin.me ?? null;
+    const registers = kept?.begin.registers ?? [];
+    const today = kept?.begin.today ?? options.today;
     const opts = options;
     if (said === '') return;
     let gone = false;
     void Promise.all([import('$lib/tell/read.ts'), import('./first-drafts.ts')]).then(([{ tellRead }, d]) => {
       if (gone) return;
+      /* READ AGAINST EVERY LIST THE BUILD MADE, NOT ONLY THE ONES TODAY HAS LEARNED (audit AP2): Today learns a list's
+         declaration as a screen reads it, so on a first Today the card read the words against a list or two, found
+         nothing, and closed itself for good a moment before the rest arrived. The record's own lists first, with its
+         names and people; each list the modules declare that Today has not learned yet beside them. */
+      const own = new Set(opts.lists.map((l) => l.id));
+      const lists = [...opts.lists, ...d.tellListsOf(d.modulesHeld(registers), today).filter((l) => !own.has(l.id))];
+      const read = { ...opts, lists, currency: opts.currency ?? kept?.begin.currency ?? null };
       merge = d.mergeDrafts;
       fill = d.filled;
       rules = d.draftsFromTold(
-        d.clausesOf(said).map((c) => ({ said: c.said, told: tellRead(c.text, opts) })),
-        opts.lists,
+        d.clausesOf(said).map((c) => ({ said: c.said, told: tellRead(c.text, read) })),
+        lists,
         { built, me },
       );
     });
@@ -99,7 +108,10 @@
       const known = [...(options.titled?.[register] ?? []), ...(register === 'people' ? (options.people ?? []) : [])];
       return known.some((k) => k.name.trim().toLowerCase() === t);
     };
-    return all.filter((d) => !kept.gone.includes(d.key) && !held(d)).map((d) => edits[d.key] ?? d);
+    /* A DRAFT PUT BACK BY UNDO IS DRAWN WHATEVER THE TAB STILL REMEMBERS (audit AP3): the names Today knows are read
+       before the record's undo is, so the one just taken out still read as held and the card closed on it again. */
+    const back = kept.back ?? [];
+    return all.filter((d) => !kept.gone.includes(d.key) && (back.includes(d.key) || !held(d))).map((d) => edits[d.key] ?? d);
   });
 
   /* NOTHING LEFT, NOTHING READING: the card says it is done, so Today stops loading it. Only once Tell's reading is in. */
@@ -127,9 +139,13 @@
   let editText = $state('');
   let list = $state<HTMLElement | undefined>(undefined);
 
-  /* AFTER A PRESS, THE NEXT DRAFT'S KEEP TAKES THE FOCUS, so a keyboard goes down the card without starting over. */
+  /* AFTER A PRESS, THE NEXT DRAFT'S KEEP TAKES THE FOCUS, so a keyboard goes down the card without starting over; after
+     the last, Tell's field, where the next thing is typed, never the page (audit AP15). */
   function focusNext(): void {
-    requestAnimationFrame(() => list?.querySelector<HTMLElement>('[data-draft] button')?.focus());
+    requestAnimationFrame(() => {
+      const next = list?.isConnected ? list.querySelector<HTMLElement>('[data-draft] button') : null;
+      (next ?? document.querySelector<HTMLElement>('[data-tell-one] .tell-one-field'))?.focus({ preventScroll: next === null });
+    });
   }
 
   async function keep(these: readonly FirstDraft[]): Promise<void> {
@@ -286,7 +302,7 @@
                 <Button
                   size="sm"
                   weight={drafts.length > 1 ? 'quiet' : 'primary'}
-                  disabled={busy || (d.needs !== undefined && (needVals[d.key] ?? '').trim() === '')}
+                  disabled={busy}
                   onclick={() => (d.needs === undefined ? void keep([d]) : keepNeeded(d))}>{say.keep}</Button
                 >
                 <Button size="sm" weight="quiet" onclick={() => change(d)}>{say.change}</Button>

@@ -46,6 +46,11 @@ export type Kept = {
   gone: string[];
   /** The card had nothing left to show: Today no longer loads it. */
   closed?: boolean;
+  /**
+   * The drafts put back by an Undo, by key: drawn again even where the tab still remembers the name it took out of the
+   * record, until they are kept or let go again.
+   */
+  back?: string[];
   begin: Begin;
 };
 
@@ -80,7 +85,9 @@ function save(k: Kept | null): void {
 function load(base: string): Kept | null {
   try {
     const v = JSON.parse(tab()?.getItem(KEY) ?? 'null') as Kept | null;
-    return v !== null && typeof v === 'object' && v.base === base && Array.isArray(v.drafts) && typeof v.begin?.said === 'string' ? { ...v, gone: Array.isArray(v.gone) ? v.gone : [] } : null;
+    return v !== null && typeof v === 'object' && v.base === base && Array.isArray(v.drafts) && typeof v.begin?.said === 'string'
+      ? { ...v, gone: Array.isArray(v.gone) ? v.gone : [], back: Array.isArray(v.back) ? v.back : [] }
+      : null;
   } catch {
     return null;
   }
@@ -158,12 +165,12 @@ async function read(b: Begin): Promise<void> {
 export function settleDrafts(base: string, keys: readonly string[]): void {
   const k = draftsFor(base);
   if (k === null) return;
-  set({ ...k, gone: [...new Set([...k.gone, ...keys])] });
+  set({ ...k, gone: [...new Set([...k.gone, ...keys])], back: (k.back ?? []).filter((b) => !keys.includes(b)) });
 }
 
-/** Drafts put back on the card: the record said no to keeping them. */
+/** Drafts put back on the card: the record said no to keeping them, or the toast's Undo took them back out of it. */
 export function restoreDrafts(base: string, keys: readonly string[]): void {
   const k = draftsFor(base);
   if (k === null) return;
-  set({ ...k, closed: false, gone: k.gone.filter((g) => !keys.includes(g)) });
+  set({ ...k, closed: false, gone: k.gone.filter((g) => !keys.includes(g)), back: [...new Set([...(k.back ?? []), ...keys])] });
 }
