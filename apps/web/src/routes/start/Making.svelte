@@ -49,7 +49,7 @@
     {#each parts as p (p.id)}
       {@const s = stateOf(p.id)}
       {@const refused = typeof s === 'object'}
-      <li class="tile" data-state={refused ? 'refused' : s} aria-atomic="true">
+      <li class="tile" data-forming="part" data-part={p.id} data-state={refused ? 'refused' : s} aria-atomic="true">
         <div class="tile-head">
           <IconWell name={p.icon} tone={refused ? 'danger' : 'ink'} />
           <span class="tile-name">{p.name}</span>

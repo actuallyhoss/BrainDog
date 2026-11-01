@@ -101,13 +101,13 @@
   <Tile icon="home" title={title ?? words.yours} meta={settled ? undefined : meta} data-build>
     <ol class="places">
       {#each shown as place (`${place.kind}:${place.id}`)}
-        <li class="place" data-place={place.id} data-arrived={fresh.has(`${place.kind}:${place.id}`) ? '' : undefined}>
+        <li class="place" data-forming="place" data-place={place.id} data-arrived={fresh.has(`${place.kind}:${place.id}`) ? '' : undefined}>
           <span class="place-head">
             <Icon name={placeIcon(place)} size="s" />
             <span class="place-name">{place.name}</span>
           </span>
           {#each entriesOf(place) as e (e.key)}
-            <span class="entry">
+            <span class="entry" data-forming="entry" data-entry={e.key}>
               <span class="entry-main">{e.title}<span class="entry-detail">, {e.detail.toLowerCase()}{#if e.due}, {words.due(day(e.due))}{/if}</span></span>
               {#if e.amount}<span class="num"><Money minor={e.amount.minor} currency={e.amount.currency} home={e.amount.currency} /></span>{/if}
             </span>

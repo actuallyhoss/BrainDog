@@ -30,12 +30,11 @@
 -->
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
-  import { afterNavigate } from '$app/navigation';
   import { focusWhenDrawn } from '$lib/ui/keep-focus.ts';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { markOf } from '@braindog/skin/agent-marks.ts';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { heardOf, poll, type Heard } from '$lib/agents/connect.ts';
   import { appLines, firstWords, signOf, type AppLine } from '$lib/agents/first-connect.ts';
   import { listenFor } from '$lib/agents/listen.ts';
@@ -46,11 +45,17 @@
   import CodeLine from '$lib/ui/CodeLine.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import type { TradeOffer } from '$lib/start/offer.ts';
+  import type { SaidMade } from '$lib/start/made.ts';
+  import { beginDrafts, draftsFor, firstDrafts } from '$lib/start/first-drafts.svelte.ts';
+  import { recordToday } from '$lib/record/zone.ts';
+  import { afterNavigate, goto } from '$app/navigation';
 
   let made: {
     modules?: readonly string[] | null | undefined;
     places?: readonly string[] | null | undefined;
     addons?: readonly TradeOffer[] | undefined;
+    /** The words the BrainDog was made from and what they built: read once more by the model, for drafts on Today. */
+    said?: SaidMade | null | undefined;
   } = $props();
   const madeLine = $derived(firstWords.made(made.places ?? []));
 
@@ -65,7 +70,44 @@
     seeAddon: (title: string) => `See ${title}`,
     /* WHAT `braindog setup` DOES NEXT, so the link and the six digits it prints are expected and not a surprise. */
     approve: 'It prints a link and six digits. Open the link, type the digits, and the terminal carries on.',
+    /* THE MODEL READING THE WORDS ONCE MORE (1 Nov), and what it found: nothing is added, it waits on Today. */
+    drafting: 'Reading what you wrote once more for anything else to keep.',
+    drafted: (n: number) => (n === 1 ? 'It found one more thing in what you wrote. It waits on Today for your yes.' : `It found ${n} more things in what you wrote. They wait on Today for your yes.`),
   } as const;
+
+  /* THE MODEL READS THE WORDS ONCE MORE, AS THE OWNER NOW (1 Nov): begun here, drawn on Today as drafts. Nothing waits
+     on it; a host with no model says nothing. */
+  onMount(() => {
+    const base = apiBase();
+    draftsFor(base);
+    /* TODAY'S CARD AND TELL'S READER, FETCHED NOW, so the drafts draw with Today and do not push it down a beat later. */
+    void import('$lib/start/FirstDrafts.svelte').catch(() => undefined);
+    void import('$lib/tell/read.ts').catch(() => undefined);
+    const s = made.said;
+    const boot = page.data.live === true ? page.data.index : null;
+    if (!s || !boot) return;
+    beginDrafts({
+      base,
+      said: s.said,
+      built: s.built,
+      registers: (boot.registers ?? []).map((r: { id: string }) => r.id),
+      currency: boot.currency ?? boot.record?.currency ?? null,
+      me: boot.me?.name ?? null,
+      today: recordToday(),
+    });
+  });
+  const drafting = $derived(firstDrafts.now !== null && firstDrafts.now.base === apiBase() ? firstDrafts.now : null);
+  /** The line under the lede while the model reads and once it found something; empty, and its place held, otherwise. */
+  const draftLine = $derived(drafting === null ? null : drafting.state === 'reading' ? words.drafting : drafting.found > 0 ? words.drafted(drafting.found) : '');
+
+  /* ENTER GOES TO TODAY (1 Nov, keyboard first): from anywhere on the screen that is not a control of its own. */
+  function enterToday(e: KeyboardEvent): void {
+    if (e.key !== 'Enter' || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const t = e.target instanceof Element ? e.target : null;
+    if (t?.closest('a, button, input, textarea, select, [contenteditable], [role="button"]')) return;
+    e.preventDefault();
+    void goto(at('/'));
+  }
 
   let heading = $state<HTMLHeadingElement | undefined>(undefined);
   onMount(() => {
@@ -138,21 +180,26 @@
   });
 </script>
 
-<section class="made" aria-labelledby="made-h">
-  <div class="made-tile">
+<svelte:window onkeydown={enterToday} />
+
+<section class="made" aria-labelledby="made-h" data-forming="made">
+  <div class="made-tile" data-forming="made-first">
     <header class="head">
       <p class="made-line">{madeLine}</p>
       <h1 class="entry-title" id="made-h" tabindex="-1" bind:this={heading}>{firstWords.title}</h1>
       <p class="entry-lede">{firstWords.sub(lists)}</p>
+      {#if draftLine !== null}
+        <p class="draft-line" role="status" data-forming="drafts-line" data-state={drafting?.state}>{draftLine}</p>
+      {/if}
     </header>
     <div class="go">
-      <Button weight="primary" href="/">{firstWords.go}</Button>
+      <Button weight="primary" href="/" kbd="↵">{firstWords.go}</Button>
     </div>
   </div>
 
   {#if (made.addons ?? []).length > 0}
     {@const addons = made.addons ?? []}
-    <section class="made-tile" aria-labelledby="addons-h">
+    <section class="made-tile" aria-labelledby="addons-h" data-forming="made-addons">
       <header class="head">
         <h2 class="agent-h" id="addons-h">{words.addonsTitle(addons.length)}</h2>
         <p class="agent-sub">{words.addonsSub}</p>
@@ -171,7 +218,7 @@
     </section>
   {/if}
 
-  <section class="made-tile agent" aria-labelledby="agent-h">
+  <section class="made-tile agent" aria-labelledby="agent-h" data-forming="made-agent">
     <header class="head">
       <h2 class="agent-h" id="agent-h">{firstWords.agentTitle}</h2>
       <p class="agent-sub">{firstWords.agentSub}</p>
@@ -239,6 +286,20 @@
   .head {
     display: grid;
     gap: var(--sp-2);
+  }
+
+  /* THE MODEL'S LINE (1 Nov): one held line, so it reading and then saying what it found moves nothing under it. */
+  .draft-line {
+    min-block-size: 22px;
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-body);
+    line-height: 22px;
+    text-wrap: pretty;
+  }
+
+  .draft-line[data-state='ready'] {
+    color: var(--ink-2);
   }
 
   /* THE SECOND STEP READS AS ONE: a heading in the head size, under the page's title, never a second page title. */

@@ -111,8 +111,11 @@
     type ReadCause,
   } from '$lib/signup.ts';
   import { MADE_ADDONS, heardOf, offerOf, readCatalogueOffer, tradeAddons, type CatalogueOffer } from '$lib/start/offer.ts';
+  import { MADE_SAID, saidMade } from '$lib/start/made.ts';
   import { becameShown, filledBy, placesOf, proposeFirst, railPlaces, type HeardLine, type Proposal } from '$lib/start/propose.ts';
   import { readAsks } from '$lib/start/ask.ts';
+  import { currencyWord } from '$lib/start/place-currency.ts';
+  import { placeZone, zoneGroups, zonePlace } from '$lib/start/place-zone.ts';
   import { answer, oneQuestion, words as asked, type Question } from '$lib/start/question.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -134,6 +137,7 @@
     type Held as HeldPart,
     type MakingPart,
     type Refused,
+    currencyChoices,
   } from '../start/building.ts';
   import { caseOf, keepsCurrency } from '../start/preview.ts';
   import Building from '../start/Building.svelte';
@@ -201,6 +205,18 @@
   /* WHERE AND HOW THE SENTENCE WAS TYPED, for a date such as "on the 1st" and the currencies worth offering. */
   const locale = typeof navigator === 'undefined' ? 'en' : navigator.language;
   const here = zone();
+
+  /*
+   * THE TIME ZONE AND THE CURRENCY, GUESSED FROM THIS DEVICE AND SAID ON THE KEEP STEP IN ONE LINE WITH CHANGE (1 Nov,
+   * "infer currency and time zone from the browser locale and Intl, and confirm in one tap"). Nothing is asked for them:
+   * the device's clock is the zone, the words or the device give the currency, and a place named in the words that keeps
+   * another clock is offered as one tap (`placeZone`), never taken without it.
+   */
+  let tzPick = $state<string | null>(null);
+  let currencyPick = $state<string | null>(null);
+  let setOpen = $state(false);
+  /** The zone the record is made in: the one picked, else this device's. */
+  const zoneSent = (): string | null => tzPick ?? here;
 
   /** `sessionStorage`, or `null` where reading it throws (storage blocked). */
   function tabStore(): Storage | null {
@@ -445,21 +461,64 @@
     return () => clearTimeout(wait);
   });
 
+  /**
+   * HOW LONG A PRESS WAITS ON THE MODEL BEFORE IT GOES ON WITH THE RULES' READING (1 Nov, "make it much smarter and
+   * smoother"): never a "Reading" button for more than about a second. The model's reading is not dropped: it lands in
+   * place when it answers (`late`), on the build beside the words, and the person never waits on it.
+   */
+  const QUICK_MS = 1200;
+  /** The words a model's reading is still out for, after the press went on without it: the build says it is still reading. */
+  let lateFor = $state<string | null>(null);
+  /** A model's reading that answered while the one question was on screen, laid on once it is answered. */
+  let lateHeld = $state.raw<{ said: string; proposal: Proposal } | null>(null);
+  /** The words a late reading landed on, so the build says it was read again. */
+  let landed = $state<string | null>(null);
+
   /** THE PRESS'S READ: the model once for these words (or the reading it already gave them), else the rules'. */
   async function readPressed(s: string): Promise<Proposal> {
     if (pressed !== null && pressed.said === s) return pressed.proposal;
     let ask: ModelAsk | null = null;
+    let late = false;
+    const model = reading(s, 'press', (q) => (ask = q)).then(
+      (p) => {
+        if (lateFor === s) lateFor = null;
+        if (p.by === undefined || p.by === 'rules' || sentence !== s) return p;
+        /* LATE, ITS QUESTION IS NOT ASKED: the person has gone on, and the rules' question (or none) stood. While the one
+           question is on screen the reading waits, so the question does not change under the person's thumb. */
+        if (late && step === 'question') lateHeld = { said: s, proposal: p };
+        else pressed = { said: s, proposal: p, ask: late ? null : ask };
+        if (late) landed = s;
+        return p;
+      },
+      /* A READ THAT THREW IS NO READING, at once: the rules' stands and nothing says it is still reading. */
+      () => {
+        if (lateFor === s) lateFor = null;
+        return 'failed' as const;
+      },
+    );
     readingNow = true;
-    let p: Proposal;
+    let quick: Proposal | 'failed' | null;
     try {
-      p = await reading(s, 'press', (q) => (ask = q));
+      quick = await Promise.race([model, new Promise<null>((done) => setTimeout(() => done(null), QUICK_MS))]);
     } finally {
       /* NEVER STUCK ON "Reading": a read that threw leaves Next pressable again. */
       readingNow = false;
     }
-    if (p.by !== undefined && p.by !== 'rules') pressed = { said: s, proposal: p, ask };
-    return p;
+    if (quick === 'failed') return reading(s);
+    if (quick !== null) return quick;
+    /* THE MODEL IS SLOW: on with the rules' reading of the same words, and the model's lands when it comes. */
+    late = true;
+    if (door !== null) lateFor = s;
+    return reading(s);
   }
+
+  /* THE LATE READING, ONCE THE QUESTION IS ANSWERED OR LEFT: laid on as any model reading is, for these very words. */
+  $effect(() => {
+    const held = lateHeld;
+    if (held === null || step === 'question') return;
+    lateHeld = null;
+    if (held.said === sentence) pressed = { said: held.said, proposal: held.proposal, ask: null };
+  });
 
   /* THE CURRENCIES THIS DEVICE POINTS AT, for the one question when it is the currency. */
   let device: CurrencyEnv | null = null;
@@ -532,6 +591,14 @@
 
   /* THE CURRENCY IS THE ONE TYPED OR THE ONE ANSWERED, never guessed (`oneQuestion` asks it where an amount has none). */
   const money = $derived(modules.find(keepsCurrency) ?? null);
+  /** A place named in the words that keeps another clock than this device, offered as one tap on the keep step. */
+  const zoneOffer = $derived(sentence.trim() === '' ? null : placeZone(sentence));
+  const zoneNow = $derived(tzPick ?? here);
+  /** The currency the record is made in, said on the keep step: the one picked, else the reading's, where Money is kept. */
+  const moneyNow = $derived(money === null ? null : (currencyPick ?? read?.currency ?? null));
+  /** The currencies worth offering first when the person opens Change, as the one question offers them. */
+  const moneyAsk = $derived(money === null || !setOpen ? null : currencyChoices(sentence, deviceOf()));
+  const zonesOffered = $derived(setOpen ? zoneGroups([zoneNow, here, zoneOffer?.zone ?? null]) : []);
   const placed = $derived(u !== null || modules.length > 0);
 
   const parts = $derived([
@@ -603,6 +670,27 @@
   function unpicked(): void {
     pickWhy = true;
     askBox?.querySelector<HTMLElement>('button, input')?.focus();
+  }
+
+  /*
+   * ENTER ANSWERS (1 Nov, keyboard first): on a choice it is that choice, and on the field what is typed; with nothing
+   * chosen it says so, as Continue does. On "What is it closest to?" a chip is chosen and the step goes on.
+   */
+  function askEnter(e: KeyboardEvent): void {
+    if (e.key !== 'Enter' || e.isComposing || e.shiftKey || readingNow) return;
+    const opt = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-value]') : null;
+    if (asks === 'closest') {
+      if (opt?.dataset.value) chosen = opt.dataset.value;
+      if (chosen === null) return;
+      e.preventDefault();
+      void keep();
+      return;
+    }
+    e.preventDefault();
+    const v = opt?.dataset.value ?? pick;
+    if (v === undefined || v === null || v.trim() === '') return unpicked();
+    pick = v;
+    void answerIt(v);
   }
 
   async function answerIt(value: string | null): Promise<void> {
@@ -814,7 +902,7 @@
    */
   const draftNow = (): Draft => ({
     said: sentence.trim(),
-    currency: money === null ? null : (read?.currency ?? null),
+    currency: money === null ? null : (currencyPick ?? read?.currency ?? null),
     usecase: chosen,
     reply,
     ...(live !== null && liveFor === sentence && sentence === sentence.trim() ? { reading: live } : {}),
@@ -836,7 +924,7 @@
     if (signedIn !== null) {
       /* NO MAIL TO WAIT ON: kept now, because a paid plan leaves for Stripe's page and comes back to a new page load. */
       keepAll();
-      held = { slug, name: titleSent(read, person || null), tz: zone(), plan };
+      held = { slug, name: titleSent(read, person || null), tz: zoneSent(), plan };
       hold(globalThis.sessionStorage, held);
       if (plan === 'free') void makeFree(held);
       else step = 'pay';
@@ -845,13 +933,13 @@
     busy = true;
     said = null;
     /* WHAT WAS SAID RIDES IN THE LINK (`said`), so a link opened on another device builds the same BrainDog. */
-    const out = await startSignup({ email, slug, name: person, tz: zone(), turnstile: human, code: codeKept(tabStore()), said: draftNow() });
+    const out = await startSignup({ email, slug, name: person, tz: zoneSent(), turnstile: human, code: codeKept(tabStore()), said: draftNow() });
     busy = false;
     if (out.ok && out.value.proof !== null) {
       /* THE INVITATION WAS MAILED TO THIS ADDRESS, so it proved it: no second mail, straight on to the build. */
       keepCode(tabStore(), null);
       keepAll();
-      hold(globalThis.sessionStorage, { slug, name: titleSent(read, person.trim() || null), tz: zone(), plan });
+      hold(globalThis.sessionStorage, { slug, name: titleSent(read, person.trim() || null), tz: zoneSent(), plan });
       keepPlan(localStore(), plan);
       await verify(out.value.proof);
       return;
@@ -864,7 +952,7 @@
       /* KEPT ONLY ONCE THE HOST SAID YES, so a refused address leaves nobody's words on this device. */
       keepAll();
       /* KEPT NOW AS WELL AS IN THE PROOF, so a proof opened in this tab still finds the name if the mail was slow. */
-      hold(globalThis.sessionStorage, { slug, name: titleSent(read, person.trim() || null), tz: zone(), plan });
+      hold(globalThis.sessionStorage, { slug, name: titleSent(read, person.trim() || null), tz: zoneSent(), plan });
       keepPlan(localStore(), plan);
       step = 'sent';
       await tick();
@@ -1130,6 +1218,9 @@
       globalThis.sessionStorage?.setItem('braindog.made.places', JSON.stringify(railPlaces(asked.proposal.places, filledBy(asked.proposal.rows)).filter((x) => x.kind !== 'today').map((x) => x.name)));
       /* AND THE ADD-ONS A TRADE SAID NAMES (AH8, FB5): offered by name at the end, never installed by the sentence. */
       globalThis.sessionStorage?.setItem(MADE_ADDONS, JSON.stringify(tradeAddons(sentence, cat).map((u) => ({ id: u.id, title: u.title, summary: u.summary }))));
+      /* AND THE WORDS WITH WHAT THEY BUILT (1 Nov): the made screen has the model read them once more, as the owner now,
+         and offers what it finds beyond the build as drafts on Today (`first-drafts.ts`). Never the whole reading. */
+      globalThis.sessionStorage?.setItem(MADE_SAID, JSON.stringify(saidMade(given.sentence, given.proposal.rows)));
     } catch {
       /* Storage off: the end says only that it is made. */
     }
@@ -1369,7 +1460,8 @@
     <h1 class="entry-title" id="first-q" tabindex="-1">{words.questionTitle}</h1>
     {#if asks === 'one' && q !== null}
       <p class="entry-lede" id="first-q-ask">{q.question}</p>
-      <div class="ask-box" bind:this={askBox}>
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="ask-box" bind:this={askBox} onkeydown={askEnter}>
       {#if q.reply === 'currency'}
         <Currency bind:value={pick} {locale} choices={q.choices.map((c) => ({ code: c.value, name: c.label, why: c.means ?? '' }))} suggested={q.suggested} find={q.find} />
       {:else if q.choices.length === 0}
@@ -1377,7 +1469,7 @@
       {:else}
         <div class="opts" role="radiogroup" aria-labelledby="first-q-ask">
           {#each q.choices as c (c.value)}
-            <button type="button" class="opt" role="radio" aria-checked={pick === c.value} onclick={() => (pick = c.value)}>
+            <button type="button" class="opt" role="radio" data-value={c.value} aria-checked={pick === c.value} onclick={() => (pick = c.value)}>
               <span class="opt-name">{#if pick === c.value}<Icon name="check" size="s" />{/if}{c.label}</span>
               {#if c.means}<span class="opt-means">{c.means}</span>{/if}
             </button>
@@ -1394,9 +1486,10 @@
     {:else}
       <p class="entry-lede">{words.closest}</p>
       <p class="quiet">{words.closestWhy}</p>
-      <div class="chips" role="group" aria-label={firstRun.mineFor}>
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div class="chips" role="group" aria-label={firstRun.mineFor} onkeydown={askEnter}>
         {#each USE_CASES as one (one.usecase)}
-          <Button weight="quiet" aria-pressed={chosen === one.usecase} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
+          <Button weight="quiet" data-value={one.usecase} aria-pressed={chosen === one.usecase} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
         {/each}
       </div>
       <div class="go sticky"><Button weight="primary" disabled={chosen === null} onclick={() => void keep()}>{words.questionNext}</Button></div>
@@ -1425,6 +1518,48 @@
           {/if}
         {/if}
       </section>
+
+      <!-- THE ZONE AND THE CURRENCY, GUESSED AND SAID IN ONE LINE (1 Nov): Change opens both in place, and a place the words
+           named that keeps another clock is one tap. Nothing here is asked; the press below keeps what the line says. -->
+      {#if zoneNow !== null}
+        <section class="set" data-forming="set" aria-labelledby="set-h">
+          <p class="field-label" id="set-h">{words.setTitle}</p>
+          {#if !setOpen}
+            <div class="set-row">
+              <p class="set-line">{words.setLine(zonePlace(zoneNow), moneyNow === null ? null : currencyWord(moneyNow))}</p>
+              <button type="button" class="link plain" aria-expanded="false" onclick={() => (setOpen = true)}>{words.setChange}</button>
+            </div>
+            {#if zoneOffer !== null && zoneOffer.zone !== zoneNow}
+              {@const offer = zoneOffer}
+              <div class="set-row">
+                <p class="quiet">{words.setPlaced(offer.place)}</p>
+                <Button size="sm" weight="quiet" onclick={() => (tzPick = offer.zone)}>{words.setUse(zonePlace(offer.zone))}</Button>
+              </div>
+            {/if}
+          {:else}
+            <label class="field-label" for="set-zone">{words.setZone}</label>
+            <span class="field">
+              <select id="set-zone" class="field-input" value={zoneNow} onchange={(e) => (tzPick = e.currentTarget.value)}>
+                {#each zonesOffered as g (g.area)}
+                  <optgroup label={g.area}>
+                    {#each g.zones as z (z)}<option value={z}>{zonePlace(z)}</option>{/each}
+                  </optgroup>
+                {/each}
+              </select>
+            </span>
+            {#if moneyAsk !== null}
+              <Currency
+                bind:value={currencyPick}
+                {locale}
+                choices={moneyAsk.choices}
+                suggested={moneyNow ?? moneyAsk.suggested}
+                find={moneyAsk.find}
+              />
+            {/if}
+            <div class="chips"><Button weight="quiet" onclick={() => (setOpen = false)}>{words.setDone}</Button></div>
+          {/if}
+        </section>
+      {/if}
 
       {#if signedIn === null}
         <!-- `email-row`, NEVER `row`: the ledger's global `.row` drew a rule under it and cut the field short. -->
@@ -1571,8 +1706,13 @@
         <div class="talk" data-tile>{@render stepNow()}</div>
 
         {#if showBuild}
-          <aside class="build" aria-label={firstRun.mineTitle}>
+          <aside class="build" aria-label={firstRun.mineTitle} data-forming="build">
             <Building {parts} title={read?.title ?? null} {places} {locale} readBy={read} settled={step !== 'describe'} />
+            <!-- THE MODEL STILL READING AFTER THE PRESS WENT ON (1 Nov): said, so a build that changes in a moment is expected;
+                 and once it lands, that it did. One slot, so the line coming and going moves nothing above it. -->
+            <p class="late" role="status" data-late={lateFor !== null && lateFor === sentence ? 'reading' : landed === sentence ? 'landed' : undefined}>
+              {lateFor !== null && lateFor === sentence ? words.stillReading : landed === sentence ? words.readAgain : ''}
+            </p>
           </aside>
         {/if}
       {/if}
@@ -2008,6 +2148,59 @@
     font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
+  }
+
+  /* THE ZONE AND THE CURRENCY (1 Nov): one quiet line under the name, with Change on its end; opened, the two pickers. */
+  .set {
+    display: grid;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .set > .field-label {
+    margin: 0;
+  }
+
+  .set .field {
+    inline-size: 100%;
+  }
+
+  .set-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .set-line {
+    margin: 0;
+    min-inline-size: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  /* THE LATE READING'S LINE (1 Nov): one held slot under the build, so its words coming and going move nothing. */
+  .late {
+    min-block-size: 22px;
+    margin: var(--sp-2) 0 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 22px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .late[data-late] {
+      animation: late-in var(--d-page) var(--ease-out) both;
+    }
+  }
+
+  @keyframes late-in {
+    from {
+      opacity: 0;
+    }
   }
 
   /* `email-row` AND NOT THE LEDGER'S `.row`: a label over a field the column's width. */
