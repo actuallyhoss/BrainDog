@@ -2529,7 +2529,7 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '6afb43bbb3cc59e0',
+    declares: 'a40750ee487c9f43',
     history: [
       'Money 3.33.0, round 1031 of 30 October: `rule.category-correction-asks`, `script.category_correction` and `script.ledger_twice` added, the figures by range such as `metric.spent-last` added, every spending figure leaves corrections out; sixteen ids added, none taken away -> b6299d6dda85dfdc',
       'Before 3.33.0 shipped, `register.snapshots` says it is kept by automations alone (`kept_by`), so it is offered no page; no id added or taken away -> 8aeb6babb5fcaf3a',
@@ -2548,6 +2548,7 @@ const DECLARED: Record<string, Version> = {
       'Before 3.33.0 shipped, `metric.bills-held` is added, `page.money` opens on an account to add when none is kept and signs its hero tiles by their way, `widget.cash-today` signs the same; one id added, none taken away -> 199f1f241a0a0d26',
       'Before 3.33.0 shipped, `metric.settled-out-7d` is added, money he paid out in the last 7 days; one id added, none taken away -> 786ef33ec53daf88',
       'Before 3.33.0 shipped, `page.money` says only how many Ledger lines came in today, without "each under the day it happened"; no id added or taken away -> 6afb43bbb3cc59e0',
+      'Before 3.33.0 shipped, `page.money` says how long the money lasts as one line under Cash now with In and Out beside it, `page.money-coming` lists what is late once, `page.money-reports` drops a share of nothing in other currencies and `page.money-accounts` draws one tile of balances; no id added or taken away -> a40750ee487c9f43',
     ],
   },
   'work@1.17.0': {

@@ -53,6 +53,27 @@ const folded = (said: string): string => said.toLowerCase().replace(/[^a-z0-9]+/
  * caught it: both keys are rendered, so `dead-copy` is content and the tests assert against the key
  * rather than the words.
  */
+/** One word said as many, or as it is where it does not change ("gold", "homework") or is plural already. */
+const manyOf = (w: string): string =>
+  /(?:[^s]s|money|cash|gold|insurance|homework|work|news|advice|equipment|data)$/iu.test(w)
+    ? w
+    : /[^aeiou]y$/iu.test(w)
+      ? `${w.slice(0, -1)}ies`
+      : /(?:ss|x|z|ch|sh)$/iu.test(w)
+        ? `${w}es`
+        : `${w}s`;
+
+/**
+ * A thing named in the one, said as many: the last word takes the plural ("savings circle" to "savings circles",
+ * "property" to "properties"), the word before "of" where there is one ("pieces of work"), and each side of an "or"
+ * ("goals or habits").
+ */
+const pluralOf = (thing: string): string =>
+  thing
+    .split(/ or (?:an? )?/u)
+    .map((part) => (/ of /u.test(part) ? part.replace(/(\p{L}+)(?= of )/u, manyOf) : part.replace(/(\p{L}+)$/u, manyOf)))
+    .join(' or ');
+
 const notReached = 'Nothing was saved. Check your connection, then try again.';
 
 /** Where a person writes when retrying will not fix it. The same address the site and the Worker's mail footer name. */
@@ -317,8 +338,15 @@ export const shell = {
    * had been asked for. The heading says what was typed, and the links under it are the likeliest of what is here.
    */
   noPageCalled: (name: string) => `No page called ${name}`,
-  /** A place with nothing in it yet, by its own first step where it has one: "Nothing here yet. Add an account to start." */
-  emptyPlace: (step: string | null) => (step === null ? 'Nothing here yet.' : `Nothing here yet. ${step} to start.`),
+  /**
+   * A place with nothing in it yet, said as its own list: "No trips yet." from its box "Add a trip". The box under it is
+   * the way to add the first, so the line does not say "to start" over it (design pass 1 Nov, M29: "Nothing here yet.
+   * Add a trip to start." read as a form letter). A step that is not "Add a …" says the plain line.
+   */
+  emptyPlace: (step: string | null) => {
+    const thing = step === null ? null : /^add (?:a |an |your first |your |the first )?(.+?)\.?$/iu.exec(step.trim())?.[1];
+    return thing ? `No ${pluralOf(thing)} yet.` : 'Nothing here yet.';
+  },
   nearPages: 'The closest pages here:',
   /**
    * THE HALF OF THE REFUSAL A PERSON CAN ACT ON, AND IT WAS A BARE FULL STOP.

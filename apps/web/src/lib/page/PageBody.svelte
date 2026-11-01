@@ -181,6 +181,19 @@
   const layout = $derived(layoutOf(page));
 
   /**
+   * A HEADING THAT HOLDS NOTHING OF ITS OWN IS NOT A TILE (design pass 1 Nov, M28): a section that neither boxes the
+   * blocks after it, nor folds them, nor carries a panel or a count drew as a tile with only its name in it, over tiles
+   * that each have a heading of their own (Zakat's "How it is worked out" over Step 1 and Step 2). While reading it is
+   * left out, at its place; arranging still draws it, as it draws every block.
+   */
+  const bareHeading = (b: LiveBlock): boolean => {
+    if (b.kind !== 'section' || b.drawn === false) return false;
+    const k = b as Record<string, unknown>;
+    const folds = k.fold === true || b.rows?.[0]?.cells?.[2] === 'fold';
+    return k.box !== true && !folds && k.panel === undefined && typeof k.source !== 'string';
+  };
+
+  /**
    * THE BLOCKS AS THIS MODE DRAWS THEM. On every page being read, a home or any other, a block that holds nothing and
    * says nothing about it, or that this build cannot draw, is not drawn (an empty or unused part is not
    * drawn), at the index it was declared at, so every id and write on the page still finds it. THE RECORD SAYS WHICH
@@ -196,7 +209,7 @@
    * because the panel reads its actions only once it is drawn: with some it stays over blocks that all went, and with
    * none it goes with them.
    */
-  const quiet = $derived(judgedWith(blocks, held, (bs) => emptyHidden(bs, mode === 'page')));
+  const quiet = $derived(judgedWith(blocks, held, (bs) => emptyHidden(bs, mode === 'page')).map((b) => (bareHeading(b) ? { ...b, drawn: false } : b)));
   const drawable = $derived(mode === 'preview' || arranging ? arranged(blocks) : quiet);
   /* AND THE LINE THE HEADER HOLDS IS NOT A TILE AS WELL (`captured`): not drawn here, and still at its place, so every
      write finds its block. Never while authoring, where it is a block like any other. */

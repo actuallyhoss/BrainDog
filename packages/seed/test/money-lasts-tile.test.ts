@@ -60,7 +60,6 @@ type Cell = { metric: string; reading: { value: number | null; beyond?: unknown 
 type Drawn = Block & { key?: string; drawn?: boolean; why?: string; tone?: string; refusals?: unknown[]; readings?: Cell[]; values?: Record<string, unknown> };
 /** The hero: the one lead stat Money draws, with its cells read. */
 const hero = (k: Kernel): Drawn => value<{ blocks: Drawn[] }>(k.page('money')).blocks.find((b) => b.kind === 'stat' && b.lead === true)!;
-const cell = (b: Drawn, metric: string): Cell | undefined => b.readings?.find((c) => c.metric === metric);
 const shown = (b: Drawn | undefined): boolean => b !== undefined && b.drawn !== false;
 /**
  * WHETHER A BLOCK'S `when:` HELD: one it turned off is answered before any figure is read (`pages.ts` `readBlock`), so
@@ -71,11 +70,13 @@ const read = (b: Drawn | undefined): boolean => b !== undefined && Array.isArray
 /** A bank account holding `balance` today. */
 const bank = (k: Kernel, balance: number): string => make(k, 'accounts', { name: `${BANKS[0]} current`, kind: 'bank', liquid: true, balance: gbp(balance), as_of: day(0) });
 
-test('MONEY DECLARES BOTH ANSWERS AS CELLS OF ITS HERO, over the same figures, once there is an account', () => {
+test('MONEY SAYS HOW LONG IT LASTS AS ONE LINE UNDER CASH NOW, the walk with what is due, once there is an account', () => {
   const [hero] = HERO as Block[];
-  const cells = hero!.cells as { metric: string }[];
-  assert.ok(cells.some((c) => c.metric === ON_WHAT_IS_DUE.metric), 'the day it runs out on what is due is not a cell');
-  assert.ok(cells.some((c) => c.metric === LASTS_SAID.metric), 'how long it lasts with nothing coming in is not a cell');
+  const cells = hero!.cells as { metric: string; note?: string }[];
+  /* ONE ANSWER, BEFORE 3.33.0 SHIPPED (design pass 1 Nov, M23): "Lasts 30 Oct" beside "If nothing comes in 19 days" read
+     as two answers to one question. The day and the days are Cash now's own line, and neither is a cell. */
+  assert.match(cells[0]!.note ?? '', new RegExp(`^Lasts until \\{\\{${ON_WHAT_IS_DUE.metric}\\}\\} \\(\\{\\{runway-days\\}\\}\\)\\.`, 'u'));
+  assert.ok(!cells.some((c) => c.metric === ON_WHAT_IS_DUE.metric || c.metric === LASTS_SAID.metric), 'how long it lasts is a cell again');
   assert.deepEqual(hero!.when, { metric: 'cash-accounts', gt: 0 });
   /* NO TILE OF THEIR OWN: nothing on the page is headed Lasts, and nothing sits in a side column. */
   const blocks = MONEY_PAGE.blocks as readonly Block[];
@@ -102,12 +103,10 @@ test('CASH ABOVE NOUGHT THAT RUNS OUT ON WHAT IS DUE READS THE DAY, calm: the da
   assert.ok(shown(h));
   assert.equal(h.tone, undefined, 'cash that runs out in two months is drawn in the danger colour');
   /* GBP 1,200.00 pays the rent on 10 September and 10 October and goes under on 10 November, 68 days on, and the
-     sentence under the figure says that day and what falls due on it. Nothing comes in, so the walk with what comes
-     in goes under the same day, and so does its sentence. */
-  assert.equal(cell(h, 'lasts-no-income')?.reading?.value, 68);
+     line under Cash now says that day and how many days off it is ("Lasts until 10 Nov (68 days)"). */
   const values = h.values ?? {};
-  assert.equal(values['lasts-no-income.on'], day(68));
-  assert.equal(values['every-month-in.names'], undefined, 'nothing comes in, so no repeating money in is named');
+  assert.equal(values['runway-days'], 68);
+  assert.ok(values['runs-out-on'] !== undefined, 'the line under Cash now has no day it lasts until');
 });
 
 test('CASH BELOW NOUGHT READS THE DAY IT RAN OUT AS TODAY', async () => {
@@ -117,7 +116,7 @@ test('CASH BELOW NOUGHT READS THE DAY IT RAN OUT AS TODAY', async () => {
   const h = hero(k);
   assert.ok(shown(h), 'the hero is not drawn over cash below nought');
   /* THE WALK OPENS UNDER, so the day is today. */
-  assert.equal(cell(h, 'runs-out-on')?.reading?.value, Math.floor(NOW / 86_400_000));
+  assert.equal((h.values ?? {})['runs-out-on'], Math.floor(NOW / 86_400_000));
 });
 
 test('A RECORD WITH NO ACCOUNT DRAWS NO HERO: a Cash now of nought held nowhere is not money that lasts', async () => {

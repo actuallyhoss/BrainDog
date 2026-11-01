@@ -4,9 +4,6 @@ import type { SeedPage } from '../../base.ts';
 import { MONEY_METRICS } from '../figures/index.ts';
 import { CONFIRMED_COLUMN, CONFIRMED_STALE } from './parts/ages.ts';
 
-/** The figure that cuts Cash now into its accounts by their lines alone, beside the bank's own (`cash-by-account`). */
-const BY_LINES = 'lines-by-account';
-
 /**
  * An account's card on this page: its name, the digits the bank prints, its book and its age. The digits read "Ending in
  * 2044" where they read "Digits 2044", and "Counts as cash yes" is gone (audit of 30 October, 20): the field showed
@@ -25,8 +22,8 @@ const ACCOUNT_CARD = [
  *
  * WHAT IT SAYS, TOP TO BOTTOM: one sentence of what the accounts hold together, each currency apart; the four numbers
  * that say whether the balances can be trusted (Cash now, what is on the card, the oldest balance and how many are past a
- * week); what each account holds by the bank's newest word, and beside it what its lines add up to, so an account whose
- * two disagree is seen at once and its own page says by how much; then every account as a card, grouped Bank, Cash and
+ * week); what each account holds by the bank's newest word, its own page setting that against what its lines add up
+ * to; then every account as a card, grouped Bank, Cash and
  * Card, each opening its page, with the day its balance was last confirmed and the out-of-date mark past a week.
  *
  * NO BALANCE ON THE CARDS. A card's money column is the balance somebody typed, while its day is the bank's newest word
@@ -36,8 +33,7 @@ const ACCOUNT_CARD = [
  * EVERY CURRENCY IN ITS OWN: a dollar account's bar is in dollars, and nothing on this page adds two currencies.
  * Closed accounts are folded at the foot, and the box to add one is last.
  */
-export const accountsPage = (declared: (figure: string) => boolean): SeedPage => {
-  const twoWays = declared(BY_LINES);
+export const accountsPage = (_declared: (figure: string) => boolean): SeedPage => {
   return {
     page: 'money-accounts',
     title: 'Accounts',
@@ -77,38 +73,20 @@ export const accountsPage = (declared: (figure: string) => boolean): SeedPage =>
         ],
       },
       {
-        /* WHAT EACH HOLDS NOW, by the bank's newest word and every line after it, each in its own currency. */
+        /* WHAT EACH HOLDS NOW, by the bank's newest word and every line after it, each in its own currency.
+
+           ONE TILE OF ACCOUNTS, BEFORE money-core 3.33.0 SHIPPED (design pass of 1 November, M26): a Ledger total tile
+           listed the same accounts beside this one, and a whole tile of prose said why the two could differ. What an
+           account's lines add up to, and what the bank counted that the Ledger has no line for, is the account's own
+           page (`account.ts`), which says it by how much. */
         kind: 'bar',
         heading: 'Balance',
         icon: 'wallet',
-        span: twoWays ? 6 : 12,
+        span: 12,
         source: 'metric.cash-by-account',
         limit: 12,
         when: { metric: 'cash-accounts', gt: 0 },
       },
-      ...(twoWays
-        ? [
-            {
-              /* AND WHAT ITS LINES ADD UP TO, from the balance typed for it: where a bar here is not the bar beside it, the
-                 bank counted money the Ledger has no line for, and the account's own page says how much. */
-              kind: 'bar',
-              heading: 'Ledger total',
-              icon: 'receipt',
-              span: 6,
-              source: `metric.${BY_LINES}`,
-              limit: 12,
-              when: { metric: 'cash-accounts', gt: 0 },
-            },
-            {
-              /* WHY THE TWO COLUMNS DIFFER, IN ONE PLAIN LINE (Q9 of 29 October): HSBC read EGP 30,624.63 in one and
-                 −EGP 272,371.46 in the other with nothing said, which reads as a bug. */
-              kind: 'note',
-              span: 12,
-              body: 'Ledger total is the balance first typed for an account plus every line since. Where it is not the Balance, the bank counted money the Ledger has no lines for, such as an opening balance not set or lines from before its first statement. Each account says how much.',
-              when: { metric: 'cash-accounts', gt: 0 },
-            },
-          ]
-        : []),
       {
         /* EVERY OPEN ACCOUNT, BY KIND: Bank, Cash and Card, each card opening the account's own page. */
         kind: 'cards',

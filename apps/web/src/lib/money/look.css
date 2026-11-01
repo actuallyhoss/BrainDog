@@ -339,6 +339,45 @@
   font-weight: var(--fw-medium);
 }
 
+/* ── what is due, by day: the day in a column of its own ─────────────────────
+   EACH DAY SAID ONCE, BESIDE ITS FIRST BILL (design pass 1 Nov, M25): Coming up drew a date heading over every bill, so
+   with one bill a day each bill took two lines, the day and then the bill. Now the list is two columns: the day starts
+   the row of its first bill, the bills of the same day stack under it with the column blank, and a hairline runs
+   between days, not between bills. The renderer's day headings are the list's own items (`render/src/timeline.ts`), so
+   the grid places them: a day in the first column, each bill in the second, and the next day moves to a new row.
+   Its net is left off: on a day of two bills it stood over the amounts it adds up. A ledger's rich rows keep their
+   headings. */
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) > .item-day {
+  grid-column: 1;
+  align-items: center;
+  padding: 0 0 0 var(--sp-3);
+  min-block-size: 44px;
+  border-block-start: 1px solid var(--rule);
+}
+
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) > .item {
+  grid-column: 2;
+  border-block-end: 0;
+}
+
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) > .item-day + .item {
+  border-block-start: 1px solid var(--rule);
+}
+
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) > .item-day:first-child,
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) > .item-day:first-child + .item {
+  border-block-start: 0;
+}
+
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) .item-day-net {
+  display: none;
+}
+
 /* ── motion ───────────────────────────────────────────────────────────────── */
 
 /* MONEY DRAWS AS IT IS ON AN OPEN (audit 11-01, AP5): its tiles rose and its eight bars grew on every visit, a reload

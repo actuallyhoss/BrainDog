@@ -40,15 +40,15 @@ test('the two sentences about where a look is kept agree with the code, which ke
   assert.doesNotMatch(line, /settings above/u, 'the line still claims every setting on the screen');
 });
 
-test('the sub-nav draws "here" as the rail does: the tile under the row and the glyph in the accent', () => {
+test('the sub-nav draws "here" as the rail does: the tile under the row and the glyph in ink', () => {
   const index = strip(readFileSync(new URL('./[area]/SettingsIndex.svelte', import.meta.url), 'utf8'));
   const here = /\.area-row\[aria-current='page'\] \{([^}]*)\}/u.exec(index)?.[1] ?? '';
   assert.match(here, /background: var\(--tile\);/u);
   assert.doesNotMatch(here, /--red-tint/u, 'the current area still wears the tinted wash');
   const glyph = /\.area-row\[aria-current='page'\] \.area-icon :global\(\.well\.well\) \{([^}]*)\}/u.exec(index)?.[1] ?? '';
   assert.match(glyph, /background: transparent;/u);
-  /* THE RED AS A MARK (UI pass 20 Oct, SPEC 1.1): the selection's glyph is `--red`, the fill is for buttons. */
-  assert.match(glyph, /color: var\(--red\);/u);
+  /* INK, NOT RED (design pass 1 Nov, M27): Look B keeps red for what is wrong or late, never for what is chosen. */
+  assert.match(glyph, /color: var\(--ink\);/u);
   assert.doesNotMatch(index, /tone=\{a\.id === current \? 'ink'/u, 'the current area still wears an ink well');
   /* A ROW IS 44 UNDER A THUMB. */
   assert.match(index, /@media \(pointer: coarse\) \{\s*\.area-row \{\s*min-block-size: var\(--tap\);/u);
