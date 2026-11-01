@@ -1546,12 +1546,16 @@
     gap: var(--sp-1) var(--sp-3);
   }
 
-  /* CHANGE IS A WORD IN THE LINK INK, not another pill: the line says what was chosen, and this opens the rest. */
+  /* CHANGE IS A WORD IN THE LINK INK, not another pill: the line says what was chosen, and this opens the rest. Ink and
+     underlined, never the red, which is kept for what is late or failing. */
   .change {
     padding: 0;
     border: 0;
     background: none;
-    color: var(--red);
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+    text-underline-offset: 3px;
     font: inherit;
     font-size: var(--fs-body);
     font-weight: 500;
