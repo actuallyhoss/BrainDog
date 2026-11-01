@@ -198,6 +198,11 @@ export function methods(deps: RecordDeps) {
       const { id, body } = got.value;
       const hidden = unseen(ctx, id, body, 'body');
       if (hidden) return { ok: false, refusal: hidden };
+      /* AND EVERY LIST IT TOUCHES READ WHOLE: the try runs as the record, so a step quoting `{{trigger.row.<field>}}` or a
+         figure answered a field hidden from this caller, or a total over rows their grant leaves out. */
+      for (const name of touched(id, body))
+        if (name !== READS_ACROSS && name !== ANY_LIST && (ctx.wheres?.[name] !== undefined || (ctx.hides?.[name]?.length ?? 0) > 0))
+          return no('FORBIDDEN', 'You can see only part of a list this touches, so only somebody who sees all of it can try it.', { at: 'body' });
 
       const given = args?.sample ?? {};
       if (!isObject(given)) return no('VALUE_MALFORMED', 'sample is { row, arrival, payload, at }, each optional.', { at: 'sample', allowed: [...SAMPLE_TAKES] });

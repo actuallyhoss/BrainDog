@@ -98,7 +98,7 @@ export function methods(deps: RecordDeps) {
         } catch {
           list = undefined;
         }
-        if (typeof list === 'string' && (readable(ctx, list) !== null || kernel.scope(ctx, list) !== undefined || sight.hidden(ctx, list).size > 0)) continue;
+        if (typeof list === 'string' ? readable(ctx, list) !== null || kernel.scope(ctx, list) !== undefined || sight.hidden(ctx, list).size > 0 : deps.readsEveryList?.(ctx) !== true) continue;
         const line = lineOf(c.question);
         if (line !== '') rows.push({ decision: c.id, line, why: lineOf(c.note), at: c.ts, withdrawn: true });
       }
@@ -110,7 +110,7 @@ export function methods(deps: RecordDeps) {
         } catch {
           list = undefined;
         }
-        if (typeof list === 'string' && (readable(ctx, list) !== null || kernel.scope(ctx, list) !== undefined || sight.hidden(ctx, list).size > 0)) continue;
+        if (typeof list === 'string' ? readable(ctx, list) !== null || kernel.scope(ctx, list) !== undefined || sight.hidden(ctx, list).size > 0 : deps.readsEveryList?.(ctx) !== true) continue;
         const line = lineOf(c.question);
         if (line !== '') rows.push({ decision: c.id.slice('decision:'.length), line, why: lineOf(c.note), at: c.ts });
       }

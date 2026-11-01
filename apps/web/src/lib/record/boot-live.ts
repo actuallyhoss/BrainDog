@@ -1213,6 +1213,8 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
             section: p.nav.section,
             order: p.nav.order,
             ...(typeof p.nav.place === 'number' ? { place: p.nav.place } : {}),
+            /* AND THE LISTS A PLACE READS, so an invitation can offer Money or Projects whole (`invite-places.ts`). */
+            ...(typeof p.nav.place === 'number' && Array.isArray(p.lists) ? { lists: p.lists.filter((l): l is string => typeof l === 'string') } : {}),
             icon: iconFor(p.icon ?? undefined, 'doc'),
             ...((p.nav as { tabs?: unknown }).tabs === true ? { tabs: true as const } : {}),
             ...(kept.has(p) ? {} : { cut: true as const }),

@@ -147,6 +147,7 @@ export const account = {
      aimed at the reader. This sentence and the invitation below it are what is left, and everything
      else comes back the day there is somebody to compare with. */
   onlyPerson: 'Only you, for now.',
+  peopleOwnersOnly: 'Who can see this BrainDog, and what each person can do, is set by its owner. Ask them if you need more.',
   levelFor: (name: string) => `What ${name} can do`,
   /* NOT A SIXTH LEVEL. `member` is a ROW that may not exist, and "no row" is a different answer from
      the lowest rung — `members.ts` shipped both wrong readings of that before settling on `null`. */
@@ -675,7 +676,7 @@ export const account = {
   inviteMaking: 'Making a link',
   /* Same words as `TEAMS_HELD_SAID` in the record's directory; a test holds them equal. */
   inviteHeld: 'Inviting colleagues opens soon. Nobody else can join yet.',
-  inviteNoMail: 'No email is sent; you pass the link on.',
+  inviteNoMail: 'Nothing is emailed: copy the link and send it to them yourself.',
   inviteLinkReady: (email: string) => `For ${email}. Shown once, so copy it now.`,
   inviteCopyLink: 'Copy link',
   inviteAddsOnlyNext: 'You add through your own agent. Make its key next.',
@@ -822,7 +823,10 @@ export const account = {
   inviteWholeRecord: 'All of it',
   inviteChosenLists: 'Only some of it',
   inviteListNothing: 'Nothing',
-  inviteListsHint: 'A part left at Nothing stays closed.',
+  inviteListsHint: 'A part left at Nothing stays closed to them.',
+  inviteListsEach: (n: number) => `List by list (${n})`,
+  inviteListsFold: 'Fewer choices',
+  inviteListsMixed: 'Some lists',
   inviteAddsOnlyLeavesOut:
     'Adds only on all of it leaves out Keys, People and anything kept for owners. To give one of those, pick Only some of it.',
   inviteNewLink: 'New link',

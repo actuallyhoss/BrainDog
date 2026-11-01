@@ -22,7 +22,8 @@
   /* Lane G: inviting somebody by address, with a link the owner sends and nobody mails. */
   import { inviteEmail, inviteLink, readInvites, renewInvite, withdrawInvite, type InviteReach, type Waiting } from '$lib/record/settings-write.ts';
   import type { Invitation } from '@braindog/client';
-  import { relative, since } from 'braindog-render';
+  import { dateSaid, relative, since } from 'braindog-render';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
@@ -32,6 +33,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { namesHeld, personSaid, secondSaid } from '../people-said.ts';
+  import { placeGroups, type PlaceGroup } from '../../invite-places.ts';
   import { hostedHere, readBilling } from '../../billing.ts';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
 
@@ -296,6 +298,24 @@
     inviteLists = { ...inviteLists, [list]: level };
   }
 
+  /* THE PLACES, each with the lists in it (`invite-places.ts`), and which of them are opened list by list. */
+  const groups = $derived(placeGroups(lists, shell.lists ?? [], shell.nav ?? []));
+  let openGroups = $state<string[]>([]);
+  const MIXED = 'mixed';
+  /** One level when every list of a place is at it, else `mixed`, which the select says as "Some lists". */
+  const groupLevel = (g: PlaceGroup): string => {
+    const at = new Set(g.lists.map((l) => inviteLists[l.id] ?? ''));
+    return at.size === 1 ? [...at][0]! : MIXED;
+  };
+  function pickGroupLevel(g: PlaceGroup, said: string) {
+    if (said === MIXED) return;
+    const level = (LIST_LEVELS as readonly string[]).includes(said) ? (said as Level) : '';
+    inviteLists = { ...inviteLists, ...Object.fromEntries(g.lists.map((l) => [l.id, level])) };
+  }
+  function toggleGroup(key: string) {
+    openGroups = openGroups.includes(key) ? openGroups.filter((k) => k !== key) : [...openGroups, key];
+  }
+
   $effect(() => {
     untrack(() => void readInvitesNow());
   });
@@ -325,6 +345,9 @@
     if (await mint(() => inviteEmail(apiBase(), email, reach))) {
       inviteTo = '';
       inviteLists = {};
+      /* BACK TO ALL OF IT, so the link made is under a short form and not under thirty lists. */
+      inviteReach = 'record';
+      openGroups = [];
     }
   }
 
@@ -441,15 +464,6 @@
   const peopleNames = $derived(namesHeld(people));
   const said = (who: Person) => personSaid(who, me.person, peopleNames);
 
-  /**
-   * THE COLLEAGUES TILE: everybody on the record but the reader, each with their face, what they may
-   * do and when they last looked. The tile is who is here at a glance; what each may do is changed on the ground under
-   * it, where the controls are.
-   */
-  const colleagues = $derived(people.filter((p) => !self(p)));
-  const tileWords = {
-    title: 'Colleagues',
-  };
 </script>
 
 <!--
@@ -482,7 +496,12 @@
 {:else if peopleFrom === 'refused' || peopleFrom === 'unrouted'}
   <Tile icon="user-check" class="section" data-surface="tile" title={copy.whoCanSee}>
     <div class="section-body">
-      <Empty kind="error" title={peopleRefusal} />
+      <!-- A COLLEAGUE IS TOLD WHO DECIDES IT, in plain words, not the ladder's "This needs owner, and you have write access". -->
+      {#if !anOwner && me.level !== 'decide'}
+        <p class="reading">{copy.peopleOwnersOnly}</p>
+      {:else}
+        <Empty kind="error" title={peopleRefusal} />
+      {/if}
     </div>
   </Tile>
 {:else if alone}
@@ -491,20 +510,6 @@
     <p class="reading">{copy.onlyPerson}</p>
   </Tile>
 {:else}
-  <Tile icon="users" title={tileWords.title} count={colleagues.length}>
-    <ul class="mates">
-      {#each colleagues as p (p.id)}
-        <li class="mate">
-          <Face name={said(p)} kind="person" size="l" />
-          <span class="mate-words">
-            <span class="mate-name" dir="auto">{said(p)}</span>
-            <span class="mate-detail">{p.seen ? copy.lastLooked(since(p.seen, Date.now())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, Date.now()))}{/if}</span>
-          </span>
-          <span class="mate-level">{roleSaid(p.level)}</span>
-        </li>
-      {/each}
-    </ul>
-  </Tile>
   <Tile icon="user-check" class="section" data-surface="tile" title={copy.whoCanSee} count={people.length || undefined}>
     <div class="section-body">
       <p class="hint">{copy.accessScope}</p>
@@ -535,8 +540,10 @@
                    looked at, and saying so twice in one line is saying nothing. -->
               <span class="who-detail">
                 <!-- A RECORD KEEPS NO ACCEPTANCE DATE, so it says when they last looked and nothing it cannot know. -->
-                {#if secondSaid(p, said(p))}{secondSaid(p, said(p))}{' · '}{/if}{p.seen ? copy.lastLooked(since(p.seen, Date.now())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, Date.now()))}{/if}
+                <!-- AND NOTHING ABOUT LOOKING ON YOUR OWN ROW: "has not opened it" under the person reading it was false. -->
+                {#if self(p)}{secondSaid(p, said(p)) ?? ''}{:else}{#if secondSaid(p, said(p))}{secondSaid(p, said(p))}{' · '}{/if}{p.seen ? copy.lastLooked(since(p.seen, Date.now())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, Date.now()))}{/if}{/if}
               </span>
+              {#if !self(p)}
               <span class="who-do">
               <!-- STOP IS NOT FOR YOURSELF, for the reason your own level is not: it is the press that removes your own
                    way back to this screen. Nor for the last owner, who would leave the record with nobody to let anybody
@@ -555,6 +562,7 @@
                 onclick={() => takeAway(p)}
               >{copy.removeAccess}</Button>
               </span>
+              {/if}
             </div>
             <div class="who-level">
               <!--
@@ -817,22 +825,44 @@
         {#if inviteLevel === 'append'}<p class="hint">{copy.inviteAddsOnlyLeavesOut}</p>{/if}
       {:else}
         <p class="hint">{copy.inviteListsHint}</p>
-        <!-- A ROW PER LIST, EACH WITH ITS SELECT, and a list is chosen by giving it a level. The three levels one list
-             honours (`LIST_LEVELS`), and Nothing first, because nothing is what every list gives until the owner says. -->
+        <!-- A ROW PER PLACE (Money, Projects, Work), EACH WITH ITS SELECT, which sets every list in it: "Projects, and not
+             Money" is two presses. "List by list" opens the place's own lists, each with its select, for the rest. The
+             three levels one list honours (`LIST_LEVELS`), and Nothing first, because nothing is what every list gives
+             until the owner says. -->
         <ul class="invite-lists">
-          {#each lists as l (l.id)}
-            <li>
-              <label class="invite-list-name" for="invite-list-{l.id}">{l.name}</label>
-              <select
-                class="ex-select"
-                id="invite-list-{l.id}"
-                value={inviteLists[l.id] ?? ''}
-                onchange={(e) => pickListLevel(l.id, e.currentTarget.value)}
-              >
+          {#each groups as g (g.key)}
+            {@const at = groupLevel(g)}
+            <li class="invite-place">
+              <span class="invite-place-head">
+                <label class="invite-list-name invite-place-name" for="invite-place-{g.key}">{g.name}</label>
+                {#if g.lists.length > 1}
+                  <button type="button" class="invite-each" aria-expanded={openGroups.includes(g.key) ? 'true' : 'false'} onclick={() => toggleGroup(g.key)}>
+                    {openGroups.includes(g.key) ? copy.inviteListsFold : copy.inviteListsEach(g.lists.length)}
+                  </button>
+                {/if}
+              </span>
+              <select class="ex-select" id="invite-place-{g.key}" value={at} onchange={(e) => pickGroupLevel(g, e.currentTarget.value)}>
+                {#if at === MIXED}<option value={MIXED} disabled>{copy.inviteListsMixed}</option>{/if}
                 <option value="">{copy.inviteListNothing}</option>
                 {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
               </select>
             </li>
+            {#if openGroups.includes(g.key)}
+              {#each g.lists as l (l.id)}
+                <li class="invite-one">
+                  <label class="invite-list-name" for="invite-list-{l.id}">{l.name}</label>
+                  <select
+                    class="ex-select"
+                    id="invite-list-{l.id}"
+                    value={inviteLists[l.id] ?? ''}
+                    onchange={(e) => pickListLevel(l.id, e.currentTarget.value)}
+                  >
+                    <option value="">{copy.inviteListNothing}</option>
+                    {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
+                  </select>
+                </li>
+              {/each}
+            {/if}
           {/each}
         </ul>
       {/if}
@@ -869,8 +899,8 @@
           <li class="invite" data-expired={inv.expired ? '' : undefined}>
             <span class="invite-who">{inv.email}</span>
             <span class="invite-when">{inv.expired
-              ? copy.inviteRanOut(inviteGives(inv), inv.expires_at.slice(0, 10))
-              : copy.inviteWaitingRow(inviteGives(inv), inv.expires_at.slice(0, 10))}</span>
+              ? copy.inviteRanOut(inviteGives(inv), dateSaid(inv.expires_at.slice(0, 10), recordNow()))
+              : copy.inviteWaitingRow(inviteGives(inv), dateSaid(inv.expires_at.slice(0, 10), recordNow()))}</span>
             <span class="invite-do">
               <Button weight="bare" disabled={inviting || peopleBusy} onclick={() => void renew(inv)}>{copy.inviteNewLink}</Button>
               <Button weight="bare" tone="bad" disabled={peopleBusy} onclick={() => void withdraw(inv)}>{copy.inviteWithdraw}</Button>
@@ -1283,6 +1313,39 @@
     overflow-wrap: anywhere;
   }
 
+  /* A PLACE'S ROW LEADS, its lists under it set in from the edge. */
+  .invite-place-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .invite-place-name {
+    font-weight: 600;
+  }
+
+  .invite-each {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-3);
+    font: inherit;
+    font-size: var(--fs-meta);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+
+  .invite-lists li.invite-one {
+    padding-inline-start: var(--sp-3);
+  }
+
+  .invite-lists li.invite-one + li.invite-one {
+    border-block-start: 0;
+  }
+
   .invite-send {
     margin-block-start: var(--sp-1);
   }
@@ -1371,58 +1434,6 @@
     margin-block-start: var(--sp-2);
   }
 
-  /* THE COLLEAGUES TILE'S ROWS: a 32px face, the name over when they last looked, and what they may do at the end, one
-     hairline between each. */
-  .mates {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .mate {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: var(--sp-3);
-    min-block-size: var(--row-h-2);
-    padding-block: var(--sp-2);
-  }
-
-  .mate + .mate {
-    border-block-start: 1px solid var(--rule);
-  }
-
-  .mate-words {
-    display: grid;
-    gap: 2px;
-    min-inline-size: 0;
-  }
-
-  .mate-name {
-    overflow: hidden;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 500;
-    line-height: 20px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mate-detail {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: 18px;
-  }
-
-  .mate-level {
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
   /* THE ONE WRITTEN LINE a tile with no figure still carries. */
   .reading {
     margin: 0;
@@ -1430,11 +1441,5 @@
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 20px;
-  }
-
-  @media (width < 900px) {
-    .mate {
-      min-block-size: 60px;
-    }
   }
 </style>

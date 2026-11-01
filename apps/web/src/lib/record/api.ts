@@ -1475,6 +1475,8 @@ export type NavEntry = {
   order: number;
   /** Where its section sits on the rail, as the page declares it (`nav.place`), lowest first; most pages say nothing. */
   place?: number | undefined;
+  /** The lists a place's page reads, sent only for a page with a place (`nav.place`). */
+  lists?: string[] | undefined;
   icon: IconName;
   /** The frozen hue of the row this page is about, when it is about one. */
   hue?: number | undefined;

@@ -42,7 +42,10 @@ export function methods(deps: RecordDeps) {
     const p = ctx.principal;
     if (p.kind === 'system') return true;
     if (p.kind !== 'person' && p.kind !== 'token') return false;
-    return p.level !== null && p.level !== 'append' && (ctx.registers === undefined || ctx.registers === '*');
+    /* AND EVERY LIST, ALL OF EACH (`readsAcross`): a member held to some rows or kept off a field was counted the runs
+       and the questions of lists they cannot read. */
+    const across = deps.readsAcross ?? deps.readsEveryList;
+    return p.level !== null && p.level !== 'append' && (ctx.registers === undefined || ctx.registers === '*') && (across === undefined || across(ctx));
   };
 
   /**
