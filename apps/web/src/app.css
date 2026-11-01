@@ -184,6 +184,13 @@
     animation: form-in var(--form-in) var(--ease-spring) calc(var(--form-i, 0) * var(--form-gap)) backwards;
   }
 
+  /* ONE MOTION AT A TIME (audit 11-01, AP13): the first Today after the made screen cross-faded in (`page-in`) while its
+     drafts card and project cards rose in the same frame. While the screen changes (`data-moving`, `AppFrame.svelte`)
+     what is forming waits where it starts, unseen, and rises once the new screen is in. */
+  [data-assembling][data-moving] [data-forming] {
+    animation-play-state: paused;
+  }
+
   :where([data-forming]:nth-child(2)) {
     --form-i: 1;
   }
