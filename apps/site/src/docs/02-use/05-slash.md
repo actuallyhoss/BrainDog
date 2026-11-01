@@ -31,7 +31,13 @@ Slash also does quieter work in the background: the inbox's patterns, a digest's
 
 Each question or change you ask Slash for counts as one Slash question, however much reading it takes.
 
-- Free includes 20 Slash questions a month, Cloud 80 and Cloud Plus 400. Cloud and Cloud Plus are monthly plans, coming soon and priced at launch.
+- Free includes 20 Slash questions a month, Cloud 80 and Cloud Plus 400.
+<!-- launch: !billing -->
+- Cloud and Cloud Plus are monthly plans, coming soon and priced at launch.
+<!-- /launch -->
+<!-- launch: billing -->
+- Cloud and Cloud Plus are monthly plans: see [Pricing](/pricing). More questions come in packs, from Settings > Billing.
+<!-- /launch -->
 - The owner sets the limit in Settings, under Agents. Zero turns Slash off.
 - Usage lists your questions by day: what was asked, when, what it cost and a link to what it filed. See [Usage and limits](/docs/use/usage).
 

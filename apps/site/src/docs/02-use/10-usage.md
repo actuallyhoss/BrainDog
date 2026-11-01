@@ -4,7 +4,13 @@ Your BrainDog includes a month of work: automation and script runs, requests to 
 
 ## What a plan includes
 
-Each month, from the first of the month in UTC. Cloud and Cloud Plus are monthly plans, coming soon and priced at launch; nothing you make on Free is lost or locked when they arrive.
+Each month, from the first of the month in UTC.
+<!-- launch: !billing -->
+Cloud and Cloud Plus are monthly plans, coming soon and priced at launch; nothing you make on Free is lost or locked when they arrive.
+<!-- /launch -->
+<!-- launch: billing -->
+Cloud and Cloud Plus are monthly plans, paid on Stripe's page from Settings > Billing; see [Pricing](/pricing).
+<!-- /launch -->
 
 ```comparison | A month's allowance, for each BrainDog
 Meter | Free | Cloud | Cloud Plus
