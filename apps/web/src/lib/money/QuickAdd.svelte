@@ -15,7 +15,7 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { wordSlot, writeAmount } from 'braindog-render';
+  import { plainName, wordSlot, writeAmount } from 'braindog-render';
 
   import { homeCurrency } from '$lib/record/api.ts';
   import { recordToday } from '$lib/record/zone.ts';
@@ -302,6 +302,7 @@
         <input
           id="{uid}-amount"
           class="qa-figure num"
+          data-own-size
           inputmode="decimal"
           autocomplete="off"
           placeholder="0.00"
@@ -328,11 +329,11 @@
     {:else}
       <!-- WHO IT WAS PAID TO: the names the ledger holds, as you type. -->
       <div class="qa-f qa-payee">
-        <label class="field-label" for="{uid}-payee">{words.paidTo[way]}{#if way !== 'move'} <em>· {words.payeeHint}</em>{/if}</label>
+        <label class="field-label" for="{uid}-payee">{words.paidTo[way]}{#if way !== 'move'}{' '}<em>· {words.payeeHint}</em>{/if}</label>
         {#if chips.length > 0 && title.trim() === '' && way !== 'move'}
           <div class="qa-chips" role="group" aria-label={words.paidTo[way]}>
             {#each chips as p (p.name)}
-              <button type="button" class="qa-chip" onclick={() => pick(p)}>{p.name}</button>
+              <button type="button" class="qa-chip" onclick={() => pick(p)}>{plainName(p.name)}</button>
             {/each}
           </div>
         {/if}
@@ -340,6 +341,7 @@
           <input
             id="{uid}-payee"
             class="field-input"
+            placeholder={way === 'move' ? undefined : words.payeeType}
             autocomplete="off"
             role="combobox"
             aria-expanded={dropping ? 'true' : 'false'}
@@ -373,7 +375,7 @@
                 onpointerdown={(e) => (e.preventDefault(), pick(p))}
               >
                 <span class="qa-chipglyph" style:--chip={chipOf(c?.colour ?? wordSlot(c?.name))} style:--chip-tint={tintOf(c?.colour ?? wordSlot(c?.name))}><Icon name={glyph(c?.icon, 'tag')} size="s" /></span>
-                <span class="qa-grow"><span class="qa-t">{p.name}</span><span class="qa-d">{words.usual(p.count, c?.name ?? null)}</span></span>
+                <span class="qa-grow"><span class="qa-t">{plainName(p.name)}</span><span class="qa-d">{words.usual(p.count, c?.name ?? null)}</span></span>
                 {#if lit === i}<kbd class="qa-kbd">↵</kbd>{/if}
               </div>
             {/each}
@@ -721,11 +723,14 @@
     font-weight: var(--fw-semi);
   }
 
+  /* A NAME TOO LONG FOR ITS SQUARE TAKES A SECOND LINE, never an ellipsis (design pass, 1 Nov): "Professional…" on a
+     phone hid which category it was. */
   .qa-catname {
     max-inline-size: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    text-align: center;
+    text-wrap: balance;
+    line-height: 1.25;
   }
 
   .qa-two {
@@ -827,6 +832,14 @@
 
     .qa-under {
       text-align: center;
+    }
+  }
+
+  /* ON A NARROW PHONE THE ACCOUNT AND THE DAY TAKE A ROW EACH: side by side the account was cut to "Studio current
+     acco" (design pass, 1 Nov). */
+  @media (width < 480px) {
+    .qa-two {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 </style>

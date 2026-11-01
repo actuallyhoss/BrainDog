@@ -71,6 +71,9 @@ export const publishWords = {
   removed: (kind: string, title: string): string => `Takes out the ${kind} ${title}`,
   changed: (kind: string, title: string): string => `Changes the ${kind} ${title}`,
   needs: (name: string): string => `Needs the ${name} add-on too`,
+  /* SEVERAL AS ONE LINE (design pass, 1 Nov): a whole starter's file said "Needs the … add-on too" twenty-two times
+     over, a column of one sentence with the names at its end. */
+  needsAll: (names: readonly string[]): string => `Needs these add-ons too: ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(names)}`,
   needsNoMore: (name: string): string => `No longer needs ${name}`,
   callsNew: (host: string): string => `Calls out to ${host}, which it did not before`,
   callsNoMore: (host: string): string => `No longer calls out to ${host}`,
@@ -219,6 +222,9 @@ export async function changesSince(before: string | null, after: string): Promis
   return { ok: true, changes: changesBetween(was?.ok ? was.value : null, now.value) };
 }
 
+/** The add-ons a file needs, one line for one and one line for several; BrainDog itself goes without saying. */
+const needsLines = (names: readonly string[]): string[] => (names.length === 0 ? [] : names.length === 1 ? [publishWords.needs(names[0]!)] : [publishWords.needsAll(names)]);
+
 /** Each change as one line a person reads. `nameOf` turns a module's id into its name. */
 export function changeLines(c: Changes, nameOf: (module: string) => string): string[] {
   const kind = (k: string): string => (Object.hasOwn(publishWords.kinds, k) ? (publishWords.kinds[k] as string) : publishWords.part);
@@ -229,7 +235,7 @@ export function changeLines(c: Changes, nameOf: (module: string) => string): str
     ...c.added.filter(named).map((n) => publishWords.added(kind(n.kind), n.title)),
     ...c.changed.filter(named).map((n) => publishWords.changed(kind(n.kind), n.title)),
     ...c.removed.filter(named).map((n) => publishWords.removed(kind(n.kind), n.title)),
-    ...c.modules.added.map((m) => publishWords.needs(nameOf(m))),
+    ...needsLines(c.modules.added.map(nameOf).filter((n) => n !== 'BrainDog')),
     ...c.modules.removed.map((m) => publishWords.needsNoMore(nameOf(m))),
     ...c.hosts.added.map(publishWords.callsNew),
     ...c.hosts.removed.map(publishWords.callsNoMore),

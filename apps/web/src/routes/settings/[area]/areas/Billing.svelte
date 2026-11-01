@@ -504,8 +504,11 @@
   }
 
   /* THE INVOICES, one row each: the day, the amount, a word when it is not simply paid, and Stripe's two pages. */
+  /* ONE SET OF COLUMNS FOR EVERY ROW (design pass, 1 Nov): each row drew its own, so an amount moved left or right
+     by the width of the word after it ("Open", or nothing for a paid one) and the figures never stood in a column. */
   .invoices {
     display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     margin: 0 0 var(--sp-2);
     padding: 0;
     list-style: none;
@@ -513,7 +516,8 @@
 
   .invoice {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     align-items: baseline;
     column-gap: var(--sp-3);
     padding-block: var(--sp-2);
@@ -526,6 +530,7 @@
   }
 
   .invoice-amount {
+    justify-self: end;
     font-variant-numeric: tabular-nums;
   }
 
@@ -573,8 +578,11 @@
       align-items: stretch;
     }
 
-    .invoice {
+    .invoices {
       grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .invoice {
       row-gap: 2px;
     }
 

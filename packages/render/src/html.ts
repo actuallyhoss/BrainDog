@@ -1862,7 +1862,7 @@ function forecast(b: Block, o: RenderOptions): string {
   const summary = `<dl class="forecast-summary">${forecastSummary(model, shown)
     .map(
       (c) =>
-        `<div class="forecast-sum" data-key="${c.key}"><dt class="forecast-sum-label">${escape(c.label)}</dt><dd class="forecast-sum-figure num">${escape(c.figure)}</dd><dd class="forecast-sum-note"${c.dir ? ` data-dir="${c.dir}"` : ''}>${escape(c.note)}</dd></div>`,
+        `<div class="forecast-sum" data-key="${c.key}"${c.below ? ' data-below=""' : ''}><dt class="forecast-sum-label">${escape(c.label)}</dt><dd class="forecast-sum-figure num">${escape(c.figure)}</dd><dd class="forecast-sum-note"${c.dir ? ` data-dir="${c.dir}"` : ''}>${escape(c.note)}</dd></div>`,
     )
     .join('')}</dl>`;
   /* EVERY MOVEMENT IN ORDER UNDER THE CHART, each part of a plan numbered as its mark on the line is (`forecastNext`). */

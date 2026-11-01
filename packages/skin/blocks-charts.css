@@ -1986,7 +1986,13 @@
     font-size: var(--fs-meta);
   }
 
-  /* GREEN FOR MONEY IN; MONEY OUT STAYS INK, and only a lowest point under £0 is red. */
+  /* GREEN FOR MONEY IN; MONEY OUT STAYS INK, and only a figure under £0 is red: the lowest point, or the cash at the
+     horizon when the walk ends below nought (design pass, 1 Nov: "Cash on 26 Nov −£13,372" stood in ink beside a red
+     lowest point, as though ending in debt were the calmer of the two). */
+  .forecast-sum[data-below] .forecast-sum-figure {
+    color: var(--red);
+  }
+
   .forecast-sum-note[data-dir='in'] {
     color: var(--good);
   }

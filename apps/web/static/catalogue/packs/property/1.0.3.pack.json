@@ -1,0 +1,921 @@
+{
+  "pack": "property",
+  "version": "1.0.3",
+  "icon": "building",
+  "title": "Property",
+  "summary": "A flat or a house paid in parts: what it is worth, what you have paid, what is left and what you own beyond that, with the parts to come and the parts paid. Makes the parts for you, or reads a plan you paste.",
+  "changes": "Says how to add a property when there is none yet.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.29.0 <4.0.0"
+    }
+  },
+  "extends": {
+    "register.plans": {
+      "fields": [
+        {
+          "id": "price",
+          "label": "Price",
+          "type": "money"
+        },
+        {
+          "id": "value",
+          "label": "Worth now",
+          "type": "money"
+        },
+        {
+          "id": "developer",
+          "label": "Developer",
+          "type": "text",
+          "search": true
+        },
+        {
+          "id": "delivers_on",
+          "label": "Delivered on",
+          "type": "day"
+        },
+        {
+          "id": "mortgage_principal",
+          "label": "Loan",
+          "type": "money"
+        },
+        {
+          "id": "mortgage_rate",
+          "label": "Loan rate a year, %",
+          "type": "decimal",
+          "min": 0,
+          "max": 100
+        },
+        {
+          "id": "mortgage_years",
+          "label": "Loan years",
+          "type": "int",
+          "min": 1,
+          "max": 40
+        },
+        {
+          "id": "mortgage_monthly",
+          "label": "Loan paid a month",
+          "type": "money"
+        },
+        {
+          "id": "mortgage_interest",
+          "label": "Loan interest in all",
+          "type": "money"
+        },
+        {
+          "id": "paid",
+          "label": "Paid so far",
+          "type": "money"
+        },
+        {
+          "id": "left",
+          "label": "Left to pay",
+          "type": "money"
+        },
+        {
+          "id": "equity",
+          "label": "Equity",
+          "type": "money"
+        },
+        {
+          "id": "make_how",
+          "label": "Make the parts",
+          "type": "enum",
+          "values": [
+            "equal",
+            "down_equal",
+            "mortgage"
+          ],
+          "labels": {
+            "equal": "Equal parts",
+            "down_equal": "A down payment, then equal parts",
+            "mortgage": "A loan paid monthly"
+          }
+        },
+        {
+          "id": "make_first",
+          "label": "First part on",
+          "type": "day"
+        },
+        {
+          "id": "make_parts",
+          "label": "Parts (after any down payment)",
+          "type": "int",
+          "min": 1,
+          "max": 120
+        },
+        {
+          "id": "make_every",
+          "label": "How often",
+          "type": "enum",
+          "values": [
+            "monthly",
+            "quarterly",
+            "half_yearly",
+            "yearly"
+          ],
+          "labels": {
+            "monthly": "Every month",
+            "quarterly": "Every 3 months",
+            "half_yearly": "Every 6 months",
+            "yearly": "Every year"
+          }
+        },
+        {
+          "id": "make_down",
+          "label": "Down payment",
+          "type": "money"
+        },
+        {
+          "id": "paste",
+          "label": "Paste a plan",
+          "type": "text"
+        },
+        {
+          "id": "plan_said",
+          "label": "What happened",
+          "type": "text"
+        }
+      ]
+    },
+    "register.installments": {
+      "fields": [
+        {
+          "id": "paid_to_date",
+          "label": "Paid in all by this part",
+          "type": "money"
+        }
+      ]
+    }
+  },
+  "declarations": [
+    {
+      "rule": "property_make",
+      "name": "Make the parts of a plan",
+      "pack": "property",
+      "on": {
+        "written": {
+          "register": "plans",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "make_how",
+            "make_first"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "property_make",
+            "as": "made"
+          }
+        }
+      ]
+    },
+    {
+      "script": "property_make",
+      "title": "Generate a plan",
+      "pack": "property",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "plans",
+        "installments"
+      ],
+      "writes": [
+        "plans",
+        "installments"
+      ],
+      "source": "/**\n * Generate a plan: a property plan says how it is paid, and this writes its parts on Instalments.\n *\n * WHAT A PERSON FILLS ON THE PLAN. \"Make the parts\" (equal parts, a down payment then equal parts, or a mortgage paid\n * monthly) and \"First part on\". For equal parts it also takes \"Parts\" and \"How often\"; with a down payment it takes\n * \"Down payment\" as well, and \"Parts\" then counts the parts after it. The price comes from the plan's Price, and a\n * mortgage from its Loan, Yearly rate and Years. Nothing is written until the way and the first day are both there.\n *\n * WHAT IT WRITES. One part for each date, on Instalments, linked to this plan, money out, open, from the plan's\n * account when it has one. Rounding goes to the last part, so the parts always add up to the price. A mortgage is\n * paid in equal monthly amounts, the last one taking what rounding left. The plan then loses the choices it was made\n * from, and says what happened in \"What happened\".\n *\n * IT NEVER ADDS TO A PLAN THAT HAS PARTS. Two runs would make the plan twice, so a plan with any part says so and is\n * left as it is. At most 120 parts.\n */\nconst every = { monthly: 1, quarterly: 3, half_yearly: 6, yearly: 12 };\nconst isDay = (v) => typeof v === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(v);\nconst money = (m) => m && typeof m === 'object' && Number.isSafeInteger(m.amount) && typeof m.currency === 'string' && m.amount > 0;\n\nfunction addMonths(day, k) {\n  const y = Number(day.slice(0, 4));\n  const m = Number(day.slice(5, 7)) - 1;\n  const d = Number(day.slice(8, 10));\n  const at = m + k;\n  const y2 = y + Math.floor(at / 12);\n  const m2 = ((at % 12) + 12) % 12;\n  const last = new Date(Date.UTC(y2, m2 + 1, 0)).getUTCDate();\n  return String(y2).padStart(4, '0') + '-' + String(m2 + 1).padStart(2, '0') + '-' + String(Math.min(d, last)).padStart(2, '0');\n}\n\n/** What each of `n` equal monthly payments is, and what is paid in all, for a loan at a yearly rate in percent. */\nfunction mortgage(principal, rate, n) {\n  const r = rate / 100 / 12;\n  const each = r === 0 ? Math.round(principal / n) : Math.round((principal * r) / (1 - Math.pow(1 + r, -n)));\n  const parts = [];\n  let left = principal;\n  for (let i = 1; i <= n; i++) {\n    const interest = Math.round(left * r);\n    const pay = i === n ? left + interest : each;\n    parts.push(pay);\n    left = left + interest - pay;\n  }\n  return parts;\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  if (!id) return;\n  const plan = await ctx.record.get(id);\n  if (!plan || plan.register !== 'plans') return;\n  const f = plan.fields;\n  const how = f.make_how;\n  const first = f.make_first;\n  if (!how || !isDay(first)) return;\n  const say = (said) => ctx.update('plans#' + plan.seq, { make_how: null, make_first: null, make_parts: null, make_every: null, make_down: null, plan_said: said }, plan.version);\n\n  const named = await ctx.record.list('installments', { all: [{ field: 'plan', is: f.name }] });\n  const linked = await ctx.record.list('installments', { all: [{ field: 'plan_row', is: plan.id }] });\n  if (named.length + linked.length > 0) return say('This plan already has parts, so none were made. Remove them first, or add the missing ones on Instalments.');\n\n  let amounts = [];\n  let currency = null;\n  let step = every[f.make_every] || 1;\n  const count = Number.isInteger(f.make_parts) ? f.make_parts : 0;\n  let monthly = null;\n  if (how === 'mortgage') {\n    const loan = f.mortgage_principal;\n    const years = f.mortgage_years;\n    if (!money(loan) || !Number.isInteger(years) || years < 1 || typeof f.mortgage_rate !== 'number') return say('A mortgage needs the loan, the yearly rate and the years on the plan.');\n    currency = loan.currency;\n    step = 1;\n    amounts = mortgage(loan.amount, f.mortgage_rate, years * 12);\n    monthly = { amount: amounts[0], currency };\n  } else {\n    const price = f.price;\n    if (!money(price)) return say('Say the price on the plan first.');\n    currency = price.currency;\n    const down = how === 'down_equal' ? f.make_down : null;\n    if (how === 'down_equal' && (!money(down) || down.currency !== currency || down.amount >= price.amount)) return say('The down payment must be in the price currency and less than the price.');\n    if (count < 1) return say('Say how many parts.');\n    const rest = how === 'down_equal' ? price.amount - down.amount : price.amount;\n    const base = Math.floor(rest / count);\n    const equal = [];\n    for (let i = 1; i <= count; i++) equal.push(i === count ? rest - base * (count - 1) : base);\n    amounts = how === 'down_equal' ? [down.amount].concat(equal) : equal;\n  }\n  if (amounts.length > 120) return say('That is more than 120 parts. Make fewer, or paste the plan.');\n\n  const account = typeof f.account === 'string' && f.account !== '' ? { account: f.account } : {};\n  amounts.forEach((amount, i) => {\n    /* A down payment falls on the first day and the equal parts follow it one step apart. */\n    const k = how === 'down_equal' ? (i === 0 ? 0 : i * step) : i * step;\n    ctx.write('installments', {\n      what: f.name + ', part ' + (i + 1) + ' of ' + amounts.length,\n      plan: f.name,\n      plan_row: plan.id,\n      number: i + 1,\n      parts: amounts.length,\n      direction: 'out',\n      amount: { amount, currency },\n      due: addMonths(first, k),\n      state: 'open',\n      ...account,\n    });\n  });\n  const patch = { make_how: null, make_first: null, make_parts: null, make_every: null, make_down: null, plan_said: 'Made ' + amounts.length + ' parts from ' + first + '.' };\n  if (monthly) {\n    patch.mortgage_monthly = monthly;\n    patch.mortgage_interest = { amount: amounts.reduce((a, b) => a + b, 0) - f.mortgage_principal.amount, currency };\n  }\n  ctx.update('plans#' + plan.seq, patch, plan.version);\n}\n"
+    },
+    {
+      "rule": "property_paste",
+      "name": "Read a pasted plan",
+      "pack": "property",
+      "on": {
+        "written": {
+          "register": "plans",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "paste"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "property_paste",
+            "as": "pasted"
+          }
+        }
+      ]
+    },
+    {
+      "script": "property_paste",
+      "title": "Paste a plan",
+      "pack": "property",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "plans",
+        "installments"
+      ],
+      "writes": [
+        "plans",
+        "installments"
+      ],
+      "source": "/**\n * Paste a plan: a payment plan copied from a spreadsheet or a contract becomes the plan's parts on Instalments.\n *\n * WHAT A PERSON PASTES. One part to a line, as a date, an amount and optionally a name, separated by tabs, semicolons\n * or commas (\"2027-01-15, 125000, Down payment\"). A date is year-month-day, or day first with slashes, dots or\n * dashes (15/01/2027). An amount may carry a currency sign or thousands marks; an amount with commas in it goes in\n * quotes when commas separate the line. A first line that does not start with a date is the heading and is skipped.\n *\n * WHAT IT WRITES. One part for each good line, on Instalments, linked to this plan, money out, open, from the plan's\n * account when it has one, numbered by date. The amounts are in the plan's price currency (or its value's, or its\n * loan's). A line it cannot read is left out and counted in \"What happened\". The pasted text is then cleared.\n *\n * IT NEVER ADDS TO A PLAN THAT HAS PARTS, as Generate a plan does not. At most 120 parts.\n */\nfunction cells(line) {\n  const sep = line.includes('\\t') ? '\\t' : line.includes(';') ? ';' : ',';\n  const out = [];\n  let cur = '';\n  let quoted = false;\n  for (const ch of line) {\n    if (ch === '\"') quoted = !quoted;\n    else if (ch === sep && !quoted) {\n      out.push(cur.trim());\n      cur = '';\n    } else cur += ch;\n  }\n  out.push(cur.trim());\n  return out;\n}\n\nfunction dayOf(text) {\n  let y, m, d;\n  let hit = /^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/.exec(text);\n  if (hit) [y, m, d] = [hit[1], hit[2], hit[3]];\n  else {\n    hit = /^(\\d{1,2})[/.-](\\d{1,2})[/.-](\\d{4})$/.exec(text);\n    if (!hit) return null;\n    [d, m, y] = [hit[1], hit[2], hit[3]];\n  }\n  const at = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));\n  if (at.getUTCFullYear() !== Number(y) || at.getUTCMonth() !== Number(m) - 1 || at.getUTCDate() !== Number(d)) return null;\n  return String(y).padStart(4, '0') + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');\n}\n\n/** Minor units from \"1,250,000.50\", \"E£ 1.250.000,50\" or \"125000\", or null. */\nfunction minorOf(text) {\n  let t = text.replace(/[^0-9.,-]/g, '');\n  if (!/[0-9]/.test(t)) return null;\n  const neg = t.startsWith('-');\n  t = t.replace(/-/g, '');\n  const dot = t.lastIndexOf('.');\n  const comma = t.lastIndexOf(',');\n  const at = Math.max(dot, comma);\n  let whole = t;\n  let frac = '';\n  if (at >= 0 && t.length - at - 1 >= 1 && t.length - at - 1 <= 2) {\n    whole = t.slice(0, at);\n    frac = t.slice(at + 1);\n  }\n  whole = whole.replace(/[.,]/g, '');\n  if (whole === '' && frac === '') return null;\n  const n = Number(whole || '0') * 100 + Number((frac + '00').slice(0, 2));\n  return Number.isSafeInteger(n) ? (neg ? -n : n) : null;\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  if (!id) return;\n  const plan = await ctx.record.get(id);\n  if (!plan || plan.register !== 'plans') return;\n  const f = plan.fields;\n  if (typeof f.paste !== 'string' || f.paste.trim() === '') return;\n  const say = (said) => ctx.update('plans#' + plan.seq, { paste: null, plan_said: said }, plan.version);\n\n  const named = await ctx.record.list('installments', { all: [{ field: 'plan', is: f.name }] });\n  const linked = await ctx.record.list('installments', { all: [{ field: 'plan_row', is: plan.id }] });\n  if (named.length + linked.length > 0) return say('This plan already has parts, so nothing was pasted in. Remove them first, or add the missing ones on Instalments.');\n  const known = [f.price, f.value, f.mortgage_principal].find((m) => m && typeof m.currency === 'string');\n  if (!known) return say('Say the price on the plan first, so the pasted amounts have a currency.');\n\n  const lines = f.paste.split(/\\r?\\n/).filter((l) => l.trim() !== '');\n  const good = [];\n  let skipped = 0;\n  lines.forEach((line, i) => {\n    const c = cells(line);\n    const due = dayOf(c[0] || '');\n    const amount = minorOf(c[1] || '');\n    if (!due || amount === null || amount <= 0) {\n      if (!(i === 0 && !due)) skipped++;\n      return;\n    }\n    good.push({ due, amount, label: c.slice(2).filter((x) => x !== '').join(', ') });\n  });\n  if (good.length === 0) return say('No line could be read. Each line is a date, an amount and optionally a name.');\n  if (good.length > 120) return say('That is more than 120 parts. Paste it in two plans.');\n  good.sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : 0));\n  const account = typeof f.account === 'string' && f.account !== '' ? { account: f.account } : {};\n  good.forEach((p, i) => {\n    ctx.write('installments', {\n      what: p.label !== '' ? p.label : f.name + ', part ' + (i + 1) + ' of ' + good.length,\n      plan: f.name,\n      plan_row: plan.id,\n      number: i + 1,\n      parts: good.length,\n      direction: 'out',\n      amount: { amount: p.amount, currency: known.currency },\n      due: p.due,\n      state: 'open',\n      ...account,\n    });\n  });\n  say('Pasted ' + good.length + ' parts' + (skipped > 0 ? ', and left out ' + skipped + ' line' + (skipped === 1 ? '' : 's') + ' it could not read' : '') + '.');\n}\n"
+    },
+    {
+      "rule": "property_sums_part",
+      "name": "Add up a plan when a part changes",
+      "pack": "property",
+      "on": {
+        "written": {
+          "register": "installments",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "state",
+            "amount",
+            "due",
+            "plan_row",
+            "plan"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "property_sums",
+            "as": "summed"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "property_sums_plan",
+      "name": "Add up a plan when its price changes",
+      "pack": "property",
+      "on": {
+        "written": {
+          "register": "plans",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "value",
+            "price",
+            "mortgage_principal",
+            "mortgage_rate",
+            "mortgage_years"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "property_sums",
+            "as": "summed"
+          }
+        }
+      ]
+    },
+    {
+      "script": "property_sums",
+      "title": "Add up what a plan has paid and what is left",
+      "pack": "property",
+      "runs": {
+        "rule": true,
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "plans",
+        "installments"
+      ],
+      "writes": [
+        "plans",
+        "installments"
+      ],
+      "source": "/**\n * What a property plan comes to: what is paid, what is left, what the property is worth beyond that, and the total\n * of its parts paid so far at each paid part, which the page draws as a line.\n *\n * STARTED WITH A PART OR A PLAN when one is written, and once a day for every plan. For each plan that has a price or\n * a value it works through the parts that are not cancelled, earliest first, in the currency of the plan's value\n * (else its price, else its loan): the paid parts add up to \"Paid\" and, running, to \"Paid in all\" on each paid part;\n * the open parts add up to \"Left to pay\"; and the value less what is left is the \"Equity\". A part in another\n * currency is left out, since two currencies are never added. A mortgage's monthly amount and the interest over its\n * years are worked out the same way Generate a plan works them.\n *\n * It writes a field only where it would change, so it starts nothing again. Plans and parts are read a page at a time, past fifty.\n */\nfunction mortgage(principal, rate, n) {\n  const r = rate / 100 / 12;\n  const each = r === 0 ? Math.round(principal / n) : Math.round((principal * r) / (1 - Math.pow(1 + r, -n)));\n  let left = principal;\n  let total = 0;\n  for (let i = 1; i <= n; i++) {\n    const interest = Math.round(left * r);\n    const pay = i === n ? left + interest : each;\n    total += pay;\n    left = left + interest - pay;\n  }\n  return { each, total };\n}\n\nconst money = (m) => m && typeof m === 'object' && typeof m.amount === 'number' && typeof m.currency === 'string';\nconst same = (a, b) => (a === undefined || a === null ? b === null : money(a) && b !== null && a.amount === b.amount && a.currency === b.currency);\n\n/**\n * Every row of a list that `where` lets through. A script's list is one page of fifty, in the list's own order and with\n * no cursor, so the rows are asked for by number instead: the top number is found by asking above the highest seen,\n * then (0, top] is cut in halves until each half comes back short. At most 60 reads; `short` says some were left.\n */\nasync function every(ctx, register, where) {\n  const PAGE = 50;\n  const READS = 60;\n  let reads = 0;\n  const ask = (above, upto) => {\n    reads += 1;\n    const parts = [...(where ? [where] : []), ...(above > 0 ? [{ field: 'seq', gt: above }] : []), ...(upto === null ? [] : [{ field: 'seq', lte: upto }])];\n    return parts.length === 0 ? ctx.record.list(register) : ctx.record.list(register, parts.length === 1 ? parts[0] : { all: parts });\n  };\n  const first = await ask(0, null);\n  if (first.length < PAGE) return first;\n  const seen = new Map(first.map((r) => [r.id, r]));\n  let top = Math.max(...first.map((r) => r.seq));\n  for (;;) {\n    if (reads >= READS) break;\n    const above = await ask(top, null);\n    for (const r of above) seen.set(r.id, r);\n    if (above.length < PAGE) break;\n    top = Math.max(...above.map((r) => r.seq));\n  }\n  const spans = [[0, top]];\n  let short = false;\n  while (spans.length > 0) {\n    if (reads >= READS) {\n      short = true;\n      break;\n    }\n    const [a, b] = spans.pop();\n    const page = await ask(a, b);\n    for (const r of page) seen.set(r.id, r);\n    if (page.length >= PAGE && b - a > 1) {\n      const mid = Math.floor((a + b) / 2);\n      spans.push([a, mid], [mid, b]);\n    }\n  }\n  const rows = [...seen.values()];\n  rows.short = short;\n  return rows;\n}\n\nasync function work(ctx, plan) {\n  const f = plan.fields;\n  const mine = new Map();\n  for (const p of await every(ctx, 'installments', { all: [{ field: 'plan_row', is: plan.id }] })) mine.set(p.id, p);\n  for (const p of await every(ctx, 'installments', { all: [{ field: 'plan', is: f.name }] })) mine.set(p.id, p);\n  const parts = [...mine.values()].filter((p) => p.fields.state !== 'cancelled' && money(p.fields.amount));\n  const base = [f.value, f.price, f.mortgage_principal].find(money) || (parts[0] && parts[0].fields.amount);\n  if (!base) return;\n  const currency = base.currency;\n  parts.sort((a, b) => (a.fields.due < b.fields.due ? -1 : a.fields.due > b.fields.due ? 1 : (a.fields.number || 0) - (b.fields.number || 0)));\n  let paid = 0;\n  let left = 0;\n  for (const p of parts) {\n    if (p.fields.amount.currency !== currency) continue;\n    let next = null;\n    if (p.fields.state === 'paid') {\n      paid += p.fields.amount.amount;\n      next = { amount: paid, currency };\n    } else left += p.fields.amount.amount;\n    if (!same(p.fields.paid_to_date, next)) ctx.update('installments#' + p.seq, { paid_to_date: next }, p.version);\n  }\n  const patch = {};\n  const set = (key, value) => {\n    if (!same(f[key], value)) patch[key] = value;\n  };\n  const any = parts.some((p) => p.fields.amount.currency === currency);\n  set('paid', any ? { amount: paid, currency } : null);\n  set('left', any ? { amount: left, currency } : null);\n  set('equity', money(f.value) && f.value.currency === currency && any ? { amount: f.value.amount - left, currency } : null);\n  const loan = f.mortgage_principal;\n  if (money(loan) && typeof f.mortgage_rate === 'number' && Number.isInteger(f.mortgage_years) && f.mortgage_years > 0) {\n    const m = mortgage(loan.amount, f.mortgage_rate, f.mortgage_years * 12);\n    set('mortgage_monthly', { amount: m.each, currency: loan.currency });\n    set('mortgage_interest', { amount: m.total - loan.amount, currency: loan.currency });\n  } else {\n    set('mortgage_monthly', null);\n    set('mortgage_interest', null);\n  }\n  if (Object.keys(patch).length > 0) ctx.update('plans#' + plan.seq, patch, plan.version);\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  let plans;\n  if (id) {\n    const row = await ctx.record.get(id);\n    if (!row) return;\n    if (row.register === 'plans') plans = [row];\n    else if (row.register === 'installments') {\n      const link = row.fields.plan_row;\n      const text = row.fields.plan;\n      const found = typeof link === 'string' && link !== '' ? [await ctx.record.get(link)] : typeof text === 'string' ? await ctx.record.list('plans', { all: [{ field: 'name', is: text }] }) : [];\n      plans = found.filter((p) => p && p.register === 'plans');\n    } else return;\n  } else plans = await every(ctx, 'plans', null);\n  for (const plan of plans) {\n    const f = plan.fields;\n    if (money(f.value) || money(f.price) || money(f.mortgage_principal)) await work(ctx, plan);\n  }\n}\n"
+    },
+    {
+      "metric": "property-value",
+      "name": "Property worth now",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "value is set",
+      "value": {
+        "sum": "value"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-equity",
+      "name": "Property equity",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "equity is set",
+      "value": {
+        "sum": "equity"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-left",
+      "name": "Property left to pay",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "value is set",
+      "value": {
+        "sum": "left"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-paid",
+      "name": "Property paid so far",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "value is set",
+      "value": {
+        "sum": "paid"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-count",
+      "name": "Properties",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "value is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-value-of",
+      "name": "Worth now of one plan",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "name is {{it}}",
+      "value": {
+        "sum": "value"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-price-of",
+      "name": "Price of one plan",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "name is {{it}}",
+      "value": {
+        "sum": "price"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-equity-of",
+      "name": "Equity of one plan",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "name is {{it}}, equity is set",
+      "value": {
+        "sum": "equity"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-left-of",
+      "name": "Left to pay on one plan",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "name is {{it}}, left is set",
+      "value": {
+        "sum": "left"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-paid-of",
+      "name": "Paid so far on one plan",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "name is {{it}}, paid is set",
+      "value": {
+        "sum": "paid"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-loan-monthly-of",
+      "name": "Loan paid a month on one plan",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "name is {{it}}, mortgage_monthly is set",
+      "value": {
+        "sum": "mortgage_monthly"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-loan-interest-of",
+      "name": "Loan interest in all on one plan",
+      "pack": "property",
+      "source": "register.plans",
+      "where": "name is {{it}}, mortgage_interest is set",
+      "value": {
+        "sum": "mortgage_interest"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "property-paid-by-month",
+      "name": "Paid in all by one plan, by quarter",
+      "pack": "property",
+      "source": "register.installments",
+      "where": "plan is {{it}}, state is paid",
+      "value": {
+        "max": "paid_to_date"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none",
+      "group_by": "due",
+      "bucket": "quarter"
+    },
+    {
+      "page": "properties",
+      "title": "Property",
+      "pack": "property",
+      "nav": {
+        "section": "Money",
+        "order": 34
+      },
+      "icon": "building",
+      "requires": [
+        "register.plans",
+        "register.installments"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "property-count",
+            "lt": 1
+          },
+          "body": "No property yet. Add a flat or a house under [Plans](/r/plans) with what it is worth, and it shows here."
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "property-count",
+            "gte": 1
+          },
+          "body": "{{property-equity}} equity in {{property-value}}. {{property-left}} left to pay."
+        },
+        {
+          "kind": "stat",
+          "heading": "Property",
+          "icon": "building",
+          "span": 12,
+          "when": {
+            "metric": "property-count",
+            "gte": 1
+          },
+          "cells": [
+            {
+              "metric": "property-equity",
+              "label": "Equity"
+            },
+            {
+              "metric": "property-value",
+              "label": "Worth now"
+            },
+            {
+              "metric": "property-paid",
+              "label": "Paid so far"
+            },
+            {
+              "metric": "property-left",
+              "label": "Left to pay"
+            }
+          ]
+        },
+        {
+          "kind": "table",
+          "heading": "Your property",
+          "icon": "building",
+          "span": 12,
+          "source": "register.plans",
+          "where": "value is set",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Plan",
+              "width": "minmax(16ch,2fr)"
+            },
+            {
+              "field": "developer",
+              "label": "Developer",
+              "width": "minmax(12ch,1fr)"
+            },
+            {
+              "field": "value",
+              "label": "Worth now",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "paid",
+              "label": "Paid so far",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "left",
+              "label": "Left to pay",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "equity",
+              "label": "Equity",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "delivers_on",
+              "label": "Delivered on",
+              "width": "13ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "delivers_on",
+              "dir": "asc"
+            }
+          ],
+          "limit": 50,
+          "empty": "No plan has a value yet."
+        }
+      ]
+    },
+    {
+      "page": "property",
+      "title": "{{name}}, property",
+      "for": {
+        "register": "plans",
+        "where": "value is set"
+      },
+      "pack": "property",
+      "nav": {
+        "section": "Money",
+        "order": 35
+      },
+      "icon": "building",
+      "requires": [
+        "register.plans",
+        "register.installments"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "plan-parts:{{name}}",
+            "lt": 1
+          },
+          "body": "No parts yet."
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "metric": "plan-parts:{{name}}",
+                "gte": 1
+              },
+              {
+                "metric": "property-equity-of:{{name}}",
+                "empty": false
+              }
+            ]
+          },
+          "body": "{{property-equity-of:{{name}}}} equity. {{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} parts paid, {{property-left-of:{{name}}}} left."
+        },
+        {
+          "kind": "stat",
+          "heading": "Where it stands",
+          "icon": "building",
+          "span": 12,
+          "when": {
+            "metric": "plan-parts:{{name}}",
+            "gte": 1
+          },
+          "cells": [
+            {
+              "metric": "property-equity-of:{{name}}",
+              "label": "Equity"
+            },
+            {
+              "metric": "property-value-of:{{name}}",
+              "label": "Worth now"
+            },
+            {
+              "metric": "property-paid-of:{{name}}",
+              "label": "Paid so far"
+            },
+            {
+              "metric": "plan-next-due:{{name}}",
+              "label": "Next due"
+            }
+          ]
+        },
+        {
+          "kind": "progress",
+          "heading": "Parts paid",
+          "icon": "credit-card",
+          "span": 12,
+          "source": "register.installments",
+          "where": "plan is {{name}}, state is not cancelled",
+          "columns": [
+            {
+              "field": "plan"
+            },
+            {
+              "field": "state"
+            }
+          ],
+          "when": {
+            "metric": "plan-parts:{{name}}",
+            "gte": 1
+          },
+          "empty": "No parts yet."
+        },
+        {
+          "kind": "series",
+          "heading": "Paid in all, over time",
+          "icon": "chart-column",
+          "span": 12,
+          "series": [
+            {
+              "metric": "property-paid-by-month:{{name}}",
+              "label": "Paid in all"
+            }
+          ],
+          "back": 24,
+          "when": {
+            "metric": "plan-parts-paid:{{name}}",
+            "gt": 0
+          },
+          "empty": "Nothing paid yet."
+        },
+        {
+          "kind": "stat",
+          "heading": "The loan",
+          "icon": "landmark",
+          "span": 12,
+          "when": {
+            "metric": "property-loan-monthly-of:{{name}}",
+            "empty": false
+          },
+          "cells": [
+            {
+              "metric": "property-loan-monthly-of:{{name}}",
+              "label": "Paid a month"
+            },
+            {
+              "metric": "property-loan-interest-of:{{name}}",
+              "label": "Interest in all"
+            }
+          ]
+        },
+        {
+          "kind": "table",
+          "heading": "Upcoming",
+          "icon": "calendar-clock",
+          "span": 12,
+          "source": "register.installments",
+          "where": "plan is {{name}}, state is open",
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "left_after",
+              "label": "Left after",
+              "width": "15ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "due",
+              "dir": "asc"
+            }
+          ],
+          "limit": 6,
+          "empty": "Nothing left to pay."
+        },
+        {
+          "kind": "section",
+          "heading": "Every part still to come",
+          "icon": "calendar-clock",
+          "span": 12,
+          "fold": true
+        },
+        {
+          "kind": "table",
+          "span": 12,
+          "source": "register.installments",
+          "where": "plan is {{name}}, state is open",
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "left_after",
+              "label": "Left after",
+              "width": "15ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "due",
+              "dir": "asc"
+            }
+          ],
+          "limit": 120
+        },
+        {
+          "kind": "table",
+          "heading": "Paid",
+          "icon": "receipt",
+          "span": 12,
+          "source": "register.installments",
+          "where": "plan is {{name}}, state is paid",
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "settled",
+              "label": "Paid on",
+              "width": "13ch"
+            },
+            {
+              "field": "paid_to_date",
+              "label": "Paid in all",
+              "width": "15ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "due",
+              "dir": "desc"
+            }
+          ],
+          "limit": 120,
+          "empty": "Nothing paid yet."
+        }
+      ]
+    }
+  ]
+}

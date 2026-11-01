@@ -1,0 +1,714 @@
+{
+  "pack": "tax-set-aside",
+  "version": "1.2.1",
+  "icon": "percent",
+  "title": "Tax set aside",
+  "summary": "For freelancers and a small business: give a category of money in a tax rate, and every payment in it says what to put aside. See this year's set aside, what you paid the tax office, what your tax account holds against it, and the tax bills still to pay.",
+  "changes": "Wears its own glyph in the store, a percent, where it shared the piggy bank with Savings circle.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.0.0 <4.0.0"
+    }
+  },
+  "extends": {
+    "register.categories": {
+      "fields": [
+        {
+          "id": "tax_rate",
+          "label": "Tax to set aside, percent",
+          "type": "decimal",
+          "unit": "%",
+          "min": 0,
+          "max": 100
+        },
+        {
+          "id": "tax_paid",
+          "label": "Tax payments",
+          "type": "bool"
+        }
+      ]
+    },
+    "register.accounts": {
+      "fields": [
+        {
+          "id": "tax_pot",
+          "label": "Holds the tax money",
+          "type": "bool"
+        }
+      ]
+    },
+    "register.transactions": {
+      "fields": [
+        {
+          "id": "tax_part",
+          "label": "Tax to set aside",
+          "type": "money"
+        },
+        {
+          "id": "tax_rate",
+          "label": "Set aside at",
+          "type": "decimal",
+          "unit": "%",
+          "min": 0,
+          "max": 100
+        },
+        {
+          "id": "tax_paid",
+          "label": "Tax paid",
+          "type": "money"
+        }
+      ]
+    }
+  },
+  "widgets": [
+    {
+      "id": "tax-aside",
+      "title": "Tax set aside",
+      "says": "What you have put by for tax this year, and what is due.",
+      "group": "money",
+      "for": "business",
+      "icon": "percent",
+      "block": {
+        "kind": "stat",
+        "heading": "Tax set aside",
+        "icon": "percent",
+        "cells": [
+          {
+            "metric": "tax-aside-year",
+            "label": "Set aside this year"
+          },
+          {
+            "metric": "tax-due",
+            "label": "Due"
+          }
+        ]
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "small",
+      "needs": {
+        "figures": [
+          "tax-aside-year"
+        ]
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "Set aside this year",
+            "said": "¤7,900"
+          }
+        ]
+      },
+      "words": [
+        "tax",
+        "vat",
+        "self assessment"
+      ],
+      "leads": [
+        "tax-set-aside"
+      ]
+    }
+  ],
+  "declarations": [
+    {
+      "rule": "tax_line",
+      "name": "Work out the tax to set aside on a Ledger line",
+      "pack": "tax-set-aside",
+      "on": {
+        "written": {
+          "register": "transactions",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "category",
+            "amount",
+            "direction",
+            "state",
+            "transfer"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "tax_set_aside",
+            "as": "setting_aside"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "tax_category",
+      "name": "Work this year's lines out again when a category's tax rate changes",
+      "pack": "tax-set-aside",
+      "on": {
+        "written": {
+          "register": "categories",
+          "op": [
+            "update"
+          ],
+          "fields": [
+            "tax_rate",
+            "tax_paid"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "tax_set_aside",
+            "as": "setting_aside"
+          }
+        }
+      ]
+    },
+    {
+      "script": "tax_set_aside",
+      "title": "Work out the tax to set aside and the tax paid",
+      "pack": "tax-set-aside",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "transactions",
+        "categories"
+      ],
+      "writes": [
+        "transactions"
+      ],
+      "source": "/**\n * Tax set aside: the part of each payment you will pay tax on, worked out on its Ledger line, and the tax you paid.\n *\n * A CATEGORY SAYS IT. \"Tax to set aside, percent\" on a category of money in (client work, freelance, rent you\n * collect) is the share of each payment in it to put aside; \"Tax payments\" on a category of money out marks what you\n * pay the tax office. Nothing else is read, so a salary taxed before it lands is simply never given a rate.\n *\n * STARTED BY A LEDGER LINE when it is written or its category, amount, way or status changes. A cleared payment in, not\n * a move between your own accounts, in a category with a rate, gets \"Tax to set aside\" (the amount times the rate,\n * rounded to the smallest unit) and \"Set aside at\" (the rate). A cleared payment out in a tax-payments category gets\n * \"Tax paid\", its amount. A line that no longer qualifies loses what it had.\n *\n * STARTED BY A CATEGORY when its rate or its tax-payments mark changes: this year's lines in it are worked out again,\n * fifty at a time and at most a thousand, so a rate you correct in March puts January right.\n *\n * IT WRITES ONLY ITS OWN THREE FIELDS ON THE LEDGER, which the automations do not watch, so it never starts itself again.\n */\n\nconst money = (m) => m && typeof m === 'object' && Number.isSafeInteger(m.amount) && typeof m.currency === 'string';\nconst same = (a, b) => (money(a) && money(b) ? a.amount === b.amount && a.currency === b.currency : !money(a) && !money(b));\n\n/** What a line should hold, given its category: `{ tax_part, tax_rate, tax_paid }`, each null when it holds none. */\nexport function taxOf(f, category) {\n  const c = category ? category.fields : {};\n  const moved = f.state === 'cleared' && f.transfer !== true && f.stays !== true && money(f.amount);\n  const rate = typeof c.tax_rate === 'number' && c.tax_rate > 0 ? c.tax_rate : null;\n  const earns = moved && f.direction === 'in' && rate !== null;\n  const pays = moved && f.direction === 'out' && c.tax_paid === true;\n  return {\n    tax_part: earns ? { amount: Math.round((f.amount.amount * rate) / 100), currency: f.amount.currency } : null,\n    tax_rate: earns ? rate : null,\n    tax_paid: pays ? f.amount : null,\n  };\n}\n\nfunction patchOf(f, want) {\n  const patch = {};\n  if (!same(f.tax_part, want.tax_part)) patch.tax_part = want.tax_part;\n  if ((f.tax_rate ?? null) !== want.tax_rate) patch.tax_rate = want.tax_rate;\n  if (!same(f.tax_paid, want.tax_paid)) patch.tax_paid = want.tax_paid;\n  return patch;\n}\n\nasync function line(ctx, row, category) {\n  const want = taxOf(row.fields, category);\n  const patch = patchOf(row.fields, want);\n  if (Object.keys(patch).length === 0) return 0;\n  ctx.update('transactions#' + row.seq, patch, row.version);\n  return 1;\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  if (!id) return;\n  const row = await ctx.record.get(String(id));\n  if (!row) return;\n  if (row.register === 'transactions') {\n    const cat = typeof row.fields.category === 'string' && row.fields.category !== '' ? await ctx.record.get(row.fields.category) : null;\n    await line(ctx, row, cat && cat.register === 'categories' ? cat : null);\n    return;\n  }\n  if (row.register !== 'categories') return;\n  const from = ctx.today().slice(0, 4) + '-01-01';\n  let above = 0;\n  let changed = 0;\n  let read = 0;\n  for (let i = 0; i < 20; i++) {\n    const page = await ctx.record.list('transactions', { all: [{ field: 'category', is: row.id }, { field: 'on', gte: from }, { field: 'seq', gt: above }] }, { order: 'seq' });\n    for (const r of page) changed += await line(ctx, r, row);\n    read += page.length;\n    if (page.length < 50) break;\n    above = Math.max(...page.map((r) => r.seq));\n  }\n  ctx.log('Worked out ' + read + ' of this year\\'s lines in ' + String(row.fields.name || 'the category') + ' again, and ' + changed + ' changed.');\n}\n"
+    },
+    {
+      "metric": "tax-aside-year",
+      "name": "Tax set aside this year",
+      "pack": "tax-set-aside",
+      "source": "register.transactions",
+      "where": "state is cleared, tax_part is set, on at least boy",
+      "value": {
+        "sum": "tax_part"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-aside-month",
+      "name": "Tax set aside this month",
+      "pack": "tax-set-aside",
+      "source": "register.transactions",
+      "where": "state is cleared, tax_part is set, on at least bom",
+      "value": {
+        "sum": "tax_part"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-earned-year",
+      "name": "Taxed money in this year",
+      "pack": "tax-set-aside",
+      "source": "register.transactions",
+      "where": "state is cleared, tax_part is set, on at least boy",
+      "value": {
+        "sum": "amount"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-paid-year",
+      "name": "Tax paid this year",
+      "pack": "tax-set-aside",
+      "source": "register.transactions",
+      "where": "state is cleared, tax_paid is set, on at least boy",
+      "value": {
+        "sum": "tax_paid"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-aside-by-month",
+      "name": "Tax set aside, by month",
+      "pack": "tax-set-aside",
+      "source": "register.transactions",
+      "where": "state is cleared, tax_part is set, on at least boy-1y",
+      "value": {
+        "sum": "tax_part"
+      },
+      "group_by": "on",
+      "bucket": "month",
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-pot",
+      "name": "In the tax account",
+      "pack": "tax-set-aside",
+      "source": "register.accounts",
+      "where": "tax_pot is true, state is not closed",
+      "value": {
+        "rolled": {
+          "balance": "balance",
+          "as_of": "as_of",
+          "checks": [
+            {
+              "register": "balances",
+              "by": "account",
+              "balance": "balance",
+              "on": "as_of"
+            },
+            {
+              "register": "transactions",
+              "by": "account",
+              "balance": "balance_after",
+              "on": "on"
+            }
+          ],
+          "moves": {
+            "register": "transactions",
+            "by": "account",
+            "on": "on",
+            "amount": "amount",
+            "direction": "direction",
+            "out": "out",
+            "where": "state is cleared"
+          }
+        }
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-pots",
+      "name": "Tax accounts",
+      "pack": "tax-set-aside",
+      "source": "register.accounts",
+      "where": "tax_pot is true, state is not closed",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-reserve",
+      "name": "In an account named for tax",
+      "pack": "tax-set-aside",
+      "source": "register.accounts",
+      "where": "tax_pot is not true, state is not closed, name contains tax",
+      "value": {
+        "rolled": {
+          "balance": "balance",
+          "as_of": "as_of",
+          "checks": [
+            {
+              "register": "balances",
+              "by": "account",
+              "balance": "balance",
+              "on": "as_of"
+            },
+            {
+              "register": "transactions",
+              "by": "account",
+              "balance": "balance_after",
+              "on": "on"
+            }
+          ],
+          "moves": {
+            "register": "transactions",
+            "by": "account",
+            "on": "on",
+            "amount": "amount",
+            "direction": "direction",
+            "out": "out",
+            "where": "state is cleared"
+          }
+        }
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-reserves",
+      "name": "Accounts named for tax",
+      "pack": "tax-set-aside",
+      "source": "register.accounts",
+      "where": "tax_pot is not true, state is not closed, name contains tax",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-rated",
+      "name": "Categories with a tax rate",
+      "pack": "tax-set-aside",
+      "source": "register.categories",
+      "where": "tax_rate is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-due",
+      "name": "Tax bills to pay",
+      "pack": "tax-set-aside",
+      "source": "register.obligations",
+      "where": "state is open or part, category is tax, direction is owed_by_me",
+      "value": {
+        "sum": "amount"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tax-due-count",
+      "name": "Tax bills open",
+      "pack": "tax-set-aside",
+      "source": "register.obligations",
+      "where": "state is open or part, category is tax, direction is owed_by_me",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "tax-set-aside",
+      "title": "Tax set aside",
+      "pack": "tax-set-aside",
+      "nav": {
+        "section": "Money",
+        "order": 70
+      },
+      "icon": "piggy-bank",
+      "requires": [
+        "register.transactions",
+        "register.categories",
+        "register.obligations"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{tax-aside-year}} set aside this year, {{tax-paid-year}} paid.",
+          "when": {
+            "metric": "tax-rated",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "note",
+          "heading": "Tax account",
+          "icon": "landmark",
+          "span": 12,
+          "when": {
+            "metric": "tax-pots",
+            "gt": 0
+          },
+          "says": [
+            {
+              "when": {
+                "metric": "tax-rated",
+                "gt": 0
+              },
+              "body": "{{tax-pot}} in the tax account, against {{tax-aside-year}} set aside this year and {{tax-due}} of tax bills to pay."
+            },
+            {
+              "body": "{{tax-pot}} in the tax account, against {{tax-due}} of tax bills to pay."
+            }
+          ]
+        },
+        {
+          "kind": "note",
+          "heading": "Tax account",
+          "icon": "landmark",
+          "span": 12,
+          "body": "{{tax-reserve}} in {{tax-reserves.first}}, against {{tax-due}} of tax bills to pay. Tick Holds the tax money on that account to keep it here.",
+          "when": {
+            "all": [
+              {
+                "metric": "tax-pots",
+                "lt": 1
+              },
+              {
+                "metric": "tax-reserves",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "heading": "No rate yet",
+          "icon": "piggy-bank",
+          "span": 12,
+          "body": "Open a category below, such as Client work, and set Tax to set aside, say 25%. Each payment in it then says what to put aside.",
+          "when": {
+            "metric": "tax-rated",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "stat",
+          "heading": "This year",
+          "icon": "piggy-bank",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "tax-aside-year",
+              "label": "Set aside"
+            },
+            {
+              "metric": "tax-paid-year",
+              "label": "Paid"
+            },
+            {
+              "metric": "tax-due",
+              "label": "Bills to pay"
+            }
+          ],
+          "when": {
+            "metric": "tax-rated",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "note",
+          "heading": "No tax account",
+          "icon": "landmark",
+          "span": 12,
+          "body": "Mark the account you keep tax money in as Holds the tax money, and this page says what it holds against what is set aside.",
+          "when": {
+            "all": [
+              {
+                "metric": "tax-rated",
+                "gt": 0
+              },
+              {
+                "metric": "tax-pots",
+                "lt": 1
+              },
+              {
+                "metric": "tax-reserves",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "series",
+          "heading": "Set aside each month",
+          "icon": "chart-bar",
+          "span": 12,
+          "series": [
+            {
+              "metric": "tax-aside-by-month",
+              "label": "Set aside"
+            }
+          ],
+          "back": 12,
+          "when": {
+            "metric": "tax-rated",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Tax bills",
+          "icon": "calendar-clock",
+          "span": 12,
+          "source": "register.obligations",
+          "where": "state is open or part, category is tax",
+          "columns": [
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "due",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "empty": "No tax bills to pay."
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a tax bill",
+          "icon": "plus",
+          "span": 12,
+          "register": "obligations",
+          "where": "category is tax"
+        },
+        {
+          "kind": "table",
+          "heading": "Payments this year",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.transactions",
+          "where": "state is cleared, tax_part is set, on at least boy",
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "tax_rate",
+              "label": "At",
+              "width": "8ch",
+              "align": "end"
+            },
+            {
+              "field": "tax_part",
+              "label": "Set aside",
+              "width": "13ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 50,
+          "when": {
+            "metric": "tax-rated",
+            "gt": 0
+          },
+          "empty": "No taxed payments this year yet."
+        },
+        {
+          "kind": "table",
+          "heading": "Categories and their rates",
+          "icon": "tag",
+          "span": 12,
+          "source": "register.categories",
+          "where": "state is live",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Category",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "direction",
+              "label": "Which way",
+              "width": "14ch"
+            },
+            {
+              "field": "tax_rate",
+              "label": "Set aside",
+              "width": "12ch",
+              "align": "end"
+            },
+            {
+              "field": "tax_paid",
+              "label": "Counts as tax paid",
+              "width": "18ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "name",
+              "dir": "asc"
+            }
+          ],
+          "limit": 60,
+          "empty": "No categories yet."
+        }
+      ]
+    }
+  ]
+}

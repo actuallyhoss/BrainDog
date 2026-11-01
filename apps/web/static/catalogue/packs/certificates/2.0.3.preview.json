@@ -1,0 +1,260 @@
+{
+  "format": 1,
+  "made_at": "2026-11-01T01:28:01.487Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Next payout {{day:certificates-next-payout}}.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "certificates-count"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "No certificates yet. Add one below with its bank, its rate and when it pays.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "is": 0,
+            "metric": "certificates-count"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "cells": [
+            {
+              "label": "Put in",
+              "metric": "certificates-principal"
+            },
+            {
+              "label": "Earned so far",
+              "metric": "certificates-accrued"
+            },
+            {
+              "label": "Interest over the terms",
+              "metric": "certificates-interest"
+            },
+            {
+              "label": "Worth at maturity",
+              "metric": "certificates-maturity"
+            },
+            {
+              "label": "Next to mature",
+              "metric": "certificates-next-matures"
+            }
+          ],
+          "heading": "What they hold",
+          "icon": "landmark",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "certificates-count"
+          },
+          "key": "k1me1w1e",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "bank",
+              "width": "minmax(14ch,2fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Put in",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "rate",
+              "label": "Rate a year",
+              "width": "9ch"
+            },
+            {
+              "align": "end",
+              "field": "accrued",
+              "label": "Earned so far",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "pays",
+              "label": "Pays each time",
+              "width": "16ch"
+            },
+            {
+              "field": "next_payout",
+              "label": "Next payout",
+              "width": "13ch"
+            },
+            {
+              "field": "ends",
+              "label": "Ends",
+              "width": "13ch"
+            },
+            {
+              "align": "end",
+              "field": "at_maturity",
+              "label": "Worth at maturity",
+              "width": "16ch"
+            }
+          ],
+          "empty": "None live.",
+          "heading": "Your certificates",
+          "icon": "landmark",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "next_payout"
+            }
+          ],
+          "source": "register.certificates",
+          "span": 12,
+          "where": "state is live",
+          "key": "k03b2ia1",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add a certificate",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "certificates",
+          "span": 12,
+          "key": "k1arnbi8",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "fold": true,
+          "heading": "Matured and closed",
+          "icon": "archive",
+          "kind": "section",
+          "span": 12,
+          "key": "k1meq49x",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "bank",
+              "width": "minmax(14ch,2fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Put in",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "rate",
+              "label": "Rate a year",
+              "width": "9ch"
+            },
+            {
+              "align": "end",
+              "field": "accrued",
+              "label": "Earned so far",
+              "width": "16ch"
+            },
+            {
+              "align": "end",
+              "field": "pays",
+              "label": "Pays each time",
+              "width": "16ch"
+            },
+            {
+              "field": "next_payout",
+              "label": "Next payout",
+              "width": "13ch"
+            },
+            {
+              "field": "ends",
+              "label": "Ends",
+              "width": "13ch"
+            },
+            {
+              "align": "end",
+              "field": "at_maturity",
+              "label": "Worth at maturity",
+              "width": "16ch"
+            }
+          ],
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "ends"
+            }
+          ],
+          "source": "register.certificates",
+          "span": 12,
+          "where": "state is not live",
+          "key": "k1jsb2um",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "landmark",
+      "nav": {
+        "order": 45,
+        "section": "Money"
+      },
+      "pack": "certificates",
+      "page": "certificates",
+      "requires": [
+        "register.certificates"
+      ],
+      "title": "Certificates",
+      "read_at": "2026-11-01T01:28:01.487Z",
+      "zone": "UTC",
+      "look": {
+        "look": "certificates",
+        "basis": "r0e0ata0",
+        "by": "rule",
+        "hide": [
+          "k03b2ia1",
+          "k1meq49x",
+          "k1jsb2um"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

@@ -528,8 +528,45 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.2",
+      "latest": "2.0.3",
       "versions": [
+        {
+          "version": "2.0.3",
+          "checksum": "983e565581c47b61377ca0b3f712ab42d5d129433d90e669803ca04efad0f220",
+          "bytes": 23850,
+          "published_at": "2026-11-01T01:28:01.487Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Certificates"
+            ],
+            "pages": [
+              "Certificates"
+            ],
+            "rules": [
+              "Work out what a certificate has earned",
+              "Ask to move a certificate's next payout on when its payout is booked"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Says what to add when there are no certificates yet.",
+          "preview": true
+        },
         {
           "version": "2.0.2",
           "checksum": "dfd8ce6eb849d4fd0592816a09fbec063309c4da647d6e92de609e500a5818a8",
@@ -1202,8 +1239,42 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.1.0",
+      "latest": "2.1.1",
       "versions": [
+        {
+          "version": "2.1.1",
+          "checksum": "b9fd248cd73b29ff1adffed56f53ec4d7a5efb52e880270d4c9b0dfa1eb1f33f",
+          "bytes": 20546,
+          "published_at": "2026-11-01T01:28:58.360Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Debts",
+              "Payoff plans"
+            ],
+            "pages": [
+              "Debts"
+            ],
+            "rules": [
+              "Work out the plans when a debt changes",
+              "Work out the plans when the extra changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Wears its own glyph in the store, a line going down, where it shared the card with Card alerts.",
+          "preview": true
+        },
         {
           "version": "2.1.0",
           "checksum": "d157ec257bff0ff8323f6226113701253cf6516663ca3ef38f9c932de83744ec",
@@ -1328,7 +1399,7 @@
         "name": "BrainDog"
       },
       "shelf": "money",
-      "icon": "credit-card"
+      "icon": "trending-down"
     },
     {
       "kind": "pack",
@@ -1569,8 +1640,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.1.0",
+      "latest": "2.2.0",
       "versions": [
+        {
+          "version": "2.2.0",
+          "checksum": "c6c0e401ce6a46bc1993a55ad98e097c2e27ae9aa405b4c2b936db01dae3c41a",
+          "bytes": 20142,
+          "published_at": "2026-11-01T01:28:01.487Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Goals"
+            ],
+            "pages": [
+              "Goals"
+            ],
+            "rules": [
+              "goals_pace",
+              "goals_pace_on_balance"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Savings goals"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Opens on what to add and a box to add the first goal when there are none, counted by a new Goals figure.",
+          "preview": true
+        },
         {
           "version": "2.1.0",
           "checksum": "c8aa52da3fe045a940cbbc53812d78f2cd9d922943c10e66449b2c864139445f",
@@ -2432,8 +2539,76 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.2",
+      "latest": "2.0.4",
       "versions": [
+        {
+          "version": "2.0.4",
+          "checksum": "17dffb2d3b11ab0a06567b6a713f72061ff143e487b74abd3e6c4df6979baf67",
+          "bytes": 35348,
+          "published_at": "2026-11-01T01:36:00.415Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Policies",
+              "Illustration years"
+            ],
+            "pages": [
+              "Insurance",
+              "{{name}}"
+            ],
+            "rules": [
+              "insurance_figures"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Says what to add when there are no policies yet, with a link to add the first, and no longer shows a fund value line before there is one.",
+          "preview": true
+        },
+        {
+          "version": "2.0.3",
+          "checksum": "c438bab9a37fc5b53913bb28cabd56770ca03463dc697688d215cda542ee0198",
+          "bytes": 35303,
+          "published_at": "2026-11-01T01:28:01.487Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Policies",
+              "Illustration years"
+            ],
+            "pages": [
+              "Insurance",
+              "{{name}}"
+            ],
+            "rules": [
+              "insurance_figures"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Says what to add when there are no policies yet, and no longer shows a fund value line before there is one.",
+          "preview": true
+        },
         {
           "version": "2.0.2",
           "checksum": "30e038b1484ced174e09029ca8728979d4eda555086d78d6ee66bf5da7a5e4a4",
@@ -4856,8 +5031,46 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.2",
+      "latest": "1.0.3",
       "versions": [
+        {
+          "version": "1.0.3",
+          "checksum": "582dd9034eec3b7707b192071cb29cf1dbc15018e7c0a39f7dff329d67a7958a",
+          "bytes": 39077,
+          "published_at": "2026-11-01T01:28:01.487Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Property",
+              "{{name}}, property"
+            ],
+            "rules": [
+              "Make the parts of a plan",
+              "Read a pasted plan",
+              "Add up a plan when a part changes",
+              "Add up a plan when its price changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.plans",
+                "writes": true
+              },
+              {
+                "id": "register.installments",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "Says how to add a property when there is none yet.",
+          "preview": true
+        },
         {
           "version": "1.0.2",
           "checksum": "d3871230b7bc4bd06b2f63e7ac0c9482f01b5a52d6e7cb6a6c4d38a48c206978",
@@ -6950,8 +7163,58 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "0d43148073552840018439b5f8b1ef2b550bdaa1d84cc574830216bbb8e1999e",
+          "bytes": 21472,
+          "published_at": "2026-11-01T01:28:58.360Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Tax set aside"
+            ],
+            "rules": [
+              "Work out the tax to set aside on a Ledger line",
+              "Work this year's lines out again when a category's tax rate changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Tax set aside"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": true
+              },
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Wears its own glyph in the store, a percent, where it shared the piggy bank with Savings circle.",
+          "preview": true
+        },
         {
           "version": "1.2.0",
           "checksum": "8f98c9863219f6549a578eaf103d773201c095fee4e7265ede59e9de4ded49f2",
@@ -7069,7 +7332,7 @@
         "name": "BrainDog"
       },
       "shelf": "money",
-      "icon": "piggy-bank"
+      "icon": "percent"
     },
     {
       "kind": "pack",
@@ -7678,8 +7941,65 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.2",
+      "latest": "2.0.3",
       "versions": [
+        {
+          "version": "2.0.3",
+          "checksum": "d3ab71c18e65f36aaba32e0c2d890dd85e9f596f55d793141a2a7611fce46a6a",
+          "bytes": 35778,
+          "published_at": "2026-11-01T01:30:54.338Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core",
+              "holdings"
+            ],
+            "lists": [
+              "Zakat working",
+              "Cash at its lowest",
+              "Zakat given"
+            ],
+            "pages": [
+              "Zakat"
+            ],
+            "rules": [
+              "zakat_inputs",
+              "zakat_rate",
+              "zakat_metals"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.gold_rates",
+                "writes": false
+              },
+              {
+                "id": "register.holdings",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Says step 1 before step 2 when there is no gold rate yet, and links to where the rate is set.",
+          "preview": true
+        },
         {
           "version": "2.0.2",
           "checksum": "a054435bef5f1b82a337c02c95c9d8b43fe5ddafc8d36aceadf48bc09e318bc9",

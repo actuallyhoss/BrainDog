@@ -1,0 +1,158 @@
+{
+  "format": 1,
+  "made_at": "2026-11-01T01:28:01.487Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "No property yet. Add a flat or a house under [Plans](/r/plans) with what it is worth, and it shows here.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "property-count"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "{{property-equity}} equity in {{property-value}}. {{property-left}} left to pay.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gte": 1,
+            "metric": "property-count"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Equity",
+              "metric": "property-equity"
+            },
+            {
+              "label": "Worth now",
+              "metric": "property-value"
+            },
+            {
+              "label": "Paid so far",
+              "metric": "property-paid"
+            },
+            {
+              "label": "Left to pay",
+              "metric": "property-left"
+            }
+          ],
+          "heading": "Property",
+          "icon": "building",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gte": 1,
+            "metric": "property-count"
+          },
+          "key": "k1embwce",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Plan",
+              "width": "minmax(16ch,2fr)"
+            },
+            {
+              "field": "developer",
+              "label": "Developer",
+              "width": "minmax(12ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "value",
+              "label": "Worth now",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "paid",
+              "label": "Paid so far",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "left",
+              "label": "Left to pay",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "equity",
+              "label": "Equity",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "delivers_on",
+              "label": "Delivered on",
+              "width": "13ch"
+            }
+          ],
+          "empty": "No plan has a value yet.",
+          "heading": "Your property",
+          "icon": "building",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "delivers_on"
+            }
+          ],
+          "source": "register.plans",
+          "span": 12,
+          "where": "value is set",
+          "key": "k13bzi62",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "empty"
+        }
+      ],
+      "icon": "building",
+      "nav": {
+        "order": 34,
+        "section": "Money"
+      },
+      "pack": "property",
+      "page": "properties",
+      "requires": [
+        "register.plans",
+        "register.installments"
+      ],
+      "title": "Property",
+      "read_at": "2026-11-01T01:28:01.487Z",
+      "zone": "UTC",
+      "look": {
+        "look": "properties",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

@@ -1,10 +1,10 @@
 {
   "pack": "certificates",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "icon": "landmark",
   "title": "Certificates",
   "summary": "Bank certificates and fixed deposits: the rate, what each has earned so far, when it pays next and when it matures. Its payouts and the principal coming back are walked into Cash ahead.",
-  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+  "changes": "Says what to add when there are no certificates yet.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -398,7 +398,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "No certificates yet.",
+          "body": "No certificates yet. Add one below with its bank, its rate and when it pays.",
           "when": {
             "metric": "certificates-count",
             "is": 0

@@ -1,10 +1,10 @@
 {
   "pack": "goals",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "icon": "star",
   "title": "Goals",
   "summary": "What you are saving for: a goal for an account, a currency or a value you keep up, a target and a day, how much to put by each month, and whether you are on track.",
-  "changes": "Brings its Savings goals widget for Today, which was BrainDog’s own until now.",
+  "changes": "Opens on what to add and a box to add the first goal when there are none, counted by a new Goals figure.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -310,6 +310,21 @@
       "source": "/**\n * How far each goal has come and what it takes each month: what is held toward it, the share of the target that is, the\n * amount to put by each month from now to its day, and whether that is on track.\n *\n * WHAT IS HELD. A goal kept in an account holds that account's balance. A goal kept in a currency holds the balances of\n * every open account that counts as cash and is in the currency of its target. A goal kept as a value holds what a\n * person last typed, and the script never writes over it. A goal with sub-goals holds what its sub-goals hold, added\n * up, since the parts are where the money is. Two currencies are never added or compared: an account in another\n * currency than the target is left out of a currency goal, and an account goal in another currency holds nothing.\n *\n * WHAT IT TAKES EACH MONTH. What is left to the target, over the months from today to the day, rounded up. A day that has\n * come with the target not met asks for all that is left. A goal with sub-goals asks nothing itself, so the same money\n * is not asked twice; its sub-goals ask it. A goal with no day, a paused goal and a goal that is met ask nothing.\n *\n * ON TRACK OR BEHIND. The first time a goal is seen, what it held and the day are kept (`from_amount`, `started_on`).\n * From there the goal is on track when it holds at least the share of the way a straight line from that start to the\n * target has reached today, and behind when it holds less. A goal met is reached, and its status says so.\n *\n * STARTED WITH NOTHING, once a day and whenever a goal, an account or a balance is written, it works every goal out. A\n * goal whose answer is already written is left alone, so the host coming round again writes nothing.\n */\nconst DAY = 86_400_000;\nconst MONTH = 30.4375;\n\nconst money = (m) => m && typeof m.amount === 'number' && typeof m.currency === 'string';\nconst same = (a, b) => (a === undefined || a === null ? b === undefined || b === null : money(a) ? money(b) && a.amount === b.amount && a.currency === b.currency : a === b);\nconst day = (s) => Math.round(Date.parse(`${String(s).slice(0, 10)}T00:00:00Z`) / DAY);\n\n/**\n * Every row of a list that `where` lets through. A script's list is one page of fifty, in the list's own order and with\n * no cursor, so the rows are asked for by number instead: the top number is found by asking above the highest seen,\n * then (0, top] is cut in halves until each half comes back short. At most 60 reads; `short` says some were left.\n */\nasync function every(ctx, register, where) {\n  const PAGE = 50;\n  const READS = 60;\n  let reads = 0;\n  const ask = (above, upto) => {\n    reads += 1;\n    const parts = [...(where ? [where] : []), ...(above > 0 ? [{ field: 'seq', gt: above }] : []), ...(upto === null ? [] : [{ field: 'seq', lte: upto }])];\n    return parts.length === 0 ? ctx.record.list(register) : ctx.record.list(register, parts.length === 1 ? parts[0] : { all: parts });\n  };\n  const first = await ask(0, null);\n  if (first.length < PAGE) return first;\n  const seen = new Map(first.map((r) => [r.id, r]));\n  let top = Math.max(...first.map((r) => r.seq));\n  for (;;) {\n    if (reads >= READS) break;\n    const above = await ask(top, null);\n    for (const r of above) seen.set(r.id, r);\n    if (above.length < PAGE) break;\n    top = Math.max(...above.map((r) => r.seq));\n  }\n  const spans = [[0, top]];\n  let short = false;\n  while (spans.length > 0) {\n    if (reads >= READS) {\n      short = true;\n      break;\n    }\n    const [a, b] = spans.pop();\n    const page = await ask(a, b);\n    for (const r of page) seen.set(r.id, r);\n    if (page.length >= PAGE && b - a > 1) {\n      const mid = Math.floor((a + b) / 2);\n      spans.push([a, mid], [mid, b]);\n    }\n  }\n  const rows = [...seen.values()];\n  rows.short = short;\n  return rows;\n}\n\nexport default async function run(ctx) {\n  const goals = await every(ctx, 'money_goals');\n  if (goals.length === 0) return null;\n  const accounts = await every(ctx, 'accounts');\n  const open = accounts.filter((a) => a.fields.state !== 'closed' && money(a.fields.balance));\n  const today = ctx.today();\n  const now = day(today);\n  const key = (g) => `money_goals#${g.seq}`;\n  const is = (ref, row, register) => ref === row.id || ref === `${register}#${row.seq}`;\n  const childOf = (s, g) => typeof s.fields.under === 'string' && s.fields.under !== '' && is(s.fields.under, g, 'money_goals');\n  const held = new Map();\n\n  const own = (g) => {\n    const target = g.fields.target;\n    if (!money(target)) return null;\n    const kind = g.fields.kind;\n    if (kind === 'account') {\n      const a = accounts.find((x) => is(g.fields.account, x, 'accounts'));\n      return a && money(a.fields.balance) && a.fields.balance.currency === target.currency ? a.fields.balance : null;\n    }\n    if (kind === 'currency') {\n      const mine = open.filter((a) => a.fields.liquid !== false && a.fields.balance.currency === target.currency);\n      return { amount: mine.reduce((sum, a) => sum + a.fields.balance.amount, 0), currency: target.currency };\n    }\n    return money(g.fields.have) && g.fields.have.currency === target.currency ? g.fields.have : null;\n  };\n\n  for (const g of goals) {\n    const subs = goals.filter((s) => childOf(s, g));\n    if (subs.length > 0) {\n      const t = g.fields.target;\n      const parts = subs.map(own).filter((m) => m && money(t) && m.currency === t.currency);\n      held.set(key(g), money(t) ? { amount: parts.reduce((sum, m) => sum + m.amount, 0), currency: t.currency } : null);\n    } else held.set(key(g), own(g));\n  }\n\n  for (const g of goals) {\n    const f = g.fields;\n    const target = f.target;\n    const have = held.get(key(g));\n    const subs = goals.some((s) => childOf(s, g));\n    const next = {};\n    if (have && f.kind !== 'value' && !same(f.have, have)) next.have = have;\n    if (subs && have && !same(f.have, have)) next.have = have;\n    if (!money(target) || !have) {\n      for (const id of ['need', 'pace']) if (f[id] !== undefined && f[id] !== null) next[id] = null;\n    } else {\n      const startedOn = typeof f.started_on === 'string' ? f.started_on.slice(0, 10) : null;\n      const from = money(f.from_amount) && f.from_amount.currency === target.currency ? f.from_amount : null;\n      if (!startedOn || !from) {\n        next.started_on = today;\n        next.from_amount = have;\n      }\n      const start = startedOn && from ? { on: day(startedOn), amount: from.amount } : { on: now, amount: have.amount };\n      const left = Math.max(0, target.amount - have.amount);\n      let pace = null;\n      let need = null;\n      if (have.amount >= target.amount) pace = 'reached';\n      else if (f.state === 'paused') pace = null;\n      else if (typeof f.by === 'string' && f.by !== '') {\n        const by = day(f.by);\n        const months = (by - now) / MONTH;\n        if (!subs) need = { amount: months <= 1 ? left : Math.ceil(left / months), currency: target.currency };\n        const span = by - start.on;\n        const expected = span <= 0 ? target.amount : start.amount + ((target.amount - start.amount) * Math.max(0, now - start.on)) / span;\n        pace = by <= now ? 'behind' : have.amount >= Math.floor(expected) ? 'on_track' : 'behind';\n      } else pace = 'no_day';\n      if (!same(f.need, need)) next.need = need;\n      if ((f.pace ?? null) !== pace) next.pace = pace;\n      if (pace === 'reached' && f.state !== 'reached') next.state = 'reached';\n    }\n    if (Object.keys(next).length > 0) ctx.update(key(g), next, g.version);\n  }\n  return null;\n}\n"
     },
     {
+      "metric": "goals-count",
+      "name": "Goals",
+      "pack": "goals",
+      "source": "register.money_goals",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
       "metric": "goals-saving",
       "name": "Goals being saved for",
       "pack": "goals",
@@ -422,6 +437,31 @@
           "kind": "note",
           "lead": true,
           "span": 12,
+          "when": {
+            "metric": "goals-count",
+            "lt": 1
+          },
+          "body": "No goals yet. Add what you are saving for, how much and by when, and each month says what to put by."
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a goal",
+          "icon": "plus",
+          "span": 12,
+          "register": "money_goals",
+          "when": {
+            "metric": "goals-count",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "goals-count",
+            "gt": 0
+          },
           "body": "{{goals-behind}} of {{goals-saving}} goals {{bad:behind}}."
         },
         {

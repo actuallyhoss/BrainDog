@@ -1,0 +1,554 @@
+{
+  "format": 1,
+  "made_at": "2026-11-01T01:28:58.360Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "{{tax-aside-year}} set aside this year, {{tax-paid-year}} paid.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "tax-rated"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Tax account",
+          "icon": "landmark",
+          "kind": "note",
+          "says": [
+            {
+              "body": "{{tax-pot}} in the tax account, against {{tax-aside-year}} set aside this year and {{tax-due}} of tax bills to pay.",
+              "when": {
+                "gt": 0,
+                "metric": "tax-rated"
+              }
+            },
+            {
+              "body": "{{tax-pot}} in the tax account, against {{tax-due}} of tax bills to pay."
+            }
+          ],
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "tax-pots"
+          },
+          "key": "k1y12sqj",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "{{tax-reserve}} in {{tax-reserves.first}}, against {{tax-due}} of tax bills to pay. Tick Holds the tax money on that account to keep it here.",
+          "heading": "Tax account",
+          "icon": "landmark",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "lt": 1,
+                "metric": "tax-pots"
+              },
+              {
+                "gt": 0,
+                "metric": "tax-reserves"
+              }
+            ]
+          },
+          "key": "k1y12sqj-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Open a category below, such as Client work, and set Tax to set aside, say 25%. Each payment in it then says what to put aside.",
+          "heading": "No rate yet",
+          "icon": "piggy-bank",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "tax-rated"
+          },
+          "key": "k0z93gcs",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "cells": [
+            {
+              "label": "Set aside",
+              "metric": "tax-aside-year"
+            },
+            {
+              "label": "Paid",
+              "metric": "tax-paid-year"
+            },
+            {
+              "label": "Bills to pay",
+              "metric": "tax-due"
+            }
+          ],
+          "heading": "This year",
+          "icon": "piggy-bank",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "tax-rated"
+          },
+          "key": "k1gb7pdm",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Mark the account you keep tax money in as Holds the tax money, and this page says what it holds against what is set aside.",
+          "heading": "No tax account",
+          "icon": "landmark",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "tax-rated"
+              },
+              {
+                "lt": 1,
+                "metric": "tax-pots"
+              },
+              {
+                "lt": 1,
+                "metric": "tax-reserves"
+              }
+            ]
+          },
+          "key": "k0bm1vpc",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "back": 12,
+          "heading": "Set aside each month",
+          "icon": "chart-bar",
+          "kind": "series",
+          "series": [
+            {
+              "label": "Set aside",
+              "metric": "tax-aside-by-month"
+            }
+          ],
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "tax-rated"
+          },
+          "key": "k0x5milj",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when",
+          "figures": {
+            "tax-aside-by-month": {
+              "name": "Tax set aside, by month",
+              "source": "register.transactions",
+              "where": "state is cleared, tax_part is set, on at least boy-1y",
+              "value": {
+                "sum": "tax_part"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              },
+              "group_by": "on"
+            }
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch"
+            }
+          ],
+          "empty": "No tax bills to pay.",
+          "heading": "Tax bills",
+          "icon": "calendar-clock",
+          "kind": "table",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.obligations",
+          "span": 12,
+          "where": "state is open or part, category is tax",
+          "key": "k0pisv5k",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add a tax bill",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "obligations",
+          "span": 12,
+          "where": "category is tax",
+          "key": "k1rkohq9",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {
+            "category": "tax"
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch"
+            },
+            {
+              "align": "end",
+              "field": "tax_rate",
+              "label": "At",
+              "width": "8ch"
+            },
+            {
+              "align": "end",
+              "field": "tax_part",
+              "label": "Set aside",
+              "width": "13ch"
+            }
+          ],
+          "empty": "No taxed payments this year yet.",
+          "heading": "Payments this year",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.transactions",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "tax-rated"
+          },
+          "where": "state is cleared, tax_part is set, on at least boy",
+          "key": "k1c16f5r",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Category",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "direction",
+              "label": "Which way",
+              "width": "14ch"
+            },
+            {
+              "align": "end",
+              "field": "tax_rate",
+              "label": "Set aside",
+              "width": "12ch"
+            },
+            {
+              "field": "tax_paid",
+              "label": "Counts as tax paid",
+              "width": "18ch"
+            }
+          ],
+          "empty": "No categories yet.",
+          "heading": "Categories and their rates",
+          "icon": "tag",
+          "kind": "table",
+          "limit": 60,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.categories",
+          "span": 12,
+          "where": "state is live",
+          "key": "k0hm3mok",
+          "rows": [
+            {
+              "id": "01M6ABJQ7R0Q6NA09WADSZATND",
+              "register": "categories",
+              "seq": 5,
+              "fields": {
+                "match_by": "exact",
+                "rollover": false,
+                "budget_period": "month",
+                "transfer": false,
+                "correction": false,
+                "name": "Bills",
+                "direction": "out",
+                "state": "live",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-01T01:28:58.360Z",
+              "updated_at": "2026-11-01T01:28:58.360Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ABJQ7R0Q6NA09WATE822BX",
+              "register": "categories",
+              "seq": 7,
+              "fields": {
+                "match_by": "exact",
+                "rollover": false,
+                "budget_period": "month",
+                "transfer": false,
+                "correction": false,
+                "name": "Food",
+                "direction": "out",
+                "state": "live",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-01T01:28:58.360Z",
+              "updated_at": "2026-11-01T01:28:58.360Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ABJQ7R0Q6NA09WA7XGCEQS",
+              "register": "categories",
+              "seq": 3,
+              "fields": {
+                "match_by": "exact",
+                "rollover": false,
+                "budget_period": "month",
+                "transfer": false,
+                "correction": false,
+                "name": "Other income",
+                "direction": "in",
+                "state": "live",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-01T01:28:58.360Z",
+              "updated_at": "2026-11-01T01:28:58.360Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ABJQ7R0Q6NA09WA255BJFW",
+              "register": "categories",
+              "seq": 2,
+              "fields": {
+                "match_by": "exact",
+                "rollover": false,
+                "budget_period": "month",
+                "transfer": false,
+                "correction": false,
+                "name": "Pay",
+                "direction": "in",
+                "state": "live",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-01T01:28:58.360Z",
+              "updated_at": "2026-11-01T01:28:58.360Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ABJQ7R0Q6NA09WABX32CK9",
+              "register": "categories",
+              "seq": 4,
+              "fields": {
+                "match_by": "exact",
+                "rollover": false,
+                "budget_period": "month",
+                "transfer": false,
+                "correction": false,
+                "name": "Rent",
+                "direction": "out",
+                "state": "live",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-01T01:28:58.360Z",
+              "updated_at": "2026-11-01T01:28:58.360Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ABJQ7R0Q6NA09W9Z5KZK18",
+              "register": "categories",
+              "seq": 1,
+              "fields": {
+                "match_by": "exact",
+                "rollover": false,
+                "budget_period": "month",
+                "transfer": false,
+                "correction": false,
+                "name": "Sales",
+                "direction": "in",
+                "state": "live",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-01T01:28:58.360Z",
+              "updated_at": "2026-11-01T01:28:58.360Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ABJQ7R0Q6NA09WAK66SWQJ",
+              "register": "categories",
+              "seq": 6,
+              "fields": {
+                "match_by": "exact",
+                "rollover": false,
+                "budget_period": "month",
+                "transfer": false,
+                "correction": false,
+                "name": "Subscriptions",
+                "direction": "out",
+                "state": "live",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-01T01:28:58.360Z",
+              "updated_at": "2026-11-01T01:28:58.360Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ABJQ7R0Q6NA09WAYV0Z7EA",
+              "register": "categories",
+              "seq": 8,
+              "fields": {
+                "match_by": "exact",
+                "rollover": false,
+                "budget_period": "month",
+                "transfer": false,
+                "correction": false,
+                "name": "Transport",
+                "direction": "out",
+                "state": "live",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-01T01:28:58.360Z",
+              "updated_at": "2026-11-01T01:28:58.360Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 8,
+          "refusals": []
+        }
+      ],
+      "icon": "piggy-bank",
+      "nav": {
+        "order": 70,
+        "section": "Money"
+      },
+      "pack": "tax-set-aside",
+      "page": "tax-set-aside",
+      "requires": [
+        "register.transactions",
+        "register.categories",
+        "register.obligations"
+      ],
+      "title": "Tax set aside",
+      "read_at": "2026-11-01T01:28:58.360Z",
+      "zone": "UTC",
+      "look": {
+        "look": "tax-set-aside",
+        "basis": "r1gx562x",
+        "by": "rule",
+        "hide": [
+          "k0pisv5k"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

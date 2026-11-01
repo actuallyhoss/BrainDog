@@ -1,0 +1,351 @@
+{
+  "format": 1,
+  "made_at": "2026-11-01T01:28:01.487Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "No goals yet. Add what you are saving for, how much and by when, and each month says what to put by.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "goals-count"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "heading": "Add a goal",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "money_goals",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "goals-count"
+          },
+          "key": "k0h07d5c",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "body": "{{goals-behind}} of {{goals-saving}} goals {{bad:behind}}.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "goals-count"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "To put by each month",
+              "metric": "goals-need"
+            },
+            {
+              "label": "Saving for",
+              "metric": "goals-saving"
+            },
+            {
+              "label": "Behind",
+              "metric": "goals-behind"
+            },
+            {
+              "label": "Reached",
+              "metric": "goals-reached"
+            }
+          ],
+          "heading": "Where the goals stand",
+          "kind": "stat",
+          "span": 12,
+          "key": "k1jbzajr",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "To put by each month",
+              "metric": "goals-need",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Saving for",
+              "metric": "goals-saving",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Behind",
+              "metric": "goals-behind",
+              "target": {
+                "lte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Reached",
+              "metric": "goals-reached",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "goals-need": {
+              "name": "To put by each month",
+              "source": "register.money_goals",
+              "where": "state is saving, need is set",
+              "value": {
+                "sum": "need"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "goals-saving": {
+              "name": "Goals being saved for",
+              "source": "register.money_goals",
+              "where": "state is saving",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "goals-behind": {
+              "name": "Goals behind",
+              "source": "register.money_goals",
+              "where": "state is saving, pace is behind",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            },
+            "goals-reached": {
+              "name": "Goals reached",
+              "source": "register.money_goals",
+              "where": "state is reached",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          },
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "target"
+            },
+            {
+              "field": "by"
+            }
+          ],
+          "empty": "No goals yet.",
+          "heading": "How far each has come",
+          "icon": "star",
+          "kind": "progress",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "seq"
+            }
+          ],
+          "source": "register.money_goals",
+          "span": 12,
+          "spent": "goals-have-by-name",
+          "where": "state is not paused",
+          "key": "k0acg4to",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "metric": "goals-have-by-name",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true,
+                "groups": [],
+                "more": 0
+              }
+            }
+          ],
+          "wholeRead": {
+            "rows": [],
+            "total": 0
+          },
+          "figures": {
+            "goals-have-by-name": {
+              "name": "Held so far, by goal",
+              "source": "register.money_goals",
+              "where": "have is set",
+              "value": {
+                "sum": "have"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              },
+              "group_by": "name"
+            }
+          },
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "have",
+              "label": "Have"
+            },
+            {
+              "field": "target",
+              "label": "Target"
+            },
+            {
+              "field": "by",
+              "label": "By"
+            },
+            {
+              "field": "need",
+              "label": "Needed a month"
+            },
+            {
+              "field": "pace",
+              "label": "Pace"
+            },
+            {
+              "field": "under",
+              "label": "Part of"
+            }
+          ],
+          "empty": "No goals yet.",
+          "heading": "Every goal",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "by"
+            }
+          ],
+          "source": "register.money_goals",
+          "span": 12,
+          "key": "k1gr1sgj",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "star",
+      "nav": {
+        "order": 50,
+        "section": "Money"
+      },
+      "pack": "goals",
+      "page": "goals",
+      "requires": [
+        "register.money_goals"
+      ],
+      "title": "Goals",
+      "read_at": "2026-11-01T01:28:01.487Z",
+      "zone": "UTC",
+      "look": {
+        "look": "goals",
+        "basis": "r1rhv246",
+        "by": "rule",
+        "hide": [
+          "k1gr1sgj"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

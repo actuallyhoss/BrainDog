@@ -850,7 +850,7 @@
     {#if planned}
       <PlanSheet
         diff={diffOf(planned)}
-        nameOf={(a: string, b?: string) => names.get(b ?? a) ?? heldList(b ?? a) ?? moduleTitle(b ?? a)}
+        nameOf={(a: string, b?: string) => ((b ?? a) === listing?.id ? listing.title : undefined) ?? names.get(b ?? a) ?? heldList(b ?? a) ?? moduleTitle(b ?? a)}
         fieldOf={fieldLabels}
         hosted={hostedHere(page.data as unknown as Shell)}
         {busy}

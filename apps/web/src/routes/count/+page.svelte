@@ -15,14 +15,14 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { apiBase, at } from '$lib/at.ts';
-  import { money } from 'braindog-render';
+  import { money, symbolFigure } from 'braindog-render';
+  import { arrive } from '$lib/motion/index.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import { loadCounter, writeCount, type Counted, type Loaded } from '$lib/money/cash-count-live.ts';
   import {
     counterReady,
     countFields,
     differenceOf,
-    faceSaid,
     linesOf,
     noteSet,
     stepped,
@@ -66,8 +66,15 @@
     category: 'Category',
     addLine: 'Add a line',
     left: 'Left as Discrepancy',
-    noCash: 'No cash account to count',
+    /* EVERY EMPTY SAYS WHAT WILL BE HERE AND THE ONE STEP THERE (Look B; design pass, 1 Nov): "No cash account to
+       count" stood alone, and a counter opened bare said it needed the add-on that was already in. */
+    noCash: 'No cash account to count yet',
+    noCashBody: 'Add a cash account on Accounts, then count its notes and coins here.',
+    toAccounts: 'Go to Accounts',
     notSetUp: 'Needs the Count the cash add-on',
+    notSetUpBody: 'It counts your cash note by note and files any difference in the Ledger.',
+    bare: 'Count from an account',
+    bareBody: 'Open Count the cash from Money, or from a cash account, and the count goes to that account.',
     addOn: 'See add-ons',
     saved: 'Count saved',
     savedBody: 'Filing the difference in the Ledger.',
@@ -79,11 +86,14 @@
   } as const;
 
   const base = $derived(apiBase(page.url));
-  const lists = $derived((page.data as { lists?: { id: string; kernel?: true }[] } | undefined)?.lists ?? []);
+  const lists = $derived((page.data as { lists?: { id: string; kernel?: true; pack?: string }[] } | undefined)?.lists ?? []);
   /* THE LIST IS NAMED BY THE LINK THAT OPENS THE COUNTER (`?list=`), which the add-on declares, so this screen holds no list's name. */
   const into = $derived(page.url.searchParams.get('list'));
   /* A RECORD WITHOUT THE ADD-ON, OR THE COUNTER OPENED BARE, HAS NOWHERE TO WRITE A COUNT: an empty screen, asking nothing. */
   const ready = $derived(counterReady(into, lists));
+  /* WHETHER THE ADD-ON IS IN, for the words alone: a counter opened bare on a record that has it is pointed back to
+     Money, not told to install what it holds. Nothing is written by this. */
+  const installed = $derived(lists.some((l) => l.pack === 'count-cash'));
   const counter = read(() => (lists.length === 0 || !ready ? null : `${base} ${lists.length} ${into ?? ''}`), async (): Promise<Result<Loaded>> => {
     if (into === null) return { ok: false, refusal: { code: 'UNREACHABLE', fix: 'Open the counter from Count the cash on Money.' } };
     const got = await loadCounter(base, lists, into);
@@ -114,7 +124,18 @@
   const out = $derived(difference !== 0);
   const split = $derived(linesOf(lines, difference));
 
-  const say = (minor: number): string => money(minor, currency);
+  /* AN AMOUNT AS EVERY OTHER MONEY SCREEN SAYS IT, "£420.00" and not "GBP 420.00" (design pass, 1 Nov); a currency
+     with no sign of its own keeps its code. */
+  const say = (minor: number): string => {
+    const coded = money(minor, currency);
+    return symbolFigure(coded) ?? coded;
+  };
+  /* A NOTE OR A COIN BY ITS VALUE IN MONEY, "£50" and "£0.50", never the bare "50" and "0.5" a person had to read as
+     pounds or pence. Whole faces drop their pence. */
+  const faceMoney = (face: string): string => {
+    const said = say(Math.round(Number(face) * 100));
+    return Number.isInteger(Number(face)) ? said.replace(/\.0+$/u, '') : said;
+  };
 
   function pick(seq: number): void {
     chosen = seq;
@@ -173,23 +194,32 @@
     void counter.reread();
   }
 
-  const signed = (minor: number): string => `${minor > 0 ? '+' : '−'}${money(Math.abs(minor), currency)}`;
+  const signed = (minor: number): string => `${minor > 0 ? '+' : '−'}${say(Math.abs(minor))}`;
 </script>
 
 <svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
 <PageHead icon="money" title={words.title} kicker="Money" back={at('/p/money', page.url.pathname)} />
 <div class="cc-page">
-  {#if !ready}
-    <Empty kind="no-data-yet" glyph="money" title={words.notSetUp}>
-      {#snippet actions()}<Button href={at('/addons', page.url.pathname)}>{words.addOn}</Button>{/snippet}
+  {#if !ready && installed && into === null}
+    <Empty kind="no-data-yet" glyph="money" title={words.bare} body={words.bareBody}>
+      {#snippet actions()}<Button href={at('/p/money', page.url.pathname)}>{words.toMoney}</Button>{/snippet}
+    </Empty>
+  {:else if !ready}
+    <Empty kind="no-data-yet" glyph="money" title={words.notSetUp} body={words.notSetUpBody}>
+      {#snippet actions()}<Button href={at('/addons/count-cash', page.url.pathname)}>{words.addOn}</Button>{/snippet}
     </Empty>
   {:else if counter.state === 'waiting' || counter.state === 'refused' || counter.state === 'offline'}
     <ReadState state={counter.state} refusal={counter.refusal} onretry={counter.reread} />
   {:else if !account}
-    <Empty kind="no-data-yet" glyph="money" title={words.noCash} />
+    <Empty kind="no-data-yet" glyph="money" title={words.noCash} body={words.noCashBody}>
+      {#snippet actions()}<Button href={at('/p/money-accounts', page.url.pathname)}>{words.toAccounts}</Button>{/snippet}
+    </Empty>
   {:else if step === 'done'}
-    <div class="cc-done" role="status">
+    <!-- A COUNT SAVED RISES INTO PLACE (design pass, 1 Nov): the one rare, finished moment on this screen, where the
+         counter itself swapped for two lines with nothing between. `arrive` is still in a screen's first second and a
+         fade under reduced motion. -->
+    <div class="cc-done" role="status" in:arrive>
       <h2>{words.saved}</h2>
       <p>{words.savedBody}</p>
       <div class="cc-actions">
@@ -219,20 +249,20 @@
               {#each set as face (face)}
                 {@const n = counts[face] ?? 0}
                 <li class="cc-note" data-has={n > 0 ? '' : undefined}>
-                  <span class="cc-face">{faceSaid(face)}</span>
+                  <span class="cc-face">{faceMoney(face)}</span>
                   <span class="cc-line-total">{n > 0 ? say(n * Math.round(Number(face) * 100)) : ''}</span>
                   <span class="cc-stepper">
-                    <button type="button" class="cc-step" aria-label={words.reduce(faceSaid(face))} disabled={n === 0} onclick={() => setCount(face, stepped(n, -1))}>−</button>
+                    <button type="button" class="cc-step" aria-label={words.reduce(faceMoney(face))} disabled={n === 0} onclick={() => setCount(face, stepped(n, -1))}>−</button>
                     <input
                       class="cc-n"
                       inputmode="numeric"
                       autocomplete="off"
-                      aria-label={words.count(faceSaid(face))}
+                      aria-label={words.count(faceMoney(face))}
                       value={n}
                       onfocus={(e) => e.currentTarget.select()}
                       oninput={(e) => setCount(face, typedCount(e.currentTarget.value))}
                     />
-                    <button type="button" class="cc-step" aria-label={words.add(faceSaid(face))} onclick={() => setCount(face, stepped(n, 1))}>+</button>
+                    <button type="button" class="cc-step" aria-label={words.add(faceMoney(face))} onclick={() => setCount(face, stepped(n, 1))}>+</button>
                   </span>
                 </li>
               {/each}
@@ -369,7 +399,7 @@
 
   .cc-note {
     display: grid;
-    grid-template-columns: 5ch minmax(0, 1fr) auto;
+    grid-template-columns: 6ch minmax(0, 1fr) auto;
     align-items: center;
     column-gap: var(--sp-3);
     min-block-size: 56px;
@@ -416,6 +446,19 @@
   .cc-step:disabled {
     color: var(--ink-3);
     cursor: default;
+  }
+
+  /* A PRESS IS A FILL CHANGE, NOTHING SCALES (Look B): the stepper is tapped tens of times a count, so the answer is
+     the darker fill for the press's own 70ms and no more. */
+  @media (hover: hover) and (pointer: fine) {
+    .cc-step:not(:disabled):hover {
+      background: color-mix(in oklab, var(--tile-2) 94%, var(--ink));
+    }
+  }
+
+  .cc-step:not(:disabled):active {
+    background: color-mix(in oklab, var(--tile-2) 88%, var(--ink));
+    transition: background-color var(--d-press, 70ms) ease-out;
   }
 
   .cc-step:focus-visible,
@@ -471,9 +514,9 @@
     flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-4);
-    border-radius: var(--r-ctl);
+    /* A TILE, NOT A BOXED CARD (design pass, 1 Nov): no edge round it, its fill alone off the board. */
+    border-radius: var(--r-tile);
     background: var(--tile);
-    border: 1px solid var(--rule);
   }
 
   .cc-sum dl {
@@ -580,6 +623,12 @@
 
     .cc-sum dl {
       flex-direction: column;
+    }
+
+    /* THE COUNT IS THE PAGE'S ONE BIG NUMBER on a desk, where the tile has the room for it. */
+    .cc-sum .big dd {
+      font-size: var(--fs-hero);
+      line-height: 1.1;
     }
 
     .cc-one-line {

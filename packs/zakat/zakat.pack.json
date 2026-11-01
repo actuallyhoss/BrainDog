@@ -1,10 +1,10 @@
 {
   "pack": "zakat",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "icon": "scale",
   "title": "Zakat",
   "summary": "Works out zakat step by step in plain words: the nisab from your gold rate, the year from your first gold buy or a day you set, each cash account at its lowest over 354 days, your gold and metals, less bills due, and 2.5% of the total. Keeps a list of what you have given.",
-  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+  "changes": "Says step 1 before step 2 when there is no gold rate yet, and links to where the rate is set.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -696,7 +696,7 @@
           "kind": "note",
           "lead": true,
           "span": 12,
-          "body": "Set today's gold rate to work it out.",
+          "body": "[Set today's gold rate](/r/gold_rates), and your zakat is worked out here.",
           "when": {
             "metric": "zakat-nisab-set",
             "lt": 1
@@ -760,6 +760,17 @@
           "heading": "How it is worked out",
           "icon": "list-checks",
           "span": 12
+        },
+        {
+          "kind": "note",
+          "heading": "Step 1. The nisab",
+          "icon": "scale",
+          "span": 12,
+          "body": "No gold rate yet, so no nisab. Set today's rate under [Gold rates](/r/gold_rates).",
+          "when": {
+            "metric": "zakat-nisab-set",
+            "lt": 1
+          }
         },
         {
           "kind": "note",

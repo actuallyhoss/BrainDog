@@ -603,7 +603,7 @@
     {/if}
     <dl class="forecast-summary">
       {#each summary as c (c.key)}
-        <div class="forecast-sum" data-key={c.key}>
+        <div class="forecast-sum" data-key={c.key} data-below={c.below ? '' : undefined}>
           <dt class="forecast-sum-label">{c.label}</dt>
           <dd class="forecast-sum-figure num">{c.figure}</dd>
           <dd class="forecast-sum-note" data-dir={c.dir}>{c.note}</dd>

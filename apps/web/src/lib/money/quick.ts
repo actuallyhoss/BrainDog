@@ -21,8 +21,10 @@ export const WAYS: readonly Way[] = ['out', 'in', 'move'];
 /** Kept here, so the sheet owns its words. Plain, sentence case, and never a sum of two currencies. */
 export const words = {
   title: 'Add a movement',
-  ways: { out: 'Money out', in: 'Money in', move: 'Between my accounts' } as Record<Way, string>,
+  ways: { out: 'Money out', in: 'Money in', move: 'Move money' } as Record<Way, string>,
   short: { out: 'Out', in: 'In', move: 'Move' } as Record<Way, string>,
+  /* THE BOX UNDER THE CHIPS SAYS WHAT IT IS FOR (design pass, 1 Nov): it was a blank bar under five names. */
+  payeeType: 'Or type a name',
   amount: 'Amount',
   currency: 'Currency',
   paidTo: { out: 'Paid to', in: 'From', move: 'What for' } as Record<Way, string>,

@@ -1,10 +1,10 @@
 {
   "pack": "property",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "icon": "building",
   "title": "Property",
   "summary": "A flat or a house paid in parts: what it is worth, what you have paid, what is left and what you own beyond that, with the parts to come and the parts paid. Makes the parts for you, or reads a plan you paste.",
-  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+  "changes": "Says how to add a property when there is none yet.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -553,7 +553,7 @@
             "metric": "property-count",
             "lt": 1
           },
-          "body": "No property yet."
+          "body": "No property yet. Add a flat or a house under [Plans](/r/plans) with what it is worth, and it shows here."
         },
         {
           "kind": "note",

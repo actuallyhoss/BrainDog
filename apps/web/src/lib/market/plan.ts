@@ -79,6 +79,11 @@ export const words = {
   extends: 'Adds to your lists',
   extendsLine: (fields: readonly string[]) => `adds ${fields.join(', ')}`,
   pageAdds: 'Adds to your pages',
+  /* A PAGE IT ADDS TO, BY ITS NAME, AND WHAT GOES ON IT BY THE TILES' OWN HEADINGS: "Money", "Cash counts, Last count".
+     The record's own sentence ("adds a block to Money from count-cash") named a block and the add-on's id. */
+  pageAddsLine: (headings: readonly string[], n: number) =>
+    headings.length > 0 ? new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(headings) : n === 1 ? 'a tile' : `${n.toLocaleString('en-GB')} tiles`,
+  pageMissing: (page: string) => `It adds to your ${page} page, which is not here yet. Add the add-on that brings ${page} first.`,
   settings: 'Settings',
   settingKept: (value: string) => `kept at ${value}`,
   settingDefault: (value: string) => `set to ${value}`,
@@ -225,10 +230,29 @@ function namer(nameOf: (id: string) => string): (id: string) => string {
     const said = nameOf(id);
     /* AN ID WITH A CAPITAL IS STILL AN ID: a namer that knew nothing better answered `rule.subscriptions_price` as
        "Rule.subscriptions_price", and the sheet drew it. */
-    if (said !== '' && said.toLowerCase() !== id.toLowerCase()) return said;
+    /* A NAME STILL HOLDING ITS PLACEHOLDER IS NO NAME: Property's page is titled "{{name}}, property" until a property
+       fills it, and the sheet's button read "Install {{name}}, property". */
+    if (said !== '' && said.toLowerCase() !== id.toLowerCase() && !said.includes('{{')) return said;
     const bare = id.includes('.') ? id.slice(id.indexOf('.') + 1) : id;
     return (bare.charAt(0).toUpperCase() + bare.slice(1)).replace(/[_-]/gu, ' ');
   };
+}
+
+/** A page an add-on adds to, by its name: `money` and `page.money` are both "Money". */
+const pageName = (page: string, name: (id: string) => string): string => name(`page.${page.replace(/^(?:page\.)+/u, '')}`);
+
+/** What a plan adds to other pages, a row a page: its name, and the headings of the tiles it puts there. */
+function pageAddRows(adds: readonly Body[], name: (id: string) => string): Row[] {
+  const by = new Map<string, { headings: string[]; n: number }>();
+  for (const p of adds) {
+    const page = pageName(text(p.page), name);
+    const one = by.get(page) ?? { headings: [], n: 0 };
+    one.n += 1;
+    const heading = text(p.heading).trim();
+    if (heading !== '' && !heading.includes('{{') && !one.headings.includes(heading)) one.headings.push(heading);
+    by.set(page, one);
+  }
+  return [...by].map(([page, { headings, n }]) => row(page, words.pageAddsLine(headings.length === n ? headings : [], n)));
 }
 
 /** An id as words when nothing names it: `trial_ends` is "trial ends". */
@@ -332,7 +356,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
   /* AN UNRESOLVED PAGE ADD IS THE PAGE THAT IS MISSING: `page_adds` carries `unresolved` only beside a
      `refusal`, whose sentence already names the page and the pack, so it is shown as a stop rather than dropped
      silently the way the resolved ones below are drawn. */
-  for (const p of list(d.page_adds)) if (p.unresolved === true && isMap(p.refusal)) stops.push(text(p.refusal.fix));
+  for (const p of list(d.page_adds)) if (p.unresolved === true && isMap(p.refusal)) stops.push(words.pageMissing(pageName(text(p.page), name)));
 
   const retires = list(d.retires);
   const seeds = isMap(d.seeds) ? d.seeds : {};
@@ -383,7 +407,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
         /* EACH FIELD BY ITS LABEL, "Free trial ends", never `trial_ends`. */
         return row(name(text(e.id)), words.extendsLine(strings(e.adds).map((f) => fieldOf?.(listId, f)?.trim() || spacedId(f))));
       })),
-      ...section('page-adds', words.pageAdds, list(d.page_adds).filter((p) => !isMap(p.refusal)).map((p) => row(name(`page.${text(p.page)}`), text(p.line) || null))),
+      ...section('page-adds', words.pageAdds, pageAddRows(list(d.page_adds).filter((p) => !isMap(p.refusal)), name)),
       ...section('settings', words.settings, list(d.config).map((c) => {
         const value = typeof c.value === 'string' || typeof c.value === 'number' || typeof c.value === 'boolean' ? String(c.value) : JSON.stringify(c.value ?? null);
         return row(name(`config.${text(c.key)}`), c.from === 'kept' || c.from === 'given' ? words.settingKept(value) : c.from === 'default' ? words.settingDefault(value) : words.settingNone);

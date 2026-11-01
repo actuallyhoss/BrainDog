@@ -1,0 +1,1010 @@
+{
+  "pack": "zakat",
+  "version": "2.0.3",
+  "icon": "scale",
+  "title": "Zakat",
+  "summary": "Works out zakat step by step in plain words: the nisab from your gold rate, the year from your first gold buy or a day you set, each cash account at its lowest over 354 days, your gold and metals, less bills due, and 2.5% of the total. Keeps a list of what you have given.",
+  "changes": "Says step 1 before step 2 when there is no gold rate yet, and links to where the rate is set.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=2.0.0",
+      "holdings": ">=2.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "zakat_basis",
+      "name": "Zakat working",
+      "icon": "scale",
+      "one": "zakat working",
+      "holds": "the one row zakat is worked out on: what you set (the measure, a silver price, a first day, money owed to you, other debts) and each step the daily run writes",
+      "title": "label",
+      "mobile": [
+        "label",
+        "total",
+        "due"
+      ],
+      "pack": "zakat",
+      "fields": [
+        {
+          "id": "label",
+          "label": "Name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "label": "Nisab by",
+          "type": "enum",
+          "values": [
+            "gold",
+            "silver"
+          ],
+          "labels": {
+            "gold": "Gold, 85 g",
+            "silver": "Silver, 595 g"
+          },
+          "default": "gold"
+        },
+        {
+          "id": "silver_rate",
+          "label": "Silver, a gram",
+          "type": "money"
+        },
+        {
+          "id": "hawl_on",
+          "label": "Year began on",
+          "type": "day"
+        },
+        {
+          "id": "lent",
+          "label": "Cash due to you",
+          "type": "money"
+        },
+        {
+          "id": "debts_other",
+          "label": "Other debts due",
+          "type": "money"
+        },
+        {
+          "id": "measure_used",
+          "label": "Nisab worked by",
+          "type": "enum",
+          "values": [
+            "gold",
+            "silver"
+          ],
+          "labels": {
+            "gold": "Gold",
+            "silver": "Silver"
+          }
+        },
+        {
+          "id": "nisab_grams",
+          "label": "Nisab grams",
+          "type": "decimal"
+        },
+        {
+          "id": "nisab",
+          "label": "Nisab",
+          "type": "money"
+        },
+        {
+          "id": "gold_grams",
+          "label": "Gold you hold, grams",
+          "type": "decimal"
+        },
+        {
+          "id": "hawl_from",
+          "label": "Year began",
+          "type": "day"
+        },
+        {
+          "id": "hawl_by",
+          "label": "Year taken from",
+          "type": "enum",
+          "values": [
+            "typed",
+            "gold",
+            "none"
+          ],
+          "labels": {
+            "typed": "A day you set",
+            "gold": "Your first gold buy",
+            "none": "Not known"
+          }
+        },
+        {
+          "id": "hawl_ends",
+          "label": "Year ends",
+          "type": "day"
+        },
+        {
+          "id": "hawl_done",
+          "label": "Year complete",
+          "type": "bool"
+        },
+        {
+          "id": "cash",
+          "label": "Cash at its lowest",
+          "type": "money"
+        },
+        {
+          "id": "metals",
+          "label": "Gold and metals",
+          "type": "money"
+        },
+        {
+          "id": "bills_due",
+          "label": "Bills and debts due",
+          "type": "money"
+        },
+        {
+          "id": "owed_to_you_in",
+          "label": "Due to you, counted",
+          "type": "money"
+        },
+        {
+          "id": "total",
+          "label": "Zakatable wealth",
+          "type": "money"
+        },
+        {
+          "id": "due",
+          "label": "Zakat at 2.5%",
+          "type": "money"
+        },
+        {
+          "id": "met",
+          "label": "At or above the nisab",
+          "type": "bool"
+        },
+        {
+          "id": "left",
+          "label": "Amounts left out",
+          "type": "decimal"
+        },
+        {
+          "id": "worked_on",
+          "label": "Worked out on",
+          "type": "day"
+        }
+      ]
+    },
+    {
+      "register": "zakat_cash",
+      "name": "Cash at its lowest",
+      "icon": "wallet",
+      "one": "cash account",
+      "holds": "each cash account and the lowest it stood at over the last 354 days, written by the daily run",
+      "title": "account",
+      "mobile": [
+        "account",
+        "low",
+        "lowest_on"
+      ],
+      "pack": "zakat",
+      "fields": [
+        {
+          "id": "account",
+          "label": "Account",
+          "type": "ref",
+          "to": "accounts",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "low",
+          "label": "Lowest balance",
+          "type": "money"
+        },
+        {
+          "id": "lowest_on",
+          "label": "Lowest on",
+          "type": "day"
+        },
+        {
+          "id": "since",
+          "label": "Window began",
+          "type": "day"
+        },
+        {
+          "id": "moves",
+          "label": "Payments read",
+          "type": "decimal"
+        },
+        {
+          "id": "whole",
+          "label": "Every payment read",
+          "type": "bool"
+        },
+        {
+          "id": "taken",
+          "label": "Counted",
+          "type": "bool",
+          "index": true
+        },
+        {
+          "id": "worked_on",
+          "label": "Worked out on",
+          "type": "day"
+        }
+      ]
+    },
+    {
+      "register": "zakat_paid",
+      "name": "Zakat given",
+      "icon": "hand-coins",
+      "one": "gift",
+      "holds": "each time you gave zakat: the day, how much and to whom",
+      "title": "paid",
+      "mobile": [
+        "paid",
+        "amount",
+        "note"
+      ],
+      "pack": "zakat",
+      "order": {
+        "field": "paid",
+        "dir": "desc"
+      },
+      "fields": [
+        {
+          "id": "paid",
+          "label": "Given on",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "amount",
+          "label": "Amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "for_year",
+          "label": "For the year ending",
+          "type": "day"
+        },
+        {
+          "id": "note",
+          "label": "To whom or how",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "rule": "zakat_inputs",
+      "pack": "zakat",
+      "on": {
+        "written": {
+          "register": "zakat_basis",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "mode",
+            "silver_rate",
+            "hawl_on",
+            "lent",
+            "debts_other"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "zakat_work",
+            "input": {},
+            "as": "working"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "zakat_rate",
+      "pack": "zakat",
+      "on": {
+        "written": {
+          "register": "gold_rates",
+          "op": [
+            "create",
+            "update",
+            "delete"
+          ],
+          "fields": [
+            "karat",
+            "per_gram",
+            "on",
+            "live"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "zakat_work",
+            "input": {},
+            "as": "working"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "zakat_metals",
+      "pack": "zakat",
+      "on": {
+        "written": {
+          "register": "holdings",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "value",
+            "kind",
+            "acquired_on"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "zakat_work",
+            "input": {},
+            "as": "working"
+          }
+        }
+      ]
+    },
+    {
+      "script": "zakat_work",
+      "title": "Work out zakat",
+      "pack": "zakat",
+      "runs": {
+        "rule": true,
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "accounts",
+        "balances",
+        "transactions",
+        "obligations",
+        "holdings",
+        "gold_rates",
+        "zakat_basis",
+        "zakat_cash"
+      ],
+      "writes": [
+        "zakat_basis",
+        "zakat_cash"
+      ],
+      "source": "/**\n * Zakat, worked out step by step and written down as rows, so a page can show every step in plain words.\n *\n * THE FIGURES IT WRITES. One row in `zakat_basis` (made the first time this runs, and the oldest one is the one used)\n * holds the nisab, the day the year began and ends, the cash, the metals, the bills due, the total and what 2.5% of it\n * comes to. One row a cash account in `zakat_cash` holds the lowest that account stood at over the last 354 days.\n *\n * WHY A SCRIPT AND NOT A FIGURE. No figure over a list says \"the lowest this account stood at over a span\": a sum, a\n * count, a first or last day and a rolled balance on one day are what a figure can say. So this walks each cash account\n * back through the ledger itself and writes the answer as a row. A page then reads the rows with ordinary figures.\n *\n * THE NISAB is 85 g of 24k gold at the gold rate in use, or 595 g of silver at the silver price somebody typed when\n * they chose silver. Silver chosen with no price typed is worked out as gold, and the row says it was. A gold rate for\n * some other karat stands in for 24k by purity when there is no 24k rate.\n *\n * THE YEAR. Its first day is the day somebody typed, else the earliest day a gold holding was bought. It is complete\n * 354 days later (a lunar year). It does not stop the 2.5% being worked out: it says whether the year has run.\n *\n * CASH. Each account that counts as cash and is open, and is not a card, at the lowest its balance stood at the end of\n * any day in the last 354 days. A balance on any day is the newest statement on or before it (the balance the account\n * says, a balance check, or a payment that printed its balance after) plus every cleared payment since that statement;\n * a day before every statement is the oldest statement less the payments between. That is how Money's own cash figure\n * rolls a balance, so the two agree on today. A balance below nothing counts as nothing.\n *\n * METALS are the gold and metal holdings at what each is worth now, from Investments and gold.\n *\n * BILLS DUE are the bills that are open or part paid, due on or before today, less what is paid so far, and anything\n * typed as other debts. Money due to the person, typed as \"cash due to you\", is added.\n *\n * ONE CURRENCY. Everything is added in the gold rate's currency (else the first cash account's). An amount in another\n * currency is left out, and `left_out` counts them so the page can say so rather than add two currencies together.\n *\n * A SCRIPT READS ONE PAGE OF FIFTY OF A LIST, so the ledger is read in slices of days, a slice split in two whenever it\n * comes back full. Nothing is written to a row that already says what this would write.\n */\n\nconst YEAR = 354;\nconst PAGE = 50;\nconst RATE = 25; /* 2.5%, in thousandths */\n\nconst amount = (m) => m !== null && typeof m === 'object' && typeof m.amount === 'number' && typeof m.currency === 'string';\nconst same = (a, b) => (amount(a) && amount(b) ? a.amount === b.amount && a.currency === b.currency : !amount(a) && !amount(b));\nconst isDay = (d) => typeof d === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(d);\nconst num = (d) => Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10))) / 86_400_000;\nconst day = (n) => new Date(n * 86_400_000).toISOString().slice(0, 10);\nconst PURITY = { '24k': 24, '22k': 22, '21k': 21, '18k': 18 };\n\n/** Every row of a list that matches `base` and has `field` between two days, a full page split in two until none is full. */\nasync function slice(ctx, register, base, field, lo, hi, out) {\n  const rows = await ctx.record.list(register, { all: [...base, { field, gte: day(lo) }, { field, lte: day(hi) }] });\n  if (rows.length < PAGE || lo >= hi) {\n    out.rows.push(...rows);\n    if (rows.length >= PAGE) out.whole = false;\n    return;\n  }\n  const mid = Math.floor((lo + hi) / 2);\n  await slice(ctx, register, base, field, lo, mid, out);\n  await slice(ctx, register, base, field, mid + 1, hi, out);\n}\n\nasync function between(ctx, register, base, field, lo, hi) {\n  const out = { rows: [], whole: true };\n  await slice(ctx, register, base, field, lo, hi, out);\n  return out;\n}\n\n/** The lowest an account stood at, and the day, over the 354 days to `today`. */\nasync function lowest(ctx, account, today) {\n  const f = account.fields;\n  const end = num(today);\n  const start = end - YEAR;\n  const checks = [];\n  if (amount(f.balance) && isDay(f.as_of)) checks.push({ on: num(f.as_of), balance: f.balance.amount });\n  const kept = await between(ctx, 'balances', [{ field: 'account', is: account.id }], 'as_of', 0, end);\n  for (const r of kept.rows) if (amount(r.fields.balance) && isDay(r.fields.as_of)) checks.push({ on: num(r.fields.as_of), balance: r.fields.balance.amount });\n  /* A STATEMENT AS OLD AS ANY THAT IS NOT AFTER THE WINDOW'S START IS WHERE THE PAYMENTS MUST BE READ FROM. */\n  const before = checks.filter((c) => c.on <= start).map((c) => c.on);\n  const from = before.length > 0 ? Math.max(...before) : start;\n  const read = await between(ctx, 'transactions', [{ field: 'account', is: account.id }, { field: 'state', is: 'cleared' }], 'on', from, end);\n  const moves = new Map();\n  let whole = kept.whole && read.whole;\n  for (const r of read.rows) {\n    const t = r.fields;\n    if (!isDay(t.on) || !amount(t.amount)) continue;\n    const d = num(t.on);\n    moves.set(d, (moves.get(d) ?? 0) + (t.direction === 'out' ? -t.amount.amount : t.amount.amount));\n    if (amount(t.balance_after)) checks.push({ on: d, balance: t.balance_after.amount });\n  }\n  if (checks.length === 0) return null;\n  checks.sort((a, b) => a.on - b.on);\n  const days = [...moves.keys()].sort((a, b) => a - b);\n  /* THE RUNNING SUM OF PAYMENTS UP TO AND INCLUDING A DAY. */\n  const upTo = (d) => days.reduce((s, x) => (x <= d ? s + moves.get(x) : s), 0);\n  const at = (d) => {\n    let s = null;\n    for (const c of checks) if (c.on <= d) s = c;\n    if (s === null) s = checks[0];\n    return s.balance + upTo(d) - upTo(s.on);\n  };\n  const candidates = new Set([start, end]);\n  for (const d of days) if (d > start && d <= end) candidates.add(d);\n  for (const c of checks) if (c.on > start && c.on <= end) candidates.add(c.on);\n  let low = null;\n  for (const d of [...candidates].sort((a, b) => a - b)) {\n    const b = at(d);\n    if (low === null || b < low.balance) low = { balance: b, on: d };\n  }\n  return { balance: { amount: low.balance, currency: f.balance.currency }, on: day(low.on), from: day(start), moves: read.rows.length, whole };\n}\n\n/** The 24k rate in use, or another karat's carried to 24k by purity. */\nfunction pureRate(rates) {\n  const best = {};\n  for (const r of rates) {\n    const k = r.fields.karat;\n    if (r.fields.live !== true || !amount(r.fields.per_gram) || PURITY[k] === undefined) continue;\n    best[k] = r.fields.per_gram;\n  }\n  if (best['24k']) return best['24k'];\n  for (const k of ['22k', '21k', '18k']) if (best[k]) return { amount: (best[k].amount * 24) / PURITY[k], currency: best[k].currency };\n  return null;\n}\n\nexport default async function run(ctx) {\n  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);\n  const basisRows = await ctx.record.list('zakat_basis');\n  const basis = basisRows.slice().sort((a, b) => a.seq - b.seq)[0] ?? null;\n  const f = basis ? basis.fields : {};\n\n  const rate = pureRate(await ctx.record.list('gold_rates'));\n  const silver = amount(f.silver_rate) ? f.silver_rate : null;\n  const useSilver = f.mode === 'silver' && silver !== null;\n  const grams = useSilver ? 595 : 85;\n  const per = useSilver ? silver : rate;\n  const nisab = per ? { amount: Math.round(grams * per.amount), currency: per.currency } : null;\n\n  const accounts = (await ctx.record.list('accounts', { field: 'liquid', is: true })).filter((a) => a.fields.state !== 'closed' && a.fields.kind !== 'card');\n  const cur = per ? per.currency : accounts.length > 0 && amount(accounts[0].fields.balance) ? accounts[0].fields.balance.currency : null;\n  let left = 0;\n\n  /* CASH: one row an account, its lowest over the year, then the sum of what is not below nothing. */\n  const kept = await ctx.record.list('zakat_cash');\n  const rowOf = new Map(kept.map((r) => [r.fields.account, r]));\n  let cash = 0;\n  const live = new Set();\n  for (const a of accounts) {\n    const got = await lowest(ctx, a, today);\n    if (got === null) continue;\n    live.add(a.id);\n    const next = { account: a.id, low: got.balance, lowest_on: got.on, since: got.from, moves: got.moves, whole: got.whole, taken: got.balance.currency === cur, worked_on: today };\n    const row = rowOf.get(a.id);\n    if (!row) ctx.write('zakat_cash', next);\n    else {\n      const patch = {};\n      for (const k of Object.keys(next)) if (k === 'low' ? !same(row.fields.low, next.low) : row.fields[k] !== next[k]) patch[k] = next[k];\n      if (Object.keys(patch).length > 0) ctx.update('zakat_cash#' + row.seq, patch, row.version);\n    }\n    if (got.balance.currency === cur) cash += Math.max(0, got.balance.amount);\n    else left += 1;\n  }\n  for (const r of kept) if (!live.has(r.fields.account) && r.fields.taken !== false) ctx.update('zakat_cash#' + r.seq, { taken: false }, r.version);\n\n  /* METALS, from Investments and gold: gold and metal holdings at what each is worth now. */\n  let metals = 0;\n  let held = 0;\n  let first = null;\n  const holdings = [...(await ctx.record.list('holdings', { field: 'kind', is: 'gold' })), ...(await ctx.record.list('holdings', { field: 'kind', is: 'commodity' }))];\n  for (const h of holdings) {\n    const g = h.fields;\n    if (amount(g.value)) {\n      if (g.value.currency === cur) metals += g.value.amount;\n      else left += 1;\n    }\n    if (g.kind === 'gold') {\n      if (typeof g.qty === 'number') held += g.qty;\n      if (isDay(g.acquired_on) && (first === null || g.acquired_on < first)) first = g.acquired_on;\n    }\n  }\n\n  /* THE YEAR: the day typed, else the first gold buy. */\n  const hawlFrom = isDay(f.hawl_on) ? f.hawl_on : first;\n  const hawlBy = isDay(f.hawl_on) ? 'typed' : first ? 'gold' : 'none';\n  const hawlEnds = hawlFrom ? day(num(hawlFrom) + YEAR) : null;\n  const hawlDone = hawlEnds !== null && hawlEnds <= today;\n\n  /* BILLS DUE ON OR BEFORE TODAY, open or part paid, less what is paid so far. */\n  let bills = 0;\n  const due = await between(ctx, 'obligations', [{ field: 'direction', is: 'owed_by_me' }, { field: 'state', in: ['open', 'part'] }], 'due', 0, num(today));\n  for (const o of due.rows) {\n    const g = o.fields;\n    if (!amount(g.amount)) continue;\n    if (g.amount.currency !== cur) {\n      left += 1;\n      continue;\n    }\n    bills += Math.max(0, g.amount.amount - (amount(g.paid_so_far) && g.paid_so_far.currency === cur ? g.paid_so_far.amount : 0));\n  }\n  const otherDebts = amount(f.debts_other) && f.debts_other.currency === cur ? f.debts_other.amount : 0;\n  if (amount(f.debts_other) && f.debts_other.currency !== cur) left += 1;\n  const owedIn = amount(f.lent) && f.lent.currency === cur ? f.lent.amount : 0;\n  if (amount(f.lent) && f.lent.currency !== cur) left += 1;\n\n  const money = (n) => (cur === null ? null : { amount: n, currency: cur });\n  const total = cash + metals + owedIn - bills - otherDebts;\n  const zakatable = Math.max(0, total);\n  const met = nisab !== null && cur !== null && zakatable >= nisab.amount && zakatable > 0;\n  const out = {\n    label: basis ? f.label : 'Zakat working',\n    measure_used: useSilver ? 'silver' : 'gold',\n    nisab_grams: grams,\n    nisab,\n    gold_grams: Math.round(held * 1e6) / 1e6,\n    hawl_from: hawlFrom,\n    hawl_by: hawlBy,\n    hawl_ends: hawlEnds,\n    hawl_done: hawlDone,\n    cash: money(cash),\n    metals: money(metals),\n    bills_due: money(bills + otherDebts),\n    owed_to_you_in: money(owedIn),\n    total: money(zakatable),\n    due: money(met ? Math.round((zakatable * RATE) / 1000) : 0),\n    met,\n    left: left,\n    worked_on: today,\n  };\n  if (!basis) {\n    ctx.write('zakat_basis', { ...out, mode: 'gold' });\n    return;\n  }\n  const patch = {};\n  for (const k of Object.keys(out)) {\n    const was = f[k];\n    const now = out[k];\n    if (now !== null && typeof now === 'object' ? !same(was, now) : (was ?? null) !== now) patch[k] = now;\n  }\n  if (Object.keys(patch).length > 0) ctx.update('zakat_basis#' + basis.seq, patch, basis.version);\n}\n"
+    },
+    {
+      "metric": "zakat-set",
+      "name": "Zakat worked out",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "worked_on is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-nisab-set",
+      "name": "Nisab known",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "nisab is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-met",
+      "name": "At or above the nisab",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "met is true",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-nisab",
+      "name": "Nisab",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "nisab is set",
+      "value": {
+        "sum": "nisab"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-grams",
+      "name": "Nisab, in grams",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "nisab_grams is set",
+      "value": {
+        "sum": "nisab_grams"
+      },
+      "format": "decimal",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-cash",
+      "name": "Cash at its lowest",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "cash is set",
+      "value": {
+        "sum": "cash"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-metals",
+      "name": "Gold and metals",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "metals is set",
+      "value": {
+        "sum": "metals"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-bills",
+      "name": "Bills and debts due",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "bills_due is set",
+      "value": {
+        "sum": "bills_due"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-owed-in",
+      "name": "Due to you, counted",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "owed_to_you_in is set",
+      "value": {
+        "sum": "owed_to_you_in"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-total",
+      "name": "Zakatable wealth",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "total is set",
+      "value": {
+        "sum": "total"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-due",
+      "name": "Zakat at 2.5%",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "due is set",
+      "value": {
+        "sum": "due"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-hawl-from",
+      "name": "Year began",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "hawl_from is set",
+      "value": {
+        "min": "hawl_from"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-hawl-ends",
+      "name": "Year ends",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "hawl_ends is set",
+      "value": {
+        "min": "hawl_ends"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-hawl-done",
+      "name": "Year complete",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "hawl_done is true",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-hawl-known",
+      "name": "Year known",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "hawl_from is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-left-out",
+      "name": "Amounts left out",
+      "pack": "zakat",
+      "source": "register.zakat_basis",
+      "where": "left is set",
+      "value": {
+        "sum": "left"
+      },
+      "format": "decimal",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-given",
+      "name": "Zakat given",
+      "pack": "zakat",
+      "source": "register.zakat_paid",
+      "value": {
+        "sum": "amount"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "zakat-gifts",
+      "name": "Times given",
+      "pack": "zakat",
+      "source": "register.zakat_paid",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "zakat",
+      "title": "Zakat",
+      "pack": "zakat",
+      "nav": {
+        "section": "Money",
+        "order": 40
+      },
+      "icon": "scale",
+      "requires": [
+        "register.zakat_basis",
+        "register.zakat_cash",
+        "register.zakat_paid",
+        "register.gold_rates",
+        "register.holdings"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "[Set today's gold rate](/r/gold_rates), and your zakat is worked out here.",
+          "when": {
+            "metric": "zakat-nisab-set",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{zakat-due}} due: {{zakat-total}} is at or above the nisab of {{zakat-nisab}}.",
+          "when": {
+            "metric": "zakat-met",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{zakat-total}} is below the nisab of {{zakat-nisab}}, so no zakat is due.",
+          "when": {
+            "all": [
+              {
+                "metric": "zakat-nisab-set",
+                "gt": 0
+              },
+              {
+                "metric": "zakat-met",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "stat",
+          "lead": true,
+          "heading": "What it comes to",
+          "icon": "scale",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "zakat-due",
+              "label": "Zakat at 2.5%"
+            },
+            {
+              "metric": "zakat-total",
+              "label": "Zakatable wealth"
+            },
+            {
+              "metric": "zakat-nisab",
+              "label": "Nisab"
+            },
+            {
+              "metric": "zakat-given",
+              "label": "Given so far"
+            }
+          ]
+        },
+        {
+          "kind": "section",
+          "heading": "How it is worked out",
+          "icon": "list-checks",
+          "span": 12
+        },
+        {
+          "kind": "note",
+          "heading": "Step 1. The nisab",
+          "icon": "scale",
+          "span": 12,
+          "body": "No gold rate yet, so no nisab. Set today's rate under [Gold rates](/r/gold_rates).",
+          "when": {
+            "metric": "zakat-nisab-set",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "note",
+          "heading": "Step 1. The nisab",
+          "icon": "scale",
+          "span": 12,
+          "body": "{{zakat-grams}} g at your rate: {{zakat-nisab}} today.",
+          "when": {
+            "metric": "zakat-nisab-set",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "note",
+          "heading": "Step 2. The year",
+          "icon": "calendar-clock",
+          "span": 12,
+          "body": "Began {{day:zakat-hawl-from}}. The year has run, so zakat is due now.",
+          "when": {
+            "metric": "zakat-hawl-done",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "note",
+          "heading": "Step 2. The year",
+          "icon": "calendar-clock",
+          "span": 12,
+          "body": "{{day:zakat-hawl-from}} to {{day:zakat-hawl-ends}}.",
+          "when": {
+            "all": [
+              {
+                "metric": "zakat-hawl-known",
+                "gt": 0
+              },
+              {
+                "metric": "zakat-hawl-done",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "heading": "Step 2. The year",
+          "icon": "calendar-clock",
+          "span": 12,
+          "body": "No start day yet. Set one in your figures below.",
+          "when": {
+            "metric": "zakat-hawl-known",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Step 3. Cash at its lowest over 354 days",
+          "icon": "wallet",
+          "span": 12,
+          "body": "Each account at its lowest over the year. Cards are left out.",
+          "source": "register.zakat_cash",
+          "where": "taken is true",
+          "columns": [
+            {
+              "field": "account",
+              "label": "Account"
+            },
+            {
+              "field": "low",
+              "label": "Lowest",
+              "align": "end"
+            },
+            {
+              "field": "lowest_on",
+              "label": "On",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "lowest_on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 30,
+          "empty": "No cash accounts yet."
+        },
+        {
+          "kind": "stat",
+          "heading": "Cash in all",
+          "icon": "wallet",
+          "span": 4,
+          "cells": [
+            {
+              "metric": "zakat-cash",
+              "label": "Cash at its lowest"
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "heading": "Step 4. Gold and metals",
+          "icon": "vault",
+          "span": 4,
+          "cells": [
+            {
+              "metric": "zakat-metals",
+              "label": "Worth now"
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "heading": "Step 5. Bills due, and cash due to you",
+          "icon": "receipt",
+          "span": 4,
+          "cells": [
+            {
+              "metric": "zakat-bills",
+              "label": "Bills and debts due, taken off"
+            },
+            {
+              "metric": "zakat-owed-in",
+              "label": "Due to you, added"
+            }
+          ]
+        },
+        {
+          "kind": "note",
+          "heading": "Step 6. The total and the 2.5%",
+          "icon": "calculator",
+          "span": 12,
+          "body": "{{zakat-total}} in all. 2.5% of it is {{zakat-due}}.",
+          "when": {
+            "metric": "zakat-nisab-set",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "body": "Left out, in other currencies: {{zakat-left-out}}.",
+          "when": {
+            "metric": "zakat-left-out",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "section",
+          "heading": "Your own figures",
+          "icon": "sliders-horizontal",
+          "span": 12,
+          "fold": true
+        },
+        {
+          "kind": "table",
+          "heading": "What you set",
+          "icon": "sliders-horizontal",
+          "span": 12,
+          "source": "register.zakat_basis",
+          "columns": [
+            {
+              "field": "label",
+              "label": "Name"
+            },
+            {
+              "field": "mode",
+              "label": "Nisab by"
+            },
+            {
+              "field": "hawl_on",
+              "label": "Year began on"
+            },
+            {
+              "field": "lent",
+              "label": "Cash due to you",
+              "align": "end"
+            },
+            {
+              "field": "debts_other",
+              "label": "Other debts due",
+              "align": "end"
+            }
+          ],
+          "limit": 1,
+          "empty": "Made on the first daily run."
+        },
+        {
+          "kind": "capture",
+          "heading": "Mark zakat as given",
+          "icon": "hand-coins",
+          "span": 12,
+          "register": "zakat_paid"
+        },
+        {
+          "kind": "table",
+          "heading": "What you have given",
+          "icon": "history",
+          "span": 12,
+          "source": "register.zakat_paid",
+          "columns": [
+            {
+              "field": "paid",
+              "label": "Given on"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "align": "end"
+            },
+            {
+              "field": "for_year",
+              "label": "For the year ending"
+            },
+            {
+              "field": "note",
+              "label": "To whom or how"
+            }
+          ],
+          "order": [
+            {
+              "field": "paid",
+              "dir": "desc"
+            }
+          ],
+          "limit": 30,
+          "empty": "Nothing given yet."
+        },
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "A working, not a ruling."
+        }
+      ]
+    }
+  ]
+}
