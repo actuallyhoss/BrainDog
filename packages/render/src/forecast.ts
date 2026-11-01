@@ -964,7 +964,8 @@ const nearLow = (across: number, down: number): boolean => Math.abs(across) <= 0
 export const FORECAST_NEXT_MOST = 8;
 
 /** One cell of the summary over the chart: what it is called, its figure said short, the line under it, and its way. */
-export type SummaryCell = { key: 'end' | 'low' | 'everyday'; label: string; figure: string; note: string; dir?: 'in' | 'out' };
+/** `below`: the figure itself is under nought, which Look B draws red whichever way it moved. */
+export type SummaryCell = { key: 'end' | 'low' | 'everyday'; label: string; figure: string; note: string; dir?: 'in' | 'out'; below?: true };
 
 /**
  * THE ANSWER BEFORE THE CHART (money-core 3.29.0): the cash at the horizon and how far that is from today, the lowest
@@ -988,6 +989,7 @@ export function forecastSummary(model: ForecastModel, shown: Scenario): SummaryC
       figure: read(last.balance),
       note: [forecastFromToday(read(model.opening)), changed].filter(Boolean).join(', '),
       ...(change !== 0 ? { dir: change > 0 ? ('in' as const) : ('out' as const) } : {}),
+      ...(Math.round(last.balance) < 0 ? { below: true as const } : {}),
     },
   ];
   const low = shown.lowest;

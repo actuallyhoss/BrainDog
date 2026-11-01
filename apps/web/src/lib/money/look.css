@@ -32,14 +32,17 @@
 
 /* ── the head ─────────────────────────────────────────────────────────────── */
 
-/* THE PAGE'S NAME AND ITS LINE, ON THE BOARD: no tile round them, the name a step up, the sentence at reading size. */
-[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) {
+/* THE PAGE'S NAME AND ITS LINE, ON THE BOARD: no tile round them, the name a step up, the sentence at reading size.
+   `.hosted` IS NOT DECORATION (design pass, 1 Nov): the lead tile's own rule in `PageBody.svelte` weighs exactly what
+   these did and loads after this sheet, so Money drew its sentence as a 34px hero in a tile above the cash, two heroes
+   on one screen. The one class more is what lets Money's head be a head. */
+.hosted[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) {
   gap: var(--sp-1);
   padding: var(--sp-2) 0 var(--sp-1);
   background: none;
 }
 
-[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p {
+.hosted[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p {
   max-inline-size: 44em;
   color: var(--ink-2);
   font-size: var(--fs-head);
@@ -49,9 +52,33 @@
   text-wrap: pretty;
 }
 
-[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p .figure {
+.hosted[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p .figure {
   color: var(--ink);
   font-weight: var(--fw-medium);
+}
+
+/* THE HEAD'S SHARE AND MORE BESIDE ITS SENTENCE, NOT ON A ROW OF THEIR OWN ABOVE IT (design pass, 1 Nov): with the
+   name in the bar the head row held two buttons and nothing else, 44px of board before the first word. The sentence
+   takes the row's first column, the buttons its end, and whatever the head carries under it (the Ledger's search and
+   filters, Reports' periods) runs the whole width under both. */
+.hosted[data-money] .block-slot[data-lead]:has(> .lead-head[data-barred]):has(> .block[data-kind='note'][data-form='lead']) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--sp-4);
+  align-items: center;
+}
+
+.hosted[data-money] .block-slot[data-lead]:has(> .lead-head[data-barred]):has(> .block[data-kind='note'][data-form='lead']) > * {
+  grid-column: 1 / -1;
+}
+
+.hosted[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) > .lead-head[data-barred] {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.hosted[data-money] .block-slot[data-lead]:has(> .lead-head[data-barred]) > .block[data-kind='note'][data-form='lead'] {
+  grid-row: 1;
+  grid-column: 1;
 }
 
 [data-money] .lead-head .lead-name {
@@ -78,6 +105,13 @@
    Only the name keeps Money's medium weight. */
 [data-money] .block-slot > .block-bar .block-name {
   font-weight: var(--fw-medium);
+}
+
+/* A LEDGER TILE'S HEAD RULE IS INSET AS EVERY OTHER TILE'S (design pass, 1 Nov): `timeline.css` ran it from edge to
+   edge of the tile, so on Money the Ledger's head line was 40px wider than Coming up's beside it. */
+[data-money] .block-slot:has(> .block[data-kind='timeline'] > .list > .item[data-rich]) > .block-bar {
+  margin-inline: 0;
+  padding-inline: 0;
 }
 
 /* ── the hero ─────────────────────────────────────────────────────────────── */
@@ -375,7 +409,7 @@
 }
 
 @media (width < 640px) {
-  [data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p {
+  .hosted[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p {
     font-size: var(--fs-body);
   }
 }
@@ -491,17 +525,25 @@
   grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
 }
 
+/* A CARD ON A TILE IS A WELL, NOT A TILE IN A TILE (design pass, 1 Nov; Look B "no tile inside a tile, no border round
+   a tile"): Accounts drew each account as a bordered card with a lift of fill, a second tile on the first. Now the
+   tile's second fill alone, no edge, and the pointer darkens it a step. */
 [data-money] .cards-item {
   gap: var(--sp-2);
   padding: var(--sp-3) var(--sp-4);
-  border: 1px solid var(--rule);
+  border: 0;
   border-radius: var(--r-pop);
-  background: color-mix(in oklab, var(--tile-2) 55%, var(--tile));
-  transition: border-color var(--d-state, 120ms) ease-out;
+  background: var(--tile-2);
 }
 
 [data-money] .cards-item:has(.cards-title a):hover {
-  border-color: var(--rule-strong);
+  background: color-mix(in oklab, var(--tile-2) 94%, var(--ink));
+}
+
+/* ITS FACTS UNDER ITS NAME, NOT UNDER ITS ICON: the date under the head already stood in the name's column, and
+   "Ending in 2044" a step to the left of it. */
+[data-money] .cards-item:has(> .cards-head > .part-chip) > .cards-facts {
+  padding-inline-start: 44px;
 }
 
 [data-money] .cards-item .cards-title {
@@ -935,20 +977,20 @@
 
 /* ── the Ledger's filters: a row each, named, as a finance app's filter bar ─ */
 
-/* EACH FIELD ON A ROW OF ITS OWN WITH ITS NAME IN FRONT ("Account", "Category", "Show"), its choices as round chips, the
-   one chosen in ink, not three rows of words with a red "All" at the start of each. Month keeps its segmented track. */
+/* EACH FIELD ON A ROW OF ITS OWN WITH ITS NAME IN FRONT ("Account", "Category", "Show"), its choices as chips, the
+   one chosen in ink, not three rows of words with a red "All" at the start of each.  */
 [data-money] .filters {
   flex-direction: column;
   align-items: stretch;
   gap: var(--sp-2);
 }
 
-[data-money] .filters-group:not([data-control='segmented']) {
+[data-money] .filters-group {
   gap: 6px;
 }
 
 /* THE FIELD'S NAME IN FRONT OF ITS CHOICES, where the hairline between fields stood. */
-[data-money] .filters-group + .filters-group:not([data-control='segmented'])::before,
+[data-money] .filters-group + .filters-group::before,
 [data-money] .filters-group::before {
   content: attr(aria-label);
   position: static;
@@ -964,40 +1006,35 @@
   font-weight: var(--fw-medium);
 }
 
+/* THE MONTH IS A ROW LIKE THE OTHERS (design pass, 1 Nov; audit AP24): it was a segmented track with no name among
+   three named rows of chips, so "All, This month, Last month" read as a second "All" for Category. Its name in front,
+   its choices as the same chips; the track's fill and inset go. */
 [data-money] .filters-group[data-control='segmented'] {
-  align-self: flex-start;
-}
-
-/* LEVEL WITH THE CHIPS of the rows named above and below it, not out at the edge under their names. */
-[data-money] .filters:has(> .filters-group:not([data-control='segmented'])) > .filters-group[data-control='segmented'] {
-  margin-inline-start: calc(72px + 6px);
-  max-inline-size: calc(100% - 78px);
-}
-
-[data-money] .filters-group[data-control='segmented']::before {
-  content: none;
+  padding: 0;
+  background: none;
+  border-radius: 0;
 }
 
 /* A CHOICE IS A RECTANGLE, AS EVERY CHIP IS (1 Nov): Money's were the last pills in the app. */
-[data-money] .filters-group:not([data-control='segmented']) .filters-choice {
+[data-money] .filters-group .filters-choice {
   border: 1px solid var(--rule);
   border-radius: var(--r-ctl);
   background: var(--tile);
   color: var(--ink-2);
 }
 
-[data-money] .filters-group:not([data-control='segmented']) .filters-choice .filters-count {
+[data-money] .filters-group .filters-choice .filters-count {
   color: var(--ink-3);
 }
 
-[data-money] .filters-group:not([data-control='segmented']) .filters-choice:is([aria-pressed='true'], [data-on]),
-[data-money] .filters-group:not([data-control='segmented']) button.filters-choice[aria-pressed='true']:hover {
+[data-money] .filters-group .filters-choice:is([aria-pressed='true'], [data-on]),
+[data-money] .filters-group button.filters-choice[aria-pressed='true']:hover {
   border-color: var(--ink);
   background: var(--ink);
   color: var(--tile);
 }
 
-[data-money] .filters-group:not([data-control='segmented']) .filters-choice[aria-pressed='true'] .filters-count {
+[data-money] .filters-group .filters-choice[aria-pressed='true'] .filters-count {
   color: inherit;
   opacity: 0.75;
 }
@@ -1013,16 +1050,16 @@
     padding-inline-end: var(--sp-1);
   }
 
-  [data-money] .filters-group:not([data-control='segmented']) {
+  [data-money] .filters-group {
     padding-inline-end: 24px;
     mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
   }
 
-  [data-money] .filters-group:not([data-control='segmented']):dir(rtl) {
+  [data-money] .filters-group:dir(rtl) {
     mask-image: linear-gradient(to left, var(--ink) calc(100% - 24px), transparent);
   }
 
-  [data-money] .filters-group:not([data-control='segmented']) {
+  [data-money] .filters-group {
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
@@ -1033,7 +1070,7 @@
     mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
   }
 
-  [data-money] .filters-group:not([data-control='segmented']):dir(rtl) {
+  [data-money] .filters-group:dir(rtl) {
     mask-image: linear-gradient(to left, var(--ink) calc(100% - 24px), transparent);
   }
 
@@ -1045,12 +1082,6 @@
   [data-money] .filters-group .filters-choice,
   [data-money] .filters-group .filters-more {
     flex: none;
-  }
-
-  [data-money] .filters-group[data-control='segmented'] {
-    max-inline-size: 100%;
-    overflow-x: auto;
-    scrollbar-width: none;
   }
 }
 
