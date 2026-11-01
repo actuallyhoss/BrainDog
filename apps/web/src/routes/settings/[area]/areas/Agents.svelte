@@ -628,8 +628,10 @@
           {#if a.key === 'default' || narrowed(a)}<span class="agent-says">{a.says}</span>{/if}
           {#if line}
             {@const machine = machinesLine(a.machines)}
-            <span class="who-detail who-heard"
-              >{line}{#if a.heard?.scope}{words.on}<ScopeChip scope={a.heard.scope} inline />{/if}{#if machine}<span class="heard-machine"><span class="sep">{' · '}</span>{machine}</span>{/if}</span
+            <!-- ONE LINE, CUT WITH AN ELLIPSIS where the row is narrow, the whole of it in its title and in the agent's
+                 sheet: wrapped, it left "· MacBook Pro" leading a second line. -->
+            <span class="who-detail who-heard agent-heard" title={machine ? `${line} · ${machine}` : line}
+              >{line}{#if a.heard?.scope}{words.on}<ScopeChip scope={a.heard.scope} inline />{/if}{#if machine}<span class="sep">{' · '}</span>{machine}{/if}</span
             >
           {/if}
         </span>
@@ -980,7 +982,7 @@
     border-block-start: 1px solid var(--rule);
   }
 
-  @container (width >= 720px) {
+  @container (width >= 660px) {
     .agents {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -1320,8 +1322,12 @@
   }
 
   /* "LAST HEARD 3 MIN AGO, ON ● KILN": the dot and the name in the sentence, no box. */
-  /* THE MACHINE AND ITS DOT GO TOGETHER: a wrap left "Last heard just now ·" with the dot ending the line. */
-  .heard-machine {
+  /* AN AGENT'S HEARD LINE IS ONE LINE: a wrap left "Last heard just now ·" ending one line or "· MacBook Pro" leading
+     the next. */
+  .who-heard.agent-heard {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
