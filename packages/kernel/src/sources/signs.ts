@@ -78,7 +78,10 @@ export function foldUnfiled(rows: readonly Entry[]): Entry[] {
   const folded: Entry = {
     ...first,
     id: 'sign:never-filed',
-    fields: { ...first.fields, sign: 'never-filed', name: listed(unfiled.map((r) => String(r.fields.name))), said: 'Nothing has been filed for these yet.' },
+    /* A TITLE IS ONE THING (the lists review, L39): the card was titled with five checks' names in a row ("The model
+       answers, Agents get the tool list, What agents are told is true…"). Its title says how many, and its sentence
+       names them. */
+    fields: { ...first.fields, sign: 'never-filed', name: `${unfiled.length} checks with nothing filed yet`, said: `Nothing has been filed yet for ${listed(unfiled.map((r) => String(r.fields.name)))}.` },
   };
   return rows.flatMap((r) => (r === first ? [folded] : unfiled.includes(r) ? [] : [r]));
 }

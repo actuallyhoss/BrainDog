@@ -137,6 +137,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   core: [
+    { version: '1.3.0', notes: 'Health folds the checks not run yet at six, as All good does, and the checks nothing was filed for are one card titled by how many, naming them in its line.' },
     { version: '1.2.1', notes: 'Health shows every check that has not run yet, so the cards add up to the count above them.' },
     { version: '1.2.0', notes: 'Health says what it found more plainly and links to Tidy up.' },
     { version: '1.1.0', notes: "Scripts calls the column that says how each script is doing Status." },
@@ -361,6 +362,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
+    { version: '2.7.0', notes: 'Services names each domain that points at nothing, with who it is with, when it renews and what it costs, and Next ninety days says what each renewal costs where it said the name twice. A service\'s own page leads with what its next renewal takes, and one with no cost written shows no empty figure.' },
     { version: '2.6.1', notes: 'A service that costs nothing is no longer asked about before it renews, and the answers to that question say what each one does.' },
     { version: '2.6.0', notes: 'The Services page is called Services, as the menu says, and Lapsing says when each service lapses and why, from its own note.' },
     { version: '2.5.0', notes: 'The Vault is now the Keychain. Nothing you keep moved.' },
@@ -383,6 +385,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    { version: '1.22.0', notes: 'Timeline with no dated task says what will stand on it and how a task gets there.' },
     { version: '1.21.0', notes: 'On a BrainDog more than one person shares, Yours is the tasks assigned to you or to nobody, and a task assigned to a colleague is theirs. The field reads Assigned to, where it read Owner.' },
     { version: '1.20.1', notes: 'No due day lists the newest tasks first, and Later lists tasks by their due day, then the newest first. Work\'s band reads "Your work this week" and Timeline\'s lane "Tasks by due day". The Next up widget lists the same tasks as Your work this week.' },
     {
@@ -442,6 +445,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    {
+      version: '1.31.0',
+      notes: 'What changed shows each learning once, on its timeline, where cards of the same learnings stood over it.',
+    },
     {
       version: '1.30.0',
       notes: 'How the brain changed is now called What changed, on its page and at the foot of Agents.',

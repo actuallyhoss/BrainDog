@@ -55,6 +55,7 @@
   import { onMount, tick, untrack } from 'svelte';
 
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
+  import { rowIn, rowOut } from '../../lib/ui/motion.ts';
   /* WHO, IN WORDS. This screen's three person-shaped slots (the actor on a line, the `by` filter, and
      the target of an access row) all printed raw `p_` ids on a record with more than one person on
      it. `who.ts` holds the reason and the measurement. */
@@ -83,6 +84,9 @@
     keepsBooks,
     keyOf,
     lineSaid,
+    foldSaid,
+    minuteFolds,
+    minuteOf,
     LANE_SPAN_MS,
     lanesOf,
     lanesSaid,
@@ -510,7 +514,8 @@
   let wanted = $state(30);
   /* A BURST IS ONE LINE (`burstsOf`), and a rule's quiet runs on one day are one line (`rolledRuns`), folded from
      everything that matched, so a line drawn and a line counted are the same line. */
-  const lines = $derived(rolledRuns(burstsOf(matched, listSaid)));
+  /* AND A MINUTE'S RUN OF ONE KIND BY ONE DOER IS ONE LINE THAT OPENS IN PLACE (`minuteFolds`, G28). */
+  const lines = $derived(minuteFolds(rolledRuns(burstsOf(matched, listSaid))));
   const told = $derived(lines.slice(0, Math.min(wanted, DOM_CAP)));
   /* ONE PRESS FOR MORE: more of what was read, then the older page under it. */
   const moreRead = $derived(told.length < lines.length && wanted < DOM_CAP);
@@ -703,7 +708,53 @@
   </Sheet>
 {/snippet}
 
-{#snippet entry(t: Told)}
+{#snippet folded(t: Told, same: boolean)}
+  <!-- A MINUTE'S RUN AS ONE LINE (`minuteFolds`): what it did in one sentence, who did it, and the lines under it on a
+       press, each drawn as any line is. The whole row is the press, as a line's target is its link. -->
+  {@const e = t.e}
+  {@const by = actorSaid(e.by, me, names, e.run_by ?? null)}
+  {@const members = t.folded ?? []}
+  {@const open = passesOpen.has(t.key)}
+  {@const title = foldSaid(
+    kindOf(e.kind).word,
+    e.kind,
+    members.map((m) => {
+      const thing = m.e.target ? thingFor(m.e.target) : null;
+      const list = m.many?.list ?? thing?.list ?? null;
+      return {
+        thing: m.many?.text ?? thing?.text ?? (handlesSaid(m.note, m.e.by, m.e.run_by ?? null) || null),
+        rows: list === null ? null : (m.many?.rows ?? 1),
+        list,
+        asked: /^(?:suggestion|decision|prediction):/u.test(m.e.target ?? ''),
+      };
+    }),
+  )}
+  <li>
+    <div class="line line-tall act folded">
+      <IconWell name={kindOf(e.kind).icon} size="l" />
+      <span class="line-main">
+        <span class="line-title"
+          ><button type="button" class="fold-line tap" aria-expanded={open} onclick={() => togglePass(t.key)}>{title}</button></span
+        >
+        <span class="line-detail">
+          <span class="who"><Face name={by.you && myName ? myName : by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
+          <span class="detail-text">{by.name}</span>
+        </span>
+      </span>
+      <span class="fold-turn" data-open={open ? '' : undefined} aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
+      <span class="line-when" data-same={same ? '' : undefined}>
+        <time datetime={e.at} title={historyWords.between(stampOf(t.from), stampOf(e.at))}>{clockOf(e.at)}</time>
+      </span>
+    </div>
+    {#if open}
+      <ul class="ledger steps" in:rowIn out:rowOut>
+        {#each members as s (s.key)}{@render entry(s, true)}{/each}
+      </ul>
+    {/if}
+  </li>
+{/snippet}
+
+{#snippet entry(t: Told, same: boolean = false)}
   {@const e = t.e}
   {@const by = actorSaid(e.by, me, names, e.run_by ?? null)}
   <!-- A RULE OR A SCRIPT THAT RAN LEADS WITH ITS TITLE ("Ran Meet payees"), and says what it is beside its face. -->
@@ -762,7 +813,7 @@
       </span>
       <!-- THE MINUTE, AND BEHIND IT THE DAY AND THE VERSION. A burst's tooltip is its span, from its first line to
            its newest; no version where the record sent none (a member held to named lists is sent `0`). -->
-      <span class="line-when">
+      <span class="line-when" data-same={same ? '' : undefined}>
         <time
           datetime={e.at}
           title={t.count > 1
@@ -888,7 +939,12 @@
               <div class="hour-band">
               <h3 class="hour num">{band.title}</h3>
               <ul class="ledger">
-                {#each band.lines as t (t.key)}{@render entry(t)}{/each}
+                <!-- A MINUTE SAYS ITS TIME ONCE: a line in the same minute as the one above keeps its time for a reader and
+                     draws none (G28). -->
+                {#each band.lines as t, i (t.key)}
+                  {@const same = i > 0 && minuteOf(band.lines[i - 1]!.e.at) === minuteOf(t.e.at)}
+                  {#if t.folded}{@render folded(t, same)}{:else}{@render entry(t, same)}{/if}
+                {/each}
               </ul>
               </div>
             {/each}
@@ -1186,6 +1242,67 @@
     grid-row: 1;
   }
 
+  /* A LIST ROW'S HEIGHT, 44 and not 53 (G28): the title and its meta line sit close, the hairline under them. */
+  .ledger .act.line-tall {
+    min-block-size: 44px;
+    padding-block: 2px;
+  }
+
+  /* A MINUTE SAYS ITS TIME ONCE: the lines after the first in one minute keep their time for a reader and draw none. */
+  .line-when[data-same] time {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .line-when[data-same] {
+    min-inline-size: 5ch;
+  }
+
+  /* A MINUTE'S RUN FOLDED: its sentence is the press, the whole row its target, a chevron that turns when it is open. */
+  .fold-line {
+    position: static;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .fold-line:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .fold-turn {
+    grid-column: 3;
+    grid-row: 1;
+    display: inline-grid;
+    color: var(--ink-3);
+    transition: rotate var(--d-state, 160ms) var(--ease-out, ease-out);
+  }
+
+  .fold-turn[data-open] {
+    rotate: 180deg;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fold-turn {
+      transition: none;
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .ledger > li:has(> .line .fold-line:hover) > .line {
+      background: var(--hover);
+    }
+  }
+
   /* THE VERB IN THE SECOND INK, WHAT IT WAS DONE TO IN INK: the thing is what a reader scans for. */
   .verb {
     color: var(--ink-2);
@@ -1311,6 +1428,14 @@
       grid-column: 1;
     }
 
+    .act.folded {
+      grid-template-columns: 6ch var(--well-l) minmax(0, 1fr) auto;
+    }
+
+    .act.folded .fold-turn {
+      grid-column: 4;
+    }
+
     .line-when time {
       color: var(--ink-3);
       font-family: var(--font-mono);
@@ -1330,6 +1455,15 @@
     .act .line-when {
       grid-column: 3;
       grid-row: 1;
+    }
+
+    .act.folded {
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto auto;
+    }
+
+    .act.folded .fold-turn {
+      grid-column: 4;
+      align-self: center;
     }
 
     .line-detail {

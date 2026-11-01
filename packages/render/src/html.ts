@@ -92,7 +92,7 @@ import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, partsRing, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_SHARE_HEAD, HEAT_SHARE_LINE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
-import { CALENDAR_FEW, CALENDAR_NONE, CALENDAR_TODAY, CALENDAR_WEEK_NONE, WEEKDAYS, calendarMore, calendarOutside, calendarPlan, calendarSkipped, calendarStripPlan } from './calendar.ts';
+import { CALENDAR_FEW, CALENDAR_NONE, CALENDAR_REST, CALENDAR_TODAY, CALENDAR_WEEK_NONE, WEEKDAYS, calendarMore, calendarOutside, calendarPlan, calendarSkipped, calendarStripPlan } from './calendar.ts';
 import { LANES_NONE, LANES_NOW, laneHue, laneWho, lanesOutside, lanesPlan, lanesSentence, lanesSkipped } from './lanes.ts';
 import { LINKS_NONE, linkPlan } from './links.ts';
 import { GALLERY_NONE, galleryPlan, pictureSrc } from './gallery.ts';
@@ -2105,6 +2105,10 @@ function formText(b: Block): string {
  * first rows and counting the rest, then an agenda of the days that hold anything (`src/calendar.ts` over
  * `src/days.ts`). `svelte/Calendar.svelte` is this function's twin.
  *
+ * ONE MONTH IS SHOWN (`plan.focus`), the others written `hidden`; this drawer has no buttons, so a reader of a copy
+ * reaches the other months' rows in the agenda, whose days in the month shown are marked `data-shown` for a wide host
+ * to leave out. The Svelte twin draws the same tree until its arrows move to another month.
+ *
  * A MONTH IS A TABLE, because it is one: a caption naming the month, a head naming the weekdays, and a row a week,
  * which a screen reader walks by row and column as a sighted reader scans one. A day of the month either side is an
  * empty cell marked `data-outside`, so the columns hold. A busy day carries `data-count`, which is what a host drawing
@@ -2126,10 +2130,11 @@ function calendar(b: Block, o: RenderOptions): string {
   const items = (rows: readonly Row[]): string => (rows.length ? `<ul class="calendar-items">${rows.map(item).join('')}</ul>` : '');
   const few = plan.days.reduce((n, d) => n + d.items.length, 0) <= CALENDAR_FEW ? ' data-few=""' : '';
   const head = `<thead><tr>${WEEKDAYS.map((d) => `<th scope="col" abbr="${d.long}">${d.short}</th>`).join('')}</tr></thead>`;
+  const shownMonth = plan.months[plan.focus]?.month ?? '';
   const months = plan.months
     .map(
-      (m) =>
-        `<table class="calendar-month"><caption class="calendar-caption">${escape(m.label)}</caption>${head}<tbody>${m.weeks
+      (m, at) =>
+        `<table class="calendar-month"${at === plan.focus ? '' : ' hidden=""'}><caption class="calendar-caption">${escape(m.label)}</caption>${head}<tbody>${m.weeks
           .map(
             (week) =>
               `<tr>${week
@@ -2145,8 +2150,9 @@ function calendar(b: Block, o: RenderOptions): string {
           .join('')}</tbody></table>`,
     )
     .join('');
-  const agenda = `<ol class="calendar-agenda">${plan.days
-    .map((d) => `<li class="calendar-day"${d.today ? ' data-today=""' : ''}><span class="calendar-date num">${escape(d.said)}</span>${items(d.items)}</li>`)
+  const rest = plan.days.some((d) => d.day.slice(0, 7) !== shownMonth) ? `<p class="calendar-rest">${escape(CALENDAR_REST)}</p>` : '';
+  const agenda = `${rest}<ol class="calendar-agenda">${plan.days
+    .map((d) => `<li class="calendar-day"${d.today ? ' data-today=""' : ''}${d.day.slice(0, 7) === shownMonth ? ' data-shown=""' : ''}><span class="calendar-date num">${escape(d.said)}</span>${items(d.items)}</li>`)
     .join('')}</ol>`;
   return `<div class="calendar"${few}>${months}${agenda}${skipped}</div>`;
 }

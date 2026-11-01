@@ -36,7 +36,9 @@ export function mostOf(block: { kind: string } & MostKeys, count: number): { sho
   const all = { shown: Math.max(0, count), more: 0 };
   if (!READS.has(block.kind) || block.panel === true || (block.group !== undefined && block.group !== false && block.group !== '')) return all;
   const most = isMost(block.most) ? block.most : DEFAULTS[block.kind];
-  if (most === undefined || count <= most) return all;
+  /* ONE MORE IS SHOWN, NOT HELD BACK (the lists review, L29): People's seven drew six and "Show all 7", a button for
+     one card in the room the card takes. */
+  if (most === undefined || count <= most + 1) return all;
   return { shown: most, more: count - most };
 }
 

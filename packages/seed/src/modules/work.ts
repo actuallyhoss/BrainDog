@@ -1287,7 +1287,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         ],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 200,
-        empty: 'No open task has a due day yet.',
+        /* WHAT WILL STAND HERE AND HOW IT GETS HERE, SINCE work 1.22.0 (the lists review, L37): an axis with nothing on it
+           said only what was missing. */
+        empty: 'Each open task with a due day stands here on its day. Give a task a due day and it joins the line.',
       },
     ],
   },

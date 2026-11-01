@@ -719,25 +719,9 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         back: 24,
         when: { metric: 'learnings-charted', gt: 0 },
       },
-      {
-        kind: 'cards',
-        key: 'changed',
-        heading: 'What changed',
-        icon: 'history',
-        span: 12,
-        source: 'register.learnings',
-        /* EACH LEARNING AS ITS ONE LINE, SINCE 1.21.0: the failure that taught it was its
-           body, and printed code (`waitForFunction(...)`, `SQLITE_ERROR`) nobody asked to see. It is on the learning's
-           own page, which the card opens. */
-        columns: [
-          { field: 'lesson', as: 'title' },
-          { field: 'topic', label: 'Bears on', as: 'fact' },
-          { field: 'supersedes', label: 'Replaces', as: 'fact' },
-          { field: 'confirmed_on', label: 'Last confirmed', as: 'when' },
-        ],
-        order: [{ field: 'created_at', dir: 'desc' }],
-        limit: 12,
-      },
+      /* NO CARDS OF THE SAME LEARNINGS OVER THE TIMELINE, SINCE 1.31.0 (the lists review, L40): "What changed" drew the
+         six learnings the timeline under it says in full, each with its reason and what it bears on. The timeline keeps
+         them; a learning's own page is one press from its line there. */
       /* THE TIMELINE, SINCE 1.24.0 (the evolution view): week by week, each learning that arrived with the failure
          that taught it, each version a skill took with its text before and after, and each learning that faded, marked
          where it faded. The host's (`panel: evolution`), for anyone who reads the learnings. */
@@ -882,8 +866,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      1.29.0 IS A DOOR, SO IT IS MINOR (AG16, 1 Nov): the foot's Keys opens the Keychain, the one Keys place, where it
      opened the list of keys, which is the Keychain's List view. No list, field or figure goes.
      1.30.0 IS WORDS, SO IT IS MINOR (AP32, 1 Nov): How the brain changed is called What changed, as a page and as the
-     foot's first door. Its address stays /p/brain. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.30.0', requires: ['register.things'] },
+     foot's first door. Its address stays /p/brain. No list, field or figure goes.
+     1.31.0 TAKES A BLOCK OFF A PAGE, SO IT IS MINOR (the lists review, L40): What changed draws its learnings once, on
+     the timeline, where a block of cards said the same six over it. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.31.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

@@ -134,20 +134,23 @@
     stroke-dasharray: 3 3;
   }
 
-  /* The now or today line, and its pill: `live` is the one hue that means "alive". */
+  /* The now or today line: `live` is the one hue that means "alive". ITS LABEL IS PLAIN WORDS ("now 16:50"), not a
+     green pill (Look B: no pills; the lists review, G28): the box under it is the tile's own ground, so the words read
+     over the line and the lanes without a shape of their own. */
   .viz-now {
     stroke: var(--live);
     stroke-width: 1.5;
   }
 
   .viz-pill {
-    fill: var(--live);
+    fill: var(--tile);
   }
 
   .viz-pill-text {
-    fill: var(--on-red);
+    fill: var(--ink-2);
     font-size: var(--fs-cap);
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
   }
 
   /* ── arriving ──────────────────────────────────────────────────────────── */
@@ -291,10 +294,10 @@
   }
 
   .viz .viz-pill {
-    fill: Highlight;
+    fill: Canvas;
   }
 
   .viz .viz-pill-text {
-    fill: HighlightText;
+    fill: CanvasText;
   }
 }

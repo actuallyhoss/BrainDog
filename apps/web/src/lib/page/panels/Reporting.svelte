@@ -214,7 +214,7 @@
     <div class="report-fold">
       <p class="report-folded">{folded}</p>
       {#if !minted}
-        <Button weight="quiet" aria-expanded={open} aria-controls={bodyId} onclick={() => (open = !open)}>{open ? FOLD_WORDS.hide : FOLD_WORDS.show}</Button>
+        <Button weight="bare" aria-expanded={open} aria-controls={bodyId} onclick={() => (open = !open)}>{open ? FOLD_WORDS.hide : FOLD_WORDS.show}</Button>
       {/if}
     </div>
 
@@ -263,7 +263,7 @@
   <section class="report" aria-hidden="true" inert data-held-line>
     <div class="report-fold">
       <p class="report-folded">&nbsp;</p>
-      <Button weight="quiet" disabled>{FOLD_WORDS.show}</Button>
+      <Button weight="bare" disabled>{FOLD_WORDS.show}</Button>
     </div>
   </section>
 {/if}
@@ -287,8 +287,10 @@
     gap: var(--sp-2) var(--sp-3);
   }
 
+  /* THE PRESS FOLLOWS THE SENTENCE, quiet words and not a filled button, so it no longer floats mid-row beside a short
+     line (the lists review, L33). */
   .report-folded {
-    flex: 1 1 16rem;
+    flex: 0 1 auto;
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);

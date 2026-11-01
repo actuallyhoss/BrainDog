@@ -974,6 +974,22 @@ const DECLARED: Record<string, Version> = {
       'Estate 2.6.1, folded before it shipped (audit 6g, AG3): the notes `rule.renewal-kept` and `rule.renewal-cancelled` leave say Needs you, the place, where they said Decide; no id added or taken away -> f0fd333b99e642ce',
     ],
   },
+  /** A VERSION AND NOT A RESET: estate's last version is on `origin/master`. */
+  'estate@2.7.0': {
+    holds: `
+      metric.domains-held metric.estate-month metric.estate-month-by-kind metric.estate-year metric.lapsing metric.points-nowhere
+      metric.project-cost metric.renews-30d metric.renews-90d metric.services-held
+      page.estate page.service
+      register.services
+      rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
+      setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
+    `,
+    declares: 'b6f775cbf9e609dd',
+    history: [
+      'Estate 2.7.0 of 1 November (lists review, L36): `metric.points-nowhere` counts domains only, `page.estate` names each domain that points at nothing in a table where a note said "something", and its Next ninety days says each renewal\'s cost where it said who it is with; no id added or taken away -> ebb6356be5fc129c',
+      'Estate 2.7.0, folded before it shipped (lists review, L28): `page.service` leads with what the next renewal takes, labelled so, and a service with no cost written draws no figure; no id added or taken away -> b6f775cbf9e609dd',
+    ],
+  },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
   'work@1.11.0': {
     holds: `
@@ -2767,6 +2783,16 @@ const DECLARED: Record<string, Version> = {
       'Before 1.2.1 shipped, `page.health` drops its two "checks have not run yet" lines and the signs read in plain words; no id added or taken away -> b4b0857fc5935c85',
     ],
   },
+  /** A VERSION AND NOT A RESET: core's last version is on `origin/master`. */
+  'core@1.3.0': {
+    holds: `
+      page.activity page.calendar page.health page.scripts
+    `,
+    declares: 'e5b0342f1bc58072',
+    history: [
+      'Core 1.3.0 of 1 November (lists review, L39): `page.health` folds its Not checked yet group at six where it drew every card; no id added or taken away -> e5b0342f1bc58072',
+    ],
+  },
 
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
   'portfolio@1.16.0': {
@@ -3200,6 +3226,25 @@ const DECLARED: Record<string, Version> = {
     declares: '18fe9a1352449b91',
     history: [
       'Work 1.21.0 (teams, 1 Nov): yours is unassigned or assigned to you, `owner is not someone else` on `metric.tasks-this-week-yours` and every yours figure and on `page.work`, and `register.tasks` says Assigned to; no id added or taken away -> 18fe9a1352449b91',
+    ],
+  },
+  /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
+  'work@1.22.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-last-worked metric.project-moved-7d metric.project-open
+      metric.tasks-after-week-yours metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-in-play metric.tasks-late-yours metric.tasks-later metric.tasks-no-project
+      metric.tasks-not-this-week metric.tasks-overdue metric.tasks-this-week-yours metric.tasks-today-yours metric.tasks-undated-yours
+      metric.tasks-waiting metric.tasks-week-yours metric.tasks-with-agents
+      page.roadmap page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: 'f0d268971d9a45aa',
+    history: [
+      'Work 1.22.0 of 1 November (lists review, L37): `page.roadmap` says what stands on the timeline and how a task gets there where its empty line said only what was missing; no id added or taken away -> f0d268971d9a45aa',
     ],
   },
 

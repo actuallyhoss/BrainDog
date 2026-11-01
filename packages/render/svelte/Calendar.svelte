@@ -4,9 +4,11 @@
   `src/days.ts` decides every cell; `calendar` in `src/html.ts` is this file's twin, and `src/parity.test.ts` compiles
   this file and holds the two to one tree.
 
-  NOTHING HERE MOVES BETWEEN MONTHS. Every month the rows reach is drawn, so the app, the mirror and the digest show the
-  same calendar, and the host lays the grids out as its width allows: side by side, one under another, or, below 640px,
-  each month as a strip of its days with a dot on a busy one (`data-count`) over the agenda.
+  ONE MONTH AT A TIME. Every month the rows reach is written and one is shown (`plan.focus`: the marked day's, else this
+  one, else the next), the rest `hidden`, as the twin writes them. Where the host can act (`opts.scenario`) two arrows
+  move between them; the tree with neither pressed is the twin's. Under the month, a wide host lists the agenda's days
+  outside it (`data-shown` marks the rest), so no row is ever only behind an arrow. Below 640px the month is a strip of
+  its days with a dot on a busy one (`data-count`) over the whole agenda.
 
   The markup has no whitespace between tags that sit on one line, on purpose: a line break there is a space the other
   renderer does not draw.
@@ -28,6 +30,7 @@
     CALENDAR_DAY,
     CALENDAR_FEW,
     CALENDAR_NONE,
+    CALENDAR_REST,
     CALENDAR_VIEWS,
     CALENDAR_VIEW_LIST,
     CALENDAR_VIEW_MONTH,
@@ -35,7 +38,9 @@
     CALENDAR_WEEK_NONE,
     WEEKDAYS,
     calendarMore,
+    calendarNext,
     calendarOutside,
+    calendarPrev,
     calendarPlan,
     calendarSkipped,
     calendarStripPlan,
@@ -81,6 +86,18 @@
   const few = $derived(plan.days.reduce((n, d) => n + d.items.length, 0) <= CALENDAR_FEW);
   let view = $state<'month' | 'list' | null>(null);
   const listed = $derived(view === null ? few : view === 'list');
+  /* THE MONTH SHOWN: the plan's until an arrow is pressed, then the month pressed to, while the rows still reach it. */
+  let picked = $state<string | null>(null);
+  const at = $derived.by(() => {
+    const i = picked === null ? -1 : plan.months.findIndex((m) => m.month === picked);
+    return i >= 0 ? i : plan.focus;
+  });
+  const shownMonth = $derived(plan.months[at]?.month ?? '');
+  const rest = $derived(plan.days.some((d) => d.day.slice(0, 7) !== shownMonth));
+  const step = (by: number): void => {
+    const to = plan.months[at + by];
+    if (to) picked = to.month;
+  };
 
   /* THE MARKED DAY IN VIEW, once for each day asked: a re-read of the page draws the same day again and does not move
      the reader, and a second link on the same page moves them to its day. */
@@ -146,8 +163,18 @@
         <button type="button" class="segment" data-on={listed ? '' : undefined} aria-pressed={listed} onclick={() => (view = 'list')}>{CALENDAR_VIEW_LIST}</button>
       </div>
     {/if}
-    {#each plan.months as m}
-      <table class="calendar-month">
+    {#if opts.scenario && plan.months.length > 1 && !listed}
+      <!-- PREVIOUS AND NEXT, at the end of the month's caption row; the twin has no buttons and writes the shown month alone. -->
+      <div class="calendar-move" role="group" aria-label={plan.months[at]?.label}>
+        <button type="button" class="calendar-step" disabled={at === 0} aria-label={calendarPrev(plan.months[at - 1]?.label ?? '')} onclick={() => step(-1)}
+          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg></button
+        ><button type="button" class="calendar-step" disabled={at === plan.months.length - 1} aria-label={calendarNext(plan.months[at + 1]?.label ?? '')} onclick={() => step(1)}
+          ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg></button
+        >
+      </div>
+    {/if}
+    {#each plan.months as m, i}
+      <table class="calendar-month" hidden={i !== at} data-moved={picked !== null && i === at ? '' : undefined}>
         <caption class="calendar-caption">{m.label}</caption>
         <thead>
           <tr>
@@ -173,9 +200,10 @@
         </tbody>
       </table>
     {/each}
+    {#if rest}<p class="calendar-rest">{CALENDAR_REST}</p>{/if}
     <ol class="calendar-agenda">
       {#each plan.days as d}
-        <li class="calendar-day" data-today={d.today ? '' : undefined}><span class="calendar-date num">{d.said}</span>{@render items(d.items)}</li>
+        <li class="calendar-day" data-today={d.today ? '' : undefined} data-shown={d.day.slice(0, 7) === shownMonth ? '' : undefined}><span class="calendar-date num">{d.said}</span>{@render items(d.items)}</li>
       {/each}
     </ol>
     {#if skipped}<p class="calendar-skipped">{skipped}</p>{/if}

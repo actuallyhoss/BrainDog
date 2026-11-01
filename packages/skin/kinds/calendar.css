@@ -1,11 +1,11 @@
 /*
  * A `calendar` block (`kinds/calendar.ts`, drawn by `braindog-render`'s `Calendar.svelte` and its `toHTML` twin).
  *
- * THE RENDERER DRAWS EVERY MONTH AND THE AGENDA, ALWAYS, and this sheet decides which the reader sees, by the width the
- * block has. Wide, each month is a grid of weeks whose days name their first rows and
- * count the rest, and the agenda is not shown, because it says again what the grid already holds. Narrow, a grid of
- * seven columns cannot hold a title, so each month is rows of its days with a dot on a busy one, and the agenda
- * under it carries the words.
+ * THE RENDERER WRITES EVERY MONTH AND SHOWS ONE (the others `hidden`), AND THE AGENDA, ALWAYS, and this sheet decides
+ * what the reader sees, by the width the block has. Wide, the month is a grid of weeks whose days name their first rows
+ * and count the rest, and the agenda under it lists only the days outside that month ("Other months"), because the
+ * grid already holds the rest. Narrow, a grid of seven columns cannot hold a title, so the month is rows of its days
+ * with a dot on a busy one, and the whole agenda under it carries the words.
  *
  * THE BLOCK IS ITS OWN CONTAINER, so a calendar in a narrow column at 1440 turns into those rows exactly as it does on a
  * phone. 40rem is the phone breakpoint's 640px at the default root; it is a container query and not a new `@media` width, so no route
@@ -27,10 +27,96 @@
      narrow month was one unwrapped row of days the track took its 1400px, and the month and the agenda both stood past
      the page. */
   .calendar {
+    position: relative;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-5);
     min-inline-size: 0;
+  }
+
+  .calendar-month[hidden] {
+    display: none !important;
+  }
+
+  /* PREVIOUS AND NEXT at the end of the month's caption row (the lists review, L38): two quiet 32px arrows, a fill on
+     hover, 44 under a thumb. Drawn only where the host can act, and not while the list is shown. */
+  .calendar-move {
+    position: absolute;
+    inset-block-start: -6px;
+    inset-inline-end: 0;
+    z-index: 1;
+    display: flex;
+    gap: var(--sp-1);
+  }
+
+  .calendar-step {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+
+  .calendar-step svg {
+    inline-size: 18px;
+    block-size: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .calendar-step:disabled {
+    color: var(--ink-3);
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .calendar-step:not(:disabled):hover {
+      background: var(--well);
+      color: var(--ink);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .calendar-step {
+      inline-size: var(--tap);
+      block-size: var(--tap);
+    }
+
+    .calendar-move {
+      inset-block-start: -12px;
+    }
+  }
+
+  /* A MONTH AN ARROW MOVED TO comes in with a short fade and lift; nothing moves on a first draw. */
+  @media (prefers-reduced-motion: no-preference) {
+    .calendar-month[data-moved] {
+      animation: calendar-month-in 180ms var(--ease-out, ease-out);
+    }
+  }
+
+  @keyframes calendar-month-in {
+    from {
+      opacity: 0;
+      translate: 0 4px;
+    }
+  }
+
+  /* "Other months", over the agenda on a wide screen where it lists only the days the month shown does not hold. */
+  .calendar-rest {
+    margin: 0 0 calc(-1 * var(--sp-3));
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 600;
+    line-height: var(--lh-tight);
   }
 
   .calendar-empty,
@@ -45,6 +131,13 @@
      narrow, the month is already a strip of days over the list. */
   .calendar-views {
     justify-self: end;
+  }
+
+  /* BESIDE THE ARROWS, in the caption row, where there is no head above for the choice to sit in. */
+  .calendar:has(> .calendar-move) > .calendar-views {
+    position: absolute;
+    inset-block-start: -6px;
+    inset-inline-end: calc(64px + var(--sp-1) + var(--sp-3));
   }
 
   .calendar-views .segment {
@@ -210,11 +303,29 @@
 
   /* A LIST IS A COLUMN A READER RUNS DOWN, not a line across 1100px: its ring and its amount stay near the name. */
   .calendar-agenda {
-    display: none;
     max-inline-size: none;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  /* WIDE, THE AGENDA IS THE OTHER MONTHS: a day the month shown holds is in its grid already. */
+  .calendar-day[data-shown] {
+    display: none;
+  }
+
+  .calendar-agenda:not(:has(> .calendar-day:not([data-shown]))) {
+    display: none;
+  }
+
+  .calendar[data-few]:not([data-view='month']) .calendar-rest,
+  .calendar[data-view='list'] .calendar-rest {
+    display: none;
+  }
+
+  .calendar[data-few]:not([data-view='month']) .calendar-day,
+  .calendar[data-view='list'] .calendar-day {
+    display: grid;
   }
 
   /* A FEW ENTRIES ARE THE LIST AND NOT THE MONTH (`data-few`, `CALENDAR_FEW`), unless the reader asked for the month;
@@ -233,7 +344,7 @@
      amount at the end in tabular figures, and the entry's ring (the money review). */
   .calendar-day {
     display: grid;
-    grid-template-columns: 9ch minmax(0, 1fr);
+    grid-template-columns: 10ch minmax(0, 1fr);
     align-items: baseline;
     gap: var(--sp-3);
     min-block-size: 44px;
@@ -282,7 +393,8 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    /* A DAY OF ANOTHER YEAR ("Sat 16 Jan 2027") puts its year on a second line rather than run into the title. */
+    white-space: normal;
   }
 
   .calendar-day .calendar-item {
@@ -323,6 +435,19 @@
 
     .calendar-agenda {
       display: block;
+    }
+
+    /* NARROW, EVERY DAY: the strip has dots, not words. */
+    .calendar-day[data-shown] {
+      display: grid;
+    }
+
+    .calendar-agenda:not(:has(> .calendar-day:not([data-shown]))) {
+      display: block;
+    }
+
+    .calendar-rest {
+      display: none;
     }
 
     .calendar-views {
