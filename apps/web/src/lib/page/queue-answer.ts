@@ -41,8 +41,17 @@ export const queueWords = {
   hardTail: HARD_TAIL,
   /** The same care as a line of its own under a row of answers, where the filled one is the hard one. */
   hardLine: 'Can’t be undone easily',
-  /** And naming the answers it is said of, where those are not the filled one alone. */
-  hardOf: (names: string) => `${names} can’t be undone easily`,
+  /** And naming the answers it is said of, where those are not the filled one alone: "Retiring can’t easily be undone"
+   *  (T15), each answer said as a doing, so the line is a sentence and not a button's name stuck to a fragment. */
+  hardOf: (names: string) => `${names} can’t easily be undone`,
+  /** One answer's name as a doing: "Retire it" → "Retiring", "Move to the apex" → "Moving to the apex". */
+  doing: (label: string): string => {
+    const [verb = '', ...rest] = label.trim().split(/\s+/u);
+    const lower = verb.toLowerCase();
+    const ing = /ie$/u.test(lower) ? `${verb.slice(0, -2)}ying` : /[^e]e$/u.test(lower) ? `${verb.slice(0, -1)}ing` : `${verb}ing`;
+    const tail = rest.join(' ');
+    return tail === '' || /^it$/iu.test(tail) ? ing : `${ing} ${tail}`;
+  },
   /** Said with the suggested answer's name to a screen reader, where the eye reads the accent's fill. */
   suggestedSaid: ', suggested',
   /** A question shown outside Decide whose answers are too many for a row: its own page, where they are chosen. */

@@ -2143,7 +2143,7 @@
      figure is never cut. It wraps under the figure, where the frame has room for a second line. */
   .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:first-child .cell-note) {
     white-space: normal;
-    text-wrap: pretty;
+    text-wrap: balance;
   }
 
   /* AT THE BOARD'S SHORTEST ROW (a laptop window about 1280 wide, his call of 23 Oct): the row is 164 tall and the frame

@@ -88,7 +88,8 @@ export const shell = {
   paletteFind: 'Search or go to…',
   /* A SENTENCE TYPED WITH NO MODEL BEHIND THE ASK, said in place of "Nothing matches", with the way to connect one. */
   askNeedsModel: 'Asking needs a model.',
-  askConnect: 'Connect one in Settings › Agents',
+  /* SHORT ENOUGH TO STAY ON ONE LINE AT 390 (T28): the link is on the two words that do it, and it opens Settings › Agents. */
+  askConnect: 'Connect one',
   /* the product */
   product: 'BrainDog',
 
@@ -279,9 +280,13 @@ export const shell = {
   /*  THE MINUS HELD TO ITS FIGURE (finish F49): a wrapped line broke "−" from "£16,213", so a word joiner follows it. */
   /* A LOW BELOW NOUGHT IS SAID IN THE RED (1 Nov): "Lowest … −£16,213" read as calmly as a figure above it. The page's
      one form for a phrase in the danger colour (`{{bad:…}}`, `braindog-render` `inline`), so the words still say it. */
-  cashLowest: (amount: string, day: string, window: string) => {
+  /* TWO FACTS, NOT A CLAUSE (next steps 1 Nov, T1): "Lasts to 30 Oct · Lowest in the next 12 weeks: −£16,213 on 7 Nov"
+     broke after "weeks:" and left the figure alone on a line. The span is the tile's own (Cash ahead, the walk the
+     Forecast draws), so the note says the low and its day; the window is kept for a reader that wants it said. */
+  cashLowest: (amount: string, day: string, _window?: string) => {
     const said = amount.replace(/^([−-])/u, '$1\u2060');
-    return `Lowest in the next ${window}: ${/^[−-]/u.test(amount) ? `{{bad:${said}}}` : said} ${day}`;
+    /* ONE FACT, HELD WHOLE: its spaces do not break, so a wrapped note breaks between the two facts, never after "Lowest". */
+    return `Lowest\u00a0${/^[−-]/u.test(amount) ? `{{bad:${said}}}` : said}\u00a0${day.replace(/ /gu, '\u00a0')}`;
   },
   /* A BAR'S OWN NOTE, beside the bar and not under the chart: what its money was kept in before it was said in home. */
   convertedFrom: (codes: string) => `converted from ${codes}`,

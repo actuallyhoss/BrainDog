@@ -32,7 +32,7 @@ test('a hard answer says its care as a line under the row, and its button says i
   const hard = card.cardOf(ask({ cost: 'undo' }), { now });
   /* NOT FILLED, SO NAMED (audit 6g, AG11): the hard answer is never the accent, and its line says which it is. */
   assert.equal(card.primaryOf(hard), null);
-  assert.equal(hardSaid!(hard, card.primaryOf(hard), card.leadOf(hard)), 'Accept can’t be undone easily');
+  assert.equal(hardSaid!(hard, card.primaryOf(hard), card.leadOf(hard)), 'Accepting can’t easily be undone');
   const safe = card.cardOf(ask(), { now });
   assert.equal(hardSaid!(safe, card.primaryOf(safe)), '', 'a safe answer says no care');
 

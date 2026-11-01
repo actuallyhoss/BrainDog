@@ -3,7 +3,7 @@
   under each, and an Undo on each that puts that whole batch back.
 
   A PLACE, NOT A QUESTION. These already happened, with a mark; the only press here takes one back. On Needs you it is
-  the third column, its head drawn like Money's and Quick's (`head="column"`), over the board and outside the tile.
+  the strip under the questions (`head="strip"`), one line a thing.
 
   UNDO IS A WORD, NOT A ROW OF GREY BUTTONS: 13/500 in the accent's words, a thumb's height to press. A LINE PUT BACK
   STAYS where it was, struck through in the quiet ink and saying so ("Put back just now"), so the press is seen to have
@@ -32,8 +32,9 @@
     found: Handled;
     /** The name where it is not Today's ("Handled" on Needs you). */
     heading?: string;
-    /** `column`: Needs you's third column, its head over the tile as Money's and Quick's are. */
-    head?: 'tile' | 'column';
+    /** `column`: a column's head over the tile as Money's and Quick's are. `strip`: Needs you's strip under its questions,
+     *  the head in the tile and each thing one line (what, why after it, Undo at the end) where there is room. */
+    head?: 'tile' | 'column' | 'strip';
   } = $props();
 
   const words = {
@@ -146,6 +147,40 @@
     padding: var(--sp-2) var(--tile-pad);
     background: var(--tile);
     border-radius: var(--r-tile);
+  }
+
+  /* NEEDS YOU'S STRIP (T16): one tile across the page, its head in it, one line a thing: the time, what, why after it in
+     the quiet ink, and Undo at the end. Where the row is narrow the why goes under, as in a column. */
+  .handled[data-head='strip'] {
+    container-type: inline-size;
+    gap: var(--sp-2);
+    padding-block: var(--sp-4) var(--sp-2);
+  }
+
+  @container (inline-size >= 640px) {
+    .handled[data-head='strip'] .h-line {
+      align-items: baseline;
+      padding: var(--sp-2) 0;
+    }
+
+    .handled[data-head='strip'] .h-text {
+      flex-direction: row;
+      align-items: baseline;
+      gap: var(--sp-2);
+    }
+
+    .handled[data-head='strip'] .h-what {
+      flex: none;
+      max-inline-size: 60%;
+    }
+
+    .handled[data-head='strip'] .h-why {
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow-wrap: normal;
+    }
   }
 
   .h-head {

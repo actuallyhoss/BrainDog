@@ -454,6 +454,33 @@
     --most: calc(2 * var(--row) + var(--gap));
   }
 
+  /* AND ON A LAPTOP AT REST A TILE CLOSES UP UNDER WHAT IT SHOWS TOO (next steps 1 Nov, T5): a row's tiles stretched to
+     the tallest, so Your work and People ended in 150px of nothing beside Coming up, and Late with one invoice stood as
+     tall as Needs you. The packer's grid is the same and editing still shows each size whole; at rest the rows are as
+     tall as the tallest thing that starts in them, and each frame as tall as what it draws, the rows it was laid across
+     at most (`--span`, by its size here and by its laid rows in `fit.ts`, which still cuts what runs past them). */
+  .board-root:not([data-editing]) .board:not([data-cols='2']) {
+    grid-auto-rows: auto;
+  }
+
+  .board-root:not([data-editing]) .board:not([data-cols='2']) :global([data-board-key][data-board-key]) {
+    --span: 1;
+    align-self: start;
+    max-block-size: calc(var(--span) * var(--row) + (var(--span) - 1) * var(--gap));
+  }
+
+  .board-root:not([data-editing]) .board:not([data-cols='2']) :global([data-board-key][data-board-key]:is([data-size='tall'], [data-size='large'])) {
+    --span: 2;
+  }
+
+  .board-root:not([data-editing]) .board:not([data-cols='2']) .reserve {
+    min-block-size: var(--row);
+  }
+
+  .board-root:not([data-editing]) .board:not([data-cols='2']) .reserve:is([data-size='tall'], [data-size='large']) {
+    min-block-size: calc(2 * var(--row) + var(--gap));
+  }
+
   /* A DRAFT TAKES A ROW MORE (`grow` in `board.svelte.ts`), so its Keep bar sits under the widget it asks about. */
   .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key]:has(> [data-draft-mark])) {
     max-block-size: calc(var(--most) + var(--row) + var(--gap));

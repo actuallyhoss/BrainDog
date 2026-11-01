@@ -72,7 +72,8 @@ export const cardWords = {
   askedBy: 'Asked by',
   /** The foot of a money row (today F4): who asked, never leading it. */
   by: (name: string) => `Asked by ${name}`,
-  byRule: (name: string) => `Asked by your rule ${name}`,
+  /* "BY CHASE LATE PAYMENTS", NOT "ASKED BY YOUR RULE CHASE LATE PAYMENTS" (T14): the rule's name says what asked. */
+  byRule: (name: string) => `By ${name}`,
   byYou: 'Asked by you',
   /** THE CARD'S SIDE, ON A WIDE TILE: why it is asked and what it changes, each under a quiet heading. */
   why: 'Why it’s asked',
@@ -577,7 +578,8 @@ export function hardSaid(card: Pick<Card, 'cost' | 'ways'>, primary: string | nu
   if (hard.length === 0) return '';
   /* BARE ONLY UNDER THE FILLED ONE; a hard answer left unfilled (`primaryOf`) is named, so it says so of itself. */
   if (hard.length === 1 && hard[0]!.key === primary) return queueWords.hardLine;
-  return queueWords.hardOf(hard.map((w) => w.label).join(' and '));
+  const said = hard.map((w) => queueWords.doing(w.label)).map((d, i) => (i === 0 ? d : d.charAt(0).toLowerCase() + d.slice(1)));
+  return queueWords.hardOf(said.join(' or '));
 }
 
 /**

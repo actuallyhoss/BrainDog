@@ -92,13 +92,19 @@ export function rowOut(node: Element): TransitionConfig {
   if (swapping) return { duration: 0 };
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
+  /* AND THE GAP IT HELD CLOSES WITH IT (next steps 1 Nov, T19): a list with a gap kept it until the row was removed, then
+     closed it in one frame. The gap after it (before it, for the last) is taken back by a margin as the row closes. */
+  const box = node.parentElement;
+  const gap = box ? Number.parseFloat(getComputedStyle(box).rowGap) || 0 : 0;
+  const room = node.nextElementSibling === null ? 'margin-block-start' : 'margin-block-end';
   return {
     duration: ms('--form-out', 180) + ms('--form-settle', 380) / 2,
     css: (t) => {
       const u = 1 - t;
       const gone = Math.min(1, u / 0.45);
       const close = spring(Math.max(0, (u - 0.3) / 0.7));
-      return `opacity:${(1 - cubicOut(gone)).toFixed(3)};transform:scale(${(1 - 0.03 * gone).toFixed(4)});block-size:${(h * (1 - close)).toFixed(1)}px;overflow:clip`;
+      const shut = gap > 0 ? `;${room}:${(-gap * close).toFixed(1)}px` : '';
+      return `opacity:${(1 - cubicOut(gone)).toFixed(3)};transform:scale(${(1 - 0.03 * gone).toFixed(4)});block-size:${(h * (1 - close)).toFixed(1)}px;overflow:clip${shut}`;
     },
   };
 }

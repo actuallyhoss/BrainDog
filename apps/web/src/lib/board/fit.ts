@@ -24,6 +24,14 @@ const CHART = '.series, [role="img"], svg';
 
 export function fitBoard(board: HTMLElement): void {
   const frames = [...board.querySelectorAll<HTMLElement>('[data-board-key]')].filter((f) => f.dataset.lifted === undefined);
+  /* EACH FRAME'S ROWS AS LAID (T5): a laptop's frame at rest is as tall as what it draws, the rows it was laid across at
+     most, and the packer may lay a frame across more rows than its size (`filled` in `pack.ts`). Read from its own
+     grid-area, written before anything is measured. */
+  for (const frame of frames) {
+    const css = getComputedStyle(frame);
+    const span = (parseInt(css.gridRowEnd, 10) || 0) - (parseInt(css.gridRowStart, 10) || 0);
+    if (span > 0 && frame.style.getPropertyValue('--span') !== String(span)) frame.style.setProperty('--span', String(span));
+  }
   /* MEASURED WHOLE: every row put back first, in the same task, so nothing is painted between and the measure is of the
      widget as it would draw with room. */
   for (const frame of frames) {
