@@ -138,14 +138,15 @@ async function read(b: Begin): Promise<void> {
   inFlight.add(b.base);
   set({ base: b.base, state: 'reading', at: Date.now(), summary: null, drafts: [], found: 0, gone: firstDrafts.now?.base === b.base ? firstDrafts.now.gone : [], begin: b });
   try {
-    const [{ draftOffer, draftsOf, modulesHeld, summaryOf }, { slashAsks }] = await Promise.all([import('./first-drafts.ts'), import('./ask.ts')]);
+    const [{ draftOffer, draftsOf, modulesHeld, renamesOf, summaryOf }, { slashAsks }] = await Promise.all([import('./first-drafts.ts'), import('./ask.ts')]);
     const modules = modulesHeld(b.registers);
     if (modules.length === 0) return void set({ ...firstDrafts.now!, state: 'none' });
     const out = await slashAsks(b.base).setup({ said: b.said, offer: draftOffer(modules), today: b.today, first: true });
     /* MOVED ON TO ANOTHER BRAINDOG MEANWHILE: what came back is not this one's to show. */
     if (firstDrafts.now?.base !== b.base) return;
     if (!out.ok) return void set({ ...firstDrafts.now, state: 'none' });
-    const drafts = draftsOf(out.value, { modules, currency: b.currency, built: b.built, me: b.me });
+    /* AND THE LISTS BY THE PERSON'S OWN WORDS, after the entries: a rename is kept by the record's `renameList`. */
+    const drafts = [...draftsOf(out.value, { modules, currency: b.currency, built: b.built, me: b.me }), ...renamesOf(out.value, { modules })];
     set({ ...firstDrafts.now, state: drafts.length > 0 ? 'ready' : 'none', summary: summaryOf(out.value), drafts, found: drafts.length, closed: false });
   } catch {
     if (firstDrafts.now?.base === b.base) set({ ...firstDrafts.now, state: 'none' });

@@ -55,6 +55,8 @@
     kept: (title: string, list: string) => `Kept “${title}” in ${list}`,
     keptAll: (n: number) => `Kept ${n} things from what you wrote`,
     raced: 'That did not reach your BrainDog. It is back on the card.',
+    /* A LIST BY THE PERSON'S OWN WORD: the line under the new name, and its field's label. */
+    renameWhat: (was: string) => `What you call ${was}`,
     notLoaded: 'That could not be kept just now. Try it again.',
   } as const;
 
@@ -94,12 +96,19 @@
     const all = merge === null ? [...kept.drafts, ...rules] : merge(kept.drafts, rules);
     /* NOR ANYTHING THIS BRAINDOG ALREADY HOLDS BY THAT NAME: somebody added since, or kept from Tell a moment ago. */
     const held = (d: FirstDraft): boolean => {
+      /* A LIST ALREADY CALLED WHAT THE DRAFT WOULD CALL IT has nothing left to keep. */
+      if (d.rename) return (options.lists.find((l) => l.id === d.rename!.list)?.name ?? '').trim().toLowerCase() === d.rename.name.trim().toLowerCase();
       const register = d.rows[d.main]?.register ?? '';
       const t = d.title.trim().toLowerCase();
       const known = [...(options.titled?.[register] ?? []), ...(register === 'people' ? (options.people ?? []) : [])];
       return known.some((k) => k.name.trim().toLowerCase() === t);
     };
-    return all.filter((d) => !kept.gone.includes(d.key) && !held(d)).map((d) => edits[d.key] ?? d);
+    /* A RENAME SAYS THE NAME THE LIST HAS NOW, as Today's lists say it, so Undo puts back what was there. */
+    const now = (d: FirstDraft): FirstDraft => {
+      const was = d.rename ? options.lists.find((l) => l.id === d.rename!.list)?.name : undefined;
+      return d.rename && was ? { ...d, list: was, detail: say.renameWhat(was), rename: { ...d.rename, was } } : d;
+    };
+    return all.filter((d) => !kept.gone.includes(d.key) && !held(d)).map((d) => now(edits[d.key] ?? d));
   });
 
   /* NOTHING LEFT, NOTHING READING: the card says it is done, so Today stops loading it. Only once Tell's reading is in. */
@@ -132,10 +141,46 @@
     requestAnimationFrame(() => list?.querySelector<HTMLElement>('[data-draft] button')?.focus());
   }
 
-  async function keep(these: readonly FirstDraft[]): Promise<void> {
-    if (busy || these.length === 0) return;
+  /**
+   * A LIST RENAMED BY THE PERSON'S OWN WORD, through the record's `renameList`: off the card at once, back on it if the
+   * record says no, and the toast's Undo is the same call with the name it had.
+   */
+  async function keepRename(d: FirstDraft): Promise<void> {
+    const r = d.rename;
+    if (!r) return;
+    const { renameListNow } = await import('$lib/record/list-name.ts');
+    settleDrafts(base, [d.key]);
+    const out = await renameListNow(base, r.list, r.name);
+    if (!out.ok) {
+      restoreDrafts(base, [d.key]);
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    void reread();
+    void invalidateAll();
+    const was = out.renamed.was;
+    toasts.push(out.renamed.said, {
+      undo: () =>
+        void renameListNow(base, r.list, was).then((back) => {
+          if (!back.ok) return void toasts.push(back.fix, { intent: 'warn' });
+          restoreDrafts(base, [d.key]);
+          void invalidateAll();
+          void reread();
+        }),
+    });
+  }
+
+  async function keep(all: readonly FirstDraft[]): Promise<void> {
+    if (busy || all.length === 0) return;
     busy = true;
     editing = null;
+    for (const d of all) if (d.rename) await keepRename(d);
+    const these = all.filter((d) => !d.rename);
+    if (these.length === 0) {
+      busy = false;
+      focusNext();
+      return;
+    }
     const run = await import('$lib/data/optimistic.svelte.ts').then((m) => m.run).catch(() => null);
     if (run === null) {
       busy = false;
@@ -245,7 +290,7 @@
                     class="field-input"
                     type="text"
                     maxlength="200"
-                    aria-label={say.changeLabel(d.list)}
+                    aria-label={d.rename ? `New name for ${d.list}` : say.changeLabel(d.list)}
                     bind:value={editText}
                     onkeydown={(e) => editKey(e, d)}
                   /></span
@@ -254,7 +299,7 @@
                 <p class="draft-title">{d.title}</p>
               {/if}
               <p class="draft-where">
-                {#if d.detail}{d.detail.charAt(0).toUpperCase() + d.detail.slice(1)}{:else}{say.where(d.list)}{#if d.day}, {dayShort(d.day)}{/if}{#if d.amount}<span
+                {#if d.rename}{d.detail}{:else if d.detail}{d.detail.charAt(0).toUpperCase() + d.detail.slice(1)}{:else}{say.where(d.list)}{#if d.day}, {dayShort(d.day)}{/if}{#if d.amount}<span
                       class="draft-amount num"><Money minor={d.amount.minor} currency={d.amount.currency} home={d.amount.currency} /></span
                     >{/if}{/if}
               </p>

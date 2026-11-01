@@ -110,6 +110,24 @@ export function apply(change: Change): void {
     case 'show':
       void navPrefs.show(change.href).then((saved) => said(saved, copy.shownInNav(change.name), () => void navPrefs.hide(change.href)));
       return;
+    case 'renameList': {
+      /* THE RECORD'S CALL, so the list is called this everywhere, for everyone; Undo is the same call with the old name. */
+      void import('../record/list-name.ts').then(async ({ renameListNow }) => {
+        const base = (await import('../at.ts')).apiBase();
+        const out = await renameListNow(base, change.list, change.to);
+        if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
+        const { forget } = await import('../record/boot-live.ts');
+        forget();
+        toasts.push(out.renamed.said, {
+          undo: () =>
+            void renameListNow(base, change.list, out.renamed.was).then((back) => {
+              forget();
+              if (!back.ok) toasts.push(back.fix, { intent: 'warn' });
+            }),
+        });
+      });
+      return;
+    }
     case 'rename': {
       const before = navPrefs.labels[change.href] ?? null;
       const back = change.to === change.own;

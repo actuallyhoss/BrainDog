@@ -171,6 +171,7 @@ export const palette = {
     showDetail: 'Back in your nav',
     rename: (from: string, to: string) => `Rename ${from} to ${to}`,
     renameDetail: 'In your nav. The page keeps its own name.',
+    renameListDetail: 'Everywhere it is named, for everyone here. Undo puts the old name back.',
     renamed: (from: string, to: string) => `${from} is ${to} in your nav.`,
     unnamed: (own: string) => `${own} has its own name again.`,
     renameAsk: (name: string) => `Rename ${name}`,

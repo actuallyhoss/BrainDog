@@ -521,7 +521,7 @@
           const mine = !views.has(e.href) && !(e as { cut?: true }).cut;
           return { href: e.href, name: mine ? navPrefs.labelOf(e.href, e.title) : e.title, own: e.title, icon: e.icon, hide: mine, rename: mine };
         }),
-      ...lists.map((l) => screen(`/r/${l.id}`, l.name, l.icon)),
+      ...lists.map((l) => ({ ...screen(`/r/${l.id}`, l.name, l.icon), list: l.id })),
     ];
   });
   /** How it looks on this device and whether the screen behind has a page menu, read each time the palette opens. */

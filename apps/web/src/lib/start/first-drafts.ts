@@ -62,6 +62,11 @@ export type FirstDraft = {
    * entry, which field, its type, and the words Tell says it in. Keep waits for it. Absent when it needs nothing.
    */
   needs?: { row: number; field: string; type: 'day' | 'text' | 'number'; label: string };
+  /**
+   * A LIST CALLED BY THE PERSON'S OWN WORD ("I keep my clients here", so People is Clients): no entries, kept by the
+   * record's `renameList`, and Undo is the same call with the old name. Absent on a draft of entries.
+   */
+  rename?: { list: string; was: string; name: string };
 };
 
 /** The field types a draft may ask for in place, as the card can take them: a date, words, or a number. */
@@ -136,6 +141,24 @@ function takenBy(from: Pick<DraftsFrom, 'built' | 'modules'>, titleOf: (register
 const isMoney = (v: unknown): v is { amount: number; currency: string } =>
   typeof v === 'object' && v !== null && typeof (v as { amount?: unknown }).amount === 'number' && typeof (v as { currency?: unknown }).currency === 'string';
 const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v);
+
+/**
+ * THE MODEL'S OWN WORDS FOR THE LISTS, AS DRAFTS (onboard-b: "list renames need a record rename call"): "Clients" for
+ * People where the words said clients. Only a list this BrainDog holds, a name of a word or a few, and never the name it
+ * has already; `names` is what each list is called now, by id, where the caller knows it.
+ */
+export function renamesOf(reply: Pick<SetupReply, 'names'>, from: Pick<DraftsFrom, 'modules'> & { names?: Readonly<Record<string, string>> }): FirstDraft[] {
+  const out: FirstDraft[] = [];
+  for (const n of reply.names ?? []) {
+    const list = listIn(n.list, from.modules);
+    const name = typeof n.name === 'string' ? n.name.replace(/\s+/gu, ' ').trim() : '';
+    if (list === null || name === '' || name.length > 40 || /[{}\n]/u.test(name)) continue;
+    const was = from.names?.[list.id] ?? list.name;
+    if (plain(was) === plain(name) || out.some((d) => d.rename?.list === list.id)) continue;
+    out.push({ key: `rename:${list.id}`, rows: [], main: 0, list: was, titleField: '', title: name, detail: `What you call ${was}`, amount: null, day: null, by: 'model', rename: { list: list.id, was, name } });
+  }
+  return out;
+}
 
 /** The model's entries as drafts: held to their lists, and none the build already made, the person, or twice. */
 export function draftsOf(reply: Pick<SetupReply, 'rows'>, from: DraftsFrom): FirstDraft[] {
@@ -295,6 +318,8 @@ export function mergeDrafts(model: readonly FirstDraft[], rules: readonly FirstD
 export function retitled(d: FirstDraft, title: string): FirstDraft {
   const t = title.replace(/\s+/gu, ' ').trim().slice(0, 500);
   if (t === '' || t === d.title) return d;
+  /* A LIST'S NEW NAME CHANGED BY HAND is the name it is kept as. */
+  if (d.rename) return { ...d, title: t.slice(0, 40), rename: { ...d.rename, name: t.slice(0, 40) } };
   return { ...d, title: t, rows: d.rows.map((r, i) => (i === d.main ? { ...r, fields: { ...r.fields, [d.titleField]: t } } : r)) };
 }
 
