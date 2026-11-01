@@ -2698,14 +2698,18 @@
       display: contents;
     }
 
-    .row-head :global(.page-head .head-main:has([data-head-primary], [data-row-chart])::after) {
+    .row-head :global(.page-head .head-main:has([data-head-primary], [data-row-chart], .sb)::after) {
       content: '';
       flex-basis: 100%;
       order: 1;
     }
 
+    /* SEND GOES WITH THE PRIMARY, under the name (1 Nov): beside the "…" it took 100px of the name's row and broke
+       "Send Northbound invoices on the 1st, not the 15th." into four lines of two words. The name's row is the name
+       and the "…"; the verbs are the row under it, the primary first. */
     .row-head :global(.page-head [data-head-primary]),
-    .row-head :global(.page-head [data-row-chart]) {
+    .row-head :global(.page-head [data-row-chart]),
+    .row-head :global(.page-head .sb) {
       order: 2;
       margin-block-start: var(--sp-3);
     }

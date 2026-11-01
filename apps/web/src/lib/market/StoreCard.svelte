@@ -216,4 +216,54 @@
       min-block-size: var(--tap);
     }
   }
+
+  /*
+   * ON A PHONE A CARD IS A ROW (1 Nov): its well and name, one line of what it does under them, and the cue at the end,
+   * level with both. The foot's "By BrainDog" goes, since the shelf already says who makes it. Forty-six cards of 176px
+   * made the store 5,866px tall at 390.
+   */
+  @media (width < 640px) {
+    .store-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: var(--sp-1) var(--sp-3);
+      padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+    }
+
+    .sc-name,
+    .sc-line,
+    .sc-note,
+    .sc-why {
+      grid-column: 1;
+    }
+
+    .sc-line {
+      padding-inline-start: calc(32px + var(--sp-3));
+      -webkit-line-clamp: 1;
+      line-clamp: 1;
+    }
+
+    .sc-note {
+      padding-inline-start: calc(32px + var(--sp-3));
+    }
+
+    .sc-why {
+      grid-column: 1 / -1;
+    }
+
+    .sc-foot {
+      display: contents;
+    }
+
+    .sc-by {
+      display: none;
+    }
+
+    .sc-cue {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      margin: 0;
+    }
+  }
 </style>
