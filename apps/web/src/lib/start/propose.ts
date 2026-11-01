@@ -917,6 +917,12 @@ const TASKS_LIST = 'tasks';
 /** The parts that are no place on the rail until they hold something: Projects until a project, Work until a task. */
 const WAITS_FOR_FIRST: ReadonlySet<string> = new Set([PORTFOLIO_ID, TO_DO]);
 
+/**
+ * WHETHER A PLACE IS A PART THAT WAITS FOR ITS FIRST ENTRY (Projects, Work), in its own name: the build beside the words
+ * draws one the words named as forming, so it agrees with What I heard, which says it (1 Nov).
+ */
+export const waitsForFirst = (p: Place): boolean => p.kind === 'module' && WAITS_FOR_FIRST.has(p.id) && p.name === partName(p.id);
+
 /** A use case's own places on the rail, by the sections its pages are filed under, Projects left to its part. */
 function caseSections(u: UseCase): { page: string; section: string }[] {
   const out: { page: string; section: string }[] = [];

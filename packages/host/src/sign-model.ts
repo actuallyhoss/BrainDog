@@ -183,7 +183,7 @@ function asksOf(sql: Sql, sinceMs: number): Ask[] {
 const KINDS: Readonly<Record<string, string>> = {
   ask: 'Your questions',
   automation: 'Automation steps',
-  plan: 'First plans',
+  plan: 'Readings of what you wrote at sign-up',
   headline: 'Page headlines',
   understand: 'Readings of what arrived',
   look: 'Daily looks and drafts',
@@ -263,8 +263,11 @@ export function readModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, 
   const tz = (typeof kernel.identity === 'function' ? kernel.identity()?.tz : null) || 'UTC';
   const since = nowMs - MODEL_WINDOW_DAYS * DAY;
   const rows = asksOf(sql, since);
-  const asks = rows.filter((a) => a.spent !== 1);
-  const refused = rows.length - asks.length;
+  /* A MISSED FIRST PLAN IS NOT A FAULT (audit 11-01, AP10): the sign-up's reading of what a stranger wrote falls back to the
+     rules when the model is quiet, and is never asked again, so nothing waits on it and nobody can mend it. Counted, it
+     opened a new person's Settings on "The model did not answer 1 of 1 ask this week". */
+  const asks = rows.filter((a) => a.spent !== 1 && !(a.purpose === 'plan' && a.ok !== 1));
+  const refused = rows.filter((a) => a.spent === 1).length;
   const faults = faultsOf(kernel);
   const dead = faults.model.filter((f) => Date.parse(f.last_at) >= since || f.last_at === '');
   /* THE OTHER WORK, OPEN AS LONG AS ITS FAULT IS: a dead copy or notification is still dead after the week. */

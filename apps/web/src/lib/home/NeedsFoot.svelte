@@ -33,6 +33,7 @@
     finished = [],
     shared,
     calm,
+    calmWhy = null,
   }: {
     /** Nothing waits: the foot is the whole tile. */
     alone?: boolean;
@@ -50,6 +51,8 @@
     shared?: SharedOut | undefined;
     /** The calm line drawn alone ("Nothing needs you"). */
     calm: string;
+    /** What will be here, under the calm line on a tile with nothing in it, so the tile says how it fills (Look B Empty). */
+    calmWhy?: string | null;
   } = $props();
 
   const words = {
@@ -77,7 +80,7 @@
         <IconWell name="inbox" size="m" />
         <h2 class="nf-title">{heading}{#if told.length > 0}<span class="nf-count num">{told.length}</span>{/if}</h2>
       </header>
-      {#if calmNow}<p class="nf-calm"><IconWell name="check" size="l" tone="good" /><span>{calm}</span></p>{/if}
+      {#if calmNow}<p class="nf-calm"><IconWell name="check" size="l" tone="good" /><span>{calm}</span></p>{#if calmWhy && !any}<p class="nf-why">{calmWhy}</p>{/if}{/if}
     {/if}
     {#if any}
       <ul class="nf-lines">
@@ -162,6 +165,16 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
+  }
+
+  /* UNDER THE CALM LINE, IN LINE WITH ITS WORDS (AP22): what will be here, so a first Today's empty tile is not a heading
+     over a band of nothing. */
+  .nf-why {
+    max-inline-size: var(--measure);
+    margin: calc(-1 * var(--sp-2)) 0 0 calc(32px + var(--sp-3));
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .nf-lines {

@@ -6,17 +6,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { leaveOf, msOf, SETTLE_MOST, settleOf } from './settle.ts';
+import { leaveOf, msOf, rideOf, SETTLE_MOST } from './settle.ts';
 
 const src = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('a card that became its line plays from the height it had to the line’s own, and nothing plays for less motion', () => {
-  assert.deepEqual(settleOf(304, 72, 180, false), [{ blockSize: '304px' }, { blockSize: '72px' }]);
-  assert.deepEqual(settleOf(72, 304, 180, false), [{ blockSize: '72px' }, { blockSize: '304px' }], 'Undo opens the card out of the line');
-  assert.equal(settleOf(304, 72, 180, true), null, 'a reader who asked for less motion sees the line at once');
-  assert.equal(settleOf(304, 304.4, 180, false), null, 'a change under a pixel plays nothing');
-  assert.equal(settleOf(304, 72, 0, false), null, 'no time to play it in');
-  assert.equal(settleOf(Number.NaN, 72, 180, false), null);
+test('what is under a card that became its line glides from where it stood on transform alone, and nothing plays for less motion', () => {
+  assert.deepEqual(rideOf(232, 180, false), [{ transform: 'translateY(232px)' }, { transform: 'translateY(0)' }]);
+  assert.deepEqual(rideOf(-232, 180, false), [{ transform: 'translateY(-232px)' }, { transform: 'translateY(0)' }], 'Undo opens the card out of the line');
+  assert.equal(rideOf(232, 180, true), null, 'a reader who asked for less motion sees the line at once');
+  assert.equal(rideOf(0.4, 180, false), null, 'a move under a pixel plays nothing');
+  assert.equal(rideOf(232, 0, false), null, 'no time to play it in');
+  assert.equal(rideOf(Number.NaN, 180, false), null);
 });
 
 test('the step is the skin’s `--d-rows`, in either unit, and never past the scale’s 300ms', () => {
@@ -29,7 +29,7 @@ test('the step is the skin’s `--d-rows`, in either unit, and never past the sc
 
 test('the card measures before the change and settles after it, on the answer, on Undo and on the reason line', () => {
   const card = src('./DecisionCard.svelte');
-  assert.match(card, /const from = footprint\(phase === 'answered' \? done : cardEl\);\n\s+change\(\);\n\s+await tick\(\);\n\s+settle\(/u);
+  assert.match(card, /const before = snapshot\(phase === 'answered' \? done : cardEl\);\n\s+change\(\);\n\s+await tick\(\);\n\s+settle\(/u);
   assert.match(card, /await morph\(\(\) => \{\n\s+phase = 'answered';\n\s+holding = hold\(/u, 'the answer is not held in the same step that draws its line');
   assert.match(card, /await morph\(\(\) => \(phase = 'open'\)\);/u, 'Undo puts the card back in one frame');
   assert.match(card, /void morph\(\(\) => \(phase = 'answered'\)\);\n\s+void send\(chosen, reason\);/u);

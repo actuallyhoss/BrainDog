@@ -277,7 +277,12 @@ export const shell = {
   /** `day` is "today" or "on 29 Oct", as Forecast says the lowest point. `window` is how far the walk looks, "12 weeks",
    *  said as Today says it ("Lowest in the next 13 weeks"), so the low is never read as the lowest ever (finish F2). */
   /*  THE MINUS HELD TO ITS FIGURE (finish F49): a wrapped line broke "−" from "£16,213", so a word joiner follows it. */
-  cashLowest: (amount: string, day: string, window: string) => `Lowest in the next ${window}: ${amount.replace(/^([−-])/u, '$1\u2060')} ${day}`,
+  /* A LOW BELOW NOUGHT IS SAID IN THE RED (1 Nov): "Lowest … −£16,213" read as calmly as a figure above it. The page's
+     one form for a phrase in the danger colour (`{{bad:…}}`, `braindog-render` `inline`), so the words still say it. */
+  cashLowest: (amount: string, day: string, window: string) => {
+    const said = amount.replace(/^([−-])/u, '$1\u2060');
+    return `Lowest in the next ${window}: ${/^[−-]/u.test(amount) ? `{{bad:${said}}}` : said} ${day}`;
+  },
   /* A BAR'S OWN NOTE, beside the bar and not under the chart: what its money was kept in before it was said in home. */
   convertedFrom: (codes: string) => `converted from ${codes}`,
   /**
@@ -339,13 +344,15 @@ export const shell = {
    */
   noPageCalled: (name: string) => `No page called ${name}`,
   /**
-   * A place with nothing in it yet, said as its own list: "No trips yet." from its box "Add a trip". The box under it is
-   * the way to add the first, so the line does not say "to start" over it (design pass 1 Nov, M29: "Nothing here yet.
-   * Add a trip to start." read as a form letter). A step that is not "Add a …" says the plain line.
+   * A place with nothing in it yet, said as its own list where its first step names it: "No trips yet." from its box
+   * "Add a trip" (design pass 1 Nov, M29), the box under it being the way to add the first. Otherwise by its name and how
+   * it fills (audit 11-01 AP8): "Nothing in People yet. What you add or mention lands here." Never a bare "Nothing here yet".
    */
-  emptyPlace: (step: string | null) => {
+  emptyPlace: (step: string | null, name: string | null = null) => {
     const thing = step === null ? null : /^add (?:a |an |your first |your |the first )?(.+?)\.?$/iu.exec(step.trim())?.[1];
-    return thing ? `No ${pluralOf(thing)} yet.` : 'Nothing here yet.';
+    if (thing) return `No ${pluralOf(thing)} yet.`;
+    const none = name === null || name.trim() === '' ? 'Nothing here yet.' : `Nothing in ${name.trim()} yet.`;
+    return step === null ? `${none} What you add or mention lands here.` : `${none} ${step}.`;
   },
   nearPages: 'The closest pages here:',
   /**

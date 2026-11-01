@@ -19,7 +19,7 @@
       "register": "debts",
       "name": "Debts",
       "one": "debt",
-      "icon": "credit-card",
+      "icon": "trending-down",
       "holds": "something being paid off: what is left on it, its yearly rate and the least that must be paid on it each month",
       "title": "name",
       "mobile": [
@@ -248,7 +248,7 @@
         "section": "Money",
         "order": 55
       },
-      "icon": "credit-card",
+      "icon": "trending-down",
       "requires": [
         "register.debts",
         "register.payoff_plans"

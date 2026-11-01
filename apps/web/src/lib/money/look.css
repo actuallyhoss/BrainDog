@@ -1076,13 +1076,16 @@
   font-weight: var(--fw-medium);
 }
 
-/* THE MONTH IS A ROW LIKE THE OTHERS (design pass, 1 Nov; audit AP24): it was a segmented track with no name among
-   three named rows of chips, so "All, This month, Last month" read as a second "All" for Category. Its name in front,
-   its choices as the same chips; the track's fill and inset go. */
+/* MONTH IS A ROW LIKE THE OTHERS, NAMED AND IN CHIPS (audit 11-01, AP24): as a segmented track with no name among three
+   rows of named chips it read as a fourth kind of control, and at 390 it stood unnamed between Category and Show. */
 [data-money] .filters-group[data-control='segmented'] {
   padding: 0;
-  background: none;
   border-radius: 0;
+  background: none;
+}
+
+[data-money] .filters-group[data-control='segmented'] .filters-choice {
+  border-radius: var(--r-ctl);
 }
 
 /* A CHOICE IS A RECTANGLE, AS EVERY CHIP IS (1 Nov): Money's were the last pills in the app. */

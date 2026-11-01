@@ -688,8 +688,12 @@
   /* THE INDEX'S DIVIDERS START AT THE TEXT (agents F28), past the row's well, where the link list's own padding puts the
      title; a rule through the well column reads as a table's. AND THEY END AT THE CHEVRON (VERIFY P37), the row's own
      end padding, where they ran on through the row's bleed to the tile's edge. */
+  /* AND NOT THE PHONE'S STRIP AS WELL (audit 11-01, AP21): `blocks.css` draws a list's hairline as a background strip under
+     each item below 640px, so on a phone every row wore that one from the well and this one from the words, a thin
+     rule turning heavier halfway. This one alone. */
   .settings-index :global(.list[data-kind='link'] > .item) {
     border-block-end: 0;
+    background-image: none;
   }
 
   .settings-index :global(.list[data-kind='link'] > .item + .item::before) {

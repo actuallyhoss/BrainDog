@@ -386,7 +386,11 @@ export function cashReading(f: Forecast): Sentence {
     const needs = `goes under on ${daySaid(f.crossed).replace(/^\S+ /u, '')}`;
     return { text: `At this rate it ${needs}, inside the next ${f.weeks} weeks.`, needs };
   }
-  if (f.low.day !== null) return { text: `Lowest in the next ${f.weeks} weeks: ${aboutSaid(f.low.value, f.currency)} on ${daySaid(f.low.day).replace(/^\S+ /u, '')}.`, needs: '' };
+  if (f.low.day !== null) {
+    const low = aboutSaid(f.low.value, f.currency);
+    /* A LOW BELOW NOUGHT IS THE PHRASE THAT NEEDS HIM, drawn in the red as money under nought always is (1 Nov). */
+    return { text: `Lowest in the next ${f.weeks} weeks: ${low} on ${daySaid(f.low.day).replace(/^\S+ /u, '')}.`, needs: f.low.value < 0 ? low : '' };
+  }
   return { text: `Nothing dated takes it below today's figure in the next ${f.weeks} weeks.`, needs: '' };
 }
 

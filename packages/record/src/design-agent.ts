@@ -634,10 +634,12 @@ export function planOffered(f: PlanFacts, chosen: PlanShape | null, keeps: reado
 
 /** Why a plan is drawn in its shape, in one sentence. */
 function planWhy(name: string, shape: PlanShape, rows: number): string {
-  if (shape === 'path') return `${name} has ${count(rows)} stages, so its plan reads as where it stands on them and what each one is done when.`;
-  if (shape === 'roadmap') return `${count(rows)} things on ${name} have a day and an effort, so its plan reads as windows on a time axis.`;
-  if (shape === 'timeline') return `${count(rows)} things on ${name} fall on a day without a span, so its plan reads as moments on a timeline.`;
-  return `${count(rows)} things on ${name} are open with no day, so its plan reads as a board of what is open, doing and done.`;
+  /* SHORT AND ABOUT HIS THINGS (1 Nov): each line was a clause of how the plan "reads as", the pen's own reasoning. Now
+     what is true, then what the plan would show. */
+  if (shape === 'path') return `${name} has ${count(rows)} stages. Its plan can show where it stands on them.`;
+  if (shape === 'roadmap') return `${count(rows)} things on ${name} have a day and a size. Its plan can lay them out over the weeks.`;
+  if (shape === 'timeline') return `${count(rows)} things on ${name} fall on a day. Its plan can put them on a timeline.`;
+  return `${count(rows)} things on ${name} are open with no day. Its plan can show them as a board.`;
 }
 
 /* ── the widget tier: what Today might show, from use (widgets plan §6) ───────────────────────────────────────── */

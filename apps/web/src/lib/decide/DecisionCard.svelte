@@ -78,7 +78,7 @@
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
   import { answeredLine, answerRowOf, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, leadOf, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
-  import { footprint, leave, pointerOff, settle } from './settle.ts';
+  import { leave, pointerOff, settle, snapshot } from './settle.ts';
   import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
   import { step } from '$lib/funnel.ts';
   import { othersLine, namer } from '../../routes/decide/[id]/decider.ts';
@@ -294,15 +294,15 @@
   let cardEl = $state<HTMLElement | null>(null);
 
   /**
-   * THE CARD BECOMES ITS LINE, OR THE LINE ITS CARD, WITHOUT A JUMP (`settle.ts`): the room it took is measured before
-   * the change, and the new one opens at that height and settles to its own over `--d-rows`, the cards under it riding
-   * up or down with it. Nothing moves for a reader who asked for less motion.
+   * THE CARD BECOMES ITS LINE, OR THE LINE ITS CARD, WITHOUT A JUMP (`settle.ts`): where the cards under it stand is
+   * taken before the change, and after it they glide from there to their new places while the new one rises and fades
+   * in, over `--d-rows`, on transform and opacity alone. Nothing moves for a reader who asked for less motion.
    */
   async function morph(change: () => void) {
-    const from = footprint(phase === 'answered' ? done : cardEl);
+    const before = snapshot(phase === 'answered' ? done : cardEl);
     change();
     await tick();
-    settle(phase === 'answered' ? done : cardEl, from);
+    settle(phase === 'answered' ? done : cardEl, before);
   }
 
   /**

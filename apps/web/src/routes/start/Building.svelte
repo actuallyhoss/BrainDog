@@ -25,7 +25,7 @@
   import Money from '$lib/ui/Money.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { firstRun } from '$lib/first-run.ts';
-  import { railPlaces, type Place, type Proposal } from '$lib/start/propose.ts';
+  import { railPlaces, waitsForFirst, type Place, type Proposal } from '$lib/start/propose.ts';
   import { placeIcon, placesFrom, words, type Part as PartOf } from './building.ts';
 
   let {
@@ -67,7 +67,12 @@
   const entriesOf = (place: Place) => (place.kind === 'module' ? (parts.find((p) => p.on && p.id === place.id)?.entries ?? []) : []);
   /* THE PLACES AS THE RAIL WILL HOLD THEM (`railPlaces`, AM10): a part that waits for its first entry is drawn once the
      words fill it. */
-  const shown = $derived(railPlaces(placesFrom(places, parts), (p) => entriesOf(p).length > 0));
+  /* AND A PART THE WORDS NAMED, THOUGH NOTHING FILLS IT YET (1 Nov): What I heard said "my projects → Projects" while this
+     left Projects out. It is drawn as forming, quieter, with when it reaches the sidebar, so the two agree and the rail
+     still holds only what has something in it. */
+  const named = (p: Place): boolean => p.phrase !== null && waitsForFirst(p);
+  const shown = $derived(railPlaces(placesFrom(places, parts), (p) => entriesOf(p).length > 0 || named(p)));
+  const forming = (p: Place): boolean => named(p) && entriesOf(p).length === 0;
 
   /** "1 Oct", in the person's own order of day and month. */
   function day(iso: string): string {
@@ -101,11 +106,12 @@
   <Tile icon="home" title={title ?? words.yours} meta={settled ? undefined : meta} data-build>
     <ol class="places">
       {#each shown as place (`${place.kind}:${place.id}`)}
-        <li class="place" data-forming="place" data-place={place.id} data-arrived={fresh.has(`${place.kind}:${place.id}`) ? '' : undefined}>
+        <li class="place" data-forming="place" data-place={place.id} data-waits={forming(place) ? '' : undefined} data-arrived={fresh.has(`${place.kind}:${place.id}`) ? '' : undefined}>
           <span class="place-head">
             <Icon name={placeIcon(place)} size="m" />
             <span class="place-name">{place.name}</span>
           </span>
+          {#if forming(place)}<span class="waits">{words.forming}</span>{/if}
           {#each entriesOf(place) as e (e.key)}
             <span class="entry" data-forming="entry" data-entry={e.key}>
               <span class="entry-main">{e.title}<span class="entry-detail">, {e.detail.toLowerCase()}{#if e.due}, {words.due(day(e.due))}{/if}</span></span>
@@ -175,6 +181,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* A PLACE STILL FORMING: its name in the quiet ink, and when it reaches the sidebar under it. */
+  .place[data-waits] {
+    color: var(--ink-3);
+  }
+
+  .waits {
+    padding-inline-start: calc(var(--icon-s) + var(--sp-3));
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   /* AN ENTRY THE SENTENCE FILLED, under its place and in line with its name. */

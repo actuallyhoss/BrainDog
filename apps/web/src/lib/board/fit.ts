@@ -103,7 +103,11 @@ export function fitBoard(board: HTMLElement): void {
        drew two, had its second cut by the frame, and said "2 more" over one question where the phone said "3 more". */
     const counted = [...frame.querySelectorAll<HTMLElement>(FOOT)].find((f) => MORE_COUNT.test(ownText(f)));
     if (counted) recounts.push([counted, rows.filter((_, i) => cutOf(i)).length]);
-    const left = says ? past(cutAt) - (keepFirst ? 1 : 0) : 0;
+    /* NEVER OVER THE ROW KEPT (Maya's Today, 1 Nov): a first row taller than the room is kept and clipped by the frame,
+       and the frame's own count, laid at its foot, was then drawn on top of that row's words. Where the kept row reaches
+       into the count's room, the frame says nothing more; the row's own clip says there is more. */
+    const keptOver = keepFirst && rects[first]!.bottom > Math.min(room, over) - MORE_PX;
+    const left = says && !keptOver ? past(cutAt) - (keepFirst ? 1 : 0) : 0;
     if (left > 0 && kept.length > 0) {
       delete frame.dataset.more;
       before.push([kept[0]!.el, `${left} more`]);

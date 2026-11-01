@@ -183,9 +183,20 @@ function openedOften(read: SignalRead, pages: ReadonlyMap<string, string>, proje
     const t = byId(read, widget);
     if (t === undefined || !needsMet(t, read)) continue;
     const title = pages.get(subject) ?? t.title;
-    out.push({ signal: 'S2', widget, why: `You opened ${title} on ${Number(r.days)} days in the last two weeks.`, seen: String(r.last), draws: true });
+    out.push({ signal: 'S2', widget, why: `You opened ${title} on ${Number(r.days)} of the last 14 days.`, seen: String(r.last), draws: true });
   }
   return out;
+}
+
+/**
+ * What came with an add-on, in a line: its name and what the widget shows, the widget's own sentence (`says`) with its
+ * first letter lowered, or its title where it has none. "New with Money: the cash you have now and how long it lasts."
+ */
+function newWith(name: string, t: { title: string; says?: string }): string {
+  const says = typeof t.says === 'string' ? t.says.trim() : '';
+  if (says === '') return `New with ${name}: ${t.title}.`;
+  const lowered = /^[A-Z][a-z]/u.test(says) ? `${says[0]!.toLowerCase()}${says.slice(1)}` : says;
+  return `New with ${name}: ${/[.!?]$/u.test(lowered) ? lowered : `${lowered}.`}`;
 }
 
 /* ── S3: something new ─────────────────────────────────────────────────────────────────────────────────────────── */
@@ -208,7 +219,10 @@ function somethingNew(read: SignalRead): WidgetSignal[] {
     const name = read.addonName?.(id);
     if (name === undefined) continue;
     if (t === undefined) continue;
-    out.push({ signal: 'S3', widget: t.id, why: `You added ${name}. ${t.title} can sit on Today.`, seen: String(e.ts).slice(0, 10), draws: true });
+    /* SAID AS WHAT IT SHOWS, NOT AS A TEMPLATE (1 Nov): "You added People. People to get back to can sit on Today." named
+       the list twice and said nothing of why. Now it is what came with the add-on and what the widget shows, in its own
+       words: "New with People: who you have not been in touch with lately." */
+    out.push({ signal: 'S3', widget: t.id, why: newWith(name, t), seen: String(e.ts).slice(0, 10), draws: true });
   }
   /* A ROW NEW IN A LIST A WIDGET SAYS IT NOTICES (`fresh`): a savings goal just set, said in the widget's own words. */
   for (const t of read.templates ?? WIDGETS) {
