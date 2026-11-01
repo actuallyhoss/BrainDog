@@ -4,7 +4,7 @@
 
     ask    the lead sentence with its figures, then the bills as bars or the project's spark, then what Slash read
            and its buttons;
-    find   how many matched and "no asks spent", then each hit with the search word marked;
+    find   how many matched and "no questions spent", then each hit with the search word marked;
     make   the draft (a page or list with its table, or a rule in one sentence), then "From Slash · reads ..." with
            its yes button and Not now. Yes says "Added to <where>." with Undo; Not now says "Nothing changed." with
            Back. Both go back to the draft, and a new question starts fresh.

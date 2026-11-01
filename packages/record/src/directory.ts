@@ -3058,7 +3058,9 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       }
       return {
         until,
-        say: `${action} is waiting until ${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}. This BrainDog has used ${SPENT[over](allowance[over])} for ${MONTHS[new Date(now).getUTCMonth()] ?? ''}.`,
+        /* KINDLY, WITH THE WAY ON: what waits and until when, that nothing made is touched, and where more is. A plan with
+           none above it (Cloud Plus) is pointed at extra usage, which is the same Billing page. */
+        say: `${action} is waiting until ${turns.getUTCDate()} ${MONTHS[turns.getUTCMonth()] ?? ''}. This BrainDog has used ${SPENT[over](allowance[over])} for ${MONTHS[new Date(now).getUTCMonth()] ?? ''}. Nothing you made is touched, and Settings > Billing has more.`,
       };
     },
 

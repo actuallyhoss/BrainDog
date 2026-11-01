@@ -80,7 +80,7 @@ export const threadWords = {
   findLabel: 'Back to find and go',
   ask: 'Ask',
   resume: (q: string) => `Continue: ${q}`,
-  left: (n: number) => (n === 1 ? '1 ask left this month' : `${n.toLocaleString('en')} asks left this month`),
+  left: (n: number) => (n === 1 ? '1 question left this month' : `${n.toLocaleString('en')} questions left this month`),
   enterDoes: 'Enter does it, Esc leaves it',
 } as const;
 

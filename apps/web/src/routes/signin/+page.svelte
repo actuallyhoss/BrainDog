@@ -56,6 +56,7 @@
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from './Entry.svelte';
   import Human from './Human.svelte';
+  import { widgetWords } from '../signup/turnstile.ts';
   import { signupMode, type SignupMode } from '$lib/signup-door.ts';
 
   const here = support();
@@ -115,6 +116,9 @@
   /* CLOUDFLARE'S CHECK on the link request, only where `/auth/methods` hands a site key. */
   const siteKey = $derived(asked?.ok === true ? (asked.value.turnstile ?? null) : null);
   let human = $state<string | null>(null);
+  /* WHILE THE CHECK IS ASKED AND NOT YET ANSWERED, the button says so and a press sends nothing, as sign-up's does:
+     sent without an answer, the host could only refuse it. */
+  const waitsForCheck = $derived(siteKey !== null && human === null);
   let humanBox = $state<{ reset: () => void } | null>(null);
   /**
    * WHETHER THE SERVER-KEY BLOCK IS OPEN IS THE READER'S, ONCE IT IS DRAWN. The first run opens it, and
@@ -427,6 +431,7 @@
 
   function send(e: SubmitEvent) {
     e.preventDefault();
+    if (waitsForCheck) return;
     sendTo(email.trim());
   }
 
@@ -721,7 +726,7 @@
                 </span>
                 {#if siteKey !== null}<Human {siteKey} bind:answer={human} bind:this={humanBox} />{/if}
                 <Button weight={doors.lead === 'magic' ? 'primary' : 'quiet'} type="submit" aria-busy={asking === 'send'}>
-                  {asking === 'send' ? copy.sendingLink : copy.emailLink}
+                  {asking === 'send' ? copy.sendingLink : waitsForCheck ? widgetWords('ready').send : copy.emailLink}
                 </Button>
               </form>
             {:else}

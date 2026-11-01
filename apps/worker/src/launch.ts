@@ -19,6 +19,8 @@
 import { cookieMode } from '@braindog/host/auth';
 import { SIGNUP_UNCHECKED } from '@braindog/record/directory';
 
+import { turnstileHalf, turnstileOn } from './turnstile.ts';
+
 export type SignupMode = 'closed' | 'invite' | 'open';
 
 export type BillingMode = 'off' | 'test' | 'live';
@@ -54,8 +56,11 @@ export function signupMode(env: LaunchEnv): SignupMode {
   return said === 'open' || said === 'invite' ? said : 'closed';
 }
 
-/** Whether a bot check runs on `start`: the secret is what `turnstilePassed` checks every answer with. */
-export const botCheckKeyed = (env: LaunchEnv): boolean => (env.TURNSTILE_SECRET ?? '').trim() !== '';
+/**
+ * Whether the bot check runs on sign-up, invitations and sign-in links: the secret AND the site key are set
+ * (`turnstile.ts`). One half alone is the check off, never every sign-up refused.
+ */
+export const botCheckKeyed = (env: LaunchEnv): boolean => turnstileOn(env);
 
 /** Billing's mode as `billingKey` reads it (`billing.ts`): `test` or `live`, and anything else is off. */
 export function billingMode(env: LaunchEnv): BillingMode {
@@ -89,8 +94,13 @@ export const STOPPING = {
   host: 'This host has no public address set, so it cannot give a new person a session and every sign-up is refused.',
   from: 'No address to send mail from is set, so nobody gets the letter that finishes a sign-up.',
   mail: 'Mail is not connected, so nobody gets the letter that finishes a sign-up.',
-  siteKey: 'The bot check has its secret and no site key, so the sign-up page cannot pass it and every sign-up is refused.',
 } as const;
+
+/**
+ * The owner's sentence for a bot check with one of its two keys: it is off, and sign-up goes on under the unchecked
+ * limit. It used to stop every sign-up (a secret with no site key), which no stranger could get past.
+ */
+export const BOT_CHECK_HALF = 'The bot check has only one of its two keys, TURNSTILE_SITE_KEY and the TURNSTILE_SECRET secret, so it is off until both are set.';
 
 /**
  * The one sentence a stranger reads for any of `STOPPING`. Which setting is missing, and the exact strike limit, are the
@@ -110,7 +120,6 @@ function stops(env: LaunchEnv): string[] {
   if (cookieMode(`https://${env.PUBLIC_HOST ?? ''}`) === null) out.push(STOPPING.host);
   if (!env.AUTH_MAIL_FROM) out.push(STOPPING.from);
   if (!env.EMAIL) out.push(STOPPING.mail);
-  if (botCheckKeyed(env) && (env.TURNSTILE_SITE_KEY ?? '').trim() === '') out.push(STOPPING.siteKey);
   return out;
 }
 
@@ -134,6 +143,7 @@ export function launchDetail(env: LaunchEnv): LaunchState {
   if (switched === 'closed') why.push(SWITCHED_OFF);
   why.push(...stopped);
   if (signup === 'invite') why.push(BY_INVITE);
+  if (turnstileHalf(env)) why.push(BOT_CHECK_HALF);
   if (signup !== 'closed' && !botCheck)
     why.push(`The bot check is not keyed, so sign-ups from one address are limited to ${limitWords()} until it is.`);
   if (billing === 'off') why.push('Billing is off, so every new record is on Free.');

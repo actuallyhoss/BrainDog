@@ -22,6 +22,7 @@ import type { Refusal, Result } from '@braindog/ports';
 
 import { NOSNIFF } from './admin.ts';
 import { SIGNUP_CLOSED, type SignupMode } from './launch.ts';
+import { NOT_A_PERSON } from './turnstile.ts';
 
 /** The most of an application body this door reads, as sign-up's: a name, an address, two short texts and an answer. */
 export const APPLY_BODY_MAX = 8_192;
@@ -67,7 +68,7 @@ export type ApplyDoorDeps = {
   sameOrigin: (request: Request) => boolean;
   /** Whether a bot check stands in front of this door (`botCheckKeyed`), which the Directory's limits are told. */
   checked: boolean;
-  /** The Turnstile answer checked, or `true` when no secret is set (`turnstilePassed`). */
+  /** The Turnstile answer checked, or `true` while the check is off, both keys not set (`turnstilePassed`, `turnstile.ts`). */
   turnstile: (answer: unknown, ip: string) => Promise<boolean>;
   /** The Directory's `apply.submit`. */
   apply: (call: Extract<ApplyCall, { flow: 'apply.submit' }>) => Promise<ApplyAnswers['apply.submit']>;
@@ -101,7 +102,7 @@ export async function applyDoor(request: Request, deps: ApplyDoorDeps): Promise<
   const body = parsed as Record<string, unknown>;
   const ip = request.headers.get('cf-connecting-ip') ?? '';
   if (!(await deps.turnstile(body['turnstile'], ip)))
-    return refused(403, { code: 'FORBIDDEN', fix: 'The check that you are a person did not pass. Try it again, then send the form.', at: 'turnstile' });
+    return refused(403, { code: 'FORBIDDEN', fix: NOT_A_PERSON, at: 'turnstile' });
   /* THE FIELDS GO THROUGH AS THEY CAME: the Directory trims, bounds and names a wrong one. */
   const out = await deps.apply({
     flow: 'apply.submit',

@@ -25,21 +25,27 @@ Ask Slash to add a task, change a field, add a person, or draft a page or a rule
 
 Slash reads how you use BrainDog and says what it noticed, such as a list that keeps growing or a question you keep asking. Under that are its suggestions, each marked as new, waiting in Needs you, or answered. One press puts the new ones in Needs you and changes nothing else. Only the owner can accept them.
 
-Slash also does quieter work in the background: the inbox's patterns, a digest's summary, the question an automation asks it. That work has its own allowance and never spends your asks.
+Slash also does quieter work in the background: the inbox's patterns, a digest's summary, the question an automation asks it. That work has its own allowance and never spends your questions.
 
-## Asks and the monthly limit
+## Questions and the monthly limit
 
-Each question or change you ask Slash for is one ask, however much reading it takes.
+Each question or change you ask Slash for counts as one Slash question, however much reading it takes.
 
-- Free includes 20 asks a month, Cloud 80 and Cloud Plus 400.
+- Free includes 20 Slash questions a month, Cloud 80 and Cloud Plus 400.
+<!-- launch: !billing -->
+- Cloud and Cloud Plus are monthly plans, coming soon and priced at launch.
+<!-- /launch -->
+<!-- launch: billing -->
+- Cloud and Cloud Plus are monthly plans: see [Pricing](/pricing). More questions come in packs, from Settings > Billing.
+<!-- /launch -->
 - The owner sets the limit in Settings, under Agents. Zero turns Slash off.
-- Usage lists your asks by day: what was asked, when, what it cost and a link to what it filed. See [Usage and limits](/docs/use/usage).
+- Usage lists your questions by day: what was asked, when, what it cost and a link to what it filed. See [Usage and limits](/docs/use/usage).
 
-When the month's asks are spent, Slash says so, and says when they reset. Two ways on are offered beside the sentence: use your own key, or open Settings.
+When the month's questions are spent, Slash says so, and says when they reset. Two ways on are offered beside the sentence: use your own key, or open Settings.
 
 ## Your own key
 
-In Settings, under Agents, the owner can give Slash a key from a model provider of their own. Asks on your own key are billed by that provider, so Slash lists them and sets no limit.
+In Settings, under Agents, the owner can give Slash a key from a model provider of their own. Questions on your own key are billed by that provider, so Slash lists them and sets no limit.
 
 ## What Slash can and cannot do
 
@@ -53,7 +59,7 @@ Where it lives | In BrainDog. Press Ctrl+J (⌘J) | Claude, Cursor and any MCP c
 <!-- /launch -->
 What it reads | Your BrainDog | What the key or sign-in you gave it allows
 What it writes | What you ask for, with an undo; money, keys, sharing and deletes wait for your yes | Proposals for you to decide, or rows directly, as you allowed
-Who pays for it | Your plan's asks, or your own key | Your agent's own provider
+Who pays for it | Your plan's questions, or your own key | Your agent's own provider
 ```
 
 Agents are covered in [Agents](/docs/agents/connect).

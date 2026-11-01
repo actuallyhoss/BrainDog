@@ -57,6 +57,7 @@ import {
   customerFor,
   endSubscription,
   idAt,
+  invoicesOf,
   metadataOf,
   objectAt,
   priceOnSubscription,
@@ -118,6 +119,16 @@ export const planPrice = (plan: ListedPlan): string => {
 };
 
 /**
+ * What a plan holds that a person counts, from the one table of plans: Slash questions a month, AI tools connected at
+ * once, people, runs a month, and whether a second person may join. `null` is no limit. The list sends it beside each record and each plan on sale, so the
+ * Billing page draws its meters and its offer against the figures the site sells, never its own copy of them.
+ */
+export const limitsOf = (plan: ListedPlan): { questions: number | null; tools: number | null; people: number | null; runs: number | null; teams: boolean } => {
+  const row = PLAN_TABLE[meteredAs(plan)];
+  return { questions: row.credits, tools: row.agents, people: row.people, runs: row.allowance?.runs ?? null, teams: row.teams };
+};
+
+/**
  * How many days after its lapse began a record is deleted: the ladder's last step, which the nightly walk takes.
  * `delete_on` in the list is that day, so the screen and the walk read one number.
  */
@@ -171,10 +182,19 @@ export type BillingEnv = MailEnv & {
    */
   STRIPE_PRICE_EXTRA?: string | undefined;
   STRIPE_METER_EXTRA?: string | undefined;
+  /**
+   * Stripe Tax on every checkout (`taxOn`): `on` asks for the payer's address on Stripe's page and adds the tax Stripe
+   * works out. Empty, the price is the whole charge. Stripe Tax itself (the origin address and where you are registered)
+   * is set in Stripe's dashboard before this is turned on.
+   */
+  STRIPE_TAX?: string | undefined;
   PUBLIC_HOST?: string | undefined;
   /** Who may make an account (`launch.ts`): while it is `closed`, nobody makes a free record either. */
   SIGNUP?: string | undefined;
 };
+
+/** Whether checkouts on this host ask Stripe to add tax (`STRIPE_TAX` is `on`). */
+export const taxOn = (env: BillingEnv): boolean => (env.STRIPE_TAX ?? '').trim() === 'on';
 
 /** A plan's Stripe price, or `null` while its setting is empty: that plan is not sold on this host. */
 export const priceOf = (env: BillingEnv, plan: HostedPlan): string | null => {
@@ -273,8 +293,8 @@ const PACK_IDS = Object.keys(PACK_SETTINGS) as PackId[];
 /** A pack's figures from the one table, or `null` for one it does not hold. */
 const packOf = (id: PackId): Pack | null => PACKS.find((p) => p.id === id) ?? null;
 
-/** A pack as a person reads it: "100 Slash credits". */
-export const packName = (pack: Pack): string => `${String(pack.credits)} Slash credits`;
+/** A pack as a person reads it: "100 Slash questions", the one word for Slash's allowance (E17). */
+export const packName = (pack: Pack): string => `${String(pack.credits)} Slash questions`;
 
 /** A pack's Stripe price, or `null` while its setting is empty: that pack is not sold on this host. */
 export const packPrice = (env: BillingEnv, pack: PackId): string | null => {
@@ -442,13 +462,22 @@ function originOf(env: BillingEnv): Result<string> {
   return host === '' ? no('NOT_IN_THIS_BUILD', 'PUBLIC_HOST is not set, so there is no page to send a person back to after paying.') : ok(`https://${host}`);
 }
 
-/** Stripe's subscription states, as a record's billing state. `null` for one that moves nothing (`incomplete`, `paused`). */
-function stateOf(status: string): BillingState | null {
+/**
+ * Stripe's subscription states, as a record's billing state. FAILS CLOSED: only the states that mean the money is in, or
+ * that Stripe is still trying, keep a record writable, and any other word Stripe sends, one it adds tomorrow included,
+ * is a lapse with a line at `error` naming it, so a state nobody read never leaves a paid plan running for free.
+ *
+ * `active` and `trialing` are paid. `past_due` is still writable: Stripe retries the card and mails the customer, and
+ * the record lapses only when it gives up. `incomplete` is a first payment waiting on the person (a card that asks for
+ * a check), read as `past_due` so the Billing page asks them to finish it. `unpaid`, `canceled`, `incomplete_expired`
+ * and `paused` (a trial that ended with no card) are lapsed.
+ */
+export function stateOf(status: string): BillingState {
   if (status === 'active' || status === 'trialing') return 'active';
-  /* STILL WRITABLE: Stripe retries the card and mails the customer, and the record lapses only when it gives up. */
-  if (status === 'past_due') return 'past_due';
-  if (status === 'unpaid' || status === 'canceled' || status === 'incomplete_expired') return 'lapsed';
-  return null;
+  if (status === 'past_due' || status === 'incomplete') return 'past_due';
+  if (status !== 'unpaid' && status !== 'canceled' && status !== 'incomplete_expired' && status !== 'paused')
+    op({ op: 'billing', did: 'state', ok: false, why: 'unknown_status', status: status.slice(0, 40) }, 'error');
+  return 'lapsed';
 }
 
 /** Stripe's event types the webhook acts on. Every other type is answered 200 and ignored. */
@@ -458,7 +487,10 @@ const ACTS: ReadonlySet<string> = new Set([
   'customer.subscription.created',
   'customer.subscription.updated',
   'customer.subscription.deleted',
+  'customer.subscription.paused',
+  'customer.subscription.resumed',
   'invoice.paid',
+  'invoice.payment_failed',
   'charge.refunded',
 ]);
 
@@ -502,7 +534,7 @@ export type BillingDeps = {
 };
 
 /** The doors `serveAccount` is handed for billing's four rows. */
-export type BillingDoors = Required<Pick<AccountDoor, 'billing' | 'checkout' | 'portal' | 'extra' | 'webhook'>>;
+export type BillingDoors = Required<Pick<AccountDoor, 'billing' | 'checkout' | 'portal' | 'invoices' | 'extra' | 'webhook'>>;
 
 /**
  * A row whose record went back to Free when its plan was cancelled: it keeps its customer and has no subscription. Any
@@ -674,6 +706,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       person: who.person,
       price,
       metadata: { kind: 'pack', record: record.record, pack: id, person: who.person },
+      tax: taxOn(env),
       success: `${back}#credits={CHECKOUT_SESSION_ID}`,
       cancel: `${back}#cancelled`,
     });
@@ -725,6 +758,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
             state: row ? row.state : 'unbilled',
             plan,
             price: planPrice(plan),
+            limits: limitsOf(plan),
             credits,
             ...(row && isGift(row) ? { gift: true } : {}),
             ...(row && row.period_end !== null ? { period_end: row.period_end } : {}),
@@ -732,10 +766,10 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
           };
         }),
     );
-    const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: planName(p), price: planPrice(p) }));
+    const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: planName(p), price: planPrice(p), limits: limitsOf(p) }));
     const open = sells(env);
     const canMake = signupMode(env) !== 'closed' && !records.some((r) => r.plan === 'free');
-    return ok({ records, open, plans: open ? sold : [], packs: packsOnSale(env), extra: sellsExtra(env), canMake, teams_held: (env as { TEAMS_HELD?: string }).TEAMS_HELD === '1' });
+    return ok({ records, open, plans: open ? sold : [], packs: packsOnSale(env), extra: sellsExtra(env), tax: open && taxOn(env), canMake, teams_held: (env as { TEAMS_HELD?: string }).TEAMS_HELD === '1' });
   };
 
   /* ── POST /account/billing/checkout ───────────────────────────────────── */
@@ -821,6 +855,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       person: who.person,
       price,
       metadata,
+      tax: taxOn(env),
       success: `${back}#paid={CHECKOUT_SESSION_ID}`,
       cancel: `${back}#cancelled`,
     });
@@ -875,6 +910,30 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       return no('RECORD_UNAVAILABLE', STRIPE_DOWN);
     }
     return ok({ url: started.url });
+  };
+
+  /* ── POST /account/billing/invoices ───────────────────────────────────── */
+
+  /**
+   * The newest invoices of the Stripe customer a record this person owns pays as, `{ record }`. Answers
+   * `{ invoices }`, each `{ id, number, at, cents, currency, status, url, pdf }`, newest first.
+   *
+   * THE CUSTOMER'S, NOT THE RECORD'S ALONE: one person pays for every record they own as one customer, so the list is
+   * theirs, and only an owner reaches it. A gift and a record never paid for have no customer and list none. Answered
+   * while billing is on in a mode its key agrees with, like every door that asks Stripe.
+   */
+  const invoices = async (who: Who, body: Record<string, unknown>): Promise<Result<unknown>> => {
+    const key = billingKey(env);
+    if (!key.ok) return key;
+    const row = await ownedRow(who.person, body['record']);
+    if (row === null) return no('OUT_OF_BOUNDS', 'There is no record of yours with payments by that id.', { at: 'record' });
+    if (isGift(row) || row.customer === '') return ok({ invoices: [] });
+    const out = await invoicesOf(deps.stripe(key.value), row.customer);
+    if (!Array.isArray(out)) {
+      op({ op: 'billing', door: 'invoices', ok: false, status: out.status, code: out.code }, 'error');
+      return no('RECORD_UNAVAILABLE', 'Your invoices could not be read from Stripe just now. Try again in a minute.');
+    }
+    return ok({ invoices: out });
   };
 
   /* ── POST /account/billing/webhook ────────────────────────────────────── */
@@ -944,7 +1003,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const customer = idAt(session, 'customer');
     const sub = await subscriptionOf(stripe, idAt(session, 'subscription'), planPrices(env));
     if (sub === null) throw new Error('the subscription of a paid checkout could not be read from Stripe');
-    const state = stateOf(sub.status) ?? 'active';
+    const state = stateOf(sub.status);
 
     const record = meta['record'];
     if (record !== undefined) {
@@ -1139,14 +1198,17 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (before === undefined) return 'unknown';
     const sub: SubscriptionSeen | null = (await subscriptionOf(stripe, id, planPrices(env))) ?? subscriptionSeen(object, planPrices(env));
     if (sub === null) return 'ignored';
+    /* NO STATE READ IS NOT A STATE: a copy with no status (an invoice's, when Stripe could not be asked) moves nothing
+       and is sent again, rather than read as the unknown state that lapses a record. */
+    if (sub.status === '') throw new Error('the subscription named no status');
     const cancelled = type === 'customer.subscription.deleted' || sub.status === 'canceled';
     if (cancelled && (await fitsFree(before))) return toFree(before);
     const state = cancelled ? 'lapsed' : stateOf(sub.status);
-    await lapseSwitch(before, before.record, state ?? before.state);
+    await lapseSwitch(before, before.record, state);
     await planFollows(before.record, sub.price);
-    await setRow({ record: before.record, price: sub.price, period_end: sub.period_end, ...(state !== null ? { state } : {}) });
-    await backLetter(before, state ?? before.state, sub.email, before.slug);
-    return state ?? before.state;
+    await setRow({ record: before.record, price: sub.price, period_end: sub.period_end, state });
+    await backLetter(before, state, sub.email, before.slug);
+    return state;
   };
 
   /**
@@ -1173,6 +1235,19 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const email = textAt(invoice, 'customer_email');
     await backLetter(before, 'active', email === '' ? null : email, before.slug);
     return 'active';
+  };
+
+  /**
+   * An invoice whose payment failed: the subscription it bills is read again and its row follows, as a change does, so
+   * a card that failed shows on the Billing page at once rather than when Stripe next sends the subscription. Stripe's
+   * own retry mails go to the customer; nothing is mailed from here.
+   */
+  const invoiceFailed = async (invoice: StripeObject, stripe: Stripe): Promise<string> => {
+    const customer = idAt(invoice, 'customer');
+    const nested = objectAt(objectAt(invoice, 'parent') ?? {}, 'subscription_details');
+    const subscription = idAt(invoice, 'subscription') || (nested ? idAt(nested, 'subscription') : '');
+    if (customer === '' || subscription === '') return 'ignored';
+    return changed('customer.subscription.updated', { id: subscription, customer }, stripe);
   };
 
   /**
@@ -1238,11 +1313,13 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       const did =
         type === 'invoice.paid'
           ? await invoicePaid(object, stripe)
-          : type === 'charge.refunded'
-            ? await refunded(object, stripe)
-            : type.startsWith('checkout.session.')
-              ? await paid(object, stripe)
-              : await changed(type, object, stripe);
+          : type === 'invoice.payment_failed'
+            ? await invoiceFailed(object, stripe)
+            : type === 'charge.refunded'
+              ? await refunded(object, stripe)
+              : type.startsWith('checkout.session.')
+                ? await paid(object, stripe)
+                : await changed(type, object, stripe);
       op({ op: 'billing', door: 'webhook', ok: true, event: type, did });
       return answer(200, { received: true });
     } catch (e) {
@@ -1291,7 +1368,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     return ok({ record: row.record, extra: set.value });
   };
 
-  return { billing, checkout, portal, extra, webhook };
+  return { billing, checkout, portal, invoices, extra, webhook };
 }
 
 /* ── a record deleted while it is paid for ───────────────────────────────── */

@@ -183,7 +183,7 @@ test('A PHRASE FOLDED INTO A LINE AND SAID APART LIGHTS AS WHAT THE LINE BECAME,
 
 test('THE RULES SAY THEY READ IT FOR ANY CAUSE, and the month spent keeps its own line', () => {
   assert.equal(firstRun.readByRulesAny, 'Simple rules read this. Check what was heard, and tell it more.');
-  assert.match(firstRun.readByRules, /out of asks this month/u, 'the spent month still says why');
+  assert.match(firstRun.readByRules, /questions are used for this month/u, 'the spent month still says why');
   assert.notEqual(firstRun.readByRulesAny, firstRun.readByRules);
   /* BEFORE THE PRESS: what Next does, plain, with no dash a person would read as an em dash. */
   assert.equal(firstRun.readOnPress, "Pressing That's me sets this up from what you wrote.");

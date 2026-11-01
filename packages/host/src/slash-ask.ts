@@ -575,7 +575,7 @@ async function pattern<C>(body: Record<string, unknown>, door: SlashAskDoor<C>, 
       ok: false,
       refusal: {
         code: 'SLASH_BUDGET_SPENT',
-        fix: `This month's Slash asks are spent until ${typeof asks.resets === 'string' ? asks.resets.slice(0, 10) : 'next month'}, so no pattern was drafted.`,
+        fix: `This month's Slash questions are used until ${typeof asks.resets === 'string' ? asks.resets.slice(0, 10) : 'next month'}, so no pattern was drafted.`,
       },
     });
 
@@ -991,7 +991,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
           ok: false,
           refusal: {
             code: 'SLASH_BUDGET_SPENT',
-            fix: `This month's Slash asks are spent until ${typeof asks.resets === 'string' ? asks.resets.slice(0, 10) : 'next month'}.`,
+            fix: `This month's Slash questions are used until ${typeof asks.resets === 'string' ? asks.resets.slice(0, 10) : 'next month'}.`,
           },
         };
       }
@@ -1097,7 +1097,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
                 ? `This month's Slash headlines are spent until ${monthResets(deps.clock.now())}, so each page keeps its own line until then.`
                 : ask === 'understand'
                   ? `This month's Slash reading of who is who is spent until ${monthResets(deps.clock.now())}, so the doubtful names wait until then.`
-                  : `This month's background Slash asks are spent until ${monthResets(deps.clock.now())}.`,
+                  : `This month's background Slash questions are used until ${monthResets(deps.clock.now())}.`,
           },
         };
       }

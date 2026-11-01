@@ -25,7 +25,8 @@ export const shell = {
     pricing: {
       title: 'Pricing: free in early access · BrainDog',
       description:
-        'BrainDog is free while in early access, with every feature, three AI tools and 20 questions to Slash a month.',
+        'BrainDog is Free: every feature, 3 AI tools and 20 Slash questions a month. ' +
+        (LAUNCH.billing ? 'Cloud and Cloud Plus are monthly plans with more of each.' : 'Cloud and Cloud Plus are coming soon, priced at launch.'),
     },
     agents: {
       title: 'Connect Claude, ChatGPT and Cursor · BrainDog',

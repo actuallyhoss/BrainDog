@@ -220,7 +220,7 @@ test('BILLING OFF SELLS NO PACK, AND A PACK WITH NO PRICE SET IS REFUSED IN A SE
   const unpriced = world({ ...ENV, STRIPE_PRICE_PACK_500: '' });
   const r = refusal(await unpriced.doors.checkout!(WHO, { record: 'rec_ada', pack: 'credits-500' }));
   assert.deepEqual([r.code, r.at], ['NOT_IN_THIS_BUILD', 'pack']);
-  assert.equal(r.fix, 'STRIPE_PRICE_PACK_500 is not set, so 500 Slash credits are not sold on this host.');
+  assert.equal(r.fix, 'STRIPE_PRICE_PACK_500 is not set, so 500 Slash questions are not sold on this host.');
   assert.doesNotMatch(r.fix, /sk_|whsec_|price_pack|@|—/u);
   assert.deepEqual(unpriced.sent, []);
 
@@ -233,7 +233,7 @@ test('A STRIPE PRICE THAT IS NOT THE TABLE’S, PAID ONCE, OPENS NO PAGE', async
   w.answers.set('GET /v1/prices/price_pack_small', { id: 'price_pack_small', unit_amount: 500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 }, active: true });
   const r = refusal(await w.doors.checkout!(WHO, { record: 'rec_ada', pack: 'credits-100' }));
   assert.equal(r.code, 'NOT_IN_THIS_BUILD');
-  assert.match(r.fix, /^100 Slash credits are \$5 here/u);
+  assert.match(r.fix, /^100 Slash questions are \$5 here/u);
   assert.ok(!w.sent.some((s) => s.method === 'POST' && s.path === '/v1/checkout/sessions'));
 });
 

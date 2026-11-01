@@ -99,7 +99,10 @@ An agent you connect works at a level too: read only, read and propose changes t
 
 ## Who can share
 
-Free is for one person. Colleagues come with Cloud and Cloud Plus, as many as you like at no extra cost.
+Free and Cloud are for one person. On Cloud Plus, a second person can join, and more after them, at no extra cost.
+<!-- launch: !billing -->
+Cloud Plus is coming soon, priced at launch.
+<!-- /launch -->
 
 ## Leaving a BrainDog, or closing your account
 

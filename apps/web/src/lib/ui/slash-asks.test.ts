@@ -62,8 +62,8 @@ test('the typed limit: any number goes to the engine, so a fraction or a negativ
 });
 
 test('what saving says, with zero named for what it does', () => {
-  assert.equal(capSaid(1), 'Slash answers up to 1 ask a month.');
-  assert.equal(capSaid(40), 'Slash answers up to 40 asks a month.');
+  assert.equal(capSaid(1), 'Slash answers up to 1 question a month.');
+  assert.equal(capSaid(40), 'Slash answers up to 40 questions a month.');
   assert.equal(capSaid(0), 'Slash is off until you raise the limit.');
 });
 
@@ -168,10 +168,10 @@ test('a list that came back full is a floor, and every line counted from it says
   const full = spentIn(many(LEDGER_FETCHED, 'u', { purpose: 'understand' }), '2026-10', NOON);
   assert.equal(full.whole, false);
   assert.deepEqual(purposeLines(full, true), ['Read what arrived: at least 100']);
-  assert.equal(backgroundLine(full), 'At least 100 background asks this month');
+  assert.equal(backgroundLine(full), 'At least 100 background questions this month');
   const short = spentIn(many(4, 'u', { purpose: 'understand' }), '2026-10', NOON);
-  assert.equal(backgroundLine(short), '4 background asks this month');
-  assert.equal(backgroundLine(short, { used: 41, cap: 600 }), '41 of 600 background asks this month');
+  assert.equal(backgroundLine(short), '4 background questions this month');
+  assert.equal(backgroundLine(short, { used: 41, cap: 600 }), '41 of 600 background questions this month');
 });
 
 test('an automation\'s ask is named as one, never by the rule\'s id', () => {

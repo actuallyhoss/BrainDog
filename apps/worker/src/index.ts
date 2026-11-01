@@ -98,6 +98,7 @@ import { consume, pump } from './pump.ts';
 import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, CTX_HEADER, ctxOversize, drained, ingestBudget, inward, isRecordId, legacyAnswer, legacyRedirect, legacyRequest, mcpMetadataAt, restoreAsked, servesAccount, servesApi, servesAppleAssociation, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz, type Night } from './health.ts';
 import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
+import { NOT_A_PERSON, turnstilePassed, turnstileSiteKey } from './turnstile.ts';
 import { cookieDomain, withSignedIn } from './signed-in.ts';
 import { isAdminHost, serveAdmin } from './admin.ts';
 import { applyDoor, opsApplications, opsInvite, type OpsApplyDeps } from './apply.ts';
@@ -4821,7 +4822,7 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
       origin,
       sameOrigin: (asked) => sameOrigin(asked, origin),
       checked: botCheckKeyed(env),
-      turnstile: (answer, ip) => turnstilePassed(env, answer, ip),
+      turnstile: (answer, ip) => turnstilePassed(env, answer, ip, 'apply'),
       apply: (call) => directory.applications(call) as never,
     });
   }
@@ -4858,13 +4859,13 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
      a JSON object, so an unauthenticated POST never has its copy read. When `operated()` forwards `tz` itself, this
      copy and `askedZone` go. */
   const copy = request.method === 'POST' && url.pathname.replace(/\/+$/, '') === '/auth/provision' ? request.clone() : null;
-  /* SIGN-IN LINK REQUESTS ARE CHECKED TOO, when the secret and the site key are both set; either missing and they are not,
-     so a half-keyed host never locks its own sign-in. The same fail-closed check sign-up uses. */
+  /* SIGN-IN LINK REQUESTS ARE CHECKED TOO (`turnstile.ts`): on with both keys, off with either missing, so a half-keyed
+     host never locks its own sign-in. The same fail-closed check sign-up uses. */
   const ip = request.headers.get('cf-connecting-ip') ?? '';
-  if (signinCheckOn(env) && request.method === 'POST' && signupPath === '/auth/magic/start') {
-    const body = (await request.clone().json().catch(() => null)) as Record<string, unknown> | null;
-    if (!(await turnstilePassed(env, body?.['turnstile'], ip)))
-      return signupRefused(403, { code: 'FORBIDDEN', fix: 'The check that you are a person did not pass. Try it again, then send the form.', at: 'turnstile' });
+  if (request.method === 'POST' && signupPath === '/auth/magic/start') {
+    const body = botCheckKeyed(env) ? ((await request.clone().json().catch(() => null)) as Record<string, unknown> | null) : null;
+    if (!(await turnstilePassed(env, body?.['turnstile'], ip, 'magic')))
+      return signupRefused(403, { code: 'FORBIDDEN', fix: NOT_A_PERSON, at: 'turnstile' });
   }
   const served = await serveAuth(request, {
     on: 'worker',
@@ -4894,19 +4895,17 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     ...((env.SESSION_SECRET ?? '').length >= 32 ? { device: devices(env), invite: invites(env) } : {}),
   });
   /* THE SIGN-IN PAGE LEARNS THE SITE KEY FROM `/auth/methods`, which it already asks, and only when the check is on. */
-  if (signinCheckOn(env) && request.method === 'GET' && signupPath === '/auth/methods' && served.status === 200) {
+  const signinKey = turnstileSiteKey(env);
+  if (signinKey !== null && request.method === 'GET' && signupPath === '/auth/methods' && served.status === 200) {
     const out = (await served.clone().json().catch(() => null)) as { ok?: unknown; value?: object } | null;
     if (out?.ok === true && out.value) {
       const headers = new Headers(served.headers);
       headers.delete('content-length');
-      return new Response(JSON.stringify({ ...out, value: { ...out.value, turnstile: (env.TURNSTILE_SITE_KEY ?? '').trim() } }), { status: 200, headers });
+      return new Response(JSON.stringify({ ...out, value: { ...out.value, turnstile: signinKey } }), { status: 200, headers });
     }
   }
   return served;
 }
-
-/** Whether sign-in link requests carry the bot check: the secret and the public site key are both set. */
-const signinCheckOn = (env: Env): boolean => botCheckKeyed(env) && (env.TURNSTILE_SITE_KEY ?? '').trim() !== '';
 
 /**
  * A letter a person waits on at sign-in or sign-up, sent, and whether it went told to the Directory, so
@@ -4943,8 +4942,6 @@ const SIGNUP_BODY_MAX = 8_192;
  */
 const SIGNUP_SAID_MOST = 1_000;
 
-/** Where Turnstile's answer is checked (developers.cloudflare.com/turnstile/get-started/server-side-validation). */
-const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
 /* A sign-up answer is one browser's and never a cache's, as every `/auth` answer is. */
 const signupReply = (status: number, payload: object, extra: readonly (readonly [string, string])[] = []): Response =>
@@ -4975,7 +4972,7 @@ const signupRefused = (status: number, refusal: Refusal, extra: readonly (readon
  * `needs: 'code'`, said here as a 403 at `code`. A known address is mailed its sign-in link either way, and gets the
  * same 403, so the refusal tells nobody who is here.
  *
- * TURNSTILE IS CHECKED ON `start` WHEN `TURNSTILE_SECRET` IS SET, in `invite` as in `open`, against the address
+ * TURNSTILE IS CHECKED ON `start` WHEN BOTH ITS KEYS ARE SET (`turnstile.ts`), in `invite` as in `open`, against the address
  * Cloudflare wrote (`cf-connecting-ip`, as `remoteip`), and a failed or missing answer is a 403 with a sentence. Unset,
  * the Directory's lockouts (`signup:<ip>`, `signup-email:<address>`, `email:<address>`) are the whole of the brake, and
  * the Directory is told so (`checked`), which tightens the first two to `SIGNUP_UNCHECKED`.
@@ -5006,8 +5003,8 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
     const slug = new URL(request.url).searchParams.get('slug') ?? '';
     const out = await ask({ flow: 'signup.name', slug: slug.slice(0, 256) });
     if (out.status !== 200) return signupAnswer(out, mode);
-    const siteKey = (env.TURNSTILE_SITE_KEY ?? '').trim();
-    return signupReply(200, { ok: true, value: { ...(out.body as object), mode: allowed, open, ...(open && siteKey !== '' ? { turnstile: siteKey } : {}) } });
+    const siteKey = turnstileSiteKey(env);
+    return signupReply(200, { ok: true, value: { ...(out.body as object), mode: allowed, open, ...(open && siteKey !== null ? { turnstile: siteKey } : {}) } });
   }
 
   if (!sameOrigin(request, origin))
@@ -5041,8 +5038,8 @@ async function signUp(request: Request, env: Env, ctx: ExecutionContext, path: k
       return signupRefused(400, { code: 'BODY_MALFORMED', fix: 'What you said is sent as text.', at: 'said' });
     if (typeof sentence === 'string' && sentence.length > SIGNUP_SAID_MOST)
       return signupRefused(400, { code: 'BODY_MALFORMED', fix: 'The link carries at most 1,000 characters of what you said. Shorten it, or leave the rest for later.', at: 'said' });
-    if (!(await turnstilePassed(env, body['turnstile'], ip)))
-      return signupRefused(403, { code: 'FORBIDDEN', fix: 'The check that you are a person did not pass. Try it again, then send the form.', at: 'turnstile' });
+    if (!(await turnstilePassed(env, body['turnstile'], ip, 'signup')))
+      return signupRefused(403, { code: 'FORBIDDEN', fix: NOT_A_PERSON, at: 'turnstile' });
     const name = said('name').trim();
     const tz = said('tz').trim();
     const code = said('code').trim();
@@ -5089,29 +5086,6 @@ function signupAnswer(out: AuthResult, mode: NonNullable<ReturnType<typeof cooki
       return signupReply(503, { ok: false }, extra);
     default:
       return signupRefused(out.status, out.refusal, extra);
-  }
-}
-
-/**
- * Whether the Turnstile answer a sign-up carried passes, or `true` when no secret is set and nothing is checked.
- *
- * FAILS CLOSED WHEN IT IS SET: no answer, a malformed one, Cloudflare unreachable or a reply that is not `success: true`
- * are all a failed check, because a check that passed whenever siteverify could not be reached is one a flood switches off.
- */
-async function turnstilePassed(env: Env, answer: unknown, ip: string): Promise<boolean> {
-  const secret = (env.TURNSTILE_SECRET ?? '').trim();
-  if (secret === '') return true;
-  if (typeof answer !== 'string' || answer === '' || answer.length > 2048) return false;
-  const form = new FormData();
-  form.append('secret', secret);
-  form.append('response', answer);
-  if (ip !== '') form.append('remoteip', ip);
-  try {
-    const res = await fetch(SITEVERIFY, { method: 'POST', body: form });
-    const verdict = (await res.json().catch(() => null)) as { success?: unknown } | null;
-    return verdict?.success === true;
-  } catch {
-    return false;
   }
 }
 

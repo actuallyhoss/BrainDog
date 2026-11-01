@@ -283,7 +283,7 @@ export function readModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, 
   const spentSaid =
     firstAway === undefined
       ? ''
-      : `The month's asks are spent: ${count(turnedAway.length, 'ask')} since ${dateSaid(Date.parse(firstAway.ts), tz)} did not reach the model.`;
+      : `The month's Slash questions are used: ${count(turnedAway.length, 'question')} since ${dateSaid(Date.parse(firstAway.ts), tz)} did not reach the model.`;
   /* The day is the meter's, which turns at midnight UTC, so it is said in UTC the way Slash's own refusal says it. */
   const backSaid = backMs === null ? '' : dateSaid(backMs, 'UTC');
 

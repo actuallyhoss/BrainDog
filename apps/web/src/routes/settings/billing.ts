@@ -32,20 +32,43 @@
  */
 
 import { copy } from '../../lib/copy.ts';
-import { words as usageWords, type Meter } from '../../lib/record/actions.ts';
+import { centsSaid, words as usageWords, type Meter } from '../../lib/record/actions.ts';
 
 export const words = {
   /* TRUE ON BOTH HOSTS, which is why it is the default: a self-host is not charged either. */
   notChargedYet: 'BrainDog does not charge for this yet.',
-  /* SLASH CREDIT PACKS: the heading over the buttons, each button's own words, and what is left of them. */
-  buyCredits: 'Buy credits',
-  packButton: (credits: number, price: string) => `${credits.toLocaleString('en-GB')} credits, ${price}`,
+  /* SLASH CREDIT PACKS, SAID AS QUESTIONS: one credit is one question, and "questions" is the one word the site and the
+     app use for Slash's allowance (E17). The heading over the buttons, each button's own words, and what is left. */
+  buyCredits: 'More Slash questions',
+  packButton: (credits: number, price: string) => `${credits.toLocaleString('en-GB')} questions, ${price}`,
   /** The button's whole name for a screen reader, which keeps the words it shows. */
-  packSaid: (credits: number, price: string) => `Buy ${credits.toLocaleString('en-GB')} credits, ${price}`,
-  creditsLeft: (n: number) => `Credits from packs: ${n.toLocaleString('en-GB')}`,
+  packSaid: (credits: number, price: string) => `Buy ${credits.toLocaleString('en-GB')} more Slash questions, ${price}`,
+  creditsLeft: (n: number) => `Extra questions from packs: ${n.toLocaleString('en-GB')}. They do not run out at the month's end.`,
   /* A PLAN THAT IS A GIFT: said where the plan's price is, and when it ends if it does. */
   gift: (plan: string) => `${plan}, a gift from BrainDog`,
   giftUntil: (day: string) => `Given until ${day}.`,
+  /* WHAT A PLAN HOLDS, in the site's words: Slash questions and AI tools (N1, E17). */
+  questionsMonth: (n: number) => `${n.toLocaleString('en-GB')} Slash questions a month`,
+  toolsAtOnce: (n: number) => `${n.toLocaleString('en-GB')} AI tools`,
+  secondPerson: 'room for a second person',
+  questionsBar: (used: number, of: number) => `Slash questions · ${used.toLocaleString('en-GB')} of ${of.toLocaleString('en-GB')}`,
+  toolsBar: (used: number, of: number) => `AI tools connected · ${used.toLocaleString('en-GB')} of ${of.toLocaleString('en-GB')}`,
+  /* A LIMIT REACHED, KINDLY: what stops, what still works, and when it comes back. The way on is the buttons beside it. */
+  questionsFull: (resets: string) => `This month's Slash questions are used. Slash comes back on ${resets}; until then your own rules still read what you tell it.`,
+  questionsNear: (left: number) => `${left === 1 ? '1 Slash question is' : `${left.toLocaleString('en-GB')} Slash questions are`} left this month.`,
+  toolsFull: 'Every AI tool this plan connects is connected. Disconnect one in Settings > Agents to connect another.',
+  meterFull: (noun: string, resets: string) => `This month's ${noun} are used, so automations wait until ${resets}. Nothing you made is touched.`,
+  /* INVOICES, under the record's plan. */
+  invoicesTitle: 'Invoices',
+  invoicesNone: 'No invoices yet. Each payment adds one here.',
+  invoicesUnread: 'Your invoices could not be read just now. Try again in a minute.',
+  invoiceOpen: 'Not paid yet',
+  invoiceVoid: 'Cancelled',
+  invoiceUnpaid: 'Unpaid',
+  invoiceView: 'View',
+  invoicePdf: 'PDF',
+  invoicesAll: 'All invoices and receipts are on Stripe’s page.',
+  taxAdded: 'Tax is worked out on Stripe’s page from your address.',
 };
 
 export type Billed = {
@@ -101,10 +124,18 @@ export type BilledRecord = {
   credits: number | null;
   /** The operator gave this plan: never charged, nothing at Stripe to manage. */
   gift: boolean;
+  /** What the plan holds, the one table's figures as the Worker sends them; `null` from a host older than the field. */
+  limits: Limits | null;
 };
 
+/**
+ * What a plan holds that a person counts: Slash questions a month, AI tools connected at once, people, runs a month,
+ * and whether a second person may join (Cloud Plus). `null` in a field is no limit. The Worker's `limitsOf`, read off the one table of plans.
+ */
+export type Limits = { questions: number | null; tools: number | null; people: number | null; runs: number | null; teams: boolean };
+
 /** A plan this host sells, in the Worker's own words: `{ id: 'cloud', name: 'Cloud', price: '$12 a month' }`. */
-export type SoldPlan = { id: string; name: string; price: string };
+export type SoldPlan = { id: string; name: string; price: string; limits: Limits | null };
 
 /** A pack of Slash credits this host sells: `{ id: 'credits-100', credits: 100, price: '$5' }`, the price in its words. */
 export type SoldPack = { id: string; credits: number; price: string };
@@ -118,6 +149,8 @@ export type BillingAnswer = {
   teamsHeld: boolean;
   /** Whether this host sells extra usage past the allowance. Absent from a host older than it, which sells none. */
   extra?: boolean;
+  /** Whether Stripe adds tax at checkout on this host. */
+  tax?: boolean;
 };
 
 /** The one fetch these calls need, so a test hands in its own and nothing here reaches for the page's. */
@@ -127,6 +160,11 @@ export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 const STATES = new Set(['active', 'past_due', 'lapsed', 'unbilled', 'comp']);
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const whole = (v: unknown): number | null => (typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : null);
+
+/** A plan's limits as the Worker sent them, or `null` when it sent none. */
+const limitsOf = (v: unknown): Limits | null =>
+  isObj(v) ? { questions: whole(v.questions), tools: whole(v.tools), people: whole(v.people), runs: whole(v.runs), teams: v.teams === true } : null;
 
 /**
  * Read one record's row, or nothing when the row is not one.
@@ -148,6 +186,7 @@ function billedOf(v: unknown): BilledRecord | null {
     deleteOn: num(v.delete_on),
     credits: credits === null ? null : Math.max(0, Math.floor(credits)),
     gift: v.gift === true || v.state === 'comp',
+    limits: limitsOf(v.limits),
   };
 }
 
@@ -160,7 +199,7 @@ const packOf = (v: unknown): SoldPack | null =>
 /** One sold plan, or nothing when it is not one: a plan with no name or no price is not offered. */
 const soldOf = (v: unknown): SoldPlan | null =>
   isObj(v) && typeof v.id === 'string' && typeof v.name === 'string' && typeof v.price === 'string' && v.name && v.price
-    ? { id: v.id, name: v.name, price: v.price }
+    ? { id: v.id, name: v.name, price: v.price, limits: limitsOf(v.limits) }
     : null;
 
 /**
@@ -174,6 +213,7 @@ export function billingOf(v: unknown): BillingAnswer | null {
     open: v.open === true,
     teamsHeld: v.teams_held === true,
     extra: v.extra === true,
+    tax: v.tax === true,
     plans: Array.isArray(v.plans) ? v.plans.map(soldOf).filter((p): p is SoldPlan => p !== null) : [],
     packs: Array.isArray(v.packs) ? v.packs.map(packOf).filter((p): p is SoldPack => p !== null) : [],
   };
@@ -278,6 +318,56 @@ export async function packPage(record: string, pack: string, io: Fetch = (u, i) 
 }
 
 /** A door's `{ url }` as the address to go to, and only Stripe's kind of address: `https`, never a path or a script. */
+/** One invoice as `POST /account/billing/invoices` lists it (`InvoiceSeen` in `apps/worker/src/stripe.ts`). */
+export type Invoice = {
+  id: string;
+  number: string | null;
+  at: number;
+  cents: number;
+  currency: string;
+  status: 'paid' | 'open' | 'void' | 'uncollectible';
+  url: string | null;
+  pdf: string | null;
+};
+
+const INVOICE_STATES = new Set(['paid', 'open', 'void', 'uncollectible']);
+const httpsOr = (v: unknown): string | null => (typeof v === 'string' && v.startsWith('https://') ? v : null);
+
+/** One invoice, or nothing when it is not one the screen can say truly. */
+function invoiceOf(v: unknown): Invoice | null {
+  if (!isObj(v) || typeof v.id !== 'string' || typeof v.status !== 'string' || !INVOICE_STATES.has(v.status)) return null;
+  const at = num(v.at);
+  const cents = num(v.cents);
+  if (at === null || cents === null || !Number.isInteger(cents)) return null;
+  return {
+    id: v.id,
+    number: typeof v.number === 'string' && v.number ? v.number : null,
+    at,
+    cents,
+    currency: typeof v.currency === 'string' && /^[A-Z]{3}$/u.test(v.currency) ? v.currency : 'USD',
+    status: v.status as Invoice['status'],
+    url: httpsOr(v.url),
+    pdf: httpsOr(v.pdf),
+  };
+}
+
+/** The newest invoices of the customer a record this person owns pays as, newest first. */
+export async function readInvoices(record: string, io: Fetch = (u, i) => globalThis.fetch(u, i)): Promise<Said<Invoice[]>> {
+  const out = await door(io, '/account/billing/invoices', { record });
+  if (!out.ok) return out;
+  const list = isObj(out.value) && Array.isArray(out.value.invoices) ? out.value.invoices : null;
+  if (list === null) return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: words.invoicesUnread } };
+  return { ok: true, value: list.map(invoiceOf).filter((i): i is Invoice => i !== null) };
+}
+
+/** An invoice's amount as a person reads it: the plans' currency by the one writer, any other by its code. */
+export const invoiceAmount = (i: Pick<Invoice, 'cents' | 'currency'>, home: string | null = null): string =>
+  i.currency === 'USD' ? centsSaid(i.cents, home) : `${(i.cents / 100).toFixed(2)} ${i.currency}`;
+
+/** An invoice's state in a word or two, said only when it is not simply paid. */
+export const invoiceState = (i: Pick<Invoice, 'status'>): string | null =>
+  i.status === 'paid' ? null : i.status === 'open' ? words.invoiceOpen : i.status === 'void' ? words.invoiceVoid : words.invoiceUnpaid;
+
 function pageOf(out: Said<unknown>): Said<string> {
   if (!out.ok) return out;
   const url = isObj(out.value) && typeof out.value.url === 'string' ? out.value.url : null;
@@ -363,11 +453,92 @@ export function packsOf(r: BilledRecord, answer: BillingAnswer): { left: string 
  * ONE OFFER, CALMLY: the first plan the host sells, which is Cloud, said once under the record with its
  * price in the Worker's words. Nothing is offered while the host takes no payment, because the button could only fail.
  */
-export function upgradeOf(r: BilledRecord, answer: BillingAnswer): { plan: SoldPlan; line: string } | null {
+export function upgradeOf(r: BilledRecord, answer: BillingAnswer): { plan: SoldPlan; line: string; also: SoldPlan | null } | null {
   /* A GIFT IS OFFERED NOTHING TO PAY FOR: the checkout refuses one, so the button could only fail. */
   if (r.plan !== 'free' || r.gift || !answer.open) return null;
   const plan = answer.plans[0];
-  return plan ? { plan, line: copy.billingFreeOffer(plan.name, plan.price) } : null;
+  return plan ? { plan, line: copy.billingFreeOffer(plan.name, plan.price, moreOf(plan.limits)), also: answer.plans[1] ?? null } : null;
+}
+
+/** What a plan holds, said for an offer: "80 Slash questions a month and 15 AI tools", or `null` with no figures. */
+export function moreOf(l: Limits | null): string | null {
+  if (l === null) return null;
+  const parts = [
+    l.questions !== null ? words.questionsMonth(l.questions) : null,
+    l.tools !== null ? words.toolsAtOnce(l.tools) : null,
+    l.teams ? words.secondPerson : null,
+  ].filter((x): x is string => x !== null);
+  if (parts.length === 0) return null;
+  return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)!}`;
+}
+
+/**
+ * The plan above a paid record's, offered as a switch on Stripe's own page: Cloud to Cloud Plus. `null` on the top plan,
+ * a gift, a lapsed record (which pays again on the plan it picks) and while the host takes no payment.
+ */
+export function moveUpOf(r: BilledRecord, answer: BillingAnswer): SoldPlan | null {
+  if (!answer.open || r.gift || r.state === 'lapsed' || r.state === 'unbilled' || r.plan !== 'cloud') return null;
+  return answer.plans.find((p) => p.id === 'plus') ?? null;
+}
+
+/* ── the meters a plan is held to ── */
+
+/** One bar on the Plan and usage tile. */
+export type LimitBar = { label: string; value: number; tone?: 'ink' | 'danger' };
+
+/** The share past which a meter is near its limit, as `/usage` says it. */
+const NEAR = 0.8;
+
+/**
+ * The tile's bars: Slash questions and AI tools first, against the plan's own figures, because those are the two the site
+ * sells; then the ledger's four meters (runs, requests, data fetched, run time). And the limits reached, each said once.
+ *
+ * `questions` IS THIS MONTH'S QUESTIONS AS SLASH COUNTED THEM, `tools` the AI tools connected now; either `null` when it
+ * could not be read, and then that bar is left out rather than drawn at nothing. A limit of `null` is no limit and draws
+ * no bar. A full meter is red, the nearest of the rest is ink, the others grey.
+ */
+export function limitBars(args: { limits: Limits | null; questions: number | null; tools: number | null; meters: readonly Meter[]; resets: string }): {
+  bars: LimitBar[];
+  full: string[];
+  near: string[];
+} {
+  const out: { bar: LimitBar; share: number; full: string | null; near: string | null }[] = [];
+  const l = args.limits;
+  if (l !== null && l.questions !== null && args.questions !== null) {
+    const share = l.questions > 0 ? args.questions / l.questions : 1;
+    out.push({
+      bar: { label: words.questionsBar(args.questions, l.questions), value: Math.min(1, share) },
+      share,
+      full: share >= 1 ? words.questionsFull(args.resets) : null,
+      near: share >= NEAR && share < 1 ? words.questionsNear(l.questions - args.questions) : null,
+    });
+  }
+  if (l !== null && l.tools !== null && args.tools !== null) {
+    const share = l.tools > 0 ? args.tools / l.tools : 1;
+    out.push({ bar: { label: words.toolsBar(args.tools, l.tools), value: Math.min(1, share) }, share, full: share >= 1 ? words.toolsFull : null, near: null });
+  }
+  for (const [i, b] of meterBars(args.meters).entries()) {
+    const m = args.meters[i]!;
+    out.push({ bar: { label: b.label, value: b.value }, share: m.share, full: m.share >= 1 ? words.meterFull(usageWords.meterNoun[m.key] ?? m.key, args.resets) : null, near: null });
+  }
+  const top = out.filter((o) => o.share < 1).sort((a, b) => b.share - a.share)[0];
+  const bars = out.map((o) => (o.share >= 1 ? { ...o.bar, tone: 'danger' as const } : o === top && o.share > 0 ? { ...o.bar, tone: 'ink' as const } : o.bar));
+  return { bars, full: out.flatMap((o) => (o.full ? [o.full] : [])), near: out.flatMap((o) => (o.near ? [o.near] : [])) };
+}
+
+/**
+ * How many AI tools a record has connected now, from its keys: live (not revoked, not past their life, not ended by the
+ * operator) and an agent's, which leaves out a report key and a run's own key, as the kernel's `liveAgents` counts them.
+ */
+export function toolsConnected(keys: readonly { label: string | null; expires_at: string | null; revoked_at: string | null; ended_by?: string }[], now: number): number {
+  return keys.filter(
+    (k) =>
+      k.revoked_at === null &&
+      k.ended_by === undefined &&
+      (k.expires_at === null || Date.parse(k.expires_at) > now) &&
+      !(k.label ?? '').startsWith('report:') &&
+      !(k.label ?? '').startsWith('job:'),
+  ).length;
 }
 
 /**
@@ -397,6 +568,8 @@ export function thisRecord(answer: BillingAnswer | null, slug: string | null | u
 /** The words the Settings tiles add. A sentence another screen already says is read from there, never typed twice. */
 export const tileWords = {
   planTitle: 'Plan and usage',
+  /** When a limit comes back, where the ledger has not said the day. */
+  nextMonth: 'the 1st of next month',
   /** The tile's meta: where the month is, and the day it starts again. */
   monthMeta: (day: number, of: number, resets: string) => `day ${day} of ${of} · resets ${resets}`,
   /** What the bars are, read out before the bars themselves. */

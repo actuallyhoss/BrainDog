@@ -20,7 +20,7 @@ const NOW = Date.UTC(2026, 9, 9, 12);
 const DAY = 86_400_000;
 const OWNER = 'p_owner';
 const RECORD = 'rec_fake';
-const FREE_FULL = 'Free connects 3 agents. Move to Cloud in Settings to connect more.';
+const FREE_FULL = 'Free connects 3 AI tools at once, and they are all connected. Disconnect one in Settings > Agents to connect this one, or move to Cloud in Settings > Billing for more.';
 
 const sha256 = async (text: string): Promise<string> =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -146,6 +146,6 @@ test('THE CLI LOGIN IS AN AGENT: at the count the exchange is refused in the sen
 
 test('EACH PLAN NAMES ITSELF AND THE WAY ON, and the top one names a revoke', () => {
   assert.equal(agentsFull({ agents: 3, plan: 'Free', next: 'Cloud' }), FREE_FULL);
-  assert.equal(agentsFull({ agents: 15, plan: 'Cloud', next: 'Cloud Plus' }), 'Cloud connects 15 agents. Move to Cloud Plus in Settings to connect more.');
-  assert.equal(agentsFull({ agents: 75, plan: 'Cloud Plus', next: null }), 'Cloud Plus connects 75 agents. Revoke one in Settings to connect another.');
+  assert.equal(agentsFull({ agents: 15, plan: 'Cloud', next: 'Cloud Plus' }), 'Cloud connects 15 AI tools at once, and they are all connected. Disconnect one in Settings > Agents to connect this one, or move to Cloud Plus in Settings > Billing for more.');
+  assert.equal(agentsFull({ agents: 75, plan: 'Cloud Plus', next: null }), 'Cloud Plus connects 75 AI tools at once, and they are all connected. Disconnect one in Settings > Agents to connect this one.');
 });

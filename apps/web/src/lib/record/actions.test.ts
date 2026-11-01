@@ -271,9 +271,9 @@ test("SLASH'S LINE IS ASKS AND THE MODEL'S WORK, never neurons, and an allowance
   r.slash = { asks: 0, neurons: 0, days: [] };
   assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, 'Slash was not asked anything this month.');
   r.slash = { asks: 1, neurons: 1, days: [], cap: 600 };
-  assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, "Slash was asked once this month, of the 600 asks a month allows, and the model did 1 unit of work answering.");
+  assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, "Slash was asked once this month, of the 600 questions a month allows, and the model did 1 unit of work answering.");
   r.slash = { asks: 1, neurons: 0, days: [], cap: 600 };
-  assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, 'Slash was asked once this month, of the 600 asks a month allows.');
+  assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, 'Slash was asked once this month, of the 600 questions a month allows.');
   delete r.slash;
   assert.equal(usageFromLedger(one, '2026-09').records[0]?.slash, null, 'a host a release behind says nothing of Slash');
 });

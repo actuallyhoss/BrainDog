@@ -142,7 +142,7 @@ export const nowSaid = (s: Start): string => {
 export const words = {
   legend: 'How Slash is run',
   kinds: {
-    included: { label: 'Included', hint: 'The model this host runs. Slash counts every ask and stops at the monthly limit.' },
+    included: { label: 'Included', hint: 'The model this host runs. Slash counts every question and stops at the monthly limit.' },
     key: { label: 'Your own key', hint: 'Your provider answers on your key and your bill. Slash lists the asks and sets no limit.' },
   },
   providerLabel: 'Provider',

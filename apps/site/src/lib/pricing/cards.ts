@@ -36,6 +36,8 @@ export type Card = {
   tag: { out: string; in: string } | null;
   price: string;
   per: string;
+  /** A paid card's price is drawn quietly, never as a headline: Free leads (his N2, 1 November, "no $12 headline"). */
+  quiet: boolean;
   lines: readonly string[];
   button: Button;
 };
@@ -51,10 +53,10 @@ export function cardsFor(flags: Flags): Card[] {
     const base = { id: plan.id, name: row.name, price: row.price.month };
     if (plan.id === 'free') {
       const c = p.cards.free;
-      return { ...base, tag: { out: c.tag, in: c.mine }, per: c.per, lines: c.lines(row), button: { kind: 'start' } };
+      return { ...base, tag: { out: c.tag, in: c.mine }, per: c.per, quiet: false, lines: c.lines(row), button: { kind: 'start' } };
     }
     const c = p.cards[plan.id];
-    return { ...base, tag: null, per: c.per, lines: c.lines(row), button: paidButton(plan, c.cta, flags) };
+    return { ...base, tag: null, per: c.per, quiet: true, lines: c.lines(row), button: paidButton(plan, c.cta, flags) };
   });
 }
 

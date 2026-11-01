@@ -153,7 +153,7 @@ test('the table of what each plan holds has a row for every meter, each cell its
     assert.equal(cell('credits', i), row.credits.toLocaleString('en-US'), `${row.name}'s questions cell is not its figure`);
     assert.equal(cell('runs', i), row.allowance.runs.toLocaleString('en-US'), `${row.name}'s runs cell is not its figure`);
     assert.equal(cell('requests', i), row.allowance.requests.toLocaleString('en-US'), `${row.name}'s requests cell is not its figure`);
-    assert.equal(cell('people', i), row.people === 1 ? 'Just you' : 'Everyone you invite', `${row.name}'s people cell is not its figure`);
+    assert.equal(cell('people', i), row.teams ? 'You and the people you invite' : 'Just you', `${row.name}'s people cell is not its figure`);
   });
 });
 

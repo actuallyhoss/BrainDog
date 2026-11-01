@@ -33,7 +33,7 @@ export const firstRun = {
   /* WHILE SLASH READS WHAT WAS SAID: the button's own word, and nothing else moves. */
   whoReading: 'Reading',
   /* WHERE SIMPLE RULES READ IT BECAUSE THE MONTH'S ASKS ARE SPENT, said once, quietly, so a thin reading is explained. */
-  readByRules: "Slash is out of asks this month, so simple rules read this. Check what was heard, and tell it more.",
+  readByRules: "Slash's questions are used for this month, so simple rules read this. Check what was heard, and tell it more.",
   /* WHERE SIMPLE RULES READ IT FOR ANY OTHER CAUSE: no model on this host, no press yet, a refusal or a silence. Said on
      the build beside the words, so a thin reading is never taken for the most this can do. */
   readByRulesAny: 'Simple rules read this. Check what was heard, and tell it more.',

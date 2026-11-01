@@ -55,8 +55,8 @@ export const CLAIMS: readonly Claim[] = [
   /* The Slash page (`copy/slash.ts`, its own export `slashPage`, which the ledger reads beside `site`). */
   { id: 'slash-asks-first', said: 'Anything with money, keys, sharing or deletes waits for your yes.', where: 'slashPage.head.lead', state: 'true' },
   { id: 'own-key-no-limit', said: 'or no limit with your own AI key', where: 'slashPage.tally.say', state: 'true' },
-  { id: 'finding-free', said: 'Finding is free and never spends an ask.', where: 'slashPage.find.body.1', state: 'true' },
-  { id: 'own-key-unlimited', said: 'Asks on your own key have no monthly limit.', where: 'slashPage.faq.questions.2.a', state: 'true' },
+  { id: 'finding-free', said: 'Finding is free and never spends a question.', where: 'slashPage.find.body.1', state: 'true' },
+  { id: 'own-key-unlimited', said: 'Questions on your own key have no monthly limit.', where: 'slashPage.faq.questions.2.a', state: 'true' },
 
   /* The connect page (`copy/agents.ts`). */
   { id: 'mcp-approve-once', said: 'no key is copied anywhere', where: 'agents.lead', state: 'true' },
@@ -69,6 +69,7 @@ export const CLAIMS: readonly Claim[] = [
   /* The pricing page (`copy/pricing.ts`, `pricing`): the early access page while billing is off, then the plans. */
   { id: 'early-free', said: 'Everything in it is free while we open it up.', where: 'pricing.early.lede', state: 'true', flag: 'signup' },
   { id: 'nothing-lost', said: 'nothing you make now will be lost or locked when they arrive', where: 'pricing.early.later.say', state: 'true' },
+  { id: 'plus-second-person', said: 'Five times Cloud, and a second person can join.', where: 'pricing.early.later.plans.1.line', state: 'flag', flag: 'billing' },
   { id: 'export-any-time-early', said: 'Yes, all of it, as one file, whenever you like.', where: 'pricing.early.faq.questions.2.a', state: 'true' },
   { id: 'export-every-plan', said: 'Yes, all of it, as one file, on every plan.', where: 'pricing.faq.questions.2.a', state: 'true' },
   { id: 'cancel-any-time', said: 'Yes, from Settings.', where: 'pricing.faq.questions.3.a', state: 'flag', flag: 'billing' },

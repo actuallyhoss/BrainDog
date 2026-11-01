@@ -69,7 +69,7 @@ const ask = (ip: string, turnstile = 'good'): Request =>
     body: JSON.stringify({ said: SAID, today: '2026-10-14', zone: 'Europe/Lisbon', locale: 'en-GB', turnstile }),
   });
 
-const allOn = (ai = fakeAi()): FirstReadEnv => ({ AI: ai.AI, SLASH_INCLUDED: 'yes', FIRST_READ_DAILY: '500', TURNSTILE_SECRET: 'test-secret' });
+const allOn = (ai = fakeAi()): FirstReadEnv => ({ AI: ai.AI, SLASH_INCLUDED: 'yes', FIRST_READ_DAILY: '500', TURNSTILE_SECRET: 'test-secret', TURNSTILE_SITE_KEY: 'test-site-key' });
 
 const door = (env: FirstReadEnv, store: MeterStore | null = memoryStore(), readSetup: ReadSetup | null = fakeRead) =>
   firstReadDoorOf(env, { origin: ORIGIN, readSetup, store, send: verify });

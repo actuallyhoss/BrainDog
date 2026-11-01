@@ -12,6 +12,7 @@
  */
 import { APPS_AND, listed, sayList } from '../agents.ts';
 import { DOCS, SECURITY, SUPPORT_EMAIL } from '../links.ts';
+import { LAUNCH } from '../launch.ts';
 
 /** Where a developer reads how to connect: the docs' first page for AI tools. */
 const CONNECT_DOCS = `${DOCS}/agents/connect`;
@@ -129,8 +130,8 @@ export const home = {
     title: 'Free while in early access.',
     say: "BrainDog is invite only for now. Ask for an invite and we'll email you when it's ready.",
     /* The figures are `TABLE.free`'s, said in ONE SENTENCE, NOT A ROW OF STATS (the
-       site's own rule, §47): "Every feature, 3 AI tools and 20 questions to Slash a month." */
-    figures: (tools: number, asks: number): string => `Every feature, ${tools} AI tools and ${asks} questions to Slash a month.`,
+       site's own rule, §47): "Free: every feature, 3 AI tools and 20 Slash questions a month." */
+    figures: (tools: number, questions: number): string => `Free: every feature, ${tools} AI tools and ${questions} Slash questions a month.`,
   },
 
   faq: {
@@ -165,7 +166,10 @@ export const home = {
       },
       {
         q: 'What does it cost?',
-        a: "Nothing while in early access. It is invite only for now: ask for an invite and we'll email you when it's ready.",
+        /* THE PAID PLANS BY THE BILLING FLAG: coming soon while it is off, and the pricing page's own figures once it is on. */
+        a: LAUNCH.billing
+          ? "Nothing: Free is $0. Cloud and Cloud Plus are monthly plans for more AI tools, questions and runs; the pricing page has each price."
+          : "Nothing: Free is $0. Cloud and Cloud Plus are coming soon, priced at launch. Sign-up is invite only for now: ask for an invite and we'll email you when it's ready.",
         link: { label: 'Pricing', href: '/pricing' },
       },
     ],

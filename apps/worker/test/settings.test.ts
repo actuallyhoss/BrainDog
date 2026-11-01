@@ -137,13 +137,8 @@ const CASES: Record<string, Case> = {
     door: SIGNUP,
     said: '/auth/signup/start in apps/worker/src/index.ts answers SIGNUP_CLOSED (launch.ts): add "Sign-up is not open on this BrainDog yet: SIGNUP is not set to open or invite."',
   },
-  TURNSTILE_SITE_KEY: {
-    kind: 'todo',
-    door: SIGNUP,
-    env: { ...SIGNUP_ON, TURNSTILE_SECRET: 'turnstile-secret-not-a-secret' },
-    said: '/auth/signup/start in apps/worker/src/index.ts answers FORBIDDEN at turnstile ("The check that you are a person did not pass") before STOPPING.siteKey (launch.ts) is asked: refuse first with "The bot check has its secret and no site key, so set TURNSTILE_SITE_KEY: every sign-up is refused until it is."',
-  },
-  TURNSTILE_SECRET: { kind: 'quiet', door: HEALTH, env: SIGNUP_ON, why: 'unset, sign-up runs on the Directory’s lockouts alone, tightened' },
+  TURNSTILE_SITE_KEY: { kind: 'quiet', door: HEALTH, env: SIGNUP_ON, why: 'unset, the bot check is off whatever the secret says (turnstile.ts), and the owner’s why says it has one key' },
+  TURNSTILE_SECRET: { kind: 'quiet', door: HEALTH, env: SIGNUP_ON, why: 'unset, the bot check is off and sign-up runs on the Directory’s lockouts alone, tightened' },
   SESSION_SECRET: {
     kind: 'todo',
     door: METHODS,

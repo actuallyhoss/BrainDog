@@ -470,12 +470,12 @@ export const ASKS: Ask[] = [
   },
 ];
 
-/** SLASH'S FIND: every match at once, for no ask. The search word is `q`, which a drawing marks in each title. */
+/** SLASH'S FIND: every match at once, for no question. The search word is `q`, which a drawing marks in each title. */
 export type Hit = { icon: IconName; title: string; sub: string; kind: string };
 
 export type Find = { q: string; count: number; aside: string; hits: Hit[] };
 
-const FOUND = 'no asks spent';
+const FOUND = 'no questions spent';
 
 export const FINDS: Find[] = [
   {

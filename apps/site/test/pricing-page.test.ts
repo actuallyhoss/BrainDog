@@ -164,8 +164,13 @@ test('with billing off one h1 and one plan, no paid plan; with it on the plans, 
   assert.deepEqual(h1(off), ['Free while in early access.'], 'the early access page does not have its one h1');
   assert.deepEqual(h1(on), ['Free for one person.'], 'the plans page does not have one h1, Free’s');
   assert.equal((off.body.match(/<tr\b/g) ?? []).length, 0, 'the early access page draws a table of plans');
-  for (const plan of PAID) assert.ok(!words(off.body).includes(plan.name), `the early access page names ${plan.name}`);
-  assert.match(words(off.body), /Early access \$0/, 'the one plan is Early access at $0');
+  /* HIS N2 (1 November): the paid plans are named, coming soon and priced at launch, with no figure of theirs. */
+  for (const plan of PAID) {
+    assert.ok(words(off.body).includes(plan.name), `the early access page does not name ${plan.name} as coming soon`);
+    assert.ok(!words(off.body).includes(plan.price), `the early access page prices ${plan.name}`);
+  }
+  assert.match(words(off.body), /Coming soon, priced at launch/, 'the paid plans are not said to be priced at launch');
+  assert.match(words(off.body), /Free \$0/, 'the one plan is Free at $0');
   assert.equal((on.body.match(/<tr\b/g) ?? []).length, 1 + 7 + 1 + 4, 'the two tables are not a header and seven meters, and a header and four prices');
   /* The cap is a promise about a checkout that is not sold yet, so it is said only with billing on (`extra-use-capped`). */
   assert.doesNotMatch(words(off.body), /monthly cap/, 'the page promises a cap on extra use while nothing is sold');
@@ -193,11 +198,11 @@ test('the built pricing page: one h1 with no $, and as billing stands, the early
   assert.doesNotMatch(h1[0]!, /\$/, 'the h1 carries a price, and Free leads');
   const text = words(html);
   if (!LAUNCH.billing) {
-    for (const plan of PAID) assert.ok(!text.includes(plan.name), `pricing.html names ${plan.name} while billing is off`);
-    assert.ok(text.includes('Early access'), 'pricing.html does not name early access');
+    for (const plan of PAID) assert.ok(!text.includes(plan.price), `pricing.html prices ${plan.name} while billing is off`);
+    assert.ok(text.includes('priced at launch'), 'pricing.html does not say the paid plans are priced at launch');
     return;
   }
   for (const plan of PLANS) assert.ok(text.includes(plan.name), `pricing.html does not name ${plan.name}`);
-  for (const meter of ['Agents connected', 'Questions and drafts from Slash', 'People on the record', 'Automation runs', 'Requests to other services', 'Data fetched', 'Script time'])
+  for (const meter of ['AI tools connected', 'Slash questions', 'People', 'Automation runs', 'Requests to other services', 'Data fetched', 'Script time'])
     assert.ok(text.includes(meter), `pricing.html has no "${meter}" row`);
 });

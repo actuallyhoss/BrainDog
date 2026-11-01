@@ -38,9 +38,9 @@ test('a record with packs on sale offers one button a pack, each with its credit
   const r = read.value.records[0]!;
   assert.equal(r.credits, 100);
   const shown = packsOf(r, read.value);
-  assert.equal(shown.left, 'Credits from packs: 100');
-  assert.deepEqual(shown.buy.map((b) => b.label), ['100 credits, $5', '500 credits, $20']);
-  assert.deepEqual(shown.buy.map((b) => b.said), ['Buy 100 credits, $5', 'Buy 500 credits, $20']);
+  assert.equal(shown.left, "Extra questions from packs: 100. They do not run out at the month's end.");
+  assert.deepEqual(shown.buy.map((b) => b.label), ['100 questions, $5', '500 questions, $20']);
+  assert.deepEqual(shown.buy.map((b) => b.said), ['Buy 100 more Slash questions, $5', 'Buy 500 more Slash questions, $20']);
   /* A free record is sold packs too: it needs no plan to buy credits. */
   assert.equal(packsOf({ ...r, plan: 'free', state: 'unbilled' }, read.value).buy.length, 2);
 });

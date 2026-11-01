@@ -26,7 +26,7 @@
         <span id="plan-{card.id}">{card.name}</span>
         {#if card.tag}<em class="when-out">{card.tag.out}</em><em class="when-in">{card.tag.in}</em>{/if}
       </p>
-      <p class="price">{card.price}<span>{card.per}</span></p>
+      <p class="price" class:quiet={card.quiet}>{card.price}<span>{card.per}</span></p>
       <ul>
         {#each card.lines as line (line)}
           <li><Icon name="check" /><span>{line}</span></li>
@@ -96,6 +96,12 @@
     margin: 0;
     font: 600 52px/1 var(--head);
     letter-spacing: -0.05em;
+  }
+
+  /* A PAID CARD'S PRICE, read and not shouted: Free's $0 is the one figure at headline size. */
+  .price.quiet {
+    font: 600 22px/1.2 var(--head);
+    letter-spacing: -0.02em;
   }
 
   .price span {

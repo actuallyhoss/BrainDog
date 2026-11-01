@@ -46,7 +46,7 @@ test('A RECORD MADE WITH NO PLAN IS STILL HOSTED, and one put on free is metered
   sql.exec("INSERT INTO dir_usage_day (record, day, scope, action, runs) VALUES (?, '2026-09-02', 'global', 'backfill', ?)", made.record, ALLOWANCE.free!.runs);
   assert.deepEqual(d.mayRun(made.record, 'npm downloads'), {
     until: Date.UTC(2026, 9, 1),
-    say: 'npm downloads is waiting until 1 October. This BrainDog has used its 1,000 runs for September.',
+    say: 'npm downloads is waiting until 1 October. This BrainDog has used its 1,000 runs for September. Nothing you made is touched, and Settings > Billing has more.',
   });
 
   /* Upgraded, the same month's runs are well inside Cloud's, and it runs again. */
