@@ -27,6 +27,8 @@
   it until then.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn, springy } from '$lib/motion/index.ts';
   import { page as route } from '$app/state';
   import { createClient } from '@braindog/client';
   import { Kpis, type KpiInput, type KpiView } from 'braindog-render/svelte';
@@ -322,7 +324,7 @@
       <h3 class="kb-head" id="{uid}-suggested">{copy.kpiSuggested}</h3>
       <ul class="kb-drafts">
         {#each drafts as d (d.seq)}
-          <li class="kb-draft">
+          <li class="kb-draft" in:lineIn out:dismiss animate:flip={springy()}>
             <span class="kb-draft-text">
               <span class="kb-draft-name">{nameOf(d)}</span>
               {#if typeof d.fields.measures === 'string' && d.fields.measures.trim() !== ''}<span class="kb-draft-line">{d.fields.measures}</span>{/if}

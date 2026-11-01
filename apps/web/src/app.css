@@ -173,4 +173,38 @@
     font-family: var(--font-ui);
     letter-spacing: -0.012em;
   }
+  /* A BRAINDOG ASSEMBLING (`$lib/motion`): anything marked `data-forming` rises into place as it is drawn, on the
+     spring, siblings one after another `--form-gap` apart (by their place among them, or by a `--form-i` a host sets,
+     which `forming(i)` from `$lib/motion` writes). Only the sign-up's first moments mark what they build, so a returning
+     reader's screen never assembles. Under reduced motion the keyframe ends at once (`a11y.css`): simply there. */
+  [data-forming] {
+    animation: form-in var(--form-in) var(--ease-spring) calc(var(--form-i, 0) * var(--form-gap)) backwards;
+  }
+
+  :where([data-forming]:nth-child(2)) {
+    --form-i: 1;
+  }
+
+  :where([data-forming]:nth-child(3)) {
+    --form-i: 2;
+  }
+
+  :where([data-forming]:nth-child(4)) {
+    --form-i: 3;
+  }
+
+  :where([data-forming]:nth-child(5)) {
+    --form-i: 4;
+  }
+
+  :where([data-forming]:nth-child(n + 6)) {
+    --form-i: 5;
+  }
+
+  @keyframes form-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.97);
+    }
+  }
 }

@@ -33,6 +33,7 @@
   import { keepOrder } from './project-order.ts';
   import { frame } from './frame.svelte.ts';
   import Brand from './Brand.svelte';
+  import { placeIn } from '$lib/motion/index.ts';
   import {
     COUNTS_KEY,
     PINS_KEY,
@@ -433,7 +434,7 @@
 {#snippet project(p: SideProject)}
   {@const here = isLit(p.href)}
   {@const name = shownName(p.name)}
-  <li class="s-item">
+  <li class="s-item" in:placeIn>
     <a class="s-row s-proj tap" href={at(p.href)} aria-current={here ? 'page' : undefined} aria-keyshortcuts={phone ? undefined : 'ArrowRight'} onkeydown={phone ? undefined : toPin}>
       {@render mark(p)}
       {#if phone}
@@ -488,7 +489,7 @@
 {/snippet}
 
 {#snippet link(l: SideLink, nested: boolean)}
-  <li>
+  <li in:placeIn>
     <a class="s-row s-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={isLit(l.href) ? 'page' : undefined}>
       {#if !nested}<Icon name={l.icon as IconName} size="s" />{/if}<span class="s-name" dir="auto">{l.label}</span>
       {#if l.count}<span class="s-count num">{l.count.toLocaleString('en-GB')}</span>{/if}
@@ -499,7 +500,9 @@
 {#snippet place(p: SidePlace)}
   {@const n = countOf(p)}
   {@const open = placeOpen(p)}
-  <li class="s-item">
+  <!-- A PLACE THAT COMES INTO THE RAIL (an add-on turned on, a list with its first row) slides in and opens its row,
+       and the places under it move down to make room (`placeIn`, the record forming). Never on the rail's first draw. -->
+  <li class="s-item" in:placeIn>
     <a class="s-row s-place tap" href={at(p.href)} aria-current={isLit(p.href) ? 'page' : undefined}>
       <Icon name={p.icon as IconName} size="s" /><span class="s-name">{p.label}</span>
       {#if p.key === 'decide'}

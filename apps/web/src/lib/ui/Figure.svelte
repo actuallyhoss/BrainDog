@@ -16,14 +16,34 @@
 
   THE OLD FIGURE LEAVES OVER `--d-exit` WHILE THE NEW ONE RISES (fluid F12), or the count was empty for a frame: the 8
   gone and the 7 not yet in. It was removed at once and the new one began at nothing.
+
+  A FIGURE THAT IS ONE NUMBER BEFORE AND AFTER COUNTS TO IT INSTEAD (the record forming, `$lib/motion/count.ts`): "£1,240"
+  becoming "£1,310" runs through the numbers between over `--form-count`, in place, with no roll and no old figure
+  fading. A word, a sign that flipped or another currency rolls as before. Never on the first draw, nor in a screen's
+  first second.
 -->
 <script lang="ts">
   import { ms, still } from './motion.ts';
+  import { calm } from '$lib/motion/index.ts';
+  import { counts, countText } from '$lib/motion/count.ts';
 
   let { value }: { value: string | number } = $props();
 
-  /* Opacity only, in the exit step; for a reader who asked for less motion the figure is simply gone. */
-  const leave = (_figure: Element) => ({ duration: still() ? 0 : ms('--d-exit', 90), css: (t: number) => `opacity:${t}` });
+  /* Opacity only, in the exit step; for a reader who asked for less motion the figure is simply gone, and so is one the
+     new figure counts on from. */
+  const leave = (figure: Element) => ({ duration: still() || counting(figure.textContent ?? '', said) ? 0 : ms('--d-exit', 90), css: (t: number) => `opacity:${t}` });
+
+  /* THE FIGURE LAST DRAWN, to count from; not state. */
+  let shown: string | null = null;
+  const counting = (from: string | null, to: string): boolean => from !== null && drawn.yet && !calm() && !still() && counts(from, to) !== null;
+  /* AS EACH FIGURE IS MADE: one that can count from the last takes over its text and counts, and does not roll. */
+  const tally = (node: HTMLElement) => {
+    const now = node.textContent ?? '';
+    const from = shown;
+    shown = now;
+    const text = node.firstChild;
+    if (from !== null && counting(from, now) && text instanceof Text && countText(text, from, now)) node.removeAttribute('data-roll');
+  };
 
   /* Not state: read once as each figure element is made, so a figure already drawn never gains the roll. */
   const drawn = { yet: false };
@@ -34,7 +54,7 @@
   const said = $derived(typeof value === 'number' ? value.toLocaleString('en') : value);
 </script>
 
-<span class="fig num">{#key said}<span class="roll" data-roll={drawn.yet ? '' : undefined} out:leave>{said}</span>{/key}</span>
+<span class="fig num">{#key said}<span class="roll" data-roll={drawn.yet ? '' : undefined} out:leave {@attach tally}>{said}</span>{/key}</span>
 
 <style>
   .fig {

@@ -21,6 +21,8 @@
   `$lib/market/describe.ts`, as the add-on's own page and the store say it.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn, springy } from '$lib/motion/index.ts';
   import { apiBase, at } from '$lib/at.ts';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
@@ -720,7 +722,7 @@
           {@const name = nameOf(state.id)}
           <!-- OFF IS SAID, NEVER ABSENT. Its rows are still in the record, and this row is the only way back to them. A row
                a refusal is waiting on keeps its verbs showing (`data-needs`). -->
-          <li class="addon-row" data-off={off ? '' : undefined} data-needs={block ? '' : undefined}>
+          <li class="addon-row" data-off={off ? '' : undefined} data-needs={block ? '' : undefined} in:lineIn out:dismiss animate:flip={springy()}>
             <div class="line addon">
               <span class="line-mark"><IconWell name={iconFor(state.id) ?? glyphOf(byId.get(state.id)?.pages, page.data.nav ?? [])} size="l" /></span>
               <a class="addon-main" href={at(`/addons/${state.id}`)}>

@@ -16,6 +16,8 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { flip } from 'svelte/animate';
+  import { arrive, depart, springy } from '$lib/motion/index.ts';
   import { apiBase, at } from '$lib/at.ts';
   import { live } from '$lib/data/live.svelte.ts';
   import AgentFace from '$lib/ui/AgentFace.svelte';
@@ -122,7 +124,7 @@
           <ul class="rows">
             {#each g.rows as r (r.key)}
               {@const s = trail(r)}
-              <li class="row" data-quiet={g.id === 'quiet' ? '' : undefined} {@attach ownMenu((p) => ((menuRow = r), (point = p)))}>
+              <li class="row" data-quiet={g.id === 'quiet' ? '' : undefined} {@attach ownMenu((p) => ((menuRow = r), (point = p)))} in:arrive out:depart animate:flip={springy()}>
                 <a class="r-name" href={at(r.href)}><ProjectWell mark={r.mark} name={r.name} hue={r.hue} /><span class="r-title" dir="auto">{r.name}</span></a>
                 <p class="r-next" dir="auto" data-none={r.next === '' ? '' : undefined}>{r.next || 'No next step'}</p>
                 <div class="r-chip">{#if r.chip}<span class="chip" data-tone={r.chip.tone}>{#if r.chip.tone === 'late'}<span class="dot"></span>{/if}{r.chip.text}</span>{/if}</div>
@@ -158,7 +160,7 @@
         {#if b.parked.length > 0}
           <ul class="chips">
             {#each b.parked as p (p.href)}
-              <li><a class="pchip" href={at(p.href)}><ProjectWell mark={p.mark} name={p.name} hue={p.hue} /><span dir="auto">{p.name}</span>{#if p.due}<span class="small" data-warn="">{p.due}</span>{/if}</a></li>
+              <li in:arrive out:depart animate:flip={springy()}><a class="pchip" href={at(p.href)}><ProjectWell mark={p.mark} name={p.name} hue={p.hue} /><span dir="auto">{p.name}</span>{#if p.due}<span class="small" data-warn="">{p.due}</span>{/if}</a></li>
             {/each}
           </ul>
         {/if}

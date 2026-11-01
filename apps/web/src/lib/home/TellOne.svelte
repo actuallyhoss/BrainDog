@@ -22,6 +22,7 @@
   the focus after a press, so the next thing is typed straight away (AH20).
 -->
 <script lang="ts">
+  import { arrive, lineIn } from '$lib/motion/index.ts';
   import { createClient } from '@braindog/client';
   import { invalidateAll } from '$app/navigation';
 
@@ -484,11 +485,12 @@
       onkeydown={keyed}
     ></textarea>
     {#if rows.length > 0}
-      <div class="tell-one-becomes" aria-live="polite">
+      <!-- WHAT IT BECOMES rises in under the words, and each line it adds opens as it is read (`$lib/motion`). -->
+      <div class="tell-one-becomes" aria-live="polite" in:arrive={{ rise: 6, from: 1 }}>
         <p class="tell-one-quiet">{say.becomes}</p>
         <ul class="tell-one-lines">
           {#each rows as row, i (i)}
-            <li class="tell-one-line">
+            <li class="tell-one-line" in:lineIn>
               <IconWell name={iconOf(row)} />
               <span class="tell-one-words">
                 <span class="tell-one-said">{row.said}</span>
@@ -560,7 +562,7 @@
   {/if}
   {#if last.length > 0 && typed.trim() === ''}
     <!-- WHAT WAS LAST ADDED, AND WHERE IT WENT, the same before and after a reload (AH23). -->
-    <p class="tell-one-quiet tell-one-last">
+    <p class="tell-one-quiet tell-one-last" in:arrive={{ rise: 6, from: 1 }}>
       <span>{say.justAdded}:</span>
       {#each last as line, i (i)}<span class="tell-one-was">{line.said}, <a href={at(line.href)}>{say.inList(line.list)}</a>{i < last.length - 1 ? ';' : ''}</span>{/each}
     </p>

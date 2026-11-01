@@ -27,7 +27,8 @@
  *
  * WITHIN THE SKIN'S MOTION AND UNDER 300ms, ON ITS OWN TWO STEPS: a block that moves, arrives or leaves takes
  * `--d-recompose` (220) and a headline written again `--d-swap` (160), so a skin or `a11y.css` that changes the scale
- * changes this with it. A reader who asked for less motion sees only opacity: a new block fades in, one that left fades
+ * changes this with it. Where the skin has its spring (`--ease-spring`), a block arriving and the blocks moving for it
+ * take the record-forming steps instead (`--form-in` 320, `--form-settle` 380, held under 420). A reader who asked for less motion sees only opacity: a new block fades in, one that left fades
  * out, and one that moved is simply where it is.
  *
  * THE PLAN IS PURE (`planOf`), so `recompose.test.ts` holds which block does what; `recompose` is the half that touches
@@ -136,6 +137,24 @@ function ms(style: CSSStyleDeclaration, token: string, fallback: number): number
   const n = Number.parseFloat(raw);
   const got = Number.isFinite(n) ? (raw.endsWith('ms') ? n : n * 1000) : fallback;
   return Math.min(280, Math.max(0, got));
+}
+
+/** A forming step in milliseconds, held under half a second whatever the skin says. */
+function formMs(style: CSSStyleDeclaration, token: string, fallback: number): number {
+  return Math.min(420, readMs(style, token, fallback));
+}
+
+function readMs(style: CSSStyleDeclaration, token: string, fallback: number): number {
+  const raw = style.getPropertyValue(token).trim();
+  const n = Number.parseFloat(raw);
+  return Math.max(0, Number.isFinite(n) ? (raw.endsWith('ms') ? n : n * 1000) : fallback);
+}
+
+/** The skin's spring (`--ease-spring`), where this browser can play it, else `null`. */
+function springOf(style: CSSStyleDeclaration): string | null {
+  const curve = style.getPropertyValue('--ease-spring').trim();
+  if (!curve) return null;
+  return typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('transition-timing-function', curve) ? curve : null;
 }
 
 /**
@@ -316,8 +335,12 @@ export function recomposer(): {
       /* ONE STEP FOR THE PAGE MOVING, `--d-recompose`, on the curves the scale names for it: what changes place rides the
          standard curve, what arrives the emphasised one, and what leaves accelerates away. */
       const recompose = ms(style, '--d-recompose', 220);
-      const move = { duration: recompose, easing: ease('--ease-standard', 'ease-in-out') };
-      const enter = { duration: recompose, easing: ease('--ease-emphasis', 'ease-out') };
+      /* THE RECORD FORMING (`$lib/motion`): a block that arrives rises into place on the spring over `--form-in`, and
+         the blocks making room for it slide there on the same spring over `--form-settle`, each under half a second.
+         A browser that cannot read the spring (`linear()`) is given the curves above, and the old steps. */
+      const spring = springOf(style);
+      const move = spring ? { duration: formMs(style, '--form-settle', 380), easing: spring } : { duration: recompose, easing: ease('--ease-standard', 'ease-in-out') };
+      const enter = spring ? { duration: formMs(style, '--form-in', 320), easing: spring } : { duration: recompose, easing: ease('--ease-emphasis', 'ease-out') };
       /* LEAVING IS SHORTER THAN ARRIVING: the exit step, accelerating away. */
       const leave = { duration: ms(style, '--d-exit', 90), easing: ease('--ease-in', 'ease-in') };
       const swapped = { duration: ms(style, '--d-swap', 160), easing: ease('--ease-standard', 'ease-in-out') };
@@ -337,7 +360,7 @@ export function recomposer(): {
         for (const key of plan.enters) {
           const el = now.get(key)?.el;
           if (!el) continue;
-          running.push(el.animate(less ? { opacity: [0, 1] } : { opacity: [0, 1], transform: ['translateY(8px)', 'none'] }, { ...enter, fill: 'backwards' }));
+          running.push(el.animate(less ? { opacity: [0, 1] } : { opacity: [0, 1], transform: ['translateY(12px) scale(0.97)', 'none'] }, { ...enter, fill: 'backwards' }));
         }
         /* A PLACE ANOTHER BLOCK NOW TAKES IS LET GO OF QUICKLY. Under it is not enough: a list drawn without a box has
            no ground, so the old block's words read through the new one's for the whole fade. It fades on the shorter

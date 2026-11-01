@@ -15,6 +15,7 @@
   once it is whole rather than a word at a time.
 -->
 <script lang="ts">
+  import { arrive, lineIn, listMotion } from '$lib/motion/index.ts';
   import { at } from '../at.ts';
   import Cited from '../ui/Cited.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -142,7 +143,9 @@
       </ul>
     {/if}
   {:else}
-    <ol class="t-turns" role="log" aria-live="polite" aria-busy={convo.busy} aria-label={threadWords.label}>
+    <!-- AN ANSWER LANDING rises into place (`$lib/motion`): a turn as it comes, then what it found, its words, what it
+         offers and its card, each as it arrives in a turn already drawn. Never on opening a thread already there. -->
+    <ol class="t-turns" role="log" aria-live="polite" aria-busy={convo.busy} aria-label={threadWords.label} {@attach listMotion('li', { leave: false })}>
       {#each convo.turns as turn, i (i)}
         {#if turn.role === 'you'}
           <li class="t-you" dir="auto">{turn.text}</li>
@@ -151,14 +154,14 @@
             {#if turn.steps.length > 0}
               <ul class="t-steps" aria-label={threadWords.steps}>
                 {#each turn.steps as step, j (j)}
-                  <li data-now={turn.streaming && j === turn.steps.length - 1 && turn.text === '' ? '' : undefined}>{step}</li>
+                  <li in:lineIn data-now={turn.streaming && j === turn.steps.length - 1 && turn.text === '' ? '' : undefined}>{step}</li>
                 {/each}
               </ul>
             {/if}
             {#if turn.legacy}
               {#if turn.legacy.where}<p class="t-where">{turn.legacy.where}</p>{/if}
               {#if turn.legacy.rows.length > 0}
-                <ul class="t-rows">
+                <ul class="t-rows" in:arrive>
                   {#each turn.legacy.rows as row (row.id)}
                     <li><a class="t-row tap" href={at(row.href)}><span dir="auto">{row.title}</span><span class="t-row-in">{listName(row.register)}</span></a></li>
                   {/each}
@@ -166,12 +169,12 @@
               {/if}
             {/if}
             {#if turn.text}
-              <p class="t-text" dir="auto"><Cited text={turn.text} figures={turn.figures} /></p>
+              <p class="t-text" dir="auto" in:arrive={{ rise: 6, from: 1 }}><Cited text={turn.text} figures={turn.figures} /></p>
             {:else if turn.streaming && turn.steps.length === 0}
               <p class="t-quiet">{copy.slashAsking}</p>
             {/if}
             {#each turn.actions as a (a.id)}
-              <div class="t-act" data-kind={a.kind} data-state={a.state} data-armed={a === pending ? '' : undefined}>
+              <div class="t-act" in:arrive data-kind={a.kind} data-state={a.state} data-armed={a === pending ? '' : undefined}>
                 <span class="t-act-mark"><Icon name={a.kind === 'done' || a.state === 'done' ? 'check' : a.state === 'undone' ? 'history' : 'ask'} size="s" /></span>
                 <div class="t-act-words">
                   <p class="t-act-title" dir="auto">{a.receipt ?? a.title}</p>
@@ -192,7 +195,7 @@
               </div>
             {/each}
             {#if turn.legacy?.card && !turn.streaming}
-              <div class="t-card" data-armed={turn === last && legacyCard ? '' : undefined}>
+              <div class="t-card" in:arrive data-armed={turn === last && legacyCard ? '' : undefined}>
                 {#if turn === last}
                   <DecisionCard bind:this={card} question={turn.legacy.card} whole={false} />
                 {:else}
@@ -201,7 +204,7 @@
               </div>
             {/if}
             {#if turn.go.length > 0}
-              <p class="t-go">
+              <p class="t-go" in:arrive={{ rise: 6, from: 1 }}>
                 {#each turn.go as go (go.href)}<a class="t-link tap" href={at(go.href)}>{go.label}</a>{/each}
               </p>
             {/if}

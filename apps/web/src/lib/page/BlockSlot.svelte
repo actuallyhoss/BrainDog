@@ -84,8 +84,7 @@
   import { valueSaid } from '$lib/voice.ts';
   import { seenWords } from '$lib/record/blocks.ts';
   import { flip } from 'svelte/animate';
-  import { FADE, ms, settle, still } from '$lib/ui/motion.ts';
-  import { quartOut } from 'svelte/easing';
+  import { arrive, depart, dismiss, lineIn, listMotion, settleOn, springy } from '$lib/motion/index.ts';
   import { isProject } from '$lib/record/project.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
   import { deskCards, type Desk } from '$lib/home/desk-part.ts';
@@ -756,9 +755,10 @@
       ...named.map((id) => ({ id, label: state ? valueSaid(state as Parameters<typeof valueSaid>[0], id) : id, count: counts.get(id) ?? 0 })),
     ];
   });
-  /* A CARD COMING INTO A LANE settles in from 98% over `--d-recompose`; one leaving fades over `--d-exit` (proj F9). */
-  const cardIn = (_: Element) => (still() ? { duration: FADE, css: (t: number) => `opacity:${t}` } : { duration: ms('--d-recompose', 220), easing: quartOut, css: (t: number) => `opacity:${t};transform:scale(${0.98 + 0.02 * t})` });
-  const cardOut = (_: Element) => ({ duration: still() ? FADE : ms('--d-exit', 90), css: (t: number) => `opacity:${t}` });
+  /* A CARD COMING INTO A LANE rises into place on the spring (`arrive`, the record forming); one leaving sinks and fades
+     (`depart`), and the cards beside them slide on the same spring (`springy`). */
+  const cardIn = arrive;
+  const cardOut = depart;
   /* THE LANE DRAWN: the one chosen while it holds a card, else the first that does, so nothing in play shows the parked. */
   const shownLane = $derived(lanes.some((l) => l.id === lane && l.count > 0) ? lane : (lanes.find((l) => l.count > 0)?.id ?? 'play'));
   /* IN SECTIONS, WHEN THE BLOCK GROUPS BY LANE: each lane that holds a card, earning and building first, its head saying
@@ -943,7 +943,7 @@
   {:else}
   <!-- AND THE LEDGER VIEW SAYS WHO WAS PAID AS THE CARDS DO (`ledger-lines.ts`): words, not the bank's capitals. -->
   {@const shown = folded ? all.slice(0, folded.shown) : all}
-  <Table columns={block.columns} rows={linesPlan ? linesSaid(shown, linesPlan.title) : shown} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} rowActions={tableActions} act={tableActions ? tableAct : undefined} />
+  <Table columns={block.columns} rows={linesPlan ? linesSaid(shown, linesPlan.title) : shown} total={block.total} label={headingText} href={inApp} home={homeCurrency()} {now} scope={block.scopeCells} rowin={lineIn} rowout={dismiss} settle={springy} {icon} onmenu={writes && verbs ? tableMenu(all) : undefined} rowActions={tableActions} act={tableActions ? tableAct : undefined} />
   {/if}
   {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
@@ -957,7 +957,9 @@
   <!-- A QUEUE THAT SAYS HOW MANY IT SHOWS (`most`, Needs you's groups) shows that many cards and opens the rest in place. -->
   {@const most = (!compact || inPlace) && typeof block.most === 'number' && !open && every.length > block.most ? block.most : null}
   {@const entries = most === null ? every : every.slice(0, most)}
-  <div class="queue" data-compact={compact ? '' : undefined}>
+  <!-- AN ANSWERED QUESTION LETS GO AND THE REST CLOSE THE GAP, and a new one rises into place (`listMotion`): its card
+       sits in an `{#if}`, where a card's own `out:` never plays. -->
+  <div class="queue" data-compact={compact ? '' : undefined} {@attach listMotion('.qa, .alike')}>
     <!-- THE LEAD QUESTION IS DRAWN WHOLE when the block says `lead:`, with what accepting it would put on the screen. -->
     <!-- QUESTIONS OF ONE CAUSE ARE ONE CARD outside a compact queue (`alike.ts`). -->
     {#each entries as entry, n (entry.kind === 'one' ? entry.q.id : entry.lead.id)}{#if entry.kind === 'many'}<AlikeCard lead={entry.lead} rest={entry.rest} onanswered={() => {}} />{:else}{@const question = entry.q}<QueueAnswer
@@ -994,14 +996,14 @@
         <section class="project-lane" aria-label={g.name || undefined}>
           {#if g.name}<h3 class="lane-head"><span class="lane-name">{g.name}</span> <span class="lane-count">· {g.said}</span></h3>{/if}
           <ul class="project-cards">
-            {#each g.cards as p (p.card.key)}<li class="pc-cell"><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} /></li>{/each}
+            {#each g.cards as p (p.card.key)}<li class="pc-cell" {@attach settleOn(p.card.draft)} in:cardIn out:cardOut animate:flip={springy()}><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} /></li>{/each}
           </ul>
         </section>
       {/each}
     </div>
   {:else}
     <ul class="project-cards">
-      {#each laneCards as p (p.card.key)}<li class="pc-cell" in:cardIn out:cardOut animate:flip={settle()}><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} /></li>{/each}
+      {#each laneCards as p (p.card.key)}<li class="pc-cell" {@attach settleOn(p.card.draft)} in:cardIn out:cardOut animate:flip={springy()}><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} /></li>{/each}
     </ul>
   {/if}
 {:else}

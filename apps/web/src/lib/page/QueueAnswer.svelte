@@ -29,7 +29,7 @@
   import { setContext } from 'svelte';
   import type { QueueQuestion } from '@braindog/kernel';
   import { at } from '$lib/at.ts';
-  import { rowOut } from '$lib/ui/motion.ts';
+  import { dismiss } from '$lib/motion/index.ts';
   import type { Picked } from './picked.svelte.ts';
   import { QUEUE_FILE, type FileAt } from './queue-answer.ts';
 
@@ -66,10 +66,10 @@
 </script>
 
 <!-- A ROW OF THE PAGE, by the question's id, so a home's cursor walks to it and Enter opens it on Decide. AN ANSWERED
-     ONE COLLAPSES OUT (`rowOut`, the motion system's row leaving) when the queue reads again without it, so the rows
-     under it close the gap instead of jumping up. -->
+     ONE LETS GO AND ITS GAP CLOSES (`dismiss`, the record forming) when the queue reads again without it: it sinks and
+     fades, then the room it held closes on the spring, so the cards under it rise into place instead of jumping up. -->
 <div
-  out:rowOut
+  out:dismiss
   class="qa"
   data-row="q:{question.id}"
   data-open={at(`/decide/${encodeURIComponent(question.id)}`)}

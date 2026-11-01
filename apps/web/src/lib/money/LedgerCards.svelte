@@ -13,6 +13,8 @@
   A TABLE WITH NO CATEGORY DRAWS NO CHIP, since a "?" on every line said "not filed" about lines nobody asked to file.
 -->
 <script module lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn, springy } from '$lib/motion/index.ts';
   import { tableCellBody, type Column as TableColumn, type TableRow } from 'braindog-render';
 
   const pick = (columns: readonly TableColumn[], fields: readonly string[]): number => {
@@ -142,7 +144,8 @@
       <ul class="lc-lines">
         {#each d.lines as l (l.key)}
           {@const look = l.between ? { glyph: 'repeat', slot: 'slate' } : looks.category(l.category)}
-          <li>
+          <!-- A PAYMENT LANDING opens its line and rises into it; one taken away closes (`$lib/motion`). -->
+          <li in:lineIn out:dismiss animate:flip={springy()}>
             <svelte:element this={l.href ? 'a' : 'div'} class="lc-line" href={l.href ? at(l.href) : undefined} data-intent={l.tone} data-chipless={chipped ? undefined : ''}>
               {#if chipped}
                 <span class="item-chip lc-chip" data-slot={look?.slot ?? undefined} data-unfiled={look ? undefined : ''} aria-hidden="true"
