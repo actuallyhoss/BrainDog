@@ -466,7 +466,7 @@
 </Tile>
 <!-- A BANK'S TEXTS: how they get here, and a box to paste one into (AH10). Today's next step opens here, at `#texts`. -->
 <Tile icon="money" class="section" data-surface="tile" title={words.textsTitle} id="texts">
-  <div class="section-body">
+  <div class="section-body texts-body">
     <p class="hint">{words.textsLead}</p>
     <ol class="texts-ways">
       <li class="hint">{words.textsForward}</li>
@@ -597,11 +597,23 @@
     list-style: none;
   }
 
+  /* ONE LINE A SOURCE ON A DESK: its name, and when it last brought something at the row's end in the meta ink, as every
+     list reads. Two lines of 15px in two inks stood each "Nothing has come in this way yet" as loud as its name. */
   .feed {
     display: grid;
-    gap: 2px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 2px var(--sp-4);
     min-inline-size: 0;
+    align-content: center;
+    min-block-size: var(--row-h);
     padding-block: var(--sp-2);
+  }
+
+  @media (width < 640px) {
+    .feed {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .feed + .feed {
@@ -615,8 +627,8 @@
   }
 
   .feed-said {
-    color: var(--ink-2);
-    font-size: var(--fs-body);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .doors {
@@ -724,6 +736,19 @@
     display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
+  }
+
+  /* THE PASTE BOX'S OWN TILE IS ITS HEADING AND ITS FIELD here, never a tile inside this one. */
+  .texts-body :global(.tile) {
+    margin-block-start: var(--sp-3);
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+
+  /* THE TWO WAYS ONE STEP APART, whatever margin a hint brings. */
+  .texts-ways > li {
+    margin: 0;
   }
 
   .texts-ways {
