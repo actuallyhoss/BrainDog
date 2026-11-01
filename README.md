@@ -6,7 +6,7 @@
 # A memory for your work, money and people, shared by you and every AI agent you use over MCP
 
 BrainDog keeps your projects, money, people, keys and decisions in one record, tells you each morning what needs
-you, and lets Claude, ChatGPT, Codex and Cursor read and write the same record you do. Use it to run a small business,
+you, and lets Claude, ChatGPT and Cursor read and write the same record you do. Use it to run a small business,
 or your own life. It is open source, hosted at [brain.dog](https://brain.dog), and runs on your own machine too.
 
 [Website](https://brain.dog) · [Docs](https://brain.dog/docs) · [Connect an agent](#connect-claude-and-other-agents) ·
@@ -52,7 +52,7 @@ https://app.brain.dog/mcp
 In Claude that is Settings, Connectors, Add custom connector. The first time, the client opens BrainDog in your
 browser: you pick the record and what the agent may do, then press Allow.
 
-**With the command line.** For Claude Code, Codex and other agents on your machine. It needs Node 24.13 or later.
+**With the command line.** For Claude Code and other agents on your machine. It needs Node 24.13 or later.
 
 ```sh
 curl -fsSL https://brain.dog/cli/install.sh | sh     # macOS and Linux
