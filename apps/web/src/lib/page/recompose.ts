@@ -22,6 +22,10 @@
  * is inside the page still slides, whatever its width did: faded from nothing, a block the reader was just looking at
  * blinks out and back, and every block on the page did that when a scrollbar came or went and took 15px off them all.
  *
+ * A BLOCK MOVES A SHORT WAY, AND ONCE (`slideOf`, audit 11-01 AP4). One that changed place by more than `SLIDE_MAX`
+ * glides the last `GLIDE` pixels and fades in rather than crossing the board, and two answers drawn in one breath are
+ * one recomposition from what the reader last saw, so no block is ever given two animations at once.
+ *
  * A HEADLINE WRITTEN AGAIN CROSSFADES (`swap`): the block stays where it is and its old words fade out over the new
  * ones fading in, rather than changing in one frame under the reader's eye.
  *
@@ -52,6 +56,27 @@ export type Plan = {
 
 /** Under a pixel is no move at all: a re-read that changed nothing must play nothing. */
 const STILL = 0.5;
+
+/**
+ * THE FURTHEST A BLOCK SLIDES, in CSS pixels. A tile that changed place by more than this (a board packed again, its
+ * neighbour now a column over) flew 600 to 900px across Today under the reader's eye (audit 11-01, AP4). Past it, a
+ * block is drawn near its new place instead and glides the last `GLIDE` pixels in from the side it came from, fading
+ * in as it does: the direction of the change is felt, and nothing crosses the board.
+ */
+export const SLIDE_MAX = 96;
+/** How far a block that moved further than `SLIDE_MAX` glides into its new place. */
+export const GLIDE = 24;
+
+/**
+ * How a block that moved `dx`, `dy` (where it was, less where it is) is played: slid the whole way when that is short,
+ * else glided the last `GLIDE` pixels on the same heading and faded in (`fade`), in one animation either way.
+ */
+export function slideOf(dx: number, dy: number): { dx: number; dy: number; fade: boolean } {
+  const far = Math.hypot(dx, dy);
+  if (far <= SLIDE_MAX) return { dx, dy, fade: false };
+  const k = GLIDE / far;
+  return { dx: dx * k, dy: dy * k, fade: true };
+}
 
 /**
  * Each block's key, by index: its kind, its source or list, and its heading, with a count where two blocks on one page
@@ -225,6 +250,15 @@ export function recomposer(): {
   let running: Animation[] = [];
   let ghosts: HTMLElement[] = [];
   let opened = now();
+  /**
+   * A CHANGE MEASURED AND NOT YET PLAYED: the page as the reader last saw it, and the copies of what was leaving it.
+   * Two answers drawn in one breath (a write's answer and the read behind it, two flushes before the next frame) each
+   * asked for a recomposition, and the second measured the page with the first's animations already on it: every tile
+   * was played twice at once, the second time back the way it came (audit 11-01, AP4). Now the second joins the first,
+   * from what the reader last saw, and only the newest plays.
+   */
+  let pending: { was: Map<string, { el: HTMLElement; box: Box }>; copies: Map<string, Copy>; swaps: Map<string, Copy>; turn: number } | null = null;
+  let turns = 0;
 
   function halt() {
     for (const a of running.splice(0)) a.cancel();
@@ -234,11 +268,13 @@ export function recomposer(): {
   /** Ends what is playing, and starts the screen's first second again: what is drawn next is the screen settling. */
   function stop() {
     halt();
+    pending = null;
+    turns += 1;
     opened = now();
   }
 
   /** A copy of a block as it is drawn now, styled to stand where it stood once the page has moved on. */
-  function copyOf(el: HTMLElement): { node: HTMLElement; style: Partial<CSSStyleDeclaration> } {
+  function copyOf(el: HTMLElement): Copy {
     const s = getComputedStyle(el);
     return {
       node: el.cloneNode(true) as HTMLElement,
@@ -259,7 +295,7 @@ export function recomposer(): {
    * measured against: where the page has no box of its own the copy's containing block is further up, and a copy
    * placed by the page's numbers stood off its place by the distance between the two (on Today, by the page's head).
    */
-  function ghost(page: HTMLElement, copy: { node: HTMLElement; style: Partial<CSSStyleDeclaration> }, box: Box, leave: KeyframeAnimationOptions, under: boolean) {
+  function ghost(page: HTMLElement, copy: Copy, box: Box, leave: KeyframeAnimationOptions, under: boolean) {
     const g = copy.node;
     /* NOTHING IN A GHOST IS THE PAGE'S: no id twice in the document, nothing to focus or press, nothing read out. */
     for (const n of [g, ...g.querySelectorAll('[id]')]) n.removeAttribute('id');
@@ -308,6 +344,19 @@ export function recomposer(): {
   }
 
   function before(page: HTMLElement, next: ReadonlySet<string>, swap: ReadonlySet<string> = new Set()): (() => void) | null {
+    const turn = ++turns;
+    /* A CHANGE MEASURED AND NOT YET PLAYED IS JOINED, not measured again: the page is still as the reader last saw it
+       less what the first draw already took out, and that is where every block plays from. */
+    if (pending) {
+      const joined = pending;
+      joined.turn = turn;
+      for (const [key, { el }] of joined.was) {
+        if (!el.isConnected) continue;
+        if (!next.has(key) && !joined.copies.has(key)) joined.copies.set(key, copyOf(el));
+        else if (next.has(key) && swap.has(key) && !joined.swaps.has(key)) joined.swaps.set(key, copyOf(el));
+      }
+      return () => play(page, joined, turn);
+    }
     /* A CHANGE STILL PLAYING ENDS HERE, so the next one starts from the page and not from its middle. */
     halt();
     if (now() - opened < SETTLE) return null;
@@ -320,81 +369,100 @@ export function recomposer(): {
     if (was.size === 0) return null;
     /* THE BLOCKS THAT ARE LEAVING, and the ones whose words are written again, copied while they are still drawn as
        they were. */
-    const copies = new Map<string, { node: HTMLElement; style: Partial<CSSStyleDeclaration> }>();
-    const swaps = new Map<string, { node: HTMLElement; style: Partial<CSSStyleDeclaration> }>();
+    const copies = new Map<string, Copy>();
+    const swaps = new Map<string, Copy>();
     for (const [key, { el }] of was) {
       if (!next.has(key)) copies.set(key, copyOf(el));
       else if (swap.has(key)) swaps.set(key, copyOf(el));
     }
-    return () => {
-      const now = measure(page);
-      const plan = planOf(boxes(was), boxes(now), frameOf(page).getBoundingClientRect().width);
-      const style = getComputedStyle(page);
-      const less = still();
-      const ease = (token: string, fallback: string) => style.getPropertyValue(token).trim() || fallback;
-      /* ONE STEP FOR THE PAGE MOVING, `--d-recompose`, on the curves the scale names for it: what changes place rides the
-         standard curve, what arrives the emphasised one, and what leaves accelerates away. */
-      const recompose = ms(style, '--d-recompose', 220);
-      /* THE RECORD FORMING (`$lib/motion`): a block that arrives rises into place on the spring over `--form-in`, and
-         the blocks making room for it slide there on the same spring over `--form-settle`, each under half a second.
-         A browser that cannot read the spring (`linear()`) is given the curves above, and the old steps. */
-      const spring = springOf(style);
-      const move = spring ? { duration: formMs(style, '--form-settle', 380), easing: spring } : { duration: recompose, easing: ease('--ease-standard', 'ease-in-out') };
-      const enter = spring ? { duration: formMs(style, '--form-in', 320), easing: spring } : { duration: recompose, easing: ease('--ease-emphasis', 'ease-out') };
-      /* LEAVING IS SHORTER THAN ARRIVING: the exit step, accelerating away. */
-      const leave = { duration: ms(style, '--d-exit', 90), easing: ease('--ease-in', 'ease-in') };
-      const swapped = { duration: ms(style, '--d-swap', 160), easing: ease('--ease-standard', 'ease-in-out') };
-      try {
-        if (!less)
-          for (const { key, dx, dy } of plan.moves) {
-            const el = now.get(key)?.el;
-            if (el) running.push(el.animate({ transform: [`translate(${dx}px, ${dy}px)`, 'none'] }, move));
-          }
-        /* A BLOCK THAT CANNOT SLIDE INSIDE THE PAGE fades in where it now is, on opacity alone: nothing about it stands
-           anywhere but its place. For a reader who asked for less motion it is simply there, as a moved block is. */
-        if (!less)
-          for (const key of plan.redrawn) {
-            const el = now.get(key)?.el;
-            if (el) running.push(el.animate({ opacity: [0, 1] }, { ...enter, fill: 'backwards' }));
-          }
-        for (const key of plan.enters) {
+    const mine = { was, copies, swaps, turn };
+    pending = mine;
+    return () => play(page, mine, turn);
+  }
+
+  /**
+   * Plays one recomposition, once the page has drawn: only the newest asked for (`turn`), and once. ONE ANIMATION ON
+   * EACH BLOCK: what moved slides, what arrived rises, what is drawn anew fades, and no block is given two.
+   */
+  function play(page: HTMLElement, change: NonNullable<typeof pending>, turn: number): void {
+    if (change.turn !== turn || pending !== change) return;
+    pending = null;
+    const { was, copies, swaps } = change;
+    const now = measure(page);
+    const plan = planOf(boxes(was), boxes(now), frameOf(page).getBoundingClientRect().width);
+    const style = getComputedStyle(page);
+    const less = still();
+    const ease = (token: string, fallback: string) => style.getPropertyValue(token).trim() || fallback;
+    /* ONE STEP FOR THE PAGE MOVING, `--d-recompose`, on the curves the scale names for it: what changes place rides the
+       standard curve, what arrives the emphasised one, and what leaves accelerates away. */
+    const recompose = ms(style, '--d-recompose', 220);
+    /* THE RECORD FORMING (`$lib/motion`): a block that arrives rises into place on the spring over `--form-in`, and
+       the blocks making room for it slide there on the same spring over `--form-settle`, each under half a second.
+       A browser that cannot read the spring (`linear()`) is given the curves above, and the old steps. */
+    const spring = springOf(style);
+    const move = spring ? { duration: formMs(style, '--form-settle', 380), easing: spring } : { duration: recompose, easing: ease('--ease-standard', 'ease-in-out') };
+    const enter = spring ? { duration: formMs(style, '--form-in', 320), easing: spring } : { duration: recompose, easing: ease('--ease-emphasis', 'ease-out') };
+    /* LEAVING IS SHORTER THAN ARRIVING: the exit step, accelerating away. */
+    const leave = { duration: ms(style, '--d-exit', 90), easing: ease('--ease-in', 'ease-in') };
+    const swapped = { duration: ms(style, '--d-swap', 160), easing: ease('--ease-standard', 'ease-in-out') };
+    try {
+      /* SHORT, AND ONE ANIMATION A BLOCK: a block that moved further than `SLIDE_MAX` glides the last stretch and
+         fades in, in the same animation, rather than crossing the board (`slideOf`). */
+      if (!less)
+        for (const { key, dx: x, dy: y } of plan.moves) {
           const el = now.get(key)?.el;
           if (!el) continue;
-          running.push(el.animate(less ? { opacity: [0, 1] } : { opacity: [0, 1], transform: ['translateY(12px) scale(0.97)', 'none'] }, { ...enter, fill: 'backwards' }));
+          const { dx, dy, fade } = slideOf(x, y);
+          const from = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`;
+          running.push(el.animate(fade ? { opacity: [0, 1], transform: [from, 'none'] } : { transform: [from, 'none'] }, fade ? { ...enter, fill: 'backwards' } : move));
         }
-        /* A PLACE ANOTHER BLOCK NOW TAKES IS LET GO OF QUICKLY. Under it is not enough: a list drawn without a box has
-           no ground, so the old block's words read through the new one's for the whole fade. It fades on the shorter
-           step and front-loaded, gone before the block moving in has landed; for a reader who asked for less motion,
-           where the block is simply there, it is not drawn at all. */
-        const drawn = [...now.values()].map((v) => v.box);
-        const quick = { duration: swapped.duration, easing: ease('--ease-out', 'ease-out') };
-        for (const { key, box } of plan.leaves) {
-          const copy = copies.get(key);
-          if (!copy) continue;
-          const taken = covered(box, drawn);
-          if (taken && less) continue;
-          ghost(page, copy, box, taken ? quick : leave, true);
-        }
-        /* A HEADLINE WRITTEN AGAIN: its old words fade out where they stood, over the new ones fading in. Opacity only,
-           so a reader who asked for less motion sees it too, as the soft change it is. A swap that also moved is laid
-           where it was, since that is where the eye still is.
-
-           THE WORDS CROSSFADE AND THE TILE STAYS. The copy carries no surface of its own and the tile is not faded,
-           only what is in it: a copy with the tile's ground would dim the tile for the length of the fade and lie over
-           the page's head, which rides over the top of the headline's tile (`PageHead`'s `over`). */
-        for (const [key, copy] of swaps) {
+      /* A BLOCK THAT CANNOT SLIDE INSIDE THE PAGE fades in where it now is, on opacity alone: nothing about it stands
+         anywhere but its place. For a reader who asked for less motion it is simply there, as a moved block is. */
+      if (!less)
+        for (const key of plan.redrawn) {
           const el = now.get(key)?.el;
-          const box = was.get(key)?.box;
-          if (!el || !box) continue;
-          ghost(page, { node: copy.node, style: { ...copy.style, background: 'transparent', boxShadow: 'none' } }, box, swapped, false);
-          for (const child of el.children) running.push(child.animate({ opacity: [0, 1] }, { ...swapped, fill: 'backwards' }));
+          if (el) running.push(el.animate({ opacity: [0, 1] }, { ...enter, fill: 'backwards' }));
         }
-      } catch {
-        /* A timing a browser cannot read is a page that changes in one frame, which is what it did before. */
-        halt();
+      for (const key of plan.enters) {
+        const el = now.get(key)?.el;
+        if (!el) continue;
+        running.push(el.animate(less ? { opacity: [0, 1] } : { opacity: [0, 1], transform: ['translateY(12px) scale(0.97)', 'none'] }, { ...enter, fill: 'backwards' }));
       }
-    };
+      /* A PLACE ANOTHER BLOCK NOW TAKES IS LET GO OF QUICKLY. Under it is not enough: a list drawn without a box has
+         no ground, so the old block's words read through the new one's for the whole fade. It fades on the shorter
+         step and front-loaded, gone before the block moving in has landed; for a reader who asked for less motion,
+         where the block is simply there, it is not drawn at all. */
+      const drawn = [...now.values()].map((v) => v.box);
+      const quick = { duration: swapped.duration, easing: ease('--ease-out', 'ease-out') };
+      for (const { key, box } of plan.leaves) {
+        const copy = copies.get(key);
+        if (!copy) continue;
+        const taken = covered(box, drawn);
+        if (taken && less) continue;
+        ghost(page, copy, box, taken ? quick : leave, true);
+      }
+      /* A HEADLINE WRITTEN AGAIN: its old words fade out where they stood, over the new ones fading in. Opacity only,
+         so a reader who asked for less motion sees it too, as the soft change it is. A swap that also moved is laid
+         where it was, since that is where the eye still is.
+
+         THE WORDS CROSSFADE AND THE TILE STAYS. The copy carries no surface of its own and the tile is not faded,
+         only what is in it: a copy with the tile's ground would dim the tile for the length of the fade and lie over
+         the page's head, which rides over the top of the headline's tile (`PageHead`'s `over`). */
+      for (const [key, copy] of swaps) {
+        const el = now.get(key)?.el;
+        const box = was.get(key)?.box;
+        if (!el || !box) continue;
+        ghost(page, { node: copy.node, style: { ...copy.style, background: 'transparent', boxShadow: 'none' } }, box, swapped, false);
+        for (const child of el.children) running.push(child.animate({ opacity: [0, 1] }, { ...swapped, fill: 'backwards' }));
+      }
+    } catch {
+      /* A timing a browser cannot read is a page that changes in one frame, which is what it did before. */
+      halt();
+    }
   }
 
   return { before, stop };
 }
+
+/** A block's element copied before it goes, with the look it had. */
+type Copy = { node: HTMLElement; style: Partial<CSSStyleDeclaration> };
