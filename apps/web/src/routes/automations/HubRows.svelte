@@ -28,6 +28,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import ItemMenu from '$lib/ui/ItemMenu.svelte';
+  import { rowIn, rowOut } from '$lib/ui/motion.ts';
   import { ownMenu } from '$lib/ui/context-menu.ts';
   import { families, familyOn, familySaid, familyWords } from './hub-family.ts';
   import type { HubRow } from './hub.ts';
@@ -55,6 +56,24 @@
   const alone = $derived(all.filter((f) => f.kind === 'one').length);
   const grouped = $derived(all.length > alone);
   const firstAlone = $derived(folds.findIndex((f) => f.kind === 'one'));
+  /* A LONG RUN OF SINGLE RULES FOLDS AT SIX (L47): "13 rules on their own" stood as thirteen rows of switches. The
+     first six stay, and so does any past them that needs a look (a dot), so folding never hides a failing rule. */
+  const FOLD_AT = 6;
+  let allAlone = $state(false);
+  const kept = $derived.by(() => {
+    const keep = new Set<string>();
+    let seen = 0;
+    for (const f of folds) {
+      if (f.kind !== 'one') continue;
+      if (seen < FOLD_AT || f.row.dot === 'bad' || f.row.dot === 'warn') keep.add(f.row.key);
+      seen += 1;
+    }
+    return keep;
+  });
+  const hidden = $derived(alone - kept.size);
+  /* THE ROWS PAST THE FOLD RISE IN ON THEIR HEIGHT WHEN OPENED; the first six are simply there. */
+  const foldIn = (node: Element, more: boolean) => (more ? rowIn(node) : { duration: 0 });
+  const foldOut = (node: Element, more: boolean) => (more ? rowOut(node) : { duration: 0 });
   /* THE FAMILIES OPENED, by key. Closed when drawn, so a long family never pushes the rest of the page down. */
   let opened = $state.raw<ReadonlySet<string>>(new Set());
   const flip = (key: string): void => {
@@ -143,7 +162,10 @@
       <li class="alone-cap">{familyWords.alone(alone)}</li>
     {/if}
     {#if f.kind === 'one'}
-      <li {@attach heard(f.row)}>{@render item(f.row)}</li>
+      {#if allAlone || hidden <= 0 || kept.has(f.row.key)}
+        {@const more = hidden > 0 && !kept.has(f.row.key)}
+        <li {@attach heard(f.row)} in:foldIn={more} out:foldOut={more}>{@render item(f.row)}</li>
+      {/if}
     {:else}
       {@const fam = f.family}
       {@const shown = opened.has(fam.key)}
@@ -174,6 +196,14 @@
       </li>
     {/if}
   {/each}
+  {#if hidden > 0}
+    <li class="fold-more">
+      <button type="button" class="more-press tap" aria-expanded={allAlone} onclick={() => (allAlone = !allAlone)}>
+        <span>{allAlone ? familyWords.fewer : familyWords.more(hidden)}</span>
+        <span class="turn" data-open={allAlone ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
+      </button>
+    </li>
+  {/if}
 </ul>
 
 <style>
@@ -324,6 +354,28 @@
 
   .turn[data-open] {
     transform: rotate(180deg);
+  }
+
+  /* THE FOLD'S PRESS, QUIET INK UNDER THE ROWS, as a row's "N more details" is: not a button that competes with them. */
+  .fold-more {
+    list-style: none;
+    padding-inline: var(--sp-3);
+  }
+  .more-press {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--fs-meta);
+    cursor: pointer;
+  }
+  .more-press:hover {
+    color: var(--ink);
   }
 
   /* ON THE ROWS' OWN EDGE: the ledger reaches out by --sp-3 and each row pads back in by as much. */

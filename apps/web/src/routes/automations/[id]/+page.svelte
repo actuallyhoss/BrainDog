@@ -95,7 +95,8 @@
     type TryRun,
     type Version,
   } from '$lib/flow/source.ts';
-  import { canvasWords, lastRunReading, pageSentence, runDurations, runMark, runParts, triggerIcon } from '../hub.ts';
+  import { canvasWords, lastRunReading, pageSentence, runDurations, runGroups, runMark, runParts, triggerIcon } from '../hub.ts';
+  import { plainSay } from '$lib/flow/plain-fail.ts';
   import { contestLines, contestOf, fieldOf, nameFor } from './run-again.ts';
   import { actorOf, mutedAfter, mutedOf, tellsQuietly } from '../../settings/[area]/muted.ts';
 
@@ -866,12 +867,19 @@
             <Tile icon="history" title={words.runs} count={runs.length}>
               {#snippet actions()}<Button weight="bare" size="sm" onclick={() => (tab = 'runs')}>{canvasWords.allRuns}</Button>{/snippet}
               <ol class="runs ledger">
-                {#each runs.slice(0, 5) as r (r.id)}
+                <!-- ALIKE RUNS ARE ONE ROW (L48): "Failed 10 times, the last 9 min ago", and why in plain words under it. -->
+                {#each runGroups(runs, 5, row.name) as g, i (g.run.id)}
+                  {@const r = g.run}
+                  <!-- THE NEWEST'S REASON IS THE HEAD'S SENTENCE ALREADY when it failed, so it is not said twice. -->
+                  {@const why = i === 0 && said?.needs ? '' : g.why}
                   {@const mark = runMark(r.state)}
                   <li class="run">
-                    <button type="button" class="run-open line" onclick={() => openRun(r)}>
+                    <button type="button" class="run-open line" class:line-tall={why !== ''} onclick={() => openRun(r)}>
                       <IconWell name={mark.icon} size="l" tone={mark.tone} />
-                      <span class="line-main"><span class="line-title">{cap(words.runState[r.state] ?? r.state)}, {since(r.started, now)}</span></span>
+                      <span class="line-main">
+                        <span class="line-title">{g.times > 1 ? editWords.runTimes(cap(words.runState[r.state] ?? r.state), g.times, since(r.started, now)) : `${cap(words.runState[r.state] ?? r.state)}, ${since(r.started, now)}`}</span>
+                        {#if why}<span class="run-say">{why}</span>{/if}
+                      </span>
                     </button>
                   </li>
                 {/each}
@@ -899,8 +907,11 @@
             {/if}
 
             <ol class="runs ledger ledger-lead">
-              {#each runs as r (r.id)}
+              {#each runs as r, i (r.id)}
                 {@const took = durationOf(r)}
+                <!-- A REASON IS SAID ONCE FOR A RUN OF ALIKE ROWS (L48): ten rows of the same sentence read as a wall. -->
+                {@const why = r.say ? plainSay(r.say, row.name) : ''}
+                {@const sameAsAbove = i > 0 && why !== '' && plainSay(runs[i - 1]!.say, row.name) === why}
                 {@const mark = runMark(r.state)}
                 <!-- THE STATE AS ITS WELL AND ITS WORD, THEN WHEN, HOW LONG AND WHAT STARTED IT, and no id: a run is opened
                      by the whole row, and its detail is the canvas it ran on (`RunView.svelte`). Stop sits beside the row,
@@ -911,10 +922,10 @@
                     <span class="line-main">
                       <span class="line-title">{cap(words.runState[r.state] ?? r.state)}, {since(r.started, now)}</span>
                       <span class="line-detail run-meta">
-                        {#if took !== null}<span>{editWords.took(took)}</span>{/if}
+                        {#if took !== null}<span>{cap(editWords.took(took))}</span>{/if}
                         {#if r.trigger !== null && editWords.startedBy[r.trigger]}<span>{editWords.startedBy[r.trigger]}</span>{/if}
                       </span>
-                      {#if r.say}<span class="run-say">{r.say}</span>{/if}
+                      {#if why && !sameAsAbove}<span class="run-say">{why}</span>{/if}
                     </span>
                   </button>
                   {#if r.state === 'pending' || r.state === 'running' || r.state === 'waiting'}

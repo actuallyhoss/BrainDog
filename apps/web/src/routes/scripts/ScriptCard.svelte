@@ -26,6 +26,7 @@
   import Segments from '$lib/viz/Segments.svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { recentOf, toneOf, words as shown } from './reading.ts';
+  import { plainSay } from '$lib/flow/plain-fail.ts';
 
   let { s, named, onresumed }: { s: Script; named: (list: string) => string; onresumed?: (() => void | Promise<void>) | undefined } = $props();
 
@@ -115,7 +116,7 @@
               <span class="run-outcome" data-outcome={r.outcome}>{outcomeOf(r.outcome)}</span>
               <span class="run-when">{since(r.at, now())}{#if r.version !== null}, {words.version(r.version).toLowerCase()}{/if}</span>
             </p>
-            {#if r.say}<p class="run-say">{r.say}</p>{/if}
+            {#if r.say}<p class="run-say">{plainSay(r.say)}</p>{/if}
             {#if r.log !== null}
               <details class="run-log">
                 <summary class="run-log-head tap">{words.showLog(since(r.at, now()))}</summary>

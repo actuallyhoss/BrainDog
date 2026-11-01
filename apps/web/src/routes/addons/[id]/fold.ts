@@ -26,12 +26,22 @@ export function sharedNotes(entries: readonly (readonly [string, { note?: string
   return [...seen].filter(([, n]) => n >= FOLD_LEAST).map(([note]) => note);
 }
 
+/**
+ * WORDS STILL AT WHAT THE ADD-ON SHIPS (L45, 1 Nov): a starter drew thirteen "Name of the … list" boxes, thirteen "What
+ * one is called" and fifteen lines of its voice, every one holding its own default, 4,672px at 1512. A word setting that
+ * still holds its shipped words folds with the blank limits; one somebody changed stays in view.
+ */
+const atShipped = (decl: { type: string; default?: unknown }, v: unknown): boolean =>
+  decl.type === 'text' && typeof decl.default === 'string' && decl.default.trim() !== '' && (blank(v) || v === decl.default);
+
 /** The settings drawn, the ones folded, both in the add-on's own order, and what the fold is called. */
 export function foldOf(
   entries: readonly (readonly [string, { type: string; default?: unknown }])[],
   values: Readonly<Record<string, unknown>>,
 ): { shown: string[]; folded: string[]; label: string } {
-  const folding = entries.filter(([key, decl]) => LIMITS.has(decl.type) && blank(values[key]) && blank(decl.default)).map(([key]) => key);
-  const folded = folding.length >= FOLD_LEAST ? folding : [];
-  return { shown: entries.map(([key]) => key).filter((k) => !folded.includes(k)), folded, label: 'More limits' };
+  const limits = entries.filter(([key, decl]) => LIMITS.has(decl.type) && blank(values[key]) && blank(decl.default)).map(([key]) => key);
+  const worded = entries.filter(([key, decl]) => atShipped(decl, values[key])).map(([key]) => key);
+  const folded = [...(limits.length >= FOLD_LEAST ? limits : []), ...(worded.length >= FOLD_LEAST ? worded : [])];
+  const label = worded.length >= FOLD_LEAST ? 'More settings' : 'More limits';
+  return { shown: entries.map(([key]) => key).filter((k) => !folded.includes(k)), folded, label };
 }
