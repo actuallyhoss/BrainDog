@@ -42,7 +42,7 @@ import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
 import { teamsOn } from '@braindog/record/plans';
-import { TEAMS_HELD_SAID, FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, FREE_ONE_PERSON, FREE_ONE_PERSON_SHORT, createDirectory, leavesAsked, leftBy, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
+import { TEAMS_HELD_SAID, FREE_JOIN_REFUSED, FREE_ONE_PERSON, createDirectory, leavesAsked, leftBy, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall, SeenAnswers, SeenCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
@@ -776,8 +776,7 @@ export class Record$ extends DurableObject<Env> {
    */
   async #outsiders(api: RecordApi): Promise<Refusal | null> {
     if (this.env.TEAMS_HELD === '1') return { code: 'FORBIDDEN', fix: TEAMS_HELD_SAID, at: 'plan' };
-    if (!sells(this.env) || teamsOn(await this.#planOf(api))) return null;
-    return { code: 'FORBIDDEN', fix: sells(this.env) ? FREE_ONE_PERSON : FREE_ONE_PERSON_SHORT, at: 'plan' };
+    return teamsStop(this.env, await this.#planOf(api), FREE_ONE_PERSON);
   }
 
   /** Set or clear this record's lapse: billing's webhook, when a payment moves it into or out of one. */
@@ -5116,6 +5115,17 @@ async function turnstilePassed(env: Env, answer: unknown, ip: string): Promise<b
 }
 
 /**
+ * WHETHER A RECORD'S PLAN TAKES A SECOND PERSON, and the one place the Cloud reads it (`teamsOn`, the plan table's
+ * `teams`): an invitation, a share to an address and a link opened all ask here, so a plan's people limit, when billing
+ * adds one, is read in one line. No refusal while this host sells no plan; the sentence names the move to Cloud Plus only
+ * where it is sold.
+ */
+function teamsStop(env: Env, plan: string | null, said: string): Refusal | null {
+  if (!sells(env) || teamsOn(plan)) return null;
+  return { code: 'FORBIDDEN', fix: said, at: 'plan' };
+}
+
+/**
  * An invitation link's two halves, over RPC: the record its token names, and the Directory.
  *
  * THE TOKEN CARRIES ITS RECORD ID, as a bearer does, so the object is found without a search. A token naming no
@@ -5136,7 +5146,8 @@ function invites(env: Env): InviteDoor {
       if (!found) return gone;
       /* A FREE RECORD IS ONE PERSON, SAID WHEN THE LINK IS OPENED, before a new address is sent a proof it cannot use. */
       if (env.TEAMS_HELD === '1') return { ok: false, refusal: { code: 'FORBIDDEN', fix: TEAMS_HELD_SAID, at: 'plan' } };
-      if (sells(env) && !teamsOn(await directory.planFor(found.id))) return { ok: false, refusal: { code: 'FORBIDDEN', fix: sells(env) ? FREE_JOIN_REFUSED : FREE_JOIN_REFUSED_SHORT, at: 'plan' } };
+      const plan = sells(env) ? teamsStop(env, await directory.planFor(found.id), FREE_JOIN_REFUSED) : null;
+      if (plan !== null) return { ok: false, refusal: plan };
       return (await found.stub.acceptInvite({ token: inviteToken })) as unknown as Awaited<ReturnType<InviteDoor['look']>>;
     },
     accept: async (inviteToken, person) => {

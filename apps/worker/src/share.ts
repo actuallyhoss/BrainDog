@@ -37,7 +37,7 @@ export const SHARES_OFF = 'Read-only links are switched off on this BrainDog.';
  * Whether this Worker makes read-only links: yes only when `KEK` is bound, which the share key is derived from, and the
  * variable `SHARE_LINKS` is exactly `on`.
  *
- * OFF UNLESS SAID, AND OFF IN PRODUCTION UNTIL THE OWNER SAYS YES. An unset, empty or misspelt `SHARE_LINKS` is no, so a
+ * OFF UNLESS SAID (on in alpha and production since 1 Nov). An unset, empty or misspelt `SHARE_LINKS` is no, so a
  * deploy that forgets the variable makes no link, and the app offers no button that would fail. The answer says
  * whether the key is bound and never reads it, so nothing here touches the secret's value.
  */

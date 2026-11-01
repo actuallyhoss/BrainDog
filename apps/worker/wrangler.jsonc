@@ -376,8 +376,10 @@
            that off, for a host that seals nothing. Set here or with
            `--var PROVISION_WITHOUT_KEYS:yes` on the deploy. */
         "PROVISION_WITHOUT_KEYS": "",
-        /* Teams held until member-row write rules and private rows ship; remove this var when sharing ships. */
-        "TEAMS_HELD": "1",
+        /* TEAMS_HELD: `1` holds new invitations and joins on every plan (`TEAMS_HELD_SAID`), the switch to pull if sharing
+           has to stop at once. Off since 1 Nov: member row rules, private rows, shares and the Admin's limits shipped, and
+           a second person joins as the plan allows (`teamsStop` in `src/index.ts`), on any plan while billing is off. */
+        "TEAMS_HELD": "",
         /* WEB PUSH'S PUBLIC KEY, AND EMPTY IS NO PUSH. It is a var and not a secret because the app hands it to every
            browser that subscribes. The private half is the secret `VAPID_PRIVATE` (the note at the end of this file),
            and `notify.push` is leased only when both are set (`delivers` in `src/deliver.ts`), so one without the
@@ -407,7 +409,8 @@
         "TURNSTILE_SITE_KEY": "",
         /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and the operator's yes to them. Unset is off, and the page reads by rules. 300, his yes to C7 (1 Nov, "i need it highly intelligent"). Still off in effect until `TURNSTILE_SECRET` is set: the door reads nothing behind no bot check. */
         "FIRST_READ_DAILY": "300",
-        /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made. Unset in production until the owner says yes. */
+        /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made, and every open link stops answering. On since 1 Nov (his ask of 20 Oct, sharing finished). */
+        "SHARE_LINKS": "on",
         /* COUNT_VISITS: `yes` counts the site's visits by day, page and where they came from, and nothing about who (`src/seen.ts`). Unset, and `/api/seen` answers 204 and counts nothing. Unset in production, the owner's choice. */
         /* THE OPERATOR'S CANARY RECORD, a `rec_...` id. Empty, and the nightly walk writes its summary nowhere and
            `deploy.yml`'s sandbox smoke says it was skipped. EMPTY ON PURPOSE UNTIL HIS CANARY SITTING:
@@ -614,8 +617,10 @@
            that off, for a host that seals nothing. Set here or with
            `--var PROVISION_WITHOUT_KEYS:yes` on the deploy. */
         "PROVISION_WITHOUT_KEYS": "",
-        /* Teams held until member-row write rules and private rows ship; remove this var when sharing ships. */
-        "TEAMS_HELD": "1",
+        /* TEAMS_HELD: `1` holds new invitations and joins on every plan (`TEAMS_HELD_SAID`), the switch to pull if sharing
+           has to stop at once. Off since 1 Nov: member row rules, private rows, shares and the Admin's limits shipped, and
+           a second person joins as the plan allows (`teamsStop` in `src/index.ts`), on any plan while billing is off. */
+        "TEAMS_HELD": "",
         /* WEB PUSH'S PUBLIC KEY, AND EMPTY IS NO PUSH. It is a var and not a secret because the app hands it to every
            browser that subscribes. The private half is the secret `VAPID_PRIVATE` (the note at the end of this file),
            and `notify.push` is leased only when both are set (`delivers` in `src/deliver.ts`), so one without the
@@ -641,7 +646,8 @@
         "TURNSTILE_SITE_KEY": "",
         /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and the operator's yes to them. Unset is off, and the page reads by rules. 300, his yes to C7 (1 Nov, "i need it highly intelligent"). Still off in effect until `TURNSTILE_SECRET` is set: the door reads nothing behind no bot check. */
         "FIRST_READ_DAILY": "300",
-        /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made. Unset in production until the owner says yes. */
+        /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made, and every open link stops answering. On since 1 Nov (his ask of 20 Oct, sharing finished). */
+        "SHARE_LINKS": "on",
         /* COUNT_VISITS: `yes` counts the site's visits by day, page and where they came from, and nothing about who (`src/seen.ts`). Unset, and `/api/seen` answers 204 and counts nothing. On in production since 23 October. */
         "COUNT_VISITS": "yes",
         /* THE OPERATOR'S CANARY RECORD, as alpha's comment says, and empty until the same sitting: the line
