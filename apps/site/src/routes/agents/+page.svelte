@@ -1,11 +1,11 @@
 <!--
   Connect your AI tools: the door the launch is built around, rewritten in the redesign so anyone reads it: the night head with the page's name, one line and the connect box; then
   what an AI tool gets and what it can't do, each line with its icon in a well; then the brief an AI tool starts with,
-  played in a terminal on the made-up record; then a row of plain links for developers; then the early access strip.
+  played in a terminal on the made-up record; then a row of plain links for developers (the MCP address is the connect
+  box's, said once there: plan F18); then the early access strip.
 
   Every word is `copy/agents.ts`'s and every connect step is `lib/connect/apps.ts`'s. With scripting off the page is
-  whole: each app's lines are in the HTML one under another, the terminal shows every line at once, and the address's
-  Copy is drawn only once the script runs. The skill an agent installs is still served at `/agents/braindog/SKILL.md`,
+  whole: each app's lines are in the HTML one under another, and the terminal shows every line at once. The skill an agent installs is still served at `/agents/braindog/SKILL.md`,
   by its own route beside this page.
 -->
 <script lang="ts">
@@ -27,21 +27,6 @@
   const GETS: readonly IconName[] = ['today', 'person', 'undo'];
   const CANNOT: readonly IconName[] = ['lock', 'card', 'clock'];
 
-  let live = $state(false);
-  let copied = $state(false);
-  $effect(() => {
-    live = true;
-  });
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(a.dev.address);
-      copied = true;
-      setTimeout(() => (copied = false), 1600);
-    } catch {
-      copied = false;
-    }
-  }
 </script>
 
 <Seo title={site.meta.agents.title} description={site.meta.agents.description} path="/agents" ld={[crumbsOf([{ name: 'BrainDog', path: '/' }, { name: site.nav.agents, path: '/agents' }])]} />
@@ -83,10 +68,6 @@
 <section class="wrap dev" aria-labelledby="dev-title">
   <h2 id="dev-title">{a.dev.title}</h2>
   <ul>
-    <li class="mcp">
-      <span>{a.dev.mcp}:</span> <code>{a.dev.address}</code>
-      {#if live}<button type="button" class="btn sm line" onclick={copy}>{copied ? a.dev.copied : a.dev.copy}</button>{/if}
-    </li>
     {#each a.dev.links as link (link.href)}
       <li><a href={link.href}>{link.label}<Icon name="arrow-right" size="s" /></a></li>
     {/each}
@@ -177,21 +158,6 @@
     font-size: var(--t-site-16);
   }
 
-  .mcp {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    color: var(--ink2);
-  }
-
-  code {
-    padding: 4px 8px;
-    border-radius: 8px;
-    background: var(--paper);
-    color: var(--ink);
-    font: 500 14px/1.4 var(--mono);
-  }
 
   .dev a {
     display: inline-flex;

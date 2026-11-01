@@ -6,7 +6,9 @@
    * Slash ... make it super readable and neat"). The prototype's `#slash`:
    *
    *   head       the / key on the night ground, the page's one h1 and its lead.
-   *   modes      Ask, Find and Make: plain words beside one drawn answer each, with the questions to try.
+   *   modes      Ask leads, its words beside its drawn answer, so one question and its answer are on the first
+   *              screen; Find and Make as a two-column bento under it (one column on a phone), and the questions to
+   *              try for all three behind one More examples (plan F15, F16: the page was 4,358 tall at 1512).
    *   facts      how asks are counted (one paragraph, no plan table), Slash beside your AI tools, and four questions.
    *   strip      the early access strip.
    *
@@ -33,18 +35,37 @@
 </PageHead>
 
 <section class="wrap read">
-  {#each MODES as m (m.mode)}
+  {#each MODES.slice(0, 1) as m (m.mode)}
     <div class="srow">
       <div class="stext">
         <h2>{m.words.title}</h2>
         {#each m.words.body as p (p)}<p>{p}</p>{/each}
-        <ul class="eg" aria-label={s.examples}>
-          {#each m.tries as q (q)}<li>{q}</li>{/each}
-        </ul>
       </div>
       <Mini mode={m.mode} />
     </div>
   {/each}
+  <div class="bento">
+    {#each MODES.slice(1) as m (m.mode)}
+      <article class="stile">
+        <h2>{m.words.title}</h2>
+        {#each m.words.body as p (p)}<p>{p}</p>{/each}
+        <Mini mode={m.mode} />
+      </article>
+    {/each}
+  </div>
+  <details class="more-eg">
+    <summary>{s.moreExamples}</summary>
+    <div class="egs">
+      {#each MODES as m (m.mode)}
+        <div>
+          <h3>{m.words.title}</h3>
+          <ul class="eg" aria-label={s.examples}>
+            {#each m.tries as q (q)}<li>{q}</li>{/each}
+          </ul>
+        </div>
+      {/each}
+    </div>
+  </details>
 </section>
 
 <section class="wrap read">
@@ -109,12 +130,76 @@
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
     gap: 64px;
     align-items: start;
-    padding-block: 88px;
-    border-block-start: 1px solid var(--rule);
+    padding-block: 56px 32px;
   }
 
-  .read > .srow:first-child {
-    border-block-start: 0;
+  /* FIND AND MAKE, side by side on a desk: each its words over its drawn answer, on the page's paper. */
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .stile {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-inline-size: 0;
+    padding: 28px;
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+  }
+
+  .stile h2 {
+    font-size: var(--t-site-28);
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+  }
+
+  .stile p {
+    margin: 12px 0 0;
+    color: var(--ink2);
+    font-size: var(--t-site-16);
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+
+  .stile :global(.mini) {
+    margin-block-start: auto;
+  }
+
+  .stile p:last-of-type {
+    margin-block-end: 24px;
+  }
+
+  /* THE QUESTIONS TO TRY, all three modes', behind one disclosure under the drawings. */
+  .more-eg {
+    margin-block: 24px 72px;
+  }
+
+  .more-eg summary {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 44px;
+    font-size: var(--t-site-16);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .egs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+    padding-block-start: 12px;
+  }
+
+  .egs h3 {
+    font-size: var(--t-site-17);
+    letter-spacing: -0.02em;
+  }
+
+  .egs .eg {
+    margin-block-start: 12px;
   }
 
   .stext h2,
@@ -155,7 +240,7 @@
   }
 
   .facts {
-    padding-block: 88px;
+    padding-block: 72px;
     border-block-start: 1px solid var(--rule);
   }
 
@@ -219,7 +304,12 @@
     .srow {
       grid-template-columns: 1fr;
       gap: 32px;
-      padding-block: 64px;
+      padding-block: 40px 24px;
+    }
+
+    .bento,
+    .egs {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .faq {
@@ -230,6 +320,10 @@
   @media (max-width: 760px) {
     .facts {
       padding-block: 64px;
+    }
+
+    .stile {
+      padding: 20px;
     }
   }
 </style>

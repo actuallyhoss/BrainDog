@@ -31,6 +31,7 @@
 -->
 <script lang="ts">
   import { page } from '$app/state';
+  import { MediaQuery } from 'svelte/reactivity';
   import { apiBase, at } from '$lib/at.ts';
   import { bytes } from 'braindog-render';
   import { humanize } from '$lib/record/names.ts';
@@ -62,6 +63,8 @@
   const month = $derived(monthRange(recordNow(), page.url.searchParams.get('month') ?? undefined).month);
   const project = $derived(page.url.searchParams.get('project'));
   const beside = $derived(monthsBeside(recordNow(), month));
+  /** A desk, where the month switch sits at the end of the sentence's row. */
+  const wide = new MediaQuery('(width >= 900px)', true);
 
   /**
    * The month, or `null` for a host with no ledger and no run events to count.
@@ -261,7 +264,9 @@
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's,
      not as a page of its own. -->
 <!-- THE MONTHS UNDER THE SENTENCE, the page's own switch, full width on a phone: on the name's row they pushed it. -->
-<PageHead icon="chart-bar" title={words.usage} sentence={sentence?.text} needs={sentence?.needs} below={months} />
+<!-- THE MONTH SWITCH IS THE SENTENCE ROW'S ACTION ON A DESK (plan F10), not a second row under it; a phone keeps it under
+     the sentence, where the bar has no room for three months. -->
+<PageHead icon="chart-bar" title={words.usage} sentence={sentence?.text} needs={sentence?.needs} actions={wide.current ? months : undefined} below={wide.current ? undefined : months} />
 <div class="page">
   {#if usage.state === 'waiting' || usage.state === 'refused' || usage.state === 'offline'}
     <ReadState state={usage.state} refusal={usage.refusal} onretry={usage.reread} />

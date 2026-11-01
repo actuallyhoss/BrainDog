@@ -11,6 +11,8 @@
  */
 export const trust = {
   legal: {
+    /* The list of a text's sections at its top (plan F26). */
+    contents: 'On this page',
     title: 'Legal',
     lede: 'What BrainDog is published under, and the terms of a hosted record.',
     licence: {
@@ -140,21 +142,9 @@ export const trust = {
       nightsRead: 'The last 30 copies are kept, and each one is sealed.',
       signin: ['A link by email', 'Or Google', 'Or a passkey', 'No password, anywhere'],
       signinLabel: 'Signing in: a link by email, Google or a passkey, and no password field',
-      /* The token's reach, row by row, as ADR-060 draws it: the first three a token may do, the rest only a person. */
-      reach: {
-        head: ['What it can do', 'An AI tool', 'You, signed in'],
-        rows: [
-          ['Read', true],
-          ['Suggest changes', true],
-          ['Write', true],
-          ['Open your keys', false],
-          ['Erase data', false],
-          ['Restore a copy', false],
-          ['Delete everything', false],
-        ] as [string, boolean][],
-        can: 'Can',
-        cannot: 'Cannot',
-      },
+      /* WHAT AN AI TOOL CAN DO IS THE AGENTS PAGE'S, said once there (plan F21): a second table here could drift from it. */
+      reachLink: "What an AI tool can and can't do",
+      reachHref: '/agents',
       exportName: 'Everything, in one file',
       exportNote: 'Every list, page and rule in it',
       /* A link and not a drawn button: a drawn button looked pressable and did nothing. */

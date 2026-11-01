@@ -57,6 +57,32 @@
     menuOpen = false;
   });
 
+  /* THE CURRENT LINK'S UNDERLINE SLIDES TO THE NEXT ON A PAGE CHANGE (plan F11, as the app's lit row does with
+     `litSlide`): one 2px bar under the row of links, moved and sized to the link of the page you are on over `--d-swap`
+     on the out curve, and faded where no link is current. Placed still on its first draw, so a page opening does not
+     slide it in; a reader who asked for less motion sees it jump. Without scripting the current link underlines itself. */
+  let row: HTMLElement | undefined = $state();
+  let under = $state<{ x: number; y: number; w: number } | null>(null);
+  let sliding = $state(false);
+  $effect(() => {
+    void page.url.pathname;
+    const box = row;
+    if (!box) return;
+    const place = () => {
+      const a = box.querySelector<HTMLElement>('a[aria-current="page"]');
+      if (a) under = { x: a.offsetLeft, y: a.offsetTop + a.offsetHeight / 2 + 14, w: a.offsetWidth };
+      else if (under) under = { ...under, w: 0 };
+    };
+    place();
+    const ready = requestAnimationFrame(() => (sliding = true));
+    void document.fonts?.ready.then(place);
+    addEventListener('resize', place);
+    return () => {
+      cancelAnimationFrame(ready);
+      removeEventListener('resize', place);
+    };
+  });
+
   /* A PAGE CHANGE CROSS-FADES (`app.css`, ui pass of 1 Nov) where the browser has view transitions, and the header holds
      still. Not for a reader who asked for less motion, nor for a jump within one page. */
   onNavigate((nav) => {
@@ -90,11 +116,12 @@
   <div class="wrap bar">
     <a class="brand" href="/" aria-label="{site.product} home"><Mark height={24} tone="inherit" />{site.product}</a>
 
-    <nav class="links" aria-label="Site">
+    <nav class="links" aria-label="Site" bind:this={row} data-slides={under ? '' : undefined}>
       {#each links as link}
         <a href={link.href} aria-current={here(link.href) ? 'page' : undefined}>{link.label}</a>
       {/each}
       <SignIn />
+      {#if under}<span class="links-under" data-moving={sliding ? '' : undefined} aria-hidden="true" style:translate="{under.x}px {under.y}px" style:inline-size="{under.w}px" style:opacity={under.w > 0 ? 1 : 0}></span>{/if}
     </nav>
 
     <div class="go"><Start size="sm" /></div>
@@ -213,6 +240,43 @@
   .links :global(a:hover),
   .links a[aria-current] {
     color: var(--on-night);
+  }
+
+  /* THE CURRENT LINK, UNDERLINED: by itself without scripting, by the sliding bar with it. */
+  .links {
+    position: relative;
+  }
+
+  .links a[aria-current] {
+    text-decoration: underline 2px;
+    text-underline-offset: 10px;
+  }
+
+  .links[data-slides] a[aria-current] {
+    text-decoration: none;
+  }
+
+  .links-under {
+    position: absolute;
+    inset-block-start: 0;
+    left: 0;
+    block-size: 2px;
+    border-radius: 1px;
+    background: var(--on-night);
+    pointer-events: none;
+  }
+
+  .links-under[data-moving] {
+    transition:
+      translate var(--d-swap) var(--ease-out),
+      inline-size var(--d-swap) var(--ease-out),
+      opacity var(--d-swap) var(--ease-out);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .links-under[data-moving] {
+      transition: none;
+    }
   }
 
   /* 44 tall under a thumb, on a tablet wide enough to show the links. */

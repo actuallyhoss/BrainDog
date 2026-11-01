@@ -36,7 +36,8 @@
     border-radius: 12px;
     background: var(--tile);
     font-size: var(--t-site-15);
-    box-shadow: inset 0 0 0 1.5px var(--red);
+    /* A PLAIN HAIRLINE, as the home band's bar (plan F17): red is kept for the one ask. */
+    box-shadow: inset 0 0 0 1px var(--rule);
   }
   .sl {
     color: var(--red);

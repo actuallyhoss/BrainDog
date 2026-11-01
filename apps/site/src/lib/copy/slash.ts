@@ -31,6 +31,8 @@ export const slashPage = {
   },
   /** The label a screen reader hears on each list of examples. */
   examples: 'Try typing',
+  /** The disclosure the questions to try sit behind, under the three drawn answers. */
+  moreExamples: 'More examples',
   ask: {
     title: 'Ask',
     body: [

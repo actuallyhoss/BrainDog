@@ -67,7 +67,8 @@
   import { KEYS_REGISTER } from '$lib/record/keys-register.ts';
   import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
-  import { MENU, WORK, arrange, flatNav, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
+  import { MENU, WORK, arrange, flatNav, isHere, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
+  import { byUse, keptUses, noteUse } from '$lib/shell/tab-use.ts';
   import { agentsHref, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount, toldReadable } from '$lib/home/need-you.ts';
@@ -347,8 +348,12 @@
   /* WHAT EACH LIST DECLARES, READ ONCE THE FIRST SCREEN HAS RESTED (`later`), on the desk and the phone alike, and kept on
      this device so the next draw places each list at once. Its reader is the sidebar's own chunk, asked for here, never
      in the entry, and never in the first screen's way: it carries the projects' cards' readers, about 20 KB. */
+  /* WHETHER THAT READ HAS ANSWERED, either way. A FIRST VISIT KEEPS NO FACTS, so every list stood under More lists ("More
+     lists 18") until the read placed them and the row said "1": the sidebar holds More lists until the lists are placed
+     (`listsPlaced`), so the row is drawn once with its true count. */
+  let factsSettled = $state(false);
   $effect(() => {
-    if (bare || data.live !== true || data.refused) return;
+    if (bare || data.live !== true || data.refused) return void (factsSettled = true);
     const base = apiBase(page.url);
     const lists = data.lists;
     let gone = false;
@@ -356,7 +361,9 @@
       void import('$lib/shell/side-read.ts')
         .then((m) => m.readFacts(base, lists))
         .then((facts) => {
-          if (gone || Object.keys(facts).length === 0) return;
+          if (gone) return;
+          factsSettled = true;
+          if (Object.keys(facts).length === 0) return;
           frame.facts = facts;
           try {
             const all = JSON.parse(localStorage.getItem(FACTS_KEY) ?? '{}') as Record<string, unknown>;
@@ -366,12 +373,14 @@
             /* Kept for this tab only. */
           }
         })
-        .catch(() => undefined),
+        .catch(() => void (factsSettled = true)),
     );
     return () => {
       gone = true;
     };
   });
+  /** Every list is in its home: the read has answered, or this device kept where each one belongs. */
+  const listsPlaced = $derived(factsSettled || Object.keys(keptFacts).length > 0);
   const sideLists = $derived<SideList[]>(
     /* ONE ENTRY FOR THE KEYS (Q28 of 29 October): the Keychain below is where keys are, so the list of them is not a
        second row ("Keys 176" over "Keychain"). The list still opens from the Keychain. */
@@ -468,8 +477,25 @@
   const keepsNoProject = $derived(
     projectsPlace !== null && !rail.things.some(([section]) => section === projectsPlace.label) && !sideLists.some((l) => l.facts?.projects === true && l.count > 0),
   );
-  /* THE PHONE'S FOUR, and Menu after them (`TabBar.svelte`): Today, Needs you, Projects, Money, or the four picked. */
-  const tabs = $derived(withThings(tabsOf(keepsNoProject ? rail.places.filter((p) => p !== projectsPlace) : rail.places, 4, navPrefs.tabs)));
+  /* THE PHONE'S FOUR, and Menu after them (`TabBar.svelte`): Today, Needs you, Projects, Money, or the four picked. WITH
+     NONE PICKED THEY FOLLOW WHAT HE OPENS MOST (`tab-use.ts`, plan F7), read once as the shell opens so the bar holds
+     still through a session; Today stays first. */
+  const tabUses = typeof window === 'undefined' ? [] : keptUses();
+  const tabs = $derived.by(() => {
+    const main = withThings(keepsNoProject ? rail.places.filter((p) => p !== projectsPlace) : rail.places);
+    const chosen = tabsOf(main, 4, navPrefs.tabs);
+    return navPrefs.tabs.length > 0 ? chosen : byUse(main, chosen, tabUses);
+  });
+  /** The place of the rail a page sits in, past Today: its own address, its section's pages, or a list under it. */
+  const placeAt = (path: string): FlatItem | undefined =>
+    withThings(rail.places)
+      .slice(1)
+      .find((p) => {
+        if (p.key === 'activity') return false;
+        if (isHere(p, path)) return true;
+        const own = model.places.find((m) => m.key === p.key)?.kids ?? (projectsPlace?.key === p.key ? (model.projects?.kids ?? []) : []);
+        return own.some((k) => path === k.href || path.startsWith(`${k.href}/`));
+      });
   /* ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE, at its own address (`MENU`); the desk draws Today there. */
   const phoneMenu = $derived(narrow && placeOf(here(page.url.pathname), page.url.searchParams) === MENU);
   $effect(() => {
@@ -819,6 +845,9 @@
   /* WHERE HE WENT, KEPT ON THIS DEVICE for the empty palette's Recent. The first screen counts too. */
   afterNavigate((nav) => {
     if (nav.to) noteOpened(`${nav.to.url.pathname}${nav.to.url.search}`, PRODUCT);
+    /* AND WHICH PLACE IT WAS IN, for the phone's four (`tab-use.ts`). */
+    const went = nav.to ? placeAt(placeOf(here(nav.to.url.pathname), nav.to.url.searchParams)) : undefined;
+    if (went) noteUse(went.href);
     /* THE RECORD FORMING (`$lib/motion`): a screen's first second draws still, so what was already there never flies in. */
     hush();
   });
@@ -1391,6 +1420,7 @@
               mode={sideOn ? 'full' : 'rail'}
               shown={sideOn}
               pen={sidePen}
+              placed={listsPlaced}
               width={sideWidth}
               onwidth={(n, done) => {
                 sideWidth = n;
@@ -1430,6 +1460,7 @@
               version={live.version}
               shown={true}
               pen={sidePen}
+              placed={listsPlaced}
               width={sideWidth}
               ontoggle={() => (sideOver = false)}
             />
@@ -1476,7 +1507,7 @@
       {/if}
       {#if phoneMenu}
         <!-- ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE: every place, the projects, every list and Settings. -->
-        {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} lit={sideLit} working={workingOn} version={live.version} pen={sidePen} />{/if}
+        {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} lit={sideLit} working={workingOn} version={live.version} pen={sidePen} placed={listsPlaced} />{/if}
       {:else}
         {@render children()}
       {/if}

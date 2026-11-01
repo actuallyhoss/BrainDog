@@ -68,6 +68,12 @@ export const docsWords = {
   copied: 'Copied the page as text.',
   failed: 'This browser would not copy. Open the page as text instead.',
   raw: 'Open as text',
+  /* A code block's own button (plan F25), as the agents page's address has one. */
+  codeCopy: 'Copy',
+  codeCopied: 'Copied',
+  codeLabel: 'Copy this code',
+  /* The part of the page in view, said in the bar that stays at the top on a phone (plan F24). */
+  inView: 'In this part',
   edit: 'Edit on GitHub',
 
   llms: {

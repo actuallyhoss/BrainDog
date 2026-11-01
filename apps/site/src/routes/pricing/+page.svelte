@@ -3,8 +3,9 @@
   import { application, faqOf } from '$lib/site/seo.ts';
   /**
    * Pricing. WHILE BILLING IS OFF it is the early access page (20 October, `copy/pricing.ts` `early`): the night
-   * head, Free on the night with its $0 and what it holds, a paper tile naming Cloud and Cloud Plus as coming soon and
-   * priced at launch (his N2, 1 November), three questions, and no close. No paid plan's price is drawn.
+   * head, Free on the night with its $0 and what it holds, one line that paid plans come later and nothing made now is
+   * lost (plan F20), and the questions people ask: this page's three and the home page's, which moved here (plan F12),
+   * and no close. No paid plan's price is drawn.
    *
    * THE DAY `LAUNCH.billing` IS ON it is the plans page again: the three plans with Free first and black (§35), what
    * each plan holds, extra use and the questions people ask. Every figure is `TABLE`'s (`plans.ts`, held to
@@ -18,6 +19,8 @@
   import { TABLE } from '$lib/plans.ts';
   import Plans from '$lib/pricing/Plans.svelte';
   import { columns, extra, faqFor, holds } from '$lib/pricing/cards.ts';
+  import { home } from '$lib/copy/home.ts';
+  import Questions from '$lib/home/Questions.svelte';
   import EarlyStrip from '$lib/site/EarlyStrip.svelte';
   import PageHead from '$lib/site/PageHead.svelte';
   import Start from '$lib/site/Start.svelte';
@@ -25,41 +28,25 @@
   const p = site.pricing;
   const e = p.early;
   const faq = faqFor(LAUNCH);
+  /* THE QUESTIONS PEOPLE ASK, this page's first and then the home page's, less what this page itself answers. */
+  const asked = [...e.faq.questions, ...home.faq.questions.filter((q) => !('link' in q) || q.link.href !== '/pricing')];
 </script>
 
-<Seo title={site.meta.pricing.title} description={site.meta.pricing.description} path="/pricing" ld={[application, faqOf(LAUNCH.billing ? faq : e.faq.questions)]} />
+<Seo title={site.meta.pricing.title} description={site.meta.pricing.description} path="/pricing" ld={[application, faqOf(LAUNCH.billing ? faq : asked)]} />
 {#if !LAUNCH.billing}
   <PageHead title={e.title} lead={e.lede} />
 
   <section class="wrap early">
-    <div class="pair">
-      <article class="plan">
-        <p class="pname">{e.plan.name} <b class="num">{e.plan.price}</b></p>
-        <ul>
-          {#each e.plan.lines(TABLE.free) as line (line)}<li>{line}</li>{/each}
-        </ul>
-        <div class="go"><Start /></div>
-      </article>
-      <article class="later">
-        <h2>{e.later.title}</h2>
-        <p>{e.later.say}</p>
-        <ul class="soonplans">
-          {#each e.later.plans as plan (plan.name)}
-            <li><b>{plan.name}</b><span>{plan.line}</span><em>{plan.soon}</em></li>
-          {/each}
-        </ul>
-      </article>
-    </div>
-
-    <div class="sec" id="questions">
-      <h2>{e.faq.title}</h2>
-      <div class="faq">
-        {#each e.faq.questions as item (item.q)}
-          <div><h3>{item.q}</h3><p>{item.a}</p></div>
-        {/each}
-      </div>
-    </div>
+    <article class="plan">
+      <p class="pname">{e.plan.name} <b class="num">{e.plan.price}</b></p>
+      <ul>
+        {#each e.plan.lines(TABLE.free) as line (line)}<li>{line}</li>{/each}
+      </ul>
+      <div class="go"><Start /></div>
+    </article>
+    <p class="later">{e.later.say}</p>
   </section>
+  <div id="questions"><Questions questions={asked} title={e.faq.title} /></div>
 {:else}
 <PageHead title={p.title} lead={p.sub} />
 
@@ -128,24 +115,15 @@
     border-block-end: 0;
   }
 
+  /* THE QUESTIONS' BAND FOLLOWS ON THE SAME GROUND, so its own padding is the space between them. */
   .early {
-    padding-block: 64px 96px;
+    padding-block: 64px 0;
   }
 
-  .early .sec {
-    padding-block-start: 96px;
-  }
-
-  /* THE TWO TILES END LEVEL, as a bento row does: they stood 16px apart at their feet, a near miss that read as a slip. */
-  .pair {
-    display: grid;
-    grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
-    gap: 16px;
-    align-items: stretch;
-  }
 
   /* THE ONE PLAN, on the night: its name and $0, what it holds, and the start button. */
   .plan {
+    max-inline-size: 640px;
     padding: 32px;
     border-radius: 16px;
     background: var(--night);
@@ -188,78 +166,17 @@
     margin-block-start: 32px;
   }
 
+  /* WHAT COMES LATER, one plain line under the plan. */
   .later {
-    padding: 32px;
-    border-radius: 16px;
-    background: var(--paper);
-  }
-
-  .later h2 {
-    font-size: var(--t-site-28);
-    letter-spacing: -0.035em;
-  }
-
-  .later p {
-    max-inline-size: 30em;
-    margin: 12px 0 0;
+    margin: 20px 0 0;
     color: var(--ink2);
     font-size: var(--t-site-17);
     line-height: 1.55;
   }
 
-  /* THE TWO PAID PLANS, named and unpriced: a hairline list on the paper, "Coming soon" plain on the right. */
-  .soonplans {
-    display: grid;
-    margin: 24px 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .soonplans li {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 16px;
-    row-gap: 2px;
-    padding-block: 14px;
-    border-block-start: 1px solid var(--rule);
-  }
-
-  .soonplans b {
-    font: 600 17px/1.3 var(--head);
-    letter-spacing: -0.02em;
-  }
-
-  .soonplans span {
-    grid-column: 1;
-    color: var(--ink2);
-    font-size: var(--t-site-15);
-    line-height: 1.45;
-  }
-
-  .soonplans em {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    align-self: center;
-    font: 500 14px/1.2 var(--ui);
-    font-style: normal;
-    color: var(--muted);
-  }
-
-  .early .sec h2 {
-    font-size: clamp(34px, 4.2vw, 48px);
-    line-height: 1;
-    letter-spacing: -0.045em;
-  }
-
-  @media (max-width: 900px) {
-    .pair {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
 
   @media (max-width: 760px) {
-    .plan,
-    .later {
+    .plan {
       padding: 24px 20px;
     }
 
@@ -268,12 +185,9 @@
     }
 
     .early {
-      padding-block: 40px 64px;
+      padding-block: 40px 0;
     }
 
-    .early .sec {
-      padding-block-start: 64px;
-    }
   }
 
   .sec .say {

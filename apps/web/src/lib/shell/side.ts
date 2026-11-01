@@ -585,13 +585,27 @@ export function leadFirst(kids: readonly SideLink[], hrefs: readonly string[]): 
   return { kids: [...open, ...rest], lead: open.length };
 }
 
-/** How many of Money's own pages stand open under it in the sidebar; its lists and the rest of its pages fold under More. */
-export const MONEY_LEAD_MOST = 6;
+/**
+ * How many of Money's own pages stand open under it in the sidebar; its lists and the rest of its pages fold under More.
+ * FOUR (plan F3): at six, with More, its rows pushed Projects 196px down the rail on every Money page.
+ */
+export const MONEY_LEAD_MOST = 4;
+
+/**
+ * HOW MANY ROWS ANY PLACE STANDS OPEN BEFORE THE REST FOLD UNDER ITS MORE, where it names none of its own (`lead`), and
+ * the most it may hold open with no More at all: five rows open is no taller than four and a More.
+ */
+export const PLACE_LEAD_MOST = 4;
+export const PLACE_OPEN_MOST = 5;
+
+/** How many of a place's rows stand open: all of them up to `PLACE_OPEN_MOST`, else its own lead capped at four. */
+export const leadOf = (p: { kids: readonly unknown[]; lead?: number | undefined }): number =>
+  p.kids.length <= PLACE_OPEN_MOST ? p.kids.length : Math.min(p.lead ?? p.kids.length, PLACE_LEAD_MOST);
 
 /**
  * THE PAGES THAT STAND OPEN UNDER MONEY: the first of the place's own pages, in the order their declarations give them
  * (`nav.order`), less the place's own page, so no page is named here. Money's own come first (Accounts, Ledger, Budgets,
- * Coming up, Forecast, Reports) because they declare the lowest orders; an add-on's page declares a later one.
+ * Coming up) because they declare the lowest orders; an add-on's page declares a later one.
  */
 export function moneyLead(views: readonly { href: string }[] | undefined, own: string | undefined): string[] {
   return (views ?? [])

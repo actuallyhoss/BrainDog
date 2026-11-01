@@ -79,6 +79,9 @@ export const shell = {
   notFound: {
     title: "There's no page here",
     lede: 'The address may be mistyped, or the page has moved.',
+    /* Over the three pages nearest the address (plan F29), and over every page under them. */
+    near: 'Did you mean',
+    all: 'Every page',
   },
 
   /** The early access line: the hero's under its buttons, and the strip that closes an inner page. */

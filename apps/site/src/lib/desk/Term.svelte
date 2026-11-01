@@ -86,8 +86,9 @@
     color: var(--term-red);
   }
 
+  /* A LINE THAT WENT WELL IS IN THE TERMINAL'S BRIGHT INK, not green (plan F19): it was the only green on the page. */
   .line[data-tone='good'] {
-    color: var(--term-green);
+    color: var(--term-bright);
   }
 
   .line[data-tone='white'] {

@@ -5,7 +5,9 @@
   THE LOOK IS LOOK B'S (LAUNCH 103 job 7): the strip carries on from the header's night, then the board.
   The page is one sheet of --paper read at 68ch (`Body`); the nav and "On this page" are flat on the board with no tile
   round them, and stay in view as the page scrolls. From 900px the nav and the page; below 900px the nav is a closed
-  disclosure at the top and the list of parts is not drawn, because on a phone the page itself is the list. A code
+  disclosure at the top and the list of parts is not drawn, because on a phone the page itself is the list; there the
+  part in view is named in one line that stays at the top as the page scrolls (plan F24), and on a desk the list marks
+  the part in view. A code
   block scrolls inside its well and nothing else on the page moves sideways.
 
   THE PAGE IS ALSO TEXT FOR AN AGENT: "Open as text" is the `.md` address beside it, the head names that address as
@@ -39,6 +41,32 @@
   /* Widened on purpose: the flag is a literal, and the page is written for both of its values. */
   const repo: string | null = LAUNCH.repo ? SOURCE : null;
   const edit = $derived(repo === null ? null : `${repo}/edit/master/${DOCS_DIR}${doc.file}`);
+
+  /* THE PART IN VIEW: the last `##` heading whose top has passed the top of the window, by its anchor. */
+  let inView = $state<string | null>(null);
+  $effect(() => {
+    const heads = doc.headings;
+    if (heads.length === 0) return void (inView = null);
+    let frame = 0;
+    const spy = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        let at: string | null = null;
+        for (const h of heads) {
+          const el = document.getElementById(h.id);
+          if (el && el.getBoundingClientRect().top <= 72) at = h.id;
+        }
+        inView = at;
+      });
+    };
+    spy();
+    addEventListener('scroll', spy, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      removeEventListener('scroll', spy);
+    };
+  });
+  const inViewText = $derived(inView === null ? null : plainOf(doc.headings.find((h) => h.id === inView)?.text ?? ''));
 </script>
 
 <Seo {title} {description} path={doc.path} type="article" ld={[crumbsOf([{ name: 'Docs', path: '/docs' }, { name: doc.title, path: doc.path }])]} />
@@ -64,6 +92,8 @@
     </div>
 
     <article class="doc" aria-labelledby="doc-title">
+      <!-- THE PART IN VIEW, ON A PHONE: one line held at the top; a link back to it. Drawn only once one is passed. -->
+      {#if inViewText}<a class="in-view" href={`#${inView}`} aria-label={`${w.inView}: ${inViewText}`}>{inViewText}</a>{/if}
       <Body src={doc.src}>
         {#snippet head()}
           <CopyText text={doc.src} />
@@ -95,7 +125,7 @@
         <h2 class="contents-title" id="doc-contents">{w.contents}</h2>
         <ol class="contents-list">
           {#each doc.headings as heading (heading.id)}
-            <li><a class="contents-link" href={`#${heading.id}`}>{plainOf(heading.text)}</a></li>
+            <li><a class="contents-link" href={`#${heading.id}`} aria-current={inView === heading.id ? 'location' : undefined}>{plainOf(heading.text)}</a></li>
           {/each}
         </ol>
       </aside>
@@ -250,6 +280,37 @@
   .contents-link:hover {
     background: var(--tile);
     color: var(--ink);
+  }
+
+  .contents-link[aria-current] {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* THE PART IN VIEW ON A PHONE: one line on the board's ground, held at the window's top once the header has scrolled
+     away, cut with an ellipsis. Fixed, so its arrival moves nothing under it. */
+  .in-view {
+    position: fixed;
+    inset-block-start: 0;
+    inset-inline: 0;
+    z-index: 2;
+    display: block;
+    padding: 12px var(--site-gutter, 16px);
+    overflow: hidden;
+    background: var(--board);
+    border-block-end: 1px solid var(--rule);
+    color: var(--ink);
+    font-size: var(--t-site-15);
+    font-weight: 600;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (width >= 900px) {
+    .in-view {
+      display: none;
+    }
   }
 
   /* A tablet held wide draws the list too, and a thumb needs the site's 44px row there. */

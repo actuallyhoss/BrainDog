@@ -6,12 +6,15 @@
   arrives instead of printing an address nobody reads. GitHub's Issues and Discussions answer 404
   while the repository is private, so they are listed only once `LAUNCH.repo` is on, last and the board's whole
   width, so the address and the checklist beside it stay a pair.
+
+  THE ADDRESS IS THE PAGE'S FIRST LINE (plan F23), on the head under its one line, not after the cards.
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
   import { LAUNCH } from '$lib/launch.ts';
   import { SOURCE, SUPPORT_EMAIL } from '$lib/links.ts';
   import { trust } from '$lib/copy/trust.ts';
+  import Icon from '$lib/Icon.svelte';
   import Parts, { type Part } from '../legal/Parts.svelte';
 
   const s = trust.support;
@@ -23,7 +26,7 @@
   const parts: Part[] = [
     address === ''
       ? { id: 'mail-title', title: s.mail.title, glyph: 'mail', span: 5, body: [s.mail.pending] }
-      : { id: 'mail-title', title: s.mail.title, glyph: 'mail', span: 5, body: [s.mail.body], action: { label: address, href: `mailto:${address}` } },
+      : { id: 'mail-title', title: s.mail.title, glyph: 'mail', span: 5, body: [s.mail.body] },
     { id: 'report-title', title: s.report.title, glyph: 'file', span: 7, lines: s.report.items },
     ...(repo === null
       ? []
@@ -43,4 +46,13 @@
 </script>
 
 <Seo title={s.meta.title} description={s.meta.description} path="/support" />
-<Parts title={s.title} lede={s.lede} {parts} />
+{#snippet head()}
+  {#if address !== ''}<p class="write"><a class="btn ghost" href="mailto:{address}"><Icon name="mail" size="m" />{address}</a></p>{/if}
+{/snippet}
+<Parts title={s.title} lede={s.lede} {parts} {head} />
+
+<style>
+  .write {
+    margin: 28px 0 0;
+  }
+</style>

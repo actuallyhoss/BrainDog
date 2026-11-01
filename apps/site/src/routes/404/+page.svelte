@@ -7,6 +7,9 @@
 
   THE NIGHT HEAD, then every page `nav.ts` knows exists, each a 44px link with its arrow in one flat tile, so it names
   a page the day its folder lands and a reader who arrived by accident is one press from somewhere real.
+
+  FIRST THE THREE NEAREST THE ADDRESS (plan F29, as the app's not-found screen offers them): this page is one file for
+  every miss, so they are found once the script runs and reads the address; without it every page is still listed.
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
@@ -14,14 +17,28 @@
   import Icon from '$lib/Icon.svelte';
   import { PAGES } from '$lib/nav.ts';
   import PageHead from '$lib/site/PageHead.svelte';
+  import { nearestPages, type Near } from '$lib/site/nearest.ts';
 
   const n = site.notFound;
+  let near = $state<Near[]>([]);
+  $effect(() => {
+    near = nearestPages(location.pathname, PAGES);
+  });
 </script>
 
 <Seo title={site.meta.notFound.title} description={site.meta.notFound.description} path="/404" noindex />
 <PageHead title={n.title} lead={n.lede} />
 
 <section class="wrap pages" aria-label="The pages">
+  {#if near.length > 0}
+    <h2 class="say">{n.near}</h2>
+    <ul class="near">
+      {#each near as link (link.path)}
+        <li><a href={link.path}><span>{link.label}</span><Icon name="chevron-right" size="m" /></a></li>
+      {/each}
+    </ul>
+    <h2 class="say">{n.all}</h2>
+  {/if}
   <ul>
     {#each PAGES as link}
       <li><a href={link.path}><span>{link.label}</span><Icon name="chevron-right" size="m" /></a></li>
@@ -32,6 +49,19 @@
 <style>
   .pages {
     padding-block: 56px 96px;
+  }
+
+  .say {
+    margin: 0 0 12px;
+    color: var(--muted);
+    font-family: var(--ui);
+    font-size: var(--t-site-15);
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .near {
+    margin-block-end: 32px;
   }
 
   /* ONE FLAT TILE holding the pages, two columns at a desk and one on a phone. */
