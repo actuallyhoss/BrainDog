@@ -491,9 +491,10 @@
     border-block-end: 1px solid var(--rule);
   }
 
+  /* GEIST, AS EVERY TILE'S AND SHEET'S HEADING IS (Look B): Lexend is for page names and big figures. */
   .bell-title {
     margin: 0;
-    font-family: var(--font-display);
+    font-family: var(--font-ui);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
     letter-spacing: -0.01em;
@@ -601,7 +602,8 @@
     outline-offset: -2px;
   }
 
-  /* NEW IS A DOT, 6 round in the red, level with the first line; read is the same slot empty. */
+  /* NEW IS A DOT, 6 round in the ink, level with the first line; read is the same slot empty. Never the red, which is
+     for what is late or failing, and the count on the bell is ink too. */
   .bell-new {
     inline-size: 6px;
     block-size: 6px;
@@ -609,7 +611,7 @@
   }
 
   .bell-row[data-unread] .bell-new {
-    background: var(--red);
+    background: var(--ink);
   }
 
   /* THE GLYPH IN ITS WELL, as a row's is everywhere else (1 Nov): bare 16px marks in the quiet ink read as specks,
@@ -754,13 +756,19 @@
     margin-block-start: 8px;
   }
 
-  .bell-in-sheet .bell-kind {
-    block-size: 22px;
-  }
-
   .bell-in-sheet .bell-foot {
     margin-block-start: auto;
     border-block-start: 0;
+  }
+
+  /* UNDER A THUMB EVERY LINE AND THE FOOT'S LINK ARE 44 TALL, as every target on a phone is. */
+  .bell-in-sheet .bell-row {
+    min-block-size: var(--tap);
+  }
+
+  .bell-in-sheet .bell-all,
+  .bell-in-sheet .bell-mark {
+    min-block-size: var(--tap);
   }
 
   @media (forced-colors: active) {

@@ -645,8 +645,11 @@
   .tell-one-field {
     inline-size: 100%;
     min-block-size: 64px;
+    max-block-size: 40vh;
     padding: var(--sp-3);
-    resize: vertical;
+    /* IT GROWS WITH WHAT IS TYPED (a pasted message too), so it needs no grip in its corner. */
+    field-sizing: content;
+    resize: none;
     font: inherit;
     font-size: var(--fs-body);
     color: var(--ink);

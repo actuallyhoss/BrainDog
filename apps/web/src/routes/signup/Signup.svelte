@@ -1821,6 +1821,8 @@
     color: var(--ink-3);
     font-size: var(--fs-body);
     line-height: 22px;
+    /* NO WORD LEFT ALONE ON A PHONE'S LAST LINE ("wrote." under a full line at 390). */
+    text-wrap: pretty;
   }
 
   /* THE TERMS LINE IS THE FORM'S SMALL PRINT, one line on a phone. */
@@ -1842,9 +1844,13 @@
     color: var(--ink-2);
   }
 
+  /* A LINK IS INK, UNDERLINED (Look B): red is kept for what is late or failing, and a stranger's first screen has none. */
   .have-link {
-    color: var(--red);
+    color: var(--ink);
     font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+    text-underline-offset: 3px;
   }
 
   .have-narrow {
@@ -2328,9 +2334,12 @@
     display: inline-flex;
     align-items: center;
     min-block-size: var(--tap);
-    color: var(--red);
+    color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+    text-underline-offset: 3px;
   }
 
   .link.plain {
@@ -2340,7 +2349,7 @@
     background: none;
     font: inherit;
     font-weight: 500;
-    color: var(--red);
+    color: var(--ink);
     cursor: pointer;
   }
 

@@ -15,6 +15,7 @@
   import { openAsk, openThread, palette } from '$lib/palette/open.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
 
@@ -22,7 +23,9 @@
     title: 'Slash',
     /* A FIGURE AND ITS AGE, or nothing: what the list is for is the list. */
     sentence: (n: number, ago: string) => `${n} ${n === 1 ? 'conversation' : 'conversations'}, the last ${ago}.`,
-    none: 'Nothing asked yet.',
+    /* WHAT WILL BE HERE AND HOW IT GETS THERE (Look B's empty state), never "Nothing asked yet" alone. */
+    none: 'Your conversations with Slash',
+    noneWhy: 'Ask about your work, your money or your people. Each conversation is kept here, to pick up later.',
     fresh: 'New conversation',
     list: 'Conversations',
     history: 'Past suggestions',
@@ -57,14 +60,20 @@
   }
 </script>
 
+{#snippet start()}
+  <Button weight="primary" kbd="⌘J" onclick={fresh}><Icon name="plus" size="m" />{words.fresh}</Button>
+{/snippet}
+
 <PageHead icon="slash" title={words.title} sentence={threads[0] ? words.sentence(threads.length, since(new Date(threads[0].at).toISOString(), now)) : undefined} />
 <div class="page">
-  <!-- EMPTY, THE LINE THEN THE BUTTON; with conversations, the button leads the list. -->
-  {#if threads.length === 0}<p class="none">{words.none}</p>{/if}
-  <div class="lead">
-    <Button weight="primary" kbd="⌘J" onclick={fresh}><Icon name="plus" size="m" />{words.fresh}</Button>
-  </div>
-  {#if threads.length > 0}
+  <!-- EMPTY, ONE TILE: what will be here, how it gets there, and the one way to start; with conversations, the button
+       leads the list. -->
+  {#if threads.length === 0}
+    <Empty kind="no-data-yet" glyph="slash" title={words.none} body={words.noneWhy}>
+      {#snippet actions()}{@render start()}<Button weight="bare" href="/slash?history">{words.history}</Button>{/snippet}
+    </Empty>
+  {:else}
+    <div class="lead">{@render start()}</div>
     <ul class="threads" aria-label={words.list}>
       {#each threads as t (t.id)}
         <li>
@@ -75,8 +84,8 @@
         </li>
       {/each}
     </ul>
+    <p class="more"><a class="tap" href={at('/slash?history')}>{words.history}</a></p>
   {/if}
-  <p class="more"><a class="tap" href={at('/slash?history')}>{words.history}</a></p>
 </div>
 
 <style>
@@ -89,12 +98,6 @@
 
   .lead {
     display: flex;
-  }
-
-  .none {
-    margin: 0;
-    max-inline-size: var(--measure);
-    color: var(--ink-3);
   }
 
   .threads {

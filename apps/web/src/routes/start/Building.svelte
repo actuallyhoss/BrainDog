@@ -103,7 +103,7 @@
       {#each shown as place (`${place.kind}:${place.id}`)}
         <li class="place" data-forming="place" data-place={place.id} data-arrived={fresh.has(`${place.kind}:${place.id}`) ? '' : undefined}>
           <span class="place-head">
-            <Icon name={placeIcon(place)} size="s" />
+            <Icon name={placeIcon(place)} size="m" />
             <span class="place-name">{place.name}</span>
           </span>
           {#each entriesOf(place) as e (e.key)}

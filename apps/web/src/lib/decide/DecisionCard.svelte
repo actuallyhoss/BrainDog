@@ -315,11 +315,14 @@
    * "Asked by your rule Chase late payments · 12h ago": who asked, at the row's foot and never leading it, and how long
    * it has waited in the words every other card says it (audit 2, B14: this row alone said "3 Sep" beside "12h ago").
    */
+  /* AN AGE IS ONE PIECE: "12h ago" never breaks between its two words at a line's end (phone, 390). */
+  const whenSaid = $derived(card.when.replace(/ /gu, '\u00a0'));
+
   const askedLine = $derived.by(() => {
     if (!row) return '';
     const rule = card.by.kind === 'rule' ? card.by.name.replace(/^A rule: /u, '') : null;
     const who = rule !== null ? cardWords.byRule(rule.charAt(0).toUpperCase() + rule.slice(1)) : card.by.kind === 'you' ? cardWords.byYou : cardWords.by(card.by.name);
-    return card.when ? `${who} · ${card.when}` : who;
+    return card.when ? `${who} · ${whenSaid}` : who;
   });
 
   /**
@@ -794,7 +797,7 @@
       <!-- A QUESTION LONGER THAN TWO LINES IS CUT THERE, and read whole on a press. -->
       {#if clamped && !readAll}<button type="button" class="dc-read tap" onclick={() => (readAll = true)}>{cardWords.readAll}</button>{/if}
       <!-- COMPACT, WHO ASKED AND HOW LONG IT HAS WAITED ARE ONE QUIET LINE: the kind of thing, who, and when. -->
-      {#if compact}<p class="dc-meta" dir="auto">{[card.by.name, ...from, card.when].filter((s) => s !== '').join(' · ')}</p>{/if}
+      {#if compact}<p class="dc-meta" dir="auto">{[card.by.name, ...from, whenSaid].filter((s) => s !== '').join(' · ')}</p>{/if}
       {#if !compact}
         <!-- WHO ASKED AND WHEN, one quiet line UNDER the question at every width, so every card starts with its sentence:
             the face and name, and the app it ran in where it has a name. "Asked by" is said to a screen reader, where the eye reads
