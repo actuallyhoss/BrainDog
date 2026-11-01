@@ -94,9 +94,10 @@
       <p class="sc-title">{removal ? offer.why.split('.')[0] : offer.title}</p>
       <p class="sc-why">{removal ? offer.why.slice(offer.why.indexOf('.') + 1).trim() : offer.why}</p>
       <div class="sc-acts">
-        <Button weight="primary" size="sm" disabled={busy} onclick={() => press('add')}>{removal ? words.remove : words.add}</Button>
-        <Button weight="quiet" size="sm" disabled={busy} onclick={() => press('notNow')}>{words.notNow}</Button>
-        <Button weight="bare" size="sm" disabled={busy} onclick={() => press('never')}>{words.never}</Button>
+        <!-- INK, NOT THE RED: an offer is never the screen's one primary, and Today's answers already wear the ink. -->
+        <Button weight="ink" disabled={busy} onclick={() => press('add')}>{removal ? words.remove : words.add}</Button>
+        <Button weight="quiet" disabled={busy} onclick={() => press('notNow')}>{words.notNow}</Button>
+        <Button weight="bare" disabled={busy} onclick={() => press('never')}>{words.never}</Button>
       </div>
     </div>
   </aside>
@@ -112,9 +113,9 @@
     flex-wrap: wrap;
     gap: var(--sp-4, 16px);
     align-items: center;
-    padding: 12px;
+    padding: var(--sp-3);
     border: 1.5px dashed var(--rule-strong);
-    border-radius: 22px;
+    border-radius: var(--r-tile);
     background: transparent;
   }
 
@@ -133,14 +134,14 @@
   .sc-say {
     display: grid;
     flex: 1 1 220px;
-    gap: 4px;
+    gap: var(--sp-1);
     min-inline-size: 0;
   }
 
   .sc-who {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-1);
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-cap);
@@ -164,8 +165,8 @@
   .sc-acts {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-block-start: 6px;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
   }
 
   /* ON THE PHONE THE BOARD IS TWO COLUMNS, so the frame is the phone's (a Full is drawn as a Wide) and the words go under. */
