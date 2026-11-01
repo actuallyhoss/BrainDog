@@ -128,7 +128,7 @@
     block-size: 28px;
     padding: 0;
     border: 1px solid var(--rule-strong);
-    border-radius: 50%;
+    border-radius: var(--r-ctl);
     background: var(--tile-2);
     color: var(--ink);
     cursor: pointer;

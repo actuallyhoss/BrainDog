@@ -55,6 +55,24 @@ test('at rest no hole is drawn: the widget beside one is drawn across it, and it
   assert.deepEqual(end.map((l) => [l.key, l.w]), [['a', 4], ['b', 4]]);
 });
 
+test('a hole goes to the widget in its row that holds the most, where the board says how much each holds', () => {
+  const p = pack(
+    [
+      { key: 'coming-up', size: 'tall' },
+      { key: 'work-due', size: 'tall' },
+      { key: 'people', size: 'tall' },
+    ],
+    4,
+  );
+  /* As the record lays Today out: Coming up nine deep, People four faces. Coming up takes the room, the rest move along. */
+  const weighed = filled(p, 4, new Set(), new Map([['coming-up', 9], ['work-due', 2], ['people', 4]]));
+  assert.deepEqual(weighed.map((l) => [l.key, l.x, l.w]), [['coming-up', 0, 2], ['work-due', 2, 1], ['people', 3, 1]]);
+  /* A board he arranged gives no weights, and the widget beside the hole takes it as before. */
+  assert.deepEqual(filled(p, 4).map((l) => [l.key, l.x, l.w]), [['coming-up', 0, 1], ['work-due', 1, 1], ['people', 2, 2]]);
+  /* On a tie the widget beside the hole keeps it. */
+  assert.deepEqual(filled(p, 4, new Set(), new Map([['coming-up', 3], ['people', 3]])).map((l) => [l.key, l.w]), [['coming-up', 1], ['work-due', 1], ['people', 2]]);
+});
+
 test('a widget picked up keeps the same share of it under the pointer when its frame shrinks to its own size', () => {
   /* At rest drawn across a hole, 600 wide; held, its own 290. Pressed at 450 across, three quarters of the way. */
   const was = { left: 100, top: 200, width: 600, height: 140 };

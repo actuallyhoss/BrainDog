@@ -71,7 +71,7 @@
   {#if said === ''}
     <div class="ways">
       {#each ways as way (way.key)}
-        <Button weight={way.recommended || (run !== null && way.key === 'accept') ? 'primary' : 'quiet'} disabled={busy} onclick={() => void send(way.key)}>{labelOf(way.key, way.label, way.hard)}</Button>
+        <Button weight={way.recommended || (run !== null && way.key === 'accept') ? 'ink' : 'quiet'} disabled={busy} onclick={() => void send(way.key)}>{labelOf(way.key, way.label, way.hard)}</Button>
       {/each}
       {#if run}<Button weight="quiet" disabled={busy} onclick={() => (through = !through)}>{alikeWords.goThrough}</Button>{/if}
     </div>

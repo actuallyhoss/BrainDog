@@ -1666,7 +1666,7 @@
     inline-size: max-content;
     z-index: var(--z-raise);
     padding: 4px 12px;
-    border-radius: var(--r-round);
+    border-radius: var(--r-ctl);
     background: var(--tile);
     border: 1px solid var(--rule);
     color: var(--ink-2);

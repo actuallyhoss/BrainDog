@@ -153,7 +153,7 @@ test('THE WRITTEN LINE COUNTS THE DAY, from the two figures over who made the en
   assert.deepEqual(drawn.values, { 'filed-today': 3 });
   assert.equal(drawn.unnamed, undefined, 'the line asks for something the record does not have');
   const filled = text.replace(/\{\{([^{}]+)\}\}/gu, (_, path: string) => String(drawn.values?.[path.trim()]));
-  assert.equal(filled, '3 came in today, each under the day it happened.');
+  assert.equal(filled, '3 came in today.');
 });
 
 test('THE LINE IS NO REASON TO DRAW AN EMPTY LEDGER: a record nothing has moved on draws no tile', async () => {

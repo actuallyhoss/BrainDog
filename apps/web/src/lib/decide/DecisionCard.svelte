@@ -183,6 +183,9 @@
   const inline = $derived(inlineOf(card, compact));
   /* The one the row fills with the accent: the suggested answer, or the first. */
   const primary = $derived(primaryOf(card));
+  /* RED IS THE ONE MAIN ACTION ON A SCREEN: only the lead card fills its answer with the red. Every other card's
+     suggested answer is ink, the neutral strong button, so a queue of ten is not ten red buttons. */
+  const filled = $derived(lead && !compact ? 'primary' : 'ink');
   /** What the filled answer does, in its own words, where it says: the line under a row of buttons. */
   /* THE CARE IS SAID OF THE ANSWER THE CARD LEADS WITH, filled or not: an unfilled hard answer still says so. */
   const leadKey = $derived(leadOf(card));
@@ -666,7 +669,7 @@
     <button
       type="button"
       class="queue-act dc-btn"
-      data-weight={way.key === primary ? 'primary' : undefined}
+      data-weight={way.key === primary ? filled : undefined}
       data-recommended={way.recommended ? '' : undefined}
       id={optId(way.key)}
       data-enter={way.key === card.enter ? '' : undefined}
@@ -894,7 +897,7 @@
             <button
               type="button"
               class="dc-btn"
-              data-weight="primary"
+              data-weight={filled}
               data-decide
               data-enter={card.enter !== null && selected !== null ? '' : undefined}
               aria-disabled={kept ? 'true' : undefined}

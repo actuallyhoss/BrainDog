@@ -213,7 +213,7 @@
   /* THE PROJECT AS A QUIET CHIP, as At work says a run's. */
   .step-proj {
     padding: 1px var(--sp-2);
-    border-radius: var(--r-round);
+    border-radius: var(--r-xs);
     background: var(--tile-2);
     color: var(--ink-2);
   }

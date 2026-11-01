@@ -333,7 +333,7 @@ test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the s
 
   const card = src('./DecisionCard.svelte');
   /* ONE PRESS DECIDES, through the same held press as every answer, and only the Enter answer carries its mark. */
-  assert.match(card, /data-weight=\{way\.key === primary \? 'primary' : undefined\}/u);
+  assert.match(card, /data-weight=\{way\.key === primary \? filled : undefined\}/u);
   assert.match(card, /data-enter=\{way\.key === card\.enter \? '' : undefined\}/u);
   assert.match(card, /onclick=\{\(\) => press\(way\)\}/u);
   assert.match(card, /<span class="dc-btn-name">\{amount !== null && way\.key === primary \? amountAnswer\(way\.label, amount\) : way\.label\}<\/span>/u, 'the gate and the answered line read the name apart from the care said after it');
@@ -371,7 +371,7 @@ test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a li
   assert.match(list, /class="queue-act dc-choice"\n\s+data-press\n\s+id=\{optId\(way\.key\)\}\n\s+data-enter=\{way\.key === card\.enter \? '' : undefined\}\n\s+onclick=\{\(\) => press\(way\)\}/u);
   assert.doesNotMatch(list, /role="radio|radiogroup|dc-ring|aria-checked/u, 'a choice that decides is drawn as a radio');
   /* AND NO DECIDE UNDER THEM, so the queue gate's press is the answer. */
-  assert.match(card, /\{:else if phase !== 'asking' && !oneTap\}\n\s+<button\n\s+type="button"\n\s+class="dc-btn"\n\s+data-weight="primary"\n\s+data-decide/u);
+  assert.match(card, /\{:else if phase !== 'asking' && !oneTap\}\n\s+<button\n\s+type="button"\n\s+class="dc-btn"\n\s+data-weight=\{filled\}\n\s+data-decide/u);
   const form = src('./form.css');
   assert.match(form, /\.dc-actions:not\(:has\(\*\)\) \{\n\s+display: none;/u, 'an empty row of buttons keeps its room');
   assert.match(form, /@media \(pointer: coarse\) \{\n\s+\.dc-choice \{\n\s+min-block-size: var\(--tap\);/u, 'a choice under a thumb is shorter than a thumb');

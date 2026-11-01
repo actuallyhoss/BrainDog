@@ -1085,7 +1085,23 @@
     }
     return out;
   });
-  boardModel.src = { widgets: () => boardWidgets, phone: () => boardPhone, shown: () => boardShown, names: () => boardNames, drafts: () => boardDrafts, quiet: () => boardQuiet, rest: () => boardRest };
+  /**
+   * HOW MUCH EACH WIDGET HOLDS, for Today as the record lays it out (never a board he arranged, `keptBoard`): a hole at
+   * the end of a row goes to the widget there with the most in it (`filled` in `pack.ts`), so Coming up nine bills deep
+   * is drawn across the room People's four faces took.
+   */
+  const boardWeight = $derived.by((): ReadonlyMap<string, number> => {
+    const out = new Map<string, number>();
+    if (!board || declares !== null || !deskedRaw || boardModel.onPhone) return out;
+    for (const b of deskedRaw) {
+      const k = boardKeyOf(b);
+      if (!k || out.has(k) || !b.drawn) continue;
+      const rows = rowsOf(b as unknown as Parameters<typeof rowsOf>[0]);
+      if (rows !== null) out.set(k, rows);
+    }
+    return out;
+  });
+  boardModel.src = { widgets: () => boardWidgets, phone: () => boardPhone, shown: () => boardShown, names: () => boardNames, drafts: () => boardDrafts, quiet: () => boardQuiet, rest: () => boardRest, weight: () => boardWeight };
   /* THE DRAFT IS KEPT ON THIS DEVICE UNDER THE RECORD IT IS FOR. */
   boardModel.draftKey = `bd_board_draft:${apiBase()}`;
 

@@ -671,7 +671,7 @@
     block-size: 40px;
     margin-block-end: var(--sp-2);
     background: var(--tile-2);
-    border-radius: var(--r-round);
+    border-radius: var(--r-ctl);
     color: var(--ink-3);
   }
 

@@ -463,7 +463,7 @@
     font-size: var(--fs-meta);
   }
 
-  /* A CONTROL'S HEIGHT, ROUND, with the quiet fill at rest so it reads as a thing to press. `.tap` grows its hit box to
+  /* A CONTROL'S HEIGHT, SQUARE AT RADIUS 8 as every button is, with the quiet fill at rest so it reads as a thing to press. `.tap` grows its hit box to
      44 where the pointer is a thumb. */
   .sheet-close {
     flex: none;
@@ -474,7 +474,7 @@
     padding: 0;
     background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-round);
+    border-radius: var(--r-ctl);
     color: var(--ink-2);
     cursor: pointer;
     transition:
