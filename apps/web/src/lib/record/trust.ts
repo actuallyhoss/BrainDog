@@ -96,7 +96,16 @@ export function trustLines(standing: TrustStanding, now: number, plain?: (i: num
   const asks = standing.agents.map((a, i) => (a.kinds.length === 0 && plain(i) ? i : -1)).filter((i) => i >= 0);
   if (asks.length < 2) return out;
   const folded = new Set(asks.slice(1).map(String));
-  const names = LIST.format(asks.map((i) => out.find((l) => l.key === `${i}`)!.text.replace(/ asks before every change$/u, '')));
+  /* IN A LIST THE DAY GOES IN BRACKETS: the commas round it in a sentence of its own read as ",," once the names were
+     joined by commas themselves ("kiln-mbp, connected 3 Sep,, Codex"). */
+  const names = LIST.format(
+    asks.map((i) =>
+      out
+        .find((l) => l.key === `${i}`)!
+        .text.replace(/ asks before every change$/u, '')
+        .replace(/, connected ([^,]+),$/u, ' (connected $1)'),
+    ),
+  );
   return out
     .filter((l) => !folded.has(l.key))
     .map((l) => (l.key === `${asks[0]}` ? { ...l, text: `${names} ask before every change` } : l));

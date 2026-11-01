@@ -67,6 +67,10 @@
   import { TONES, relative, since } from 'braindog-render';
   import { isQuiet } from '@braindog/kernel/constants';
   import { liveOf, type RunLive } from '$lib/ui/face.ts';
+  import Sheet from '$lib/ui/Sheet.svelte';
+  import { flip } from 'svelte/animate';
+  import { lineIn, dismiss } from '$lib/motion';
+  import { settle } from '$lib/ui/motion.ts';
   import { presenceSaid, stillWord, type RunPresence } from '$lib/ui/presence-words.ts';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -251,8 +255,9 @@
   const legend = $derived.by(() => {
     /* DEFAULTS SAYS ITS OWN SENTENCE ON ITS ROW, so its level is not said again here. */
     const used = new Set(agents.filter((a) => a.key !== 'default' && !narrowed(a)).map((a) => a.may).filter((m) => m !== null));
-    return (['write', 'propose', 'read'] as const).filter((l) => used.has(l)).map((l) => ({ word: `${LEVEL_WORDS[l]}:`, line: LEVEL_LINES[l].charAt(0).toLowerCase() + LEVEL_LINES[l].slice(1) }));
+    return (['write', 'propose', 'read'] as const).filter((l) => used.has(l)).map((l) => ({ word: LEVEL_WORDS[l], line: words.levels[l] ?? LEVEL_LINES[l] }));
   });
+
 
   /** Whether an agent's newest run is at work now, which its face and its line say. */
   const workingOf = (a: AgentRow): boolean => a.heard?.seq != null && held.value?.live.get(a.heard.seq) === 'working';
@@ -295,6 +300,36 @@
      typed, and an approval reads the list again (`CodeForm.svelte`). */
   const approveCode = (typed: string) => approverOf(clientOf())(typed);
 
+  /* ── the page's shape (UI pass 1 Nov): his agents and the owner's switches lead; the rest opens in a side panel ── */
+
+  /** The agents, Defaults apart: the agents stand two to a row on a wide tile, Defaults under them across the whole. */
+  const agentGroups = $derived(groups.filter((g) => g.row.key !== 'default'));
+  const defaults = $derived(groups.find((g) => g.row.key === 'default') ?? null);
+
+  /**
+   * THE THREE PANELS, each a side drawer on a desk and the bottom sheet on a phone (`Sheet.svelte`): what is connected,
+   * with Revoke; what each agent does on its own; and Slash. Read once in a while, so they wait one press away rather
+   * than standing on the page every visit. A link to one of Slash's parts (`#slash-…`) opens its panel.
+   */
+  let connOpen = $state(false);
+  let trustOpen = $state(false);
+  let slashOpen = $state(false);
+  $effect(() => {
+    const hash = page.url.hash;
+    if (/^#slash/u.test(hash)) untrack(() => (slashOpen = true));
+    else if (hash === '#connections') untrack(() => (connOpen = true));
+    else if (hash === '#permissions') untrack(() => (trustOpen = true));
+  });
+
+  /** What the Connections row says under its name: how many, and how many are at work. */
+  const connLine = $derived.by(() => {
+    if (held.state !== 'ready' && !legacy) return '';
+    const n = legacy ? count : rows.length;
+    if (n === 0) return atWorkNow > 0 ? words.noKeysWorking(workingNames, atWorkNow) : words.noKeys;
+    const said = `${n} ${n === 1 ? 'machine or key' : 'machines and keys'}`;
+    return atWork ? `${said}, ${atWork}` : said;
+  });
+
   /* ONE REVOKE AT A TIME, so a double press sends one. */
   let revoking = $state<string | null>(null);
 
@@ -309,6 +344,12 @@
    */
   const words = {
     workHere: 'Agents that work here',
+    more: 'Keys, permissions and Slash',
+    trust: 'Permissions',
+    trustLine: 'What each agent does without asking you',
+    slashLine: 'Its model and what it reads',
+    /* WHAT EACH LEVEL MEANS, in one line under the list: it was three lines, one a level. */
+    levels: { write: 'makes changes; money, keys and deletes still wait', propose: 'asks you first', read: 'changes nothing' } as Record<string, string>,
     yours: 'Your agents',
     connections: 'Connections',
     noKeys: 'No machines or keys yet',
@@ -537,6 +578,11 @@
   `listDevices` and `listTokens` all need `owner`, and a `read` colleague was offered the six-digit field and its
   Approve button. So everything but Slash's sections is drawn inside this arm, and a colleague is given their own keys.
 -->
+<!-- THE ONE PRIMARY ON THIS SCREEN, in the first tile's head (agents F21). -->
+{#snippet connectButton()}
+  <Button weight="primary" size="sm" disabled={loadingSheet} onclick={() => void openSheet()}>{copy.connectTitle}</Button>
+{/snippet}
+
 {#if anOwner}
   <!--
     THE SIX-DIGIT FIELD, drawn once, in one of two places: first on the screen while a machine is waiting, and as the
@@ -561,157 +607,84 @@
     </Tile>
   {/if}
 
-  <!--
-    EVERYTHING THAT CAN ACT ON THE RECORD, AS ONE LIST TILE: each machine or key with its face, what it
-    can do in two words at the end of its row, and the line under the list that says what the narrowest of them means.
-    Every row the record keeps, denied ones included: "I said no to a request I did not make" (`12 §6.1`). Never a
-    secret, a handle or an id: a row is named by what runs on it or the name it was given (`12 §3`). A pure list, so the
-    one tile that holds no chart.
-  -->
-  <!-- THE ONE PRIMARY ON THIS SCREEN, in the first tile's head (agents F21). -->
-  {#snippet connectButton()}
-    <Button weight="primary" size="sm" disabled={loadingSheet} onclick={() => void openSheet()}>{copy.connectTitle}</Button>
-  {/snippet}
-  <!--
-    HIS AGENTS, ONE ROW EACH, DEFAULTS LAST: the face (with the live dot while its run is at work), the name, what it may
-    do in one sentence, when it was last heard and where, and how far it may go in one word at the row's end. A row is
-    one button that opens its sheet. A host that keeps no settings rows draws the agents heard from in the list below,
-    as it did before.
-  -->
-  {#if !legacy}
-    <Tile icon="session" title={words.yours} actions={connectButton} data-part="your-agents">
-      {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
-        <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+  {#snippet agentLine(g: (typeof groups)[number])}
+    {@const a = g.row}
+    {@const nowMs = recordNow()}
+    {@const working = workingOf(a)}
+    {@const line = heardLine(a, working, (at) => since(at, nowMs))}
+    <!-- THE FACE BESIDE THE BUTTON, NEVER IN IT: a face that names a run is a link to the run, and a link inside a
+         button is two controls in one that a screen reader cannot tell apart. The button's press still covers the
+         whole row (`.agent::before`), and the face sits over it as its own door. -->
+    <div class="agent-row">
+      {#if a.kind === null}
+        <IconWell name={a.key === 'default' ? 'plus' : 'key'} size="l" />
       {:else}
-        {@const nowMs = recordNow()}
-        <!-- NO AGENT IS LISTED UNTIL ONE IS HEARD FROM (`profile.ts`), so a new record says so once, above Defaults. -->
-        {@const none = noAgentYet(agents)}
-        {#if none}<Empty kind="no-data-yet" compact title={none} />{/if}
-        <ul class="agents">
-          {#each groups as g (g.row.key)}
-            {@const a = g.row}
-            {@const working = workingOf(a)}
-            {@const line = heardLine(a, working, (at) => since(at, nowMs))}
-            <!-- THE FACE BESIDE THE BUTTON, NEVER IN IT: a face that names a run is a link to the run, and a link inside a
-                 button is two controls in one that a screen reader cannot tell apart. The button's press still covers the
-                 whole row (`.agent::before`), and the face sits over it as its own door. -->
-            <li data-default={a.key === 'default' ? '' : undefined}>
-              <div class="agent-row">
-                {#if a.kind === null}
-                  <IconWell name={a.key === 'default' ? 'plus' : 'key'} size="l" />
-                {:else}
-                  <AgentFace agent={a.kind} run={a.heard?.seq != null ? `S${a.heard.seq}` : ''} live={working ? 'working' : 'stopped'} size="m" />
-                {/if}
-                <button type="button" class="agent" data-profile-row={a.key} onclick={() => openProfile(a)}>
-                <span class="who-words">
-                  <span class="who-name" dir="auto">{a.name}</span>
-                  <!-- ITS OWN SENTENCE ONLY WHERE IT IS HELD TO LESS THAN ITS LEVEL; Defaults always says what it gives. -->
-                  {#if a.key === 'default' || narrowed(a)}<span class="agent-says">{a.says}</span>{/if}
-                  {#if line}
-                    {@const machine = machinesLine(a.machines)}
-                    <span class="who-detail who-heard"
-                      >{line}{#if a.heard?.scope}{words.on}<ScopeChip scope={a.heard.scope} inline />{/if}{#if machine}<span class="sep">{' · '}</span>{machine}{/if}</span
-                    >
-                  {/if}
-                </span>
-                <span class="who-scope agent-may">{a.may ? LEVEL_WORDS[a.may] : ''}</span>
-                <Icon name="chevron" size="s" />
-                </button>
-              </div>
-              <!-- ITS PROFILES, ONE CHIP EACH, under the row they belong to: each opens its own sheet. A chip says its level
-                   only where it is not its agent's, and carries the live dot while its run is at work. -->
-              {#if g.chips.length > 0}
-                <ul class="chips" aria-label={words.profiles(a.name)}>
-                  {#each g.chips as c (c.key)}
-                    {@const on = workingOf(c)}
-                    <li>
-                      <button type="button" class="chip tap" data-profile-row={c.key} onclick={() => openProfile(c)}>
-                        {#if on}<span class="chip-dot" aria-hidden="true"></span>{/if}<span dir="auto">{chipName(c)}</span>{#if c.may && c.may !== a.may}<span class="chip-may">{LEVEL_WORDS[c.may]}</span>{/if}
-                      </button>
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-        {#if legend.length > 0}
-          <div class="legend">
-            {#each legend as l (l.word)}<p><span class="legend-word">{l.word}</span> {l.line}</p>{/each}
-          </div>
-        {/if}
-        {#if atWorkNow > 0}
-          <p class="reading">{words.atWorkNow(atWorkNow)} <a class="run tap" href={at('/r/session')}>{words.seeThem}</a></p>
-        {/if}
+        <AgentFace agent={a.kind} run={a.heard?.seq != null ? `S${a.heard.seq}` : ''} live={working ? 'working' : 'stopped'} size="m" />
       {/if}
-    </Tile>
-  {/if}
-
-  <!-- WHAT CAN ACT ON THE RECORD: every machine, key and connected app, with Revoke. Drawn once the list is read, since
-       the tile above says the screen is still reading. -->
-  {#if legacy || held.state === 'ready'}
-  <!-- A COLUMN OF FULL TILES, SO THIS ONE IS FULL TOO (`data-wide`): alone at 640 under Your agents it read as a
-       half-width card. No count over nothing: "Connections 0" over the sentence said the same fact twice. -->
-  <Tile icon={legacy ? 'session' : 'key'} title={legacy ? words.workHere : words.connections} count={held.state === 'ready' ? (legacy ? count : rows.length) || undefined : undefined} actions={legacy ? connectButton : undefined} data-wide>
-    {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
-      <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
-    {:else if (legacy ? count : rows.length) === 0}
-      <Empty kind="no-data-yet" compact title={legacy ? copy.connectedNone : atWorkNow > 0 ? words.noKeysWorking(workingNames, atWorkNow) : words.noKeys} body={legacy ? copy.connectedNoneWhy : undefined} />
-    {:else}
-      {@const nowMs = recordNow()}
-      <ul class="whos">
-        {#each rows as c (c.key)}
-          {@const scope = scopeOf(c)}
-          {@const parts = partsOf(c, nowMs)}
-          <li class="who" data-done={c.live ? undefined : ''}>
-            <!-- A RUN'S FACE WHERE A RUN USED IT, its ring the run's state (at work, quiet, stopped); a well otherwise,
-                 amber only on the machine waiting for the reader's six digits. -->
-            {#if c.run}
-              <AgentFace agent={c.run.agent} run={runName(c.run)} live={liveOfRun(c.run)} />
-            {:else}
-              <IconWell name={c.machine ? 'session' : 'key'} size="l" tone={waitsOnYou(c) ? 'warn' : undefined} />
-            {/if}
-            <span class="who-words">
-              <!-- `dir="auto"`: an app names itself, in whatever script it chose. -->
-              <span class="who-name" dir="auto">{parts.app}</span>
-              <!-- ONE QUIET LINE UNDER THE NAME: where it runs and how it came in ("Signed in",
-                   "A key you made"), then the facts, each its own item so a wrap breaks between them. A machine's grant
-                   is said by its two words at the row's end, so its sentence is not drawn under it as well. -->
-              {#if !scope.whole && !c.machine}<span class="who-detail who-reach">{reachOf(c)}</span>{/if}
-              <span class="who-detail who-facts">
-                {#if lineOf(c, parts)}<span dir="auto">{lineOf(c, parts)}</span>{/if}
-                <!-- UNUSED FOR OVER A WEEK: the warn tone, and its mark beside the words, never the colour alone. -->
-                {#if parts.idle !== null}<span class="who-idle"><span role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span> {copy.notUsedFor(parts.idle)}</span>{/if}
-                {#each factsOf(c, nowMs, parts.idle).filter((f) => f !== lineOf(c, parts)) as fact}<span>{fact}</span>{/each}
-                <!-- THE RUN THAT LAST USED IT, BY WHERE IT IS NOW ("Working now", "Gone quiet", "Ended"), as a link to what it
-                     did; "Last run" where the record gives no word. Never its id: "S41" is the record's name for it, not his.
-                     `.tap` because small text is a target far under a thumb's 44px. -->
-                {#if c.run}<a class="run tap" href={at(`/r/session/${c.run.seq}`)}>{wordOfRun(c.run) ?? copy.lastRun}</a>{/if}
-              </span>
-            </span>
-            {#if c.live && scope.word}<span class="who-scope">{scope.word}</span>{/if}
-            <span class="who-do">
-              {#if c.live}
-                <Button weight="bare" size="sm" tone="bad" disabled={revoking !== null} onclick={() => void revokeRow(c)}>{copy.revokeKey}</Button>
-              {/if}
-            </span>
-          </li>
-        {/each}
-        {#each legacy ? heard : [] as h (h.agent)}
-          <li class="who" data-heard="">
-            <AgentFace agent={h.agent} run={`S${h.seq}`} live={held.value?.live.get(h.seq) ?? 'stopped'} size="m" />
-            <span class="who-words">
-              <span class="who-name">{agentName(h.agent)}</span>
-              <span class="who-detail who-heard"
-                >{words.lastHeard(since(h.seen, nowMs))}{#if h.scope}{words.on}<ScopeChip scope={h.scope} inline />{/if}</span
-              >
-            </span>
+      <button type="button" class="agent" data-profile-row={a.key} onclick={() => openProfile(a)}>
+        <span class="who-words">
+          <span class="who-name" dir="auto">{a.name}</span>
+          <!-- ITS OWN SENTENCE ONLY WHERE IT IS HELD TO LESS THAN ITS LEVEL; Defaults always says what it gives. -->
+          {#if a.key === 'default' || narrowed(a)}<span class="agent-says">{a.says}</span>{/if}
+          {#if line}
+            {@const machine = machinesLine(a.machines)}
+            <span class="who-detail who-heard"
+              >{line}{#if a.heard?.scope}{words.on}<ScopeChip scope={a.heard.scope} inline />{/if}{#if machine}<span class="heard-machine"><span class="sep">{' · '}</span>{machine}</span>{/if}</span
+            >
+          {/if}
+        </span>
+        <span class="who-scope agent-may">{a.may ? LEVEL_WORDS[a.may] : ''}</span>
+        <Icon name="chevron" size="s" />
+      </button>
+    </div>
+    <!-- ITS PROFILES, ONE CHIP EACH, under the row they belong to: each opens its own sheet. A chip says its level
+         only where it is not its agent's, and carries the live dot while its run is at work. -->
+    {#if g.chips.length > 0}
+      <ul class="chips" aria-label={words.profiles(a.name)}>
+        {#each g.chips as c (c.key)}
+          {@const on = workingOf(c)}
+          <li>
+            <button type="button" class="chip tap" data-profile-row={c.key} onclick={() => openProfile(c)}>
+              {#if on}<span class="chip-dot" aria-hidden="true"></span>{/if}<span dir="auto">{chipName(c)}</span>{#if c.may && c.may !== a.may}<span class="chip-may">{LEVEL_WORDS[c.may]}</span>{/if}
+            </button>
           </li>
         {/each}
       </ul>
-      {#if reading}<p class="reading">{reading}</p>{/if}
     {/if}
-  </Tile>
+  {/snippet}
+
+  <!--
+    HIS AGENTS, ONE COMPACT ROW EACH, TWO TO A ROW ON A WIDE TILE, DEFAULTS UNDER THEM: the face (with the live dot while
+    its run is at work), the name, when it was last heard and where, and how far it may go in one word at the row's end.
+    A row is one button that opens its sheet, which holds everything that agent works under. A host that keeps no
+    settings rows draws the agents heard from in the Connections panel, as it did before.
+  -->
+  {#if !legacy}
+    <Tile icon="session" title={words.yours} count={held.state === 'ready' && agentGroups.length > 0 ? agentGroups.length : undefined} actions={connectButton} data-wide data-part="your-agents">
+      {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
+        <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+      {:else}
+        <!-- NO AGENT IS LISTED UNTIL ONE IS HEARD FROM (`profile.ts`), so a new record says so once, above Defaults. -->
+        {@const none = noAgentYet(agents)}
+        {#if none}<Empty kind="no-data-yet" compact title={none} />{/if}
+        <div class="agents-box">
+          <ul class="agents">
+            {#each agentGroups as g (g.row.key)}
+              <li in:lineIn out:dismiss animate:flip={settle()}>{@render agentLine(g)}</li>
+            {/each}
+          </ul>
+        </div>
+        {#if defaults}<div class="agents-default">{@render agentLine(defaults)}</div>{/if}
+        {#if legend.length > 0 || atWorkNow > 0}
+          <div class="agents-foot">
+            {#if atWorkNow > 0}<p class="reading">{words.atWorkNow(atWorkNow)} <a class="run tap" href={at('/r/session')}>{words.seeThem}</a></p>{/if}
+            {#if legend.length > 0}
+              <p class="legend">{#each legend as l, i (l.word)}{#if i > 0}<span class="sep" aria-hidden="true">{' · '}</span>{/if}<span class="legend-word">{l.word}</span> {l.line}{/each}</p>
+            {/if}
+          </div>
+        {/if}
+      {/if}
+    </Tile>
   {/if}
 
   <!-- ONE SHEET FOR EVERY AGENT, Defaults included. -->
@@ -724,7 +697,19 @@
     keepers={picked?.key === 'default' ? keepersOf(agents).map((k) => k.name) : []}
     onsave={saveProfile}
   />
-  <TrustRows />
+
+  <!-- THE OWNER'S FOUR ANSWERING SWITCHES IN ONE TILE, a row each, second on the page because they are what he comes
+       here to change: agents doing everything without asking (`Bypass.svelte`, first, the one that lifts the rest),
+       answering from the card in a chat app (`ChatAnswer.svelte`), agents answering on his word (`OnWord.svelte`), and
+       agents' suggestions kept apart from Needs you (`Apart.svelte`). -->
+  <Tile icon="decide" title={words.answering} data-wide data-part="answering">
+    <div class="answering">
+      <Bypass prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+      <ChatAnswer prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+      <OnWord prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+      <Apart prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
+    </div>
+  </Tile>
 
   <!-- THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, in a tile of its own that says what it is:
        its lists and pages by name and its figures as one count, so the offer fits on a phone's screen. -->
@@ -769,16 +754,69 @@
     </Tile>
   {/if}
 
-  <!-- THE OWNER'S FOUR ANSWERING SWITCHES IN ONE TILE, a row each: agents doing everything without asking, answering from the card in a chat app
-       (`ChatAnswer.svelte`), agents answering on his word (`OnWord.svelte`), and agents' suggestions kept apart from
-       Needs you (`Apart.svelte`). Three tiles of one switch each read as three screens. -->
-  <Tile icon="decide" title={words.answering} data-part="answering">
-    <!-- FIRST, THE ONE THAT LIFTS THE REST: agents doing everything without asking (`Bypass.svelte`). -->
-    <Bypass prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
-    <ChatAnswer prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
-    <OnWord prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
-    <Apart prefs={(shell.me as { prefs?: Record<string, unknown> }).prefs} />
-  </Tile>
+  <!-- WHAT CAN ACT ON THE RECORD: every machine, key and connected app, with Revoke, in its own panel. Every row the
+       record keeps, denied ones included: "I said no to a request I did not make" (`12 §6.1`). Never a secret, a handle
+       or an id: a row is named by what runs on it or the name it was given (`12 §3`). -->
+  <Sheet bind:open={connOpen} title={legacy ? words.workHere : words.connections} subtitle={connLine || undefined} wide caret={false}>
+    {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
+      <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+    {:else if (legacy ? count : rows.length) === 0}
+      <Empty kind="no-data-yet" compact title={legacy ? copy.connectedNone : atWorkNow > 0 ? words.noKeysWorking(workingNames, atWorkNow) : words.noKeys} body={legacy ? copy.connectedNoneWhy : undefined} />
+    {:else}
+      {@const nowMs = recordNow()}
+      <ul class="whos">
+        {#each rows as c (c.key)}
+          {@const scope = scopeOf(c)}
+          {@const parts = partsOf(c, nowMs)}
+          <li class="who" data-done={c.live ? undefined : ''} in:lineIn out:dismiss animate:flip={settle()}>
+            <!-- A RUN'S FACE WHERE A RUN USED IT, its ring the run's state (at work, quiet, stopped); a well otherwise,
+                 amber only on the machine waiting for the reader's six digits. -->
+            {#if c.run}
+              <AgentFace agent={c.run.agent} run={runName(c.run)} live={liveOfRun(c.run)} />
+            {:else}
+              <IconWell name={c.machine ? 'session' : 'key'} size="l" tone={waitsOnYou(c) ? 'warn' : undefined} />
+            {/if}
+            <span class="who-words">
+              <!-- `dir="auto"`: an app names itself, in whatever script it chose. -->
+              <span class="who-name" dir="auto">{parts.app}</span>
+              {#if !scope.whole && !c.machine}<span class="who-detail who-reach">{reachOf(c)}</span>{/if}
+              <span class="who-detail who-facts">
+                {#if lineOf(c, parts)}<span dir="auto">{lineOf(c, parts)}</span>{/if}
+                <!-- UNUSED FOR OVER A WEEK: the warn tone, and its mark beside the words, never the colour alone. -->
+                {#if parts.idle !== null}<span class="who-idle"><span role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span> {copy.notUsedFor(parts.idle)}</span>{/if}
+                {#each factsOf(c, nowMs, parts.idle).filter((f) => f !== lineOf(c, parts)) as fact}<span>{fact}</span>{/each}
+                {#if c.run}<a class="run tap" href={at(`/r/session/${c.run.seq}`)}>{wordOfRun(c.run) ?? copy.lastRun}</a>{/if}
+              </span>
+            </span>
+            {#if c.live && scope.word}<span class="who-scope">{scope.word}</span>{/if}
+            <span class="who-do">
+              {#if c.live}
+                <Button weight="bare" size="sm" tone="bad" disabled={revoking !== null} onclick={() => void revokeRow(c)}>{copy.revokeKey}</Button>
+              {/if}
+            </span>
+          </li>
+        {/each}
+        {#each legacy ? heard : [] as h (h.agent)}
+          <li class="who" data-heard="">
+            <AgentFace agent={h.agent} run={`S${h.seq}`} live={held.value?.live.get(h.seq) ?? 'stopped'} size="m" />
+            <span class="who-words">
+              <span class="who-name">{agentName(h.agent)}</span>
+              <span class="who-detail who-heard"
+                >{words.lastHeard(since(h.seen, nowMs))}{#if h.scope}{words.on}<ScopeChip scope={h.scope} inline />{/if}</span
+              >
+            </span>
+          </li>
+        {/each}
+      </ul>
+      {#if reading}<p class="reading conn-reading">{reading}</p>{/if}
+    {/if}
+  </Sheet>
+
+  <!-- HOW FAR EACH AGENT IS TRUSTED ON ITS OWN (`TrustRows`), in its panel; the panel's title names it, so the tile's
+       own heading is not drawn twice. -->
+  <Sheet bind:open={trustOpen} title={words.trust} subtitle={words.trustLine}>
+    <div class="flat flat-headless"><TrustRows /></div>
+  </Sheet>
 
   <!-- CONNECT AN AGENT is the first tile's one primary; the sheet it opens is a chunk of its own, asked for on the first
        press, and the six-digit field rides in it under the setup line while no machine waits above. -->
@@ -791,18 +829,52 @@
        three ways in that the record would refuse them at the end. -->
   <MyTokens />
 {/if}
-<!-- ONE SLASH TILE (agents F21): its one line while no model is connected, what a model has when one is, and the two
-     switch rows. Never "host": the person did not set one up. -->
-<Tile icon="slash" title={words.slash} data-part="slash">
-  <SlashAsks owner={anOwner} bare />
-  <!-- SLASH LOOKING ON ITS OWN is the owner's choice, beside the agents they let in. -->
-  <SlashDaily link row />
-  <!-- WHAT SLASH READS ON ITS OWN, and what a model is sent: the one switch for it, and the paragraph that says so. -->
-  <SlashReads row />
+
+<!--
+  THE REST, ONE PRESS AWAY: what is connected, what each agent does on its own, and Slash, each a row that opens its
+  panel. They were four more tiles down the page (connections, permissions, Slash, Slash's model), read now and then
+  and scrolled past on every visit. A colleague sees Slash alone.
+-->
+<Tile icon="sliders-horizontal" title={anOwner ? words.more : words.slash} actions={anOwner && legacy ? connectButton : undefined} data-wide data-part="agents-more">
+  <ul class="more">
+    {#if anOwner}
+      <li>
+        <button type="button" class="more-row" aria-haspopup="dialog" onclick={() => (connOpen = true)}>
+          <IconWell name="key" size="l" />
+          <span class="who-words"><span class="who-name">{legacy ? words.workHere : words.connections}</span>{#if connLine}<span class="who-detail">{connLine}</span>{/if}</span>
+          <Icon name="chevron" size="s" />
+        </button>
+      </li>
+      <li>
+        <button type="button" class="more-row" aria-haspopup="dialog" onclick={() => (trustOpen = true)}>
+          <IconWell name="vault" size="l" />
+          <span class="who-words"><span class="who-name">{words.trust}</span><span class="who-detail">{words.trustLine}</span></span>
+          <Icon name="chevron" size="s" />
+        </button>
+      </li>
+    {/if}
+    <li>
+      <button type="button" class="more-row" aria-haspopup="dialog" onclick={() => (slashOpen = true)}>
+        <IconWell name="slash" size="l" />
+        <span class="who-words"><span class="who-name">{words.slash}</span><span class="who-detail">{words.slashLine}</span></span>
+        <Icon name="chevron" size="s" />
+      </button>
+    </li>
+  </ul>
 </Tile>
-<SlashModel owner={anOwner} />
-<!-- SLASH'S TWO DEPTHS, and Claude on the owner's Mac while a runner there is live: a machine let in to run work. -->
-<SlashBrain owner={anOwner} mac={rows.some((c) => c.live && c.machine?.reach === 'runner')} />
+
+<!-- SLASH, IN ITS PANEL: its one line while no model is connected, what a model has when one is, the two switch rows,
+     its model and its two depths, with Claude on the owner's Mac while a runner there is live. Never "host": the person
+     did not set one up. -->
+<Sheet bind:open={slashOpen} title={words.slash} caret={false}>
+  <div class="flat slash-panel" data-part="slash">
+    <SlashAsks owner={anOwner} bare />
+    <SlashDaily link row />
+    <SlashReads row />
+    <SlashModel owner={anOwner} />
+    <SlashBrain owner={anOwner} mac={rows.some((c) => c.live && c.machine?.reach === 'runner')} />
+  </div>
+</Sheet>
 
 <style>
   /* THE CONNECTED TILE'S ROWS: the face or the 32px well, the name over what is known about it, what it can
@@ -887,10 +959,18 @@
     gap: var(--sp-2);
   }
 
-  /* HIS AGENTS: one button a row, the face, the words, the level in one word, and a chevron, a hairline between. */
+  /* HIS AGENTS: one button a row, the face, the words, the level in one word, and a chevron, a hairline between. TWO TO A
+     ROW ON A WIDE TILE (a container query, since the Settings chooser takes a column beside it): eight agents were eight
+     rows the height of the screen, and a row reads whole at half the tile. */
+  .agents-box {
+    container-type: inline-size;
+  }
+
   .agents {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    column-gap: var(--sp-6);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -898,6 +978,30 @@
 
   .agents > li + li {
     border-block-start: 1px solid var(--rule);
+  }
+
+  @container (width >= 720px) {
+    .agents {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .agents > li:nth-child(2) {
+      border-block-start: 0;
+    }
+  }
+
+  /* DEFAULTS IS NOT AN AGENT: it stands under them across the tile, a hairline above it. */
+  .agents-default {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .agents-default:first-child {
+    border-block-start: 0;
+  }
+
+  .agents-foot {
+    display: grid;
+    gap: var(--sp-1);
   }
 
   /* THE ROW: the face, then the button, which takes the rest. Hover and focus are the row's, so the row reads as the one
@@ -964,6 +1068,7 @@
   /* WHAT IT MAY DO, in the second ink: the sentence the row is about. */
   .agent-says {
     color: var(--ink-2);
+    text-wrap: pretty;
     font-size: var(--fs-body);
     line-height: 20px;
   }
@@ -1029,27 +1134,20 @@
 
   /* WHAT EACH LEVEL MEANS, ONCE, under the list: the level's word in ink, its sentence in the second ink. */
   .legend {
-    display: grid;
-    gap: var(--sp-1);
-    margin-block-start: var(--sp-2);
-    max-inline-size: var(--measure);
-    color: var(--ink-2);
+    margin: 0;
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
+    text-wrap: pretty;
   }
 
-  .legend p {
-    margin: 0;
+  .legend .sep {
+    color: var(--ink-3);
   }
 
   .legend-word {
     color: var(--ink);
     font-weight: var(--fw-medium);
-  }
-
-  /* DEFAULTS IS NOT AN AGENT: it sits after them, a step apart. */
-  .agents > li[data-default] {
-    margin-block-start: var(--sp-2);
   }
 
   @media (width < 640px) {
@@ -1085,15 +1183,22 @@
      next to a name is the worst tap on this screen. */
   @media (width < 640px) {
     .who {
-      grid-template-columns: var(--well-l) minmax(0, 1fr);
+      grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
       align-items: start;
       row-gap: var(--sp-1);
       min-block-size: 60px;
     }
 
-    .who-scope,
-    .who-do {
+    /* WHAT IT CAN DO UNDER THE FACTS, and Revoke at the row's end across both, so the two never take a line each. */
+    .who-scope {
       grid-column: 2;
+      grid-row: 2;
+    }
+
+    .who-do {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+      align-self: center;
     }
   }
 
@@ -1215,10 +1320,95 @@
   }
 
   /* "LAST HEARD 3 MIN AGO, ON ● KILN": the dot and the name in the sentence, no box. */
+  /* THE MACHINE AND ITS DOT GO TOGETHER: a wrap left "Last heard just now ·" with the dot ending the line. */
+  .heard-machine {
+    white-space: nowrap;
+  }
+
   .who-heard {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     white-space: pre-wrap;
+  }
+
+  /* THE ANSWERING SWITCHES, ONE LIST: each row's own padding, a hairline between (`settings.css`), and no gap of the
+     tile's on top of that, which stood each row 28px from the next. */
+  .answering {
+    display: flex;
+    flex-direction: column;
+    margin-block: calc(-1 * var(--sp-3));
+  }
+
+  /* THE ROWS THAT OPEN A PANEL: a well, the name over one line, and a chevron, one press each, a hairline between. */
+  .more {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .more > li + li {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .more-row {
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    inline-size: calc(100% + 2 * var(--sp-2));
+    min-block-size: var(--row-h-2);
+    margin-inline: calc(-1 * var(--sp-2));
+    padding: var(--sp-2);
+    background: none;
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .more-row:hover {
+      background: var(--hover);
+    }
+  }
+
+  .more-row > :global(svg) {
+    color: var(--ink-3);
+  }
+
+  /* A TILE A PANEL HOLDS IS ITS HEADING AND ITS ROWS on the panel's surface, never a tile inside it. */
+  .flat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+  }
+
+  .flat > :global(.tile) {
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+
+  .flat > :global(.tile + .tile) {
+    padding-block-start: var(--sp-5);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  /* THE PANEL'S TITLE ALREADY NAMES IT, so its one tile's own heading is not said twice. */
+  .flat-headless > :global(.tile:first-child > .tile-head) {
+    display: none;
+  }
+
+  .conn-reading {
+    margin-block-start: var(--sp-3);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 </style>
