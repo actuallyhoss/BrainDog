@@ -80,6 +80,18 @@
     white-space: nowrap;
   }
 
+  /* UNDER THE SENTENCE, ON THE BOARD: the track in the tile's colour, as a quiet control beside the name is drawn. */
+  :global(.head-below .hub-tabs) {
+    background: var(--tile);
+  }
+
+  /* AT ITS OWN WIDTH FROM 640, under the sentence's start; the whole width only on a phone (`full`). */
+  @media (width >= 640px) {
+    :global(.head-below .hub-tabs) {
+      inline-size: fit-content;
+    }
+  }
+
   /* NO GLASS: once the title row is the compact bar, the control in it is the bar's. */
   :global(.head[data-under] .hub-tabs) {
     background: transparent;

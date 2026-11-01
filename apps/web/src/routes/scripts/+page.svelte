@@ -164,11 +164,11 @@
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's. -->
 <PageHead icon="code" title={words.heading} count={live ? rows.length : undefined} sentence={told ? sentence : undefined}>
   {#snippet actions()}
-    {#if !phone.current}<HubTabs here="scripts" />{/if}
     <!-- THE ONE PRIMARY: its word, and on a phone the 44px button with the plus. -->
     <Button weight="primary" href="/scripts/new" aria-label={words.newScript} data-circle><Icon name="plus" size="s" /><span class="new-word">{words.newScript}</span></Button>
   {/snippet}
-  {#snippet below()}{#if phone.current}<HubTabs here="scripts" full />{/if}{/snippet}
+  <!-- THE TABS UNDER THE SENTENCE AT EVERY WIDTH, as the hub's layout draws them: beside it they broke it in two. -->
+  {#snippet below()}<HubTabs here="scripts" full={phone.current} />{/snippet}
 </PageHead>
 <div class="page">
   {#if none}
