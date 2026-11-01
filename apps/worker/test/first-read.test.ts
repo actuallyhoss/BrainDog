@@ -76,11 +76,11 @@ const door = (env: FirstReadEnv, store: MeterStore | null = memoryStore(), readS
 
 const refusal = async (res: Response) => ((await res.json()) as { refusal: { code: string; fix: string } }).refusal;
 
-test('OFF AS SHIPPED: FIRST_READ_DAILY unset, or 0, answers 501 in the off sentence and the model is never run', async () => {
+test('OFF AS SHIPPED: FIRST_READ_DAILY unset, or 0, answers 200 in the off sentence and the model is never run', async () => {
   for (const daily of [undefined, '0', '', '-3', '2.5', 'lots']) {
     const ai = fakeAi();
     const res = await serveFirstRead(ask('203.0.113.7'), door({ ...allOn(ai), FIRST_READ_DAILY: daily }), NOW);
-    assert.equal(res.status, 501, `FIRST_READ_DAILY ${String(daily)} read a stranger's words`);
+    assert.equal(res.status, 200, `FIRST_READ_DAILY ${String(daily)} read a stranger's words`);
     assert.deepEqual(await refusal(res), { code: 'NOT_IN_THIS_BUILD', fix: FIRST_READ_OFF });
     assert.equal(ai.runs.length, 0);
   }
@@ -90,14 +90,14 @@ test('OFF AS SHIPPED: FIRST_READ_DAILY unset, or 0, answers 501 in the off sente
 test('OFF WITHOUT A MODEL: no binding, or the included model not switched on, is no reader', async () => {
   for (const env of [{ ...allOn(), AI: undefined }, { ...allOn(), SLASH_INCLUDED: undefined }]) {
     const res = await serveFirstRead(ask('203.0.113.7'), door(env), NOW);
-    assert.equal(res.status, 501);
+    assert.equal(res.status, 200);
     assert.equal((await refusal(res)).fix, FIRST_READ_OFF);
   }
 });
 
-test('OFF WITHOUT A BOT CHECK, A READER OR A COUNT: each missing part is the same 501', async () => {
+test('OFF WITHOUT A BOT CHECK, A READER OR A COUNT: each missing part is the same 200 that it is off', async () => {
   const cases = [door({ ...allOn(), TURNSTILE_SECRET: undefined }), door(allOn(), null), door(allOn(), memoryStore(), null)];
-  for (const d of cases) assert.equal((await serveFirstRead(ask('203.0.113.7'), d, NOW)).status, 501);
+  for (const d of cases) assert.equal((await serveFirstRead(ask('203.0.113.7'), d, NOW)).status, 200);
 });
 
 test('ON WITH ALL OF IT: the bot check passes, the included model reads, and the reading comes back', async () => {
