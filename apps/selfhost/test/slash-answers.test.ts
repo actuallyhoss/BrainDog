@@ -288,7 +288,7 @@ test("AT ask_cap 0 NOTHING IS POSTED, and the run ends on the month's own senten
     assert.equal(s.sent.length, 0, `${s.sent.length} model calls with the month spent`);
     const r = s.run();
     assert.equal(r?.state, 'failed');
-    assert.equal(r?.say, `rule.rate asked Slash at step 1, and this month's asks are spent until 1 ${next}. Raise the monthly limit, or wait.`);
+    assert.equal(r?.say, `rule.rate asked Slash at step 1, and this month's Slash questions are used until 1 ${next}. Raise the monthly limit, or wait.`);
   } finally {
     await s.close();
   }
