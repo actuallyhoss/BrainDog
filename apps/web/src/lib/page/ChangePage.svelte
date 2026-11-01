@@ -73,7 +73,13 @@
     extra = [],
     built = null,
     board = null,
+    here = null,
   }: {
+    /**
+     * THE SETTINGS THAT DECIDE HOW THIS PAGE READS, changed here (`SettingHere.svelte`): Money's currency on Money's
+     * pages, a list's name on its page. `null` offers none.
+     */
+    here?: { currency?: string | null | undefined; list?: { id: string; name: string } | undefined } | null;
     /**
      * Whether this page can be laid out as a board, and whether it is one now (`page-boards.svelte.ts`): a project's
      * page and Money's home. `null` offers no board.
@@ -327,8 +333,16 @@
     toasts.push(on ? boardWords.onSaid(title) : boardWords.offSaid(title), { undo: () => void pageBoards.put(slug, before) });
   }
 
+  /* ── a setting, changed where it shows ── */
+  let setting = $state<{ kind: 'currency'; code: string | null } | { kind: 'list'; id: string; name: string } | null>(null);
+  let settingOpen = $state(false);
+  function changeSetting(what: NonNullable<typeof setting>) {
+    setting = what;
+    settingOpen = true;
+  }
+
   /** Whether the menu holds anything at this width; one that would open on nothing is not drawn. */
-  const offers = $derived(extra.length > 0 || mayChange || mayPin || source !== null || (onarrange !== null && wide.current) || (board !== null && mayPin));
+  const offers = $derived(extra.length > 0 || mayChange || mayPin || source !== null || (onarrange !== null && wide.current) || (board !== null && mayPin) || (here !== null && mayPin));
 </script>
 
 <!-- `page-more` and `data-arrange` NAME THE WAY INTO EDIT LAYOUT for a gate, which opened it from its own button. -->
@@ -376,6 +390,17 @@
   {#if onarrange && wide.current && !board?.on}
     <button type="button" class="mi" role="menuitem" data-arrange onclick={() => onarrange?.()}><Icon name="grid" size="s" />{copy.arrange}</button>
   {/if}
+  {#if here && mayPin && here.currency !== undefined}
+    <button type="button" class="mi" role="menuitem" onclick={() => changeSetting({ kind: 'currency', code: here.currency ?? null })}
+      ><Icon name="money" size="s" />{here.currency ? `Counted in ${here.currency}` : 'Money’s currency'}<span class="change-show" aria-hidden="true">Change</span></button
+    >
+  {/if}
+  {#if here && mayPin && here.list}
+    {@const list = here.list}
+    <button type="button" class="mi" role="menuitem" onclick={() => changeSetting({ kind: 'list', id: list.id, name: list.name })}
+      ><Icon name="edit" size="s" />{`Called ${list.name}`}<span class="change-show" aria-hidden="true">Change</span></button
+    >
+  {/if}
   {#if board && mayPin}
     <button type="button" class="mi" role="menuitem" onclick={() => void toBoard(!board.on)}
       ><Icon name={board.on ? 'rows' : 'grid'} size="s" />{board.on ? boardOff : boardOn}</button
@@ -383,6 +408,10 @@
   {/if}
 </Menu>
 </span>
+{/if}
+
+{#if setting}
+  {#await import('./SettingHere.svelte') then { default: SettingHere }}<SettingHere bind:open={settingOpen} what={setting} onchanged={reread} />{/await}
 {/if}
 
 {#if mayChange}

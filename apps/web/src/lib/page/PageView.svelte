@@ -1025,6 +1025,7 @@
           keys={drawnKeys}
           heads={blockHeads}
           board={boardable ? { on: boardKept !== null, keys: drawnKeys } : null}
+          here={moneyPage ? { currency: shell?.index?.currency ?? null } : null}
           extra={[
             ...(projectPage && dataHref
               ? [{ label: 'Edit details', icon: 'edit' as const, href: dataHref }]

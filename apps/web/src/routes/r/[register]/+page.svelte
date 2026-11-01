@@ -272,6 +272,8 @@
      once or waits on Decide, and the sheet says which before the press. */
   const owner = $derived(page.data.me ? ownsRecord(page.data.me as Me) : false);
   let fieldsOpen = $state(false);
+  /** The list's name, changed in place from the overflow. */
+  let renameOpen = $state(false);
   let makeOpen = $state(false);
 
   /**
@@ -3231,7 +3233,7 @@
       {/if}
       <!-- THE REST OF WHAT A LIST OFFERS, IN THE OVERFLOW: a row started with every field in front of you, the view over
            what is handed to you, on a list that says who holds its rows, and the list's fields (`ListEditor.svelte`). -->
-      {#if handedToMe || proposes || (adds && !arriving) || rowsAsCards() || shares}
+      {#if handedToMe || proposes || (adds && !arriving) || rowsAsCards() || shares || (owner && id !== KEYS_REGISTER)}
         <Menu label={headWords.more(decl.name)} align="end">
           <!-- NAMED, as every "⋯" is (motion F11): the name is text inside the trigger, never a `title` on a child. On a
                phone it also holds Display, which the toolbar's own "⋯" holds from 640. -->
@@ -3242,11 +3244,14 @@
           <!-- SHARE THE LIST, with somebody here, a group or an email, an owner's or an Admin's. -->
           {#if shares}<button type="button" role="menuitem" data-share-list onclick={shareList}><Icon name="user-plus" size="s" />{copy.shareSheetTitle(decl.name)}</button>{/if}
           {#if proposes}<button type="button" role="menuitem" data-fields-open onclick={() => (fieldsOpen = true)}>{sheetWords.open}</button>{/if}
+          <!-- ITS NAME, CHANGED HERE (`SettingHere.svelte`): the record's `renameList`, with an Undo, no trip to Settings. -->
+          {#if owner && id !== KEYS_REGISTER}<button type="button" role="menuitem" onclick={() => (renameOpen = true)}><Icon name="edit" size="s" />Rename this list</button>{/if}
         </Menu>
       {/if}
     {/snippet}
   </PageHead>
   {#if proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={refresh} />{/if}
+  {#if renameOpen}{#await import('$lib/page/SettingHere.svelte') then { default: SettingHere }}<SettingHere bind:open={renameOpen} what={{ kind: 'list', id, name: decl.name }} onchanged={refresh} />{/await}{/if}
 
   <div class="page" aria-busy={busy ? 'true' : undefined} data-from-copy={fromCopy ? '' : undefined} data-picking={picked.length > 0 ? '' : undefined}>
     <!-- THE LIST HAS MOVED ON AND MORE THAN ONE PAGE OF IT IS IN HAND, so it says so rather than splicing a new head
