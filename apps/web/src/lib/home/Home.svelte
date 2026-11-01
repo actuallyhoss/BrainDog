@@ -57,7 +57,6 @@
   import { stillShown, type WidgetSize } from 'braindog-render';
   import { recordToday, recordZone } from '$lib/record/zone.ts';
   import { partsOf } from '$lib/shell/headline.ts';
-  import { barTitled, frame } from '$lib/shell/frame.svelte.ts';
   import { everyAsked, onAppendOnly, recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
@@ -1457,16 +1456,8 @@
   /** The greeting, by the reader's name as the bar's face takes it: the record's name for them, else `boot`'s `me.name`. */
   const greeting = $derived(greetingOf(data.now, readerName));
 
-  /* THE BAR SAYS THE GREETING, ONCE (29 October): its crumb ends on it in place of "Today", and the greeting here is the
-     unseen `h1` wherever a bar is drawn. */
-  $effect(() => {
-    if (!headed) return;
-    const said = greeting;
-    frame.heading = said;
-    return () => {
-      if (frame.heading === said) frame.heading = '';
-    };
-  });
+  /* THE BAR SAYS "TODAY", AS EVERY PAGE'S BAR SAYS ITS PLACE (plan F5, 1 Nov): it said "Good afternoon", the one page
+     whose name was not where it is. The greeting is the page's own first line, its sentence row, said once there. */
 
   /* TODAY'S LATE LIST, read off the page as Home shaped it: what the brief names, and the Late tile at the top of the
      desk shows with a button each, in the brief's order and less what a question in Needs you already asks about
@@ -1716,7 +1707,7 @@
       are the tiles under it, said once there and not twice.
     -->
     {#if headed}
-      <header class="today-head" data-barred={barTitled() ? '' : undefined}>
+      <header class="today-head">
         <h1 class="today-hi" tabindex="-1">{greeting}</h1>
       </header>
     {/if}
@@ -1830,8 +1821,8 @@
 
   /* ── the head: the greeting and the brief ─────────────────────────── */
 
-  /* ON THE BOARD, NOT ON A TILE (the approved look of 19 October): the greeting at 34/40 in the display face (28/34 on a
-     phone, `--fs-hero`). */
+  /* ON THE BOARD, NOT ON A TILE: the greeting as the page's sentence row, 17 in the text face and the ink, as every
+     page's first line is (`head-row.css`), since the bar now says the page's name (plan F5). */
   .today-head {
     display: grid;
     gap: var(--sp-2);
@@ -1841,21 +1832,9 @@
   .today-hi {
     margin: 0;
     color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--fs-hero);
-    font-weight: var(--fw-semi);
-    line-height: 40px;
-    letter-spacing: -0.01em;
-  }
-
-  /* THE BAR SAYS IT: the greeting stays the screen's `h1` for a screen reader and the focus a move lands, drawn nowhere. */
-  .today-head[data-barred] {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+    font-size: var(--fs-head);
+    font-weight: var(--fw-regular);
+    line-height: calc(24 / 17);
   }
 
   .today-hi:focus:not(:focus-visible) {
@@ -1863,11 +1842,7 @@
     outline: none;
   }
 
-  @media (width < 640px) {
-    .today-hi {
-      line-height: 34px;
-    }
-  }
+
 
   /* ON A PHONE, the tiles read as the desk's phone board read them. */
   @media (width < 600px) {

@@ -7,7 +7,7 @@
   last a link back; "Ask or change anything" with its "/" key; the bell (what happened, never what was asked); and the
   face (how you sign in, the keyboard keys, Sign out).
 
-  THE LAST STEP IS THE PAGE'S TITLE, AND THE ONLY TIME IT IS SAID (29 October): "Good afternoon, Mara" on Today, "Needs
+  THE LAST STEP IS THE PAGE'S TITLE, AND THE ONLY TIME IT IS SAID (29 October): "Today" on Today (plan F5), "Needs
   you" with its count as a quiet figure, "Projects › Kiln". The page under it draws no name of its own (`PageHead`).
 
   ITS START IS THE WORK'S START: the bar pads its start by the page's gutter, so the crumb and the first tile under it
@@ -185,6 +185,13 @@
     text-align: start;
     cursor: text;
     transition: border-color var(--d-state) var(--ease-out);
+  }
+
+  /* BELOW 1360 IT ASKS FOR 240 (plan F6): at 320 on a 1280 window it pushed the crumb into an ellipsis. */
+  @media (width < 1360px) {
+    .bar-ask {
+      flex-basis: 240px;
+    }
   }
 
   @media (hover: hover) and (pointer: fine) {
