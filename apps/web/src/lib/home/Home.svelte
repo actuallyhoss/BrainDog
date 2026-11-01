@@ -37,12 +37,8 @@
   are Settings › Health, read only when that opens. Today asks none of them, the walk of every page and note least of all.
 -->
 <script module lang="ts">
-  /** Whether Today has been drawn once in this tab: its tiles come in on the first load only. */
-  let enteredOnce = false;
   /** When this tab last drew Today from the record, so an open while that is kept draws it and not the local copy. */
   let drewAt = 0;
-  /** How long after the first read the tiles still come in, so the desk's late parts land the same way. */
-  const ENTER_HELD_MS = 900;
   /** Whether this tab's first Today has taken what `boot` said was new: only that read can, as `boot` is that old. */
   let bootNewsTaken = false;
   /* THE PAGE READER, LOADED BESIDE TODAY'S FIRST READ AND NOT IN FRONT OF IT (scope 2026-10-24 A19): it brings every
@@ -118,8 +114,6 @@
   import { createClient, wrote, type Cursor, type EngineHealth, type EventLine, type SlashStatus } from '@braindog/client';
   import { quietLine } from '$lib/ui/engine-line.ts';
   import { page } from '$app/state';
-  import { afterNavigate } from '$app/navigation';
-  import { still } from '$lib/ui/motion.ts';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
   import { bandHeading, bandOf, greetingOf, inBriefOrder, lateOf, onceEach, unasked } from '$lib/home/today-brief.ts';
   import { verbOf } from '$lib/home/late-verb.ts';
@@ -921,24 +915,9 @@
   const board = $derived(declares === null || keptBoard);
 
 
-  /**
-   * THE TILES COME IN ONCE, ON THE APP'S FIRST LOAD (Today polish 11): a fade and a 4px rise as each lands, and never
-   * on a way back, which the page change already moves. Held for the first read and a breath after it, then off, so a
-   * tile that comes later (a reread) is simply there.
-   */
-  let entering = $state(false);
-  afterNavigate((nav) => {
-    if (nav.type === 'enter' && !enteredOnce && !still()) entering = true;
-    enteredOnce = true;
-  });
-  /* HELD FROM THE FIRST PICTURE, not from the record's answer: a copy drawn first and the answer landing seconds later
-     kept the arrival on, and a tile drawn again in that answer rose in a second time (live check of 30 October, 8). */
-  const pictured = $derived(got !== null || settled);
-  $effect(() => {
-    if (!entering || !pictured) return;
-    const off = setTimeout(() => (entering = false), ENTER_HELD_MS);
-    return () => clearTimeout(off);
-  });
+  /* NOTHING RISES IN ON AN OPEN (audit 11-01, AP5). The tiles' cold-open rise is gone: a load, a reload and a new tab
+     draw Today as it is, and only a real change while it is open moves a tile (`recompose.ts`), or the first Today
+     after a sign-up as it assembles (`assembling.ts`). */
 
   /* THE PAGE AS HOME DRAWS IT, handed to the reader whole, so the reader's writes index the blocks it draws. A rail with
      nothing beside it, or nothing in it, is one column. */
@@ -1707,7 +1686,7 @@
       THE DESK (`board`): one twelve-column board that the desk's parts and the page's blocks are laid out on together,
       each where the 19 October desk puts it. A kept page is its own board.
     -->
-    <div class="body" data-board={board ? '' : undefined} data-enter={entering ? '' : undefined}>
+    <div class="body" data-board={board ? '' : undefined}>
       <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
       {#if board}
         <!-- TODAY IS A BOARD OF WIDGETS (the widgets plan of 29 October): each in its cell, and the editor over them. -->
@@ -2002,6 +1981,27 @@
     min-inline-size: 0;
   }
 
+  /* NEEDS YOU WITH NOTHING ASKED STARTS AT THE TOP, as the tiles beside it do (audit 11-01, AP22): stretched to its cell,
+     the foot's two rows shared the height and its heading sat 17px under Cash ahead's, over an empty band. */
+  .body[data-board] :global(.board-part > [data-needs-foot][data-alone]) {
+    align-content: start;
+  }
+
+  /* A TABLE ON TODAY KEEPS ITS RULES INSIDE THE TILE'S PADDING, as Today's lists do (audit 11-01, AP25): the page's
+     table hangs a cell's padding into what is round it (`blocks.css`), which on a tile ran each rule 12px past the
+     heading's edge. Its first and last columns take the tile's edge instead. */
+  .body[data-board] :global(.block-slot > .table-region) {
+    margin-inline: 0;
+  }
+
+  .body[data-board] :global(.block-slot > .table-region :is(.th, .td):first-child) {
+    padding-inline-start: 0;
+  }
+
+  .body[data-board] :global(.block-slot > .table-region :is(.th, .td):last-child) {
+    padding-inline-end: 0;
+  }
+
   .body[data-board] :global(.board-part > *) {
     flex: 1;
     min-block-size: 0;
@@ -2219,48 +2219,7 @@
     display: none;
   }
 
-
   /* ── the tiles, as Today draws them (the Today polish of 20 October) ── */
-
-  /* THE TILES COME IN ONCE, on the first load: a fade and a 4px rise, the first six one after another `--d-stagger`
-     apart, so the last is still by 450ms (`motion.ts` `ARRIVAL`). A tile past the sixth is simply there. */
-  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(-n + 6)) {
-    animation: tile-in var(--d-page) var(--ease-out) both;
-    animation-delay: calc(var(--arrive, 0) * var(--d-stagger));
-  }
-
-  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(2)) {
-    --arrive: 1;
-  }
-
-  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(3)) {
-    --arrive: 2;
-  }
-
-  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(4)) {
-    --arrive: 3;
-  }
-
-  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(5)) {
-    --arrive: 4;
-  }
-
-  .body[data-board][data-enter] :global(.home-page > .page > :nth-child(6)) {
-    --arrive: 5;
-  }
-
-  @keyframes -global-tile-in {
-    from {
-      opacity: 0;
-      translate: 0 4px;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .body[data-board][data-enter] :global(.home-page > .page > :nth-child(-n + 6)) {
-      animation: none;
-    }
-  }
 
   /* NEEDS YOU'S COUNT IS THE ONLY RED IN A TILE'S HEAD (polish 5): red words, not a filled badge, which the top bar has. */
   .body[data-board] :global(.block-slot[data-key='needs-you'] > .block-bar .block-count) {

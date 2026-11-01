@@ -103,17 +103,50 @@ export const dismiss = rowOut;
 
 /**
  * A PLACE COMING INTO THE SIDEBAR or the tab bar (an add-on turned on, a list that now has something): it slides in from
- * the rail's edge and its row opens, so the places under it move down to make room rather than jumping.
+ * the rail's edge and fades in, at its own height from the first frame. Its row opening by `block-size` laid the rail
+ * out again every frame and shifted it (audit 11-01, AP14); the places under it now glide down to make room on
+ * transform alone (`glide`, which the rail runs round every change of what it holds). `hold` is its owner saying it is
+ * still filling in as it opens, which is no arrival.
  */
-export function placeIn(node: Element): TransitionConfig {
-  if (calm()) return NONE;
+export function placeIn(_node: Element, { hold = false }: { hold?: boolean } = {}): TransitionConfig {
+  if (hold || calm()) return NONE;
   if (still()) return fadeIn();
-  const h = (node as HTMLElement).offsetHeight;
-  const tall = h > 0 && getComputedStyle(node).display !== 'inline';
   return {
     duration: ms('--form-in', 320),
     easing: spring,
-    css: (t, u) => `opacity:${Math.min(1, t * 2)};transform:translateX(${(-12 * u).toFixed(2)}px)${tall ? `;block-size:${(Math.min(1, t) * h).toFixed(1)}px;overflow:clip` : ''}`,
+    css: (t, u) => `opacity:${Math.min(1, t * 2)};transform:translateX(${(-12 * u).toFixed(2)}px)`,
+  };
+}
+
+/**
+ * WHAT MAKES ROOM, GLIDING: measures every element of `box` that `match` names, and returns the function that, once the
+ * change is drawn, plays each one that moved from where it stood to where it is now, on the spring and on transform
+ * alone (FLIP), so nothing is laid out twice and the rail never shifts under the reader. One inside another that moved
+ * plays only its own share of the move. A new element is not here: it arrives by its own `in:` (`placeIn`). Nothing in
+ * a screen's first second, nothing under reduced motion.
+ */
+export function glide(box: HTMLElement | null | undefined, match: string): () => void {
+  if (!box || calm() || still() || typeof box.animate !== 'function') return () => {};
+  const was = new Map<Element, number>();
+  for (const el of box.querySelectorAll(match)) was.set(el, el.getBoundingClientRect().top);
+  return () => {
+    if (!box.isConnected) return;
+    const moved = new Map<Element, number>();
+    for (const el of box.querySelectorAll<HTMLElement>(match)) {
+      const top = was.get(el);
+      if (top === undefined) continue;
+      /* A GLIDE STILL PLAYING ENDS HERE, from where it was drawn, so the next one starts from the reader's picture. */
+      for (const a of el.getAnimations()) if (a.id === 'glide') a.cancel();
+      const dy = top - el.getBoundingClientRect().top;
+      if (Math.abs(dy) > 0.5) moved.set(el, dy);
+    }
+    for (const [el, dy] of moved) {
+      const up = el.parentElement?.closest(match);
+      const own = dy - (up && box.contains(up) ? (moved.get(up) ?? 0) : 0);
+      if (Math.abs(own) <= 0.5) continue;
+      const a = play(el as HTMLElement, { transform: [`translateY(${own.toFixed(2)}px)`, 'none'] }, { duration: ms('--form-settle', 380) });
+      if (a) a.id = 'glide';
+    }
   };
 }
 

@@ -47,9 +47,9 @@ test('the typed line is swapped in place only when the record has answered it', 
   assert.match(page, /const out = await writes\(\)\.create\(id, fields\);\n\s+\/\*[^]*?\*\/\n\s+if \(out\.ok && asked === was\) swapInPlace\(\);\n\s+unline\(\);/u);
 });
 
-/* A PLACE'S FIRST DRAW ARRIVES IN ORDER AND IS STILL BY 450ms (fluid F6): six tiles at most, 40ms apart, each
-   over a page's 200; none on a way back, none under reduced motion. Home's sheet and the skin's tokens say the same. */
-test('the first draw rises six tiles 40ms apart and is done by 450ms, and none past six', async () => {
+/* A PLACE'S FIRST DRAW, WHERE ONE STILL ARRIVES, IS IN ORDER AND STILL BY 450ms (fluid F6): six at most, 40ms apart. TODAY
+   NO LONGER RISES ON AN OPEN AT ALL (audit 11-01, AP5): a load, a reload and a new tab draw it as it is. */
+test('the arrival steps are six 40ms apart and done by 450ms, and Today draws still on an open', async () => {
   const { ARRIVAL, arrivalDelay } = await import('./motion.ts');
   const tokens = readFileSync(fileURLToPath(new URL('../../../../../packages/skin/tokens.css', import.meta.url)), 'utf8');
   assert.match(tokens, /--d-stagger: 40ms;/u);
@@ -58,8 +58,6 @@ test('the first draw rises six tiles 40ms apart and is done by 450ms, and none p
   assert.ok((arrivalDelay(ARRIVAL.most - 1) ?? 0) + ARRIVAL.page <= ARRIVAL.by, 'the last tile is still by 450ms');
 
   const home = readFileSync(fileURLToPath(new URL('../home/Home.svelte', import.meta.url)), 'utf8');
-  assert.match(home, /:nth-child\(-n \+ 6\)\)[^{]*\{\s*animation: tile-in var\(--d-page\)[^;]*;\s*animation-delay: calc\(var\(--arrive, 0\) \* var\(--d-stagger\)\);/u);
-  for (let n = 2; n <= ARRIVAL.most; n++) assert.match(home, new RegExp(`:nth-child\\(${n}\\)\\) \\{\\s*--arrive: ${n - 1};`, 'u'));
-  assert.match(home, /prefers-reduced-motion: reduce\) \{\s*\.body\[data-board\]\[data-enter\][^{]*\{\s*animation: none;/u, 'none under reduced motion');
-  assert.match(home, /if \(nav\.type === 'enter' && !enteredOnce && !still\(\)\) entering = true;/u, 'only on the first load, never on a way back');
+  assert.doesNotMatch(home, /animation: tile-in/u, 'no tile rises in on an open');
+  assert.doesNotMatch(home, /data-enter=/u);
 });

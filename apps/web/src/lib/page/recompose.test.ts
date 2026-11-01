@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { blockKeys, covered, frameOf, planOf, rewritten, type Box } from './recompose.ts';
+import { blockKeys, covered, frameOf, GLIDE, planOf, rewritten, slideOf, SLIDE_MAX, type Box } from './recompose.ts';
 
 const at = (x: number, y: number, w = 100, h = 40): Box => ({ x, y, w, h });
 
@@ -171,4 +171,13 @@ test('a page with no box is laid against the nearest positioned ancestor that ha
 test('with nothing positioned above it the page is its own frame', () => {
   const page = el('contents', 'static', el('contents', 'relative', el('block', 'static')));
   assert.equal(withStyles(() => frameOf(page as never)), page);
+});
+
+test('a short move slides the whole way, and a long one glides the last stretch on its heading and fades in', () => {
+  assert.deepEqual(slideOf(-40, 30), { dx: -40, dy: 30, fade: false });
+  assert.deepEqual(slideOf(0, SLIDE_MAX), { dx: 0, dy: SLIDE_MAX, fade: false });
+  const far = slideOf(601.7, -196.9);
+  assert.equal(far.fade, true);
+  assert.ok(Math.abs(Math.hypot(far.dx, far.dy) - GLIDE) < 1e-9);
+  assert.ok(far.dx > 0 && far.dy < 0);
 });

@@ -21,6 +21,9 @@
   becoming "£1,310" runs through the numbers between over `--form-count`, in place, with no roll and no old figure
   fading. A word, a sign that flipped or another currency rolls as before. Never on the first draw, nor in a screen's
   first second.
+
+  NOR DOES IT ROLL WHILE THE SCREEN OPENS (audit 11-01, AP5): the record's answer landing over the copy a screen drew
+  first is the screen settling (`calm`), not the figure changing, so a load, a reload or a new tab never rolls one.
 -->
 <script lang="ts">
   import { ms, still } from './motion.ts';
@@ -54,7 +57,7 @@
   const said = $derived(typeof value === 'number' ? value.toLocaleString('en') : value);
 </script>
 
-<span class="fig num">{#key said}<span class="roll" data-roll={drawn.yet ? '' : undefined} out:leave {@attach tally}>{said}</span>{/key}</span>
+<span class="fig num">{#key said}<span class="roll" data-roll={drawn.yet && !calm() ? '' : undefined} out:leave {@attach tally}>{said}</span>{/key}</span>
 
 <style>
   .fig {
