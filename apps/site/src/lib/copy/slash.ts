@@ -17,6 +17,7 @@
  * IT IS NOT SPREAD INTO `copy.ts`: the Slash page and the drawing import it directly.
  */
 
+import { APPS_AND } from '../agents.ts';
 import { TABLE } from '../plans.ts';
 
 const FREE = TABLE.free.credits;
@@ -64,7 +65,7 @@ export const slashPage = {
   },
   agents: {
     title: 'Slash and your AI tools',
-    say: 'Slash lives inside BrainDog. Your AI tools live in Claude, ChatGPT, Codex, Cursor and VS Code. Both read the same BrainDog.',
+    say: `Slash lives inside BrainDog. Your AI tools live in ${APPS_AND}. Both read the same BrainDog.`,
     head: ['Slash', 'Your AI tools'],
     lines: [
       ['Where', 'In BrainDog. Press ⌘J', 'In the apps you connect'],

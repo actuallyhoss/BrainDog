@@ -8,6 +8,7 @@
       "source": "./plugins/claude-code",
       "description": "Connects Claude Code to your BrainDog record: the MCP server with sign-in, the session hooks, and the BrainDog skill.",
       "homepage": "https://brain.dog/docs/agents/connect",
+      "repository": "https://github.com/actuallyhoss/BrainDog",
       "license": "Apache-2.0"
     }
   ]

@@ -38,6 +38,11 @@ No secret is printed, logged or written. What was live is kept in `.ship/live-be
 prints the `rollback.mjs decide` and `wrangler rollback` lines that put it back. After a red Parity or Smoke the
 rollback steps run as they do in the workflow.
 
+A green deploy then asks production five things from outside (`tools/ship/after-deploy.mjs`), one plain line each:
+health with the build held to HEAD, the kernel against this checkout's migrations, the sign-in page, the MCP door's
+sign-in metadata, and the site. It needs no canary record (`OPS_RECORD`) and no key. A red line makes the exit 1 and
+rolls nothing back. Run it alone any time: `node tools/ship/after-deploy.mjs [--sha <commit>] [--env alpha]`.
+
 A green deploy then attaches the status page (or `BRAINDOG_STATUS_PAGE`) to the BrainDog
 project (`things#21`, or `BRAINDOG_STATUS_ON`) as the next version of its "Status" visual, so the loop folder is not its
 only copy. An unchanged page writes nothing, and a failed attach is said without turning the deploy red.

@@ -27,7 +27,12 @@ Slash is built into BrainDog. Press ⌘J, or Ctrl+J off a Mac, and ask. Ask what
 
 ## Your agents
 
+<!-- launch: codex -->
 Claude, Codex, Cursor and anything else that speaks MCP can read and write your BrainDog once you allow it. When an agent wants to change something, you get a question first, and its name stays on the change. Agents and scripts use your API keys without ever seeing them.
+<!-- /launch -->
+<!-- launch: !codex -->
+Claude, Cursor and anything else that speaks MCP can read and write your BrainDog once you allow it. When an agent wants to change something, you get a question first, and its name stays on the change. Agents and scripts use your API keys without ever seeing them.
+<!-- /launch -->
 
 ## Things that arrive on their own
 

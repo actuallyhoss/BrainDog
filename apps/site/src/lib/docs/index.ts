@@ -16,6 +16,7 @@
 import { SECTIONS, byOrder, docOf, plainOf, type Doc, type Entry, type Section } from './pages.ts';
 import { docsWords } from './words.ts';
 import { LAUNCH } from '../launch.ts';
+import { CODEX_LISTED } from '../agents.ts';
 
 const files: Record<string, string> = import.meta.env
   ? import.meta.glob<string>('/src/docs/**/*.md', { query: '?raw', import: 'default', eager: true })
@@ -23,7 +24,7 @@ const files: Record<string, string> = import.meta.env
 
 /** Every page, in the order the docs are read. */
 export const DOCS: readonly Doc[] = Object.entries(files)
-  .map(([key, src]) => docOf(key, src, LAUNCH))
+  .map(([key, src]) => docOf(key, src, { ...LAUNCH, codex: CODEX_LISTED }))
   .sort(byOrder);
 
 /** The page at `/docs/<section>/<slug>`, or `null`. */

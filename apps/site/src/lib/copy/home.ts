@@ -10,6 +10,7 @@
  * THE DRAWINGS' NAMES AND FIGURES ARE NOT HERE. Maya Okafor's record is one file, `lib/demo/maya.ts`, and every band
  * draws from it. The early access figures are `lib/plans.ts`, read by the page and never typed.
  */
+import { APPS_AND, listed, sayList } from '../agents.ts';
 import { DOCS, SECURITY, SUPPORT_EMAIL } from '../links.ts';
 
 /** Where a developer reads how to connect: the docs' first page for AI tools. */
@@ -25,13 +26,15 @@ export const home = {
     secondary: 'Connect your AI tools',
     works: 'Works with',
     /* The makers, once each: Claude, not "Claude Code" (§47 his notes). Their marks are `@braindog/skin/agent-marks.ts`. */
-    makers: [
-      { id: 'claude', name: 'Claude' },
-      { id: 'chatgpt', name: 'ChatGPT' },
-      { id: 'codex', name: 'Codex' },
-      { id: 'cursor', name: 'Cursor' },
-      { id: 'vscode', name: 'VS Code' },
-    ],
+    makers: (
+      [
+        { id: 'claude', name: 'Claude' },
+        { id: 'chatgpt', name: 'ChatGPT' },
+        { id: 'codex', name: 'Codex' },
+        { id: 'cursor', name: 'Cursor' },
+        { id: 'vscode', name: 'VS Code' },
+      ] as const
+    ).filter((maker) => listed(maker.name)),
   },
 
   /* WHO IT'S FOR: three readers, each a tile with its own fill, icon and drawing. */
@@ -47,7 +50,7 @@ export const home = {
     },
     build: {
       title: 'Build with AI',
-      say: "Claude, Cursor and Codex start every session from your brief and leave a note when they're done.",
+      say: `${sayList(['Claude', 'Cursor', 'Codex'])} start every session from your brief and leave a note when they're done.`,
       lines: ['braindog · context', 'Tidepool, building. Next: ship webhook retries.', "Cursor: onboarding copy waits on Dana's icons."],
       link: 'Connect your tools',
       href: '/agents',
@@ -148,7 +151,7 @@ export const home = {
       },
       {
         q: 'Which AI tools work with it?',
-        a: 'Claude, ChatGPT, Codex, Cursor and VS Code. You approve each one once in BrainDog. Developers can use the MCP address or the command line.',
+        a: `${APPS_AND}. You approve each one once in BrainDog. Developers can use the MCP address or the command line.`,
         link: { label: 'How to connect', href: CONNECT_DOCS },
       },
       {

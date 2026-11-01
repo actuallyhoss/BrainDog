@@ -17,6 +17,7 @@ import type { Component } from 'svelte';
 import { markOf } from '@braindog/skin/agent-marks.ts';
 import { CONNECT, CONNECT_WORDS, hintParts, hintText } from '../src/lib/connect/apps.ts';
 import { agents } from '../src/lib/copy/agents.ts';
+import { APP_NAMES, APPS_AND } from '../src/lib/agents.ts';
 import { APP, CLI_INSTALL, MCP } from '../src/lib/links.ts';
 import { BUILD, missing, when } from './built.ts';
 
@@ -55,7 +56,7 @@ const prose = (html: string): string =>
 test('every app has its maker mark, the address in its code, and one plain line of hint', () => {
   assert.deepEqual(
     CONNECT.map((a) => a.name),
-    ['Claude', 'ChatGPT', 'Codex', 'Cursor', 'VS Code'],
+    APP_NAMES,
   );
   for (const app of CONNECT) {
     const mark = markOf(app.id);
@@ -105,7 +106,7 @@ test("the page's words hold no em dash and no never-word outside code", () => {
     assert.ok(!s.includes(EM_DASH), `an em dash in "${s}"`);
     assert.doesNotMatch(s, NEVER, `a never-word in "${s}"`);
   }
-  assert.equal(agents.agents.lead.startsWith('Claude, ChatGPT, Codex, Cursor and VS Code can read your BrainDog'), true);
+  assert.equal(agents.agents.lead.startsWith(`${APPS_AND} can read your BrainDog`), true);
   assert.equal(agents.agents.dev.address, MCP, 'the row for developers gives the address the box gives');
 });
 

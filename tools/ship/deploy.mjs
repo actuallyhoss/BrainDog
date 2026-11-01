@@ -354,6 +354,27 @@ say('      (first: it holds when a migration, a Durable Object class or a store 
 say(`    (cd apps/worker && pnpm exec wrangler rollback ${live.APP_PREVIOUS || '<app version>'} --env production --message "Rolled back by hand" --yes)`);
 say(`    (cd apps/site && pnpm exec wrangler rollback ${live.SITE_PREVIOUS || '<site version>'} --env production --message "Rolled back by hand" --yes)`);
 
+/* THE AFTER-DEPLOY CHECK (`after-deploy.mjs`): health, the kernel, the sign-in page, the MCP door's metadata and the
+   site, asked from outside with no record, so it needs no canary (`OPS_RECORD`). After a green deploy it holds the live
+   build to HEAD; a dry run asks what is live and holds it to nothing. A red line is said and makes the exit 1, but rolls
+   nothing back: the smoke above is what decides that. */
+let afterRed = false;
+if (refusals.length === 0 || DRY) {
+  if (!DRY && state.failed) say('\n  after-deploy: not asked, since this deploy is not green');
+  else {
+    const { afterDeploy, linesOf } = await import('./after-deploy.mjs');
+    say(`\n  after-deploy, from outside${DRY ? ' (what is live, since nothing was deployed)' : ''}:`);
+    try {
+      const checks = await afterDeploy({ sha: DRY ? null : HEAD });
+      for (const line of linesOf(checks)) say(line);
+      afterRed = !DRY && checks.some((c) => !c.ok);
+    } catch (e) {
+      say(`  after-deploy: could not be asked (${e instanceof Error ? e.message : String(e)})`);
+      afterRed = !DRY;
+    }
+  }
+}
+
 /* THE STATUS GOES INTO BRAINDOG WITH EACH DEPLOY, so the loop folder on this Mac is not its only copy. The same title is
    the visual's next version (an unchanged page writes nothing), and a failed attach is said and never turns a deploy red. */
 const STATUS_PAGE = process.env.BRAINDOG_STATUS_PAGE || join(ROOT, 'loop/status/index.html');
@@ -374,4 +395,4 @@ say(`  log: ${relative(ROOT, LOG)}\n`);
 for (const name of ['braindog.mjs', 'braindog.mjs.sha256', 'braindog.mjs.build']) rmSync(join(ROOT, 'apps/site/static/cli', name), { force: true });
 if (lockHeld) rmSync(LOCK, { force: true });
 rmSync(TMP, { recursive: true, force: true });
-process.exitCode = state.failed || refusals.length > 0 ? 1 : 0;
+process.exitCode = state.failed || refusals.length > 0 || afterRed ? 1 : 0;
