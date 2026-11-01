@@ -1459,15 +1459,11 @@
     gap: var(--sp-4);
     align-content: start;
     min-inline-size: 0;
-    padding: var(--sp-6);
+    /* THE LEAD TILE'S PADDING (`--tile-pad-lead`: 24, 16 on a phone), the board's one step, not a 32 of its own beside
+       the build's 20 (skills pass, bento, 2 Nov). */
+    padding: var(--tile-pad-lead);
     background: var(--tile);
     border-radius: var(--r-tile);
-  }
-
-  @media (width < 640px) {
-    .talk {
-      padding: 20px;
-    }
   }
 
   /* THE HEADING FOCUS LANDS ON AFTER A READ is a place, not a control: focus-ok: it is `tabindex="-1"`, reached only
