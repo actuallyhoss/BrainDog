@@ -332,7 +332,7 @@
   was known, written down, and applied to one group.
 -->
 <Tile icon="sun" class="section" data-surface="tile" title={words.looks}>
-  <div class="section-body">
+  <div class="section-body looks-host">
     <p class="hint">{kept === 'record' ? words.hint(props.shell.index.name) : kept === 'pending' ? words.hintPending : words.hintDevice}</p>
     <div class="looks">
       <div class="choices">
@@ -597,10 +597,16 @@
     display: none;
   }
 
-  /* BESIDE THE CHOICES FROM 1,280: the sidebar under the bar (frame B) takes its column first. */
-  @media (width >= 1280px) {
+  /* BESIDE THE CHOICES WHERE THE AREA HAS ROOM, measured on the area and not the window (UI pass 1 Nov): at 1280 the
+     window rule stood both previews beside choices squeezed to 110px, "Colour scheme", "Top bar" and "Needs you" each
+     broken over two lines. The picked scheme alone from 640 of area; both from 900. */
+  .looks-host {
+    container-type: inline-size;
+  }
+
+  @container (width >= 640px) {
     .looks {
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(18rem, 1fr) auto;
       align-items: start;
     }
 
@@ -611,7 +617,9 @@
       position: sticky;
       inset-block-start: var(--sp-6);
     }
+  }
 
+  @container (width >= 900px) {
     .preview[data-other] {
       display: block;
     }

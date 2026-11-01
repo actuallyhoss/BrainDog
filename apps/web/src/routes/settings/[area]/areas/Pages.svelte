@@ -50,6 +50,7 @@
   import type { AreaProps } from '../settings-state.svelte.ts';
   import { ownsRecord } from '../../levels.ts';
   import { foldSaid } from './pages-fold.ts';
+  import { lineIn } from '$lib/motion';
 
   /**
    * PAGES IS FOLDED INTO NAVIGATION (UI pass 20 Oct, agents F14): Navigation draws this file three times, one `part` each,
@@ -97,6 +98,8 @@
     isHidden: 'Hidden from your nav',
     called: (own: string) => `Called ${own} on its page`,
     under: (section: string) => `In ${section}`,
+    inSection: (n: number, section: string) => `${n} pages in ${section}`,
+    showThem: 'Show',
     none: 'No pages yet',
     noneWhy: 'They come with add-ons and from Slash.',
     renameTitle: (title: string) => `Rename ${title}`,
@@ -287,7 +290,7 @@
   /* THE PAGES A ROW MADE ARE FOLDED, and the written ones past eight: a record with a page per person or project lists
      them all, and a list that long is read by the person who asked for it. The fold names only what it hides, so the
      pages drawn and the pages it adds come to the count over the section. */
-  const FOLD = 8;
+  const FOLD = 4;
   let unfolded = $state(false);
   /* ADD A PAGE FINDS BY NAME: typing narrows every page not in the sidebar, folded ones too. */
   let finding = $state('');
@@ -296,6 +299,33 @@
   /* WHAT IS IN THE NAV NOW, and the pages hidden from it, which "Not in your nav" leads with. */
   const navShown = $derived(ordered.filter((p) => !navPrefs.isHidden(p.href)));
   const hiddenRows = $derived(ordered.filter((p) => navPrefs.isHidden(p.href)));
+  /**
+   * A SECTION'S PAGES FOLD UNDER ONE ROW (UI pass 1 Nov): three or more pages in a row under one section ("In Money",
+   * nine of them) are one row that names the first few and opens them in place, so the sidebar's list is the sidebar's
+   * shape and not every page of Money. Opened, they stay open for the visit; moving one moves it among the others as
+   * before, since the order is still `navShown`'s.
+   */
+  type Run = { kind: 'row'; p: Listed } | { kind: 'fold'; section: string; rows: Listed[] };
+  let openSections = $state<readonly string[]>([]);
+  const navRuns = $derived.by((): Run[] => {
+    const out: Run[] = [];
+    let i = 0;
+    while (i < navShown.length) {
+      const p = navShown[i]!;
+      let j = i;
+      while (p.section !== undefined && j + 1 < navShown.length && navShown[j + 1]!.section === p.section) j++;
+      const run = navShown.slice(i, j + 1);
+      if (p.section !== undefined && run.length >= 3 && !openSections.includes(p.section)) out.push({ kind: 'fold', section: p.section, rows: run });
+      else for (const q of run) out.push({ kind: 'row', p: q });
+      i = j + 1;
+    }
+    return out;
+  });
+  const foldNames = (rows: readonly Listed[]): string => {
+    const names = rows.map((r) => navPrefs.labelOf(r.href, r.own));
+    return names.length <= 3 ? LIST.format(names) : `${names.slice(0, 3).join(', ')} and ${names.length - 3} more`;
+  };
+  const LIST = new Intl.ListFormat('en-GB', { type: 'conjunction' });
   const outCount = $derived(hiddenRows.length + others.length);
   /* WHAT THE FOLD HOLDS, BY KIND: "Pages of 30 projects, 8 people and every agent run", never "1047 more pages". */
   const foldLine = $derived.by(() => {
@@ -428,7 +458,7 @@
   {@const title = navPrefs.labelOf(p.href, p.own)}
   {@const hidden = p.inNav && navPrefs.isHidden(p.href)}
   {@const first = navPrefs.home === p.href || (p.href === '/' && navPrefs.home === null)}
-  <li class="page-row" data-hidden={hidden ? '' : undefined}>
+  <li class="page-row" data-hidden={hidden ? '' : undefined} in:lineIn>
     <div class="line" class:line-tall={first || hidden || title !== p.own || p.section !== undefined || p.app === true}>
       <span class="line-mark"><IconWell name={p.icon} size="l" /></span>
       <span class="line-main">
@@ -521,7 +551,23 @@
       <!-- ONE LIST, ONE RHYTHM: a hairline between every row, the nav's order, and a page under a section named
            otherwise says where it is ("In Work"). -->
       <ul class="ledger ledger-lead pages">
-        {#each navShown as p (p.href)}{@render pageRow(p)}{/each}
+        {#each navRuns as r (r.kind === 'row' ? r.p.href : `fold:${r.section}`)}
+          {#if r.kind === 'row'}
+            {@render pageRow(r.p)}
+          {:else}
+            <li class="page-row page-fold">
+              <button type="button" class="line line-tall fold-line" aria-expanded="false" onclick={() => (openSections = [...openSections, r.section])}>
+                <span class="line-mark"><IconWell name="rows" size="l" /></span>
+                <span class="line-main">
+                  <span class="line-title">{foldNames(r.rows)}</span>
+                  <span class="line-detail">{words.inSection(r.rows.length, r.section)}</span>
+                </span>
+                <span class="line-amount"></span>
+                <span class="line-when fold-go" aria-hidden="true">{words.showThem}<Icon name="chevron" size="s" /></span>
+              </button>
+            </li>
+          {/if}
+        {/each}
       </ul>
     {/if}
   </Tile>
@@ -534,7 +580,9 @@
       {#if outCount === 0}
         <p class="nothing-out">{words.nothingOut}</p>
       {:else}
-        <div class="find">
+        <!-- A FIELD THAT LOOKS LIKE ONE: the input stood bare on the tile, read as a line of grey words. -->
+        <div class="find field">
+          <Icon name="search" size="s" />
           <input class="field-input" type="search" aria-label={words.find} placeholder={words.find} autocomplete="off" spellcheck="false" bind:value={finding} />
         </div>
         {#if finding.trim() !== '' && hiddenRows.filter(found).length + othersShown.length === 0}<p class="nothing-out">{words.noMatch}</p>{/if}
@@ -796,7 +844,11 @@
   }
 
   .fold-go {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
     color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   @media (hover: hover) and (pointer: fine) {

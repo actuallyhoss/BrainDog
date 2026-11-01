@@ -6,6 +6,7 @@
   found across eleven precedents (19 §4).
 -->
 <script lang="ts">
+  import Icon from '$lib/ui/Icon.svelte';
   import * as pref from '$lib/pref.ts';
   import { copy } from '$lib/copy.ts';
   import Tile from '$lib/ui/Tile.svelte';
@@ -100,7 +101,8 @@
   answer until the page reloaded.
 -->
 <Tile icon="rows" title={query.trim() === '' ? words.every : words.found}>
-  <div class="find">
+  <div class="find field">
+    <Icon name="search" size="s" />
     <input class="field-input" type="search" aria-label={words.find} placeholder={words.findHint} autocomplete="off" spellcheck="false" bind:value={query} />
   </div>
   <Keymap silenced={!chars} only={MOST} {query} />
