@@ -207,7 +207,7 @@
     </Empty>
   {:else if !ready}
     <Empty kind="no-data-yet" glyph="money" title={words.notSetUp} body={words.notSetUpBody}>
-      {#snippet actions()}<Button href={at('/addons/count-cash', page.url.pathname)}>{words.addOn}</Button>{/snippet}
+      {#snippet actions()}<Button href={at('/addons/count-cash?kind=pack', page.url.pathname)}>{words.addOn}</Button>{/snippet}
     </Empty>
   {:else if counter.state === 'waiting' || counter.state === 'refused' || counter.state === 'offline'}
     <ReadState state={counter.state} refusal={counter.refusal} onretry={counter.reread} />
