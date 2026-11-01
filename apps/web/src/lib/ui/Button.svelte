@@ -1,5 +1,6 @@
 <!--
-  One control, three weights, and every one of them a rectangle.
+  One control, three weights, and every one of them a rectangle (and INK, the neutral strong fill: `--ink` with
+  `--tile` words, for a suggested answer where the screen's one red is spent elsewhere).
 
   PRIMARY is the red fill with white words, one per screen: `--red-fill` at rest, `--red-fill-hover` under the pointer,
   `--red-fill-press` while it is held, and `--on-red` (white) on all three, in light and in dark. QUIET, the default, is
@@ -44,7 +45,7 @@
     children,
     ...rest
   }: {
-    weight?: 'primary' | 'quiet' | 'bare' | 'glass' | undefined;
+    weight?: 'primary' | 'ink' | 'quiet' | 'bare' | 'glass' | undefined;
     href?: string | undefined;
     type?: 'button' | 'submit' | undefined;
     tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;
@@ -149,6 +150,18 @@
     background: var(--red-fill-press, var(--red-fill-hover));
   }
 
+  /* INK, THE NEUTRAL STRONG BUTTON: a suggested answer on a screen whose one red is spent elsewhere. */
+  .btn[data-weight='ink'] {
+    --btn-fill: var(--ink);
+
+    background: var(--btn-fill);
+    color: var(--tile);
+  }
+
+  .btn[data-weight='ink']:active:not(:disabled) {
+    background: color-mix(in oklab, var(--ink) 78%, var(--tile));
+  }
+
   .btn[data-weight='bare'] {
     background: none;
     color: var(--ink-2);
@@ -170,6 +183,10 @@
 
     .btn[data-weight='primary']:hover:not(:disabled):not(:active) {
       background: var(--red-fill-hover);
+    }
+
+    .btn[data-weight='ink']:hover:not(:disabled):not(:active) {
+      background: color-mix(in oklab, var(--ink) 86%, var(--tile));
     }
 
     .btn[data-weight='bare']:hover:not(:disabled):not(:active) {
@@ -196,7 +213,7 @@
     cursor: not-allowed;
   }
 
-  .btn[data-weight='primary']:disabled {
+  .btn:is([data-weight='primary'], [data-weight='ink']):disabled {
     background: var(--tile-2);
     color: var(--ink-3);
   }

@@ -63,10 +63,13 @@ export const LEDGER: Record<string, unknown>[] = [
        AND EACH UNDER THE DAY IT HAPPENED (audit 2, A33): "36 added today." still stood over lines dated June to August
        and read as a count of what the tile shows, so the line says the lines below are by the day each happened.
 
+       AND THEN SHORT AGAIN (polish, 1 Nov): "each under the day it happened" was a clause nobody needed; the dates
+       on the lines below say it. The line is the one count, "36 came in today."
+
        NO GATE OF ITS OWN: a line is not a thing a tile holds, so a Ledger nothing has moved on is still not drawn. */
     kind: 'timeline',
     heading: 'Ledger',
-    body: '{{filed-today}} came in today, each under the day it happened.',
+    body: '{{filed-today}} came in today.',
     icon: 'receipt',
     /* NO WIDTH OF ITS OWN, SINCE money-core 3.29.0, so the app pairs it beside the accounts on Money's home. */
     source: 'register.transactions',

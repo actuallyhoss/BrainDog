@@ -394,6 +394,12 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   color: var(--ink-2);
 }
 
+/* INK, THE NEUTRAL STRONG ANSWER: the suggested answer on every card but the lead, so the screen keeps one red. */
+.dc-btn[data-weight='ink'] {
+  background: var(--ink);
+  color: var(--tile);
+}
+
 /* NOT NOW STANDS IN THE ROW WITH THE ANSWERS, a step further off than they are from each other and in words only, so
    "Not yet" and "Not now" are never read as two answers side by side. It stood at the far end of the form's measure,
    which on a wide tile left it floating in the middle of the row, lined up with nothing. */
@@ -407,6 +413,11 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   color: var(--on-red);
 }
 
+.dc-btn[data-weight='ink'] .queue-key {
+  border-color: color-mix(in srgb, var(--tile) 45%, transparent);
+  color: var(--tile);
+}
+
 @media (hover: hover) and (pointer: fine) {
   .dc-btn:hover:not(:disabled, [aria-disabled='true']) {
     background: var(--hover);
@@ -414,6 +425,10 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
   .dc-btn[data-weight='primary']:hover:not(:disabled, [aria-disabled='true']) {
     background: var(--red-fill-hover);
+  }
+
+  .dc-btn[data-weight='ink']:hover:not(:disabled, [aria-disabled='true']) {
+    background: color-mix(in oklab, var(--ink) 86%, var(--tile));
   }
 
   .dc-btn[data-weight='bare']:hover:not(:disabled, [aria-disabled='true']) {
