@@ -389,6 +389,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    { version: '1.23.0', notes: 'A task can say which client it is for. A task with a client and no project is filed under its client, not under Needs a project, and Work\'s lists say the client beside the task.' },
     { version: '1.22.0', notes: 'Timeline with no dated task says what will stand on it and how a task gets there.' },
     { version: '1.21.0', notes: 'On a BrainDog more than one person shares, Yours is the tasks assigned to you or to nobody, and a task assigned to a colleague is theirs. The field reads Assigned to, where it read Owner.' },
     { version: '1.20.1', notes: 'No due day lists the newest tasks first, and Later lists tasks by their due day, then the newest first. Work\'s band reads "Your work this week" and Timeline\'s lane "Tasks by due day". The Next up widget lists the same tasks as Your work this week.' },

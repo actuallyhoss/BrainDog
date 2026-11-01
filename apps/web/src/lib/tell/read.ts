@@ -503,6 +503,34 @@ const sharedBy = (name: string, people: readonly Known[]): boolean =>
 
 /* ── the lists ────────────────────────────────────────────────────────── */
 
+/**
+ * THE CLIENT AN ENTRY'S WORDS NAME, for a list with a link that says client (Work's tasks, `client`, since work 1.23.0,
+ * 2 Nov: "Send Fenwick's invoice" on a record that keeps Fenwick as an organisation is Fenwick's, and the words stay as
+ * typed): an entry of the list the link points at whose name stands in the words as a word of its own, "Fenwick's" and
+ * "for Acme" alike, the longest name first, and a company's name without the word it ends on ("Brightside" for
+ * "Brightside Ltd"). `pool` names the entries a list keeps. `null` where the list has no such link, it is set already,
+ * or no kept name is said. Today's drafts ask it too, of the model's.
+ */
+export function clientNamed(
+  l: Pick<TellList, 'fields' | 'title'>,
+  fields: Readonly<Record<string, unknown>>,
+  pool: (to: string) => readonly Known[],
+): { field: string; ref: string; name: string } | null {
+  const link = l.fields.find((f) => f.type === 'ref' && !f.retired && f.to !== undefined && f.to !== PEOPLE && /client/iu.test(`${f.id} ${f.label ?? ''}`));
+  if (!link?.to || (fields[link.id] !== undefined && fields[link.id] !== null && fields[link.id] !== '')) return null;
+  const title = l.fields.find((f) => f.id === l.title) ?? l.fields.find((f) => f.type === 'text');
+  const said = words(String(title ? (fields[title.id] ?? '') : ''));
+  if (said === '') return null;
+  const esc = (x: string): string => x.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  const stands = (name: string): boolean => name.length > 1 && new RegExp(`(?:^|[^\\p{L}\\p{N}])${esc(name)}(?=$|[^\\p{L}\\p{N}])`, 'u').test(said);
+  const hit = pool(link.to)
+    .filter((k) => k.name.trim() !== '')
+    .map((k) => ({ k, n: words(oneLine(k.name)).replace(/[.,;:]+$/u, '') }))
+    .sort((a, b) => b.n.length - a.n.length)
+    .find(({ n }) => stands(n) || stands(n.replace(COMPANY_END, '')));
+  return hit ? { field: link.id, ref: `${link.to}#${hit.k.seq}`, name: hit.k.name } : null;
+}
+
 const textField = (l: TellList): FieldDecl | undefined =>
   l.fields.find((f) => f.id === l.title && f.type === 'text') ?? l.fields.find((f) => f.type === 'text' && f.required);
 const callsItself = (l: TellList, word: RegExp): boolean => word.test(l.one ?? '') || word.test(l.name);
@@ -1442,6 +1470,11 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     startIn(l, fields);
     for (const f of l.fields) if (f.required && !f.retired && f.default === undefined && fields[f.id] === undefined && counted(f)) fields[f.id] = 0;
     if (kept && keptLink) fields[keptLink.id] = `${keptTo}#${kept.seq}`;
+    /* THE CLIENT IT IS FOR, NAMED ANYWHERE IN ITS WORDS (work 1.23.0, 2 Nov): "Send Fenwick's invoice" on a record that
+       keeps Fenwick as an organisation is Fenwick's, and the words stay as typed. Only where the list links to the
+       organisations and nothing above linked it already. */
+    const forClient = clientFor(l, fields);
+    if (forClient) fields[forClient.field] = forClient.ref;
     let who: string | null = null;
     if (owner && assigned) {
       const ref = personOf(assigned[1]!);
@@ -1450,7 +1483,14 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
         who = assigned[1]!;
       }
     }
-    const bits = [`new in ${l.name}`, ...(due && day ? [`due ${partTold(dayTold(day), at && part ? part : null)}`] : []), ...(who ? [`for ${who}`] : []), ...(kept && keptLink ? [`in ${kept.name}`] : [])];
+    const bits = [
+      `new in ${l.name}`,
+      ...(due && day ? [`due ${partTold(dayTold(day), at && part ? part : null)}`] : []),
+      ...(who ? [`for ${who}`] : []),
+      /* A CLIENT IS WHO IT IS FOR, a project where it is: "for Acme", "in Kiln". */
+      ...(kept && keptLink ? [`${/client/iu.test(`${keptLink.id} ${keptLink.label ?? ''}`) ? 'for' : 'in'} ${kept.name}`] : []),
+      ...(forClient ? [`for ${forClient.name}`] : []),
+    ];
     return { register: l.id, fields, said: String(fields[what.id]), detail: bits.join(', '), icon: iconOf(l), missing: missingOf(l, fields) };
   }
 
@@ -1474,6 +1514,12 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     /* An organisation kept where no list of them is read is still nobody, though nothing links to it. */
     const org = !orgList ? (opts.orgs ?? []).find((k) => same(k.name)) : undefined;
     return org ? { list: null, seq: org.seq, name: org.name } : null;
+  }
+
+  /** The client an entry's words name (`clientNamed`), against the organisations and the entries this record keeps. */
+  function clientFor(l: TellList, fields: Record<string, TellValue>): { field: string; ref: string; name: string } | null {
+    const orgs = orgsList()?.id ?? 'organisations';
+    return clientNamed(l, fields, (to) => [...(opts.titled?.[to] ?? []), ...(to === orgs ? (opts.orgs ?? []) : [])]);
   }
 
   /** The list People links a person's company to, where it keeps organisations. */

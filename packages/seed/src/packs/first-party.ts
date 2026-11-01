@@ -934,6 +934,10 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   the account, bill, book, plan, budgets, forecast, reports, payees and filing rules pages say each figure once; and a
  *   payee names list (`register.payee_names`, `rule.payee-named-back`, `script.name_payees`). Ids added, none taken
  *   away, so a minor step.
+ * - work 1.23.0 (client-link, 2 Nov): a task says which client it is for (`register.tasks`'s Client, a link to People's
+ *   organisations, `LINKS` below); open work with a client and no project is no longer counted or listed as needing a
+ *   project (`metric.tasks-no-project`, `page.work`), and Work's bands say the client beside the task. A field added,
+ *   no id taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
@@ -941,7 +945,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   people: '4.2.2',
   'money-core': '3.34.0',
   estate: '2.7.0',
-  work: '1.22.0',
+  work: '1.23.0',
 };
 
 type Body = Record<string, unknown>;
@@ -960,7 +964,8 @@ type Body = Record<string, unknown>;
    points at People's organisations since money-core 3.10.0, where a bill's still points at its people. AND WHICH PROJECT
    A BILL, A PAYMENT OR A REPEATING LINE IS FOR (`thing`, audit 31 Oct m, AM4), as Work's tasks say it: Money turned on
    from a money line on a Student's Today was refused, "money-core points at the things list ... which is not here". */
-const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], 'money-core': ['party', 'thing'], work: ['owner', 'thing'] };
+/* AND WHO A TASK IS FOR (`client`, work 1.23.0), an organisation of People's, so a homework list still installs Work. */
+const LINKS: Partial<Record<FirstPartyId, readonly string[]>> = { people: ['projects'], 'money-core': ['party', 'thing'], work: ['owner', 'thing', 'client'] };
 
 /**
  * The id a declaration in a document is filed under: its kind's key.
@@ -1078,6 +1083,22 @@ const ROLE_KEYS = ['meets', 'rates', 'hand', 'org'] as const;
  * A declaration with the fields in `gone` taken out, and every column and phone field drawn over them. A bar grouped by
  * a field that is gone is left out whole: "Open work by project" on a record with no projects has nothing to group by.
  */
+/**
+ * THE LINKS WHOSE `is empty` ONLY NARROWS A SENTENCE ABOUT SOMETHING ELSE: a task's Client in Work's With no project
+ * (work 1.23.0). Not `thing`: a sentence about work with no project means nothing on a record with no projects, and goes.
+ */
+const NARROWS: ReadonlySet<string> = new Set(['client']);
+
+/** A sentence with each `<link> is empty` clause taken out, for a gone link that only narrows (`NARROWS`). */
+function emptied(where: string, gone: ReadonlySet<string>): string {
+  let out = where;
+  for (const f of gone) {
+    if (!NARROWS.has(f)) continue;
+    out = out.replace(new RegExp(`,\\s*${f} is empty(?=\\s*(?:,|$))`, 'gu'), '').replace(new RegExp(`^\\s*${f} is empty\\s*(?:,\\s*|$)`, 'u'), '');
+  }
+  return out;
+}
+
 function without(d: Body, gone: ReadonlySet<string>): Body | null {
   if (gone.size === 0) return d;
   const out: Body = { ...d };
@@ -1097,9 +1118,14 @@ function without(d: Body, gone: ReadonlySet<string>): Body | null {
   const all = pairs !== null && typeof pairs === 'object' && pairs.where !== null && typeof pairs.where === 'object' ? (pairs.where as Body).all : undefined;
   if (pairs && Array.isArray(all))
     out.pairs = { ...pairs, where: { ...(pairs.where as Body), all: (all as Body[]).filter((c) => !(typeof c.field === 'string' && gone.has(c.field) && c.empty === true)) } };
+  /* A CLAUSE THAT A GONE LINK IS EMPTY, WHERE THE LINK ONLY NARROWS (`NARROWS`), IS TRUE OF EVERY ROW, SINCE work
+     1.23.0, so it goes from the sentence and the rest stands, as a pairing's does above: Work's With no project reads
+     `thing is empty, client is empty`, and on a record with Projects and no People it is still the open work with no
+     project. */
+  if (typeof d.metric === 'string' && typeof d.where === 'string') out.where = emptied(d.where, gone);
   /* A FIGURE ASKED OF A FIELD THAT IS GONE is left out whole: `project-open` counts a project's tasks, and a record with
      no projects has none to count. */
-  if (typeof d.metric === 'string' && typeof d.where === 'string' && [...gone].some((f) => new RegExp(`(?:^|,\\s*)${f}\\s`, 'u').test(d.where as string)))
+  if (typeof d.metric === 'string' && typeof out.where === 'string' && [...gone].some((f) => new RegExp(`(?:^|,\\s*)${f}\\s`, 'u').test(out.where as string)))
     return null;
   /* A READER'S FILTER ON A FIELD THAT IS GONE GOES WITH IT: Work's strip of projects is over `thing`, and the kernel
      refuses a page filtering on a field none of its lists has (`filtersFault` in `packages/kernel/src/declare.ts`). */
@@ -1111,6 +1137,8 @@ function without(d: Body, gone: ReadonlySet<string>): Body | null {
   if (Array.isArray(d.blocks))
     out.blocks = (d.blocks as Body[])
       .filter((b) => !(GROUPED.has(String(b.kind)) && Array.isArray(b.columns) && gone.has(String((b.columns as Body[])[0]?.field))))
+      /* A GONE LINK THAT ONLY NARROWS IS TAKEN OUT OF THE SENTENCE first, as a figure's is (`emptied`). */
+      .map((b) => (typeof b.where === 'string' ? { ...b, where: emptied(b.where, gone) } : b))
       /* A BLOCK WHOSE SENTENCE READS A FIELD THAT IS GONE is left out whole, as a figure over one is: Work's With no
          project lists open tasks whose project is empty, and a record with no projects has no such field
          (FIELD_UNKNOWN at install). */

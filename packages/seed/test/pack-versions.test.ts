@@ -3308,6 +3308,25 @@ const DECLARED: Record<string, Version> = {
       'Work 1.22.0 of 1 November (lists review, L37): `page.roadmap` says what stands on the timeline and how a task gets there where its empty line said only what was missing; no id added or taken away -> f0d268971d9a45aa',
     ],
   },
+  /* A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
+  'work@1.23.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-last-worked metric.project-moved-7d metric.project-open
+      metric.tasks-after-week-yours metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-in-play metric.tasks-late-yours metric.tasks-later metric.tasks-no-project
+      metric.tasks-not-this-week metric.tasks-overdue metric.tasks-this-week-yours metric.tasks-today-yours metric.tasks-undated-yours
+      metric.tasks-waiting metric.tasks-week-yours metric.tasks-with-agents
+      page.roadmap page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: '3ada74ddfab871db',
+    history: [
+      'Work 1.23.0 of 2 November (client-link): `register.tasks` gains Client, a link to the organisations; `metric.tasks-no-project` and `page.work`\'s Needs a project leave out a task with a client, and the bands of `page.work` say the client, with Client beside Project in a list of tasks; no id added or taken away -> 3ada74ddfab871db',
+    ],
+  },
 
 };
 

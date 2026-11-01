@@ -306,6 +306,15 @@ export const WORK_REGISTERS: Record<string, WorkRegister> = {
       { id: 'done_on', label: 'Done on', type: 'day', index: true },
       /* A task on no project is global. A link, like Owner, so Work installs on a record with no Projects and leaves it out. */
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true, scope: {} },
+      /* WHO THE WORK IS FOR, SINCE work 1.23.0 (2 Nov, the first run: "Send Fenwick's invoice" sat under Needs a project
+         on a freelancer's record that keeps clients and no projects): the organisation the task is for, a client most of
+         the time. A link, like Project, so Work installs on a record with no People and leaves it out (`LINKS` in
+         `packs/first-party.ts`). ONE LIST, BECAUSE A LINK POINTS AT ONE: a client who is a company is kept in
+         organisations (`clientCompany` in the first run), and a person who is a client is with theirs. NOT INDEXED: the
+         list holds the eight indexes it may, and a task's client is read with the task, never searched for alone.
+         IT TRAVELS WITH PROJECT (`qualifies`): a list of tasks opens with Client beside Project, so a task filed under its
+         client says so where "Everywhere" stands for no project. */
+      { id: 'client', label: 'Client', type: 'ref', to: 'organisations', qualifies: 'thing' },
       { id: 'by', label: 'Due', type: 'day', index: true, deadline: true, remind: ['0d'] },
       /* Usually unset, and the schema has to be the thing that says so — the prose two documents
          away saying "most tasks carry no thread" is what lost last time (10 §7). */
@@ -360,6 +369,14 @@ const IN_HAND = 'state is open or doing';
    record of one, or without People's Owner field, nobody else holds anything and yours is what it was. */
 const NOT_THEIRS = 'owner is not someone else';
 const YOURS = `${IN_HAND}, agent is empty, ${NOT_THEIRS}`;
+
+/**
+ * OPEN WORK FILED NOWHERE: no project and no client. A TASK FOR A CLIENT IS FILED UNDER THEM, SINCE work 1.23.0 (2 Nov,
+ * the first run: a freelancer's "Send Fenwick's invoice" waited under Needs a project, on a record with no projects).
+ * On a record without People the task has no Client field, and `client is empty` goes from the sentence with it, as it
+ * is true of every row (`without` in `packs/first-party.ts`).
+ */
+const NO_HOME = `${OPEN}, thing is empty, client is empty`;
 
 /**
  * WORK'S FIGURES, as documents a page names. Counts of tasks, never a score: how much is open, what is due soon or past
@@ -634,7 +651,7 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     metric: 'tasks-no-project',
     name: 'With no project',
     source: 'register.tasks',
-    where: `${OPEN}, thing is empty`,
+    where: NO_HOME,
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
@@ -793,7 +810,7 @@ export const WITH_NO_PROJECT = {
   icon: 'folder',
   span: 12,
   source: 'register.tasks',
-  where: `${OPEN}, thing is empty`,
+  where: NO_HOME,
   columns: [DESCRIPTION, { field: 'by', label: 'Due', width: '13ch', align: 'end' }],
   order: [{ field: 'created_at', dir: 'desc' }],
   limit: 5,
@@ -984,7 +1001,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         span: 6,
         source: 'register.tasks',
         where: `${YOURS}, by before today`,
-        columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }],
+        columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }, { field: 'client' }],
         order: [
           { field: 'by', dir: 'asc' },
           { field: 'priority', dir: 'asc' },
@@ -1021,7 +1038,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         span: 6,
         source: 'register.tasks',
         where: `${YOURS}, by after yesterday, by before +8d`,
-        columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }],
+        columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }, { field: 'client' }],
         order: [
           { field: 'by', dir: 'asc' },
           { field: 'priority', dir: 'asc' },
@@ -1067,7 +1084,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         span: 12,
         source: 'register.tasks',
         where: `${YOURS}, by after +7d`,
-        columns: [{ field: 'what' }, { field: 'by' }],
+        columns: [{ field: 'what' }, { field: 'by' }, { field: 'client' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
         when: { metric: 'tasks-after-week-yours', gt: 0 },
@@ -1082,7 +1099,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         span: 12,
         source: 'register.tasks',
         where: `${YOURS}, by is empty`,
-        columns: [{ field: 'what' }, { field: 'thing' }],
+        columns: [{ field: 'what' }, { field: 'thing' }, { field: 'client' }],
         order: [{ field: 'created_at', dir: 'desc' }],
         limit: 8,
         when: { metric: 'tasks-undated-yours', gt: 0 },
@@ -1096,7 +1113,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         span: 12,
         source: 'register.tasks',
         where: 'state is backlog',
-        columns: [{ field: 'what' }, { field: 'thing' }],
+        columns: [{ field: 'what' }, { field: 'thing' }, { field: 'client' }],
         order: [
           { field: 'by', dir: 'asc' },
           { field: 'created_at', dir: 'desc' },

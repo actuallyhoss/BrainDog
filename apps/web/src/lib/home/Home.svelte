@@ -105,7 +105,7 @@
   import type WantMoreOf from '$lib/home/WantMore.svelte';
   import { read as readPref } from '$lib/pref.ts';
   import { REGISTERS, TITLES } from '$lib/record/held.ts';
-  import { learn } from '$lib/record/remote.ts';
+  import { learn, refMapOf } from '$lib/record/remote.ts';
   import { playedBy } from '$lib/start/parts.ts';
   import type { TellOptions } from '$lib/tell/read.ts';
   import { PEOPLE } from '$lib/who.ts';
@@ -340,6 +340,27 @@
     }
     const client = createClient({ base: apiBase() });
     void Promise.all(missing.map((id) => learn(client.schema, id, asked))).finally(() => (learnt += 1));
+  });
+  /* THE ORGANISATIONS' NAMES, READ ONCE WHERE THE RECORD KEEPS THEM (work 1.23.0, 2 Nov): a line told to Today that
+     names a client ("Send Fenwick's invoice") is that client's task, and a first Today has never read the list that
+     holds them. The tab's walk of the list (`rowsOf`, kept five minutes) names them (`refMapOf`), and `learnt` reads the
+     card's options again. */
+  let orgsAsked = false;
+  $effect(() => {
+    if (data.refused || orgsAsked || !data.lists.some((l) => l.id === 'organisations')) return;
+    orgsAsked = true;
+    const base = apiBase();
+    void import('$lib/data/ref-rows.ts')
+      .then(async ({ rowsOf: walked }) => {
+        const client = createClient({ base });
+        /* ITS DECLARATION FIRST, which says the field a name is in. */
+        await learn(client.schema, 'organisations', asked);
+        const rows = await walked(client, base, 'organisations');
+        if (rows === null) return;
+        refMapOf('organisations', rows);
+        learnt += 1;
+      })
+      .catch(() => undefined);
   });
   /** The lists' declarations as this tab has learnt them, read again each time more land. */
   const decls = $derived.by((): WeekDecl[] => {

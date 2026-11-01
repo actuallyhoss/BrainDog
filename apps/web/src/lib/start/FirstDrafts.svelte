@@ -22,7 +22,7 @@
 
   import { apiBase } from '$lib/at.ts';
   import { reread } from '$lib/data/live.svelte.ts';
-  import type { TellList, TellOptions } from '$lib/tell/read.ts';
+  import type { Known, TellList, TellOptions, clientNamed } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import Money from '$lib/ui/Money.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -69,6 +69,25 @@
   let rules = $state.raw<FirstDraft[]>([]);
   let merge = $state.raw<((m: readonly FirstDraft[], r: readonly FirstDraft[]) => FirstDraft[]) | null>(null);
   let fill = $state.raw<((d: FirstDraft, value: string) => FirstDraft) | null>(null);
+  let named = $state.raw<typeof clientNamed | null>(null);
+  /**
+   * THE ORGANISATIONS THIS BRAINDOG KEEPS, READ ONCE FOR THE CARD (work 1.23.0, 2 Nov): the build has just written the
+   * clients they named, and a first Today has not read that list yet, so "Send Fenwick's invoice" could not be told to
+   * be Fenwick's. Every draft of a list with a Client is then said and kept as theirs (`clientNamed`).
+   */
+  let orgsKept = $state.raw<Known[]>([]);
+  $effect(() => {
+    if (kept === null) return;
+    let off = false;
+    void import('$lib/data/ref-rows.ts')
+      .then(({ rowsOf }) => rowsOf(createClient({ base }), base, 'organisations'))
+      .then((rows) => {
+        if (off || rows === null) return;
+        orgsKept = rows.flatMap((r) => (typeof r.seq === 'number' && typeof r.fields?.name === 'string' && r.fields.name.trim() !== '' ? [{ seq: r.seq, name: r.fields.name }] : []));
+      })
+      .catch(() => undefined);
+    return () => (off = true);
+  });
   /** The lists the words were last read against, so a kept draft's every entry can be named by its list's title. */
   let readLists: readonly TellList[] = [];
   $effect(() => {
@@ -78,6 +97,7 @@
     const registers = kept?.begin.registers ?? [];
     const today = kept?.begin.today ?? options.today;
     const back = kept?.back ?? [];
+    const orgs = orgsKept;
     /* A DRAFT PUT BACK BY UNDO IS NOBODY KEPT YET (AP3): Today still remembers the name the undo took out of the record,
        and Tell then read "Mum's birthday is 14 November" as news about Mum, not Mum, so the draft never came back. */
     const gone = (register: string, name: string): boolean => back.includes(`${register}:${name.replace(/\s+/gu, ' ').trim().toLowerCase()}`);
@@ -91,7 +111,7 @@
           };
     if (said === '') return;
     let off = false;
-    void Promise.all([import('$lib/tell/read.ts'), import('./first-drafts.ts')]).then(([{ tellRead }, d]) => {
+    void Promise.all([import('$lib/tell/read.ts'), import('./first-drafts.ts')]).then(([{ tellRead, clientNamed }, d]) => {
       if (off) return;
       /* READ AGAINST EVERY LIST THE BUILD MADE, NOT ONLY THE ONES TODAY HAS LEARNED (audit AP2): Today learns a list's
          declaration as a screen reads it, so on a first Today the card read the words against a list or two, found
@@ -100,9 +120,10 @@
       const own = new Set(opts.lists.map((l) => l.id));
       const lists = [...opts.lists, ...d.tellListsOf(d.modulesHeld(registers), today).filter((l) => !own.has(l.id))];
       readLists = lists;
-      const read = { ...opts, lists, currency: opts.currency ?? kept?.begin.currency ?? null };
+      const read = { ...opts, lists, currency: opts.currency ?? kept?.begin.currency ?? null, orgs: [...(opts.orgs ?? []), ...orgs] };
       merge = d.mergeDrafts;
       fill = d.filled;
+      named = clientNamed;
       rules = d.draftsFromTold(
         d.clausesOf(said).map((c) => ({ said: c.said, told: tellRead(c.text, read) })),
         lists,
@@ -134,8 +155,26 @@
     /* A DRAFT PUT BACK BY UNDO IS DRAWN WHATEVER THE TAB STILL REMEMBERS (audit AP3): the names Today knows are read
        before the record's undo is, so the one just taken out still read as held and the card closed on it again. */
     const back = kept.back ?? [];
-    return all.filter((d) => !kept.gone.includes(d.key) && (back.includes(d.key) || !held(d))).map((d) => now(edits[d.key] ?? d));
+    return all.filter((d) => !kept.gone.includes(d.key) && (back.includes(d.key) || !held(d))).map((d) => forClient(now(edits[d.key] ?? d)));
   });
+
+  /**
+   * A DRAFT FOR A CLIENT THE WORDS NAME, LINKED TO THEM (work 1.23.0): the model's "Send Fenwick's invoice" comes with its
+   * words alone, so its Client is set here from the organisations kept, and its line says who it is for. One the reading
+   * linked already is left as it is.
+   */
+  function forClient(d: FirstDraft): FirstDraft {
+    const row = d.rows[d.main];
+    const list = row ? readLists.find((l) => l.id === row.register) : undefined;
+    if (named === null || d.rename || !row || !list) return d;
+    const hit = named(list, row.fields, (to) => [...(options.titled?.[to] ?? []), ...(options.orgs ?? []), ...orgsKept]);
+    if (hit === null) return d;
+    return {
+      ...d,
+      detail: `${d.detail ?? `new in ${d.list}`}, for ${hit.name}`,
+      rows: d.rows.map((r, i) => (i === d.main ? { ...r, fields: { ...r.fields, [hit.field]: hit.ref } } : r)),
+    };
+  }
 
   /* NOTHING LEFT, NOTHING READING: the card says it is done, so Today stops loading it. Only once Tell's reading is in. */
   $effect(() => {
