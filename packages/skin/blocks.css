@@ -262,6 +262,15 @@
     border-block-end: 0;
   }
 
+  /* ONE HEADING GRAMMAR OVER ROWS (the lists review, L35): a list of rows under its own name, as each project's numbers
+     on the Dashboard are, has the hairline under the name that every row has under it, so "Ferment & Co" reads as the
+     head of the rows below and the first row is not the only one with no rule over it. */
+  .block-rows > .block-head {
+    margin-block-end: 0;
+    padding-block-end: var(--sp-2);
+    border-block-end: 1px solid var(--rule);
+  }
+
   .row-label {
     color: var(--ink-3);
     font-size: var(--fs-meta);
