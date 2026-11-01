@@ -276,7 +276,7 @@
   .mc-chip {
     padding: var(--sp-1) var(--sp-3);
     border: 1px solid var(--rule-strong);
-    border-radius: var(--r-round);
+    border-radius: var(--r-ctl);
     background: transparent;
     color: var(--ink-2);
     font: inherit;

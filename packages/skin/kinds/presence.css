@@ -397,7 +397,7 @@
     align-items: center;
     gap: 6px;
     padding: 2px var(--sp-2);
-    border-radius: var(--r-round);
+    border-radius: var(--r-xs);
     background: var(--tile-2);
     color: var(--ink-2);
     line-height: 18px;

@@ -239,7 +239,7 @@
     place-items: center;
     inline-size: calc(var(--well) + var(--sp-1));
     block-size: calc(var(--well) + var(--sp-1));
-    border-radius: var(--r-round);
+    border-radius: var(--r-ctl);
     background: var(--tile-2);
     color: var(--ink-2);
     font-size: var(--fs-meta);
