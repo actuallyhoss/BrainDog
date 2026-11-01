@@ -137,8 +137,13 @@
   const featured = $derived.by((): Listing[] => {
     if (searching || chip !== null || states === null) return [];
     const named = new Set(suggested.flatMap((s) => (s.listing ? [s.listing.key] : [])));
+    /* NOR ONE ITS OWN SHELF ALREADY SHOWS (1 Nov): the four it picked were Money's first four, so Card alerts,
+       Certificates, Count the cash and Debts stood twice on one screen. It offers what a folded shelf keeps out of
+       sight, and says nothing when every shelf shows all it holds. */
+    const shown = new Set(laid.shelves.flatMap((s) => s.items.slice(0, FOLDED_AT).map((l) => l.key)));
     return laid.shelves
       .flatMap((s) => s.items)
+      .filter((l) => !shown.has(l.key))
       .filter((l) => l.kind === 'pack' && ours(l) && !named.has(l.key) && cueOf(l).cue === store.add)
       .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
       .slice(0, FEATURED_MOST);
