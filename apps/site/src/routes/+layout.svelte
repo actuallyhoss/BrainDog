@@ -32,7 +32,7 @@
   import '@braindog/skin/blocks.css';
   import '../app.css';
 
-  import { afterNavigate } from '$app/navigation';
+  import { afterNavigate, onNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
@@ -55,6 +55,20 @@
 
   afterNavigate(() => {
     menuOpen = false;
+  });
+
+  /* A PAGE CHANGE CROSS-FADES (`app.css`, ui pass of 1 Nov) where the browser has view transitions, and the header holds
+     still. Not for a reader who asked for less motion, nor for a jump within one page. */
+  onNavigate((nav) => {
+    if (typeof document.startViewTransition !== 'function') return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!nav.from || !nav.to || nav.from.url.pathname === nav.to.url.pathname) return;
+    return new Promise<void>((done) => {
+      document.startViewTransition(async () => {
+        done();
+        await nav.complete.catch(() => undefined);
+      });
+    });
   });
 
   const outside = (event: MouseEvent) => {
@@ -153,6 +167,8 @@
   .nav {
     position: relative;
     z-index: var(--z-hint);
+    /* HELD STILL through a page change's cross-fade (`app.css`). */
+    view-transition-name: site-bar;
   }
 
   .bar {
@@ -274,6 +290,19 @@
     padding: 8px;
     background: var(--night-2);
     border-radius: 16px;
+    /* IT DROPS IN FROM THE BUTTON (ui pass, 1 Nov): 4px and 98% to its place over the menu's step, from the button's
+       corner; shutting is at once, as a disclosure's is. A fade alone under reduced motion. */
+    transform-origin: 100% 0;
+    transition:
+      opacity var(--d-menu) var(--ease-out),
+      transform var(--d-menu) var(--ease-out);
+  }
+
+  @starting-style {
+    .menu[open] .menu-panel {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
   }
 
   .menu-panel a,
