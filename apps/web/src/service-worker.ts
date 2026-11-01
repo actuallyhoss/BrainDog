@@ -139,7 +139,9 @@ async function answer(kind: Exclude<Route, 'pass' | 'out'>, e: Fetched, now: num
     const quick = await shellFirst(e, now).catch(() => null);
     if (quick !== null) return quick;
   }
-  if (kind === 'asset') {
+  /* AND A FILE WHOSE ADDRESS CARRIES ITS VERSION (`/fonts/geist.woff2?v=494f`) IS THE SAME BYTES UNTIL THAT CHANGES, as a
+     hashed file is: an open from the home screen fetched both faces again, beside the record's first reads. */
+  if (kind === 'asset' || (kind === 'file' && new URL(req.url).searchParams.has('v'))) {
     const held = await kept(req.url, now);
     if (held) return held.res;
   }
