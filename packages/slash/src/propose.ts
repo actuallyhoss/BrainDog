@@ -1027,7 +1027,19 @@ export type SetupOffer = {
 };
 
 /** What one person typed about themselves, with the catalogue it is read against and their day (`YYYY-MM-DD`). */
-export type SetupAsk = { said: string; offer: SetupOffer; today: string; /** The owner's sign-up words, read once on the house (`FIRST_WORDS`). */ first?: boolean };
+export type SetupAsk = {
+  said: string;
+  offer: SetupOffer;
+  today: string;
+  /** The owner's sign-up words, read once on the house (`FIRST_WORDS`). */
+  first?: boolean;
+  /**
+   * THE FIRST RUN IS A CONVERSATION (1 Nov, "i need the who are you to be a conversation with questions"): what BrainDog
+   * asked so far, one question a line as `about: question`, in order. `said` is their answers in the same order. The
+   * model reads the answers against the questions and asks the next one, never one whose `about` is here already.
+   */
+  asked?: string;
+};
 
 /** The setup the model proposed, every id one it was offered and every phrase one the person typed. */
 export type SetupAnswer = {
@@ -1053,9 +1065,13 @@ export type SetupAnswer = {
 };
 
 /** What a question back may be about: the five things a first run builds differently on. */
-export type SetupAbout = 'name' | 'kind' | 'things' | 'who_for' | 'currency';
+export type SetupAbout = 'name' | 'kind' | 'things' | 'who_for' | 'currency' | 'work' | 'money' | 'people' | 'tools' | 'first';
 
-/** One question back: one line, and up to four short choices to tap. */
+/**
+ * One question back: one line, and up to four short choices to tap. The conversation's own (1 Nov) are what they work
+ * on (`work`), the money that comes in and goes out (`money`), who they work with (`people`), the AI tools and agents
+ * they use (`tools`) and what to keep track of first (`first`), beside the five a single reading asked about.
+ */
 export type SetupQuestion = { about: SetupAbout; question: string; choices: string[] };
 
 /** A list an export may go into, with each field's id, type and, for an enum, its values. */
@@ -1141,12 +1157,24 @@ export const setupOf = (raw: Record<string, unknown>, ask: SetupAsk, by: string)
     names,
     rows,
     draft: draft === '' ? null : draft,
-    ask: questionOf(raw['ask'], { named: held.name !== null, priced: held.currency !== null || MONEY_SIGN.test(ask.said) }),
+    ask: questionOf(raw['ask'], { named: held.name !== null, priced: held.currency !== null || MONEY_SIGN.test(ask.said), asked: askedAbouts(ask.asked) }),
     by,
   };
 };
 
-const ABOUTS: ReadonlySet<string> = new Set<SetupAbout>(['name', 'kind', 'things', 'who_for', 'currency']);
+const ABOUTS: ReadonlySet<string> = new Set<SetupAbout>(['name', 'kind', 'things', 'who_for', 'currency', 'work', 'money', 'people', 'tools', 'first']);
+/** The most questions a conversation asks (`asked` lines read), and how long one line of it may be. */
+const ASKED_MOST = 6;
+const ASKED_LINE = 160;
+
+/** The topics already asked, read off `asked`'s `about: question` lines. */
+const askedAbouts = (asked: string | undefined): Set<string> =>
+  new Set(
+    (asked ?? '')
+      .split('\n')
+      .map((l) => (l.split(':')[0] ?? '').trim())
+      .filter((a) => ABOUTS.has(a)),
+  );
 /** A question back is one line of this many characters at most, and a choice to tap this many. */
 const QUESTION_MOST = 120;
 const CHOICE_MOST = 24;
@@ -1161,13 +1189,15 @@ const MONEY_SIGN = /[$£€¥₹₩₺₦]/u;
  * a currency of someone who typed one. Where the model answered a list (the scope's first shape was two), the first that
  * holds is the one kept and the rest are dropped: one question, never two.
  */
-const questionOf = (raw: unknown, typed: { named: boolean; priced: boolean }): SetupQuestion | null => {
+const questionOf = (raw: unknown, typed: { named: boolean; priced: boolean; asked?: ReadonlySet<string> }): SetupQuestion | null => {
   for (const q of (Array.isArray(raw) ? raw : [raw]).filter(isRecord)) {
     const about = textOf(q['about']);
     const question = textOf(q['question']);
     const choices = Array.isArray(q['choices']) ? q['choices'] : [];
     if (!ABOUTS.has(about) || question === '' || /[\r\n]/u.test(question) || [...question].length > QUESTION_MOST) continue;
     if ((about === 'name' && typed.named) || (about === 'currency' && typed.priced)) continue;
+    /* NEVER A TOPIC THE CONVERSATION ALREADY ASKED, whatever the model says. */
+    if (typed.asked?.has(about)) continue;
     const said = choices.map(textOf);
     if (choices.length > CHOICES_MOST || said.some((c) => c === '' || /[\r\n]/u.test(c) || [...c].length > CHOICE_MOST)) continue;
     return { about: about as SetupAbout, question, choices: [...new Set(said)] };
@@ -1233,11 +1263,19 @@ export const setupAskOf = (raw: unknown): SetupAsk => {
       : [],
   );
   const today = textOf(r['today']);
+  /* WHAT WAS ASKED, ONE LINE A QUESTION, each cut to a line and the first six kept: a browser's text, read as data. */
+  const asked = textOf(r['asked'])
+    .split(/\r?\n/u)
+    .map((l) => oneLine(l, ASKED_LINE))
+    .filter((l) => l !== '')
+    .slice(0, ASKED_MOST)
+    .join('\n');
   return {
     said: textOf(r['said']),
     offer: { usecases: usecases.slice(0, 40), modules: modules.slice(0, 40) },
     today: /^\d{4}-\d{2}-\d{2}$/u.test(today) ? today : '',
     ...(r['first'] === true ? { first: true } : {}),
+    ...(asked === '' ? {} : { asked }),
   };
 };
 
@@ -1298,6 +1336,7 @@ const setupStep = async (raw: SetupAsk, asking: Asking): Promise<Result<SetupAns
     '%USECASES%': caseLines(ask.offer),
     '%MODULES%': moduleLines(ask.offer),
     '%TODAY%': ask.today === '' ? 'not said' : ask.today,
+    '%ASKED%': ask.asked === undefined ? 'Nothing yet: this is their first answer, to "What do you do?".' : fenced('asked', ask.asked),
     '%SAID%': fenced('said', said),
   });
   return out.ok ? ok(setupOf(out.value.value, { ...ask, said }, out.value.by)) : out;

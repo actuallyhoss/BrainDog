@@ -184,7 +184,10 @@ Modules you may turn on, each with its lists as id (name): field ids:
 
 Today is %TODAY%.
 
-What they typed, inside its fence, JSON-encoded:
+This is a short conversation. What you asked them so far, one question a line as about: question, in order; a line ending in [skipped] or [answered: ...] has no answer below:
+%ASKED%
+
+Their answers, in the same order, inside its fence, JSON-encoded:
 %SAID%
 
 Reply with the schema.
@@ -197,7 +200,7 @@ heard: each phrase that made you choose something, copied exactly, and what it b
 names: a list renamed to their own word for it, only where they used one: "my three shops" names the projects list "Shops".
 rows: at most five entries their words fill completely, each { list, fields } with the list's field ids.
 draft: when nothing offered fits what they do, one sentence in their words of the lists and pages they need; otherwise null.
-ask: at most one short question, only where the answer would change what you build, in their own words, never about what they already said, as { about, question, choices }; otherwise null. about is one of name, kind, things, who_for, currency; question is one line of at most 120 characters; choices are up to four answers to tap of at most 24 characters each, or none.`;
+ask: the next question of the conversation, the one whose answer would change what you build the most, as { about, question, choices }; null when you have enough. Never a topic already asked, and never about what they already said. about is one of work (the projects, clients or products they work on), money (what comes in and goes out), currency (which currency, offering the one their words or place suggest), people (who they work with), tools (the AI tools and agents they use, such as Claude, ChatGPT or Cursor), first (what to keep track of first), name, kind, things, who_for. question is one warm, plain line of at most 120 characters that builds on what they said, such as "Which clients are you working with right now?". choices are two to four short answers they could tap, drawn from their own words where you can, at most 24 characters each.`;
 
 const MAPPING_USER = `They exported a file from another app, called %FILE%. Its columns, in order:
 %COLUMNS%
@@ -551,7 +554,7 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
     system: SETUP_SYSTEM,
     user: SETUP_USER,
     schema: SETUP_SCHEMA,
-    slots: ['%USECASES%', '%MODULES%', '%TODAY%', '%SAID%'],
+    slots: ['%USECASES%', '%MODULES%', '%TODAY%', '%ASKED%', '%SAID%'],
   },
   mapping: {
     purpose: 'ask',
