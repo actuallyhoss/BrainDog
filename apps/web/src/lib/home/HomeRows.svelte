@@ -9,7 +9,7 @@
   TICKED IS THE PAGE'S HOLD (`done`, `page-writes.ts` `heldDone`), so a refusal or an Undo takes the tick back, and a
   ticked line the page's next read leaves out stays where it was, done, as a ticked row does in any list.
 
-  COMING UP: each day a 40px block, the weekday over the date (today the word "Today" in red, in a red ring), and beside it
+  COMING UP: each day a 40px block, the weekday over the date (today the word "Today" in ink, in an ink ring), and beside it
   what falls due that day, its amount at the right.
 
   No box round a line, no glyph before one: a hairline between lines, and the tile is the surface.
@@ -353,10 +353,11 @@
     line-height: 1;
   }
 
-  /* TODAY IS A RING, NOT A FILL: a 1.5px inset ring and the word in the red, on the tile's own ground. */
+  /* TODAY IS A RING, NOT A FILL: a 1.5px inset ring and the word in the ink, on the tile's own ground. Never the red:
+     what falls due today is not late yet (Look B keeps the red for what is). */
   .hd-chip[data-today] {
     background: none;
-    border: 1.5px solid var(--red);
+    border: 1.5px solid var(--ink);
   }
 
   /* ABOUT 11 BESIDE THE DATE AT 15, as a share of it, so the block keeps its proportion at every text size. */
@@ -367,9 +368,10 @@
     line-height: 12px;
   }
 
+  /* "TODAY" IS FIVE LETTERS IN A 37px WELL: at 500 and pulled a hair tighter it clears the ring on both sides. */
   .hd-chip[data-today] .hd-week {
-    color: var(--red);
-    font-weight: var(--fw-semi);
+    color: var(--ink);
+    letter-spacing: -0.02em;
   }
 
   .hd-date {
