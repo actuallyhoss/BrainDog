@@ -1449,8 +1449,14 @@
    search does, rather than under a row that held the three buttons and nothing else. */
 .hosted[data-money] > .page-head[data-titled]:has(.name-unseen) + .page-filters {
   margin-block-start: -54px;
-  padding-inline-end: 320px;
+  padding-inline-end: 180px;
   pointer-events: none;
+}
+
+/* ROOM FOR THE BUTTONS THE HEAD HOLDS, AND NO MORE: Share and More take 140px, Show the data 120 beside them. At a flat
+   320 Payees' "25 more" fell onto a line of its own under five chips that had room for it. */
+.hosted[data-money] > .page-head[data-titled]:has(.name-unseen):has(.head-actions > a.btn) + .page-filters {
+  padding-inline-end: 300px;
 }
 
 .hosted[data-money] > .page-head[data-titled]:has(.name-unseen) + .page-filters > * {
@@ -1555,4 +1561,33 @@
     background-color var(--d-menu, 120ms) var(--ease-out, ease-out),
     color var(--d-menu, 120ms) var(--ease-out, ease-out),
     box-shadow var(--d-menu, 120ms) var(--ease-out, ease-out);
+}
+
+/* WHAT REPEATS' "NEXT" IS NEVER CUT (UI pass, 1 Nov): its four columns shared the row as 1fr and three 12ch tracks, so
+   "Due in 11 days" and "Due in 14 days" ended in "da…" at every desk width while the description had 780px to itself.
+   The day's column takes what its longest phrase needs; the description keeps the rest. Desk only: on a phone the rows
+   are cards. */
+@media (width >= 900px) {
+  [data-money] .block-slot[data-source='register.recurring'] .table .tr:has(> :nth-child(4):last-child) {
+    --cols: minmax(16ch, 1fr) 14ch 17ch 12ch;
+  }
+}
+
+/* ON A PHONE THE ACCOUNTS ARE WELLS TWO A ROW, NOT A STRIP THAT SCROLLS SIDEWAYS (UI pass, 1 Nov): the strip hid the
+   third account past the edge with nothing to say it was there, and could not be scrolled from a keyboard (axe,
+   scrollable-region-focusable). Two columns hold three or four accounts in two short rows, all in view. */
+@media (width < 640px) {
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop:has(> .prop-row) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-inline: 0;
+    padding-inline: 0;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  [data-money] .block-slot[data-source='metric.cash-by-account'] .prop > .prop-row {
+    min-inline-size: 0;
+    max-inline-size: none;
+  }
 }
