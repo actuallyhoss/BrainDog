@@ -29,6 +29,7 @@
   import Icon from '../ui/Icon.svelte';
   import { isGlyph, type IconName } from '../ui/icons.ts';
   import PageHead from '../ui/PageHead.svelte';
+  import { titleOf } from '../title.ts';
   import { drew, rested } from '../ui/screen.svelte.ts';
   import { knowProjects } from '../page/known-project.ts';
   import { keepOrder } from './project-order.ts';
@@ -649,6 +650,9 @@
     {/each}
   </ul>
 {/snippet}
+
+<!-- THE MENU IS A SCREEN ON A PHONE, so it names the tab as every screen does. -->
+<svelte:head>{#if phone}<title>{titleOf(words.menu)}</title>{/if}</svelte:head>
 
 {#if mode === 'phone'}
   <PageHead title={words.menu} headless />
