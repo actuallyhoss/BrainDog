@@ -9,7 +9,7 @@
   TICKED IS THE PAGE'S HOLD (`done`, `page-writes.ts` `heldDone`), so a refusal or an Undo takes the tick back, and a
   ticked line the page's next read leaves out stays where it was, done, as a ticked row does in any list.
 
-  COMING UP: each day a 40px block, the weekday over the date (today the word "Today" in ink, in an ink ring), and beside it
+  COMING UP: each day a 44 by 40 block, the weekday over the date (today the word "Today" in ink, in an ink ring), and beside it
   what falls due that day, its amount at the right.
 
   No box round a line, no glyph before one: a hairline between lines, and the tile is the surface.
@@ -321,7 +321,7 @@
 
   .hd {
     display: grid;
-    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-columns: 44px minmax(0, 1fr);
     column-gap: var(--sp-3);
     align-items: start;
     padding-block: var(--sp-3);
@@ -335,7 +335,7 @@
     border-block-start: 1px solid var(--rule);
   }
 
-  /* THE DAY (Today polish 6): 40 square at the control's corner on the second surface, the weekday at 11 in the quiet ink
+  /* THE DAY (Today polish 6): 44 wide and 40 tall, so "Today" clears its ring, at the control's corner on the second surface, the weekday at 11 in the quiet ink
      over the date at 15/600. Never a filled block: it was the loudest thing on the page. */
   .hd-chip {
     position: relative;
@@ -343,7 +343,7 @@
     place-content: center;
     justify-items: center;
     gap: 2px;
-    inline-size: 40px;
+    inline-size: 44px;
     block-size: 40px;
     box-sizing: border-box;
     background: var(--tile-2);

@@ -70,7 +70,7 @@
        leads the list. -->
   {#if threads.length === 0}
     <Empty kind="no-data-yet" glyph="slash" title={words.none} body={words.noneWhy}>
-      {#snippet actions()}{@render start()}{/snippet}
+      {#snippet actions()}{@render start()}<Button weight="bare" href="/slash?history">{words.history}</Button>{/snippet}
     </Empty>
   {:else}
     <div class="lead">{@render start()}</div>
@@ -84,8 +84,8 @@
         </li>
       {/each}
     </ul>
+    <p class="more"><a class="tap" href={at('/slash?history')}>{words.history}</a></p>
   {/if}
-  <p class="more"><a class="tap" href={at('/slash?history')}>{words.history}</a></p>
 </div>
 
 <style>
