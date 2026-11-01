@@ -4,7 +4,7 @@
   Today's late list (`home-rows.ts` `lateLines`: every list's deadlines before today, and the late tasks) was folded
   behind More, and on his record a 13 days late salary, a 9 days late instalment and a 14 days late fee stood on no part
   of Today's first screen. Here they lead the desk: a line a thing, its name opening its row, how late in red and the day
-  it fell due. A BILL carries its amount to the cent in its own currency and two answers: Paid, the one primary,
+  it fell due. A BILL carries its amount to the cent in its own currency and two answers: Paid, in ink,
   and Not yet, which puts it aside until tomorrow in this browser. A TASK is a quiet tick at its start, never a red
   "Mark done". Each finishes through the row's own write with an Undo (`late-finish.ts`, fetched on the press); a list
   with no way to finish a row opens the row instead. A line Needs you already asks about is answered there and is not
@@ -168,8 +168,8 @@
         {#if bill}
           <span class="ln-acts">
             {#if verb}
-              <!-- A BILL IS ANSWERED PAID OR NOT YET: Paid is the one primary, Not yet puts it aside until tomorrow. -->
-              <Button weight="primary" size="sm" aria-label={verb} disabled={busy.has(line.key) || done.has(line.key)} aria-busy={busy.has(line.key)} onclick={() => void finish(line)}>{lateWords.paid}</Button>
+              <!-- A BILL IS ANSWERED PAID OR NOT YET: Paid is the strong one, in ink (the screen keeps its one red), Not yet puts it aside until tomorrow. -->
+              <Button weight="ink" size="sm" aria-label={verb} disabled={busy.has(line.key) || done.has(line.key)} aria-busy={busy.has(line.key)} onclick={() => void finish(line)}>{lateWords.paid}</Button>
               <Button size="sm" disabled={busy.has(line.key) || done.has(line.key)} onclick={() => notYet(line)}>{lateWords.notYet}</Button>
             {:else if line.href}
               <Button size="sm" href={line.href}>{words.open}</Button>

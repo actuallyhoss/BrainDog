@@ -201,7 +201,7 @@
     inline-size: 40px;
     block-size: 40px;
     background: var(--good-tint);
-    border-radius: var(--r-round);
+    border-radius: var(--r-ctl);
     color: var(--good);
   }
 

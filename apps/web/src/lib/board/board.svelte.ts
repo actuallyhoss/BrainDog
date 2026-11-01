@@ -112,6 +112,9 @@ export class BoardModel {
     drafts?: () => ReadonlySet<string>;
     quiet?: () => ReadonlySet<string>;
     rest?: () => ReadonlyMap<string, WidgetSize>;
+    /* AND `weight`: how much each widget holds, handed in only for the board as the record lays it out, never one he
+       arranged, so a hole goes to the widget with the most in it (`filled`). */
+    weight?: () => ReadonlyMap<string, number>;
   } = {
     widgets: () => [],
     phone: () => null,
@@ -267,7 +270,7 @@ export class BoardModel {
      cells and the room a smaller size leaves is seen. */
   places: ReadonlyMap<string, Place> = $derived(
     new Map(
-      (this.editing && this.held !== null ? this.packed.laid : filled(this.packed, this.onPhone ? 2 : 4, this.short)).map((l: Laid) => [l.key, { key: l.key, area: areaOf(l), size: l.size }]),
+      (this.editing && this.held !== null ? this.packed.laid : filled(this.packed, this.onPhone ? 2 : 4, this.short, this.onPhone ? undefined : this.src.weight?.())).map((l: Laid) => [l.key, { key: l.key, area: areaOf(l), size: l.size }]),
     ),
   );
 

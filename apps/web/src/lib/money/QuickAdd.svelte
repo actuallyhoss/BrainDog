@@ -689,7 +689,7 @@
     place-items: center;
     inline-size: 30px;
     block-size: 30px;
-    border-radius: var(--r-round);
+    border-radius: var(--r-ctl);
     background: var(--chip-tint, var(--tile-2));
     color: var(--chip, var(--ink-2));
   }

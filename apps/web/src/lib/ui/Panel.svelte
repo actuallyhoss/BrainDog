@@ -405,7 +405,7 @@
     padding: 0;
     background: var(--tile-2, var(--hover));
     border: 0;
-    border-radius: var(--r-round);
+    border-radius: var(--r-ctl);
     color: var(--ink-2);
     cursor: pointer;
     transition:

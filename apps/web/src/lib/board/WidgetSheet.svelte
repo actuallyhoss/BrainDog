@@ -631,7 +631,7 @@
     block-size: 28px;
     padding: 0;
     border: 0;
-    border-radius: 50%;
+    border-radius: var(--r-ctl);
     background: var(--ink);
     box-shadow: 0 0 0 3px var(--tile);
     color: var(--tile);

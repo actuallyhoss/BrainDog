@@ -70,7 +70,7 @@
   .db-mark {
     flex: none;
     padding: 2px 8px;
-    border-radius: var(--r-round);
+    border-radius: var(--r-xs);
     background: color-mix(in srgb, var(--red) 14%, transparent);
     color: var(--red);
     font-size: var(--fs-cap);

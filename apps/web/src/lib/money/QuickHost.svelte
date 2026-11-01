@@ -102,7 +102,7 @@
 {/if}
 
 <style>
-  /* THE FLOATING +, ON A PHONE ONLY: round, in the red fill, at the end edge over the tab bar. From 900 up the `+` key
+  /* THE FLOATING +, ON A PHONE ONLY: a square of radius 8 as every button is, in the red fill, at the end edge over the tab bar. From 900 up the `+` key
      and the palette are the way in, and a button floating over a desk's tiles would cover them. */
   .qa-fab {
     display: none;
@@ -125,7 +125,7 @@
       inline-size: 56px;
       block-size: 56px;
       border: 0;
-      border-radius: var(--r-round);
+      border-radius: var(--r-ctl);
       background: var(--red-fill);
       color: var(--on-red);
       cursor: pointer;

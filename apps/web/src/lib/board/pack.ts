@@ -81,7 +81,14 @@ export function pack(items: readonly Item[], cols: number): Packed {
  * down into empty cells as wide as it is, then left. Its size is unchanged (what it shows, what is kept); only its frame
  * is drawn larger. The editor shows the packed board, holes and all, so he sees where they would be.
  */
-export function filled(packed: Packed, cols: number, short: ReadonlySet<string> = new Set()): Laid[] {
+/**
+ * THE ROOM GOES TO WHAT HOLDS MORE (polish, 1 Nov): on Today as the record lays it out, People with four faces took the
+ * half of the board a hole left at its foot while Coming up, nine bills deep, stayed a narrow column beside it. Where
+ * `weight` is given, a hole at the end of a row of widgets the same height is handed to the one in that row that holds
+ * the most, and the widgets after it move along; the order read is the same and no size changes. Without `weight` (a
+ * board he arranged himself) the widget beside the hole takes it, as before.
+ */
+export function filled(packed: Packed, cols: number, short: ReadonlySet<string> = new Set(), weight?: ReadonlyMap<string, number>): Laid[] {
   const rows = packed.rows;
   const grid: (string | null)[][] = Array.from({ length: rows }, () => Array<string | null>(cols).fill(null));
   const out = packed.laid.map((l) => ({ ...l }));
@@ -94,6 +101,36 @@ export function filled(packed: Packed, cols: number, short: ReadonlySet<string> 
   const claim = (l: Laid, x: number, y: number, w: number, h: number): void => {
     for (let r = y; r < y + h; r += 1) for (let c = x; c < x + w; c += 1) grid[r]![c] = l.key;
   };
+  const clear = (o: Laid): void => {
+    for (let r = o.y; r < o.y + o.h; r += 1) for (let c = o.x; c < o.x + o.w; c += 1) grid[r]![c] = null;
+  };
+  if (weight !== undefined && weight.size > 0) {
+    for (const l of out) {
+      let gap = 0;
+      while (empty(l.x + l.w + gap, l.y, 1, l.h)) gap += 1;
+      if (gap === 0) continue;
+      /* THE ROW ENDING AT THE HOLE: the widgets the same height that touch, each at the end of the one before. */
+      const run = [l];
+      for (;;) {
+        const first = run[0]!;
+        const before = out.find((o) => o.y === first.y && o.h === first.h && o.x + o.w === first.x);
+        if (before === undefined) break;
+        run.unshift(before);
+      }
+      const most = (o: Laid): number => weight.get(o.key) ?? 0;
+      /* THE ONE HOLDING THE MOST, and on a tie the last, the widget beside the hole, as without weights. */
+      const to = run.reduce((best, o) => (most(o) > most(best) ? o : best), l);
+      if (to === l) continue;
+      for (const o of run) clear(o);
+      let x = run[0]!.x;
+      for (const o of run) {
+        o.x = x;
+        if (o === to) o.w += gap;
+        claim(o, o.x, o.y, o.w, o.h);
+        x += o.w;
+      }
+    }
+  }
   for (const l of out) {
     while (empty(l.x + l.w, l.y, 1, l.h)) claim(l, l.x + l.w, l.y, 1, l.h), (l.w += 1);
   }
