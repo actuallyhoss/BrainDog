@@ -29,6 +29,7 @@
     tabs,
     menu,
     live = false,
+    nowhere = false,
   }: {
     /** The four tabs, as `tabsOf` reads them from the rail's places. */
     tabs: readonly FlatItem[];
@@ -36,13 +37,15 @@
     menu: string;
     /** An agent is at work now: Menu wears the live dot. */
     live?: boolean;
+    /** The address names no page here (`AppFrame`'s `stray`): no tab is lit. */
+    nowhere?: boolean;
   } = $props();
 
   const words = { menu: 'Menu', working: 'An agent is at work' } as const;
 
   /* COMPARED INSIDE THE RECORD, the address with the base and the slug taken off (`lib/at.ts`). */
   const path = $derived(placeOf(inside(page.url.pathname), page.url.searchParams));
-  const lit = $derived(tabs.find((t) => isHere(t, path))?.key ?? null);
+  const lit = $derived(nowhere ? null : (tabs.find((t) => isHere(t, path))?.key ?? null));
 </script>
 
 <nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length + 1}`} {@attach litSlide('.tab[aria-current="page"] .badge-slot', { fill: 'var(--nav-selected)' })}>

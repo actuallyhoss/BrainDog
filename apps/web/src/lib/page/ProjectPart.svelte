@@ -1153,6 +1153,15 @@
     .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]):has(~ .shape-part[data-empty]):not(:has(~ .shape-part:not([data-empty]))) > :global(:last-child) {
       flex-grow: 1;
     }
+
+    /* AGENTS IS AS TALL AS ITS RUNS (skills pass 2 Nov), as Dates and Numbers are: grown to end level with the work's
+       column it stood over a 330px empty band at 1512 on Kiln, two runs and then nothing down to the box to tell them.
+       A column ending short of its neighbour is the board's background; a hole inside a tile reads as something
+       missing. */
+    .shape-row[data-cols] .shape-col > .shape-part[data-shape='agents-here']:not([data-empty]),
+    .shape-row[data-cols] .shape-col > .shape-part[data-shape='agents-here']:not([data-empty]):has(~ .shape-part[data-empty]):not(:has(~ .shape-part:not([data-empty]))) {
+      flex-grow: 0;
+    }
   }
 
   /* ── work ── */

@@ -63,6 +63,13 @@
   );
 
   const doingOf = (e: Entry): string => String(e.fields[decl.title] ?? '').trim();
+  /* A RUN NAMED ONLY FOR ITS AGENT SAYS NOTHING UNDER THE NAME (skills pass 2 Nov): "Claude Code" over "Claude Code",
+     "Gemini CLI" over "Gemini", four rows of the name twice. The name is the line, and the row is one line tall. */
+  const repeats = (doing: string, e: Entry): boolean => {
+    const d = doing.toLowerCase();
+    const names = [runWho(e.fields), typeof e.fields.agent === 'string' ? e.fields.agent : null].filter((x): x is string => Boolean(x)).map((x) => x.toLowerCase());
+    return d !== '' && names.some((n) => n === d || n.startsWith(`${d} `) || d.startsWith(`${n} `));
+  };
   const whoOf = (e: Entry): string => {
     const who = runWho(e.fields) ?? words.agent;
     return typeof e.fields.parent === 'string' && e.fields.parent !== '' ? `${who}, ${words.helping}` : who;
@@ -93,7 +100,7 @@
         <span class="line-mark"><AgentFace agent={faceOf(e)} run="" {live} size="m" /></span>
         <span class="line-main">
           <span class="line-title" dir="auto">{whoOf(e)}</span>
-          <span class="line-detail" dir="auto">{doing || words.nothingSaid}</span>
+          {#if !repeats(doing, e)}<span class="line-detail" dir="auto">{doing || words.nothingSaid}</span>{/if}
         </span>
         <span></span>
         <span class="line-when">{whenOf(e)}</span>

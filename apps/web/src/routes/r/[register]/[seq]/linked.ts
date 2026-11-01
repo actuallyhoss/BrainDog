@@ -122,3 +122,43 @@ export function linkedCells(
     .slice(1)
     .filter((c) => c !== '');
 }
+
+/**
+ * THE LINES THAT POINT HERE, IN THE ORDER A PERSON READS THEM (skills pass 2 Nov): a person's eight bills came in the
+ * record's order, "7 Oct, 26 Feb 2027, 8 Nov, 5 Dec…", with the one 38 days late last. Now what is late leads, then what
+ * is still open by the day it falls due, the undated open after them, and the finished last, the newest of them first.
+ * A list with no deadline and no state keeps the record's order. Returns the order as indexes, so a caller keeps a line
+ * and the fields read beside it together.
+ */
+export function pointingOrder(decl: RegisterDecl | undefined, raw: readonly (Readonly<Record<string, unknown>> | undefined)[], count: number, now: number): number[] {
+  const at = Array.from({ length: count }, (_, i) => i);
+  const deadline = decl?.fields.find((f) => f.type === 'day' && f.deadline)?.id;
+  const stateId = decl?.state;
+  if (!decl || (!deadline && !stateId)) return at;
+  const dueOf = (i: number): string => {
+    const v = deadline ? raw[i]?.[deadline] : undefined;
+    return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(v) ? v.slice(0, 10) : '';
+  };
+  const done = (i: number): boolean => {
+    const s = stateId ? raw[i]?.[stateId] : undefined;
+    return typeof s === 'string' && (decl.done?.includes(s) ?? false);
+  };
+  const band = (i: number): number => {
+    if (raw[i] === undefined) return 2;
+    if (done(i)) return 3;
+    const due = dueOf(i);
+    if (due === '') return 2;
+    return daysUntil(due, now) < 0 ? 0 : 1;
+  };
+  return at.sort((a, b) => {
+    const d = band(a) - band(b);
+    if (d !== 0) return d;
+    const x = dueOf(a);
+    const y = dueOf(b);
+    if (x === y) return a - b;
+    if (x === '') return 1;
+    if (y === '') return -1;
+    /* THE FINISHED, NEWEST FIRST; everything else soonest first. */
+    return band(a) === 3 ? (x < y ? 1 : -1) : x < y ? -1 : 1;
+  });
+}

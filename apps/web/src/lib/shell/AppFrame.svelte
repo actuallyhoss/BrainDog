@@ -26,7 +26,7 @@
   and twice on `/search`.
 -->
 <script lang="ts">
-  import { BASE, apiBase, at, here } from '$lib/at.ts';
+  import { BASE, apiBase, at, here, slugOf } from '$lib/at.ts';
   import { appPath, isApp, macNotifications, notify, onShell, setBadge, windowFocused } from '$lib/shell.ts';
   import { handoffAlert, instructionAlert, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
   /* THE STYLESHEETS AND `applyInset()` ARE THE ROOT LAYOUT'S (`routes/+layout.svelte`), in the order they always had,
@@ -594,7 +594,14 @@
     }),
   );
   /* THE ONE LIT ROW, and the crumb the bar says it in. */
-  const spot = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
+  /* AN ADDRESS WHOSE FIRST WORD NAMES NO RECORD THAT ANSWERED is a page that is not here (`routes/+page.svelte`), not this
+     record's Today: the bar said "Today" and lit it over "No page called nope-not-here" (skills pass 2 Nov). Nothing is
+     lit, and the bar says the page's own name. */
+  const stray = $derived.by(() => {
+    const named = slugOf(page.url.pathname);
+    return named !== null && here(page.url.pathname) === '/' && data.index.slug !== '' && named !== data.index.slug;
+  });
+  const spot = $derived(stray ? '' : placeOf(here(page.url.pathname), page.url.searchParams));
   const lit = $derived(litOf(spot, model));
   const crumb = $derived(crumbOf(spot, model, lit, frame.title || null, frame.heading || null, frame.up));
   /* A PAGE ABOUT A ROW LIGHTS THE ROW ITS LIST SITS UNDER (F33): an account's page opened Money with Accounts lit, as its
@@ -1520,7 +1527,7 @@
   </div>
 
   <div class="tab-slot">
-    <TabBar tabs={phoneTabs} menu={MENU} live={workingNow().length > 0} />
+    <TabBar tabs={phoneTabs} menu={MENU} live={workingNow().length > 0} nowhere={stray} />
   </div>
 
   <!-- THE PHONE'S OWN WAYS (`lib/phone/Phone.svelte`): the status bar's colour, the iPhone's launch pictures, back from the

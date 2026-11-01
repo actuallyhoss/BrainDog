@@ -52,6 +52,8 @@
   import { miniOf } from './mini.ts';
   import { readHostCatalogue } from './catalogue.ts';
   import { addonHref } from './share/addon-from.ts';
+  import Swap from '$lib/motion/Swap.svelte';
+  import { cardsIn } from './cards-in.ts';
 
   const store = words.store;
 
@@ -236,6 +238,10 @@
     </Empty>
   {/if}
 
+  <!-- A CHIP PRESSED CHANGES EVERY SHELF UNDER IT AT ONCE: the shelves shown fade out and the chosen one up in their place
+       (`Swap`, skills pass 2 Nov), where they swapped in one frame. Keyed on the chip alone, so a search typed does not fade. -->
+  <Swap key={chip}>
+  <div class="shelves">
   {#if suggested.length > 0}
     <section class="part" aria-labelledby="store-suggested">
       <h2 class="part-h" id="store-suggested">{store.suggested}<span class="part-note">{store.suggestedNote}</span></h2>
@@ -301,12 +307,14 @@
             <span class="part-more"><Button weight="bare" size="sm" onclick={() => (opened = { ...opened, [s.shelf]: !opened[s.shelf] })}>{opened[s.shelf] ? store.showFewer : store.showAll}</Button></span>
           {/if}
         </h2>
-        <ul class="cards">
+        <ul class="cards" {@attach cardsIn(() => !searching)}>
           {#each fold ? s.items.slice(0, FOLDED_AT) : s.items as l (l.key)}{@render card(l, SHELF_SLOTS[shelfOf(l)])}{/each}
         </ul>
       </section>
     {/if}
   {/each}
+  </div>
+  </Swap>
 </div>
 
 <style>
@@ -315,6 +323,13 @@
     flex-direction: column;
     gap: var(--sp-5);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
+    min-inline-size: 0;
+  }
+
+  .shelves {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
     min-inline-size: 0;
   }
 

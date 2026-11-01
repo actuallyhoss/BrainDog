@@ -1042,7 +1042,9 @@ export function lateFirst(decl: RegisterDecl | undefined, entries: readonly Entr
   };
   return entries
     .map((e, at) => ({ e, at, band: band(e) }))
-    .sort((a, b) => a.band - b.band || ((a.band === 1 || a.band === 2) && dueOn(a.e).localeCompare(dueOn(b.e))) || a.at - b.at)
+    /* THE FINISHED, THE MOST RECENTLY DUE FIRST (skills pass 2 Nov): they came in the record's order, "27 Oct, 31 Oct,
+       29 Oct, 30 Oct", under rows sorted by their day. */
+    .sort((a, b) => a.band - b.band || ((a.band === 1 || a.band === 2) && dueOn(a.e).localeCompare(dueOn(b.e))) || (a.band === 4 && dueOn(b.e).localeCompare(dueOn(a.e))) || a.at - b.at)
     .map((x) => x.e);
 }
 

@@ -116,6 +116,7 @@
   import ListRuns from './parts/ListRuns.svelte';
   import ListKpis from './parts/ListKpis.svelte';
   import { peopleOrder, setPeopleOrder } from './parts/people-order.svelte.ts';
+  import { swapUp } from '$lib/page/swap-up.ts';
   import { lastDayOf, meetsOf, mergedAway, orgRoleOf } from './folk.ts';
   import { readingOf as readingsOf, valueSaid } from '$lib/record/reading.ts';
   import { amountField, signedSaid, wayField, wayOf } from '$lib/record/money-way.ts';
@@ -1526,6 +1527,29 @@
    * this row height.
    */
   let body = $state<HTMLElement | undefined>(undefined);
+
+  /*
+   * A VIEW SWITCHED OR A SLICE PRESSED FADES THE NEW BODY UP (`$lib/page/swap-up.ts`, skills pass 2 Nov). When the view
+   * changes, at once; when the chips change, once their answer has landed (the rows stay until then, so the fade is on
+   * the new rows and not the old). Keyed on the view and the chips alone: a search being typed and a column sorted
+   * change the answer too, and neither fades. A different list is a different screen, and the page's own cross-fade has it.
+   */
+  const swapKey = $derived(JSON.stringify([filters, twiceAsked]));
+  let swapSeen: { id: string; view: string; key: string; pages: Entry[][] } | null = null;
+  $effect(() => {
+    const now = { id, view, key: swapKey, pages };
+    if (now.pages.length === 0) return;
+    const was = swapSeen;
+    if (was === null || was.id !== now.id) {
+      swapSeen = now;
+      return;
+    }
+    const viewMoved = was.view !== now.view;
+    const answerMoved = was.pages !== now.pages && was.key !== now.key;
+    /* THE CHIPS ARE SEEN ONLY WITH THEIR ANSWER, so a press is not marked seen while the old rows still stand. */
+    swapSeen = { id: now.id, view: now.view, key: was.pages !== now.pages ? now.key : was.key, pages: now.pages };
+    if (viewMoved || answerMoved) void tick().then(() => swapUp(body));
+  });
 
   $effect(() => {
     /**
