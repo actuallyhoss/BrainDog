@@ -19,7 +19,7 @@
   names one. ITS OWN CHUNK, loaded when the shell draws it (`+layout.svelte`), so the shell's entry carries none of it.
 -->
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import { markOf } from 'braindog-render';
   import { at, here as inside } from '../at.ts';
@@ -33,7 +33,7 @@
   import { keepOrder } from './project-order.ts';
   import { frame } from './frame.svelte.ts';
   import Brand from './Brand.svelte';
-  import { placeIn } from '$lib/motion/index.ts';
+  import { glide, placeIn } from '$lib/motion/index.ts';
   import {
     COUNTS_KEY,
     PINS_KEY,
@@ -97,6 +97,8 @@
   } = $props();
 
   const phone = $derived(mode === 'phone');
+  /** What in the rail moves to make room for a place arriving: each row, the head of Projects, and the rule. */
+  const ROWS = '.s-list, li, .s-head, .s-rule, .s-tile';
 
   const words = {
     title: 'Projects',
@@ -424,6 +426,25 @@
   }
 
   const showProjects = $derived(model.projects !== null && (read === null ? !answered : holdsProjects(read)));
+
+  /* A PLACE ARRIVING MAKES ROOM ON TRANSFORM ALONE (audit 11-01, AP14): the rows are measured before the rail draws what
+     changed and the ones that moved glide from where they stood (`glide`), while the new one slides in (`placeIn`). Its
+     height opening shifted the whole rail, frame by frame. */
+  let rows = $state<HTMLElement | null>(null);
+  /* THE RAIL FILLING IN AS IT OPENS IS NO ARRIVAL: its lists and projects land from their own reads, which on a slow
+     open come after the screen's first second, and slid in then on a plain open. Its first `SETTLING_MS`, and until its
+     first read has answered, draw still. */
+  const SETTLING_MS = 2500;
+  const born = typeof performance === 'undefined' ? 0 : performance.now();
+  const settling = (): boolean => !untrack(() => answered) || performance.now() - born < SETTLING_MS;
+  $effect.pre(() => {
+    void model;
+    void play;
+    void showProjects;
+    if (settling()) return;
+    const go = glide(untrack(() => rows), ROWS);
+    void tick().then(go);
+  });
 </script>
 
 {#snippet mark(p: SideProject)}
@@ -434,7 +455,7 @@
 {#snippet project(p: SideProject)}
   {@const here = isLit(p.href)}
   {@const name = shownName(p.name)}
-  <li class="s-item" in:placeIn>
+  <li class="s-item" in:placeIn={{ hold: settling() }}>
     <a class="s-row s-proj tap" href={at(p.href)} aria-current={here ? 'page' : undefined} aria-keyshortcuts={phone ? undefined : 'ArrowRight'} onkeydown={phone ? undefined : toPin}>
       {@render mark(p)}
       {#if phone}
@@ -489,7 +510,7 @@
 {/snippet}
 
 {#snippet link(l: SideLink, nested: boolean)}
-  <li in:placeIn>
+  <li in:placeIn={{ hold: settling() }}>
     <a class="s-row s-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={isLit(l.href) ? 'page' : undefined}>
       {#if !nested}<Icon name={l.icon as IconName} size="s" />{/if}<span class="s-name" dir="auto">{l.label}</span>
       {#if l.count}<span class="s-count num">{l.count.toLocaleString('en-GB')}</span>{/if}
@@ -502,7 +523,7 @@
   {@const open = placeOpen(p)}
   <!-- A PLACE THAT COMES INTO THE RAIL (an add-on turned on, a list with its first row) slides in and opens its row,
        and the places under it move down to make room (`placeIn`, the record forming). Never on the rail's first draw. -->
-  <li class="s-item" in:placeIn>
+  <li class="s-item" in:placeIn={{ hold: settling() }}>
     <a class="s-row s-place tap" href={at(p.href)} aria-current={isLit(p.href) ? 'page' : undefined}>
       <Icon name={p.icon as IconName} size="s" /><span class="s-name">{p.label}</span>
       {#if p.key === 'decide'}
@@ -558,7 +579,7 @@
       {#if model.projects.href}<a class="s-title tap" href={at(model.projects.href)} aria-current={isLit(model.projects.href) ? 'page' : undefined}>{model.projects.label}</a>{:else}<span class="s-title">{model.projects.label}</span>{/if}
       {#if split}<span class="s-count">{words.inPlay(split.play.length)}</span>{/if}
       {#if read}
-        <a class="s-add tap" href={at(`/r/${read.list}?new=1`)} aria-label={words.add} title={words.add}><Icon name="plus" size="m" /></a>
+        <a class="s-add tap" href={at(`/r/${read.list}?new=1`)} aria-label={words.add} title={words.add}><Icon name="plus" size="m" /><span class="sr-only">{words.add}</span></a>
       {/if}
     </div>
     {#if read && split}
@@ -609,7 +630,7 @@
   <PageHead title={words.menu} headless />
   <!-- THE PAGE'S NAME FOR A SCREEN READER: the bar says it for the eye. -->
   <h1 class="sr-only" tabindex="-1">{words.menu}</h1>
-  <div class="s-phone">
+  <div class="s-phone" bind:this={rows}>
     <nav class="s-tile" aria-label={words.nav}>
       <ul class="s-list">
         {#each model.places as p (p.key)}{@render place(p)}{/each}
@@ -671,7 +692,7 @@
         <svg class="s-side-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.75" y="4.75" width="16.5" height="14.5" rx="3" /><path d="M9.25 4.75v14.5" /></svg>
       </button>
     </div>
-    <nav class="s-scroll" aria-label={words.nav}>
+    <nav class="s-scroll" aria-label={words.nav} bind:this={rows}>
       <ul class="s-list">
         {#each model.places as p (p.key)}{@render place(p)}{/each}
       </ul>
