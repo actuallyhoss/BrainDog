@@ -10,12 +10,16 @@ export const words = {
   searchLabel: 'Search add-ons and starters',
   /* THE WAY FROM THE STORE TO WHAT THIS RECORD HOLDS, Settings › Add-ons. */
   yours: 'Your add-ons',
+  /* THE WAY TO PUBLISH ONE, for anybody signed in: it waits for review before anyone else sees it. */
+  publish: 'Publish an add-on',
   searchHint: 'Search add-ons and starters',
   /* THE STORE: starters first, then the shelves, and what the record suggests itself. */
   store: {
     sentence: 'Each shows its plan before anything changes.',
     suggested: 'Suggested for you',
     suggestedNote: 'from your own BrainDog',
+    featured: 'From BrainDog',
+    featuredNote: 'made and kept up to date by BrainDog',
     starters: 'Starters',
     startersNote: 'whole setups to begin with',
     examples: 'Example setups',
@@ -48,6 +52,8 @@ export const words = {
     tiers: { builtin: 'Part of BrainDog', store: 'In the store', unlisted: 'By its name only', link: 'By link only' },
     onHere: 'In your BrainDog',
     partOf: 'Part of BrainDog',
+    alwaysOn: 'Always on. You can still hide its pages.',
+    hidePages: 'Choose what is in your nav',
     on: (version: string): string => `On · ${version}`,
     off: (version: string): string => `Off · ${version}`,
     updateTo: (version: string): string => `Update to ${version}`,
@@ -99,6 +105,8 @@ export const words = {
   addsModules: 'Needs first',
   addsNothing: 'Nothing of its own',
   addsFigures: 'Numbers it tracks',
+  addsWidgets: 'Widgets for Today',
+  addsSkills: 'Skills for your agents',
   atLeast: (n: string): string => `at least ${n}`,
   atMost: (n: string): string => `at most ${n}`,
   exactly: (n: string): string => `exactly ${n}`,

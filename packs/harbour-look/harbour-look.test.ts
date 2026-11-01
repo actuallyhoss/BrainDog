@@ -62,7 +62,7 @@ const drawn = async (api: Api): Promise<{ light: Record<string, string>; dark: R
 
 test('THE FILE IS harbour-look, ONE THEME AND NOTHING ELSE, read through the add-on door as it ships', async () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version], ['harbour-look', '1.0.0']);
+  assert.deepEqual([doc.pack, doc.version], ['harbour-look', '1.0.1']);
   assert.deepEqual(
     doc.declarations.map((d) => Object.keys(d)[0]),
     ['theme'],

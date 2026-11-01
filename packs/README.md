@@ -47,6 +47,11 @@ The top of a pack file says what the add-on is and what it needs. Its keys are t
 - `icon` (optional): the name of one icon from the app's icon set, drawn beside the add-on in the store and the installed list.
 - `requires`: the format and primitives it is written for, and each add-on it needs installed first, with a version
   range, as `"money-core": ">=3.0.0 <4.0.0"`.
+- `uses`: every place of yours it reads or changes that is not its own, by id, as
+  `["register.transactions", "metric.cash-now", "page.project", "activity"]` (a view of the whole record, such as
+  `activity` or `governance.open`, is named as a block's `source` says it). A person sees these in plain words before installing,
+  and an add-on can reach nothing it does not name. A file that says `uses` is held to it wherever it is read, and the
+  store takes no add-on whose `uses` leaves one out. `braindog addon check` prints what it uses and the line to write.
 - `declarations`: the lists, pages, figures, rules, digests and scripts it adds. Beside them, `extends` lays optional
   fields on another add-on's list, `config` declares the settings a person sets on the add-on's page, and `seeds` are
   example rows.

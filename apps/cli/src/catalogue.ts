@@ -55,7 +55,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { addressFaults, exportUseCase, listingFault, sharedFileName } from '@braindog/declare';
+import { addressFaults, exportUseCase, listingFault, sharedFileName, usesFault } from '@braindog/declare';
 import {
   addKeyStatement,
   CATALOGUE_INDEX,
@@ -429,9 +429,11 @@ async function checkPack(args: string[], io: AgentIo): Promise<number> {
      where none may be, and a key a listing never says. Said here in the sentence those two say, and every one of them,
      where a record stops at the first. */
   const written: unknown = JSON.parse(read.text);
+  /* WHAT IT USES OF YOURS IS SAID BY `reachLines` ABOVE; whether its `uses` line says so is the Kennel's to refuse. */
   const remote = addressFaults(written);
-  const unlistable = listingFault(written);
-  for (const r of [...remote, ...(unlistable ? [unlistable] : [])]) io.out(`  ${oneLine(`${r.fix} (${r.code})`)}`);
+  const kennelOnly = [listingFault(written), usesFault(written, true)].filter((r) => r !== null);
+  const unlistable = kennelOnly.length > 0;
+  for (const r of [...remote, ...kennelOnly]) io.out(`  ${oneLine(`${r.fix} (${r.code})`)}`);
   if (remote.length > 0) {
     io.say(`${title} ${pack.manifest.version} would be refused by BrainDog, as said above.`);
     return 1;
@@ -506,6 +508,7 @@ export function reachLines(given: Reach): string[] {
     `  Adds lists: ${list(reach.lists)}; pages: ${list(reach.pages)}; rules: ${list(reach.rules)}`,
     `  Example rows: ${reach.examples}; suggests skills: ${list(reach.skills)}`,
     ...(reach.widgets?.length ? [`  Widgets for Today: ${list(reach.widgets)}`] : []),
+    ...(reach.uses?.length ? [`  Uses of yours: ${reach.uses.map((u) => `${u.id}${u.writes ? ' (changes it)' : ''}`).join(', ')}`] : []),
     reach.calls_out.length === 0 ? '  Calls out to: nothing. It reads and writes only your BrainDog.' : `  Calls out to: ${reach.calls_out.map((c) => c.line).join('; ')}`,
   ];
 }

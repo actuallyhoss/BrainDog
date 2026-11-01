@@ -54,6 +54,7 @@
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import PreviewPage from '$lib/market/PreviewPage.svelte';
   import { addsOf, fieldsOf, namesOf } from '$lib/market/adds.ts';
+  import { asksLines, asksWords, placesLines } from '$lib/market/asks.ts';
   import { readCounts } from '$lib/market/counts.ts';
   import { actionOf, compareVersion, entryOf, latestOf, listingKey, listingsOf, unlistedListing, type ListingKind } from '$lib/market/listing.ts';
   import { readVersionPreview, type PreviewRead } from '$lib/market/preview.ts';
@@ -217,6 +218,9 @@
       push('pages', 'doc', words.addsPages, reach.pages);
       push('rules', 'skill', words.addsRules, reach.rules, '; ');
     }
+    /* THE WIDGETS IT SHIPS FOR TODAY AND THE SKILLS IT GIVES YOUR AGENTS, each by name: both are things it adds. */
+    push('widgets', 'grid', words.addsWidgets, adds?.widgets ?? []);
+    push('skills', 'learning', words.addsSkills, adds?.skills ?? []);
     if (reach) {
       const hosts = [...new Set(reach.calls_out.map((c) => c.host ?? '').filter((h) => h !== ''))];
       /* ONE THAT CALLS NOTHING SAYS SO WITHOUT A NOUGHT (AM20): "Hosts it calls 0" read as a count gone wrong. */
@@ -242,6 +246,25 @@
     const each = d && typeof d.for === 'object' && d.for !== null ? (d.for as { register?: unknown }).register : undefined;
     return typeof each === 'string' ? copy.sharePageEach(oneOf(names.get(each) ?? listWords(each))) : p.title;
   }
+
+  /**
+   * WHAT IT ASKS FOR OF YOURS, from the file (`$lib/market/asks.ts`): each list, figure and page it uses that is not its
+   * own, then its scripts and its agents' skills; every call it makes is said under them by `callSaid`, one line each.
+   * A list is said by the name this record gives it.
+   */
+  const usedName = (id: string): string => {
+    const dot = id.indexOf('.');
+    const [kind, rest] = [id.slice(0, dot), id.slice(dot + 1)];
+    if (kind === 'register') return heldList(id) ?? names.get(id) ?? listWords(rest);
+    return names.get(id) ?? listWords(rest.replaceAll('-', '_'));
+  };
+  const asks = $derived.by((): string[] | null => {
+    const doc = file ? (file.doc ?? (file.text ? safeParse(file.text) : null)) : null;
+    if (doc === null) return null;
+    const calls = (reach?.calls_out ?? []).map(callSaid);
+    const lines = [...asksLines(doc, usedName, { calls: calls.length === 0 }), ...calls];
+    return lines.length > 0 ? lines : [asksWords.nothing];
+  });
 
   /** How many things it adds, for the tile's count; `null` until the file or its reach is read. */
   const addsTotal = $derived(planRows.length === 0 ? null : planRows.filter((r) => r.key !== 'hosts').reduce((n, r) => n + (r.n ?? 0), 0));
@@ -496,6 +519,8 @@
   async function approve() {
     if (!listing || !client || !states || !planned) return;
     const p = planned;
+    /* A FIRST INSTALL OF AN ADD-ON IS UNDONE FROM ITS TOAST: Undo takes it back out, as Uninstall does, keeping what it held. */
+    const fresh = addingFirst === null && listing.kind === 'pack' && action?.kind === 'install' ? { id: listing.installedId, title: listing.title } : null;
     busy = true;
     try {
       const out = await install(client, p, states, pref.read().nav ?? [], copy.writeRaced);
@@ -505,7 +530,8 @@
         /* A run that took other updates in first names them (`offer.ts` `installInTurn`), so nobody finds one moved unsaid. */
         const title = addingFirst !== null ? moduleTitle(addingFirst) : listing.title;
         /* AND WHAT THE UPDATE CARRIED INTO A PAGE OR LIST HE CHANGED, in the record's own words (RJ6). */
-        toasts.push([out.first ? turnWords.installedAfter(title, out.first) : copy.shareInstalled(title), ...(out.said ?? [])].join(' '), { intent: 'good' });
+        const undo = fresh && !out.first ? fresh : null;
+        toasts.push([out.first ? turnWords.installedAfter(title, out.first) : copy.shareInstalled(title), ...(out.said ?? [])].join(' '), undo ? { intent: 'good', undo: () => void takeBack(undo.id, undo.title) } : { intent: 'good' });
         planned = null;
         const wasFirst = addingFirst !== null;
         addingFirst = null;
@@ -542,6 +568,17 @@
     } finally {
       busy = false;
     }
+  }
+
+  /** Undo of a first install: the add-on taken back out, its lists and what they hold kept, as Uninstall keeps them. */
+  async function takeBack(id: string, title: string) {
+    const c = client;
+    if (!c) return;
+    const out = await c.uninstallPack({ id }).catch(() => null);
+    if (out?.ok) toasts.push(copy.uninstalled(title), { intent: 'good' });
+    else toasts.push((out && !out.ok && 'refusal' in out ? out.refusal.fix : null) ?? copy.writeRaced, { intent: 'warn' });
+    await reread();
+    await railAgain();
   }
 
   /**
@@ -749,7 +786,18 @@
         </div>
       {/if}
 
-      {#if reach && reach.calls_out.length > 0}
+      <!-- WHAT IT ASKS FOR, IN PLAIN WORDS: the lists of yours it reads or changes, what it sends where and with which key,
+           its scripts and its agents' skills, read from the file it would install. Nothing else is within its reach. -->
+      {#if asks}
+        <div class="third-cell calls-cell">
+          <Tile icon="lock" title={asksWords.title}>
+            <ul class="log">
+              {#each asks as line, i (i)}<li class="log-row loud">{line}</li>{/each}
+            </ul>
+            <p class="quiet">{asksWords.note}</p>
+          </Tile>
+        </div>
+      {:else if reach && reach.calls_out.length > 0}
         <div class="third-cell calls-cell">
           <Tile icon="globe" title={words.calls} count={reach.calls_out.length}>
             <ul class="log">
@@ -813,6 +861,7 @@
         }}
         onrecheck={again}
         onkey={putKey}
+        uses={addingFirst === null && file ? placesLines(file.doc ?? (file.text ? safeParse(file.text) : null), usedName) : undefined}
         extra={waits.length > 0 || moved ? told : undefined}
       />
     {/if}

@@ -1,0 +1,18 @@
+{
+  "pack": "harbour-look",
+  "version": "1.0.1",
+  "icon": "eye",
+  "title": "Harbour look",
+  "summary": "A sea blue-green in place of the house red, on a cooler grey, in light and in dark.",
+  "changes": "Wears its own icon in the store and in your add-ons.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": { "format": 1, "primitives": 1, "packs": {} },
+  "declarations": [
+    {
+      "theme": "harbour",
+      "scheme": "both",
+      "seed": { "accent": "#1C7E92", "neutral_hue": 220 }
+    }
+  ]
+}

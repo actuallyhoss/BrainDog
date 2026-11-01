@@ -37,6 +37,7 @@
     fieldOf,
     onrecheck,
     onkey,
+    uses,
   }: {
     /** The record's `Diff`, a use case's `SharedPlan`, or an array of either for "Update all". */
     diff: unknown;
@@ -62,6 +63,11 @@
      * in place (RF3). Left out, the sheet offers only the terminal command.
      */
     onkey?: ((label: string, value: string, passphrase: string) => Promise<{ ok: true } | { ok: false; fix: string; pass?: boolean; signin?: string }>) | undefined;
+    /**
+     * WHAT IT WILL USE OF YOURS, in plain words (`asks.ts`): the lists, figures and pages it reads or changes that are not
+     * its own. Approving the plan is agreeing to these; it can reach nothing else. Left out or empty, nothing is drawn.
+     */
+    uses?: readonly string[] | undefined;
   } = $props();
 
   /* WHAT IS TYPED FOR EACH MISSING KEY, never kept past the sheet: emptied as it is sent, whatever comes back (RF4), as
@@ -231,6 +237,16 @@
           </ul>
           {#if estimate}<p class="plan-note">{estimate}</p>{/if}
           <p class="plan-note">{words.callsNote}</p>
+        </section>
+      {/if}
+
+      {#if uses && uses.length > 0}
+        <section class="plan-group" aria-labelledby="plan-uses-h">
+          <h3 class="plan-h" id="plan-uses-h"><IconWell name="lock" /><span class="plan-title">{words.uses}</span></h3>
+          <ul class="plan-rows">
+            {#each uses as line, i (i)}<li class="plan-row"><span class="plan-text">{line}</span></li>{/each}
+          </ul>
+          <p class="plan-note">{words.usesNote}</p>
         </section>
       {/if}
 

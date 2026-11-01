@@ -49,6 +49,7 @@
   import { INSTALLED_AT } from './moved.ts';
   import { miniOf } from './mini.ts';
   import { readHostCatalogue } from './catalogue.ts';
+  import { addonHref } from './share/addon-from.ts';
 
   const store = words.store;
 
@@ -128,6 +129,20 @@
   );
   const suggested = $derived(searching || chip !== null ? [] : suggestionsOf({ signs, questions, listings, states, moneyOn, href: listingHref }));
 
+  /* FROM BRAINDOG: at most four add-ons BrainDog makes and keeps up, that this record does not hold yet and the
+     suggestions above do not name, the most held first. Drawn only on the whole store, never over a search or a chip,
+     and only once the record has said what it holds, so nothing it already has is offered. */
+  const FEATURED_MOST = 4;
+  const featured = $derived.by((): Listing[] => {
+    if (searching || chip !== null || states === null) return [];
+    const named = new Set(suggested.flatMap((s) => (s.listing ? [s.listing.key] : [])));
+    return laid.shelves
+      .flatMap((s) => s.items)
+      .filter((l) => l.kind === 'pack' && ours(l) && !named.has(l.key) && cueOf(l).cue === store.add)
+      .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+      .slice(0, FEATURED_MOST);
+  });
+
   /* ── reading ───────────────────────────────────────────────────────────── */
 
   /* A STORE THAT DID NOT ANSWER SAYS SO, WITH TRY AGAIN, and never as a store with nothing in it. */
@@ -172,7 +187,11 @@
 <svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
 
 <PageHead icon="packs" title={copy.packs} sentence={store.sentence}>
-  {#snippet actions()}<Button size="sm" href={INSTALLED_AT}>{words.yours}</Button>{/snippet}
+  {#snippet actions()}
+    <Button size="sm" href={INSTALLED_AT}>{words.yours}</Button>
+    <!-- ANYBODY SIGNED IN MAY PUBLISH ONE: the form makes it from what they built, and it waits for review. -->
+    <Button size="sm" weight="bare" href={addonHref}>{words.publish}</Button>
+  {/snippet}
 </PageHead>
 
 {#snippet card(l: Listing, hue: (typeof SHELF_SLOTS)[keyof typeof SHELF_SLOTS], note: string | null = null)}
@@ -223,6 +242,15 @@
             why={s.why}
           />
         {/each}
+      </ul>
+    </section>
+  {/if}
+
+  {#if featured.length > 0}
+    <section class="part" aria-labelledby="store-featured">
+      <h2 class="part-h" id="store-featured">{store.featured}<span class="part-note">{store.featuredNote}</span></h2>
+      <ul class="cards">
+        {#each featured as l (l.key)}{@render card(l, SHELF_SLOTS[shelfOf(l)])}{/each}
       </ul>
     </section>
   {/if}
