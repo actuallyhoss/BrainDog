@@ -193,7 +193,8 @@ export const words = {
   resumed: (title: string) => `${title} runs again now. Three more refused runs one after another pause it again.`,
   /* What starts it. */
   /* `15m`, `1h`, `1d` AS A PERSON SAYS THEM: "every 15 minutes", "every hour", "every day" (`often`). */
-  every: (every: string) => often(every),
+  /* WITH A TIME OF DAY, SAID AFTER IT: "every day at 09:00", the record's own wall clock (`runs.at`). */
+  every: (every: string, at: string | null = null) => (at === null ? often(every) : `${often(every)} at ${at}`),
   door: (door: string) => `when something arrives at ${door}`,
   rule: 'when an automation starts it',
   runs: (parts: string[]) => `Runs ${parts.join(' and ')}.`,
@@ -246,7 +247,7 @@ export const words = {
 /** What starts a script, in one sentence. */
 export function startsBy(s: Pick<ScriptRow, 'runs'>): string {
   const parts: string[] = [];
-  if (s.runs.every !== null) parts.push(words.every(s.runs.every));
+  if (s.runs.every !== null) parts.push(words.every(s.runs.every, s.runs.at ?? null));
   if (s.runs.door !== null) parts.push(words.door(humanize(s.runs.door)));
   if (s.runs.rule) parts.push(words.rule);
   return parts.length === 0 ? words.never : words.runs(parts);
@@ -280,7 +281,7 @@ export function nextSaid(iso: string, now: number = recordNow()): string {
  */
 export function startsShort(s: Pick<ScriptRow, 'runs'>): string {
   const parts: string[] = [];
-  if (s.runs.every !== null) parts.push(words.every(s.runs.every));
+  if (s.runs.every !== null) parts.push(words.every(s.runs.every, s.runs.at ?? null));
   if (s.runs.door !== null) parts.push(words.doorShort(humanize(s.runs.door)));
   if (s.runs.rule) parts.push(words.ruleShort);
   const said = parts.length === 0 ? words.byHand : parts.join(' · ');
@@ -308,7 +309,7 @@ export function scriptOf(fields: Readonly<Record<string, unknown>>, now: number 
   const lastAt = text(fields.last_at);
   const said = rowOf(
     {
-      runs: { every: text(fields.every), door: text(fields.door), rule: fields.rule === true },
+      runs: { every: text(fields.every), at: text(fields.at), door: text(fields.door), rule: fields.rule === true },
       status: fields.status === 'paused' ? 'paused' : 'on',
       last: lastAt === null ? null : { at: lastAt, version: null, outcome: text(fields.last) ?? '', say: text(fields.said) ?? '' },
       next: text(fields.next),

@@ -244,7 +244,7 @@ import { answerAsked, arrive, day, exponentOf, fileAsSecond, offerAgain, pattern
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { firstSlotMs } from './slot.ts';
-import { activeScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
+import { activeScript, clockOfScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
 import { finishScript, prepareScript, resumeScript, tryProposal, type ScriptProposal, type ScriptProposed, type ScriptRunDeps, type ScriptRunner } from './script-run.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
 import { extractPull, type ExtractDecl, type ExtractDeps, type Extraction } from './extract.ts';
@@ -2754,8 +2754,30 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* A SCRIPT IS ARMED ON ITS OWN CLOCK (`script.ts`). One only a door or a rule starts still gets its row, which
          pausing and the list read, and its one turn ends it. */
       if (decl.kind === 'script') {
-        const every = (body.runs as { every?: unknown } | undefined)?.every;
-        arm('script', bare, { script: bare }, firstDueMs(recordIdentity(sql)?.id ?? 'self', bare, typeof every === 'string' ? every : null, clock.now()));
+        const { every, at } = clockOfScript(body);
+        const due = firstDueMs(recordIdentity(sql)?.id ?? 'self', bare, every, clock.now(), { at, tz });
+        /* THE ROW KEEPS THE CLOCK IT WAS ARMED FROM, and a pending row whose clock was changed is armed again from the new
+           one, as a rule's clock is below: `arm` moves only a row that is done or failed, so a script moved from "every
+           day" to "every day at 09:00" would otherwise have run once more at the old hour before it learned the new one.
+           A row armed before it kept a clock is moved only when a time of day is now named, so no unpinned script's
+           spread is reset by this build. */
+        const said = jcs({ every, at } as unknown as Json);
+        const held = sql.one<{ state: string; payload: string }>("SELECT state, payload FROM schedule WHERE kind = 'script' AND key = ?", bare);
+        if (held?.state === 'pending') {
+          let kept: unknown;
+          try {
+            kept = (JSON.parse(held.payload) as { clock?: unknown }).clock;
+          } catch {
+            kept = undefined;
+          }
+          if (typeof kept === 'string' ? kept !== said : at !== null)
+            sql.exec(
+              "UPDATE schedule SET due_at = ?, payload = ?, attempts = 0 WHERE kind = 'script' AND key = ? AND state = 'pending'",
+              instant(due),
+              JSON.stringify({ script: bare, clock: said }),
+              bare,
+            );
+        } else arm('script', bare, { script: bare, clock: said }, due);
         /* A REINSTALL UNPAUSES A SCRIPT, and `arm` only moves a row that is `done` or `failed` (the comment
            above), so a script paused for refusing too many times in a row stayed paused after the fix that was
            supposed to end that streak was installed. `pauseAfterRefusals` counts only the installed version's
@@ -9993,7 +10015,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     call: (row) => fireAction(actionDeps(), row),
     poll: (row) => fireAction(actionDeps(), row),
     /* A scheduled `script`: one `script.run` outbox row for a host to run in a sandbox, and the next run armed. */
-    script: (row) => fireScript(scriptDeps(sql, { recordId: recordIdentity(sql)?.id ?? 'self', nowMs: clock.now(), mint }), row, activeScript(sql, row.key)),
+    script: (row) => fireScript(scriptDeps(sql, { recordId: recordIdentity(sql)?.id ?? 'self', nowMs: clock.now(), tz: recordTz(), mint }), row, activeScript(sql, row.key)),
 
     /* A credential due for rotation. It says the id and the kind and never the label — a
        notification naming "Stripe, live" tells whoever can see it which one is worth taking. */

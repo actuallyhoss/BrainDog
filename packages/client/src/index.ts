@@ -771,7 +771,7 @@ export type ScriptRow = {
   title: string;
   version: number;
   pack: string | null;
-  runs: { every: string | null; door: string | null; rule: boolean };
+  runs: { every: string | null; at: string | null; door: string | null; rule: boolean };
   reads: string[];
   writes: string[];
   egress: string[];

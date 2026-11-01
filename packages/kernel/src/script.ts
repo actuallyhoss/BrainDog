@@ -26,6 +26,9 @@ import type { Refusal, Sql } from '@braindog/ports';
 import { enqueue } from './outbox.ts';
 import { meter, originOf, RULE_CALLS_PER_DAY, type Egress } from './actions.ts';
 import { checkInterval, FLOOR_MS, intervalMs, jitterMs } from './pull.ts';
+import { timeOf } from './clock.ts';
+import { clockOf, firstSlotMs, nextSlotMs } from './slot.ts';
+import { instant } from './migrate.ts';
 
 /**
  * The most a declaration's `limits` may ask for: design section 5.
@@ -42,8 +45,12 @@ export const SCRIPT_SOURCE_BYTES = 64 * 1024;
 export type ScriptBody = {
   script: string;
   title?: string;
-  /** At least one. `every` is a schedule row; `door` is an ingest whose verified arrivals start it (`startAtDoor`); `rule` lets a rule's `script` step start it. */
-  runs: { every?: string; door?: string; rule?: true };
+  /**
+   * At least one. `every` is a schedule row; `door` is an ingest whose verified arrivals start it (`startAtDoor`); `rule`
+   * lets a rule's `script` step start it. `at` pins `every` to a time of day, `HH:MM` in the record's zone, and needs an
+   * `every` of whole days (`every: 1d, at: 09:00` is every day at nine).
+   */
+  runs: { every?: string; at?: string; door?: string; rule?: true };
   /** Literal `https://` origins, compared as origins. Printed in the install diff, one line per script. */
   egress: string[];
   /** Keychain labels. The host opens each for one request; the sandbox never holds a key's bytes. */
@@ -59,7 +66,9 @@ export type ScriptBody = {
 /* `pack` IS HERE BECAUSE THE RECORD READS IT. The seed installs first-party packs with no `pack` row, owned only by
    `pack:` in each body (`packStates`), and a script in one of them was refused as a key nothing reads. */
 const HEADER = ['script', 'title', 'runs', 'egress', 'keys', 'reads', 'writes', 'limits', 'source', 'pack'] as const;
-const RUNS = ['every', 'door', 'rule'] as const;
+const RUNS = ['every', 'at', 'door', 'rule'] as const;
+/** A day, in the milliseconds `intervalMs` answers: a time of day repeats only on whole ones. */
+const DAY_MS = 86_400_000;
 const LIMITS = ['cpu_ms', 'fetches', 'wall_ms', 'writes'] as const;
 
 /** A script's own id, and a door's: the ingest grammar, which is the register grammar with a hyphen allowed. */
@@ -96,7 +105,7 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
   if (body.pack !== undefined && typeof body.pack !== 'string') return bad('DECLARATION_INVALID', `${id}'s pack is the id of the pack that owns it.`, 'pack');
 
   const runs = body.runs as Record<string, unknown> | undefined;
-  if (runs === null || typeof runs !== 'object' || Array.isArray(runs) || !RUNS.some((k) => runs[k] !== undefined))
+  if (runs === null || typeof runs !== 'object' || Array.isArray(runs) || !RUNS.some((k) => k !== 'at' && runs[k] !== undefined))
     return bad('DECLARATION_INVALID', `${id} says nothing about when it runs. Write runs: with every:, door: or rule: true.`, 'runs');
   const odd = Object.keys(runs).find((k) => !(RUNS as readonly string[]).includes(k));
   if (odd !== undefined) return bad('DECLARATION_INVALID', `${id} runs on ${odd}, and a script runs on every:, door: or rule: true.`, `runs.${odd}`);
@@ -110,6 +119,16 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
       return every.refusal.code === 'OUT_OF_BOUNDS'
         ? bad('ACTION_INTERVAL_TOO_SHORT', `${id} may run no more often than every fifteen minutes.`, 'runs.every')
         : bad('DECLARATION_INVALID', every.refusal.fix, 'runs.every');
+  }
+  /* A TIME OF DAY IS READ ON THE CLOCK THE CONNECTORS KEEP (`slot.ts`), in the record's zone, and repeats only on whole
+     days, as theirs does (`clockFault` in `declare.ts`): `every: 6h, at: 09:00` names a time the next run cannot keep. */
+  if (runs.at !== undefined) {
+    if (runs.every === undefined)
+      return bad('DECLARATION_INVALID', `${id} runs at ${String(runs.at)} and says no clock. Write every: 1d beside it.`, 'runs.at');
+    if (timeOf(runs.at) === null) return bad('DECLARATION_INVALID', `${id}'s at: is a time of day from 00:00 to 23:59, such as 09:00.`, 'runs.at');
+    const ms = intervalMs(runs.every as string);
+    if (ms === null || ms % DAY_MS !== 0)
+      return bad('DECLARATION_INVALID', `${id} runs at ${String(runs.at)} every ${String(runs.every)}, and a time of day repeats only on whole days. Write every: 1d, 2d or 1w.`, 'runs.every');
   }
   if (runs.door !== undefined && (typeof runs.door !== 'string' || !NAME.test(runs.door)))
     return bad('DECLARATION_INVALID', `${id}'s door is the id of the ingest whose arrivals start it.`, 'runs.door');
@@ -183,13 +202,15 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
 
 /* ── armed and fired ─────────────────────────────────────────────────────────────────────────── */
 
-/** The one thing a fire needs from the declaration: which version is active, and how often it runs. */
-export type ArmedScript = { script: string; version: number; every: string | null };
+/** The one thing a fire needs from the declaration: which version is active, how often it runs, and at what time of day. */
+export type ArmedScript = { script: string; version: number; every: string | null; at: string | null };
 
 export type ScriptDeps = {
   sql: Sql;
   recordId: string;
   nowMs: number;
+  /** The record's zone, which a script's `runs.at` is read in. */
+  tz: string;
   mint: () => string;
   outbox: (payload: ScriptRun) => string;
 };
@@ -201,9 +222,10 @@ export type ScriptDeps = {
  */
 export type ScriptRun = { script: string; version: number; input: unknown; door?: string };
 
-export const scriptDeps = (sql: Sql, at: { recordId: string; nowMs: number; mint: () => string }): ScriptDeps => ({
+export const scriptDeps = (sql: Sql, at: { recordId: string; nowMs: number; tz?: string; mint: () => string }): ScriptDeps => ({
   sql,
   ...at,
+  tz: at.tz ?? 'UTC',
   outbox: (payload) => enqueue(sql, at.mint, at.nowMs, 'script.run', payload),
 });
 
@@ -215,7 +237,15 @@ export function activeScript(sql: Sql, bare: string): ArmedScript | null {
   );
   if (!row) return null;
   const body = JSON.parse(row.body) as Partial<ScriptBody>;
-  return { script: bare, version: row.version, every: typeof body.runs?.every === 'string' ? body.runs.every : null };
+  return { script: bare, version: row.version, ...clockOfScript(body) };
+}
+
+/** A script body's clock: how often, and the time of day when it names one. */
+export function clockOfScript(body: Partial<ScriptBody> | Record<string, unknown>): { every: string | null; at: string | null } {
+  const runs = (body as { runs?: unknown }).runs;
+  const r = runs !== null && typeof runs === 'object' && !Array.isArray(runs) ? (runs as Record<string, unknown>) : {};
+  const every = typeof r.every === 'string' ? r.every : null;
+  return { every, at: every !== null && typeof r.at === 'string' && timeOf(r.at) !== null ? r.at : null };
 }
 
 /**
@@ -226,8 +256,11 @@ export function activeScript(sql: Sql, bare: string): ArmedScript | null {
  * scheduled run can take its place in the spread like every later one, and twenty scripts accepted from one pack
  * do not all start in the same wake.
  */
-export const firstDueMs = (recordId: string, bare: string, every: string | null, nowMs: number): number => {
+export const firstDueMs = (recordId: string, bare: string, every: string | null, nowMs: number, clock?: { at: string | null; tz: string }): number => {
   const ms = every === null ? null : intervalMs(every);
+  /* ON A TIME OF DAY, THE FIRST RUN IS THE NEXT TIME THE RECORD'S WALL CLOCK READS IT, with no jitter: a script the owner
+     pinned to nine runs at nine, and the spread is for clocks nobody pinned. */
+  if (ms !== null && clock !== undefined && clock.at !== null) return firstSlotMs({ at: clock.at }, clock.tz, nowMs);
   return ms === null ? nowMs : nowMs + jitterMs(recordId, `script:${bare}`, ms);
 };
 
@@ -238,10 +271,10 @@ export const firstDueMs = (recordId: string, bare: string, every: string | null,
  * starts a script without this row, and the row still exists because it is what pausing, resuming and the list read,
  * exactly as for a `call` only a rule runs.
  */
-export function fireScript(deps: ScriptDeps, row: { id: string; key: string }, script: ArmedScript | null): number | null {
+export function fireScript(deps: ScriptDeps, row: { id: string; key: string; payload?: string; due_at?: string }, script: ArmedScript | null): number | null {
   if (script === null || script.every === null) return null;
   const every = intervalMs(script.every) ?? FLOOR_MS;
-  const next = deps.nowMs + every + jitterMs(deps.recordId, `script:${script.script}`, every);
+  const next = script.at === null ? deps.nowMs + every + jitterMs(deps.recordId, `script:${script.script}`, every) : nextOnClock(deps, row, every, script.at);
 
   /* A RUN THAT HAS NOT FINISHED IS NOT QUEUED AGAIN, which `pull` learned by paying for two runs of one window. A
      script that overruns its hour must not have a second copy racing it to write the same series point. `failed` is
@@ -253,6 +286,31 @@ export function fireScript(deps: ScriptDeps, row: { id: string; key: string }, s
     script.script,
   );
   if (!busy) deps.outbox({ script: script.script, version: script.version, input: null });
+  return next;
+}
+
+/**
+ * The next run of a script pinned to a time of day, counted from its slot and kept on the row, as a connector's is
+ * (`fireAction` in `actions.ts`).
+ *
+ * FROM THE SLOT AND NOT FROM NOW, AND READ BACK ONTO THE WALL CLOCK EACH TIME (`nextSlotMs`), so a script at 09:00 stays
+ * at 09:00 across the night the clocks change, whichever way they go, and a drain that rings late does not walk it off
+ * its hour. The first fire has no slot kept and reads the instant it was armed for; slots that went by while the host
+ * was away are skipped, not run, as a connector's are: a script fetches now what it would have fetched then.
+ */
+function nextOnClock(deps: ScriptDeps, row: { id: string; payload?: string; due_at?: string }, everyMs: number, at: string): number {
+  let kept: Record<string, unknown> = {};
+  try {
+    const said: unknown = JSON.parse(row.payload ?? '{}');
+    if (said !== null && typeof said === 'object' && !Array.isArray(said)) kept = said as Record<string, unknown>;
+  } catch {
+    kept = {};
+  }
+  const stored = typeof kept.slot === 'string' ? Date.parse(kept.slot) : Number.NaN;
+  const due = row.due_at === undefined ? Number.NaN : Date.parse(row.due_at);
+  const slot = Number.isFinite(stored) ? stored : Number.isFinite(due) ? due : deps.nowMs;
+  const next = nextSlotMs({ slotMs: slot, nowMs: deps.nowMs, everyMs, clock: clockOf({ at }, deps.tz) });
+  deps.sql.exec('UPDATE schedule SET payload = ? WHERE id = ?', JSON.stringify({ ...kept, slot: instant(next) }), row.id);
   return next;
 }
 
@@ -269,8 +327,6 @@ export function fireScript(deps: ScriptDeps, row: { id: string; key: string }, s
  * of it here threw at import. It is read when a door is walked, by which time both modules have loaded.
  */
 export const doorRunsPerDay = (): number => RULE_CALLS_PER_DAY;
-
-const DAY_MS = 86_400_000;
 
 /** What a verified arrival hands the scripts on its door: the door, and the body and headers the host stored. */
 export type DoorArrival = { door: string; body: string; headers: Record<string, string> };

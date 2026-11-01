@@ -21,7 +21,7 @@
   import { TONES } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
   import { humanize, listName } from '$lib/record/names.ts';
-  import { canSave, faultsOf, idFrom, indent, sendDraft, tryDraft, words, type Door, type Draft, type Tried } from '$lib/record/script-draft.ts';
+  import { canSave, faultsOf, idFrom, indent, sendDraft, takesTime, tryDraft, words, type Door, type Draft, type Tried } from '$lib/record/script-draft.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
@@ -174,6 +174,15 @@
               </button>
             {/each}
           </Segmented>
+
+          <!-- A CLOCK OF WHOLE DAYS MAY BE PINNED TO A TIME OF DAY, in the record's zone; any other clock repeats from its last run. -->
+          {#if takesTime(draft.every)}
+            <label class="sub" for="script-at">{words.at}</label>
+            <div class="field field-time">
+              <input id="script-at" class="field-input" type="time" step="60" aria-describedby="script-at-help" bind:value={draft.at} />
+            </div>
+            <p class="help" id="script-at-help">{words.atHelp}</p>
+          {/if}
 
           {#if doorChoices !== null && doorChoices.length > 0}
             <p class="sub" id="script-door">{words.door}</p>
@@ -387,6 +396,11 @@
   .lines[data-wrong],
   .code[data-wrong] {
     box-shadow: inset 0 0 0 1.5px var(--red);
+  }
+
+  /* A TIME IS FIVE CHARACTERS, so its field is not the width of the form. */
+  .field-time {
+    max-inline-size: 10rem;
   }
 
   .switch-line {
