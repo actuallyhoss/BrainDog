@@ -1,6 +1,6 @@
 # Data Processing Addendum
 
-Last updated: 2026-10-31
+Last updated: 2026-11-01
 
 ## The short version
 
@@ -75,7 +75,7 @@ Telling you about a breach is not an admission of fault.
 ## When you leave
 
 - **At any time**, an owner can export the whole record, and delete it.
-- **When a plan ends**, the record becomes read-only and can still be exported. After 90 days it is deleted, unless it is paid for again. We email you before that happens.
+- **When a plan ends**, the record goes back to Free if it fits Free: one person on it, and no other free record of theirs. It stays as it was and keeps working. If it doesn't fit, the record becomes read-only and can still be exported. After 90 days it is deleted, unless it is paid for again. We email you before that happens.
 - **After deletion**, every other copy is deleted at once, and we keep one sealed final copy for 30 days. Then nothing of the record remains, in backups or anywhere else.
 
 We keep data longer only where the law requires it.

@@ -77,8 +77,11 @@ if (ENV !== 'alpha' && ENV !== 'production') stop('--env is alpha or production.
 const KEYCHAIN = `braindog-stripe-${MODE}`;
 
 function readKey() {
-  const r = spawnSync('security', ['find-generic-password', '-s', KEYCHAIN, '-w'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  if (r.status === 0 && r.stdout.trim() !== '') return { key: r.stdout.trim(), from: `keychain ${KEYCHAIN}` };
+  /* The item made by the command below (account braindog) wins over an older item of the same name. */
+  for (const account of [['-a', 'braindog'], []]) {
+    const r = spawnSync('security', ['find-generic-password', '-s', KEYCHAIN, ...account, '-w'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    if (r.status === 0 && r.stdout.trim() !== '') return { key: r.stdout.trim(), from: `keychain ${KEYCHAIN}` };
+  }
   const env = (process.env.STRIPE_SECRET_KEY ?? '').trim();
   if (env !== '') return { key: env, from: 'STRIPE_SECRET_KEY in the environment' };
   return null;

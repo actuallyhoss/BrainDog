@@ -395,14 +395,14 @@
         /* THE STRIPE PRICES OF THE TWO PLANS, `price_...`, one per environment. Empty, and that plan is not sold: Cloud
            at $12 a month and Cloud Plus at $29, the words in `HOSTED_PLANS` (`src/billing.ts`) and the choice in
            `apps/site/src/lib/plans.ts`. What a card is charged is whatever the Stripe price says. */
-        "STRIPE_PRICE_HOSTED": "price_1UKiDwPop5yzbTmmSBwLkuFa",
-        "STRIPE_PRICE_PLUS": "price_1UKiEhPop5yzbTmmOMMwOGJP",
-        "STRIPE_PRICE_PACK_100": "",
-        "STRIPE_PRICE_PACK_500": "",
+        "STRIPE_PRICE_HOSTED": "price_1UWyb4PzwPNEI3xxnKVyIRxZ",
+        "STRIPE_PRICE_PLUS": "price_1UWyb5PzwPNEI3xx2wLtpXmd",
+        "STRIPE_PRICE_PACK_100": "price_1UWyb6PzwPNEI3xxk4kmImtq",
+        "STRIPE_PRICE_PACK_500": "price_1UWyb7PzwPNEI3xxbhlFyxhN",
         /* EXTRA USAGE'S METERED PRICE AND ITS METER, and STRIPE TAX (`on` adds tax on Stripe's page). Empty is not sold / off.
            `node tools/ship/stripe.mjs` fills the price and the meter; STRIPE_TAX is the owner's switch once Stripe Tax is set up. */
-        "STRIPE_PRICE_EXTRA": "",
-        "STRIPE_METER_EXTRA": "",
+        "STRIPE_PRICE_EXTRA": "price_1UWyb9PzwPNEI3xx2babBohE",
+        "STRIPE_METER_EXTRA": "braindog_extra_cents",
         "STRIPE_TAX": "",
         /* WHO MAY MAKE AN ACCOUNT, AND THIS IS ITS ONE SWITCH (`src/launch.ts`). `open` is anybody, `invite` is a new
            address with a code from `/account/ops/invite`, and anything else, empty included, is closed. Open here as in
@@ -643,8 +643,8 @@
         "STRIPE_PRICE_PACK_500": "price_1UTR8VPop5yzbTmmnUXsyt9O",
         /* EXTRA USAGE'S METERED PRICE AND ITS METER, and STRIPE TAX (`on` adds tax on Stripe's page). Empty is not sold / off.
            `node tools/ship/stripe.mjs` fills the price and the meter; STRIPE_TAX is the owner's switch once Stripe Tax is set up. */
-        "STRIPE_PRICE_EXTRA": "",
-        "STRIPE_METER_EXTRA": "",
+        "STRIPE_PRICE_EXTRA": "price_1UWyboPop5yzbTmmvioaE1BT",
+        "STRIPE_METER_EXTRA": "braindog_extra_cents",
         "STRIPE_TAX": "",
         /* WHO MAY MAKE AN ACCOUNT, as alpha's comment says. OPEN TO STRANGERS FROM 8 OCTOBER:
            with no bot check keyed, the strikes are tightened until it is. The site's `LAUNCH.signup` mirrors this value,

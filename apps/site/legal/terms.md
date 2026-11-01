@@ -49,7 +49,7 @@ BrainDog is only offered as a hosted service at brain.dog. These terms cover tha
 
 ## Agents and keys
 
-You can connect AI agents, such as Claude, Codex, Cursor or any other MCP client, and your own programs.
+You can connect AI agents, such as Claude, Cursor or any other MCP client, and your own programs.
 
 - **You choose what each one can do.** A key can read, propose or write, and nothing more. You grant it, and you can take it back at any time in Settings.
 - **Keys don't last forever.** A key an app gets by asking you to approve it lasts 90 days. A key you make yourself lasts 90 days unless you choose another length, up to a year.
