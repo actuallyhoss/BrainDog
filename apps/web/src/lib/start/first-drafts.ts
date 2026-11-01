@@ -27,10 +27,11 @@
 import { AGENTS_PACK } from '@braindog/seed/packs';
 import { moduleOfList } from '@braindog/seed/packs/modules';
 import { moduleName } from '@braindog/seed/usecases/names';
-
 import type { TellList, Told } from '../tell/read.ts';
 import { PEOPLE } from '../who.ts';
 import type { SetupOffer, SetupReply } from './ask.ts';
+import { moduleDocument } from '@braindog/seed/usecases/install';
+
 import { entryOf, FILLABLE, listsOf, type List } from './lists.ts';
 
 /** One entry of a draft, as the record's capture takes it. */
@@ -56,7 +57,26 @@ export type FirstDraft = {
   day: string | null;
   /** Who read it: Tell's rules on the device, or the model. */
   by: 'rules' | 'model';
+  /**
+   * THE ONE FIELD IT STILL NEEDS, asked on the card in place ("Nadia 300 a month" needs the day it is next due): which
+   * entry, which field, its type, and the words Tell says it in. Keep waits for it. Absent when it needs nothing.
+   */
+  needs?: { row: number; field: string; type: 'day' | 'text' | 'number'; label: string };
 };
+
+/** The field types a draft may ask for in place, as the card can take them: a date, words, or a number. */
+const ASKABLE: Readonly<Record<string, 'day' | 'text' | 'number'>> = { day: 'day', text: 'text', int: 'number', decimal: 'number', number: 'number' };
+
+/** A draft with its one missing field filled, or the draft as it was where the value does not fit. */
+export function filled(d: FirstDraft, value: string): FirstDraft {
+  const n = d.needs;
+  if (n === undefined) return d;
+  const v = value.trim();
+  const fit = n.type === 'day' ? (/^\d{4}-\d{2}-\d{2}$/u.test(v) ? v : null) : n.type === 'number' ? (v !== '' && Number.isFinite(Number(v)) ? Number(v) : null) : v === '' ? null : v.slice(0, 500);
+  if (fit === null) return d;
+  const { needs: _done, ...rest } = d;
+  return { ...rest, ...(n.type === 'day' ? { day: fit as string } : {}), rows: d.rows.map((r, i) => (i === n.row ? { ...r, fields: { ...r.fields, [n.field]: fit } } : r)) };
+}
 
 /** The modules a BrainDog keeps, read off the lists it holds, in the order first met; the agents' lists are no module here. */
 export function modulesHeld(registers: readonly string[]): string[] {
@@ -193,7 +213,8 @@ export function draftsFromTold(read: readonly { said: string; told: Pick<Told, '
   for (const { said, told } of read) {
     if (ABOUT_ME.test(said) && !DOING.test(said)) continue;
     const rows = told.rows;
-    if (rows.length === 0 || rows.some((r) => r.missing.length > 0)) continue;
+    /* ONE FIELD STILL NEEDED IN THE WHOLE SENTENCE IS ASKED ON THE CARD; MORE IS NO DRAFT. */
+    if (rows.length === 0 || rows.reduce((n, r) => n + r.missing.length, 0) > 1) continue;
     /* THE GROUPS: rows joined by a `$row` that points from one to another. */
     const group = rows.map((_, i) => i);
     const root = (i: number): number => (group[i] === i ? i : (group[i] = root(group[i]!)));
@@ -218,6 +239,16 @@ export function draftsFromTold(read: readonly { said: string; told: Pick<Told, '
       const day = values.find(isDay) ?? null;
       const somebody = at.some((i) => rows[i]!.register === PEOPLE);
       if (money === null && day === null && !somebody && !DOING.test(said)) continue;
+      /* THE FIELD STILL NEEDED, by the list's own declaration (as Tell's `missingOf` reads it), where it is one the card can ask. */
+      let needs: FirstDraft['needs'];
+      const short = at.find((i) => rows[i]!.missing.length > 0);
+      if (short !== undefined) {
+        const sl = listOf(rows[short]!.register);
+        const f = sl?.fields.find((x) => x.required && rows[short]!.fields[x.id] === undefined && x.default === undefined && !x.retired);
+        const type = f ? ASKABLE[f.type] : undefined;
+        if (f === undefined || type === undefined) continue;
+        needs = { row: at.indexOf(short), field: f.id, type, label: rows[short]!.missing[0]! };
+      }
       seen.add(key);
       /* THE GROUP'S OWN ORDER, with each `$row` pointed again at its place in the group. */
       const place = new Map(at.map((i, n) => [i, n]));
@@ -238,6 +269,7 @@ export function draftsFromTold(read: readonly { said: string; told: Pick<Told, '
         amount: money ? { minor: money.amount, currency: money.currency } : null,
         day,
         by: 'rules',
+        ...(needs === undefined ? {} : { needs }),
       });
     }
   }
@@ -271,4 +303,31 @@ export function summaryOf(reply: Pick<SetupReply, 'summary'>): string | null {
   const s = reply.summary.replace(/\s+/gu, ' ').trim();
   if (s.length < 12 || s.length > 160) return null;
   return s;
+}
+
+/**
+ * THE LISTS TELL READS AGAINST, FROM THE MODULES' OWN DECLARATIONS, for a screen that has not learned them from the
+ * record yet (the made screen, which counts what waits on Today before Today has drawn). Today reads against the record's
+ * own (`tellLists`), with its people and entries, so its count can only be the same or smaller.
+ */
+export function tellListsOf(modules: readonly string[], today: string): TellList[] {
+  const out: TellList[] = [];
+  for (const m of modules) {
+    const doc = moduleDocument(null, m, { today });
+    for (const d of Array.isArray(doc?.declarations) ? (doc.declarations as Record<string, unknown>[]) : []) {
+      if (typeof d.register !== 'string' || !Array.isArray(d.fields) || out.some((l) => l.id === d.register)) continue;
+      const fields = d.fields as TellList['fields'];
+      out.push({
+        id: d.register,
+        name: typeof d.name === 'string' ? d.name : d.register,
+        ...(typeof d.one === 'string' ? { one: d.one } : {}),
+        title: typeof d.title === 'string' ? d.title : (fields[0]?.id ?? ''),
+        fields,
+        ...(typeof d.state === 'string' ? { state: d.state } : {}),
+        ...(Array.isArray(d.done) ? { done: d.done as string[] } : {}),
+        ...(typeof d.icon === 'string' ? { icon: d.icon } : {}),
+      });
+    }
+  }
+  return out;
 }
