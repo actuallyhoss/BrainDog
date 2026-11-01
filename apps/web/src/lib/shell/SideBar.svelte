@@ -476,7 +476,7 @@
     {@const open = foldOpen(key, list)}
     <li>
       <button type="button" class="s-row s-fold tap" aria-expanded={open} onclick={() => (folds[key] = !open)}>
-        <Icon name={icon} size="s" /><span class="s-name">{label}</span><span class="s-count num">{list.length}</span>
+        <Icon name={icon} size="m" /><span class="s-name">{label}</span><span class="s-count num">{list.length}</span>
         <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
       </button>
       {#if open}
@@ -491,7 +491,7 @@
 {#snippet link(l: SideLink, nested: boolean)}
   <li in:placeIn>
     <a class="s-row s-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={isLit(l.href) ? 'page' : undefined}>
-      {#if !nested}<Icon name={l.icon as IconName} size="s" />{/if}<span class="s-name" dir="auto">{l.label}</span>
+      {#if !nested}<Icon name={l.icon as IconName} size="m" />{/if}<span class="s-name" dir="auto">{l.label}</span>
       {#if l.count}<span class="s-count num">{l.count.toLocaleString('en-GB')}</span>{/if}
     </a>
   </li>
@@ -504,7 +504,7 @@
        and the places under it move down to make room (`placeIn`, the record forming). Never on the rail's first draw. -->
   <li class="s-item" in:placeIn>
     <a class="s-row s-place tap" href={at(p.href)} aria-current={isLit(p.href) ? 'page' : undefined}>
-      <Icon name={p.icon as IconName} size="s" /><span class="s-name">{p.label}</span>
+      <Icon name={p.icon as IconName} size="m" /><span class="s-name">{p.label}</span>
       {#if p.key === 'decide'}
         {#if n}<Count n={n} label={words.needs(n)} />{/if}
       {:else}
@@ -579,7 +579,7 @@
     <ul class="s-list">
       <li>
         <button type="button" class="s-row s-fold tap" aria-expanded={moreOpen} onclick={() => (folds.more = !moreOpen)}>
-          <Icon name="rows" size="s" /><span class="s-name">{words.more}</span><span class="s-count num">{model.more.length}</span>
+          <Icon name="rows" size="m" /><span class="s-name">{words.more}</span><span class="s-count num">{model.more.length}</span>
           <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
         </button>
         {#if moreOpen}
@@ -597,7 +597,7 @@
     {#each model.foot as l (l.href)}
       {#if l.href === '/settings' && pen}
         <li>
-          <a class="s-row s-link tap" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><Icon name="alert" size="s" /><span class="s-name">{pen.label}</span><span class="s-count">{words.review}</span></a>
+          <a class="s-row s-link tap" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><Icon name="alert" size="m" /><span class="s-name">{pen.label}</span><span class="s-count">{words.review}</span></a>
         </li>
       {/if}
       {@render link(l, false)}
@@ -823,7 +823,7 @@
     background: color-mix(in oklab, var(--ink) 6%, transparent);
   }
 
-  /* A ROW: 30 tall, a glyph or the project's mark, the name at 14/500, then its count, "late" or the dot at its end. */
+  /* A ROW: 30 tall, a 16px glyph or the project's 20px mark, the name at 14/500, then its count, "late" or the dot at its end. */
   .s-row,
   .s-part {
     display: flex;
@@ -848,6 +848,12 @@
   .s-row :global(.icon) {
     flex: none;
     color: var(--ink-3);
+  }
+
+  /* A PLACE'S GLYPH AT 16, AS A ROW'S IS EVERYWHERE (Look B), centred in the 20 a project's mark takes, so every name in
+     the rail starts on one edge. At 12 in the quiet ink they read as specks. */
+  .s-row > :global(.icon:first-child) {
+    margin-inline: 2px;
   }
 
   /* ROOM FOR THE PIN, which shows at the row's end under a pointer or on focus. */
