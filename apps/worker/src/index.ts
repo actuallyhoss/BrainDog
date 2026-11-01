@@ -2253,7 +2253,7 @@ export class Record$ extends DurableObject<Env> {
    * refuses to replace one.
    */
   async depositGrant(
-    args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown },
+    args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown; everywhere?: unknown },
     by: KeychainGrant | CallContext,
     hints: SessionHints,
     seal: (target: SealTarget) => Promise<Result<Sealed>>,

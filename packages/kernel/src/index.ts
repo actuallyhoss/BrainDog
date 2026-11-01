@@ -1186,7 +1186,7 @@ export type WriteContext = {
    * signed by the run it resolves to, `S42` (`30 §3`). Every other principal keeps `actor` as given,
    * which is how a person in a browser is never a run.
    */
-  principal?: { kind: 'person' | 'token' | 'system'; token?: string | undefined } | undefined;
+  principal?: { kind: 'person' | 'token' | 'system'; token?: string | undefined; widens?: true | undefined } | undefined;
   /** What an agent says about its run. Read for a token's write only. */
   session?: SessionHints | undefined;
   /**
@@ -4972,7 +4972,11 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (scoped) {
         const home = locate().project?.id ?? null;
         if (!current && scoped.type === 'ref' && patch[scoped.id] === undefined && home !== null) merged[scoped.id] = home;
-        if (!current || touched.includes(scoped.id)) {
+        /* AN EDIT BY AN AGENT THE OWNER LETS DO EVERYTHING WITHOUT ASKING (`widens`, set only by the record from its
+           `bypassOf`) may move a row out of its project, which is otherwise his: a key kept for one project is made one
+           for every project so a script can send it. Only where a row applies; a key's value is the keychain's and no
+           token reaches it, switch or not. A create still starts in its run's project. */
+        if ((!current || touched.includes(scoped.id)) && !(current && w.principal?.kind === 'token' && w.principal.widens === true && scoped.scope?.widen === 'person')) {
           const why = scopeFault(scoped, current?.fields[scoped.id], merged[scoped.id], !current, home, nameOf);
           if (why) return no<Entry>('FORBIDDEN', why, { at: scoped.id });
         }

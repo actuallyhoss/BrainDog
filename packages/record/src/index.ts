@@ -7787,7 +7787,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return ctx.principal.kind === 'token'
       ? {
           actor: agentOf(ctx),
-          principal: { kind: 'token', token: ctx.principal.id },
+          principal: { kind: 'token', token: ctx.principal.id, ...(ctx.bypass !== undefined && ctx.bypass === ctx.principal.person ? { widens: true as const } : {}) },
           ...(ctx.session === undefined ? {} : { session: ctx.session }),
           ...via,
         }
@@ -16709,9 +16709,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * in none, and it is signed by that run. A label already within that reach is refused, because replacing a value is
      * rotation and rotation still needs a keychain grant or the owner: a login token that leaks can add a key and can
      * never swap one.
+     *
+     * `everywhere: true` FILES A NEW KEY FOR EVERY PROJECT, which is a key of no project, the one a script running for
+     * the whole record can send (`keyOutOfScope`). A person may always say it, and a keychain grant only when it is
+     * already for every project. A login token's run puts its key in its own project, so it may say it only while the
+     * owner lets his agents do everything without asking (`bypassOf`), or when its run is in no project anyway.
      */
     async depositGrant(
-      args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown; sealed_under?: unknown },
+      args: { label?: unknown; opens?: unknown; kind?: unknown; project?: unknown; credential?: unknown; sealed_under?: unknown; everywhere?: unknown },
       by: KeychainGrant | CallContext,
       hints: SessionHints,
       seal: (target: SealTarget) => Promise<Result<Sealed>>,
@@ -16750,6 +16755,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const stop = keychain(ctx);
         if (stop) return { ok: false as const, refusal: stop };
       }
+      if (args?.everywhere !== undefined && typeof args.everywhere !== 'boolean')
+        return no('VALUE_MALFORMED', 'everywhere is true for a key every project may use, or left out.', { at: 'everywhere' });
+      const everywhere = args?.everywhere === true;
+      if (everywhere && typeof args.project === 'string' && args.project.trim() !== '')
+        return no('VALUE_MALFORMED', 'A key is kept for one project or for every project, so name a project or say everywhere, not both.', { at: 'everywhere' });
+      if (everywhere && grant !== null && grant.scope !== '*')
+        return no(
+          'FORBIDDEN',
+          'This keychain access is for one project, so a key it puts away is kept there. Put a key for every project under your own login (braindog keys put <label> --everywhere) or on the Keys screen.',
+          { at: 'everywhere' },
+        );
       if (agent) {
         const stop = guard(agent, 'write', KEYS);
         if (stop) return { ok: false as const, refusal: stop };
@@ -16786,7 +16802,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (!found.ok) return tail(found as Result<never>);
         const at = projectOf(found.value.run);
         const home = at === null ? null : (kernel.get(at)?.id ?? null);
-        reach = { scope: home ?? '*' };
+        /* A KEY FOR EVERY PROJECT FROM A RUN IN ONE is a key out of its run's reach, which is the owner's to allow: his
+           switch is that yes. Asked after the run is found, so the refusal can name the project it would have gone to. */
+        if (everywhere && home !== null && bypassOf(agent) === null)
+          return tail(
+            no<Deposited>(
+              'FORBIDDEN',
+              `This run is in ${kernel.titleOfRow(home) ?? 'its project'}, so a key it puts away is kept there. A key for every project is the owner's to make on the Keys screen, or yours while he lets agents do everything without asking.`,
+              { at: 'everywhere' },
+            ),
+          );
+        reach = { scope: everywhere ? '*' : (home ?? '*') };
         signer = found.value.spoken;
         const ran = (field: string): string | null => {
           const v = found.value.run.fields[field];
@@ -16839,7 +16865,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          for a key that already exists. */
       const asked = typeof args.project === 'string' ? args.project.trim() : '';
       const project =
-        reach !== null ? (reach.scope === '*' ? null : reach.scope) : asked === '' ? null : (kernel.get(asked)?.id ?? asked);
+        reach !== null ? (reach.scope === '*' ? null : reach.scope) : asked === '' || everywhere ? null : (kernel.get(asked)?.id ?? asked);
       const fields: Patch = {
         label,
         opens,

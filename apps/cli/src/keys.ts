@@ -336,7 +336,7 @@ function refusedLine(door: Door, answer: Answer): string {
  * Send one deposit. THE ONE REQUEST A VALUE LEAVES IN, and `secret-grep` names this function as its exemption. A
  * redirect is refused rather than followed, because following it would carry the value somewhere nobody chose.
  */
-async function depositOne(door: Door, ask: { label: string; opens?: string; kind?: string }, value: Plaintext, headers: Record<string, string>, io: KeysIo): Promise<Answer> {
+async function depositOne(door: Door, ask: { label: string; opens?: string; kind?: string; everywhere?: true }, value: Plaintext, headers: Record<string, string>, io: KeysIo): Promise<Answer> {
   const fetch = io.fetch ?? globalThis.fetch;
   const res = await fetch(`${door.base}/api/vault/deposit`, {
     method: 'POST',
@@ -353,7 +353,7 @@ async function depositOne(door: Door, ask: { label: string; opens?: string; kind
  * and answers `KEY_ASKED`; this says the record's sentence once and sends the same deposit again every three seconds for
  * up to two minutes, as `getWaiting` does for a key set to ask first, until it is kept or refused for another reason.
  */
-async function depositWaiting(door: Door, ask: { label: string; opens?: string; kind?: string }, value: Plaintext, headers: Record<string, string>, io: KeysIo): Promise<Answer> {
+async function depositWaiting(door: Door, ask: { label: string; opens?: string; kind?: string; everywhere?: true }, value: Plaintext, headers: Record<string, string>, io: KeysIo): Promise<Answer> {
   const asked = (a: Answer): string | null => {
     const r = a.body?.ok === false && isObject(a.body.refusal) ? a.body.refusal : null;
     return r?.code === 'KEY_ASKED' ? (typeof r.fix === 'string' && r.fix ? r.fix.slice(0, 300) : 'You were asked in BrainDog first.') : null;
@@ -545,7 +545,7 @@ export function variableOf(label: string): string {
     .replace(/^[0-9_]+/, '');
 }
 
-const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --keychain and --host, and reads the value from standard input, or asks for it at a terminal.';
+const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --everywhere, --keychain and --host, and reads the value from standard input, or asks for it at a terminal.';
 const USAGE_EXEC = 'braindog keys exec takes one label or credentials#n, --as, --keychain and --host, then -- and the command to run.';
 const USAGE_HEADERS = 'braindog keys headers takes one label or credentials#n, --as with the header name, --keychain and --host, and nothing else.';
 const USAGE_HELPER = 'braindog keys helper takes one label or credentials#n, --keychain and --host, and nothing else.';
@@ -574,7 +574,15 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
   const rest = cut === -1 ? all : all.slice(0, cut);
   const command = cut === -1 ? [] : all.slice(cut + 1);
 
-  let values: { opens?: string | undefined; kind?: string | undefined; vault?: string | undefined; keychain?: string | undefined; host?: string | undefined; as?: string | undefined };
+  let values: {
+    opens?: string | undefined;
+    kind?: string | undefined;
+    everywhere?: boolean | undefined;
+    vault?: string | undefined;
+    keychain?: string | undefined;
+    host?: string | undefined;
+    as?: string | undefined;
+  };
   let positionals: string[];
   try {
     ({ values, positionals } =
@@ -583,7 +591,7 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
             args: rest,
             allowPositionals: true,
             strict: true,
-            options: { opens: { type: 'string' }, kind: { type: 'string' }, vault: { type: 'string' }, keychain: { type: 'string' }, host: { type: 'string' } },
+            options: { opens: { type: 'string' }, kind: { type: 'string' }, everywhere: { type: 'boolean' }, vault: { type: 'string' }, keychain: { type: 'string' }, host: { type: 'string' } },
           })
         : verb === 'helper'
           ? parseArgs({ args: rest, allowPositionals: true, strict: true, options: { vault: { type: 'string' }, keychain: { type: 'string' }, host: { type: 'string' } } })
@@ -666,7 +674,9 @@ export async function keys(args: string[], io: KeysIo): Promise<number> {
   try {
     const headers = await io.headers(door.key);
     if (verb === 'put' && value !== null) {
-      const ask = { label: label.trim(), ...(values.opens ? { opens: values.opens } : {}), ...(values.kind ? { kind: values.kind } : {}) };
+      /* `--everywhere` KEEPS IT FOR EVERY PROJECT, as a script needs: under a login the record files a new key in the
+         session's project otherwise, and it says plainly when only the owner may make one for every project. */
+      const ask = { label: label.trim(), ...(values.opens ? { opens: values.opens } : {}), ...(values.kind ? { kind: values.kind } : {}), ...(values.everywhere === true ? { everywhere: true as const } : {}) };
       const answer = await depositWaiting(door, ask, value, headers, io);
       const kept = answer.body?.ok === true && isObject(answer.body.value) ? answer.body.value : null;
       if (kept === null || typeof kept.credential !== 'string') {
