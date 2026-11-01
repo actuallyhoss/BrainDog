@@ -61,6 +61,7 @@
     type Word,
   } from '../words-money.ts';
   import StateRow from './StateRow.svelte';
+  import TimeZone from './TimeZone.svelte';
 
   let props: AreaProps = $props();
   const shell = $derived(props.shell);
@@ -75,7 +76,7 @@
        rail's "Your things" keeps out of everywhere else. */
     lists: 'Your lists',
     listsHint: 'Clear a name to put the original back.',
-    money: 'Money',
+    money: 'Time and money',
     currency: 'Home currency',
     currencyWhy: 'Other currencies add up in this one, at the day’s rate.',
     noMoney: 'Turn on Money in Add-ons first.',
@@ -419,6 +420,8 @@
     {:else}
       <StateRow icon="money" title={words.currency} line={money ? (heldIn ? currencySaid(heldIn) : copy.currencyNone) : !on ? words.noMoney : keptIn ? words.kept(keptIn) : copy.currencyNone} />
     {/if}
+    <!-- AND THE TIME ZONE UNDER IT, as sign-up asks for the two together ("Time and money", audit 11-01 AP20). -->
+    <TimeZone {owner} />
   </Tile>
 
   {#if spoken && voice && all.length > 0}

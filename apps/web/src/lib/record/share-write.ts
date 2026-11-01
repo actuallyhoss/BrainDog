@@ -49,7 +49,7 @@ export const words = {
   shareEmptyMoney: 'With money left off, the link would show nothing.',
   shareCopy: 'Copy the link',
   shareCopied: 'Link copied',
-  shareUntil: (day: string) => `It works until ${day}, or until you close it in Settings, under People & sharing.`,
+  shareUntil: (day: string) => `It works until ${day}, or until you close it in Settings, under People and sharing.`,
   shareAnother: 'Make another link',
   shareDone: 'Done',
   shareAsking: 'Checking whether this BrainDog makes links',

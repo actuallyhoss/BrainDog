@@ -86,7 +86,7 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     icon: 'user',
     areas: [
       area('/settings/signing-in', 'Signing in', 'key', 'Passkeys, devices'),
-      area('/settings/notifications', 'Notifications', 'bell', 'Quiet hours, summaries, time zone'),
+      area('/settings/notifications', 'Notifications', 'bell', 'Quiet hours, summaries'),
       area('/settings/keyboard', 'Keyboard', 'keyboard', 'Shortcuts'),
     ],
   },
@@ -96,7 +96,7 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     areas: [
       area('/settings/appearance', 'Appearance', 'sun', 'Theme, density, phone bar'),
       area('/settings/navigation', 'Pages', 'rows', 'Sidebar and bar'),
-      area('/settings/words', 'Words and money', 'tag', 'List names, currency'),
+      area('/settings/words', 'Time and money', 'tag', 'Time zone, currency, list names'),
     ],
   },
   /* WHAT PLUGS INTO THIS BRAINDOG: the agents, the keys they are given, what comes in by mail and feed, and the add-ons. */
@@ -119,7 +119,7 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     title: 'People and billing',
     icon: 'users',
     areas: [
-      area('/settings/people', 'People & sharing', 'user-plus', 'Colleagues, invites, shares'),
+      area('/settings/people', 'People and sharing', 'user-plus', 'Colleagues, invites, shares'),
       area('/settings/billing', 'Billing', 'money', 'Plan'),
     ],
     outside: [{ label: 'Usage', href: '/usage', icon: 'observe', line: 'This month', before: 'billing' }],

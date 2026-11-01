@@ -174,7 +174,7 @@ test('Money counts as on when its add-on is on, even one that keeps no currency 
 });
 
 test('the area is on the index, in the record\'s group, with a mark of its own, and the page draws it', () => {
-  assert.equal(AREAS.get('words')?.label, 'Words and money');
+  assert.equal(AREAS.get('words')?.label, 'Time and money');
   assert.ok(DEFAULT_GROUPS.find((g) => g.title === 'How it looks')?.areas.some((a) => a.id === 'words'), 'Words is under How it looks');
   const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /area === 'words'\}\s*<Words \{shell\} \{area\} \/>/u);
