@@ -14,6 +14,11 @@
  * the record has none (`putBackOf`, as Today's late lines do).
  *
  * LOADED ON THE FIRST SUCH LINE, never with Today.
+ *
+ * AND BY ITS NAME OR WHOSE IT IS (audit 1 Nov, AP6): "Rent paid", "Salma's order is paid" and "Rent 12,000 just paid"
+ * found nothing, and the last added a second 12,000 while Rent stayed due. A line that says "paid" and no number asks
+ * here for the open entries of those same lists (`openToMark`), each with the day it is due, what it comes to, who it is
+ * linked to and which way its money goes, so the reader can match "Rent" or "Salma's order" and say which it marks.
  */
 
 import { createClient } from '@braindog/client';
@@ -21,14 +26,15 @@ import { createClient } from '@braindog/client';
 import type { Change } from '../data/optimistic.ts';
 import { putBackOf } from '../record/field-write.ts';
 import { REGISTERS } from '../record/held.ts';
-import type { Fields } from '../record/schema.ts';
+import { isMoney, type Fields } from '../record/schema.ts';
+import { PEOPLE } from '../who.ts';
 import { markKind, namedAs, type Open, type TellChange, type TellList } from './read.ts';
 
 /** The most entries one list is asked for by the number in their name, before the ones whose name starts with it are kept:
     "13 mugs" and "Order 23" hold a 3 too, so five could leave the one out (RQ1). */
 const MOST = 25;
 
-type Row = { seq?: unknown; fields?: Record<string, unknown> };
+type Row = { id?: unknown; seq?: unknown; fields?: Record<string, unknown> };
 const rowsOf = (v: unknown): Row[] => ((v as { rows?: unknown } | null)?.rows as Row[] | undefined) ?? [];
 
 /** The open entries of the lists that keep a bill, an invoice or an order paid, known by `n`: kept under it, or named by it. */
@@ -63,6 +69,75 @@ export async function openNumbered(base: string, lists: readonly TellList[], n: 
       if (one && open(one.fields) && !seen.has(n)) out.push({ register: l.id, seq: n, name: named(one.fields) });
     }),
   );
+  return out;
+}
+
+/** The fields an open entry is said by beside its name: the day it is due, what it comes to, who, and which way. */
+function partsOf(l: TellList) {
+  const live = l.fields.filter((f) => f.retired !== true);
+  const due = live.find((f) => f.type === 'day' && f.deadline === true);
+  /* WHAT IT COMES TO, never what is paid of it so far: a required amount, else one called its total or amount. */
+  const amount = live.find((f) => f.type === 'money' && f.required === true) ?? live.find((f) => f.type === 'money' && /total|amount|price/iu.test(`${f.id} ${f.label ?? ''}`));
+  const by = live.find((f) => f.type === 'ref' && f.to === PEOPLE);
+  const way = live.find((f) => f.type === 'enum' && f.values?.includes('owed_to_me') === true && f.values.includes('owed_by_me'));
+  return { due, amount, by, way };
+}
+
+/** The most open entries one list is asked for when a line says "paid" with no number: the soonest due first. */
+const MOST_OPEN = 40;
+
+/**
+ * THE OPEN ENTRIES A LINE THAT SAYS "PAID" COULD MEAN (AP6): every open bill, invoice and order, the soonest due first,
+ * with who each is linked to by name where People lets this reader see them. Asked once a line says "paid", never with
+ * Today.
+ */
+export async function openToMark(base: string, lists: readonly TellList[]): Promise<Open[]> {
+  const client = createClient({ base });
+  const out: Open[] = [];
+  /* Whose each is, by the People entry its link names: by its number where the link says one, else by its id. */
+  const byId = new Map<string, Open[]>();
+  await Promise.all(
+    lists.map(async (l) => {
+      const kind = markKind(l);
+      if (!l.state || kind === null) return;
+      const state = l.state;
+      const done = l.done ?? [];
+      const { due, amount, by, way } = partsOf(l);
+      const fields = [l.title, state, ...[due, amount, by, way].flatMap((f) => (f ? [f.id] : []))];
+      const got = await client
+        .list({ register: l.id, where: { field: state, not_in: [...done] } as never, limit: MOST_OPEN, fields, short: true, ...(due ? { order: [{ field: due.id, dir: 'asc' as const }] } : {}) })
+        .catch(() => null);
+      for (const r of got?.ok ? rowsOf(got.value) : []) {
+        const f = r.fields ?? {};
+        if (typeof r.seq !== 'number' || done.includes(String(f[state] ?? ''))) continue;
+        const title = f[l.title];
+        const e: Open = { register: l.id, seq: r.seq, name: typeof title === 'string' ? title : '' };
+        const day = due ? f[due.id] : undefined;
+        if (typeof day === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(day)) e.due = day.slice(0, 10);
+        const sum = amount ? f[amount.id] : undefined;
+        if (isMoney(sum)) e.amount = { amount: sum.amount, currency: sum.currency };
+        if (kind === 'order') e.toMe = true;
+        else if (way && (f[way.id] === 'owed_to_me' || f[way.id] === 'owed_by_me')) e.toMe = f[way.id] === 'owed_to_me';
+        const link = by ? f[by.id] : undefined;
+        const n = typeof link === 'number' ? link : typeof link === 'string' ? /^(?:[a-z][a-z0-9_]*#)?(\d+)$/u.exec(link.trim())?.[1] : undefined;
+        if (n !== undefined) e.by = { seq: Number(n), name: '' };
+        else if (typeof link === 'string' && link.trim() !== '') byId.set(link.trim(), [...(byId.get(link.trim()) ?? []), e]);
+        out.push(e);
+      }
+    }),
+  );
+  const ids = [...byId.keys()];
+  const people = lists.find((l) => l.id === PEOPLE);
+  if (ids.length > 0 && people) {
+    const got = await client
+      .list({ register: PEOPLE, where: { field: 'id', in: ids } as never, limit: ids.length, fields: [people.title], short: true })
+      .catch(() => null);
+    for (const r of got?.ok ? rowsOf(got.value) : []) {
+      const name = r.fields?.[people.title];
+      if (typeof r.id !== 'string' || typeof r.seq !== 'number') continue;
+      for (const e of byId.get(r.id) ?? []) e.by = { seq: r.seq, name: typeof name === 'string' ? name : '' };
+    }
+  }
   return out;
 }
 

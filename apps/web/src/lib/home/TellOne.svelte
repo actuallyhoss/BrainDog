@@ -114,6 +114,10 @@
     todoOn: 'Start a to-do list and add it',
     todoTurning: 'Starting a to-do list…',
     todoTurned: 'Started a to-do list in Work',
+    /* "NEW PROJECT: …" WHERE NO PROJECTS ARE KEPT (AP7): one press starts Projects and adds it there. */
+    projectsOn: 'Start Projects and add it',
+    projectsTurning: 'Starting Projects…',
+    projectsTurned: 'Started Projects',
   };
 
   let typed = $state('');
@@ -137,9 +141,14 @@
   /* "INVOICE 1042 PAID": THE OPEN BILL, INVOICE OR ORDER KNOWN BY THAT NUMBER is asked of the record once a line names one
      and says paid, never with Today, and the line is read again with it (`tell/numbered.ts`). */
   const NUMBERED = /^\s*(?:order|invoice|inv|bill)\s*(?:#|no\.?|number)?\s*(\d{1,9})\b.*\bpaid\b/iu;
-  const numberSaid = $derived(NUMBERED.exec(typed)?.[1] ?? '');
+  /* AND ANY LINE THAT SAYS "PAID" (AP6): "Rent paid", "Salma's order is paid". The open ones are asked for once, under
+     `PAID`, and the line is read against them while it still says paid. */
+  const PAID = 'paid';
+  const numberSaid = $derived(NUMBERED.exec(typed)?.[1] ?? (/\bpaid\b/iu.test(typed) ? PAID : ''));
   let numbered = $state.raw<{ n: string; open: readonly Open[] } | null>(null);
   let asking = '';
+  /* STILL ASKING: Add waits a moment, so a quick press never adds a second payment for a bill it was about to find. */
+  const looking = $derived(numberSaid !== '' && numbered?.n !== numberSaid);
   $effect(() => {
     const n = numberSaid;
     /* THE LINE CHANGED, SO WHAT WAS READ FOR IT GOES (RQ5): the same words typed again later are asked of the record again. */
@@ -152,10 +161,11 @@
     asking = n;
     const lists = options.lists;
     void import('$lib/tell/numbered.ts')
-      .then((m) => m.openNumbered(apiBase(), lists, Number(n)))
+      .then((m) => (n === PAID ? m.openToMark(apiBase(), lists) : m.openNumbered(apiBase(), lists, Number(n))))
       .then(
         (open) => void (asking === n && (numbered = { n, open })),
-        () => void (asking === n && (asking = '')),
+        /* A FAILED ASK READS THE LINE AS BEFORE, with nothing open to mark, and the next line asks again. */
+        () => void (asking === n && (numbered = { n, open: [] })),
       );
   });
   const heard = $derived(numbered !== null && numbered.n === numberSaid ? { ...options, open: numbered.open } : options);
@@ -222,6 +232,7 @@
 
   function add(e: SubmitEvent) {
     e.preventDefault();
+    if (looking) return;
     void send(ready, rows, readyAt(rows));
   }
 
@@ -363,8 +374,12 @@
       if ('fix' in out) moneyFix = out.fix;
       else {
         const go = readyRows(out.told.rows);
-        /* ONE PRESS, ONE TOAST: "Turned on Money. Added …" names Money, so the rail does not say it came as well. */
-        if (go.length > 0) toasts.named(MONEY_PLACE);
+        /* ONE PRESS, ONE TOAST: "Turned on Money. Added …" names Money, so the rail does not say it came as well, nor any
+           place that came with it (AP17: "Agents is in your sidebar now" over "Turned on Money"). With nothing added yet,
+           the one toast says Money is on. */
+        toasts.named(MONEY_PLACE);
+        toasts.hush();
+        if (go.length === 0) toasts.push(say.moneyTurned);
         /* AND A LINE THAT DID NOT GO IN IS SAID ON THE CARD, still in the box, for Add once the page knows Money (RP1). */
         if (go.length > 0) {
           if (!(await send(go, out.told.rows, readyAt(out.told.rows), say.moneyTurned, out.lists))) moneyFix = say.moneyNotAdded;
@@ -441,9 +456,12 @@
       else {
         const go = readyRows(out.told.rows);
         /* ONE PRESS, ONE TOAST, as Money's: "Started a to-do list in Work" names Work, so the rail does not say it came. */
-        if (go.length > 0) for (const href of ['/?work', ...go.map((r) => `/r/${r.register}`)]) toasts.named(href);
+        toasts.hush();
         if (go.length > 0) await send(go, out.told.rows, readyAt(out.told.rows), say.todoTurned, out.lists);
-        else todoFix = out.told.why ?? null;
+        else {
+          toasts.push(say.todoTurned);
+          todoFix = out.told.why ?? null;
+        }
       }
       await invalidateAll();
     } finally {
@@ -451,12 +469,46 @@
     }
   }
 
+  /* ── starting Projects for "New project: …" (AP7) ──
+     As the to-do list above: Projects is turned on, the same words read again against the lists it brought, and the
+     project added under one batch with the one Undo. Projects stays on after an Undo; the project is what is taken back. */
+  let projectsWait = $state(false);
+  let projectsFix = $state<string | null>(null);
+  async function projectsOn() {
+    if (sending || projectsWait || reader === null) return;
+    projectsFix = null;
+    projectsWait = true;
+    const words = typed;
+    try {
+      const { moduleThenRead, PROJECTS_MODULE, PROJECTS_SAID } = await import('$lib/tell/todo-on.ts');
+      const out = await moduleThenRead(apiBase(), PROJECTS_MODULE, PROJECTS_SAID, words, options, reader);
+      if ('fix' in out) projectsFix = out.fix;
+      else {
+        const go = readyRows(out.told.rows);
+        toasts.hush();
+        if (go.length > 0) await send(go, out.told.rows, readyAt(out.told.rows), say.projectsTurned, out.lists);
+        else {
+          toasts.push(say.projectsTurned);
+          projectsFix = out.told.why ?? null;
+        }
+      }
+      await invalidateAll();
+    } catch {
+      projectsFix = PROJECTS_FAILED;
+    } finally {
+      projectsWait = false;
+    }
+  }
+  /** Said when the press's own code did not load, as Money's and Tell's own presses say it (RP1). */
+  const PROJECTS_FAILED = "Couldn't start Projects. Try again.";
+
   /* CMD OR CTRL AND ENTER ADDS (AH20): Enter alone is a new line, for a pasted message. */
   function keyed(e: KeyboardEvent) {
     if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return;
     e.preventDefault();
+    if (looking) return;
     if (ready.length > 0) void send(ready, rows, readyAt(rows));
-    else if (rows.length === 0 && offers.length === 1 && !told?.about && !told?.needsTodo) addOffer(offers[0]!);
+    else if (rows.length === 0 && offers.length === 1 && !told?.about && !told?.needsTodo && !told?.needsProjects) addOffer(offers[0]!);
     else if (rows.length === 0 && told?.change) void changeOn(told.change);
     /* AND NEVER TURNS MONEY ON (RN3): ⌘↵ adds a line where a home for it exists; a module goes on by its own button. */
   }
@@ -501,7 +553,7 @@
           {/each}
         </ul>
         {#if told && told.left.length > 0}<p class="tell-one-quiet">{say.left(told.left)}</p>{/if}
-        <Button weight="primary" type="submit" disabled={sending || ready.length === 0}>{ready.length < rows.length && ready.length > 0 ? say.addReady(ready.length) : ready.length <= 1 ? say.addOne : say.addAll(ready.length)}</Button>
+        <Button weight="primary" type="submit" disabled={sending || looking || ready.length === 0}>{ready.length < rows.length && ready.length > 0 ? say.addReady(ready.length) : ready.length <= 1 ? say.addOne : say.addAll(ready.length)}</Button>
       </div>
     {/if}
     {#if told?.change}
@@ -511,6 +563,17 @@
         <p class="tell-one-why">{change.ask}</p>
         <div class="tell-one-offers">
           <Button weight={rows.length === 0 ? 'primary' : 'quiet'} disabled={sending} onclick={() => void changeOn(change)}>{change.mark ? say.markIt : say.keepOn([change, ...(change.also ?? [])].map((k) => k.name))}</Button>
+        </div>
+      </div>
+    {/if}
+    {#if told?.which}
+      <!-- TWO OPEN ENTRIES THE LINE COULD MEAN (AP6): which was paid is asked, each its own press, none chosen for him. -->
+      <div class="tell-one-becomes" aria-live="polite">
+        <p class="tell-one-why">{told.which.ask}</p>
+        <div class="tell-one-offers">
+          {#each told.which.marks as mark (`${mark.register}#${mark.seq}`)}
+            <Button weight="quiet" disabled={sending} onclick={() => void changeOn(mark)}>{mark.label ?? mark.name}</Button>
+          {/each}
         </div>
       </div>
     {/if}
@@ -544,20 +607,22 @@
           </div>
           {#if moneyFix}<p class="tell-one-needs" role="alert">{moneyFix}</p>{/if}
         {/if}
-        {#if told.about || offers.length > 0 || told.needsTodo}
+        {#if told.about || offers.length > 0 || told.needsTodo || told.needsProjects}
           <div class="tell-one-offers">
+            {#if told.needsProjects}<Button weight="primary" disabled={sending || projectsWait} onclick={() => void projectsOn()}>{projectsWait ? say.projectsTurning : say.projectsOn}</Button>{/if}
             {#if told.needsTodo}<Button weight="primary" disabled={sending || todoWait} onclick={() => void todoOn()}>{todoWait ? say.todoTurning : say.todoOn}</Button>{/if}
             {#if told.about}<Button weight="primary" href={at(told.about.href)}>{say.openPage(told.about.name)}</Button>{/if}
             {#each offers as offer (offer.register)}
-              <Button weight={offers.length === 1 && !told.about && !told.needsTodo ? 'primary' : 'quiet'} disabled={sending} onclick={() => addOffer(offer)}>{say.addTo(listName(offer.register))}</Button>
+              <Button weight={offers.length === 1 && !told.about && !told.needsTodo && !told.needsProjects ? 'primary' : 'quiet'} disabled={sending} onclick={() => addOffer(offer)}>{say.addTo(listName(offer.register))}</Button>
             {/each}
           </div>
           {#if todoFix}<p class="tell-one-needs" role="alert">{todoFix}</p>{/if}
+          {#if projectsFix}<p class="tell-one-needs" role="alert">{projectsFix}</p>{/if}
         {/if}
       </div>
     {/if}
   </form>
-  {#if !slim || rows.length > 0 || offers.length > 0 || told?.needsMoney || told?.needsTodo || told?.change}
+  {#if !slim || rows.length > 0 || offers.length > 0 || told?.needsMoney || told?.needsTodo || told?.needsProjects || told?.change || told?.which}
     <p class="tell-one-quiet">{say.notYet} {ready.length > 1 ? say.undoAll(ready.length) : ready.length === 1 ? say.undoOne : say.undoAny}</p>
   {/if}
   {#if last.length > 0 && typed.trim() === ''}
