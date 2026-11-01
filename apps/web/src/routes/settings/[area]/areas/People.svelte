@@ -32,6 +32,7 @@
   import Face from '$lib/ui/Face.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
   import { namesHeld, personSaid, secondSaid } from '../people-said.ts';
   import { placeGroups, type PlaceGroup } from '../../invite-places.ts';
   import { hostedHere, readBilling } from '../../billing.ts';
@@ -278,6 +279,8 @@
     { reach: 'lists', said: copy.inviteChosenLists },
   ];
   let inviting = $state(false);
+  /* THE INVITE FORM IS A SHEET (G20): the page leads with who is in, and "Invite a person" is the tile's action. */
+  let inviteOpen = $state(false);
   /* WHAT THE FORM STILL NEEDS, said under the button when it is pressed: the button is
      never drawn grey for a field left empty, which read as broken; it says what is missing and goes to it. */
   let inviteWhy = $state('');
@@ -349,6 +352,8 @@
       return;
     }
     if (await mint(() => inviteEmail(apiBase(), email, reach))) {
+      /* THE SHEET CLOSES ON THE LINK, which the tile shows once, beside the invitations waiting. */
+      inviteOpen = false;
       inviteTo = '';
       inviteLists = {};
       /* BACK TO ALL OF IT, so the link made is under a short form and not under thirty lists. */
@@ -787,98 +792,9 @@
 </Tile>
 {:else if anOwner}
 <Tile icon="user-plus" class="section" data-surface="tile" title={copy.inviteTitle}>
+  {#snippet actions()}<Button onclick={() => (inviteOpen = true)}><Icon name="plus" size="s" />{copy.invitePerson}</Button>{/snippet}
   <div class="section-body">
-    <!-- NO MAIL LEAVES THIS HOST, and the line says so beside the control rather than after the press: the owner sends
-         the link themselves, and somebody expecting an email would wait for one that never comes. -->
-    <p class="hint">{copy.inviteHow} {copy.inviteNoMail}</p>
-    <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
-         row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->
-    <form class="code-form invite-form" onsubmit={makeInvite}>
-      <label class="ex-label" for="invite-email">{copy.inviteEmailLabel}</label>
-      <div class="field field-lg invite-email">
-        <input
-          class="field-input"
-          id="invite-email"
-          type="email"
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck="false"
-          bind:value={inviteTo}
-          oninput={() => (inviteWhy = '')}
-        />
-      </div>
-      <Segmented class="reach" role="group" aria-label={copy.inviteReachLabel}>
-        {#each REACHES as r (r.reach)}
-          <button
-            type="button"
-            class="segment"
-            data-on={inviteReach === r.reach ? '' : undefined}
-            aria-pressed={inviteReach === r.reach ? 'true' : 'false'}
-            onclick={() => (inviteReach = r.reach)}
-          >{r.said}</button>
-        {/each}
-      </Segmented>
-      {#if inviteReach === 'record'}
-        <label class="ex-field">
-          <span class="ex-label">{copy.inviteLevelLabel}</span>
-          <select class="ex-select" bind:value={inviteLevel}>
-            {#each LEVELS as level}<option value={level}>{roleSaid(level)}</option>{/each}
-          </select>
-        </label>
-        <!-- WHAT A WHOLE-RECORD "ADDS ONLY" LEAVES OUT, said before the link is made (`20 §1`): the record keeps an
-             appender off Keys, People and any list declared for owners, and an owner who meant them to add keys would
-             otherwise learn it from the colleague. -->
-        {#if inviteLevel === 'append'}<p class="hint">{copy.inviteAddsOnlyLeavesOut}</p>{/if}
-      {:else}
-        <p class="hint">{copy.inviteListsHint}</p>
-        <!-- A ROW PER PLACE (Money, Projects, Work), EACH WITH ITS SELECT, which sets every list in it: "Projects, and not
-             Money" is two presses. "List by list" opens the place's own lists, each with its select, for the rest. The
-             three levels one list honours (`LIST_LEVELS`), and Nothing first, because nothing is what every list gives
-             until the owner says. -->
-        <ul class="invite-lists">
-          {#each groups as g (g.key)}
-            {@const at = groupLevel(g)}
-            <li class="invite-place">
-              <span class="invite-place-head">
-                <label class="invite-list-name invite-place-name" for="invite-place-{g.key}">{g.name}</label>
-                {#if g.lists.length > 1}
-                  <button type="button" class="invite-each" aria-expanded={openGroups.includes(g.key) ? 'true' : 'false'} onclick={() => toggleGroup(g.key)}>
-                    {openGroups.includes(g.key) ? copy.inviteListsFold : copy.inviteListsEach(g.lists.length)}
-                  </button>
-                {/if}
-              </span>
-              <select class="ex-select" id="invite-place-{g.key}" value={at} onchange={(e) => pickGroupLevel(g, e.currentTarget.value)}>
-                {#if at === MIXED}<option value={MIXED} disabled>{copy.inviteListsMixed}</option>{/if}
-                <option value="">{copy.inviteListNothing}</option>
-                {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
-              </select>
-            </li>
-            {#if openGroups.includes(g.key)}
-              {#each g.lists as l (l.id)}
-                <li class="invite-one">
-                  <label class="invite-list-name" for="invite-list-{l.id}">{l.name}</label>
-                  <select
-                    class="ex-select"
-                    id="invite-list-{l.id}"
-                    value={inviteLists[l.id] ?? ''}
-                    onchange={(e) => pickListLevel(l.id, e.currentTarget.value)}
-                  >
-                    <option value="">{copy.inviteListNothing}</option>
-                    {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
-                  </select>
-                </li>
-              {/each}
-            {/if}
-          {/each}
-        </ul>
-      {/if}
-      <div class="invite-send">
-        <Button weight="primary" type="submit" disabled={inviting} aria-busy={inviting}>
-          <Icon name="plus" size="s" />{inviting ? copy.inviteMaking : copy.invitePerson}
-        </Button>
-        {#if inviteWhy}<p class="invite-why" role="alert">{inviteWhy}</p>{/if}
-      </div>
-    </form>
+    {#if !madeLink && waitingInvites.length === 0}<p class="hint">{copy.invitesNone}</p>{/if}
 
     {#if madeLink}
       <!-- ONCE. The record keeps the hash and hands back the only copy of the link, so leaving this screen is
@@ -917,6 +833,100 @@
     {/if}
   </div>
 </Tile>
+<!-- THE FORM IN ITS SHEET (G20): the address, what it opens, the level or the lists, then the button. -->
+<Sheet bind:open={inviteOpen} title={copy.invitePerson}>
+  <!-- NO MAIL LEAVES THIS HOST, and the line says so beside the control rather than after the press: the owner sends
+       the link themselves, and somebody expecting an email would wait for one that never comes. -->
+  <p class="hint">{copy.inviteHow} {copy.inviteNoMail}</p>
+  <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
+       row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->
+  <form class="code-form invite-form" onsubmit={makeInvite}>
+    <label class="ex-label" for="invite-email">{copy.inviteEmailLabel}</label>
+    <div class="field field-lg invite-email">
+      <input
+        class="field-input"
+        id="invite-email"
+        type="email"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        bind:value={inviteTo}
+        oninput={() => (inviteWhy = '')}
+      />
+    </div>
+    <Segmented class="reach" role="group" aria-label={copy.inviteReachLabel}>
+      {#each REACHES as r (r.reach)}
+        <button
+          type="button"
+          class="segment"
+          data-on={inviteReach === r.reach ? '' : undefined}
+          aria-pressed={inviteReach === r.reach ? 'true' : 'false'}
+          onclick={() => (inviteReach = r.reach)}
+        >{r.said}</button>
+      {/each}
+    </Segmented>
+    {#if inviteReach === 'record'}
+      <label class="ex-field">
+        <span class="ex-label">{copy.inviteLevelLabel}</span>
+        <select class="ex-select" bind:value={inviteLevel}>
+          {#each LEVELS as level}<option value={level}>{roleSaid(level)}</option>{/each}
+        </select>
+      </label>
+      <!-- WHAT A WHOLE-RECORD "ADDS ONLY" LEAVES OUT, said before the link is made (`20 §1`): the record keeps an
+           appender off Keys, People and any list declared for owners, and an owner who meant them to add keys would
+           otherwise learn it from the colleague. -->
+      {#if inviteLevel === 'append'}<p class="hint">{copy.inviteAddsOnlyLeavesOut}</p>{/if}
+    {:else}
+      <p class="hint">{copy.inviteListsHint}</p>
+      <!-- A ROW PER PLACE (Money, Projects, Work), EACH WITH ITS SELECT, which sets every list in it: "Projects, and not
+           Money" is two presses. "List by list" opens the place's own lists, each with its select, for the rest. The
+           three levels one list honours (`LIST_LEVELS`), and Nothing first, because nothing is what every list gives
+           until the owner says. -->
+      <ul class="invite-lists">
+        {#each groups as g (g.key)}
+          {@const at = groupLevel(g)}
+          <li class="invite-place">
+            <span class="invite-place-head">
+              <label class="invite-list-name invite-place-name" for="invite-place-{g.key}">{g.name}</label>
+              {#if g.lists.length > 1}
+                <button type="button" class="invite-each" aria-expanded={openGroups.includes(g.key) ? 'true' : 'false'} onclick={() => toggleGroup(g.key)}>
+                  {openGroups.includes(g.key) ? copy.inviteListsFold : copy.inviteListsEach(g.lists.length)}
+                </button>
+              {/if}
+            </span>
+            <select class="ex-select" id="invite-place-{g.key}" value={at} onchange={(e) => pickGroupLevel(g, e.currentTarget.value)}>
+              {#if at === MIXED}<option value={MIXED} disabled>{copy.inviteListsMixed}</option>{/if}
+              <option value="">{copy.inviteListNothing}</option>
+              {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
+            </select>
+          </li>
+          {#if openGroups.includes(g.key)}
+            {#each g.lists as l (l.id)}
+              <li class="invite-one">
+                <label class="invite-list-name" for="invite-list-{l.id}">{l.name}</label>
+                <select
+                  class="ex-select"
+                  id="invite-list-{l.id}"
+                  value={inviteLists[l.id] ?? ''}
+                  onchange={(e) => pickListLevel(l.id, e.currentTarget.value)}
+                >
+                  <option value="">{copy.inviteListNothing}</option>
+                  {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
+                </select>
+              </li>
+            {/each}
+          {/if}
+        {/each}
+      </ul>
+    {/if}
+    <div class="invite-send">
+      <Button weight="primary" type="submit" disabled={inviting} aria-busy={inviting}>
+        <Icon name="plus" size="s" />{inviting ? copy.inviteMaking : copy.invitePerson}
+      </Button>
+      {#if inviteWhy}<p class="invite-why" role="alert">{inviteWhy}</p>{/if}
+    </div>
+  </form>
+</Sheet>
 {/if}
 
 <!-- THE READ-ONLY LINKS ARE IN SHARING'S SHARED CARD, and "Read what you already have" is under Tidy up (audit
