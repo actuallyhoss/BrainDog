@@ -97,6 +97,9 @@
   import { Picked } from './picked.svelte.ts';
   import { RowHost } from './row-host.svelte.ts';
   import { blockKeys } from './recompose.ts';
+  import { heldOrder } from './hold-order.ts';
+  import { wroteAt } from '@braindog/client';
+  import { ms, play, still } from '$lib/motion/index.ts';
   import { pageBoards } from './page-boards.svelte.ts';
   import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
   import Icon from '$lib/ui/Icon.svelte';
@@ -189,7 +192,23 @@
   });
 
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
-  const live = $derived(got?.from === 'live' ? got : null);
+  /* WHAT THE READER DID STAYS WHERE THEY DID IT (`hold-order.ts`): once this tab has written during a visit to a page,
+     the page keeps the order its blocks were drawn in until the reader opens it again (another page or another filter).
+     `drawn` is not state: it is what the last answer was drawn as, read when the next one arrives. */
+  let drawn: { visit: string; keys: string[]; since: number } | null = null;
+  const visit = $derived(`${slug}?${route.url.search}`);
+  const live = $derived.by(() => {
+    if (got?.from !== 'live') return null;
+    const before = drawn;
+    if (mode !== 'page' || before === null || before.visit !== visit || wroteAt() < before.since) return got;
+    const blocks = heldOrder(got.page.blocks, blockKeys(got.page.blocks), before.keys);
+    return blocks === got.page.blocks ? got : { ...got, page: { ...got.page, blocks: [...blocks] } };
+  });
+  $effect.pre(() => {
+    if (!live) return;
+    const since = drawn?.visit === visit ? drawn.since : performance.now();
+    drawn = { visit, keys: blockKeys(live.page.blocks), since };
+  });
 
   /* ── the page's declared head ────────────────────────────────────
      A PAGE THAT SAYS `header:` IS ANSWERED A HEAD, drawn round its title and sentence as they are: the kicker over the
@@ -466,6 +485,28 @@
      the address says; this only draws the strip and moves the address. */
   const filters = $derived(live ? filtersOf(live.page.page) : []);
   const chosen = $derived(filterOf(route.url.searchParams));
+
+  /* A FILTER'S ANSWER SETTLES IN (skills pass 2 Nov): a chip pressed on the Ledger swapped 142 lines for 33 in one frame,
+     the whole list teleporting under the eye. The answer that lands for a new choice comes up from 40% over `--d-enter`
+     on the arrival curve, opacity alone, so nothing moves and nothing waits: near enough to still for a control pressed
+     tens of times a session, and none of it under reduced motion. Only a filter's choice, not the head's search, which
+     answers every keystroke, and not the page's lead, whose sentence hands over on its own (`recompose.ts`) and whose
+     strip holds the chip just pressed. The page's other motion still slides what changed size. */
+  let refiltered = false;
+  let filterSeen: string | null = null;
+  $effect.pre(() => {
+    const now = JSON.stringify(chosen);
+    if (filterSeen !== null && filterSeen !== now) refiltered = true;
+    filterSeen = now;
+  });
+  $effect(() => {
+    if (!live || !refiltered || mode !== 'page') return;
+    refiltered = false;
+    if (still()) return;
+    const main = document.getElementById('main');
+    for (const el of main?.querySelectorAll<HTMLElement>('.block-slot:not([data-lead])') ?? [])
+      play(el, { opacity: [0.4, 1] }, { duration: ms('--d-enter', 110), easing: getComputedStyle(el).getPropertyValue('--ease-out').trim() || 'ease-out' });
+  });
   function onfilter(field: string, value: string | null) {
     void goto(`?${filterQuery(route.url.searchParams, field, value)}`, { keepFocus: true, noScroll: true });
   }

@@ -1776,6 +1776,18 @@ let OUT = new Map<string, { version: number | null; sent: number; marks: number;
 /** Every write this tab sent but a read sent as one, once answered; and the reader's marks it moved. */
 let SENT = 0;
 let MARKS = 0;
+/** When this tab's last write of a row answered (`wroteAt`), in the page's clock; 0 before any. */
+let WROTE_AT = 0;
+const clockNow = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+/**
+ * WHEN THIS TAB LAST WROTE, in `performance.now()` milliseconds (0 before any write): every write sent through a client and
+ * every one sent past it (`wroteOutside`), but not a read sent as one and not the reader's mark. A screen reads it to tell
+ * an answer that changed because of what the reader just did from one that changed under them, so the first is drawn
+ * where the reader is working and does not rearrange the page (skills pass 2 Nov: a budget typed on Budgets lifted its
+ * tile to the page's top and threw the field 600px down).
+ */
+export const wroteAt = (): number => WROTE_AT;
 
 /**
  * The kept answer for `key` on the record `heard` names, or `ask`ed and kept once it lands if nothing moved while it was
@@ -1876,6 +1888,7 @@ export function forgetReads(): void {
  */
 export function wroteOutside(): void {
   SENT += 1;
+  WROTE_AT = clockNow();
 }
 
 /** Where the sign-in routes are for a client's `base`: its origin, since `/auth/*` is the person's and never under a record's path. */
@@ -2336,7 +2349,10 @@ export function createClient(options: ClientOptions) {
     /* AND ANY WRITE BUT A READ SENT AS ONE DROPS THE KEPT READS (`KEEPS`); the reader's mark only those that carry it. */
     if (WRITES.has(name) && !POST_READS.has(name)) {
       if (name === 'markRead') MARKS += 1;
-      else SENT += 1;
+      else {
+        SENT += 1;
+        WROTE_AT = clockNow();
+      }
     }
     return out;
   }
