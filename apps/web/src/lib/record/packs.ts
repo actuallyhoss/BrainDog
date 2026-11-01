@@ -286,6 +286,8 @@ export const words = {
   /* AN EMPTY LIMIT IS NO LIMIT, said in its box (audit 31 Oct g, AG29). */
   noLimit: 'No limit',
   moreLimits: (n: number) => `Show ${n} more ${n === 1 ? 'limit' : 'limits'}`,
+  /** Settings still holding the words the add-on ships, folded (L45). */
+  moreSettings: (n: number) => `Show ${n} more ${n === 1 ? 'setting' : 'settings'}, as the add-on ships them`,
   saved: (names: readonly string[]) => `Saved ${names.join(', ')}.`,
   speaksAlone: 'It is the only starter on, so BrainDog speaks in its words. This becomes a choice when a second one is on.',
   unit: 'Unit',

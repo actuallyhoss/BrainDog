@@ -849,7 +849,7 @@
 
             {#if fold.folded.length > 0 && !unfoldedMore}
               <div class="more-limits">
-                <Button weight="bare" onclick={() => (unfoldedMore = true)}>{words.moreLimits(fold.folded.length)}</Button>
+                <Button weight="bare" onclick={() => (unfoldedMore = true)}>{fold.label === 'More settings' ? words.moreSettings(fold.folded.length) : words.moreLimits(fold.folded.length)}</Button>
               </div>
             {/if}
             {#each shared as note (note)}<p class="setting-note">{note}</p>{/each}
