@@ -43,7 +43,6 @@
   import { readCounts } from '$lib/market/counts.ts';
   import { actionOf, latestOf, listingHref, listingsOf, searchListings, verifiedOf, type Listing } from '$lib/market/listing.ts';
   import { categoryName } from '$lib/market/chips.ts';
-  import IconWell from '$lib/ui/IconWell.svelte';
   import { baseTurnedOn, SHELF_NAMES, SHELF_SLOTS, shelfOf, storeChips, storeOf } from '$lib/market/shelves.ts';
   import { suggestionsOf, type SignRead } from '$lib/market/suggest.ts';
   import { words } from '$lib/market/words.ts';
