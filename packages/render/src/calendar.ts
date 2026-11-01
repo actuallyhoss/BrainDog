@@ -9,15 +9,15 @@
  * A ROW IS `title | day`, and a tone. The day reads as `2026-09-12`, as an instant whose day is that one, or as
  * `12 Sep 2026`, the form `day()` writes and so the form a page's reader may project a day field in.
  *
- * EVERY MONTH FROM THE FIRST ROW'S TO THE LAST ROW'S IS DRAWN, one grid each, and nothing is hidden behind a control.
- * The record reads the rows of a window of whole months (`back:` and `ahead:`), so the rows already say which months
- * the reader asked for; the host lays the grids out, side by side or one under another. The mirror and the digest
- * draw the same months the app does, because a calendar whose other months were behind a button would be a calendar
- * of one month in every copy that has no button.
+ * EVERY MONTH FROM THE FIRST ROW'S TO THE LAST ROW'S IS WRITTEN, one grid each, AND ONE IS SHOWN (`focus`): the month
+ * of the day a link opened, else this month, else the first month after it, else the last (the lists review, L38:
+ * three months stacked were 2,266px at 1512). The others are written `hidden`, so a drawer with buttons moves between
+ * them, and a copy with none (the mirror, the digest) still says every row: in the agenda.
  *
  * AND UNDER THE GRIDS, AN AGENDA of the days that hold anything, every row of them in the order they came. It is the
  * dated list a calendar falls back to, the whole of what a narrow screen shows under a strip of the month's days, and
- * the one place every row is said, because a day's cell names its first three and counts the rest.
+ * the one place every row is said, because a day's cell names its first three and counts the rest. A day in the month
+ * shown is marked `shown`, so a wide host lists only the rest under the grid: the agenda for the other months.
  *
  * OR A STRIP OF WEEKS, when the block says `weeks:` (`calendarStripPlan`): whole weeks from the Monday of this one, a
  * week a row of seven days, which is what a person reads on Today and a project page, where three whole months would
@@ -121,6 +121,8 @@ export type CalendarMonth<R> = { month: string; label: string; weeks: CalendarCe
 export type CalendarDay<R> = { day: string; said: string; today: boolean; items: R[] };
 export type CalendarPlan<R> = {
   months: CalendarMonth<R>[];
+  /** The month shown, by index into `months` (`calendarFocus`); the rest are written hidden. */
+  focus: number;
   days: CalendarDay<R>[];
   /** The rows whose day does not read, by index, which the drawers name under the calendar rather than lose. */
   skipped: number[];
@@ -159,7 +161,7 @@ export function calendarPlan<R extends { cells: readonly string[] }>(rows: reado
   const keys = [...byDay.keys()].sort();
   const first = keys[0];
   const last = keys[keys.length - 1];
-  if (first === undefined || last === undefined) return { months: [], days: [], skipped, empty: true };
+  if (first === undefined || last === undefined) return { months: [], focus: 0, days: [], skipped, empty: true };
 
   const clock = isDay(today) ? today : NO_TODAY;
   const marking = mark && isDay(mark) ? mark : null;
@@ -176,8 +178,29 @@ export function calendarPlan<R extends { cells: readonly string[] }>(rows: reado
   }
 
   const days = keys.map((day) => ({ day, said: calendarSaid(day, today), today: day === today, items: byDay.get(day) ?? [] }));
-  return { months, days, skipped, empty: false };
+  return { months, focus: calendarFocus(months.map((m) => m.month), clock === NO_TODAY ? '' : clock, marking), days, skipped, empty: false };
 }
+
+/**
+ * THE MONTH A CALENDAR OPENS ON, by index into `months` (`YYYY-MM`, in order): the month of the day a link opened it on,
+ * else this month, else the first month after this one, else the last month (every month is past). With no clock and
+ * no mark, the first.
+ */
+export function calendarFocus(months: readonly string[], today: string, mark?: string | null): number {
+  if (months.length === 0) return 0;
+  const marked = mark && isDay(mark) ? months.indexOf(mark.slice(0, 7)) : -1;
+  if (marked >= 0) return marked;
+  if (!isDay(today)) return 0;
+  const now = today.slice(0, 7);
+  const after = months.findIndex((m) => m >= now);
+  return after >= 0 ? after : months.length - 1;
+}
+
+/** The arrows' names: which month each moves to. */
+export const calendarPrev = (label: string): string => (label ? `Previous month, ${label}` : 'Previous month');
+export const calendarNext = (label: string): string => (label ? `Next month, ${label}` : 'Next month');
+/** Over the agenda on a wide screen, where it lists only the days outside the month shown. */
+export const CALENDAR_REST = 'Other months';
 
 /** The most weeks a strip draws, as many as the record reads (`weeks:` 1 to 8). */
 export const CALENDAR_WEEKS_MOST = 8;
