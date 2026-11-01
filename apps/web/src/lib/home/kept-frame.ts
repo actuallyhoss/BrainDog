@@ -10,7 +10,8 @@
  * KEPT IN THE WORKER'S COPY (`COPY`), so it goes wherever that copy goes: on a 401, a refusal that access ended, a
  * sign-out (the worker and `forget`), a move to another record (`keep`), and after a week (`sweep`). And only on a page
  * the worker controls, so the worker that deletes it is there. `app.html` draws it only on the address it was taken on,
- * at the same width and scheme, never while seeing the record as somebody else, and for a week at most.
+ * at the same width, scheme, text size and density, never while seeing the record as somebody else, and for a week at
+ * most.
  *
  * IT SAYS WHEN IT IS FROM. Money in it is as the record last answered: older than `KEPT_SAY_MS`, the line Today draws
  * over a copy (`words.updating`) is laid in where Today draws it, with the time it was taken, so a figure is never shown
@@ -41,7 +42,8 @@ export type Frame = {
   path: string;
   /** The width and the scheme it was laid out at. */
   w: number;
-  scheme: string;
+  /** The scheme, text size, density and contrast it was drawn in, as `app.html` sets them from the device's choice. */
+  look: string;
   dark: boolean;
   at: number;
   html: string;
@@ -127,7 +129,7 @@ export function frameOf(doc: Document, now: number): Frame | null {
     /* WITHOUT A LAST SLASH: the app writes the address without it, and the home screen opens it with one. */
     path: location.pathname.replace(/\/$/u, ''),
     w: innerWidth,
-    scheme: html.getAttribute('data-scheme') ?? '',
+    look: ['scheme', 'text', 'density', 'theme'].map((a) => html.getAttribute(`data-${a}`) ?? '').join(' '),
     dark: matchMedia('(prefers-color-scheme: dark)').matches,
     at: now,
     html: copy.innerHTML,
