@@ -824,7 +824,9 @@
        heading list. While arranging it shows, since that is the label a block is moved by. -->
   <!-- A PART THAT DRAWS ITS OWN TITLED TILE (the desk's, the projects' cards, a project's parts) names the region here and
        is not a second heading: a screen reader heard a hidden "Late 7" beside the tile's "Late and urgent 6" (audit Q11). -->
-  {@const titled = !arranging && ((projectCards && (lanes.length > 1 || board)) || desk !== null || parts !== null)}
+  <!-- ON A BOARD, PROJECT CARDS WEAR THE TILE'S HEADING (1 Nov): their lane bar is no name, and a one-row frame hides it,
+       so Maya's "Projects in play" stood with no heading at all. The lanes stay under it where the frame has room. -->
+  {@const titled = !arranging && ((projectCards && (board || (lanes.length > 1 && widget === null))) || desk !== null || parts !== null)}
   <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || titled ? '' : undefined}>
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
