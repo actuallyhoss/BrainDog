@@ -228,7 +228,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'resumeScript', group: 'ADMIN', writes: true, what: 'Start a script paused by three refused runs in a row again, now. Nothing else restarts it, and three more refused runs pause it again.' },
   /* A BROWSER SESSION ONLY, as `installPack` is: a run writes rows as the rule and notifies, so pressing Run now is a
      person's decision, and an agent's way to one is `propose`. */
-  { name: 'automationRun', group: 'ADMIN', writes: true, what: 'Run an automation now, one that declares a Run now button. A browser session only.' },
+  { name: 'automationRun', group: 'ADMIN', writes: true, what: 'Run an automation now, one that declares a Run now button. The owner in the app, or his agents while he lets them do everything without asking.' },
   { name: 'cancelRun', group: 'ADMIN', writes: true, what: 'Stop a run that has not finished. A run stopped while it waits never resumes.' },
   { name: 'fileArrival', group: 'ADMIN', writes: true, what: 'File one arrival from the inbox as a row in a list. The row is written like any other, and the arrival leaves the inbox.' },
   { name: 'archiveArrival', group: 'ADMIN', writes: true, what: 'Take one arrival out of the inbox without filing it. Its bytes are kept, and asking twice is the same answer.' },

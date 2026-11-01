@@ -15263,10 +15263,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /**
      * Run an automation now: the canvas's Run now, and the `manual` trigger's only door.
      *
-     * AN OWNER'S, IN A BROWSER, AS `installPack` IS. A run writes rows as the rule, notifies and calls out, so pressing
-     * it is a decision a person makes. An agent that wants one run proposes the rule and waits for the owner, or writes
-     * the row a write trigger listens for. Which rules have a button is the kernel's to say: only one that declares
-     * `on: { manual: true }`.
+     * AN OWNER'S, AS `installPack` IS, AND HIS AGENTS' WHILE HE LETS THEM DO EVERYTHING WITHOUT ASKING. A run writes rows
+     * as the rule, notifies and calls out, so pressing it is a decision a person makes, and his switch (`bypassOf`) is
+     * that decision made once for every press: `admin` admits the agent the wrapper marked, through MCP `act` or the CLI,
+     * and the run is signed on the agent's own run (`signBypassed`). Off, a token is refused here as before, and an agent
+     * that wants one run proposes the rule and waits for him, or writes the row a write trigger listens for. Not in
+     * `NEVER_BYPASS`: a run is undone row by row like any write. Which rules have a button is the kernel's to say: only
+     * one that declares `on: { manual: true }`.
      */
     async automationRun(args: { rule: string }, ctx: CallContext) {
       const stop = admin(ctx, 'start an automation');

@@ -2,14 +2,13 @@
  * `braindog automations list|show|run|cancel` and `braindog scripts list|resume`: the record's automations and scripts from a
  * terminal, over the methods the canvas and an agent's MCP tools already call.
  *
- * READING IS FOR ANY TOKEN; STARTING, STOPPING AND RESUMING ARE A BROWSER'S. `automations` is READ+, held to the lists
+ * READING IS FOR ANY TOKEN; STARTING, STOPPING AND RESUMING ARE THE OWNER'S. `automations` is READ+, held to the lists
  * the caller reads, so `list` and `show` answer a login from this machine. `automationRun`, `cancelRun` and
- * `resumeScript` are ADMIN, and `packages/record/src/index.ts`'s `admin()` refuses every `token` principal before it
- * reads the arguments, with "Open this from the app; a token cannot start an automation." Every bearer this command
- * holds is a token, so `run`, `cancel` and `resume` are built exactly as the record takes them and show that sentence
- * today. They are not left out: the day the record opens a door for a proven session
- * that is not a browser cookie, they work with no change here, and until then a person reading the refusal learns where
- * the button is rather than learning that the command does not exist.
+ * `resumeScript` are ADMIN, and `packages/record/src/index.ts`'s `admin()` refuses a `token` principal before it reads
+ * the arguments, with "Open this from the app; a token cannot start an automation.", unless the owner lets his agents do
+ * everything without asking (`bypassOf`), when his own whole-record login is admitted as he is. So `run`, `cancel` and
+ * `resume` are built exactly as the record takes them: they work while his switch is on, and otherwise a person reading
+ * the refusal learns where the button is rather than learning that the command does not exist.
  *
  * `scripts list` WAS REFUSED HERE UNTIL THE RECORD HAD A READ TO ANSWER IT. Measured across
  * `packages/host/src/index.ts`'s route table: no method read the `schedule` rows of kind `script` or listed script
