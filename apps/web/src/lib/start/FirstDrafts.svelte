@@ -73,11 +73,22 @@
     const me = kept?.begin.me ?? null;
     const registers = kept?.begin.registers ?? [];
     const today = kept?.begin.today ?? options.today;
-    const opts = options;
+    const back = kept?.back ?? [];
+    /* A DRAFT PUT BACK BY UNDO IS NOBODY KEPT YET (AP3): Today still remembers the name the undo took out of the record,
+       and Tell then read "Mum's birthday is 14 November" as news about Mum, not Mum, so the draft never came back. */
+    const gone = (register: string, name: string): boolean => back.includes(`${register}:${name.replace(/\s+/gu, ' ').trim().toLowerCase()}`);
+    const opts: TellOptions =
+      back.length === 0
+        ? options
+        : {
+            ...options,
+            ...(options.people ? { people: options.people.filter((k) => !gone('people', k.name)) } : {}),
+            ...(options.titled ? { titled: Object.fromEntries(Object.entries(options.titled).map(([r, ks]) => [r, ks.filter((k) => !gone(r, k.name))])) } : {}),
+          };
     if (said === '') return;
-    let gone = false;
+    let off = false;
     void Promise.all([import('$lib/tell/read.ts'), import('./first-drafts.ts')]).then(([{ tellRead }, d]) => {
-      if (gone) return;
+      if (off) return;
       /* READ AGAINST EVERY LIST THE BUILD MADE, NOT ONLY THE ONES TODAY HAS LEARNED (audit AP2): Today learns a list's
          declaration as a screen reads it, so on a first Today the card read the words against a list or two, found
          nothing, and closed itself for good a moment before the rest arrived. The record's own lists first, with its
@@ -93,7 +104,7 @@
         { built, me },
       );
     });
-    return () => (gone = true);
+    return () => (off = true);
   });
 
   /** A draft's words as changed here, by key, laid over it until it is kept. */
