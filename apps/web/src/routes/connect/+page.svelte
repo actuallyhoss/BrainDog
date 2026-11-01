@@ -39,6 +39,7 @@
   import CodeLine from '$lib/ui/CodeLine.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Face from '$lib/ui/Face.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from '../signin/Entry.svelte';
@@ -133,6 +134,9 @@
         <span class="agent-disc" aria-hidden="true"><AgentMark kind={marked} size="m" /></span>
       {:else if consent !== null}
         <Face name={consent.client_name} of="record" size="l" />
+      {:else}
+        <!-- A WELL WHERE NO APP IS NAMED YET (G25), as Invite's card leads with one: the two entry cards start alike. -->
+        <IconWell name="plug" size="card" />
       {/if}
       <h1 class="entry-title" dir="auto">{title}</h1>
     </header>
