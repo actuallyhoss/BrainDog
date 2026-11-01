@@ -196,5 +196,17 @@
   </head>
   <body data-sveltekit-preload-data="hover">
     <div style="display: contents">%sveltekit.body%</div>
+    <!--
+      TODAY AS THIS PHONE LAST DREW IT, PAINTED BEFORE THE APP HAS RUN (`lib/home/kept-frame.ts`, which keeps it and says
+      every rule). Opened again from the home screen the files come from the worker's copy at once, and Today still drew
+      only once the app had loaded, run and read its local copy, about 0.65 s on a phone. This lays the last picture of
+      it over the page, inert and hidden from readers, with the styles it was drawn in, and takes it away the moment the
+      app's own screen says it has drawn, or after 8 s whatever happens.
+
+      ONLY ON A PAGE THE WORKER CONTROLS, where the copy it is kept in is deleted on sign-out and on a 401; only on the
+      address, width and scheme it was taken at; never while seeing the record as somebody else; a week at most. Older
+      than a minute it carries the line Today draws over a copy, the words made when it was kept.
+    -->
+    <script>try{var N=navigator.serviceWorker;if(location.search===''&&'caches'in window&&N&&N.controller&&!(window.sessionStorage&&sessionStorage.getItem('braindog.see-as'))){caches.open('braindog-copy').then(function(c){return c.match(location.origin+'/~today-frame')}).then(function(r){return r?r.json():null}).then(function(f){var D=document,H=D.documentElement,n=Date.now();if(!f||f.v!==1||f.path!==location.pathname.replace(/\/$/,'')||Math.abs(f.w-innerWidth)>2||f.scheme!==(H.getAttribute('data-scheme')||'')||f.dark!==matchMedia('(prefers-color-scheme: dark)').matches||!(n>=f.at&&n-f.at<6048e5)||D.querySelector('#main[data-screen]'))return;var s=new CSSStyleSheet();s.replaceSync(f.root+'\n'+('CSSScopeRule'in window?'@scope (#kept-frame) {'+f.css+'}':f.css)+'\n#kept-frame{position:fixed;inset:0;z-index:2147483646;overflow:hidden;contain:strict;background:var(--board,Canvas)}#kept-frame *,#kept-frame *::before,#kept-frame *::after{animation:none!important;transition:none!important}');var e=D.createElement('div');e.id='kept-frame';e.inert=true;e.setAttribute('aria-hidden','true');e.innerHTML=f.html;var g=n-f.at>=6e4?(new Date(f.at).toDateString()===new Date(n).toDateString()?f.today:f.other):'',b=g?e.querySelector('.page > .body'):null;if(b){var p=D.createElement('p');p.className='kept-line';p.textContent=g;b.parentNode.insertBefore(p,b)}D.adoptedStyleSheets=D.adoptedStyleSheets.concat([s]);D.body.appendChild(e);performance.mark('kept-frame');var o=null,x=function(){if(o)o.disconnect();e.remove();D.adoptedStyleSheets=D.adoptedStyleSheets.filter(function(y){return y!==s})};o=new MutationObserver(function(){if(D.querySelector('#main[data-screen]'))x()});o.observe(D.body,{subtree:true,childList:true,attributes:true,attributeFilter:['data-screen']});setTimeout(x,8e3)}).catch(function(){})}}catch(e){}</script>
   </body>
 </html>
