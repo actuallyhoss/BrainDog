@@ -33,6 +33,18 @@
   body {
     block-size: 100%;
     overflow: hidden;
+    /* A PHONE APP DOES NOT BOUNCE ITS WHOLE WINDOW. Safari pulls the page itself past its edges even with nothing to
+       scroll, showing the ground above the app bar and under the tab bar; the one scroller (`.body`) still scrolls and
+       Today's own pull to read again (`Pull.svelte`) still works, since it listens to the scroller. */
+    overscroll-behavior: none;
+  }
+
+  /* A TAP IS A TAP AT ONCE: no wait to see whether it was the first half of a double-tap zoom, which a phone browser
+     otherwise holds every tap for. Pinch zoom stays. And the text stays the size it was set in when the phone turns. */
+  html {
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   /* A LINK IN THE RECORD IS INK WITH A QUIET UNDERLINE. Red is kept for what needs him, the one primary action

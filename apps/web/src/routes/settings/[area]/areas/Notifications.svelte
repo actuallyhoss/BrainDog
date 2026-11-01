@@ -26,6 +26,7 @@
   import StateRow from './StateRow.svelte';
   import SummariesTile from '$lib/agents/SummariesTile.svelte';
   import { KINDS, kindsOff, type PushKind } from '$lib/phone/kinds.ts';
+  import { untrack } from 'svelte';
 
   /* EVERY AREA TAKES THE SAME PROPS. This one reads who is asking, since only an owner moves the quiet hours. */
   let props: AreaProps = $props();
@@ -232,7 +233,8 @@
   /* ── WHAT RINGS: one switch per kind of push (`lib/phone/kinds.ts`), this person's own and on every phone of theirs
      (`push.off`). Drawn with the test, while this device is rung, since a switch over pushes nothing receives is a
      control that writes nothing anybody would notice. Kept at once, and put back with the record's sentence if refused. */
-  let off = $state<PushKind[]>(kindsOff(props.shell.me?.prefs?.['push.off']));
+  /* WHERE THE SWITCHES START, read once: after that the switch is the truth, until the next visit reads `boot` again. */
+  let off = $state<PushKind[]>(untrack(() => kindsOff(props.shell.me?.prefs?.['push.off'])));
   let kindLine = $state('');
   async function flipKind(kind: PushKind): Promise<void> {
     const was = off;

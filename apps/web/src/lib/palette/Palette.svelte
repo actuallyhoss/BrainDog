@@ -2465,7 +2465,8 @@
       inset-block: 0 auto;
       inline-size: 100%;
       block-size: auto;
-      max-block-size: 100dvh;
+      /* LESS THE KEYBOARD WHILE ONE IS UP (`--kb`), so Ask's foot and the last answer stay above the keys. */
+      max-block-size: calc(100dvh - var(--kb, 0px));
       padding-block-start: env(safe-area-inset-top, 0px);
       border: 0;
       border-block-end: 1px solid var(--rule-strong);

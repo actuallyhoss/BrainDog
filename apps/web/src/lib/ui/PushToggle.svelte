@@ -17,12 +17,10 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { dev } from '$app/environment';
-  import { createClient } from '@braindog/client';
   import { BASE, apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { hostKey, offerOf, startOf, turnOff, turnOn, type Manager, type Offer, type Ports, type Said } from '$lib/ui/push.ts';
-  import type { Call } from '$lib/ui/webhook-doors.ts';
+  import { hostKey, offerOf, startOf, turnOff, turnOn, type Offer, type Said } from '$lib/ui/push.ts';
+  import { pushCan, pushPorts as ports } from '$lib/ui/push-ports.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
 
@@ -39,28 +37,12 @@
   /* EVERY ARM BUT `on` AND `off` IS ONE SENTENCE: the browser's, which `push.ts` words, or the record's own `fix`. */
   const lineOf = (s: Said): string => (s.kind === 'on' || s.kind === 'off' ? '' : 'line' in s ? s.line : s.fix);
 
-  async function manager(): Promise<Manager> {
-    /* DEVELOPMENT SERVES THE WORKER UNBUNDLED, AS A MODULE. Kit's dev server answers `service-worker.js` with one
-       `import` of the source file, whatever `register` says, and only a module worker can run an `import`. */
-    await navigator.serviceWorker.register(`${BASE}/service-worker.js`, { scope: `${BASE}/`, type: dev ? 'module' : 'classic' });
-    /* `subscribe` ON A WORKER STILL INSTALLING FAILS in Chrome with "no active Service Worker", so this waits for one. */
-    return (await navigator.serviceWorker.ready).pushManager as unknown as Manager;
-  }
-
-  const ports = (): Ports => ({
-    permission: () => Notification.requestPermission(),
-    manager,
-    call: createClient({ base: apiBase() }).call as unknown as Call,
-  });
+  /* THE WORKER AND THE SUBSCRIPTION ARE `push-ports.ts`'s, shared with the phone's one ask (`lib/phone/PhoneHints.svelte`). */
 
   /* `hostKey` AND `startOf` NEVER REJECT, which is why nothing below catches: each turns every refusal into a value. */
   async function begin() {
     if (host === 'self-host') return;
-    const made = offerOf(await hostKey(apiBase()), {
-      worker: 'serviceWorker' in navigator,
-      push: 'PushManager' in window,
-      notify: 'Notification' in window,
-    });
+    const made = offerOf(await hostKey(apiBase()), pushCan());
     offer = made;
     if (made?.can !== true) return;
     /* WHETHER THIS BROWSER IS ALREADY TOLD, read from the registration that already exists and never by making one:

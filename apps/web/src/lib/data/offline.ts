@@ -122,10 +122,12 @@ export const markOf = (scope: string): string => new URL('~record', scope).href;
  * import the copy aggregate: the whole of every screen's words would ship inside a file whose job is two listeners.
  */
 export const words = {
-  /** Drawn over a screen answered from the copy: "Offline · from 14:02". */
-  from: (when: string) => `Offline · from ${when}`,
-  /** Under it, and the `fix` of every write the worker answers offline. */
-  notSent: 'Not sent, because you are offline. Nothing waits to be sent later: do it again once you are back online.',
+  /** Drawn over a screen answered from the copy, calm and plain: "Offline, showing what you last saw at 14:02." */
+  from: (when: string) => `Offline, showing what you last saw at ${when}.`,
+  /** Beside it: what cannot happen until the phone is back, said before anybody tries. */
+  cannotSave: 'Changes can’t be saved until you’re back online.',
+  /** The `fix` of every write the worker answers offline. */
+  notSent: 'Not saved, because you’re offline. Nothing is kept to send later, so do it again once you’re back online.',
 };
 
 /**

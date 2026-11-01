@@ -246,6 +246,12 @@
   const open = $derived(needYouCount(waitsNow(), data.open, toldNow().needs.length));
   /* THE DOCK BADGE FOLLOWS THE NEEDS YOU COUNT (the PWA badge in a browser that has one); 0 clears it. */
   $effect(() => setBadge(open));
+  /* THE PHONE'S OWN WAYS ARE LOADED A MOMENT AFTER THE SHELL, so their chunk never holds up a first screen. */
+  let phoneWays = $state(false);
+  $effect(() => {
+    const t = setTimeout(() => (phoneWays = true), 800);
+    return () => clearTimeout(t);
+  });
   /* A NEW QUESTION OR HANDOFF RINGS ONCE (`alerts.ts` dedups by id and seeds on the first hearing), never while this
      window is in front, and only with the Settings switch on. A click goes to the item through the shell's `goto`. */
   let rung: Set<string> | null = null;
@@ -1479,6 +1485,12 @@
   <div class="tab-slot">
     <TabBar tabs={phoneTabs} menu={MENU} live={workingNow().length > 0} />
   </div>
+
+  <!-- THE PHONE'S OWN WAYS (`lib/phone/Phone.svelte`): the status bar's colour, the iPhone's launch pictures, back from the
+       left edge in the Home Screen app, and the two asks. Its own chunk, a moment after the shell has drawn. -->
+  {#if phoneWays}
+    {#await import('$lib/phone/Phone.svelte') then { default: Phone }}<Phone waiting={open} path={page.url.pathname} />{/await}
+  {/if}
 
   <!--
     THE SEARCH BUTTON OF A DESKTOP WITH NO RAIL, and nowhere else.

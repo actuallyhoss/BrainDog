@@ -18,6 +18,16 @@
     <meta name="color-scheme" content="light dark" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- A PHONE'S OWN BAR TAKES THE APP BAR'S COLOUR: `--nav`, white in light and the crimson in dark, for the device's own
+         scheme before anything runs; `lib/phone/device.ts` follows a scheme or palette chosen in Settings. An iPhone
+         opened from the Home Screen draws its status bar in it (`default`, dark letters on light and light on dark),
+         and BrainDog is the app's name under its icon. -->
+    <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#2E0C18" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="BrainDog" />
     <!-- `not just code`, AND IT SAID `isn't code`. The rest of the product was changed to match it: a repository, a deploy and a bug are all things a
          record holds, and what it is not is a place to keep the code itself. "Isn't code" reads as
          a boundary the product does not have, and it tells a developer their work is out of scope.

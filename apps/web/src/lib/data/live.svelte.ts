@@ -35,7 +35,7 @@ import { forgetSignedOut } from '../record/signed-out.ts';
  * not seen means "ask again".
  *
  * `from` IS WHEN THE OLDEST ANSWER ON SCREEN WAS KEPT, in milliseconds, when the service worker answered from the read
- * copy (`offline.ts`), and `null` when everything drawn came from the record. `Pull.svelte` says it as "Offline · from
+ * copy (`offline.ts`), and `null` when everything drawn came from the record. `Pull.svelte` says it as "Offline, showing what you last saw at
  * 14:02".
  */
 export const live = $state<{ state: LiveState; version: number | null; from: number | null; ended: { said: string } | null }>({

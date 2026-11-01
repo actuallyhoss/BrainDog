@@ -13,8 +13,8 @@
   has settled again (`settled()` in `screen.svelte.ts`), or `LONGEST` at most, so a read that never answers cannot leave
   it running. It is `aria-hidden` for the layout's hairline's reason: the screen's own states say what it read.
 
-  THE OFFLINE LINE is the one banner (`Banner.svelte`), in the warn tint, drawn while the poll says offline and something on screen came from the copy: "Offline · from
-  14:02", and that nothing changed here is sent until he is back online.
+  THE OFFLINE LINE is the one banner (`Banner.svelte`), in the warn tint, drawn while the poll says offline and something on screen came from the copy: "Offline, showing what
+  you last saw at 14:02.", and that nothing changed here can be saved until he is back online.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -23,6 +23,7 @@
   import { when, words } from '$lib/data/offline.ts';
   import { settled } from '$lib/ui/screen.svelte.ts';
   import Banner from './Banner.svelte';
+  import { haptic } from '$lib/phone/device.ts';
 
   /** How far, in CSS pixels, a pull from the top travels before letting go reads again. */
   const FAR = 72;
@@ -88,7 +89,10 @@
         drag = 0;
         return;
       }
+      const was = drag;
       drag = Math.max(0, Math.min(1, (t.clientY - from) / FAR));
+      /* THE THUMB FEELS THE POINT WHERE LETTING GO READS AGAIN, where the phone has a way to say it (`haptic`). */
+      if (was < 1 && drag >= 1) haptic('light');
     };
     const end = () => {
       const far = from !== null && drag >= 1;
@@ -117,7 +121,7 @@
     aria-hidden="true"
   ></div>
   {#if offline}
-    <Banner tone="warn" icon="alert"><span class="pull-from">{words.from(kept)}</span>{' '}{words.notSent}</Banner>
+    <Banner tone="warn" icon="alert"><span class="pull-from">{words.from(kept)}</span>{' '}{words.cannotSave}</Banner>
   {/if}
 </div>
 

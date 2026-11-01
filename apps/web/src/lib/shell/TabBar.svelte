@@ -86,6 +86,9 @@
     border-block-start: 1px solid var(--rule);
     /* HELD STILL IN A PAGE CHANGE: the page's pictures pass under it (`app.css` gives this name no animation). */
     view-transition-name: tabbar;
+    /* A HELD THUMB ON A TAB IS NOT A LINK TO PREVIEW OR WORDS TO SELECT, as an app's own tab bar is not. */
+    -webkit-touch-callout: none;
+    user-select: none;
   }
 
   /* THE KEYBOARD TAKES THE BOTTOM OF THE SCREEN, and four dead targets over the keys somebody is using would sit above
