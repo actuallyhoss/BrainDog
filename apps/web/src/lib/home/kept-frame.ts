@@ -30,6 +30,11 @@ export const FRAME_VERSION = 1;
 /** How old a picture may be before it says when it is from. Today's own line over a copy keeps the same rule. */
 export const KEPT_SAY_MS = 60_000;
 
+/** What Today says over a copy kept at `at`, or `null` while it is younger than `KEPT_SAY_MS`. */
+export function keptLineOf(at: number, now: number): string | null {
+  return now - at >= KEPT_SAY_MS ? words.updating(when(at, now)) : null;
+}
+
 export type Frame = {
   v: number;
   /** The address it was taken on. */

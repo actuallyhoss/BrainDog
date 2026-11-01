@@ -148,8 +148,6 @@
   import { holdPresses } from '$lib/data/held.svelte.ts';
   import { drewFirst, firstDrawn } from '$lib/data/first-drawn.ts';
   import { painted } from '$lib/data/timing.ts';
-  import { when as keptWhen, words as keptWords } from '$lib/data/offline.ts';
-  import { KEPT_SAY_MS } from './kept-frame.ts';
   import type { Near } from '$lib/data/local.ts';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
 
@@ -475,6 +473,10 @@
   /* AND IT SAYS WHEN IT IS FROM while the record is asked again (`kept-frame.ts`), once that is more than a minute ago:
      what the copy holds is the money as the record last answered, and an old figure is never shown without saying so. */
   let keptLine = $state<string | null>(null);
+  /* ITS WORDS ARE IN `kept-frame.ts`, asked as Today opens (below) and not with Today's first load: the copy is read from
+     the browser's store meanwhile, so they are in hand when it draws. */
+  let keptFrame: typeof import('./kept-frame.ts') | null = null;
+  const keptFrameCode = () => import('./kept-frame.ts').then((m) => (keptFrame = m));
   /** Whether the copy drew this open: the reads behind it are quiet, as the ones behind what the tab drew are. */
   let copyDrawn = false;
   $effect(() => {
@@ -486,7 +488,7 @@
   $effect(() => {
     if (!settled || fromCopy || got?.from !== 'live' || data.refused) return;
     const keepNow = () => {
-      if (!untrack(() => boardModel.editing)) void import('./kept-frame.ts').then((m) => m.keepFrame()).catch(() => undefined);
+      if (!untrack(() => boardModel.editing)) void keptFrameCode().then((m) => m.keepFrame()).catch(() => undefined);
     };
     const rest = setTimeout(keepNow, 3_000);
     const leaving = () => {
@@ -527,8 +529,11 @@
     news = near.value.news;
     newLines = near.value.news?.lines ?? [];
     fromCopy = true;
-    const now = Date.now();
-    keptLine = now - near.kept >= KEPT_SAY_MS ? keptWords.updating(keptWhen(near.kept, now)) : null;
+    const say = (m: typeof import('./kept-frame.ts')) => {
+      if (fromCopy) keptLine = m.keptLineOf(near.kept, Date.now());
+    };
+    if (keptFrame) say(keptFrame);
+    else void keptFrameCode().then(say, () => undefined);
     /* WHAT THE COPY DREW IS THE SCREEN, as what this tab drew is: the read behind it is quiet and lands over it, so the
        screen settles now and does not wait for the record's answer (`fromMemory` below does the same). */
     copyDrawn = true;
@@ -568,6 +573,7 @@
          on a cold phone it was about 100 ms between the lists landing and Today being asked (finish W3). */
       void import('$lib/record/page-drawn.ts').catch(() => null);
       void import('./today-read.ts').catch(() => null);
+      void keptFrameCode().catch(() => null);
       /* AND THE CODE OF THE TILES TODAY'S EARLY ANSWER SHOWS (`tile-code.ts`), which is in the tab long before that read. */
       if (declares === null) void import('./tile-code.ts').then((m) => m.askEarlyTiles(`${apiBase()}/api/today`, { base: apiBase(), owner: data.me?.owner === true }), () => null);
       const slug = declares;
