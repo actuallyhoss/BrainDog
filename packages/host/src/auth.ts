@@ -82,6 +82,7 @@ export const ACCOUNT_ROUTES: readonly AccountRoute[] = [
   { path: '/account/billing', method: 'GET', on: 'worker', needs: 'session', what: 'Each BrainDog you own, whether it is paid for, and whether this host takes payment at all.' },
   { path: '/account/billing/checkout', method: 'POST', on: 'worker', needs: 'session', what: 'A payment page for a new record, `{ slug, name?, tz?, plan? }`, for paying again, `{ record, plan? }`, or for Slash credits, `{ record, pack }`.' },
   { path: '/account/billing/portal', method: 'POST', on: 'worker', needs: 'session', what: 'The page the payment provider keeps for a BrainDog you own, `{ record }`, or `{ record, plan }` to switch its plan.' },
+  { path: '/account/billing/invoices', method: 'POST', on: 'worker', needs: 'session', what: 'The newest invoices for a BrainDog you own and pay for, `{ record }`, each with its own page at the payment provider.' },
   { path: '/account/billing/extra', method: 'POST', on: 'worker', needs: 'session', what: 'Extra usage past the allowance for a paid record you own, under a monthly cap: `{ record, cap_cents }`, 0 turning it off.' },
   { path: '/account/billing/webhook', method: 'POST', on: 'worker', needs: 'stripe', what: 'The payment provider saying a payment happened, signed over the body as it was sent.' },
   { path: '/account/close', method: 'POST', on: 'worker', needs: 'session', what: 'Close your account, `{ email }` typed to confirm, from a sign-in in the last fifteen minutes.' },
@@ -118,6 +119,8 @@ export type AccountDoor = {
   checkout?: AccountAsk | undefined;
   /** `POST /account/billing/portal`: `{ url }` of the provider's page for a record this person owns. */
   portal?: AccountAsk | undefined;
+  /** `POST /account/billing/invoices`: `{ invoices }`, the newest invoices of the customer a record this person owns pays as. */
+  invoices?: AccountAsk | undefined;
   /** `POST /account/billing/extra`: `{ record, extra }`, the record's extra usage under the cap just set. */
   extra?: AccountAsk | undefined;
   /** `POST /account/close`: the account closed, after the checks the door makes. */
@@ -326,7 +329,7 @@ export function closeDoor(deps: CloseDeps): AccountAsk {
 type Asked = (who: Who, body: Record<string, unknown>, url: URL) => Result<unknown> | Promise<Result<unknown>>;
 
 function askedOf(path: string, door: AccountDoor): Asked | null {
-  const { billing, checkout, portal, extra, close, email } = door;
+  const { billing, checkout, portal, invoices, extra, close, email } = door;
   switch (path) {
     case '/account/usage':
       return (who, _body, url) => door.usage(who.person, { from: url.searchParams.get('from') ?? '', to: url.searchParams.get('to') ?? '' });
@@ -338,6 +341,8 @@ function askedOf(path: string, door: AccountDoor): Asked | null {
       return checkout ? (who, body) => checkout(who, body) : null;
     case '/account/billing/portal':
       return portal ? (who, body) => portal(who, body) : null;
+    case '/account/billing/invoices':
+      return invoices ? (who, body) => invoices(who, body) : null;
     case '/account/billing/extra':
       return extra ? (who, body) => extra(who, body) : null;
     case '/account/close':

@@ -275,6 +275,12 @@ export type CheckoutAsk = {
   success: string;
   cancel: string;
   mode?: 'subscription' | 'payment';
+  /**
+   * Stripe Tax on this checkout (`STRIPE_TAX` on the host): Stripe works out the tax from the address it asks for, adds
+   * it to the price, and keeps the address and any tax id on the customer for the invoices after. Off, the price is the
+   * whole charge, as it always was.
+   */
+  tax?: boolean;
 };
 
 /**
@@ -316,6 +322,15 @@ export async function startCheckout(stripe: Stripe, ask: CheckoutAsk): Promise<S
     success_url: ask.success,
     cancel_url: ask.cancel,
   };
+  if (ask.tax === true) {
+    /* THE ADDRESS IS ASKED ON STRIPE'S PAGE AND KEPT ON THE CUSTOMER, because tax is worked out from it and a customer
+       made by `customerFor` holds only an address to mail. */
+    form['automatic_tax[enabled]'] = true;
+    form['billing_address_collection'] = 'required';
+    form['customer_update[address]'] = 'auto';
+    form['customer_update[name]'] = 'auto';
+    form['tax_id_collection[enabled]'] = true;
+  }
   const made = mode === 'payment' ? 'payment_intent_data' : 'subscription_data';
   for (const [k, v] of Object.entries(ask.metadata)) {
     form[`metadata[${k}]`] = v;
@@ -366,4 +381,52 @@ export async function startPortal(
     if (flowed.ok || flowed.status !== 400) return pageOf(flowed);
   }
   return pageOf(await stripe.create('/v1/billing_portal/sessions', front));
+}
+
+/**
+ * One invoice as the Billing page lists it: when, how much in which currency, whether it is paid, and Stripe's own
+ * pages for it (the hosted invoice and its PDF), each `null` when Stripe sent none.
+ */
+export type InvoiceSeen = {
+  id: string;
+  number: string | null;
+  at: number;
+  cents: number;
+  currency: string;
+  status: 'paid' | 'open' | 'void' | 'uncollectible';
+  url: string | null;
+  pdf: string | null;
+};
+
+/** The most invoices one read lists, a year of a monthly plan. */
+export const INVOICES_MOST = 12;
+
+/**
+ * A customer's newest invoices, at most `INVOICES_MOST`, drafts left out: what they were billed and Stripe's page for
+ * each. The failure when Stripe could not be asked.
+ */
+export async function invoicesOf(stripe: Stripe, customer: string): Promise<InvoiceSeen[] | StripeFault> {
+  if (!/^cus_[A-Za-z0-9]{1,250}$/u.test(customer)) return [];
+  const got = await stripe.read('/v1/invoices', { customer, limit: INVOICES_MOST });
+  if (!got.ok) return got;
+  const https = (v: string): string | null => (v.startsWith('https://') ? v : null);
+  return listOf(got.body).flatMap((i): InvoiceSeen[] => {
+    const status = textAt(i, 'status');
+    const at = msAt(i, 'created');
+    const cents = i['total'];
+    if (status !== 'paid' && status !== 'open' && status !== 'void' && status !== 'uncollectible') return [];
+    if (at === null || typeof cents !== 'number' || !Number.isSafeInteger(cents)) return [];
+    return [
+      {
+        id: textAt(i, 'id'),
+        number: textAt(i, 'number') || null,
+        at,
+        cents,
+        currency: textAt(i, 'currency').toUpperCase(),
+        status,
+        url: https(textAt(i, 'hosted_invoice_url')),
+        pdf: https(textAt(i, 'invoice_pdf')),
+      },
+    ];
+  });
 }
