@@ -30,9 +30,8 @@ import { moduleName } from '@braindog/seed/usecases/names';
 import type { TellList, Told } from '../tell/read.ts';
 import { PEOPLE } from '../who.ts';
 import type { SetupOffer, SetupReply } from './ask.ts';
-import { moduleDocument } from '@braindog/seed/usecases/install';
 
-import { entryOf, FILLABLE, listsOf, type List } from './lists.ts';
+import { entryOf, FILLABLE, listDocument, listsOf, useCaseOfList, type List } from './lists.ts';
 
 /** One entry of a draft, as the record's capture takes it. */
 export type DraftRow = { register: string; fields: Record<string, unknown> };
@@ -83,11 +82,14 @@ export function filled(d: FirstDraft, value: string): FirstDraft {
   return { ...rest, ...(n.type === 'day' ? { day: fit as string } : {}), rows: d.rows.map((r, i) => (i === n.row ? { ...r, fields: { ...r.fields, [n.field]: fit } } : r)) };
 }
 
-/** The modules a BrainDog keeps, read off the lists it holds, in the order first met; the agents' lists are no module here. */
+/**
+ * The modules a BrainDog keeps, read off the lists it holds, in the order first met; the agents' lists are no module here.
+ * A STARTER'S OWN LISTS COUNT AS ITS OWN PACK (`usecase-shop`: Orders, Products), so they are offered too (audit AP1).
+ */
 export function modulesHeld(registers: readonly string[]): string[] {
   const out: string[] = [];
   for (const r of registers) {
-    const id = moduleOfList(r)?.id;
+    const id = moduleOfList(r)?.id ?? useCaseOfList(r) ?? undefined;
     if (id !== undefined && id !== AGENTS_PACK.manifest.id && !out.includes(id)) out.push(id);
   }
   return out;
@@ -222,6 +224,34 @@ const ABOUT_ME = /^(?:hi|hello|hey)?[\s,!]*(?:i'?m|i am|i run|i own|i work|i hav
 /** Words a to-do starts with, so "need to call the bank" is a to-do and "a solo founder building Tallow" is not. */
 const DOING = /\b(?:need to|have to|must|got to|remember to|want to|going to|call|email|text|send|book|buy|pay|finish|fix|file|renew|cancel|chase|ask|meet|pick up|drop off)\b/iu;
 
+/** One name as a person writes it: "Karim", "Hana", "Lina Haddad". */
+const NAME = String.raw`\p{Lu}\p{Ll}+(?:\s\p{Lu}\p{Ll}+)?`;
+/**
+ * THE PEOPLE A SENTENCE SAYS ARE AROUND THE PERSON, which Tell reads as a thing to do ("Karim and Hana are on my team"
+ * became a task called that, audit AP2): who is on their team, works with them, or is their sister, client or cofounder.
+ * Each name is a draft in People with what was said of them; nothing else in the sentence is read here.
+ */
+const AROUND = [
+  new RegExp(String.raw`^(${NAME}(?:(?:,\s*|,?\s+and\s+)${NAME})*)\s+(?:is|are)\s+(?:on|in|part of)\s+(?:my|our|the)\s+team\b`, 'u'),
+  new RegExp(String.raw`^(${NAME}(?:(?:,\s*|,?\s+and\s+)${NAME})*)\s+works?\s+(?:with|for)\s+(?:me|us)\b`, 'u'),
+  new RegExp(String.raw`^(?:[Aa]nd\s+)?(?:[Mm]y|[Oo]ur)\s+(?:sister|brother|mum|mom|dad|wife|husband|partner|son|daughter|friend|colleague|cofounder|co-founder|boss|client|accountant|lawyer|landlord)\s+(?:is\s+)?(\p{Lu}\p{Ll}+)\b`, 'u'),
+];
+const TEAM_SAID = /\bteam\b/iu;
+
+/** The names a clause says are around the person, and what was said of them, or `null`. */
+export function peopleAround(said: string): { names: string[]; detail: string } | null {
+  const s = said.trim();
+  for (const re of AROUND) {
+    const m = re.exec(s);
+    if (!m?.[1]) continue;
+    const names = m[1].split(/,\s*|,?\s+and\s+/u).map((n) => n.trim()).filter((n) => n !== '' && !/^(?:I|We|My|Our|The)$/u.test(n));
+    if (names.length === 0) continue;
+    const kin = /(?:my|our)\s+([a-z-]+)/iu.exec(s)?.[1]?.toLowerCase();
+    return { names, detail: TEAM_SAID.test(s) ? 'On your team' : re === AROUND[1] ? 'Works with you' : kin ? `Your ${kin}` : '' };
+  }
+  return null;
+}
+
 /**
  * TELL'S READING OF EACH SENTENCE, AS DRAFTS: the rows one sentence became, split into the groups that point at one
  * another (`$row`: the payment and the person it names), each group one draft. A group is kept only where it is concrete:
@@ -233,7 +263,19 @@ export function draftsFromTold(read: readonly { said: string; told: Pick<Told, '
   const seen = takenBy({ built: from.built, modules: [] }, (r) => listOf(r)?.title ?? null);
   const me = plain(from.me);
   const out: FirstDraft[] = [];
+  const people = listOf(PEOPLE);
   for (const { said, told } of read) {
+    /* THE PEOPLE AROUND THEM FIRST, never the task Tell would make of the sentence. */
+    const around = people === undefined ? null : peopleAround(said);
+    if (around !== null && people !== undefined) {
+      for (const name of around.names) {
+        const key = `${PEOPLE}:${plain(name)}`;
+        if (seen.has(key) || (me !== '' && plain(name) === me)) continue;
+        seen.add(key);
+        out.push({ key, rows: [{ register: PEOPLE, fields: { [people.title]: name } }], main: 0, list: people.name, titleField: people.title, title: name, detail: around.detail === '' ? null : around.detail, amount: null, day: null, by: 'rules' });
+      }
+      continue;
+    }
     if (ABOUT_ME.test(said) && !DOING.test(said)) continue;
     const rows = told.rows;
     /* ONE FIELD STILL NEEDED IN THE WHOLE SENTENCE IS ASKED ON THE CARD; MORE IS NO DRAFT. */
@@ -338,7 +380,7 @@ export function summaryOf(reply: Pick<SetupReply, 'summary'>): string | null {
 export function tellListsOf(modules: readonly string[], today: string): TellList[] {
   const out: TellList[] = [];
   for (const m of modules) {
-    const doc = moduleDocument(null, m, { today });
+    const doc = listDocument(m, today);
     for (const d of Array.isArray(doc?.declarations) ? (doc.declarations as Record<string, unknown>[]) : []) {
       if (typeof d.register !== 'string' || !Array.isArray(d.fields) || out.some((l) => l.id === d.register)) continue;
       const fields = d.fields as TellList['fields'];

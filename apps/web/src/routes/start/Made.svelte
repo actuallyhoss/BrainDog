@@ -48,6 +48,7 @@
   import type { SaidMade } from '$lib/start/made.ts';
   import { beginDrafts, draftsFor, firstDrafts } from '$lib/start/first-drafts.svelte.ts';
   import { recordToday } from '$lib/record/zone.ts';
+  import { currencyGuessed } from '$lib/start/place-currency.ts';
   import { afterNavigate, goto } from '$app/navigation';
 
   let made: {
@@ -86,15 +87,27 @@
     const s = made.said;
     const boot = page.data.live === true ? page.data.index : null;
     if (!s || !boot) return;
-    beginDrafts({
-      base,
-      said: s.said,
-      built: s.built,
-      registers: (boot.registers ?? []).map((r: { id: string }) => r.id),
-      currency: boot.currency ?? boot.record?.currency ?? null,
-      me: boot.me?.name ?? null,
-      today: recordToday(),
-    });
+    /* EVERY LIST THE NEW BRAINDOG DECLARES (audit AP1): `index.registers` is the rail's, only the lists that hold
+       something, which on a BrainDog a moment old is People and little else, so the model was offered People alone.
+       `lists` is every list `boot` declared; and the modules just installed here, where this screen's shell is the one
+       from before the build. */
+    const declared = (page.data.lists ?? []).filter((l: { kernel?: true }) => l.kernel !== true).map((l: { id: string }) => l.id);
+    const held = (boot.registers ?? []).map((r: { id: string }) => r.id);
+    void import('$lib/start/lists.ts')
+      .then(({ listsOf }) => (made.modules ?? []).flatMap((m) => listsOf(m).map((l) => l.id)))
+      .catch(() => [] as string[])
+      .then((installed) =>
+        beginDrafts({
+          base,
+          said: s.said,
+          built: s.built,
+          registers: [...new Set([...declared, ...held, ...installed])],
+          /* AND THE ONE SIGN-UP SAID, where the record keeps none of its own (AP9). */
+          currency: boot.currency ?? boot.record?.currency ?? currencyGuessed(base),
+          me: boot.me?.name ?? null,
+          today: recordToday(),
+        }),
+      );
   });
   const drafting = $derived(firstDrafts.now !== null && firstDrafts.now.base === apiBase() ? firstDrafts.now : null);
   /*
@@ -207,13 +220,16 @@
 
 <svelte:window onkeydown={enterToday} />
 
-<section class="made" aria-labelledby="made-h" data-forming="made">
+<!-- THE TILES RISE ON THEIR OWN, never inside a wrapper rising too (AP12): two fades multiplied left the screen blank
+     for the first quarter second. -->
+<section class="made" aria-labelledby="made-h">
   <div class="made-tile" data-forming="made-first">
     <header class="head">
       <p class="made-line">{madeLine}</p>
       <h1 class="entry-title" id="made-h" tabindex="-1" bind:this={heading}>{firstWords.title}</h1>
       <p class="entry-lede">{firstWords.sub(lists)}</p>
-      {#if draftLine !== null}
+      <!-- NOTHING TO SAY IS NO LINE (AP11): the held line left a hole over Go to Today on the common screen. -->
+      {#if draftLine}
         <p class="draft-line" role="status" data-forming="drafts-line" data-state={drafting?.state}>{draftLine}</p>
       {/if}
     </header>
@@ -313,9 +329,8 @@
     gap: var(--sp-2);
   }
 
-  /* THE MODEL'S LINE (1 Nov): one held line, so it reading and then saying what it found moves nothing under it. */
+  /* THE MODEL'S LINE (1 Nov): one line, while it reads and once something waits; none otherwise. */
   .draft-line {
-    min-block-size: 22px;
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-body);
@@ -328,6 +343,12 @@
   }
 
   /* THE SECOND STEP READS AS ONE: a heading in the head size, under the page's title, never a second page title. */
+  /* THE HEADING TAKES THE FOCUS SO A KEYBOARD STARTS HERE, AND WEARS NO RING (AP11): it is no control, and the ring drew
+     a hard square box round the screen's title. */
+  .entry-title[tabindex='-1']:focus {
+    outline: none;
+  }
+
   .agent-h {
     margin: 0;
     color: var(--ink);

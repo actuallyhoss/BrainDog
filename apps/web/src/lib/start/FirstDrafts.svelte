@@ -22,7 +22,7 @@
 
   import { apiBase } from '$lib/at.ts';
   import { reread } from '$lib/data/live.svelte.ts';
-  import type { TellOptions } from '$lib/tell/read.ts';
+  import type { TellList, TellOptions } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import Money from '$lib/ui/Money.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -69,24 +69,47 @@
   let rules = $state.raw<FirstDraft[]>([]);
   let merge = $state.raw<((m: readonly FirstDraft[], r: readonly FirstDraft[]) => FirstDraft[]) | null>(null);
   let fill = $state.raw<((d: FirstDraft, value: string) => FirstDraft) | null>(null);
+  /** The lists the words were last read against, so a kept draft's every entry can be named by its list's title. */
+  let readLists: readonly TellList[] = [];
   $effect(() => {
     const said = kept?.begin.said ?? '';
     const built = kept?.begin.built ?? [];
     const me = kept?.begin.me ?? null;
-    const opts = options;
+    const registers = kept?.begin.registers ?? [];
+    const today = kept?.begin.today ?? options.today;
+    const back = kept?.back ?? [];
+    /* A DRAFT PUT BACK BY UNDO IS NOBODY KEPT YET (AP3): Today still remembers the name the undo took out of the record,
+       and Tell then read "Mum's birthday is 14 November" as news about Mum, not Mum, so the draft never came back. */
+    const gone = (register: string, name: string): boolean => back.includes(`${register}:${name.replace(/\s+/gu, ' ').trim().toLowerCase()}`);
+    const opts: TellOptions =
+      back.length === 0
+        ? options
+        : {
+            ...options,
+            ...(options.people ? { people: options.people.filter((k) => !gone('people', k.name)) } : {}),
+            ...(options.titled ? { titled: Object.fromEntries(Object.entries(options.titled).map(([r, ks]) => [r, ks.filter((k) => !gone(r, k.name))])) } : {}),
+          };
     if (said === '') return;
-    let gone = false;
+    let off = false;
     void Promise.all([import('$lib/tell/read.ts'), import('./first-drafts.ts')]).then(([{ tellRead }, d]) => {
-      if (gone) return;
+      if (off) return;
+      /* READ AGAINST EVERY LIST THE BUILD MADE, NOT ONLY THE ONES TODAY HAS LEARNED (audit AP2): Today learns a list's
+         declaration as a screen reads it, so on a first Today the card read the words against a list or two, found
+         nothing, and closed itself for good a moment before the rest arrived. The record's own lists first, with its
+         names and people; each list the modules declare that Today has not learned yet beside them. */
+      const own = new Set(opts.lists.map((l) => l.id));
+      const lists = [...opts.lists, ...d.tellListsOf(d.modulesHeld(registers), today).filter((l) => !own.has(l.id))];
+      readLists = lists;
+      const read = { ...opts, lists, currency: opts.currency ?? kept?.begin.currency ?? null };
       merge = d.mergeDrafts;
       fill = d.filled;
       rules = d.draftsFromTold(
-        d.clausesOf(said).map((c) => ({ said: c.said, told: tellRead(c.text, opts) })),
-        opts.lists,
+        d.clausesOf(said).map((c) => ({ said: c.said, told: tellRead(c.text, read) })),
+        lists,
         { built, me },
       );
     });
-    return () => (gone = true);
+    return () => (off = true);
   });
 
   /** A draft's words as changed here, by key, laid over it until it is kept. */
@@ -108,7 +131,10 @@
       const was = d.rename ? options.lists.find((l) => l.id === d.rename!.list)?.name : undefined;
       return d.rename && was ? { ...d, list: was, detail: say.renameWhat(was), rename: { ...d.rename, was } } : d;
     };
-    return all.filter((d) => !kept.gone.includes(d.key) && !held(d)).map((d) => now(edits[d.key] ?? d));
+    /* A DRAFT PUT BACK BY UNDO IS DRAWN WHATEVER THE TAB STILL REMEMBERS (audit AP3): the names Today knows are read
+       before the record's undo is, so the one just taken out still read as held and the card closed on it again. */
+    const back = kept.back ?? [];
+    return all.filter((d) => !kept.gone.includes(d.key) && (back.includes(d.key) || !held(d))).map((d) => now(edits[d.key] ?? d));
   });
 
   /* NOTHING LEFT, NOTHING READING: the card says it is done, so Today stops loading it. Only once Tell's reading is in. */
@@ -136,9 +162,13 @@
   let editText = $state('');
   let list = $state<HTMLElement | undefined>(undefined);
 
-  /* AFTER A PRESS, THE NEXT DRAFT'S KEEP TAKES THE FOCUS, so a keyboard goes down the card without starting over. */
+  /* AFTER A PRESS, THE NEXT DRAFT'S KEEP TAKES THE FOCUS, so a keyboard goes down the card without starting over; after
+     the last, Tell's field, where the next thing is typed, never the page (audit AP15). */
   function focusNext(): void {
-    requestAnimationFrame(() => list?.querySelector<HTMLElement>('[data-draft] button')?.focus());
+    requestAnimationFrame(() => {
+      const next = list?.isConnected ? list.querySelector<HTMLElement>('[data-draft] button') : null;
+      (next ?? document.querySelector<HTMLElement>('[data-tell-one] .tell-one-field'))?.focus({ preventScroll: next === null });
+    });
   }
 
   /**
@@ -189,6 +219,16 @@
     }
     const client = createClient({ base });
     const keys = these.map((d) => d.key);
+    /* EVERY ENTRY A DRAFT WRITES, by its list and title ("people:salma" beside "obligations:salma owes you"): an Undo
+       takes all of them out, and each must read as nobody kept yet, or the draft kept again points at the person the
+       Undo deleted. */
+    const written = these.flatMap((d) =>
+      d.rows.flatMap((r) => {
+        const title = readLists.find((l) => l.id === r.register)?.title;
+        const v = title ? r.fields[title] : undefined;
+        return typeof v === 'string' && v.trim() !== '' ? [`${r.register}:${v.replace(/\s+/gu, ' ').trim().toLowerCase()}`] : [];
+      }),
+    );
     /* EACH DRAFT'S ENTRIES IN ONE CAPTURE, each `$row` pointed again past the drafts before it. */
     const sent: { register: string; fields: Record<string, unknown> }[] = [];
     for (const d of these) {
@@ -203,8 +243,8 @@
     }
     await run({
       /* OFF THE CARD AT ONCE, back on it if the record says no. */
-      apply: () => settleDrafts(base, keys),
-      revert: () => restoreDrafts(base, keys),
+      apply: () => settleDrafts(base, [...keys, ...written]),
+      revert: () => restoreDrafts(base, [...keys, ...written]),
       send: async () => {
         const answer = await client.capture({ rows: sent });
         if (answer.ok) return { ok: true as const, value: answer.value };
@@ -218,7 +258,7 @@
       /* THE TOAST'S UNDO TAKES THEM BACK OUT OF THE RECORD AND PUTS THE DRAFTS BACK ON THE CARD: the record's undo reads
          the screen again through this, and only once it has put them back. */
       reread: () => {
-        restoreDrafts(base, keys);
+        restoreDrafts(base, [...keys, ...written]);
         void invalidateAll();
         return reread();
       },
@@ -331,7 +371,7 @@
                 <Button
                   size="sm"
                   weight={drafts.length > 1 ? 'quiet' : 'primary'}
-                  disabled={busy || (d.needs !== undefined && (needVals[d.key] ?? '').trim() === '')}
+                  disabled={busy}
                   onclick={() => (d.needs === undefined ? void keep([d]) : keepNeeded(d))}>{say.keep}</Button
                 >
                 <Button size="sm" weight="quiet" onclick={() => change(d)}>{say.change}</Button>

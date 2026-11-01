@@ -13,7 +13,7 @@
  * A plain `.ts` with relative imports, so `node --test` can hold it; the screen only calls it.
  */
 
-import { MODULE_ORDER } from '@braindog/seed/usecases';
+import { MODULE_ORDER, USE_CASES, useCaseDocument } from '@braindog/seed/usecases';
 import { moduleDocument } from '@braindog/seed/usecases/install';
 import { moduleName } from '@braindog/seed/usecases/names';
 import { exponentOf } from 'braindog-render';
@@ -35,11 +35,32 @@ const spoken = (id: string): string => {
 
 const cache = new Map<string, List[]>();
 
-/** The lists one module declares, each with its fields; one that only extends another list's fields is left out. */
+/** A use case's own pack, as a record names it (`usecase-shop`). */
+const USECASE = /^usecase-(.+)$/u;
+
+/**
+ * THE DOCUMENT A MODULE OR A STARTER'S OWN PACK DECLARES ITS LISTS IN (1 Nov, audit AP1): a shop's Orders and Products
+ * are its starter's, not a module's, and the drafts read after sign-up offered only the modules' lists, so a shop's
+ * "Salma owes me 600" had nowhere to go.
+ */
+export function listDocument(id: string, today = '1970-01-01'): Body | null {
+  const usecase = USECASE.exec(id)?.[1];
+  return usecase !== undefined ? useCaseDocument(usecase, today) : moduleDocument(null, id, { today });
+}
+
+/** The starter's own pack (`usecase-shop`) that declares a list no module does, or `null`. */
+export function useCaseOfList(register: string): string | null {
+  for (const u of USE_CASES)
+    for (const d of (u.pack?.declarations ?? []) as unknown[])
+      if (isMap(d) && d.register === register && Array.isArray(d.fields) && d.page === undefined && d.rule === undefined) return `usecase-${u.usecase}`;
+  return null;
+}
+
+/** The lists one module (or one starter's own pack) declares, each with its fields; one that only extends another list's fields is left out. */
 export function listsOf(module: string): List[] {
   const held = cache.get(module);
   if (held) return held;
-  const doc = moduleDocument(null, module, { today: '1970-01-01' });
+  const doc = listDocument(module);
   const out: List[] = [];
   for (const d of Array.isArray(doc?.declarations) ? (doc.declarations as unknown[]) : []) {
     if (!isMap(d) || typeof d.register !== 'string' || !Array.isArray(d.fields)) continue;

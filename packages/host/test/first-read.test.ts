@@ -99,11 +99,11 @@ test('an empty sentence, a sentence too long and a day that is not a date are re
   }
 });
 
-test('off, without a reader or without a bot check, the door answers 501 and simple rules read it', async () => {
+test('off, without a reader or without a bot check, the door answers 200 that it is off and simple rules read it', async () => {
   for (const over of [{ on: false }, { read: null }, { botCheck: null }] as Partial<FirstReadDoor>[]) {
     const { door, seen } = fakeDoor(over);
     const { status, out } = await answer(await serveFirstRead(ask(good), door, NOW));
-    assert.equal(status, 501);
+    assert.equal(status, 200);
     assert.deepEqual(out.refusal, { code: 'NOT_IN_THIS_BUILD', fix: FIRST_READ_OFF });
     assert.equal(seen.reads.length + seen.takes.length, 0);
   }

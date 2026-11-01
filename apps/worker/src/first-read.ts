@@ -4,9 +4,9 @@
  *
  * OFF AS SHIPPED, AND ONLY THE OPERATOR SWITCHES IT ON. Each reading is a model call that costs money, and a stranger's
  * words reach a model only after the operator's yes, so the door is `on` only where `FIRST_READ_DAILY` is a whole number
- * above 0: that number is both the operator's yes and the day's ceiling across every stranger. Unset or 0, the door answers 501 and the page reads by rules.
+ * above 0: that number is both the operator's yes and the day's ceiling across every stranger. Unset or 0, the door answers that it is off (a 200) and the page reads by rules.
  * Even on, it reads nothing without the included model (`includedInference`), a reader (`readSetup`, handed in), a bot
- * check keyed by both Turnstile keys (`turnstile.ts`) and a place to count in (`MeterStore`); any one missing is the same 501.
+ * check keyed by both Turnstile keys (`turnstile.ts`) and a place to count in (`MeterStore`); any one missing is the same answer.
  *
  * THE COUNT IS THE DIRECTORY'S. Six readings a day for one address and the ceiling for all are counted by key and UTC
  * day over `MeterStore`, which the Cloud hands as the Directory's `firstReadHit`; `store: null` keeps the door off.

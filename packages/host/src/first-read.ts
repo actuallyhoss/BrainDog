@@ -9,7 +9,7 @@
  * Then the body's keys, exactly `said`, `today`, `zone`, `locale` and `turnstile`; another is refused by name.
  *
  * SWITCHED OFF UNLESS ALL THREE ARE THERE. A model reads a stranger's words only when the owner turned it `on`, a
- * reader is bound, and a bot check is keyed; otherwise a 501 the page reads as "simple rules read it". Then the bot
+ * reader is bound, and a bot check is keyed; otherwise a 200 saying so, which the page reads as "simple rules read it". Then the bot
  * check, then the meter (six readings for one address a day, and one ceiling for all strangers), and only then the
  * reader, whose own refusal comes back with its code kept (`UNREACHABLE`, `PROPOSAL_SCHEMA`, `SLASH_BUDGET_SPENT`).
  *
@@ -102,7 +102,9 @@ export async function serveFirstRead(request: Request, door: FirstReadDoor, now 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) return refused(400, 'BODY_MALFORMED', 'today is the date where you are, written as 2026-10-14.', 'today');
 
   const read = door.read;
-  if (!door.on || read === null || door.botCheck === null) return refused(501, 'NOT_IN_THIS_BUILD', FIRST_READ_OFF);
+  /* OFF IS AN ANSWER, NOT A FAILURE (onboarding audit AP31): a 200 that says no model reads here, which the page reads as
+     the rules reading, where a 501 put a red line in every stranger's console on every sign-up. */
+  if (!door.on || read === null || door.botCheck === null) return refused(200, 'NOT_IN_THIS_BUILD', FIRST_READ_OFF);
 
   const ip = firstReadIp(request);
   const token = typeof body['turnstile'] === 'string' ? body['turnstile'] : '';

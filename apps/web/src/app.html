@@ -166,6 +166,11 @@
       and the only complete spellings in this file are the two that are meant to be replaced.
     -->
     <!--
+      THE ENTRY SCREENS DRAW NO TOP BAR (onboarding audit AP12): sign-up, sign in and the made screen at `/start` are the
+      ground and the brand alone, so the shell's white strip drawn while they load was a bar they never have.
+    -->
+    <script>try{if(/^\/(?:[a-z0-9-]+\/)?(?:start|signup|signin)\/?$/.test(location.pathname))document.documentElement.setAttribute('data-entry','')}catch(e){}</script>
+    <!--
       THE GROUND AND THE TOP BAR, as the shell draws them (19 October): the ground, and the bar's white strip 56 tall with
       one hairline under it. Every value falls back to something that draws, because the tokens may not have arrived
       yet. The strip is the default shape's; the side rail or the menu is drawn right the moment the app is there.
@@ -198,6 +203,10 @@
 
       body:has(#main)::before,
       body:has(#main)::after {
+        content: none;
+      }
+
+      [data-entry] body::after {
         content: none;
       }
     </style>
