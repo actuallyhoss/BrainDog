@@ -974,6 +974,21 @@ const DECLARED: Record<string, Version> = {
       'Estate 2.6.1, folded before it shipped (audit 6g, AG3): the notes `rule.renewal-kept` and `rule.renewal-cancelled` leave say Needs you, the place, where they said Decide; no id added or taken away -> f0fd333b99e642ce',
     ],
   },
+  /** A VERSION AND NOT A RESET: estate's last version is on `origin/master`. */
+  'estate@2.7.0': {
+    holds: `
+      metric.domains-held metric.estate-month metric.estate-month-by-kind metric.estate-year metric.lapsing metric.points-nowhere
+      metric.project-cost metric.renews-30d metric.renews-90d metric.services-held
+      page.estate page.service
+      register.services
+      rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
+      setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
+    `,
+    declares: 'ebb6356be5fc129c',
+    history: [
+      'Estate 2.7.0 of 1 November (lists review, L36): `metric.points-nowhere` counts domains only, `page.estate` names each domain that points at nothing in a table where a note said "something", and its Next ninety days says each renewal\'s cost where it said who it is with; no id added or taken away -> ebb6356be5fc129c',
+    ],
+  },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
   'work@1.11.0': {
     holds: `

@@ -251,7 +251,9 @@ export const ESTATE_METRICS: Record<string, SeedMetric> = {
     metric: 'points-nowhere',
     name: 'Points at nothing',
     source: 'register.services',
-    where: 'state is live, points_at is empty',
+    /* A DOMAIN, SINCE estate 2.7.0 (the lists review, L36): the tile under it names each one, and GitHub or a gym
+       membership points at nothing because it is not a thing that points. */
+    where: 'kind is domain, state is live, points_at is empty',
     value: { count: 'id' },
     format: 'int',
     target: { lte: 0 },
@@ -418,13 +420,18 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
       },
       {
         /* UNDER THE LINE, SINCE estate 2.1.0, because it is the one tile here that needs the person: a domain still paid
-           for that resolves nowhere. */
-        kind: 'note',
-        tone: 'warn',
+           for that resolves nowhere. WHICH ONE, BY NAME, SINCE estate 2.7.0 (the lists review, L36): the note said
+           "Something here renews and points at nothing" and nothing on the page said which; each one now, with who it
+           is with, when it renews and what it costs. */
+        kind: 'table',
         heading: 'Points at nothing',
         icon: 'circle-alert',
         span: 12,
-        body: 'Something here renews and points at nothing. A domain that resolves nowhere still costs what it costs.',
+        source: 'register.services',
+        where: 'kind is domain, state is live, points_at is empty',
+        columns: [{ field: 'name' }, { field: 'provider' }, { field: 'renews' }, { field: 'cost' }],
+        order: [{ field: 'renews', dir: 'asc' }],
+        limit: 6,
         /* AND THE GATE COUNTS THE SET THE SENTENCE IS ABOUT. It counted `lapsing`, which is one row
            and that row points somewhere, while the services that point nowhere are all live: the
            note drew, truthfully-looking, about rows it was not describing. */
@@ -487,7 +494,9 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
            30-day money tiles were bounded below to fix. `after yesterday` is exclusive, so today
            still counts. */
         where: 'state is not cancelled, renews after yesterday, renews before +90d',
-        columns: [{ field: 'renews' }, { field: 'name' }, { field: 'provider' }],
+        /* THE DAY, THE NAME AND WHAT IT COSTS, SINCE estate 2.7.0 (the lists review, L36): the third column was who it is
+           with, which for GitHub, Vercel and Shopify is the name again ("GitHub … GitHub"). */
+        columns: [{ field: 'renews' }, { field: 'name' }, { field: 'cost' }],
         source: 'register.services',
         order: [{ field: 'renews', dir: 'asc' }],
         limit: 8,
