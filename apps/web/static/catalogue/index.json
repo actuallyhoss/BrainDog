@@ -7907,8 +7907,65 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.2",
+      "latest": "2.0.3",
       "versions": [
+        {
+          "version": "2.0.3",
+          "checksum": "d3ab71c18e65f36aaba32e0c2d890dd85e9f596f55d793141a2a7611fce46a6a",
+          "bytes": 35778,
+          "published_at": "2026-11-01T01:30:54.338Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core",
+              "holdings"
+            ],
+            "lists": [
+              "Zakat working",
+              "Cash at its lowest",
+              "Zakat given"
+            ],
+            "pages": [
+              "Zakat"
+            ],
+            "rules": [
+              "zakat_inputs",
+              "zakat_rate",
+              "zakat_metals"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.gold_rates",
+                "writes": false
+              },
+              {
+                "id": "register.holdings",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Says step 1 before step 2 when there is no gold rate yet, and links to where the rate is set.",
+          "preview": true
+        },
         {
           "version": "2.0.2",
           "checksum": "a054435bef5f1b82a337c02c95c9d8b43fe5ddafc8d36aceadf48bc09e318bc9",
