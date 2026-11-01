@@ -75,7 +75,7 @@ export type InferenceReply = {
   usage: { in: number; out: number };
 };
 
-export type ModelId = 'llama-3.2-1b' | 'glm-5.3-flash' | 'glm-5.3' | 'bge-m3';
+export type ModelId = 'llama-3.2-1b' | 'glm-5.3-flash' | 'glm-5.3' | 'bge-m3' | 'gemma-4-26b-a4b';
 /** Neurons per million tokens, `08 §6`. */
 export type ModelRate = { in: number; out: number };
 
@@ -84,7 +84,7 @@ export type ModelRate = { in: number; out: number };
  * an automation's question, `setup` and `mapping` are the first run's two asks, and the other five of the eight have no
  * caller here yet.
  */
-export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' | 'mapping' | 'chat';
+export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' | 'mapping' | 'chat' | 'turn';
 
 export type PromptTemplate = {
   /** The purpose the host's route is asked for; every template in `PROMPTS` says one (`SlashPurpose` below). */
@@ -99,6 +99,8 @@ export type PromptTemplate = {
   schema: object;
   /** The `%SLOT%` names `user` substitutes, whole, in one pass, never re-scanned. */
   slots: readonly string[];
+  /** `false`: asked on its own model, never walked down the host's route (`prompts.ts`). */
+  walks?: false;
 };
 
 /**

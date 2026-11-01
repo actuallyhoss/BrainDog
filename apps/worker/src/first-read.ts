@@ -167,8 +167,8 @@ export function catalogueOffer(assets: Assets | undefined, log: (line: string) =
 /** The reader bound to one model, or `null` without either. A throw is the model not reached, with its real code kept. */
 export function readerOver(readSetup: ReadSetup | null, model: Inference | undefined): FirstReadDoor['read'] {
   if (readSetup === null || model === undefined) return null;
-  return async ({ said, offer, today, asked }) => {
-    const out = await readSetup({ said, offer: offer as SetupOffer, today, ...(asked === undefined ? {} : { asked }) }, model);
+  return async ({ said, offer, today, asked, quick }) => {
+    const out = await readSetup({ said, offer: offer as SetupOffer, today, ...(asked === undefined ? {} : { asked }), ...(quick === true ? { quick } : {}) }, model);
     if (out.ok) return { ok: true, value: out.value };
     /* A READING CHANGES NOTHING, so a conflict cannot come back; were one to, it is the model's answer not kept. */
     if (!('refusal' in out)) return { ok: false, refusal: { code: 'PROPOSAL_SCHEMA', fix: 'The reader answered something that is not a reading.' } };

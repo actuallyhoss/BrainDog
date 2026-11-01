@@ -502,6 +502,7 @@ const KINDS: Readonly<Record<PromptId, CallKind>> = {
   setup: 'read',
   mapping: 'read',
   chat: 'read',
+  turn: 'read',
 };
 
 /** A throw the host marked as a ceiling saying no before anything was sent: true of every candidate after it too. */
@@ -743,7 +744,8 @@ export const core = (
     /* THE WALK, only where the host handed a route and the ask is the template's own: his own key (`b`) and a
        model he named are his choice and never fall to another, so either is asked as before. No route, or an empty one,
        is the one call this function always made. */
-    const walk = route === undefined || model !== template.model || settings().tier === 'b' ? [] : route(template.purpose);
+    /* A TEMPLATE THAT SAYS IT IS NEVER WALKED (`walks: false`, the conversation's turn) is asked on its own model too. */
+    const walk = route === undefined || template.walks === false || model !== template.model || settings().tier === 'b' ? [] : route(template.purpose);
     if (walk.length === 0) return (await ask(model, args.inference ?? fallback, t0)).ran;
 
     let start = t0;

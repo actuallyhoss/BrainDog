@@ -603,8 +603,10 @@ async function pattern<C>(body: Record<string, unknown>, door: SlashAskDoor<C>, 
  * which the first run reads as "use the rules".
  */
 async function firstRun<C>(route: 'setup' | 'mapping', body: Record<string, unknown>, door: SlashAskDoor<C>, ctx: C): Promise<Response> {
-  /* `first` IS THE OWNER'S SIGN-UP WORDS, read once on the house (`FIRST_WORDS` in `packages/slash/src/propose.ts`). */
-  const takes = route === 'setup' ? ['said', 'offer', 'today', 'first'] : ['file', 'columns', 'sample', 'lists'];
+  /* `first` IS THE OWNER'S SIGN-UP WORDS, read once on the house (`FIRST_WORDS` in `packages/slash/src/propose.ts`).
+     `asked` IS THE CONVERSATION'S QUESTIONS SO FAR, which the page has sent since 1 November and this door refused by name,
+     so every answer after the first was read by the rules; `quick` asks one turn of it (`turn`), not the whole reading. */
+  const takes = route === 'setup' ? ['said', 'offer', 'today', 'first', 'asked', 'quick'] : ['file', 'columns', 'sample', 'lists'];
   const stray = Object.keys(body).find((k) => !takes.includes(k));
   if (stray !== undefined)
     return refusal(422, { code: 'FIELD_UNKNOWN', fix: `${stray} is not something this call takes. It takes ${takes.join(', ')}.`, at: stray, allowed: takes });

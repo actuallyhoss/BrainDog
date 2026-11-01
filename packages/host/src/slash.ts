@@ -704,7 +704,7 @@ export interface SlashInference {
 }
 
 /**
- * The package's routing short names, the four `ModelId`s of `packages/slash/src/prompts.ts`, WRITTEN OUT AND NOT IMPORTED.
+ * The package's routing short names, the five `ModelId`s of `packages/slash/src/prompts.ts`, WRITTEN OUT AND NOT IMPORTED.
  *
  * `packages/host` MUST NOT DEPEND ON `@braindog/slash` (`31 §2` puts the package at row 13, and `46 §5.1` has only the app
  * `import()` it, and only when it has a model to offer), so reading `MODELS` here would be the edge that rule forbids,
@@ -713,7 +713,7 @@ export interface SlashInference {
  * the package's own `MODELS` through this rule (a test may reach across; `graph.mjs` reads `src/**` alone), so that drift is
  * a red test and not a silent refusal.
  */
-const ROUTING_NAMES: ReadonlySet<string> = new Set(['llama-3.2-1b', 'glm-5.3-flash', 'glm-5.3', 'bge-m3']);
+const ROUTING_NAMES: ReadonlySet<string> = new Set(['llama-3.2-1b', 'glm-5.3-flash', 'glm-5.3', 'bge-m3', 'gemma-4-26b-a4b']);
 
 /** What the endpoint is sent for what the package asked: `SLASH_MODEL` in place of a short name, anything else as it came. */
 const modelSent = (asked: string, configured: string | undefined): string =>

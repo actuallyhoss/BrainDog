@@ -203,8 +203,8 @@ export function selfhostFirstReadDoor(env: Record<string, string | undefined>, d
     read:
       readSetup === null || model === undefined
         ? null
-        : async ({ said, offer, today, asked }) => {
-            const out = await readSetup({ said, offer: offer as SetupOffer, today, ...(asked === undefined ? {} : { asked }) }, model);
+        : async ({ said, offer, today, asked, quick }) => {
+            const out = await readSetup({ said, offer: offer as SetupOffer, today, ...(asked === undefined ? {} : { asked }), ...(quick === true ? { quick } : {}) }, model);
             if (out.ok) return { ok: true, value: out.value };
             if (!('refusal' in out)) return { ok: false, refusal: { code: 'PROPOSAL_SCHEMA', fix: 'The reader answered something that is not a reading.' } };
             return { ok: false, refusal: { code: out.refusal.code, fix: out.refusal.fix } };

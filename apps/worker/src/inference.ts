@@ -108,7 +108,7 @@ export type AiDeps = { fetch?: typeof fetch | undefined; log?: ((line: string) =
  * 231.8 × $0.011 / 1,000 = $0.00255. The table reproduces the published figure to the cent it is
  * quoted at, so the arithmetic below is the same arithmetic `08 §6` costed the product with.
  */
-type Rate = { provider: string; shape: Shape; inPerM: number; outPerM: number; effort?: Effort | undefined };
+type Rate = { provider: string; shape: Shape; inPerM: number; outPerM: number; effort?: Effort | undefined; thinks?: false | undefined };
 
 /**
  * HOW HARD A ROW THAT REASONS IS ASKED TO THINK BEFORE IT ANSWERS, sent as `reasoning_effort`. Absent on a row that does not
@@ -152,9 +152,25 @@ type Effort = 'low' | 'high' | 'max';
  */
 type Shape = 'text' | 'chat';
 
+/*
+ * `gemma-4-26b-a4b` IS THE FIRST RUN'S CONVERSATION, ONE TURN AT A TIME (`turn` in `packages/slash/src/prompts.ts`), and
+ * nothing else. Measured on 1 November through this account's binding, the turn's own prompt (about 700 tokens in):
+ *
+ *   `glm-5.3-flash` at `low`   3.3 to 7.6 s, and 11 and 22 s for a bare `{"ok":true}`; it cannot stop thinking
+ *   `gemma-4-26b-a4b`          0.8 to 3.9 s, median about 2.2 s, 40 to 57 tokens out, with its thinking off
+ *   `llama-4-scout-17b`        1.1 to 4.2 s, and questions that asked what was already said
+ *   `llama-3.3-70b-fp8-fast`   2.4 to 9.7 s, and questions cut to "How much?"
+ *   `mistral-small-3.1-24b`    1.8 to 6.2 s
+ *
+ * Its questions were the best of the fast ones ("What kind of things do you sell at the markets?"), it is a third of the
+ * flash model's price, and it is a `chat` row (`ChatCompletionsInput` in `@cloudflare/workers-types` 5.20260907.1).
+ * `thinks: false` sends `chat_template_kwargs: { enable_thinking: false }`, the platform's own switch for a model that
+ * reasons by default; with it on, the same turn spent its whole ceiling thinking.
+ */
 const MODELS: Record<string, Rate> = {
   'llama-3.2-1b': { provider: '@cf/meta/llama-3.2-1b-instruct', shape: 'text', inPerM: 2_455, outPerM: 18_273 },
   'glm-5.3-flash': { provider: '@cf/zai-org/glm-5.3-flash', shape: 'chat', inPerM: 13_636, outPerM: 45_455, effort: 'low' },
+  'gemma-4-26b-a4b': { provider: '@cf/google/gemma-4-26b-a4b-it', shape: 'chat', inPerM: 9_091, outPerM: 27_273, thinks: false },
 };
 
 /**
@@ -583,6 +599,8 @@ export function aiInference(env: AiEnv, deps: AiDeps = {}): StreamingInference {
       response_format: formatFor(rate.shape, req.schema),
       /* THE ROW'S OWN EFFORT, where it reasons (`Effort`): its thinking is spent from `max_tokens` too. */
       ...(rate.effort === undefined ? {} : { reasoning_effort: rate.effort }),
+      /* AND A ROW THAT MUST NOT THINK AT ALL, where the platform has the switch (`thinks`). */
+      ...(rate.thinks === false ? { chat_template_kwargs: { enable_thinking: false } } : {}),
       ...(onText === undefined ? {} : { stream: true }),
     });
     if ('why' in got) return modelMissing<Completion>(req.model, got.why, got.raw);

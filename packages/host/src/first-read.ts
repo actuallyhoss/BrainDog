@@ -7,7 +7,7 @@
  *
  * THE SAME CHECKS THE SIGN-UP DOORS MAKE, in their order: a POST, from a page on this origin, as JSON, of 8 KB at most.
  * Then the body's keys, exactly `said`, `today`, `zone`, `locale`, `turnstile` and `asked` (what BrainDog asked her so
- * far, in the conversation of 1 Nov); another is refused by name.
+ * far, in the conversation of 1 Nov), and `quick` (one turn of it, read short and fast); another is refused by name.
  *
  * SWITCHED OFF UNLESS ALL THREE ARE THERE. A model reads a stranger's words only when the owner turned it `on`, a
  * reader is bound, and a bot check is keyed; otherwise a 200 saying so, which the page reads as "simple rules read it". Then the bot
@@ -33,7 +33,7 @@ export type FirstReadDoor = {
   meter: { take(ip: string, day: string): Promise<'ok' | 'address' | 'day'> };
   /** What is on offer to be read into: the host's use cases and modules, as the reader takes them. */
   offer(): Promise<unknown>;
-  read: ((ask: { said: string; offer: unknown; today: string; asked?: string }) => Promise<{ ok: true; value: unknown } | { ok: false; refusal: { code: string; fix: string } }>) | null;
+  read: ((ask: { said: string; offer: unknown; today: string; asked?: string; quick?: boolean }) => Promise<{ ok: true; value: unknown } | { ok: false; refusal: { code: string; fix: string } }>) | null;
 };
 
 /** The most a body may be, as the sign-up doors hold it (`SIGNUP_BODY_MAX` in the Worker). */
@@ -49,6 +49,8 @@ export const FIRST_READ_SAID_MOST = 2_000;
 export const FIRST_READ_ASKED_MOST = 1_200;
 
 const KEYS = ['said', 'today', 'zone', 'locale', 'turnstile', 'asked'] as const;
+/** `quick`, a turn of the conversation and not the whole reading (`turn` in `@braindog/slash`): the one key that is not text. */
+const QUICK = 'quick';
 
 export const FIRST_READ_OFF = 'This BrainDog does not read a sign-up with a model, so simple rules read it.';
 export const FIRST_READ_NOT_PERSON = 'The check that you are a person did not pass.';
@@ -97,11 +99,13 @@ export async function serveFirstRead(request: Request, door: FirstReadDoor, now 
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return refused(400, 'BODY_MALFORMED', 'This door takes a JSON object, sent as application/json.');
   const body = parsed as Record<string, unknown>;
-  const extra = Object.keys(body).find((k) => !(KEYS as readonly string[]).includes(k));
-  if (extra !== undefined) return refused(400, 'FIELD_UNKNOWN', `This door takes ${KEYS.join(', ')}, and not ${extra.slice(0, 40)}.`, extra.slice(0, 40));
+  const extra = Object.keys(body).find((k) => k !== QUICK && !(KEYS as readonly string[]).includes(k));
+  if (extra !== undefined) return refused(400, 'FIELD_UNKNOWN', `This door takes ${KEYS.join(', ')} and ${QUICK}, and not ${extra.slice(0, 40)}.`, extra.slice(0, 40));
   for (const k of KEYS) {
     if (body[k] !== undefined && typeof body[k] !== 'string') return refused(400, 'BODY_MALFORMED', `${k} is sent as text.`, k);
   }
+  if (body[QUICK] !== undefined && typeof body[QUICK] !== 'boolean') return refused(400, 'BODY_MALFORMED', `${QUICK} is true or false.`, QUICK);
+  const quick = body[QUICK] === true;
   const said = typeof body['said'] === 'string' ? body['said'] : '';
   const today = typeof body['today'] === 'string' ? body['today'] : '';
   if (said.trim() === '') return refused(400, 'BODY_MALFORMED', 'Say a sentence first, then it can be read.', 'said');
@@ -130,7 +134,7 @@ export async function serveFirstRead(request: Request, door: FirstReadDoor, now 
   }
 
   try {
-    const out = await read({ said, offer: await door.offer(), today, ...(asked.trim() === '' ? {} : { asked }) });
+    const out = await read({ said, offer: await door.offer(), today, ...(asked.trim() === '' ? {} : { asked }), ...(quick ? { quick } : {}) });
     if (out.ok) return reply(200, { ok: true, value: out.value });
     return reply(statusOf(out.refusal.code), { ok: false, refusal: { code: out.refusal.code, fix: out.refusal.fix } });
   } catch {

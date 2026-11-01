@@ -1039,6 +1039,11 @@ export type SetupAsk = {
    * model reads the answers against the questions and asks the next one, never one whose `about` is here already.
    */
   asked?: string;
+  /**
+   * ONE TURN OF THE CONVERSATION, ASKED QUICKLY (1 Nov, lane onboard-speed): the `turn` template, what the answers point
+   * at and the next question, in about fifty tokens on a fast model. The whole reading (`setup`) is asked without it.
+   */
+  quick?: boolean;
 };
 
 /** The setup the model proposed, every id one it was offered and every phrase one the person typed. */
@@ -1062,6 +1067,8 @@ export type SetupAnswer = {
   ask?: SetupQuestion | null;
   /** Who answered, as the ledger names it. */
   by: string;
+  /** A turn's quick answer (`quick` on the ask): its parts, phrases, currency and next question, and no names, entries or summary. */
+  quick?: true;
 };
 
 /** What a question back may be about: the five things a first run builds differently on. */
@@ -1276,6 +1283,7 @@ export const setupAskOf = (raw: unknown): SetupAsk => {
     today: /^\d{4}-\d{2}-\d{2}$/u.test(today) ? today : '',
     ...(r['first'] === true ? { first: true } : {}),
     ...(asked === '' ? {} : { asked }),
+    ...(r['quick'] === true ? { quick: true } : {}),
   };
 };
 
@@ -1313,12 +1321,62 @@ const caseLines = (offer: SetupOffer): string => offer.usecases.map((u) => `${u.
 /** `money-core (Money)` and under it one list a line, `  obligations (Bills and invoices): what, amount, due`. */
 const moduleLines = (offer: SetupOffer): string =>
   offer.modules.map((m) => [`${m.id} (${m.name})`, ...m.lists.map((l) => `  ${l.id} (${l.name}): ${l.fields.join(', ')}`)].join('\n')).join('\n');
+/** A turn's shorter offer: `money-core (Money): Bills and invoices, Accounts, …`, one module a line, no fields. */
+const partLines = (offer: SetupOffer): string =>
+  offer.modules.map((m) => `${m.id} (${m.name})${m.lists.length > 0 ? `: ${m.lists.map((l) => l.name).join(', ')}` : ''}`).join('\n');
+
+/** What a turn may ask about next, in the order the rules ask: each with the words the model is told it means. */
+const TURN_TOPICS: readonly (readonly [SetupAbout, string])[] = [
+  ['work', 'work: the projects, clients or products they work on'],
+  ['money', 'money: what comes in and what goes out'],
+  ['currency', 'currency: which currency their money is in, once money has come up and they named none'],
+  ['people', 'people: who they work with'],
+  ['tools', 'tools: the AI assistants they use, such as Claude, ChatGPT or Cursor, never design or office software'],
+  ['first', 'first: what to keep track of first'],
+];
+
+/** The topics a turn may still ask about: those not asked yet (`asked`), one a line, or a line saying there are none. */
+const openLines = (asked: string | undefined): string => {
+  const done = askedAbouts(asked);
+  const open = TURN_TOPICS.filter(([t]) => !done.has(t)).map(([, line]) => line);
+  return open.length > 0 ? open.join('\n') : 'none: every topic is asked, so about and q are null.';
+};
+
+/**
+ * A TURN'S ANSWER READ INTO A READING'S SHAPE, and then held by `setupOf` as a whole reading is: `parts` are modules or use
+ * cases by id, each with the words it came from (`heard`, said as the part's own name), `case` the use case, `cur` the
+ * currency, and `about`, `q` and `taps` the next question. Nothing here is trusted that `setupOf` does not check again.
+ */
+const turnOf = (raw: Record<string, unknown>, ask: SetupAsk, by: string): SetupAnswer => {
+  const named = new Map<string, string>([...ask.offer.usecases.map((u) => [u.id, u.title] as const), ...ask.offer.modules.map((m) => [m.id, m.name] as const)]);
+  const cases = new Set(ask.offer.usecases.map((u) => u.id));
+  const pairs = (Array.isArray(raw['parts']) ? raw['parts'] : []).flatMap((p) => (Array.isArray(p) && p.length === 2 ? [[textOf(p[0]), textOf(p[1])] as const] : []));
+  const usecase = textOf(raw['case']);
+  const about = textOf(raw['about']);
+  const question = textOf(raw['q']);
+  const reading = {
+    name: null,
+    summary: '',
+    usecase: usecase === '' ? null : usecase,
+    /* A USE CASE NAMED AS A PART IS ONE THEY ALSO DESCRIBED. */
+    also: pairs.filter(([id]) => cases.has(id) && id !== usecase).map(([id]) => id),
+    modules: pairs.filter(([id]) => !cases.has(id)).map(([id]) => id),
+    currency: raw['cur'] ?? null,
+    heard: pairs.flatMap(([id, phrase]) => (named.has(id) ? [{ phrase, became: named.get(id) }] : [])),
+    names: [],
+    rows: [],
+    draft: null,
+    ask: about === '' || question === '' ? null : { about, question, choices: Array.isArray(raw['taps']) ? raw['taps'] : [] },
+  };
+  return { ...setupOf(reading, ask, by), quick: true };
+};
+
 /** `transactions (Ledger): what:text · on:day · direction:enum[in/out]`, one a line. */
 const listLines = (lists: readonly MappingList[]): string =>
   lists.map((l) => `${l.id} (${l.name}): ${l.fields.map((f) => `${f.id}:${f.type}${f.values && f.values.length > 0 ? `[${f.values.join('/')}]` : ''}`).join(' · ')}`).join('\n');
 
 /** One model call for a first-run template, answering the checked object and the name it ran under, or the refusal. */
-type Asking = (question: string, slots: Record<string, string>) => Promise<Result<{ value: Record<string, unknown>; by: string }>>;
+type Asking = (id: 'setup' | 'turn', question: string, slots: Record<string, string>) => Promise<Result<{ value: Record<string, unknown>; by: string }>>;
 
 /**
  * THE STORE-FREE STEP FROM A SENTENCE TO A READING, which both doors take: the ask as the browser or the host handed it,
@@ -1332,11 +1390,23 @@ const setupStep = async (raw: SetupAsk, asking: Asking): Promise<Result<SetupAns
   if (said === '') return no('VALUE_MALFORMED', 'Say who you are first. A blank answer has nothing to read.', { at: 'said' });
   if (ask.offer.usecases.length === 0 && ask.offer.modules.length === 0)
     return no('VALUE_MALFORMED', 'The first run offered nothing to choose from, so the model was not asked.', { at: 'offer' });
-  const out = await asking(firstBytes(said, ASK_BYTES), {
+  const asked = ask.asked === undefined ? 'Nothing yet: this is their first answer, to "What do you do?".' : fenced('asked', ask.asked);
+  /* A TURN IS THE SHORT ASK (`turn`): the parts by their lists' names, the topics still open, and no day. */
+  if (ask.quick === true) {
+    const out = await asking('turn', firstBytes(said, ASK_BYTES), {
+      '%USECASES%': caseLines(ask.offer),
+      '%MODULES%': partLines(ask.offer),
+      '%ASKED%': asked,
+      '%SAID%': fenced('said', said),
+      '%OPEN%': openLines(ask.asked),
+    });
+    return out.ok ? ok(turnOf(out.value.value, { ...ask, said }, out.value.by)) : out;
+  }
+  const out = await asking('setup', firstBytes(said, ASK_BYTES), {
     '%USECASES%': caseLines(ask.offer),
     '%MODULES%': moduleLines(ask.offer),
     '%TODAY%': ask.today === '' ? 'not said' : ask.today,
-    '%ASKED%': ask.asked === undefined ? 'Nothing yet: this is their first answer, to "What do you do?".' : fenced('asked', ask.asked),
+    '%ASKED%': asked,
     '%SAID%': fenced('said', said),
   });
   return out.ok ? ok(setupOf(out.value.value, { ...ask, said }, out.value.by)) : out;
@@ -1386,7 +1456,7 @@ const askedOnce = async (id: PromptId, slots: Record<string, string>, engine: In
  * draws, and the person's press after the mailed link is what builds.
  */
 export const readSetup = (ask: SetupAsk, inference: Inference): Promise<Result<SetupAnswer>> =>
-  setupStep(ask, (_question, slots) => askedOnce('setup', slots, inference));
+  setupStep(ask, (id, _question, slots) => askedOnce(id, slots, inference));
 
 /**
  * The first run's two asks, over the ledger every other ask is held and settled in.
@@ -1412,7 +1482,7 @@ export const setups = (core: Core, fallback: Inference): Setups => {
 
   /** Hold, ask, settle: the one path both asks take, answering the checked object or the refusal the ledger kept. */
   const asked = async (
-    id: 'setup' | 'mapping',
+    id: 'setup' | 'mapping' | 'turn',
     question: string,
     slots: Record<string, string>,
     inference: Inference | undefined,
@@ -1454,7 +1524,7 @@ export const setups = (core: Core, fallback: Inference): Setups => {
     const charge = onHouse ? FIRST_WORDS : PLANNED;
     const stop = owner(ctx) ?? (onHouse ? null : spent(PLANNED));
     if (stop) return { ok: false, refusal: stop };
-    return setupStep(raw, (question, slots) => asked('setup', question, slots, inference, charge));
+    return setupStep(raw, (id, question, slots) => asked(id, question, slots, inference, charge));
   };
 
   const proposeMapping = async (raw: MappingAsk, ctx: CallContext, inference?: Inference): Promise<Result<MappingAnswer>> => {
