@@ -332,7 +332,11 @@ export const runsList = (decl: RegisterDecl | undefined): boolean => decl?.id ==
 /** The key numbers, which open as their readings with a small chart each (`ListKpis`), "List" in the switch (L11). */
 export const kpisList = (decl: RegisterDecl | undefined): boolean => decl?.id === 'kpis';
 
-export const homeViewOf = (decl: RegisterDecl | undefined): View => (groupsOf(decl) ? 'groups' : 'table');
+/* A LIST OF SENTENCES OPENS AS CARDS (1 Nov, L13): Learnings at 1512 was a one-column table of long lines; two columns
+   of cards read them. Its table is `?view=table`. */
+const SENTENCE_LISTS: ReadonlySet<string> = new Set(['learnings']);
+
+export const homeViewOf = (decl: RegisterDecl | undefined): View => (groupsOf(decl) ? 'groups' : decl && SENTENCE_LISTS.has(decl.id) ? 'cards' : 'table');
 
 export const viewOf = (asked: string | null, decl: RegisterDecl | undefined): View => {
   if (asked === 'cards' || asked === 'table') return asked;
@@ -601,6 +605,36 @@ export function atWorkIn(entries: readonly Entry[], now: number): number {
   return working.filter((e) => !(typeof e.fields.parent === 'string' && runs.has(e.fields.parent))).length;
 }
 
+/* HOW MANY OF A CYCLE MAKE A MONTH, for a list that says how often each row renews. */
+const PER_MONTH: Readonly<Record<string, number>> = { weekly: 52 / 12, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12, annual: 1 / 12, annually: 1 / 12 };
+
+/**
+ * THE ROWS' COST A MONTH, said as money ("$628"): the list's first money field over a choice field of how often it
+ * renews (`cycle`, `billing`), each row's amount scaled to a month. Nothing where the rows hold two currencies, a cycle
+ * this cannot scale, or no amounts at all.
+ */
+function monthlyOf(decl: RegisterDecl, rows: readonly Entry[]): string | null {
+  const amount = decl.fields.find((f) => f.type === 'money' && !f.retired);
+  const cycle = decl.fields.find((f) => f.type === 'enum' && /^(cycle|billing|every|period)$/iu.test(f.id));
+  if (!amount || !cycle) return null;
+  let total = 0;
+  let currency: string | null = null;
+  for (const e of rows) {
+    const v = e.fields[amount.id];
+    const c = String(e.fields[cycle.id] ?? '');
+    if (!isMoney(v)) continue;
+    const per = PER_MONTH[c];
+    if (per === undefined) return null;
+    if (currency !== null && v.currency !== currency) return null;
+    currency = v.currency;
+    total += v.amount * per;
+  }
+  if (currency === null || total <= 0) return null;
+  /* A MONTH'S COST IS SAID IN WHOLE UNITS: a yearly plan scaled to a month has cents nobody pays. */
+  const unit = 10 ** exponentOf(currency);
+  return figureSaid({ currency }, Math.round(total / unit) * unit, true);
+}
+
 /**
  * WHAT THE LIST OF RUNS SAYS, COUNTING WHAT ITS ROWS SHOW (1 Nov, L16): "2 at work, 2 open" stood over two working runs
  * and one finished, the open two being the working two. Now each run is counted once, by what its line says: at work,
@@ -621,6 +655,7 @@ const words = {
   open: (n: number) => `${n} open`,
   atWork: (n: number) => `${n} at work`,
   quietRuns: (n: number) => `${n} active but quiet`,
+  aMonth: (said: string) => `${said} a month`,
   finished: (n: number) => `${n} finished`,
   toSettle: (n: number) => `${n} to settle`,
   toShip: (n: number) => `${n} to ship`,
@@ -765,7 +800,9 @@ export function readingOf(
   const next = coming[0]?.v;
   const nextTitle = decl.title && coming[0] ? String(coming[0].e.fields[decl.title] ?? '').trim() : '';
   const tail = next ? `, ${renews && nextTitle ? words.nextNamed(nextTitle, dayWord(next, now)) : words.nextDue(dayWord(next, now))}.` : '.';
-  if (renews && late === 0) return plain(`${lead}${tail}`);
+  /* WHAT IT ALL COSTS A MONTH (1 Nov, L14): "7 renew, $628 a month; next GitHub in 12 days." */
+  const monthly = renews ? monthlyOf(decl, open) : null;
+  if (renews && late === 0) return plain(monthly ? `${lead}, ${words.aMonth(monthly)}; ${tail.slice(2)}` : `${lead}${tail}`);
   return late > 0 ? { before: `${lead}, `, needs: words.late(late), after: tail } : plain(`${lead}, ${words.noneLate}${tail}`);
 }
 
