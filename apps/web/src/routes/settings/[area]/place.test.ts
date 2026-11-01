@@ -116,14 +116,15 @@ test('every area this build declares has an arm in the page that draws it', () =
   for (const id of AREAS.keys()) assert.ok(route.includes(`area === '${id}'`), `the index offers ${id} and no arm draws it`);
 });
 
-test('YOU, THIS BRAINDOG AND DATA: six rows beside six, Data the whole width under them, Keys, Add-ons and Usage listed, Delete last', () => {
-  assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'This BrainDog', 'Data']);
+test('FIVE GROUPS NAMED BY WHAT THEY HOLD, two by two and Your data the whole width under them, Delete last', () => {
+  assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'How it looks', 'Agents and add-ons', 'People and billing', 'Your data']);
   const rows = DEFAULT_GROUPS.map((g) => rowsOf(g).map((r) => r.label));
-  assert.deepEqual(rows[0], ['Appearance', 'Pages', 'Words and money', 'Notifications', 'Keyboard', 'Signing in']);
-  assert.deepEqual(rows[1], ['Agents', 'People & sharing', 'What comes in', 'Keychain', 'Add-ons', 'Health']);
-  assert.deepEqual(rows[2], ['Tidy up', 'Backups', 'Usage', 'Billing', 'Export', 'Delete my BrainDog']);
-  assert.equal(rows[0]!.length, rows[1]!.length, 'the two columns side by side end together');
-  assert.deepEqual(SETTINGS_INDEX.blocks.map((b) => b.span), [6, 6, 12]);
+  assert.deepEqual(rows[0], ['Signing in', 'Notifications', 'Keyboard']);
+  assert.deepEqual(rows[1], ['Appearance', 'Pages', 'Words and money']);
+  assert.deepEqual(rows[2], ['Agents', 'Keychain', 'What comes in', 'Add-ons']);
+  assert.deepEqual(rows[3], ['People & sharing', 'Usage', 'Billing']);
+  assert.deepEqual(rows[4], ['Health', 'Tidy up', 'Backups', 'Export', 'Delete my BrainDog']);
+  assert.deepEqual(SETTINGS_INDEX.blocks.map((b) => b.span), [6, 6, 6, 6, 12]);
   const hrefs = SETTINGS_INDEX.blocks.flatMap((b) => (b.authored ?? []).map((r) => r.cells[1]));
   for (const at of ['/keychain', '/settings/addons', '/usage']) assert.ok(hrefs.includes(at), at);
   assert.ok(!DEFAULT_GROUPS.some((g) => g.areas.some((a) => a.id === 'look')), 'the design book is a setting again');

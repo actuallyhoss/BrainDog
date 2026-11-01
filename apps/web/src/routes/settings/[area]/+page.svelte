@@ -778,6 +778,11 @@
       display: none;
     }
 
+    /* AND THE ROW BEFORE IT, THE LAST ONE DRAWN, TAKES NO RULE UNDER IT: You ended on a hairline over nothing. */
+    .settings-index :global(.list[data-kind='link'] > .item:has(+ .item:last-child > a[href$='/settings/keyboard'])) {
+      background-image: none;
+    }
+
     .settings-place[data-area] .chooser {
       display: none;
     }
