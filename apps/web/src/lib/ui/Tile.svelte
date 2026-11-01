@@ -144,6 +144,17 @@
     min-block-size: var(--well);
   }
 
+  /* A HEADING WITH NOTHING BESIDE IT KEEPS ITS NAME BY ITS WELL: in a narrow tile (two to a row on a phone) "Quiet
+     numbers" dropped under its well as a second line. The name wraps beside the well instead, never cut. */
+  .tile-head:not(:has(> .tile-aside)) {
+    flex-wrap: nowrap;
+  }
+
+  .tile-head:not(:has(> .tile-aside)) .tile-name {
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
   .tile-title {
     display: flex;
     align-items: baseline;
