@@ -793,6 +793,17 @@
     background: var(--red-fill-press);
   }
 
+  /* AN ANSWER IN THE DRAWING IS INK, as the app draws a suggested answer: the one solid red on the page is Start free
+     (1 Nov), and three red buttons in the picture outshouted it. */
+  .win :global(.dbtn.ink) {
+    background: var(--ink);
+    color: var(--page);
+  }
+
+  .win :global(.dbtn.ink:hover) {
+    background: var(--ink2);
+  }
+
   .win :global(.dbtn:focus-visible),
   .win :global(.undo:focus-visible),
   .win :global(.lead:focus-visible) {

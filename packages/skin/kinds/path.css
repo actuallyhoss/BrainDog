@@ -120,8 +120,8 @@
     padding: 1px var(--sp-2);
     border: 0;
     border-radius: var(--r-xs);
-    background: var(--red-tint);
-    color: var(--red);
+    background: var(--tile-2);
+    color: var(--ink);
     font-size: var(--fs-meta);
     font-weight: 500;
   }

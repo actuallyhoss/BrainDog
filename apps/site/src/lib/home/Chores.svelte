@@ -1,6 +1,7 @@
 <!--
-  The red band: "It does the chores. You make the calls." (site 2a section 3). What waits for a person, on a tile,
-  beside what got done on its own, on the red itself; under both, the floor no rule and no AI tool can lower.
+  The chores band: "It does the chores. You make the calls." (site 2a section 3). What waits for a person, on a tile,
+  beside what got done on its own, on the band's grey; under both, the floor no rule and no AI tool can lower. The band
+  was red until 1 Nov; the only solid red on a page is Start free now, so the answer is ink as the app draws one.
 
   THE QUESTIONS HERE ARE NOT THE DESK'S: the desk's Today already shows Northbound and Dana, so this band
   asks the two only a person decides (a merge and a key), from their own store (`asked` in `desk/needs.svelte.ts`).
@@ -68,7 +69,7 @@
                 <p class="why">{ask.why}</p>
                 {#if live}
                   <div class="acts">
-                    <button type="button" class="btn red sm" onclick={() => answer(ask.id, true)}>{ask.yes}</button>
+                    <button type="button" class="btn ink sm" onclick={() => answer(ask.id, true)}>{ask.yes}</button>
                     <button type="button" class="btn line sm" onclick={() => answer(ask.id, false)}>{ask.no}</button>
                   </div>
                 {/if}
@@ -142,9 +143,9 @@
     outline-offset: 4px;
   }
 
-  /* WHAT WAITS, on its tile on the red. */
+  /* WHAT WAITS, on its tile on the band. */
   .wait {
-    background: var(--band-red-tile);
+    background: var(--band-yours-tile);
     color: var(--ink);
   }
 
@@ -206,15 +207,20 @@
     font-size: var(--t-site-14);
   }
 
-  /* WHAT GOT DONE, on the red ground itself; each reason on its own line at 13px, full white. */
+  /* WHAT GOT DONE, on the band's ground itself; each reason on its own line at 13px, in the second ink. */
   .done {
-    color: var(--on-red);
+    color: var(--ink);
+  }
+
+  .done .hd .n,
+  .why2 {
+    color: var(--ink2);
   }
 
   .done .hd {
     padding-block: 8px 12px;
     margin: 0;
-    border-block-end: 1px solid var(--red-rule);
+    border-block-end: 1px solid var(--rule);
   }
 
   .item {
@@ -222,7 +228,7 @@
     align-items: center;
     gap: 12px;
     padding: 8px 0;
-    border-block-end: 1px solid var(--red-rule);
+    border-block-end: 1px solid var(--rule);
     font-size: var(--t-site-15);
   }
 
@@ -241,7 +247,7 @@
   .undo {
     all: unset;
     cursor: pointer;
-    color: var(--on-red);
+    color: var(--ink);
     font-size: var(--t-site-14);
     font-weight: 500;
     text-decoration: underline;
@@ -249,7 +255,7 @@
   }
 
   .undo:focus-visible {
-    outline: 2px solid var(--on-red);
+    outline: 2px solid var(--ink);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -274,7 +280,7 @@
     align-items: flex-start;
     margin-block-start: 20px;
     padding-block-start: 16px;
-    border-block-start: 1px solid var(--red-rule);
+    border-block-start: 1px solid var(--rule);
     font-size: var(--t-site-17);
     line-height: 1.5;
   }

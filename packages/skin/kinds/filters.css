@@ -84,17 +84,18 @@
   }
 
   button.filters-choice:hover {
-    background: var(--tile-2);
+    background: var(--hover);
     color: var(--ink);
   }
 
-  /* THE CHOSEN VALUE IS THE ACCENT'S TINT, in the accent's words: chosen, in the colour that means chosen, and quiet
-     enough that a strip of filters never outshouts the page's one primary. `data-on` is the mirror's spelling of the
-     same fact. */
+  /* THE CHOSEN VALUE IS INK ON THE WELL, edged by the field's hairline: red is never "chosen" (Look B, 1 Nov), and
+     a strip of filters stays quieter than the page's one primary. `data-on` is the mirror's spelling of the same
+     fact. */
   .filters-choice:is([aria-pressed='true'], [data-on]),
   button.filters-choice[aria-pressed='true']:hover {
-    background: var(--red-tint);
-    color: var(--red);
+    background: var(--tile-2);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    color: var(--ink);
   }
 
   /* INSIDE A SEGMENTED TRACK A SEGMENT'S CORNER SITS INSIDE THE TRACK'S, and the chosen one is the tile's colour lifted

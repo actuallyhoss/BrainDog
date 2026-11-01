@@ -290,7 +290,13 @@
     min-block-size: var(--well, 28px);
   }
 
+  /* A WEEK TILE'S NAME STAYS BY ITS WELL AND WRAPS THERE: two to a row on a phone, "Quiet numbers" dropped under it. */
+  .wk .t-head {
+    flex-wrap: nowrap;
+  }
+
   .t-title {
+    min-inline-size: 0;
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
