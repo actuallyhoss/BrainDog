@@ -93,7 +93,7 @@
   import { choicesOf, finishOf, stateSaid } from './lead.ts';
   import { addedSaid, daySaid, dueSaid, importKeysOnly, keyHeld, keySentence, localDay, rowWords, sentenceOf } from './said.ts';
   import { KEYS_REGISTER } from '$lib/record/keychain.ts';
-  import { linkedCells, linkedState } from './linked.ts';
+  import { linkedCells, linkedState, pointingOrder } from './linked.ts';
   import {
     aboutOf,
     figureReader,
@@ -850,6 +850,10 @@
     const i = leadOrder.indexOf(field);
     return i === -1 ? leadOrder.length : i;
   };
+  const sameAsName = (v: unknown): boolean => {
+    const name = decl && row ? row.fields[decl.title] : undefined;
+    return typeof v === 'string' && typeof name === 'string' && v.trim() !== '' && v.trim().toLowerCase() === name.trim().toLowerCase();
+  };
   const facts = $derived(
     shownFields
       /* "SOURCE · TYPED" SAYS NOTHING: a number somebody typed is how most readings arrive, so only another source is said. */
@@ -858,6 +862,9 @@
       /* THE STATE ONCE (1 Nov, L24): where the sentence under the name says it ("Doing, due tomorrow"), its chip in the
          facts said it again. It is changed from the head's verb or the "⋯"'s Edit. */
       .filter((f) => editing === f.id || f.id !== decl?.state || !sentence.some((p) => p.kind === 'state'))
+      /* A FACT THAT ONLY SAYS THE PAGE'S NAME AGAIN IS LEFT TO THE NAME (skills pass 2 Nov): "Monthly revenue" stood over
+         "What it measures: Monthly revenue" and "Measure: Monthly revenue". Still changed from the "⋯"'s Edit. */
+      .filter((f) => editing === f.id || f.id === decl?.title || !sameAsName(row?.fields[f.id]))
       .sort((a, b) => Number(b.id === decl?.state) - Number(a.id === decl?.state) || leadRank(a.id) - leadRank(b.id)),
   );
 
@@ -1741,8 +1748,11 @@
                  round; and THE DOT HAS A WORD, "Paid", "38 days late", "Due in 5 days", so the state is never a colour
                  alone (`linked.ts`). -->
             {@const relDecl = REGISTERS[rel.register]}
+            <!-- LATE FIRST, THEN OPEN BY ITS DAY, THE FINISHED LAST (`pointingOrder`): a person's bills came in the record's order. -->
+            {@const laid = pointingOrder(relDecl, rel.raw ?? [], rel.rows.length, clock)}
             <ul class="items" aria-label="{rel.name} · {rel.label}">
-              {#each rel.rows as r, i (r.key)}
+              {#each laid as i (rel.rows[i]!.key)}
+                {@const r = rel.rows[i]!}
                 {@const fields = rel.raw?.[i]}
                 {@const stood = fields ? linkedState(relDecl, fields, clock, r.tone, moneySaid) : { text: null, tone: r.tone }}
                 {@const rest = linkedCells(relDecl, rel.columns, r.cells, fields, (c) => moneyInText(c, homeCurrency())).filter((c) => !stood.text || c.trim().toLowerCase() !== stood.text.trim().toLowerCase())}

@@ -65,7 +65,8 @@
     largest: 'Largest',
     unset: 'Not set',
     money: 'Money',
-    holding: (n: number, of: number, what: string) => `${n} of ${of} have ${/^[aeiou]/u.test(what) ? 'an' : 'a'} ${what}.`,
+    /* A FIELD NAMED IN THE PLURAL TAKES NO ARTICLE (skills pass 2 Nov): runs said "4 of 9 have a writes". */
+    holding: (n: number, of: number, what: string) => `${n} of ${of} have ${plural(what) ? '' : /^[aeiou]/u.test(what) ? 'an ' : 'a '}${what}.`,
     share: (n: number) => `${n}%`,
     late: (n: number, said: string | null) => (said ? `${n} late · ${said}` : `${n} late`),
     out: 'Out',
@@ -88,6 +89,8 @@
   const sided = $derived(figured?.by !== undefined);
   const whole = $derived(fig !== null && wholeMoney(decl, entries).has(fig.field.id));
   const said = (f: Figured, n: number): string => figureSaid(f, n, whole);
+  /** A field's name in the plural ("writes", "hours"), by its last letter: not "status", not "process". */
+  const plural = (what: string): boolean => /[^su]s$/u.test(what) && !what.includes(' ');
 
   type Dot = 'open' | 'part' | 'done';
   type Line = { key: string; label: string; count: number | null; value: number | null; stand: Dot | null; tint: boolean; share: number; late: { count: number; value: number; share: number } | null };
@@ -170,7 +173,12 @@
   const shown = $derived(fig !== null || sides.some((x) => x.lines.length >= 2));
   /* A FIGURE THAT IS NOT MONEY SAYS WHAT IT COUNTS beside the line's count: "Active 12 10" read as two counts of one
      thing on the list of runs, where the 10 was writes. Money says itself by its symbol. */
-  const figureNamed = (f: Figured, n: number): string => (f.field.type === 'money' ? said(f, n) : `${said(f, n)} ${labelOf(f.field).toLowerCase()}`);
+  /* AND ONE OF A PLURAL NAME IS SAID IN THE SINGULAR: "1 write", not "1 writes". */
+  const figureNamed = (f: Figured, n: number): string => {
+    if (f.field.type === 'money') return said(f, n);
+    const what = labelOf(f.field).toLowerCase();
+    return `${said(f, n)} ${n === 1 && plural(what) ? what.slice(0, -1) : what}`;
+  };
   /* The late line of a side, in the list's own figures: "2 late · £10,540". */
   const lateSaid = (late: { count: number; value: number }): string => words.late(late.count, fig ? said(fig, late.value) : null);
   /* A side's short name on a phone: "Out" and "In" for the two ways money goes, named by what the side's value says

@@ -107,6 +107,15 @@
     .calendar-month[data-moved='prev'] {
       animation-name: calendar-month-back;
     }
+
+    /* RIGHT TO LEFT, next is the other side. */
+    .calendar-month[data-moved='next']:dir(rtl) {
+      animation-name: calendar-month-back;
+    }
+
+    .calendar-month[data-moved='prev']:dir(rtl) {
+      animation-name: calendar-month-in;
+    }
   }
 
   @keyframes calendar-month-in {
