@@ -360,6 +360,19 @@ export const ADMIN_JS = String.raw`'use strict';
     return 'Calls out: ' + calls.map(function (c) { return c.line || c.host || 'somewhere'; }).join('; ');
   }
 
+  /* The lists, figures and pages of the person's it reads or changes that are not its own, from the Kennel's reading of
+     the file, so what it can reach is read before Approve. */
+  function usesOf(reach) {
+    var uses = reach && Array.isArray(reach.uses) ? reach.uses : [];
+    if (uses.length === 0) return 'Uses only its own lists';
+    return 'Uses of theirs: ' + uses.map(function (u) {
+      var id = String(u.id || '');
+      var name = id.slice(id.indexOf('.') + 1).replace(/[_-]/g, ' ');
+      var what = id.indexOf('metric.') === 0 ? ' (figure)' : id.indexOf('page.') === 0 ? ' (page, adds to it)' : u.writes ? ' (changes it)' : '';
+      return name + what;
+    }).join(', ');
+  }
+
   function addon(item) {
     var entry = item.entry || {};
     var version = item.version || {};
@@ -369,6 +382,7 @@ export const ADMIN_JS = String.raw`'use strict';
     li.appendChild(el('span', 'meta', 'By ' + who));
     if (entry.summary) li.appendChild(el('span', 'what', entry.summary));
     li.appendChild(el('span', 'what', addsOf(version.reach)));
+    li.appendChild(el('span', 'what', usesOf(version.reach)));
     li.appendChild(el('span', 'what', asksOf(version.reach)));
     li.appendChild(el('span', 'state waiting', 'Waiting for review'));
     var why = el('input');

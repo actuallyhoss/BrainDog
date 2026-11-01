@@ -38,6 +38,7 @@ import { egressOf, FIRST_PARTY_LISTS, normalise, type Pack, type PackDeclaration
 import { CHANGES_MOST, kindUnknownSentence, readChanges, readShared, SHARED_MOST_BYTES, type Shared } from './shared.ts';
 import { MODULE_LISTS, MODULES } from './usecase.ts';
 import { holdsOf, resolveWhen } from './when.ts';
+import { usesOf } from './uses.ts';
 import {
   isRevocation,
   isRotation,
@@ -132,6 +133,11 @@ export type Reach = {
    * that holds none of them gets the add-on without those parts until it does, and a card says so before the install.
    */
   waits?: string[];
+  /**
+   * The places of yours an add-on reads or changes that are not its own (`uses.ts`), each with whether it changes it,
+   * when it uses any. Read from the file, so a reviewer and a store say what it can reach whatever its author wrote.
+   */
+  uses?: { id: string; writes: boolean }[];
 };
 
 export type Bump = 'major' | 'minor' | 'patch';
@@ -440,7 +446,15 @@ export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
     }),
     ...(s.pack?.manifest.widgets?.length ? { widgets: s.pack.manifest.widgets.map((w) => w.title) } : {}),
     ...waitsOf(s.pack),
+    ...usesIn(file),
   };
+}
+
+/** What an add-on file uses of yours, from the file as written; nothing for a use case, which stands on its modules. */
+function usesIn(file: Shared | PackFile | CatalogueFile): { uses?: { id: string; writes: boolean }[] } {
+  const raw = 'kind' in file ? (file.kind === 'pack' ? file.file.doc : null) : 'doc' in file ? file.doc : null;
+  const uses = raw ? usesOf(raw).map((u) => ({ id: u.id, writes: u.writes })) : [];
+  return uses.length > 0 ? { uses } : {};
 }
 
 /**
