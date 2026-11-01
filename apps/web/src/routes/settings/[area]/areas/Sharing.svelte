@@ -346,7 +346,8 @@
 
   <Tile icon="user-plus" title={copy.sharingGroups} count={groups?.length || undefined}>
     {#if (groups ?? []).length === 0}
-      <Empty kind="no-data-yet" compact title={copy.sharingNoGroups} />
+      <!-- THE LINE RUNS TO THE TILE (G19): the empty title's balanced wrap broke it at half the width on a phone. -->
+      <div class="groups-none"><Empty kind="no-data-yet" compact title={copy.sharingNoGroups} /></div>
     {:else}
       <ul class="bunches">
         {#each groups ?? [] as g (g.id)}
@@ -590,5 +591,9 @@
     gap: var(--sp-2);
     margin-block-start: var(--sp-4);
     max-inline-size: var(--measure);
+  }
+
+  .groups-none :global(.empty-title) {
+    text-wrap: pretty;
   }
 </style>

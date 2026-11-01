@@ -32,6 +32,7 @@
   import Face from '$lib/ui/Face.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
   import { namesHeld, personSaid, secondSaid } from '../people-said.ts';
   import { placeGroups, type PlaceGroup } from '../../invite-places.ts';
   import { hostedHere, readBilling } from '../../billing.ts';
@@ -349,6 +350,8 @@
       return;
     }
     if (await mint(() => inviteEmail(apiBase(), email, reach))) {
+      /* THE SHEET CLOSES ON THE LINK, which the tile then holds (G20). */
+      inviteOpen = false;
       inviteTo = '';
       inviteLists = {};
       /* BACK TO ALL OF IT, so the link made is under a short form and not under thirty lists. */
@@ -361,6 +364,9 @@
    * One link made, from the form or from a listed row, then shown once and the list read again.
    * `inviting` is the in-flight guard for both, so a double press makes one link and not two that withdraw each other.
    */
+  /* THE INVITATION'S FORM IS A SHEET (G20): the page leads with who is in, and "Invite a person" is the tile's action. */
+  let inviteOpen = $state(false);
+
   async function mint(make: () => ReturnType<typeof inviteEmail>): Promise<boolean> {
     inviting = true;
     const at = opened();
@@ -786,16 +792,20 @@
   </div>
 </Tile>
 {:else if anOwner}
-<Tile icon="user-plus" class="section" data-surface="tile" title={copy.inviteTitle}>
+{#snippet inviteAction()}
+  <Button weight="primary" size="sm" aria-haspopup="dialog" onclick={() => (inviteOpen = true)}><Icon name="plus" size="s" />{copy.invitePerson}</Button>
+{/snippet}
+<Tile icon="user-plus" class="section" data-surface="tile" title={copy.inviteTitle} actions={inviteAction} count={waitingInvites.length || undefined}>
   <div class="section-body">
     <!-- NO MAIL LEAVES THIS HOST, and the line says so beside the control rather than after the press: the owner sends
          the link themselves, and somebody expecting an email would wait for one that never comes. -->
     <p class="hint">{copy.inviteHow} {copy.inviteNoMail}</p>
+    <Sheet bind:open={inviteOpen} title={copy.invitePerson} subtitle={copy.inviteHow}>
     <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
          row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->
     <form class="code-form invite-form" onsubmit={makeInvite}>
       <label class="ex-label" for="invite-email">{copy.inviteEmailLabel}</label>
-      <div class="field field-lg invite-email">
+      <div class="field invite-email">
         <input
           class="field-input"
           id="invite-email"
@@ -879,6 +889,7 @@
         {#if inviteWhy}<p class="invite-why" role="alert">{inviteWhy}</p>{/if}
       </div>
     </form>
+    </Sheet>
 
     {#if madeLink}
       <!-- ONCE. The record keeps the hash and hands back the only copy of the link, so leaving this screen is
@@ -1290,6 +1301,25 @@
     margin-block-end: 0;
     inline-size: fit-content;
     max-inline-size: 100%;
+  }
+
+  /* ONE HEIGHT FOR THE FORM'S CONTROLS (G21): the address was 44 beside a 36 select and a 32 track; all are the house's
+     control height now, and 44 under a thumb. */
+  .invite-form .invite-email,
+  .invite-form .ex-select,
+  .invite-form :global(.segmented) {
+    box-sizing: border-box;
+    block-size: var(--ctl-h);
+    min-block-size: var(--ctl-h);
+  }
+
+  @media (pointer: coarse) {
+    .invite-form .invite-email,
+    .invite-form .ex-select,
+    .invite-form :global(.segmented) {
+      block-size: var(--tap);
+      min-block-size: var(--tap);
+    }
   }
 
   /* A ROW PER LIST: its name, and its select at the end of the line. The name takes the slack and
