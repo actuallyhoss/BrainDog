@@ -7438,6 +7438,10 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const decl = registers.get(register);
       if (!decl) return null;
       if (title.trim().toLowerCase() === SOMEONE_ELSE && register === meetsRole(registers.values())?.register) return othersOf(reader, register);
+      /* AND THE NOBODY IT WAS READ AS, READ AGAIN: a page's block parses its sentence once and hands the tree to `list`,
+         which looks every ref up a second time. `e_nobody` names no row, so with nobody signed in as a person (a key, an
+         open self-host) Today's "Your work this week" was refused "owner is e_nobody: there is no people called e_nobody". */
+      if (title.trim() === NOBODY_ROW) return [NOBODY_ROW];
       return sql
         .all<{ id: string }>(`SELECT id FROM entry WHERE register = ? AND json_extract(fields, '$.${decl.title}') = ?`, register, title)
         .map((r) => r.id);

@@ -301,11 +301,14 @@ function clausesOfNode(node: Predicate, schema: Schema, text: string, now: numbe
  * A TREE IS NOT A SENTENCE, and the record's parser refuses one with its own sentence; the two callers that hand this a
  * declaration's `where` then read no clause from it, which is what they read from any predicate they cannot print.
  */
+/** The row `someone else` is read as in this tab, which no row is (the record's `NOBODY_ROW`). */
+const NOBODY = 'e_nobody';
+
 export function compile(register: string, where: string | undefined, now: number = Date.now()): Where {
   const schema = schemaOf(register);
   /* `someone else` IS THE RECORD'S TO SAY (who else is on it), so this tab reads it as nobody: a task is yours unless
      it says whose, which is how a record with one person reads it too. */
-  const parsed = parseWhere(where, schema, { nowMs: now, refByTitle: (to, title) => (title.trim().toLowerCase() === 'someone else' ? ['e_nobody'] : rowNamed(to, title)) });
+  const parsed = parseWhere(where, schema, { nowMs: now, refByTitle: (to, title) => (title.trim().toLowerCase() === 'someone else' ? [NOBODY] : rowNamed(to, title)) });
   const predicate = parsed.predicate;
   /* AND WHAT THE RECORD'S COMPILER REFUSES ONCE THE SENTENCE HAS PARSED, a `contains` past its ceiling or a text test
      over a series among them: the record runs both before it reads a row, so between them they are every refusal it
@@ -398,6 +401,9 @@ function standing(register: string, c: Clause): boolean {
   const meets = meetsOf(decl);
   const org = orgRoleOf(decl);
   if (c.op === 'empty' && (c.field === meets?.merged_into || c.field === org?.merged_into)) return true;
+  /* AND "NOT SOMEONE ELSE" READ AS NOBODY (`compile`), which is every row: carried as a chip it opened Work under
+     "Owner is not e_nobody". */
+  if (c.op === 'is not' && 'values' in c && c.values.length > 0 && c.values.every((v) => v === NOBODY)) return true;
   return c.field === meets?.self && c.op === 'is not' && c.values.length === 1 && String(c.values[0]) === 'true';
 }
 
