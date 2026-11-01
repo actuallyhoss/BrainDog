@@ -274,8 +274,10 @@
 }
 
 /* A PART THAT OPENS ITS LINES ("Not filed yet") reads as the link it is, its bar hatched-quiet rather than the loudest. */
+/* THE WARN AMBER ITSELF, NOT A WASH OF IT (design pass, 1 Nov): the amber mixed half with white came out tan, the one
+   brown Look B rules out, on "Not named yet" on Payees and Reports. */
 [data-money] .prop-row:has(> .prop-label a) > .prop-track::after {
-  background: var(--tone-fill, color-mix(in oklab, var(--warn) 55%, var(--tile)));
+  background: var(--tone-fill, var(--warn));
 }
 
 /* A CURRENCY'S HEADING OVER ITS ROWS ("In EGP"), a quiet label and not a bold line. */
