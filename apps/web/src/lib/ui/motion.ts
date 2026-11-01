@@ -71,6 +71,24 @@ export const ms = (name: string, fallback: number): number => {
 };
 
 /**
+ * THE GAP A ROW'S LIST PUTS BESIDE IT, and which side it is on (T19, 1 Nov). A row closing to nothing left its list's
+ * `gap` (12px on Needs you) standing until the row was taken out, and then it went in one frame. The gap closes with the
+ * height: a negative margin on the side the gap sits, after the row while one follows it, before it for the last.
+ */
+export function gapOf(node: Element): { px: number; side: 'margin-block-end' | 'margin-block-start' } | null {
+  const parent = node.parentElement;
+  if (!parent || typeof getComputedStyle !== 'function') return null;
+  const px = Number.parseFloat(getComputedStyle(parent).rowGap);
+  if (!Number.isFinite(px) || px <= 0) return null;
+  const alone = node.previousElementSibling === null && node.nextElementSibling === null;
+  if (alone) return null;
+  return { px, side: node.nextElementSibling !== null ? 'margin-block-end' : 'margin-block-start' };
+}
+
+/** The margin that takes back `part` (0 to 1) of the gap, as CSS, or nothing where there is no gap. */
+const gapCss = (gap: ReturnType<typeof gapOf>, part: number): string => (gap ? `;${gap.side}:${(-gap.px * part).toFixed(1)}px` : '');
+
+/**
  * A ROW ARRIVING (the record forming of 1 November): its height opens on the even curve, so the rows under it glide down
  * to make room, while it rises 8px into place on the spring (`--ease-spring`) and fades in, over `--form-in`.
  */
@@ -78,9 +96,13 @@ export function rowIn(node: Element): TransitionConfig {
   if (swapping) return { duration: 0 };
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
+  const gap = gapOf(node);
   return {
     duration: ms('--form-in', 320),
-    css: (p) => `opacity:${Math.min(1, p * 3).toFixed(3)};transform:translateY(${((1 - spring(p)) * 8).toFixed(2)}px);block-size:${(h * cubicOut(Math.min(1, p / 0.6))).toFixed(1)}px;overflow:clip`,
+    css: (p) => {
+      const open = cubicOut(Math.min(1, p / 0.6));
+      return `opacity:${Math.min(1, p * 3).toFixed(3)};transform:translateY(${((1 - spring(p)) * 8).toFixed(2)}px);block-size:${(h * open).toFixed(1)}px;overflow:clip${gapCss(gap, 1 - open)}`;
+    },
   };
 }
 
@@ -92,13 +114,15 @@ export function rowOut(node: Element): TransitionConfig {
   if (swapping) return { duration: 0 };
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
+  const gap = gapOf(node);
   return {
     duration: ms('--form-out', 180) + ms('--form-settle', 380) / 2,
     css: (t) => {
       const u = 1 - t;
       const gone = Math.min(1, u / 0.45);
       const close = spring(Math.max(0, (u - 0.3) / 0.7));
-      return `opacity:${(1 - cubicOut(gone)).toFixed(3)};transform:scale(${(1 - 0.03 * gone).toFixed(4)});block-size:${(h * (1 - close)).toFixed(1)}px;overflow:clip`;
+      /* THE GAP GOES WITH THE HEIGHT, so taking the row out at the end moves nothing (T19). */
+      return `opacity:${(1 - cubicOut(gone)).toFixed(3)};transform:scale(${(1 - 0.03 * gone).toFixed(4)});block-size:${(h * (1 - close)).toFixed(1)}px;overflow:clip${gapCss(gap, Math.min(1, close))}`;
     },
   };
 }
