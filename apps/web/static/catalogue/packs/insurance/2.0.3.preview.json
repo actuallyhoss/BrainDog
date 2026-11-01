@@ -1,0 +1,229 @@
+{
+  "format": 1,
+  "made_at": "2026-11-01T01:28:01.487Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "{{policies-fund}} in funds. Next maturity {{day:policies-next}}.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "policies-live"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "No policies yet. Add one below with its cover, its premium and when it matures.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "policies-live"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "cells": [
+            {
+              "label": "Fund value",
+              "metric": "policies-fund"
+            },
+            {
+              "label": "Cover",
+              "metric": "policies-cover"
+            },
+            {
+              "label": "Premiums a year",
+              "metric": "policies-year"
+            },
+            {
+              "label": "Premiums paid so far",
+              "metric": "policies-paid"
+            }
+          ],
+          "heading": "Your policies",
+          "icon": "shield",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "policies-live"
+          },
+          "key": "k1keczc0",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Oldest fund value from {{day:policies-fund-on}}.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "policies-live"
+              },
+              {
+                "is": 0,
+                "metric": "policies-fund-stale"
+              }
+            ]
+          },
+          "key": "k08lez9h-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Oldest fund value from {{day:policies-fund-on}}, {{bad:over 90 days ago}}.",
+          "kind": "note",
+          "span": 12,
+          "tone": "warn",
+          "when": {
+            "gt": 0,
+            "metric": "policies-fund-stale"
+          },
+          "key": "k08lez9h-4",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "figure",
+              "field": "fund_value",
+              "label": "Fund value"
+            },
+            {
+              "as": "fact",
+              "field": "insurer",
+              "label": "Insurer"
+            },
+            {
+              "as": "fact",
+              "field": "fund_as_of",
+              "label": "Fund value as of"
+            },
+            {
+              "as": "fact",
+              "field": "matures_on",
+              "label": "Matures"
+            }
+          ],
+          "empty": "No policies yet.",
+          "heading": "Policies",
+          "icon": "shield",
+          "kind": "cards",
+          "limit": 24,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "matures_on"
+            }
+          ],
+          "source": "register.policies",
+          "span": 12,
+          "key": "k11ipdzb",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Policy",
+              "width": "minmax(16ch,2fr)"
+            },
+            {
+              "align": "end",
+              "field": "cover",
+              "label": "Cover"
+            },
+            {
+              "align": "end",
+              "field": "per_year",
+              "label": "Premiums a year"
+            },
+            {
+              "align": "end",
+              "field": "paid",
+              "label": "Premiums paid so far"
+            },
+            {
+              "field": "state",
+              "label": "Status"
+            }
+          ],
+          "empty": "No policies yet.",
+          "heading": "Premiums and cover",
+          "icon": "shield",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.policies",
+          "span": 12,
+          "key": "k1mmoh7c",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "shield",
+      "nav": {
+        "order": 50,
+        "section": "Money"
+      },
+      "pack": "insurance",
+      "page": "insurance",
+      "requires": [
+        "register.policies"
+      ],
+      "title": "Insurance",
+      "read_at": "2026-11-01T01:28:01.487Z",
+      "zone": "UTC",
+      "look": {
+        "look": "insurance",
+        "basis": "r0zzl8nj",
+        "by": "rule",
+        "hide": [
+          "k1mmoh7c"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

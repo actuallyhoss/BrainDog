@@ -1,10 +1,10 @@
 {
   "pack": "insurance",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "icon": "shield",
   "title": "Insurance",
   "summary": "Your life and savings policies: who the insurer is, what the premium is and where it is paid, the cover, what the fund is worth and from when, and when it matures.",
-  "changes": "Shorter words on its pages: one line under a heading, and one line when there is nothing yet.",
+  "changes": "Says what to add when there are no policies yet, and no longer shows a fund value line before there is one.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -605,7 +605,7 @@
             "metric": "policies-live",
             "lt": 1
           },
-          "body": "No policies yet."
+          "body": "No policies yet. Add one below with its cover, its premium and when it matures."
         },
         {
           "kind": "stat",
@@ -639,8 +639,16 @@
           "kind": "note",
           "span": 12,
           "when": {
-            "metric": "policies-fund-stale",
-            "is": 0
+            "all": [
+              {
+                "metric": "policies-live",
+                "gt": 0
+              },
+              {
+                "metric": "policies-fund-stale",
+                "is": 0
+              }
+            ]
           },
           "body": "Oldest fund value from {{day:policies-fund-on}}."
         },

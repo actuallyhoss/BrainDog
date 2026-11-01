@@ -528,8 +528,45 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.2",
+      "latest": "2.0.3",
       "versions": [
+        {
+          "version": "2.0.3",
+          "checksum": "983e565581c47b61377ca0b3f712ab42d5d129433d90e669803ca04efad0f220",
+          "bytes": 23850,
+          "published_at": "2026-11-01T01:28:01.487Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Certificates"
+            ],
+            "pages": [
+              "Certificates"
+            ],
+            "rules": [
+              "Work out what a certificate has earned",
+              "Ask to move a certificate's next payout on when its payout is booked"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Says what to add when there are no certificates yet.",
+          "preview": true
+        },
         {
           "version": "2.0.2",
           "checksum": "dfd8ce6eb849d4fd0592816a09fbec063309c4da647d6e92de609e500a5818a8",
@@ -1569,8 +1606,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.1.0",
+      "latest": "2.2.0",
       "versions": [
+        {
+          "version": "2.2.0",
+          "checksum": "c6c0e401ce6a46bc1993a55ad98e097c2e27ae9aa405b4c2b936db01dae3c41a",
+          "bytes": 20142,
+          "published_at": "2026-11-01T01:28:01.487Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Goals"
+            ],
+            "pages": [
+              "Goals"
+            ],
+            "rules": [
+              "goals_pace",
+              "goals_pace_on_balance"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Savings goals"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Opens on what to add and a box to add the first goal when there are none, counted by a new Goals figure.",
+          "preview": true
+        },
         {
           "version": "2.1.0",
           "checksum": "c8aa52da3fe045a940cbbc53812d78f2cd9d922943c10e66449b2c864139445f",
@@ -2432,8 +2505,42 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.2",
+      "latest": "2.0.3",
       "versions": [
+        {
+          "version": "2.0.3",
+          "checksum": "c438bab9a37fc5b53913bb28cabd56770ca03463dc697688d215cda542ee0198",
+          "bytes": 35303,
+          "published_at": "2026-11-01T01:28:01.487Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Policies",
+              "Illustration years"
+            ],
+            "pages": [
+              "Insurance",
+              "{{name}}"
+            ],
+            "rules": [
+              "insurance_figures"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Says what to add when there are no policies yet, and no longer shows a fund value line before there is one.",
+          "preview": true
+        },
         {
           "version": "2.0.2",
           "checksum": "30e038b1484ced174e09029ca8728979d4eda555086d78d6ee66bf5da7a5e4a4",
@@ -4856,8 +4963,46 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.2",
+      "latest": "1.0.3",
       "versions": [
+        {
+          "version": "1.0.3",
+          "checksum": "582dd9034eec3b7707b192071cb29cf1dbc15018e7c0a39f7dff329d67a7958a",
+          "bytes": 39077,
+          "published_at": "2026-11-01T01:28:01.487Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Property",
+              "{{name}}, property"
+            ],
+            "rules": [
+              "Make the parts of a plan",
+              "Read a pasted plan",
+              "Add up a plan when a part changes",
+              "Add up a plan when its price changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.plans",
+                "writes": true
+              },
+              {
+                "id": "register.installments",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "Says how to add a property when there is none yet.",
+          "preview": true
+        },
         {
           "version": "1.0.2",
           "checksum": "d3871230b7bc4bd06b2f63e7ac0c9482f01b5a52d6e7cb6a6c4d38a48c206978",
