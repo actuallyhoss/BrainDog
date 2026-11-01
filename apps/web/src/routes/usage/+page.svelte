@@ -369,7 +369,7 @@
         </Empty>
       {:else if sliced.length === 0}
         <!-- A ROW A PROJECT, then A ROW AN ACTION, each with its counts beside it; a project's row opens its slice. -->
-        {#if split}<Tile class="section" data-surface="tile" title={words.byProject} count={projectRows.length || undefined}>
+        {#if split}<Tile class="section" data-surface="tile" icon="board" title={words.byProject} count={projectRows.length || undefined}>
           <div class="section-body">
             <ul class="ledger use-list">
               {#each projectRows as g (g.key)}
@@ -387,7 +387,7 @@
             </ul>
           </div>
         </Tile>{/if}
-        <Tile class="section" data-surface="tile" title={words.byAction} count={actionRows.length || undefined}>
+        <Tile class="section" data-surface="tile" icon="play" title={words.byAction} count={actionRows.length || undefined}>
           <div class="section-body">
             <ul class="ledger use-list">
               {#each actionRows as a, i (`${a.project} ${a.name} ${i}`)}
@@ -403,7 +403,7 @@
         </Tile>
       {:else}
         <!-- ONE PROJECT'S SLICE, ITS ACTIONS UNDER IT; the link beside the heading shows every project again. -->
-        <Tile class="section" data-surface="tile" title={sliced.length > 0 ? words.only(sliced[0]?.name ?? '') : reading.projects} count={(sliced.length > 0 ? 0 : groups.length) || undefined}>
+        <Tile class="section" data-surface="tile" icon="projects" title={sliced.length > 0 ? words.only(sliced[0]?.name ?? '') : reading.projects} count={(sliced.length > 0 ? 0 : groups.length) || undefined}>
           {#snippet actions()}
             {#if sliced.length > 0}<a class="use-all tap" href={at(`/usage?month=${view.month}`)}>{words.allProjects}</a>{/if}
           {/snippet}
@@ -427,7 +427,7 @@
       <!-- DELIVERIES AND ARRIVALS, EACH KIND ONE ROW: the name and its count beside it, wrapping under it on a phone. A
            month with neither draws nothing, since there is nothing the owner can do about a zero here. -->
       {#if countedRows.sent.length > 0 || countedRows.arrived.length > 0}
-        <Tile class="section" data-surface="tile" title={said.counted}>
+        <Tile class="section" data-surface="tile" icon="mail" title={said.counted}>
           <div class="section-body">
             <p class="use-why">{said.countedWhy}</p>
             <div class="use-groups">
@@ -649,9 +649,11 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* AN ACTION'S ROW STARTS WHERE ITS PROJECT'S NAME DOES, past the well, so the list reads as the project's own. */
+  /* AN ACTION'S ROW STARTS WHERE THE TILE'S NAME DOES, past its heading well, so the list reads as that heading's own.
+     It was the 32 of a row's well under a 28 heading well (8 off the name), and on a tile with no well a 44 indent
+     under nothing. */
   .use-list {
-    margin-inline-start: var(--well-l);
+    margin-inline-start: var(--well);
   }
 
   .use-row {
@@ -661,6 +663,7 @@
 
   .use-row .line-title {
     font-size: var(--fs-body);
+    text-wrap: pretty;
   }
 
   .use-row[data-faint] .line-title {

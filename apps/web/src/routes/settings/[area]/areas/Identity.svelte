@@ -591,11 +591,13 @@
           >
             <span class="line-mark"><Face name={r.name} of="record" size="l" /></span>
             <span class="line-main">
-              <span class="line-title">{r.name}</span>
+              <!-- "YOU ARE HERE" BESIDE THE NAME, not at the row's end, where on a phone it squeezed the line under the
+                   name to two lines and left "people" alone on the second. -->
+              <span class="line-title">{r.name}{#if here}<span class="here">{copy.thisOne}</span>{/if}</span>
               <span class="line-detail">{r.level === null ? levelWord(r) : (copy.levelMeans[r.level] ?? r.level)}</span>
             </span>
             <span class="line-amount"></span>
-            <span class="line-when">{#if here}<span class="here">{copy.thisOne}</span>{:else}<span class="go" aria-hidden="true"><Icon name="chevron" size="s" /></span>{/if}</span>
+            <span class="line-when">{#if !here}<span class="go" aria-hidden="true"><Icon name="chevron" size="s" /></span>{/if}</span>
           </svelte:element>
         </li>
       {/each}
@@ -730,7 +732,11 @@
 
   /* "THIS ONE" IS WHERE YOU ARE, said in the meta ink; every other record's row goes somewhere, and says so. */
   .here {
+    margin-inline-start: var(--sp-2);
     color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 400;
+    white-space: nowrap;
   }
 
   .go {

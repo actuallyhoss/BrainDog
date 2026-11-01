@@ -216,7 +216,8 @@
          "nothing has happened yet" and "you turned this off" cannot read the same. -->
     <Empty kind="cleared" title={copy.suggestOff} body={copy.suggestOffWhy} />
   {:else}
-    <p class="hint">{penWords.hint} {copy.holdingPen}</p>
+    <!-- ONE LINE, NOT THREE: the pen's long paragraph said what the three buttons already say. -->
+    {#if offers.length > 0}<p class="hint">Nothing changes until you keep one.</p>{/if}
     {#if kept.length > 0}
       <ul class="ledger ledger-lead pen">
         {#each kept as row (row.item.id)}

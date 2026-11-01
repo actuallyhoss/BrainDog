@@ -351,3 +351,9 @@
     display: none;
   }
 }
+
+/* NO WORD LEFT ALONE ON A LINE (UI pass 1 Nov): "in.", "people", "you." each stood by itself under a sentence at 390.
+   Every sentence an area writes wraps for balance where the browser can; where it cannot, nothing changes. */
+.settings-place :is(p, .line-detail, .switch-row-line, .setting-help, .hint, .state-line, .agent-says) {
+  text-wrap: pretty;
+}

@@ -822,7 +822,7 @@
     </Tile>
   {/if}
 
-  <Tile icon="key" class="section" data-surface="tile" title={words.keys}>
+  <Tile icon="key" class="section keys-tile" data-surface="tile" title={words.keys}>
     {#snippet actions()}
       {#if acts && !locked}
         <label class="vh" for="lock-after">{accessWords.lockAfter}</label>
@@ -1154,10 +1154,11 @@
 </div>
 
 <style>
+  /* TILES 12 APART, THE BOARD'S GAP (Look B): they stood 32 apart here and 12 on every other screen. */
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
+    gap: var(--sp-3);
     padding: var(--sp-5) var(--gutter) var(--sp-9);
     /* THE PAGE'S CAP IS THE TOKEN EVERY SCREEN SHARES (design 6.7), not a width of its own. */
     max-inline-size: var(--page-max);
@@ -1316,13 +1317,36 @@
       flex-wrap: nowrap;
     }
 
+    /* THE BOX THE WIDER OF THE TWO: the order's select sized itself to its longest option and left "Find a key" a third
+       of the line. */
     .find .sort-field {
-      flex: 0 0 8.5rem;
+      flex: 0 1 8.5rem;
+      min-inline-size: 0;
+    }
+
+    .find .sort-field .field-input {
+      inline-size: 100%;
+      min-inline-size: 0;
     }
   }
 
   .find-input {
     inline-size: 100%;
+  }
+
+  /* ON A PHONE THE LOCK CONTROLS TAKE THEIR OWN LINE FROM THE TITLE'S EDGE: wrapped to the right they hung under nothing,
+     and the title stood alone above a gap. */
+  @media (width < 640px) {
+    :global(.keys-tile > .tile-head > .tile-aside) {
+      flex-basis: 100%;
+      justify-content: flex-start;
+      margin-inline-start: 0;
+    }
+  }
+
+  /* A PROJECT'S NAME ON ITS LINE IS THE SIZE "All projects" IS under it: the inline chip drew it at 13 beside a 15. */
+  .group-head :global(.scope-chip[data-inline]) {
+    font-size: var(--fs-body);
   }
 
   /* THE COUNT ON A PROJECT'S LINE SITS AT ITS END, on the column every row's count keeps. */
@@ -1735,7 +1759,6 @@
 
   @media (width < 900px) {
     .page {
-      gap: var(--sp-5);
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 

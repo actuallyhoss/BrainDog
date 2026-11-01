@@ -391,23 +391,28 @@
 
     /* AT 320 THE TWO PICKERS AND "to" OUTRAN THE ROW, and squeezing them cut the times to "10:00 P": each picker keeps
        its nine characters, grows into what is left, and "to" with its time wraps under the first when both will not fit. */
+    /* ONE LINE, TWO EQUAL PICKERS: "21:00 to 08:00" read as two rows of two widths when each picker took the row. Each
+       keeps nine characters, so at 320 the times are never cut. */
     .quiet-pickers {
       display: flex;
       flex-basis: 100%;
+      flex-wrap: nowrap;
       min-inline-size: 0;
     }
 
     .quiet-pickers > .quiet-time,
     .quiet-to {
-      flex: 1 1 auto;
+      flex: 1 1 0;
+      min-inline-size: 0;
     }
 
     .quiet-to > .quiet-time {
-      flex: 1 1 auto;
+      flex: 1 1 0;
     }
 
     .quiet-time {
       inline-size: 100%;
+      min-inline-size: 9ch;
       min-block-size: var(--tap);
     }
   }

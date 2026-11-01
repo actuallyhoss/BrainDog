@@ -114,9 +114,17 @@
 </a>
 
 <style>
+  /* THE TRACK HUGS ITS TWO OPTIONS, as the scheme and density beside it do; on a phone `full` takes the row. */
   .choice {
     display: grid;
+    justify-items: start;
     gap: var(--sp-2);
+  }
+
+  @media (width < 640px) {
+    .choice {
+      justify-items: stretch;
+    }
   }
 
   .choice-name {
