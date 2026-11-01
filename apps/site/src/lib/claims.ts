@@ -68,8 +68,7 @@ export const CLAIMS: readonly Claim[] = [
 
   /* The pricing page (`copy/pricing.ts`, `pricing`): the early access page while billing is off, then the plans. */
   { id: 'early-free', said: 'Everything in it is free while we open it up.', where: 'pricing.early.lede', state: 'true', flag: 'signup' },
-  { id: 'nothing-lost', said: 'nothing you make now will be lost or locked when they arrive', where: 'pricing.early.later.say', state: 'true' },
-  { id: 'plus-second-person', said: 'Five times Cloud, and a second person can join.', where: 'pricing.early.later.plans.1.line', state: 'flag', flag: 'billing' },
+  { id: 'nothing-lost', said: 'nothing you make now is lost', where: 'pricing.early.later.say', state: 'true' },
   { id: 'export-any-time-early', said: 'Yes, all of it, as one file, whenever you like.', where: 'pricing.early.faq.questions.2.a', state: 'true' },
   { id: 'export-every-plan', said: 'Yes, all of it, as one file, on every plan.', where: 'pricing.faq.questions.2.a', state: 'true' },
   { id: 'cancel-any-time', said: 'Yes, from Settings.', where: 'pricing.faq.questions.3.a', state: 'flag', flag: 'billing' },

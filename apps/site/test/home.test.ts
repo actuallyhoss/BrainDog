@@ -48,7 +48,7 @@ test('home.ts holds the words of site 2a at the key paths the ledger reads', () 
     ['Run a small business', 'Build with AI', 'Keep your own life in order'],
   );
   assert.deepEqual([home.who.small.href, home.who.build.href, home.who.life.href], ['/for/founders', '/agents', '/docs/use/money']);
-  assert.equal(home.chores.title, 'It does the chores. You make the calls.');
+  assert.equal(home.chores.title, 'It does the filing, you make the calls, and it stays yours.');
   assert.equal(
     home.chores.say,
     'Filing, naming and sorting just happen, each with a reason and an undo. You only see what needs a person.',
@@ -114,9 +114,10 @@ test('the hero is section.hero with the slogan and the .sub sentence', when(NO_B
   assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*One place that remembers your work/);
 });
 
-test('the seven bands, in order, and no close after them', when(NO_BUILD), () => {
+test('the five bands and the ask, in order, and no close after them', when(NO_BUILD), () => {
   const said = text(page());
-  const order = [home.who.title, home.money.title, home.chores.title, home.tools.title, home.slash.title, home.yours.title, home.free.title, home.faq.title];
+  /* "IT STAYS YOURS" IS THE CHORES BAND'S, and the questions are the pricing page's (plan F12, 1 Nov). */
+  const order = [home.who.title, home.money.title, home.chores.title, home.tools.title, home.slash.title, home.free.title];
   let at = 0;
   for (const heading of order) {
     const found = said.indexOf(heading, at);
@@ -157,5 +158,5 @@ test('with scripting off, every band says what it draws', when(NO_BUILD), async 
   for (const h of HANDLED) assert.ok(said.includes(h.text), `the chore "${h.text}"`);
   assert.ok(said.includes(ASKS[0]!.q), "the Slash band's first question");
   assert.ok(said.includes(home.chores.floor), 'the floor');
-  for (const q of home.faq.questions) assert.ok(said.includes(q.a), `the answer to "${q.q}"`);
+  for (const p of home.yours.points) assert.ok(said.includes(p.text), `what keeps it yours: "${p.text}"`);
 });

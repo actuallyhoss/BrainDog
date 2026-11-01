@@ -65,15 +65,9 @@ export const pricing = {
           'Export any time',
         ],
       },
-      later: {
-        title: 'Cloud and Cloud Plus',
-        say: 'Monthly plans with room for more AI tools, more questions and more runs. Coming soon, priced at launch, and nothing you make now will be lost or locked when they arrive.',
-        /** The two paid plans by name, each with what it adds and no figure: they are priced at launch. */
-        plans: [
-          { name: 'Cloud', line: 'More AI tools, Slash questions, runs and data.', soon: 'Coming soon' },
-          { name: 'Cloud Plus', line: 'Five times Cloud, and a second person can join.', soon: 'Coming soon' },
-        ],
-      },
+      /* ONE LINE FOR WHAT COMES LATER (plan F20): a tile naming Cloud and Cloud Plus with two "Coming soon" rows said
+         nothing a reader could act on. Still his N2 words: both named, coming soon, priced at launch. */
+      later: { say: 'Cloud and Cloud Plus are coming soon, priced at launch; nothing you make now is lost.' },
       faq: {
         title: 'Questions people ask',
         questions: [

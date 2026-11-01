@@ -82,7 +82,7 @@ export const home = {
   },
 
   chores: {
-    title: 'It does the chores. You make the calls.',
+    title: 'It does the filing, you make the calls, and it stays yours.',
     say: 'Filing, naming and sorting just happen, each with a reason and an undo. You only see what needs a person.',
     waits: 'Waits for you',
     done: 'Done on its own',

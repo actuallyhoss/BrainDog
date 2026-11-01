@@ -1,7 +1,8 @@
 <!--
   The Slash band (site 2a section 5): two columns and no drawn app behind them. On the left the "/ Slash" name,
-  the title, the line and three questions to try; on the right Slash's bar, ringed in red, with the answer attached
-  under it at the same width.
+  the title, the line and three questions to try; on the right Slash's bar and the answer attached
+  under it at the same width, one plain tile with a hairline (plan F17: the red ring was the only red outline on the
+  site; red is kept for the one ask).
 
   THE FIRST QUESTION IS ANSWERED IN THE HTML, so a reader with scripting off, or one who asked for less motion, has the
   finished picture. Pressing a try types it into the bar and answers it (`slash/typing.ts`). The answer is Slash's own
@@ -152,7 +153,7 @@
     text-underline-offset: 4px;
   }
 
-  /* THE BAR AND ITS ANSWER: one width, the bar ringed 1.5px in red with radius 12, the answer attached under it. */
+  /* THE BAR AND ITS ANSWER: one width, one plain tile with a hairline and radius 12, the answer attached under the bar. */
   .open {
     --tile: var(--desk-tile);
     --board: var(--desk-board);
@@ -169,7 +170,7 @@
     padding: 0 16px;
     border-radius: 12px 12px 0 0;
     background: var(--tile);
-    box-shadow: inset 0 0 0 1.5px var(--red);
+    box-shadow: inset 0 0 0 1px var(--rule);
     font-size: var(--t-site-16);
   }
 
@@ -188,7 +189,7 @@
     flex: none;
     inline-size: 1.5px;
     block-size: 20px;
-    background: var(--red);
+    background: var(--ink);
     animation: blink 1s steps(2) infinite;
   }
 
@@ -204,7 +205,7 @@
     align-content: start;
     padding: 16px;
     background: var(--board);
-    border: 1.5px solid var(--red);
+    border: 1px solid var(--rule);
     border-block-start: 0;
     border-radius: 0 0 12px 12px;
   }
@@ -223,7 +224,7 @@
     inline-size: 6px;
     block-size: 6px;
     border-radius: 50%;
-    background: var(--red);
+    background: var(--muted);
   }
 
   @media (pointer: coarse) {

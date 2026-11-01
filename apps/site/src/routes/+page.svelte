@@ -1,21 +1,24 @@
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
-  import { application, faqOf, organization, website } from '$lib/site/seo.ts';
+  import { application, organization, website } from '$lib/site/seo.ts';
   /**
    * brain.dog's home page, rebuilt in the redesign.
    *
-   * ONE PRODUCT PICTURE, THEN SEVEN BANDS THAT EACH SAY ONE NEW THING. The dark hero with the slogan, two buttons, the
+   * ONE PRODUCT PICTURE, THEN FIVE BANDS THAT EACH SAY ONE NEW THING, AND THE ASK (plan F12, 1 Nov: eight bands was too
+   * many for a page whose job is one ask). The dark hero with the slogan, two buttons, the
    * early access line and the makers, then Maya's desk across the hero's edge (`lib/desk/Desk.svelte`), drawn as the
    * app's own Today. Under it, full-bleed bands, each on its own ground in both schemes so two neighbours never share
    * one (`--band-*` in Look B):
    *
    *   who      Who it's for: three readers (a small business, building with AI, your own life), each a tile.
    *   money    Your money, in one place: the app's Money home on Maya's two books, and the add-ons.
-   *   chores   red: it does the chores, you make the calls, with questions the desk does not show.
+   *   chores   it does the filing, you make the calls, and it stays yours: the questions the desk does not show,
+   *            and under them the floor and the three promises that keep it yours.
    *   tools    night: your AI tools share one memory, the notes and the connect line.
    *   slash    Press ⌘J and ask anything, the bar and its answer.
-   *   yours    It stays yours, and free while in early access: the page's last call to action.
-   *   faq      Questions.
+   *   yours    Free while in early access: the page's last call to action.
+   *
+   * The questions are the pricing page's now, where they are asked.
    *
    * No close after them: the free tile is the last ask.
    *
@@ -34,7 +37,6 @@
   import Desk from '$lib/desk/Desk.svelte';
   import Chores from '$lib/home/Chores.svelte';
   import MoneyBand from '$lib/home/MoneyBand.svelte';
-  import Questions from '$lib/home/Questions.svelte';
   import SlashBand from '$lib/home/SlashBand.svelte';
   import Tools from '$lib/home/Tools.svelte';
   import WhoFor from '$lib/home/WhoFor.svelte';
@@ -42,7 +44,7 @@
   import Start from '$lib/site/Start.svelte';
 </script>
 
-<Seo title={site.meta.home.title} description={site.meta.home.description} path="/" ld={[organization, website, application, faqOf(home.faq.questions)]} />
+<Seo title={site.meta.home.title} description={site.meta.home.description} path="/" ld={[organization, website, application]} />
 <section class="hero night" aria-labelledby="hero-title">
   <span class="hero-mark" aria-hidden="true"><Mark tone="line" height={731} /></span>
   <div class="wrap copy">
@@ -73,7 +75,6 @@
 <Tools />
 <SlashBand />
 <Yours />
-<Questions />
 
 <style>
   /* THE HERO: night ground, the slogan big, the mark a thin line behind it. */
@@ -207,23 +208,15 @@
       block-size: 48px;
     }
 
+    /* THE MAKERS AT 20 WITH THEIR NAMES (plan F13): as bare marks at 16 they read as specks, and a stranger cannot name
+       a mark. Two to a line if the names need it. */
     .works {
-      gap: 12px;
+      gap: 10px 16px;
     }
 
-    .maker :global(svg) {
+    .maker :global(svg.agent-mark[data-sized]) {
       inline-size: 20px;
       block-size: 20px;
-    }
-
-    /* Read by a screen reader and not drawn: the marks say it to the eye. */
-    .maker-name {
-      position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
     }
   }
 </style>

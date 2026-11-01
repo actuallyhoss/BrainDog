@@ -348,8 +348,12 @@
   /* WHAT EACH LIST DECLARES, READ ONCE THE FIRST SCREEN HAS RESTED (`later`), on the desk and the phone alike, and kept on
      this device so the next draw places each list at once. Its reader is the sidebar's own chunk, asked for here, never
      in the entry, and never in the first screen's way: it carries the projects' cards' readers, about 20 KB. */
+  /* WHETHER THAT READ HAS ANSWERED, either way. A FIRST VISIT KEEPS NO FACTS, so every list stood under More lists ("More
+     lists 18") until the read placed them and the row said "1": the sidebar holds More lists until the lists are placed
+     (`listsPlaced`), so the row is drawn once with its true count. */
+  let factsSettled = $state(false);
   $effect(() => {
-    if (bare || data.live !== true || data.refused) return;
+    if (bare || data.live !== true || data.refused) return void (factsSettled = true);
     const base = apiBase(page.url);
     const lists = data.lists;
     let gone = false;
@@ -357,7 +361,9 @@
       void import('$lib/shell/side-read.ts')
         .then((m) => m.readFacts(base, lists))
         .then((facts) => {
-          if (gone || Object.keys(facts).length === 0) return;
+          if (gone) return;
+          factsSettled = true;
+          if (Object.keys(facts).length === 0) return;
           frame.facts = facts;
           try {
             const all = JSON.parse(localStorage.getItem(FACTS_KEY) ?? '{}') as Record<string, unknown>;
@@ -367,12 +373,14 @@
             /* Kept for this tab only. */
           }
         })
-        .catch(() => undefined),
+        .catch(() => void (factsSettled = true)),
     );
     return () => {
       gone = true;
     };
   });
+  /** Every list is in its home: the read has answered, or this device kept where each one belongs. */
+  const listsPlaced = $derived(factsSettled || Object.keys(keptFacts).length > 0);
   const sideLists = $derived<SideList[]>(
     /* ONE ENTRY FOR THE KEYS (Q28 of 29 October): the Keychain below is where keys are, so the list of them is not a
        second row ("Keys 176" over "Keychain"). The list still opens from the Keychain. */
@@ -1412,6 +1420,7 @@
               mode={sideOn ? 'full' : 'rail'}
               shown={sideOn}
               pen={sidePen}
+              placed={listsPlaced}
               width={sideWidth}
               onwidth={(n, done) => {
                 sideWidth = n;
@@ -1451,6 +1460,7 @@
               version={live.version}
               shown={true}
               pen={sidePen}
+              placed={listsPlaced}
               width={sideWidth}
               ontoggle={() => (sideOver = false)}
             />
@@ -1497,7 +1507,7 @@
       {/if}
       {#if phoneMenu}
         <!-- ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE: every place, the projects, every list and Settings. -->
-        {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} lit={sideLit} working={workingOn} version={live.version} pen={sidePen} />{/if}
+        {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} lit={sideLit} working={workingOn} version={live.version} pen={sidePen} placed={listsPlaced} />{/if}
       {:else}
         {@render children()}
       {/if}

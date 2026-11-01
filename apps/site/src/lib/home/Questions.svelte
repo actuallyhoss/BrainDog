@@ -5,22 +5,29 @@
 
   THREE, THEN MORE QUESTIONS: the rest sit behind one plain disclosure, so a phone reads
   three questions and not five before the footer.
+
+  ON THE PRICING PAGE SINCE PLAN F12, where the questions are asked: the home page's, after the pricing page's own
+  (`questions`), and no longer on the home page, whose job is one ask.
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
   import { home } from '$lib/copy/home.ts';
 
-  const q = home.faq;
+  type Asked = { q: string; a: string; link?: { label: string; href: string } };
+
+  let { questions = home.faq.questions, title = home.faq.title }: { questions?: readonly Asked[]; title?: string } = $props();
+
+  const q = $derived({ ...home.faq, questions, title });
   /** How many questions are drawn before More questions. */
   const FIRST = 3;
 </script>
 
-{#snippet asked(item: (typeof q.questions)[number], open: boolean)}
+{#snippet asked(item: Asked, open: boolean)}
   <details {open}>
     <summary>{item.q}<Icon name="chevron-down" /></summary>
     <p>
       {item.a}
-      {#if 'link' in item && item.link}<a class="more" href={item.link.href}>{item.link.label}<Icon name="arrow-right" size="s" /></a>{/if}
+      {#if item.link}<a class="more" href={item.link.href}>{item.link.label}<Icon name="arrow-right" size="s" /></a>{/if}
     </p>
   </details>
 {/snippet}

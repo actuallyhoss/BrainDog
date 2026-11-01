@@ -201,9 +201,6 @@ const NOT_YET = [
 const SOON = {
   'site.pricing.extra.soon': 'Coming soon.',
   'site.pricing.cards.soon': 'Coming soon',
-  /* HIS N2 (1 November): the early access page names Cloud and Cloud Plus, each "Coming soon", with no price. */
-  'site.pricing.early.later.plans.0.soon': 'Coming soon',
-  'site.pricing.early.later.plans.1.soon': 'Coming soon',
 };
 
 /**

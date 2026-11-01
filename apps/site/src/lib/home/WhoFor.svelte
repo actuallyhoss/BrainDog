@@ -1,7 +1,8 @@
 <!--
-  "Who it's for" (2a section 2): three readers, three tiles, each with its own fill, a real icon in a 40px
-  well, a title, one line, a small drawing that differs per tile, and the way on. Fills are category slots, not status
-  hues (SPEC 0.2): amber for a small business, the night for building with AI, blue for your own life. The words are
+  "Who it's for" (2a section 2): three readers, three tiles, a real icon in a 40px well, a title, one line, a small
+  drawing that differs per tile, and the way on. ONE NEUTRAL TILE FOR ALL THREE, AND THE ICON CARRIES THE COLOUR (plan
+  F14, Look B: no tinted cards for decoration): amber for a small business, ink for building with AI, blue for your own
+  life, each in its well. The words are
   `copy/home.ts`; the names in the drawings are Maya's (`demo/maya.ts`).
 
   YOUR OWN LIFE (29 October, personal use as much as business) is drawn as what is coming up in Maya's own book, the
@@ -75,24 +76,23 @@
     min-inline-size: 0;
   }
 
-  .amber {
-    background: var(--cat-amber-tint);
+  .ftile {
+    background: var(--band-yours-tile);
     color: var(--ink);
-    --well: color-mix(in srgb, var(--cat-amber) 16%, transparent);
+  }
+
+  .amber {
+    --well: var(--cat-amber-tint);
     --well-ink: var(--cat-amber);
   }
 
   .night {
-    background: var(--night);
-    color: var(--on-night);
-    --well: var(--night-tint-2);
-    --well-ink: var(--on-night);
+    --well: color-mix(in srgb, var(--ink) 8%, transparent);
+    --well-ink: var(--ink);
   }
 
   .blue {
-    background: var(--cat-blue-tint);
-    color: var(--ink);
-    --well: color-mix(in srgb, var(--cat-blue) 16%, transparent);
+    --well: var(--cat-blue-tint);
     --well-ink: var(--cat-blue);
   }
 
@@ -123,10 +123,6 @@
     font-size: var(--t-site-15);
     line-height: 1.5;
     color: var(--ink2);
-  }
-
-  .night .say {
-    color: var(--on-night-2);
   }
 
   .draw {
@@ -166,11 +162,12 @@
     letter-spacing: -0.035em;
   }
 
+  /* THE TERMINAL IS A DRAWING OF ONE, so it keeps the night's ground inside the plain tile. */
   .term {
     display: grid;
     gap: 4px;
     padding: 10px 12px;
-    background: var(--night-tint);
+    background: var(--night);
     border-radius: 8px;
     font: 400 13px/1.45 var(--mono);
     color: var(--on-night-2);
@@ -187,7 +184,7 @@
     grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 12px;
     padding: 6px 0;
-    border-block-start: 1px solid color-mix(in srgb, var(--cat-blue) 18%, transparent);
+    border-block-start: 1px solid var(--rule, color-mix(in srgb, var(--ink) 10%, transparent));
     color: var(--ink);
     font-size: var(--t-site-14);
   }

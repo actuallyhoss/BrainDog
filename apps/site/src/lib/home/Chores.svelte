@@ -1,5 +1,7 @@
 <!--
-  The chores band: "It does the chores. You make the calls." (site 2a section 3). What waits for a person, on a tile,
+  The chores band: "It does the filing, you make the calls, and it stays yours." (site 2a sections 3 and 6, one band
+  since plan F12: eight bands was too many for a page whose job is one ask). UNDER THE DRAWING, WHAT KEEPS IT YOURS: the
+  floor and the three promises of "It stays yours", four short lines in a row, and the way to how it is kept safe. What waits for a person, on a tile,
   beside what got done on its own, on the band's grey; under both, the floor no rule and no AI tool can lower. The band
   was red until 1 Nov; the only solid red on a page is Start free now, so the answer is ink as the app draws one.
 
@@ -15,11 +17,13 @@
   import { tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import Icon from '$lib/Icon.svelte';
+  import type { IconName } from '$lib/icons.ts';
   import { home } from '$lib/copy/home.ts';
   import { ASKED, HANDLED } from '$lib/demo/maya.ts';
   import { asked } from '$lib/desk/needs.svelte.ts';
 
   const words = home.chores;
+  const y = home.yours;
   const byId = new Map(ASKED.map((n) => [n.id, n]));
 
   const open = $derived(asked.open.map((id) => byId.get(id)).filter((n) => n !== undefined));
@@ -97,7 +101,13 @@
         </ul>
       </div>
     </div>
-    <p class="floor"><Icon name="lock" size="m" /><b>{words.floor}</b></p>
+    <ul class="keeps">
+      <li class="floor"><Icon name="lock" size="m" /><b>{words.floor}</b></li>
+      {#each y.points as point (point.text)}
+        <li><Icon name={point.icon as IconName} size="m" />{point.text}</li>
+      {/each}
+    </ul>
+    <a class="safe" href={y.href}>{y.link}<Icon name="arrow-right" size="s" /></a>
   </div>
 </section>
 
@@ -273,27 +283,65 @@
     }
   }
 
-  /* THE FLOOR, one line under both. */
-  .floor {
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-    margin-block-start: 20px;
-    padding-block-start: 16px;
+  /* WHAT KEEPS IT YOURS, under both: the floor first and in the ink at 600, then the three promises, four across a desk
+     over a hairline, two by two below 1060 and one under another on a phone. */
+  .keeps {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px 24px;
+    margin-block-start: 24px;
+    padding-block-start: 20px;
     border-block-start: 1px solid var(--rule);
-    font-size: var(--t-site-17);
+  }
+
+  .keeps li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    color: var(--ink2);
+    font-size: var(--t-site-15);
     line-height: 1.5;
   }
 
-  .floor :global(.icon) {
-    margin-block-start: 3px;
+  .keeps :global(.icon) {
+    flex: none;
+    margin-block-start: 2px;
+    color: var(--ink);
   }
 
   .floor b {
+    color: var(--ink);
     font-weight: 600;
   }
 
+  .safe {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-block-size: 32px;
+    margin-block-start: 16px;
+    color: var(--ink);
+    font-size: var(--t-site-15);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .safe:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  @media (max-width: 1059px) {
+    .keeps {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
   @media (pointer: coarse) {
+    .safe {
+      min-block-size: var(--tap);
+    }
+
     .undo {
       display: inline-flex;
       align-items: center;
@@ -328,6 +376,11 @@
   @media (max-width: 760px) {
     .body {
       margin-block-start: 24px;
+    }
+
+    .keeps {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
     }
 
     /* The question says itself on a phone; its reason is the desk's. */

@@ -69,6 +69,7 @@
     mode = 'full',
     shown = true,
     pen = null,
+    placed = true,
     onwidth,
     ontoggle,
   }: {
@@ -91,6 +92,11 @@
     shown?: boolean;
     /** Suggested changes waiting, said as one line, and where they are reviewed. */
     pen?: { label: string; href: string } | null;
+    /**
+     * Whether every list is in its home yet. Until then More lists is not drawn: on a first visit every list stood
+     * under it ("More lists 18") and stepped out as the read placed them, and the row's count jumped to "1".
+     */
+    placed?: boolean;
     /** Told of a width dragged, and whether the drag is over (then it is kept). */
     onwidth?: ((n: number, done: boolean) => void) | undefined;
     /** Hide or show the full column (`[` does the same). */
@@ -427,7 +433,8 @@
 
   const showProjects = $derived(model.projects !== null && (read === null ? !answered : holdsProjects(read)));
   /* THE PAGE IDEAS ARE A QUIET LINE UNDER PROJECTS (plan F1): in the foot beside Settings, "2 page ideas / Review" read
-     like a setting. They stay in the foot only where no projects are drawn. */
+     like a setting. They stay in the foot only where no projects are drawn, and wait for the first read to say which,
+     so the line never starts in the foot and moves up. */
   const penUnder = $derived(pen !== null && showProjects && read !== null && split !== null);
   /* MORE LISTS FOLDS ONLY WHAT IS WORTH A FOLD (plan F2): one or two lists stand in the rail as rows of their own, and a
      fold that opened on one row is a press for one thing. From three they fold as before. */
@@ -607,7 +614,9 @@
 {/snippet}
 
 {#snippet morePart()}
-  {#if model.more.length > 0 && model.more.length < MORE_FOLDS}
+  {#if !placed}
+    <!-- HELD UNTIL THE LISTS ARE PLACED, so the row is drawn once with its true count. -->
+  {:else if model.more.length > 0 && model.more.length < MORE_FOLDS}
     <ul class="s-list">
       {#each model.more as l (l.href)}{@render link(l, false)}{/each}
     </ul>
@@ -631,7 +640,7 @@
 {#snippet footPart()}
   <ul class="s-list s-end">
     {#each model.foot as l (l.href)}
-      {#if l.href === '/settings' && pen && !penUnder}
+      {#if l.href === '/settings' && pen && answered && !penUnder}
         <li>
           <a class="s-row s-link tap" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><Icon name="alert" size="m" /><span class="s-name">{pen.label}</span></a>
         </li>
@@ -656,7 +665,7 @@
         {@render projectsPart()}
       </div>
     {/if}
-    {#if model.more.length > 0}
+    {#if placed && model.more.length > 0}
       <div class="s-tile">
         {@render morePart()}
       </div>
@@ -717,7 +726,7 @@
         {#each model.places as p (p.key)}{@render place(p)}{/each}
       </ul>
       {@render projectsPart()}
-      {#if model.more.length > 0}<div class="s-rule" role="presentation"></div>{/if}
+      {#if placed && model.more.length > 0}<div class="s-rule" role="presentation"></div>{/if}
       {@render morePart()}
       {@render footPart()}
     </nav>
