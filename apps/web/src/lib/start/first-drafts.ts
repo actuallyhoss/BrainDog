@@ -1,20 +1,25 @@
 /**
- * WHAT THE MODEL READ IN A STRANGER'S FIRST WORDS, BEYOND WHAT THE BUILD ALREADY MADE, AS DRAFTS (1 Nov, his words: "perfect
- * the onboarding please, i need it highly intelligent"; his yes to C7).
+ * WHAT A STRANGER'S FIRST WORDS HOLD BEYOND WHAT THE BUILD ALREADY MADE, AS DRAFTS (1 Nov, his words: "perfect the
+ * onboarding please, i need it highly intelligent"; his yes to C7).
  *
  * THE RULES BUILD FIRST AND NEVER WAIT. Sign-up reads the sentence by its rules on the device and the build writes what
- * they found (the starter, the places, the entries the words fill completely). Once the BrainDog is made the person is its
- * owner, so the record's own model door (`POST /api/slash/setup`, the one `/start` asks, on the owner's month of asks) reads
- * the same words once more, against the lists this BrainDog now keeps. What it finds that the build did not write (a
- * project named in passing, the people, a to-do, a bill) comes back as drafts: each one shown, kept with one press, changed
- * in place, or let go. NOTHING HERE WRITES. The press on a draft is the write, through the record's capture and its Undo.
+ * they found: the starter, the places, the entries the words fill completely. That reading is about who the person is,
+ * so it leaves out the things said in passing: "I pay Nadia 300 a month", "need to call the bank tomorrow", "my sister
+ * Huda". Two readers find those once the BrainDog is made, and both only offer:
  *
- * EVERY VALUE HELD TO THE LIST'S OWN DECLARATION (`entryOf`), as the first run holds the model's entries: a field that does
- * not fit is left out, and an entry missing its title or a required field is no draft. Money is kept only in the
- * BrainDog's own currency, so a draft never asks for a rate.
+ * - TELL'S OWN READER, AT ONCE AND ON THE DEVICE (`draftsFromTold`): each sentence read as if it had been told to Today
+ *   (`tellRead`), against the lists this BrainDog now keeps. Kept only where it gives something concrete (a day, an
+ *   amount, somebody), never the self-introduction, so a bio is not turned into to-dos. This is the fallback: it needs
+ *   no model and draws with Today.
+ * - THE MODEL, ONCE, AS THE OWNER NOW (`draftsOf`): the record's own door (`POST /api/slash/setup`, the one `/start`
+ *   asks, on the owner's month of asks) reads the same words against the same lists. Its entries are held to each
+ *   list's declaration (`entryOf`) and join the card when it answers; where both found one thing, it is one draft.
  *
- * NOTHING TWICE: an entry whose title the build already wrote, or that is the person themselves, is not a draft, and two
- * drafts with one title are one.
+ * NOTHING HERE WRITES. A draft is shown, kept with one press (the record's capture, with its Undo), changed in place,
+ * or let go. A draft is one or more entries kept together: a payment and the new person it is paid to go in one press,
+ * linked as Tell links them (`$row`).
+ *
+ * NOTHING TWICE: an entry whose title the build already wrote, or that is the person themselves, is no draft.
  *
  * A plain `.ts` with relative imports, so `node --test` can hold it; the card only calls it.
  */
@@ -23,24 +28,34 @@ import { AGENTS_PACK } from '@braindog/seed/packs';
 import { moduleOfList } from '@braindog/seed/packs/modules';
 import { moduleName } from '@braindog/seed/usecases/names';
 
+import type { TellList, Told } from '../tell/read.ts';
+import { PEOPLE } from '../who.ts';
 import type { SetupOffer, SetupReply } from './ask.ts';
 import { entryOf, FILLABLE, listsOf, type List } from './lists.ts';
 
-/** One entry the model read that the build did not write, waiting for the person's press. */
+/** One entry of a draft, as the record's capture takes it. */
+export type DraftRow = { register: string; fields: Record<string, unknown> };
+
+/** One thing the words held that the build did not write, waiting for the person's press. */
 export type FirstDraft = {
   /** Stable for this draft: its list and its title, read without case. */
   key: string;
-  register: string;
-  /** The list's own name ("Projects", "People"). */
+  /** The entries it writes, in the order the capture takes them; `main` is the one it is about. */
+  rows: DraftRow[];
+  main: number;
+  /** The main entry's list, by its own name ("Projects", "People"). */
   list: string;
   /** The field its title is kept in, so Change writes the new words there. */
   titleField: string;
   title: string;
-  fields: Record<string, unknown>;
-  /** The first amount on it, for the card to draw. */
+  /** The line under the title, where the reader said one ("EGP 12,000 out every month"). */
+  detail: string | null;
+  /** The first amount on it, for the card to draw where no detail says it. */
   amount: { minor: number; currency: string } | null;
   /** The first day on it, `YYYY-MM-DD`. */
   day: string | null;
+  /** Who read it: Tell's rules on the device, or the model. */
+  by: 'rules' | 'model';
 };
 
 /** The modules a BrainDog keeps, read off the lists it holds, in the order first met; the agents' lists are no module here. */
@@ -79,22 +94,32 @@ const listIn = (register: string, modules: readonly string[]): List | null => {
 export type DraftsFrom = {
   /** The modules this BrainDog keeps (`modulesHeld`). */
   modules: readonly string[];
-  /** The BrainDog's own currency, the only one a draft's money may be in; `null` keeps no money on a draft. */
+  /** The BrainDog's own currency, the only one a model's money may be in; `null` keeps no money on its drafts. */
   currency: string | null;
   /** What the build wrote from the same words, by list: never offered again. */
-  built: readonly { register: string; fields: Readonly<Record<string, unknown>> }[];
+  built: readonly DraftRow[];
   /** The person's own name, who is no draft in People. */
   me: string | null;
 };
 
-/** The model's entries as drafts: held to their lists, and none the build already made, the person, or twice. */
-export function draftsOf(reply: Pick<SetupReply, 'rows'>, from: DraftsFrom): FirstDraft[] {
+/** The keys the build already wrote, and the person: what no draft may be. */
+function takenBy(from: Pick<DraftsFrom, 'built' | 'modules'>, titleOf: (register: string) => string | null): Set<string> {
   const seen = new Set<string>();
   for (const b of from.built) {
-    const l = listIn(b.register, from.modules);
-    const t = plain(l ? b.fields[l.title] : undefined);
+    const field = titleOf(b.register);
+    const t = plain(field === null ? undefined : b.fields[field]);
     if (t !== '') seen.add(`${b.register}:${t}`);
   }
+  return seen;
+}
+
+const isMoney = (v: unknown): v is { amount: number; currency: string } =>
+  typeof v === 'object' && v !== null && typeof (v as { amount?: unknown }).amount === 'number' && typeof (v as { currency?: unknown }).currency === 'string';
+const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v);
+
+/** The model's entries as drafts: held to their lists, and none the build already made, the person, or twice. */
+export function draftsOf(reply: Pick<SetupReply, 'rows'>, from: DraftsFrom): FirstDraft[] {
+  const seen = takenBy(from, (r) => listIn(r, from.modules)?.title ?? null);
   const me = plain(from.me);
   const out: FirstDraft[] = [];
   for (const r of reply.rows) {
@@ -106,28 +131,139 @@ export function draftsOf(reply: Pick<SetupReply, 'rows'>, from: DraftsFrom): Fir
     const key = `${list.id}:${plain(title)}`;
     if (title === '' || seen.has(key) || (me !== '' && plain(title) === me)) continue;
     seen.add(key);
-    const money = list.fields.find((f) => f.type === 'money' && fields[f.id] !== undefined);
-    const day = list.fields.find((f) => f.type === 'day' && typeof fields[f.id] === 'string');
-    const m = money ? (fields[money.id] as { amount: number; currency: string }) : null;
+    const money = Object.values(fields).find(isMoney) ?? null;
     out.push({
       key,
-      register: list.id,
+      rows: [{ register: list.id, fields }],
+      main: 0,
       list: list.name,
       titleField: list.title,
       title,
-      fields,
-      amount: m ? { minor: m.amount, currency: m.currency } : null,
-      day: day ? (fields[day.id] as string) : null,
+      detail: null,
+      amount: money ? { minor: money.amount, currency: money.currency } : null,
+      day: Object.values(fields).find(isDay) ?? null,
+      by: 'model',
     });
   }
   return out;
 }
 
-/** A draft with its title changed by hand: the same entry, under its new words. */
+/** Where one clause ends and the next thing to do starts: "… for design and need to call the bank tomorrow". */
+const NEXT_TODO = /,?\s+(?:and|but)\s+(?=(?:i\s+|we\s+)?(?:also\s+)?(?:need|have|must|got|remember|want|am going|'m going)\s+to\b)/iu;
+/** What a person says before the thing itself, which Tell would keep in its title: "Life admin:", "and", "I need to". */
+const LABEL = /^[^:,.]{1,30}:\s*/u;
+const LEAD = /^(?:and|also|plus|then|oh)\s+/iu;
+const MUST = /^(?:(?:i|we)\s+(?:also\s+)?)?(?:need|have|must|got|remember|want|am going|'m going)\s+to\s+/iu;
+const SUBJECT = /^(?:i|we)\s+(?=(?:pay|owe|get|earn|spend|buy|rent|send|call|meet|charge|bill|invoice)\b)/iu;
+
+/**
+ * THE CLAUSES OF WHAT WAS TYPED, each read on its own as one thing told: the sentences, a second thing to do split off
+ * its own clause, and the words a person puts before the thing taken off, so Tell's title is the thing ("Call the bank",
+ * "Rent"). `said` is the clause as typed, for telling a self-introduction from a thing to do; `text` is what Tell reads.
+ */
+export function clausesOf(said: string): { said: string; text: string }[] {
+  return said
+    .split(/(?<=[.!?;])\s+|\n+/u)
+    .flatMap((s) => s.split(NEXT_TODO))
+    .map((s) => s.trim())
+    .filter((s) => s.length > 2)
+    .map((s) => {
+      const text = s.replace(LABEL, '').replace(LEAD, '').replace(MUST, '').replace(SUBJECT, '').trim();
+      return { said: s, text: text.charAt(0).toUpperCase() + text.slice(1) };
+    })
+    .filter((c) => c.text.length > 2);
+}
+
+/** A sentence about who the person is, which Tell would read as a to-do ("I run a small candle shop"). */
+const ABOUT_ME = /^(?:hi|hello|hey)?[\s,!]*(?:i'?m|i am|i run|i own|i work|i have|i've|i do|i'm a|we are|we're|we run|my name|this is)\b/iu;
+/** Words a to-do starts with, so "need to call the bank" is a to-do and "a solo founder building Tallow" is not. */
+const DOING = /\b(?:need to|have to|must|got to|remember to|want to|going to|call|email|text|send|book|buy|pay|finish|fix|file|renew|cancel|chase|ask|meet|pick up|drop off)\b/iu;
+
+/**
+ * TELL'S READING OF EACH SENTENCE, AS DRAFTS: the rows one sentence became, split into the groups that point at one
+ * another (`$row`: the payment and the person it names), each group one draft. A group is kept only where it is concrete:
+ * it has a day or an amount, it is somebody, or its words read as a thing to do. Nothing that still needs a field, the
+ * person, or what the build wrote.
+ */
+export function draftsFromTold(read: readonly { said: string; told: Pick<Told, 'rows'> }[], lists: readonly TellList[], from: Pick<DraftsFrom, 'built' | 'me'>): FirstDraft[] {
+  const listOf = (id: string): TellList | undefined => lists.find((l) => l.id === id);
+  const seen = takenBy({ built: from.built, modules: [] }, (r) => listOf(r)?.title ?? null);
+  const me = plain(from.me);
+  const out: FirstDraft[] = [];
+  for (const { said, told } of read) {
+    if (ABOUT_ME.test(said) && !DOING.test(said)) continue;
+    const rows = told.rows;
+    if (rows.length === 0 || rows.some((r) => r.missing.length > 0)) continue;
+    /* THE GROUPS: rows joined by a `$row` that points from one to another. */
+    const group = rows.map((_, i) => i);
+    const root = (i: number): number => (group[i] === i ? i : (group[i] = root(group[i]!)));
+    rows.forEach((r, i) => {
+      for (const v of Object.values(r.fields)) {
+        if (typeof v === 'object' && v !== null && '$row' in v && typeof v.$row === 'number' && v.$row >= 0 && v.$row < rows.length) group[root(i)] = root(v.$row);
+      }
+    });
+    const groups = new Map<number, number[]>();
+    rows.forEach((_, i) => groups.set(root(i), [...(groups.get(root(i)) ?? []), i]));
+    for (const at of groups.values()) {
+      /* THE MAIN ENTRY IS THE ONE OTHERS POINT FROM: the payment, never the person it names. */
+      const main = at.find((i) => Object.values(rows[i]!.fields).some((v) => typeof v === 'object' && v !== null && '$row' in v)) ?? at[0]!;
+      const r = rows[main]!;
+      const list = listOf(r.register);
+      if (list === undefined) continue;
+      const title = String(r.fields[list.title] ?? '').trim();
+      const key = `${r.register}:${plain(title)}`;
+      if (title === '' || seen.has(key) || (me !== '' && plain(title) === me)) continue;
+      const values = at.flatMap((i) => Object.values(rows[i]!.fields));
+      const money = values.find(isMoney) ?? null;
+      const day = values.find(isDay) ?? null;
+      const somebody = at.some((i) => rows[i]!.register === PEOPLE);
+      if (money === null && day === null && !somebody && !DOING.test(said)) continue;
+      seen.add(key);
+      /* THE GROUP'S OWN ORDER, with each `$row` pointed again at its place in the group. */
+      const place = new Map(at.map((i, n) => [i, n]));
+      const sent = at.map((i) => ({
+        register: rows[i]!.register,
+        fields: Object.fromEntries(
+          Object.entries(rows[i]!.fields).map(([k, v]) => [k, typeof v === 'object' && v !== null && '$row' in v ? { $row: place.get(v.$row) ?? 0 } : v]),
+        ),
+      }));
+      out.push({
+        key,
+        rows: sent,
+        main: place.get(main) ?? 0,
+        list: list.name,
+        titleField: list.title,
+        title,
+        detail: r.detail.trim() === '' ? null : r.detail,
+        amount: money ? { minor: money.amount, currency: money.currency } : null,
+        day,
+        by: 'rules',
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * THE TWO READINGS AS ONE CARD: the model's first where it answered, then Tell's that the model did not also find. One
+ * thing found by both is one draft, by its list and a title one holds the other of ("Call the bank" and "Call the bank
+ * tomorrow").
+ */
+export function mergeDrafts(model: readonly FirstDraft[], rules: readonly FirstDraft[]): FirstDraft[] {
+  const same = (a: FirstDraft, b: FirstDraft): boolean => {
+    if (a.rows[a.main]?.register !== b.rows[b.main]?.register) return false;
+    const x = plain(a.title);
+    const y = plain(b.title);
+    return x === y || x.includes(y) || y.includes(x);
+  };
+  return [...model, ...rules.filter((r) => !model.some((m) => same(m, r)))];
+}
+
+/** A draft with its title changed by hand: the same entries, its main one under the new words. */
 export function retitled(d: FirstDraft, title: string): FirstDraft {
   const t = title.replace(/\s+/gu, ' ').trim().slice(0, 500);
   if (t === '' || t === d.title) return d;
-  return { ...d, title: t, fields: { ...d.fields, [d.titleField]: t } };
+  return { ...d, title: t, rows: d.rows.map((r, i) => (i === d.main ? { ...r, fields: { ...r.fields, [d.titleField]: t } } : r)) };
 }
 
 /** The model's one sentence of what this BrainDog is for, where it said one that reads as a sentence and not a label. */

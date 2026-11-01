@@ -1622,7 +1622,7 @@
     {#if data.live && ClearExamples}<ClearExamples />{/if}
 
     <!-- WHAT THE MODEL FOUND IN THE SIGN-UP WORDS BEYOND THE BUILD, each a draft kept with one press (1 Nov). -->
-    {#if drafting && FirstDrafts}<FirstDrafts />{/if}
+    {#if drafting && FirstDrafts}<FirstDrafts options={tellOptions} />{/if}
 
     <!-- A FIRST TODAY OPENS ON THE CARD: one real thing, read into the entries it becomes, added on one press. -->
     {#if tell}<TellOne options={tellOptions} onadded={toldOne} />{:else if slim}<TellOne

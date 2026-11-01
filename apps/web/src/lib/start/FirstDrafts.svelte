@@ -6,8 +6,10 @@
   Undo every write has; Change opens its words in a field, where Enter keeps it as typed and Escape puts it back; Not this
   lets it go. Keep all, where there are two or more. Nothing is written until a press, and the card says so.
 
-  WHILE THE MODEL READS, a line and a bar that fills, never a spinner: the read has twenty seconds at most, and a read that
-  finds nothing, or a host with no model, draws nothing at all (the rules' build already stands).
+  TELL'S OWN READING FIRST, THE MODEL'S AS IT COMES. The words are read on the device as if told to Today, at once, and
+  what is concrete becomes drafts (`draftsFromTold`); the model's read joins them when it answers (`mergeDrafts`). While
+  it reads, a line and a bar that fills, never a spinner: the read has twenty seconds at most. A host with no model is
+  Tell's drafts alone, and with none of those either the card is never drawn (the build already stands).
 
   STABLE WRAPPERS FOR THE MOTION LANE: the card is `data-forming="drafts"`, each draft `data-forming="draft"` keyed by
   `data-draft`, so a draft arriving and a draft kept can be animated after the merge. Here only plain fades, and none
@@ -20,18 +22,27 @@
 
   import { apiBase } from '$lib/at.ts';
   import { reread } from '$lib/data/live.svelte.ts';
+  import type { TellOptions } from '$lib/tell/read.ts';
   import Button from '$lib/ui/Button.svelte';
   import Money from '$lib/ui/Money.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import type { FirstDraft } from './first-drafts.ts';
-  import { firstDrafts, replaceDraft, restoreDrafts, settleDrafts } from './first-drafts.svelte.ts';
+  import { closeDrafts, firstDrafts, restoreDrafts, settleDrafts } from './first-drafts.svelte.ts';
+
+  let {
+    options,
+  }: {
+    /** What Today reads a told line against (`tellOptions`): the same lists, people and day, for Tell's own reading of the words. */
+    options: TellOptions;
+  } = $props();
 
   /** The card's own words. */
   const say = {
     title: 'From what you wrote',
     sub: 'A few more things in your words. Nothing is added until you keep it.',
     reading: 'Reading what you wrote once more, for people, projects, to-dos and money.',
+    readingMore: 'Still reading for anything else.',
     where: (list: string) => `In ${list}`,
     keep: 'Keep',
     keepAll: (n: number) => (n === 2 ? 'Keep both' : `Keep all ${n}`),
@@ -47,8 +58,43 @@
 
   const base = apiBase();
   const kept = $derived(firstDrafts.now !== null && firstDrafts.now.base === base ? firstDrafts.now : null);
-  const drafts = $derived(kept?.state === 'ready' ? kept.drafts : []);
   const reading = $derived(kept?.state === 'reading');
+
+  /* TELL'S OWN READING OF THE WORDS, ON THIS DEVICE AND AT ONCE (`draftsFromTold`): the fallback that needs no model, and
+     what the card opens with while the model reads. Its code and the reader come after the card, as Tell's own do. */
+  let rules = $state.raw<FirstDraft[]>([]);
+  let merge = $state.raw<((m: readonly FirstDraft[], r: readonly FirstDraft[]) => FirstDraft[]) | null>(null);
+  $effect(() => {
+    const said = kept?.begin.said ?? '';
+    const built = kept?.begin.built ?? [];
+    const me = kept?.begin.me ?? null;
+    const opts = options;
+    if (said === '') return;
+    let gone = false;
+    void Promise.all([import('$lib/tell/read.ts'), import('./first-drafts.ts')]).then(([{ tellRead }, d]) => {
+      if (gone) return;
+      merge = d.mergeDrafts;
+      rules = d.draftsFromTold(
+        d.clausesOf(said).map((c) => ({ said: c.said, told: tellRead(c.text, opts) })),
+        opts.lists,
+        { built, me },
+      );
+    });
+    return () => (gone = true);
+  });
+
+  /** A draft's words as changed here, by key, laid over it until it is kept. */
+  let edits = $state.raw<Record<string, FirstDraft>>({});
+  const drafts = $derived.by(() => {
+    if (kept === null) return [];
+    const all = merge === null ? [...kept.drafts, ...rules] : merge(kept.drafts, rules);
+    return all.filter((d) => !kept.gone.includes(d.key)).map((d) => edits[d.key] ?? d);
+  });
+
+  /* NOTHING LEFT, NOTHING READING: the card says it is done, so Today stops loading it. Only once Tell's reading is in. */
+  $effect(() => {
+    if (kept !== null && !reading && merge !== null && drafts.length === 0) closeDrafts(base);
+  });
 
   let busy = $state(false);
   let editing = $state<string | null>(null);
@@ -71,11 +117,23 @@
       return;
     }
     const client = createClient({ base });
-    const sent = these.map((d) => ({ register: d.register, fields: d.fields }));
+    const keys = these.map((d) => d.key);
+    /* EACH DRAFT'S ENTRIES IN ONE CAPTURE, each `$row` pointed again past the drafts before it. */
+    const sent: { register: string; fields: Record<string, unknown> }[] = [];
+    for (const d of these) {
+      const from = sent.length;
+      for (const r of d.rows)
+        sent.push({
+          register: r.register,
+          fields: Object.fromEntries(
+            Object.entries(r.fields).map(([k, v]) => [k, typeof v === 'object' && v !== null && '$row' in v && typeof (v as { $row: unknown }).$row === 'number' ? { $row: from + (v as { $row: number }).$row } : v]),
+          ),
+        });
+    }
     await run({
       /* OFF THE CARD AT ONCE, back on it if the record says no. */
-      apply: () => settleDrafts(base, these.map((d) => d.key)),
-      revert: () => restoreDrafts(base, these),
+      apply: () => settleDrafts(base, keys),
+      revert: () => restoreDrafts(base, keys),
       send: async () => {
         const answer = await client.capture({ rows: sent });
         if (answer.ok) return { ok: true as const, value: answer.value };
@@ -111,7 +169,7 @@
   async function keepChanged(d: FirstDraft): Promise<void> {
     const { retitled } = await import('./first-drafts.ts');
     const next = retitled(d, editText);
-    if (next !== d) replaceDraft(base, next);
+    if (next !== d) edits = { ...edits, [d.key]: next };
     await keep([next]);
   }
 
@@ -133,7 +191,7 @@
 
 {#if reading || drafts.length > 0}
   <Tile icon="slash" title={say.title} class="first-drafts" data-forming="drafts" data-state={reading ? 'reading' : 'ready'} actions={drafts.length > 1 ? keepAllAction : undefined}>
-    {#if reading}
+    {#if drafts.length === 0}
       <p class="drafts-line" role="status">{say.reading}</p>
       <div class="bar" aria-hidden="true"><span class="bar-fill"></span></div>
     {:else}
@@ -157,9 +215,9 @@
                 <p class="draft-title">{d.title}</p>
               {/if}
               <p class="draft-where">
-                {say.where(d.list)}{#if d.day}, {dayShort(d.day)}{/if}{#if d.amount}<span class="draft-amount num"
-                    ><Money minor={d.amount.minor} currency={d.amount.currency} home={d.amount.currency} /></span
-                  >{/if}
+                {#if d.detail}{d.detail.charAt(0).toUpperCase() + d.detail.slice(1)}{:else}{say.where(d.list)}{#if d.day}, {dayShort(d.day)}{/if}{#if d.amount}<span
+                      class="draft-amount num"><Money minor={d.amount.minor} currency={d.amount.currency} home={d.amount.currency} /></span
+                    >{/if}{/if}
               </p>
             </div>
             <div class="draft-acts">
@@ -175,6 +233,11 @@
           </li>
         {/each}
       </ul>
+      <!-- THE MODEL STILL READING BESIDE TELL'S DRAFTS: one quiet line and the bar, and its drafts join the list. -->
+      {#if reading}
+        <p class="drafts-more" role="status">{say.readingMore}</p>
+        <div class="bar" aria-hidden="true"><span class="bar-fill"></span></div>
+      {/if}
     {/if}
   </Tile>
 {/if}
@@ -229,6 +292,13 @@
     from {
       opacity: 0;
     }
+  }
+
+  .drafts-more {
+    margin: var(--sp-3) 0 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .drafts {

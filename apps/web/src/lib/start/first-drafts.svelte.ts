@@ -38,9 +38,14 @@ export type Kept = {
   /** When the read began, so a reload long after an interrupted read does not ask again. */
   at: number;
   summary: string | null;
+  /** What the model found, kept or not; the card adds Tell's own reading of the words beside it. */
   drafts: FirstDraft[];
-  /** How many the model found, kept or not, so the made screen can say it. */
+  /** How many the model found, so the made screen can say it. */
   found: number;
+  /** The drafts kept or let go, by key, whoever read them: never drawn again. */
+  gone: string[];
+  /** The card had nothing left to show: Today no longer loads it. */
+  closed?: boolean;
   begin: Begin;
 };
 
@@ -75,7 +80,7 @@ function save(k: Kept | null): void {
 function load(base: string): Kept | null {
   try {
     const v = JSON.parse(tab()?.getItem(KEY) ?? 'null') as Kept | null;
-    return v !== null && typeof v === 'object' && v.base === base && Array.isArray(v.drafts) && typeof v.begin?.said === 'string' ? v : null;
+    return v !== null && typeof v === 'object' && v.base === base && Array.isArray(v.drafts) && typeof v.begin?.said === 'string' ? { ...v, gone: Array.isArray(v.gone) ? v.gone : [] } : null;
   } catch {
     return null;
   }
@@ -103,11 +108,20 @@ export function draftsFor(base: string): Kept | null {
   return firstDrafts.now;
 }
 
-/** Whether there are drafts to draw for this BrainDog: reading, or found and not all handled. Reads only; `draftsFor` first. */
+/**
+ * Whether Today loads the card for this BrainDog: there are words to read and the card has not said it is done. The card
+ * itself works out what is left (Tell's reading is the device's, so only the card can). Reads only; `draftsFor` first.
+ */
 export const draftsWaiting = (base: string): boolean => {
   const k = firstDrafts.now;
-  return k !== null && k.base === base && (k.state === 'reading' || (k.state === 'ready' && k.drafts.length > 0));
+  return k !== null && k.base === base && k.closed !== true;
 };
+
+/** The card had nothing left to show: kept, so Today stops loading it. */
+export function closeDrafts(base: string): void {
+  const k = draftsFor(base);
+  if (k !== null && k.closed !== true && k.state !== 'reading') set({ ...k, closed: true });
+}
 
 const inFlight = new Set<string>();
 
@@ -122,7 +136,7 @@ export function beginDrafts(b: Begin): void {
 async function read(b: Begin): Promise<void> {
   if (inFlight.has(b.base)) return;
   inFlight.add(b.base);
-  set({ base: b.base, state: 'reading', at: Date.now(), summary: null, drafts: [], found: 0, begin: b });
+  set({ base: b.base, state: 'reading', at: Date.now(), summary: null, drafts: [], found: 0, gone: firstDrafts.now?.base === b.base ? firstDrafts.now.gone : [], begin: b });
   try {
     const [{ draftOffer, draftsOf, modulesHeld, summaryOf }, { slashAsks }] = await Promise.all([import('./first-drafts.ts'), import('./ask.ts')]);
     const modules = modulesHeld(b.registers);
@@ -132,7 +146,7 @@ async function read(b: Begin): Promise<void> {
     if (firstDrafts.now?.base !== b.base) return;
     if (!out.ok) return void set({ ...firstDrafts.now, state: 'none' });
     const drafts = draftsOf(out.value, { modules, currency: b.currency, built: b.built, me: b.me });
-    set({ ...firstDrafts.now, state: drafts.length > 0 ? 'ready' : 'none', summary: summaryOf(out.value), drafts, found: drafts.length });
+    set({ ...firstDrafts.now, state: drafts.length > 0 ? 'ready' : 'none', summary: summaryOf(out.value), drafts, found: drafts.length, closed: false });
   } catch {
     if (firstDrafts.now?.base === b.base) set({ ...firstDrafts.now, state: 'none' });
   } finally {
@@ -144,20 +158,12 @@ async function read(b: Begin): Promise<void> {
 export function settleDrafts(base: string, keys: readonly string[]): void {
   const k = draftsFor(base);
   if (k === null) return;
-  set({ ...k, drafts: k.drafts.filter((d) => !keys.includes(d.key)) });
+  set({ ...k, gone: [...new Set([...k.gone, ...keys])] });
 }
 
-/** A draft changed by hand, in place. */
-export function replaceDraft(base: string, d: FirstDraft): void {
+/** Drafts put back on the card: the record said no to keeping them. */
+export function restoreDrafts(base: string, keys: readonly string[]): void {
   const k = draftsFor(base);
   if (k === null) return;
-  set({ ...k, drafts: k.drafts.map((x) => (x.key === d.key ? d : x)) });
-}
-
-/** A draft put back after an Undo, where it was. */
-export function restoreDrafts(base: string, back: readonly FirstDraft[]): void {
-  const k = draftsFor(base);
-  if (k === null) return;
-  const keys = new Set(k.drafts.map((d) => d.key));
-  set({ ...k, state: 'ready', drafts: [...k.drafts, ...back.filter((d) => !keys.has(d.key))] });
+  set({ ...k, closed: false, gone: k.gone.filter((g) => !keys.includes(g)) });
 }
