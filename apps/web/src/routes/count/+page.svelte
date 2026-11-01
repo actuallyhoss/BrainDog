@@ -75,7 +75,7 @@
     notSetUpBody: 'It counts your cash note by note and files any difference in the Ledger.',
     bare: 'Count from an account',
     bareBody: 'Open Count the cash from Money, or from a cash account, and the count goes to that account.',
-    addOn: 'See add-ons',
+    addOn: 'See the add-on',
     saved: 'Count saved',
     savedBody: 'Filing the difference in the Ledger.',
     again: 'Count again',
