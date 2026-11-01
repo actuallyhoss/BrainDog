@@ -47,6 +47,8 @@ export type Place = {
   hide: boolean;
   /** Whether the nav draws it under a name the person can change (`nav.labels`). */
   rename: boolean;
+  /** The list this place is, by id, which a rename renames everywhere through the record's `renameList`. */
+  list?: string | undefined;
 };
 
 /** What the palette knows about the screen and the person when the query is read. */
@@ -60,6 +62,8 @@ export type Here = {
   pageMenu: boolean;
   /** Where a look change is kept now, as `pref.whereKept` answers; absent is this device, the claim that is never wrong. */
   kept?: 'record' | 'pending' | 'device';
+  /** The list whose page is behind the palette, which "rename this list to Clients" names. */
+  here?: Place | undefined;
 };
 
 export type LookKey = 'scheme' | 'text' | 'density';
@@ -73,6 +77,8 @@ export type Change =
   | { kind: 'hide'; href: string; name: string }
   | { kind: 'show'; href: string; name: string }
   | { kind: 'rename'; href: string; own: string; from: string; to: string }
+  /** A list renamed everywhere, by the record (`renameList`), not only in this person's nav. */
+  | { kind: 'renameList'; list: string; from: string; to: string }
   /** Puts a sentence in the box and keeps the palette open, for a rename that has no new name yet. */
   | { kind: 'fill'; text: string }
   | { kind: 'page' }
@@ -209,7 +215,15 @@ export const QUIET_HREF = '/settings/notifications';
  * so Enter on it is a step toward the sentence and never a guess at a name.
  */
 function renames(typed: string, here: Here): Offer[] {
-  const renamable = here.places.filter((p) => p.rename);
+  /* "RENAME THIS LIST TO CLIENTS" ON A LIST'S PAGE is that list, by the record's call. */
+  const self = /^(?:this list|this|it)(?:\s+to(?:\s+(.*))?)?$/iu.exec(typed.trim());
+  if (self && here.here?.list !== undefined) {
+    const p = here.here;
+    const to = (self[1] ?? '').trim().slice(0, LABEL_MOST);
+    if (to === '') return [asking(p)];
+    return to === p.name ? [] : [{ id: `cz-rename-${p.href}`, title: w.rename(p.name, to), detail: w.renameListDetail, icon: 'edit', change: { kind: 'renameList', list: p.list!, from: p.name, to } }];
+  }
+  const renamable = here.places.filter((p) => p.rename || p.list !== undefined);
   /* A PAGE WHOSE OWN NAME HOLDS " to " ("Back to work"), typed whole, is that page, and not "Back" renamed to "work". */
   const whole = terms(typed)?.join(' ') ?? '';
   const exact = renamable.filter((p) => (terms(p.name) ?? []).join(' ') === whole);
@@ -226,9 +240,9 @@ function renames(typed: string, here: Here): Offer[] {
             .map((p) => ({
               id: `cz-rename-${p.href}`,
               title: w.rename(p.name, to),
-              detail: w.renameDetail,
+              detail: p.list !== undefined ? w.renameListDetail : w.renameDetail,
               icon: 'edit' as const,
-              change: { kind: 'rename' as const, href: p.href, own: p.own, from: p.name, to },
+              change: p.list !== undefined ? { kind: 'renameList' as const, list: p.list, from: p.name, to } : { kind: 'rename' as const, href: p.href, own: p.own, from: p.name, to },
             }));
   }
   /* NO " to " YET: the whole is read as the page. */

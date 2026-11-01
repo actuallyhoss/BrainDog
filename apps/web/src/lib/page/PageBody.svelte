@@ -78,6 +78,7 @@
     between = null,
     placed = null,
     inside = null,
+    bare = false,
   }: {
     /**
      * `page` is `/p/<slug>`, with its block keys. `home` is a home's body: its blocks that hold nothing are not drawn, a
@@ -154,6 +155,11 @@
     placed?: ((i: number) => { key: string; area: string; size: string } | null) | null;
     /** What the screen draws inside a block's tile, at its foot: Needs you's foot, a board's editing handles. */
     inside?: Snippet<[number]> | null;
+    /**
+     * THE BLOCKS AND NOTHING ELSE, for a page laid out as a board (`PageBoard.svelte`): its head (the next step, the slot,
+     * what changed, the project's shape) is drawn by the page above the board, so every cell here is a widget.
+     */
+    bare?: boolean;
   } = $props();
 
   const arranging = $derived(arrangement?.editing ?? false);
@@ -396,7 +402,7 @@
    * every block is loose, because a block being moved is a list item and a list item inside a surface inside the list
    * is a listitem whose parent is not the list.
    */
-  const runsOf = (list: Laid[]): Run<Laid>[] => (arranging ? [{ box: false, items: list }] : boxesOf(list, (x) => x.block));
+  const runsOf = (list: Laid[]): Run<Laid>[] => (arranging || placed ? [{ box: false, items: list }] : boxesOf(list, (x) => x.block));
 
   /**
    * HOW WIDE EACH COLUMN IS DRAWN, `0` for one not drawn: a column whose every block said no to `when:` is not drawn, as
@@ -1410,22 +1416,22 @@
   <!-- JUST CHANGED OPENS THE PAGE, before what it holds; on a page whose head rides over its lead tile it follows that
        tile instead, or the head would sit over it. -->
   <!-- A PAGE WITH NO HEADLINE STILL OPENS ON THE LOOK'S NEXT ACTION, before what narrows it. -->
-  {#if next && !headline && !arranging}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
-  {#if opens && opensAt < 0}<div class="page-strip" data-opens>{@render opens()}</div>{/if}
+  {#if next && !headline && !arranging && !bare}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
+  {#if opens && opensAt < 0 && !bare}<div class="page-strip" data-opens>{@render opens()}</div>{/if}
   <!-- THE PROJECT'S SHAPE OVER BOTH COLUMNS, where the screen's own opening stood, its parts in one flow of their own (`shapeParts`). -->
-  {#if shapeParts.some((x) => x.block.drawn)}
+  {#if shapeParts.some((x) => x.block.drawn) && !bare}
     <div class="area" data-area="shape">
       {#each shapeParts as x (keys[x.slot.i])}{@render slotted(x)}{/each}
     </div>
   {/if}
   {#if under && !lifted}<div class="page-strip">{@render under()}</div>{/if}
   {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
-  {#if host && mode === 'page' && !arranging && !lifted}<JustChanged {host} />{/if}
+  {#if host && mode === 'page' && !arranging && !lifted && !bare}<JustChanged {host} />{/if}
   <!-- THE RESERVED SLOT (`slot.ts`): BrainDog's one suggestion, at the head of a page or a home being read by someone who
        may answer it. It arrives after the page has drawn and draws nothing when there is nothing to suggest, and never
        on a page that is no place to decide (`slotPlace`). ON A HOME EVERY QUESTION ITS QUEUE HOLDS COUNTS AS DRAWN, the
        folded ones too: Today's Needs you is where they are asked, and the slot never asks one of them a second time. -->
-  {#if (mode === 'page' || mode === 'home') && writes && readerWhole && !arranging && slotAt && !ownQuestions}
+  {#if (mode === 'page' || mode === 'home') && writes && readerWhole && !arranging && slotAt && !ownQuestions && !bare}
     <div class="page-strip" data-slot>{#await import('./SuggestionSlot.svelte') then { default: SuggestionSlot }}<SuggestionSlot blocks={given} page={slotAt.page} row={slotAt.row} compact={whole || mode === 'home' ? null : COMPACT_MOST} reread={writes.reread} />{/await}</div>
   {/if}
   {#if layout}
@@ -1448,7 +1454,7 @@
     {@render column(rest)}
   {/if}
   <!-- WHAT WAS CHANGED FOR THE READER THIS WEEK, one line at the foot of the board; the list opens in the panel. -->
-  {#if host && mode === 'page' && !arranging}<Changed {host} />{/if}
+  {#if host && mode === 'page' && !arranging && !bare}<Changed {host} />{/if}
 </div>
 
 <style>

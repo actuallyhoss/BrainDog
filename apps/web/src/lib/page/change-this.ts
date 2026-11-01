@@ -139,7 +139,7 @@ export const queryFields = (fields: readonly AskField[]): QueryField[] =>
   fields.map((f) => ({ id: f.id, type: f.type ?? (f.values ? 'enum' : 'text'), ...(f.label ? { label: f.label } : {}), ...(f.values ? { values: f.values } : {}) }));
 
 /** The `where` that joins a new sentence to what the block already filters by, or `null` where the two cannot be joined. */
-function joined(had: unknown, sentence: string, i: AskIn): unknown | null {
+export function joined(had: unknown, sentence: string, i: Pick<AskIn, 'register' | 'fields' | 'now'>): unknown | null {
   const reading = readSentence(sentence, i.register ?? '', queryFields(i.fields), i.now);
   if (!reading.ok) return null;
   if (had === undefined || had === null) return sentence;

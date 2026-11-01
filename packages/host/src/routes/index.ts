@@ -56,6 +56,7 @@ import { ROUTES as NAMED_TWICE } from './named-twice.ts';
 import { ROUTES as exportPack } from './export-pack.ts';
 import { ROUTES as SHARES } from './shares.ts';
 import { ROUTES as deviceRename } from './device-rename.ts';
+import { ROUTES as renameList } from './rename-list.ts';
 import { ROUTES as doorSwitch } from './door-switch.ts';
 import { ROUTES as flowGrammar } from './flow-grammar.ts';
 import { ROUTES as PACKS_REMOVED } from './packs-removed.ts';
@@ -120,6 +121,7 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...exportPack,
   ...SHARES,
   ...deviceRename,
+  ...renameList,
   ...doorSwitch,
   ...flowGrammar,
   ...PACKS_REMOVED,

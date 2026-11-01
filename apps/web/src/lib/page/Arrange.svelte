@@ -68,7 +68,7 @@
   import type BlockEditorView from './BlockEditor.svelte';
   import { composeWords, type Composed } from './compose.ts';
   import type MakeComponentView from './MakeComponent.svelte';
-  import { askedIn, CHANGE_EVENT, holdLine, keyInFocus, slashEntryWords, withoutEntry } from './slash-entry.ts';
+  import { askedIn, CHANGE_EVENT, CHANGE_PAGE_EVENT, holdLine, keyInFocus, slashEntryWords, withoutEntry } from './slash-entry.ts';
   import { listOf, shelfWords, type Declared, type Shelved } from './shelf.ts';
   import type { LookUndo } from '$lib/record/arrange-look.ts';
   import { layoutOf, slotOf } from './layout.ts';
@@ -222,6 +222,10 @@
     }
     const key = keyInFocus(document.activeElement);
     if (key !== null) return void window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { key, line: got.line } }));
+    /* NO BLOCK IN FOCUS: THE LINE IS ABOUT THE PAGE ("move Bills up", "show only open ones"), and the page's ⋯ menu opens
+       its Change sheet on it (`ChangePage.svelte`). Only where no menu took it is it held for a block's Change this. */
+    const page = new CustomEvent(CHANGE_PAGE_EVENT, { detail: { line: got.line }, cancelable: true });
+    if (!window.dispatchEvent(page)) return;
     holdLine(got.line);
     toasts.push(slashEntryWords.which);
   });

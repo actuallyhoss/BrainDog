@@ -56,6 +56,8 @@
     type Headed,
   } from './look.ts';
   import { words as pageWords } from './words.ts';
+  import { CHANGE_PAGE_EVENT } from './slash-entry.ts';
+  import type { SayBlock, SayIn, SayList } from './say-page.ts';
 
   let {
     slug,
@@ -70,7 +72,19 @@
     heads = () => [],
     extra = [],
     built = null,
+    board = null,
+    here = null,
   }: {
+    /**
+     * THE SETTINGS THAT DECIDE HOW THIS PAGE READS, changed here (`SettingHere.svelte`): Money's currency on Money's
+     * pages, a list's name on its page. `null` offers none.
+     */
+    here?: { currency?: string | null | undefined; list?: { id: string; name: string } | undefined } | null;
+    /**
+     * Whether this page can be laid out as a board, and whether it is one now (`page-boards.svelte.ts`): a project's
+     * page and Money's home. `null` offers no board.
+     */
+    board?: { on: boolean; keys: () => readonly string[] } | null;
     /** Links the page offers first, above its own entries: a project's "Edit details" (proj F7, VERIFY H13). */
     extra?: readonly { label: string; icon: IconName; href: string }[];
     /** The page's address, which the description is about. */
@@ -102,6 +116,12 @@
 
   let open = $state(false);
   let menu = $state(false);
+  /* THE BOARD'S TWO WORDS, here so the menu draws them before the board's code is asked for. */
+  const boardOn = 'Lay out as a board';
+  const boardOff = 'Back to a plain page';
+  /** A line Slash handed this page ("move Bills up"), sent once as the sheet opens; each one opens a fresh sheet. */
+  let line = $state<string | undefined>(undefined);
+  let lines = $state(0);
 
   /* THE SAME FACT THE PALETTE'S SLASH ROW STANDS ON: whether this host has a model behind Slash. */
   const model = $derived(page.data.slash === true);
@@ -139,6 +159,67 @@
     /* THROUGH `at()`, which hands back an address already under the app as it is (`at-sites.test.ts`). */
     void goto(at(withoutDescribe(page.url)), { replaceState: true, noScroll: true, keepFocus: true });
   });
+
+  /* A LINE ABOUT THE WHOLE PAGE FROM SLASH (`Arrange.svelte` hands it over when no block is in focus): the sheet opens on
+     it and reads it at once, by the rules first and the model only where they cannot. Taken, so it is not also held. */
+  $effect(() => {
+    if (!mayChange) return;
+    const on = (e: Event) => {
+      const said = (e as CustomEvent<{ line?: unknown }>).detail?.line;
+      if (typeof said !== 'string' || said.trim() === '') return;
+      e.preventDefault();
+      line = said.trim();
+      lines += 1;
+      open = true;
+    };
+    addEventListener(CHANGE_PAGE_EVENT, on);
+    return () => removeEventListener(CHANGE_PAGE_EVENT, on);
+  });
+
+  /**
+   * WHAT THE RULES READ A LINE AGAINST (`say-page.ts`), read as the line is sent and not before: the page's own body as
+   * the record stores it, its blocks in the order they are drawn, his look, and the lists with their fields. A home the
+   * record holds none of yet is the model's alone, since there is no body to change.
+   */
+  async function sayCtx(): Promise<Omit<SayIn, 'text'> | null> {
+    if (!change) return null;
+    const [{ authoredOf }, { REGISTERS }] = await Promise.all([import('$lib/record/page-write.ts'), import('$lib/record/held.ts')]);
+    const read = await authoredOf(apiBase(), slug);
+    if ('from' in read) return null;
+    const order = keys();
+    const all = heads() as readonly (Headed & { kind?: string; register?: string | null; source?: string; drawn?: boolean; area?: string })[];
+    const rank = (k: string) => {
+      const n = order.indexOf(k);
+      return n < 0 ? order.length + 1 : n;
+    };
+    const blocks: SayBlock[] = [...all]
+      .sort((a, b) => rank(a.key) - rank(b.key))
+      .map((b) => ({
+        key: b.key,
+        kind: b.kind ?? '',
+        heading: b.heading ?? null,
+        register: b.register ?? null,
+        source: b.source,
+        drawn: order.includes(b.key) && b.drawn !== false,
+        area: b.area === 'rail' ? 'rail' : 'main',
+      }));
+    /* EACH LIST BY THE NAME THIS PERSON SEES IT BY (the shell's, with his words), with the fields the record declared. */
+    const seen = new Map(((page.data as { index?: { registers?: { id: string; name: string }[] } }).index?.registers ?? []).map((r) => [r.id, r.name]));
+    const lists: SayList[] = Object.values(REGISTERS).map((r) => ({
+      id: r.id,
+      name: seen.get(r.id) ?? r.name,
+      one: r.one,
+      title: r.title,
+      state: r.state,
+      done: r.done,
+      fields: r.fields.map((f) => ({ id: f.id, type: f.type, label: f.label, values: (f as { values?: readonly string[] }).values })),
+    }));
+    for (const [id, name] of seen) if (!lists.some((l) => l.id === id)) lists.push({ id, name, fields: [] });
+    const counts = new Map<string, number>();
+    for (const b of blocks) if (b.register) counts.set(b.register, (counts.get(b.register) ?? 0) + 1);
+    const current = blocks.find((b) => b.register && slug.replace(/^r[-/]/u, '') === b.register)?.register ?? [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    return { slug: under, body: read.body, version: read.version, mine: read.mine, blocks, look, lists, current, now: Date.now() };
+  }
 
   /* EDIT LAYOUT FROM 900px, the width the arranging mode is drawn for. Read as the menu is drawn, so a window narrowed
      with the menu shut offers it no more. */
@@ -237,8 +318,31 @@
     }
   }
 
+  /* ── the board ─────────────────────────────────────────────────────────────
+     LAY OUT AS A BOARD: his own arrangement of this page, kept as his (`page-boards.svelte.ts`), and its editor opens on
+     it at once. Back to a plain page takes it away. Each with an Undo. */
+  async function toBoard(on: boolean) {
+    const { boardSlug, boardWords, pageBoards } = await import('./page-boards.svelte.ts');
+    if (on) pageBoards.fresh = boardSlug(slug);
+    const out = await pageBoards.put(slug, on ? { order: [], sizes: {} } : null);
+    if (!out.ok) {
+      pageBoards.fresh = null;
+      return void toasts.push(out.fix, { intent: 'warn' });
+    }
+    const before = out.before;
+    toasts.push(on ? boardWords.onSaid(title) : boardWords.offSaid(title), { undo: () => void pageBoards.put(slug, before) });
+  }
+
+  /* ── a setting, changed where it shows ── */
+  let setting = $state<{ kind: 'currency'; code: string | null } | { kind: 'list'; id: string; name: string } | null>(null);
+  let settingOpen = $state(false);
+  function changeSetting(what: NonNullable<typeof setting>) {
+    setting = what;
+    settingOpen = true;
+  }
+
   /** Whether the menu holds anything at this width; one that would open on nothing is not drawn. */
-  const offers = $derived(extra.length > 0 || mayChange || mayPin || source !== null || (onarrange !== null && wide.current));
+  const offers = $derived(extra.length > 0 || mayChange || mayPin || source !== null || (onarrange !== null && wide.current) || (board !== null && mayPin) || (here !== null && mayPin));
 </script>
 
 <!-- `page-more` and `data-arrange` NAME THE WAY INTO EDIT LAYOUT for a gate, which opened it from its own button. -->
@@ -283,20 +387,41 @@
   {:else if source}
     <button type="button" class="mi" role="menuitem" onclick={toSource}><Icon name="code" size="s" />{copy.pageSource}</button>
   {/if}
-  {#if onarrange && wide.current}
+  {#if onarrange && wide.current && !board?.on}
     <button type="button" class="mi" role="menuitem" data-arrange onclick={() => onarrange?.()}><Icon name="grid" size="s" />{copy.arrange}</button>
+  {/if}
+  {#if here && mayPin && here.currency !== undefined}
+    <button type="button" class="mi" role="menuitem" onclick={() => changeSetting({ kind: 'currency', code: here.currency ?? null })}
+      ><Icon name="money" size="s" />{here.currency ? `Counted in ${here.currency}` : 'Money’s currency'}<span class="change-show" aria-hidden="true">Change</span></button
+    >
+  {/if}
+  {#if here && mayPin && here.list}
+    {@const list = here.list}
+    <button type="button" class="mi" role="menuitem" onclick={() => changeSetting({ kind: 'list', id: list.id, name: list.name })}
+      ><Icon name="edit" size="s" />{`Called ${list.name}`}<span class="change-show" aria-hidden="true">Change</span></button
+    >
+  {/if}
+  {#if board && mayPin}
+    <button type="button" class="mi" role="menuitem" onclick={() => void toBoard(!board.on)}
+      ><Icon name={board.on ? 'rows' : 'grid'} size="s" />{board.on ? boardOff : boardOn}</button
+    >
   {/if}
 </Menu>
 </span>
 {/if}
 
+{#if setting}
+  {#await import('./SettingHere.svelte') then { default: SettingHere }}<SettingHere bind:open={settingOpen} what={setting} onchanged={reread} />{/await}
+{/if}
+
 {#if mayChange}
-  <Sheet bind:open title={words.change}>
-    <!-- KEYED BY THE PAGE, because the reader is kept across pages and a draft for the last page is not this one's. -->
-    {#key slug}
+  <Sheet bind:open title={words.change} onclose={() => (line = undefined)}>
+    <!-- KEYED BY THE PAGE, because the reader is kept across pages and a draft for the last page is not this one's; and by
+         each line Slash hands over, so a second line is read afresh. -->
+    {#key `${slug}:${lines}`}
       {#await import('./AskPage.svelte') then { default: AskPage }}
-        {#if built !== null && !change}<AskPage page={slug} {model} onsource={toSource} onkept={keptFirst} {built} />
-        {:else}<AskPage page={slug} {model} onsource={toSource} onkept={reread} />{/if}
+        {#if built !== null && !change}<AskPage page={slug} {model} onsource={toSource} onkept={keptFirst} {built} ask={line} />
+        {:else}<AskPage page={slug} {model} onsource={toSource} onkept={reread} say={sayCtx} ask={line} />{/if}
       {/await}
     {/key}
   </Sheet>

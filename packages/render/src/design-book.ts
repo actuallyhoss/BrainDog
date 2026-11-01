@@ -44,12 +44,37 @@ export type DesignBook = {
   reach_for: readonly string[];
   layout: Record<'desk_grid' | 'phone_stacking' | 'reserved_slot' | 'in_a_decision' | 'in_a_task' | 'in_a_card', string>;
   voice: readonly string[];
+  /**
+   * LOOK B, AS BUILT (`loop/DESIGN-SYSTEM.md`, rewritten 1 Nov): the rules every design follows, a person's or an
+   * agent's, read before the tokens. Where the book's tables and these lines meet, these say how to use them.
+   */
+  look: readonly string[];
   compose: readonly string[];
   /** How to write a `drawn` block, the second way to design, when no kind fits. */
   draw: readonly string[];
   /** The check every design passes before it is shown (`design-check.ts`), one line a rule. */
   check: readonly string[];
 };
+
+/**
+ * LOOK B IN LINES (`loop/DESIGN-SYSTEM.md`, "Look B, as built", 1 Nov): what the app draws today, said once for the model,
+ * every agent through `braindog:design`, and Settings > Look > Design book. The file is the source; these lines follow it,
+ * and `design-book.test.ts` holds the ones a design is most often caught by.
+ */
+export const LOOK_B: readonly string[] = [
+  'Plain and restrained, between Bento and Encore: flat tiles on a quiet board, one red accent, warm dark greys in dark mode, and small icons and infographics where they help a person read. Nothing shines, floats or glows.',
+  'Never: gradients, glass, blur, glow, or shadows on anything in the page; pills (buttons, chips, segments, tags and fields are rectangles with an 8px radius; only dots, faces, counts and switches are round); taglines or marketing lines; a grid of four big numbers with nothing to say; serif type, cream, beige, oxblood or brown; emoji, streaks, badges or scores; a tile inside a tile, a border round a tile, or a box round a group.',
+  'Type: Lexend 600 for page names (28) and big figures (22 on a tile, 34 for a page\'s one number), Geist for every other word: headings 15 to 17 at 600, body 15, controls 14 at 500, meta 13, captions 12. Weights 400, 500 and 600 only. Figures are tabular and right-aligned in a column. At most two inks in a row: --ink for the subject, --ink-3 for the rest.',
+  'Colour is a role token, never a hex: --board under the tiles, --tile for a tile, --tile-2 for a well or a quiet control on it. Red (--red-fill with white words) is the one primary button and the count on Needs you; --red words only for what is late, failing or below nought. --good, --warn and --info always beside their word or glyph, never colour alone. Money out is ink with its minus, money in --good with its plus, one currency at a time, "≈" for a converted figure.',
+  'Projects and chart series wear one of the eight category slots (--cat-blue, -violet, -pink, -teal, -sky, -amber, -lime, -slate, each with a -tint), for telling things apart and never for state.',
+  'Space: 4, 8, 12, 16, 24, 32, 48 and 64 (--sp-1 to --sp-8). Tiles sit 12 apart; inside a tile 20 of padding (16 on a phone), 16 between parts, 12 from heading to rows. Radii: 4 tags, 8 controls and wells, 12 menus, 16 tiles and sheets. Targets 44 under a thumb; controls 32 tall.',
+  'A tile opens on one heading row: a 28px neutral well with an 18px icon, the title at 15/600, an optional count in --ink-3, and at its end one link ("All 17 →"), a line of meta or its actions. A heading well never takes a tone.',
+  'A row reads subject, detail, figure, when; one line of detail at most; hairlines only between rows of one list. A list that cuts off says how many more. Dates "29 Oct", times "14:20", ages "2h ago".',
+  'Charts only where they help read a number, one idea each: lines 1.5 to 2px in --ink or a category colour, a 6% wash under a line, a solid zero rule and faint others, below nought in --red. A label never sits on a line. Axis words at 12 in --ink-3.',
+  'An empty state says what will be here and offers the one next step, under a 40px neutral well. Never "Nothing here yet" alone, never "Get started".',
+  'Motion explains a change and never decorates: a press is a fill change, menus 120ms, sheets about 240ms, rows that move 180ms. Everything honours reduced motion.',
+  'On a phone: designed, not squeezed. 44px targets, sheets from the bottom, nothing scrolling sideways at 390.',
+];
 
 /** What each named colour is for. Only the ones a design reaches for; the rest follow from these. */
 const ROLES: Readonly<Record<string, string>> = {
@@ -61,8 +86,8 @@ const ROLES: Readonly<Record<string, string>> = {
   'ink-2': 'second-line text',
   'ink-3': 'meta and captions',
   rule: 'a line between rows',
-  'red-fill': 'the primary button and the count pill, with white words',
-  red: 'red words and marks: late, links, and what needs a person',
+  'red-fill': 'the one primary button on a screen and the count on Needs you, with white words',
+  red: 'red words and marks, only for what is late, overdue or failing, or money below nought; never decoration or "selected"',
   'red-tint': 'the wash behind a red mark',
   good: 'done and paid, with its word',
   warn: 'a real warning, with its word',
@@ -156,7 +181,7 @@ export function designBook(input: { look: string; scale: string }): DesignBook {
 
   return {
     about:
-      'BrainDog describes every page, card, component and visual in its own language: the .dog page declaration, whose blocks are the kinds below. Compose from them. Nothing is drawn by hand outside it.',
+      'BrainDog describes every page, card, component and visual in its own language: the .dog page declaration, whose blocks are the kinds below. Compose from them. Nothing is drawn by hand outside it. Every design follows Look B (the look rules first), the design system the app is drawn in.',
     tokens: {
       colours,
       type: steps(input.scale, 'fs-'),
@@ -176,11 +201,14 @@ export function designBook(input: { look: string; scale: string }): DesignBook {
       in_a_card: 'A card holds one block at a time. It is drawn on the tile, takes the card hue for its mark only, and shows a quiet line when it has nothing, never an empty frame.',
     },
     voice: [
-      'Say names, never ids.',
+      'Say names, never ids, handles, run codes or field names.',
       'Never say record, row or register to a person: say list, entry and the list by name.',
-      'Short and plain, one line where one will do.',
+      'Short and plain, the way a person would say it to a friend; one line where one will do.',
+      'Say what to do next on every warning.',
+      'Numbers in digits with thousands grouped (£7,000), one currency at a time.',
       'Nothing is drawn empty.',
     ],
+    look: LOOK_B,
     compose: [
       'Arrange these kinds into a page, a card or a visual. It is native, instant, and right in both themes and on a phone.',
       'Draw a small component of your own only when no kind fits.',
@@ -190,6 +218,7 @@ export function designBook(input: { look: string; scale: string }): DesignBook {
       `It runs in a sandbox with no network, no storage and no reach into the page around it. Nothing is fetched: write pictures inline as SVG or data: images. Its code is at most ${DRAWN_CODE_MOST / 1024} KB.`,
       `It is handed braindog.data, { list, columns, rows }, each entry { ref, fields } with only the fields its columns name, at most ${DRAWN_ROWS_MOST} of them, read for whoever is looking. braindog.on(fn) calls fn(data, theme) now and whenever either changes.`,
       `The theme's colours are CSS variables of the same names: ${DRAWN_TOKENS.map((t) => `--${t}`).join(', ')} and --font. Use them, never a colour of your own, and it reads in light and dark.`,
+      'It is drawn in Look B: flat, with no gradient, shadow, glow or pill; corners of 8 on controls and 16 on a surface; red only for what is late, failing or below nought; a big figure at 600 and tabular; text in --ink with --ink-3 for the rest.',
       `braindog.open(ref) opens one of the entries it was handed. Its height follows its content, from ${DRAWN_HEIGHT.least} to ${DRAWN_HEIGHT.most} pixels; height: on the block is where it starts.`,
       'It fits a 390 px phone with nothing scrolling sideways, says its empty state in words, and names things, never ids.',
     ],
@@ -198,6 +227,7 @@ export function designBook(input: { look: string; scale: string }): DesignBook {
       'It reads only the lists it may read.',
       `It fits a ${PHONE_PX} px phone and a laptop with nothing scrolling sideways, and a whole-page kind never sits inside a decision, a task or a card.`,
       "It uses only the book's colours, so it reads in light and dark.",
+      'It follows Look B: no pill, gradient, glass or shadow; nothing red unless something is late, failing or below nought; no tile inside a tile; every tile opens on the same heading row.',
       'It says what it shows when it has nothing, and its loading state is the picture drawn first.',
       'It uses his words: names, never ids, no em dash, and no heading that says row, register, block or entity.',
       `It draws in budget: under ${DESIGN_BUDGET.composedMs} ms composed, and a drawn one alive within ${DESIGN_BUDGET.aliveMs} ms of its picture.`,

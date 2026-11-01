@@ -85,6 +85,7 @@
   import ChangesPanel from './ChangesPanel.svelte';
   import RowVerbMenu from './RowVerbMenu.svelte';
   import { blockKeys } from './recompose.ts';
+  import { pageBoards } from './page-boards.svelte.ts';
   import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import { at } from '../at.ts';
@@ -682,7 +683,16 @@
   function blockHeads() {
     const blocks = arranged(declaredOnly(live?.page.blocks ?? []));
     const keyed = blockKeys(blocks);
-    return blocks.map((b, i) => ({ key: keyed[i]!, heading: typeof (b as { heading?: unknown }).heading === 'string' ? (b as { heading: string }).heading : null }));
+    /* AND WHAT A LINE SAID ABOUT THE PAGE IS READ AGAINST (`say-page.ts`): its kind, its list, its source and column. */
+    return blocks.map((b, i) => ({
+      key: keyed[i]!,
+      heading: typeof (b as { heading?: unknown }).heading === 'string' ? (b as { heading: string }).heading : null,
+      kind: b.kind,
+      register: typeof b.register === 'string' ? b.register : null,
+      source: typeof (b as { source?: unknown }).source === 'string' ? (b as { source: string }).source : undefined,
+      drawn: b.drawn,
+      area: (b as { area?: unknown }).area === 'rail' ? 'rail' : 'main',
+    }));
   }
 
   /**
@@ -725,6 +735,13 @@
      line: the declared lead is not drawn under the hero (`project-page.ts`), so the hero is where a kept line is read. */
   const modelLine = $derived(modelLineOf(live?.page.blocks ?? []));
   const all = $derived<LiveBlock[]>(arrangement.editing || arrangement.slots !== null ? own : [...own, ...feet]);
+  /** A page drawn as a board has no rail: the board's own grid places every widget. */
+  const withoutLayout = <P extends { layout?: unknown }>(p: P): P => {
+    const { layout: _rail, ...rest } = p;
+    return rest as P;
+  };
+  /** The blocks a page's body is drawn from: all of them, the project's other blocks held back while its shape loads. */
+  const bodyBlocks = $derived(shapeWaits ? all.map((b) => (b.kind === 'project' || !b.drawn ? b : ({ ...b, drawn: false } as LiveBlock))) : all);
 
   /* ── the line a page opens on ──────────────────────────────────────────────
      A PAGE WHOSE MAIN COLUMN OPENS ON A LONE LINE TO TYPE INTO KEEPS IT IN ITS HEADER, as Today does (`layout.ts`
@@ -770,6 +787,10 @@
      HOW THE ENGINE ARRANGED THE PAGE (`look.ts`), and the page it is the look of: the page the record answered, which on
      a home is the page Home read (`home`) and not the screen's own address. */
   const look = $derived(live?.page.page.look ?? null);
+  /* HIS BOARD FOR THIS PAGE, where he laid it out as one (`page-boards.svelte.ts`); a plain page otherwise. */
+  const boardKept = $derived(mode === 'page' ? pageBoards.of(slug) : null);
+  /* THE PAGES A BOARD IS OFFERED ON: a project's page, Money's home, and any page already laid out as one. */
+  const boardable = $derived(mode === 'page' && (projectPage || live?.page.page.page === 'money' || boardKept !== null));
   const answered = $derived(lookPage(live?.page.page.page ?? slug, look));
 
   /**
@@ -1003,6 +1024,8 @@
           {look}
           keys={drawnKeys}
           heads={blockHeads}
+          board={boardable ? { on: boardKept !== null, keys: drawnKeys } : null}
+          here={moneyPage ? { currency: shell?.index?.currency ?? null } : null}
           extra={[
             ...(projectPage && dataHref
               ? [{ label: 'Edit details', icon: 'edit' as const, href: dataHref }]
@@ -1124,24 +1147,41 @@
       {/if}
     {/snippet}
     <div class="body-wrap" data-project={projectPage ? '' : undefined} style={projectStyle}>
-    <PageBody
-      mode="page"
-      opens={about && !shapeBox.hold ? (waiting ?? null) : null}
-      page={bodyPage ?? live.page.page}
-      blocks={shapeWaits ? all.map((b) => (b.kind === 'project' || !b.drawn ? b : ({ ...b, drawn: false } as LiveBlock))) : all}
-      held={counted}
-      now={live.now}
-      {writes}
-      {arrangement}
-      headed={led}
-      leadHead={tiled ? leadRow : null}
-      captured={headLine?.at ?? -1}
-      under={headLine && (tiled || !wide.current) && !shapeWaits ? lineInHead : null}
-      strip={strip && led && !shapeWaits ? narrow : null}
-      host={hosting && !shapeWaits ? host : null}
-      pick={hosting ? picked : null}
-      {onwalk}
-    />
+    {#snippet laidOut(blocks: LiveBlock[], placed: ((i: number) => { key: string; area: string; size: string } | null) | null, inside: import('svelte').Snippet<[number]> | null)}
+      <PageBody
+        mode="page"
+        opens={about && !shapeBox.hold && !placed ? (waiting ?? null) : null}
+        page={placed ? withoutLayout(bodyPage ?? live!.page.page) : (bodyPage ?? live!.page.page)}
+        {blocks}
+        held={counted}
+        now={live!.now}
+        {writes}
+        {arrangement}
+        headed={led && !placed}
+        leadHead={tiled && !placed ? leadRow : null}
+        captured={placed ? -1 : (headLine?.at ?? -1)}
+        under={headLine && (tiled || !wide.current) && !shapeWaits && !placed ? lineInHead : null}
+        strip={strip && led && !shapeWaits && !placed ? narrow : null}
+        host={hosting && !shapeWaits ? host : null}
+        pick={hosting ? picked : null}
+        {onwalk}
+        {placed}
+        {inside}
+        bare={placed !== null}
+        ids={placed ? 'board-' : ''}
+      />
+    {/snippet}
+    <!-- A PAGE HE LAID OUT AS A BOARD (`PageBoard.svelte`, widgets plan W6): its head as ever, every other block a widget. -->
+    {#if boardKept && !arranging}
+      {#await import('./PageBoard.svelte') then { default: PageBoard }}
+        <PageBoard {slug} title={live.page.page.title} blocks={bodyBlocks} kept={boardKept} mayEdit={shell?.me?.owner === true || Boolean(shell?.me?.person)} {reread}>
+          {#snippet head(heads)}{@render laidOut(heads, null, null)}{/snippet}
+          {#snippet body(placed, laid, inside)}{@render laidOut(laid, placed, inside)}{/snippet}
+        </PageBoard>
+      {/await}
+    {:else}
+      {@render laidOut(bodyBlocks, null, null)}
+    {/if}
     </div>
     <!-- BUDGETS SETS ITS BUDGETS, a week's, a month's or a year's, at its foot (`BudgetSet.svelte`), placed as the offer is. -->
     {#if slug === 'money-budgets' && !shapeWaits && !arranging && writes && ledgerHere?.category}<div class="page-offer" data-after="blocks">{#await import('$lib/money/BudgetSet.svelte') then { default: BudgetSet }}<BudgetSet category={ledgerHere.category} onsaved={() => void reread()} />{/await}</div>{/if}

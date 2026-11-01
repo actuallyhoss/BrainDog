@@ -299,7 +299,7 @@ export { LINT_RULES, lintHtml, lintPage, lintPart, lintText, type LintFinding, t
 /* The look sheets: fixed specimens of every chart form, the plan and the parts, drawn on one fixed day. */
 export { FAILED_RUN, SHEET_DAY, SHEET_FORMS, SHEET_KINDS, SHEET_NOW, SHEET_POINTS, SHEET_STALE_STEPS, SHEET_STATES, SPECIMEN, chartSpecimen, chartSpecimens, partSpecimens, planSpecimen, planSpecimens, sheetKey, specimenFor, specimenSegments, specimenStale, type SheetAge, type SheetForm, type SheetKind, type SheetState, type Specimen } from './sheet.ts';
 /* The design book: every kind, the tokens and the layout rules, generated from the tables and the skin. */
-export { designBook, type BookKind, type BookStep, type BookToken, type DesignBook } from './design-book.ts';
+export { designBook, LOOK_B, type BookKind, type BookStep, type BookToken, type DesignBook } from './design-book.ts';
 /* Compose's shape rules (Compose): the columns each shape reads over a list, and the one block it makes there. */
 export {
   SHAPE_BY_DAY,
