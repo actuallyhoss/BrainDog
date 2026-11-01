@@ -204,7 +204,7 @@ export const SEARCH_HINTS: Readonly<Record<string, string>> = {
   update: 'edit change fix row field',
   log: 'note comment page html attach',
   propose: 'ask person decide suggest',
-  undo: 'revert put back',
+  act: 'undo revert settings packs add-on board widget page automation rule share invite key zone currency export anything app',
   record_index: 'registers lists fields schema',
   activity: 'history changes recent',
   governance: 'decisions waiting questions',
@@ -538,7 +538,7 @@ function listedFor(e: Effective | null): readonly Tool[] {
 }
 
 /** The tool a folded one answers through, whose switch it shares: `schema` is `record_index`'s, `history` is `get`'s. */
-const FOLDED_INTO: Readonly<Record<string, string>> = { schema: 'record_index', history: 'get' };
+const FOLDED_INTO: Readonly<Record<string, string>> = { schema: 'record_index', history: 'get', undo: 'act' };
 
 /**
  * A call to a tool he switched off for this agent, refused before it runs (`TOOL_OFF`): a list cached

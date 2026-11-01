@@ -783,6 +783,38 @@ export async function serveApi(
 
 export { FIREWALL_FAULT };
 
+/**
+ * One method of the table, called by its name from a door that is not HTTP: the MCP's `act`, which does what the app
+ * does. The same table, the same handlers, the same checks a POST to `/api/<name>` gets (the argument kinds, a U+0000,
+ * See as being read-only, the firewall, a crash answered with a reference), and the record decides who may, exactly as
+ * it does for the app. `reads` is the one route left out: it answers several HTTP envelopes, and a door that calls by
+ * name calls each read itself.
+ */
+export async function callRoute(handlers: Record<string, Handler>, name: string, args: Record<string, unknown>, ctx: unknown): Promise<Result<unknown>> {
+  const route = BY_NAME.get(name);
+  const handler = Object.hasOwn(handlers, name) ? handlers[name] : undefined;
+  if (!route || !handler || name === READS) return { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no method called ${name || '(nothing)'}.` } };
+  if (route.writes && route.postRead !== true && previewOf(ctx) !== null) return { ok: false, refusal: PREVIEW_READ_ONLY };
+  const bag = Object.create(null) as Record<string, unknown>;
+  for (const [k, v] of Object.entries(args)) bag[k] = v;
+  for (const [key, kind] of Object.entries(route.takes ?? {})) {
+    const value = Object.hasOwn(bag, key) ? bag[key] : undefined;
+    if (value === null || value === undefined) continue;
+    if (kind === 'text' && typeof value !== 'string') return { ok: false, refusal: notText(key, value) };
+    if (kind === 'integer' && !Number.isSafeInteger(value)) return { ok: false, refusal: notWhole(key, value) };
+  }
+  const nul = JSON.stringify(bag).includes('\\u0000') ? nulAt(bag) : null;
+  if (nul !== null) return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: nulSaid(nul), at: nul } };
+  try {
+    const out = await handler(bag, ctx);
+    const held = firewall(ctx, out);
+    if (held.stripped.length > 0) FIREWALLED.get(handlers)?.(name, held.stripped);
+    return held.answer;
+  } catch (e) {
+    return crashed(`act ${name}`, e);
+  }
+}
+
 /** The route that carries several reads (`routes/reads.ts`). */
 const READS = 'reads';
 

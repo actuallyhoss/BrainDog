@@ -22,6 +22,8 @@ import type { Refusal, Result } from '@braindog/ports';
 /* THE TABLE ALONE, AND NOT THE HOST: `@braindog/host` re-exports every door and the kernel behind them, and this file is
    in every screen's first load. `table.ts` is the same rows with nothing else. */
 import { ROUTES } from '@braindog/host/table';
+/* THE TABLE ITSELF, FOR A CALLER THAT NAMES A CALL AT RUN TIME (the command line's MCP `act`): data, no host. */
+export { ROUTES as CALL_TABLE };
 import type { Answer, AnswerOr } from '@braindog/host/types';
 import type { ShareClosed, ShareLink, ShareRow } from '@braindog/host';
 

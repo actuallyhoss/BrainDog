@@ -98,6 +98,8 @@ import type { HANDOFF_STATES as RecordHandoffStates } from '@braindog/record';
 import { firewall } from '@braindog/record/sight';
 
 import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
+import { ASKS, catalogue, doorTakes, keyAsk, notADoor, type Ask, type CallRow } from './act.ts';
+export { withCalls, type CallRow } from './act.ts';
 import { ANSWERED_GRAMMAR, AUTOMATION_GRAMMAR } from './automations.ts';
 import {
   activityBrief,
@@ -197,6 +199,14 @@ export type McpSurface<C> = {
   meet?(args: Args, ctx: C): Answer;
   /** Take back one write of the caller's own run by its receipt's batch; the record refuses anyone else's. Optional like `meet`. */
   undoOwn?(args: { batch: string; dry?: boolean }, ctx: C): Answer;
+  /**
+   * One call of the record's table by its name, made as the app's `/api/<call>` makes it (`callRoute` in
+   * `@braindog/host`): what the `act` tool runs. Optional like `undoOwn`: a surface without it answers `act`
+   * `NOT_IN_THIS_BUILD`. Both hosts hand it beside the record (`withCalls`), and the command line sends it through its client.
+   */
+  call?(name: string, args: Args, ctx: C): Answer;
+  /** The record's table of calls (`ROUTES` in `@braindog/host/table`), which `act` and `braindog:calls` are held to. */
+  calls?(): readonly CallRow[];
   /** Hang a page on a thing, or give one it carries a new version (`methods/visuals.ts`). Optional like `undoOwn`. */
   attachVisual?(args: { on: string; page: string; title?: string; draft?: boolean }, ctx: C): Answer;
   sessionsLive?(args: Record<string, never>, ctx: C): Answer;
@@ -822,17 +832,16 @@ export const TOOLS: readonly Tool[] = [
     idempotent: true,
   },
   {
-    name: 'undo',
-    title: 'Undo a change',
-    /* THE LAST ONE, FOR THE RECEIPTS: every write answers a batch and this takes it back. Only the caller's own run's
-       writes go back; the owner's Undo in the app stays the owner's. DESTRUCTIVE IN THE SPEC'S SENSE (door audit D35):
-       undoing a create deletes the row, and a client that runs non-destructive tools without asking would have run it
-       unasked. */
-    description: 'Put back your own write, by its receipt\'s batch.',
-    input: obj({ batch: { type: 'string' }, dry: { type: 'boolean' } }, ['batch']),
+    name: 'act',
+    title: 'Do anything',
+    /* EVERYTHING ELSE THE APP DOES, BY THE CALL IT MAKES (the owner's ask of 1 Nov, `act.ts`): one tool and the list of
+       calls as a resource, so the list pays for one tool. It took `undo`'s place, and `undo` is folded into it: its
+       receipt's batch is `act undoOwn`. Destructive in the spec's sense, as `undo` was: a call may delete. Who may make
+       which call is the record's to say, with the caller's own grant, so nothing here widens what an agent reaches. */
+    description: 'Any app call; braindog:calls lists them. Undo: undoOwn {batch}.',
+    input: obj({ call: { type: 'string' }, args: { type: 'object' } }, ['call']),
     writes: true,
     destructive: true,
-    idempotent: true,
   },
 ];
 
@@ -847,6 +856,16 @@ export const FOLDED_UNTIL = '2026-12-20';
  * `instructions` and the new arguments, so the list's ceiling stayed at 2,760 (`budget.test.ts`).
  */
 export const FOLDED: readonly (Tool & { into: string })[] = [
+  {
+    name: 'undo',
+    title: 'Undo a change',
+    description: 'Put back your own write, by its receipt\'s batch.',
+    input: obj({ batch: { type: 'string' }, dry: { type: 'boolean' } }, ['batch']),
+    writes: true,
+    destructive: true,
+    idempotent: true,
+    into: 'act {call: "undoOwn", args: {batch}}',
+  },
   {
     name: 'schema',
     title: 'See the fields',
@@ -981,6 +1000,38 @@ const LIST_WHOLE = 60;
 const CLIP = 280;
 /** The longest note `log` takes, the ledger's own ceiling (`log` in the record). */
 const NOTE_MOST = 280;
+/** The longest note `log` takes in one call, kept as consecutive notes of `NOTE_MOST` each: a run's summary fits. */
+const NOTE_LONG = NOTE_MOST * 5;
+
+/**
+ * A long note as the notes it is kept as, each at most `NOTE_MOST`, cut between sentences where it can and between words
+ * where a sentence is longer than one note, never inside a word that fits.
+ */
+export function notesOf(note: string): string[] {
+  const out: string[] = [];
+  let at = '';
+  const words = (text: string): void => {
+    for (const word of text.split(/\s+/u)) {
+      const piece = word.length > NOTE_MOST ? word.match(new RegExp(`.{1,${NOTE_MOST}}`, 'gu')) ?? [] : [word];
+      for (const w of piece) {
+        if (at !== '' && at.length + 1 + w.length > NOTE_MOST) {
+          out.push(at);
+          at = '';
+        }
+        at = at === '' ? w : `${at} ${w}`;
+      }
+    }
+  };
+  for (const sentence of note.split(/(?<=[.!?])\s+/u)) {
+    if (at !== '' && at.length + 1 + sentence.length <= NOTE_MOST) at = `${at} ${sentence}`;
+    else if (sentence.length <= NOTE_MOST) {
+      if (at !== '') out.push(at);
+      at = sentence;
+    } else words(sentence);
+  }
+  if (at !== '') out.push(at);
+  return out;
+}
 
 /**
  * A compact row as `list` answers it: what an agent reads to choose a row, and not the whole of each one.
@@ -1336,6 +1387,7 @@ const FIXED: readonly Resource[] = [
   resource('grammar/kinds', 'Every kind of block a page draws, a line each, and what to reach for. grammar/kind/<name> says one whole.'),
   resource('grammar/script', 'What a script declaration may contain, what its ctx can reach, its limits, and two that install.'),
   resource('grammar/automations', 'What an automation may say: its triggers, its steps, its limits, what does not run yet, and two that install.'),
+  resource('calls', 'Every call act makes, a line each: what the app does, by name, and how to make one.'),
 ];
 
 /**
@@ -3160,48 +3212,26 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (!note) return { result: { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'A note is one sentence, and this one is empty.', at: 'note' } } };
       /* THE LEDGER'S CEILING, AS THE RECORD'S OWN `log` HOLDS IT (audit 10k, AK9). This door goes through `update` and
          `handoff`, which took a note of any length, so the 280 the docs promise held over HTTP and not here. */
-      if (note.length > NOTE_MOST)
-        return { result: { ok: false, refusal: { code: 'OUT_OF_BOUNDS', fix: `A note is at most ${String(NOTE_MOST)} characters, and this one is ${String(note.length)}.`, at: 'note' } } };
-      /**
-       * NO ROW IS THE CALLER'S OWN SESSION, AND IT IS THE RECORD'S `handoff` WITH THE NOTE ALONE. That is the one method
-       * that finds a token's run, or opens it on its first write, inside the same transaction as the write, so a note is
-       * one call whether or not the run exists yet. It appends the line to the run's notes and keeps it in the run's
-       * history, which is where a note about nothing in particular was always taught to go (`teach` in `briefing.ts`). A
-       * person names a run from the app, so the record refuses one here in its own sentence, as `handoff` does.
-       */
-      let out: Result<unknown>;
-      if (args.spoken === undefined || args.spoken === null) {
-        if (!surface.handoff) return { result: unbuilt('log with no row', 'Name the row the note is about in spoken.') };
-        out = await surface.handoff({ note }, ctx);
-      } else {
-        const at = await locate(args.spoken, ctx, { tool: 'log', args });
-        if (!at.ok) return { result: at };
-        out = noRow(await surface.update({ ...at.value, patch: {}, note }, ctx), args.spoken);
+      /* A LONGER NOTE IS KEPT AS SEVERAL, IN ORDER (the 1 Nov cleanup run: a run's summary could not be logged at all), up
+         to `NOTE_LONG`; past that it is a page, which `log` with `page` hangs on the same row. */
+      if (note.length > NOTE_LONG)
+        return {
+          result: {
+            ok: false,
+            refusal: {
+              code: 'OUT_OF_BOUNDS',
+              fix: `A note is at most ${String(NOTE_LONG)} characters, kept as notes of ${String(NOTE_MOST)}, and this one is ${String(note.length)}. Split it into calls, or send the whole as page (HTML) on log.`,
+              at: 'note',
+            },
+          },
+        };
+      const parts = note.length > NOTE_MOST ? notesOf(note) : [note];
+      for (const part of parts.slice(0, -1)) {
+        const first = await logOne(args, part, ctx, turn);
+        if (!first.result.ok) return first;
       }
-      if (!out.ok) return { result: await failed(out, ctx, turn) };
-      turn.batch = batchIn(out.value);
-      const ruled = ruledOf(out.value);
-      if (!isEntry(out.value)) {
-        if (ruled !== null && 'filed' in ruled) return filedOut(ruled.filed, ctx, turn);
-        return { result: { ok: true, value: bare(out.value) } };
-      }
-      const entry = out.value;
-      if (!prefixes.has(entry.register)) await learnPrefix(entry.register, ctx);
-      const row = compact(entry, prefixOf(entry.register));
-      /* AND `deleted_at` WHEN THE ROW HAS ONE. The record takes a note on a deleted row, and cutting the answer to three
-         fields cut the one that said so: an agent logging on an id carried from another session was told `ok` and
-         nothing else, which is the case where it did not already have the row. */
-      const { spoken, version, updated_at, deleted_at } = row;
-      const value = { spoken, version, ...(updated_at === undefined ? {} : { updated_at }), ...(deleted_at === undefined ? {} : { deleted_at }) };
-      const words = titleOf(entry.fields, decls.get(entry.register));
-      if (ruled === null || !('rung' in ruled)) return { result: { ok: true, value }, say: (look) => loggedBrief(String(spoken), words, version, deleted_at !== undefined, look) };
-      return {
-        result: { ok: true, value: ruled.rung === null ? value : { ...value, rung: ruled.rung } },
-        say: (look) => [loggedBrief(String(spoken), words, version, deleted_at !== undefined, look), ruledBrief(ruled, [entry.register], look)].join('\n'),
-        names: { people: true },
-      };
+      return logOne(args, parts.at(-1)!, ctx, turn);
     },
-
     /* The arguments go through whole: which fields a session may set, and how `tried` appends, are
        the record's rules, and it names the field when one is wrong.
        ITS RECEIPT OFFERS AN UNDO ONLY WHEN ONE WOULD PUT SOMETHING BACK (audit 10k, AK10): a run's own step, doing and
@@ -3341,6 +3371,56 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     },
 
     /**
+     * ANY CALL THE APP MAKES, BY ITS NAME (`act.ts`). The name is held to the record's own table and to what this door
+     * never makes; the arguments go to the record as sent, through the handler the app's `/api/<call>` runs, with the
+     * caller's own context, so the record's gates, the ladder and its receipts are the app's. A write the ladder filed is
+     * answered as `create`'s is, the question and its link; a row as a row; anything else as the record said it.
+     *
+     * A CALL ONLY AN OWNER IN A BROWSER MAKES, REFUSED SO, IS ASKED INSTEAD WHERE A QUESTION CAN SAY IT (`ASKS`, and
+     * `keyAsk` for a key), through `propose` with the caller's own context: filed on Decide, or landed at once where his
+     * rung and his switches let it. Nothing is asked for a call refused for any other reason.
+     */
+    act: async (args, ctx, turn) => {
+      const name = typeof args.call === 'string' ? args.call.trim() : '';
+      const sent = args.args === undefined || args.args === null ? {} : args.args;
+      if (!isObject(sent)) return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'args is an object: the call\'s own arguments, as braindog:calls names them.', at: 'args' } } };
+      if (!surface.call || !surface.calls) return { result: unbuilt('act', 'Use the other tools, or ask the owner to do it from the app.') };
+      const rows = surface.calls();
+      const row = rows.find((r) => r.name === name);
+      if (row === undefined || !doorTakes(row)) return { result: { ok: false, refusal: notADoor(name, rows) } };
+      /* `undoOwn` IS `undo`'s, and answered in its words. */
+      if (name === 'undoOwn') return run.undo!(sent, ctx, turn);
+      const out = await surface.call(name, sent, ctx);
+      if (!out.ok) {
+        const refusal = 'refusal' in out ? out.refusal : null;
+        if (refusal?.code === 'NEEDS_BROWSER_SESSION') {
+          let ask: Ask | null = Object.hasOwn(ASKS, name) ? ASKS[name]!(sent) : null;
+          if (ask === null && name === 'revokeGrant' && typeof sent.id === 'string' && sent.id.trim() !== '') {
+            const key = await surface.get({ spoken: sent.id.trim() }, ctx);
+            if (key.ok && isEntry(key.value) && key.value.register === 'credentials') {
+              if (!prefixes.has('credentials')) await learnPrefix('credentials', ctx);
+              const words = titleOf(key.value.fields, decls.get('credentials'));
+              const spoken = key.value.seq === null ? key.value.id : spokenOf('credentials', key.value.seq);
+              ask = keyAsk({ spoken, version: key.value.version, name: words || null });
+            }
+          }
+          if (ask !== null) {
+            const asked = await run.propose!({ question: ask.question, body_kind: ask.body_kind, body: ask.body, cause: ask.cause }, ctx, turn);
+            if (asked.result.ok) return asked;
+          }
+        }
+        return { result: await failed(out, ctx, turn) };
+      }
+      turn.batch = batchIn(out.value);
+      const ruled = ruledOf(out.value);
+      if (ruled !== null && 'filed' in ruled && !isEntry(out.value)) return filedOut(ruled.filed, ctx, turn);
+      if (isEntry(out.value)) return wrote(out, 'Changed', ctx, turn);
+      const value = bare(out.value);
+      const say = isObject(value) && typeof value.say === 'string' ? value.say : null;
+      return { result: { ok: true, value }, ...(say === null ? {} : { say: () => say }) };
+    },
+
+    /**
      * THE ARGUMENTS GO TO THE RECORD AS SENT, and who may triage is the record's to say: a token without the `inbox` reach
      * is refused there in one sentence naming what it lacks, and a field it does not take is named in `FIELD_UNKNOWN`.
      *
@@ -3363,6 +3443,48 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       return { result: { ok: true, value }, say: (look) => triagedBrief(value, entry as Shaped, filed.register, look) };
     },
   };
+
+  /** One note of at most `NOTE_MOST`, on the row `spoken` names or on the caller's own run: what `log` writes, once a part. */
+  async function logOne(args: Args, note: string, ctx: C, turn: Turn): Promise<Done> {
+      /**
+       * NO ROW IS THE CALLER'S OWN SESSION, AND IT IS THE RECORD'S `handoff` WITH THE NOTE ALONE. That is the one method
+       * that finds a token's run, or opens it on its first write, inside the same transaction as the write, so a note is
+       * one call whether or not the run exists yet. It appends the line to the run's notes and keeps it in the run's
+       * history, which is where a note about nothing in particular was always taught to go (`teach` in `briefing.ts`). A
+       * person names a run from the app, so the record refuses one here in its own sentence, as `handoff` does.
+       */
+      let out: Result<unknown>;
+      if (args.spoken === undefined || args.spoken === null) {
+        if (!surface.handoff) return { result: unbuilt('log with no row', 'Name the row the note is about in spoken.') };
+        out = await surface.handoff({ note }, ctx);
+      } else {
+        const at = await locate(args.spoken, ctx, { tool: 'log', args });
+        if (!at.ok) return { result: at };
+        out = noRow(await surface.update({ ...at.value, patch: {}, note }, ctx), args.spoken);
+      }
+      if (!out.ok) return { result: await failed(out, ctx, turn) };
+      turn.batch = batchIn(out.value);
+      const ruled = ruledOf(out.value);
+      if (!isEntry(out.value)) {
+        if (ruled !== null && 'filed' in ruled) return filedOut(ruled.filed, ctx, turn);
+        return { result: { ok: true, value: bare(out.value) } };
+      }
+      const entry = out.value;
+      if (!prefixes.has(entry.register)) await learnPrefix(entry.register, ctx);
+      const row = compact(entry, prefixOf(entry.register));
+      /* AND `deleted_at` WHEN THE ROW HAS ONE. The record takes a note on a deleted row, and cutting the answer to three
+         fields cut the one that said so: an agent logging on an id carried from another session was told `ok` and
+         nothing else, which is the case where it did not already have the row. */
+      const { spoken, version, updated_at, deleted_at } = row;
+      const value = { spoken, version, ...(updated_at === undefined ? {} : { updated_at }), ...(deleted_at === undefined ? {} : { deleted_at }) };
+      const words = titleOf(entry.fields, decls.get(entry.register));
+      if (ruled === null || !('rung' in ruled)) return { result: { ok: true, value }, say: (look) => loggedBrief(String(spoken), words, version, deleted_at !== undefined, look) };
+      return {
+        result: { ok: true, value: ruled.rung === null ? value : { ...value, rung: ruled.rung } },
+        say: (look) => [loggedBrief(String(spoken), words, version, deleted_at !== undefined, look), ruledBrief(ruled, [entry.register], look)].join('\n'),
+        names: { people: true },
+      };
+  }
 
   /**
    * What `create`, `update` and `log` on a run answer: the row compact, or the conflict with its row in that shape.
@@ -3821,7 +3943,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     /* EVERY WRITE ENDS WITH ITS RECEIPT: what changed in names, and the one call that takes it back. */
     const receipted = (s: Said, line: string | null, short: string | null): Said =>
       line === null ? s : { ...s, ...(short !== null ? { text: `${s.text}\n${short}` } : {}), structured: { ...s.structured, receipt: line } };
-    const receiptOn = (line: string): string | null => (RECEIPTED.has(name) ? line : null);
+    /* `act` IS RECEIPTED WHEN ITS CALL WROTE: a batch came back, or the call is a write in the record's table. */
+    const receiptOn = (line: string): string | null =>
+      RECEIPTED.has(name) || (name === 'act' && (turn.batch !== undefined || turn.asks !== undefined || surface.calls?.().find((r) => r.name === sent.call)?.writes === true)) ? line : null;
     if (full || walled || !done.say) return receipted(said(result), receiptOn(receiptOf(name, '', turn, value)), null);
     const body = done.say(await lookOf(ctx, turn, done.names));
     return receipted(said(result, body), receiptOn(receiptOf(name, body, turn, value)), receiptOf(name, body, turn, value, true));
@@ -4203,6 +4327,13 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
        `version`'s `slash` PICKS WHICH, because it is the one fact about the host this package can read, and the hosts
        set it and the record's `answersSlash` from the same model. A surface whose `version` carries no `slash`, as
        `test/stub.ts`'s does not, is served the grammar that lists `ask_slash` as not running. */
+    /* THE CALLS `act` MAKES, from the record's own table as this surface hands it, and asked of `version` first as the
+       grammars are, so a caller who may read nothing is told so in the record's words. */
+    if (head === 'calls' && !rest) {
+      if (!surface.calls || !surface.call) return unbuilt(uri, 'Use the other tools.');
+      const may = await surface.version(ctx);
+      return may.ok ? { ok: true, value: catalogue(surface.calls()) } : may;
+    }
     if (head === 'grammar' && rest === 'automations') {
       const may = await surface.version(ctx);
       return may.ok ? { ok: true, value: may.value.slash === true ? ANSWERED_GRAMMAR : AUTOMATION_GRAMMAR } : may;
@@ -4405,7 +4536,7 @@ function receiptOf(name: string, said: string, turn: Turn, value: unknown, inTex
   const first = (said.split('\n')[0] ?? '').trim().replace(/[.\s]+$/u, '');
   const did = first === '' ? `Done with ${name}` : first.length > 110 ? `${first.slice(0, 109)}…` : first;
   const head = inText && first !== '' ? 'Receipt:' : `Receipt: ${did}.`;
-  if (turn.batch !== undefined) return `${head} To undo, call undo with batch "${turn.batch}".`;
+  if (turn.batch !== undefined) return `${head} To undo, call act with call "undoOwn" and args {"batch": "${turn.batch}"}.`;
   /* A HANDOFF THAT MOVED ONLY THE RUN'S OWN STEP has nothing undo puts back: the next handoff is how it changes. */
   if (name === 'handoff') return `${head} To change it, call handoff again.`;
   if (turn.asks !== undefined) return `${head} To take it back, call propose with withdraw "${turn.asks}".`;

@@ -15,6 +15,7 @@
  * with their own sentence.
  */
 
+import { CALL_TABLE } from '@braindog/client';
 import type { McpSurface } from '@braindog/mcp';
 import type { Result } from '@braindog/ports';
 
@@ -88,6 +89,8 @@ export function signedOutSurface(fix: string): McpSurface<Ctx> {
     tryAutomation: no,
     previewChange: no,
     undoOwn: no,
+    call: no,
+    calls: () => CALL_TABLE,
     attachVisual: no,
     understandPlan: no,
     about: no,

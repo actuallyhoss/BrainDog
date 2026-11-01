@@ -24,6 +24,7 @@ import { ROUTES as keychainAccess } from './keychain-access.ts';
 import { ROUTES as ownTokens } from './own-tokens.ts';
 import { ROUTES as quiet } from './quiet.ts';
 import { ROUTES as zone } from './zone.ts';
+import { ROUTES as sameValues } from './same-values.ts';
 import { ROUTES as pattern } from './pattern.ts';
 import { ROUTES as personName } from './person-name.ts';
 import { ROUTES as retype } from './retype.ts';
@@ -89,6 +90,7 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...ownTokens,
   ...quiet,
   ...zone,
+  ...sameValues,
   ...pattern,
   ...personName,
   ...retype,

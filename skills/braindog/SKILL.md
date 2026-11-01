@@ -57,6 +57,20 @@ An audit, a plan, a design or a before and after goes on the thing it is about, 
 - The page loads nothing from elsewhere: no links out, no fonts or scripts from the web. Sent again under the same
   title, it is the next version.
 
+## Anything else the app does
+
+`act` makes any call the BrainDog app makes, by its name: settings and time zone, add-ons and their settings,
+automations, boards and Today, books and bills, sharing and people, Needs you, export. Read `braindog:calls` for every
+call and what it takes, then `act {call:"<name>", args:{...}}`.
+
+- It runs with your own grant. What you may not do in the app you may not do here; a change your rung asks about is
+  filed on Needs you, as any other.
+- What only the owner does in a browser (an add-on on or off, its settings, a declaration, taking a key out) is asked
+  instead, and lands when the person says yes. Anything else refused that way is theirs: say so.
+- Take back your own write with `act {call:"undoOwn", args:{batch:"<from the receipt>"}}`.
+- Never a key's value, in or out. A key goes in with `braindog keys put <label>`, which reads standard input.
+- A note longer than 280 characters is kept as several, in order, up to 1,400. Past that, send it as a page.
+
 ## Key numbers
 
 `context` lists the key numbers you keep on the project under "Numbers", with when each was last reported. "Stale"
@@ -66,6 +80,9 @@ means one is overdue.
   `amount` for money) and `at`.
 - Propose anything else with `propose`: a new key number, or a change to a target, cadence or owner.
 - A money reading for a key number you do not keep is asked too, with `propose`.
+- A key number's readings may carry its project after its name. `get {spoken:"kpi-stale:kpis#4"}` and a filter of
+  the readings by the key number's name find them either way. Readings written twice: `act {call:"sameValues",
+  args:{register:"datapoints", fields:["name","thing","at","value"]}}`.
 
 ## Stop and pause
 

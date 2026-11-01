@@ -100,7 +100,7 @@ export const TOOL_ROWS: readonly ToolRow[] = [
   { name: 'handoff', label: 'Leave the next step', group: 'write' },
   { name: 'meet', label: 'Note people it meets', group: 'write' },
   { name: 'triage', label: 'File what arrives', group: 'write' },
-  { name: 'undo', label: 'Undo its changes', group: 'write' },
+  { name: 'act', label: 'Do anything the app does', group: 'write' },
 ];
 
 /** The context sizes, as words. */

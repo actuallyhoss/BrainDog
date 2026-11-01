@@ -855,6 +855,9 @@ export type OpenedForGrant = SealedGrant & { credential: string; label: string }
 /** The register a keychain door deposits into and opens from, and its sealed field. */
 const KEYS = 'credentials';
 const KEY_FIELD = 'value';
+/** The key numbers and their readings, by the lists Portfolio declares (`KPI_LIST` in the seed's portfolio module). */
+const KPIS = 'kpis';
+const READINGS = 'datapoints';
 
 /**
  * One start counted against an address, in the record's own `auth_fail` (`30 §1`).
@@ -9087,6 +9090,51 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const spokenAs = (given: string): string | null => (isHandle(given) ? spokenOf(sql, given) : null);
 
   /**
+   * The name a key number's readings are written under, from the key number or a name a person says for it.
+   *
+   * ASKED FOR BY A CLEANUP RUN ON HIS RECORD (1 Nov): the key number "Monthly revenue" was read as "Monthly revenue,
+   * Encore", so `kpi-stale:Monthly revenue` and a filter of the readings by that name found nothing, and a check said it
+   * was never read. So a key number's row (`kpis#4`, its prefix or its id, when the caller reads key numbers) is read as
+   * its measure, or its name, and as that name with its project after it where the readings carry that; and a name no
+   * reading holds is read as the one reading name that is it with something after a comma. A name readings hold is
+   * itself, always, and anything else is left as it was said.
+   */
+  const readingNameOf = (said: string, ctx?: CallContext): string => {
+    const text = said.trim();
+    if (text === '' || !kernel.register(READINGS)) return said;
+    const held = (name: string): boolean =>
+      sql.one<{ n: number }>("SELECT 1 AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.name') = ? LIMIT 1", READINGS, name) !== null;
+    const asRow = isHandle(text) ? (spokenAs(text) ?? text) : /^[0-9A-HJKMNP-TV-Z]{26}$/u.test(text) ? text : null;
+    const row = asRow === null || (ctx !== undefined && readable(ctx, KPIS) !== null) ? null : kernel.get(asRow);
+    const kpi = row !== null && row !== undefined && row.register === KPIS ? row : null;
+    if (kpi === null && held(text)) return said;
+    const measure = kpi === null ? text : [kpi.fields.measure, kpi.fields.name].find((v): v is string => typeof v === 'string' && v.trim() !== '')?.trim() ?? '';
+    if (measure === '') return said;
+    const thing = kpi !== null && typeof kpi.fields.thing === 'string' ? kernel.get(kpi.fields.thing) : null;
+    const project = thing !== null && thing !== undefined && typeof thing.fields.name === 'string' ? thing.fields.name.trim() : '';
+    if (project !== '' && held(`${measure}, ${project}`)) return `${measure}, ${project}`;
+    if (held(measure)) return measure;
+    const like = sql.all<{ name: string }>(
+      "SELECT DISTINCT json_extract(fields, '$.name') AS name FROM entry WHERE register = ? AND deleted_at IS NULL AND substr(json_extract(fields, '$.name'), 1, ?) = ? LIMIT 2",
+      READINGS,
+      measure.length + 2,
+      `${measure}, `,
+    );
+    return like.length === 1 && typeof like[0]!.name === 'string' ? like[0]!.name : kpi === null ? said : measure;
+  };
+
+  /** A filter of the readings with each `name is <words>` read as `readingNameOf` reads the words. Anything else as it came. */
+  const readingsWhere = (where: unknown, ctx: CallContext, depth = 0): unknown => {
+    if (depth > 8 || where === null || typeof where !== 'object' || Array.isArray(where)) return where;
+    const node = where as Record<string, unknown>;
+    if (node.field === 'name' && typeof node.is === 'string') return { ...node, is: readingNameOf(node.is, ctx) };
+    const out: Record<string, unknown> = { ...node };
+    for (const key of ['all', 'any'] as const) if (Array.isArray(node[key])) out[key] = (node[key] as unknown[]).map((n) => readingsWhere(n, ctx, depth + 1));
+    if (node.not !== undefined && typeof node.not === 'object') out.not = readingsWhere(node.not, ctx, depth + 1);
+    return out;
+  };
+
+  /**
    * What one thing a comment may be on is called to this caller, or `null` when she may not see it or it is not there
    * (`docs/20-COLLABORATION.md` §5, `methods/comments.ts`).
    *
@@ -12125,6 +12173,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop };
+      /* THE READINGS FILTERED BY A KEY NUMBER'S NAME, OR ITS ROW, FIND ITS READINGS (`readingNameOf`). */
+      if (args.register === READINGS && args.where !== undefined && args.where !== null && typeof args.where === 'object')
+        args = { ...args, where: readingsWhere(args.where, ctx) as Predicate };
       /* TRUE OR FALSE, AND ANYTHING ELSE IS REFUSED RATHER THAN READ AS FALSE. The host decodes it as
          JSON, so `?includeDeleted=1` arrives as the number 1 and a POST may carry the text "true"; the
          kernel reads `=== true`, and either was answered with live rows alone and nothing said, which
@@ -13511,7 +13562,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          words. It is the same answer somebody outside the ceiling would get for a name nobody ever
          declared, which is the only shape of answer that leaks nothing. */
       const decl = kernel.metricDecl(id ?? '');
-      const filled = decl && param !== undefined ? (fill(decl, null, param) as typeof decl) : decl;
+      /* A KEY NUMBER'S READINGS ARE ASKED FOR BY THE KEY NUMBER TOO (`readingNameOf`): `kpi-stale:kpis#4`, or its short
+         name where the readings carry the project after it. Only a figure over the readings is read that way. */
+      const said = param !== undefined && decl?.source === `register.${READINGS}` ? readingNameOf(param, ctx) : param;
+      const filled = decl && said !== undefined ? (fill(decl, null, said) as typeof decl) : decl;
       const register = filled?.source.startsWith('register.') ? filled.source.slice('register.'.length) : null;
       /* AND THE CHECK IS `readable`, not the ceiling. A figure over a register somebody may only
          append to answered with the figure, which is the same leak one number wide.
@@ -14049,7 +14103,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* THE LEDGER'S OWN CEILING. `event.note` is 280 characters because a note nobody reads is a
          note nobody writes; cutting it silently would lose the half somebody meant. */
       if (note.length > 280)
-        return no('OUT_OF_BOUNDS', `A note is at most 280 characters, and this one is ${note.length}.`, { at: 'note' });
+        return no('OUT_OF_BOUNDS', `A note is at most 280 characters, and this one is ${note.length}. Split it into notes of 280, in order, or hang the whole on the row as a page.`, { at: 'note' });
       /* `append`, NOT `write`. 20 §1 puts `log` in the append half beside `create` and `propose` —
          "the conservative half: an appender sees nothing, not even what it filed" — and 45 §5.1 says
          the same. Demanding `write` meant an agent invited to file notes and nothing else could not
