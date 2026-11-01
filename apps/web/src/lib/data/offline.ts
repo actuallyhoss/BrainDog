@@ -124,6 +124,8 @@ export const markOf = (scope: string): string => new URL('~record', scope).href;
 export const words = {
   /** Drawn over a screen answered from the copy, calm and plain: "Offline, showing what you last saw at 14:02." */
   from: (when: string) => `Offline, showing what you last saw at ${when}.`,
+  /** The same, where the time is not known (the shell drew its own last copy). */
+  lastSaw: 'Offline, showing what you last saw.',
   /** Beside it: what cannot happen until the phone is back, said before anybody tries. */
   cannotSave: 'Changes can’t be saved until you’re back online.',
   /** The `fix` of every write the worker answers offline. */

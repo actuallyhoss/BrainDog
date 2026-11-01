@@ -82,6 +82,7 @@
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import Pull from '$lib/ui/Pull.svelte';
+  import { words as offlineWords } from '$lib/data/offline.ts';
   import { holdIn, presses } from '$lib/data/held.svelte.ts';
   import { drewFirst } from '$lib/data/first-drawn.ts';
   import { tick, untrack, type Snippet } from 'svelte';
@@ -1460,8 +1461,8 @@
       {#if CopyMark}<CopyMark />{/if}
       <Pull />
       {#if data.offline}
-        <!-- OFFLINE, THE ERROR PAGE'S OWN WORDS, as one line over what the local copy drew. -->
-        <p class="offline-line" role="status">{copy.errorPage.offline.title}. {copy.errorPage.offline.body}</p>
+        <!-- OFFLINE, CALMLY, as one line over what the local copy drew: what it shows, and that nothing saves until back. -->
+        <p class="offline-line" role="status">{offlineWords.lastSaw} {offlineWords.cannotSave}</p>
       {/if}
       <!-- SEEING AS SOMEBODY (§3.3): the banner is its own chunk, since only an owner or an Admin trying it loads it. -->
       {#if seeingAs() !== null}

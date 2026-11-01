@@ -154,6 +154,10 @@ sw.addEventListener('fetch', (e) => {
   /* THE COPY GOES BEFORE THE SESSION DOES, whatever the sign-out answers: a sign-out that failed half way still meant
      he wanted nothing of the record left on this phone. */
   if (kind === 'out') return e.waitUntil(Promise.all([sw.caches.delete(COPY), sw.caches.delete(SHARED)]));
+  /* ─── the phone lane: Today offline. Today's read is sent as a POST (`today`, a read the host marks `postRead`), so it
+     was a write here, never kept, and a phone that opened offline drew Today's refusal. It is kept like a read now,
+     under its address and its question. ─── */
+  if (kind === 'write' && POST_READS.test(new URL(req.url).pathname) && !req.headers.has('authorization')) return e.respondWith(postRead(e, Date.now()));
   e.respondWith(answer(kind, e, Date.now()));
 });
 
@@ -214,6 +218,37 @@ async function network(req: Request): Promise<Response | null> {
   }
   if (res.status === 401 || accessEnded(res.headers)) await sw.caches.delete(COPY);
   return res;
+}
+
+/* ─── the phone lane: reads sent as a POST, kept as reads ─── */
+
+/** The reads a client sends as a POST because their question is a body (`postRead` in the host's table). */
+const POST_READS = /\/api\/(?:today|previewPage)$/u;
+
+/**
+ * A read sent as a POST, answered as a read is: the network's answer, kept under its address and its question (the
+ * body's mark, since the same address asked with another body is another answer); and when nothing answered, the kept
+ * one for the same question, with the page told how old it is, or the refusal every write gets offline.
+ */
+async function postRead(e: Fetched, now: number): Promise<Response> {
+  const req = e.request;
+  const body = await req.clone().text().catch(() => null);
+  const key = body === null ? null : `${req.url}?~asked=${markOfText(body)}`;
+  const net = await network(req);
+  if (net !== null) {
+    const json = (net.headers.get('content-type') ?? '').includes('application/json');
+    if (key !== null && net.ok && net.type === 'basic' && json) e.waitUntil(put(key, net.clone(), now));
+    return net;
+  }
+  const held = key === null ? null : await kept(key, now);
+  if (held) {
+    e.waitUntil(tell(e.clientId, held.at));
+    return held.res;
+  }
+  return new Response(JSON.stringify({ ok: false, refusal: { code: 'UNREACHABLE', fix: words.notSent } }), {
+    status: 503,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 /** The address several reads are sent to as one, under the session's record or a named one. */
