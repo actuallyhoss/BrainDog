@@ -30,9 +30,8 @@ import { moduleName } from '@braindog/seed/usecases/names';
 import type { TellList, Told } from '../tell/read.ts';
 import { PEOPLE } from '../who.ts';
 import type { SetupOffer, SetupReply } from './ask.ts';
-import { moduleDocument } from '@braindog/seed/usecases/install';
 
-import { entryOf, FILLABLE, listsOf, type List } from './lists.ts';
+import { entryOf, FILLABLE, listDocument, listsOf, useCaseOfList, type List } from './lists.ts';
 
 /** One entry of a draft, as the record's capture takes it. */
 export type DraftRow = { register: string; fields: Record<string, unknown> };
@@ -78,11 +77,14 @@ export function filled(d: FirstDraft, value: string): FirstDraft {
   return { ...rest, ...(n.type === 'day' ? { day: fit as string } : {}), rows: d.rows.map((r, i) => (i === n.row ? { ...r, fields: { ...r.fields, [n.field]: fit } } : r)) };
 }
 
-/** The modules a BrainDog keeps, read off the lists it holds, in the order first met; the agents' lists are no module here. */
+/**
+ * The modules a BrainDog keeps, read off the lists it holds, in the order first met; the agents' lists are no module here.
+ * A STARTER'S OWN LISTS COUNT AS ITS OWN PACK (`usecase-shop`: Orders, Products), so they are offered too (audit AP1).
+ */
 export function modulesHeld(registers: readonly string[]): string[] {
   const out: string[] = [];
   for (const r of registers) {
-    const id = moduleOfList(r)?.id;
+    const id = moduleOfList(r)?.id ?? useCaseOfList(r) ?? undefined;
     if (id !== undefined && id !== AGENTS_PACK.manifest.id && !out.includes(id)) out.push(id);
   }
   return out;
@@ -313,7 +315,7 @@ export function summaryOf(reply: Pick<SetupReply, 'summary'>): string | null {
 export function tellListsOf(modules: readonly string[], today: string): TellList[] {
   const out: TellList[] = [];
   for (const m of modules) {
-    const doc = moduleDocument(null, m, { today });
+    const doc = listDocument(m, today);
     for (const d of Array.isArray(doc?.declarations) ? (doc.declarations as Record<string, unknown>[]) : []) {
       if (typeof d.register !== 'string' || !Array.isArray(d.fields) || out.some((l) => l.id === d.register)) continue;
       const fields = d.fields as TellList['fields'];
