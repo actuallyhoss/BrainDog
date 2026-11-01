@@ -11,10 +11,14 @@ import { redirect, type LoadEvent } from '@sveltejs/kit';
 
 import { at } from '$lib/at.ts';
 import { openPaletteWith } from '$lib/palette/open.svelte.ts';
+import { takeShared } from '$lib/phone/shared.svelte.ts';
 
 import { sharedSeed } from './seed.ts';
 
 export function load({ url }: Pick<LoadEvent, 'url'>): void {
   openPaletteWith(sharedSeed(url.searchParams));
+  /* AND A SHARED PHOTO, which the service worker kept (`lib/phone/share.ts`): drawn under the palette's field. */
+  const photos = Number(url.searchParams.get('photos') ?? 0);
+  if (Number.isInteger(photos) && photos > 0) void takeShared(photos);
   redirect(307, at('/', url.pathname));
 }

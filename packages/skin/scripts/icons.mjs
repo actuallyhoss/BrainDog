@@ -203,7 +203,7 @@ function span(alpha, rowAt, size, from, to) {
 }
 
 /** A palette colour as three bytes. The theme writes six hex digits; anything else is refused, not guessed at. */
-function bytes(colour) {
+export function bytes(colour) {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/iu.exec(colour.trim());
   if (!m) throw new Error(`The palette gave ${colour}, and an icon is drawn in exact bytes from six hex digits.`);
   return [m[1], m[2], m[3]].map((part) => parseInt(part, 16));
@@ -222,7 +222,7 @@ function crc(data) {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-function chunk(type, data) {
+export function chunk(type, data) {
   const head = Buffer.alloc(8);
   head.writeUInt32BE(data.length, 0);
   head.write(type, 4, 'latin1');
@@ -259,7 +259,7 @@ function png(size, alpha, ground, ink) {
  * EACH PATH IS COVERED ON ITS OWN AND LAID OVER THE ONE BEFORE, as SVG paints two paths in one group. Wound together,
  * a path drawn the other way round inside another would cancel it and leave a hole the favicon does not have.
  */
-function layered(size, fill = FILL) {
+export function layered(size, fill = FILL) {
   const out = new Float64Array(size * size);
   for (const d of MARK.paths) {
     const cover = coverage(outlines(d), size, fill);
@@ -335,25 +335,28 @@ function pixels(size) {
   return out;
 }
 
-const ground = bytes(HOUSE.schemes.light.bg);
-const ink = bytes(HOUSE.schemes.light.accent);
-for (const size of SIZES) {
-  const path = join(root, 'apps', 'web', 'static', `icon-${size}.png`);
-  const file = png(size, layered(size), ground, ink);
-  await writeFile(path, file);
-  console.log(`  wrote apps/web/static/icon-${size}.png, ${file.length} bytes`);
-}
+/* WRITTEN ONLY WHEN RUN, so `splash.mjs` can draw with the same pen without writing these files again. */
+if (process.argv[1] === import.meta.filename) {
+  const ground = bytes(HOUSE.schemes.light.bg);
+  const ink = bytes(HOUSE.schemes.light.accent);
+  for (const size of SIZES) {
+    const path = join(root, 'apps', 'web', 'static', `icon-${size}.png`);
+    const file = png(size, layered(size), ground, ink);
+    await writeFile(path, file);
+    console.log(`  wrote apps/web/static/icon-${size}.png, ${file.length} bytes`);
+  }
 
-/* THE TAB'S OWN, IN THE FAVICON'S RED (`theme.mjs` writes `mark.svg` in the same), into both apps' static folders: the
-   site answers brain.dog/favicon.ico and the app its own path. */
-const red = bytes(HOUSE.frame.light['red-fill']);
-const tab = TAB.map((size) => ({ size, file: pngClear(size, pixels(size), red) }));
-for (const { size, file } of tab) {
-  await writeFile(join(root, 'apps', 'web', 'static', `icon-${size}.png`), file);
-  console.log(`  wrote apps/web/static/icon-${size}.png, ${file.length} bytes`);
-}
-const icon = ico(tab);
-for (const app of ['web', 'site']) {
-  await writeFile(join(root, 'apps', app, 'static', 'favicon.ico'), icon);
-  console.log(`  wrote apps/${app}/static/favicon.ico, ${icon.length} bytes`);
+  /* THE TAB'S OWN, IN THE FAVICON'S RED (`theme.mjs` writes `mark.svg` in the same), into both apps' static folders: the
+     site answers brain.dog/favicon.ico and the app its own path. */
+  const red = bytes(HOUSE.frame.light['red-fill']);
+  const tab = TAB.map((size) => ({ size, file: pngClear(size, pixels(size), red) }));
+  for (const { size, file } of tab) {
+    await writeFile(join(root, 'apps', 'web', 'static', `icon-${size}.png`), file);
+    console.log(`  wrote apps/web/static/icon-${size}.png, ${file.length} bytes`);
+  }
+  const icon = ico(tab);
+  for (const app of ['web', 'site']) {
+    await writeFile(join(root, 'apps', app, 'static', 'favicon.ico'), icon);
+    console.log(`  wrote apps/${app}/static/favicon.ico, ${icon.length} bytes`);
+  }
 }

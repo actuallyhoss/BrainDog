@@ -25,6 +25,7 @@
   import type { AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
   import SummariesTile from '$lib/agents/SummariesTile.svelte';
+  import { KINDS, kindsOff, type PushKind } from '$lib/phone/kinds.ts';
 
   /* EVERY AREA TAKES THE SAME PROPS. This one reads who is asking, since only an owner moves the quiet hours. */
   let props: AreaProps = $props();
@@ -228,6 +229,23 @@
     if (!v) tested = '';
   };
 
+  /* ── WHAT RINGS: one switch per kind of push (`lib/phone/kinds.ts`), this person's own and on every phone of theirs
+     (`push.off`). Drawn with the test, while this device is rung, since a switch over pushes nothing receives is a
+     control that writes nothing anybody would notice. Kept at once, and put back with the record's sentence if refused. */
+  let off = $state<PushKind[]>(kindsOff(props.shell.me?.prefs?.['push.off']));
+  let kindLine = $state('');
+  async function flipKind(kind: PushKind): Promise<void> {
+    const was = off;
+    off = off.includes(kind) ? off.filter((k) => k !== kind) : [...off, kind];
+    kindLine = '';
+    const out = await clientOf()
+      .setPref('push.off', off.length === 0 ? null : off)
+      .catch(() => null);
+    if (out?.ok) return;
+    off = was;
+    kindLine = out && 'refusal' in out ? out.refusal.fix : copy.recordNotReached;
+  }
+
   async function test() {
     if (testing) return;
     testing = true;
@@ -358,6 +376,18 @@
     {#if rung && tested}{#if testBad}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {/if}{tested}{/if}
   </p>
 </div>
+{#if rung}
+  <Tile icon="phone" title={KINDS.title}>
+    <p class="hint">{KINDS.how}</p>
+    {#each KINDS.rows as k (k.kind)}
+      {#snippet kindSwitch()}
+        <button type="button" class="switch" role="switch" aria-checked={!off.includes(k.kind)} aria-label={k.title} onclick={() => void flipKind(k.kind)}><span class="switch-track"></span></button>
+      {/snippet}
+      <StateRow icon={k.icon} title={k.title} line={k.line} action={kindSwitch} />
+    {/each}
+    <p class="said" role="status" data-intent={kindLine ? 'bad' : undefined}>{kindLine}</p>
+  </Tile>
+{/if}
 
 <style>
   /* THE QUIET HOURS, AS ONE ROW: the well, the sentence with its two pickers inside it, and the switch at the row's end

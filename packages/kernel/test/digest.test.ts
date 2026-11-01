@@ -279,7 +279,7 @@ test('A PUSH CARRIES NO CONTENT, only which phone it rings', async () => {
   const row = outbox(sql)[0]!;
   assert.equal(row.kind, 'notify.push');
   /* WHERE A TAP OPENS rides with it: the summary's own screen, a path in the app, which says no content either. */
-  assert.deepEqual(JSON.parse(row.payload), { sub: { id: 'ps_1' }, open: '/agents/summary/money-weekly' });
+  assert.deepEqual(JSON.parse(row.payload), { sub: { id: 'ps_1' }, open: '/agents/summary/money-weekly', kind: 'summary' });
   assert.ok(!row.payload.includes('Invoice 41'), 'the push carried the content');
   assert.ok(!row.payload.includes('fcm.googleapis.com'), 'the push carried the address');
   sql.close();
@@ -544,7 +544,7 @@ test('`urgent` INTERRUPTS, and that is what the word was for', async () => {
   const mail = rows.filter((r) => r.kind === 'notify.email');
   assert.equal(push.length, 1, 'an urgent rule wrote an event and nothing left the record');
   assert.equal(mail.length, 1, 'a push carries one line and no content — the email is the half with the reason');
-  assert.deepEqual(JSON.parse(push[0]!.payload), { sub: { id: 'ps_1' } });
+  assert.deepEqual(JSON.parse(push[0]!.payload), { sub: { id: 'ps_1' }, open: '/r/obligations', kind: 'money' });
   assert.match(JSON.parse(mail[0]!.payload).subject as string, /Payment failed/);
   /* AND THE EVENT TOO, always, because it is the record's own memory of the thing having happened
      and what the unread count is counted over. */

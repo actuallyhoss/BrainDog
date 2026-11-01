@@ -198,11 +198,12 @@ export type Added = { ok: true; entry: Entry; filled: readonly string[]; back: (
  * record has no delete, so the row leaves every list and `restore` can still bring it back. It is handed back as a
  * function rather than run here, because it is the toast's to offer and the reader's to press.
  */
-export async function addRow(c: Creation | Plain, now: number, base: string, io?: Fetch): Promise<Added> {
+export async function addRow(c: Creation | Plain, now: number, base: string, io?: Fetch, extra: Fields = {}): Promise<Added> {
   const { rowWriter } = await import('../record/rows-write.ts');
   const { fields, filled } = await addedFields(c.register, c.title, now, 'chips' in c ? c.chips : []);
   const writer = rowWriter(base, io);
-  const out = await writer.create(c.register, fields);
+  /* `extra` IS WHAT CAME WITH THE LINE AND NOT FROM IT: a photo shared from another app, in the list's file field. */
+  const out = await writer.create(c.register, { ...fields, ...extra });
   if (!out.ok) return { ok: false, fix: out.fix };
   const { entry } = out;
   return { ok: true, entry, filled, back: () => writer.archive(c.register, entry.seq, entry.version) };

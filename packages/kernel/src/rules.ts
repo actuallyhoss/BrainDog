@@ -630,7 +630,9 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       /* AN URGENT ONE GOES THROUGH THE ROUTER, which writes the same event and then interrupts —
          once an hour per record, 09 §4. A plain one is the event and nothing else, which is what
          "batch by default" means: it lands in the digest. */
-      if (one.urgent) deps.interrupt({ actor: `rule:${rule.rule}`, say: one.text, url: `/${fired.entry.id}` });
+      /* IT OPENS THE ROW'S LIST (`/r/<list>`), a path a push may carry (`PUSH_OPEN`), where `/<id>` was none and every
+         such push opened Today; and the list says its kind, so a bill's notice is `money` (`pushKindOf`). */
+      if (one.urgent) deps.interrupt({ actor: `rule:${rule.rule}`, say: one.text, url: `/r/${fired.entry.register}` });
       else deps.note(fired.entry, `rule:${rule.rule}`, one.text, fired.batch);
 
     /* THE EXPANSION IS LAST, and it shares the triggering write's batch — so "undo this expansion"

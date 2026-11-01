@@ -47,7 +47,7 @@ import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import { NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
-import { SAID_MOST, mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
+import { PUSH_KINDS, SAID_MOST, mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
 import { OWN_RUN, nameMid, personNamed, stopLine, toldOf, toldTo, type Told } from './methods/instructions.ts';
 import { saysOf } from './methods/agent-profile.ts';
 import type { Grant, InvitationRow } from '@braindog/kernel';
@@ -1277,6 +1277,7 @@ export const PREF_KEYS = [
   'agents.answer_on_word',
   'decide.agents_apart',
   'widgets.held',
+  'push.off',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
@@ -1336,6 +1337,8 @@ export type Prefs = {
   'home.page'?: string;
   'nav.labels'?: Record<string, string>;
   'notify.muted'?: string[];
+  /** The kinds of push this person turned off on every phone they are rung on (`PUSH_KINDS`): `needs`, `agents`, `money`, `summary`. */
+  'push.off'?: string[];
   'look.scheme'?: LookScheme;
   'look.size'?: LookSize;
   'look.density'?: LookDensity;
@@ -13724,6 +13727,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           });
         /* NEWEST LAST AND THE OLDEST LET GO, as `pen.dismissed` is, so the switch that mutes one more never stops working. */
         kept = [...new Set(value)].slice(-MUTED_MOST);
+      } else if (value !== null && key === 'push.off') {
+        /* THE KINDS OF PUSH THIS PERSON TURNED OFF, each one of the kernel's closed list, so a typo is refused. */
+        if (!texts(value, PUSH_KINDS.length, (s) => (PUSH_KINDS as readonly string[]).includes(s)))
+          return no('VALUE_MALFORMED', `push.off is a list of the kinds of push turned off, each one of ${PUSH_KINDS.join(', ')}, or null to take it away.`, {
+            at: 'value',
+            allowed: [...PUSH_KINDS],
+          });
+        kept = [...new Set(value)];
       } else if (key === 'agents.answer_in_chat' || key === ON_WORD_PREF || key === APART_PREF) {
         /* THE OWNER'S, IN A BROWSER: each lets somebody other than him answer questions, or says what waits on him, so each
            is held to `admin`'s door. */

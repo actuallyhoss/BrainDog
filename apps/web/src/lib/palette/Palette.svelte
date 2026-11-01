@@ -75,10 +75,12 @@
   import { listName } from '../record/names.ts';
   import { commands, ranked, type Act, type Creation } from './admit.ts';
   import { addRow, creation, homeCapture, moneyWay, offered, plainAdd, words as createWords, type Into, type Plain } from './create.ts';
+  import { letGo, photoFields, shared } from '$lib/phone/shared.svelte.ts';
   import { quick } from '$lib/money/quick.svelte.ts';
   import { tokensOf as lineTokens, untoken, type Chip } from './tokens.ts';
   import { homeSlugOf, labels as heardLabels, relabel, singularOf } from '../voice.ts';
   import type { Shell } from '../record/boot-live.ts';
+  import type { Fields } from '../record/schema.ts';
   import { entryHref, slashEntryWords, slashLine } from '../page/slash-entry.ts';
   import { customise, type Change, type Look, type Place } from './customise.ts';
   import { widgetRows } from '../board/palette-rows.ts';
@@ -587,6 +589,13 @@
    */
   /** The phone's way out of the whole-screen palette, said as a word. */
   const words = { cancel: 'Cancel' } as const;
+  /** What a photo shared from another app says, under the field. */
+  const shareWords = {
+    photo: (name: string) => (name === '' ? 'Shared photo' : `Shared photo, ${name}`),
+    line: (n: number) => (n === 1 ? 'The photo goes with what you add, into a list that keeps a file.' : `The first of ${n} photos goes with what you add, into a list that keeps a file.`),
+    remove: 'Take the photo off',
+    notKept: (list: string) => `Added, without the photo: ${list} keeps no file, or the photo could not be sent.`,
+  } as const;
   const FIGURES = 'Figures';
   const OPEN_QUESTION = 'Open question';
   const RECENT = 'Recent';
@@ -1398,6 +1407,8 @@
     } else if (!open && el.open) {
       el.close();
       overlays.close();
+      /* A SHARED PHOTO NOBODY ADDED ANYTHING WITH goes when the palette does, with the phone's copy of it. */
+      if (untrack(() => shared.urls.length) > 0) letGo();
       if (dismissed) queueMicrotask(focusBack);
       else returnTo = null;
     }
@@ -1522,13 +1533,19 @@
     const list = addNamed.get(c.register) ?? listName(c.register);
     if (!isLive) return;
     let out: Awaited<ReturnType<typeof addRow>>;
+    /* A SHARED PHOTO GOES WITH THE LINE, into the list's file field; a list that keeps no file adds the line alone. */
+    const photo = shared.photos.length > 0 ? await photoFields(c.register, apiBase(page.url)) : 'none';
     try {
-      out = await addRow(c, Date.now(), apiBase(page.url));
+      out = await addRow(c, Date.now(), apiBase(page.url), undefined, photo !== null && photo !== 'none' ? (photo as unknown as Fields) : {});
     } catch {
       /* THE WRITE MODULE IS LOADED ON THE PRESS, so a dropped connection can fail the import before any request. */
       return void toasts.push(copy.writeNotReached, { intent: 'warn' });
     }
     if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
+    if (photo !== 'none') {
+      if (photo === null) toasts.push(shareWords.notKept(list), { intent: 'warn' });
+      letGo();
+    }
     /* WHAT THE LINE SAID IS SAID BACK, "due Thu 15 Oct", so the chip under the field is in the receipt too. */
     const read = 'chips' in c ? c.chips.map((chip) => chip.said) : [];
     const said = read.length > 0 ? createWords.addedWith(list, c.title, read) : createWords.added(list, c.title);
@@ -1733,6 +1750,15 @@
     <p class="p-count" role="status">{announced}</p>
     <button type="button" class="p-close tap" onclick={dismiss}>{words.cancel}</button>
   </div>
+  <!-- A PHOTO SHARED FROM ANOTHER APP (`lib/phone/share.ts`), beside the words it came with, until something is added
+       with it or it is taken off. It goes into the list's file field, so the line under it says where it can go. -->
+  {#if shared.urls.length > 0 && !inAsk}
+    <div class="p-shared">
+      {#each shared.urls as src, i (src)}<img class="p-shared-img" {src} alt={shareWords.photo(shared.photos[i]?.name ?? '')} />{/each}
+      <span class="p-shared-line">{shareWords.line(shared.urls.length)}</span>
+      <button type="button" class="p-shared-x tap" aria-label={shareWords.remove} onclick={() => letGo()}><Icon name="close" size="s" /></button>
+    </div>
+  {/if}
   <!-- WHAT THE PLAIN LINE WAS READ AS: a chip for each, under the field, drawn only while the line makes a row. -->
   {#if plainMade && plainMade.chips.length > 0}
     <ul class="p-chips" aria-label={createWords.chips}>
@@ -2079,6 +2105,42 @@
   }
 
   .p-input::placeholder {
+    color: var(--ink-3);
+  }
+
+  /* A SHARED PHOTO: a 48px picture at the control radius, the line beside it, and a 44px way to take it off. */
+  .p-shared {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-4);
+  }
+
+  .p-shared-img {
+    flex: none;
+    inline-size: 48px;
+    block-size: 48px;
+    border-radius: var(--r-ctl);
+    object-fit: cover;
+    background: var(--board);
+  }
+
+  .p-shared-line {
+    flex: 1;
+    min-inline-size: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lh-body);
+  }
+
+  .p-shared-x {
+    display: grid;
+    flex: none;
+    place-items: center;
+    min-inline-size: var(--tap);
+    min-block-size: var(--tap);
+    border: 0;
+    background: none;
     color: var(--ink-3);
   }
 
