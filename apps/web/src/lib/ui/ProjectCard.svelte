@@ -347,7 +347,6 @@
     letter-spacing: -0.035em;
     line-height: 34px;
     white-space: nowrap;
-    animation: roll var(--d-swap) var(--ease-out);
   }
 
   .pc-label {
@@ -564,10 +563,6 @@
     [data-arrived],
     .pc-num[data-arrived] {
       animation: landed 1.5s step-end;
-    }
-
-    .pc-num {
-      animation: none;
     }
   }
 

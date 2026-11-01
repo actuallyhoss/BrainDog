@@ -305,22 +305,26 @@
 
 /* ── motion ───────────────────────────────────────────────────────────────── */
 
+/* MONEY DRAWS AS IT IS ON AN OPEN (audit 11-01, AP5): its tiles rose and its eight bars grew on every visit, a reload
+   and a new tab. They rise and grow only while a BrainDog is assembling (`$lib/start/assembling.ts`); any other time a
+   bar that changes while Money is open grows from its old share to its new (`$lib/motion/watch.ts`), and a tile that
+   arrives rises in (`$lib/page/recompose.ts`). */
 @media (prefers-reduced-motion: no-preference) {
-  [data-money] .page > .block-slot,
-  [data-money] .page > .box {
+  [data-assembling] [data-money] .page > .block-slot,
+  [data-assembling] [data-money] .page > .box {
     animation: money-rise 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
-  [data-money] .page > :nth-child(3) {
+  [data-assembling] [data-money] .page > :nth-child(3) {
     animation-delay: 30ms;
   }
 
-  [data-money] .page > :nth-child(n + 4) {
+  [data-assembling] [data-money] .page > :nth-child(n + 4) {
     animation-delay: 60ms;
   }
 
-  [data-money] .prop-track::after,
-  [data-money] .progress-fill {
+  [data-assembling] [data-money] .prop-track::after,
+  [data-assembling] [data-money] .progress-fill {
     transform-origin: left center;
     animation: money-grow 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
