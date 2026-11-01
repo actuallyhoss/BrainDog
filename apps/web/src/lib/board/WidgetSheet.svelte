@@ -446,7 +446,7 @@
       </span>
     </button>
     {#if w.ready || waiting}
-      <button type="button" class="ws-plus" aria-label={sheetWords.addNamed(w.title)} title={sheetWords.add} disabled={adding || waiting} onclick={() => add(w, s, offer)}>
+      <button type="button" class="ws-plus tap" aria-label={sheetWords.addNamed(w.title)} title={sheetWords.add} disabled={adding || waiting} onclick={() => add(w, s, offer)}>
         <Icon name="plus" size="s" />
       </button>
     {/if}
@@ -636,6 +636,14 @@
     box-shadow: 0 0 0 3px var(--tile);
     color: var(--tile);
     cursor: pointer;
+  }
+
+  /* UNDER A THUMB THE PLUS IS 32 DRAWN AND 44 TO PRESS (`.tap`), clear of the frame's corner. */
+  @media (pointer: coarse) {
+    .ws-plus {
+      inline-size: 32px;
+      block-size: 32px;
+    }
   }
 
   .ws-plus:disabled {

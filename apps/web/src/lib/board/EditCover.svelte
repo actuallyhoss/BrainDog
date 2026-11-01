@@ -45,7 +45,7 @@
     oncontextmenu={(e) => e.preventDefault()}
   ></button>
   {#if !fixed}
-    <button type="button" class="dot" aria-label={boardWords.remove(name)} onclick={() => model.hide(key)} onpointerdown={(e) => e.stopPropagation()}>
+    <button type="button" class="dot tap" aria-label={boardWords.remove(name)} onclick={() => model.hide(key)} onpointerdown={(e) => e.stopPropagation()}>
       <Icon name="x" size="s" />
     </button>
   {/if}
@@ -146,6 +146,24 @@
 
   .dot:hover {
     background: var(--tile-2);
+  }
+
+  /* ENTERING EDIT, THE HANDLES COME IN (the board is about to change, so say so): the dot and the corner fade up from
+     a step smaller over 160ms, once, as the mode opens. Never on a widget's own redraw: the cover is drawn only while
+     editing. Reduced motion keeps the fade alone (`skin/a11y.css`). */
+  .dot,
+  .corner {
+    transition:
+      opacity 160ms var(--ease-out),
+      transform 160ms var(--ease-out);
+  }
+
+  @starting-style {
+    .dot,
+    .corner {
+      opacity: 0;
+      transform: scale(0.9);
+    }
   }
 
   .sizes {
