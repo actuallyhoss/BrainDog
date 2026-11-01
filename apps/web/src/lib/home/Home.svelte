@@ -148,6 +148,8 @@
   import { holdPresses } from '$lib/data/held.svelte.ts';
   import { drewFirst, firstDrawn } from '$lib/data/first-drawn.ts';
   import { painted } from '$lib/data/timing.ts';
+  import { when as keptWhen, words as keptWords } from '$lib/data/offline.ts';
+  import { KEPT_SAY_MS } from './kept-frame.ts';
   import type { Near } from '$lib/data/local.ts';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
 
@@ -470,11 +472,31 @@
   /** Whether an answer was read without the widgets the phone hides (`phone-ask.ts`). */
   const isPhoneOnly = (o: Opened | null): boolean => o?.from === 'live' && (o.page.page as { phoneOnly?: unknown }).phoneOnly === true;
   let fromCopy = $state(false);
+  /* AND IT SAYS WHEN IT IS FROM while the record is asked again (`kept-frame.ts`), once that is more than a minute ago:
+     what the copy holds is the money as the record last answered, and an old figure is never shown without saying so. */
+  let keptLine = $state<string | null>(null);
   /** Whether the copy drew this open: the reads behind it are quiet, as the ones behind what the tab drew are. */
   let copyDrawn = false;
   $effect(() => {
     if (!fromCopy) return;
     return untrack(() => holdCopyMark());
+  });
+  /* TODAY DRAWN FROM THE RECORD IS KEPT AS A PICTURE for the next open to paint before the app has run (`kept-frame.ts`):
+     once it has rested, and again as the phone leaves it, so the picture is the last one seen. */
+  $effect(() => {
+    if (!settled || fromCopy || got?.from !== 'live' || data.refused) return;
+    const keepNow = () => {
+      if (!untrack(() => boardModel.editing)) void import('./kept-frame.ts').then((m) => m.keepFrame()).catch(() => undefined);
+    };
+    const rest = setTimeout(keepNow, 3_000);
+    const leaving = () => {
+      if (document.visibilityState === 'hidden') keepNow();
+    };
+    document.addEventListener('visibilitychange', leaving);
+    return () => {
+      clearTimeout(rest);
+      document.removeEventListener('visibilitychange', leaving);
+    };
   });
   /* AND DRAWN FROM WHAT THIS TAB KEPT OF IT (`today-kept.ts`), its presses wait for the read behind it (`held.svelte.ts`):
      what it kept may be a question somebody has answered since. */
@@ -505,6 +527,8 @@
     news = near.value.news;
     newLines = near.value.news?.lines ?? [];
     fromCopy = true;
+    const now = Date.now();
+    keptLine = now - near.kept >= KEPT_SAY_MS ? keptWords.updating(keptWhen(near.kept, now)) : null;
     /* WHAT THE COPY DREW IS THE SCREEN, as what this tab drew is: the read behind it is quiet and lands over it, so the
        screen settles now and does not wait for the record's answer (`fromMemory` below does the same). */
     copyDrawn = true;
@@ -1707,6 +1731,8 @@
       THE DESK (`board`): one twelve-column board that the desk's parts and the page's blocks are laid out on together,
       each where the 19 October desk puts it. A kept page is its own board.
     -->
+    <!-- DRAWN FROM THE COPY, IT SAYS WHEN IT IS FROM until the record answers (`kept-frame.ts` lays the same line in). -->
+    {#if fromCopy && keptLine}<p class="kept-line" role="status">{keptLine}</p>{/if}
     <div class="body" data-board={board ? '' : undefined} data-enter={entering ? '' : undefined}>
       <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
       {#if board}
@@ -1936,6 +1962,14 @@
 
   .body {
     min-inline-size: 0;
+  }
+
+  /* WHEN A COPY IS FROM, in the offline line's muted words. GLOBAL UNDER THE PAGE because `app.html` lays the same line
+     into the kept picture (`kept-frame.ts`), where it carries no scoped class. */
+  .page :global(.kept-line) {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* ── the board ─────────────────────────────────────────────────────────

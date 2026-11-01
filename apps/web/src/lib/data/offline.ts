@@ -124,6 +124,8 @@ export const markOf = (scope: string): string => new URL('~record', scope).href;
 export const words = {
   /** Drawn over a screen answered from the copy: "Offline · from 14:02". */
   from: (when: string) => `Offline · from ${when}`,
+  /** Over a screen drawn from the copy while the record is asked again: "Updating · from 14:02" (`kept-frame.ts`). */
+  updating: (when: string) => `Updating · from ${when}`,
   /** Under it, and the `fix` of every write the worker answers offline. */
   notSent: 'Not sent, because you are offline. Nothing waits to be sent later: do it again once you are back online.',
 };
