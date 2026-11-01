@@ -540,6 +540,9 @@
          its machine, and over a list with no copy yet, what Restore this will do once there is one. -->
     {#if copiesFrom === 'refused'}
       <p class="hint">{shell.host === 'cloud' ? copy.restoreNotHere : copy.restoreSelfHost}</p>
+      {#if shell.host !== 'cloud'}
+        <div class="restore-lines"><CodeLine text={copy.restoreSelfHostBackup} /><CodeLine text={copy.restoreSelfHostRestore} /></div>
+      {/if}
     {:else if copiesFrom === 'live'}
       <p class="hint">{copyLines.length > 0 ? copy.restoreLive : copy.restoreFirst}</p>
     {/if}
@@ -741,5 +744,11 @@
     .strip-ends {
       display: none;
     }
+  }
+
+  .restore-lines {
+    display: grid;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-3);
   }
 </style>

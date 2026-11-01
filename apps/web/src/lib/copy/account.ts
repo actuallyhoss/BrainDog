@@ -483,7 +483,8 @@ export const account = {
      person who does. `kek` in the data folder is where `braindog init` writes it (`apps/selfhost/src/main.ts`). */
   /* AND WHAT IT SEALS, TRUE TO THE BYTE (AI17): a copy is plain SQLite, and only the saved keys inside it are sealed.
      ON DOCKER the data folder is inside a volume, so the way off it is named (AI24). */
-  theKeyWhere: 'It is the backup key file, named kek, in the data folder. Without it your saved keys stay sealed; everything else in a copy is readable, so keep copies as private as the key. Keep a copy of the key somewhere else.',
+  /* NOT "NAMED KEK" (G23): a machine word in the sentence; the Docker command under it names the file where it is needed. */
+  theKeyWhere: 'It is the key file next to your data. Without it your saved keys stay sealed; everything else in a copy is readable, so keep copies as private as the key. Keep a copy of the key somewhere else.',
   theKeyDocker: 'On Docker, copy it off the volume with:',
   theKeyDockerCommand: 'mkdir -p ~/braindog-backups && docker compose cp braindog:/data/kek ~/braindog-backups/',
   downloadNeedsKey: 'A downloaded copy is put back with the key file beside it.',
@@ -503,7 +504,10 @@ export const account = {
    */
   restoreNotHere: `Going back to an earlier copy is asked for rather than pressed: write to ${SUPPORT_EMAIL} and say which day.`,
   /* AND ON A SELF-HOST, HOW: the copy and the going back are two commands on the machine it runs on. */
-  restoreSelfHost: 'On this machine, braindog backup <folder> saves a copy and braindog restore <folder> puts it back.',
+  /* THE TWO COMMANDS AS LINES TO COPY (G23), not inline in a sentence. */
+  restoreSelfHost: 'On this machine, save a copy and put one back with:',
+  restoreSelfHostBackup: 'braindog backup <folder>',
+  restoreSelfHostRestore: 'braindog restore <folder>',
 
   /* billing — nothing to bill on a self-host (23 §8: one line in Settings) */
   billingSelfHost: 'Runs on your own machine. Nothing to bill.',

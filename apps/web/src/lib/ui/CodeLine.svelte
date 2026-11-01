@@ -68,9 +68,11 @@
 {/if}
 
 <style>
+  /* THE WORDS LEVEL WITH COPY (G25): at the top they sat 6 to 8px above the middle of the button that copies them,
+     whatever its height (32 on a desk, 40 or 44 elsewhere). A command that wraps keeps Copy at its middle. */
   .code-line {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: var(--sp-2);
     min-inline-size: 0;
     padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
@@ -78,12 +80,10 @@
     border-radius: var(--r-ctl);
   }
 
-  /* THE FIRST LINE CENTRED ON COPY (G25): the words sat 6 to 8px above the middle of the button that copies them. The
-     text's box is at least the button's height, its first line in the middle of it; a long command wraps below. */
   .code-text {
     flex: 1;
     min-inline-size: 0;
-    padding-block: max(var(--sp-1), calc((var(--code-copy-h, 40px) - 20px) / 2));
+    padding-block: var(--sp-1);
     color: var(--ink);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
@@ -103,15 +103,6 @@
     display: flex;
   }
 
-  .code-line {
-    --code-copy-h: 40px;
-  }
-
-  @media (pointer: coarse) {
-    .code-line {
-      --code-copy-h: var(--tap);
-    }
-  }
 
   .code-line .code-copy :global(.btn[data-weight]) {
     --btn-fill: var(--tile);

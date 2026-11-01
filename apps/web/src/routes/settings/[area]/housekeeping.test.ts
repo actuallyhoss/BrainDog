@@ -80,10 +80,10 @@ test('X20: Backups says Needs you, one line per state, and how each going back i
   assert.match(backups, /missedLine: 'Tries again tonight\.'/u);
   /* THE SELF-HOST'S KEY IS NAMED, on a self-host, never "if you run BrainDog yourself". */
   assert.doesNotMatch(account.theKeyWhere, /If you run BrainDog yourself/u);
-  assert.match(account.theKeyWhere, /kek/u, 'the key file is not named');
+  assert.match(account.theKeyWhere, /key file next to your data/u, 'the key file is not named');
   /* GOING BACK SAYS HOW, on each host: the Cloud by writing to us, a self-host by the one command. */
   assert.match(account.restoreNotHere, new RegExp(SUPPORT_EMAIL.replace('.', '\\.'), 'u'), 'the Cloud does not say who to ask');
-  assert.match(account.restoreSelfHost, /braindog restore/u, 'a self-host is not told the command');
+  assert.match(account.restoreSelfHostRestore, /braindog restore/u, 'a self-host is not told the command');
   /* NO "COPIES ABOVE" OVER NO COPY, and no "No backup yet" under "First copy tonight". */
   const area = markup(backups);
   assert.match(area, /copyLines\.length > 0 \? copy\.restoreLive : copy\.restoreFirst/u, 'the copies above are named with none above');

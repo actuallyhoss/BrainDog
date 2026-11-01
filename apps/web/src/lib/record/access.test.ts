@@ -365,7 +365,7 @@ test('and the two areas that report rather than offer say which deployment this 
   assert.match(key, /cannot show it to you/i);
   /* AND THE FILE BY ITS NAME, ON A SELF-HOST: "If you run BrainDog yourself" was said to the one
      person who does. */
-  assert.match(copy.theKeyWhere, /backup key file, named kek/i, 'the screen no longer says where the key is');
+  assert.match(copy.theKeyWhere, /key file next to your data/i, 'the screen no longer says where the key is');
   /**
    * `53 §5.4`: thirty kept, and the sentence says the number rather than the word "some".
    *
