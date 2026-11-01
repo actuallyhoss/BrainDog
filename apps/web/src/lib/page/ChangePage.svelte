@@ -72,7 +72,13 @@
     heads = () => [],
     extra = [],
     built = null,
+    board = null,
   }: {
+    /**
+     * Whether this page can be laid out as a board, and whether it is one now (`page-boards.svelte.ts`): a project's
+     * page and Money's home. `null` offers no board.
+     */
+    board?: { on: boolean; keys: () => readonly string[] } | null;
     /** Links the page offers first, above its own entries: a project's "Edit details" (proj F7, VERIFY H13). */
     extra?: readonly { label: string; icon: IconName; href: string }[];
     /** The page's address, which the description is about. */
@@ -104,6 +110,9 @@
 
   let open = $state(false);
   let menu = $state(false);
+  /* THE BOARD'S TWO WORDS, here so the menu draws them before the board's code is asked for. */
+  const boardOn = 'Lay out as a board';
+  const boardOff = 'Back to a plain page';
   /** A line Slash handed this page ("move Bills up"), sent once as the sheet opens; each one opens a fresh sheet. */
   let line = $state<string | undefined>(undefined);
   let lines = $state(0);
@@ -303,8 +312,23 @@
     }
   }
 
+  /* ── the board ─────────────────────────────────────────────────────────────
+     LAY OUT AS A BOARD: his own arrangement of this page, kept as his (`page-boards.svelte.ts`), and its editor opens on
+     it at once. Back to a plain page takes it away. Each with an Undo. */
+  async function toBoard(on: boolean) {
+    const { boardSlug, boardWords, pageBoards } = await import('./page-boards.svelte.ts');
+    if (on) pageBoards.fresh = boardSlug(slug);
+    const out = await pageBoards.put(slug, on ? { order: [], sizes: {} } : null);
+    if (!out.ok) {
+      pageBoards.fresh = null;
+      return void toasts.push(out.fix, { intent: 'warn' });
+    }
+    const before = out.before;
+    toasts.push(on ? boardWords.onSaid(title) : boardWords.offSaid(title), { undo: () => void pageBoards.put(slug, before) });
+  }
+
   /** Whether the menu holds anything at this width; one that would open on nothing is not drawn. */
-  const offers = $derived(extra.length > 0 || mayChange || mayPin || source !== null || (onarrange !== null && wide.current));
+  const offers = $derived(extra.length > 0 || mayChange || mayPin || source !== null || (onarrange !== null && wide.current) || (board !== null && mayPin));
 </script>
 
 <!-- `page-more` and `data-arrange` NAME THE WAY INTO EDIT LAYOUT for a gate, which opened it from its own button. -->
@@ -349,8 +373,13 @@
   {:else if source}
     <button type="button" class="mi" role="menuitem" onclick={toSource}><Icon name="code" size="s" />{copy.pageSource}</button>
   {/if}
-  {#if onarrange && wide.current}
+  {#if onarrange && wide.current && !board?.on}
     <button type="button" class="mi" role="menuitem" data-arrange onclick={() => onarrange?.()}><Icon name="grid" size="s" />{copy.arrange}</button>
+  {/if}
+  {#if board && mayPin}
+    <button type="button" class="mi" role="menuitem" onclick={() => void toBoard(!board.on)}
+      ><Icon name={board.on ? 'rows' : 'grid'} size="s" />{board.on ? boardOff : boardOn}</button
+    >
   {/if}
 </Menu>
 </span>

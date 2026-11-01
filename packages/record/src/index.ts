@@ -1277,6 +1277,7 @@ export const PREF_KEYS = [
   'agents.answer_on_word',
   'decide.agents_apart',
   'widgets.held',
+  'boards.pages',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
@@ -1358,7 +1359,43 @@ export type Prefs = {
    * every turned-down offer, is in `pen.dismissed`.
    */
   'widgets.held'?: { notNow: string[]; last?: string; forgot?: string };
+  /**
+   * THE PAGES HE LAYS OUT AS BOARDS (widgets plan §4.2, W6): a project's page, Money's home, any page, by its address
+   * without the slash, each with its widgets' order and sizes, what he took off, and the phone's own arrangement. His
+   * own and nobody else's, laid over the page as it is read, so an add-on's page keeps its updates (`boardsFault`).
+   */
+  'boards.pages'?: Record<string, PageBoard>;
 };
+
+/** One page laid out as a board: its widgets by key, in order, at their sizes, less the ones taken off. */
+export type PageBoard = { order: string[]; sizes: Record<string, string>; hidden?: string[]; phone?: { order?: string[]; sizes?: Record<string, string>; hidden?: string[] } };
+
+/** The most pages one person lays out as boards, and the most widgets one board holds. */
+export const BOARDS_PAGES_MOST = 100;
+const BOARD_KEYS_MOST = 48;
+const WIDGET_SIZE_WORDS: ReadonlySet<string> = new Set(['small', 'wide', 'tall', 'large', 'full']);
+
+/** Why a `boards.pages` value cannot be kept, or `null` with it as kept. */
+export function boardsFault(value: unknown): string | null {
+  const said = 'boards.pages maps each page (its address without the slash) to { order, sizes, hidden?, phone? }: block keys, and sizes small, wide, tall, large or full; at most 100 pages, or null to take it away.';
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return said;
+  const pages = Object.entries(value as Record<string, unknown>);
+  if (pages.length > BOARDS_PAGES_MOST) return said;
+  const keys = (v: unknown): boolean => v === undefined || (Array.isArray(v) && v.length <= BOARD_KEYS_MOST && v.every((k) => typeof k === 'string' && /^[a-z][a-z0-9_-]{0,47}$/u.test(k)));
+  const sizes = (v: unknown): boolean =>
+    v === undefined || (v !== null && typeof v === 'object' && !Array.isArray(v) && Object.entries(v).length <= BOARD_KEYS_MOST && Object.entries(v).every(([k, s]) => /^[a-z][a-z0-9_-]{0,47}$/u.test(k) && typeof s === 'string' && WIDGET_SIZE_WORDS.has(s)));
+  for (const [slug, board] of pages) {
+    if (!/^[a-z0-9][a-z0-9/_-]{0,119}$/u.test(slug) || board === null || typeof board !== 'object' || Array.isArray(board)) return said;
+    const b = board as Record<string, unknown>;
+    if (Object.keys(b).some((k) => !['order', 'sizes', 'hidden', 'phone'].includes(k))) return said;
+    if (!Array.isArray(b.order) || !keys(b.order) || !sizes(b.sizes ?? {}) || !keys(b.hidden)) return said;
+    if (b.phone !== undefined) {
+      const ph = b.phone as Record<string, unknown> | null;
+      if (ph === null || typeof ph !== 'object' || Array.isArray(ph) || Object.keys(ph).some((k) => !['order', 'sizes', 'hidden'].includes(k)) || !keys(ph.order) || !sizes(ph.sizes) || !keys(ph.hidden)) return said;
+    }
+  }
+  return null;
+}
 
 /** The words each `look.*` key takes. `look.accent` takes `LOOK_ACCENTS`, which follows the suggested accents. */
 export const LOOK_SCHEMES = ['light', 'dark', 'system'] as const;
@@ -13774,6 +13811,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ...(typeof held.last === 'string' ? { last: held.last } : {}),
           ...(typeof held.forgot === 'string' ? { forgot: held.forgot } : {}),
         };
+      } else if (value !== null && key === 'boards.pages') {
+        const fault = boardsFault(value);
+        if (fault) return no('VALUE_MALFORMED', fault, { at: 'value' });
+        kept = value as Record<string, PageBoard>;
       } else if (value !== null && key === 'packs.known_keys') {
         const entries = typeof value === 'object' && !Array.isArray(value) ? Object.entries(value as Record<string, unknown>) : null;
         if (!entries || entries.length > 200 || !entries.every(([k, v]) => k.length > 0 && k.length <= 300 && texts(v, 8, (s) => /^[0-9a-f]{16}$/u.test(s))))
