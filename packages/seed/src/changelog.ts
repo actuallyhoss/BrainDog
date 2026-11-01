@@ -443,6 +443,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.30.0',
+      notes: 'How the brain changed is now called What changed, on its page and at the foot of Agents.',
+    },
+    {
       version: '1.29.0',
       notes: 'Keys at the foot of Agents opens the Keychain, the one place for keys.',
     },

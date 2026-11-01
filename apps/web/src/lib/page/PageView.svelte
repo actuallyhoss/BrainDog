@@ -95,6 +95,7 @@
   import QuickHost from '$lib/money/QuickHost.svelte';
   import { pageOfLedger } from '$lib/money/ledger.ts';
   import { quick } from '$lib/money/quick.svelte.ts';
+  import { words as quickWords } from '$lib/money/quick.ts';
   import SetupGate from '$lib/money/SetupGate.svelte';
   import { looks as moneyLooks } from '$lib/money/looks.svelte.ts';
   import { masonry } from '$lib/money/masonry.ts';
@@ -609,6 +610,8 @@
   const ledgerHere = $derived(mode === 'page' && live && quick.base === apiBase() ? quick.ledger : null);
   /** The ledger's book list (`ledger.ts` `book`), which Money's home and each book's page draw Which book over. */
   const bookHere = $derived(ledgerHere?.book ?? null);
+  /** Whether this page draws the ledger or its accounts, so a phone's head offers Add a movement (`QuickHost`). */
+  const quickHere = $derived(mode === 'page' && moneyPage && !!live && pageOfLedger(live.page.page.requires, quick.ledger));
   /** Whether this page is one row of the ledger's accounts, which an owner may share as a household view. */
   const accountPage = $derived(ledgerHere !== null && about?.register === ledgerHere.account.list);
   const importHref = $derived.by(() => {
@@ -998,6 +1001,12 @@
         <!-- AN ADD WEARS THE PLUS, so on a phone it is the 36px square the head draws for a glyph (`PageHead.svelte`). -->
         <Button weight="primary" onclick={pressHead}>{#if /^(add|new)\b/iu.test(declared.action.label)}<Icon name="plus" size="s" />{/if}{declared.action.label}</Button>
       {/if}
+      <!-- ADD A MOVEMENT, IN THE HEAD ON A PHONE (1 Nov): floating at the end edge, the red + sat on the first line's
+           amount at rest on the Ledger at 390, and on whichever amount it passed after. From 900 up the `+` key and the
+           palette are the way in. -->
+      {#if quickHere && !arranging && !showSource}
+        <span class="quick-head"><Button weight="primary" onclick={() => quick.start('out')} aria-label={quickWords.fab} title={quickWords.fab} aria-keyshortcuts="+"><Icon name="plus" size="s" />{quickWords.fab}</Button></span>
+      {/if}
       {#if finish && finish.key === spoken && !arranging && !showSource}
         <Button weight="primary" onclick={() => void pressFinish()}>{finish.said}</Button>
       {/if}
@@ -1297,7 +1306,7 @@
 <!-- LAST IN THE PAGE, so the floating + is the last stop before the tab bar and not the second after the skip link
      (audit 31 Oct i, AI2): it floats, so where it stands in the page changes only the order Tab meets it. -->
 {#if mode !== 'preview' && live}
-  <QuickHost fab={mode === 'page' && moneyPage && pageOfLedger(live.page.page.requires, quick.ledger)} />
+  <QuickHost />
 {/if}
 
 <style>
@@ -1559,8 +1568,17 @@
     }
   }
 
+  /* ADD A MOVEMENT IS A PHONE'S, where there is no `+` key to press. */
+  .quick-head {
+    display: none;
+  }
+
   /* ON A PHONE A BUTTON WITH A GLYPH IS THE GLYPH ALONE in a 44px square, as the head draws it; its words stay its name. */
   @media (width < 900px) {
+    .quick-head {
+      display: contents;
+    }
+
     .lead-actions {
       gap: var(--sp-1);
     }

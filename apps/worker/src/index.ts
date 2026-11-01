@@ -2362,7 +2362,17 @@ export class Record$ extends DurableObject<Env> {
    * rule stated 130 lines down, broken in the two places the sentence did not reach.
    */
   override async fetch(request: Request): Promise<Response> {
-    const out = await this.#answer(request);
+    /* NOTHING THROWS OUT OF THE OBJECT (1 Nov): a call that threw past `serveApi`'s own catch, in the object's doors
+       before it, left the runtime to log the fetch as an exception (`Record$ fetch /api/pulse error`) and the front door
+       to make the 500. It is answered here with the same reference and plain sentence (`crashAnswer`). A restore still
+       being armed and an object too busy are the front door's to answer, 503 each, so they go on up as they were. */
+    let out: Response;
+    try {
+      out = await this.#answer(request);
+    } catch (e) {
+      if (restoring(e) || overloaded(e)) throw e;
+      out = crashAnswer(request, e, (fields) => this.ctx.waitUntil(opsAlert(this.env, fields, alertClaim(this.env))));
+    }
     /* A BODY NOBODY READ IS READ TO ITS END BEFORE THE ANSWER GOES. Every early answer here, and `serveApi`'s 404
        and 405, returned without touching the body the router was still streaming in, and the runtime then threw
        "Can't read from request stream after response has been sent" out of the request: `POST /api/<a typo>` with
@@ -4455,20 +4465,25 @@ function mailAddress(request: Request, env: Env, id: string, ctx: CallContext): 
  * A BEARER AND NOTHING ELSE. This is reached before `doorOf`, so a session cookie is never read: an agent carries its
  * own credential, and a person in a browser has the app. `gate` is the transport's own, so the order is the
  * self-host's: 405, 403, 415, then 401.
+ *
+ * EVERY EARLY ANSWER READS THE BODY FIRST (`drained`), as the record's object does (1 Nov). `brain.dog/mcp` comes through
+ * the site's service binding, which streams the body across as it arrives; answered unread (the watchdog's unsigned POST
+ * every five minutes, a 401), the site logged "Can't read from request stream after response has been sent". The body
+ * is at most `/mcp`'s ceiling by now (`guardBody`).
  */
 async function agent(request: Request, env: Env): Promise<Response> {
   const early = gate(request);
-  if (early) return early;
+  if (early) return drained(request, early);
   const found = await bearerOf(request, 'mcp', bearerDeps(env));
   /* THE 401 NAMES WHERE TO SIGN IN, so an MCP client that holds no token starts OAuth from it (RFC 9728).
      On the name it reached, so a client set up with `brain.dog/mcp` reads `brain.dog/mcp` as the resource
      (`mcpMetadataAt`). Without a public host there is no address to name, and the 401 is as it was. */
   const metadata = mcpMetadataAt(request, env.PUBLIC_HOST, env.LEGACY_HOSTS);
-  if ('status' in found) return found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unknownAgent(metadata);
+  if ('status' in found) return drained(request, found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unknownAgent(metadata));
   /* THE TOKEN'S MINUTE BEFORE THE RECORD READS THE BODY, and always the MCP budget (`RL_MCP`, else the read one): which tool is called is inside a
      body nobody has parsed yet (`classOf`), and the record still decides whether a write is allowed. */
   const over = await overLimit(env, { door: 'bearer', ctx: found.ctx }, request, 'mcp');
-  if (over !== null) return over;
+  if (over !== null) return drained(request, over);
   return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
 }
 

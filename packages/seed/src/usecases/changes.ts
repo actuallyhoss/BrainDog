@@ -42,6 +42,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.5.1', notes: NAMED('Courses') },
   ],
   founder: [
+    { version: '3.9.2', notes: 'The Dashboard says where a project sends its numbers in a plain sentence: to its own address, shown on its page.' },
     { version: '3.9.1', notes: 'The Dashboard comes after Agents in your sidebar, so nothing already there moves. When the sidebar is full, it is under More.' },
     { version: '3.9.0', notes: 'The Dashboard is in your sidebar from the start. Before your first project it asks you to add one; it talks about fixing a numbers feed only once a feed has sent a number. Nothing you hold changes.' },
     { version: '3.8.2', notes: 'A project\'s services are headed Services.' },

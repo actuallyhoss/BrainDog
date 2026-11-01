@@ -510,7 +510,7 @@
   const kpis = $derived(block.kind === KPIS_KIND ? kpisIn(block as { kpis?: unknown }) : []);
   const glyph = $derived(headIcon(block.kind, block.icon, isGlyph));
   /* A BLOCK MAY SAY A HEAD COUNT OF ITS OWN (`counted`): Today's Needs you counts an agent's question with its rows. */
-  const count = $derived(headCount({ kind: block.kind, total: (block as { counted?: number }).counted ?? block.total, refused: !!drawn.refusal || block.cannot !== undefined, key: typeof block.key === 'string' ? block.key : undefined }));
+  const counted = $derived((block as { counted?: number }).counted ?? block.total);
 
   /* HOME'S OWN LIST, where Home drew the block as one (`home/home-rows.ts`): what is late as one list, what comes up by
      day. THE HEADING'S WELL IS NEUTRAL on every tile: a heading names a group, and a group is not late or good;
@@ -715,6 +715,12 @@
       return { card: { ...c, late: lates.get(c.seq) ?? said?.late ?? 0, worked: c.told ? (c.worked ?? null) : (said?.worked ?? null), last: c.told ? (c.last ?? null) : (lasts.get(c.seq) ?? null), moved: moved.get(c.seq) ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
     });
   });
+  /* AND PROJECT CARDS ON A BOARD, which wear the tile's heading there: a one-row frame shows one card, and the count says
+     how many it holds. */
+  const count = $derived(
+    headCount({ kind: block.kind, total: counted, refused: !!drawn.refusal || block.cannot !== undefined, key: typeof block.key === 'string' ? block.key : undefined }) ??
+      (widget !== null && projectCards && Number.isInteger(counted) && counted > 0 ? counted : null),
+  );
   /* THE PROJECTS PAGE'S BOARD (`ProjectsBoard.svelte`): a cards block over the projects list keyed `board` is drawn as
      the one board, its headline, its money, its week, its list and its parked, in place of a grid of cards. */
   const board = $derived(block.key === 'board' && projectCards !== null && !arranging ? (block.register ?? null) : null);
@@ -824,7 +830,9 @@
        heading list. While arranging it shows, since that is the label a block is moved by. -->
   <!-- A PART THAT DRAWS ITS OWN TITLED TILE (the desk's, the projects' cards, a project's parts) names the region here and
        is not a second heading: a screen reader heard a hidden "Late 7" beside the tile's "Late and urgent 6" (audit Q11). -->
-  {@const titled = !arranging && ((projectCards && (lanes.length > 1 || board)) || desk !== null || parts !== null)}
+  <!-- ON A BOARD, PROJECT CARDS WEAR THE TILE'S HEADING (1 Nov): their lane bar is no name, and a one-row frame hides it,
+       so Maya's "Projects in play" stood with no heading at all. The lanes stay under it where the frame has room. -->
+  {@const titled = !arranging && ((projectCards && (board || (lanes.length > 1 && widget === null))) || desk !== null || parts !== null)}
   <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || titled ? '' : undefined}>
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket

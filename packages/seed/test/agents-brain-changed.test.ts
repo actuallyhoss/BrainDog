@@ -57,7 +57,7 @@ const AS = { actor: 'p_seed' };
 
 test('THE PAGE IS DECLARED: How the brain changed, with no place in the rail, and every block has a key', async () => {
   assert.ok(PAGE, 'the add-on holds no page `brain`');
-  assert.equal(PAGE.title, 'How the brain changed');
+  assert.equal(PAGE.title, 'What changed');
   assert.equal(PAGE.nav, undefined, 'the page takes a place of its own in the rail');
   assert.equal(PAGE.for, undefined, 'it is one page, not one a learning');
   assert.deepEqual(PAGE.requires, ['register.learnings']);
@@ -78,7 +78,7 @@ test('THE AGENTS PAGE LINKS TO IT FROM ITS FOOT, first of the doors and always d
   const blocks = AGENTS_PAGES.agents!.blocks as Declared[];
   const link = blocks.find((b) => b.kind === 'note' && String(b.body).includes('(/p/brain)'));
   assert.ok(link, 'nothing on the Agents page opens the page');
-  assert.ok(String(link.body).startsWith('[How the brain changed](/p/brain)'), 'How the brain changed is not the first door');
+  assert.ok(String(link.body).startsWith('[What changed](/p/brain)'), 'What changed is not the first door');
   assert.equal(link.key, 'brain-link');
   assert.equal(link.when, undefined, 'the link is drawn only some of the time');
   /* NOTHING FOLDS IT AWAY: no section after it, and none of the page's sections is a fold. */
@@ -135,7 +135,7 @@ test('ON A FRESH RECORD IT INSTALLS CLEAN, and draws its line and no empty chart
   const { k, sql } = await fresh();
   const page = k.pages().find((p) => p.slug === 'brain');
   assert.ok(page, k.pages().map((p) => p.slug).join(', '));
-  assert.equal(page.title, 'How the brain changed');
+  assert.equal(page.title, 'What changed');
   const blocks = opened(k);
   for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.key}: ${JSON.stringify(b.refusals)}`);
   assert.deepEqual(blocks.map((b) => b.key), PAGE.blocks.map((b) => b.key), 'a block answers under another key');
