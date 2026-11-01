@@ -120,7 +120,7 @@
           <ul class="kv">
             {#each b.earning.lines as l (l.name)}
               <li>
-                <a class="kv-k" href={at(l.href)}><span class="sw" style={slotStyle(l.hue)}></span><span class="kv-name" dir="auto">{l.name}</span>{#if l.status}<span class="small" data-warn={l.warn ? '' : undefined}>· {l.status}</span>{/if}</a>
+                <a class="kv-k" href={at(l.href)}><span class="sw" style={slotStyle(l.hue)}></span><span class="kv-name" dir="auto">{l.name}</span>{#if l.status}<span class="small kv-status" data-warn={l.warn ? '' : undefined}>{l.status}</span>{/if}</a>
                 <span class="kv-v num">{l.said}</span>
               </li>
             {/each}
@@ -469,15 +469,26 @@
     border-block-start: 0;
   }
 
+  /* THE STATUS HANGS ITS DOT IN THE GAP (skills pass 2 Nov): where it fits beside the name the dot sits between them, and
+     where it wraps under the name the dot falls outside the row's edge and is clipped, so no line starts "· repeats". */
   .kv-k {
     display: flex;
     flex: 1;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0 6px;
+    gap: 0 12px;
     min-inline-size: 0;
+    overflow-x: clip;
     color: inherit;
     text-decoration: none;
+  }
+
+  .kv-status::before {
+    content: '·';
+    display: inline-block;
+    inline-size: 6px;
+    margin-inline: -9px 3px;
+    text-align: center;
   }
 
   .kv-k:hover .kv-name {

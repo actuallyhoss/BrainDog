@@ -456,7 +456,7 @@ export function sideOf(f: FactsIn, numbers: Numbers): SideTile {
     return {
       kind: 'keep',
       about: f.about,
-      lines: kept.slice(0, 4).map((s) => ({ k: `${s.name}${s.provider ? ` · ${s.provider}` : ''}`, v: s.renews ? renewal(s.renews, f.today)!.said : s.cost ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}` : '', href: s.href })),
+      lines: kept.slice(0, 4).map((s) => ({ k: `${s.name}${s.provider && !sameName(s.provider, s.name) ? ` · ${s.provider}` : ''}`, v: s.renews ? renewal(s.renews, f.today)!.said : s.cost ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}` : '', href: s.href })),
       year: year && year.minor > 0 ? `${f.format(year.minor, year.currency)} a year to keep` : kept.length === 0 ? 'Nothing it runs on is still paid for.' : null,
       domain,
     };
@@ -521,6 +521,12 @@ export function datesOf(f: FactsIn, most = 6): DateLine[] {
 
 export type RunsOnLine = { name: string; sub: string; right: string; tone: 'bad' | 'warn' | 'good' | 'plain'; href: string | null };
 
+/** Whether a provider only says the service's name again: "GitHub" for GitHub, "Amazon" for "Amazon Web Services" is not. */
+const sameName = (provider: string | null | undefined, name: string): boolean => {
+  const p = (provider ?? '').trim().toLowerCase();
+  return p !== '' && p === name.trim().toLowerCase();
+};
+
 export function runsOnOf(f: Pick<FactsIn, 'today' | 'format'> & { services: readonly FactService[] }, numbers: Numbers): RunsOnLine[] {
   const lines: RunsOnLine[] = f.services
     .filter(live)
@@ -530,7 +536,9 @@ export function runsOnOf(f: Pick<FactsIn, 'today' | 'format'> & { services: read
       const when = renewal(s.renews, f.today);
       return {
         name: s.name,
-        sub: [s.provider || s.kind, s.cost && s.cost.minor > 0 ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}`.trim() : ''].filter(Boolean).join(' · '),
+        /* THE PROVIDER ONCE (skills pass 2 Nov): "GitHub" over "GitHub · $40 monthly" and "Stripe" over "Stripe" said the
+           name twice; a provider that is the name is left for the name to say. */
+        sub: [sameName(s.provider, s.name) ? '' : s.provider || s.kind, s.cost && s.cost.minor > 0 ? `${f.format(s.cost.minor, s.cost.currency)} ${s.cycle}`.trim() : ''].filter(Boolean).join(' · '),
         right: when?.said ?? '',
         tone: when?.gone ? 'bad' : soon ? 'warn' : 'plain',
         href: s.href,
