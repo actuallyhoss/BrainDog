@@ -1,10 +1,10 @@
 {
   "pack": "debts",
-  "version": "2.1.0",
-  "icon": "credit-card",
+  "version": "2.1.1",
+  "icon": "trending-down",
   "title": "Debts",
   "summary": "List what you are paying off, with its balance, yearly rate and minimum, and see how long the avalanche and the snowball each take to clear it, with an extra amount a month, and how much interest each saves.",
-  "changes": "What is left on your debts is one figure, so net worth takes it away; a debt on an account that counts as cash is already in that account's balance, so it is left out of it.",
+  "changes": "Wears its own glyph in the store, a line going down, where it shared the card with Card alerts.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

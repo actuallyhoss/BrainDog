@@ -1239,8 +1239,42 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.1.0",
+      "latest": "2.1.1",
       "versions": [
+        {
+          "version": "2.1.1",
+          "checksum": "b9fd248cd73b29ff1adffed56f53ec4d7a5efb52e880270d4c9b0dfa1eb1f33f",
+          "bytes": 20546,
+          "published_at": "2026-11-01T01:28:58.360Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Debts",
+              "Payoff plans"
+            ],
+            "pages": [
+              "Debts"
+            ],
+            "rules": [
+              "Work out the plans when a debt changes",
+              "Work out the plans when the extra changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Wears its own glyph in the store, a line going down, where it shared the card with Card alerts.",
+          "preview": true
+        },
         {
           "version": "2.1.0",
           "checksum": "d157ec257bff0ff8323f6226113701253cf6516663ca3ef38f9c932de83744ec",
@@ -1365,7 +1399,7 @@
         "name": "BrainDog"
       },
       "shelf": "money",
-      "icon": "credit-card"
+      "icon": "trending-down"
     },
     {
       "kind": "pack",
@@ -7095,8 +7129,58 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "0d43148073552840018439b5f8b1ef2b550bdaa1d84cc574830216bbb8e1999e",
+          "bytes": 21472,
+          "published_at": "2026-11-01T01:28:58.360Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Tax set aside"
+            ],
+            "rules": [
+              "Work out the tax to set aside on a Ledger line",
+              "Work this year's lines out again when a category's tax rate changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Tax set aside"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": true
+              },
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.balances",
+                "writes": false
+              },
+              {
+                "id": "register.obligations",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Wears its own glyph in the store, a percent, where it shared the piggy bank with Savings circle.",
+          "preview": true
+        },
         {
           "version": "1.2.0",
           "checksum": "8f98c9863219f6549a578eaf103d773201c095fee4e7265ede59e9de4ded49f2",
@@ -7214,7 +7298,7 @@
         "name": "BrainDog"
       },
       "shelf": "money",
-      "icon": "piggy-bank"
+      "icon": "percent"
     },
     {
       "kind": "pack",

@@ -1,10 +1,10 @@
 {
   "pack": "tax-set-aside",
-  "version": "1.2.0",
-  "icon": "piggy-bank",
+  "version": "1.2.1",
+  "icon": "percent",
   "title": "Tax set aside",
   "summary": "For freelancers and a small business: give a category of money in a tax rate, and every payment in it says what to put aside. See this year's set aside, what you paid the tax office, what your tax account holds against it, and the tax bills still to pay.",
-  "changes": "Says how to give a category its rate, and shows the tax account only once you have one. It says what an account named for tax holds against the tax bills, before one is marked as holding the tax money.",
+  "changes": "Wears its own glyph in the store, a percent, where it shared the piggy bank with Savings circle.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {

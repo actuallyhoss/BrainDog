@@ -1,0 +1,424 @@
+{
+  "pack": "debts",
+  "version": "2.1.1",
+  "icon": "trending-down",
+  "title": "Debts",
+  "summary": "List what you are paying off, with its balance, yearly rate and minimum, and see how long the avalanche and the snowball each take to clear it, with an extra amount a month, and how much interest each saves.",
+  "changes": "Wears its own glyph in the store, a line going down, where it shared the card with Card alerts.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.0.0 <4.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "debts",
+      "name": "Debts",
+      "one": "debt",
+      "icon": "credit-card",
+      "holds": "something being paid off: what is left on it, its yearly rate and the least that must be paid on it each month",
+      "title": "name",
+      "mobile": [
+        "name",
+        "left",
+        "apr"
+      ],
+      "fields": [
+        {
+          "id": "name",
+          "label": "Name",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "left",
+          "label": "Balance left",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "apr",
+          "label": "Yearly rate %",
+          "type": "decimal",
+          "min": 0,
+          "max": 1000
+        },
+        {
+          "id": "minimum",
+          "label": "Minimum each month",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "account",
+          "label": "Account",
+          "type": "ref",
+          "to": "accounts",
+          "index": true
+        },
+        {
+          "id": "in_cash",
+          "label": "Its account counts as cash",
+          "type": "bool",
+          "derive": {
+            "via": {
+              "ref": "account",
+              "field": "liquid"
+            }
+          }
+        },
+        {
+          "id": "note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "register": "payoff_plans",
+      "name": "Payoff plans",
+      "one": "plan",
+      "icon": "chart-line",
+      "holds": "one way of paying the debts off, avalanche or snowball, with the extra paid each month and what it works out to",
+      "title": "how",
+      "mobile": [
+        "how",
+        "takes",
+        "saved"
+      ],
+      "fields": [
+        {
+          "id": "how",
+          "label": "Way",
+          "type": "enum",
+          "values": [
+            "avalanche",
+            "snowball"
+          ],
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "extra",
+          "label": "Extra each month",
+          "type": "money"
+        },
+        {
+          "id": "used",
+          "label": "Worked with",
+          "type": "money"
+        },
+        {
+          "id": "takes",
+          "label": "Debt-free in",
+          "type": "text"
+        },
+        {
+          "id": "mos",
+          "label": "Months",
+          "type": "int"
+        },
+        {
+          "id": "debt_free",
+          "label": "Debt-free on",
+          "type": "day"
+        },
+        {
+          "id": "interest",
+          "label": "Interest paid",
+          "type": "money"
+        },
+        {
+          "id": "minimum_interest",
+          "label": "Interest at the minimums",
+          "type": "money"
+        },
+        {
+          "id": "saved",
+          "label": "Interest saved",
+          "type": "money"
+        },
+        {
+          "id": "sooner",
+          "label": "Months sooner",
+          "type": "int"
+        },
+        {
+          "id": "order",
+          "label": "Paid off in this order",
+          "type": "text"
+        },
+        {
+          "id": "said",
+          "label": "What happened",
+          "type": "text"
+        },
+        {
+          "id": "worked_at",
+          "label": "Worked out",
+          "type": "instant"
+        }
+      ]
+    },
+    {
+      "rule": "work_out_debts",
+      "name": "Work out the plans when a debt changes",
+      "on": {
+        "written": {
+          "register": "debts",
+          "op": [
+            "create",
+            "update",
+            "delete"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "payoff",
+            "as": "queued"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "work_out_extra",
+      "name": "Work out the plans when the extra changes",
+      "on": {
+        "written": {
+          "register": "payoff_plans",
+          "op": [
+            "update"
+          ],
+          "fields": [
+            "extra"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "payoff",
+            "as": "queued"
+          }
+        }
+      ]
+    },
+    {
+      "script": "payoff",
+      "title": "Pay the debts off",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "debts",
+        "payoff_plans"
+      ],
+      "writes": [
+        "payoff_plans"
+      ],
+      "source": "/**\n * Pay the debts off: how long it takes to be debt-free by the avalanche and by the snowball, with an extra amount a\n * month, and how much interest each saves against paying only the minimums.\n *\n * STARTED BY THE PACK'S AUTOMATION when a debt is written, or when the extra on a plan is changed. It reads every debt\n * that still has a balance and writes the answer on two plans, one for each way, creating them the first time.\n *\n * THE TWO WAYS. Both pay every minimum each month and put everything else on one debt: the extra, and the minimums of\n * the debts already paid off. The avalanche puts it on the debt with the highest yearly rate first, which costs the\n * least interest. The snowball puts it on the smallest balance first, which clears a debt soonest.\n *\n * THE BASELINE is paying the minimums and nothing more, each debt on its own, with nothing passed on when one is\n * paid. What a plan saves is the interest of that less the interest of the plan, and how many months sooner it ends.\n *\n * ONE EXTRA FOR BOTH. A person types the extra on either plan. The one that differs from what the plans were last\n * worked with is taken, the newest edit when both differ, and both plans are worked with it.\n *\n * ONE CURRENCY. Two currencies are never added, so the plan is worked in the currency of the extra when it is set, and\n * otherwise in the currency holding the most debts. A debt in another currency is left out and the plan says so.\n *\n * WHAT IT WILL NOT GUESS. Interest is a twelfth of the yearly rate on the balance each month, rounded to the smallest\n * unit. A debt whose minimum does not cover its interest never ends, and the plan says which one rather than showing\n * a date. A plan that runs past 100 years is called never.\n */\n\nconst PLANS = 'payoff_plans';\nconst DEBTS = 'debts';\nconst METHODS = ['avalanche', 'snowball'];\nconst LIMIT = 1200;\n\nconst isMoney = (m) => m !== null && typeof m === 'object' && typeof m.amount === 'number' && typeof m.currency === 'string';\n\n/** The months as a sentence: 1 month, 8 months, 2 years 5 months. */\nfunction span(months) {\n  const years = Math.floor(months / 12);\n  const rest = months % 12;\n  const y = years === 0 ? '' : `${years} ${years === 1 ? 'year' : 'years'}`;\n  const m = rest === 0 ? '' : `${rest} ${rest === 1 ? 'month' : 'months'}`;\n  return [y, m].filter((s) => s !== '').join(' ');\n}\n\n/** The day `months` months on from `today`, keeping the day of the month or the last day of a shorter one. */\nfunction after(today, months) {\n  const [y, m, d] = today.split('-').map(Number);\n  const first = Date.UTC(y, m - 1 + months, 1);\n  const last = new Date(Date.UTC(y, m + months, 0)).getUTCDate();\n  return new Date(first + (Math.min(d, last) - 1) * 86_400_000).toISOString().slice(0, 10);\n}\n\n/**\n * Month by month until nothing is left. `order` is the debts in the order the spare money goes to them, `pass` whether\n * a paid-off minimum is passed on. Returns the months it took (null when it never ends), the interest paid, and the\n * month each debt ended.\n */\nfunction simulate(debts, extra, order, pass) {\n  const left = new Map(debts.map((d) => [d.id, d.balance]));\n  const ended = new Map();\n  const budget = debts.reduce((sum, d) => sum + d.minimum, 0) + extra;\n  let interest = 0;\n  for (let month = 1; month <= LIMIT; month++) {\n    for (const d of debts) {\n      const owing = left.get(d.id);\n      if (owing === 0) continue;\n      const add = Math.round((owing * d.apr) / 1200);\n      left.set(d.id, owing + add);\n      interest += add;\n    }\n    let pool = pass ? budget : 0;\n    for (const d of debts) {\n      const owing = left.get(d.id);\n      if (owing === 0) continue;\n      const pay = Math.min(d.minimum, owing);\n      left.set(d.id, owing - pay);\n      pool -= pass ? pay : 0;\n    }\n    for (const d of order) {\n      if (!pass) break;\n      const owing = left.get(d.id);\n      if (owing === 0 || pool <= 0) continue;\n      const pay = Math.min(pool, owing);\n      left.set(d.id, owing - pay);\n      pool -= pay;\n    }\n    for (const d of debts) if (left.get(d.id) === 0 && !ended.has(d.id)) ended.set(d.id, month);\n    if (debts.every((d) => left.get(d.id) === 0)) return { months: month, interest, ended };\n  }\n  return { months: null, interest, ended };\n}\n\n/** The debts in the order the spare money goes to them. */\nconst ordered = (debts, method) =>\n  [...debts].sort((a, b) =>\n    method === 'avalanche' ? b.apr - a.apr || a.balance - b.balance : a.balance - b.balance || b.apr - a.apr,\n  );\n\nconst same = (a, b) => isMoney(a) && isMoney(b) && a.amount === b.amount && a.currency === b.currency;\n\n/**\n * Every row of a list that `where` lets through. A script's list is one page of fifty, in the list's own order and with\n * no cursor, so the rows are asked for by number instead: the top number is found by asking above the highest seen,\n * then (0, top] is cut in halves until each half comes back short. At most 60 reads; `short` says some were left.\n */\nasync function every(ctx, register, where) {\n  const PAGE = 50;\n  const READS = 60;\n  let reads = 0;\n  const ask = (above, upto) => {\n    reads += 1;\n    const parts = [...(where ? [where] : []), ...(above > 0 ? [{ field: 'seq', gt: above }] : []), ...(upto === null ? [] : [{ field: 'seq', lte: upto }])];\n    return parts.length === 0 ? ctx.record.list(register) : ctx.record.list(register, parts.length === 1 ? parts[0] : { all: parts });\n  };\n  const first = await ask(0, null);\n  if (first.length < PAGE) return first;\n  const seen = new Map(first.map((r) => [r.id, r]));\n  let top = Math.max(...first.map((r) => r.seq));\n  for (;;) {\n    if (reads >= READS) break;\n    const above = await ask(top, null);\n    for (const r of above) seen.set(r.id, r);\n    if (above.length < PAGE) break;\n    top = Math.max(...above.map((r) => r.seq));\n  }\n  const spans = [[0, top]];\n  let short = false;\n  while (spans.length > 0) {\n    if (reads >= READS) {\n      short = true;\n      break;\n    }\n    const [a, b] = spans.pop();\n    const page = await ask(a, b);\n    for (const r of page) seen.set(r.id, r);\n    if (page.length >= PAGE && b - a > 1) {\n      const mid = Math.floor((a + b) / 2);\n      spans.push([a, mid], [mid, b]);\n    }\n  }\n  const rows = [...seen.values()];\n  rows.short = short;\n  return rows;\n}\n\nexport default async function run(ctx) {\n  const rows = await every(ctx, DEBTS, { field: 'left', present: true });\n  const plans = await every(ctx, PLANS, { field: 'how', present: true });\n  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);\n\n  /* THE EXTRA: the plan whose extra differs from what it was last worked with, the newest edit when both do. */\n  const edited = plans\n    .filter((p) => isMoney(p.fields.extra) && !same(p.fields.extra, p.fields.used))\n    .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];\n  const known = plans.find((p) => isMoney(p.fields.extra));\n  const set = edited ? edited.fields.extra : known ? known.fields.extra : null;\n\n  const open = rows.filter((r) => isMoney(r.fields.left) && r.fields.left.amount > 0);\n  if (open.length === 0 && plans.length === 0) {\n    ctx.log('There are no debts with a balance, so no plan was made.');\n    return;\n  }\n\n  /* THE CURRENCY: the extra's, or the one holding the most debts. */\n  const counts = new Map();\n  for (const r of open) counts.set(r.fields.left.currency, (counts.get(r.fields.left.currency) ?? 0) + 1);\n  const currency = set ? set.currency : [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;\n  const extra = set ? set.amount : 0;\n  const worked = open.filter((r) => r.fields.left.currency === currency);\n  const left = open.length - worked.length;\n\n  const debts = worked.map((r) => {\n    const min = isMoney(r.fields.minimum) && r.fields.minimum.currency === currency ? r.fields.minimum.amount : 0;\n    return {\n      id: r.id,\n      name: String(r.fields.name),\n      balance: r.fields.left.amount,\n      minimum: Math.max(0, min),\n      apr: Number(r.fields.apr ?? 0) || 0,\n    };\n  });\n\n  const stuck = debts.filter((d) => d.minimum <= Math.round((d.balance * d.apr) / 1200) && d.minimum < d.balance);\n  const base = debts.length === 0 ? null : simulate(debts, 0, debts, false);\n  const none = debts.length > 0 && debts.every((d) => d.minimum === 0) && extra === 0;\n\n  for (const method of METHODS) {\n    const order = ordered(debts, method);\n    const plan = debts.length === 0 ? null : simulate(debts, extra, order, true);\n    const money = (n) => (currency === null || n === null ? null : { amount: n, currency });\n    const ok = plan !== null && plan.months !== null;\n    const said = [];\n    if (debts.length === 0) said.push('There are no debts with a balance to pay off.');\n    if (none) said.push('No debt has a minimum and there is no extra, so nothing is paid.');\n    if (!ok && debts.length > 0 && !none) {\n      const names = stuck.map((d) => d.name);\n      said.push(names.length > 0 ? `The minimum on ${names.join(', ')} does not cover its interest, so it does not end. Add an extra or raise the minimum.` : 'This does not end within 100 years.');\n    }\n    if (ok && (base === null || base.months === null)) said.push('Paying only the minimums never ends, so there is nothing to compare with.');\n    if (left > 0) said.push(`${left} ${left === 1 ? 'debt' : 'debts'} in another currency than ${currency} ${left === 1 ? 'was' : 'were'} left out.`);\n\n    const comparable = ok && base !== null && base.months !== null;\n    const patch = {\n      how: method,\n      used: currency === null ? null : { amount: extra, currency },\n      mos: ok ? plan.months : null,\n      takes: ok ? span(plan.months) : null,\n      debt_free: ok ? after(today, plan.months) : null,\n      interest: ok ? money(plan.interest) : null,\n      minimum_interest: comparable ? money(base.interest) : null,\n      saved: comparable ? money(base.interest - plan.interest) : null,\n      sooner: comparable ? base.months - plan.months : null,\n      order: ok ? order.map((d) => `${d.name} (${span(plan.ended.get(d.id))})`).join(', then ') : null,\n      said: said.join(' '),\n      worked_at: ctx.now(),\n    };\n\n    const mine = plans.find((p) => p.fields.how === method);\n    if (currency !== null && !(mine && same(mine.fields.extra, patch.used))) patch.extra = patch.used;\n    if (mine) ctx.update(`${PLANS}#${mine.seq}`, patch, mine.version);\n    else ctx.write(PLANS, patch);\n  }\n}\n"
+    },
+    {
+      "metric": "debts-left",
+      "name": "Left on your debts",
+      "source": "register.debts",
+      "where": "left is set, in_cash is not true",
+      "value": {
+        "sum": "left"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "debts",
+      "title": "Debts",
+      "nav": {
+        "section": "Money",
+        "order": 55
+      },
+      "icon": "credit-card",
+      "requires": [
+        "register.debts",
+        "register.payoff_plans"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "Two ways to clear your debts."
+        },
+        {
+          "kind": "cards",
+          "heading": "Payoff plans",
+          "span": 12,
+          "source": "register.payoff_plans",
+          "columns": [
+            {
+              "field": "how",
+              "label": "Way",
+              "as": "title"
+            },
+            {
+              "field": "takes",
+              "label": "Debt-free in",
+              "as": "figure"
+            },
+            {
+              "field": "debt_free",
+              "label": "Debt-free on",
+              "as": "when"
+            },
+            {
+              "field": "saved",
+              "label": "Interest saved",
+              "as": "fact"
+            },
+            {
+              "field": "order",
+              "label": "Paid off in this order",
+              "as": "fact"
+            },
+            {
+              "field": "said",
+              "label": "What happened",
+              "as": "fact"
+            }
+          ],
+          "order": [
+            {
+              "field": "how",
+              "dir": "asc"
+            }
+          ],
+          "limit": 2,
+          "empty": "No debts yet."
+        },
+        {
+          "kind": "table",
+          "heading": "The two compared",
+          "span": 12,
+          "source": "register.payoff_plans",
+          "columns": [
+            {
+              "field": "how",
+              "label": "Way",
+              "width": "14ch"
+            },
+            {
+              "field": "extra",
+              "label": "Extra each month",
+              "width": "18ch",
+              "align": "end"
+            },
+            {
+              "field": "takes",
+              "label": "Debt-free in",
+              "width": "16ch"
+            },
+            {
+              "field": "interest",
+              "label": "Interest paid",
+              "width": "16ch",
+              "align": "end"
+            },
+            {
+              "field": "minimum_interest",
+              "label": "Interest at the minimums",
+              "width": "20ch",
+              "align": "end"
+            },
+            {
+              "field": "saved",
+              "label": "Interest saved",
+              "width": "16ch",
+              "align": "end"
+            },
+            {
+              "field": "sooner",
+              "label": "Months sooner",
+              "width": "14ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "how",
+              "dir": "asc"
+            }
+          ],
+          "limit": 2,
+          "empty": "Nothing to compare yet."
+        },
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Avalanche: highest rate first, least interest. Snowball: smallest balance first."
+        },
+        {
+          "kind": "table",
+          "heading": "What you are paying off",
+          "span": 12,
+          "source": "register.debts",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Debt",
+              "width": "minmax(16ch,2fr)"
+            },
+            {
+              "field": "left",
+              "label": "Balance left",
+              "width": "16ch",
+              "align": "end"
+            },
+            {
+              "field": "apr",
+              "label": "Yearly rate %",
+              "width": "14ch",
+              "align": "end"
+            },
+            {
+              "field": "minimum",
+              "label": "Minimum each month",
+              "width": "18ch",
+              "align": "end"
+            },
+            {
+              "field": "account",
+              "label": "Account",
+              "width": "minmax(14ch,1fr)"
+            }
+          ],
+          "order": [
+            {
+              "field": "left",
+              "dir": "desc"
+            }
+          ],
+          "limit": 50,
+          "empty": "No debts yet."
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a debt",
+          "icon": "plus",
+          "span": 12,
+          "register": "debts"
+        }
+      ]
+    }
+  ]
+}
