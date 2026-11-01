@@ -27,7 +27,7 @@
 </script>
 
 {#if summaries !== null}
-  <Tile icon="bell" title={words.all}>
+  <Tile icon="history" title={words.all}>
     {#if summaries.length === 0}
       <p class="said">{words.offer}</p>
       <div class="foot"><Button href={offerHref}>{words.getIt}</Button></div>

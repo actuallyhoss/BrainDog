@@ -166,20 +166,18 @@
   its own, which is this person's (`notify.muted`), not the record's. The last switch is Web Push for this device,
   which is kept by the browser and the record, not a preference over what interrupts.
 -->
+<!-- THE RULES THAT TELL YOU ARE AUTOMATIONS': one row to them, where each rule's own page turns its notices off for
+     you. A row under what interrupts (G6), where it stood as a tile with no heading, its line in the heading's place. -->
+{#snippet toRules()}<Button weight="quiet" href="/automations">{words.openRules}</Button>{/snippet}
 <Tile icon="bell" title={copy.whenWeInterrupt}>
   <p class="said-once">{words.interrupts}</p>
+  <StateRow icon="refresh" title={words.tellers} line={words.tellersWhere} action={toRules} />
 </Tile>
 
 <!-- THE SUMMARY THE SENTENCE ABOVE PROMISES: which ones this record sends, each opening its screen, or the add-on that
      sends the two a day. -->
 <SummariesTile />
 
-<!-- THE RULES THAT TELL YOU ARE AUTOMATIONS': one row to them, where each rule's own page turns its notices off for
-     you. Listing them here read every rule, one by one, before the screen settled. -->
-{#snippet toRules()}<Button weight="quiet" href="/automations">{words.openRules}</Button>{/snippet}
-<Tile>
-  <StateRow icon="refresh" title={words.tellers} line={words.tellersWhere} action={toRules} />
-</Tile>
 
 <Tile icon="moon" title={copy.quietHours}>
   {#if held.state === 'waiting' || ((held.state === 'refused' || held.state === 'offline') && answered === null)}
