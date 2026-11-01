@@ -363,7 +363,7 @@
    */
   const signsAt = $derived(shell.pages.includes('health') ? '/p/health' : area === undefined ? null : '/settings');
 
-  const health = $derived(SAID_ON.has(area) ? healthSaid(copyLast, month, { faults, engine, signs, signsAt, backupsAt: '/settings/backups', inboxAt: owns ? '/inbox' : null }) : null);
+  const health = $derived(SAID_ON.has(area) ? healthSaid(copyLast, month, { faults, engine, signs, signsAt, backupsAt: '/settings/backups', inboxAt: owns ? '/inbox' : null, now: shell.now }) : null);
 
   /**
    * TRY AGAIN AND DETAILS, under the sentence while a fault is open. Try again queues the job behind the fault
@@ -715,6 +715,20 @@
     block-size: 1px;
     background: var(--rule);
     pointer-events: none;
+  }
+
+  /* A WHOLE-WIDTH GROUP (Your data) STANDS ITS ROWS TWO TO A LINE from 1100 (G2): five rows across 1100px put each
+     chevron 900px from its name. Two columns read like the four groups above it; the second row has no rule over it. */
+  @media (width >= 1100px) {
+    .settings-index :global(.block-slot[style*='--span: 12'] .list[data-kind='link']) {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--sp-6);
+    }
+
+    .settings-index :global(.block-slot[style*='--span: 12'] .list[data-kind='link'] > .item:nth-child(2)::before) {
+      display: none;
+    }
   }
 
   /* THE ONE IRREVERSIBLE ACT IS DATA'S LAST ROW, ITS NAME IN RED, at the rows' own rhythm: the 16 it stood apart

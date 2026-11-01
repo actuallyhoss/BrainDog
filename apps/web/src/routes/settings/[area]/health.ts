@@ -90,7 +90,25 @@ export type More = {
    * rather than the signs page saying the same line again. Absent, it links where the signs are.
    */
   inboxAt?: string | null;
+  /** The record's own now, so a backup that missed last night is said as last night's (G1). */
+  now?: number;
 };
+
+/**
+ * "The backup on 3 Sep did not run" AS "Last night's backup did not run" when the day it names is today or yesterday by
+ * the record's clock (G1): the dated line wrapped to two lines at 390, and the date was the one word a person had to
+ * work out. Any older day keeps its date, which is then the news.
+ */
+export function nightOf(said: string, now: number | undefined): string {
+  const m = /^The backup on (\d{1,2}) ([A-Z][a-z]{2}) did not run$/u.exec(said);
+  if (!m || now === undefined) return said;
+  const month = SHORT_MONTHS.indexOf(m[2]!);
+  for (const back of [0, 1]) {
+    const d = new Date(now - back * 86_400_000);
+    if (d.getUTCDate() === Number(m[1]) && d.getUTCMonth() === month) return "Last night's backup did not run";
+  }
+  return said;
+}
 
 /** The word of the link at the line's end when what needs a look is messages waiting: they open where they wait. */
 /** The word of the link when the newest exchange rate is old. */
@@ -210,7 +228,7 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
     const lead = more.signs?.find((x) => x.state === 'red' && typeof x.said === 'string' && x.said.trim() !== '');
     const headed = typeof lead?.to === 'string' && lead.to.startsWith('/') && typeof lead.name === 'string' && lead.name.trim() !== '';
     const raw = headed ? lead!.name : lead?.said;
-    const named = raw === undefined ? 'One check needs a look' : upper(plainSign(raw).replace(/[.!?]$/u, ''));
+    const named = raw === undefined ? 'One check needs a look' : nightOf(upper(plainSign(raw).replace(/[.!?]$/u, '')), more.now);
     const link =
       /* AN OLD RATE LINKS TO WHAT CURES IT: a feed that is paused to where scheduled actions start again, anything else to
          the switch that keeps rates current, in Money's settings. Both rate signs, by their ids: "How old is the newest
