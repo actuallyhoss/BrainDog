@@ -6,8 +6,8 @@
  * The questions in the examples, and every name and figure in an answer, are the made-up record's
  * (`demo/maya.ts`), so none is typed here.
  *
- * EVERY COUNT OF ASKS IS `PLAN_TABLE`'S, through `plans.ts`: early access has Free's 20. No plan name or price is
- * said here while BrainDog is in early access (20 October): one paragraph and no table.
+ * EVERY COUNT OF QUESTIONS IS `PLAN_TABLE`'S, through `plans.ts`: Free's 20. The unit is a question, never an "ask"
+ * (E17, his N1 of 1 November). No paid plan's price is said here: one paragraph and no table.
  *
  * TWO LINES CHECKED AGAINST THE PRODUCT (17 October). "In Settings under Agents": the model key is chosen in
  * `SlashModel`, drawn in the Agents area of Settings (`apps/web/src/routes/settings/[area]/areas/Agents.svelte`), and
@@ -44,7 +44,7 @@ export const slashPage = {
     title: 'Find',
     body: [
       "Press / and type a few letters, and everything that matches shows up at once: people, projects, invoices, notes, pages and your agents' work.",
-      'It also jumps to any page and runs actions. Finding is free and never spends an ask.',
+      'It also jumps to any page and runs actions. Finding is free and never spends a question.',
     ],
   },
   make: {
@@ -56,12 +56,12 @@ export const slashPage = {
     ],
   },
   tally: {
-    title: 'How asks are counted',
+    title: 'How questions are counted',
     say:
-      'Each question or change is one ask, however much reading it takes. Finding things, your brief and the work ' +
-      `Slash does in the background cost nothing. Early access includes ${FREE} asks a month, or no limit with your ` +
+      'Each question or change counts as one question, however much reading it takes. Finding things, your brief and the work ' +
+      `Slash does in the background cost nothing. Free includes ${FREE} Slash questions a month, or no limit with your ` +
       'own AI key.',
-    after: "When the month's asks run out, Slash says when they come back. Everything else keeps working.",
+    after: "When the month's questions run out, Slash says when they come back. Everything else keeps working.",
   },
   agents: {
     title: 'Slash and your AI tools',
@@ -71,7 +71,7 @@ export const slashPage = {
       ['Where', 'In BrainDog. Press ⌘J', 'In the apps you connect'],
       ['What it reads', 'Your BrainDog', 'What you allowed it'],
       ['What it writes', 'Changes you ask for, each with an undo', 'Notes and changes, each with an undo'],
-      ['Who pays', 'Your included asks, or your own key', "Your AI tool's own plan"],
+      ['Who pays', 'Your included questions, or your own key', "Your AI tool's own plan"],
     ],
   },
   faq: {
@@ -79,7 +79,7 @@ export const slashPage = {
     questions: [
       { q: 'Does Slash change things on its own?', a: 'No. It changes what you ask for, and every change has an undo.' },
       { q: 'Can it move money or delete things?', a: 'Not without you. Money, keys, sharing and deletes always wait for your yes.' },
-      { q: 'Can I use my own AI key?', a: 'Yes, in Settings under Agents. Asks on your own key have no monthly limit.' },
+      { q: 'Can I use my own AI key?', a: 'Yes, in Settings under Agents. Questions on your own key have no monthly limit.' },
       { q: 'Can I turn it off?', a: 'Yes. Set the monthly limit to zero and Slash stays quiet. Finding still works.' },
     ],
   },
@@ -101,7 +101,7 @@ export const slashDrawing = {
       empty: 'Ask or change anything',
       enter: 'to ask',
       think: 'Reading what you keep',
-      note: `One ask per question. Early access has ${FREE} a month.`,
+      note: `One question each time. Free has ${FREE} a month.`,
     },
     find: {
       tab: 'Find',
@@ -109,7 +109,7 @@ export const slashDrawing = {
       empty: 'Find a person, a project, a note',
       enter: 'to open',
       think: null,
-      note: 'Finding is free. It never spends an ask.',
+      note: 'Finding is free. It never spends a question.',
     },
     make: {
       tab: 'Make',
@@ -117,7 +117,7 @@ export const slashDrawing = {
       empty: 'Make a page, a list or a rule',
       enter: 'to draft',
       think: 'Drafting',
-      note: 'One ask per change. Each one has an undo.',
+      note: 'One question per change. Each one has an undo.',
     },
   },
   move: 'to move',

@@ -87,7 +87,7 @@ test('a part of a gigabyte is said in megabytes', async () => {
   const { pricing } = await import('../src/lib/copy/pricing.ts');
   const bytes = pricing.pricing.holds.rows.find((r) => r.key === 'bytes');
   assert.ok(bytes, 'the pricing table has no row for data fetched');
-  const of = (n: number) => ({ agents: 1, credits: 1, people: 1, allowance: { runs: 0, requests: 0, bytes: n, ms: 0 } });
+  const of = (n: number) => ({ agents: 1, credits: 1, people: 1, teams: false, allowance: { runs: 0, requests: 0, bytes: n, ms: 0 } });
   assert.equal(bytes.cell(of(100_000_000)), '100 MB');
   assert.equal(bytes.cell(of(5_000_000_000)), '5 GB');
 });

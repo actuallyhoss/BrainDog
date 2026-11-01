@@ -1,10 +1,10 @@
 # Terms of Service
 
-Last updated: 2026-10-31
+Last updated: 2026-11-01
 
 ## The short version
 
-- BrainDog is a hosted service at brain.dog. Free gives one person one record at no charge. Cloud and Cloud Plus are paid by the month, for each record.
+- BrainDog is a hosted service at brain.dog. Free gives one person one record at no charge. Cloud and Cloud Plus, paid by the month for each record, are coming soon and will be priced at launch.
 - What you put in your record is yours. We host it and run it for you, and we don't sell it or use it for ads.
 - You can export the whole record as one file at any time, even if a payment has failed.
 - Slash, the assistant, can be wrong. Nothing it writes goes into your record until a person accepts it.
@@ -43,7 +43,7 @@ BrainDog is only offered as a hosted service at brain.dog. These terms cover tha
 ## Records, owners and members
 
 - A record has at least one **owner**. The person who pays for a record is responsible for its bill.
-- You can invite as many people as you like to a record, with the level of access you choose. They don't cost extra.
+- On Cloud Plus, you can invite as many people as you like to a record, with the level of access you choose. They don't cost extra. Free and Cloud are for one person.
 - An owner decides who can reach the record and what they can do. You're responsible for the people you invite and for what they do in your record.
 - If a record holds information about other people, such as your clients or colleagues, you're responsible for having the right to keep it there. For a business, the [Data processing addendum](/legal/processing) says how we handle it for you.
 
@@ -104,14 +104,14 @@ If you find a security problem, please tell us at support@brain.dog before telli
 ## Plans and prices
 
 - **Free** costs nothing and needs no card. It is one record for one person, and each person can have one free record.
-- **Cloud** is US$12 a month for each record. **Cloud Plus** is US$29 a month for each record. You can move a free record to either from Settings.
-- Each plan includes a monthly amount of Slash credits, automation and script runs, requests to other services, data fetched and script time. The pricing page (brain.dog/pricing) lists them. People, pages, lists and history are never counted.
+- **Cloud** and **Cloud Plus** are monthly plans, for each record. They are coming soon and will be priced at launch: the pricing page (brain.dog/pricing) and these terms will show each price before anyone can buy them. Once they are on sale, you can move a free record to either from Settings.
+- Each plan includes a monthly amount of Slash questions, AI tools connected, automation and script runs, requests to other services, data fetched and script time. The pricing page (brain.dog/pricing) lists them. People, pages, lists and history are never counted.
 - Allowances reset on the first of each month (UTC). What you don't use doesn't carry over.
 - When you reach an allowance, work that needs more waits for the next month, and your record tells you what is waiting.
 
-**Slash credits.** One question or one draft uses one credit, however long Slash works on it. Slash's own daily check, your daily email and learning how to file things never use your credits.
+**Slash questions.** One question or one draft counts as one Slash question, however long Slash works on it. Slash's own daily check, your daily email and learning how to file things never count.
 
-Credits have no cash value, and can't be sold, transferred or moved to another record. We don't sell extra credits or extra usage today; if we start, these terms will say how before you can buy any.
+Unused questions have no cash value, and can't be sold, transferred or moved to another record. We don't sell extra questions or extra usage today; if we start, these terms will say how before you can buy any.
 
 ## Payment
 
@@ -119,7 +119,7 @@ Credits have no cash value, and can't be sold, transferred or moved to another r
 - Free is never billed, and there is no free trial of a paid plan.
 - Paid plans are billed monthly in advance, from the day you pay.
 - Prices are in US dollars and don't include tax. Where the law requires us to charge sales tax or VAT, we add it at checkout, and you see it before you pay.
-- You can change plan or cancel at any time from Settings, on Stripe's own page. A change of plan takes effect straight away, and Stripe works out the difference for the rest of the month: a bigger plan is charged for the days left, and a smaller one leaves a credit against your next payments. A cancellation takes effect at the end of the period you've paid for, and the record then becomes read-only (see below).
+- You can change plan or cancel at any time from Settings, on Stripe's own page. A change of plan takes effect straight away, and Stripe works out the difference for the rest of the month: a bigger plan is charged for the days left, and a smaller one leaves a credit against your next payments. A cancellation takes effect at the end of the period you've paid for. The record then goes back to Free if it fits Free (one person, and your only free record); otherwise it becomes read-only (see below).
 - We may change our prices. We'll tell you by email at least 30 days before a new price applies to you. If you don't agree, you can cancel before it does.
 - Refunds are covered in the next section.
 
@@ -133,7 +133,7 @@ Credits have no cash value, and can't be sold, transferred or moved to another r
 ## If a payment fails, or your plan ends
 
 - **Payment failed.** Your record keeps working while Stripe tries your card again. Update your card in Settings to fix it.
-- **Plan ended.** If the plan is cancelled, or a payment still hasn't gone through after Stripe's tries, the record becomes **read-only**. Its people and agents can still read it, and nothing new runs: no connectors, automations, scripts or Slash.
+- **Plan ended.** If the plan is cancelled and the record doesn't fit Free, or a payment still hasn't gone through after Stripe's tries, the record becomes **read-only**. Its people and agents can still read it, and nothing new runs: no connectors, automations, scripts or Slash.
 - **You can always export.** An owner can export the whole record at any time while it is read-only. We never hold your data back to make you pay.
 - **Before we delete it, we tell you.** We email the payer and every owner when the record becomes read-only, and again 60 days and 83 days later.
 - **After 90 days** of being read-only, the record is deleted, and we email you to say so. Paying again at any time before then brings it straight back.

@@ -86,7 +86,7 @@ const HELD: Record<string, Set<number>> = {
 function figuresNotHeld(text: string): string[] {
   const out: string[] = [];
   for (const m of text.matchAll(/\$\d[\d,]*(?:\.\d+)?/g)) if (!PRICES.has(m[0])) out.push(m[0]);
-  const meter = /(\d[\d,]*) (?:Slash credits|credits|questions|agents|AI tools|automation runs|runs)\b/g;
+  const meter = /(\d[\d,]*) (?:Slash credits|Slash questions|credits|questions|agents|AI tools|automation runs|runs)\b/g;
   for (const m of text.matchAll(meter)) {
     const key = /credits|questions/.test(m[0]) ? 'credits' : /agents|AI tools/.test(m[0]) ? 'agents' : 'runs';
     if (!HELD[key]!.has(Number(m[1]!.replace(/,/g, '')))) out.push(m[0]);
@@ -140,7 +140,7 @@ test('the figure check sees what it is meant to', () => {
   assert.deepEqual(figuresNotHeld('Cloud is $14 a month'), ['$14']);
   assert.deepEqual(figuresNotHeld('Connect up to 4 agents'), ['4 agents']);
   assert.deepEqual(figuresNotHeld('5 AI tools connected'), ['5 AI tools']);
-  assert.deepEqual(figuresNotHeld('30 questions to Slash a month'), ['30 questions']);
+  assert.deepEqual(figuresNotHeld('30 Slash questions a month'), ['30 Slash questions']);
   assert.deepEqual(figuresNotHeld('400 Slash credits and 60,000 runs a month'), ['60,000 runs']);
   assert.deepEqual(figuresNotHeld('$12 a month, $29 a month, $0.50 a GB, 100 credits for $5'), []);
   /* And it is reading the cards and the table: every plan's agents and runs are in what it read. */

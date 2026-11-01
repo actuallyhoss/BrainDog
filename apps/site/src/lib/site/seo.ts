@@ -66,7 +66,7 @@ export const website = {
 };
 
 /**
- * The app, with the offer the pricing page makes. While billing is off that is one: free in early access. The paid
+ * The app, with the offer the pricing page makes. While billing is off that is one: Free, at $0. The paid
  * plans join as offers the day `LAUNCH.billing` is on and the pricing page prices them.
  */
 export const application = {
@@ -87,7 +87,7 @@ export const application = {
         priceCurrency: 'USD',
         url: `${ORIGIN}/pricing`,
       }))
-    : [{ '@type': 'Offer', name: 'Early access', price: '0', priceCurrency: 'USD', url: `${ORIGIN}/pricing` }],
+    : [{ '@type': 'Offer', name: TABLE.free.name, price: '0', priceCurrency: 'USD', url: `${ORIGIN}/pricing` }],
 };
 
 /**

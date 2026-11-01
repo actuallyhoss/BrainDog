@@ -2,9 +2,9 @@
   import Seo from '$lib/site/Seo.svelte';
   import { application, faqOf } from '$lib/site/seo.ts';
   /**
-   * Pricing. WHILE BILLING IS OFF it is the one-plan early access page (20 October, `copy/pricing.ts` `early`):
-   * the night head, the early access card on the night with its $0 and what it holds, a paper tile that says paid
-   * plans come later, three questions, and no close. No paid plan's name or price is drawn.
+   * Pricing. WHILE BILLING IS OFF it is the early access page (20 October, `copy/pricing.ts` `early`): the night
+   * head, Free on the night with its $0 and what it holds, a paper tile naming Cloud and Cloud Plus as coming soon and
+   * priced at launch (his N2, 1 November), three questions, and no close. No paid plan's price is drawn.
    *
    * THE DAY `LAUNCH.billing` IS ON it is the plans page again: the three plans with Free first and black (§35), what
    * each plan holds, extra use and the questions people ask. Every figure is `TABLE`'s (`plans.ts`, held to
@@ -43,6 +43,11 @@
       <article class="later">
         <h2>{e.later.title}</h2>
         <p>{e.later.say}</p>
+        <ul class="soonplans">
+          {#each e.later.plans as plan (plan.name)}
+            <li><b>{plan.name}</b><span>{plan.line}</span><em>{plan.soon}</em></li>
+          {/each}
+        </ul>
       </article>
     </div>
 
@@ -199,6 +204,44 @@
     color: var(--ink2);
     font-size: var(--t-site-17);
     line-height: 1.55;
+  }
+
+  /* THE TWO PAID PLANS, named and unpriced: a hairline list on the paper, "Coming soon" plain on the right. */
+  .soonplans {
+    display: grid;
+    margin: 24px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .soonplans li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 16px;
+    row-gap: 2px;
+    padding-block: 14px;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .soonplans b {
+    font: 600 17px/1.3 var(--head);
+    letter-spacing: -0.02em;
+  }
+
+  .soonplans span {
+    grid-column: 1;
+    color: var(--ink2);
+    font-size: var(--t-site-15);
+    line-height: 1.45;
+  }
+
+  .soonplans em {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    font: 500 14px/1.2 var(--ui);
+    font-style: normal;
+    color: var(--muted);
   }
 
   .early .sec h2 {

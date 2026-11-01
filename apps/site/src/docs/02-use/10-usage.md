@@ -1,14 +1,15 @@
 # Usage and limits
 
-Your BrainDog includes a month of work: automation and script runs, requests to other services, data fetched, script time, and Slash asks. **Usage** shows where this month stands against each, and what happens when one runs out.
+Your BrainDog includes a month of work: automation and script runs, requests to other services, data fetched, script time, and Slash questions. **Usage** shows where this month stands against each, and what happens when one runs out.
 
 ## What a plan includes
 
-Each month, from the first of the month in UTC:
+Each month, from the first of the month in UTC. Cloud and Cloud Plus are monthly plans, coming soon and priced at launch; nothing you make on Free is lost or locked when they arrive.
 
 ```comparison | A month's allowance, for each BrainDog
 Meter | Free | Cloud | Cloud Plus
-Slash asks | 20 | 80 | 400
+Slash questions | 20 | 80 | 400
+AI tools connected | 3 | 15 | 75
 Runs of automations, scheduled actions and scripts | 1,000 | 15,000 | 75,000
 Requests to other services | 10,000 | 150,000 | 750,000
 Data fetched from other services | 100 MB | 1 GB | 5 GB
@@ -24,7 +25,7 @@ Open **Usage** from the foot of the sidebar, or with See usage in Settings, unde
 - **The plan and its meters**: each of the four against its allowance, with a thin bar and a sentence, and the one nearest its limit named.
 - **What ran**: runs, requests, data and time, by project, with each project's actions under it and the ones that belong to no project under Everywhere. A project's page links straight to its own slice.
 - **Runs by week**, as bars.
-- **Slash**: your asks this month against the limit, the background work's own allowance apart, and your asks by day, each with what it cost and a link to what it filed.
+- **Slash**: your questions this month against the limit, the background work's own allowance apart, and your questions by day, each with what it cost and a link to what it filed.
 - **Deliveries and arrivals**: notices BrainDog sent and things that reached its doors. They are counted here and never held by the monthly limit, because neither is work BrainDog chose to run.
 
 ## When a meter runs out
@@ -37,7 +38,7 @@ The month turns | Everything that waited runs again on its own | On the first of
 
 Nothing already in your BrainDog is touched while work waits. What you type still goes in, and what arrives at your doors is counted and never held by the limit, since neither is work BrainDog chose to run.
 
-When Slash's asks run out, Slash says when they reset and offers two ways on: use your own key from a model provider, which that provider bills and Slash does not limit, or open Settings to change the limit.
+When Slash's questions run out, Slash says when they reset and offers two ways on: use your own key from a model provider, which that provider bills and Slash does not limit, or open Settings to change the limit.
 
 ## Limits that hold everywhere
 

@@ -198,16 +198,36 @@ const NOT_YET = [
  * paid cards' word in their buttons' place. Each is allowed at its own path, as those exact words, and only while
  * `LAUNCH.billing` is false; anywhere else, in any other words, or with billing on, "coming soon" is refused as before.
  */
-const SOON = { 'site.pricing.extra.soon': 'Coming soon.', 'site.pricing.cards.soon': 'Coming soon' };
+const SOON = {
+  'site.pricing.extra.soon': 'Coming soon.',
+  'site.pricing.cards.soon': 'Coming soon',
+  /* HIS N2 (1 November): the early access page names Cloud and Cloud Plus, each "Coming soon", with no price. */
+  'site.pricing.early.later.plans.0.soon': 'Coming soon',
+  'site.pricing.early.later.plans.1.soon': 'Coming soon',
+};
 
-/** Whether a sentence at a path is one of the two allowed "coming soon"s, for a set of launch flags. */
-const soonAllowed = (at, text, launch = LAUNCH) => !launch.billing && Object.hasOwn(SOON, at) && SOON[at] === text;
+/**
+ * HIS OWN WORDS FOR THE PAID PLANS (N2, 1 November): "coming soon, priced at launch". Said of Cloud and Cloud Plus, it
+ * is a fact about a price nobody can pay yet, not a part of the product put off, so it passes both the "coming soon" and
+ * the "at launch" patterns while billing is off, wherever it stands. With billing on it is refused like any other.
+ */
+const PRICED_AT_LAUNCH = /\bcoming soon,? (and )?(will be )?priced at launch\b/i;
+const AT_LAUNCH = NOT_YET.find((p) => p.source.includes('launch\\b') && p.source.includes('at|after'));
+
+/** Whether a sentence at a path is one of the allowed "coming soon"s, for a set of launch flags. */
+const soonAllowed = (at, text, launch = LAUNCH) =>
+  !launch.billing && ((Object.hasOwn(SOON, at) && SOON[at] === text) || PRICED_AT_LAUNCH.test(text));
 
 /** Every sentence of `said` a NOT_YET pattern refuses, as `path: text`, for a set of launch flags. */
 const notYet = (said, launch = LAUNCH) =>
   NOT_YET.flatMap((pattern) =>
     said
-      .filter(([at, text]) => pattern.test(text) && !(pattern === COMING_SOON && soonAllowed(at, text, launch)))
+      .filter(
+        ([at, text]) =>
+          pattern.test(text) &&
+          !(pattern === COMING_SOON && soonAllowed(at, text, launch)) &&
+          !(pattern === AT_LAUNCH && !launch.billing && PRICED_AT_LAUNCH.test(text)),
+      )
       .map(([at, text]) => `${at}: ${text}`),
   );
 
@@ -226,6 +246,10 @@ test('"Coming soon" is said only where the owner asked for it, and only while bi
   assert.deepEqual(notYet([['site.pricing.extra.say', 'Packs are coming soon.']]), ['site.pricing.extra.say: Packs are coming soon.']);
   const on = { ...LAUNCH, billing: true };
   assert.deepEqual(notYet([['site.pricing.cards.soon', 'Coming soon']], on), ['site.pricing.cards.soon: Coming soon']);
+  /* HIS N2 PHRASE passes while billing is off and is refused once it is on; a launch put off in other words never passes. */
+  assert.deepEqual(notYet([['site.meta.pricing.description', 'Cloud is coming soon, priced at launch.']], { ...LAUNCH, billing: false }), []);
+  assert.ok(notYet([['site.meta.pricing.description', 'Cloud is coming soon, priced at launch.']], on).length > 0, 'the phrase passes with billing on');
+  assert.ok(notYet([['site.home.free.say', 'Teams arrive after launch.']], { ...LAUNCH, billing: false }).length > 0, 'another launch sentence passes');
   /* AND THE REST STILL HOLDS: open source is refused while the repository is private. */
   if (!LAUNCH.repo) assert.deepEqual(notYet([['site.pricing.extra.soon', 'BrainDog is open source.']]), ['site.pricing.extra.soon: BrainDog is open source.']);
 });

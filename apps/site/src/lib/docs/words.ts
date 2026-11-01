@@ -86,7 +86,7 @@ export const docsWords = {
       'Add-ons extend Money and the rest: subscriptions, splitting costs with friends, investments and gold (with a daily gold price), certificates, property, insurance, zakat, trips, debts and goals.',
       'Slash: press ⌘J anywhere to ask in plain words or ask for a change, with an undo.',
       `${APPS_AND} connect over MCP at https://app.brain.dog/mcp, approved once with OAuth. The command line sets up a machine with \`braindog setup\`.`,
-      'Early access is invite only and free, with every feature, 3 AI tools and 20 questions to Slash a month. Paid plans are not priced yet.',
+      'Free is $0, with every feature, 3 AI tools and 20 Slash questions a month; sign-up is by invite for now. Cloud and Cloud Plus, paid monthly, are coming soon, priced at launch.',
       'The app is at https://app.brain.dog. BrainDog is made by Quartz Apps LLC. Support: support@brain.dog.',
     ],
     about:

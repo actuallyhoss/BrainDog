@@ -57,19 +57,19 @@ const NEVER: readonly RegExp[] = [
   /spark(?!line)/i,
 ];
 
-test("the page's words are the early access copy, and its one count of asks is the plan table's", () => {
+test("the page's words are the early access copy, and its one count of questions is the plan table's", () => {
   assert.equal(slashPage.head.title, 'Slash knows your whole business.');
   assert.deepEqual(
     [slashPage.ask.title, slashPage.find.title, slashPage.make.title, slashPage.tally.title, slashPage.agents.title, slashPage.faq.title],
-    ['Ask', 'Find', 'Make', 'How asks are counted', 'Slash and your AI tools', 'Questions'],
+    ['Ask', 'Find', 'Make', 'How questions are counted', 'Slash and your AI tools', 'Questions'],
   );
   assert.ok(!('close' in slashPage), 'the page ends on the early access strip, not a close of its own (site F11)');
   assert.equal(slashPage.faq.questions.length, 4);
   assert.equal(slashPage.agents.lines.length, 4);
   /* No paid plan is named while billing is off: one count, the early access month. */
-  assert.ok(slashPage.tally.say.includes(`Early access includes ${TABLE.free.credits} asks a month`));
+  assert.ok(slashPage.tally.say.includes(`Free includes ${TABLE.free.credits} Slash questions a month`));
   for (const plan of [TABLE.hosted.name, TABLE.plus.name]) assert.ok(!strings(slashPage).some((s) => s.includes(plan)), `the page names ${plan}`);
-  assert.equal(slashDrawing.modes.ask.note, `One ask per question. Early access has ${TABLE.free.credits} a month.`);
+  assert.equal(slashDrawing.modes.ask.note, `One question each time. Free has ${TABLE.free.credits} a month.`);
   assert.ok(slashPage.ask.body.some((p) => p.includes('Every figure opens what it came from')));
 });
 
@@ -222,7 +222,7 @@ test('slash.html has one h1, the three modes, how asks are counted and the first
   const html = readFileSync(new URL('slash.html', BUILD), 'utf8');
   assert.equal((html.match(/<h1\b/g) ?? []).length, 1, 'not one h1');
   const h2s = [...html.matchAll(/<h2\b[^>]*>([\s\S]*?)<\/h2>/g)].map((m) => text(m[1] ?? '').trim());
-  for (const h of ['Ask', 'Find', 'Make', 'How asks are counted']) assert.ok(h2s.includes(h), `no "${h}" heading`);
+  for (const h of ['Ask', 'Find', 'Make', 'How questions are counted']) assert.ok(h2s.includes(h), `no "${h}" heading`);
   const said = text(html);
   assert.ok(said.includes(slashPage.head.title));
   assert.ok(said.includes(slashPage.tally.say), 'how asks are counted is not said in plain text');

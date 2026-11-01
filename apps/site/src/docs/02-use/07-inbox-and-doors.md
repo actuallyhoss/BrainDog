@@ -70,10 +70,10 @@ When BrainDog read an arrival and was not sure enough to file it, the arrival wa
 
 Arrivals that are alike are drawn together. Once three or more alike are waiting, the group offers two ways to make a rule:
 
-- **Ask Slash for a pattern**. Slash drafts a rule from them and puts it in Needs you. Drafting a pattern is Slash's background work, so it does not spend your asks.
+- **Ask Slash for a pattern**. Slash drafts a rule from them and puts it in Needs you. Drafting a pattern is Slash's background work, so it does not spend your Slash questions.
 - **Make a rule from these** opens the pattern builder. Select the words in a sample that give the amount, the date or the name, and the builder finds them again in every sample, showing how many it matched. Try it, then save it.
 
-When the owner saves a rule, what it reads waits in Needs you until they press **Trust it now**. A colleague's rule is sent to the owner as a proposal. Once a rule is trusted, arrivals like those are filed as they come in, with no Slash and no asks.
+When the owner saves a rule, what it reads waits in Needs you until they press **Trust it now**. A colleague's rule is sent to the owner as a proposal. Once a rule is trusted, arrivals like those are filed as they come in, with no Slash and no questions spent.
 
 ## Connectors
 

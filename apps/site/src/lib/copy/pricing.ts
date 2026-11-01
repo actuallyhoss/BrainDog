@@ -8,8 +8,11 @@
 /** A count as every figure on the site is grouped: 1,000 and 750,000. */
 const grouped = (n: number): string => n.toLocaleString('en-US');
 
-/** Who may hold a record: `people` in `PLAN_TABLE`, where `null` is no limit. */
-const people = (n: number | null): string => (n === 1 ? 'Just you' : 'Everyone you invite');
+/**
+ * Who may hold a record: `teams` in `PLAN_TABLE`. A second person joins on Cloud Plus only (`teamsOn`), so Cloud's
+ * `people: null` is not "everyone you invite": nobody can be let in on it.
+ */
+const people = (teams: boolean): string => (teams ? 'You and the people you invite' : 'Just you');
 
 /** A figure of bytes as a person says it: Free's 100,000,000 reads as 100 MB, never 0.1 GB. */
 const size = (bytes: number): string => (bytes < 1_000_000_000 ? `${grouped(bytes / 1_000_000)} MB` : `${grouped(bytes / 1_000_000_000)} GB`);
@@ -22,6 +25,7 @@ export type Figures = {
   agents: number;
   credits: number;
   people: number | null;
+  teams: boolean;
   allowance: { runs: number; requests: number; bytes: number; ms: number };
 };
 
@@ -42,26 +46,38 @@ export const pricing = {
    */
   pricing: {
     /**
-     * THE EARLY ACCESS PAGE (20 October): what `/pricing` says while `LAUNCH.billing` is off. One plan and no
-     * price but its $0, a tile that says paid plans come later and are not priced, and three questions. The plans below
-     * come back the day billing does, and not before. The figures are `TABLE.free`'s, filled in by the page.
+     * THE EARLY ACCESS PAGE (20 October): what `/pricing` says while `LAUNCH.billing` is off. Free, the one plan
+     * anybody can be on, leads with its $0 and the same limits Settings > Billing shows; Cloud and Cloud Plus sit
+     * beside it, named, with no price: "coming soon, priced at launch" (his N2, 1 November). The plans below come back
+     * the day billing does. The figures are `TABLE.free`'s, filled in by the page.
      */
     early: {
       title: 'Free while in early access.',
       lede: 'BrainDog is invite only for now. Everything in it is free while we open it up.',
       plan: {
-        name: 'Early access',
+        name: 'Free',
         price: '$0',
-        lines: (f: Figures) => ['The whole app', `${grouped(f.agents)} AI tools connected`, `${grouped(f.credits)} questions to Slash a month`, 'Export any time'],
+        lines: (f: Figures) => [
+          'The whole app',
+          `${grouped(f.agents)} AI tools connected`,
+          `${grouped(f.credits)} Slash questions a month`,
+          `${grouped(f.allowance.runs)} automation runs a month`,
+          'Export any time',
+        ],
       },
       later: {
-        title: 'Later',
-        say: 'Paid plans add room for more AI tools, more questions and your whole team. They are not priced yet, and nothing you make now will be lost or locked when they arrive.',
+        title: 'Cloud and Cloud Plus',
+        say: 'Monthly plans with room for more AI tools, more questions and more runs. Coming soon, priced at launch, and nothing you make now will be lost or locked when they arrive.',
+        /** The two paid plans by name, each with what it adds and no figure: they are priced at launch. */
+        plans: [
+          { name: 'Cloud', line: 'More AI tools, Slash questions, runs and data.', soon: 'Coming soon' },
+          { name: 'Cloud Plus', line: 'Five times Cloud, and a second person can join.', soon: 'Coming soon' },
+        ],
       },
       faq: {
         title: 'Questions people ask',
         questions: [
-          { q: 'What is a question to Slash?', a: 'One question or one change, however much work it takes. Your brief, filing and your rules never spend one.' },
+          { q: 'What is a Slash question?', a: 'One question or one change, however much work it takes. Your brief, filing and your rules never spend one.' },
           { q: 'What counts as an AI tool?', a: 'Each app you connect. Claude on your laptop is one, Cursor is another.' },
           { q: 'Can I take my data out?', a: 'Yes, all of it, as one file, whenever you like.' },
         ],
@@ -69,7 +85,7 @@ export const pricing = {
     },
     // A headline with no price in it: `plans.test.ts` checks that "$12 a month" never leads.
     title: 'Free for one person.',
-    sub: 'Every plan has the whole app. You pay for room: more agents, more questions, more people.',
+    sub: 'Every plan has the whole app. You pay for room: more AI tools, more questions, and on Cloud Plus more people.',
     /** The three cards, Free first. A line that carries a figure is filled from the plan's row of `TABLE`. */
     cards: {
       free: {
@@ -78,18 +94,18 @@ export const pricing = {
         mine: 'Your plan',
         // The free door is `makeFree` in `billing.ts`: no Stripe call and no card.
         per: 'no card',
-        lines: (f: Figures) => ['The whole app', `${grouped(f.agents)} agents`, `${grouped(f.credits)} questions to Slash a month`, people(f.people)],
+        lines: (f: Figures) => ['The whole app', `${grouped(f.agents)} AI tools connected`, `${grouped(f.credits)} Slash questions a month`, people(f.teams)],
       },
       cloud: {
         per: 'a month',
         cta: 'Choose Cloud',
-        lines: (f: Figures) => [`${grouped(f.agents)} agents`, `${grouped(f.credits)} questions a month`, people(f.people), 'More runs, data and script time'],
+        lines: (f: Figures) => [`${grouped(f.agents)} AI tools connected`, `${grouped(f.credits)} Slash questions a month`, people(f.teams), 'More runs, data and script time'],
       },
       plus: {
         per: 'a month',
         cta: 'Choose Cloud Plus',
         // Five times is every figure in `ALLOWANCE.plus` over `ALLOWANCE.hosted`, held by `plans.test.ts`.
-        lines: (f: Figures) => [`${grouped(f.agents)} agents`, `${grouped(f.credits)} questions a month`, people(f.people), 'Five times Cloud'],
+        lines: (f: Figures) => [`${grouped(f.agents)} AI tools connected`, `${grouped(f.credits)} Slash questions a month`, people(f.teams), 'Five times Cloud'],
       },
       /** A paid card's word in its button's place while `LAUNCH.billing` is off. Plain text: nothing to press. */
       soon: 'Coming soon',
@@ -103,10 +119,10 @@ export const pricing = {
       /** The table's seven rows, in the order they are drawn: a name and a plan's cell from its own figures. */
       rows: [
         // `agents` in `PLAN_TABLE`: agent keys a record holds live at once.
-        { key: 'agents', name: 'Agents connected', cell: (f: Figures) => grouped(f.agents) },
+        { key: 'agents', name: 'AI tools connected', cell: (f: Figures) => grouped(f.agents) },
         // One question or draft is one credit, however many passes it takes (`packages/slash/src/types.ts`).
-        { key: 'credits', name: 'Questions and drafts from Slash', cell: (f: Figures) => grouped(f.credits) },
-        { key: 'people', name: 'People on the record', cell: (f: Figures) => people(f.people) },
+        { key: 'credits', name: 'Slash questions', cell: (f: Figures) => grouped(f.credits) },
+        { key: 'people', name: 'People', cell: (f: Figures) => people(f.teams) },
         { key: 'runs', name: 'Automation runs', cell: (f: Figures) => grouped(f.allowance.runs) },
         { key: 'requests', name: 'Requests to other services', cell: (f: Figures) => grouped(f.allowance.requests) },
         { key: 'bytes', name: 'Data fetched', cell: (f: Figures) => size(f.allowance.bytes) },
@@ -132,14 +148,14 @@ export const pricing = {
       title: 'Questions people ask',
       /** `billing: true` is a question drawn only while `LAUNCH.billing` is on: nobody can cancel what nobody sells. */
       questions: [
-        // `ASK_CAP_*` and `BACKGROUND_ASKS_MONTH` in `packages/slash/src/types.ts`: the brief and filing spend no ask.
-        { q: 'What is a question to Slash?', a: 'One question or one change, however much work it takes. Your brief, filing and your rules never spend one.' },
+        // `ASK_CAP_*` and `BACKGROUND_ASKS_MONTH` in `packages/slash/src/types.ts`: the brief and filing spend no question.
+        { q: 'What is a Slash question?', a: 'One question or one change, however much work it takes. Your brief, filing and your rules never spend one.' },
         // An agent key per app (`agents` in `PLAN_TABLE`).
-        { q: 'What counts as an agent?', a: 'Each app you connect. Claude on your laptop is one, Cursor is another.' },
+        { q: 'What counts as an AI tool?', a: 'Each app you connect. Claude on your laptop is one, Cursor is another.' },
         // Export is the CLI's and Settings' one file, on every plan.
         { q: 'Can I take my data out?', a: 'Yes, all of it, as one file, on every plan.' },
         // The portal is `billing.ts`; export is never withheld from a lapsed record.
-        { q: 'Can I cancel any time?', a: 'Yes, from Settings. Your record stays readable, and you can export it.', billing: true },
+        { q: 'Can I cancel any time?', a: 'Yes, from Settings. Your BrainDog goes back to Free, or stays readable if it no longer fits Free, and you can always export it.', billing: true },
       ],
     },
   },
