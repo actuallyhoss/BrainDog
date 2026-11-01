@@ -308,6 +308,8 @@ export const words = {
   holdsNothingYet: 'Empty until you add to it.',
   /** Over a page opened from its card: what it is drawn with. */
   yours: 'Drawn with only what you gave it. Nothing is kept until you keep it.',
+  /** Under the first pages, the door to the rest. */
+  morePages: (n: number) => `${n} more ${n === 1 ? 'page' : 'pages'}`,
   /** Where the record cannot draw the pages: the rail above still says what is made. */
   undrawn: 'These pages could not be drawn here. They are made as shown above.',
 } as const;

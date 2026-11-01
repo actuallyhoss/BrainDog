@@ -1570,7 +1570,7 @@
   /* WHAT IT FOUND, one phrase to a cell, two a row where there is room (the board's grid of found things). */
   .heard {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
     gap: var(--sp-2) var(--sp-4);
     margin: 0;
     padding: 0;

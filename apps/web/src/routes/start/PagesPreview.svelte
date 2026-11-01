@@ -141,6 +141,23 @@
     }
   });
 
+  /* FOUR PAGES, AND THE REST ON A PRESS (UI pass 1 Nov): nine rows made the right column 700px taller than the form beside
+     it, and four of them said the same "It will hold what is in each bank account…" line. Each line is said once, under
+     the first page that holds it; a later page with the same line is its name alone. */
+  const FIRST_PAGES = 4;
+  let allPages = $state(false);
+  const saidOnce = $derived.by(() => {
+    const seen = new Set<string>();
+    const first = new Set<string>();
+    for (const p of drawn ?? []) {
+      const line = lines.get(p.slug);
+      if (line === undefined || seen.has(line)) continue;
+      seen.add(line);
+      first.add(p.slug);
+    }
+    return first;
+  });
+
   /** The one notifier: Escape and the close button both end in the element's own `close` event. */
   function closed() {
     shown = null;
@@ -158,9 +175,9 @@
     {/if}
     {#if drawn && drawn.length > 0}
       <ul class="pages">
-        {#each drawn as p, i (p.slug)}
+        {#each drawn.slice(0, allPages ? drawn.length : FIRST_PAGES) as p, i (p.slug)}
           {@const where = sectionOf(p)}
-          {@const line = lines.get(p.slug)}
+          {@const line = saidOnce.has(p.slug) ? lines.get(p.slug) : (lines.has(p.slug) ? '' : undefined)}
           <li>
             {#if line === undefined}
               <button type="button" class="card" aria-label={words.openPage(p.got.page.page.title)} onclick={() => (shown = i)}>
@@ -177,13 +194,14 @@
                 <IconWell name={where ? 'doc' : 'home'} size="l" />
                 <span class="card-main">
                   <span class="card-title">{p.got.page.page.title}</span>
-                  <span class="card-holds">{line}</span>
+                  {#if line}<span class="card-holds">{line}</span>{/if}
                 </span>
               </div>
             {/if}
           </li>
         {/each}
       </ul>
+      {#if !allPages && drawn.length > FIRST_PAGES}<button type="button" class="more-pages tap" onclick={() => (allPages = true)}>{words.morePages(drawn.length - FIRST_PAGES)}</button>{/if}
       <p class="reading">{said.pagesIn(drawn.length, places.length)}</p>
     {:else}
       <ul class="pages">
@@ -283,6 +301,22 @@
   }
 
   /* WHAT A PAGE WILL HOLD, under one nothing of theirs reaches: a whole sentence, so it wraps rather than cuts. */
+  .more-pages {
+    justify-self: start;
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, var(--ink) 40%, transparent);
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
   .card-holds {
     color: var(--ink-3);
     font-size: var(--fs-meta);

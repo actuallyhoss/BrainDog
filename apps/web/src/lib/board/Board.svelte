@@ -24,6 +24,7 @@
   import { WIDGETS_PARAM } from './sheet-address.ts';
   import { todayOffer } from './offer.svelte.ts';
   import { fitBoard } from './fit.ts';
+  import { calm, ms, play, still as lessMotion } from '$lib/motion';
 
   /* THE SHEET AND THE SUGGESTION ARE FETCHED WHEN ASKED FOR, not with Today: the catalogue, its previews and the
      compose step are the sheet's, and Today draws without them (the bundle gate's first-load row). */
@@ -90,6 +91,34 @@
     let on = true;
     requestAnimationFrame(() => requestAnimationFrame(() => on && (still = false)));
     return () => (on = false);
+  });
+
+  /* A WIDGET THAT COMES ONTO A BOARD ALREADY OPEN ARRIVES (UI pass 1 Nov). On a first Today the first thing told adds
+     Money this week and People to the board, and while the board settles (`data-still`, which keeps the page's own
+     recomposition off it) they were simply there in one frame. Each widget the board had not drawn before now rises
+     10px and fades in on the record's spring, 40ms after the one before and the fourth and on together. What a screen
+     draws as it opens (`calm`) is still, as is everything under reduced motion; and one the page's recomposition is
+     already playing is left to it, so nothing is played twice. */
+  let drawnKeys: Set<string> | null = null;
+  $effect(() => {
+    void model.shown;
+    const root = el;
+    if (!root) return;
+    let frame = requestAnimationFrame(() => {
+      frame = 0;
+      const tiles = [...root.querySelectorAll<HTMLElement>('[data-board-key]')];
+      const was = drawnKeys;
+      drawnKeys = new Set(tiles.map((t) => t.dataset.boardKey!));
+      if (was === null || calm() || lessMotion() || model.editing) return;
+      tiles
+        .filter((t) => !was.has(t.dataset.boardKey!) && t.getAnimations().length === 0)
+        .forEach((t, i) => {
+          play(t, { opacity: [0, 1], transform: ['translateY(10px) scale(0.97)', 'none'] }, { duration: ms('--form-in', 320), delay: Math.min(i, 3) * 40, fill: 'backwards' });
+        });
+    });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+    };
   });
 
   /* FOUR COLUMNS FROM 720px, TWO UNDER IT (§3.2). */
@@ -318,6 +347,7 @@
   /* ── the grid ── */
 
   .frame {
+    position: relative;
     container: board / inline-size;
     min-inline-size: 0;
   }
@@ -399,6 +429,10 @@
     overflow: hidden;
     contain: layout paint;
     will-change: auto;
+    /* EACH WIDGET IS THE CONTAINER ITS OWN PARTS ASK (UI pass 1 Nov): with none of its own, a card's `@container` read
+       the whole board's width, so at 1280 Needs you laid a money question as if it were 34rem wide (its answers beside
+       the amount) inside a tile half that, and cut the question to "Invoice 2026-041: bran…". */
+    container-type: inline-size;
   }
 
   /* ON A PHONE AT REST A TILE ENDS WHERE WHAT IT SHOWS ENDS (audit 31 Oct, A16): the phone's tiles are one column of
@@ -566,6 +600,23 @@
     border-radius: var(--r-tile);
     background: var(--tile);
     pointer-events: none;
+  }
+
+  /* A NARROW WIDGET'S NAME STAYS ON ONE LINE (UI pass 1 Nov): a small at 1280 is 234 wide, and "Your work this week 2"
+     wanted 159px of the 154 its heading row left it, so it broke over two lines and pushed its rows down. Under 250px the
+     well sits 8 from the name and the count 6 from it, which gives the name back its line. */
+  @container (inline-size < 250px) {
+    .board :global([data-board-key] > .block-bar) {
+      gap: var(--sp-2);
+    }
+
+    .board :global([data-board-key] > .block-bar .block-name) {
+      max-inline-size: calc(100% - var(--well) - var(--sp-2));
+    }
+
+    .board :global([data-board-key] > .block-bar .block-count) {
+      margin-inline-start: 6px;
+    }
   }
 
   /* ── editing ── */
