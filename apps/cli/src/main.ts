@@ -30,6 +30,7 @@ import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
 import { PRIMITIVES_VERSION } from 'braindog-render';
 
 import { automations, scripts } from './automations.ts';
+import { bypassCommand, systemOpen } from './bypass.ts';
 import { behindLine, doctorLine, installedBuild } from './behind.ts';
 import { serveBridge, SIGNAL_EXIT_MS } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
@@ -299,6 +300,8 @@ const fullUsage = () =>
     '  With --keychain it asks for keychain access that opens the keys of one project, or with * the keys of no project.',
     'braindog logout [<host>] [--host <host>]',
     "  Remove this machine's token, runner token and keychain access for one host from the hosts file. Nothing is sent, and the host is not told.",
+    'braindog bypass on|off [--host <host>]',
+    '  Open Settings > Agents at "Let agents do everything without asking", for you to turn it on or off there. Only you, signed in to BrainDog, can change it, so an agent on this machine cannot turn it on for itself.',
     'braindog keys list [--project <name>] [--everywhere] [--json] [--host <host>]',
     '  The keys your BrainDog holds, one line each: what each opens, where it applies, whether it is sealed, and the day it expires. Never a value.',
     'braindog keys put <label> [--opens <what>] [--kind <kind>] [--keychain <project>] [--host <host>]',
@@ -1371,6 +1374,8 @@ try {
     if (json) emit(json.envelope(code));
     process.exitCode = code;
   } else if (command === 'keys') await keysCommand(args);
+  /* IT OPENS THE APP AND SETS NOTHING (`bypass.ts` says why), so it reads no token and sends nothing. */
+  else if (command === 'bypass') process.exitCode = bypassCommand(args, { env: process.env, out: (line) => process.stdout.write(`${line}\n`), err: say, open: process.stdout.isTTY ? systemOpen : undefined });
   /* `run` IS `keys exec` UNDER ITS SHORTER NAME (`48 §2`), not a second door: it opens a key into one
      environment variable. The two verbs that print a key are `keys headers` and `keys helper`, through one
      function, to a program and never to a terminal, and neither has a shorter name, so nobody reaches one by typing less. */
