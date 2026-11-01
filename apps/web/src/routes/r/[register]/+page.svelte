@@ -93,6 +93,7 @@
     homeViewOf,
     groupsOf,
     runsList,
+    kpisList,
     isLate,
     lateFirst,
     weighed,
@@ -113,6 +114,7 @@
   import ListPeople from './parts/ListPeople.svelte';
   import ListOrgs from './parts/ListOrgs.svelte';
   import ListRuns from './parts/ListRuns.svelte';
+  import ListKpis from './parts/ListKpis.svelte';
   import { peopleOrder, setPeopleOrder } from './parts/people-order.svelte.ts';
   import { lastDayOf, meetsOf, mergedAway, orgRoleOf } from './folk.ts';
   import { readingOf as readingsOf, valueSaid } from '$lib/record/reading.ts';
@@ -3385,7 +3387,7 @@
              the one way to add, the list's primary, named with what it adds. Below 640 the head holds the "+" and the
              "⋯", so this end is not drawn. -->
         <div class="list-views">
-          {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable ? iconFor(decl.icon, 'rows') : null} groupsWord={runsList(decl) ? 'List' : undefined} onview={setView} />{/if}
+          {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable ? iconFor(decl.icon, 'rows') : null} groupsWord={runsList(decl) || kpisList(decl) ? 'List' : undefined} onview={setView} />{/if}
           <!-- ONE "⋯" FOR THE LIST: how it is drawn and its views first, then what the list itself offers (a row with every
                field, what is handed to you, sharing, its fields, its name). There were two, a hand's width apart. -->
           <Menu label={headWords.more(decl.name)} align="end">
@@ -3466,7 +3468,16 @@
   {#snippet listBody()}
     <div class="body-slot" bind:this={body}>
     <!-- PEOPLE BY ORGANISATION, at every width: a phone reads the groups as a laptop does, since a group is one line. -->
-    {#if view === 'groups' && runsList(decl)}
+    {#if view === 'groups' && kpisList(decl)}
+      <ListKpis
+        register={id}
+        {decl}
+        entries={result.entries.slice(0, DOM_CAP)}
+        {now}
+        names={result.names ?? undefined}
+        more={cursor !== null && loaded < DOM_CAP}
+      />
+    {:else if view === 'groups' && runsList(decl)}
       <ListRuns
         register={id}
         {decl}

@@ -324,10 +324,13 @@ export type View = 'table' | 'board' | 'cards' | 'groups';
  * twenty-four. That list's table is then `?view=table`, so a link to it still opens the table.
  */
 /** A list that draws in groups: people by organisation, and since 29 October organisations by kind. */
-export const groupsOf = (decl: RegisterDecl | undefined): boolean => orgFieldOf(decl) !== null || orgRoleOf(decl) !== null || runsList(decl);
+export const groupsOf = (decl: RegisterDecl | undefined): boolean => orgFieldOf(decl) !== null || orgRoleOf(decl) !== null || runsList(decl) || kpisList(decl);
 
 /** The list of agent runs, which opens as one ledger of faces (`ListRuns`), its "List" in the switch where People's says Groups (L17). */
 export const runsList = (decl: RegisterDecl | undefined): boolean => decl?.id === RUNS;
+
+/** The key numbers, which open as their readings with a small chart each (`ListKpis`), "List" in the switch (L11). */
+export const kpisList = (decl: RegisterDecl | undefined): boolean => decl?.id === 'kpis';
 
 export const homeViewOf = (decl: RegisterDecl | undefined): View => (groupsOf(decl) ? 'groups' : 'table');
 
