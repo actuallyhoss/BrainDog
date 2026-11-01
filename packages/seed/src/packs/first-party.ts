@@ -935,7 +935,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   people: '4.2.2',
   'money-core': '3.33.0',
   estate: '2.7.0',
-  work: '1.21.0',
+  work: '1.22.0',
 };
 
 type Body = Record<string, unknown>;
