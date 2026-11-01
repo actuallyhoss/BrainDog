@@ -30,6 +30,8 @@ const HOLD_SLOP = 8;
 /** How long a widget slides to its new place. */
 const SLIDE_MS = 180;
 const SLIDE_EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+/** A widget taken off the board fades out where it stood over this, accelerating away. */
+const LEAVE_MS = 140;
 
 /** One widget's place for the reader: its key, its grid area and its size. */
 export type Place = { key: string; area: string; size: WidgetSize };
@@ -310,8 +312,10 @@ export class BoardModel {
     this.inspected = null;
     this.past = [];
     this.future = [];
+    const before = this.hushPage();
     this.editing = true;
     this.said = '';
+    void this.glideSwitch(before);
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.(8);
   }
 
@@ -327,7 +331,9 @@ export class BoardModel {
 
   /** Leave without writing (Esc or Cancel). */
   cancel(): void {
+    const before = this.hushPage();
     this.editing = false;
+    void this.glideSwitch(before);
     this.changed = {};
     this.inspected = null;
     this.from = null;
@@ -381,8 +387,10 @@ export class BoardModel {
 
   /** Leave the mode with what it made shown while the record takes it (`landing`). */
   close(): void {
+    const before = this.hushPage();
     this.landing = this.now;
     this.editing = false;
+    void this.glideSwitch(before);
     this.from = null;
     this.now = null;
     this.added = [];
@@ -403,7 +411,7 @@ export class BoardModel {
   /** Apply one change as a step of its own, sliding what moved. */
   change(next: Arranged, slide = true): void {
     if (!this.now) return;
-    const before = slide ? this.measure() : null;
+    const before = slide ? this.hushPage() : null;
     this.past = [...this.past, this.now].slice(-100);
     this.future = [];
     this.now = next;
@@ -414,7 +422,7 @@ export class BoardModel {
   undo(): void {
     const last = this.past.at(-1);
     if (!last || !this.now) return;
-    const before = this.measure();
+    const before = this.hushPage();
     this.future = [this.now, ...this.future];
     this.past = this.past.slice(0, -1);
     this.now = last;
@@ -425,7 +433,7 @@ export class BoardModel {
   redo(): void {
     const next = this.future[0];
     if (!next || !this.now) return;
-    const before = this.measure();
+    const before = this.hushPage();
     this.past = [...this.past, this.now];
     this.future = this.future.slice(1);
     this.now = next;
@@ -591,7 +599,26 @@ export class BoardModel {
    */
   private async slide(before: Map<string, DOMRect>): Promise<void> {
     if (!this.el || before.size === 0 || still()) return;
+    const nodes = new Map<string, HTMLElement>();
+    for (const node of this.el.querySelectorAll<HTMLElement>('[data-board-key]')) nodes.set(node.dataset.boardKey!, node);
     await tick();
+    /* A WIDGET TAKEN OFF LEAVES WHERE IT STOOD: its last drawing fades and sinks to 97% over the exit step while the rest
+       slide into its room, rather than going in one frame. */
+    const frame = this.el.parentElement;
+    for (const [key, node] of nodes) {
+      if (node.isConnected || !frame || !before.has(key)) continue;
+      const was = before.get(key)!;
+      const box = frame.getBoundingClientRect();
+      node.style.cssText += `;position:absolute;inset:auto;left:${was.left - box.left}px;top:${was.top - box.top}px;inline-size:${was.width}px;block-size:${was.height}px;margin:0;pointer-events:none;z-index:1`;
+      node.setAttribute('aria-hidden', 'true');
+      node.inert = true;
+      frame.append(node);
+      const gone = node.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(0.97)' }], { duration: LEAVE_MS, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' });
+      void gone.finished.then(
+        () => node.remove(),
+        () => node.remove(),
+      );
+    }
     for (const node of this.el.querySelectorAll<HTMLElement>('[data-board-key]')) {
       const key = node.dataset.boardKey!;
       if (key === this.held && this.heldBy === 'pointer') continue;
@@ -599,17 +626,39 @@ export class BoardModel {
       if (!was) continue;
       for (const a of node.getAnimations()) if (a.id === 'board-slide') a.cancel();
       const now = node.getBoundingClientRect();
+      /* ON TRANSFORM'S TRANSLATE ALONE, FROM ITS OLD TOP LEFT (UI pass 1 Nov): a widget that changed size takes its new
+         size at once, as its outline showed while it was dragged. Scaled from its old box, its words and figures were
+         drawn squashed and stretched for the length of the slide. */
       const dx = was.left - now.left;
       const dy = was.top - now.top;
-      const sx = now.width > 0 ? was.width / now.width : 1;
-      const sy = now.height > 0 ? was.height / now.height : 1;
-      if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) continue;
-      const a = node.animate(
-        [{ transformOrigin: '0 0', transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` }, { transformOrigin: '0 0', transform: 'none' }],
-        { duration: SLIDE_MS, easing: SLIDE_EASE },
-      );
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      const a = node.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: SLIDE_MS, easing: SLIDE_EASE });
       a.id = 'board-slide';
     }
+  }
+
+  /**
+   * ENTERING AND LEAVING THE MODE GLIDES, IT DOES NOT BLINK (UI pass 1 Nov). On a phone the board's rows are as tall as
+   * what each widget shows at rest and whole cells while editing, so every widget under the first changed place by up to
+   * a few hundred pixels; the page's own recomposition read that as blocks crossing the board and faded each one in from
+   * nothing, so the whole board blinked out and back on Edit, Cancel and Done. Now the page is held still for the switch
+   * (`data-still` on the frame, which `recompose.ts` reads) and each widget slides from where it was to where it is, on
+   * transform alone, its new height there at once. Nothing under reduced motion.
+   */
+  private hushPage(): Map<string, DOMRect> {
+    const frame = this.el?.parentElement;
+    if (frame) {
+      frame.setAttribute('data-still', '');
+      clearTimeout(this.hushed);
+      this.hushed = setTimeout(() => frame.removeAttribute('data-still'), SLIDE_MS + 120);
+    }
+    return this.measure();
+  }
+
+  private hushed: ReturnType<typeof setTimeout> | undefined;
+
+  private glideSwitch(before: Map<string, DOMRect>): Promise<void> {
+    return this.slide(before);
   }
 
   /* ── the pointer: hold, drag, resize ── */

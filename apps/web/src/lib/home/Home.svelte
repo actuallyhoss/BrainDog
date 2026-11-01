@@ -1993,16 +1993,21 @@
 
   /* NEEDS YOU HOLDS TWO QUESTIONS ON A LAPTOP'S LARGE (Q17): each question without its well, so its buttons sit on its
      second line, and the foot's lines at a press's height, not a row's. */
-  .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large'] .dc-row > .dr-actions) {
-    grid-row: 2;
-    grid-column: 3;
-    justify-self: end;
-    margin: 0;
-  }
+  /* ONLY WHERE THE QUESTION STILL HAS ITS ROOM BESIDE THEM (UI pass 1 Nov): at 1280 the tile is 440 wide inside, and the
+     answers beside the amount took the third column's 200px from the question, cut to "Invoice 2026-041: bran…". Under
+     32rem they take their own line under it, as on a phone. */
+  @container (inline-size >= 32rem) {
+    .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large'] .dc-row > .dr-actions) {
+      grid-row: 2;
+      grid-column: 3;
+      justify-self: end;
+      margin: 0;
+    }
 
-  .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large'] .dc-row > .dr-meta) {
-    grid-column: 2;
-    align-self: center;
+    .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large'] .dc-row > .dr-meta) {
+      grid-column: 2;
+      align-self: center;
+    }
   }
 
   .body[data-board] :global(.block-slot[data-board-key='needs-you'] > [data-needs-foot]) {
@@ -2195,6 +2200,19 @@
 
   .body[data-board] :global(.block-slot[data-board-key]:is([data-size='small'], [data-size='wide']):has(.pcard) > .lane-bar) {
     display: none;
+  }
+
+  /* AND AT THE BOARD'S SHORTEST ROW (a 1280 window: the row is 164) THE CARDS STILL STAND THREE ACROSS (UI pass 1 Nov). A
+     card is 130 under a 36 head, 178 in all, so the frame cut the second and third and the first stretched across the
+     whole row alone under "In play 3". Each card gives 7px top and foot and the head 4, and the row fits 162. */
+  @container (inline-size < 1150px) {
+    .body[data-board] :global(.block-slot[data-board-key='projects'][data-size='full'] .projects) {
+      gap: var(--sp-2);
+    }
+
+    .body[data-board] :global(.block-slot[data-board-key='projects'][data-size='full'] .pcard) {
+      padding-block: 13px;
+    }
   }
 
   .body[data-board] :global(.block-slot[data-board-key='projects'] .desk-part) {
