@@ -63,7 +63,7 @@
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
   import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
-  import { KEYS_REGISTER } from '$lib/record/keychain.ts';
+  import { KEYS_REGISTER } from '$lib/record/keys-register.ts';
   import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
   import { MENU, WORK, arrange, flatNav, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
