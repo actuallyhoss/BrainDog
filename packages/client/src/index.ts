@@ -771,7 +771,8 @@ export type ScriptRow = {
   title: string;
   version: number;
   pack: string | null;
-  runs: { every: string | null; at: string | null; door: string | null; rule: boolean };
+  /** `at` is the time of day its clock is pinned to (`HH:MM`, the record's zone); absent from a host a release behind. */
+  runs: { every: string | null; at?: string | null; door: string | null; rule: boolean };
   reads: string[];
   writes: string[];
   egress: string[];

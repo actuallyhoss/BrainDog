@@ -347,7 +347,7 @@ const SCRIPTS_USAGE = 'braindog scripts takes list, or resume <id>, and --host.'
 
 /** How a script starts, as a sentence: its clock, the door that hands it an arrival, a rule's `run:`, or any of them. */
 function scriptStarts(r: ScriptRow['runs']): string {
-  const ways = [r.every === null ? null : everyOf(r.every), r.door === null ? null : `When ${r.door} receives an arrival`, r.rule ? 'When a rule runs it' : null].filter((w): w is string => w !== null);
+  const ways = [r.every === null ? null : `${everyOf(r.every)}${typeof r.at === 'string' ? ` at ${r.at}` : ''}`, r.door === null ? null : `When ${r.door} receives an arrival`, r.rule ? 'When a rule runs it' : null].filter((w): w is string => w !== null);
   if (ways.length === 0) return 'Nothing starts it.';
   return `${ways.map((w, i) => (i === 0 ? w : w.charAt(0).toLowerCase() + w.slice(1))).join(', or ')}.`;
 }
