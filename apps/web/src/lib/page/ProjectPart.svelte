@@ -1398,6 +1398,12 @@
     margin-block-start: 8px;
   }
 
+  /* WHERE THE TILE GROWS TO END LEVEL WITH THE WORK'S COLUMN (`cols`, L32), the box goes to its foot, so the room is
+     between the runs and the box to tell them, as a thread's is, and not a hole under the box. */
+  :global(.t-agents > .a-tell) {
+    margin-block-start: auto;
+  }
+
   /* SEND KEEPS ITS ONE PRIMARY LOOK, as on Agents (Q32 of 29 October): it was drawn in ink here and red there. */
 
   .a-when {
