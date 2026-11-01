@@ -2141,6 +2141,17 @@
     display: none;
   }
 
+  /* AND ANY ONE-ROW FRAME THAT HOLDS PROJECT CARDS (the gallery's Projects in play at wide, Maya's Today): a whole card is
+     273 tall, so in a 185 frame it ran past the foot and the frame's "3 more" was drawn on top of its words. One row shows
+     each card's name, standing and number, without the lane switch, as the row above does. */
+  .body[data-board] :global(.block-slot[data-board-key]:is([data-size='small'], [data-size='wide'], [data-size='full']) .pcard :is(.pc-c, .pc-next, .pc-foot, .pc-move)) {
+    display: none;
+  }
+
+  .body[data-board] :global(.block-slot[data-board-key]:is([data-size='small'], [data-size='wide']):has(.pcard) > .lane-bar) {
+    display: none;
+  }
+
   .body[data-board] :global(.block-slot[data-board-key='projects'] .desk-part) {
     flex: 1;
     min-block-size: 0;

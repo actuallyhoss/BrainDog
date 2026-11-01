@@ -425,6 +425,15 @@
     max-block-size: calc(var(--most) + var(--row) + var(--gap));
   }
 
+  /* AND THE BAR IS IN THE FLOW, UNDER WHAT IT ASKS ABOUT (Maya's Today at 390): a phone's frame is as tall as what is drawn
+     in it, so a bar laid over its foot covered the widget's own figures ("Spent, 30 days $19,901" under Keep). */
+  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key] > [data-draft-mark]) {
+    position: static;
+    order: 2;
+    flex: none;
+    margin-block-start: auto;
+  }
+
   /* AND THE "N MORE" A FRAME WITH NONE OF ITS OWN IS GIVEN (`fit.ts`) TAKES ITS OWN LINE under what it kept, as the
      frame no longer ends below the rows with room for it laid over: in the flow, after the block. A part of Today's own
      (Working now) is a card inside a bare frame, so its count stays laid over the card's foot, and the card makes room. */
