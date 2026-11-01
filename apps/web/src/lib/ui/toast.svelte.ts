@@ -185,8 +185,21 @@ class Toasts {
     this.#named.set(href, now);
   }
 
-  /** Whether a toast named the place at `href` in the last half minute (`named`). */
+  /**
+   * WHEN A PRESS LAST TURNED A MODULE ON (audit 1 Nov, AP17): Tell's "Turn on Money and add it" said "Agents is in your
+   * sidebar now. Turned on Money. Added a payment", since Money brought the agents' place along and only Money's was
+   * named. A module's own toast says it came, so every place that arrives in the next half minute came with it.
+   */
+  #hushed = Number.NEGATIVE_INFINITY;
+
+  /** Says that a toast this press pushes names a module turned on, so the rail says no place that comes with it. */
+  hush(now: number = Date.now()): void {
+    this.#hushed = now;
+  }
+
+  /** Whether a toast named the place at `href` in the last half minute (`named`), or a module turned on did (`hush`). */
   wasNamed(href: string, now: number = Date.now()): boolean {
+    if (now - this.#hushed <= NAMED_MS) return true;
     const at = this.#named.get(href);
     if (at === undefined) return false;
     if (now - at <= NAMED_MS) return true;
