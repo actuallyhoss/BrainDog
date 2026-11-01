@@ -187,7 +187,7 @@ test('AT THE 600 CAP THE ANSWERS ARE SETTINGS\' COUNT: a build without the model
      its own sentence, so its health still reads the last answer, and both count the same six. */
   assert.equal(r.state, 'red', r.said);
   assert.equal(r.value, 6);
-  assert.equal(r.said, "The month's asks are spent: 20 asks since 8 October did not reach the model. They come back on 1 November.");
+  assert.equal(r.said, "The month's Slash questions are used: 20 questions since 8 October did not reach the model. They come back on 1 November.");
   assert.equal(h.state, 'answering');
   assert.equal(Date.parse(h.last_ok!), NOW - 30 * HOUR, 'Settings\' last answer is the sign\'s');
   assert.ok((r.facts ?? []).includes('6 asks this week, 6 answered.'), (r.facts ?? []).join(' | '));
@@ -232,7 +232,7 @@ test('A SPENT MONTH IS RED, NEVER "answered all" (5): five answers and then fift
   assert.equal(s.state, 'red', s.said);
   assert.equal(s.value, 5);
   assert.doesNotMatch(s.said, /answered all/u);
-  assert.match(s.said, /month's asks are spent: 50 asks since 7 October did not reach the model\. They come back on 1 November\./u);
+  assert.match(s.said, /month's Slash questions are used: 50 questions since 7 October did not reach the model\. They come back on 1 November\./u);
   const r = readModelSign(k, sql, NOW);
   /* SAID ONCE, by the headline, and not again among the facts. */
   assert.ok(!(r.facts ?? []).some((f) => /turned away/u.test(f)), (r.facts ?? []).join(' | '));
@@ -278,7 +278,7 @@ test('A CALL REFUSED FOR ITS SIZE IS NOT THE MONTH SPENT (model-sign-49): the pe
   ask(sql, 1, 'refused', 'SLASH_BUDGET_SPENT');
   const read = readModelSign(k, sql, NOW);
   assert.notEqual(read.state, 'red', read.said);
-  assert.doesNotMatch(read.said, /month's asks are spent/u);
+  assert.doesNotMatch(read.said, /month's Slash questions are used/u);
 });
 
 test('THE FACTS SAY HOW MANY PAGES THE MODEL WROTE NOW, from the count the lint round keeps, and nothing from a stale count', async () => {

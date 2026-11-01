@@ -22,10 +22,10 @@ export const said = {
   days: 'Runs by day',
   byProject: words.byProject,
   projects: 'Projects',
-  asks: 'Slash asks',
+  asks: 'Slash questions',
   runs: (n: number) => (n === 1 ? 'run' : 'runs'),
   runsSaid: (n: number) => (n === 1 ? '1 run' : `${n.toLocaleString('en-GB')} runs`),
-  asksOf: (max: number) => `of ${max.toLocaleString('en-GB')} asks`,
+  asksOf: (max: number) => `of ${max.toLocaleString('en-GB')} questions`,
   firedWeek: (n: number) => `Automations fired ${n === 1 ? 'once' : `${n.toLocaleString('en-GB')} times`} in the last 7 days.`,
   noActionRun: 'No scheduled runs this month',
   /* ONLY FROM A HOST TOO OLD TO SEND EACH RULE'S MONTH (AF9): there an inline rule's work is in no run counted here, and

@@ -68,7 +68,7 @@ test('A RECORD ON FREE STARTS AT FREE\'S ASKS, and a save above them is refused 
   const over = engine.configure({ ask_cap: ASK_CAP_FREE + 1 }, OWNER) as Refused;
   assert.equal(over.ok, false);
   assert.equal(over.refusal?.at, 'ask_cap');
-  assert.match(over.refusal?.fix ?? '', new RegExp(`^Free comes with ${ASK_CAP_FREE} Slash asks a month`, 'u'));
+  assert.match(over.refusal?.fix ?? '', new RegExp(`^Free comes with ${ASK_CAP_FREE} Slash questions a month`, 'u'));
   /* FEWER IS HIS TO CHOOSE. */
   assert.ok((engine.configure({ ask_cap: 5 }, OWNER) as Refused).ok);
   assert.equal(cap(), 5);
@@ -82,7 +82,7 @@ test("PAID FOR, THE ASKS GO UP TO THE PLAN'S CREDITS ONCE, and the plan still ho
   assert.equal(held(), String(ASK_CAP_DEFAULT));
   const over = engine.configure({ ask_cap: 200 }, OWNER) as Refused;
   assert.equal(over.ok, false);
-  assert.match(over.refusal?.fix ?? '', /^Cloud comes with 80 Slash asks a month, so the monthly ask limit is 80 or lower\. Cloud Plus comes with more\.$/u);
+  assert.match(over.refusal?.fix ?? '', /^Cloud comes with 80 Slash questions a month, so the monthly limit is 80 or lower\. Cloud Plus comes with more\.$/u);
 
   /* A RENEWAL MOVES NOTHING: an owner's own number on Cloud stays his. */
   assert.ok((engine.configure({ ask_cap: 30 }, OWNER) as Refused).ok);

@@ -43,11 +43,11 @@
 
   /* THIS SECTION'S OWN WORDS FOR ITS TILES. The sentences are `slash-asks.ts`'s. */
   const said = {
-    asks: 'Your asks',
+    asks: 'Your questions',
     background: 'Background work',
     of: (cap: number) => `of ${cap.toLocaleString('en-GB')}`,
-    busiest: (label: string, n: number) => `Busiest ${label === 'Today' || label === 'Yesterday' ? label.toLowerCase() : `on ${label}`}, with ${n === 1 ? '1 ask' : `${n.toLocaleString('en-GB')} asks`}.`,
-    asksSubject: 'Asks by day',
+    busiest: (label: string, n: number) => `Busiest ${label === 'Today' || label === 'Yesterday' ? label.toLowerCase() : `on ${label}`}, with ${n === 1 ? '1 question' : `${n.toLocaleString('en-GB')} questions`}.`,
+    asksSubject: 'Questions by day',
   } as const;
 
   let status = $state<SlashStatus | null>(null);

@@ -82,7 +82,7 @@ test('on tier byo at ask_cap 1 with one read made, answer refuses SLASH_BUDGET_S
     ok: false,
     refusal: {
       code: 'SLASH_BUDGET_SPENT',
-      fix: "rule.rate asked Slash at step 2, and this month's asks are spent until 1 October. Raise the monthly limit, or wait.",
+      fix: "rule.rate asked Slash at step 2, and this month's Slash questions are used until 1 October. Raise the monthly limit, or wait.",
     },
   });
 });

@@ -373,10 +373,14 @@ function jobBearer(sql: Sql, label: string | undefined): boolean {
   );
 }
 
-/** The sentence a mint past the count is refused with, naming the plan and the way on. */
+/**
+ * The sentence a mint past the count is refused with: the plan's figure in the site's words ("AI tools"), that what is
+ * connected keeps working, the way on that always works (disconnect one), and the plan above where there is one.
+ */
 export const agentsFull = (cap: AgentCap): string =>
-  `${cap.plan} connects ${cap.agents} agent${cap.agents === 1 ? '' : 's'}. ` +
-  (cap.next === null ? 'Revoke one in Settings to connect another.' : `Move to ${cap.next} in Settings to connect more.`);
+  `${cap.plan} connects ${cap.agents} AI tool${cap.agents === 1 ? '' : 's'} at once, and ${cap.agents === 1 ? 'it is' : 'they are'} all connected. ` +
+  'Disconnect one in Settings > Agents to connect this one' +
+  (cap.next === null ? '.' : `, or move to ${cap.next} in Settings > Billing for more.`);
 
 export type Minted = { id: string; bearer: string; scope: Scope; reach: TokenReach[]; expires_at: string };
 

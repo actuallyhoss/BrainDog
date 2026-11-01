@@ -125,7 +125,7 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
   /* THE PRESS PAST THE CEILING STILL ANSWERS, drafted by the rules, and says why the model was not asked. */
   const last = presses.at(-1)!;
   assert.equal(last.by, 'rules');
-  assert.ok(last.dropped.some((d) => d.startsWith("This month's Slash asks are spent until 2026-10-01.")), JSON.stringify(last.dropped));
+  assert.ok(last.dropped.some((d) => d.startsWith("This month's Slash questions are used until 2026-10-01.")), JSON.stringify(last.dropped));
 
   /* AND ONE NUMBER FOR BOTH: the presses spent the month a person's read at the palette is spent from. */
   const read = (await (await c.ask('/api/slash/read', { method: 'POST', cookie, body: JSON.stringify({ question: 'What is still open?' }) })).json()) as Out;

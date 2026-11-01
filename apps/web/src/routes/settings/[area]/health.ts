@@ -327,7 +327,7 @@ export function engineLines(engine: Engine | null | undefined, now: number): str
   if (DOWN.has(h.state) && words !== '') lines.push(`${h.state === 'key_closed' ? 'Your key’s provider' : 'The provider'} said: ${words}`);
   const twice = h.doubleOf;
   if ((h.doubleShare ?? 0) > 0 && twice && twice.twice > 0 && twice.asks > 0)
-    lines.push(`Needed a second model for ${twice.twice} of ${twice.asks} ${twice.asks === 1 ? 'ask' : 'asks'}.`);
+    lines.push(`Needed a second model for ${twice.twice} of ${twice.asks} ${twice.asks === 1 ? 'question' : 'questions'}.`);
   if ((h.passedOver ?? 0) > 0) lines.push(`Skipped a failing model ${h.passedOver} ${h.passedOver === 1 ? 'time' : 'times'} and asked the next one.`);
   return lines;
 }

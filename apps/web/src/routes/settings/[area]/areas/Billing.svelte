@@ -1,7 +1,9 @@
 <!--
-  Settings > Billing: this month's plan and usage as a tile of meters, then what each record you own costs on the Cloud
-  and where its bill stands, or on a self-host the one line that says there is nothing to bill; then where usage and
-  the export are. A free record says Free and offers the first paid plan once, quietly.
+  Settings > Billing: this month's plan and usage as a tile of meters, Slash questions and AI tools first because those
+  are the two the site sells, then what each record you own costs on the Cloud and where its bill stands, the invoices
+  of the record on screen, or on a self-host the one line that says there is nothing to bill; then where usage and the
+  export are. A free record says Free and offers the paid plans quietly, or says they are coming soon while they are.
+  A limit reached is said in red under the bars, kindly: what waits, what still works, when it comes back, and the way on.
 -->
 <script lang="ts">
   import { page } from '$app/state';
@@ -11,9 +13,12 @@
   import { readUsage, words as actionWords, type Meter, type UsageView } from '$lib/record/actions.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import {
-    backFromCheckout, billingLine, hostedHere, managedAtStripe, meterBars, monthDay, packPage, packsOf, paymentPage, planLine, planShown,
-    readBilling, shareOf, stateLine, thisRecord, tileWords, upgradeOf, words as billWords, type BilledRecord,
+    backFromCheckout, billingLine, dayOf, hostedHere, invoiceAmount, invoiceState, limitBars, managedAtStripe, monthDay, moveUpOf, packPage, packsOf,
+    paymentPage, planLine, planShown, readBilling, readInvoices, shareOf, stateLine, thisRecord, tileWords, toolsConnected, upgradeOf,
+    words as billWords, type BilledRecord, type Invoice,
   } from '../../billing.ts';
+  import { createClient } from '@braindog/client';
+  import { metered } from '$lib/ui/slash-asks.ts';
   import { untrack } from 'svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -64,27 +69,70 @@
   const meters = $derived<Meter[]>(allowed?.meters ?? []);
   const billed = $derived(bill.value ? thisRecord(bill.value, shell.index.slug) : null);
   const month = $derived(monthDay(shell.now));
-  /* THE ONE THE MONTH TURNS ON, whose own sentence joins the reading line once it is near its limit. */
-  const nearest = $derived(meters.find((m) => m.binding) ?? null);
   const figure = $derived(
     billed && (billed.state !== 'unbilled' || billed.plan === 'free' || billed.gift) ? planLine(billed) : (allowed?.plan ?? null),
   );
-  const needs = $derived(nearest && nearest.share >= 0.8 ? nearest.said : null);
+
+  /**
+   * THE TWO COUNTS THE SITE SELLS, read from the record itself: this month's Slash questions as Slash counted them (live,
+   * where the ledger is a night behind), and the AI tools connected now, from its keys. Both are the owner's to read, and
+   * asked only on the Cloud for a record this person owns; either one that cannot be read is left out of the tile.
+   */
+  let questions = $state<number | null>(null);
+  let tools = $state<number | null>(null);
+  $effect(() => {
+    if (!hosted || !anOwner || !billed?.limits) return;
+    untrack(() => {
+      const c = createClient({ base: apiBase(page.url) });
+      if (page.data.slash === true)
+        void c
+          .slashStatus()
+          .then((s) => {
+            if (s.ok) questions = metered(s.value) ? s.value.asks.used : null;
+          })
+          .catch(() => undefined);
+      void c
+        .listTokens()
+        .then((out) => {
+          if (out.ok) tools = toolsConnected(out.value as Parameters<typeof toolsConnected>[0], Date.now());
+        })
+        .catch(() => undefined);
+    });
+  });
+  /* THE LEDGER'S COUNT OF QUESTIONS WHERE SLASH'S OWN COULD NOT BE READ. */
+  const questionsUsed = $derived(questions ?? allowed?.asks?.asks ?? null);
+  const resets = $derived(allowed?.resets ?? null);
+  const limits = $derived(
+    limitBars({ limits: billed?.limits ?? null, questions: questionsUsed, tools, meters, resets: resets ?? tileWords.nextMonth }),
+  );
   const reading = $derived(
     [
-      /* THE NEAREST LIMIT IS NAMED ONLY ONCE IT IS HALF USED: under that, every limit is far, and naming one worried a
-         person at 1 run of 1,000 (first hour audit, E9). */
-      allowed?.binding && nearest && nearest.share >= 0.5
-        ? actionWords.binding(allowed.binding)
-        : allowed?.binding
-          ? actionWords.withinAll
-          : `${actionWords.noUsage}.`,
-      allowed?.slash ?? null,
+      limits.full.length > 0
+        ? null
+        : allowed?.binding && meters.some((m) => m.binding && m.share >= 0.5)
+          ? actionWords.binding(allowed.binding)
+          : allowed?.binding
+            ? actionWords.withinAll
+            : allowed
+              ? `${actionWords.noUsage}.`
+              : null,
+      ...limits.near,
       allowed?.extra ?? null,
     ]
       .filter((x): x is string => x !== null)
       .join(' '),
   );
+  /* THE WAY ON FROM A LIMIT: the next plan where one is on sale, said beside the red lines. */
+  const wayUp = $derived(billed && bill.value ? (upgradeOf(billed, bill.value)?.plan ?? moveUpOf(billed, bill.value)) : null);
+
+  /**
+   * THE INVOICES OF THE RECORD ON SCREEN, asked only where Stripe has something to show for it (`managedAtStripe`): a
+   * free record, a gift and a host with billing off have none, and are asked nothing.
+   */
+  const invoiced = $derived(billed && bill.value && managedAtStripe(billed, bill.value) ? billed.record : null);
+  const invoices = read(() => (invoiced ? `invoices ${invoiced}` : null), () => readInvoices(invoiced ?? ''), {
+    empty: (v: Invoice[]) => v.length === 0,
+  });
 
   /**
    * AND BILLING ASKS THE MAIL DOOR, because it is the one answer only a self-host gives.
@@ -175,11 +223,19 @@
 </div>
 {/snippet}
 
-{#if meters.length > 0 && allowed}
-  <Tile icon="money" title={tileWords.planTitle} meta={tileWords.monthMeta(month.day, month.of, allowed.resets)} lead>
+{#if limits.bars.length > 0}
+  <Tile icon="money" title={tileWords.planTitle} meta={resets ? tileWords.monthMeta(month.day, month.of, resets) : undefined} lead>
     {#if figure}<p class="figure num">{figure}</p>{/if}
-    <Bars items={meterBars(meters)} max={1} format={shareOf} subject={tileWords.metersSubject} />
-    <p class="reading">{reading}{#if needs}{' '}<span data-needs>{needs}</span>{/if}</p>
+    <Bars items={limits.bars} max={1} format={shareOf} subject={tileWords.metersSubject} />
+    {#if reading}<p class="reading">{reading}</p>{/if}
+    {#each limits.full as line (line)}<p class="reading" data-needs>{line}</p>{/each}
+    {#if limits.full.length > 0 && wayUp && billed}
+      <div class="row-actions">
+        <Button weight="primary" onclick={() => goPay(billed.plan === 'free' ? 'checkout' : 'portal', billed, wayUp.id)} aria-busy={going === billed.record} disabled={going !== null}
+          >{going === billed.record ? copy.billingOpening : billed.plan === 'free' ? copy.billingUpgrade(wayUp.name) : copy.billingMoveTo(wayUp.name)}</Button
+        >
+      </div>
+    {/if}
   </Tile>
 {/if}
 
@@ -206,6 +262,7 @@
             {@const late = r.state === 'past_due' || r.state === 'lapsed'}
             {@const upgrade = upgradeOf(r, bill.value)}
             {@const credits = packsOf(r, bill.value)}
+            {@const moveUp = moveUpOf(r, bill.value)}
             {@const said = r.state !== 'unbilled' || r.gift ? stateLine(r, shell.now) : ''}
             <li class="bill">
               <IconWell name="money" size="l" tone={late ? 'danger' : undefined} />
@@ -242,6 +299,10 @@
                   <Button onclick={() => goPay('checkout', r, upgrade.plan.id)} aria-busy={going === r.record} disabled={going !== null}
                     >{going === r.record ? copy.billingOpening : copy.billingUpgrade(upgrade.plan.name)}</Button
                   >
+                  {#if upgrade.also}
+                    {@const also = upgrade.also}
+                    <Button weight="quiet" onclick={() => goPay('checkout', r, also.id)} disabled={going !== null}>{copy.billingUpgrade(also.name)}</Button>
+                  {/if}
                 </div>
               {/if}
               <!-- THE ACTIONS STRIPE CAN TAKE, and only while this host is taking payments: with billing off every
@@ -254,6 +315,9 @@
                       >{going === r.record ? copy.billingOpening : copy.billingPayAgain}</Button
                     >
                   {/if}
+                  {#if moveUp}
+                    <Button onclick={() => goPay('portal', r, moveUp.id)} disabled={going !== null}>{copy.billingMoveTo(moveUp.name)}</Button>
+                  {/if}
                   <Button onclick={() => goPay('portal', r)} aria-busy={going === r.record} disabled={going !== null}
                     >{copy.billingManage}</Button
                   >
@@ -262,6 +326,7 @@
             </li>
           {/each}
         </ul>
+        {#if bill.value.tax && bill.value.open}<p class="hint">{billWords.taxAdded}</p>{/if}
       {:else if bill.state === 'empty'}
         <Empty kind="no-data-yet" compact title={copy.billingNoneOwned} />
       {:else if bill.state !== 'ready'}
@@ -270,6 +335,35 @@
       {@render foot()}
     </div>
   </Tile>
+  <!-- THE INVOICES OF THE RECORD ON SCREEN, each with its day, its amount and Stripe's own page and PDF. Drawn only
+       where Stripe has something for it; the portal holds the full history. -->
+  {#if invoiced}
+    <Tile icon="history" class="section" data-surface="tile" title={billWords.invoicesTitle}>
+      <div class="section-body">
+        {#if invoices.state === 'ready' && invoices.value}
+          <ul class="invoices">
+            {#each invoices.value as i (i.id)}
+              {@const state = invoiceState(i)}
+              <li class="invoice">
+                <span class="invoice-day">{dayOf(i.at, shell.now)}</span>
+                <span class="invoice-amount num">{invoiceAmount(i, homeCurrency())}</span>
+                <span class="invoice-state" data-state={i.status}>{state ?? ''}</span>
+                <span class="invoice-links">
+                  {#if i.url}<a href={i.url} target="_blank" rel="noopener noreferrer">{billWords.invoiceView}</a>{/if}
+                  {#if i.pdf}<a href={i.pdf} target="_blank" rel="noopener noreferrer">{billWords.invoicePdf}</a>{/if}
+                </span>
+              </li>
+            {/each}
+          </ul>
+          <p class="hint">{billWords.invoicesAll}</p>
+        {:else if invoices.state === 'empty'}
+          <p class="hint">{billWords.invoicesNone}</p>
+        {:else if invoices.state !== 'ready'}
+          <ReadState state={invoices.state} refusal={invoices.refusal} onretry={() => void invoices.reread()} />
+        {/if}
+      </div>
+    </Tile>
+  {/if}
 {:else}
   <!-- THE CARD SAYS WHAT IT HOLDS: it was "Billing" under a page called Billing, over a row
        saying Not billed. The state is the card's title now, and the host's sentence its one line. -->
@@ -309,7 +403,7 @@
     line-height: 20px;
   }
 
-  .reading [data-needs] {
+  .reading[data-needs] {
     color: var(--red);
     font-weight: 500;
   }
@@ -409,6 +503,52 @@
     gap: 6px;
   }
 
+  /* THE INVOICES, one row each: the day, the amount, a word when it is not simply paid, and Stripe's two pages. */
+  .invoices {
+    display: grid;
+    margin: 0 0 var(--sp-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .invoice {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    align-items: baseline;
+    column-gap: var(--sp-3);
+    padding-block: var(--sp-2);
+    color: var(--ink);
+    font-size: var(--fs-body);
+  }
+
+  .invoice + .invoice {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .invoice-amount {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .invoice-state {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .invoice-state[data-state='open'],
+  .invoice-state[data-state='uncollectible'] {
+    color: var(--red);
+  }
+
+  .invoice-links {
+    display: flex;
+    gap: var(--sp-3);
+    font-size: var(--fs-meta);
+  }
+
+  .invoice-links a {
+    color: var(--ink-2);
+  }
+
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
      are two buttons off the edge. */
   .row-actions {
@@ -431,6 +571,11 @@
       grid-column: 2;
       flex-direction: column;
       align-items: stretch;
+    }
+
+    .invoice {
+      grid-template-columns: minmax(0, 1fr) auto;
+      row-gap: 2px;
     }
 
     .row-actions,

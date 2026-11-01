@@ -51,9 +51,24 @@
      is the banner's business. A member of somebody else's record is not listed, because billing is the owner's. */
   const here = $derived(thisRecord(answer, shell.index.slug));
   const lines = $derived(lapseLines(here, shell.now));
+  /* A CARD THAT FAILED IS SAID TOO, KINDLY AND IN AMBER: nothing is locked yet, Stripe tries again, and one press opens
+     the page where the card is changed. Only to the owner, who is the only one the answer lists the record for. */
+  const behind = $derived(answer?.open === true && here?.state === 'past_due' && !here.gift);
 
   /* ONE CHECKOUT AT A TIME, for the reason Settings > Billing gives: a second press would open a second payment. */
   let going = $state(false);
+
+  async function newCard() {
+    if (going || !here) return;
+    going = true;
+    const out = await paymentPage('portal', here.record);
+    if (out.ok) {
+      openOutside(out.value, { here: true });
+      return;
+    }
+    going = false;
+    toasts.push(out.refusal.fix, { intent: 'warn' });
+  }
 
   async function payAgain() {
     if (going || !here) return;
@@ -77,6 +92,15 @@
         >{going ? copy.billingOpening : copy.billingPayAgain}</Button
       >
       <Button href="/settings/export"><Icon name="download" size="m" />{copy.export}</Button>
+    {/snippet}
+  </Banner>
+{/if}
+{#if behind && here && !lines}
+  <Banner tone="warn" icon="money">
+    {copy.billingPastDueLine}
+    {#snippet actions()}
+      <Button onclick={newCard} aria-busy={going} disabled={going}>{going ? copy.billingOpening : copy.billingUpdateCard}</Button>
+      <Button weight="quiet" href="/settings/billing">{copy.billingSee}</Button>
     {/snippet}
   </Banner>
 {/if}

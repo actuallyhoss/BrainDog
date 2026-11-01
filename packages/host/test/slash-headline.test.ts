@@ -175,7 +175,7 @@ test('SKILL DRAFTS AND THE MODEL-JOBS PASS cannot spend the headlines: with the 
   }
   const spent = await meter.background('skill');
   assert.equal(spent.ok, false);
-  if (!spent.ok) assert.match(spent.refusal.fix, /background Slash asks are spent until 2026-11-01/u);
+  if (!spent.ok) assert.match(spent.refusal.fix, /background Slash questions are used until 2026-11-01/u);
 
   const headline = await meter.background('headline');
   assert.ok(headline.ok, 'the skill drafts and digests ate the headlines');

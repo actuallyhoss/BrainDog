@@ -722,9 +722,16 @@ export const account = {
   billingPlanPlus: 'Cloud Plus',
   /* FREE, the plan a record made without paying is on: named, then one calm offer of the paid plan. */
   billingPlanFree: 'Free',
-  billingFreeOffer: (plan: string, price: string) =>
-    `Everything in the app, for one person. When you need more Slash, more automations or colleagues, ${plan} is ${price}.`,
+  /* THE OFFER UNDER A FREE RECORD: what the next plan adds in the figures the site sells, then its price. `more` is
+     "80 Slash questions and 15 AI tools", built by `upgradeOf` from the Worker's own limits. */
+  billingFreeOffer: (plan: string, price: string, more: string | null) =>
+    more ? `Everything in the app, for one person. ${plan} gives you ${more}, for ${price}.` : `Everything in the app, for one person. ${plan} is ${price}.`,
   billingUpgrade: (plan: string) => `Upgrade to ${plan}`,
+  billingMoveTo: (plan: string) => `Move to ${plan}`,
+  /* THE SHELL'S AMBER LINE OVER A RECORD WHOSE CARD FAILED: nothing is locked yet, and one press fixes it. */
+  billingPastDueLine: 'The last payment for this BrainDog did not go through. Nothing is locked: Stripe tries the card again over the next few days, and a new card settles it now.',
+  billingUpdateCard: 'Update the card',
+  billingSee: 'See billing',
   billingPaidThrough: (day: string) => `Paid through ${day}.`,
   billingPaid: 'Paid and up to date.',
   billingPastDue: 'The last payment did not go through. Stripe will try again; update the card.',
@@ -736,7 +743,9 @@ export const account = {
   billingPayAgain: 'Pay again',
   billingOpening: 'Opening the payment page',
   /* ABOUT BRAINDOG'S OWN PLANS: "not taking payments" read as if her bakery had stopped taking them (E9). */
-  billingNotOpen: 'Paid plans are not open yet, so there is nothing to pay or change here.',
+  /* N2 AND N3, THE SITE'S OWN WORDS: the paid plans are named, monthly, coming soon and priced at launch, and nothing made
+     on Free is lost or locked when they arrive. */
+  billingNotOpen: 'Cloud and Cloud Plus, the monthly plans, are coming soon and priced at launch. Nothing you make now will be lost or locked when they arrive.',
   billingNoneOwned: 'Billing belongs to the owner, and you own no BrainDog here.',
   billingUnread: 'What your BrainDog costs could not be read just now. Try again in a minute.',
   /* The Worker's `LAPSED_FIX` (`apps/worker/src/lapse.ts`), word for word, because the banner and a refused write must

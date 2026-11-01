@@ -1766,12 +1766,12 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
     const s = tierOf();
     if (s === undefined || !hostDrafted(s.tier)) return null;
     if (drafted() < s.ask_cap) return null;
-    const until = monthOf(deps.clock.now(), 1).slice(0, 10);
+    const until = dayOf(monthOf(deps.clock.now(), 1));
     /* THE ASK TURNED AWAY LEAVES ITS ROW (`slash-turned-away.ts`, model-sign-49). */
     turnedAway(deps.sql, new Date(deps.clock.now()).toISOString(), 'read', s.tier);
     return {
       code: 'SLASH_BUDGET_SPENT',
-      fix: `Slash reads and answers each question on this host's model, and those asks are spent until ${until}. Raise the monthly limit, or wait.`,
+      fix: `This month's Slash questions are used, so this one was not sent to the model. They come back on ${until}. Your own rules still read what you tell it; raise your monthly limit in Settings, or see Billing for more.`,
     };
   };
 
@@ -1812,7 +1812,7 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
         ok: false,
         refusal: {
           code: 'SLASH_BUDGET_SPENT',
-          fix: `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and this month's asks are spent until ${until}. Raise the monthly limit, or wait.`,
+          fix: `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and this month's Slash questions are used until ${until}. Raise the monthly limit, or wait.`,
         },
       });
     };

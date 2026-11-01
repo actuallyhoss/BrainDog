@@ -110,7 +110,7 @@ test('AT THE LIMIT AN ACTION WAITS UNTIL THE FIRST OF NEXT MONTH, UTC, and the s
   value(d.meter(record, run({ at: '2026-09-15T11:00:00.000Z' })));
   assert.deepEqual(d.mayRun(record, 'npm downloads'), {
     until: Date.UTC(2026, 9, 1),
-    say: 'npm downloads is waiting until 1 October. This BrainDog has used its 15,000 runs for September.',
+    say: 'npm downloads is waiting until 1 October. This BrainDog has used its 15,000 runs for September. Nothing you made is touched, and Settings > Billing has more.',
   });
 
   /* A new month is a new allowance, and December's turns into January of the next year. */
@@ -238,7 +238,7 @@ test('THE LEDGER AGREES WITH THE RECORD’S OWN EVENTS, and a record at its limi
   const held = await pass();
   assert.deepEqual([held.held, sent], [1, 3]);
   const note = sql.one<{ note: string }>("SELECT note FROM event WHERE kind = 'pull' AND to_v IS NOT NULL ORDER BY rowid DESC LIMIT 1")?.note;
-  assert.equal(note, 'ping is waiting until 1 October. This BrainDog has used its 15,000 runs for September.');
+  assert.equal(note, 'ping is waiting until 1 October. This BrainDog has used its 15,000 runs for September. Nothing you made is touched, and Settings > Billing has more.');
   assert.deepEqual([month().totals.held, month().month.used.runs], [1, ALLOWANCE.hosted!.runs]);
 
   /* When the month turns it runs again, on its own. */

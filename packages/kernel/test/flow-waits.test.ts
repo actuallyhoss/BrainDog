@@ -342,7 +342,7 @@ test('A REFUSAL ACKED AS result.failed ENDS THE RUN ON ITS OWN SENTENCE, not on 
   /* A MEASUREMENT, AS A TEST. The host's pass acks a refusal `done` with the package's sentence under `result.failed`,
      and `ack` read `result.text` alone, so the month's sentence was thrown away and the run said "Slash answered job
      ... with no text". */
-  const spent = "rule.pick asked Slash at step 1, and this month's asks are spent until 1 October. Raise the monthly limit, or wait.";
+  const spent = "rule.pick asked Slash at step 1, and this month's Slash questions are used until 1 October. Raise the monthly limit, or wait.";
   const { k, sql } = await slashed(rule({ rule: 'pick', on: { manual: true }, steps: [{ ask_slash: { question: 'Which?', as: 'which' } }, { notify: { say: '{{vars.which}}' } }] }));
   value(k.automationRun('pick', 'p_1'));
   await k.drain();

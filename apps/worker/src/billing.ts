@@ -119,6 +119,16 @@ export const planPrice = (plan: ListedPlan): string => {
 };
 
 /**
+ * What a plan holds that a person counts, from the one table of plans: Slash questions a month, AI tools connected at
+ * once, people, runs a month, and whether a second person may join. `null` is no limit. The list sends it beside each record and each plan on sale, so the
+ * Billing page draws its meters and its offer against the figures the site sells, never its own copy of them.
+ */
+export const limitsOf = (plan: ListedPlan): { questions: number | null; tools: number | null; people: number | null; runs: number | null; teams: boolean } => {
+  const row = PLAN_TABLE[meteredAs(plan)];
+  return { questions: row.credits, tools: row.agents, people: row.people, runs: row.allowance?.runs ?? null, teams: row.teams };
+};
+
+/**
  * How many days after its lapse began a record is deleted: the ladder's last step, which the nightly walk takes.
  * `delete_on` in the list is that day, so the screen and the walk read one number.
  */
@@ -283,8 +293,8 @@ const PACK_IDS = Object.keys(PACK_SETTINGS) as PackId[];
 /** A pack's figures from the one table, or `null` for one it does not hold. */
 const packOf = (id: PackId): Pack | null => PACKS.find((p) => p.id === id) ?? null;
 
-/** A pack as a person reads it: "100 Slash credits". */
-export const packName = (pack: Pack): string => `${String(pack.credits)} Slash credits`;
+/** A pack as a person reads it: "100 Slash questions", the one word for Slash's allowance (E17). */
+export const packName = (pack: Pack): string => `${String(pack.credits)} Slash questions`;
 
 /** A pack's Stripe price, or `null` while its setting is empty: that pack is not sold on this host. */
 export const packPrice = (env: BillingEnv, pack: PackId): string | null => {
@@ -748,6 +758,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
             state: row ? row.state : 'unbilled',
             plan,
             price: planPrice(plan),
+            limits: limitsOf(plan),
             credits,
             ...(row && isGift(row) ? { gift: true } : {}),
             ...(row && row.period_end !== null ? { period_end: row.period_end } : {}),
@@ -755,7 +766,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
           };
         }),
     );
-    const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: planName(p), price: planPrice(p) }));
+    const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: planName(p), price: planPrice(p), limits: limitsOf(p) }));
     const open = sells(env);
     const canMake = signupMode(env) !== 'closed' && !records.some((r) => r.plan === 'free');
     return ok({ records, open, plans: open ? sold : [], packs: packsOnSale(env), extra: sellsExtra(env), tax: open && taxOn(env), canMake, teams_held: (env as { TEAMS_HELD?: string }).TEAMS_HELD === '1' });

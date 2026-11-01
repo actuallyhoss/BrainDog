@@ -885,7 +885,7 @@ function planCeiling(engine: Slash, sql: Sql): Slash {
       const name = on === undefined ? 'This plan' : PLAN_TABLE[on].name;
       return no(
         'VALUE_MALFORMED',
-        `${name} comes with ${most} Slash asks a month, so the monthly ask limit is ${most} or lower.${up === null ? '' : ` ${PLAN_TABLE[up].name} comes with more.`}`,
+        `${name} comes with ${most} Slash questions a month, so the monthly limit is ${most} or lower.${up === null ? '' : ` ${PLAN_TABLE[up].name} comes with more.`}`,
         { at: 'ask_cap' },
       );
     }
@@ -1099,7 +1099,7 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, budget
   const refused = <T>(kind: 'read' | 'propose' | 'pattern' = 'read'): Result<T> => {
     /* THE ASK TURNED AWAY LEAVES ITS ROW (`@braindog/host/slash` `turnedAway`, model-sign-49). */
     turnedAway(deps.sql, new Date(deps.clock.now()).toISOString(), kind, 'a');
-    return no('SLASH_BUDGET_SPENT', `Slash has asked this host's model as often as one record may in a month, so it is out of asks until ${until().slice(0, 10)}.`);
+    return no('SLASH_BUDGET_SPENT', `Slash has asked this host's model as often as one BrainDog may in a month, so its questions are used until ${until().slice(0, 10)}.`);
   };
 
   const capped = Object.create(engine) as Slash;
@@ -1134,7 +1134,7 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, budget
     return Promise.resolve(
       no(
         'SLASH_BUDGET_SPENT',
-        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and this BrainDog has used every ask this host's model allows one BrainDog in a month, so the run stopped there. Asks start again on ${next.getUTCDate()} ${MONTHS[next.getUTCMonth()]}.`,
+        `rule.${ask.rule} asked Slash at step ${ask.step + 1}, and this BrainDog has used every question this host's model allows one BrainDog in a month, so the run stopped there. Questions start again on ${next.getUTCDate()} ${MONTHS[next.getUTCMonth()]}.`,
       ),
     );
   };
@@ -1144,8 +1144,8 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, budget
       return no(
         'VALUE_MALFORMED',
         asks === 0
-          ? "This host's included model answers no asks, so the monthly ask limit here is 0."
-          : `This host's included model answers at most ${grouped(asks)} asks a month for one record, so the monthly ask limit is ${grouped(asks)} or lower.`,
+          ? "This host's included model answers no questions, so the monthly limit here is 0."
+          : `This host's included model answers at most ${grouped(asks)} questions a month for one BrainDog, so the monthly limit is ${grouped(asks)} or lower.`,
         { at: 'ask_cap' },
       );
     return engine.configure(patch, ctx);

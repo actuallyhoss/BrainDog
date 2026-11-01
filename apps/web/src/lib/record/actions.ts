@@ -273,9 +273,9 @@ export const words = {
      model did. */
   slashLine: (asks: number, neurons: number, cap: number | null, when: string) =>
     asks === 0
-      ? `Slash was not asked anything ${when}${cap !== null ? `, of the ${cap.toLocaleString('en-GB')} asks a month allows` : ''}.`
+      ? `Slash was not asked anything ${when}${cap !== null ? `, of the ${cap.toLocaleString('en-GB')} questions a month allows` : ''}.`
       : `Slash was asked ${asks === 1 ? 'once' : `${asks.toLocaleString('en-GB')} times`} ${when}` +
-        (cap !== null ? `, of the ${cap.toLocaleString('en-GB')} asks a month allows` : '') +
+        (cap !== null ? `, of the ${cap.toLocaleString('en-GB')} questions a month allows` : '') +
         (neurons > 0 ? `, and the model did ${neurons.toLocaleString('en-GB')} ${neurons === 1 ? 'unit' : 'units'} of work answering.` : '.'),
   thisMonth: 'this month',
   inMonth: (month: string) => `in ${month}`,

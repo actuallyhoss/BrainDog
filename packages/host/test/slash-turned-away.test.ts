@@ -41,5 +41,5 @@ test("THE BYO GUARD'S OWN REFUSAL LEAVES THE ROW, and five answers then the spen
   const read = readModelSign(k, sql, NOW);
   assert.equal(read.state, 'red', read.said);
   assert.doesNotMatch(read.said, /answered all/u);
-  assert.match(read.said, /month's asks are spent: 3 asks/u);
+  assert.match(read.said, /month's Slash questions are used: 3 questions/u);
 });

@@ -39,7 +39,7 @@ export const capOf = (typed: string): number | null => {
 
 /** The toast after a saved limit. */
 export const capSaid = (cap: number): string =>
-  cap === 0 ? 'Slash is off until you raise the limit.' : `Slash answers up to ${cap} ${cap === 1 ? 'ask' : 'asks'} a month.`;
+  cap === 0 ? 'Slash is off until you raise the limit.' : `Slash answers up to ${cap} ${cap === 1 ? 'question' : 'questions'} a month.`;
 
 /**
  * How many calls the Slash section on `/usage` asks the ledger for: the most its door answers (`history` in
@@ -261,13 +261,13 @@ export const purposeLines = (m: SpentMonth, background: boolean): string[] =>
 
 /** A call's cost as the line says it. */
 export const costSaid = (cost: number, background: boolean): string =>
-  cost === 0 ? words.free : `${cost} ${background ? 'background ' : ''}${cost === 1 ? 'ask' : 'asks'}`;
+  cost === 0 ? words.free : `${cost} ${background ? 'background ' : ''}${cost === 1 ? 'question' : 'questions'}`;
 
 /** His asks this month, as the section's first meter says them, or `null` on `byo`, where nothing is counted. */
 export const asksLine = (s: SlashStatus): string | null => {
   const shown = asksShown(s);
   if (shown === null) return null;
-  return metered(s) ? `${shown} asks this month` : `${shown} ${s.asks.used === 1 ? 'ask' : 'asks'} on your key this month`;
+  return metered(s) ? `${shown} questions this month` : `${shown} ${s.asks.used === 1 ? 'question' : 'questions'} on your key this month`;
 };
 
 /**
@@ -277,31 +277,31 @@ export const asksLine = (s: SlashStatus): string | null => {
  */
 export const backgroundLine = (m: SpentMonth, exact?: { used: number; cap: number }): string =>
   exact
-    ? `${exact.used.toLocaleString('en-GB')} of ${exact.cap.toLocaleString('en-GB')} background asks this month`
-    : `${m.whole ? '' : 'At least '}${m.background.toLocaleString('en-GB')} background ${m.background === 1 && m.whole ? 'ask' : 'asks'} this month`;
+    ? `${exact.used.toLocaleString('en-GB')} of ${exact.cap.toLocaleString('en-GB')} background questions this month`
+    : `${m.whole ? '' : 'At least '}${m.background.toLocaleString('en-GB')} background ${m.background === 1 && m.whole ? 'question' : 'questions'} this month`;
 
 /**
  * Where the two buttons go when the month's asks are spent. Both are the Agents area of
  * Settings, where `SlashModel` is: "Use your own key" lands on its own-key choice, whose hint carries that id.
  */
-export const outOfAsks = { key: '/settings/agents#slash-kind-key', settings: '/settings/agents' } as const;
+export const outOfAsks = { key: '/settings/agents#slash-kind-key', settings: '/settings/agents', plans: '/settings/billing' } as const;
 
 export const words = {
   title: 'Slash',
-  asks: 'Asks this month',
-  keyAsks: 'Asks on your key this month',
+  asks: 'Questions this month',
+  keyAsks: 'Questions on your key this month',
   keyHint: 'Your provider bills these, so Slash lists them and sets no limit.',
   model: 'Model',
   resets: 'Resets',
-  spent: 'Out of asks',
+  spent: 'Questions used',
   noModel: 'Slash suggests from your own rules until a model is connected.',
   capLabel: 'Monthly limit',
-  capHint: 'The most asks Slash answers in a month. Zero turns Slash off.',
+  capHint: 'The most questions Slash answers in a month. Zero turns Slash off.',
   capGo: 'Save the limit',
   /* The Slash section of `/usage`. */
-  byDay: 'Asks by day',
+  byDay: 'Questions by day',
   none: 'Nothing asked of Slash this month. Each question you ask, and what it cost, is listed here by day.',
-  partial: 'The newest asks are listed here; the earlier ones this month are in the count above.',
+  partial: 'The newest questions are listed here; the earlier ones this month are in the count above.',
   erased: 'A question since erased',
   workOther: 'Background work',
   workElse: 'Other background work',
@@ -309,7 +309,8 @@ export const words = {
   free: 'Cost nothing',
   filed: 'Open in Needs you',
   refused: 'not answered',
-  out: (resets: string) => `Slash is out of asks until ${resets}.`,
+  out: (resets: string) => `This month's Slash questions are used. They come back on ${resets}.`,
   outKey: 'Use your own key',
   outSettings: 'Settings',
+  outPlans: 'See plans',
 } as const;
