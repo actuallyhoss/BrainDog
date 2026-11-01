@@ -45,12 +45,20 @@
 -->
 <script lang="ts">
   import { tick, untrack } from 'svelte';
+  import { flip } from 'svelte/animate';
+  import { cubicOut } from 'svelte/easing';
   import { overlays } from '../a11y/keys.svelte.ts';
   import { copy } from '../copy/frame.ts';
   import Icon from './Icon.svelte';
   import Kbd from './Kbd.svelte';
   import { scrims, settled } from './panel.ts';
   import { toasts, type Toast } from './toast.svelte.ts';
+  import { ms, still } from './motion.ts';
+
+  /* THE OTHERS CLOSE THE GAP (skills pass, 2 Nov): when one toast in a stack has gone, the ones above it dropped into its
+     place in one frame. They slide there over `--d-rows` on the out curve; chrome, so no spring. At once under reduced
+     motion. */
+  const closeUp = () => ({ duration: still() ? 0 : ms('--d-rows', 180), easing: cubicOut });
 
   /**
    * WHAT THE STACK DRAWS: every live toast, and each one that has just gone, for its exit. The newest first, which the
@@ -174,6 +182,7 @@
       data-held={held ? '' : undefined}
       inert={gone || held}
       aria-hidden={gone ? 'true' : undefined}
+      animate:flip={closeUp()}
     >
       {#if toast.intent}
         <span class="tone" aria-hidden="true"><Icon name={GLYPH[toast.intent]} size="m" /></span>

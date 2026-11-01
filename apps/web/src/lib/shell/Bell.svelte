@@ -439,7 +439,7 @@
     color: var(--ink);
     transform-origin: 100% 0;
     transition-property: transform, opacity;
-    transition-duration: 160ms;
+    transition-duration: var(--d-swap);
     transition-timing-function: var(--ease-out);
   }
 

@@ -361,7 +361,11 @@
     background: var(--segment-on);
     border-radius: var(--r-xs);
     transform: translate(var(--x), var(--y));
-    transition: transform var(--d-state) var(--ease-out);
+    /* A TRAVEL, NOT A STATE: over the swap's step, so the eye can follow it from one choice to the next (it was the
+       90ms state step, which read as a jump at 80px and more). Its width follows with it. */
+    transition:
+      transform var(--d-swap) var(--ease-out),
+      inline-size var(--d-swap) var(--ease-out);
     pointer-events: none;
   }
 

@@ -968,7 +968,11 @@
     if (typeof document.startViewTransition !== 'function') return;
     /* Asked for less motion: the page just changes, no fade stands in for it. */
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    if (nav.from === null || nav.to === null || nav.from.url.pathname === nav.to.url.pathname) return;
+    /* A PLACE, NOT A PATH (skills pass, 2 Nov): Work (`/?work`) and the phone's Menu (`/?menu`) are places of their own
+       at Today's path, and they cut while every other place cross-faded. `placeOf` tells them apart; any other query is
+       the same screen answering a filter, and stays still. */
+    if (nav.from === null || nav.to === null) return;
+    if (placeOf(here(nav.from.url.pathname), nav.from.url.searchParams) === placeOf(here(nav.to.url.pathname), nav.to.url.searchParams)) return;
     const root = document.documentElement;
     return new Promise<void>((done) => {
       root.dataset.moving = '';
