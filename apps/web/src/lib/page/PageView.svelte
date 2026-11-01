@@ -1633,6 +1633,25 @@
       min-block-size: var(--tap);
       color: var(--ink);
     }
+
+    /* THE GLYPHS AT THE SIZE THE HEAD DRAWS THEM ON A PHONE (`PageHead.svelte`): the red + a 36 square with a 16px
+       glyph, a quiet glyph at 20. At 12 in a 44 square they read as specks (People at 390, 1 Nov). */
+    .lead-actions :global(.btn[data-weight='primary']:has(.icon):not(dialog *)) {
+      inline-size: 36px;
+      min-inline-size: 36px;
+      min-block-size: 36px;
+      margin: 4px;
+    }
+
+    .lead-actions :global(.btn[data-weight='primary']:has(.icon):not(dialog *) .icon[data-size]) {
+      inline-size: var(--icon-m);
+      block-size: var(--icon-m);
+    }
+
+    .lead-actions :global(:is(.btn[data-weight='quiet'], .change-more, .share-trigger):not(dialog *) .icon[data-size]) {
+      inline-size: var(--icon-l);
+      block-size: var(--icon-l);
+    }
   }
 
   /* A DECLARED HEAD'S LINE: one row under the sentence that wraps on a phone. Flat, on the board: no tile,

@@ -1793,16 +1793,16 @@
   }
 
   @media (width >= 640px) {
-    .block-slot[data-lead]:has(> :global(.lead-head[data-barred] + .block[data-kind='note'][data-form='lead'])) {
+    .block-slot[data-lead]:has(> :global(.lead-head[data-barred])):has(> :global(.block[data-kind='note'][data-form='lead'])) {
       grid-template-columns: minmax(0, 1fr) auto;
       column-gap: var(--sp-5);
     }
 
-    .block-slot[data-lead]:has(> :global(.lead-head[data-barred] + .block[data-kind='note'][data-form='lead'])) > :global(*) {
+    .block-slot[data-lead]:has(> :global(.lead-head[data-barred])):has(> :global(.block[data-kind='note'][data-form='lead'])) > :global(*) {
       grid-column: 1 / -1;
     }
 
-    .block-slot[data-lead] > :global(.lead-head[data-barred]:has(+ .block[data-kind='note'][data-form='lead'])) {
+    .block-slot[data-lead]:has(> :global(.block[data-kind='note'][data-form='lead'])) > :global(.lead-head[data-barred]) {
       grid-row: 1;
       grid-column: 2;
       align-self: start;
@@ -1810,7 +1810,9 @@
       margin-block-start: calc((40px - var(--ctl-h)) / 2);
     }
 
-    .block-slot[data-lead] > :global(.lead-head[data-barred] + .block[data-kind='note'][data-form='lead']) {
+    /* THE SENTENCE TAKES THE FIRST ROW'S START even where the page's search stands between it and the buttons in the
+       source (Numbers): the search then opens the row under the sentence. */
+    .block-slot[data-lead]:has(> :global(.lead-head[data-barred])) > :global(.block[data-kind='note'][data-form='lead']) {
       grid-row: 1;
       grid-column: 1;
     }
