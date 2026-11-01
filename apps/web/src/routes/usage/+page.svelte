@@ -48,6 +48,7 @@
   import ReadState from '$lib/ui/ReadState.svelte';
   import SlashUsage from '$lib/ui/SlashUsage.svelte';
   import Bars from '$lib/viz/Bars.svelte';
+  import { lineIn } from '$lib/motion';
   import HeatGrid from '$lib/viz/HeatGrid.svelte';
   import Ring from '$lib/viz/Ring.svelte';
   import Stacked from '$lib/viz/Stacked.svelte';
@@ -135,6 +136,12 @@
       .flatMap((g) => g.actions.map((a) => ({ ...a, project: placeOf(g) })))
       .sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name)),
   );
+  /* A BAR A ROW, AND THE TOP FIVE (G26): nineteen rows of "36 runs" were a table to read; the bars read at a glance, and
+     the rest wait behind "14 more". The bar is the share of the busiest action, one ink. */
+  const TOP = 5;
+  let allActions = $state(false);
+  const mostRuns = $derived(Math.max(1, ...actionRows.map((a) => a.runs)));
+  const actionsShown = $derived(allActions ? actionRows : actionRows.slice(0, TOP));
   /* WHETHER A ROW A PROJECT SAYS ANYTHING: not when every run was in none. */
   const split = $derived(byProject(groups));
   /* A ROW A PROJECT, BUSIEST FIRST, linking to its slice. Everywhere has no slice and no link. */
@@ -154,6 +161,8 @@
   const usageWords = {
     seeAgents: 'Agents',
     seeAutomations: 'Automations',
+    moreActions: (n: number) => `${n} more`,
+    fewer: 'Show the top five',
   } as const;
 
   const said = {
@@ -394,16 +403,22 @@
         </Tile>{/if}
         <Tile class="section" data-surface="tile" icon="play" title={words.byAction} count={actionRows.length || undefined}>
           <div class="section-body">
-            <ul class="ledger use-list">
-              {#each actionRows as a, i (`${a.project} ${a.name} ${i}`)}
-                <li>
-                  <div class="line use-row" data-faint={a.faint ? '' : undefined}>
+            <ul class="ledger use-list use-bars">
+              {#each actionsShown as a, i (`${a.project} ${a.name} ${i}`)}
+                <li in:lineIn>
+                  <div class="line use-row use-bar-row" data-faint={a.faint ? '' : undefined}>
                     <span class="line-title">{a.name}{#if a.project}<span class="use-in">{` · ${a.project}`}</span>{/if}</span>
+                    <span class="use-bar" aria-hidden="true"><span class="use-bar-fill" style:inline-size={`${Math.max(2, (a.runs / mostRuns) * 100)}%`}></span></span>
                     <span class="line-when use-counts">{countsOf(a)}</span>
                   </div>
                 </li>
               {/each}
             </ul>
+            {#if actionRows.length > TOP}
+              <button type="button" class="use-more tap" aria-expanded={allActions} onclick={() => (allActions = !allActions)}
+                >{allActions ? usageWords.fewer : usageWords.moreActions(actionRows.length - TOP)}</button
+              >
+            {/if}
           </div>
         </Tile>
       {:else}
@@ -673,6 +688,84 @@
 
   .use-row[data-faint] .line-title {
     color: var(--ink-2);
+  }
+
+  /* A BAR A ROW (G26): the name, its bar, its figure at the end. The bar is one ink on the well's fill, at a third of
+     the row from 900 up, and under the name on a phone. */
+  .use-bar-row {
+    grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.6fr) 4.5rem;
+    column-gap: var(--sp-4);
+  }
+
+  .use-bar-row .use-counts {
+    justify-content: flex-end;
+    text-align: end;
+  }
+
+  .use-bar {
+    display: block;
+    block-size: 8px;
+    background: var(--tile-2);
+    border-radius: var(--r-xs);
+    overflow: hidden;
+  }
+
+  .use-bar-fill {
+    display: block;
+    block-size: 100%;
+    background: var(--ink-2);
+    border-radius: var(--r-xs);
+  }
+
+  .use-bar-row[data-faint] .use-bar-fill {
+    background: var(--ink-3);
+  }
+
+  .use-more {
+    margin-block-start: var(--sp-2);
+    margin-inline-start: calc(var(--well) + var(--sp-3));
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .use-more:hover {
+      color: var(--ink);
+    }
+  }
+
+  @media (width < 640px) {
+    .use-row.use-bar-row {
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: var(--sp-3);
+      row-gap: var(--sp-1);
+    }
+
+    .use-row.use-bar-row .line-title {
+      grid-column: 1 / -1;
+    }
+
+    .use-row.use-bar-row .use-bar {
+      grid-column: 1;
+      grid-row: 2;
+      align-self: center;
+    }
+
+    .use-row.use-bar-row .use-counts {
+      grid-column: 2;
+      grid-row: 2;
+      white-space: nowrap;
+    }
+
+    .use-more {
+      margin-inline-start: 0;
+    }
   }
 
   /* THE PROJECT AN ACTION RUNS IN, quieter than its name. */
