@@ -1355,8 +1355,11 @@
   <!-- ON A PHONE THE NAME TAKES ITS OWN ROW, three lines at most, with the "…" at its end, and the primary stands under it
        (`.row-head` below): a name, a chip, a primary and a "…" on one row cut "Chase Halden on 2026-041" to "Chase
        Halden…". -->
+  <!-- A PERSON'S PAGE WEARS THEIR FACE, as every list draws them: a who is round, and the list's group glyph beside one
+       person's name read as a crowd. -->
+  {#snippet personWell()}<Face name={String(row?.fields[decl?.title ?? ''] ?? '')} kind="person" you={self && owner} size="l" />{/snippet}
   <div class="row-head">
-  <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : rowNameSaid(id, String(row.fields[decl.title] ?? ''))} sentence={headLine}>
+  <PageHead icon={iconFor(decl?.icon, 'rows')} named kicker={listName(id)} back={`/r/${id}`} title={orgRole ? orgNameSaid(String(row.fields[decl.title] ?? '')) : rowNameSaid(id, String(row.fields[decl.title] ?? ''))} sentence={headLine} well={meets ? personWell : undefined}>
     {#snippet actions()}
       <!-- `Copy id` WAS THE FIRST ACTION IN THIS HEADER. A row's page led with a developer verb: the first control a
            person saw on an invoice was the one that puts `obligations#1` on the clipboard, ahead of anything that does
@@ -1713,7 +1716,7 @@
       <!-- THE TIMELINE: one tile beside the row, a single composer and then what happened and what was said, newest
            first. The history's own refusal is said in it, above whatever comments there are. -->
       <aside class="side">
-        <Tile title={timelineWords.heading}>
+        <Tile icon="history" title={timelineWords.heading}>
           {#if told?.from === 'refused'}
             <Empty kind="error" compact title={told.fix} />
           {/if}
