@@ -1325,7 +1325,7 @@ const FIXED: readonly Resource[] = [
   resource('actions', 'Every scheduled action: what it calls, how often, whether it is paused and why, and this month so far. Keys by name only.'),
   resource('automations', 'Every automation: what starts it, when it runs next, and how its runs went this month.'),
   resource('arrangement', 'How this BrainDog is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits.'),
-  resource('design', 'The design book: every kind of block with an example, the colours, type and spacing, and the layout rules. Read before designing a page, a card or a visual.'),
+  resource('design', 'The design book: the house look (Look B) first, then every kind of block with an example, the colours, type and spacing, and the layout rules. Read before designing a page, a card, a widget or a visual, and follow its look rules.'),
   resource('grammar/page', 'What a page declaration may contain, with one that installs.'),
   resource('grammar/register', "What a list declaration may contain: its keys, each field's keys, and one that installs."),
   resource('grammar/metric', 'What a figure declaration may contain, with one that installs.'),

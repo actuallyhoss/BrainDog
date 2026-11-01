@@ -22,7 +22,7 @@ import { VOICE_KEYS } from '@braindog/declare';
 import { AGGREGATIONS, CAPABILITIES, FIELD_TYPES } from '@braindog/kernel';
 import * as kernel from '@braindog/kernel';
 import * as render from 'braindog-render';
-import { designBook } from 'braindog-render';
+import { designBook, LOOK_B } from 'braindog-render';
 import { LOOK_B_CSS } from '@braindog/theme/look-b.ts';
 import { SCALE_CSS } from '@braindog/theme/scale.ts';
 
@@ -589,7 +589,9 @@ export function grammarOf(name: string): Result<unknown> {
  * description only a `change` is filed. They are the same objects `arrangement({ grammar })` answers, so the model and an
  * agent read one text.
  */
-export const describedGrammar = (): { page: unknown; register: unknown; metric: unknown; rule: unknown; ingest: unknown } => ({
+export const describedGrammar = (): { page: unknown; register: unknown; metric: unknown; rule: unknown; ingest: unknown; design: readonly string[] } => ({
+  /* LOOK B (`loop/DESIGN-SYSTEM.md`): how a page it builds should look, the same lines `braindog:design` opens on. */
+  design: LOOK_B,
   page: PAGE,
   register: REGISTER,
   metric: METRIC,

@@ -28,6 +28,7 @@
     space: 'Space',
     radii: 'Corners',
     layout: 'Layout',
+    look: 'The look',
     voice: 'Voice',
     kinds: 'Blocks and charts',
     compose: 'Composing',
@@ -46,6 +47,11 @@
 
 <div class="book">
   <p class="book-lead">{book.about}</p>
+
+  <!-- LOOK B FIRST (`loop/DESIGN-SYSTEM.md`): the rules every design follows, before the tables it uses. -->
+  <Tile title={words.look}>
+    <ul class="plain">{#each book.look as line (line)}<li>{line}</li>{/each}</ul>
+  </Tile>
 
   <Tile title={words.colours}>
     <ul class="swatches">

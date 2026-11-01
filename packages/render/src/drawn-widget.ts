@@ -86,6 +86,7 @@ export function drawWidgetAsk(line: string, sizes: readonly WidgetSize[]): strin
     `It is drawn in a fixed frame at each of these sizes: ${framesSaid(claimed)}. The frame does not grow; draw what fits it and nothing that scrolls.`,
     claimed.length > 1 ? 'Read braindog.size (or the third value braindog.on hands you) and draw less in the smaller frames.' : '',
     'Say something in words when there is nothing to draw.',
+    'Draw it in the house look, as the design book\'s look rules say: flat on the tile, no gradient, shadow, glow or pill, corners of 8, red only for what is late, failing or below nought, big figures at 600 and tabular.',
   ]
     .filter((l) => l !== '')
     .join('\n');

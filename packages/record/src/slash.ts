@@ -1518,7 +1518,7 @@ export type SlashModelInput = {
    * instructions named grammars and the record sent none of them, so a list's keys were learnt from the refusals Decide
    * showed the owner.
    */
-  grammar?: { page: unknown; register: unknown; metric: unknown; rule: unknown; ingest?: unknown };
+  grammar?: { page: unknown; register: unknown; metric: unknown; rule: unknown; ingest?: unknown; design?: readonly string[] };
   /** The page a description is about, as it is declared (a page drawn per row is its template's declaration). */
   page?: { id: string; body: unknown };
   /**
