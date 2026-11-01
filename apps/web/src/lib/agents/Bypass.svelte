@@ -8,6 +8,7 @@
 
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
+  import { handOver } from '$lib/motion/open.ts';
   import { BYPASS_PREF, bypassOn, bypassSaid, bypassWords as words } from './bypass.ts';
 
   let { prefs }: { prefs?: Record<string, unknown> | undefined } = $props();
@@ -38,7 +39,7 @@
   <div class="switch-row">
     <div class="switch-row-words">
       <span class="switch-row-title">{words.title}</span>
-      <p class="switch-row-line" id="bypass-said">{bypassSaid(on)}</p>
+      {#key on}<p class="switch-row-line" in:handOver id="bypass-said">{bypassSaid(on)}</p>{/key}
       <!-- WHAT STILL NEEDS HIM, ONE PRESS AWAY (G15): the second paragraph that stood under the switch on every visit. -->
       <details class="bypass-more">
         <summary class="tap">{words.more}</summary>
@@ -52,11 +53,11 @@
       aria-checked={on}
       aria-label={words.title}
       aria-describedby="bypass-said bypass-still"
-      disabled={busy}
+      aria-busy={busy}
       onclick={() => void flip()}><span class="switch-track"></span></button
     >
   </div>
-  {#if refusal}<p class="bypass-refused" role="status">{refusal}</p>{/if}
+  {#if refusal}<p class="bypass-refused" role="status" in:handOver>{refusal}</p>{/if}
 </div>
 
 <style>

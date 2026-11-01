@@ -8,6 +8,9 @@
   phone. The sample has no record, so there they stay on this device, and the screen says which it is.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn } from '$lib/motion';
+  import { settle } from '$lib/ui/motion.ts';
   import { invalidateAll } from '$app/navigation';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
@@ -236,7 +239,7 @@
     {#if kept.length > 0}
       <ul class="ledger ledger-lead pen">
         {#each kept as row (row.item.id)}
-          <li class="pen-row">
+          <li class="pen-row" in:lineIn out:dismiss animate:flip={settle()}>
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="check" size="l" tone="earn" /></span>
               <span class="line-main">
@@ -257,7 +260,7 @@
     {:else if penOpen}
       <ul class="ledger ledger-lead pen">
         {#each offers as o (idOf(o))}
-          <li class="pen-row" data-pen={idOf(o)}>
+          <li class="pen-row" data-pen={idOf(o)} in:lineIn out:dismiss animate:flip={settle()}>
             <div class="line line-tall">
               <span class="line-mark"><IconWell name={glyphOf(o)} size="l" /></span>
               <span class="line-main">

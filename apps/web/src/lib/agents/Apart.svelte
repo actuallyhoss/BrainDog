@@ -8,6 +8,7 @@
 
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
+  import { handOver } from '$lib/motion/open.ts';
   import { APART_PREF, apartOnIn, apartSaid, apartWords as words } from './apart.ts';
 
   let { prefs }: { prefs?: Record<string, unknown> | undefined } = $props();
@@ -38,13 +39,13 @@
   <div class="switch-row">
     <div class="switch-row-words">
       <span class="switch-row-title">{words.title}</span>
-      <p class="switch-row-line" id="apart-said">{apartSaid(on)}</p>
+      {#key on}<p class="switch-row-line" in:handOver id="apart-said">{apartSaid(on)}</p>{/key}
     </div>
-    <button type="button" class="switch" role="switch" aria-checked={on} aria-label={words.title} aria-describedby="apart-said" disabled={busy} onclick={() => void flip()}
+    <button type="button" class="switch" role="switch" aria-checked={on} aria-label={words.title} aria-describedby="apart-said" aria-busy={busy} onclick={() => void flip()}
       ><span class="switch-track"></span></button
     >
   </div>
-  {#if refusal}<p class="apart-refused" role="status">{refusal}</p>{/if}
+  {#if refusal}<p class="apart-refused" role="status" in:handOver>{refusal}</p>{/if}
 </div>
 
 <style>

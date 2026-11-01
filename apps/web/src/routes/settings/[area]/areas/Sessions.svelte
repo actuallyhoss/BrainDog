@@ -4,6 +4,9 @@
   and the one press that forgets it.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn } from '$lib/motion';
+  import { settle } from '$lib/ui/motion.ts';
   import { copy } from '$lib/copy.ts';
   import { sessions, signOutEverywhere, type SessionInfo } from '$lib/auth.ts';
   import { since } from 'braindog-render';
@@ -113,7 +116,7 @@
            is; the others are the plain well. -->
       <ul class="ledger ledger-lead sessions">
         {#each ordered as r (r.ref)}
-          <li class="session" data-current={r.current ? '' : undefined}>
+          <li class="session" data-current={r.current ? '' : undefined} in:lineIn out:dismiss animate:flip={settle()}>
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="monitor" size="l" tone={r.current ? 'ink' : undefined} /></span>
               <span class="line-main">

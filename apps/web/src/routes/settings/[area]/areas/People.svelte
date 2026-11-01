@@ -3,6 +3,9 @@
   invitations still waiting, and erasing a person.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { dismiss, lineIn } from '$lib/motion';
+  import { settle as settleRows } from '$lib/ui/motion.ts';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
@@ -534,7 +537,7 @@
            can do on the second, and the sentence directly under the control that sets it. -->
       <ul class="whos">
         {#each people as p (p.id)}
-          <li class="who">
+          <li class="who" in:lineIn out:dismiss animate:flip={settleRows()}>
             <div class="who-head">
               <Face name={said(p)} you={self(p)} kind="person" />
               <span class="who-name">{said(p)}</span>
@@ -913,7 +916,7 @@
           <!-- A ROW THAT RAN OUT STAYS, SAYING SO, with New link beside Withdraw: the owner who hears nothing sees why,
                and one press makes a fresh link giving what this one gave. A waiting row has New link too, for the
                link that was copied somewhere and lost. -->
-          <li class="invite" data-expired={inv.expired ? '' : undefined}>
+          <li class="invite" data-expired={inv.expired ? '' : undefined} in:lineIn out:dismiss animate:flip={settleRows()}>
             <span class="invite-who">{inv.email}</span>
             <span class="invite-when">{inv.expired
               ? copy.inviteRanOut(inviteGives(inv), dateSaid(inv.expires_at.slice(0, 10), recordNow()))
