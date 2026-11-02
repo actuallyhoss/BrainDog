@@ -852,6 +852,8 @@
   /* THE BUTTONS GO TO THE LEAD TILE where the head would hold nothing else (`page-buttons.svelte.ts`): a project's page
      and Projects, from 900px, while the page is read and not arranged. */
   const buttonsHost = hostButtons();
+  /** How long the head waits for a lead tile to take the page's buttons before it draws them itself. */
+  const LEND_WAIT_MS = 1_000;
   const buttonsLent = $derived(mode === 'page' && wide.current && !arranging && !showSource && (projectPage || slug === 'portfolio'));
   /* Attached beside the snippet, which is the template's and not this script's to name. */
   const lendButtons =
@@ -862,7 +864,21 @@
         buttonsHost.buttons = null;
       };
     };
-  const buttonsTaken = $derived(buttonsLent && buttonsHost.held > 0);
+  /* THE HEAD GIVES ITS ROW BACK FROM THE FIRST FRAME, not once the tile has taken the buttons: the lead tile draws a
+     frame or two after the head (its block's code lands after the page's), so the head stood 52px tall over the page
+     and then folded, and every cold open of a project or Projects jumped the whole screen up (layout shift 0.78 on the
+     seed's Kiln, 0.4 on Projects, 2 Nov). Only when no tile has taken them after `LEND_WAIT_MS` does the head draw
+     them itself, as before. */
+  let lentLate = $state(false);
+  $effect(() => {
+    if (!buttonsLent || buttonsHost.held > 0) {
+      lentLate = false;
+      return;
+    }
+    const wait = setTimeout(() => (lentLate = true), LEND_WAIT_MS);
+    return () => clearTimeout(wait);
+  });
+  const buttonsTaken = $derived(buttonsLent && (buttonsHost.held > 0 || !lentLate));
   const headLine = $derived.by((): { at: number; block: LiveBlock } | null => {
     if (!hosting || !live) return null;
     const layout = layoutOf(live.page.page);
