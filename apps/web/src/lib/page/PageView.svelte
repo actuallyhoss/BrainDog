@@ -46,6 +46,7 @@
   import '$lib/money/look.css';
   import { setContext, untrack } from 'svelte';
   import { SHAPE_KEY, type ShapeBox } from './shape-key.ts';
+  import { partLanded } from './part-landed.ts';
   import { MediaQuery } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
@@ -318,7 +319,9 @@
       /* AND THE CODE ITS PARTS ARE DRAWN BY, BEFORE THE HOLD IS SET: the blocks drew as bare headings while
          `ProjectPart` was on its way, and the hero then landed over them and pushed the page 304px down (0.6 of a
          project page's layout shift). Until both are in, the page waits in its bars (`partWaits`). */
-      void Promise.all([import('./shape-hold.svelte.ts'), import('./ProjectPart.svelte')]).then(([{ ShapeHold }]) => {
+      void Promise.all([import('./shape-hold.svelte.ts'), import('./ProjectPart.svelte')]).then(([{ ShapeHold }, part]) => {
+        /* AND KEPT WHERE A SLOT DRAWS IT AT ONCE (`part-landed.ts`), not a frame after the hold. */
+        partLanded.part = part.default;
         if (about?.register !== of.register || about.seq !== of.seq || said !== shapeSaid) return;
         const hold = shapeBox.hold ?? new ShapeHold();
         hold.owner = isOwner;

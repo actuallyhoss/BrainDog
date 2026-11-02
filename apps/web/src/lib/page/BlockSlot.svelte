@@ -93,6 +93,7 @@
   import { drawnOf } from './kinds/drawn.ts';
   import { goto } from '$app/navigation';
   import { landed } from '$lib/home/tile-landed.ts';
+  import { partLanded } from './part-landed.ts';
 
   let {
     block,
@@ -900,7 +901,8 @@
   <!-- THE ROW, its component fetched as the row is drawn, so a page that is no project's carries none of it. -->
   {#if shapeBox?.hold}
     {@const hold = shapeBox.hold}
-    {#await import('./ProjectPart.svelte') then { default: ProjectPart }}<ProjectPart {hold} {parts} />{/await}
+    <!-- AT ONCE WHERE ITS CODE HAS LANDED (`part-landed.ts`), so the hero draws with the hold and moves nothing under it. -->
+    {#await partLanded.part ?? import('./ProjectPart.svelte').then((m) => m.default) then ProjectPart}<ProjectPart {hold} {parts} />{/await}
   {/if}
 {:else if desk && !arranging && !block.refusals.length}
   <!-- THE DESK'S OWN TILE, its component fetched as the tile is drawn, so a page that is not Today carries none of it. -->
