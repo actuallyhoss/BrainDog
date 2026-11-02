@@ -125,6 +125,49 @@ export function fitBoard(board: HTMLElement): void {
   for (const [row, cut] of marks) if (cut) row.dataset.cut = '';
   for (const [foot, said] of before) foot.dataset.moreBefore = said;
   for (const [foot, cut] of recounts) recount(foot, cut);
+  closeUp(board, frames);
+}
+
+/**
+ * NO AIR UNDER A TILE BUT THE BOARD'S GAP (leftovers 2 Nov, 8). On a laptop at rest each row is as tall as the tallest
+ * thing that starts in it, and a tile laid across two rows hands its height to both, so the tile under a short one stood
+ * 75px down (Working now beside Coming up), where every other pair of tiles stands one gap apart. Each tile is moved up
+ * to one gap under whatever stands above it in its own columns, read in the order the packer laid them, and never down;
+ * the board gives back what its foot no longer holds. A move, not a new layout: the grid, the order the screen is read
+ * in and the cells a drag measures stay as they were, and editing draws every frame where its cells are.
+ */
+function closeUp(board: HTMLElement, frames: readonly HTMLElement[]): void {
+  const resting = board.dataset.cols !== '2' && !board.closest('[data-editing]');
+  for (const f of frames) f.style.translate = '';
+  board.style.marginBlockEnd = '';
+  if (!resting || frames.length === 0) return;
+  const gap = parseFloat(getComputedStyle(board).rowGap) || 0;
+  const laid = frames
+    .map((f) => {
+      const css = getComputedStyle(f);
+      const r = f.getBoundingClientRect();
+      const from = parseInt(css.gridColumnStart, 10);
+      const to = parseInt(css.gridColumnEnd, 10);
+      return { f, row: parseInt(css.gridRowStart, 10) || 0, from, to, top: r.top, bottom: r.bottom, height: r.height };
+    })
+    .filter((l) => Number.isFinite(l.from) && Number.isFinite(l.to) && l.to > l.from && l.height > 0)
+    .sort((a, b) => a.row - b.row || a.from - b.from);
+  const floor = new Map<number, number>();
+  const moves: [HTMLElement, number][] = [];
+  let lowest = -Infinity;
+  for (const l of laid) {
+    let above = -Infinity;
+    for (let c = l.from; c < l.to; c += 1) above = Math.max(above, floor.get(c) ?? -Infinity);
+    const want = Number.isFinite(above) ? Math.min(l.top, above + gap) : l.top;
+    const up = l.top - want >= 1 ? Math.round(l.top - want) : 0;
+    const bottom = l.bottom - up;
+    for (let c = l.from; c < l.to; c += 1) floor.set(c, bottom);
+    lowest = Math.max(lowest, bottom);
+    if (up > 0) moves.push([l.f, up]);
+  }
+  for (const [f, up] of moves) f.style.translate = `0 ${-up}px`;
+  const slack = Math.round(board.getBoundingClientRect().bottom - lowest);
+  if (moves.length > 0 && slack > 0) board.style.marginBlockEnd = `${-slack}px`;
 }
 
 /** A foot's "N more" at its start, the number it says it leaves out. */
