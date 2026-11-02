@@ -132,7 +132,7 @@
       const device = d.draftsFromTold(
         d.clausesOf(k.begin.said).map((c) => ({ said: c.said, told: tellRead(c.text, opts) })),
         lists,
-        { built: k.begin.built, me: k.begin.me },
+        { built: k.begin.built, me: k.begin.me, today, currency: k.begin.currency },
       );
       waiting = d.mergeDrafts(k.drafts, device).filter((x) => !k.gone.includes(x.key)).length;
     });

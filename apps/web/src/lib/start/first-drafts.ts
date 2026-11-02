@@ -60,13 +60,22 @@ export type FirstDraft = {
    * THE ONE FIELD IT STILL NEEDS, asked on the card in place ("Nadia 300 a month" needs the day it is next due): which
    * entry, which field, its type, and the words Tell says it in. Keep waits for it. Absent when it needs nothing.
    */
-  needs?: { row: number; field: string; type: 'day' | 'text' | 'number'; label: string };
+  needs?: { row: number; field: string; type: 'day' | 'text' | 'number' | 'money'; label: string; currency?: string };
   /**
    * A LIST CALLED BY THE PERSON'S OWN WORD ("I keep my clients here", so People is Clients): no entries, kept by the
    * record's `renameList`, and Undo is the same call with the old name. Absent on a draft of entries.
    */
   rename?: { list: string; was: string; name: string };
 };
+
+/** How many places after the point a currency keeps (2 for pounds, 0 for yen). */
+function decimalsOf(currency: string): number {
+  try {
+    return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+  } catch {
+    return 2;
+  }
+}
 
 /** The field types a draft may ask for in place, as the card can take them: a date, words, or a number. */
 const ASKABLE: Readonly<Record<string, 'day' | 'text' | 'number'>> = { day: 'day', text: 'text', int: 'number', decimal: 'number', number: 'number' };
@@ -76,6 +85,14 @@ export function filled(d: FirstDraft, value: string): FirstDraft {
   const n = d.needs;
   if (n === undefined) return d;
   const v = value.trim();
+  /* AN AMOUNT IS TYPED IN UNITS AND KEPT IN THE CURRENCY'S SMALLEST ONE, in the currency the draft was made in. */
+  if (n.type === 'money') {
+    const units = Number(v.replace(/[,\s]/gu, ''));
+    if (v === '' || !Number.isFinite(units) || units <= 0 || !n.currency) return d;
+    const value = { amount: Math.round(units * 10 ** decimalsOf(n.currency)), currency: n.currency };
+    const { needs: _done, ...rest } = d;
+    return { ...rest, amount: { minor: value.amount, currency: value.currency }, rows: d.rows.map((r, i) => (i === n.row ? { ...r, fields: { ...r.fields, [n.field]: value } } : r)) };
+  }
   const fit = n.type === 'day' ? (/^\d{4}-\d{2}-\d{2}$/u.test(v) ? v : null) : n.type === 'number' ? (v !== '' && Number.isFinite(Number(v)) ? Number(v) : null) : v === '' ? null : v.slice(0, 500);
   if (fit === null) return d;
   const { needs: _done, ...rest } = d;
@@ -261,19 +278,68 @@ export function peopleAround(said: string): { names: string[]; detail: string } 
   return null;
 }
 
+/** The to-do sign-up draws from "invoices" kept first (`todosFor` in `chat.ts`): "Send Fenwick's invoice". */
+const INVOICE_TODO = /^send (?:(.+?)'s invoice|this month's invoices)\.?$/iu;
+/** How long an invoice drafted on the first day is given to be paid: the usual thirty days. */
+const INVOICE_DAYS = 30;
+
+/**
+ * THE FIRST INVOICE, IN MONEY (2 Nov, a walk: an agency that keeps "clients, invoices" first opened a Today with nothing,
+ * since a small business has no Tasks to keep "Send Northwind's invoice" in). Where the BrainDog keeps bills and invoices
+ * and no tasks, that to-do is an invoice to be paid to them: money in, open, due in thirty days, asking only how much.
+ * Where there are tasks, it stays a task, as it was.
+ */
+function invoiceDraft(said: string, lists: readonly TellList[], from: { today?: string; currency?: string | null }): FirstDraft | null {
+  const m = INVOICE_TODO.exec(said.trim());
+  if (m === null || !from.today || !from.currency || lists.some((l) => l.id === 'tasks')) return null;
+  const owed = lists.find((l) => l.id === 'obligations');
+  if (owed === undefined) return null;
+  const has = (id: string): boolean => owed.fields.some((f) => f.id === id && !f.retired);
+  if (!['what', 'direction', 'amount', 'due', 'state'].every(has)) return null;
+  const client = m[1]?.trim() ?? '';
+  const title = client === '' ? "This month's invoices" : `Invoice to ${client}`;
+  const due = new Date(`${from.today}T00:00:00Z`);
+  due.setUTCDate(due.getUTCDate() + INVOICE_DAYS);
+  const day = due.toISOString().slice(0, 10);
+  return {
+    key: `${owed.id}:${plain(title)}`,
+    rows: [{ register: owed.id, fields: { what: title, direction: 'owed_to_me', state: 'open', due: day } }],
+    main: 0,
+    list: owed.name,
+    titleField: 'what',
+    title,
+    detail: `money in, due in ${INVOICE_DAYS} days, in ${owed.name}`,
+    amount: null,
+    day,
+    by: 'rules',
+    needs: { row: 0, field: 'amount', type: 'money', label: 'how much it is for', currency: from.currency },
+  };
+}
+
 /**
  * TELL'S READING OF EACH SENTENCE, AS DRAFTS: the rows one sentence became, split into the groups that point at one
  * another (`$row`: the payment and the person it names), each group one draft. A group is kept only where it is concrete:
  * it has a day or an amount, it is somebody, or its words read as a thing to do. Nothing that still needs a field, the
  * person, or what the build wrote.
  */
-export function draftsFromTold(read: readonly { said: string; told: Pick<Told, 'rows'> }[], lists: readonly TellList[], from: Pick<DraftsFrom, 'built' | 'me'>): FirstDraft[] {
+export function draftsFromTold(
+  read: readonly { said: string; told: Pick<Told, 'rows'> }[],
+  lists: readonly TellList[],
+  from: Pick<DraftsFrom, 'built' | 'me'> & { today?: string; currency?: string | null },
+): FirstDraft[] {
   const listOf = (id: string): TellList | undefined => lists.find((l) => l.id === id);
   const seen = takenBy({ built: from.built, modules: [] }, (r) => listOf(r)?.title ?? null);
   const me = plain(from.me);
   const out: FirstDraft[] = [];
   const people = listOf(PEOPLE);
   for (const { said, told } of read) {
+    /* AN INVOICE TO SEND, WHERE THERE IS NO TASKS LIST, IS AN INVOICE IN MONEY (`invoiceDraft`). */
+    const invoice = invoiceDraft(said, lists, from);
+    if (invoice !== null) {
+      if (!seen.has(invoice.key)) out.push(invoice);
+      seen.add(invoice.key);
+      continue;
+    }
     /* THE PEOPLE AROUND THEM FIRST, never the task Tell would make of the sentence. */
     const around = people === undefined ? null : peopleAround(said);
     if (around !== null && people !== undefined) {

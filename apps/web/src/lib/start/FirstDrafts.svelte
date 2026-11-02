@@ -127,7 +127,7 @@
       rules = d.draftsFromTold(
         d.clausesOf(said).map((c) => ({ said: c.said, told: tellRead(c.text, read) })),
         lists,
-        { built, me },
+        { built, me, today, currency: read.currency },
       );
     });
     return () => (off = true);
@@ -389,7 +389,9 @@
                   <span class="field"
                     ><input
                       class="field-input"
-                      type={n.type === 'day' ? 'date' : n.type === 'number' ? 'number' : 'text'}
+                      type={n.type === 'day' ? 'date' : n.type === 'number' || n.type === 'money' ? 'number' : 'text'}
+                      step={n.type === 'money' ? 'any' : undefined}
+                      inputmode={n.type === 'money' ? 'decimal' : undefined}
                       bind:value={needVals[d.key]}
                       onkeydown={(e) => {
                         if (e.key === 'Enter' && !e.isComposing) {
