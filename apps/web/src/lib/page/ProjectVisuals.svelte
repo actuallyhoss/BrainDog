@@ -157,7 +157,9 @@
           {#if change}<p class="change" data-tone={change.tone}>{change.text}</p>{/if}
           {#if trend}
             <div class="periods" aria-hidden="true">
+              <span class="p-name">This period</span>
               <span class="bar"><span style:inline-size="{Math.max(trend.now > 0 ? 3 : 0, Math.round((trend.now / scale) * 100))}%"></span></span>
+              <span class="p-name">Before</span>
               <span class="bar" data-before><span style:inline-size="{Math.max(trend.before > 0 ? 3 : 0, Math.round((trend.before / scale) * 100))}%"></span></span>
             </div>
           {/if}
@@ -462,10 +464,20 @@
     color: var(--red);
   }
 
+  /* EACH BAR SAYS WHICH PERIOD IT IS (2 Nov): two bars with no names read as a chart of nothing on a new project, where
+     the money tile holds little else. The words are the meta size and ink, at the bar's start. */
   .periods {
     display: grid;
-    gap: 6px;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 10px;
     margin-block-start: 12px;
+  }
+
+  .p-name {
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
+    line-height: 1.2;
   }
 
   .bar {
