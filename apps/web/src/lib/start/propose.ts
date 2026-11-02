@@ -1378,7 +1378,9 @@ export function fitsTheKind(fields: Record<string, unknown>, usecase: string | n
 }
 
 /** The words of ours a person never reads: what a model writes to them that holds one is not said (2 Nov, "people list"). */
-export const INSIDE_WORDS = /\b(?:lists?|registers?|records?|modules?|packs?|fields?)\b/iu;
+/* AND THE NAMES OF THE LISTS THEMSELVES WHERE NOBODY TALKS LIKE THAT (onboarding8: "Are there any other people or
+   organisations you work with?" asked a freelancer in the words of BrainDog's own lists). */
+export const INSIDE_WORDS = /\b(?:lists?|registers?|records?|modules?|packs?|fields?|organi[sz]ations?|entr(?:y|ies))\b/iu;
 
 export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeContext, rules: Proposal): Proposal {
   const offers = [...BUNDLED, ...(ctx.catalogue ?? []).filter((o) => !BUNDLED.some((b) => b.id === o.id))];

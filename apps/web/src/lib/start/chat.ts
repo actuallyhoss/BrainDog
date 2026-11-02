@@ -29,7 +29,12 @@ import { INSIDE_WORDS, placesOf, YOU, type HeardLine, type Proposal } from './pr
 export type Topic = 'what' | 'closest' | 'work' | 'money' | 'currency' | 'people' | 'tools' | 'name' | 'first' | 'kind' | 'things' | 'who_for';
 
 /** One answer to tap: what it fills, and what it says on the button. */
-export type Choice = { value: string; label: string };
+export type Choice = {
+  value: string;
+  label: string;
+  /** How the tap is said back where its words alone would be a fragment ("One big client" is "I'm working for one big client."). */
+  say?: string;
+};
 
 export type ChatAsk = {
   topic: Topic;
@@ -93,7 +98,7 @@ export const chatWords = {
   startup: 'Startup',
   /** The end, before the summary. */
   done: "That's enough to start. Here is what I'll make. Take out anything you don't want.",
-  doneShort: 'Here is what I will make. Take out anything you do not want.',
+  doneShort: "Here is what I'll make. Take out anything you don't want.",
   /** Said after the person typed nothing to send. */
   empty: 'Type an answer, tap one, or skip.',
   /** For a screen reader: how many questions are left at most. */
@@ -402,7 +407,14 @@ function peopleTaps(w: Pick<Where, 'said' | 'usecase'>): string[] {
 /** The rules' question for a topic, in words that fit what kind of person they are. */
 export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
   const kind = kindOf(w.said, w.usecase);
-  const ask = (question: string, choices: string[], extra: Partial<ChatAsk> = {}): ChatAsk => ({ topic, question, choices: choices.map((c) => tap(c)), by: 'rules', ...extra });
+  /* A TAP IS ITS WORDS, or its words and the sentence it is said back as (`saidOf`). */
+  const ask = (question: string, choices: (string | readonly [string, string])[], extra: Partial<ChatAsk> = {}): ChatAsk => ({
+    topic,
+    question,
+    choices: choices.map((c) => (typeof c === 'string' ? tap(c) : { ...tap(c[0]), say: c[1] })),
+    by: 'rules',
+    ...extra,
+  });
   switch (topic) {
     case 'closest':
       return {
@@ -415,21 +427,22 @@ export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
         by: 'rules',
       };
     case 'work':
-      if (kind === 'freelance') return ask('Which clients or projects are you working on right now?', ['Two or three clients', 'One big client', 'My own projects']);
-      if (kind === 'founder') return ask('What are you building, and what is on this month?', ['Our first launch', 'Finding customers', 'Raising money', 'Hiring']);
-      if (kind === 'student') return ask('Which courses or side projects are you on right now?', ['My courses', 'A side project', 'A thesis', 'Job hunting']);
-      if (kind === 'shop') return ask('What do you sell?', ['Things I make', 'Products I stock', 'Digital things']);
+      if (kind === 'freelance') return ask('Which clients or projects are you working on right now?', [['Two or three clients', "I'm working for two or three clients."], ['One big client', "I'm working for one big client."], 'My own projects']);
+      if (kind === 'founder') return ask("What are you building, and what's on this month?", ['Our first launch', 'Finding customers', 'Raising money', 'Hiring']);
+      if (kind === 'student') return ask('Which courses or side projects are you on right now?', ['My courses', 'A side project', 'A thesis', ['Job hunting', "I'm job hunting."]]);
+      if (kind === 'shop') return ask('What do you sell?', [['Things I make', 'I sell things I make.'], ['Products I stock', 'I sell products I stock.'], ['Digital things', 'I sell digital things.']]);
       /* NOT "WHAT ARE YOU WORKING ON" TO SOMEBODY SORTING OUT HOME MONEY (2 Nov, a walk: a household was offered "Day-to-day
          running"). */
       if (kind === 'personal') return ask('What are you saving for or sorting out right now?', ['Saving for a holiday', 'Paying off a card', 'Moving home', 'Sorting out bills']);
-      return ask('What are you working on right now?', ['A few projects', 'One big project', 'Day-to-day running']);
+      return ask('What are you working on right now?', ['A few projects', 'One big project', ['Day-to-day running', 'Mostly the day-to-day running.']]);
     case 'money':
-      if (kind === 'freelance') return ask('How do you get paid, and what goes out each month?', ['Invoices to clients', 'A monthly retainer', 'Bills and subscriptions', 'Not now']);
-      if (kind === 'founder') return ask('Is money coming in yet, and what goes out?', ['Customer subscriptions', 'Not yet', 'Investor money', 'Hosting and tools']);
-      if (kind === 'student') return ask('Any money to keep an eye on?', ['Rent and bills', 'A part-time job', 'A loan or grant', 'Not really']);
-      if (kind === 'shop') return ask('What money comes in and goes out?', ['Sales', 'Supplier bills', 'Shipping costs', 'Not now']);
-      if (kind === 'personal') return ask('What comes in and goes out each month?', ['My salary', 'Rent or mortgage', 'Bills and subscriptions', 'Not now']);
-      return ask('What money comes in and goes out?', ['Invoices I send', 'Bills I pay', 'Subscriptions', 'Not now']);
+      /* EACH TAP SAID BACK AS A SENTENCE ABOUT THEIR MONEY ("I'm paid a monthly retainer."), never "A monthly retainer." */
+      if (kind === 'freelance') return ask('How do you get paid, and what goes out each month?', [['Invoices to clients', 'I invoice my clients.'], ['A monthly retainer', "I'm paid a monthly retainer."], ['Bills and subscriptions', 'Bills and subscriptions go out each month.'], 'Not now']);
+      if (kind === 'founder') return ask('Is money coming in yet, and what goes out?', [['Customer subscriptions', 'Customers pay us a subscription.'], 'Not yet', ['Investor money', 'We have investor money.'], ['Hosting and tools', 'We pay for hosting and tools.']]);
+      if (kind === 'student') return ask('Any money to keep an eye on?', [['Rent and bills', 'I pay rent and bills.'], ['A part-time job', 'I have a part-time job.'], ['A loan or grant', 'I have a loan or a grant.'], 'Not really']);
+      if (kind === 'shop') return ask('What money comes in and goes out?', [['Sales', 'Money comes in from sales.'], ['Supplier bills', 'I pay supplier bills.'], ['Shipping costs', 'I pay for shipping.'], 'Not now']);
+      if (kind === 'personal') return ask('What comes in and goes out each month?', [['My salary', 'My salary comes in each month.'], ['Rent or mortgage', 'Rent or a mortgage goes out.'], ['Bills and subscriptions', 'Bills and subscriptions go out each month.'], 'Not now']);
+      return ask('What money comes in and goes out?', [['Invoices I send', 'I send invoices.'], ['Bills I pay', 'I pay bills.'], ['Subscriptions', 'I pay for subscriptions.'], 'Not now']);
     case 'currency': {
       const c = w.env ? currencyChoices(w.said, w.env, 3) : null;
       const nameOf = (code: string): string => c?.choices.find((x) => x.code === code)?.name ?? displayName(code);
@@ -645,6 +658,12 @@ const sentence = (s: string): string => {
   const p = plain(s);
   return p === '' ? '' : `${p.charAt(0).toUpperCase()}${p.slice(1)}.`;
 };
+/** A list typed with commas, said with an "and" before the last ("Claude, Notion, Slack" is "Claude, Notion and Slack"). */
+const listed = (s: string): string => {
+  if (/\band\b/iu.test(s)) return s;
+  const parts = s.split(/\s*,\s*/u).filter((x) => x !== '');
+  return parts.length < 2 ? s : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
+};
 /** Whether an answer reads as a sentence of its own, which is kept as typed. */
 const whole = (s: string): boolean => plain(s).split(' ').length >= 5 || /^(?:i|i'm|i’m|we|we're|my|our|it|they)\b/iu.test(plain(s));
 
@@ -658,13 +677,17 @@ export function saidOf(ask: ChatAsk, answer: string): string {
   if (a === '' || NO.test(a)) return '';
   if (ask.topic === 'currency' || ask.topic === 'closest' || ask.topic === 'name') return '';
   /* A TAP IS SAID IN A SENTENCE OF ITS OWN, even one that starts like a sentence ("My partner" is "I share the money with my partner."). */
-  const tapped = ask.choices.some((c) => c.label.toLocaleLowerCase() === a.toLocaleLowerCase());
-  if (ask.topic === 'what' || (whole(a) && !tapped)) return sentence(a);
+  const tappedChoice = ask.choices.find((c) => c.label.toLocaleLowerCase() === a.toLocaleLowerCase());
+  const tapped = tappedChoice !== undefined;
+  if (tappedChoice?.say !== undefined) return tappedChoice.say;
+  /* WHO, SAID SHORT ("My partner Sam") IS SAID AS WHO THEY WORK OR SHARE WITH, not left as a fragment of a sentence. */
+  const shortWho = ask.topic === 'people' && plain(a).split(' ').length < 5 && /^(?:my|our)\b/iu.test(a);
+  if (ask.topic === 'what' || (whole(a) && !tapped && !shortWho)) return sentence(a);
   const low = a.charAt(0).toLowerCase() + a.slice(1);
   switch (ask.topic) {
     case 'work':
-      /* "Saving for a holiday" is a sentence already; "A redesign" is what they work on. */
-      return /^\p{L}+ing\b/u.test(a) ? sentence(a) : `I'm working on ${low}.`;
+      /* "Saving for a holiday" is what they are doing ("I'm saving for a holiday."); "A redesign" is what they work on. */
+      return /^\p{L}+ing\b/u.test(a) && !/^(?:no|some|any|every)?thing\b|^during\b/iu.test(a) ? `I'm ${low}.` : `I'm working on ${low}.`;
     case 'money':
       return sentence(a);
     case 'people':
@@ -679,11 +702,11 @@ export function saidOf(ask: ChatAsk, answer: string): string {
         return /^just me$/iu.test(a) ? 'I work on my own.' : `I work with ${who}.`;
       }
     case 'tools':
-      return `I use ${a}.`;
+      return `I use ${listed(a)}.`;
     case 'first': {
       /* "Invoices and deadlines first" is said once: the "first" the sentence already says is not said again. */
       const what = low.replace(/^(?:first(?:ly)?|to start)[,:]?\s+/iu, '').replace(/[,\s]+(?:first|to start with|to start)$/iu, '');
-      return what === '' ? '' : `First I want to keep track of ${what}.`;
+      return what === '' ? '' : `First I want to keep track of ${listed(what)}.`;
     }
     default:
       return sentence(a);
