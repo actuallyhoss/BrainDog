@@ -9,6 +9,12 @@
  * up to (gmail.com, outlook.com and the like), and a person with no organisation yet is put with it. The mail is then
  * linked to the person and marked as met, so it is looked at once. A mail's day is set in your own clock.
  *
+ * WHAT A MAIL LOOKS LIKE IS SAID HERE, ONCE, when it is first looked at (1.1.0), and the script in Google only hints.
+ * A bill needs "invoice" in its subject, or bill words with an amount in a currency or a sender known to send bills
+ * (a biller's domain, or an address such as billing@). A receipt needs receipt or order words with the same. A
+ * newsletter (the script says `list`, or the sender or words say so) is never a bill, a receipt or a date. Gmail
+ * updating a mail later never changes it, and "Not a bill" in Needs you clears it.
+ *
  * IT NEVER TOUCHES GMAIL, and it never answers, files or deletes a mail. What needs a reply, a bill, a receipt or a date
  * is asked about in Needs you by the add-on's rules, and only you act on it.
  */
@@ -20,6 +26,32 @@ const FREE_MAIL = new Set([
 ]);
 /* AT MOST THIS MANY MAILS A RUN, so a first hour after a long gap is spread over the next ones. */
 const MOST = 200;
+
+const BILLERS = /(^|\.)(stripe\.com|paypal\.com|paddle\.com|apple\.com|google\.com|microsoft\.com|amazon\.[a-z.]+|aws\.amazon\.com|adobe\.com|netflix\.com|spotify\.com|uber\.com|airbnb\.com|github\.com|vercel\.com|cloudflare\.com|digitalocean\.com|heroku\.com|godaddy\.com|namecheap\.com|squarespace\.com|shopify\.com|wix\.com|notion\.so|figma\.com|slack\.com|zoom\.us|dropbox\.com|atlassian\.com|openai\.com|anthropic\.com|xero\.com|intuit\.com|quickbooks\.com|freshbooks\.com|waveapps\.com|chargebee\.com|recurly\.com|gocardless\.com|wise\.com|revolut\.com|vodafone\.[a-z.]+|etisalat\.[a-z.]+|orange\.[a-z.]+)$/i;
+const BILLING_SENDER = /^(billing|invoices?|receipts?|payments?|accounts?|statements?|orders?)[@+.-]/i;
+const AMOUNT = /([$€£¥₹]\s?\d[\d,]*(\.\d{1,2})?|\b(usd|eur|gbp|egp|aed|sar|cad|aud|inr|jpy|chf)\s?\d[\d,]*(\.\d{1,2})?|\d[\d,]*(\.\d{1,2})?\s?(usd|eur|gbp|egp|aed|sar|cad|aud|inr|jpy|chf)\b)/i;
+
+/** Whether a mail reads as a newsletter by its sender or its words, for a script that does not say `list`. */
+export function looksLikeNewsletter(text, address) {
+  return /^(news|newsletters?|marketing|promo(tions)?|offers|deals|digest|weekly|editor|community)[@+.-]/i.test(String(address ?? '')) ||
+    /\b(newsletter|unsubscribe|weekly digest|this week in|% off|flash sale|webinar)\b/i.test(String(text ?? ''));
+}
+
+/** What a received mail looks like: `bill`, `receipt`, `date` or `none`. `hint` is what the script in Google sent. */
+export function kindOf(subject, snippet, address, hint) {
+  const s = String(subject ?? '');
+  const n = String(snippet ?? '');
+  const text = `${s} ${n}`;
+  const from = String(address ?? '').toLowerCase();
+  if (hint === 'list' || looksLikeNewsletter(text, from)) return 'none';
+  const known = BILLERS.test(from.split('@')[1] ?? '') || BILLING_SENDER.test(from);
+  const amount = AMOUNT.test(text);
+  if (/\binvoice\b/i.test(s) || (/\binvoice\b/i.test(n) && (amount || known))) return 'bill';
+  if (/\b(amount due|payment due|due date|pay by|your bill|bill is ready|new bill|statement is ready|renewal notice|payment failed)\b/i.test(text) && (amount || known)) return 'bill';
+  if (/\b(receipt|order confirm\w*|your order|order (no|number|#)|payment received|thanks for your (order|purchase|payment)|we received your payment)\b/i.test(text) && (amount || known)) return 'receipt';
+  if (/\b(invitation|invite|meeting|appointment|booking|reservation|interview|deadline|rsvp)\b/i.test(text)) return 'date';
+  return 'none';
+}
 
 async function every(ctx, list, where) {
   const out = [];
@@ -86,6 +118,8 @@ export default async function run(ctx) {
     const patch = {};
     const day = dayIn(f.at, tz);
     if (day !== null && day !== f.day) patch.day = day;
+    const kind = f.direction === 'sent' ? 'none' : kindOf(f.subject, f.snippet, f.address, f.hint ?? f.kind);
+    if (kind !== (f.kind ?? 'none')) patch.kind = kind;
     const address = lower(f.address);
     const counts = (f.person === true || f.direction === 'sent') && address.includes('@');
     if (!counts) {

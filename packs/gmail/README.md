@@ -11,8 +11,20 @@ subject, who it is from or to, the day, a snippet of at most 160 characters and 
   no-reply address or a notification) and everyone you write to, by their address, and moves their Last in touch to the
   mail's day. Their organisation is met by the address's domain, unless it is a mail service anybody can sign up to.
 - **Needs you**: a mail waiting on your reply, a bill, a receipt, and a date from a person are each asked about once,
-  with the link to the mail. Nothing acts on its own: you answer and you act.
-- A **Mail** page, and two Today widgets: **Mail** (need a reply, unread) and **Waiting on your reply**.
+  with the link to the mail. Nothing acts in Gmail: you answer and you act. Your answer changes the mail's row at once
+  (1.1.0): **I replied** or **No reply needed** takes it off Waiting on your reply, and **Not a bill** or **Not a
+  receipt** clears what it looked like. **I will reply** leaves it waiting until Gmail shows your reply.
+- **Bills and receipts** (1.1.0): the hourly script decides, once, when it first looks at a mail. A bill needs
+  "invoice" in its subject, or bill words with an amount in a currency or a sender known to send bills (a biller's
+  domain such as stripe.com, or an address such as billing@). A receipt needs receipt or order words with the same.
+  A newsletter (sent to a list, or filed by Gmail as promotions, social or forums) never raises a bill, a receipt or a
+  date. Tune `kindOf` in `gmail.js`.
+- **Older than two weeks** (1.1.0): a mail still waiting on your reply, or still unread, stays in BrainDog with its
+  question until you answer it or reply. The 1.1.0 script in Google keeps looking at up to 60 such mails after they
+  leave its 14 days, so a late reply or read still reaches BrainDog. The 1.0.0 script keeps working as it was; it just
+  does not see a reply made after two weeks, so answer the question instead.
+- A **Mail** page, and two Today widgets: **Mail** (need a reply, unread) and **Waiting on your reply**. Both stay off
+  the board until the first mail arrives; until then the Connect tile on the add-on page is where to start.
 
 ## Why a script in your own Google account
 
@@ -51,3 +63,10 @@ project, or delete the project. Making a new address in BrainDog stops the old o
   `BRAINDOG_ADDRESS` and `BRAINDOG_TIMEZONE` are filled in by the page.
 
 The pack file is built from these files; when one changes, its text in `gmail.pack.json` changes with it.
+
+## The script and its versions
+
+The door reads the same lines from every version of the script, so a script pasted from 1.0.0 keeps working with the
+1.1.0 add-on. The 1.1.0 script differs in two places only: it keeps looking at a mail still waiting or unread after it
+is 14 days old, and in `gmail.kind=` it may say `list` for a newsletter. Since 1.1.0 that line is read into `hint`
+(Gmail's guess) and never into `kind`, so Gmail updating a mail later cannot bring back a bill you cleared.

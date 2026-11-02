@@ -1,10 +1,10 @@
 {
   "pack": "gmail",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "icon": "mail",
   "title": "Gmail",
   "summary": "Your Gmail in BrainDog: who you are in touch with, mail waiting on your reply, and bills, receipts and dates to look at. A short script in your own Google account sends the subject, sender, day, a short snippet and the link. Reads only; nothing is ever sent from your Gmail.",
-  "changes": "First version: mail in, people and organisations met from it, Last in touch kept, questions in Needs you, a Mail page and a Today widget.",
+  "changes": "Answering a question in Needs you changes the mail at once: I replied or No reply needed takes it off Waiting on your reply, Not a bill or Not a receipt clears it. A mail still waiting after two weeks is kept until you reply or answer. Bills and receipts need an amount, a known biller or the word invoice, never from a newsletter. Today's Mail widget waits for your first mail.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "uses": [
@@ -112,6 +112,19 @@
           "index": true
         },
         {
+          "id": "hint",
+          "label": "Gmail's guess",
+          "type": "enum",
+          "values": [
+            "none",
+            "bill",
+            "receipt",
+            "date",
+            "list"
+          ],
+          "default": "none"
+        },
+        {
           "id": "snippet",
           "label": "Snippet",
           "type": "text"
@@ -145,6 +158,12 @@
           "type": "bool",
           "default": false,
           "index": true
+        },
+        {
+          "id": "answered",
+          "label": "Answered in Needs you",
+          "type": "bool",
+          "default": false
         }
       ]
     },
@@ -263,7 +282,7 @@
             }
           }
         },
-        "kind": {
+        "hint": {
           "enum": {
             "between": [
               "gmail.kind= ",
@@ -273,7 +292,8 @@
               "none": "none",
               "bill": "bill",
               "receipt": "receipt",
-              "date": "date"
+              "date": "date",
+              "list": "list"
             }
           }
         },
@@ -331,7 +351,7 @@
           },
           {
             "name": "Code.gs",
-            "text": "/**\n * BrainDog: Gmail reader. Runs under your own Google account, every 15 minutes, and only reads.\n *\n * It sends your BrainDog, for each mail of the last 14 days that is new or changed: who it is from (or to, for one you\n * sent), the subject, the day, a short snippet of up to 160 characters, the link to it in Gmail,\n * and whether it is unread and waiting for your reply. Never the whole mail, never an attachment.\n *\n * It never sends, changes, moves, labels or deletes any mail: the only permission it asks for is to read.\n *\n * To stop it: run stop() once, or delete this project.\n */\n\nvar BRAINDOG = 'BRAINDOG_ADDRESS';\nvar EVERY_MINUTES = 15;\nvar LOOK_BACK_DAYS = 14;\nvar MOST_A_RUN = 40;\n\n/** Run this once: it reads now and then every 15 minutes. */\nfunction start() {\n  stop();\n  ScriptApp.newTrigger('read').timeBased().everyMinutes(EVERY_MINUTES).create();\n  read();\n}\n\n/** Run this to stop reading. */\nfunction stop() {\n  ScriptApp.getProjectTriggers().forEach(function (t) {\n    if (t.getHandlerFunction() === 'read') ScriptApp.deleteTrigger(t);\n  });\n}\n\nfunction read() {\n  if (BRAINDOG.indexOf('https://') !== 0) throw new Error('Paste the address from BrainDog into BRAINDOG at the top first.');\n  var store = PropertiesService.getUserProperties();\n  var told = JSON.parse(store.getProperty('told') || '{}');\n  var me = String(Gmail.Users.getProfile('me').emailAddress).toLowerCase();\n  var listed = Gmail.Users.Messages.list('me', { q: 'newer_than:' + LOOK_BACK_DAYS + 'd -in:spam -in:trash -in:chats', maxResults: 100 }).messages || [];\n  var keep = {};\n  var posts = [];\n  for (var i = 0; i < listed.length && posts.length < MOST_A_RUN; i++) {\n    var id = listed[i].id;\n    var was = told[id];\n    keep[id] = was;\n    /* A MAIL ALREADY TOLD AS DONE IS NOT ASKED AGAIN: only new ones and ones still unread or waiting are read. */\n    if (was === 'done') continue;\n    var mail = readOne(id, me);\n    if (mail === null) continue;\n    var state = mail.unread || mail.reply ? 'open:' + mail.unread + ':' + mail.reply : 'done';\n    keep[id] = state;\n    if (state !== was) posts.push(mail);\n  }\n  var requests = posts.map(function (m) {\n    return { url: BRAINDOG, method: 'post', contentType: 'text/plain; charset=utf-8', payload: bodyOf(m), muteHttpExceptions: true };\n  });\n  if (requests.length > 0) {\n    var answers = UrlFetchApp.fetchAll(requests);\n    answers.forEach(function (a, n) {\n      /* NOT TAKEN: told again next run. */\n      if (a.getResponseCode() >= 300) delete keep[posts[n].id];\n    });\n  }\n  store.setProperty('told', JSON.stringify(keep));\n}\n\nfunction readOne(id, me) {\n  var m = Gmail.Users.Messages.get('me', id, {\n    format: 'metadata',\n    metadataHeaders: ['From', 'To', 'Subject', 'Date', 'List-Unsubscribe', 'List-Id', 'Precedence', 'Auto-Submitted'],\n  });\n  var labels = m.labelIds || [];\n  var h = {};\n  (m.payload && m.payload.headers ? m.payload.headers : []).forEach(function (x) { h[x.name.toLowerCase()] = String(x.value); });\n  var out = labels.indexOf('SENT') !== -1;\n  var from = parseAddress(h['from'] || '');\n  var to = parseAddress((h['to'] || '').split(',')[0]);\n  var other = out ? to : from;\n  if (!other.address || (!out && other.address === me)) return null;\n  var subject = clean(h['subject'] || '(no subject)', 200);\n  var snippet = clean(decode(m.snippet || ''), 160);\n  var bulk = Boolean(h['list-unsubscribe'] || h['list-id'] || /bulk|list|junk/i.test(h['precedence'] || '') ||\n    /auto/i.test(h['auto-submitted'] || '') || /no-?reply|do-?not-?reply|notifications?@|mailer-daemon|bounce/i.test(other.address) ||\n    labels.some(function (l) { return /^CATEGORY_(PROMOTIONS|SOCIAL|UPDATES|FORUMS)$/.test(l); }));\n  var unread = !out && labels.indexOf('UNREAD') !== -1 && labels.indexOf('INBOX') !== -1;\n  var reply = !out && !bulk && labels.indexOf('INBOX') !== -1 && !answered(m.threadId, id, me);\n  var at = new Date(Number(m.internalDate));\n  return {\n    id: id,\n    thread: m.threadId,\n    out: out,\n    name: clean(other.name || other.address, 120),\n    address: other.address,\n    subject: subject,\n    snippet: snippet,\n    at: at,\n    unread: unread,\n    reply: reply,\n    person: !bulk,\n    kind: out ? 'none' : kindOf(subject + ' ' + snippet),\n    link: 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(me) + '#all/' + m.threadId,\n  };\n}\n\n/** Whether you wrote in the thread after this mail arrived. */\nfunction answered(threadId, id, me) {\n  var t = Gmail.Users.Threads.get('me', threadId, { format: 'metadata', metadataHeaders: ['From'] });\n  var after = false;\n  var mine = false;\n  (t.messages || []).forEach(function (x) {\n    if (x.id === id) { after = true; return; }\n    if (!after) return;\n    var f = ((x.payload && x.payload.headers) || []).filter(function (y) { return y.name.toLowerCase() === 'from'; })[0];\n    if (f && parseAddress(String(f.value)).address === me) mine = true;\n  });\n  return mine;\n}\n\nfunction kindOf(text) {\n  if (/\\b(invoice|bill|amount due|payment due|due date|pay by|statement is ready|renewal notice)\\b/i.test(text)) return 'bill';\n  if (/\\b(receipt|your order|order confirm|payment received|thanks for your (order|purchase|payment)|we received your payment)\\b/i.test(text)) return 'receipt';\n  if (/\\b(invitation|invite|meeting|appointment|booking|reservation|interview|deadline|rsvp|webinar)\\b/i.test(text)) return 'date';\n  return 'none';\n}\n\nfunction parseAddress(raw) {\n  var s = String(raw || '').trim();\n  var m = s.match(/^\\s*\"?([^\"<]*?)\"?\\s*<([^>]+)>/);\n  if (m) return { name: m[1].trim(), address: m[2].trim().toLowerCase() };\n  return { name: '', address: s.toLowerCase() };\n}\n\nfunction decode(s) {\n  return s.replace(/&#39;/g, \"'\").replace(/&quot;/g, '\"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');\n}\n\n/** One line, at most n characters, and none of the words BrainDog reads the lines by. */\nfunction clean(s, n) {\n  var one = String(s).replace(/[\\r\\n\\t]+/g, ' ').replace(/gmail\\.[a-z]+=/gi, '').replace(/\\s+/g, ' ').trim();\n  return one.length > n ? one.slice(0, n - 1) + '…' : one;\n}\n\nfunction bodyOf(m) {\n  return [\n    'BrainDog Gmail 1',\n    'gmail.message= ' + m.id,\n    'gmail.thread= ' + m.thread,\n    'gmail.direction= ' + (m.out ? 'sent' : 'received'),\n    'gmail.name= ' + m.name,\n    'gmail.address= ' + m.address,\n    'gmail.subject= ' + m.subject,\n    'gmail.day= ' + Utilities.formatDate(m.at, Session.getScriptTimeZone(), 'yyyy-MM-dd'),\n    'gmail.at= ' + m.at.toISOString(),\n    'gmail.unread= ' + (m.unread ? 'yes' : 'no'),\n    'gmail.reply= ' + (m.reply ? 'yes' : 'no'),\n    'gmail.person= ' + (m.person ? 'yes' : 'no'),\n    'gmail.kind= ' + m.kind,\n    'gmail.link= ' + m.link,\n    'gmail.snippet= ' + m.snippet,\n    'gmail.end',\n    '',\n  ].join('\\n');\n}\n"
+            "text": "/**\n * BrainDog: Gmail reader. Runs under your own Google account, every 15 minutes, and only reads.\n *\n * It sends your BrainDog, for each mail of the last 14 days that is new or changed: who it is from (or to, for one you\n * sent), the subject, the day, a short snippet of up to 160 characters, the link to it in Gmail,\n * and whether it is unread and waiting for your reply. Never the whole mail, never an attachment.\n *\n * A mail still waiting on your reply, or still unread, is kept and looked at again after it is 14 days old, until you\n * reply, read it or archive it, so BrainDog never forgets it (at most CARRY_MOST of them).\n *\n * It never sends, changes, moves, labels or deletes any mail: the only permission it asks for is to read.\n *\n * To stop it: run stop() once, or delete this project.\n */\n\nvar BRAINDOG = 'BRAINDOG_ADDRESS';\nvar EVERY_MINUTES = 15;\nvar LOOK_BACK_DAYS = 14;\nvar MOST_A_RUN = 40;\nvar CARRY_MOST = 60;\n\n/** Run this once: it reads now and then every 15 minutes. */\nfunction start() {\n  stop();\n  ScriptApp.newTrigger('read').timeBased().everyMinutes(EVERY_MINUTES).create();\n  read();\n}\n\n/** Run this to stop reading. */\nfunction stop() {\n  ScriptApp.getProjectTriggers().forEach(function (t) {\n    if (t.getHandlerFunction() === 'read') ScriptApp.deleteTrigger(t);\n  });\n}\n\nfunction read() {\n  if (BRAINDOG.indexOf('https://') !== 0) throw new Error('Paste the address from BrainDog into BRAINDOG at the top first.');\n  var store = PropertiesService.getUserProperties();\n  var told = JSON.parse(store.getProperty('told') || '{}');\n  var me = String(Gmail.Users.getProfile('me').emailAddress).toLowerCase();\n  var listed = Gmail.Users.Messages.list('me', { q: 'newer_than:' + LOOK_BACK_DAYS + 'd -in:spam -in:trash -in:chats', maxResults: 100 }).messages || [];\n  var keep = {};\n  var posts = [];\n  for (var i = 0; i < listed.length && posts.length < MOST_A_RUN; i++) {\n    var id = listed[i].id;\n    var was = told[id];\n    keep[id] = was;\n    /* A MAIL ALREADY TOLD AS DONE IS NOT ASKED AGAIN: only new ones and ones still unread or waiting are read. */\n    if (was === 'done') continue;\n    var mail = readOne(id, me);\n    if (mail === null) continue;\n    var state = mail.unread || mail.reply ? 'open:' + mail.unread + ':' + mail.reply : 'done';\n    keep[id] = state;\n    if (state !== was) posts.push(mail);\n  }\n  /* OLDER THAN THE WINDOW AND STILL OPEN: looked at again, so a reply or a read after 14 days still reaches BrainDog. */\n  var carried = 0;\n  var old = {};\n  Object.keys(told).forEach(function (id) {\n    if (Object.prototype.hasOwnProperty.call(keep, id) || String(told[id]).indexOf('open:') !== 0) return;\n    /* AT MOST CARRY_MOST ARE KEPT, so what the script remembers stays small; one past that is let go. */\n    if (carried >= CARRY_MOST) return;\n    carried++;\n    old[id] = true;\n    keep[id] = told[id];\n    /* A FULL RUN LOOKS AT IT NEXT TIME. */\n    if (posts.length >= MOST_A_RUN) return;\n    var mail = null;\n    try {\n      mail = readOne(id, me);\n    } catch (e) {\n      /* GONE FROM GMAIL (deleted for good): nothing more to say about it. */\n      delete keep[id];\n      return;\n    }\n    if (mail === null) return;\n    var state = mail.unread || mail.reply ? 'open:' + mail.unread + ':' + mail.reply : 'done';\n    if (state !== told[id]) posts.push(mail);\n    keep[id] = state;\n  });\n  var requests = posts.map(function (m) {\n    return { url: BRAINDOG, method: 'post', contentType: 'text/plain; charset=utf-8', payload: bodyOf(m), muteHttpExceptions: true };\n  });\n  if (requests.length > 0) {\n    var answers = UrlFetchApp.fetchAll(requests);\n    answers.forEach(function (a, n) {\n      /* NOT TAKEN: told again next run. One older than the window keeps what it was told as, so it is not dropped. */\n      if (a.getResponseCode() >= 300) {\n        if (old[posts[n].id]) keep[posts[n].id] = told[posts[n].id];\n        else delete keep[posts[n].id];\n      }\n      /* TOLD AS DONE AND OLDER THAN THE WINDOW: nothing more to look at. */\n      else if (old[posts[n].id] && keep[posts[n].id] === 'done') delete keep[posts[n].id];\n    });\n  }\n  store.setProperty('told', JSON.stringify(keep));\n}\n\nfunction readOne(id, me) {\n  var m = Gmail.Users.Messages.get('me', id, {\n    format: 'metadata',\n    metadataHeaders: ['From', 'To', 'Subject', 'Date', 'List-Unsubscribe', 'List-Id', 'Precedence', 'Auto-Submitted'],\n  });\n  var labels = m.labelIds || [];\n  var h = {};\n  (m.payload && m.payload.headers ? m.payload.headers : []).forEach(function (x) { h[x.name.toLowerCase()] = String(x.value); });\n  var out = labels.indexOf('SENT') !== -1;\n  var from = parseAddress(h['from'] || '');\n  var to = parseAddress((h['to'] || '').split(',')[0]);\n  var other = out ? to : from;\n  if (!other.address || (!out && other.address === me)) return null;\n  var subject = clean(h['subject'] || '(no subject)', 200);\n  var snippet = clean(decode(m.snippet || ''), 160);\n  var bulk = Boolean(h['list-unsubscribe'] || h['list-id'] || /bulk|list|junk/i.test(h['precedence'] || '') ||\n    /auto/i.test(h['auto-submitted'] || '') || /no-?reply|do-?not-?reply|notifications?@|mailer-daemon|bounce/i.test(other.address) ||\n    labels.some(function (l) { return /^CATEGORY_(PROMOTIONS|SOCIAL|UPDATES|FORUMS)$/.test(l); }));\n  /* A NEWSLETTER is sent to a list or filed by Gmail as promotions, social or forums. It never raises a bill or a receipt. */\n  var newsletter = Boolean(h['list-id'] || /bulk|list/i.test(h['precedence'] || '') ||\n    labels.some(function (l) { return /^CATEGORY_(PROMOTIONS|SOCIAL|FORUMS)$/.test(l); }) || looksLikeNewsletter(subject + ' ' + snippet, other.address));\n  var unread = !out && labels.indexOf('UNREAD') !== -1 && labels.indexOf('INBOX') !== -1;\n  var reply = !out && !bulk && labels.indexOf('INBOX') !== -1 && !answered(m.threadId, id, me);\n  var at = new Date(Number(m.internalDate));\n  return {\n    id: id,\n    thread: m.threadId,\n    out: out,\n    name: clean(other.name || other.address, 120),\n    address: other.address,\n    subject: subject,\n    snippet: snippet,\n    at: at,\n    unread: unread,\n    reply: reply,\n    person: !bulk,\n    kind: out ? 'none' : newsletter ? 'list' : kindOf(subject, snippet, other.address),\n    link: 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(me) + '#all/' + m.threadId,\n  };\n}\n\n/** Whether you wrote in the thread after this mail arrived. */\nfunction answered(threadId, id, me) {\n  var t = Gmail.Users.Threads.get('me', threadId, { format: 'metadata', metadataHeaders: ['From'] });\n  var after = false;\n  var mine = false;\n  (t.messages || []).forEach(function (x) {\n    if (x.id === id) { after = true; return; }\n    if (!after) return;\n    var f = ((x.payload && x.payload.headers) || []).filter(function (y) { return y.name.toLowerCase() === 'from'; })[0];\n    if (f && parseAddress(String(f.value)).address === me) mine = true;\n  });\n  return mine;\n}\n\n/* The same reading BrainDog's hourly script makes (gmail.js): it decides, this only hints. */\nvar BILLERS = /(^|\\.)(stripe\\.com|paypal\\.com|paddle\\.com|apple\\.com|google\\.com|microsoft\\.com|amazon\\.[a-z.]+|aws\\.amazon\\.com|adobe\\.com|netflix\\.com|spotify\\.com|uber\\.com|airbnb\\.com|github\\.com|vercel\\.com|cloudflare\\.com|digitalocean\\.com|heroku\\.com|godaddy\\.com|namecheap\\.com|squarespace\\.com|shopify\\.com|wix\\.com|notion\\.so|figma\\.com|slack\\.com|zoom\\.us|dropbox\\.com|atlassian\\.com|openai\\.com|anthropic\\.com|xero\\.com|intuit\\.com|quickbooks\\.com|freshbooks\\.com|waveapps\\.com|chargebee\\.com|recurly\\.com|gocardless\\.com|wise\\.com|revolut\\.com|vodafone\\.[a-z.]+|etisalat\\.[a-z.]+|orange\\.[a-z.]+)$/i;\nvar BILLING_SENDER = /^(billing|invoices?|receipts?|payments?|accounts?|statements?|orders?)[@+.-]/i;\nvar AMOUNT = /([$€£¥₹]\\s?\\d[\\d,]*(\\.\\d{1,2})?|\\b(usd|eur|gbp|egp|aed|sar|cad|aud|inr|jpy|chf)\\s?\\d[\\d,]*(\\.\\d{1,2})?|\\d[\\d,]*(\\.\\d{1,2})?\\s?(usd|eur|gbp|egp|aed|sar|cad|aud|inr|jpy|chf)\\b)/i;\n\nfunction looksLikeNewsletter(text, address) {\n  return /^(news|newsletters?|marketing|promo(tions)?|offers|deals|digest|weekly|editor|community)[@+.-]/i.test(address) ||\n    /\\b(newsletter|unsubscribe|weekly digest|this week in|% off|flash sale|webinar)\\b/i.test(text);\n}\n\nfunction kindOf(subject, snippet, address) {\n  var text = subject + ' ' + snippet;\n  var domain = String(address).split('@')[1] || '';\n  var known = BILLERS.test(domain) || BILLING_SENDER.test(address);\n  var amount = AMOUNT.test(text);\n  if (/\\binvoice\\b/i.test(subject) || (/\\binvoice\\b/i.test(snippet) && (amount || known))) return 'bill';\n  if (/\\b(amount due|payment due|due date|pay by|your bill|bill is ready|new bill|statement is ready|renewal notice|payment failed)\\b/i.test(text) && (amount || known)) return 'bill';\n  if (/\\b(receipt|order confirm\\w*|your order|order (no|number|#)|payment received|thanks for your (order|purchase|payment)|we received your payment)\\b/i.test(text) && (amount || known)) return 'receipt';\n  if (/\\b(invitation|invite|meeting|appointment|booking|reservation|interview|deadline|rsvp)\\b/i.test(text)) return 'date';\n  return 'none';\n}\n\nfunction parseAddress(raw) {\n  var s = String(raw || '').trim();\n  var m = s.match(/^\\s*\"?([^\"<]*?)\"?\\s*<([^>]+)>/);\n  if (m) return { name: m[1].trim(), address: m[2].trim().toLowerCase() };\n  return { name: '', address: s.toLowerCase() };\n}\n\nfunction decode(s) {\n  return s.replace(/&#39;/g, \"'\").replace(/&quot;/g, '\"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');\n}\n\n/** One line, at most n characters, and none of the words BrainDog reads the lines by. */\nfunction clean(s, n) {\n  var one = String(s).replace(/[\\r\\n\\t]+/g, ' ').replace(/gmail\\.[a-z]+=/gi, '').replace(/\\s+/g, ' ').trim();\n  return one.length > n ? one.slice(0, n - 1) + '…' : one;\n}\n\nfunction bodyOf(m) {\n  return [\n    'BrainDog Gmail 1',\n    'gmail.message= ' + m.id,\n    'gmail.thread= ' + m.thread,\n    'gmail.direction= ' + (m.out ? 'sent' : 'received'),\n    'gmail.name= ' + m.name,\n    'gmail.address= ' + m.address,\n    'gmail.subject= ' + m.subject,\n    'gmail.day= ' + Utilities.formatDate(m.at, Session.getScriptTimeZone(), 'yyyy-MM-dd'),\n    'gmail.at= ' + m.at.toISOString(),\n    'gmail.unread= ' + (m.unread ? 'yes' : 'no'),\n    'gmail.reply= ' + (m.reply ? 'yes' : 'no'),\n    'gmail.person= ' + (m.person ? 'yes' : 'no'),\n    'gmail.kind= ' + m.kind,\n    'gmail.link= ' + m.link,\n    'gmail.snippet= ' + m.snippet,\n    'gmail.end',\n    '',\n  ].join('\\n');\n}\n"
           }
         ],
         "after": "Google says the app is not verified because it is your own script, not one from a company. To stop it, run stop in the same project, or delete the project."
@@ -361,7 +381,7 @@
         "cpu_ms": 1000,
         "wall_ms": 30000
       },
-      "source": "/**\n * Who you are in touch with, from the mail your Gmail sends in. Runs every hour and reads only this BrainDog.\n *\n * WHAT IT READS. The mails the Gmail door wrote into Mail since it last looked, and your People and Organisations.\n *\n * WHAT IT WRITES. For a mail from a person (not a newsletter, a no-reply address or a notification), and for one you\n * sent: the person is met in People by their address if they are new, and their Last in touch moves to the mail's day\n * when that is later. Their organisation is met by the address's domain, unless it is a mail service anybody can sign\n * up to (gmail.com, outlook.com and the like), and a person with no organisation yet is put with it. The mail is then\n * linked to the person and marked as met, so it is looked at once. A mail's day is set in your own clock.\n *\n * IT NEVER TOUCHES GMAIL, and it never answers, files or deletes a mail. What needs a reply, a bill, a receipt or a date\n * is asked about in Needs you by the add-on's rules, and only you act on it.\n */\n\nconst FREE_MAIL = new Set([\n  'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'yahoo.com', 'ymail.com',\n  'icloud.com', 'me.com', 'mac.com', 'aol.com', 'proton.me', 'protonmail.com', 'pm.me', 'gmx.com', 'gmx.net',\n  'mail.com', 'zoho.com', 'yandex.com', 'hey.com', 'fastmail.com',\n]);\n/* AT MOST THIS MANY MAILS A RUN, so a first hour after a long gap is spread over the next ones. */\nconst MOST = 200;\n\nasync function every(ctx, list, where) {\n  const out = [];\n  let from = 1;\n  for (;;) {\n    const clause = { field: 'seq', gte: from };\n    const page = await ctx.record.list(list, where ? { all: [where, clause] } : clause, { order: 'seq' });\n    out.push(...page);\n    if (page.length < 50 || out.length >= 5000) return out;\n    from = page[page.length - 1].seq + 1;\n  }\n}\n\nconst spoken = (list, row) => `${list}#${row.seq}`;\nconst lower = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');\n\n/**\n * The day of an instant in a zone, `YYYY-MM-DD`, or `null` when it cannot be said, and then the day Gmail sent is kept.\n * The script in Google sends the day in the zone it was set up with, so this only mends one sent in another.\n */\nexport function dayIn(iso, tz) {\n  const at = new Date(String(iso ?? ''));\n  if (Number.isNaN(at.getTime()) || typeof Intl === 'undefined') return null;\n  try {\n    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);\n    return /^\\d{4}-\\d{2}-\\d{2}$/u.test(parts) ? parts : null;\n  } catch {\n    return null;\n  }\n}\n\n/** An organisation's name from its domain: `marlow-studio.co.uk` is Marlow Studio. */\nexport function orgName(domain) {\n  const parts = String(domain).split('.');\n  const second = new Set(['co', 'com', 'org', 'net', 'ac', 'gov', 'edu']);\n  let stem = parts.length > 2 && second.has(parts[parts.length - 2]) ? parts[parts.length - 3] : parts[parts.length - 2] ?? parts[0];\n  stem = String(stem ?? '').replace(/[-_]+/gu, ' ').trim();\n  return stem.replace(/\\b\\w/gu, (c) => c.toUpperCase()) || domain;\n}\n\nexport default async function run(ctx) {\n  const tz = ctx.tz || 'UTC';\n  const mail = (await ctx.record.list('gmail_mail', { none: [{ field: 'met', is: true }] }, { order: 'seq', limit: MOST })).slice(0, MOST);\n  if (mail.length === 0) return { looked: 0 };\n\n  const people = await every(ctx, 'people');\n  const orgs = await every(ctx, 'organisations');\n  const byEmail = new Map();\n  for (const p of people) if (p.fields.merged_into == null && lower(p.fields.email) !== '') byEmail.set(lower(p.fields.email), p);\n  const byDomain = new Map();\n  for (const o of orgs) if (o.fields.merged_into == null && lower(o.fields.domain) !== '') byDomain.set(lower(o.fields.domain), o);\n\n  const metNow = new Set();\n  const orgNow = new Set();\n  /* ONE UPDATE A PERSON A RUN, however many of their mails came in, so no update is refused for a version it already moved. */\n  const owed = new Map();\n  let met = 0;\n  let orgsMet = 0;\n  let linked = 0;\n  let waiting = 0;\n\n  for (const row of mail) {\n    const f = row.fields;\n    const patch = {};\n    const day = dayIn(f.at, tz);\n    if (day !== null && day !== f.day) patch.day = day;\n    const address = lower(f.address);\n    const counts = (f.person === true || f.direction === 'sent') && address.includes('@');\n    if (!counts) {\n      ctx.update(spoken('gmail_mail', row), { ...patch, met: true }, row.version);\n      continue;\n    }\n    const domain = address.split('@')[1] ?? '';\n    const org = FREE_MAIL.has(domain) ? null : byDomain.get(domain) ?? null;\n    if (!FREE_MAIL.has(domain) && org === null && domain !== '' && !orgNow.has(domain)) {\n      ctx.write('organisations', { name: orgName(domain), domain, tags: ['gmail'] });\n      orgNow.add(domain);\n      orgsMet++;\n    }\n    const person = byEmail.get(address);\n    if (!person) {\n      /* MET NOW, LINKED NEXT HOUR: a row written in this run has no id to point at until it is kept. */\n      if (!metNow.has(address)) {\n        const name = typeof f.name === 'string' && f.name.trim() !== '' && !f.name.includes('@') ? f.name.trim() : address;\n        ctx.write('people', { name, email: address, ...(day ? { in_touch: day } : {}), ...(org ? { org: org.id } : {}), tags: ['gmail'] });\n        metNow.add(address);\n        met++;\n      }\n      if (Object.keys(patch).length > 0) ctx.update(spoken('gmail_mail', row), patch, row.version);\n      waiting++;\n      continue;\n    }\n    const pp = owed.get(person.id) ?? {};\n    const was = pp.in_touch ?? (typeof person.fields.in_touch === 'string' ? person.fields.in_touch : '');\n    if (day !== null && day > was) pp.in_touch = day;\n    if (org && (person.fields.org === null || person.fields.org === undefined || person.fields.org === '')) pp.org = org.id;\n    owed.set(person.id, pp);\n    ctx.update(spoken('gmail_mail', row), { ...patch, who: person.id, met: true }, row.version);\n    linked++;\n  }\n\n  for (const p of people) {\n    const pp = owed.get(p.id);\n    if (pp && Object.keys(pp).length > 0) ctx.update(spoken('people', p), pp, p.version);\n  }\n\n  ctx.log(`Looked at ${mail.length} mails: met ${met} people and ${orgsMet} organisations, linked ${linked} mails${waiting > 0 ? `, ${waiting} wait for their person to be kept` : ''}.`);\n  return { looked: mail.length, met, orgs: orgsMet, linked };\n}\n"
+      "source": "/**\n * Who you are in touch with, from the mail your Gmail sends in. Runs every hour and reads only this BrainDog.\n *\n * WHAT IT READS. The mails the Gmail door wrote into Mail since it last looked, and your People and Organisations.\n *\n * WHAT IT WRITES. For a mail from a person (not a newsletter, a no-reply address or a notification), and for one you\n * sent: the person is met in People by their address if they are new, and their Last in touch moves to the mail's day\n * when that is later. Their organisation is met by the address's domain, unless it is a mail service anybody can sign\n * up to (gmail.com, outlook.com and the like), and a person with no organisation yet is put with it. The mail is then\n * linked to the person and marked as met, so it is looked at once. A mail's day is set in your own clock.\n *\n * WHAT A MAIL LOOKS LIKE IS SAID HERE, ONCE, when it is first looked at (1.1.0), and the script in Google only hints.\n * A bill needs \"invoice\" in its subject, or bill words with an amount in a currency or a sender known to send bills\n * (a biller's domain, or an address such as billing@). A receipt needs receipt or order words with the same. A\n * newsletter (the script says `list`, or the sender or words say so) is never a bill, a receipt or a date. Gmail\n * updating a mail later never changes it, and \"Not a bill\" in Needs you clears it.\n *\n * IT NEVER TOUCHES GMAIL, and it never answers, files or deletes a mail. What needs a reply, a bill, a receipt or a date\n * is asked about in Needs you by the add-on's rules, and only you act on it.\n */\n\nconst FREE_MAIL = new Set([\n  'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'yahoo.com', 'ymail.com',\n  'icloud.com', 'me.com', 'mac.com', 'aol.com', 'proton.me', 'protonmail.com', 'pm.me', 'gmx.com', 'gmx.net',\n  'mail.com', 'zoho.com', 'yandex.com', 'hey.com', 'fastmail.com',\n]);\n/* AT MOST THIS MANY MAILS A RUN, so a first hour after a long gap is spread over the next ones. */\nconst MOST = 200;\n\nconst BILLERS = /(^|\\.)(stripe\\.com|paypal\\.com|paddle\\.com|apple\\.com|google\\.com|microsoft\\.com|amazon\\.[a-z.]+|aws\\.amazon\\.com|adobe\\.com|netflix\\.com|spotify\\.com|uber\\.com|airbnb\\.com|github\\.com|vercel\\.com|cloudflare\\.com|digitalocean\\.com|heroku\\.com|godaddy\\.com|namecheap\\.com|squarespace\\.com|shopify\\.com|wix\\.com|notion\\.so|figma\\.com|slack\\.com|zoom\\.us|dropbox\\.com|atlassian\\.com|openai\\.com|anthropic\\.com|xero\\.com|intuit\\.com|quickbooks\\.com|freshbooks\\.com|waveapps\\.com|chargebee\\.com|recurly\\.com|gocardless\\.com|wise\\.com|revolut\\.com|vodafone\\.[a-z.]+|etisalat\\.[a-z.]+|orange\\.[a-z.]+)$/i;\nconst BILLING_SENDER = /^(billing|invoices?|receipts?|payments?|accounts?|statements?|orders?)[@+.-]/i;\nconst AMOUNT = /([$€£¥₹]\\s?\\d[\\d,]*(\\.\\d{1,2})?|\\b(usd|eur|gbp|egp|aed|sar|cad|aud|inr|jpy|chf)\\s?\\d[\\d,]*(\\.\\d{1,2})?|\\d[\\d,]*(\\.\\d{1,2})?\\s?(usd|eur|gbp|egp|aed|sar|cad|aud|inr|jpy|chf)\\b)/i;\n\n/** Whether a mail reads as a newsletter by its sender or its words, for a script that does not say `list`. */\nexport function looksLikeNewsletter(text, address) {\n  return /^(news|newsletters?|marketing|promo(tions)?|offers|deals|digest|weekly|editor|community)[@+.-]/i.test(String(address ?? '')) ||\n    /\\b(newsletter|unsubscribe|weekly digest|this week in|% off|flash sale|webinar)\\b/i.test(String(text ?? ''));\n}\n\n/** What a received mail looks like: `bill`, `receipt`, `date` or `none`. `hint` is what the script in Google sent. */\nexport function kindOf(subject, snippet, address, hint) {\n  const s = String(subject ?? '');\n  const n = String(snippet ?? '');\n  const text = `${s} ${n}`;\n  const from = String(address ?? '').toLowerCase();\n  if (hint === 'list' || looksLikeNewsletter(text, from)) return 'none';\n  const known = BILLERS.test(from.split('@')[1] ?? '') || BILLING_SENDER.test(from);\n  const amount = AMOUNT.test(text);\n  if (/\\binvoice\\b/i.test(s) || (/\\binvoice\\b/i.test(n) && (amount || known))) return 'bill';\n  if (/\\b(amount due|payment due|due date|pay by|your bill|bill is ready|new bill|statement is ready|renewal notice|payment failed)\\b/i.test(text) && (amount || known)) return 'bill';\n  if (/\\b(receipt|order confirm\\w*|your order|order (no|number|#)|payment received|thanks for your (order|purchase|payment)|we received your payment)\\b/i.test(text) && (amount || known)) return 'receipt';\n  if (/\\b(invitation|invite|meeting|appointment|booking|reservation|interview|deadline|rsvp)\\b/i.test(text)) return 'date';\n  return 'none';\n}\n\nasync function every(ctx, list, where) {\n  const out = [];\n  let from = 1;\n  for (;;) {\n    const clause = { field: 'seq', gte: from };\n    const page = await ctx.record.list(list, where ? { all: [where, clause] } : clause, { order: 'seq' });\n    out.push(...page);\n    if (page.length < 50 || out.length >= 5000) return out;\n    from = page[page.length - 1].seq + 1;\n  }\n}\n\nconst spoken = (list, row) => `${list}#${row.seq}`;\nconst lower = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');\n\n/**\n * The day of an instant in a zone, `YYYY-MM-DD`, or `null` when it cannot be said, and then the day Gmail sent is kept.\n * The script in Google sends the day in the zone it was set up with, so this only mends one sent in another.\n */\nexport function dayIn(iso, tz) {\n  const at = new Date(String(iso ?? ''));\n  if (Number.isNaN(at.getTime()) || typeof Intl === 'undefined') return null;\n  try {\n    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);\n    return /^\\d{4}-\\d{2}-\\d{2}$/u.test(parts) ? parts : null;\n  } catch {\n    return null;\n  }\n}\n\n/** An organisation's name from its domain: `marlow-studio.co.uk` is Marlow Studio. */\nexport function orgName(domain) {\n  const parts = String(domain).split('.');\n  const second = new Set(['co', 'com', 'org', 'net', 'ac', 'gov', 'edu']);\n  let stem = parts.length > 2 && second.has(parts[parts.length - 2]) ? parts[parts.length - 3] : parts[parts.length - 2] ?? parts[0];\n  stem = String(stem ?? '').replace(/[-_]+/gu, ' ').trim();\n  return stem.replace(/\\b\\w/gu, (c) => c.toUpperCase()) || domain;\n}\n\nexport default async function run(ctx) {\n  const tz = ctx.tz || 'UTC';\n  const mail = (await ctx.record.list('gmail_mail', { none: [{ field: 'met', is: true }] }, { order: 'seq', limit: MOST })).slice(0, MOST);\n  if (mail.length === 0) return { looked: 0 };\n\n  const people = await every(ctx, 'people');\n  const orgs = await every(ctx, 'organisations');\n  const byEmail = new Map();\n  for (const p of people) if (p.fields.merged_into == null && lower(p.fields.email) !== '') byEmail.set(lower(p.fields.email), p);\n  const byDomain = new Map();\n  for (const o of orgs) if (o.fields.merged_into == null && lower(o.fields.domain) !== '') byDomain.set(lower(o.fields.domain), o);\n\n  const metNow = new Set();\n  const orgNow = new Set();\n  /* ONE UPDATE A PERSON A RUN, however many of their mails came in, so no update is refused for a version it already moved. */\n  const owed = new Map();\n  let met = 0;\n  let orgsMet = 0;\n  let linked = 0;\n  let waiting = 0;\n\n  for (const row of mail) {\n    const f = row.fields;\n    const patch = {};\n    const day = dayIn(f.at, tz);\n    if (day !== null && day !== f.day) patch.day = day;\n    const kind = f.direction === 'sent' ? 'none' : kindOf(f.subject, f.snippet, f.address, f.hint ?? f.kind);\n    if (kind !== (f.kind ?? 'none')) patch.kind = kind;\n    const address = lower(f.address);\n    const counts = (f.person === true || f.direction === 'sent') && address.includes('@');\n    if (!counts) {\n      ctx.update(spoken('gmail_mail', row), { ...patch, met: true }, row.version);\n      continue;\n    }\n    const domain = address.split('@')[1] ?? '';\n    const org = FREE_MAIL.has(domain) ? null : byDomain.get(domain) ?? null;\n    if (!FREE_MAIL.has(domain) && org === null && domain !== '' && !orgNow.has(domain)) {\n      ctx.write('organisations', { name: orgName(domain), domain, tags: ['gmail'] });\n      orgNow.add(domain);\n      orgsMet++;\n    }\n    const person = byEmail.get(address);\n    if (!person) {\n      /* MET NOW, LINKED NEXT HOUR: a row written in this run has no id to point at until it is kept. */\n      if (!metNow.has(address)) {\n        const name = typeof f.name === 'string' && f.name.trim() !== '' && !f.name.includes('@') ? f.name.trim() : address;\n        ctx.write('people', { name, email: address, ...(day ? { in_touch: day } : {}), ...(org ? { org: org.id } : {}), tags: ['gmail'] });\n        metNow.add(address);\n        met++;\n      }\n      if (Object.keys(patch).length > 0) ctx.update(spoken('gmail_mail', row), patch, row.version);\n      waiting++;\n      continue;\n    }\n    const pp = owed.get(person.id) ?? {};\n    const was = pp.in_touch ?? (typeof person.fields.in_touch === 'string' ? person.fields.in_touch : '');\n    if (day !== null && day > was) pp.in_touch = day;\n    if (org && (person.fields.org === null || person.fields.org === undefined || person.fields.org === '')) pp.org = org.id;\n    owed.set(person.id, pp);\n    ctx.update(spoken('gmail_mail', row), { ...patch, who: person.id, met: true }, row.version);\n    linked++;\n  }\n\n  for (const p of people) {\n    const pp = owed.get(p.id);\n    if (pp && Object.keys(pp).length > 0) ctx.update(spoken('people', p), pp, p.version);\n  }\n\n  ctx.log(`Looked at ${mail.length} mails: met ${met} people and ${orgsMet} organisations, linked ${linked} mails${waiting > 0 ? `, ${waiting} wait for their person to be kept` : ''}.`);\n  return { looked: mail.length, met, orgs: orgsMet, linked };\n}\n"
     },
     {
       "rule": "gmail_reply",
@@ -374,8 +394,9 @@
           "suggest": {
             "question": "{{name}} is waiting on a reply about {{subject}}. Open it in Gmail: {{link}}",
             "options": [
-              "I will reply",
-              "No reply needed"
+              "I replied",
+              "No reply needed",
+              "I will reply"
             ]
           }
         }
@@ -417,7 +438,7 @@
             "question": "A receipt from {{name}}: {{subject}}. Keep it with your money? {{link}}",
             "options": [
               "I will add it",
-              "Leave it"
+              "Not a receipt"
             ]
           }
         }
@@ -445,6 +466,106 @@
       ],
       "once_per": [
         "entry"
+      ]
+    },
+    {
+      "rule": "gmail_replied",
+      "name": "Take a mail you replied to off Waiting on your reply",
+      "pack": "gmail",
+      "on": {
+        "decided": {
+          "about": "rule.gmail_reply",
+          "option": "I replied"
+        }
+      },
+      "steps": [
+        {
+          "set": {
+            "field": "needs_reply",
+            "to": "false"
+          }
+        },
+        {
+          "set": {
+            "field": "answered",
+            "to": "true"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "gmail_no_reply",
+      "name": "Take a mail that needs no reply off Waiting on your reply",
+      "pack": "gmail",
+      "on": {
+        "decided": {
+          "about": "rule.gmail_reply",
+          "option": "No reply needed"
+        }
+      },
+      "steps": [
+        {
+          "set": {
+            "field": "needs_reply",
+            "to": "false"
+          }
+        },
+        {
+          "set": {
+            "field": "answered",
+            "to": "true"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "gmail_not_bill",
+      "name": "Clear a mail you said is not a bill",
+      "pack": "gmail",
+      "on": {
+        "decided": {
+          "about": "rule.gmail_bill",
+          "option": "Not a bill"
+        }
+      },
+      "steps": [
+        {
+          "set": {
+            "field": "kind",
+            "to": "none"
+          }
+        },
+        {
+          "set": {
+            "field": "answered",
+            "to": "true"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "gmail_not_receipt",
+      "name": "Clear a mail you said is not a receipt",
+      "pack": "gmail",
+      "on": {
+        "decided": {
+          "about": "rule.gmail_receipt",
+          "option": "Not a receipt"
+        }
+      },
+      "steps": [
+        {
+          "set": {
+            "field": "kind",
+            "to": "none"
+          }
+        },
+        {
+          "set": {
+            "field": "answered",
+            "to": "true"
+          }
+        }
       ]
     },
     {
@@ -484,7 +605,7 @@
       "name": "Mail waiting on your reply",
       "pack": "gmail",
       "source": "register.gmail_mail",
-      "where": "needs_reply is true, direction is received",
+      "where": "needs_reply is true, direction is received, answered is not true",
       "value": {
         "count": "id"
       },
@@ -581,7 +702,7 @@
             "gt": 0
           },
           "source": "register.gmail_mail",
-          "where": "needs_reply is true, direction is received",
+          "where": "needs_reply is true, direction is received, answered is not true",
           "columns": [
             {
               "field": "subject"
@@ -696,7 +817,7 @@
         "kind": "stat",
         "heading": "Mail",
         "icon": "mail",
-        "empty": "Gmail is not connected yet. Set it up on the Gmail add-on page.",
+        "empty": "Nothing waiting on your reply and nothing unread.",
         "cells": [
           {
             "metric": "gmail-needs-reply",
@@ -706,7 +827,11 @@
             "metric": "gmail-unread",
             "label": "Unread"
           }
-        ]
+        ],
+        "when": {
+          "metric": "gmail-mail",
+          "gt": 0
+        }
       },
       "sizes": [
         "small",
@@ -754,7 +879,7 @@
       "block": {
         "kind": "table",
         "source": "register.gmail_mail",
-        "where": "needs_reply is true, direction is received",
+        "where": "needs_reply is true, direction is received, answered is not true",
         "columns": [
           {
             "field": "subject",
@@ -777,7 +902,11 @@
         ],
         "limit": 6,
         "empty": "Nothing is waiting on your reply.",
-        "icon": "mail"
+        "icon": "mail",
+        "when": {
+          "metric": "gmail-mail",
+          "gt": 0
+        }
       },
       "blanks": [],
       "sizes": [

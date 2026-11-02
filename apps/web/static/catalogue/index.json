@@ -1673,8 +1673,55 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "63e2cabdcd28f3e61bfcd53888867cbabf161a04947b01bbd4fbd4d45c66c264",
+          "bytes": 43671,
+          "published_at": "2026-11-02T21:57:35.356Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Mail"
+            ],
+            "pages": [
+              "Mail"
+            ],
+            "rules": [
+              "Ask about mail waiting on your reply",
+              "Ask about a mail that looks like a bill",
+              "Ask about a mail that looks like a receipt",
+              "Ask about a mail from a person with a date in it",
+              "Take a mail you replied to off Waiting on your reply",
+              "Take a mail that needs no reply off Waiting on your reply",
+              "Clear a mail you said is not a bill",
+              "Clear a mail you said is not a receipt"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Mail",
+              "Waiting on your reply"
+            ],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": true
+              },
+              {
+                "id": "register.organisations",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "Answering a question in Needs you changes the mail at once: I replied or No reply needed takes it off Waiting on your reply, Not a bill or Not a receipt clears it. A mail still waiting after two weeks is kept until you reply or answer. Bills and receipts need an amount, a known biller or the word invoice, never from a newsletter. Today's Mail widget waits for your first mail.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "21d752d9cbafdec1f6e2c5bdf2bef3d00c8ba58a5857f7142da89c42ee076795",
@@ -1722,6 +1769,7 @@
       "categories": [
         "modules",
         "doors",
+        "automations",
         "made-by-braindog"
       ],
       "publisher": {
