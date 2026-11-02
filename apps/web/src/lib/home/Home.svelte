@@ -596,7 +596,10 @@
       void import('./today-read.ts').catch(() => null);
       void keptFrameCode().catch(() => null);
       /* AND THE CODE OF THE TILES TODAY'S EARLY ANSWER SHOWS (`tile-code.ts`), which is in the tab long before that read. */
-      if (declares === null) void import('./tile-code.ts').then((m) => m.askEarlyTiles(`${apiBase()}/api/today`, { base: apiBase(), owner: data.me?.owner === true }), () => null);
+      /* A KEPT TODAY TAKES THE CODE FROM IT TOO (speed4, 2 Nov), though not the reads: the early answer is the record's last
+         drawn Today, whose tiles are a kept page's own, and its reader waits on their code (`tilesLanded`). */
+      const earlyAsk = (globalThis as { __bdToday?: { url?: unknown; at?: unknown } }).__bdToday;
+      void import('./tile-code.ts').then((m) => m.askEarlyTiles(`${apiBase()}/api/today`, declares === null ? { base: apiBase(), owner: data.me?.owner === true } : undefined, earlyAsk), () => null);
       const slug = declares;
       const before = new Set(Object.keys(REGISTERS));
       /* EVERY LIST LEARNT ALREADY (Today drawn before in this tab): nothing waits for the copy. */
@@ -696,6 +699,8 @@
     /* AND THE TILES' OWN FIRST READS, now the page has been read and before it draws (`tile-code.ts` `askReads`). */
     if (drawn.from === 'live') tiles.askReads(answered, { base, owner: data.me?.owner === true });
     if (drawn.from !== 'live' || decl === null || decl.board !== true) return null;
+    /* AND THE TILES' CODE IN HAND, so they draw with the page and not a frame after it, moving what is under them. */
+    await tiles.tilesLanded(answered);
     const { blocks: kept, ...declOwn } = decl;
     declaredBlocks = Array.isArray(kept) ? (kept as Record<string, unknown>[]) : [];
     tilesBeside(base);
@@ -768,6 +773,8 @@
     if (drawn.from === 'live') {
       /* AND THE TILES' OWN FIRST READS, now the page has been read and before it draws (`tile-code.ts` `askReads`). */
       tiles.askReads(answered, { base, owner: data.me?.owner === true });
+      /* AND THE TILES' CODE IN HAND, so they draw with the page and not a frame after it, moving what is under them. */
+      await tiles.tilesLanded(answered);
       const at = drawn.now;
       const blocks = withLeft(drawn.blocks, body.blocks, left, (b) => leftBlock(b, at) as unknown as LiveBlock);
       return {

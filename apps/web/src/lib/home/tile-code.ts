@@ -14,6 +14,7 @@
  * PURE ENOUGH FOR NODE: no rune, no `$lib`.
  */
 
+import { landed } from './tile-landed.ts';
 import { askWorking } from './working-early.ts';
 
 /** A drawn block as this reads one: its key and whatever it lists. */
@@ -32,13 +33,30 @@ export function tilesOf(blocks: unknown): Array<'late' | 'working' | 'card'> {
   return out;
 }
 
+/** The code of one tile, asked (or found already asked: a module is fetched and run once). */
+const codeOf = (tile: 'late' | 'working' | 'card'): Promise<unknown> =>
+  tile === 'late'
+    ? import('./LateNow.svelte').then((m) => (landed.late = m.default))
+    : tile === 'working'
+      ? Promise.all([import('./WorkingNow.svelte'), import('./desk-live.ts')]).then(([m]) => (landed.working = m.default))
+      : import('../decide/card-load.ts').then((m) => m.loadCard());
+
 /** Ask for the code of each tile `blocks` (Today's answer, as the record drew it) has something to show in. */
 export function askTiles(blocks: unknown): void {
-  for (const tile of tilesOf(blocks)) {
-    if (tile === 'late') void import('./LateNow.svelte').catch(() => null);
-    else if (tile === 'working') void Promise.all([import('./WorkingNow.svelte'), import('./desk-live.ts')]).catch(() => null);
-    else void import('../decide/card-load.ts').then((m) => m.loadCard()).catch(() => null);
-  }
+  for (const tile of tilesOf(blocks)) void codeOf(tile).catch(() => null);
+}
+
+/**
+ * WHEN THE TILES' CODE HAS LANDED, OR `most` MS, whichever is first (speed4, 2 Nov): Today's reader waits on this before
+ * it hands the page over. The code was asked with the early answer and is in the tab by then, so the wait is the few ms
+ * of running it; drawn without it, Late and handed back, Working now and Needs you's cards each drew a frame or three
+ * after the page, every tile under them moving down as they did (a phone's layout shift of 0.17 to 0.29 over HTTP/2).
+ * A tile whose code is slow is drawn when it comes, as before, and never holds the page past `most`.
+ */
+export function tilesLanded(blocks: unknown, most = 250): Promise<void> {
+  const asks = tilesOf(blocks).map((tile) => codeOf(tile).catch(() => null));
+  if (asks.length === 0) return Promise.resolve();
+  return Promise.race([Promise.all(asks).then(() => undefined), new Promise<void>((done) => setTimeout(done, most))]);
 }
 
 /** The record Today is on and whether its reader is the owner, for the reads a tile is asked ahead (`working-early.ts`). */
@@ -63,9 +81,11 @@ export function askReads(blocks: unknown, at: TileAt): void {
  * page had been read, in one request with the screen's own suggestion, three seconds after this answer was in the tab.
  * Asked here it goes by itself (the client's `ahead` reads fill a wave of their own) and is answered before the tile
  * mounts; `askReads` after the page's read then finds it held and asks nothing.
+ *
+ * `early` is the early answer as Home found it when it opened: Today's reader takes it off the window when it reads it
+ * (`earlyToday`), which on a cold open is often before this file has landed (speed4, 2 Nov).
  */
-export function askEarlyTiles(url: string, at?: TileAt): void {
-  const early = (globalThis as { __bdToday?: { url?: unknown; at?: unknown } | undefined }).__bdToday;
+export function askEarlyTiles(url: string, at?: TileAt, early: { url?: unknown; at?: unknown } | undefined = (globalThis as { __bdToday?: { url?: unknown; at?: unknown } | undefined }).__bdToday): void {
   if (early === undefined || early.url !== url || !(early.at instanceof Promise)) return;
   void (early.at as Promise<{ ok?: unknown; body?: unknown } | null>)
     .then((res) => {

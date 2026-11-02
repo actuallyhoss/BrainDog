@@ -92,6 +92,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { drawnOf } from './kinds/drawn.ts';
   import { goto } from '$app/navigation';
+  import { landed } from '$lib/home/tile-landed.ts';
 
   let {
     block,
@@ -905,11 +906,12 @@
   <!-- THE DESK'S OWN TILE, its component fetched as the tile is drawn, so a page that is not Today carries none of it. -->
   <div class="desk-part" data-desk={desk.kind}>
     {#if desk.kind === 'late'}
-      {#await import('$lib/home/LateNow.svelte') then { default: LateNow }}
+      <!-- AT ONCE WHERE ITS CODE HAS LANDED (`tile-landed.ts`), so it draws with the page and moves nothing under it. -->
+      {#await landed.late ?? import('$lib/home/LateNow.svelte').then((m) => m.default) then LateNow}
         <LateNow lines={desk.lines} heading={desk.heading} more={desk.more} most={phone.current ? Math.min(3, desk.most) : desk.most} writes={(list) => may(route.data as unknown as Shell, 'write', list)} onfinished={() => void writes?.reread()} />
       {/await}
     {:else if desk.kind === 'working'}
-      {#await import('$lib/home/WorkingNow.svelte') then { default: WorkingNow }}<WorkingNow rows={desk.rows} />{/await}
+      {#await landed.working ?? import('$lib/home/WorkingNow.svelte').then((m) => m.default) then WorkingNow}<WorkingNow rows={desk.rows} />{/await}
     {:else if desk.kind === 'projects' && deskProjects && block.register}
       {#await import('$lib/home/ProjectCards.svelte') then { default: ProjectCards }}
         <ProjectCards cards={deskProjects.cards} more={deskProjects.more} list={block.register} name={desk.name} working={workingNow()} />
