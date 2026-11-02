@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "3.6.1",
+  "version": "3.7.0",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "A holding with a cost written on it and no buys, such as a gold bar valued by the gold rate, now has its gain worked out, so Worth now less Paid in is Gain.",
+  "changes": "Investments and gold reads like the rest of Money: what you hold leads across the page, the gold rate pairs with where it sits, everything you hold is one list with what each is worth at the end, a buy names its holding first, and the date prices are from is a line, not a tile.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -1040,7 +1040,7 @@
           "lead": true,
           "heading": "What you hold",
           "icon": "chart-pie",
-          "span": 8,
+          "span": 12,
           "cells": [
             {
               "metric": "holdings-worth-costed",
@@ -1070,7 +1070,7 @@
           "lead": true,
           "heading": "What you hold",
           "icon": "chart-pie",
-          "span": 8,
+          "span": 12,
           "cells": [
             {
               "metric": "holdings-worth-costed",
@@ -1096,7 +1096,7 @@
         },
         {
           "kind": "note",
-          "span": 8,
+          "span": 12,
           "body": "1 holding has no price yet, so it is left out of these.",
           "when": {
             "metric": "holdings-unvalued",
@@ -1105,7 +1105,7 @@
         },
         {
           "kind": "note",
-          "span": 8,
+          "span": 12,
           "body": "{{holdings-unvalued}} holdings have no price yet, so they are left out of these.",
           "when": {
             "metric": "holdings-unvalued",
@@ -1114,7 +1114,7 @@
         },
         {
           "kind": "note",
-          "span": 8,
+          "span": 12,
           "body": "1 holding has no cost yet, so it is left out of these until you say what you paid.",
           "when": {
             "metric": "holdings-uncosted",
@@ -1123,7 +1123,7 @@
         },
         {
           "kind": "note",
-          "span": 8,
+          "span": 12,
           "body": "{{holdings-uncosted}} holdings have no cost yet, so they are left out of these until you say what you paid.",
           "when": {
             "metric": "holdings-uncosted",
@@ -1131,10 +1131,40 @@
           }
         },
         {
+          "kind": "note",
+          "span": 12,
+          "body": "Prices are from {{holdings-priced-on}}.",
+          "when": {
+            "all": [
+              {
+                "metric": "holdings-stale",
+                "is": 0
+              },
+              {
+                "metric": "holdings-count",
+                "gt": 0
+              },
+              {
+                "metric": "holdings-priced-on",
+                "empty": false
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "body": "Priced on {{holdings-priced-on}}, {{bad:over 30 days ago}}.",
+          "when": {
+            "metric": "holdings-stale",
+            "gt": 0
+          }
+        },
+        {
           "kind": "table",
           "heading": "Gold rate",
           "icon": "vault",
-          "span": 4,
           "body": "A karat with no rate of its own follows the newest rate there is.",
           "source": "register.gold_rates",
           "where": "live is true",
@@ -1189,7 +1219,6 @@
           "kind": "split",
           "heading": "Where it sits",
           "icon": "chart-pie",
-          "span": 12,
           "source": "metric.holdings-by-kind",
           "when": {
             "metric": "holdings-count",
@@ -1199,18 +1228,68 @@
         },
         {
           "kind": "table",
+          "heading": "Everything you hold",
+          "icon": "chart-line",
+          "span": 12,
+          "source": "register.holdings",
+          "columns": [
+            {
+              "field": "label",
+              "label": "Holding",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "kind",
+              "label": "Type",
+              "width": "12ch"
+            },
+            {
+              "field": "qty",
+              "label": "How many",
+              "width": "10ch",
+              "align": "end"
+            },
+            {
+              "field": "karat",
+              "label": "Karat",
+              "width": "8ch"
+            },
+            {
+              "field": "value",
+              "label": "Worth now",
+              "width": "14ch",
+              "align": "end"
+            },
+            {
+              "field": "gain",
+              "label": "Gain",
+              "width": "14ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "value",
+              "dir": "desc"
+            }
+          ],
+          "limit": 100,
+          "empty": "Nothing held yet."
+        },
+        {
+          "kind": "table",
           "heading": "Buys",
           "icon": "hand-coins",
           "span": 12,
           "source": "register.holding_buys",
           "columns": [
             {
-              "field": "bought_on",
-              "label": "Bought on"
-            },
-            {
               "field": "item",
               "label": "Holding"
+            },
+            {
+              "field": "bought_on",
+              "label": "Bought on"
             },
             {
               "field": "qty",
@@ -1239,73 +1318,6 @@
           ],
           "limit": 50,
           "empty": "No buys yet."
-        },
-        {
-          "kind": "cards",
-          "heading": "Everything you hold",
-          "icon": "chart-line",
-          "span": 12,
-          "source": "register.holdings",
-          "group": "kind",
-          "columns": [
-            {
-              "field": "label",
-              "as": "title"
-            },
-            {
-              "field": "value",
-              "as": "figure"
-            },
-            {
-              "field": "qty",
-              "label": "How many",
-              "as": "fact"
-            },
-            {
-              "field": "karat",
-              "label": "Karat",
-              "as": "fact"
-            },
-            {
-              "field": "gain",
-              "label": "Gain since you bought",
-              "as": "fact"
-            }
-          ],
-          "order": [
-            {
-              "field": "label",
-              "dir": "asc"
-            }
-          ],
-          "limit": 100,
-          "empty": "Nothing held yet."
-        },
-        {
-          "kind": "stat",
-          "heading": "Priced on",
-          "icon": "calendar-clock",
-          "span": 12,
-          "cells": [
-            {
-              "metric": "holdings-priced-on",
-              "label": "Oldest price"
-            }
-          ],
-          "when": {
-            "metric": "holdings-stale",
-            "is": 0
-          }
-        },
-        {
-          "kind": "note",
-          "tone": "warn",
-          "span": 12,
-          "body": "Priced on {{holdings-priced-on}}, {{bad:over 30 days ago}}.",
-          "when": {
-            "metric": "holdings-stale",
-            "gt": 0
-          }
         },
         {
           "kind": "section",

@@ -2044,8 +2044,60 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "3.6.1",
+      "latest": "3.7.0",
       "versions": [
+        {
+          "version": "3.7.0",
+          "checksum": "36912cc3a81d81a876d5fbd67f43b9cf8dfc43573e2a33a1607cbcecbc665e62",
+          "bytes": 63123,
+          "published_at": "2026-11-02T21:04:31.571Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "latest.currency-api.pages.dev",
+                "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
+                "key": null
+              }
+            ],
+            "widgets": [
+              "Gold price"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.fx",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Investments and gold reads like the rest of Money: what you hold leads across the page, the gold rate pairs with where it sits, everything you hold is one list with what each is worth at the end, a buy names its holding first, and the date prices are from is a line, not a tile.",
+          "preview": true
+        },
         {
           "version": "3.6.1",
           "checksum": "fcee3b200d983de742a981da847608bfbf80f73ec3ba701200088f62115857cb",
@@ -7092,8 +7144,46 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.2",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "edef1e9a7a9978616aa34352e50d363e6c6f8829ddcf7346cc5e615fc0058885",
+          "bytes": 26059,
+          "published_at": "2026-11-02T21:04:31.571Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Splits",
+              "Where each person stands"
+            ],
+            "pages": [
+              "Splits",
+              "{{name}}"
+            ],
+            "rules": [
+              "Write the split of a Ledger line marked shared",
+              "Work out a split and where that person stands"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Splits"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "Splits reads like the Ledger: each open and settled split is a line with what it was, who it was with and the whole cost under it, and what comes back to you or goes to them at the end, with its sign. With nothing shared yet the page opens on one line and the box to add a cost.",
+          "preview": true
+        },
         {
           "version": "1.2.2",
           "checksum": "25679537d93909216919e69174a578420ec986f7270bcf754d4620759a8e33e2",
@@ -7724,8 +7814,41 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.2",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "e471df77315fca007bfce888daec1254ea05b4f1ba1ed1a7bf40568e683ef32b",
+          "bytes": 23902,
+          "published_at": "2026-11-02T21:04:31.571Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Subscriptions"
+            ],
+            "rules": [
+              "Keep a subscription's old price when its amount changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Subscriptions"
+            ],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "Subscriptions opens on one line and the box to add one when nothing is marked yet, and What they cost shows what they cost a month and a year, leaving the counts to the lists under it that already say them.",
+          "preview": true
+        },
         {
           "version": "1.2.2",
           "checksum": "97b8b3fab5126bfdf65a1502697312e6d22e10227e1e7daf02b4e8e0b7216342",
