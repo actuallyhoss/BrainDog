@@ -821,6 +821,38 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: var(--sp-2) var(--sp-2) var(--sp-3);
+    /* A THIN, QUIET SCROLLBAR (2 Nov, his word: "just make the scrollbar thinner"). With a mouse plugged in a Mac draws
+       a classic 15px bar, always on, that crowded the counts. Now it is the thin one, its gutter kept so a count never
+       sits under it, its track clear, and its thumb shows only while the pointer or the keyboard is in the rail. */
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+    scrollbar-color: transparent transparent;
+  }
+
+  .s-scroll:hover,
+  .s-scroll:focus-within {
+    scrollbar-color: color-mix(in oklab, var(--ink) 22%, transparent) transparent;
+  }
+
+  /* Safari before scrollbar-width: the same bar drawn the old way. */
+  .s-scroll::-webkit-scrollbar {
+    inline-size: 8px;
+  }
+
+  .s-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .s-scroll::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: var(--r-round);
+    background-clip: padding-box;
+    background-color: transparent;
+  }
+
+  .s-scroll:hover::-webkit-scrollbar-thumb,
+  .s-scroll:focus-within::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--ink) 22%, transparent);
   }
 
   .s-head {
