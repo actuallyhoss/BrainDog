@@ -35,10 +35,17 @@ export const escapeCell = (c: string): string =>
  * NO LIST, NO ROWS, so a capture with nothing to add to still degrades rather than drawing a field that writes
  * nowhere. Both engines refuse that declaration first, so this is only reached by a block built by hand.
  */
+/**
+ * LISTS NAMED BY AN ADD-ON NOBODY HAS INSTALLED, while its preview is on the screen (`market/PreviewPage.svelte`).
+ * The preview's lists are lent to `REGISTERS` only while its blocks are read, so its capture line was drawn later with
+ * the list's id where the name goes ("Add to money_goals"). Names only, so nothing else reads a list that is not here.
+ */
+export const LENT_NAMES = new Map<string, string>();
+
 export function captureRows(block: BlockResult): string[] {
   const register = block.register;
   if (!register) return [];
-  const into = ['into', register, REGISTERS[register]?.name ?? register, registerHref(register, block.where)];
+  const into = ['into', register, REGISTERS[register]?.name ?? LENT_NAMES.get(register) ?? register, registerHref(register, block.where)];
   return [into, ...Object.entries(block.fills ?? {}).map(([field, value]) => ['set', field, value])].map((cells) => cells.map(escapeCell).join(' | '));
 }
 

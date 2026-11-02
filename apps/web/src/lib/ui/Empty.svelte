@@ -413,6 +413,19 @@
     margin-block-start: var(--sp-1);
   }
 
+  /* A CENTRED SCREEN CENTRES ITS ACTIONS TOO. With a full-width line in the row (the not-found page's nearest pages,
+     `NearLinks`), the row spanned the tile and its buttons sat at the start edge under a centred title. `--row-justify`
+     carries the same choice into that line's own list. On a surface the screen reads from its start, as before. */
+  .empty:not(.compact) .empty-actions {
+    justify-content: center;
+    --row-justify: center;
+  }
+
+  :global(:where(.tile, .sheet, dialog, [data-surface='tile'], .block-slot)) .empty:not(.compact) .empty-actions {
+    justify-content: flex-start;
+    --row-justify: flex-start;
+  }
+
   /* THE AGENT'S WAY ON, 16 under the action, the prompt in its copyable line. */
   /* CODE READS FROM ITS START: a centred empty state centres its words, never a command or a prompt to paste. */
   .empty :global(.code-line) {

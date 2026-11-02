@@ -15,7 +15,7 @@ export const onWordWords = {
   /* THE SAME AS THE AGENT IS TOLD (`ON_WORD` in `packages/record/src/methods/agent-profile.ts`): on his word, changes
      and deletes go through; money and keys are asked. NOT "ALWAYS": with "Let agents do everything without asking" on
      (`bypass.ts`), money goes through too, and only what `NEVER_BYPASS` keeps still waits (`BYPASS_SAYS`). */
-  on: 'When you tell an agent to, it goes ahead, deletes too, and says it was your word. You can undo it. Money and keys wait for you, unless agents may do everything without asking: then only keys, paying, and deleting or exporting all of BrainDog still wait.',
+  on: 'When you tell an agent to do something, it does it, deletes included, and notes that you said so. You can undo it. Money and keys still wait for you, unless agents may do everything without asking.',
   off: 'Deletes, money and keys wait for you here, even when you told the agent.',
 } as const;
 

@@ -40,6 +40,7 @@
     type Said,
     type Who,
   } from '$lib/auth.ts';
+  import { opens } from '$lib/motion/open.ts';
   import { at, BASE } from '$lib/at.ts';
   import { appLink, CHALLENGE, desktopStart, handOff, keepVerifier, pkce } from '$lib/desktop-signin.ts';
   import { isApp, openOutside } from '$lib/shell.ts';
@@ -611,7 +612,9 @@
       {:else if view.name === 'locked'}
         <div class="said"><Empty kind="no-permission" title={copy.lockedTitle(view.minutes)} body={copy.lockedWhy} /></div>
       {:else if view.name === 'rejected'}
-        <div class="said">
+        <!-- THE REFUSAL OPENS ABOVE THE FORM (`opens`, 180ms by height), so the field slides down to make room rather
+             than jumping under the pointer. -->
+        <div class="said" in:opens>
           <Empty
             kind="error"
             title={view.closed ? copy.closedTitle : (view.fix ?? copy.rejectedTitle)}

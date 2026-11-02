@@ -855,7 +855,8 @@
     <!-- NO MAIL LEAVES THIS HOST, and the line says so beside the control rather than after the press: the owner sends
          the link themselves, and somebody expecting an email would wait for one that never comes. -->
     <p class="hint">{inviteHow}</p>
-    <Sheet bind:open={inviteOpen} title={copy.invitePerson} subtitle={inviteHow}>
+    {#if mailOff}<code class="invite-command">{copy.inviteCommand}</code>{/if}
+    <Sheet bind:open={inviteOpen} title={copy.invitePerson} subtitle={mailOff ? copy.inviteHowNoMailShort : inviteHow}>
     <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
          row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->
     <form class="code-form invite-form" onsubmit={makeInvite}>
@@ -1479,6 +1480,21 @@
       display: block;
       inline-size: 100%;
     }
+  }
+
+  /* THE SERVER'S COMMAND, in the house's mono on a well, so it reads as something to type. */
+  .invite-command {
+    display: block;
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    margin: calc(-1 * var(--sp-2)) 0 var(--sp-3);
+    padding: var(--sp-1) var(--sp-2);
+    overflow-wrap: anywhere;
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
   }
 
   .hint {

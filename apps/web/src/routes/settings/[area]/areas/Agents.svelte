@@ -1162,11 +1162,13 @@
   }
 
   /* WHAT IT MAY DO, in the second ink: the sentence the row is about. */
+  /* THE ROW'S SECOND LINE AT THE SIZE EVERY AGENT'S SECOND LINE IS (`.who-detail`, 13): at 15 "Suggests; every change
+     waits for you." stood louder than the agents' own names' lines above it. One step darker, since it is what it gives. */
   .agent-says {
     color: var(--ink-2);
     text-wrap: pretty;
-    font-size: var(--fs-body);
-    line-height: 20px;
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .agent-may {

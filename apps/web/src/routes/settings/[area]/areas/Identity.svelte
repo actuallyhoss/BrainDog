@@ -26,6 +26,7 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import { opens } from '$lib/motion/open.ts';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import { hostedHere } from '../../billing.ts';
 
@@ -379,7 +380,8 @@
         {#if myName === null && !renaming && !signedOut && (s.hostAuth?.me || s.hostAuth?.open)}
           <button type="button" class="add-name tap" onclick={startRename}>{identityWords.addName}</button>
         {/if}
-        {#if myEmail && !signedOut}<p class="person-email">{myEmail}</p>{/if}
+        <!-- A NAME THAT IS THE ADDRESS (a record whose person was never named) is said once, not twice. -->
+        {#if myEmail && !signedOut && myEmail !== myName}<p class="person-email">{myEmail}</p>{/if}
       </div>
     </div>
 
@@ -387,7 +389,7 @@
          session; the record refuses a token, so nothing here is offered to one. -->
     {#if !signedOut && (s.hostAuth?.me || s.hostAuth?.open)}
       {#if renaming}
-        <form class="rename" onsubmit={saveName}>
+        <form class="rename" onsubmit={saveName} in:opens>
           <label class="identity-label" for="identity-name">{copy.identityNameLabel}</label>
           <span class="field rename-field" class:rename-bad={!!nameRefusal}>
             <input
@@ -676,9 +678,10 @@
 <style>
   /* HOW YOU SIGN IN, AS ROWS ON THE GROUND: a 28px well, what the fact is in the meta size, and what is true
      at the row's size under it, with a hairline between rows from the words' edge. */
+  /* 16 UNDER THE NAME'S BUTTONS, so Change name is not read as the first fact's. */
   .facts {
     display: grid;
-    margin: 0 0 var(--sp-3);
+    margin: var(--sp-4) 0 var(--sp-3);
     padding: 0;
     list-style: none;
   }

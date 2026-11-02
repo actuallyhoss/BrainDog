@@ -721,7 +721,10 @@ export const account = {
   /* NAMES THE OPERATOR'S COMMAND (selfhost2 lane, 2 Nov): with no mail, whoever runs the server prints a link that works
      for a new address (`invite` in apps/selfhost). The link copied here works only for an address that already signs in. */
   inviteHowNoMail:
-    "One use, one address, good for 24 hours. This BrainDog can't send mail, so this link works only for an address that already signs in here. For somebody new, invite them here first, then whoever runs the server types node apps/selfhost/src/main.ts invite with their email on it and sends them the link it prints.",
+    "One use, one address, good for 24 hours. This BrainDog can't send mail, so the link only works for someone who already signs in here. To bring in someone new, invite them here first, then whoever runs the server runs this with their email and sends them the link it prints:",
+  inviteHowNoMailShort: "One use, one address, good for 24 hours. This BrainDog can't send mail, so the link only works for someone who already signs in here.",
+  /* THE COMMAND ITSELF, drawn as code under the line above so it reads as something to type, not as words. */
+  inviteCommand: 'node apps/selfhost/src/main.ts invite their@email.com',
   inviteFor: (email: string) => `This invitation is for ${email}.`,
   inviteSignedInAs: (email: string) => `You are signed in as ${email}.`,
   inviteAccept: (record: string | null) => (record ? `Join ${record}` : 'Join'),

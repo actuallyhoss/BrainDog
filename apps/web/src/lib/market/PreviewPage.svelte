@@ -14,7 +14,10 @@
   frame, so the page itself never scrolls sideways at 390px.
 -->
 <script lang="ts">
+  import { onDestroy } from 'svelte';
+
   import type { Preview } from '@braindog/declare/catalogue';
+  import { LENT_NAMES } from '$lib/record/capture-plan.ts';
   import PageView from '$lib/page/PageView.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import { openedOf } from './preview.ts';
@@ -30,6 +33,18 @@
   const pages = $derived(large ? preview.pages : preview.pages.slice(0, 1));
   const shown = $derived(pages[Math.min(at, Math.max(pages.length - 1, 0))] ?? null);
   const got = $derived(shown ? openedOf(shown, now, lists) : null);
+
+  /* ITS LISTS' NAMES, LENT WHILE IT IS DRAWN, so its capture says "Add to Goals" and not the list's id (`LENT_NAMES`).
+     Set before the first draw (a plain map, read as the rows are written) and handed back when the preview goes. */
+  const lent: string[] = [];
+  for (const d of lists) {
+    if (typeof d.register !== 'string' || typeof d.name !== 'string' || d.name.trim() === '' || LENT_NAMES.has(d.register)) continue;
+    LENT_NAMES.set(d.register, d.name.trim());
+    lent.push(d.register);
+  }
+  onDestroy(() => {
+    for (const id of lent) LENT_NAMES.delete(id);
+  });
 </script>
 
 {#if shown && got}

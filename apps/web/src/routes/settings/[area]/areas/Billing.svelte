@@ -210,7 +210,7 @@
 <!-- THE TWO WAYS ON, AT THE TILE'S FOOT: they were loose on the board under it. -->
 {#snippet foot()}
 <div class="row-actions">
-  <Button weight="quiet" href="/usage"><Icon name="history" size="s" />{actionWords.seeUsage}</Button>
+  <Button weight="quiet" href="/usage"><Icon name="observe" size="s" />{actionWords.seeUsage}</Button>
   <!-- AND THE SECOND LINK IS THE OWNER'S, because the screen it leads to is. `export` needs
        `owner`, so offering a colleague *Export the record* here is an invitation to a screen
        where all four buttons refuse. Usage is the account's rather than the record's and

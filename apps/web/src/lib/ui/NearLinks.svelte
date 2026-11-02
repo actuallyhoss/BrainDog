@@ -48,6 +48,7 @@
   .near-list {
     display: flex;
     flex-wrap: wrap;
+    justify-content: var(--row-justify, flex-start);
     gap: var(--sp-1) var(--sp-4);
     margin: 0;
     padding: 0;
