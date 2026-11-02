@@ -131,7 +131,7 @@
   import type EditCoverOf from '$lib/board/EditCover.svelte';
   import type DraftMarkOf from '$lib/board/DraftMark.svelte';
   import { BoardModel, boardWords } from '$lib/board/board.svelte.ts';
-  import { DESK_ONE_ROW_HOLDS, deskLines, restSize, rowsOf } from '$lib/board/rest-size.ts';
+  import { DESK_ONE_ROW_HOLDS, TABLE_GROWS_TO, TABLE_ONE_ROW_HOLDS, deskLines, grewTo, restSize, rowsOf } from '$lib/board/rest-size.ts';
   import { WORKING_MOST } from '$lib/home/desk.ts';
   import { leftBlock, phoneAsk, withLeft } from '$lib/home/phone-ask.ts';
   import { fitted, widgetsOf, type Phone } from '$lib/board/board-widgets.ts';
@@ -147,7 +147,7 @@
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { holdPresses } from '$lib/data/held.svelte.ts';
   import { drewFirst, firstDrawn } from '$lib/data/first-drawn.ts';
-  import { emptySaid } from './widget-empty.ts';
+  import { emptySaid, fromSheet } from './widget-empty.ts';
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
@@ -1198,7 +1198,13 @@
     if (kinds.has('arrivals')) counted.set('arrivals', landedKit ? landedKit.arrivalsOf(landed).length : landed.length);
     for (const [k, rows] of counted) {
       const size = boardModel.sizeNow(k);
-      const at = restSize(kinds.get(k)!, size, k === 'working' ? workingRuns(rows) : rows, tall.has(k) ? { holds: DESK_ONE_ROW_HOLDS, grow: true } : undefined);
+      /* A TABLE FROM THE SHEET HOLDS ONE ROW WHOLE IN A ONE-ROW FRAME, its column names taking the second, and grows to two
+         rows where that shows every row it has (`TABLE_ONE_ROW_HOLDS`): the week's weather laid wide drew 1 day and "All
+         3 in Weather" on a laptop (widgets-empty, 2 Nov). */
+      const table = kinds.get(k) === 'table' && fromSheet({ key: k }) && rows !== null && rows <= TABLE_GROWS_TO;
+      /* AND A TALL ONE, one column wide, cut its five columns to two (the week's weather's own size): laid as wide, two
+         rows tall, so its days are whole. */
+      const at = table && size === 'tall' ? 'large' : restSize(kinds.get(k)!, size, k === 'working' ? workingRuns(rows) : rows, tall.has(k) ? { holds: DESK_ONE_ROW_HOLDS, grow: true } : table ? { holds: TABLE_ONE_ROW_HOLDS, grow: true } : undefined);
       if (at !== size) out.set(k, at);
     }
     return out;
@@ -1234,7 +1240,10 @@
     const fit = raw.map((b) => {
       const k = boardKeyOf(b);
       if (k && b.drawn && ((widgetKeys.has(k) && boardModel.placeOf(k) === null) || !onBoardToday(b))) return { ...b, drawn: false };
-      return k && b.drawn && b.kind !== undefined ? fitted(b, boardModel.sizeNow(k), boardModel.onPhone) : b;
+      /* A FRAME LAID TALLER AT REST SHOWS WHAT ITS TALLER SIZE SHOWS (`boardRest`, a table from the sheet). */
+      const rest = boardRest.get(k ?? '');
+      const size = k ? (rest !== undefined && grewTo(boardModel.sizeNow(k), rest) ? rest : boardModel.sizeNow(k)) : 'wide';
+      return k && b.drawn && b.kind !== undefined ? fitted(b, size, boardModel.onPhone) : b;
     });
     const rank = new Map(boardModel.keys.map((k, i) => [k, i] as const));
     const at = (b: Desked<LiveBlock>): number => {

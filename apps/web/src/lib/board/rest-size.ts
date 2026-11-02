@@ -26,6 +26,17 @@ export const DESK_ONE_ROW_HOLDS: Readonly<Partial<Record<WidgetSize, number>>> =
 /** Whether a block as Home draws it is one of the desk's own tiles, whose lines are tall (`DESK_ONE_ROW_HOLDS`). */
 export const deskLines = (b: { desk?: { kind: string } | undefined }): boolean => b.desk?.kind === 'late' || b.desk?.kind === 'working';
 
+/**
+ * AND HOW MANY ROWS OF A TABLE ONE ROW SHOWS WHOLE: one, since its column names take a line (widgets-empty, 2 Nov). A
+ * table from the sheet with no more rows than `TABLE_GROWS_TO` is laid two rows tall where one cannot hold them, so the
+ * week's weather shows its three days at Wide.
+ */
+export const TABLE_ONE_ROW_HOLDS: Readonly<Partial<Record<WidgetSize, number>>> = { wide: 1, small: 1 };
+export const TABLE_GROWS_TO = 3;
+
+/** Whether the size laid at rest is two rows tall where the size chosen is one: the frame grew (`grow`). */
+export const grewTo = (chosen: WidgetSize, laid: WidgetSize): boolean => TALLER[chosen] === laid || (chosen === 'tall' && laid === 'large');
+
 /** The size two rows tall of the same width: a wide's is a large, a small's a tall. */
 const TALLER: Readonly<Partial<Record<WidgetSize, WidgetSize>>> = { wide: 'large', small: 'tall' };
 
