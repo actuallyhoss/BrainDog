@@ -424,8 +424,9 @@
   </Tile>
 {:else if copiesFrom === 'reading'}
   <!-- NOTHING UNTIL THE RECORD ANSWERS: "No backup yet" drawn while the list is read is a sentence the answer may take
-       straight back. -->
-  <Tile icon="history" class="section" data-surface="tile" title={copy.kept}><div class="section-body">{''}</div></Tile>
+       straight back. AND NO TILE AT ALL (verify6, 2 Nov): an empty Kept tile, The key and Restore drawn while the copies
+       were read were pushed down by the strip of nights landing over them, 0.24 of a phone's screen. The area draws
+       whole once the record answers, into empty room. -->
 {:else if copyLines.length === 0}
   <!-- "The 30 newest are kept" IS A SENTENCE ABOUT A LIST THAT HAS SOME. On a record whose
        first backup has not run it describes a policy over nothing, above nothing. -->
@@ -492,6 +493,7 @@
 <!-- `49 §8`, and it asks for exactly this: the key "is what a self-hoster must back up
      SEPARATELY; Settings > backups says so in one line." A snapshot sealed with a key that
      is only inside the snapshot is a snapshot nobody can open. -->
+{#if copiesFrom !== 'reading'}
 <Tile icon="key" class="section" data-surface="tile" title={copy.theKey}>
   <div class="section-body">
     <!-- IT GAVE AN INSTRUCTION AND WITHHELD THE ONE THING NEEDED TO FOLLOW IT. This section had
@@ -564,6 +566,7 @@
          purpose. Going back is `Restore this` on one of the copies listed above. -->
   </div>
 </Tile>
+{/if}
 
 <style>
   /* A LIST WHOSE LEAD COLUMN IS ONLY A GLYPH: no id, so the glyph sits against the title and the trailing column may
