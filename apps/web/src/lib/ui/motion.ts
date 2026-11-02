@@ -133,8 +133,9 @@ export function rowOut(node: Element): TransitionConfig {
       const u = 1 - t;
       const gone = Math.min(1, u / 0.45);
       const close = spring(Math.max(0, (u - 0.3) / 0.7));
-      /* THE GAP GOES WITH THE HEIGHT, so taking the row out at the end moves nothing (T19). */
-      return `opacity:${(1 - cubicOut(gone)).toFixed(3)};transform:scale(${(1 - 0.03 * gone).toFixed(4)});block-size:${(h * (1 - close)).toFixed(1)}px;overflow:clip${gapCss(gap, Math.min(1, close))}`;
+      /* THE GAP GOES WITH THE HEIGHT, so taking the row out at the end moves nothing (T19). The spring overshoots past 1,
+         so the height stops at nought: below it the browser refused the keyframe and warned on every row taken out. */
+      return `opacity:${(1 - cubicOut(gone)).toFixed(3)};transform:scale(${(1 - 0.03 * gone).toFixed(4)});block-size:${Math.max(0, h * (1 - close)).toFixed(1)}px;overflow:clip${gapCss(gap, Math.min(1, close))}`;
     },
   };
 }

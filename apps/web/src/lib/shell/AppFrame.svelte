@@ -164,6 +164,10 @@
      2 Nov). A plain `{#if}` draws the room in the same frame as the head, wherever the banners are drawn. */
   let NameAsk = $state<typeof NameAskView | null>(null);
   const asking = $derived(nameAskDue(data, apiBase()));
+  /* AND ITS ROOM WHILE THE SCREEN IS DRAWN FROM THE LOCAL COPY (sweep10, 2 Nov): the ask waits for the live shell, so a
+     settings area drawn from the copy stood 76px higher and was pushed down when `boot` answered (0.09 on every area).
+     The copy names the same person, so the room is held from the first frame and the banner lands in it. */
+  const roomFor = $derived(asking || (data.stale === true && nameAskDue({ ...data, stale: undefined }, apiBase())));
   $effect(() => {
     if (asking && NameAsk === null) void import('$lib/sharing/NameAsk.svelte').then((m) => (NameAsk = m.default), () => undefined);
   });
@@ -1605,6 +1609,8 @@
        after the page, 150px tall on a phone, and pushed the whole screen down. -->
   {#if asking}
     {#if NameAsk}<NameAsk shell={data} />{:else}<div class="banner-room" aria-hidden="true"></div>{/if}
+  {:else if roomFor}
+    <div class="banner-room" aria-hidden="true"></div>
   {/if}
   <!-- WHAT WAS SHARED WITH A GUEST, ONCE A SHARE (§3.4). Its own chunk: only somebody a share let in loads it. -->
   {#if data.me.grant !== undefined && !data.me.owner}

@@ -411,9 +411,10 @@
             <Button weight="bare" disabled={savingName} onclick={() => (renaming = false)}>{copy.identityCancel}</Button>
           </div>
         </form>
-      {:else}
+      {:else if myName !== null}
+        <!-- NO EMPTY ROW WHERE THERE IS NO NAME TO CHANGE (sweep10): it held a gap that came a beat late and moved the facts. -->
         <div class="row-actions">
-          {#if myName !== null}<Button onclick={startRename}>{copy.identityChangeName}</Button>{/if}
+          <Button onclick={startRename}>{copy.identityChangeName}</Button>
         </div>
       {/if}
       {#if nameSaid}<p class="hint" role="status">{nameSaid}</p>{/if}
