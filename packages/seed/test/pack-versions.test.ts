@@ -3708,9 +3708,10 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'c94391b360e6dbf1',
+    declares: '53c291b1a05eeffc',
     history: [
       'money-core 3.38.1 of 2 November (fin-ledger-cols): `register.transactions` declares `table`, the columns the Ledger opens on: Date, Payee (or the bank\'s words), Account, Category and Amount -> c94391b360e6dbf1',
+      'money-core 3.38.1 again, same day: the Payee column of `register.transactions` reads the bank\'s words and then the description in turn (`table` `or` as a list) -> 53c291b1a05eeffc',
     ],
   },
 

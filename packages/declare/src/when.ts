@@ -119,16 +119,18 @@ function sifted(kind: DeclKind, body: Body, at: string, decide: Decide, out: Wai
          field that is not there draws nothing and the kernel does not refuse it. */
       if (isBody(body.hand)) body.hand = Object.fromEntries(Object.entries(body.hand).filter(([k, v]) => k === 'taken' || !lost.has(String(v))));
       /* AND A COLUMN OF `table` OVER IT, which the kernel refuses as it refuses a role's part: the column waits with its
-         field, a column's `or` over it goes and the column stays, and a table left with no column goes, so the list
+         field, a field of a column's `or` over it goes and the column stays, and a table left with no column goes, so the list
          opens on the columns the app works out. */
       if (Array.isArray(body.table)) {
         const columns = body.table.flatMap((c): unknown[] => {
           if (typeof c === 'string') return lost.has(c) ? [] : [c];
           if (!isBody(c)) return [c];
           if (lost.has(String(c.field))) return [];
-          if (c.or === undefined || !lost.has(String(c.or))) return [c];
+          const ors = Array.isArray(c.or) ? c.or : c.or === undefined ? [] : [c.or];
+          const kept = ors.filter((o) => !lost.has(String(o)));
+          if (kept.length === ors.length) return [c];
           const { or: _gone, ...rest } = c;
-          return [rest];
+          return [kept.length === 0 ? rest : { ...rest, or: Array.isArray(c.or) ? kept : kept[0] }];
         });
         if (columns.length === 0) delete body.table;
         else body.table = columns;

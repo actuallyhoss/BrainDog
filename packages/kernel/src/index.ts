@@ -1085,7 +1085,7 @@ export type RegisterDecl = {
   /** The order a read that names none comes back in: one field of this list that sorts, no `dir` lowest first, as `declare.ts` admits it. */
   order?: { field: string; dir?: 'asc' | 'desc' };
   /** The columns its table opens on, in order: a field, or one with a field read where it holds nothing and a heading (`42 §4.4`). */
-  table?: readonly (string | { field: string; or?: string; label?: string })[];
+  table?: readonly (string | { field: string; or?: string | readonly string[]; label?: string })[];
   /** A list a record-wide "Adds only" does not reach, as Keys and People are by their roles (`20 §1`). */
   owner_only?: true;
   /** A list only the owner reads and writes: no grant, share, link, child key or "See as" reaches it (`42 §4.4`). */

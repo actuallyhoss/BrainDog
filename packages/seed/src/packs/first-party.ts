@@ -967,7 +967,7 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   its money runs out (`page.money-book`); Reports' spending ring is six parts and everything else
  *   (`page.money-reports`); Today's Owed to you says Coming in under its name. An id added, so a minor step.
  * - money-core 3.38.1 (fin-ledger-cols, 2 Nov): the Ledger's table opens on Date, Payee (the bank's words where no name
- *   was given), Account, Category and Amount, declared by the list's new `table` key (`register.transactions`), where it
+ *   was given, then the description), Account, Category and Amount, declared by the list's new `table` key (`register.transactions`), where it
  *   opened on Description, an import's copy of the category. No id added or taken away, so a patch.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {

@@ -79,14 +79,14 @@ A `register` declaration is a list. Its `fields` each have an `id` and a `type`,
 `table` is optional. It names the columns the list's table opens on, in the order they are drawn, one to nine of them. Each is a field of the list, or an object with three keys:
 
 - `field`: the field the column draws.
-- `or`: another field, read where `field` holds nothing.
+- `or`: another field read where `field` holds nothing, or a list of up to three read in turn.
 - `label`: the column's heading, up to 40 characters, in place of the field's own label.
 
 ```json
-"table": ["on", { "field": "payee", "or": "counterparty_text", "label": "Payee" }, "account", "category", "amount"]
+"table": ["on", { "field": "payee", "or": ["counterparty_text", "what"], "label": "Payee" }, "account", "category", "amount"]
 ```
 
-That is the Ledger's: the date, who the money went to or came from (the bank's words where nobody gave a name), the account, the category and the amount. Every field named has to be a field of the list, or the install is refused with the field it could not find. A column over a field that waits for another list (`when`) waits with it.
+That is the Ledger's: the date, who the money went to or came from (the bank's words where nobody gave a name, and the description where the bank gave none), the account, the category and the amount. Every field named has to be a field of the list, or the install is refused with the field it could not find. A column over a field that waits for another list (`when`) waits with it.
 
 Leave `table` out and the list opens on columns worked out for it: the `title`, the `mobile` fields, the `state` and a deadline. A pack written before `table` existed keeps those. Either way a person can hide a column from Display, and that choice is theirs alone.
 

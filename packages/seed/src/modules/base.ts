@@ -46,7 +46,7 @@ export type SeedRegister = {
   /** The order a read that names none comes back in: one field that sorts, `desc` highest first (`declare.ts`). */
   order?: { field: string; dir: 'asc' | 'desc' };
   /** The columns its table opens on, in order: a field, or one read from a second where it holds nothing, with its own heading. */
-  table?: readonly (string | { field: string; or?: string; label?: string })[];
+  table?: readonly (string | { field: string; or?: string | readonly string[]; label?: string })[];
   /** A list whose rows are steps of another's: the link naming that row, the done flag, and the order they go in. */
   steps?: { of: string; done: string; order?: string };
 };

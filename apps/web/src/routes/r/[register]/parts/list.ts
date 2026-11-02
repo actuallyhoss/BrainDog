@@ -11,7 +11,7 @@
 
 import { day, exponentOf, money, shortDay, since, symbolFigure, type Tone } from 'braindog-render';
 import { copy } from '../../../../lib/copy.ts';
-import { seqWidth } from '../../../../lib/record/api.ts';
+import { orsOf, seqWidth } from '../../../../lib/record/api.ts';
 import { wayField } from '../../../../lib/record/money-way.ts';
 import { declaredValue } from '../../../../lib/record/where.ts';
 import { recordToday } from '../../../../lib/record/zone.ts';
@@ -83,7 +83,7 @@ export type Receipt = {
  * DECLARED track list, which `Table` needs for `content-visibility`: the rows decide the numbers
  * once, and layout never measures a cell.
  */
-export function weighed<C extends { field: string; width: string; or?: string | undefined }>(c: C, isTitle: boolean, entries: readonly Entry[]): C {
+export function weighed<C extends { field: string; width: string; or?: string | readonly string[] | undefined }>(c: C, isTitle: boolean, entries: readonly Entry[]): C {
   /* THE SPOKEN ID GIVES WAY. On Keys an 11ch column held `#6` in 102px while "Fenwick Cloud
      recovery codes" was cut beside it. It takes the digits the rows in hand have (`seqWidth`). */
   if (c.field === 'seq') return { ...c, width: seqWidth(entries) };
@@ -92,8 +92,7 @@ export function weighed<C extends { field: string; width: string; or?: string | 
   let longest = 0;
   for (const e of entries.slice(0, 200)) {
     /* A COLUMN READ FROM A SECOND FIELD WHERE ITS OWN IS EMPTY (`table:`'s `or`) is as wide as what it draws. */
-    const own = e.fields[c.field];
-    const v = (own === undefined || own === null || own === '') && c.or !== undefined ? e.fields[c.or] : own;
+    const v = [c.field, ...orsOf(c)].map((f) => e.fields[f]).find((x) => x !== undefined && x !== null && x !== '');
     if (typeof v === 'string' && v.length > longest) longest = v.length;
   }
   const fr = Math.min(4, Math.max(isTitle ? 3 : 1, Math.ceil(longest / 10)));

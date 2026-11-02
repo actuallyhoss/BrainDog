@@ -710,26 +710,30 @@ const FIELD_COLUMNS = 9;
  * column over a field this reader is not shown, or the list no longer holds, is left out, and so is an `or` over one.
  * The first text column leads, taking the share of the row the title takes where the columns are worked out.
  */
-export function tableOf(r: RegisterDecl): (Column & { or?: string })[] {
+export function tableOf(r: RegisterDecl): (Column & { or?: string | readonly string[] })[] {
   if (!Array.isArray(r.table)) return [];
   const live = (id: unknown) => (typeof id === 'string' ? r.fields.find((f) => f.id === id && f.retired !== true) : undefined);
-  const cols: (Column & { or?: string })[] = [];
+  const cols: (Column & { or?: string | readonly string[] })[] = [];
   let led = false;
   for (const said of r.table) {
     const column = typeof said === 'string' ? { field: said } : said;
     const f = live(column?.field);
     if (!f || cols.length >= FIELD_COLUMNS || cols.some((c) => c.field === f.id)) continue;
-    const or = live(column.or);
+    const ors = (Array.isArray(column.or) ? column.or : column.or === undefined ? [] : [column.or]).flatMap((o: string) => {
+      const x = live(o);
+      return x && x.id !== f.id ? [x.id] : [];
+    });
     const lead = !led && (f.type === 'text' || f.id === r.title);
     if (lead) led = true;
     cols.push({
       field: f.id,
       label: typeof column.label === 'string' && column.label.trim() !== '' ? column.label : labelOf(f),
-      width: lead ? 'minmax(24ch, 3fr)' : (WIDTH[f.type] ?? WIDTH.text!),
-      /* A DAY THAT OPENS THE ROW STARTS AT THE ROW'S EDGE, as the words do: ended, it hung in a gutter of its own. */
+      /* A DAY THAT OPENS THE ROW STARTS AT THE ROW'S EDGE, as the words do, and is as wide as "30 Aug 2025": ended in its
+         15ch it hung in a gutter of its own. */
+      width: lead ? 'minmax(24ch, 3fr)' : cols.length === 0 && f.type === 'day' ? '12ch' : (WIDTH[f.type] ?? WIDTH.text!),
       align: END.has(f.type) && !(cols.length === 0 && f.type === 'day') ? 'end' : 'start',
       truncate: f.type === 'money' ? 'never' : 'end',
-      ...(or && or.id !== f.id ? { or: or.id } : {}),
+      ...(ors.length === 0 ? {} : { or: ors.length === 1 ? ors[0]! : ors }),
     });
   }
   return cols;
@@ -834,6 +838,9 @@ const runLink = (said: string | null, value: unknown): string | null => {
   return said === null || seq === undefined || /[[\]]/u.test(said) ? said : `[${said}](/r/session/${seq})`;
 };
 
+/** The fields a column reads in turn where its own holds nothing: none, one, or a list's `table:` several. */
+export const orsOf = (c: { or?: string | readonly string[] | undefined }): readonly string[] => (c.or === undefined ? [] : typeof c.or === 'string' ? [c.or] : c.or);
+
 /**
  * `types` IS WHAT THE BLOCK ANSWERED for columns no list declares (a computed source's, `BlockResult.types`), which
  * `display` falls back to. A column typed as a run links to the run.
@@ -844,7 +851,7 @@ const runLink = (said: string | null, value: unknown): string | null => {
 export function toRows(
   register: string,
   entries: Entry[],
-  columns: readonly (Column & { or?: string | undefined })[],
+  columns: readonly (Column & { or?: string | readonly string[] | undefined })[],
   now: number = Date.now(),
   names?: Names,
   types?: Readonly<Record<string, string>>,
@@ -852,7 +859,7 @@ export function toRows(
   /* AN ENUM IN SENTENCE CASE, as the register's own grid draws it. The list says "Owed by me" through
      a first-letter rule on its own markup; a page block or a backlink table drawing the same row said
      "owed by me", so one row read two ways a click apart. */
-  const read = columns.flatMap((c) => (c.or === undefined ? [c.field] : [c.field, c.or]));
+  const read = columns.flatMap((c) => [c.field, ...orsOf(c)]);
   const enums = new Set(read.filter((field) => decl(register, field)?.type === 'enum'));
   const cased = (field: string, text: string | null): string | null => (enums.has(field) && text ? text.charAt(0).toUpperCase() + text.slice(1) : text);
   /* A LINE SPLIT INTO PARTS IS STILL ONE ROW, and a column its parts are cut by says so in place of the line's own value:
@@ -892,7 +899,10 @@ export function toRows(
           const days = Math.round((Date.parse(`${recordToday(now)}T00:00:00Z`) - Date.parse(`${v}T00:00:00Z`)) / 86_400_000);
           if (days > 0) return `${days === 1 ? '1 day' : `${days} days`} late · ${cell(c.field) ?? v}`;
         }
-        return cell(c.field) ?? (c.or === undefined ? null : cell(c.or));
+        /* A LIST'S `table:` MAY NAME SEVERAL IN TURN: the first that says something is drawn. */
+        let said = cell(c.field);
+        for (const or of orsOf(c)) if (said === null) said = cell(or);
+        return said;
       }),
     };
   });

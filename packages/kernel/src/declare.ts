@@ -4607,6 +4607,8 @@ const TABLE_MOST = 9;
 const TABLE_PARTS = ['field', 'or', 'label'] as const;
 /** The most characters a column's own heading takes. */
 const TABLE_LABEL_MOST = 40;
+/** The most fields a column reads in turn where its own holds nothing. */
+const TABLE_OR_MOST = 3;
 
 /**
  * Why a list's `table:` would draw a column it cannot fill, or `null` when it can be read.
@@ -4616,7 +4618,7 @@ const TABLE_LABEL_MOST = 40;
  */
 function tableFault(id: string, fields: readonly { id?: unknown; retired?: unknown }[], table: unknown): Refusal | null {
   const live = fields.filter((f) => f.retired !== true).map((f) => String(f.id));
-  const shape = `as [on, { field: payee, or: counterparty_text, label: Payee }, amount]: one to ${TABLE_MOST} of ${id}'s fields, in the order they are drawn`;
+  const shape = `as [on, { field: payee, or: [counterparty_text, what], label: Payee }, amount]: one to ${TABLE_MOST} of ${id}'s fields, in the order they are drawn`;
   if (!Array.isArray(table) || table.length === 0 || table.length > TABLE_MOST)
     return bad('DECLARATION_INVALID', `${id}'s table names the columns it opens on. Say it ${shape}.`, 'table', live);
   const seen = new Set<string>();
@@ -4625,15 +4627,19 @@ function tableFault(id: string, fields: readonly { id?: unknown; retired?: unkno
     const column: Record<string, unknown> | null = typeof raw === 'string' ? { field: raw } : isPart(raw) ? raw : null;
     if (column === null || Object.keys(column).some((k) => !(TABLE_PARTS as readonly string[]).includes(k)))
       return bad('DECLARATION_INVALID', `${id}'s ${at} is a field, or { field, or?, label? }. Say it ${shape}.`, at, TABLE_PARTS);
-    for (const part of ['field', 'or'] as const) {
-      const name = column[part];
-      if (part === 'or' && name === undefined) continue;
+    const field = column.field;
+    if (typeof field !== 'string' || !live.includes(field))
+      return bad('FIELD_UNKNOWN', `${id}'s ${at} draws ${JSON.stringify(field ?? null)}, and ${id} has no such field to draw.`, at, live);
+    /* `or` IS ONE FIELD OR UP TO THREE IN TURN, each read where every one before it holds nothing. */
+    const ors = column.or === undefined ? [] : Array.isArray(column.or) ? column.or : [column.or];
+    if (column.or !== undefined && (ors.length === 0 || ors.length > TABLE_OR_MOST))
+      return bad('DECLARATION_INVALID', `${id}'s ${at} reads one field, or up to ${TABLE_OR_MOST} in turn, where ${field} holds nothing.`, `${at}.or`, live);
+    for (const name of ors) {
       if (typeof name !== 'string' || !live.includes(name))
-        return bad('FIELD_UNKNOWN', `${id}'s ${at} draws ${JSON.stringify(name ?? null)}, and ${id} has no such field to draw.`, part === 'or' ? `${at}.or` : at, live);
+        return bad('FIELD_UNKNOWN', `${id}'s ${at} draws ${JSON.stringify(name ?? null)} where ${field} holds nothing, and ${id} has no such field to draw.`, `${at}.or`, live);
+      if (name === field || ors.indexOf(name) !== ors.lastIndexOf(name))
+        return bad('DECLARATION_INVALID', `${id}'s ${at} reads ${name} twice in turn. Name each field once, and not ${field} itself.`, `${at}.or`, live);
     }
-    const field = String(column.field);
-    if (column.or === field)
-      return bad('DECLARATION_INVALID', `${id}'s ${at} reads ${field} where ${field} holds nothing. Name another field in or, or take it off.`, `${at}.or`, live);
     if (seen.has(field)) return bad('DECLARATION_INVALID', `${id}'s table draws ${field} twice.`, at, live);
     seen.add(field);
     const label = column.label;

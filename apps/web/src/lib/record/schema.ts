@@ -179,7 +179,7 @@ export type RegisterDecl = {
   mobile: readonly [string, string, string];
   /** The columns its table opens on, in order, where the list declares them: a field, or one read from `or` where it
       holds nothing, under its own `label`. Absent, `columnsFor` works them out from the title, the card and the state. */
-  table?: readonly (string | { field: string; or?: string; label?: string })[];
+  table?: readonly (string | { field: string; or?: string | readonly string[]; label?: string })[];
   /** The field whose value carries the row's state, if it has one. */
   state?: string;
   /** Which state values are terminal, so `cleared` can say when the last one closed. */

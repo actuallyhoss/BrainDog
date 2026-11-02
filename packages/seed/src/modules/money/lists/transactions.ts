@@ -26,8 +26,8 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
   /* THE TABLE A LEDGER IS READ BY, SINCE money-core 3.38.1: the day, who it was with, the account, what it was for and
      the amount. Worked out from the title and the card, it opened on Description, which an import fills with the
      category's name, so the category was read twice and the payee not at all. Who it was with is the name a person
-     gave, else the words the bank wrote. */
-  table: ['on', { field: 'payee', or: 'counterparty_text', label: 'Payee' }, 'account', 'category', 'amount'],
+     gave, else the words the bank wrote, else the description, so a line nobody named still says what it was. */
+  table: ['on', { field: 'payee', or: ['counterparty_text', 'what'], label: 'Payee' }, 'account', 'category', 'amount'],
   state: 'state',
   done: ['cleared', 'void'],
   pack: 'money-core',
