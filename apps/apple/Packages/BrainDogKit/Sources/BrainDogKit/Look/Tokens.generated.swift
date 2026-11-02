@@ -45,10 +45,12 @@ public enum Palette {
     public static let good = Color("good", bundle: .module)
     /// `--good-tint`: #E4F3EA light, #14301F dark.
     public static let goodTint = Color("good-tint", bundle: .module)
-    /// `--warn`: #9A5800 light, #F0A64B dark.
+    /// `--warn`: #A85700 light, #F0A64B dark.
     public static let warn = Color("warn", bundle: .module)
-    /// `--warn-tint`: #FBF0DD light, #36260F dark.
+    /// `--warn-tint`: #FFEDD7 light, #512F08 dark.
     public static let warnTint = Color("warn-tint", bundle: .module)
+    /// `--warn-fill`: #C77700 light, #F0A64B dark.
+    public static let warnFill = Color("warn-fill", bundle: .module)
     /// `--info`: #2F5BD3 light, #7AA7FF dark.
     public static let info = Color("info", bundle: .module)
     /// `--info-tint`: #E8EEFC light, #18264A dark.
@@ -99,16 +101,32 @@ public enum Palette {
     public static let catSkyTint = Color("cat-sky-tint", bundle: .module)
     /// `--cat-yellow`: #7E6300 light, #E8C34F dark.
     public static let catYellow = Color("cat-yellow", bundle: .module)
-    /// `--cat-yellow-tint`: #FAF1D2 light, #33290F dark.
+    /// `--cat-yellow-tint`: #FAF1C7 light, #513C01 dark.
     public static let catYellowTint = Color("cat-yellow-tint", bundle: .module)
     /// `--cat-lime`: #437010 light, #A6D45F dark.
     public static let catLime = Color("cat-lime", bundle: .module)
-    /// `--cat-lime-tint`: #EDF5DF light, #222E12 dark.
+    /// `--cat-lime-tint`: #EDF5DF light, #20371D dark.
     public static let catLimeTint = Color("cat-lime-tint", bundle: .module)
     /// `--cat-slate`: #5A6475 light, #A9B3C4 dark.
     public static let catSlate = Color("cat-slate", bundle: .module)
     /// `--cat-slate-tint`: #EEF0F3 light, #262C38 dark.
     public static let catSlateTint = Color("cat-slate-tint", bundle: .module)
+    /// `--cat-blue-fill`: #2F5BD3 light, #7AA7FF dark.
+    public static let catBlueFill = Color("cat-blue-fill", bundle: .module)
+    /// `--cat-violet-fill`: #6A4FD6 light, #B29BFF dark.
+    public static let catVioletFill = Color("cat-violet-fill", bundle: .module)
+    /// `--cat-pink-fill`: #B42F78 light, #F28DC4 dark.
+    public static let catPinkFill = Color("cat-pink-fill", bundle: .module)
+    /// `--cat-teal-fill`: #0C7168 light, #4FD1C5 dark.
+    public static let catTealFill = Color("cat-teal-fill", bundle: .module)
+    /// `--cat-sky-fill`: #0B6E95 light, #5CC8F0 dark.
+    public static let catSkyFill = Color("cat-sky-fill", bundle: .module)
+    /// `--cat-yellow-fill`: #AF8300 light, #E8C34F dark.
+    public static let catYellowFill = Color("cat-yellow-fill", bundle: .module)
+    /// `--cat-lime-fill`: #649900 light, #A6D45F dark.
+    public static let catLimeFill = Color("cat-lime-fill", bundle: .module)
+    /// `--cat-slate-fill`: #5A6475 light, #A9B3C4 dark.
+    public static let catSlateFill = Color("cat-slate-fill", bundle: .module)
     /// `--scrim`: rgb(16 17 20 / 0.32) light, rgb(7 7 7 / 0.6) dark.
     public static let scrim = Color("scrim", bundle: .module)
 
@@ -138,6 +156,7 @@ public enum PlatformPalette {
     public static var goodTint: PlatformColor { named("good-tint") }
     public static var warn: PlatformColor { named("warn") }
     public static var warnTint: PlatformColor { named("warn-tint") }
+    public static var warnFill: PlatformColor { named("warn-fill") }
     public static var info: PlatformColor { named("info") }
     public static var infoTint: PlatformColor { named("info-tint") }
     public static var live: PlatformColor { named("live") }
@@ -168,6 +187,14 @@ public enum PlatformPalette {
     public static var catLimeTint: PlatformColor { named("cat-lime-tint") }
     public static var catSlate: PlatformColor { named("cat-slate") }
     public static var catSlateTint: PlatformColor { named("cat-slate-tint") }
+    public static var catBlueFill: PlatformColor { named("cat-blue-fill") }
+    public static var catVioletFill: PlatformColor { named("cat-violet-fill") }
+    public static var catPinkFill: PlatformColor { named("cat-pink-fill") }
+    public static var catTealFill: PlatformColor { named("cat-teal-fill") }
+    public static var catSkyFill: PlatformColor { named("cat-sky-fill") }
+    public static var catYellowFill: PlatformColor { named("cat-yellow-fill") }
+    public static var catLimeFill: PlatformColor { named("cat-lime-fill") }
+    public static var catSlateFill: PlatformColor { named("cat-slate-fill") }
     public static var scrim: PlatformColor { named("scrim") }
 
     private static func named(_ name: String) -> PlatformColor {
