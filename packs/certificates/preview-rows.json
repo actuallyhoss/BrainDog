@@ -1,0 +1,4 @@
+[
+  { "register": "certificates", "fields": { "bank": "Harbor Savings", "amount": { "amount": 1000000, "currency": "USD" }, "rate": 4.6, "term": 12, "start": { "day": "-120" }, "every": "quarterly", "flow": "in", "state": "live" } },
+  { "register": "certificates", "fields": { "bank": "Northline Bank", "amount": { "amount": 500000, "currency": "USD" }, "rate": 4.1, "term": 24, "start": { "day": "-300" }, "every": "monthly", "flow": "in", "state": "live" } }
+]

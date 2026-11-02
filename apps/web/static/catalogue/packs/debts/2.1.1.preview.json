@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-11-01T01:28:58.360Z",
+  "made_at": "2026-11-02T13:35:38.653Z",
   "pages": [
     {
       "blocks": [
@@ -181,11 +181,79 @@
           "source": "register.debts",
           "span": 12,
           "key": "k0r6kygi",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E7J0MX1F84BXDQQV35PGYE",
+              "register": "debts",
+              "seq": 3,
+              "fields": {
+                "name": "Student loan",
+                "left": {
+                  "amount": 2240000,
+                  "currency": "USD"
+                },
+                "apr": 4.5,
+                "minimum": {
+                  "amount": 22000,
+                  "currency": "USD"
+                },
+                "in_cash": null
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T13:35:38.653Z",
+              "updated_at": "2026-11-02T13:35:38.653Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E7J0MX1F84BXDQQG8401HT",
+              "register": "debts",
+              "seq": 2,
+              "fields": {
+                "name": "Car loan",
+                "left": {
+                  "amount": 1180000,
+                  "currency": "USD"
+                },
+                "apr": 6.4,
+                "minimum": {
+                  "amount": 31000,
+                  "currency": "USD"
+                },
+                "in_cash": null
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T13:35:38.653Z",
+              "updated_at": "2026-11-02T13:35:38.653Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E7J0MX1F84BXDQQ85SVSPN",
+              "register": "debts",
+              "seq": 1,
+              "fields": {
+                "name": "Credit card",
+                "left": {
+                  "amount": 420000,
+                  "currency": "USD"
+                },
+                "apr": 22.9,
+                "minimum": {
+                  "amount": 12500,
+                  "currency": "USD"
+                },
+                "in_cash": null
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T13:35:38.653Z",
+              "updated_at": "2026-11-02T13:35:38.653Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 3,
+          "refusals": []
         },
         {
           "heading": "Add a debt",
@@ -211,16 +279,15 @@
         "register.payoff_plans"
       ],
       "title": "Debts",
-      "read_at": "2026-11-01T01:28:58.360Z",
+      "read_at": "2026-11-02T13:35:38.653Z",
       "zone": "UTC",
       "look": {
         "look": "debts",
-        "basis": "r1tcy3vl",
+        "basis": "r0vesv2g",
         "by": "rule",
         "hide": [
           "k0po1xcw",
-          "k0uq5y7w",
-          "k0r6kygi"
+          "k0uq5y7w"
         ]
       },
       "declared_version": 1

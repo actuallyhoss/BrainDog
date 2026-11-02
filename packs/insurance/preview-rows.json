@@ -1,0 +1,4 @@
+[
+  { "register": "policies", "fields": { "name": "Home cover", "insurer": "Brightside Mutual", "cover": { "amount": 35000000, "currency": "USD" }, "starts_on": { "day": "-400" }, "state": "live" } },
+  { "register": "policies", "fields": { "name": "Term life", "insurer": "Oakfield Life", "cover": { "amount": 50000000, "currency": "USD" }, "starts_on": { "day": "-900" }, "matures_on": { "day": "+6400" }, "state": "live" } }
+]

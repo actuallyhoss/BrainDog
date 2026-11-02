@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-11-01T01:28:01.487Z",
+  "made_at": "2026-11-02T13:35:38.653Z",
   "pages": [
     {
       "blocks": [
@@ -16,9 +16,7 @@
           "key": "k08lez9h",
           "rows": [],
           "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "refusals": []
         },
         {
           "body": "No certificates yet. Add one below with its bank, its rate and when it pays.",
@@ -32,7 +30,9 @@
           "key": "k08lez9h-2",
           "rows": [],
           "matched": 0,
-          "refusals": []
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
         },
         {
           "cells": [
@@ -69,8 +69,146 @@
           "rows": [],
           "matched": 0,
           "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "readings": [
+            {
+              "label": "Put in",
+              "metric": "certificates-principal",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 1500000,
+                "unit": "USD",
+                "rows": 2,
+                "refusals": [],
+                "backs": [
+                  "certificates#1",
+                  "certificates#2"
+                ],
+                "held": 2,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Earned so far",
+              "metric": "certificates-accrued",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 2,
+                "refusals": [],
+                "held": 2,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Interest over the terms",
+              "metric": "certificates-interest",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 2,
+                "refusals": [],
+                "held": 2,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Worth at maturity",
+              "metric": "certificates-maturity",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 2,
+                "refusals": [],
+                "held": 2,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "certificates-principal": {
+              "name": "Put in",
+              "source": "register.certificates",
+              "where": "state is live",
+              "value": {
+                "sum": "amount"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "certificates-accrued": {
+              "name": "Earned so far",
+              "source": "register.certificates",
+              "where": "state is live",
+              "value": {
+                "sum": "accrued"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "certificates-interest": {
+              "name": "Interest over the terms",
+              "source": "register.certificates",
+              "where": "state is live",
+              "value": {
+                "sum": "interest"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "certificates-maturity": {
+              "name": "Worth at maturity",
+              "source": "register.certificates",
+              "where": "state is live",
+              "value": {
+                "sum": "at_maturity"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "certificates-next-matures": {
+              "name": "Next to mature",
+              "source": "register.certificates",
+              "where": "state is live, ends is set",
+              "value": {
+                "min": "ends"
+              },
+              "format": "day",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
         },
         {
           "columns": [
@@ -134,11 +272,58 @@
           "span": 12,
           "where": "state is live",
           "key": "k03b2ia1",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E7J0MXBZAAJ7WB33D8BDFS",
+              "register": "certificates",
+              "seq": 2,
+              "fields": {
+                "roll": false,
+                "bank": "Northline Bank",
+                "amount": {
+                  "amount": 500000,
+                  "currency": "USD"
+                },
+                "rate": 4.1,
+                "term": 24,
+                "start": "2026-01-06",
+                "every": "monthly",
+                "flow": "in",
+                "state": "live"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T13:35:38.653Z",
+              "updated_at": "2026-11-02T13:35:38.653Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E7J0MXBZAAJ7WB2RN56HHX",
+              "register": "certificates",
+              "seq": 1,
+              "fields": {
+                "roll": false,
+                "bank": "Harbor Savings",
+                "amount": {
+                  "amount": 1000000,
+                  "currency": "USD"
+                },
+                "rate": 4.6,
+                "term": 12,
+                "start": "2026-07-05",
+                "every": "quarterly",
+                "flow": "in",
+                "state": "live"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T13:35:38.653Z",
+              "updated_at": "2026-11-02T13:35:38.653Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
         },
         {
           "heading": "Add a certificate",
@@ -242,14 +427,13 @@
         "register.certificates"
       ],
       "title": "Certificates",
-      "read_at": "2026-11-01T01:28:01.487Z",
+      "read_at": "2026-11-02T13:35:38.653Z",
       "zone": "UTC",
       "look": {
         "look": "certificates",
-        "basis": "r0e0ata0",
+        "basis": "r06bga6r",
         "by": "rule",
         "hide": [
-          "k03b2ia1",
           "k1meq49x",
           "k1jsb2um"
         ]

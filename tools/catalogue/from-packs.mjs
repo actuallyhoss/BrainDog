@@ -324,6 +324,15 @@ for (const entry of index.entries) {
 }
 index = { ...index, entries: described };
 
+/* THE SAMPLE ROWS A PACK'S FOLDER DECLARES FOR ITS PREVIEW (`preview-rows.json`, `previews.mjs`), or none. */
+const samplesOf = (where) => {
+  const file = join(packsDir, where.slice('packs/'.length), 'preview-rows.json');
+  if (!existsSync(file)) return [];
+  const rows = JSON.parse(readFileSync(file, 'utf8'));
+  if (!Array.isArray(rows)) fail(`${where}/preview-rows.json is a list of { register, fields }.`);
+  return rows;
+};
+
 /* A PREVIEW FOR EACH VERSION IN `packs/` THAT ADDS A PAGE and has none, or for every one with `--previews`. */
 for (const [id, { where, doc }] of packs) {
   if (!(doc.declarations ?? []).some((d) => typeof d?.page === 'string')) continue;
@@ -332,7 +341,7 @@ for (const [id, { where, doc }] of packs) {
   if (!had || values.previews) {
     /* A PREVIEW THAT THROWS IS A PREVIEW NOT MADE. The web build runs this tool, so a scratch record that fails in a way
        the record does not answer as a refusal is said here, beside the pack, and the build goes on without it. */
-    const made = await makePreview(doc, new Map([...packs].map(([k, v]) => [k, v.doc])), now).catch((e) => ({ ok: false, why: `making it threw: ${e instanceof Error ? e.message : String(e)}` }));
+    const made = await makePreview(doc, new Map([...packs].map(([k, v]) => [k, v.doc])), now, samplesOf(where)).catch((e) => ({ ok: false, why: `making it threw: ${e instanceof Error ? e.message : String(e)}` }));
     if (made.ok) {
       files.set(path, `${JSON.stringify(made.preview, null, 2)}\n`);
       said.push(`${where} previewed as ${path}`);

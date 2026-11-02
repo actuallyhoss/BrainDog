@@ -1,0 +1,4 @@
+[
+  { "register": "trips", "fields": { "name": "Lisbon", "from": { "day": "+20" }, "to": { "day": "+27" }, "hue": "amber" } },
+  { "register": "trips", "fields": { "name": "Work offsite, Berlin", "from": { "day": "-40" }, "to": { "day": "-37" }, "hue": "blue" } }
+]

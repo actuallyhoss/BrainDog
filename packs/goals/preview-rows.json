@@ -1,0 +1,5 @@
+[
+  { "register": "money_goals", "fields": { "name": "Emergency fund", "kind": "value", "target": { "amount": 1200000, "currency": "USD" }, "have": { "amount": 780000, "currency": "USD" }, "by": { "day": "+240" }, "started_on": { "day": "-150" }, "state": "saving" } },
+  { "register": "money_goals", "fields": { "name": "New laptop", "kind": "value", "target": { "amount": 240000, "currency": "USD" }, "have": { "amount": 60000, "currency": "USD" }, "by": { "day": "+75" }, "started_on": { "day": "-60" }, "state": "saving" } },
+  { "register": "money_goals", "fields": { "name": "Summer trip", "kind": "value", "target": { "amount": 350000, "currency": "USD" }, "have": { "amount": 350000, "currency": "USD" }, "by": { "day": "-10" }, "started_on": { "day": "-200" }, "state": "reached" } }
+]

@@ -1,0 +1,5 @@
+[
+  { "register": "debts", "fields": { "name": "Credit card", "left": { "amount": 420000, "currency": "USD" }, "apr": 22.9, "minimum": { "amount": 12500, "currency": "USD" } } },
+  { "register": "debts", "fields": { "name": "Car loan", "left": { "amount": 1180000, "currency": "USD" }, "apr": 6.4, "minimum": { "amount": 31000, "currency": "USD" } } },
+  { "register": "debts", "fields": { "name": "Student loan", "left": { "amount": 2240000, "currency": "USD" }, "apr": 4.5, "minimum": { "amount": 22000, "currency": "USD" } } }
+]

@@ -12,6 +12,13 @@
  * their own example rows, as the pack tests install them, because the modules' lists point at one another. A pack that
  * needs another pack from `packs/` is given that one first, and that one's needs before it.
  *
+ * AND THE SAMPLE ROWS THE PACK'S FOLDER DECLARES FOR ITS PREVIEW (leftovers 7, 2 Nov). Most add-ons plant no example
+ * rows, so their previews drew their own empty lines ("No goals yet.") and showed nothing of what the add-on does. A
+ * pack's folder may hold `preview-rows.json`, a list of `{ register, fields }`, written into the scratch record after the
+ * install, as the owner, through `create`, so each row meets the same checks and rules a typed one does. They are the
+ * preview's alone: the pack document is not touched, so nobody who installs the add-on gets them. A day written as
+ * `{ "day": "+30" }` is that many days from the preview's clock, so the samples never go stale.
+ *
  * LOADED ONLY WHEN A PREVIEW IS MADE. The record, the seed and the SQLite adapter are imported inside the call, so a
  * build whose previews are all in place never opens a record.
  */
@@ -24,6 +31,17 @@ const OWNER = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 /** The longest chain of packs one pack's requirements may make, so two packs that need each other end here. */
 const NEEDS_DEEPEST = 8;
 
+/** A sample row's fields with every `{ day: "+N" }` (or "-N") made the day that many days from `now`. */
+const daysFrom = (fields, now) =>
+  Object.fromEntries(
+    Object.entries(fields ?? {}).map(([k, v]) => {
+      const rel = v !== null && typeof v === 'object' && typeof v.day === 'string' ? /^([+-]\d+)$/u.exec(v.day) : null;
+      if (rel === null) return [k, v];
+      const at = new Date(now.getTime() + Number(rel[1]) * 86_400_000);
+      return [k, at.toISOString().slice(0, 10)];
+    }),
+  );
+
 /** A refusal said in one line: its sentence and its code. */
 const refusalOf = (r) => `${r?.refusal?.fix ?? 'the record refused it'} (${r?.refusal?.code ?? 'no code'})`;
 
@@ -33,7 +51,7 @@ const refusalOf = (r) => `${r?.refusal?.fix ?? 'the record refused it'} (${r?.re
  * `packs` maps a catalogue id to the document of each pack in `packs/`, for the requirements that are not BrainDog's
  * own modules. `now` is the scratch record's clock and the preview's `made_at`.
  */
-export async function makePreview(doc, packs, now) {
+export async function makePreview(doc, packs, now, samples = []) {
   const [{ createRecordApi }, { FIRST_PARTY, firstPartyDocument }, { fixedClock, openSqlite }] = await Promise.all([
     import('../../packages/record/src/index.ts'),
     import('../../packages/seed/src/index.ts'),
@@ -84,6 +102,10 @@ export async function makePreview(doc, packs, now) {
     const before = new Set(await slugs());
     const installed = await put(doc);
     if (!installed.ok) return { ok: false, why: `it did not install: ${refusalOf(installed)}` };
+    for (const row of samples) {
+      const wrote = await api.create({ register: row.register, fields: daysFrom(row.fields, now) }, OWNER);
+      if (!wrote.ok) return { ok: false, why: `its sample row in ${row.register} was refused: ${refusalOf(wrote)}` };
+    }
 
     const pages = [];
     for (const slug of await slugs()) {
