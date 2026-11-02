@@ -60,7 +60,7 @@ import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitFig
 import { slotOf } from './slot.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_PALER, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
-import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesKeyed, linesOnly, linesPlan } from './lines.ts';
+import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, againstSaid, linesAge, linesKeyed, linesOnly, linesPlan } from './lines.ts';
 import { linesTrend } from './lines-trend.ts';
 import { PROGRESS_ALL_BUDGETS, PROGRESS_NONE, budgetTotal, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
@@ -1731,7 +1731,7 @@ function lines(b: Block, o: RenderOptions): string {
   const lead = plan.now
     ? `<p class="lines-lead"><span class="lines-now num">${escape(plan.now)}</span>${
         plan.change
-          ? `<span class="lines-change num" data-trend="${plan.trend}">${escape(plan.change)}</span><span class="lines-against">${LINES_AGAINST} ${escape(plan.against)}, <span class="num">${escape(plan.then)}</span></span>`
+          ? `<span class="lines-change num" data-trend="${plan.trend}">${escape(plan.change)}</span><span class="lines-against">${LINES_AGAINST} ${escape(againstSaid(plan.against))}, <span class="num">${escape(plan.then)}</span></span>`
           : ''
       }${age ? `<span class="lines-against" data-old="">${escape(age)}</span>` : ''}</p>`
     : '';

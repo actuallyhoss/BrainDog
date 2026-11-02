@@ -198,6 +198,42 @@ const time = (s: string | null | undefined): number | null => {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/** How long a level's axis runs before it is named by months rather than by three days: about ten weeks. */
+const LONG_AXIS_MS = 75 * 86_400_000;
+
+/**
+ * A LONG AXIS IS NAMED BY ITS MONTHS (work2 2 Nov, 4): a level over seven months read "6 Apr, 20 Jul, 2 Nov", three days
+ * nobody had chosen, where Look B names a long axis by its months. Each tick is the first of a month inside the axis,
+ * at most five, the last month always among them; January carries its year. Fewer than two months inside draws none,
+ * and the caller falls back to the three days.
+ */
+function monthTicks(t0: number, t1: number): KpiTick[] {
+  const starts: number[] = [];
+  const d = new Date(t0);
+  let y = d.getUTCFullYear();
+  let m = d.getUTCMonth() + 1;
+  for (;;) {
+    if (m > 11) {
+      m = 0;
+      y += 1;
+    }
+    const t = Date.UTC(y, m, 1);
+    if (t > t1) break;
+    starts.push(t);
+    m += 1;
+  }
+  if (starts.length < 2) return [];
+  const step = Math.max(1, Math.ceil(starts.length / 5));
+  const kept: number[] = [];
+  for (let i = starts.length - 1; i >= 0; i -= step) kept.unshift(starts[i]!);
+  return kept.map((t) => {
+    const f = (t - t0) / (t1 - t0);
+    const when = new Date(t);
+    const label = when.getUTCMonth() === 0 ? `Jan ${when.getUTCFullYear()}` : MONTHS[when.getUTCMonth()]!;
+    return { at: at(f), label, align: f < 0.06 ? 'start' : f > 0.94 ? 'end' : 'middle' };
+  });
+}
+
 /** `2 Oct`, with the year when it is not this year's. */
 export function kpiDay(t: number, now: number): string {
   const d = new Date(t);
@@ -591,7 +627,8 @@ function chartOf(plots: Plot[], kind: KpiKind, target: number | null, unit: stri
   const end = lastWhole >= 0 ? `M${at(x(lastWhole))} ${at(y(plots[lastWhole]!.n!))}l0 0` : '';
   const targetLine = target !== null ? { y: at(y(target)), label: `Target ${kpiFigure(target, unit, home).text}` } : null;
 
-  /* TICKS: a flow names its periods, the last always and at most five; a level names its first, middle and last day. */
+  /* TICKS: a flow names its periods, the last always and at most five; a level names its first, middle and last day, or
+     over a long axis its months (`monthTicks`). */
   let ticks: KpiTick[] = [];
   if (kind === 'flow') {
     const n = plots.length;
@@ -601,7 +638,10 @@ function chartOf(plots: Plot[], kind: KpiKind, target: number | null, unit: stri
       const label = period === 'month' ? MONTHS[new Date(p.t).getUTCMonth()]! : kpiDay(p.t, now);
       ticks.unshift({ at: at(n > 1 ? i / (n - 1) : 0.5), label, align: n > 1 && i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle' });
     }
-  } else if (t1 > t0) {
+  } else if (t1 - t0 >= LONG_AXIS_MS) {
+    ticks = monthTicks(t0, t1);
+  }
+  if (kind !== 'flow' && ticks.length === 0 && t1 > t0) {
     ticks = [
       { at: '0', label: kpiDay(t0, now), align: 'start' },
       { at: '0.5', label: kpiDay(t0 + (t1 - t0) / 2, now), align: 'middle' },

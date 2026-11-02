@@ -14,7 +14,7 @@
 -->
 <script lang="ts">
   import { inline, text, type Block, type RenderOptions } from '../src/index.ts';
-  import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesKeyed, linesNearest, linesOnly, linesPlan } from '../src/lines.ts';
+  import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, againstSaid, linesAge, linesKeyed, linesNearest, linesOnly, linesPlan } from '../src/lines.ts';
   import { linesTrend } from '../src/lines-trend.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -48,7 +48,7 @@
   <div class="prop lines">
     {#if plan.now}
       <p class="lines-lead">
-        <span class="lines-now num">{plan.now}</span>{#if plan.change}<span class="lines-change num" data-trend={plan.trend}>{plan.change}</span><span class="lines-against">{LINES_AGAINST} {plan.against}, <span class="num">{plan.then}</span></span>{/if}{#if age}<span class="lines-against" data-old="">{age}</span>{/if}
+        <span class="lines-now num">{plan.now}</span>{#if plan.change}<span class="lines-change num" data-trend={plan.trend}>{plan.change}</span><span class="lines-against">{LINES_AGAINST} {againstSaid(plan.against)}, <span class="num">{plan.then}</span></span>{/if}{#if age}<span class="lines-against" data-old="">{age}</span>{/if}
       </p>
     {/if}
     {#if keyed.length > 0}

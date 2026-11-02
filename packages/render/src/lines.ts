@@ -316,5 +316,19 @@ export const LINES_NOTHING = 'no values';
 /** NOT "The numbers", which is what a page of tiles is headed: a chart's fold holds the points it was drawn from. */
 export const LINES_NUMBERS = 'Points on this chart';
 export const LINES_AGAINST = 'against';
+
+/** Words a comparison line's label starts with that are ordinary words, not a name: lower case inside a sentence. */
+const PLAIN_LEAD = /^(?:previous|last|this|next|prior|same|the|a|an|target|plan|planned|budget|forecast|average|goal|before|earlier|year|month|week|day)\b/iu;
+
+/**
+ * THE COMPARISON LINE'S LABEL INSIDE A SENTENCE (work2 2 Nov, 6): Dashboard read "against Previous 30 days", the legend's
+ * capital carried into the middle of a line. A label that starts with an ordinary word is said in lower case after
+ * "against"; a name ("Northbound", "Q3 plan", "US sales") keeps its capitals. The legend keeps the label as written.
+ */
+export function againstSaid(label: string): string {
+  const t = label.trim();
+  if (!PLAIN_LEAD.test(t) || /^\p{Lu}{2}/u.test(t)) return t;
+  return t.charAt(0).toLowerCase() + t.slice(1);
+}
 /** Beside a figure of one reading: why it is a figure and not a line. */
 export const LINES_ONLY = 'the only reading';
