@@ -845,7 +845,8 @@
         <Button weight="quiet" onclick={lockNow}>{dated.lockNow}</Button>
       {/if}
       <!-- AND NO FORM OVER A LIST THAT IS NOT THERE: an eight-field sheet whose save the record would refuse. -->
-      {#if acts && index.kind === 'held'}
+      <!-- NOT OVER AN EMPTY LIST, whose own Add a key stands under it (live check of 2 Nov: two Add a key, one above the other). -->
+      {#if acts && index.kind === 'held' && !(indexTell === null && from !== 'reading' && keys.length === 0)}
         <span class="add-desk"><Button onclick={openAdd}>{words.addKey}</Button></span>
       {/if}
     {/snippet}
@@ -864,7 +865,8 @@
       {:else if from !== 'reading' && keys.length === 0}
         <Empty kind="no-data-yet" glyph="key" title={words.noKeys} body={words.noKeysHow}>
           {#snippet actions()}
-            {#if acts && index.kind === 'held'}<Button weight="primary" onclick={openAdd}>{words.addKey}</Button>{/if}
+            <!-- THE RED IS UNLOCK'S WHILE IT IS LOCKED: the screen's one red is the one that needs him. -->
+            {#if acts && index.kind === 'held'}<Button weight={locked ? undefined : 'primary'} onclick={openAdd}>{words.addKey}</Button>{/if}
           {/snippet}
         </Empty>
         <div class="agent-add">
