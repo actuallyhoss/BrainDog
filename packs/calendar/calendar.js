@@ -6,8 +6,9 @@
  * calendar, so it goes in the record's keys under a name, and the add-on's setting holds only that name (a `secret`
  * setting). The script asks the host for it by that name, `ctx.fetch(null, { address })`: the host opens the key, reads
  * `webcal://` as `https://`, sends it only if its host is one this add-on declares (Google's and Outlook's), and the
- * script never holds it. In 1.0.0 the link sat in a plain setting. (iCloud's published calendars live on a hundred
- * numbered hosts, pNN-caldav, and an add-on names each host it calls, so iCloud waits.)
+ * script never holds it. In 1.0.0 the link sat in a plain setting. Since 2.1.1 the key is optional: with none held the
+ * run reads nothing and ends quietly, since Connect Google fills the same Events. (iCloud's published calendars live
+ * on a hundred numbered hosts, pNN-caldav, and an add-on names each host it calls, so iCloud waits.)
  *
  * WHAT IS KEPT: the events from yesterday to sixty days ahead, a repeating event once for each time it falls in that
  * window (daily, weekly, monthly or yearly, with its interval, count, end, weekdays and the dates it skips), a moved
@@ -40,8 +41,21 @@ export default async function run(ctx) {
     return null;
   }
   /* THE LINK STAYS IN THE KEYS. The host opens it, holds its host to this add-on's three, and sends it; this script
-     never sees it. */
-  const answered = await ctx.fetch(null, { address: label });
+     never sees it.
+     NO KEY IS NOT A FAULT (2.1.1). The link is one of two ways in, beside Connect Google, so the add-on installs without
+     it (`optional` on the setting). Both hosts answer a key the keychain does not hold with the same sentence, before
+     anything is sent, and that one answer ends the run quietly: nothing failed, so nobody is told or asked anything. Any
+     other refusal, a key that will not open or an address at a host this add-on does not declare, still fails the run. */
+  let answered;
+  try {
+    answered = await ctx.fetch(null, { address: label });
+  } catch (e) {
+    if (/is not in the keychain/.test(String(e && e.message ? e.message : e))) {
+      ctx.log(`No key called ${label} is in your keys, so the link was not read. Connect Google, or add the link under that name.`);
+      return null;
+    }
+    throw e;
+  }
   if (!answered.ok) throw new Error(`The calendar answered ${answered.status}, so the events stay as they were. Check the link in your keys is still the secret one.`);
   const text = await answered.text();
   if (!/BEGIN:VCALENDAR/.test(text)) throw new Error('That address did not answer a calendar, so nothing was written.');

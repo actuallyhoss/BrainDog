@@ -1,0 +1,668 @@
+{
+  "pack": "calendar",
+  "version": "2.1.1",
+  "icon": "calendar",
+  "title": "Calendar",
+  "summary": "Your calendar's events in a list you, your widgets and your agents can read: from Connect Google, every 15 minutes with invitations and your answers, or every hour from its secret ICS link in Google Calendar or Outlook. Nothing is written back to the calendar.",
+  "changes": "Installs without the calendar link: Connect Google fills Events on its own, so the ICS link is now one of two ways in, not a key Install asks for. With no link in your keys, the hourly reader skips quietly.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "config": {
+    "address": {
+      "type": "secret",
+      "default": "Calendar link",
+      "optional": true,
+      "label": "Key holding the calendar link",
+      "note": "Only if you do not connect Google. Copy your calendar's secret ICS link (Google Calendar: Settings, your calendar, Secret address in iCal format; Outlook: Settings, Shared calendars, Publish a calendar, ICS) and add it to your keys as Calendar link."
+    }
+  },
+  "widgets": [
+    {
+      "id": "calendar-next",
+      "title": "Next meetings",
+      "group": "Life",
+      "for": "both",
+      "kind": "table",
+      "block": {
+        "kind": "table",
+        "source": "register.events",
+        "where": "gone is not true, day after yesterday",
+        "columns": [
+          {
+            "field": "what",
+            "label": "What"
+          },
+          {
+            "field": "day",
+            "label": "Day"
+          },
+          {
+            "field": "time",
+            "label": "At"
+          }
+        ],
+        "order": [
+          {
+            "field": "day",
+            "dir": "asc"
+          },
+          {
+            "field": "time",
+            "dir": "asc"
+          }
+        ],
+        "limit": 6,
+        "empty": "Nothing coming up.",
+        "icon": "calendar-days"
+      },
+      "blanks": [],
+      "sizes": [
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "tall",
+      "needs": [
+        "register.events"
+      ],
+      "example": {
+        "rows": [
+          {
+            "title": "Call with the accountant",
+            "meta": "Tomorrow · 10:00"
+          },
+          {
+            "title": "Studio walk-through",
+            "meta": "Tomorrow · 14:00"
+          }
+        ]
+      },
+      "says": "What is in your calendar next, soonest first.",
+      "icon": "calendar-days",
+      "rows": {
+        "title": "what",
+        "day": "day",
+        "meta": "time"
+      },
+      "words": [
+        "calendar",
+        "meetings",
+        "events",
+        "schedule",
+        "appointments"
+      ],
+      "leads": [
+        "events"
+      ]
+    },
+    {
+      "id": "calendar-today",
+      "title": "Today's events",
+      "group": "Life",
+      "for": "both",
+      "kind": "table",
+      "block": {
+        "kind": "table",
+        "source": "register.events",
+        "where": "gone is not true, day is today",
+        "columns": [
+          {
+            "field": "time",
+            "label": "At"
+          },
+          {
+            "field": "what",
+            "label": "What"
+          },
+          {
+            "field": "place",
+            "label": "Where"
+          }
+        ],
+        "order": [
+          {
+            "field": "time",
+            "dir": "asc"
+          }
+        ],
+        "limit": 4,
+        "empty": "Nothing today.",
+        "icon": "calendar-days"
+      },
+      "blanks": [],
+      "sizes": [
+        "small",
+        "wide",
+        "tall"
+      ],
+      "size": "wide",
+      "needs": [
+        "register.events"
+      ],
+      "example": [
+        {
+          "what": "Call with the accountant",
+          "day": "2026-10-29",
+          "time": "10:00",
+          "place": "Phone"
+        }
+      ],
+      "icon": "calendar-days",
+      "leads": [
+        "events"
+      ]
+    },
+    {
+      "id": "calendar-invites",
+      "title": "Invitations",
+      "group": "Life",
+      "for": "both",
+      "kind": "table",
+      "block": {
+        "kind": "table",
+        "source": "register.events",
+        "where": "invite is true, response is waiting, gone is not true, day after yesterday",
+        "columns": [
+          {
+            "field": "what",
+            "label": "What"
+          },
+          {
+            "field": "organiser",
+            "label": "From"
+          },
+          {
+            "field": "day",
+            "label": "Day"
+          }
+        ],
+        "order": [
+          {
+            "field": "day",
+            "dir": "asc"
+          },
+          {
+            "field": "time",
+            "dir": "asc"
+          }
+        ],
+        "limit": 6,
+        "empty": "No invitations waiting on your answer.",
+        "icon": "calendar-days",
+        "when": {
+          "metric": "events-invites",
+          "gt": 0
+        }
+      },
+      "blanks": [],
+      "sizes": [
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "tall",
+      "needs": [
+        "register.events"
+      ],
+      "example": {
+        "rows": [
+          {
+            "title": "Quarterly review",
+            "meta": "Lena Park · Thursday"
+          },
+          {
+            "title": "Studio walk-through",
+            "meta": "Omar Haddad · Friday"
+          }
+        ]
+      },
+      "says": "Invitations in your Google Calendar you have not answered yet, soonest first.",
+      "icon": "calendar-days",
+      "rows": {
+        "title": "what",
+        "meta": "organiser"
+      },
+      "words": [
+        "calendar",
+        "invitations",
+        "invites",
+        "rsvp",
+        "meetings"
+      ],
+      "leads": [
+        "events"
+      ]
+    }
+  ],
+  "declarations": [
+    {
+      "register": "events",
+      "name": "Events",
+      "icon": "calendar",
+      "one": "event",
+      "holds": "the events on your calendar, from Connect Google or its ICS address, with who invited you and your answer when Google is connected",
+      "title": "what",
+      "mobile": [
+        "day",
+        "time",
+        "what"
+      ],
+      "pack": "calendar",
+      "fields": [
+        {
+          "id": "what",
+          "label": "What",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "day",
+          "label": "Day",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "time",
+          "label": "At",
+          "type": "text"
+        },
+        {
+          "id": "until",
+          "label": "Until",
+          "type": "text"
+        },
+        {
+          "id": "all_day",
+          "label": "All day",
+          "type": "bool",
+          "default": false
+        },
+        {
+          "id": "starts",
+          "label": "Starts",
+          "type": "instant"
+        },
+        {
+          "id": "place",
+          "label": "Where",
+          "type": "text"
+        },
+        {
+          "id": "calendar",
+          "label": "Calendar",
+          "type": "text"
+        },
+        {
+          "id": "key",
+          "label": "Calendar's own id",
+          "type": "text",
+          "index": true
+        },
+        {
+          "id": "gone",
+          "label": "Gone from the calendar",
+          "type": "bool",
+          "default": false
+        },
+        {
+          "id": "invite",
+          "label": "Invitation",
+          "type": "bool",
+          "default": false,
+          "index": true
+        },
+        {
+          "id": "organiser",
+          "label": "Invited by",
+          "type": "text"
+        },
+        {
+          "id": "response",
+          "label": "Your answer",
+          "type": "enum",
+          "values": [
+            "waiting",
+            "yes",
+            "maybe",
+            "no"
+          ],
+          "index": true
+        },
+        {
+          "id": "link",
+          "label": "In Google Calendar",
+          "type": "url"
+        }
+      ]
+    },
+    {
+      "script": "calendar_poll",
+      "title": "Read the next events from your calendar",
+      "pack": "calendar",
+      "runs": {
+        "every": "1h"
+      },
+      "egress": [
+        "https://calendar.google.com",
+        "https://outlook.office365.com",
+        "https://outlook.live.com"
+      ],
+      "keys": [
+        "{{config:address}}"
+      ],
+      "reads": [
+        "events"
+      ],
+      "writes": [
+        "events"
+      ],
+      "limits": {
+        "fetches": 1,
+        "writes": 800,
+        "cpu_ms": 1000
+      },
+      "source": "/**\n * Your calendar's next events, from its secret address (an ICS or webcal link), into Events every hour.\n *\n * THE ADDRESS IS A SECRET, AND IT STAYS IN THE KEYS (1.1.0). It is the link a calendar gives to read it from elsewhere\n * (\"Secret address in iCal format\" in Google Calendar, \"Publish calendar\" in Outlook), and anyone who has it can read the\n * calendar, so it goes in the record's keys under a name, and the add-on's setting holds only that name (a `secret`\n * setting). The script asks the host for it by that name, `ctx.fetch(null, { address })`: the host opens the key, reads\n * `webcal://` as `https://`, sends it only if its host is one this add-on declares (Google's and Outlook's), and the\n * script never holds it. In 1.0.0 the link sat in a plain setting. Since 2.1.1 the key is optional: with none held the\n * run reads nothing and ends quietly, since Connect Google fills the same Events. (iCloud's published calendars live\n * on a hundred numbered hosts, pNN-caldav, and an add-on names each host it calls, so iCloud waits.)\n *\n * WHAT IS KEPT: the events from yesterday to sixty days ahead, a repeating event once for each time it falls in that\n * window (daily, weekly, monthly or yearly, with its interval, count, end, weekdays and the dates it skips), a moved\n * occurrence where it was moved to, and nothing cancelled. Each is one row, found again by its own key (`key`: the\n * event's id and the start of the occurrence), so an hourly run changes only what moved.\n *\n * AN EVENT THAT LEAVES THE CALENDAR is marked gone (`gone`) rather than deleted, since a script writes and never\n * deletes; every page and widget reads `gone is not true`.\n *\n * TIMES ARE THE CALENDAR'S OWN WALL CLOCK. The sandbox has no time zone database, so the zone each time is in is read\n * from the calendar file itself (its VTIMEZONE blocks, with their summer and winter rules), and every time is said in\n * the calendar's own zone (`X-WR-TIMEZONE`, else the first zone the file defines), as `day` and `time`. `starts` holds\n * the same moment as an instant. A zone the file does not define is read as the calendar's own.\n *\n * NOTHING OUTSIDE `run` IS READ: the text of this file is the script (`calendar.pack.json`).\n */\n\nexport default async function run(ctx) {\n  const BACK = 1;\n  const AHEAD = 60;\n  const MOST = 400;\n  const PAGE = 50;\n  const DAY = 86400000;\n  const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];\n\n  const config = ctx.config && typeof ctx.config === 'object' ? ctx.config : {};\n  const label = typeof config.address === 'string' ? config.address.trim() : '';\n  if (label === '') {\n    ctx.log('No key is named for the calendar link, so nothing was read. Name one on this add-on\\'s page and put the link in your keys under it.');\n    return null;\n  }\n  /* THE LINK STAYS IN THE KEYS. The host opens it, holds its host to this add-on's three, and sends it; this script\n     never sees it.\n     NO KEY IS NOT A FAULT (2.1.1). The link is one of two ways in, beside Connect Google, so the add-on installs without\n     it (`optional` on the setting). Both hosts answer a key the keychain does not hold with the same sentence, before\n     anything is sent, and that one answer ends the run quietly: nothing failed, so nobody is told or asked anything. Any\n     other refusal, a key that will not open or an address at a host this add-on does not declare, still fails the run. */\n  let answered;\n  try {\n    answered = await ctx.fetch(null, { address: label });\n  } catch (e) {\n    if (/is not in the keychain/.test(String(e && e.message ? e.message : e))) {\n      ctx.log(`No key called ${label} is in your keys, so the link was not read. Connect Google, or add the link under that name.`);\n      return null;\n    }\n    throw e;\n  }\n  if (!answered.ok) throw new Error(`The calendar answered ${answered.status}, so the events stay as they were. Check the link in your keys is still the secret one.`);\n  const text = await answered.text();\n  if (!/BEGIN:VCALENDAR/.test(text)) throw new Error('That address did not answer a calendar, so nothing was written.');\n\n  /* ── reading the file ── */\n  const lines = text.replace(/\\r\\n[ \\t]/g, '').replace(/\\n[ \\t]/g, '').split(/\\r?\\n/);\n  const unescape = (v) => v.replace(/\\\\n/gi, '\\n').replace(/\\\\([,;\\\\])/g, '$1');\n  const prop = (line) => {\n    const colon = line.search(/:(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/);\n    if (colon < 0) return null;\n    const head = line.slice(0, colon).split(';');\n    const params = {};\n    for (const p of head.slice(1)) {\n      const eq = p.indexOf('=');\n      if (eq > 0) params[p.slice(0, eq).toUpperCase()] = p.slice(eq + 1).replace(/^\"|\"$/g, '');\n    }\n    return { name: head[0].toUpperCase(), params, value: line.slice(colon + 1) };\n  };\n  const blocks = [];\n  const stack = [];\n  let calName = '';\n  let calZone = '';\n  for (const line of lines) {\n    const p = prop(line);\n    if (!p) continue;\n    if (p.name === 'BEGIN') {\n      const b = { type: p.value.toUpperCase(), props: [], children: [] };\n      if (stack.length > 0) stack[stack.length - 1].children.push(b);\n      else blocks.push(b);\n      stack.push(b);\n    } else if (p.name === 'END') stack.pop();\n    else if (stack.length > 0) stack[stack.length - 1].props.push(p);\n    if (p.name === 'X-WR-CALNAME' && stack.length <= 1) calName = unescape(p.value);\n    if (p.name === 'X-WR-TIMEZONE' && stack.length <= 1) calZone = p.value;\n  }\n  const cal = blocks.find((b) => b.type === 'VCALENDAR') || { props: [], children: [] };\n  const first = (b, name) => b.props.find((p) => p.name === name);\n  const all = (b, name) => b.props.filter((p) => p.name === name);\n\n  /* ── zones from the file: each a list of rules, an offset in minutes and the yearly day it starts ── */\n  const offsetOf = (v) => {\n    const m = /^([+-])(\\d{2})(\\d{2})/.exec(v || '');\n    return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : 0;\n  };\n  const rruleOf = (v) => Object.fromEntries(String(v || '').split(';').filter(Boolean).map((kv) => kv.split('=')).map(([k, x]) => [k.toUpperCase(), x]));\n  const zones = {};\n  for (const z of cal.children.filter((b) => b.type === 'VTIMEZONE')) {\n    const id = (first(z, 'TZID') || {}).value;\n    if (!id) continue;\n    zones[id] = z.children\n      .filter((c) => c.type === 'STANDARD' || c.type === 'DAYLIGHT')\n      .map((c) => ({ to: offsetOf((first(c, 'TZOFFSETTO') || {}).value), start: (first(c, 'DTSTART') || {}).value || '', rule: rruleOf((first(c, 'RRULE') || {}).value) }));\n  }\n  if (calZone === '' || !zones[calZone]) calZone = Object.keys(zones)[0] || calZone;\n\n  /* The day a yearly rule falls on in a year: BYMONTH and one BYDAY such as 2SU or -1SU. */\n  const ruleDay = (rule, year) => {\n    const month = Number(rule.BYMONTH) - 1;\n    const m = /^(-?\\d)?([A-Z]{2})$/.exec(rule.BYDAY || '');\n    if (!(month >= 0) || !m) return null;\n    const want = WEEKDAYS.indexOf(m[2]);\n    const nth = m[1] ? Number(m[1]) : 1;\n    if (nth > 0) {\n      const d = new Date(Date.UTC(year, month, 1));\n      const shift = (want - d.getUTCDay() + 7) % 7;\n      return Date.UTC(year, month, 1 + shift + (nth - 1) * 7);\n    }\n    const last = new Date(Date.UTC(year, month + 1, 0));\n    const shift = (last.getUTCDay() - want + 7) % 7;\n    return Date.UTC(year, month + 1, 0 - shift + (nth + 1) * 7);\n  };\n  /* The offset in minutes a zone is at, at a moment given as its own wall clock in ms. */\n  const offsetAt = (zone, wallMs) => {\n    const rules = zones[zone];\n    if (!rules || rules.length === 0) return zone === 'UTC' || zone === 'Etc/UTC' ? 0 : null;\n    const year = new Date(wallMs).getUTCFullYear();\n    let best = null;\n    for (const r of rules) {\n      const hm = /T(\\d{2})(\\d{2})/.exec(r.start);\n      const at = hm ? (Number(hm[1]) * 60 + Number(hm[2])) * 60000 : 0;\n      for (const y of [year - 1, year]) {\n        const d = r.rule.FREQ === 'YEARLY' ? ruleDay(r.rule, y) : wallOf(r.start);\n        if (d === null || d === undefined) continue;\n        const when = r.rule.FREQ === 'YEARLY' ? d + at : d;\n        if (when <= wallMs && (best === null || when > best.when)) best = { when, to: r.to };\n      }\n    }\n    return best ? best.to : rules[0].to;\n  };\n  /* An ICS date or date-time as wall-clock ms (read as if UTC), and whether it is a whole day or already UTC. */\n  function wallOf(v) {\n    const m = /^(\\d{4})(\\d{2})(\\d{2})(?:T(\\d{2})(\\d{2})(\\d{2})?(Z)?)?$/.exec(v || '');\n    return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4] || 0), Number(m[5] || 0), Number(m[6] || 0)) : null;\n  }\n  /* A DATE OR DATE-TIME PROPERTY AT ONE OF ITS OCCURRENCES (`raw`, in the property's own clock: UTC when it ends in Z,\n     else its zone's wall clock), said as the calendar's wall clock and as an instant. Repeating is done in the\n     event's own clock, so a weekly 9:00 in Cairo stays 9:00 across the change of the clocks. */\n  const timeAt = (p, raw) => {\n    if (!p || raw === null) return null;\n    const allDay = p.params.VALUE === 'DATE' || /^\\d{8}$/.test(p.value);\n    if (allDay) return { allDay: true, wall: raw, utc: null };\n    const utcGiven = /Z$/.test(p.value);\n    const zone = p.params.TZID || calZone;\n    const off = utcGiven ? 0 : offsetAt(zone, raw);\n    const utc = raw - (off === null ? (offsetAt(calZone, raw) || 0) : off) * 60000;\n    const here = offsetAt(calZone, utc) || 0;\n    return { allDay: false, wall: utc + here * 60000, utc };\n  };\n  const timeOf = (p) => (p ? timeAt(p, wallOf(p.value)) : null);\n\n  /* ── the window and each event's occurrences in it ── */\n  const today = Date.parse(`${ctx.today()}T00:00:00Z`);\n  const from = today - BACK * DAY;\n  const to = today + (AHEAD + 1) * DAY;\n  const iso = (ms) => new Date(ms).toISOString();\n  const dayOf = (ms) => iso(ms).slice(0, 10);\n  const hm = (ms) => iso(ms).slice(11, 16);\n  const occurrences = (start, rule, exdates) => {\n    if (!rule.FREQ) return [start];\n    const out = [];\n    const step = Number(rule.INTERVAL) > 0 ? Number(rule.INTERVAL) : 1;\n    const count = Number(rule.COUNT) > 0 ? Number(rule.COUNT) : Infinity;\n    const until = rule.UNTIL ? wallOf(rule.UNTIL.slice(0, 15)) : null;\n    const days = rule.BYDAY ? rule.BYDAY.split(',').map((d) => WEEKDAYS.indexOf(d.replace(/^-?\\d/, ''))).filter((d) => d >= 0) : null;\n    const d0 = new Date(start);\n    /* A RULE WITH NO COUNT STARTS NEAR THE WINDOW, never at an event first held years ago. The period is read long, so the\n       start is never past the window. */\n    const period = { DAILY: DAY, WEEKLY: 7 * DAY, MONTHLY: 31 * DAY, YEARLY: 366 * DAY }[rule.FREQ] * step;\n    const i0 = count === Infinity && period > 0 ? Math.max(0, Math.floor((from - DAY - start) / period) - 2) : 0;\n    let n = 0;\n    for (let i = i0; i < i0 + 2000 && n < count; i++) {\n      let candidates;\n      if (rule.FREQ === 'DAILY') candidates = [start + i * step * DAY];\n      else if (rule.FREQ === 'WEEKLY') {\n        const weekStart = start - ((d0.getUTCDay() - 1 + 7) % 7) * DAY + i * step * 7 * DAY;\n        candidates = (days && days.length > 0 ? days : [d0.getUTCDay()]).map((w) => weekStart + ((w - 1 + 7) % 7) * DAY).filter((t) => t >= start).sort((a, b) => a - b);\n      } else if (rule.FREQ === 'MONTHLY') {\n        const t = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() + i * step, d0.getUTCDate(), d0.getUTCHours(), d0.getUTCMinutes());\n        candidates = new Date(t).getUTCDate() === d0.getUTCDate() ? [t] : [];\n      } else if (rule.FREQ === 'YEARLY') {\n        const t = Date.UTC(d0.getUTCFullYear() + i * step, d0.getUTCMonth(), d0.getUTCDate(), d0.getUTCHours(), d0.getUTCMinutes());\n        candidates = new Date(t).getUTCMonth() === d0.getUTCMonth() ? [t] : [];\n      } else return [start];\n      for (const t of candidates) {\n        if (n >= count || (until !== null && t > until + DAY)) return out;\n        n += 1;\n        if (!exdates.has(t)) out.push(t);\n      }\n      if (candidates.length > 0 && candidates[candidates.length - 1] > to + 7 * DAY) break;\n    }\n    return out;\n  };\n\n  const events = cal.children.filter((b) => b.type === 'VEVENT');\n  const moved = new Map();\n  for (const e of events) {\n    const rid = first(e, 'RECURRENCE-ID');\n    const uid = (first(e, 'UID') || {}).value;\n    if (rid && uid) moved.set(`${uid}@${wallOf(rid.value)}`, e);\n  }\n  const wanted = new Map();\n  /* One occurrence of an event, `raw` the start in the event's own clock. */\n  const add = (e, raw, key) => {\n    const startProp = first(e, 'DTSTART');\n    const endProp = first(e, 'DTEND');\n    const raw0 = startProp ? wallOf(startProp.value) : null;\n    const s = timeAt(startProp, raw);\n    if (!s || raw0 === null) return;\n    const end = endProp ? timeAt(endProp, wallOf(endProp.value) === null ? null : wallOf(endProp.value) + (raw - raw0)) : null;\n    const wall = s.wall;\n    if (wall < from || wall >= to) return;\n    if (((first(e, 'STATUS') || {}).value || '').toUpperCase() === 'CANCELLED') return;\n    wanted.set(key, {\n      key,\n      what: unescape((first(e, 'SUMMARY') || {}).value || 'Busy'),\n      day: dayOf(wall),\n      time: s.allDay ? null : hm(wall),\n      until: end && !end.allDay ? hm(end.wall) : null,\n      all_day: s.allDay,\n      starts: s.allDay ? null : iso(s.utc),\n      place: unescape((first(e, 'LOCATION') || {}).value || '') || null,\n      calendar: calName || null,\n      gone: false,\n    });\n  };\n  for (const e of events) {\n    const uid = (first(e, 'UID') || {}).value;\n    if (!uid || first(e, 'RECURRENCE-ID')) continue;\n    const startProp = first(e, 'DTSTART');\n    const raw = startProp ? wallOf(startProp.value) : null;\n    if (raw === null) continue;\n    const rule = rruleOf((first(e, 'RRULE') || {}).value);\n    const exdates = new Set(all(e, 'EXDATE').flatMap((p) => p.value.split(',')).map((v) => wallOf(v)));\n    for (const t of occurrences(raw, rule, exdates)) {\n      if (t >= to + DAY) break;\n      const swap = moved.get(`${uid}@${t}`);\n      if (swap) {\n        const ms = first(swap, 'DTSTART');\n        if (ms) add(swap, wallOf(ms.value), `${uid}@${dayOf(t)}`);\n      } else add(e, t, rule.FREQ ? `${uid}@${dayOf(t)}` : uid);\n      if (wanted.size >= MOST) break;\n    }\n    if (wanted.size >= MOST) {\n      ctx.log(`The calendar holds more than ${MOST} events in the next ${AHEAD} days, so the rest were left out.`);\n      break;\n    }\n  }\n\n  /* ── kept in step with Events ── */\n  const held = new Map();\n  let below = null;\n  for (;;) {\n    const parts = [{ field: 'day', gte: dayOf(from) }, ...(below === null ? [] : [{ field: 'seq', lt: below }])];\n    const page = await ctx.record.list('events', { all: parts });\n    for (const r of page) held.set(String(r.fields.key), r);\n    if (page.length < PAGE) break;\n    below = Math.min(...page.map((r) => r.seq));\n  }\n  let wrote = 0;\n  let gone = 0;\n  const same = (a, b) => (a === undefined || a === null ? b === null || b === undefined : a === b);\n  for (const [key, fields] of wanted) {\n    const row = held.get(key);\n    if (!row) {\n      ctx.write('events', Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null)));\n      wrote += 1;\n      continue;\n    }\n    const patch = {};\n    for (const [k, v] of Object.entries(fields)) if (!same(row.fields[k], v)) patch[k] = v;\n    if (Object.keys(patch).length === 0) continue;\n    ctx.update(`events#${row.seq}`, patch, row.version);\n    wrote += 1;\n  }\n  for (const [key, row] of held) {\n    if (wanted.has(key) || row.fields.gone === true) continue;\n    ctx.update(`events#${row.seq}`, { gone: true }, row.version);\n    gone += 1;\n  }\n  ctx.log(`${wanted.size} ${wanted.size === 1 ? 'event' : 'events'} in the next ${AHEAD} days; ${wrote} written${gone > 0 ? `, ${gone} gone from the calendar` : ''}.`);\n  return { events: wanted.size, wrote, gone };\n}\n"
+    },
+    {
+      "metric": "events-ahead",
+      "name": "Events coming up",
+      "pack": "calendar",
+      "source": "register.events",
+      "where": "gone is not true, day after yesterday",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "events-later",
+      "name": "Events after today",
+      "pack": "calendar",
+      "source": "register.events",
+      "where": "gone is not true, day after today",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "events-today",
+      "name": "Events today",
+      "pack": "calendar",
+      "source": "register.events",
+      "where": "gone is not true, day is today",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "events-invites",
+      "name": "Invitations to answer",
+      "pack": "calendar",
+      "source": "register.events",
+      "where": "invite is true, response is waiting, gone is not true, day after yesterday",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "rule": "calendar_invite",
+      "name": "Ask about an invitation you have not answered",
+      "pack": "calendar",
+      "register": "events",
+      "when": "invite is true, response is waiting, gone is not true",
+      "then": [
+        {
+          "suggest": {
+            "question": "{{organiser}} invited you to {{what}} on {{day}} and you have not answered. Answer it in Google Calendar: {{link}}",
+            "options": [
+              "I answered it",
+              "Leave it"
+            ]
+          }
+        }
+      ],
+      "once_per": [
+        "entry"
+      ]
+    },
+    {
+      "page": "events",
+      "title": "Events",
+      "pack": "calendar",
+      "nav": {
+        "section": "Life",
+        "order": 20
+      },
+      "icon": "calendar",
+      "requires": [
+        "register.events"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "heading": "Nothing coming up",
+          "icon": "calendar",
+          "span": 12,
+          "when": {
+            "metric": "events-ahead",
+            "lt": 1
+          },
+          "body": "Nothing is on your calendar in the next sixty days. If it is not connected yet, Connect Google, or paste your calendar's private link: both are on this add-on's page."
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "Nothing on today, and {{events-later}} coming up in the next sixty days.",
+          "when": {
+            "all": [
+              {
+                "metric": "events-later",
+                "gt": 0
+              },
+              {
+                "metric": "events-today",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{events-today}} on today, and nothing after it in the next sixty days.",
+          "when": {
+            "all": [
+              {
+                "metric": "events-today",
+                "gt": 0
+              },
+              {
+                "metric": "events-later",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{events-today}} on today, and {{events-later}} coming up in the next sixty days.",
+          "when": {
+            "all": [
+              {
+                "metric": "events-ahead",
+                "gt": 0
+              },
+              {
+                "metric": "events-today",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Invitations to answer",
+          "icon": "mail",
+          "span": 12,
+          "when": {
+            "metric": "events-invites",
+            "gt": 0
+          },
+          "source": "register.events",
+          "where": "invite is true, response is waiting, gone is not true, day after yesterday",
+          "columns": [
+            {
+              "field": "day",
+              "label": "Day",
+              "width": "12ch"
+            },
+            {
+              "field": "time",
+              "label": "At",
+              "width": "7ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "organiser",
+              "label": "From",
+              "width": "minmax(10ch,16ch)"
+            }
+          ],
+          "order": [
+            {
+              "field": "day",
+              "dir": "asc"
+            },
+            {
+              "field": "time",
+              "dir": "asc"
+            }
+          ],
+          "limit": 20,
+          "empty": "No invitations waiting on your answer."
+        },
+        {
+          "kind": "table",
+          "heading": "Today",
+          "icon": "calendar-check",
+          "span": 12,
+          "when": {
+            "metric": "events-today",
+            "gt": 0
+          },
+          "source": "register.events",
+          "where": "gone is not true, day is today",
+          "columns": [
+            {
+              "field": "time",
+              "label": "At",
+              "width": "7ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "place",
+              "label": "Where",
+              "width": "minmax(10ch,16ch)"
+            }
+          ],
+          "order": [
+            {
+              "field": "time",
+              "dir": "asc"
+            }
+          ],
+          "limit": 20,
+          "empty": "Nothing today."
+        },
+        {
+          "kind": "table",
+          "heading": "Coming up",
+          "icon": "calendar-days",
+          "span": 12,
+          "when": {
+            "metric": "events-ahead",
+            "gt": 0
+          },
+          "source": "register.events",
+          "where": "gone is not true, day after today",
+          "columns": [
+            {
+              "field": "day",
+              "label": "Day",
+              "width": "12ch"
+            },
+            {
+              "field": "time",
+              "label": "At",
+              "width": "7ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "place",
+              "label": "Where",
+              "width": "minmax(10ch,16ch)"
+            }
+          ],
+          "order": [
+            {
+              "field": "day",
+              "dir": "asc"
+            },
+            {
+              "field": "time",
+              "dir": "asc"
+            }
+          ],
+          "limit": 50,
+          "empty": "Nothing coming up."
+        }
+      ]
+    }
+  ]
+}

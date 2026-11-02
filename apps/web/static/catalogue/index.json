@@ -263,8 +263,43 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.1.0",
+      "latest": "2.1.1",
       "versions": [
+        {
+          "version": "2.1.1",
+          "checksum": "85540cb384852a989d9cc19ba80bc909469e2a191780d63aae3ae09615fae5f0",
+          "bytes": 32105,
+          "published_at": "2026-11-02T23:15:44.991Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Events"
+            ],
+            "pages": [
+              "Events"
+            ],
+            "rules": [
+              "Ask about an invitation you have not answered"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "calendar.google.com",
+                "line": "CALLS OUT calendar.google.com, outlook.office365.com and outlook.live.com · every 1h · key \"Calendar link\" to the host its keychain entry opens",
+                "key": "Calendar link"
+              }
+            ],
+            "widgets": [
+              "Next meetings",
+              "Today's events",
+              "Invitations"
+            ]
+          },
+          "notes": "Installs without the calendar link: Connect Google fills Events on its own, so the ICS link is now one of two ways in, not a key Install asks for. With no link in your keys, the hourly reader skips quietly.",
+          "preview": true
+        },
         {
           "version": "2.1.0",
           "checksum": "696283fa9a4947b54df3ee0a897aecc5f772fc269565a1857287e08c568ef5c9",

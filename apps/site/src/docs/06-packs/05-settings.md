@@ -15,10 +15,12 @@ A pack's settings are the few values its owner should choose rather than you: wh
 
 A setting's name is lower-case letters, digits and underscores. Each one has a `type`, and may have a `default`, a `label` a person reads and a `note` that says what it does. An `enum` names its `values`, and a `list` is a few lines of text, with `max` saying how many.
 
-The types a setting may take are `text`, `enum`, `bool`, `money`, `day`, `duration`, `number` and `list`. Three field types are left out on purpose, and a setting of one is refused:
+The types a setting may take are `text`, `enum`, `bool`, `money`, `day`, `duration`, `number`, `list` and `secret`. Two field types are left out on purpose, and a setting of one is refused:
 
 - **`ref`**, because a setting that pointed at a list would let a pack configure its way into a list it did not declare.
-- **`secret` and `file`**, because a manifest is a file people share, so a setting never holds a credential or a document. A key a script sends is held in the Keychain and named by its label.
+- **`file`**, because a manifest is a file people share, so a setting never holds a document.
+
+A **`secret`** setting never holds a credential either: it holds the label of a key in the Keychain, such as `"Calendar link"`, and a script names `{{config:<name>}}` in its `keys`. A link or a key typed into it is refused. Install asks for that key to be in the Keychain first. When the pack works without it, because there is another way in, write `"optional": true` on the setting: the pack then installs with the key missing, and its script is the one that skips quietly until the key is added. Calendar does this, since Connect Google fills the same list. A key that is there but cannot be opened is still refused, and `optional` is a `secret` setting's only.
 
 A default is checked the way a row's field is: a money default is an amount and a currency, a day is a day that exists, and a text that looks like a key is refused.
 

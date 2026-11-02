@@ -88,6 +88,7 @@
   import { foundListing, newerThan } from './found.ts';
   import Connect from './Connect.svelte';
   import GoogleConnect from '$lib/google/GoogleConnect.svelte';
+  import CalendarLink from './CalendarLink.svelte';
   import type { GoogleStatus } from '$lib/google/google.ts';
   import { recipesIn, type Recipe } from './connect.ts';
 
@@ -693,8 +694,15 @@
     </div>
 
     <div class="wide-cell stack">
+    {#if googleFor === 'calendar' && installed}
+      <!-- TWO WAYS IN, SAID ONCE (Calendar 2.1.1): Install asks for no key, so the page says both here. -->
+      <p class="ways">Connect Google, or paste your calendar's private link.</p>
+    {/if}
     {#if googleFor && installed}
       <GoogleConnect place={googleFor} onstatus={(s) => (google = s)} />
+    {/if}
+    {#if googleFor === 'calendar' && installed}
+      <CalendarLink label={typeof settings?.values.address === 'string' ? settings.values.address : 'Calendar link'} google={google?.connected === true && !google.broken} />
     {/if}
     {#each recipes as recipe (recipe.ingest)}
       {#if !(googleFor === 'gmail' && google?.connected && !google.broken)}
@@ -1163,6 +1171,13 @@
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 22px;
+  }
+  .ways {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-body);
   }
 
   /* THE FORM KEEPS THE READING MEASURE, not the page: the page runs the window's width with the rest, and a switch

@@ -3978,6 +3978,13 @@ function keysNotReadyIn(filled: Pack, diff: Diff, keyReady: NonNullable<Host['ke
     const keys = script !== undefined && isObject(script.body) ? script.body.keys : undefined;
     return Array.isArray(keys) && keys.length > 0 && keys.every((k) => typeof k === 'string') ? (keys as string[]) : [grant];
   };
+  /* A KEY AN OPTIONAL `secret` SETTING NAMES IS NOT ASKED FOR WHILE IT IS MISSING (`ConfigDecl.optional`): the add-on
+     installs without it and its script skips quietly until it is added. One that is there and cannot be opened is still
+     said, since that is a key added the wrong way. A pack with no optional setting asks exactly as before. */
+  const settings = filled.manifest.config ?? {};
+  const optional = new Set(
+    diff.config.filter((c) => settings[c.key]?.type === 'secret' && settings[c.key]?.optional === true && typeof c.value === 'string').map((c) => String(c.value).trim()),
+  );
   const out: KeyNotReady[] = [];
   const asked = new Set<string>();
   for (const c of diff.calls_out) {
@@ -3988,6 +3995,7 @@ function keysNotReadyIn(filled: Pack, diff: Diff, keyReady: NonNullable<Host['ke
       if (asked.has(ask)) continue;
       asked.add(ask);
       const why = keyReady(label, c.paged);
+      if (why !== null && why.code === 'REQUIRED_MISSING' && optional.has(label.trim())) continue;
       if (why !== null && !out.some((k) => k.label === label)) out.push({ label, code: why.code, fix: why.fix });
     }
   }

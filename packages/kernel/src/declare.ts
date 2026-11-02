@@ -7143,14 +7143,20 @@ export type ConfigType = (typeof CONFIG_TYPES)[number];
 /**
  * One setting as a manifest declares it, after `readConfig` has checked it. `max` is a `list`'s own
  * ceiling on its lines, at most `LIST_ITEMS_CEILING`, and no other type takes one.
+ *
+ * `optional: true` IS A `secret` SETTING'S ONLY, AND SAYS THE ADD-ON INSTALLS WITHOUT THE KEY IT NAMES (Calendar 2.1.1,
+ * whose ICS link is one of two ways in beside Connect Google). The install then asks nothing about that key while it is
+ * missing, and the script that sends it is the one that skips quietly when it is not held. A key that is there but cannot
+ * be opened is still refused. Absent, as on every setting written before it, a missing key refuses the install as it always
+ * did, and the setting reads exactly as before, so no other pack's checksum moves.
  */
-export type ConfigDecl = { type: ConfigType; values?: string[]; max?: number; default?: Json; label?: string; note?: string };
+export type ConfigDecl = { type: ConfigType; values?: string[]; max?: number; default?: Json; label?: string; note?: string; optional?: true };
 
 /** A pack's settings as the record holds them: what the manifest declares, and the value each holds now. */
 export type PackConfig = { id: string; version: string | null; config: Record<string, ConfigDecl>; values: Record<string, Json> };
 
 const CONFIG_NAME = /^[a-z][a-z0-9_]{0,31}$/;
-const CONFIG_KEYS = ['type', 'values', 'max', 'default', 'label', 'note'];
+const CONFIG_KEYS = ['type', 'values', 'max', 'default', 'label', 'note', 'optional'];
 const CONFIG_CEILING = 64;
 const CONFIG_TEXT_BYTES = 1024;
 /** The longest key label a `secret` setting holds, a script's key label's own ceiling (`script.ts`). */
@@ -7292,6 +7298,14 @@ export function readConfig(config: unknown): Result<Record<string, ConfigDecl>> 
       if (typeof said.max !== 'number' || !Number.isInteger(said.max) || said.max < 1 || said.max > LIST_ITEMS_CEILING)
         return no('OUT_OF_BOUNDS', `The setting ${key}'s max is a whole number from 1 to ${LIST_ITEMS_CEILING}.`, { at: `${at}.max` });
       decl.max = said.max;
+    }
+
+    if (said.optional !== undefined) {
+      if (decl.type !== 'secret')
+        return no('FIELD_UNKNOWN', `The setting ${key} is a ${decl.type}, and only a secret setting is optional.`, { at: `${at}.optional`, allowed: ['type', 'default', 'label', 'note'] });
+      if (typeof said.optional !== 'boolean')
+        return no('VALUE_MALFORMED', `The setting ${key}'s optional is true when the add-on installs without that key, and false or absent when it needs it.`, { at: `${at}.optional` });
+      if (said.optional) decl.optional = true;
     }
 
     for (const [name, ceiling] of [['label', 80], ['note', 280]] as const) {
