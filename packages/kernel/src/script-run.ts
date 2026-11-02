@@ -595,6 +595,8 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     proposals.push(one.value);
   }
   const proposed = { asked: 0, waiting: 0, answered: 0 };
+  /* THE NEW QUESTIONS' IDS, stamped on the run below, so the scripts read can say whether they still wait. */
+  const proposedIds: string[] = [];
   let proposeRefused = -1;
 
   /* ONE BATCH FOR THE RUN, so the history shows its rows as one change, and one note on each that says which run. */
@@ -656,7 +658,10 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
       }
       if (out.value.answered !== undefined) proposed.answered += 1;
       else if (out.value.joined && !out.value.widened) proposed.waiting += 1;
-      else proposed.asked += 1;
+      else {
+        proposed.asked += 1;
+        proposedIds.push(out.value.id);
+      }
     }
     return ok(null);
   }));
@@ -724,6 +729,16 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   );
   /* AND THE STOP AS A NUMBER ON THE RUN, so the stopped-chains sign (`signs-flow.ts`) does not hang on the line's words. */
   if (stopped.length > 0) deps.sql.exec("UPDATE event SET to_v = json_set(to_v, '$.stopped', ?) WHERE id = ?", stopped.length, metered.event);
+  /* AND THE QUESTIONS IT OPENED, BY ID (2 Nov fix pass). The line says "which waits on Decide" as it was when the run
+     ended, and the scripts read showed that for days after the question was answered. With the ids on the run, the
+     read (`script-rows.ts`) words the line by each question's state as it is when somebody reads it. */
+  const askedId = put !== null && put.answered === undefined && !put.joined ? put.id : null;
+  if (askedId !== null || proposedIds.length > 0)
+    deps.sql.exec(
+      "UPDATE event SET to_v = json_set(to_v, '$.questions', json(?)) WHERE id = ?",
+      JSON.stringify({ ...(askedId !== null ? { asked: askedId } : {}), ...(proposedIds.length > 0 ? { proposed: proposedIds } : {}) }),
+      metered.event,
+    );
   return metered;
 }
 

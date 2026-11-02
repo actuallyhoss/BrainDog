@@ -55,6 +55,63 @@ export type ScriptRow = {
 
 const strings = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []);
 
+const WAITS_ASKED = / It asked one question, which waits (?:on Decide|in Needs you)\./;
+const WAITS_PROPOSED = / (One question it proposed waits|(\d+) questions it proposed wait) (?:on Decide|in Needs you)\./;
+
+/**
+ * A run's line as it reads now (2 Nov fix pass): the sentences that said a question "waits on Decide" are worded by the
+ * question's state today, since the line is written once, when the run ends, and was shown as written long after the
+ * question was answered.
+ *
+ * THE IDS ARE ON THE RUN (`$.questions`, stamped by `script-run.ts`) for a run since this fix. An older run has none, so
+ * its questions are found as the ones its signer opened in the ten minutes up to the line, which is the run's own
+ * transaction; with none found the sentence is put in the past and says nothing about now.
+ */
+function sayNow(sql: Sql, run: { ts: string; actor: string; note: string | null; questions: string | null }): string {
+  const note = run.note ?? '';
+  if (!WAITS_ASKED.test(note) && !WAITS_PROPOSED.test(note)) return note;
+  let kept: { asked?: string; proposed?: string[] } = {};
+  try {
+    const parsed: unknown = run.questions === null ? null : JSON.parse(run.questions);
+    if (isObject(parsed)) kept = { ...(typeof parsed.asked === 'string' ? { asked: parsed.asked } : {}), proposed: strings(parsed.proposed) };
+  } catch {
+    kept = {};
+  }
+  const openNow = (id: string): boolean | null => {
+    const q = sql.one<{ status: string }>('SELECT status FROM suggestion WHERE id = ?', id);
+    return q === undefined ? null : q.status === 'open';
+  };
+  /* AN OLDER RUN: what its signer opened in the ten minutes before its line, oldest first, the one question before the
+     proposals as the run filed them. */
+  const found =
+    run.questions === null
+      ? sql.all<{ id: string; status: string }>(
+          "SELECT id, status FROM suggestion WHERE opened_by = ? AND opened_at <= ? AND opened_at >= ? ORDER BY opened_at, rowid",
+          run.actor,
+          run.ts,
+          new Date(Date.parse(run.ts) - 10 * 60_000).toISOString(),
+        )
+      : [];
+  const askedOpen = kept.asked !== undefined ? openNow(kept.asked) : WAITS_ASKED.test(note) && found.length > 0 ? found[0]!.status === 'open' : null;
+  const rest = WAITS_ASKED.test(note) && kept.asked === undefined ? found.slice(1) : found;
+  const proposedStates = (kept.proposed ?? []).length > 0 ? (kept.proposed ?? []).map(openNow) : rest.map((q) => q.status === 'open');
+  let said = note.replace(
+    WAITS_ASKED,
+    askedOpen === null ? ' It asked one question.' : askedOpen ? ' It asked one question, which still waits on Decide.' : ' It asked one question, now answered.',
+  );
+  said = said.replace(WAITS_PROPOSED, (_all, _phrase: string, many: string | undefined) => {
+    const k = many === undefined ? 1 : Number(many);
+    const asked = k === 1 ? 'It proposed one question' : `It proposed ${String(k)} questions`;
+    const known = proposedStates.filter((x): x is boolean => x !== null);
+    if (known.length === 0) return ` ${asked}.`;
+    const waiting = known.filter(Boolean).length;
+    if (waiting === 0) return k === 1 ? ` ${asked}, now answered.` : ` ${asked}, all answered now.`;
+    if (k === 1) return ` ${asked}, which still waits on Decide.`;
+    return waiting === k ? ` ${asked}, all still on Decide.` : ` ${asked}; ${waiting === 1 ? 'one still waits' : `${String(waiting)} still wait`} on Decide.`;
+  });
+  return said;
+}
+
 /**
  * Every live script, by id.
  *
@@ -76,8 +133,8 @@ export function scriptRows(sql: Sql, nowMs: number): ScriptRow[] {
       const row = sql.one<{ state: string; due_at: string }>("SELECT state, due_at FROM schedule WHERE kind = 'script' AND key = ?", bare);
       const every = typeof runs.every === 'string' ? runs.every : null;
 
-      const lastEvent = sql.one<{ ts: string; actor: string; outcome: string; note: string | null }>(
-        `SELECT ts, actor, json_extract(to_v, '$.outcome') AS outcome, note FROM event
+      const lastEvent = sql.one<{ ts: string; actor: string; outcome: string; note: string | null; questions: string | null }>(
+        `SELECT ts, actor, json_extract(to_v, '$.outcome') AS outcome, note, json_extract(to_v, '$.questions') AS questions FROM event
           WHERE kind = 'pull' AND target = ? AND to_v IS NOT NULL AND json_valid(to_v) AND json_extract(to_v, '$.outcome') IS NOT NULL
           ORDER BY rowid DESC LIMIT 1`,
         target,
@@ -122,7 +179,7 @@ export function scriptRows(sql: Sql, nowMs: number): ScriptRow[] {
         keys: strings(body.keys),
         status: row?.state === 'paused' ? 'paused' : 'on',
         next: every !== null && (row?.state === 'pending' || row?.state === 'firing') ? row.due_at : null,
-        last: lastEvent ? { at: lastEvent.ts, version: version ? Number(version[1]) : null, outcome: lastEvent.outcome, say: lastEvent.note ?? '' } : null,
+        last: lastEvent ? { at: lastEvent.ts, version: version ? Number(version[1]) : null, outcome: lastEvent.outcome, say: sayNow(sql, lastEvent) } : null,
         refused: { in_a_row: inARow, pauses_at: REFUSED_IN_A_ROW },
         month: counts,
       };
