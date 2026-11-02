@@ -48,6 +48,10 @@
     font-synthesis-weight: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    /* NO WORD LEFT ALONE ON A LINE (leftovers 4, 2 Nov): "Send Leo the receipts for / October" and "Proofing press, 5 /
+       of 8" on Today. The style only, so whatever wraps still wraps where it did and what never wraps never does; a
+       name set to `balance` keeps its own. Inherited, so one rule here reaches every row. */
+    text-wrap-style: pretty;
   }
 
   h1, h2, h3, h4 {
