@@ -153,6 +153,9 @@ extension Links {
         case "end": _ = try? await app.current?.top?.webView.evaluateJavaScript("window.scrollTo(0, document.documentElement.scrollHeight)")
         case "account": app.accountOpen = true
         case "widgets": app.gallery = .widgets
+        case "widgets2": app.gallery = .widgets2
+        case "lock": Lock.shared.coverForShot()
+        case let p where p.hasPrefix("quick:"): QuickActions.run("dog.brain." + String(p.dropFirst(6)))
         case "tellLink": await Links.open(GlanceLink.tell)
         case let p where p.hasPrefix("share:"):
             /* The share sheet's own view over the app, with what a share would bring (`share:<words>|<photo>`). */

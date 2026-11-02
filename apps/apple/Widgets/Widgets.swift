@@ -1,3 +1,4 @@
+import AppIntents
 import BrainDogKit
 import SwiftUI
 import WidgetKit
@@ -15,7 +16,12 @@ struct BrainDogWidgets: WidgetBundle {
     var body: some Widget {
         NeedsWidget()
         NumbersWidget()
+        DueWidget()
+        TodayNumberWidget()
         TellButton()
+        #if os(iOS)
+        TellControl()
+        #endif
     }
 }
 
@@ -157,3 +163,131 @@ private extension WidgetFamily {
         }
     }
 }
+
+// MARK: - Due next (M5)
+
+struct DueWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "due", provider: GlanceProvider()) { entry in
+            DueWidgetView(entry: entry)
+        }
+        .configurationDisplayName(Words.dueNext)
+        .description("What is due next on Today, in your words.")
+        .supportedFamilies(Self.families)
+    }
+
+    static var families: [WidgetFamily] {
+        #if os(iOS)
+        [.systemSmall, .systemMedium, .accessoryRectangular]
+        #else
+        [.systemSmall, .systemMedium]
+        #endif
+    }
+}
+
+struct DueWidgetView: View {
+    let entry: GlanceEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        DueGlance(entry.glance, size: family.glance)
+            .onTile()
+            .widgetURL(GlanceLink.today)
+    }
+}
+
+// MARK: - A number from Today, picked (M5)
+
+/// One of Today's numbers, as the widget's settings offer them: the Home figures the record leads Today with.
+struct FigureEntity: AppEntity {
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Number"
+    static let defaultQuery = FigureQuery()
+
+    let id: String
+    let label: String
+
+    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(label)") }
+}
+
+/// The numbers to pick from: what the app last read of Today (the kept glance), so the list is there offline too.
+struct FigureQuery: EntityQuery {
+    @MainActor
+    func entities(for identifiers: [FigureEntity.ID]) async throws -> [FigureEntity] {
+        try await suggestedEntities().filter { identifiers.contains($0.id) }
+    }
+
+    @MainActor
+    func suggestedEntities() async throws -> [FigureEntity] {
+        var glance = GlanceStore.kept
+        if glance == nil { glance = await GlanceStore.refresh() }
+        return (glance?.figures ?? []).map { FigureEntity(id: $0.metric, label: $0.label) }
+    }
+
+    @MainActor
+    func defaultResult() async -> FigureEntity? {
+        try? await suggestedEntities().first
+    }
+}
+
+/// The widget's settings: which number.
+struct PickNumber: WidgetConfigurationIntent {
+    static let title: LocalizedStringResource = "Today number"
+    static let description = IntentDescription("Pick one of the numbers Today leads with.")
+
+    @Parameter(title: "Number")
+    var figure: FigureEntity?
+}
+
+nonisolated struct FigureEntry: TimelineEntry {
+    let date: Date
+    let glance: Glance?
+    let metric: String?
+}
+
+nonisolated struct FigureProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> FigureEntry { FigureEntry(date: .now, glance: .sample, metric: nil) }
+
+    func snapshot(for configuration: PickNumber, in context: Context) async -> FigureEntry {
+        if context.isPreview { return FigureEntry(date: .now, glance: .sample, metric: configuration.figure?.id) }
+        return await MainActor.run { FigureEntry(date: .now, glance: Session.shared.signedIn ? (GlanceStore.kept ?? .empty) : nil, metric: configuration.figure?.id) }
+    }
+
+    func timeline(for configuration: PickNumber, in context: Context) async -> Timeline<FigureEntry> {
+        let metric = configuration.figure?.id
+        let signedIn = await MainActor.run { Session.shared.signedIn }
+        var glance: Glance?
+        if signedIn { glance = (await GlanceStore.refresh()) ?? .empty }
+        return Timeline(entries: [FigureEntry(date: .now, glance: glance, metric: metric)], policy: .after(Date().addingTimeInterval(15 * 60)))
+    }
+}
+
+struct TodayNumberWidget: Widget {
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(kind: "today-number", intent: PickNumber.self, provider: FigureProvider()) { entry in
+            FigureGlance(entry.glance, metric: entry.metric)
+                .onTile()
+                .widgetURL(GlanceLink.today)
+        }
+        .configurationDisplayName(Words.todayNumber)
+        .description("One number from Today, the one you pick.")
+        .supportedFamilies([.systemSmall])
+    }
+}
+
+// MARK: - Tell in Control Center (M5)
+
+#if os(iOS)
+/// "Tell BrainDog" in Control Center, on the Lock Screen and on the Action button: opens BrainDog in Tell. It runs the
+/// app's own Open Tell intent (`Shared/Open.swift`), which is compiled into both so the press lands in the app.
+struct TellControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "dog.brain.tell") {
+            ControlWidgetButton(action: OpenTellIntent()) {
+                Label(Words.tellTitle, systemImage: "plus.bubble")
+            }
+        }
+        .displayName("Tell BrainDog")
+        .description("Open BrainDog ready to tell it something.")
+    }
+}
+#endif

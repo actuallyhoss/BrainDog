@@ -146,14 +146,14 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: © Quartz Apps LLC
+        # Handoff of the page open now, with the iPhone app (M5).
+        NSUserActivityTypes: [dog.brain.page]
         CFBundleURLTypes:
           - CFBundleURLName: dog.brain.desktop
             CFBundleURLSchemes: [braindog]
         BrainDogServer: https://app.brain.dog
         BrainDogAppGroup: $(TeamIdentifierPrefix)dog.brain
         BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
-        # Handoff of the page open now, with the iPhone app (M5).
-        NSUserActivityTypes: [dog.brain.page]
         # The menu bar extra and the Dock badge keep the count while the window is closed; the app stays open then.
         NSSupportsAutomaticTermination: false
 

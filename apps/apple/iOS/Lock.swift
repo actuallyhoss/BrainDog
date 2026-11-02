@@ -26,7 +26,14 @@ final class Lock {
         locked = on
     }
 
-    var covered: Bool { on && (locked || away) }
+    var covered: Bool { (on && (locked || away)) || shot }
+
+    /// The cover drawn for the screenshot walk alone (a Debug press), never kept.
+    private(set) var shot = false
+
+    #if DEBUG
+    func coverForShot() { shot = true }
+    #endif
 
     /// Whether this phone can lock at all: Face ID, Touch ID or a passcode set up.
     static var possible: Bool {

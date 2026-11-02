@@ -226,3 +226,90 @@ public struct TellGlance: View {
         }
     }
 }
+
+/// What is due next (M5): the reminders automations put on Today, newest first, in the record's words.
+public struct DueGlance: View {
+    let glance: Glance?
+    let size: GlanceSize
+
+    public init(_ glance: Glance?, size: GlanceSize) {
+        self.glance = glance
+        self.size = size
+    }
+
+    private var most: Int { size == .medium ? 3 : 2 }
+
+    public var body: some View {
+        if size == .rectangular {
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Glyph.clock.image.resizable().scaledToFit().frame(width: 13, height: 13)
+                    Text(Words.dueNext).font(Typeface.caption)
+                }
+                Text(glance?.due?.first?.text ?? (glance == nil ? Words.signInToSee : Words.nothingDue)).font(Typeface.meta).lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                GlanceHead(glyph: .clock, title: Words.dueNext)
+                Spacer(minLength: 0)
+                if let glance {
+                    let due = glance.due ?? []
+                    if due.isEmpty {
+                        Text(Words.nothingDue).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(3)
+                    } else {
+                        VStack(alignment: .leading, spacing: Space.s2) {
+                            ForEach(Array(due.prefix(most).enumerated()), id: \.element.id) { index, line in
+                                Text(line.text)
+                                    .font(index == 0 ? Typeface.bodyMedium : Typeface.meta)
+                                    .foregroundStyle(index == 0 ? Palette.ink : Palette.ink2)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    }
+                } else {
+                    Text(Words.signInToSee).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(3)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+}
+
+/// One of Today's numbers, the one he picked in the widget's settings, large: its name, its reading, red only where it
+/// misses its own target.
+public struct FigureGlance: View {
+    let glance: Glance?
+    let metric: String?
+
+    public init(_ glance: Glance?, metric: String?) {
+        self.glance = glance
+        self.metric = metric
+    }
+
+    private var figure: Glance.Figure? {
+        guard let figures = glance?.figures else { return nil }
+        return figures.first { $0.metric == metric } ?? (metric == nil ? figures.first : nil)
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: Space.s1) {
+            GlanceHead(glyph: .observe, title: figure?.label ?? Words.todayNumber)
+            Spacer(minLength: 0)
+            if let figure {
+                Text(figure.said)
+                    .font(Typeface.hero)
+                    .foregroundStyle(figure.met == false ? Palette.red : Palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .monospacedDigit()
+                if let record = glance?.record { Text(record).font(Typeface.caption).foregroundStyle(Palette.ink3).lineLimit(1) }
+            } else {
+                Text(glance == nil ? Words.signInToSee : Words.pickNumber).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(3)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityElement(children: .combine)
+    }
+}

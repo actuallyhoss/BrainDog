@@ -31,11 +31,21 @@ nonisolated public struct Glance: Codable, Sendable, Equatable {
         public var id: String { metric }
     }
 
+    /// One line due next: a reminder an automation put on Today ("remind me on Today"), in the record's words.
+    public struct Due: Codable, Sendable, Equatable, Identifiable, Hashable {
+        public let text: String
+        public let at: String
+        public var id: String { "\(at) \(text)" }
+    }
+
     public var waiting: Int
     public var questions: [Question]
     public var figures: [Figure]
     public var record: String?
     public var readAt: Date
+    /// What is due next on Today (`todayReminders`, newest first, at most eight); nil from a glance kept before M5's
+    /// second pass.
+    public var due: [Due]? = nil
 
     public static let empty = Glance(waiting: 0, questions: [], figures: [], record: nil, readAt: .distantPast)
 
@@ -53,7 +63,11 @@ nonisolated public struct Glance: Codable, Sendable, Equatable {
             Figure(metric: "owed-to-me", label: "Owed to you", said: "GBP 4,800", met: nil),
         ],
         record: "The Studio",
-        readAt: Date()
+        readAt: Date(),
+        due: [
+            Due(text: "Pay the studio rent, GBP 1,850, due Friday", at: "2026-11-03T08:00:00Z"),
+            Due(text: "Send Acme the November invoice", at: "2026-11-03T08:00:00Z"),
+        ]
     )
 }
 
@@ -68,6 +82,7 @@ public extension Calls {
                 ["kind": "stat", "source": "figures.home"],
             ]),
         ]
+        async let reminders = try? Client.shared.call("todayReminders", [:], as: JSONValue.self)
         let raw: JSONValue = try await Client.shared.call("previewPage", ["body": body])
         let blocks = raw["blocks"]?.array ?? []
         let queue = blocks.first { $0["source"]?.string == "governance.open" }
@@ -79,7 +94,11 @@ public extension Calls {
         let waiting = max(Int(queue?["matched"]?.number ?? 0), questions.count)
         let currency = Kept.load("boot", as: Boot.self)?.currency
         let figures = (stat?["readings"]?.array ?? []).compactMap { Reading.figure($0, currency: currency) }
-        return Glance(waiting: waiting, questions: questions, figures: figures, record: Kept.load("boot", as: Boot.self)?.record?.name, readAt: Date())
+        let due = (await reminders)?["lines"]?.array?.compactMap { r -> Glance.Due? in
+            guard let text = r["text"]?.string, let at = r["at"]?.string else { return nil }
+            return Glance.Due(text: text, at: at)
+        }
+        return Glance(waiting: waiting, questions: questions, figures: figures, record: Kept.load("boot", as: Boot.self)?.record?.name, readAt: Date(), due: due ?? [])
     }
 }
 
@@ -94,7 +113,7 @@ public enum GlanceStore {
         guard Session.shared.signedIn else { return nil }
         do {
             let glance = try await Calls.glance()
-            let changed = glance.waiting != kept?.waiting || glance.questions != kept?.questions || glance.figures != kept?.figures
+            let changed = glance.waiting != kept?.waiting || glance.questions != kept?.questions || glance.figures != kept?.figures || glance.due != kept?.due
             Kept.save(glance, as: "glance")
             #if canImport(WidgetKit)
             if changed && !Server.isExtension { WidgetCenter.shared.reloadAllTimelines() }

@@ -17,7 +17,7 @@ struct BrainDogMac: App {
 
     var body: some Scene {
         Window("BrainDog", id: "main") {
-            MainWindow()
+            MainWindow().modifier(MacHandoff())
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1440, height: 900)

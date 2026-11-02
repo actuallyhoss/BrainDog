@@ -7,8 +7,16 @@ import SwiftUI
 /// glance the app just read; and the share sheet's own view with what a share would bring. A Release build has none.
 enum Gallery: Identifiable, Hashable {
     case widgets
+    /// The second page: Due next, a picked Today number, and the Due next Lock Screen line (M5, second pass).
+    case widgets2
     case share(String)
-    var id: String { if case .share(let s) = self { "share:\(s)" } else { "widgets" } }
+    var id: String {
+        switch self {
+        case .share(let s): "share:\(s)"
+        case .widgets: "widgets"
+        case .widgets2: "widgets2"
+        }
+    }
 }
 
 struct GalleryView: View {
@@ -18,6 +26,7 @@ struct GalleryView: View {
     var body: some View {
         switch gallery {
         case .widgets: WidgetsGallery(close: { dismiss() })
+        case .widgets2: WidgetsGallery(close: { dismiss() }, second: true)
         case .share(let what): ShareGallery(what: what, close: { dismiss() })
         }
     }
@@ -26,10 +35,35 @@ struct GalleryView: View {
 /// The widgets as the Home Screen and Lock Screen hold them: small 170, medium 364 by 170, the Lock Screen's two.
 private struct WidgetsGallery: View {
     let close: () -> Void
+    var second = false
     @State private var glance: Glance? = GlanceStore.kept
 
     var body: some View {
         ScrollView {
+            if second { more } else { first }
+        }
+        .background(Palette.board)
+        .onTapGesture(count: 2, perform: close)
+        .task { glance = await GlanceStore.refresh() ?? glance }
+    }
+
+    private var more: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(spacing: 22) {
+                widget(170) { DueGlance(glance, size: .small) }
+                widget(170) { FigureGlance(glance, metric: glance?.figures.dropFirst().first?.metric) }
+            }
+            widget(364) { DueGlance(glance, size: .medium) }
+            HStack(spacing: 22) {
+                widget(170) { FigureGlance(glance, metric: glance?.figures.first?.metric) }
+                lock(170, 72) { DueGlance(glance, size: .rectangular) }
+            }
+        }
+        .padding(.horizontal, 19)
+        .padding(.top, 58)
+    }
+
+    private var first: some View {
             VStack(alignment: .leading, spacing: 22) {
                 HStack(spacing: 22) {
                     widget(170) { NeedsGlance(glance, size: .small) }
@@ -50,10 +84,6 @@ private struct WidgetsGallery: View {
             }
             .padding(.horizontal, 19)
             .padding(.top, 58)
-        }
-        .background(Palette.board)
-        .onTapGesture(count: 2, perform: close)
-        .task { glance = await GlanceStore.refresh() ?? glance }
     }
 
     private func widget<Content: View>(_ width: CGFloat, @ViewBuilder _ content: () -> Content) -> some View {

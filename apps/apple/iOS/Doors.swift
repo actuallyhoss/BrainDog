@@ -113,7 +113,7 @@ enum Handoff {
         a.isEligibleForHandoff = true
         a.isEligibleForSearch = false
         a.userInfo = ["path": path, "record": slug ?? ""]
-        a.webpageURL = Server.url(slug.map { path == "/" ? "/\($0)" : "/\($0)\(path)" } ?? path)
+        a.webpageURL = Server.url(path)
         a.needsSave = true
         activity = a
         a.becomeCurrent()
