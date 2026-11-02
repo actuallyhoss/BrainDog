@@ -393,6 +393,8 @@ export function mayaRecord(today) {
   for (const [name, cents] of Object.entries(opening))
     if (name !== 'amex' && cents < 50_000) throw new Error(`${name} would open at ${cents} cents; the ledger does not fit the balances`);
 
+  /* A CARD'S TO PAY IS AS OF TODAY (`to_pay_on` is "To pay as of", the day the figure was read, which `card-owed.js`
+     reads lines from): a statement day ahead made Money say "$148.85 to pay on the card, as of 28 Nov" on 2 Nov. */
   for (const a of Object.values(ACCOUNTS))
     add('accounts', a.key, {
       name: a.name,
@@ -402,7 +404,7 @@ export function mayaRecord(today) {
       liquid: a.liquid,
       last4: a.last4,
       state: 'open',
-      ...(a.kind === 'card' ? { limit: usd(1_000_000), to_pay: usd(-a.end), to_pay_on: dateIn(y, m + (Number(today.slice(8, 10)) >= 28 ? 1 : 0), 28) } : {}),
+      ...(a.kind === 'card' ? { limit: usd(1_000_000), to_pay: usd(-a.end), to_pay_on: today } : {}),
     });
 
   /* FILING RULES: how the card lines are filed, which Money's rules page lists. */
