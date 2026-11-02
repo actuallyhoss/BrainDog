@@ -156,9 +156,9 @@ test('and every `index:` field is still offerable as a filter, which is what ind
 test('A DURATION IS STORED IN SECONDS AND SAID IN ITS DECLARED UNIT', () => {
   /* `0.2` on its own is a number of something, and adding it to `3` needs both to have meant the
      same thing. Seconds is the one unit; the field says how to say it. */
-  assert.equal(display('tasks', 'effort', 3 * 86_400), '3 d');
-  assert.equal(display('tasks', 'effort', 17_280), '0.2 d');
-  assert.equal(display('tasks', 'effort', 0), '0 d');
+  assert.equal(display('tasks', 'effort', 3 * 86_400), '3 days');
+  assert.equal(display('tasks', 'effort', 17_280), '4.8 hours');
+  assert.equal(display('tasks', 'effort', 0), '0 days');
 });
 
 test('a ref reads as the title of the row it points at', () => {

@@ -391,7 +391,8 @@ export const roadmapSkipped = (titles: readonly string[]): string => `Not drawn,
  * days, or one whose effort is declared in hours, reached this pattern as text it refused, and the row was skipped as
  * a date that does not read (defects P9). The commas are read only in groups of three, as `display()` writes them.
  */
-const EFFORT = /^(-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*([smhdw])?$/u;
+/* "1.5 d" OR "1.5 days", AS THE LIST NOW SAYS IT (pages polish, 2 Nov): the unit is its first letter, the rest of the word read past. */
+const EFFORT = /^(-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(?:([smhdw])[a-z]*)?$/u;
 
 /** The days an effort `EFFORT` matched comes to, before it is rounded up. */
 const effortDays = (m: RegExpExecArray): number => {

@@ -395,6 +395,15 @@ export const stepWords = {
 /** What a `duration`'s declared unit is worth in the seconds the record stores. */
 const SECONDS: Record<string, number> = { s: 1, m: 60, h: 3_600, d: 86_400, w: 604_800 };
 
+/** Each duration unit in words, one and many. */
+const UNIT_WORDS: Record<string, readonly [string, string]> = {
+  s: ['second', 'seconds'],
+  m: ['minute', 'minutes'],
+  h: ['hour', 'hours'],
+  d: ['day', 'days'],
+  w: ['week', 'weeks'],
+};
+
 /**
  * A field's unit after its figure. A PERCENTAGE AND A DEGREE SIT ON THE FIGURE, "60%" and "21°", as every share and every
  * temperature on the screen is written; another unit keeps its space, "3 h".
@@ -504,7 +513,17 @@ export function display(
       if (!Number.isFinite(seconds)) return String(value);
       const unit = f.unit ?? 's';
       const per = SECONDS[unit] ?? 1;
-      return `${(seconds / per).toLocaleString('en-GB', { maximumFractionDigits: 3 })} ${unit}`;
+      /* IN WORDS, "3 days" and not "3 d" (pages polish, 2 Nov): a unit's letter is how it is stored, not how anybody
+         says it. One is "1 day"; any other figure, a part of one included, takes the plural. A unit this map does not
+         know keeps its own spelling. */
+      /* AND LESS THAN ONE OF ITS UNIT IN THE NEXT ONE DOWN: "0.2 days" is "4.8 hours", as a person says it. */
+      const order = ['w', 'd', 'h', 'm', 's'];
+      const down = seconds > 0 && seconds < per && UNIT_WORDS[unit] ? order.slice(order.indexOf(unit) + 1).find((u) => seconds >= SECONDS[u]!) : undefined;
+      const shown = down ?? unit;
+      const n = seconds / (SECONDS[shown] ?? per);
+      const words = UNIT_WORDS[shown];
+      const said = words ? (n === 1 ? words[0] : words[1]) : unit;
+      return `${n.toLocaleString('en-GB', { maximumFractionDigits: down ? 1 : 3 })} ${said}`;
     }
     case 'decimal': {
       /* ROUNDED, because these get summed. `0.2 + 3 + 0.2` is 3.4000000000000004 in binary
