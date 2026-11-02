@@ -459,7 +459,8 @@
             {#each L.facts as i}
               {@const fe = scoped(i) ? null : boxOf(r, i)}
               {#if !scoped(i) && (r.cells[i] || fe)}
-                <div class="cards-fact">
+                <!-- ITS WHOLE WORDS ON THE POINTER, for a surface that cuts a fact short (Today's people, two lines). -->
+                <div class="cards-fact" title={fe ? undefined : said(r, i) || undefined}>
                   <dt>{label(i)}</dt>
                   <dd>{#if fe}{@render box(r, n, i, fe, EMPTY_LINE)}{:else}<Text nodes={nodes(r, i)} {opts} />{/if}</dd>
                 </div>

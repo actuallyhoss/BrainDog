@@ -2573,6 +2573,26 @@
     font-size: var(--fs-meta);
   }
 
+  /* A LONG ORGANISATION IN A NARROW TILE (today 11, settings3 2 Nov): "Lars Holm Nordhaven Registry" broke the
+     organisation under the name, and a longer one left a sliver of it. It keeps its place after the name and takes two
+     lines at most, ending in an ellipsis, with its whole name on the pointer (`title`, `Cards.svelte`). The name keeps
+     room for a few letters of it, so the organisation never shrinks to nothing. */
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-item:has(.cards-fact) .cards-head) {
+    flex: 0 1 auto;
+    max-inline-size: calc(100% - 10ch);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-fact) {
+    flex: 1 1 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: break-word;
+    line-height: 1.3;
+  }
+
   .body[data-board] :global(.block-slot[data-key='faces'] .cards-fact dt) {
     position: absolute;
     inline-size: 1px;
