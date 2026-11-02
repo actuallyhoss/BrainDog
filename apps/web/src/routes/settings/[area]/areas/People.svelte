@@ -1616,6 +1616,14 @@
     text-decoration: underline;
     text-underline-offset: 3px;
   }
+  /* A 44PX TARGET UNDER A THUMB (design pass 2 Nov): its words alone were 20 tall. */
+  @media (pointer: coarse) {
+    .roles-all {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .role {
       transition: none;

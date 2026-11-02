@@ -295,6 +295,12 @@
     font-weight: var(--fw-medium);
     text-decoration: none;
   }
+  /* A 44PX TARGET UNDER A THUMB (design pass 2 Nov): its words alone were 20 tall. */
+  @media (pointer: coarse) {
+    .to-people {
+      min-block-size: var(--tap);
+    }
+  }
   .to-people:hover {
     text-decoration: underline;
     text-underline-offset: 3px;

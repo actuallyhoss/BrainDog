@@ -548,6 +548,13 @@
     font-size: var(--fs-body);
   }
 
+  /* UNDER A THUMB THE WHOLE LINE IS THE BOX'S 44PX TARGET (design pass 2 Nov): the box alone was 20. */
+  @media (pointer: coarse) {
+    .st-check {
+      min-block-size: var(--tap);
+    }
+  }
+
   /* EACH COLUMN'S CHOICE, two to a line on a wide screen, with the first value it holds under it. */
   .st-map {
     display: grid;
