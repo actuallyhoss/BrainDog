@@ -469,7 +469,7 @@ export function leggedByAddons(id: string): boolean {
  * founder's Late and Due this week and every organisation page's Money were refused for a field the list did not have,
  * and a row written in between lost who it was with.
  */
-export async function relegFirstParty(port: Pick<QuietPort, 'held' | 'document' | 'plan' | 'install' | 'nameOf' | 'tookOff'>, o: { links?: boolean } = {}): Promise<string[]> {
+export async function relegFirstParty(port: Pick<QuietPort, 'held' | 'document' | 'plan' | 'install' | 'nameOf' | 'tookOff' | 'holds'>, o: { links?: boolean } = {}): Promise<string[]> {
   const went: string[] = [];
   const nameOf = (id: string): string => {
     const said = port.nameOf?.(id);
@@ -495,6 +495,23 @@ export async function relegFirstParty(port: Pick<QuietPort, 'held' | 'document' 
     const adds = o.links ? diff.adds.filter((a) => !laidWithLink(id, doc, a.id, changed)) : diff.adds;
     if (diff.changes.length === 0 || adds.length > 0 || losses(diff, nameOf, tookOff).length > 0 || unready(diff) !== null) continue;
     if ((await port.install(doc, diff.planHash)).ok) went.push(id);
+  }
+  /* AND THE AGENTS PACK'S LINKS (leftovers 7, 2 Nov). A record made without Projects holds Agents with no Where it
+     applies on its learnings, skills, keys and tools (`agentsPackDocument({ holds })`, 1.32.0). Turning Projects on
+     later lays that link back now, at the version it holds, on the same terms as the five: changes only, nothing lost,
+     nothing added, nothing reaching outside. Before, it waited for the next Agents version. */
+  if (o.links && port.holds) {
+    const id = AGENTS_PACK.manifest.id;
+    const held = (await port.held()).find((p) => p.id === id && p.on && p.version !== null);
+    if (held && held.version === AGENTS_PACK.manifest.version) {
+      const doc = without(agentsPackDocument({ holds: await port.holds() }));
+      const planned = await port.plan(doc);
+      if (planned.ok) {
+        const diff = planned.value;
+        if (diff.changes.length > 0 && diff.adds.length === 0 && losses(diff, nameOf, tookOff).length === 0 && unready(diff) === null)
+          if ((await port.install(doc, diff.planHash)).ok) went.push(id);
+      }
+    }
   }
   return went;
 }

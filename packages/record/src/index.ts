@@ -3793,6 +3793,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return installHeld(kernel, got.value.pack, got.value.diff, host, planHash, []);
         },
         tookOff: () => takenOff(),
+        /* The lists the record holds now, so the agents pack's links follow Projects in (`relegFirstParty`). */
+        holds: () => [...kernel.registers()].map(([list]) => list),
         nameOf: (id) => {
           const body = kernel.declarations().find((d) => d.id === id)?.body as { name?: unknown; title?: unknown } | undefined;
           return typeof body?.name === 'string' ? body.name : typeof body?.title === 'string' ? body.title : null;
@@ -15585,7 +15587,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const out = await kernel.enablePack(args.id, { actor: actorOf(ctx) });
       /* A SWITCH-ON BRINGS WHAT WAITED FOR IT, as an install does, and is what plans an add-on that was off again. */
       if (out.ok) await waitedFor(ctx);
-      if (out.ok) await legsFollow(ctx);
+      /* ONE OF THE FIVE SWITCHED BACK ON LAYS ITS LINKS BACK as one put in by name does, Projects' into Agents with them. */
+      if (out.ok) await legsFollow(ctx, { links: args.id });
       /* A REGISTER ID IS `[a-z][a-z0-9_]*`, so it goes into the pattern as it is. */
       const fix = !out.ok && 'refusal' in out ? out.refusal.fix : '';
       return tail(offPack(out, (r) => new RegExp(`\\b${r}\\b`).test(fix), args.id));
