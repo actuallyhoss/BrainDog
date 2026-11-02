@@ -42,6 +42,7 @@ import { ok } from '@braindog/ports';
 
 import { labelsOf } from '@braindog/declare';
 import { speakingNow } from '../arrange.ts';
+import { agentLists } from '../agent-lists.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -1375,9 +1376,16 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
     typed: typedKept(where.money, typedIn(where.now, zone, where.home)),
     cell: typedKept(where.money, typedIn(where.now, zone, where.home, true)),
   };
-  const blocks = page.blocks.map((b) => shownBlock(b, showing)).filter((b) => b !== null);
+  /* WORDS HE TYPED KEEP NO AMOUNT ON A LINK WITHOUT MONEY (security pass, 2 Nov): a note's body, its lead line (a
+     project's next step) and every other string a block carries go through `maskMoneyText`, as the project's own
+     words already do (`projectOf`). Only `{{money:…}}` and money figures were held before, so "They pay £9,999.99 on
+     launch" in a project's note reached a link that keeps money off whole. */
+  const masked = (v: unknown): unknown =>
+    typeof v === 'string' ? maskMoneyText(v) : Array.isArray(v) ? v.map(masked) : isRecord(v) ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, masked(x)])) : v;
+  const shownBlocks = page.blocks.map((b) => shownBlock(b, showing)).filter((b) => b !== null);
+  const blocks = where.money ? shownBlocks : (shownBlocks.map(masked) as typeof shownBlocks);
   return {
-    title: page.title,
+    title: where.money || typeof page.title !== 'string' ? page.title : maskMoneyText(page.title),
     read_at: typeof page.read_at === 'string' ? page.read_at : null,
     layout:
       layout === null
@@ -1565,7 +1573,7 @@ export function methods(deps: RecordDeps) {
     if (decl === undefined || row === null || row.deleted_at !== null) return undefined;
     const personal = new Set(kernel.personalLists());
     const hidden = (id: string): boolean => sql.one('SELECT 1 AS x FROM entry_private WHERE entry_id = ? LIMIT 1', id) !== undefined;
-    if (personal.has(register) || NEVER_READ.has(register) || hidden(row.id)) return undefined;
+    if (personal.has(register) || NEVER_READ.has(register) || hidden(row.id) || decl.owner_only === true || (!money && moneyList(decl))) return undefined;
     const masked = (t: string): string => (money ? t : maskMoneyText(t));
     const words = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? masked(wordsShown(v.trim())).replace(SPOKEN_ID, '').trim() || null : null);
     const enumWord = (list: RegisterDecl, field: string | undefined, v: unknown): string => {
@@ -1581,8 +1589,12 @@ export function methods(deps: RecordDeps) {
     const work: SharedProject['work'] = [];
     const moved: { at: string; said: string }[] = [];
     let firstOpen: string | null = null;
+    /* NEVER THE AGENTS' LISTS OR AN OWNER'S OWN (security pass, 2 Nov): Keys, Learnings, Skills and Tools say when a row
+       is finished and point at a project, so a link to Kiln listed "Stripe live secret for Kiln" under Keys, and a
+       lesson's words under Learnings, to anybody holding it. */
+    const agents = new Set(Object.values(agentLists(lists)));
     for (const list of lists.values()) {
-      if (list.id === register || personal.has(list.id) || NEVER_READ.has(list.id) || moneyList(list) || (list.done ?? []).length === 0) continue;
+      if (list.id === register || personal.has(list.id) || NEVER_READ.has(list.id) || agents.has(list.id) || list.owner_only === true || moneyList(list) || (list.done ?? []).length === 0) continue;
       const links = list.fields.filter((f) => f.type === 'ref' && f.to === register && f.retired !== true).map((f) => f.id);
       if (links.length === 0) continue;
       const got = kernel.list({ register: list.id, where: links.length === 1 ? { field: links[0]!, is: row.id } : { any: links.map((f) => ({ field: f, is: row.id })) }, limit: 200 });
