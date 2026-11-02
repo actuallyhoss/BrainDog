@@ -378,8 +378,28 @@ const hoistPlugin: Plugin = {
   },
 };
 
+/**
+ * VITE'S PRELOAD HELPER LOOKS EACH FILE UP ONCE, NOT IN EVERY LINK OF THE PAGE (speed6, 2 Nov). Before it adds a
+ * `<link>` for a file a dynamic import needs, the helper walked every `<link>` in the document from the end, reading each
+ * one's `href`. The list it walks is live, so after each link it added the next look counted the document again, and a
+ * cold Today asks for over 200 files: 30 to 55 ms of a throttled phone's first screen, on every page. The page's own
+ * links (the shell's preloads and sheets) are read once, at the first ask; every link the helper adds itself is already
+ * in its `seen`, so it is never looked for. A file is still asked once, as before.
+ */
+const PRELOAD_LOOP = /for \(let i = links\.length - 1; i >= 0; i--\) \{\s*const link = links\[i\];\s*if \(link\.href === dep && \(!isCss \|\| link\.rel === "stylesheet"\)\) return;\s*\}/u;
+const preloadOncePlugin: Plugin = {
+  name: 'braindog:preload-once',
+  enforce: 'post',
+  transform(code, id) {
+    if (id !== '\0vite/preload-helper.js') return null;
+    if (!PRELOAD_LOOP.test(code)) throw new Error("braindog:preload-once: Vite's preload helper changed; read it again before building");
+    const once = `let pageLinks = null;function inPage(links, dep, isCss) {if (pageLinks === null) {pageLinks = new Map();for (const l of links) pageLinks.set(l.href, pageLinks.get(l.href) === true || l.rel === "stylesheet");}const sheet = pageLinks.get(dep);return sheet !== undefined && (!isCss || sheet);}`;
+    return { code: `${once}${code.replace(PRELOAD_LOOP, 'if (inPage(links, dep, isCss)) return;')}`, map: null };
+  },
+};
+
 export default defineConfig({
-  plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin, routeRuntimePlugin, routeMarksPlugin, hoistPlugin],
+  plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin, routeRuntimePlugin, routeMarksPlugin, hoistPlugin, preloadOncePlugin],
   /* `__BRAINDOG_BUILD__` IS THE DEPLOY'S BUILD TUPLE, the one the Worker answers `/api/version` with as `app`, so a tab can
      tell it is running an older build than the one live (`newerBuild` in `lib/data/live.ts`). Empty in a build without one,
      which compares nothing. */
