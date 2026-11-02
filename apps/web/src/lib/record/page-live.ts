@@ -96,13 +96,22 @@ function oneMarkIn(text: string): string {
   });
 }
 
-export function wholeMoneyIn(text: string): string {
+/** An amount of a thousand or more in a text, which the one rule for cents says whole. */
+const BIG_AMOUNT = /(?<!\b1 = )(?:[£$€¥₹]|\b[A-Z]{3}\s)[−-]?(?:\d{1,3}(?:,\d{3})+|\d{4,})(?!\d)/u;
+
+export const wholeMoneyIn = (text: string): string => wholeMoneyOf(text);
+
+function wholeMoneyOf(text: string, all = false): string {
   text = oneMarkIn(text);
+  /* ONE RULE A SENTENCE (polish5, 2 Nov): Budgets read "$951.67 a month across 3 categories. $2,586 spent this month",
+     one sentence saying money two ways. Where any amount in it is a thousand or more, and so said whole, every amount in
+     it is whole; where none is, the cents stay where they are not nought ("$148.85 to pay on the card"). */
+  const big = all || BIG_AMOUNT.test(text);
   /* A RATE IS NOT AN AMOUNT: "USD 1 = EGP 50.50" keeps its pence, or "GBP 1 = USD 1.35" would read as one to one. */
   return text.replace(/(?<!\b1 = )((?:[£$€¥₹]|\b[A-Z]{3}\s)[−-]?)(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})(?!\d)/gu, (found: string, lead: string, units: string, cents: string) => {
     /* THE ONE RULE FOR CENTS (1 Nov): under a thousand the cents stay where they are not nought, "$148.85 to pay on the
        card"; from a thousand up, and ".00" at any size, the amount is whole. */
-    if (Number(units.replace(/,/gu, '')) < 1000 && cents !== '00') return found;
+    if (!big && Number(units.replace(/,/gu, '')) < 1000 && cents !== '00') return found;
     const whole = Number(units.replace(/,/gu, '')) + (Number(cents) >= 50 ? 1 : 0);
     return `${lead}${whole.toLocaleString('en')}`;
   });
@@ -2438,7 +2447,18 @@ export function workedAtOf(when: unknown): WorkedAt | null {
  * drops.
  */
 export function resolverOf(values: Record<string, unknown> | undefined): (path: string) => string | null {
-  return (path) => {
+  /* ONE RULE A SENTENCE (polish5, 2 Nov): a block's figures are said into one sentence, so where any money among them is
+     a thousand or more, and so whole, every amount it says is whole: Budgets' "$951.67 a month across 3 categories.
+     $2,586 spent this month" said money two ways in one line. Read once, from the figures as each alone would be said. */
+  let big: boolean | null = null;
+  const all = (): boolean => (big ??= Object.keys(values ?? {}).some((k) => BIG_AMOUNT.test(sayOf(values, k, false) ?? '')));
+  return (path) => sayOf(values, path, all());
+}
+
+/** One figure of a block as its sentence says it; `all`, every amount whole (`resolverOf`). */
+function sayOf(values: Record<string, unknown> | undefined, path: string, all: boolean): string | null {
+  const wholeMoneyIn = (text: string) => wholeMoneyOf(text, all);
+  {
     if (!values || !Object.hasOwn(values, path)) return null;
     const v = values[path];
     /* `<figure>.since` IS A DAY, said as the month a person would: "quiet since April", and the year only when it is not
@@ -2479,7 +2499,7 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
       if (typeof amount === 'number' && typeof currency === 'string') return wholeMoneyIn(money(amount, currency));
     }
     return null;
-  };
+  }
 }
 
 /**

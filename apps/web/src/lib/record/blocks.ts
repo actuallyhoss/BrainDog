@@ -386,7 +386,10 @@ function progressRows(block: BlockResult): string[] {
            Money's spending figures group by), else the words in the label. Matched by the words alone, every budget drew
            nothing spent against a figure grouped by its category. */
         const part = spent.groups.find((g) => (e.id !== undefined && g.key === e.id) || g.key === String(e.fields[label] ?? ''))?.value ?? 0;
-        const figure = currency ? money(Math.round(part), currency) : String(part);
+        /* A BUDGET IS A SUMMARY, SAID WHOLE (polish5, 2 Nov): "$6.24 of $35" over "$29 left" said one budget two ways, and
+           the left was not the limit less the spent. Whole, it reads "$6 of $35", "$29 left". */
+        const unit = currency ? 10 ** exponentOf(currency) : 1;
+        const figure = currency ? money(Math.sign(part) * Math.round(Math.abs(part) / unit) * unit, currency) : String(part);
         return `${escapeCell(said(label, e.fields[label]))} | ${escapeCell(figure)} | ${escapeCell(said(value, limit))} | ${escapeCell(noteSaid)}`;
       }),
     );

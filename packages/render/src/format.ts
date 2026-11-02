@@ -325,14 +325,40 @@ export function barFigure(text: string, home?: Home): string {
  * `barFigure`, then said by the one rule for cents below. A cell that is not one figure is left as it was.
  */
 export function barFigures(texts: readonly string[], home?: Home, written = false): string[] {
-  /* ONE RULE FOR CENTS, EVERYWHERE (coordinator's live check of 1 Nov): some money showed cents and some did not, "$3,200"
-     over "+$3,200.00". Now an amount shows its cents only where they say something: never ".00", and a total of a
-     thousand or more is said whole (`totalSaid`). `written`, a set of exact amounts (a ledger's lines, a list's rows),
-     keeps every cent that is not nought, whatever its size. Nothing is padded to line up any more. */
-  return texts.map((t) => {
-    const said = barFigure(t, home);
-    return written || !figureParts(t) ? said : totalSaid(said);
+  /* ONE RULE A SET (polish5, 2 Nov), where it was one rule a figure: Reports' Paid most read "£3,300" over "£389.90" over
+     "£5.91", and a Ledger tile "−$2,100" over "−$117.18", two kinds of figure down one column. A SET OF TOTALS (a bar
+     chart, a split, a table of months: a summary) is said whole, every figure of it. A SET OF EXACT AMOUNTS (`written`:
+     a ledger's lines, a list's rows) is said to the penny where any one of a currency carries pence, every amount of
+     that currency then showing its places ("−$2,100.00" over "−$117.18"), and whole where none does. */
+  const said = texts.map((t) => barFigure(t, home));
+  if (!written) return said.map((t) => (figureParts(t) ? wholeFigure(t) : t));
+  const places = new Map<string, number>();
+  for (const t of said) {
+    const p = figureParts(t);
+    if (p && p.minor !== '') places.set(markOf(p), Math.max(places.get(markOf(p)) ?? 0, p.minor.length));
+  }
+  return said.map((t) => {
+    const p = figureParts(t);
+    const n = p ? places.get(markOf(p)) : undefined;
+    if (!p || n === undefined || p.minor.length >= n) return t;
+    return `${p.sign}${p.unit}${p.inner}${grouped(p.whole)}.${p.minor.padEnd(n, '0')}${p.code}`;
   });
+}
+
+/** A figure's currency as its marks say it, the digits taken out: `$` and `−$` are one, `EGP ` another. */
+const markOf = (p: FigureParts): string => `${p.unit}|${p.code.trim()}`;
+
+/**
+ * A FIGURE IN A SET OF TOTALS, WHOLE AT ANY SIZE: "£389.90" is "£390", "£5.91" is "£6". Half a unit rounds away from
+ * nought. Text that is not one figure comes back as it was.
+ */
+export function wholeFigure(text: string): string {
+  const p = figureParts(text);
+  if (!p || p.minor === '') return text;
+  const units = BigInt(p.whole) + (Number(p.minor[0]) >= 5 ? 1n : 0n);
+  /* NOUGHT HAS NO SIGN: "−£0.40" is "£0", not "−£0". */
+  const signed = units === 0n ? { sign: '', inner: '' } : p;
+  return `${signed.sign}${p.unit}${signed.inner}${grouped(units.toString())}${p.code}`;
 }
 
 /**

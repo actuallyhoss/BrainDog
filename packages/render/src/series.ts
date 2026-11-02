@@ -12,7 +12,7 @@
  * everything they print comes back from here.
  */
 
-import { MISSING, axisFigure, exponentOf, totalSaid } from './format.ts';
+import { MISSING, axisFigure, exponentOf, totalSaid, wholeFigure } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike, wholeMinor, wholeShape } from './figure.ts';
 import { type AmountSetting, currencyOfFigure, writeAmount } from './money.ts';
@@ -351,9 +351,10 @@ export const SERIES_UNDER = 'More out than in';
  * `barFigures` tells one, and a cell with no digits (`—`) or no mark of a currency (an hour count) is left as it is.
  */
 export function evenPlaces(cells: readonly string[]): string[] {
-  /* NO LONGER PADDED, SINCE 1 NOV: a table of months is totals, said by the one rule for cents (`totalSaid`): whole from a
-     thousand up, to the cent under it, never ".00". The name stays for its callers. */
-  return cells.map((c) => (/\d/u.test(c) ? totalSaid(c) : c));
+  /* NO LONGER PADDED, SINCE 1 NOV: a table of months is totals, and since 2 Nov (polish5, one rule a set) every total in
+     it is said whole, "£390" beside "£6,880" where "£389.90" stood beside it. A cell that is not one figure keeps the
+     rule for one figure (`totalSaid`). The name stays for its callers. */
+  return cells.map((c) => (/\d/u.test(c) ? (wholeFigure(c) === c ? totalSaid(c) : wholeFigure(c)) : c));
 }
 /** The key for a bar drawn at half strength: a month not over yet, or still to come. */
 export const SERIES_PALER = 'Paler: not over yet';
