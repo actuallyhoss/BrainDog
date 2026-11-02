@@ -2093,6 +2093,31 @@
     }
   }
 
+  /* A TICK SAYS IT TOOK (2 Nov, find-animation-opportunities): Your work's box filled in one frame, so a press read as
+     nothing until the row moved. The fill comes in over a press and the box settles from a hair smaller, 160ms on the
+     arriving curve, transform only; under reduced motion it is the fill alone (`skin/a11y.css`). */
+  .body[data-board] :global(.item-marker) {
+    transition:
+      background-color var(--d-press) var(--ease-out),
+      border-color var(--d-press) var(--ease-out);
+  }
+
+  .body[data-board] :global(.item-marker[data-done='yes']) {
+    animation: today-tick var(--d-swap) var(--ease-out);
+  }
+
+  @keyframes -global-today-tick {
+    from {
+      scale: 0.82;
+    }
+  }
+
+  /* AN ANSWER'S LINE KEEPS A STEP OF AIR UNDER IT (2 Nov): "Not yet" with its Undo sat on the next question's title with
+     nothing between them, so the two read as one. The line takes the card's place and the step under it, as a row does. */
+  .body[data-board] :global(.block-slot[data-board-key='needs-you'] .qa:has(> .qa-done)) {
+    padding-block-end: var(--sp-3);
+  }
+
   .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line) {
     padding-block-start: 0;
     font-size: var(--fs-meta);

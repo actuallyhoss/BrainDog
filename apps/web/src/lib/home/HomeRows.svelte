@@ -232,6 +232,17 @@
     }
   }
 
+  /* AND IT SETTLES FROM A HAIR SMALLER when ticked (feedback, 160ms, transform only; Home's `today-tick`). */
+  .hl[data-done] .hl-check {
+    animation: today-tick var(--d-swap) var(--ease-out);
+  }
+
+  @keyframes today-tick {
+    from {
+      scale: 0.82;
+    }
+  }
+
   .hl[data-done] .hl-check {
     background: var(--ink);
     border-color: var(--ink);
