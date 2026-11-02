@@ -85,6 +85,8 @@ struct MainWindow: View {
         ZStack {
             if session.signedIn {
                 WebView(model.desk).ignoresSafeArea()
+                LaunchCover(screen: model.desk).ignoresSafeArea()
+                if model.desk.offline { MacOffline { model.desk.reload() }.ignoresSafeArea() }
             } else {
                 SignInView().frame(minWidth: 480, minHeight: 560)
             }
@@ -102,6 +104,10 @@ struct MainWindow: View {
             if now { Task { await model.read() } } else { model.forget() }
         }
         .onOpenURL { url in Links.open(url) }
+        /* A UNIVERSAL LINK (app.brain.dog/decide/…, /p/…, /r/…, an invitation, the sign-in link) arrives as a web visit. */
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            if let url = activity.webpageURL { Links.open(url) }
+        }
         .task { await session.refreshIfDue() }
         #if DEBUG
         .task { await DebugPress.onLaunch { path, _ in Links.debug(path) } }
@@ -116,6 +122,17 @@ enum Links {
         let model = MacModel.shared
         if url.path == "/signin" {
             Task { await SignInFlow.shared.open(link: url) }
+            return
+        }
+        /* ONLY THE APP'S OWN NAMES: brain.dog and app.brain.dog in a universal link, the seed's in a Debug build. */
+        if url.scheme == "https" || url.scheme == "http" {
+            guard let host = url.host, host == Server.host || host == "app.brain.dog" || host == "brain.dog" else {
+                NSWorkspace.shared.open(url)
+                return
+            }
+        }
+        if url.scheme == "braindog", url.host == "quick" {
+            QuickPanel.shared.show()
             return
         }
         if url.scheme == "braindog", url.host == "tell" {
@@ -141,6 +158,19 @@ enum Links {
                 switch step {
                 case let s where s.hasPrefix("tell:"): model.openTell(prefill: String(s.dropFirst(5)).replacingOccurrences(of: "|", with: "\n"))
                 case "settings": model.openSettings?()
+                case let s where s.hasPrefix("settings:"):
+                    SettingsTabs.chosen = String(s.dropFirst(9))
+                    model.openSettings?()
+                case let s where s.hasPrefix("quick:"):
+                    /* `quick:tell:<lines>`, `quick:search:<words>`, `quick:add` (Enter in Tell). */
+                    let rest = String(s.dropFirst(6))
+                    if rest == "add" { await QuickPanel.shared.model.enter(); break }
+                    let parts = rest.split(separator: ":", maxSplits: 1).map(String.init)
+                    let words = (parts.count > 1 ? parts[1] : "").replacingOccurrences(of: "|", with: "\n")
+                    QuickPanel.shared.show(mode: parts.first == "search" ? .search : .tell, text: words)
+                case let s where s.hasPrefix("quickshot:"):
+                    Shots.other(titled: "Quick panel", name: String(s.dropFirst(10)))
+
                 case "menubar": model.openWindow?("menubar-shot")
                 case "search": model.desk.emit("search")
                 case let s where s.hasPrefix("shot:"): await Shots.window(String(s.dropFirst(5)))
@@ -160,12 +190,27 @@ enum Links {
     #endif
 }
 
-/// The menus (plan M6, Menus): the app's, Edit and Window as the system makes them, View, Go and Help.
+/// The menus (plan M6, Menus): the app's, File, Edit and Window as the system makes them, View, Go and Help.
 struct Menus: Commands {
     let model: MacModel
     let session: Session
+    let hotKey = HotKey.shared
+
+    /// The quick panel, with its global keys shown when they are held (they work from any app; here they are a reminder).
+    @ViewBuilder private var quickItem: some View {
+        if let shortcut = hotKey.shortcut, hotKey.state == .on, let key = shortcut.keyEquivalent {
+            Button("Quick Panel") { QuickPanel.shared.toggle() }
+                .keyboardShortcut(key, modifiers: shortcut.menuModifiers)
+        } else {
+            Button("Quick Panel") { QuickPanel.shared.toggle() }
+        }
+    }
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { Updates.shared.check() }
+                .disabled(!Updates.shared.canCheck)
+        }
         CommandGroup(after: .appSettings) {
             Toggle("Open at Login", isOn: Binding(get: { model.opensAtLogin }, set: { model.setOpensAtLogin($0) }))
             if session.signedIn {
@@ -174,8 +219,10 @@ struct Menus: Commands {
             }
         }
         CommandGroup(replacing: .newItem) {
-            Button("\(Words.tellTitle)…") { model.openTell() }
-                .keyboardShortcut("t")
+            Button("New Tell…") { model.openTell() }
+                .keyboardShortcut("n")
+                .disabled(!session.signedIn)
+            quickItem
                 .disabled(!session.signedIn)
         }
         CommandGroup(replacing: .toolbar) {
@@ -190,8 +237,19 @@ struct Menus: Commands {
             Button(Words.back) { model.back() }.keyboardShortcut("[")
             Button("Forward") { model.forward() }.keyboardShortcut("]")
             Divider()
-            Button(Words.today) { model.go("/") }.keyboardShortcut("1")
-            Button(Words.needsYou) { model.go("/decide") }.keyboardShortcut("2")
+            /* TODAY ⌘1, NEEDS YOU ⌘2, then the web's own places and the record's pages, ⌘3 to ⌘9 while they last. */
+            ForEach(Array(model.places.enumerated()), id: \.element.id) { i, place in
+                if i < 9 {
+                    Button(place.label) { model.go(place.href) }.keyboardShortcut(KeyEquivalent(Character(String(i + 1))))
+                } else {
+                    Button(place.label) { model.go(place.href) }
+                }
+            }
+            .disabled(!session.signedIn)
+            Divider()
+            Button("Settings in BrainDog") { model.go("/settings") }
+                .keyboardShortcut(",", modifiers: [.command, .option])
+                .disabled(!session.signedIn)
             Divider()
             Button("Search or Go To…") { model.front(); model.desk.emit("search") }.keyboardShortcut("k")
             Button("Ask…") { model.front(); model.desk.emit("slash") }.keyboardShortcut("j")

@@ -2,7 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   The Mac app, signed with Developer ID and its provisioning profile (M6). Sandboxed; the network for the web app and
-  the calls; Downloads for exports and backups; passkeys through both names; the team-prefixed App Group and the
+  the calls; Downloads for exports and backups; passkeys through both names, universal links on app.brain.dog; Sparkle's installer
+  service (the two mach-lookup names its sandboxed install needs); the team-prefixed App Group and the
   Keychain group the widgets and the share extension read the session from; push (M4).
 -->
 <plist version="1.0">
@@ -19,6 +20,12 @@
 	<array>
 		<string>webcredentials:brain.dog</string>
 		<string>webcredentials:app.brain.dog</string>
+		<string>applinks:app.brain.dog</string>
+	</array>
+	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spks</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spki</string>
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>

@@ -35,6 +35,10 @@ settings:
 packages:
   BrainDogKit:
     path: Packages/BrainDogKit
+  # The Mac app's updates (plan M6): Sparkle 2, pinned. Off until a team-signed build carries SUPublicEDKey (Mac/Updates.swift).
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.6
 
 targets:
   # ── iPhone ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -120,6 +124,7 @@ targets:
         buildPhase: resources
     dependencies:
       - package: BrainDogKit
+      - package: Sparkle
       - target: WidgetsMac
       - target: ShareMac
     settings:
@@ -156,6 +161,14 @@ targets:
         BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
         # The menu bar extra and the Dock badge keep the count while the window is closed; the app stays open then.
         NSSupportsAutomaticTermination: false
+        # Updates (Mac/Updates.swift): the feed on the site, checked against SUPublicEDKey, which stays empty (and the
+        # updater off) until the key pair is made for the first signed release. The installer runs as Sparkle's own
+        # service, as a sandboxed app needs (the Release entitlements let the app reach it).
+        SUFeedURL: https://brain.dog/mac/appcast.xml
+        SUPublicEDKey: ""
+        SUEnableInstallerLauncherService: true
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
 
   # ── Extensions (the widgets and share in M5; the notification service in M4) ─────────────────────────────────────────────────────────────────
   WidgetsiOS:

@@ -22,6 +22,33 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
 
     var count: Int { glance?.waiting ?? 0 }
 
+    /// One place in the app: the Go menu's and the quick panel's Search's.
+    struct Place: Identifiable, Hashable {
+        let href: String
+        let label: String
+        let icon: String
+        var id: String { href }
+    }
+
+    /// Where the Go menu goes: Today and Needs you, then the web's own places (`places`, its first four, as the iPhone's
+    /// tabs take them), then the record's pages that sit in its navigation, each once.
+    var places: [Place] {
+        var out = [Place(href: "/", label: Words.today, icon: "today"), Place(href: "/decide", label: Words.needsYou, icon: "decide")]
+        func add(_ place: Place) { if !out.contains(where: { $0.href == place.href }) { out.append(place) } }
+        for tab in desk.places?.array ?? [] {
+            if let href = tab["href"]?.string, href.hasPrefix("/"), let label = tab["label"]?.string {
+                add(Place(href: href, label: label, icon: tab["icon"]?.string ?? ""))
+            }
+        }
+        let pages = (boot?.pages ?? []).filter { $0.nav != nil }.sorted { ($0.nav?.order ?? 999) < ($1.nav?.order ?? 999) }
+        for page in pages { add(Place(href: "/p/\(page.slug)", label: page.title, icon: page.icon ?? "")) }
+        return out
+    }
+
+    /// A list's name as the person named it, for a search result.
+    func listName(_ register: String) -> String { boot?.registers.first { $0.id == register }?.name ?? register }
+    func listGlyph(_ register: String) -> Glyph { Glyph.named(boot?.registers.first { $0.id == register }?.icon) }
+
     /// The page's zoom, ⌘+ and ⌘−, kept: 0.5 to 2.0 in the browser's own steps.
     var zoom: Double = UserDefaults.standard.object(forKey: "mac.zoom") as? Double ?? 1 {
         didSet {
@@ -53,6 +80,12 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
         guard !started else { return }
         started = true
         desk.webView.pageZoom = zoom
+        desk.cover = LaunchPicture.kept
+        HotKey.shared.onPress = { QuickPanel.shared.toggle() }
+        HotKey.shared.start()
+        NotificationCenter.default.addObserver(forName: NSApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.keepPicture() }
+        }
         desk.onAsk = { [weak self] ask in self?.heard(ask) }
         desk.onFile = { [weak self] file in self?.keep(file) }
         UNUserNotificationCenter.current().delegate = self
@@ -94,11 +127,23 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
 
     /// Signed out: nothing of the last person stays in the Dock, the menu bar or Tell.
     func forget() {
+        LaunchPicture.kept = nil
+        desk.cover = nil
+        QuickPanel.shared.close()
         glance = nil
         boot = nil
         badge(0)
         tell.text = ""
         GlanceStore.redraw()
+    }
+
+    /// Today as it was last drawn, for the next launch to show until the page draws (as the iPhone app does).
+    private func keepPicture() {
+        guard Session.shared.signedIn, desk.ready, !desk.offline, desk.here == "/" else { return }
+        Task {
+            guard let picture = try? await desk.webView.takeSnapshot(configuration: nil) else { return }
+            LaunchPicture.kept = picture
+        }
     }
 
     // MARK: what the page asks
