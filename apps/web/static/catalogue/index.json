@@ -6186,8 +6186,45 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "4501fd04572dfef4bde0e3099aeb516b7041e9db9bdde906618021b46d320de7",
+          "bytes": 16904,
+          "published_at": "2026-11-02T15:04:40.855Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Savings circles"
+            ],
+            "rules": [
+              "Write a savings circle's months and your payout"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Savings circle"
+            ],
+            "uses": [
+              {
+                "id": "register.plans",
+                "writes": true
+              },
+              {
+                "id": "register.installments",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "The Savings circle widget on Today says No circle yet when you are in none, rather than A month £0.",
+          "preview": true
+        },
         {
           "version": "1.2.0",
           "checksum": "67420983d5c4b8a40099daa874e87e7a815ce23ea8dea408984a86f1d6df68aa",
@@ -6692,8 +6729,46 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.1",
+      "latest": "1.2.2",
       "versions": [
+        {
+          "version": "1.2.2",
+          "checksum": "25679537d93909216919e69174a578420ec986f7270bcf754d4620759a8e33e2",
+          "bytes": 27236,
+          "published_at": "2026-11-02T15:04:40.855Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Splits",
+              "Where each person stands"
+            ],
+            "pages": [
+              "Splits",
+              "{{name}}"
+            ],
+            "rules": [
+              "Write the split of a Ledger line marked shared",
+              "Work out a split and where that person stands"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Splits"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "The Splits widget on Today says Nothing split yet when nothing is shared, rather than leaving the board.",
+          "preview": true
+        },
         {
           "version": "1.2.1",
           "checksum": "40b3c235a8606ba614848ae00dcee9e6fd77465c73bd0cc8bf1f92e3e33d8813",
@@ -7286,8 +7361,41 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.1",
+      "latest": "1.2.2",
       "versions": [
+        {
+          "version": "1.2.2",
+          "checksum": "97b8b3fab5126bfdf65a1502697312e6d22e10227e1e7daf02b4e8e0b7216342",
+          "bytes": 23686,
+          "published_at": "2026-11-02T15:04:40.855Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [
+              "Subscriptions"
+            ],
+            "rules": [
+              "Keep a subscription's old price when its amount changes"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Subscriptions"
+            ],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "The Subscriptions widget on Today says Nothing tracked yet when no subscription is marked, rather than A month £0.",
+          "preview": true
+        },
         {
           "version": "1.2.1",
           "checksum": "aaed8f53fc4c4afe5969bb9feb28d8d01fbd746ac8045a8be145e120c45b82b0",

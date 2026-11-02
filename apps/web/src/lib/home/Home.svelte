@@ -147,6 +147,7 @@
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { holdPresses } from '$lib/data/held.svelte.ts';
   import { drewFirst, firstDrawn } from '$lib/data/first-drawn.ts';
+  import { emptySaid } from './widget-empty.ts';
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
@@ -1063,6 +1064,8 @@
         if (board && b.key === 'arrivals') return { ...b, drawn: false };
         /* A VITAL SIGN READING RED IS SAID UNDER WHAT NEEDS YOU, in its tile (`signsSaid`), not as a tile of its own. */
         if (board && (b.key === 'signs' || b.key === 'signs-many')) return { ...b, drawn: false };
+        /* A WIDGET FROM THE SHEET WITH NOTHING TO SHOW SAYS ITS OWN EMPTY LINE in its frame (`widget-empty.ts`). */
+        if (board) return emptySaid(b) ?? b;
         return b;
       }),
       recordNow(),

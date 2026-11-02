@@ -1,10 +1,10 @@
 {
   "pack": "savings-circle",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "icon": "piggy-bank",
   "title": "Savings circle",
   "summary": "A savings circle (a gam'eya, a tontine, a committee): everyone puts the same part in each month and one person takes the pot each month. Say the people, the part, your turn and the first month, and the months and your payout are written as a plan's parts, so Cash ahead and Coming up count them.",
-  "changes": "A circle already under way marks the months before today paid, and says its days as 1 Oct. Its page says one circle as one.",
+  "changes": "The Savings circle widget on Today says No circle yet when you are in none, rather than A month £0.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -71,6 +71,7 @@
         "kind": "stat",
         "heading": "Savings circle",
         "icon": "coins",
+        "empty": "No circle yet.",
         "cells": [
           {
             "metric": "circles-month",

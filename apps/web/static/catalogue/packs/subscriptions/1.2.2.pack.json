@@ -1,0 +1,876 @@
+{
+  "pack": "subscriptions",
+  "version": "1.2.2",
+  "icon": "refresh",
+  "title": "Subscriptions",
+  "summary": "Everything you pay for on a cadence, in one place: what it costs a month and a year, what renews in the next 30 days, free trials about to end, the day to cancel by, a price that went up, and what you hardly use. Built on Repeating, so Cash ahead and Coming up already count them.",
+  "changes": "The Subscriptions widget on Today says Nothing tracked yet when no subscription is marked, rather than A month £0.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.0.0 <4.0.0"
+    }
+  },
+  "extends": {
+    "register.recurring": {
+      "fields": [
+        {
+          "id": "subscription",
+          "label": "A subscription",
+          "type": "bool"
+        },
+        {
+          "id": "trial_ends",
+          "label": "Free trial ends",
+          "type": "day",
+          "remind": [
+            "-3d",
+            "0d"
+          ]
+        },
+        {
+          "id": "cancel_by",
+          "label": "Cancel by",
+          "type": "day",
+          "remind": [
+            "-7d",
+            "-1d"
+          ]
+        },
+        {
+          "id": "cancel_how",
+          "label": "How to cancel",
+          "type": "text"
+        },
+        {
+          "id": "used",
+          "label": "How much you use it",
+          "type": "enum",
+          "values": [
+            "often",
+            "sometimes",
+            "hardly",
+            "never"
+          ],
+          "labels": {
+            "often": "Often",
+            "sometimes": "Now and then",
+            "hardly": "Hardly",
+            "never": "Not at all"
+          }
+        },
+        {
+          "id": "price_was",
+          "label": "Price before",
+          "type": "money"
+        },
+        {
+          "id": "price_up_on",
+          "label": "Went up on",
+          "type": "day"
+        },
+        {
+          "id": "price_seen",
+          "label": "Price seen",
+          "type": "money"
+        }
+      ]
+    }
+  },
+  "widgets": [
+    {
+      "id": "subscriptions",
+      "title": "Subscriptions",
+      "says": "What your subscriptions cost a month, and what renews in 30 days.",
+      "group": "money",
+      "for": "both",
+      "icon": "repeat",
+      "block": {
+        "kind": "stat",
+        "heading": "Subscriptions",
+        "icon": "repeat",
+        "empty": "Nothing tracked yet.",
+        "cells": [
+          {
+            "metric": "subs-month",
+            "label": "A month"
+          },
+          {
+            "metric": "subs-renew-30d",
+            "label": "Renew in 30 days"
+          },
+          {
+            "metric": "subs-unused",
+            "label": "Unused"
+          }
+        ]
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "small",
+      "needs": {
+        "figures": [
+          "subs-month"
+        ]
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "A month",
+            "said": "¤110"
+          },
+          {
+            "label": "Renew in 30 days",
+            "said": "4"
+          }
+        ]
+      },
+      "words": [
+        "subs",
+        "renewals",
+        "netflix",
+        "spotify"
+      ],
+      "asked": [
+        {
+          "match": "\\bsubscriptions?\\b",
+          "about": "your subscriptions"
+        }
+      ],
+      "leads": [
+        "subscriptions"
+      ]
+    }
+  ],
+  "declarations": [
+    {
+      "rule": "subscriptions_price",
+      "name": "Keep a subscription's old price when its amount changes",
+      "pack": "subscriptions",
+      "on": {
+        "written": {
+          "register": "recurring",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "amount",
+            "subscription"
+          ]
+        }
+      },
+      "when": "subscription is true",
+      "steps": [
+        {
+          "script": {
+            "id": "subscriptions_price",
+            "as": "pricing"
+          }
+        }
+      ]
+    },
+    {
+      "script": "subscriptions_price",
+      "title": "Keep a subscription's old price",
+      "pack": "subscriptions",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "recurring"
+      ],
+      "writes": [
+        "recurring"
+      ],
+      "source": "/**\n * Subscriptions: keep the price a subscription had before, and the day it went up.\n *\n * STARTED WHEN A REPEATING LINE IS WRITTEN AND ITS AMOUNT, OR WHETHER IT IS A SUBSCRIPTION, CHANGES, and handed the\n * line's id. A line that is not a subscription is left alone.\n *\n * HOW IT KNOWS THE OLD PRICE. A line holds one amount, so the script keeps the last amount it saw in \"Price seen\". The\n * first time it sees a line it only notes the amount. When the amount then differs from what it saw, in the same\n * currency, it writes the old one into \"Price before\", and when the new one is higher it writes today into \"Went up\n * on\", which the Subscriptions page reads for the last ninety days. A price that went down keeps its old price and\n * clears \"Went up on\".\n *\n * IT WRITES ONLY ITS OWN THREE FIELDS, and the automation does not watch them, so it never starts itself again.\n */\n\nconst money = (m) => m && typeof m === 'object' && Number.isSafeInteger(m.amount) && typeof m.currency === 'string';\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  if (!id) return;\n  const line = await ctx.record.get(String(id));\n  if (!line || line.register !== 'recurring') return;\n  const f = line.fields;\n  if (f.subscription !== true || !money(f.amount)) return;\n  const seen = f.price_seen;\n  const name = String(f.what || 'The subscription');\n  if (!money(seen) || seen.currency !== f.amount.currency) {\n    ctx.update('recurring#' + line.seq, { price_seen: f.amount }, line.version);\n    return;\n  }\n  if (seen.amount === f.amount.amount) return;\n  const up = f.amount.amount > seen.amount;\n  ctx.update('recurring#' + line.seq, { price_seen: f.amount, price_was: seen, price_up_on: up ? ctx.today() : null }, line.version);\n  ctx.log(name + (up ? ' went up' : ' went down') + ', and its old price is kept.');\n}\n"
+    },
+    {
+      "metric": "subs-count",
+      "name": "Subscriptions",
+      "pack": "subscriptions",
+      "source": "register.recurring",
+      "where": "state is live, subscription is true",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "subs-month",
+      "name": "Subscriptions a month",
+      "pack": "subscriptions",
+      "source": "register.recurring",
+      "where": "state is live, subscription is true, direction is out",
+      "value": {
+        "sum": {
+          "product": [
+            "amount",
+            {
+              "lookup": "per_month",
+              "by": "every"
+            }
+          ]
+        }
+      },
+      "lookups": {
+        "per_month": {
+          "weekly": 4.333333333333333,
+          "fortnightly": 2.1666666666666665,
+          "twice_monthly": 2,
+          "monthly": 1,
+          "quarterly": 0.3333333333333333,
+          "yearly": 0.08333333333333333
+        }
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "subs-year",
+      "name": "Subscriptions a year",
+      "pack": "subscriptions",
+      "source": "register.recurring",
+      "where": "state is live, subscription is true, direction is out",
+      "value": {
+        "sum": {
+          "product": [
+            "amount",
+            {
+              "lookup": "per_year",
+              "by": "every"
+            }
+          ]
+        }
+      },
+      "lookups": {
+        "per_year": {
+          "weekly": 52,
+          "fortnightly": 26,
+          "twice_monthly": 24,
+          "monthly": 12,
+          "quarterly": 4,
+          "yearly": 1
+        }
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "subs-month-by-category",
+      "name": "Subscriptions a month, by category",
+      "pack": "subscriptions",
+      "source": "register.recurring",
+      "where": "state is live, subscription is true, direction is out",
+      "value": {
+        "sum": {
+          "product": [
+            "amount",
+            {
+              "lookup": "per_month",
+              "by": "every"
+            }
+          ]
+        }
+      },
+      "lookups": {
+        "per_month": {
+          "weekly": 4.333333333333333,
+          "fortnightly": 2.1666666666666665,
+          "twice_monthly": 2,
+          "monthly": 1,
+          "quarterly": 0.3333333333333333,
+          "yearly": 0.08333333333333333
+        }
+      },
+      "group_by": "category",
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "subs-renew-30d",
+      "name": "Subscriptions renewing in 30 days",
+      "pack": "subscriptions",
+      "source": "register.recurring",
+      "where": "state is live, subscription is true, next_due after yesterday, next_due before +31d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "subs-trials",
+      "name": "Free trials ending in 14 days",
+      "pack": "subscriptions",
+      "source": "register.recurring",
+      "where": "state is live, subscription is true, trial_ends after yesterday, trial_ends before +15d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "subs-cancel-soon",
+      "name": "To cancel in 14 days",
+      "pack": "subscriptions",
+      "source": "register.recurring",
+      "where": "state is live, subscription is true, cancel_by after yesterday, cancel_by before +15d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "subs-price-up",
+      "name": "Went up in 90 days",
+      "pack": "subscriptions",
+      "source": "register.recurring",
+      "where": "state is live, subscription is true, price_up_on after -90d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "90d",
+      "compare": "none"
+    },
+    {
+      "metric": "subs-unused",
+      "name": "Hardly used",
+      "pack": "subscriptions",
+      "source": "register.recurring",
+      "where": "state is live, subscription is true, used is hardly or never",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "subs-unused-month",
+      "name": "A month on what you hardly use",
+      "pack": "subscriptions",
+      "source": "register.recurring",
+      "where": "state is live, subscription is true, direction is out, used is hardly or never",
+      "value": {
+        "sum": {
+          "product": [
+            "amount",
+            {
+              "lookup": "per_month",
+              "by": "every"
+            }
+          ]
+        }
+      },
+      "lookups": {
+        "per_month": {
+          "weekly": 4.333333333333333,
+          "fortnightly": 2.1666666666666665,
+          "twice_monthly": 2,
+          "monthly": 1,
+          "quarterly": 0.3333333333333333,
+          "yearly": 0.08333333333333333
+        }
+      },
+      "format": "money",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "subscriptions",
+      "title": "Subscriptions",
+      "pack": "subscriptions",
+      "nav": {
+        "section": "Money",
+        "order": 45
+      },
+      "icon": "refresh",
+      "requires": [
+        "register.recurring"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "One subscription: {{subs-month}} a month, {{subs-year}} a year.",
+          "when": {
+            "metric": "subs-count",
+            "is": 1
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{subs-count}} subscriptions: {{subs-month}} a month, {{subs-year}} a year.",
+          "when": {
+            "metric": "subs-count",
+            "gt": 1
+          }
+        },
+        {
+          "kind": "note",
+          "heading": "Nothing marked yet",
+          "icon": "refresh",
+          "span": 12,
+          "body": "Mark the repeating payments below that are subscriptions, or add one.",
+          "when": {
+            "metric": "subs-count",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Repeating payments",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.recurring",
+          "where": "state is live, direction is out, subscription is not true",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Payment",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "every",
+              "label": "How often",
+              "width": "14ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "amount",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "row_actions": [
+            {
+              "verb": "row.update",
+              "label": "Mark as a subscription",
+              "args": {
+                "field": "subscription"
+              }
+            }
+          ],
+          "when": {
+            "metric": "subs-count",
+            "lt": 1
+          },
+          "empty": "No repeating payments yet."
+        },
+        {
+          "kind": "stat",
+          "heading": "What they cost",
+          "icon": "refresh",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "subs-month",
+              "label": "A month"
+            },
+            {
+              "metric": "subs-year",
+              "label": "A year"
+            },
+            {
+              "metric": "subs-renew-30d",
+              "label": "Renew in 30 days"
+            },
+            {
+              "metric": "subs-trials",
+              "label": "Trials ending"
+            }
+          ],
+          "when": {
+            "metric": "subs-count",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Free trials ending",
+          "icon": "circle-alert",
+          "span": 12,
+          "source": "register.recurring",
+          "where": "state is live, subscription is true, trial_ends after yesterday, trial_ends before +15d",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Subscription",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "trial_ends",
+              "label": "Trial ends",
+              "width": "13ch"
+            },
+            {
+              "field": "amount",
+              "label": "Then",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "cancel_how",
+              "label": "How to cancel",
+              "width": "minmax(14ch,1fr)"
+            }
+          ],
+          "order": [
+            {
+              "field": "trial_ends",
+              "dir": "asc"
+            }
+          ],
+          "limit": 10,
+          "when": {
+            "metric": "subs-trials",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "To cancel soon",
+          "icon": "calendar-clock",
+          "span": 12,
+          "source": "register.recurring",
+          "where": "state is live, subscription is true, cancel_by after yesterday, cancel_by before +15d",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Subscription",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "cancel_by",
+              "label": "Cancel by",
+              "width": "13ch"
+            },
+            {
+              "field": "cancel_how",
+              "label": "How to cancel",
+              "width": "minmax(14ch,1fr)"
+            }
+          ],
+          "order": [
+            {
+              "field": "cancel_by",
+              "dir": "asc"
+            }
+          ],
+          "limit": 10,
+          "when": {
+            "metric": "subs-cancel-soon",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Went up",
+          "icon": "trending-up",
+          "span": 12,
+          "source": "register.recurring",
+          "where": "state is live, subscription is true, price_up_on after -90d",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Subscription",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "price_was",
+              "label": "Was",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "amount",
+              "label": "Now",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "price_up_on",
+              "label": "Since",
+              "width": "13ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "price_up_on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 10,
+          "when": {
+            "metric": "subs-price-up",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "timeline",
+          "heading": "Renewing in the next 30 days",
+          "icon": "calendar-clock",
+          "span": 12,
+          "source": "register.recurring",
+          "where": "state is live, subscription is true, next_due after yesterday, next_due before +31d",
+          "columns": [
+            {
+              "field": "next_due"
+            },
+            {
+              "field": "what"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "order": [
+            {
+              "field": "next_due",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "when": {
+            "metric": "subs-count",
+            "gt": 0
+          },
+          "empty": "Nothing renews in the next 30 days."
+        },
+        {
+          "kind": "note",
+          "heading": "Hardly used",
+          "icon": "circle-alert",
+          "span": 12,
+          "body": "You hardly use {{subs-unused}} of them, and they cost {{subs-unused-month}} a month.",
+          "when": {
+            "metric": "subs-unused",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "split",
+          "heading": "A month, by category",
+          "icon": "chart-pie",
+          "span": 12,
+          "source": "metric.subs-month-by-category",
+          "limit": 8,
+          "unset": "No category",
+          "when": {
+            "metric": "subs-count",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Every subscription",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.recurring",
+          "where": "subscription is true, state is not ended",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Subscription",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "every",
+              "label": "How often",
+              "width": "14ch"
+            },
+            {
+              "field": "next_due",
+              "label": "Next",
+              "width": "13ch"
+            },
+            {
+              "field": "used",
+              "label": "Used",
+              "width": "12ch"
+            },
+            {
+              "field": "account",
+              "label": "From",
+              "width": "minmax(12ch,16ch)"
+            }
+          ],
+          "order": [
+            {
+              "field": "next_due",
+              "dir": "asc"
+            }
+          ],
+          "limit": 100,
+          "empty": "No subscriptions yet."
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a subscription",
+          "icon": "plus",
+          "span": 12,
+          "register": "recurring",
+          "where": "subscription is true"
+        },
+        {
+          "kind": "table",
+          "heading": "Other repeating payments",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.recurring",
+          "where": "state is live, direction is out, subscription is not true",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Payment",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "every",
+              "label": "How often",
+              "width": "14ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "amount",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "row_actions": [
+            {
+              "verb": "row.update",
+              "label": "Mark as a subscription",
+              "args": {
+                "field": "subscription"
+              }
+            }
+          ],
+          "when": {
+            "metric": "subs-count",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "section",
+          "heading": "Cancelled",
+          "icon": "archive",
+          "span": 12,
+          "fold": true,
+          "when": {
+            "metric": "subs-count",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Ended",
+          "icon": "archive",
+          "span": 12,
+          "source": "register.recurring",
+          "where": "subscription is true, state is ended",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Subscription",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Was",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "ends",
+              "label": "Ended",
+              "width": "13ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "ends",
+              "dir": "desc"
+            }
+          ],
+          "limit": 50,
+          "empty": "Nothing cancelled yet."
+        }
+      ]
+    }
+  ]
+}

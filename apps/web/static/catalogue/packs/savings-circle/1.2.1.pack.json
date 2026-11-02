@@ -1,0 +1,440 @@
+{
+  "pack": "savings-circle",
+  "version": "1.2.1",
+  "icon": "piggy-bank",
+  "title": "Savings circle",
+  "summary": "A savings circle (a gam'eya, a tontine, a committee): everyone puts the same part in each month and one person takes the pot each month. Say the people, the part, your turn and the first month, and the months and your payout are written as a plan's parts, so Cash ahead and Coming up count them.",
+  "changes": "The Savings circle widget on Today says No circle yet when you are in none, rather than A month £0.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.29.0 <4.0.0"
+    }
+  },
+  "extends": {
+    "register.plans": {
+      "fields": [
+        {
+          "id": "circle_members",
+          "label": "People in the circle",
+          "type": "int",
+          "min": 2,
+          "max": 60
+        },
+        {
+          "id": "circle_part",
+          "label": "Each month's part",
+          "type": "money"
+        },
+        {
+          "id": "circle_turn",
+          "label": "Your turn, month",
+          "type": "int",
+          "min": 1,
+          "max": 60
+        },
+        {
+          "id": "circle_first",
+          "label": "First month",
+          "type": "day"
+        },
+        {
+          "id": "circle_payout",
+          "label": "Your payout",
+          "type": "money"
+        },
+        {
+          "id": "circle_payout_on",
+          "label": "Your payout on",
+          "type": "day"
+        },
+        {
+          "id": "circle_said",
+          "label": "Circle",
+          "type": "text"
+        }
+      ]
+    }
+  },
+  "widgets": [
+    {
+      "id": "savings-circle",
+      "title": "Savings circle",
+      "says": "What you pay into your circles a month, and the payouts to come.",
+      "group": "money",
+      "for": "personal",
+      "icon": "coins",
+      "block": {
+        "kind": "stat",
+        "heading": "Savings circle",
+        "icon": "coins",
+        "empty": "No circle yet.",
+        "cells": [
+          {
+            "metric": "circles-month",
+            "label": "A month"
+          },
+          {
+            "metric": "circles-payouts",
+            "label": "Payouts to come"
+          }
+        ]
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "small",
+      "needs": {
+        "figures": [
+          "circles-month"
+        ]
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "A month",
+            "said": "¤250"
+          }
+        ]
+      },
+      "words": [
+        "gameya",
+        "jameya",
+        "circle",
+        "rosca"
+      ],
+      "leads": [
+        "savings-circles"
+      ]
+    }
+  ],
+  "declarations": [
+    {
+      "rule": "circle_make",
+      "name": "Write a savings circle's months and your payout",
+      "pack": "savings-circle",
+      "on": {
+        "written": {
+          "register": "plans",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "circle_members",
+            "circle_part",
+            "circle_turn",
+            "circle_first"
+          ]
+        }
+      },
+      "when": "circle_members is set",
+      "steps": [
+        {
+          "script": {
+            "id": "circle_make",
+            "as": "made"
+          }
+        }
+      ]
+    },
+    {
+      "script": "circle_make",
+      "title": "Write a savings circle's months",
+      "pack": "savings-circle",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "plans",
+        "installments"
+      ],
+      "writes": [
+        "plans",
+        "installments"
+      ],
+      "source": "/**\n * Savings circle: a group that each puts the same part in every month, and each month one of them takes the whole\n * pot, until everyone has had a turn (a gam'eya, a tontine, a ROSCA). This writes the circle's months on Instalments.\n *\n * WHAT A PERSON FILLS ON THE PLAN. \"People in the circle\", \"Each month's part\", \"Your turn\" (the month you take the\n * pot, counted from one) and \"First month\". Nothing is written until all four are there and the turn is one of the\n * months.\n *\n * WHAT IT WRITES. One part a month for as many months as there are people, money out, open, linked to this plan and\n * from its account when it has one; and on your month the payout, money in, the part times the people. So Cash ahead\n * walks the months out and the pot coming in, and Coming up says each one on its day. The plan then says what was made,\n * the payout and its day.\n *\n * IT NEVER ADDS TO A PLAN THAT HAS PARTS, so saving the plan twice does not make the circle twice. At most 60 months.\n *\n * A CIRCLE ALREADY UNDER WAY (2.0.0). A first month before today is a circle he joined before he wrote it down, so the\n * months already gone are written paid, and the payout too when his turn has been: written open, each one read as late\n * on Today and the Calendar the moment the circle was saved. The plan says so, so a month he did not pay is one he\n * changes on Instalments. And its days are said as a person says them, \"1 Oct\", never `2026-10-01`.\n */\n\nconst isDay = (v) => typeof v === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(v);\nconst money = (m) => m && typeof m === 'object' && Number.isSafeInteger(m.amount) && typeof m.currency === 'string' && m.amount > 0;\n\nfunction addMonths(day, k) {\n  const y = Number(day.slice(0, 4));\n  const m = Number(day.slice(5, 7)) - 1;\n  const d = Number(day.slice(8, 10));\n  const at = m + k;\n  const y2 = y + Math.floor(at / 12);\n  const m2 = ((at % 12) + 12) % 12;\n  const last = new Date(Date.UTC(y2, m2 + 1, 0)).getUTCDate();\n  return String(y2).padStart(4, '0') + '-' + String(m2 + 1).padStart(2, '0') + '-' + String(Math.min(d, last)).padStart(2, '0');\n}\n\n/** The circle's months: `{ parts: [{ due, amount }], payout: { due, amount } }`, or `{ why }` when it cannot be made. */\nexport function monthsOf(f) {\n  const n = f.circle_members;\n  if (!Number.isInteger(n) || n < 2 || n > 60) return { why: 'Say how many people are in the circle, from 2 to 60.' };\n  if (!money(f.circle_part)) return { why: \"Say each month's part.\" };\n  if (!Number.isInteger(f.circle_turn) || f.circle_turn < 1 || f.circle_turn > n) return { why: 'Your turn is a month from 1 to ' + n + '.' };\n  if (!isDay(f.circle_first)) return { why: 'Say the first month.' };\n  const parts = [];\n  for (let k = 0; k < n; k++) parts.push({ due: addMonths(f.circle_first, k), amount: f.circle_part.amount });\n  return { parts, payout: { due: addMonths(f.circle_first, f.circle_turn - 1), amount: f.circle_part.amount * n }, currency: f.circle_part.currency };\n}\n\nconst MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];\n\n/** A day as a person says it: \"1 Oct\", with the year when it is not `year`'s. */\nexport function dayWords(day, year) {\n  const said = Number(day.slice(8, 10)) + ' ' + MONTHS[Number(day.slice(5, 7)) - 1];\n  return day.slice(0, 4) === year ? said : said + ' ' + day.slice(0, 4);\n}\n\n/** What the plan says once its months are made: how many, from when, the payout's day, and what was taken as paid. */\nexport function madeWords(n, first, payout, today, paid) {\n  const year = today.slice(0, 4);\n  const made = 'Made ' + n + ' months from ' + dayWords(first, year) + ', and your payout on ' + dayWords(payout, year) + '.';\n  if (paid === 0) return made;\n  return made + ' ' + (paid === 1 ? 'The month before today is' : 'The ' + paid + ' months before today are') + ' marked paid; change any you did not pay on Instalments.';\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  if (!id) return;\n  const plan = await ctx.record.get(String(id));\n  if (!plan || plan.register !== 'plans') return;\n  const f = plan.fields;\n  const made = monthsOf(f);\n  const say = (said, more) => ctx.update('plans#' + plan.seq, { circle_said: said, ...(more || {}) }, plan.version);\n  if (made.why) {\n    if (f.circle_said !== made.why) say(made.why);\n    return;\n  }\n  const named = await ctx.record.list('installments', { all: [{ field: 'plan', is: f.name }] });\n  const linked = await ctx.record.list('installments', { all: [{ field: 'plan_row', is: plan.id }] });\n  if (named.length + linked.length > 0) {\n    const why = 'This circle already has its months, so none were made. Remove them on Instalments to make them again.';\n    if (f.circle_said !== why) say(why);\n    return;\n  }\n  const account = typeof f.account === 'string' && f.account !== '' ? { account: f.account } : {};\n  const n = made.parts.length;\n  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);\n  const gone = (day) => day < today;\n  made.parts.forEach((p, i) => {\n    ctx.write('installments', {\n      what: f.name + ', month ' + (i + 1) + ' of ' + n,\n      plan: f.name,\n      plan_row: plan.id,\n      number: i + 1,\n      parts: n,\n      direction: 'out',\n      amount: { amount: p.amount, currency: made.currency },\n      due: p.due,\n      state: gone(p.due) ? 'paid' : 'open',\n      ...account,\n    });\n  });\n  ctx.write('installments', {\n    what: f.name + ', your payout',\n    plan: f.name,\n    plan_row: plan.id,\n    direction: 'in',\n    amount: { amount: made.payout.amount, currency: made.currency },\n    due: made.payout.due,\n    state: gone(made.payout.due) ? 'paid' : 'open',\n    ...account,\n  });\n  say(madeWords(n, f.circle_first, made.payout.due, today, made.parts.filter((p) => gone(p.due)).length), {\n    circle_payout: { amount: made.payout.amount, currency: made.currency },\n    circle_payout_on: made.payout.due,\n  });\n}\n"
+    },
+    {
+      "metric": "circles-count",
+      "name": "Savings circles",
+      "pack": "savings-circle",
+      "source": "register.plans",
+      "where": "circle_members is set, state is open",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "circles-month",
+      "name": "Into circles each month",
+      "pack": "savings-circle",
+      "source": "register.plans",
+      "where": "circle_members is set, state is open",
+      "value": {
+        "sum": "circle_part"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "circles-payouts",
+      "name": "Payouts to come",
+      "pack": "savings-circle",
+      "source": "register.plans",
+      "where": "circle_members is set, state is open, circle_payout_on after yesterday",
+      "value": {
+        "sum": "circle_payout"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "circles-payouts-count",
+      "name": "Payouts still to come",
+      "pack": "savings-circle",
+      "source": "register.plans",
+      "where": "circle_members is set, state is open, circle_payout_on after yesterday",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "savings-circles",
+      "title": "Savings circles",
+      "pack": "savings-circle",
+      "nav": {
+        "section": "Money",
+        "order": 36
+      },
+      "icon": "piggy-bank",
+      "requires": [
+        "register.plans",
+        "register.installments"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "One circle: {{circles-month}} goes in each month, and {{circles-payouts}} comes back to you.",
+          "when": {
+            "all": [
+              {
+                "metric": "circles-count",
+                "is": 1
+              },
+              {
+                "metric": "circles-payouts-count",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "One circle: {{circles-month}} goes in each month, and your payout has come.",
+          "when": {
+            "all": [
+              {
+                "metric": "circles-count",
+                "is": 1
+              },
+              {
+                "metric": "circles-payouts-count",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{circles-count}} circles: {{circles-month}} goes in each month, and {{circles-payouts}} comes back to you.",
+          "when": {
+            "all": [
+              {
+                "metric": "circles-count",
+                "gt": 1
+              },
+              {
+                "metric": "circles-payouts-count",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{circles-count}} circles: {{circles-month}} goes in each month, and every payout has come.",
+          "when": {
+            "all": [
+              {
+                "metric": "circles-count",
+                "gt": 1
+              },
+              {
+                "metric": "circles-payouts-count",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "heading": "No circle yet",
+          "icon": "piggy-bank",
+          "span": 12,
+          "body": "Start one below: give it a name, the people in it, each month's part, your turn and the first month.",
+          "when": {
+            "metric": "circles-count",
+            "lt": 1
+          }
+        },
+        {
+          "kind": "stat",
+          "heading": "Your circles",
+          "icon": "piggy-bank",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "circles-month",
+              "label": "In each month"
+            },
+            {
+              "metric": "circles-payouts",
+              "label": "Payouts to come"
+            },
+            {
+              "metric": "circles-payouts-count",
+              "label": "Turns to come"
+            }
+          ],
+          "when": {
+            "metric": "circles-count",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Every circle",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.plans",
+          "where": "circle_members is set",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Circle",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "circle_members",
+              "label": "People",
+              "width": "8ch",
+              "align": "end"
+            },
+            {
+              "field": "circle_part",
+              "label": "A month",
+              "width": "13ch",
+              "align": "end"
+            },
+            {
+              "field": "circle_turn",
+              "label": "Your turn",
+              "width": "10ch",
+              "align": "end"
+            },
+            {
+              "field": "circle_payout",
+              "label": "Payout",
+              "width": "14ch",
+              "align": "end"
+            },
+            {
+              "field": "circle_payout_on",
+              "label": "On",
+              "width": "13ch"
+            },
+            {
+              "field": "state",
+              "label": "Status",
+              "width": "10ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "circle_payout_on",
+              "dir": "asc"
+            }
+          ],
+          "limit": 50,
+          "empty": "No circles yet."
+        },
+        {
+          "kind": "table",
+          "heading": "What happened",
+          "icon": "circle-alert",
+          "span": 12,
+          "source": "register.plans",
+          "where": "circle_members is set, circle_payout is empty, circle_said is set",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Circle",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "circle_said",
+              "label": "What it says",
+              "width": "minmax(24ch,2fr)"
+            }
+          ],
+          "limit": 10,
+          "empty": "Nothing to fix."
+        },
+        {
+          "kind": "capture",
+          "heading": "Start a circle",
+          "icon": "plus",
+          "span": 12,
+          "register": "plans"
+        }
+      ]
+    }
+  ]
+}

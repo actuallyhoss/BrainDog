@@ -409,6 +409,11 @@ export type LiveBlock = BlockResult & {
    * record older than the look overlay, where the page works one out the same way.
    */
   key?: string;
+  /**
+   * A WIDGET ON TODAY THAT SAYS ITS OWN `empty:` LINE in its frame, holding nothing (`home/widget-empty.ts`): the page's
+   * quiet rule leaves it drawn (`PageBody.svelte`), and the drawer says the line as any empty block does.
+   */
+  saysEmpty?: true | undefined;
   /** Who changed each row last, aligned with the rows, as the record answered it (`$lib/page/byline.ts` reads it). */
   changes?: unknown[];
   /**
@@ -1021,6 +1026,8 @@ export function tileOf(
     /* AND A FIGURE OVER A LIST THAT HOLDS NOTHING SAYS THAT TOO, only where the record counted it (`held`): an empty Work
        drew "Done in 7 days 0" under eight tiles each saying the list held nothing. */
     ...(r.held === 0 ? { nothingHeld: true } : {}),
+    /* AND A FIGURE THAT ADDED UP NO ROW SAYS SO, so a widget on Today over nothing but such figures says its `empty:`. */
+    ...(r.rows === 0 ? { readNone: true } : {}),
     /* AND WHAT BACKS IT, so two figures of one entry are said once and two of one amount are not. */
     ...backsOf(r),
   };

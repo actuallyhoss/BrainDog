@@ -1,10 +1,10 @@
 {
   "pack": "subscriptions",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "icon": "refresh",
   "title": "Subscriptions",
   "summary": "Everything you pay for on a cadence, in one place: what it costs a month and a year, what renews in the next 30 days, free trials about to end, the day to cancel by, a price that went up, and what you hardly use. Built on Repeating, so Cash ahead and Coming up already count them.",
-  "changes": "A month, by category says the ones with no category as No category, so its parts add up to the whole. With nothing marked yet, its page lists your repeating payments, each with Mark as a subscription, and the ones not marked stay under Other repeating payments once one is. It no longer points to Money watch.",
+  "changes": "The Subscriptions widget on Today says Nothing tracked yet when no subscription is marked, rather than A month £0.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -92,6 +92,7 @@
         "kind": "stat",
         "heading": "Subscriptions",
         "icon": "repeat",
+        "empty": "Nothing tracked yet.",
         "cells": [
           {
             "metric": "subs-month",

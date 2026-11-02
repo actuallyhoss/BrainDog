@@ -1,0 +1,873 @@
+{
+  "format": 1,
+  "made_at": "2026-11-02T15:04:40.855Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "No instalments for Family circle yet.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "plan-parts:Family circle"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "says": [
+            {
+              "body": "{{plan-parts-paid:Family circle}} of {{plan-parts:Family circle}} parts paid, the last due on {{plan-last-due:Family circle}}. [Property](/p/properties) has what it is worth and your equity.",
+              "when": {
+                "empty": false,
+                "metric": "property-value-of:Family circle"
+              }
+            },
+            {
+              "body": "{{plan-parts-paid:Family circle}} of {{plan-parts:Family circle}} parts paid, the last due on {{plan-last-due:Family circle}}."
+            }
+          ],
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Family circle"
+              },
+              {
+                "gte": 1,
+                "metric": "plan-parts-open:Family circle"
+              }
+            ]
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "says": [
+            {
+              "body": "{{plan-parts-paid:Family circle}} of {{plan-parts:Family circle}} parts paid, and nothing is left. The last was due on {{plan-last-due:Family circle}}. [Property](/p/properties) has what it is worth and your equity.",
+              "when": {
+                "empty": false,
+                "metric": "property-value-of:Family circle"
+              }
+            },
+            {
+              "body": "{{plan-parts-paid:Family circle}} of {{plan-parts:Family circle}} parts paid, and nothing is left. The last was due on {{plan-last-due:Family circle}}."
+            }
+          ],
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Family circle"
+              },
+              {
+                "lt": 1,
+                "metric": "plan-parts-open:Family circle"
+              }
+            ]
+          },
+          "key": "k08lez9h-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid",
+              "metric": "plan-paid:Family circle"
+            },
+            {
+              "label": "Left",
+              "metric": "plan-left:Family circle"
+            },
+            {
+              "label": "Late",
+              "metric": "plan-late:Family circle"
+            }
+          ],
+          "heading": "Where it stands",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 12,
+          "tone": "bad",
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Family circle"
+              },
+              {
+                "gte": 1,
+                "metric": "plan-parts-open:Family circle"
+              },
+              {
+                "gt": 0,
+                "metric": "plan-late:Family circle"
+              }
+            ]
+          },
+          "key": "k0jacd2u",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid",
+              "metric": "plan-paid:Family circle"
+            },
+            {
+              "label": "Left",
+              "metric": "plan-left:Family circle"
+            }
+          ],
+          "heading": "Where it stands",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 12,
+          "tone": "bad",
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Family circle"
+              },
+              {
+                "gte": 1,
+                "metric": "plan-parts-open:Family circle"
+              },
+              {
+                "lte": 0,
+                "metric": "plan-late:Family circle"
+              }
+            ]
+          },
+          "key": "k0jacd2u-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid",
+              "metric": "plan-paid:Family circle"
+            }
+          ],
+          "heading": "Where it stands",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 12,
+          "tone": "bad",
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Family circle"
+              },
+              {
+                "lt": 1,
+                "metric": "plan-parts-open:Family circle"
+              }
+            ]
+          },
+          "key": "k0jacd2u-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid",
+              "metric": "plan-parts-paid-by-plan:Family circle"
+            },
+            {
+              "label": "Parts",
+              "metric": "plan-parts-by-plan:Family circle"
+            },
+            {
+              "label": "Next due",
+              "metric": "plan-next-due-by-plan:Family circle"
+            },
+            {
+              "label": "Left",
+              "metric": "plan-left-by-plan:Family circle"
+            },
+            {
+              "label": "Left after",
+              "metric": "plan-after-next-by-plan:Family circle"
+            }
+          ],
+          "empty": "No parts of Family circle yet.",
+          "heading": "Parts paid",
+          "icon": "credit-card",
+          "kind": "progress",
+          "span": 12,
+          "when": {
+            "gte": 1,
+            "metric": "plan-parts:Family circle"
+          },
+          "key": "k0px7fce",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "amount"
+            },
+            {
+              "field": "due"
+            },
+            {
+              "field": "note"
+            }
+          ],
+          "empty": "Nothing left to pay on Family circle.",
+          "heading": "Upcoming",
+          "icon": "calendar-clock",
+          "kind": "todo",
+          "limit": 6,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "where": "plan is Family circle, state is open",
+          "key": "k0foinoo",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            },
+            {
+              "field": "settled",
+              "label": "Paid on",
+              "width": "13ch"
+            },
+            {
+              "field": "paid_by",
+              "label": "Paid by",
+              "width": "minmax(10ch,18ch)"
+            }
+          ],
+          "empty": "Nothing paid on Family circle yet.",
+          "heading": "Paid",
+          "icon": "receipt",
+          "kind": "table",
+          "limit": 120,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "where": "plan is Family circle, state is paid",
+          "key": "k0122i0w",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "fold": true,
+          "heading": "Every part still to come",
+          "icon": "calendar-clock",
+          "kind": "section",
+          "span": 12,
+          "key": "k0zxpvfj",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "left_after",
+              "label": "Left after",
+              "width": "15ch"
+            }
+          ],
+          "empty": "Nothing left to pay on Family circle.",
+          "kind": "table",
+          "limit": 120,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "where": "plan is Family circle, state is open",
+          "key": "k13g77aq",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            }
+          ],
+          "heading": "Cancelled",
+          "icon": "calendar-x",
+          "kind": "table",
+          "limit": 120,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "when": {
+            "gte": 1,
+            "metric": "plan-parts-cancelled:Family circle"
+          },
+          "where": "plan is Family circle, state is cancelled",
+          "key": "k0y2324n",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "register": "plans"
+      },
+      "icon": "calendar",
+      "nav": {
+        "order": 30,
+        "section": "Money"
+      },
+      "pack": "money-core",
+      "page": "family-circle",
+      "requires": [
+        "register.plans",
+        "register.installments"
+      ],
+      "title": "Family circle",
+      "read_at": "2026-11-02T15:04:40.855Z",
+      "zone": "UTC",
+      "param": {
+        "register": "plans",
+        "seq": 1,
+        "title": "Family circle"
+      },
+      "look": {
+        "look": "money-plan",
+        "basis": "r0fvuo47",
+        "by": "rule",
+        "hide": [
+          "k0122i0w",
+          "k0zxpvfj",
+          "k13g77aq"
+        ]
+      }
+    },
+    {
+      "blocks": [
+        {
+          "body": "One circle: {{circles-month}} goes in each month, and {{circles-payouts}} comes back to you.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "is": 1,
+                "metric": "circles-count"
+              },
+              {
+                "gt": 0,
+                "metric": "circles-payouts-count"
+              }
+            ]
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "One circle: {{circles-month}} goes in each month, and your payout has come.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "is": 1,
+                "metric": "circles-count"
+              },
+              {
+                "lt": 1,
+                "metric": "circles-payouts-count"
+              }
+            ]
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "circles-month": {
+              "amount": 50000,
+              "currency": "USD"
+            }
+          },
+          "read_as": {
+            "circles-month": "figure"
+          },
+          "figures": {
+            "circles-month": {
+              "name": "Into circles each month",
+              "source": "register.plans",
+              "where": "circle_members is set, state is open",
+              "value": {
+                "sum": "circle_part"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "body": "{{circles-count}} circles: {{circles-month}} goes in each month, and {{circles-payouts}} comes back to you.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 1,
+                "metric": "circles-count"
+              },
+              {
+                "gt": 0,
+                "metric": "circles-payouts-count"
+              }
+            ]
+          },
+          "key": "k08lez9h-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "{{circles-count}} circles: {{circles-month}} goes in each month, and every payout has come.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 1,
+                "metric": "circles-count"
+              },
+              {
+                "lt": 1,
+                "metric": "circles-payouts-count"
+              }
+            ]
+          },
+          "key": "k08lez9h-4",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Start one below: give it a name, the people in it, each month's part, your turn and the first month.",
+          "heading": "No circle yet",
+          "icon": "piggy-bank",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "circles-count"
+          },
+          "key": "k03qmtve",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "In each month",
+              "metric": "circles-month"
+            },
+            {
+              "label": "Payouts to come",
+              "metric": "circles-payouts"
+            },
+            {
+              "label": "Turns to come",
+              "metric": "circles-payouts-count"
+            }
+          ],
+          "heading": "Your circles",
+          "icon": "piggy-bank",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "circles-count"
+          },
+          "key": "k0urhrdx",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "In each month",
+              "metric": "circles-month",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 50000,
+                "unit": "USD",
+                "rows": 1,
+                "refusals": [],
+                "backs": [
+                  "plans#1"
+                ],
+                "held": 1,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Payouts to come",
+              "metric": "circles-payouts",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 1,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Turns to come",
+              "metric": "circles-payouts-count",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 1,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "circles-month": {
+              "name": "Into circles each month",
+              "source": "register.plans",
+              "where": "circle_members is set, state is open",
+              "value": {
+                "sum": "circle_part"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "circles-payouts": {
+              "name": "Payouts to come",
+              "source": "register.plans",
+              "where": "circle_members is set, state is open, circle_payout_on after yesterday",
+              "value": {
+                "sum": "circle_payout"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "circles-payouts-count": {
+              "name": "Payouts still to come",
+              "source": "register.plans",
+              "where": "circle_members is set, state is open, circle_payout_on after yesterday",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Circle",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "circle_members",
+              "label": "People",
+              "width": "8ch"
+            },
+            {
+              "align": "end",
+              "field": "circle_part",
+              "label": "A month",
+              "width": "13ch"
+            },
+            {
+              "align": "end",
+              "field": "circle_turn",
+              "label": "Your turn",
+              "width": "10ch"
+            },
+            {
+              "align": "end",
+              "field": "circle_payout",
+              "label": "Payout",
+              "width": "14ch"
+            },
+            {
+              "field": "circle_payout_on",
+              "label": "On",
+              "width": "13ch"
+            },
+            {
+              "field": "state",
+              "label": "Status",
+              "width": "10ch"
+            }
+          ],
+          "empty": "No circles yet.",
+          "heading": "Every circle",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "circle_payout_on"
+            }
+          ],
+          "source": "register.plans",
+          "span": 12,
+          "where": "circle_members is set",
+          "key": "k1ke4ml5",
+          "rows": [
+            {
+              "id": "01M6ECN1MQF4V8PFB6AH1NPAYX",
+              "register": "plans",
+              "seq": 1,
+              "fields": {
+                "name": "Family circle",
+                "state": "open",
+                "circle_members": 10,
+                "circle_part": {
+                  "amount": 50000,
+                  "currency": "USD"
+                },
+                "circle_turn": 4,
+                "circle_first": "2026-09-03"
+              },
+              "state": "open",
+              "version": 1,
+              "created_at": "2026-11-02T15:04:40.855Z",
+              "updated_at": "2026-11-02T15:04:40.855Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Circle",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "circle_said",
+              "label": "What it says",
+              "width": "minmax(24ch,2fr)"
+            }
+          ],
+          "empty": "Nothing to fix.",
+          "heading": "What happened",
+          "icon": "circle-alert",
+          "kind": "table",
+          "limit": 10,
+          "source": "register.plans",
+          "span": 12,
+          "where": "circle_members is set, circle_payout is empty, circle_said is set",
+          "key": "k00he8s9",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Start a circle",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "plans",
+          "span": 12,
+          "key": "k04d5fd2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        }
+      ],
+      "icon": "piggy-bank",
+      "nav": {
+        "order": 36,
+        "section": "Money"
+      },
+      "pack": "savings-circle",
+      "page": "savings-circles",
+      "requires": [
+        "register.plans",
+        "register.installments"
+      ],
+      "title": "Savings circles",
+      "read_at": "2026-11-02T15:04:40.855Z",
+      "zone": "UTC",
+      "look": {
+        "look": "savings-circles",
+        "basis": "r1cis6kw",
+        "by": "rule",
+        "hide": [
+          "k00he8s9"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

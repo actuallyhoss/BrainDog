@@ -1443,6 +1443,11 @@ export type Metric = {
    * it, so a page being read does not draw it, and a row of nothing else holds nothing (`lib/page/home.ts`).
    */
   nothingHeld?: boolean | undefined;
+  /**
+   * A figure that added up no row at all (`rows: 0`): its nought or its count of none is what any figure says over
+   * nothing. A widget on Today whose every figure is one says its own `empty:` line in its frame instead (`widget-empty.ts`).
+   */
+  readNone?: boolean | undefined;
 };
 
 /* ── the third state of a figure ──────────────────────────────────────────

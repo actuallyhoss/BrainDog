@@ -1,10 +1,10 @@
 {
   "pack": "splits",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "icon": "split",
   "title": "Splits",
   "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their splits close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
-  "changes": "Its description is in plainer words. Nothing it does has changed.",
+  "changes": "The Splits widget on Today says Nothing split yet when nothing is shared, rather than leaving the board.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -45,6 +45,7 @@
         "kind": "stat",
         "heading": "Splits",
         "icon": "split",
+        "empty": "Nothing split yet.",
         "cells": [
           {
             "metric": "splits-to-me",

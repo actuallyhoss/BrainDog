@@ -216,7 +216,12 @@
    * because the panel reads its actions only once it is drawn: with some it stays over blocks that all went, and with
    * none it goes with them.
    */
-  const quiet = $derived(judgedWith(blocks, held, (bs) => emptyHidden(bs, mode === 'page')).map((b) => (bareHeading(b) ? { ...b, drawn: false } : b)));
+  /* A WIDGET THAT SAYS ITS OWN EMPTY LINE (`saysEmpty`, `home/widget-empty.ts`) holds nothing on purpose, and stays drawn. */
+  const quiet = $derived(
+    judgedWith(blocks, held, (bs) => emptyHidden(bs, mode === 'page')).map((b, i) =>
+      bareHeading(b) ? { ...b, drawn: false } : !b.drawn && blocks[i]?.drawn && blocks[i]?.saysEmpty === true ? blocks[i]! : b,
+    ),
+  );
   const drawable = $derived(mode === 'preview' || arranging ? arranged(blocks) : quiet);
   /* AND THE LINE THE HEADER HOLDS IS NOT A TILE AS WELL (`captured`): not drawn here, and still at its place, so every
      write finds its block. Never while authoring, where it is a block like any other. */
