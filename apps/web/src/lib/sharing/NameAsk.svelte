@@ -14,6 +14,7 @@
   import { apiBase } from '$lib/at.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { wrote } from '$lib/record/settings-write.ts';
+  import { dismiss } from '$lib/motion/index.ts';
   import Banner from '$lib/ui/Banner.svelte';
   import Button from '$lib/ui/Button.svelte';
   import { nameAskDue, nameAskKey } from './name-ask.ts';
@@ -25,11 +26,18 @@
   let typed = $state('');
   let busy = $state(false);
   let fault = $state('');
+  let field = $state<HTMLInputElement | null>(null);
   const shown = $derived(!done && nameAskDue(shell, apiBase()));
 
   async function save(e: SubmitEvent): Promise<void> {
     e.preventDefault();
-    if (busy || typed.trim() === '') return;
+    if (busy) return;
+    /* A PRIMARY IS NEVER GREYED FOR A MISSING FIELD (Look B): pressed empty, it says what is missing and goes to it. */
+    if (typed.trim() === '') {
+      fault = 'Type the name you go by first.';
+      field?.focus();
+      return;
+    }
     busy = true;
     fault = '';
     const out = wrote(await createClient({ base: apiBase() }).renamePerson(typed.trim()));
@@ -57,6 +65,9 @@
 </script>
 
 {#if shown}
+  <!-- ANSWERED OR SKIPPED, IT LETS GO AND THE PAGE UNDER IT RISES INTO ITS ROOM (motion pass 2 Nov), rather than the page
+       jumping up by the banner's height. `global`, because the frame's own if takes it away in the same moment. -->
+  <div out:dismiss|global>
   <!-- THE WORDS ARE THE BANNER'S LINE AND THE FORM ITS ACTIONS, since the line is a paragraph and a form may not sit in one. -->
   <Banner tone="note" icon="user-check">
     <label for="name-ask-field">What should people here call you?</label>
@@ -64,15 +75,16 @@
     {#snippet actions()}
       <form class="ask" onsubmit={save}>
         <span class="field ask-field">
-          <input class="field-input" id="name-ask-field" type="text" autocomplete="name" maxlength="80" bind:value={typed} disabled={busy} aria-describedby={fault ? 'name-ask-fault' : undefined} />
+          <input class="field-input" id="name-ask-field" type="text" autocomplete="name" maxlength="80" bind:value={typed} bind:this={field} oninput={() => (fault = '')} disabled={busy} aria-describedby={fault ? 'name-ask-fault' : undefined} />
         </span>
         <span class="ask-presses">
-          <Button weight="primary" type="submit" disabled={busy || typed.trim() === ''}>{busy ? 'Saving' : 'Save'}</Button>
+          <Button weight="primary" type="submit" disabled={busy}>{busy ? 'Saving' : 'Save'}</Button>
           <Button weight="quiet" onclick={() => void skip()} disabled={busy}>Skip</Button>
         </span>
       </form>
     {/snippet}
   </Banner>
+  </div>
 {/if}
 
 <style>

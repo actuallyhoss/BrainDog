@@ -62,7 +62,9 @@
 </Tile>
 
 <Tile icon="grid" title={words.grid}>
-  <div class="matrix-wrap">
+  <!-- A NARROW DESK MAY STILL SCROLL IT SIDEWAYS, so the box takes the keyboard and says what it holds. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div class="matrix-wrap" role="region" aria-label={words.grid} tabindex="0">
     <table class="matrix">
       <thead>
         <tr>
@@ -126,7 +128,7 @@
     gap: var(--sp-2);
     padding: var(--sp-4);
     border-radius: var(--r-ctl);
-    background: var(--in-fill);
+    background: var(--tile-2);
   }
   .card[data-mine] {
     background: var(--tile);
@@ -176,6 +178,7 @@
   }
   .matrix-wrap {
     overflow-x: auto;
+    border-radius: var(--r-ctl);
   }
   .matrix {
     inline-size: 100%;
@@ -184,7 +187,7 @@
   }
   .matrix th,
   .matrix td {
-    padding: var(--sp-2) var(--sp-3);
+    padding: var(--sp-2) var(--sp-2);
     border-block-end: 1px solid var(--rule);
     text-align: center;
     vertical-align: middle;
@@ -198,14 +201,16 @@
     text-align: start;
     font-weight: var(--fw-regular);
     color: var(--ink);
-    min-inline-size: 220px;
+    /* THE THING'S NAME WRAPS BEFORE A ROLE IS PUSHED OFF: at 1280, 220 held Can view behind a sideways scroll. */
+    min-inline-size: 11rem;
+    text-wrap: pretty;
   }
   .matrix tbody tr:last-child th,
   .matrix tbody tr:last-child td {
     border-block-end: 0;
   }
   .matrix [data-mine] {
-    background: var(--in-fill);
+    background: var(--tile-2);
   }
   .matrix td[data-v='yes'] :global(svg) {
     color: var(--good);

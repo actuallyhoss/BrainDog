@@ -1578,9 +1578,9 @@
     align-items: start;
     padding: var(--sp-3);
     border-radius: var(--r-ctl);
-    background: var(--in-fill);
+    background: var(--tile-2);
     cursor: pointer;
-    transition: background-color 160ms ease, box-shadow 160ms ease;
+    transition: background-color var(--d-swap) var(--ease-standard), box-shadow var(--d-swap) var(--ease-standard);
   }
   .role[data-on] {
     background: var(--tile);

@@ -388,7 +388,7 @@
     gap: 2px;
     padding: var(--sp-3) var(--sp-4);
     border-radius: var(--r-ctl);
-    background: var(--in-fill);
+    background: var(--tile-2);
     text-align: start;
     max-inline-size: 420px;
     inline-size: 100%;

@@ -21,6 +21,7 @@
   import { balancesOf, freshOf, guessRoles, linesOf, readStatement, rolesMissing, fieldsOf, ROLES, signSaid, words, type Held, type Roles, type Sign } from '$lib/money/statement.ts';
   import { addLines, fillBalances, heldFor, loadStatement, type Added, type Into, type Loaded } from '$lib/money/statement-live.ts';
   import { fileLines, filedOnArrival, filingWords, loadCategories, suggestCategory, type Offered } from '$lib/money/filing.ts';
+  import { arrive } from '$lib/motion/index.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -201,13 +202,13 @@
       {#snippet actions()}<Button weight="primary" href={home}>{words.addAccount}</Button>{/snippet}
     </Empty>
   {:else if result}
-    <div class="st-done" role="status">
+    <div class="st-done" role="status" in:arrive={{ rise: 4, from: 1 }}>
       <h2>{result.added === 0 && result.filled > 0 ? words.filled(result.filled) : words.added(result.added, result.account)}</h2>
       {#if result.added > 0 && result.filled > 0}<p class="st-quiet">{words.filled(result.filled)}</p>{/if}
       {#if result.missed > 0}<p class="st-warn">{words.missed(result.missed)} {result.why}</p>{/if}
       {#if offered && offered.self > 0}<p class="st-quiet">{filingWords.self(offered.self)}</p>{/if}
       {#if offered && offered.offers.length > 0}
-        <section class="st-filing" aria-labelledby="st-file-h">
+        <section class="st-filing" aria-labelledby="st-file-h" in:arrive={{ rise: 4, from: 1 }}>
           {#if filed === null}
             <h3 class="st-label" id="st-file-h">{filingWords.title(offered.offers.length)}</h3>
             <p class="st-quiet">{filingWords.sentence} {filingWords.next}</p>
@@ -282,7 +283,8 @@
         {#if why}<p class="st-warn" role="alert">{why}</p>{/if}
       </section>
     {:else}
-      <section class="st-step" aria-labelledby="st-columns">
+      <!-- THE COLUMNS AND THE PREVIEW RISE INTO THE DROP ZONE'S PLACE (motion pass 2 Nov), so the swap reads as the file opening. -->
+      <section class="st-step" aria-labelledby="st-columns" in:arrive={{ rise: 4, from: 1 }}>
         <div class="st-row">
           <h2 class="st-label" id="st-columns">{words.columns}{#if exp.file !== words.pastedName}{' '}<span class="st-quiet">{exp.file}</span>{/if}</h2>
           <Button weight="quiet" size="sm" onclick={again}>{words.other}</Button>
@@ -438,9 +440,9 @@
 
   .st-filing {
     display: grid;
-    gap: var(--space-2, 8px);
+    gap: var(--sp-2);
     justify-items: start;
-    margin-block: var(--space-3, 12px);
+    margin-block: var(--sp-3);
   }
   .st-file-list {
     display: grid;
@@ -518,7 +520,7 @@
     inline-size: 100%;
     min-block-size: 44px;
     padding-inline: var(--sp-3);
-    border: 1px solid var(--rule);
+    border: 1px solid var(--rule-strong);
     border-radius: var(--r-ctl);
     background: var(--tile);
     color: var(--ink);
@@ -566,10 +568,10 @@
     white-space: nowrap;
   }
 
+  /* ON A TILE, NOT IN A BOX (Look B: no border round a tile). */
   .st-table-wrap {
     overflow-x: auto;
-    border: 1px solid var(--rule);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-tile);
     background: var(--tile);
   }
 

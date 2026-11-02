@@ -16,6 +16,7 @@
   import { walkRows } from '$lib/data/ref-rows.ts';
   import { BYTES_MOST } from '$lib/start/export.ts';
   import { listed, personFields, planOf, readContacts, tidyOf, words, type Contact, type HeldOrg, type HeldPerson, type Tidy, type Wrote } from '$lib/people/contacts.ts';
+  import { arrive } from '$lib/motion/index.ts';
   import Button from '$lib/ui/Button.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import { titleOf } from '$lib/title.ts';
@@ -194,7 +195,7 @@
 <PageHead icon="upload" title={words.title} sentence={words.sentence} kicker={words.kicker} back={home} />
 <div class="ct-page">
   {#if result}
-    <div class="ct-done" role="status">
+    <div class="ct-done" role="status" in:arrive={{ rise: 4, from: 1 }}>
       <h2>{words.added(result.people, result.orgs)}</h2>
       {#if result.missed > 0}<p class="ct-warn">{words.missed(result.missed)} {result.why}</p>{/if}
       {#if tidy}
@@ -239,7 +240,8 @@
       {#if why}<p class="ct-warn" role="alert">{why}</p>{/if}
     </section>
   {:else}
-    <section class="ct-step" aria-labelledby="ct-preview">
+    <!-- WHAT THE FILE WILL ADD RISES INTO THE DROP ZONE'S PLACE (motion pass 2 Nov), so the swap reads as the file opening. -->
+    <section class="ct-step" aria-labelledby="ct-preview" in:arrive={{ rise: 4, from: 1 }}>
       <div class="ct-row">
         <h2 class="ct-label" id="ct-preview">{words.preview} <span class="ct-quiet">{file}</span></h2>
         <Button weight="quiet" size="sm" onclick={again}>{words.other}</Button>
@@ -331,11 +333,10 @@
     font-weight: 600;
   }
 
-  /* THE ONE QUESTION: a plain bordered tile, its lines a short list. */
+  /* THE ONE QUESTION: a plain tile, told from the board by its fill, its lines a short list. */
   .ct-tidy {
-    padding: var(--sp-4);
-    border: 1px solid var(--rule);
-    border-radius: var(--r-ctl);
+    padding: var(--tile-pad);
+    border-radius: var(--r-tile);
     background: var(--tile);
   }
 
@@ -455,10 +456,10 @@
     cursor: pointer;
   }
 
+  /* ON A TILE, NOT IN A BOX (Look B: no border round a tile). */
   .ct-table-wrap {
     overflow-x: auto;
-    border: 1px solid var(--rule);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-tile);
     background: var(--tile);
   }
 

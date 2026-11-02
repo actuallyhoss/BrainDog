@@ -88,12 +88,14 @@
     from = -1;
   }
 
+  const coarse = (): boolean => globalThis.matchMedia?.('(pointer: coarse)').matches === true;
+
   /** Under the field, or over it when the window has less room below than the list needs. */
   function measure() {
     if (!field) return;
     const r = field.getBoundingClientRect();
     const room = window.innerHeight - r.bottom;
-    const need = Math.min(matches.length, MOST) * 40 + 12;
+    const need = Math.min(matches.length, MOST) * (coarse() ? 44 : 40) + 12;
     const width = Math.min(Math.max(220, Math.min(r.width, 320)), window.innerWidth - 16);
     const left = Math.min(Math.max(8, r.left), window.innerWidth - width - 8);
     place = room < need && r.top > need ? { left, top: null, bottom: window.innerHeight - r.top + 4, width } : { left, top: r.bottom + 4, bottom: null, width };
@@ -161,6 +163,15 @@
       el.removeAttribute('aria-expanded');
       el.removeAttribute('aria-activedescendant');
     };
+  });
+
+  /* THE NAMES LANDING AFTER THE "@" (design pass 2 Nov): a box asks who it may offer when it is first entered, so an "@"
+     typed at once came before the names and opened nothing until the next key. Read the field again when they land. */
+  $effect(() => {
+    if (people.length === 0) return;
+    untrack(() => {
+      if (field && document.activeElement === field) read();
+    });
   });
 
   /* WHAT THE FIELD SAYS OF THE LIST, kept with it. */
@@ -231,12 +242,14 @@
     border: 1px solid var(--rule-strong);
     border-radius: var(--r-pop);
     color: var(--ink);
-    animation: mentions-in 120ms var(--ease-out);
+    animation: mentions-in var(--d-menu) var(--ease-out);
   }
 
+  /* A MENU OPENING (Look B motion): in over --d-menu with a 2px settle toward the field. */
   @keyframes mentions-in {
     from {
       opacity: 0;
+      translate: 0 -2px;
     }
   }
 
@@ -258,6 +271,13 @@
     cursor: pointer;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* UNDER A THUMB A NAME IS A 44PX TARGET (Look B phones). */
+  @media (pointer: coarse) {
+    .mention {
+      min-block-size: 44px;
+    }
   }
 
   .mention[aria-selected='true'] {
