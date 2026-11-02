@@ -108,6 +108,9 @@ extension Links {
         let app = AppModel.shared
         switch step {
         case let p where p.hasPrefix("tab:"): app.select(String(p.dropFirst(4)), toRoot: true)
+        case "tell:":
+            app.tell.text = ""
+            app.openTell()
         case let p where p.hasPrefix("tell:"): app.openTell(prefill: String(p.dropFirst(5)).replacingOccurrences(of: "|", with: "\n"))
         case let p where p.hasPrefix("ask:"): app.openTell(prefill: String(p.dropFirst(4)), mode: .ask)
         case let p where p.hasPrefix("search:"): app.selected = "search"; app.searchText = String(p.dropFirst(7))
