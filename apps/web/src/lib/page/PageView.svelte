@@ -332,6 +332,20 @@
     });
   });
   $effect(() => () => shapeBox.hold?.stop());
+  /* AND ITS FIRST READ, ON A COLD OPEN: the hero drew from the page's answer a frame before the shape's read landed, so
+     the numbers and the work drew a frame later and pushed the board's foot (and Changed for you) off the screen, a
+     0.1 to 0.2 shift on every project page at a desk. The bars wait for the read once, for 2s at most; after that a
+     page moved to another project draws as before. */
+  let shapeOnce = $state(false);
+  $effect(() => {
+    if (shapeOnce || shapeBox.hold === null) return;
+    if (shapeBox.hold.known) {
+      shapeOnce = true;
+      return;
+    }
+    const t = setTimeout(() => (shapeOnce = true), 2000);
+    return () => clearTimeout(t);
+  });
   /* What the project's shape draws on this page, once its reads are back. */
   const shapeDrew = $derived<readonly Block[]>(shapeBox.hold?.blocks ?? []);
   const shapeRow = $derived<Readonly<Record<string, unknown>> | null>(shapeBox.hold?.shape && shapeBox.hold.read ? shapeBox.hold.read.fields : null);
@@ -1071,7 +1085,7 @@
   <div class="pull" role="status" style:transform={`translateY(${pullBusy ? 16 : pulled - 24}px)`}>{pullBusy ? 'Refreshing' : pulled >= PULL_AT / 2 ? 'Let go to refresh' : 'Pull to refresh'}</div>
 {/if}
 
-{#if got === null || (got.from === 'live' && projectPage && shapeBox.hold === null && !partsFailed && !arranging)}
+{#if got === null || (got.from === 'live' && projectPage && (shapeBox.hold === null || !shapeOnce) && !partsFailed && !arranging)}
   {#if railed}
     <!-- THE HEAD FROM THE RAIL'S OWN ENTRY, AND BARS ONLY FOR THE BLOCKS, until the record answers. -->
     <!-- A PAGE ONE ROW MADE (a project's) WAITS IN THE HEAD IT WILL HAVE: the way back and no name row, its hero holding
