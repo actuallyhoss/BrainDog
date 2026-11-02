@@ -306,8 +306,8 @@
   {/if}
   <div class="bar-lead" data-greets={shortGreeting(where) !== null ? '' : undefined}>
     <!-- WHERE YOU ARE, the same words the desk's crumb ends on, and over it the page's name once it has scrolled away. -->
-    <p class="bar-where" dir="auto" bind:this={whereEl}>{whereShown}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
-    <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
+    <p class="bar-where" dir="auto" data-word={/\s/u.test(whereShown.trim()) ? undefined : ''} bind:this={whereEl}>{whereShown}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
+    <p class="bar-title" dir="auto" data-word={/\s/u.test(title.trim()) ? undefined : ''} aria-hidden="true">{title}</p>
   </div>
   <span class="bar-end">
     {#if barred && actions}<span class="head-actions bar-actions">{@render actions()}</span>{/if}
@@ -900,6 +900,9 @@
     }
 
     /* TODAY'S GREETING STAYS ON ONE LINE: it has a shorter form of its own it changes to when it does not fit. */
+    /* A NAME OF ONE WORD ENDS IN AN ELLIPSIS (ui-work 2 Nov): two lines cannot break it, so at 390 beside Share, More,
+       Search, the bell and the face "Northbound" was cut to "Northboun" with nothing to say it went on. */
+    .bar-lead > :is(.bar-where, .bar-title)[data-word],
     .bar-lead[data-greets] > :is(.bar-where, .bar-title) {
       display: block;
       text-overflow: ellipsis;

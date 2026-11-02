@@ -484,7 +484,9 @@
         </Tile>
       {/if}
 
-      {#each found.groups as group (group.kind)}
+      <!-- A LIST WHOSE ONLY HIT IS THE BEST MATCH IS NOT DRAWN AGAIN under it (ui-work 2 Nov): "north" drew Northbound's
+           late invoice as Best match and then as Needs you 1, the same line twice in two tiles. -->
+      {#each found.groups.filter((g) => !(best && g.total === 1 && g.hits.length === 1 && g.hits[0]!.href === best.href)) as group (group.kind)}
         {@const all = isWhole(group.kind)}
         <!-- EACH LIST IN A TILE OF ITS OWN, its name and count the tile's heading and the way to the rest its action. -->
         <Tile title={group.kind} count={group.total.toLocaleString('en')}>
