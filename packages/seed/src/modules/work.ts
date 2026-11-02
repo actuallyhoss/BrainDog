@@ -1249,7 +1249,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         lead: true,
         span: 12,
-        body: '{{open-tasks}} open task(s), {{tasks-later}} for later, {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent',
+        /* WHAT NEEDS SOMEBODY FIRST AND LATER LAST, AND NO "tasks", SINCE work 1.26.0 (pages polish, 2 Nov): the line ran to
+           two lines at the headline's size, and the board under it says what it counts. Every count is still said. */
+        body: '{{open-tasks}} open, {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent, {{tasks-later}} for later',
       },
       {
         /* ADD IN PLACE, SINCE work 1.19.0: the same line as Work's, first after the sentence and before the board, so a

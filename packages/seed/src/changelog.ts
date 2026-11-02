@@ -403,6 +403,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    { version: '1.26.0', notes: 'The Board\'s first line says what is to check or blocked and what is with an agent before what is kept for later.' },
     { version: '1.25.0', notes: 'A list of tasks heads its names Task, not Description.' },
     { version: '1.24.0', notes: 'Work says nothing of late tasks while none is open, and the Timeline says what will stand on it while no task has a due day.' },
     { version: '1.23.0', notes: 'A task can say which client it is for. A task with a client and no project is filed under its client, not under Needs a project, and Work\'s lists say the client beside the task.' },
