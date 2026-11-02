@@ -156,6 +156,9 @@ function takenBy(from: Pick<DraftsFrom, 'built' | 'modules'>, titleOf: (register
     const field = titleOf(b.register);
     const t = plain(field === null ? undefined : b.fields[field]);
     if (t !== '') seen.add(`${b.register}:${t}`);
+    /* SOMEBODY IS ONE NAME, PERSON OR ORGANISATION (onboarding9: a client the build kept as an organisation, "Fenwick", came
+       back from the read as a person in People, and Today offered all three of Priya's clients again). */
+    if (t !== '' && (b.register === 'people' || b.register === 'organisations')) for (const r of ['people', 'organisations']) seen.add(`${r}:${t}`);
   }
   return seen;
 }
