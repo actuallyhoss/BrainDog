@@ -36,17 +36,72 @@
     "weather",
     "week-in-money",
     "worked-numbers",
-    "zakat"
+    "zakat",
+    "sentry"
   ],
-  "usecases": ["landlord", "photographer", "retainer-hours"],
-  "examples": ["landlord", "photographer", "retainer-hours"],
-  "private": ["bank-hsbc-eg"],
+  "usecases": [
+    "landlord",
+    "photographer",
+    "retainer-hours"
+  ],
+  "examples": [
+    "landlord",
+    "photographer",
+    "retainer-hours"
+  ],
+  "private": [
+    "bank-hsbc-eg"
+  ],
   "shelves": {
-    "money": ["stripe", "mercury", "card-alerts", "money-watch", "count-cash", "holdings", "week-in-money", "certificates", "debts", "goals", "insurance", "property", "trips", "zakat", "subscriptions", "splits", "receipts", "tax-set-aside", "savings-circle"],
-    "planning": ["project-brief", "task-tiers", "portfolio-bands", "worked-numbers", "fixed-dates", "standup", "launch-desk"],
-    "helpers": ["agent-notes", "job-starter", "profiles", "setup-sync", "weather", "calendar"],
-    "reading": ["pad", "reading-list", "pad-second-opinion"],
-    "looks": ["harbour-look"],
-    "regions": ["bank-hsbc-eg"]
+    "money": [
+      "stripe",
+      "mercury",
+      "card-alerts",
+      "money-watch",
+      "count-cash",
+      "holdings",
+      "week-in-money",
+      "certificates",
+      "debts",
+      "goals",
+      "insurance",
+      "property",
+      "trips",
+      "zakat",
+      "subscriptions",
+      "splits",
+      "receipts",
+      "tax-set-aside",
+      "savings-circle"
+    ],
+    "planning": [
+      "project-brief",
+      "task-tiers",
+      "portfolio-bands",
+      "worked-numbers",
+      "fixed-dates",
+      "standup",
+      "launch-desk"
+    ],
+    "helpers": [
+      "agent-notes",
+      "job-starter",
+      "profiles",
+      "setup-sync",
+      "weather",
+      "calendar",
+      "sentry"
+    ],
+    "reading": [
+      "pad",
+      "reading-list",
+      "pad-second-opinion"
+    ],
+    "looks": [
+      "harbour-look"
+    ],
+    "regions": [
+      "bank-hsbc-eg"
+    ]
   }
 }
