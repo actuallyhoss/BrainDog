@@ -77,6 +77,35 @@
 </nav>
 
 <style>
+  /* A ROW OF TABS PRESSED TO MOVE HOLDS STILL (skills pass follow-up, 2 Nov; `AppFrame.svelte` `pressTab`). Here and not
+     in `app.css`, so only a screen with a row pays for it; a row is on both sides or on the side that has this file. The pressed
+     tab was chosen on the press, so the row is the same on both sides: the new picture alone is drawn, and where the
+     new screen puts the row higher or lower (Money's home has its sentence over it) it waits for the old screen to leave
+     and glides there as the new one arrives, on the arrival's step. A row on one side only leaves and arrives with the page. */
+  :global(::view-transition-group(tab-row)) {
+    animation-duration: calc(var(--d-page) - var(--d-exit));
+    animation-timing-function: var(--ease-out);
+    animation-delay: var(--d-exit);
+    animation-fill-mode: both;
+  }
+
+  :global(::view-transition-old(tab-row):not(:only-child)) {
+    animation: none;
+    opacity: 0;
+  }
+
+  :global(::view-transition-new(tab-row):not(:only-child)) {
+    animation: none;
+  }
+
+  :global(::view-transition-old(tab-row):only-child) {
+    animation: page-out var(--d-exit) var(--ease-in) both;
+  }
+
+  :global(::view-transition-new(tab-row):only-child) {
+    animation: page-in calc(var(--d-page) - var(--d-exit)) var(--ease-out) var(--d-exit) both;
+  }
+
   /* THE STRIP IS ONE SEGMENTED RECTANGLE (buttons are rectangles, radius 8, and no glass on the board):
      a quiet tinted track, each tab a rectangle in it, and the page you are on the tile's own fill lifted by a tiny
      shadow, a shape and not a shade. It sits in the page's gutter, on the title's left edge. */
