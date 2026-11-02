@@ -428,10 +428,12 @@
      bar by a ring of the nav. Never the red, which is Needs you's. */
   /* THE BADGE KEEPS TO THE BELL'S OWN SQUARE, its end at the square's end and growing back over the bell: grown from the
      middle, "9+" ran onto the face beside it (30 October). */
+  /* AND IT STANDS ON THE SQUARE'S CORNER, half out of it (2 Nov): at 2px in, "9+" covered the bell's whole top and only its
+     clapper showed. Out by 6 it leaves the bell's shape whole; the bar has the room, as the face is 12 away. */
   .bell-count {
     position: absolute;
-    inset-block-start: 2px;
-    inset-inline-end: -2px;
+    inset-block-start: -3px;
+    inset-inline-end: -7px;
     box-sizing: border-box;
     min-inline-size: 16px;
     block-size: 16px;
@@ -449,7 +451,8 @@
   }
 
   .bell[data-phone] .bell-count {
-    inset-block-start: 7px;
+    inset-block-start: 3px;
+    inset-inline-end: -1px;
   }
 
   /* ── the panel ─────────────────────────────────────────────── */
