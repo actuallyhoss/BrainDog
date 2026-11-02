@@ -7,13 +7,19 @@
   waiting draws nothing. Red only for what needs him: the Answer word.
 -->
 <script lang="ts">
+  import { page } from '$app/state';
   import { at } from '$lib/at.ts';
+  import { heldPage } from '$lib/nav/rail.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import type { ToldNeed } from '$lib/record/told-live.ts';
 
   let { rows }: { rows: readonly ToldNeed[] } = $props();
 
   const words = { title: 'Agents asking you', answer: 'Answer' } as const;
+
+  /* ANSWERED ON THE AGENTS PAGE, WHERE THE RECORD HOLDS IT (`heldPage`): without the agents add-on there is no thread to
+     open, so the row says who asks and what, and no Answer lands on a page that is not there. */
+  const answerAt = $derived(heldPage((page.data as { pages?: readonly string[] } | undefined)?.pages, 'agents'));
 </script>
 
 {#if rows.length > 0}
@@ -24,7 +30,7 @@
           <span class="tn-words"
             ><span class="tn-what" dir="auto">{r.line}</span>{#if r.reply}<span class="tn-reply" dir="auto">{r.reply}</span>{/if}</span
           >
-          <a class="tn-go tap" href={at('/p/agents')}>{words.answer}</a>
+          {#if answerAt}<a class="tn-go tap" href={at(answerAt)}>{words.answer}</a>{/if}
         </li>
       {/each}
     </ul>

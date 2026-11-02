@@ -144,11 +144,42 @@ export function railOf<T extends { href: string; row?: boolean | undefined; tabs
 /** Where the agents work is read, when the record has no Agents place: the page the agents pack declares. */
 export const AGENTS_PAGE = '/p/agents';
 
+/** Where agents are connected and set, on every BrainDog: Settings › Agents. */
+export const AGENTS_SETTINGS = '/settings/agents';
+
+/**
+ * A PACK'S PAGE IS LINKED ONLY WHERE THE RECORD HOLDS IT (empty states, 2 Nov). A new BrainDog does not install the
+ * agents pack, and sixteen links in the app sent a person to `/p/agents`, which answered "No page called agents". Each
+ * asks here: the page's address where the record's pages (`shell.pages`, the slugs it declares) hold it, else `null`,
+ * and the caller then sends the link somewhere that does exist, or draws none.
+ */
+export const heldPage = (pages: readonly string[] | null | undefined, slug: string): string | null =>
+  pages?.includes(slug) === true ? `/p/${slug}` : null;
+
+/**
+ * An address as a link may go to it: as it is, unless it names a declared page (`/p/<slug>`, its query and fragment
+ * aside) the record does not hold, which is `null`, no link.
+ */
+export function heldHref(pages: readonly string[] | null | undefined, href: string): string | null {
+  const slug = /^\/p\/([^/?#]+)/u.exec(href)?.[1];
+  if (slug === undefined) return href;
+  /* A ROW'S OWN PAGE (`/p/session%23904`, `pagesByRow`) is not among the declared pages, and goes as it is. */
+  if (slug.includes('%23')) return href;
+  return heldPage(pages, slug) === null ? null : href;
+}
+
+/**
+ * Where a link to the agents goes: their page where the record holds it, else Settings › Agents, where one is
+ * connected. Every BrainDog has that.
+ */
+export const agentsPlace = (pages: readonly string[] | null | undefined): string => heldPage(pages, 'agents') ?? AGENTS_SETTINGS;
+
 /**
  * Where the rail's "2 working" row goes: the Agents place, wherever the rail put it (among the seven or under More), by
- * the same plain name `PLACES` ranks it at, else the agents pack's own page.
+ * the same plain name `PLACES` ranks it at, else the agents pack's own page where the record holds it, else Settings ›
+ * Agents (`agentsPlace`).
  */
-export function agentsHref(items: readonly FlatItem[]): string {
+export function agentsHref(items: readonly FlatItem[], pages?: readonly string[] | null): string {
   const place = items.find((i) => plainOf(i.key.replace(/^section:/u, '')) === 'agents' || i.href === AGENTS_PAGE);
-  return place?.href ?? AGENTS_PAGE;
+  return place?.href ?? (pages === undefined ? AGENTS_PAGE : agentsPlace(pages));
 }

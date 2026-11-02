@@ -942,7 +942,7 @@
     /* ONLY WITH A MODEL BEHIND THE ASK (audit 31 Oct g, AG5): without one the three were questions nobody answers, and as
        places they were Go to's own rows a second time ("Needs you" twice). */
     if (blank && slashHere)
-      for (const [i, asked] of questionsOf(slashHere).entries())
+      for (const [i, asked] of questionsOf(slashHere, (page.data as { pages?: readonly string[] } | undefined)?.pages).entries())
         out.push({ id: `a-${i}`, title: asked.title, href: asked.href, group: ASK_TODAY, icon: 'search', ...(asked.ask === null ? {} : { ask: asked.ask }) });
     /* OPENED ON THIS DEVICE, SO TOLD BY THIS DEVICE'S CLOCK: the record's could be behind it, and said "in 8w". */
     if (blank)

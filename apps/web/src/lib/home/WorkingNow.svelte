@@ -20,6 +20,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { apiBase } from '$lib/at.ts';
+  import { agentsPlace } from '$lib/nav/rail.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import type { LiveRun, Project, Thread } from '$lib/record/instruct.ts';
   import { listen } from '$lib/page/listen.svelte.ts';
@@ -43,6 +44,8 @@
 
   /* HIS ALONE: only a person signed in as the owner tells, pauses or stops a run. */
   const owner = $derived((page.data as unknown as Partial<Shell> | undefined)?.me?.owner === true);
+  /* ALL AGENTS IS THEIR PAGE WHERE THE RECORD HOLDS IT, else Settings › Agents, which lists every one (`agentsPlace`). */
+  const allAgents = $derived(agentsPlace((page.data as unknown as Partial<Shell> | undefined)?.pages));
 
   /* WHAT `presence` LAST SAID, worded (`desk-live.ts`): the rows, and the lines for the runs left out of them. `null`
      until it has answered. */
@@ -134,7 +137,7 @@
 </script>
 
 {#if drawn.length > 0 || folds.length > 0}
-  <Tile icon="session" tone="live" title={words.title} count={drawn.length} href="/p/agents" hrefLabel={words.open} data-working>
+  <Tile icon="session" tone="live" title={words.title} count={drawn.length} href={allAgents} hrefLabel={words.open} data-working>
     <ol class="runs">
       {#each shown as r (r.key)}
         <li class="run" data-held={r.held ?? undefined}>

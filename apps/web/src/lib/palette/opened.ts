@@ -104,6 +104,10 @@ export const TODAY_QUESTIONS = [
   { title: 'What changed today?', href: '/audit', place: 'What changed' },
 ] as const;
 
-/* WITHOUT A MODEL EACH IS NAMED AS THE PLACE IT OPENS, never as a question nobody will answer (audit 31 Oct g, AG5). */
-export const questionsOf = (slash: boolean): Asked[] =>
-  TODAY_QUESTIONS.map((q) => (slash ? { title: q.title, href: null, ask: q.title } : { title: q.place, href: q.href, ask: null }));
+/* WITHOUT A MODEL EACH IS NAMED AS THE PLACE IT OPENS, never as a question nobody will answer (audit 31 Oct g, AG5).
+   AND A PLACE THE RECORD DOES NOT HOLD IS NOT OFFERED (empty states, 2 Nov): a new BrainDog has no agents page, and
+   "What your agents did" opened "No page called agents". `pages` is the record's declared pages; absent, all three. */
+export const questionsOf = (slash: boolean, pages?: readonly string[] | null): Asked[] =>
+  TODAY_QUESTIONS.flatMap((q): Asked[] =>
+    slash ? [{ title: q.title, href: null, ask: q.title }] : pages && q.href.startsWith('/p/') && !pages.includes(q.href.slice(3)) ? [] : [{ title: q.place, href: q.href, ask: null }],
+  );

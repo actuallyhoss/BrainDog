@@ -13,6 +13,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import { titleOf } from '$lib/title.ts';
+  import { agentsPlace, heldHref } from '$lib/nav/rail.ts';
   import { offerHref, summariesOf, summaryHref, summaryWords as words, type Summary } from '$lib/agents/summary.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
@@ -31,13 +32,15 @@
     },
   );
 
+  /* THE WAY BACK AND THE DOORS GO ONLY TO PAGES THE RECORD HOLDS: the agents page, else Settings › Agents (`agentsPlace`). */
+  const pages = $derived((page.data as { pages?: readonly string[] }).pages);
   const summaries = $derived(held.value ?? []);
   const title = $derived(id !== null && summaries.length === 1 ? summaries[0]!.name : words.all);
 </script>
 
 <svelte:head><title>{titleOf(title)}</title></svelte:head>
 
-<PageHead icon="bell" {title} kicker={words.parent} back="/p/agents" sentence={summaries.length > 0 ? words.sentAt : undefined} />
+<PageHead icon="bell" {title} kicker={words.parent} back={agentsPlace(pages)} sentence={summaries.length > 0 ? words.sentAt : undefined} />
 <div class="page">
   {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
     <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
@@ -65,8 +68,10 @@
                 {/each}
                 {#if sec.more > 0}<li class="said-line line-detail">{words.more(sec.more)}</li>{/if}
               </ul>
-              {#if sec.href}
-                <div class="foot"><Button size="sm" href={sec.href}>{sec.href === '/decide' ? words.decide : words.upNext}</Button></div>
+              <!-- A DOOR ONLY TO A PAGE THE RECORD HOLDS (`heldHref`): the runs' door is the agents page, which a new BrainDog has not. -->
+              {#if sec.href !== null && heldHref(pages, sec.href)}
+                {@const door = sec.href}
+                <div class="foot"><Button size="sm" href={door}>{door === '/decide' ? words.decide : words.upNext}</Button></div>
               {/if}
             </section>
           {/each}

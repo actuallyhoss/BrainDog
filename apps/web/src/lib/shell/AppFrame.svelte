@@ -69,7 +69,7 @@
   import { openRecord } from '$lib/record/switcher.ts';
   import { MENU, WORK, arrange, flatNav, isHere, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { byUse, keptUses, noteUse } from '$lib/shell/tab-use.ts';
-  import { agentsHref, railOf } from '$lib/nav/rail.ts';
+  import { AGENTS_PAGE, agentsHref, agentsPlace, heldHref, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount, toldReadable } from '$lib/home/need-you.ts';
   import { heardWaits, waitsNow, waitsTicket, workingNow } from '$lib/home/waits.svelte.ts';
@@ -258,8 +258,11 @@
   /* A NEW QUESTION OR HANDOFF RINGS ONCE (`alerts.ts` dedups by id and seeds on the first hearing), never while this
      window is in front, and only with the Settings switch on. A click goes to the item through the shell's `goto`. */
   let rung: Set<string> | null = null;
+  /* AN ALERT OPENS A PAGE THE RECORD HOLDS: a handoff or a finished instruction goes to the agents page where there is
+     one, else to Settings › Agents (`agentsPlace`), never to "No page called agents". */
+  const landed = (goto: string): string => heldHref(data.pages, goto) ?? (goto.startsWith(AGENTS_PAGE) ? agentsPlace(data.pages) : '/');
   const hear = (items: Alert[]): void => {
-    rung = ring(rung, items, { on: macNotifications, focused: windowFocused, send: notify });
+    rung = ring(rung, items.map((a) => ({ ...a, goto: landed(a.goto) })), { on: macNotifications, focused: windowFocused, send: notify });
   };
   $effect.pre(() => {
     const asked = (data.questions ?? []).map((q) => questionAlert({ id: q.id, question: q.title }));
@@ -529,7 +532,7 @@
   }
 
   /* WHERE THE AGENTS PLACE IS, wherever the rail put it: the place that carries the live dot. */
-  const agentsAt = $derived(agentsHref([...rail.places, ...rail.rest]));
+  const agentsAt = $derived(agentsHref([...rail.places, ...rail.rest], data.pages));
 
   /**
    * THE SIDEBAR, ONE MODEL (`side.ts` `sideModel`): Today, Needs you and the record's places, each with its count and the

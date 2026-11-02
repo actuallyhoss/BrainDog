@@ -10,6 +10,7 @@
 import { redirect, type LoadEvent } from '@sveltejs/kit';
 
 import { at } from '$lib/at.ts';
+import { agentsPlace } from '$lib/nav/rail.ts';
 
 /**
  * Each page, and the screen it is drawn as.
@@ -19,7 +20,14 @@ import { at } from '$lib/at.ts';
  */
 const SCREENS: Readonly<Record<string, string>> = { activity: '/audit', scripts: '/scripts' };
 
-export function load({ params, url }: Pick<LoadEvent, 'params' | 'url'>): void {
+export async function load({ params, url, parent }: Pick<LoadEvent, 'params' | 'url'> & Partial<Pick<LoadEvent, 'parent'>>): Promise<void> {
   const to = Object.hasOwn(SCREENS, params.slug ?? '') ? SCREENS[params.slug ?? ''] : undefined;
   if (to) redirect(307, at(`${to}${url.search}`, url.pathname));
+  /* THE AGENTS PAGE ON A RECORD THAT DOES NOT HOLD IT (empty states, 2 Nov): a new BrainDog has no agents pack, and an
+     address kept from somewhere (an alert, a bookmark, an old link) answered "No page called agents". It goes to
+     Settings › Agents, where an agent is connected (`agentsPlace`). Only this page waits on the shell to know. */
+  if (params.slug === 'agents' && parent) {
+    const shell = (await parent()) as { pages?: readonly string[] };
+    if (Array.isArray(shell.pages) && !shell.pages.includes('agents')) redirect(307, at(agentsPlace(shell.pages), url.pathname));
+  }
 }

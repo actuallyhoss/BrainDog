@@ -36,8 +36,14 @@
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { staleLine, staleShown, twiceHeading, twiceOf, type StaleRow } from './stale.ts';
+  import { page } from '$app/state';
+  import { heldHref } from '$lib/nav/rail.ts';
 
-  let { rows }: { rows: readonly StaleRow[] } = $props();
+  let { rows: told }: { rows: readonly StaleRow[] } = $props();
+
+  /* A LINE CLEARED ON A PAGE THE RECORD DOES NOT HOLD (the steps, on the agents page) IS WORDS, NOT A LINK (`heldHref`). */
+  const pages = $derived((page.data as { pages?: readonly string[] } | undefined)?.pages);
+  const rows = $derived(told.map((r) => (r.href === null ? r : { ...r, href: heldHref(pages, r.href) })));
 
   const words = {
     more: (n: number) => (n === 1 ? 'And one more of another kind.' : `And ${String(n)} more of other kinds.`),

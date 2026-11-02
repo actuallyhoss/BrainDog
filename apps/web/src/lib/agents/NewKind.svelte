@@ -18,7 +18,7 @@
   import { page } from '$app/state';
   import { TONES } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
-  import { AGENTS_PAGE } from '$lib/nav/rail.ts';
+  import { agentsPlace } from '$lib/nav/rail.ts';
   import { AGENTS, FILE_TOOLS, PERMISSIONS, PRESETS, RECORD_TOOLS, TURNS_MOST, blankKind, fileKind, kindFaultAt, presetOf, recordToolWords, slotParts, slotsOf, withPreset, words, writesOf, type KindDraft } from './new-kind.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -214,7 +214,7 @@
       <!-- AT THE TILE'S FOOT, ON THE START EDGE, never loose on the board under it. -->
       <div class="do form-submit">
         <Button weight="primary" disabled={sending || filed !== null} onclick={() => void send()}>{sending ? words.busy : words.send}</Button>
-        <Button weight="quiet" href={at(AGENTS_PAGE)}>{words.cancel}</Button>
+        <Button weight="quiet" href={at(agentsPlace((page.data as { pages?: readonly string[] }).pages))}>{words.cancel}</Button>
       </div>
     </div>
   </Tile>

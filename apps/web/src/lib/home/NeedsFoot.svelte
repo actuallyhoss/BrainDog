@@ -19,7 +19,9 @@
 <script lang="ts">
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import { page } from '$app/state';
   import { at } from '$lib/at.ts';
+  import { heldPage } from '$lib/nav/rail.ts';
   import { WORK } from '$lib/nav.ts';
   import type { ToldNeed } from '$lib/record/told-live.ts';
   import { sharedLine, type SharedOut } from './shared-line.ts';
@@ -58,6 +60,9 @@
     line?: boolean;
   } = $props();
 
+  /* WHERE AN AGENT'S QUESTION IS ANSWERED: the agents page, where the record holds one, else nowhere to link. */
+  const answerAt = $derived(heldPage((page.data as { pages?: readonly string[] } | undefined)?.pages, 'agents'));
+
   const words = {
     late: (n: number, said: string) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'payment is' : 'payments are'} late, ${said} in all`,
     handled: (n: number) => `BrainDog handled ${n.toLocaleString('en-GB')} today`,
@@ -95,11 +100,21 @@
       <ul class="nf-lines">
         {#each told as t (t.key)}
           <li>
-            <a class="nf-line nf-told" href={at('/p/agents')} data-told>
-              <Icon name="session" size="s" /><span class="nf-words"
-                ><span class="nf-what" dir="auto">{t.line}</span>{#if t.reply}<span class="nf-reply" dir="auto">{t.reply}</span>{/if}</span
-              ><span class="nf-go" data-needs>{words.answer}</span>
-            </a>
+            <!-- ANSWERED ON THE AGENTS PAGE, WHERE THE RECORD HOLDS IT (`heldPage`). Without the agents add-on there is no
+                 thread to open, so the line says who asks and what, and offers no Answer that lands nowhere. -->
+            {#if answerAt}
+              <a class="nf-line nf-told" href={at(answerAt)} data-told>
+                <Icon name="session" size="s" /><span class="nf-words"
+                  ><span class="nf-what" dir="auto">{t.line}</span>{#if t.reply}<span class="nf-reply" dir="auto">{t.reply}</span>{/if}</span
+                ><span class="nf-go" data-needs>{words.answer}</span>
+              </a>
+            {:else}
+              <p class="nf-line nf-told" data-told>
+                <Icon name="session" size="s" /><span class="nf-words"
+                  ><span class="nf-what" dir="auto">{t.line}</span>{#if t.reply}<span class="nf-reply" dir="auto">{t.reply}</span>{/if}</span
+                >
+              </p>
+            {/if}
           </li>
         {/each}
         {#if late && late.count > 0}
@@ -231,6 +246,11 @@
     font-size: var(--fs-body);
     text-decoration: none;
     transition: color var(--d-state) var(--ease-out);
+  }
+
+  /* A line with nowhere to go (an agent's question on a record with no agents page) is words, not a link. */
+  p.nf-line {
+    margin: 0;
   }
 
   .nf-words {
