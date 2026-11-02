@@ -31,6 +31,7 @@
   import { titleOf } from '$lib/title.ts';
   import { listLine } from '$lib/record/tags.ts';
   import { amountOf, currencyOf, moneyInText, symbolText } from '$lib/record/money.ts';
+  import { wayField, wayOfValue } from '$lib/record/money-way.ts';
   import { money, TONES } from 'braindog-render';
   import { Document } from 'braindog-render/svelte';
   import { page } from '$app/state';
@@ -837,6 +838,10 @@
   /* A KEY NUMBER LEADS WITH ITS READING AND CHART (`KpiLead`, L25), so its target is a fact like the rest, not the figure. */
   const kpiPage = $derived(id === 'kpis');
   const figure = $derived(!kpiPage && figureField && row ? amountOf(row.fields[figureField.id]) : null);
+  /* THE FIGURE SAYS WHICH WAY IT WENT, as its list does: a ledger line's rent read "$2,100" here and "−$2,100.00" on the
+     Ledger, an invoice owed to you "$3,200" here and "+$3,200" in Bills. Money out has its minus, money in its plus and
+     the good colour (`money-way.ts`); a list with no way field keeps the bare figure. */
+  const figureWay = $derived(figureField && row ? wayOfValue(wayField(decl, figureField), row.fields[wayField(decl, figureField)?.id ?? '']) : null);
   /**
    * PART PAID, UNDER THE FIGURE: "Paid £4,000 · £5,190 left" over a 6px track (money F9). The paid amount is the list's
    * second money field named for it ("Paid so far", which money's `settle` writes), in the figure's currency; a bill
@@ -1638,7 +1643,7 @@
                 {@render fieldEditor(figureField, row.fields[figureField.id])}
               {:else}
                 <div class="figure-line">
-                  <p class="figure-value num"><Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" /></p>
+                  <p class="figure-value num" data-sign={figureWay ?? undefined}>{#if figureWay === 'in'}+{/if}<Money minor={figureWay === 'out' ? -Math.abs(figure) : figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" /></p>
                   {#if changes && editable(figureField, id)}{@render pencil(figureField)}{/if}
                 </div>
                 {#if paidPart}
@@ -2172,6 +2177,10 @@
   }
 
   /* The code in front of the figure at half its size, the way every headline figure sets it. */
+  .figure-value[data-sign='in'] {
+    color: var(--good);
+  }
+
   .figure-value :global(.code) {
     font-size: 0.5em;
     font-weight: 600;
