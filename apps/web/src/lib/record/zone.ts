@@ -11,7 +11,7 @@
  * PURE AND NODE LOADS IT, so a test sets a zone and reads the day.
  */
 
-import { dayIn, readerZone, timeIn } from 'braindog-render';
+import { dayIn, knowsZone, readerZone, timeIn } from 'braindog-render';
 
 let zone: string | null = null;
 
@@ -25,14 +25,9 @@ export const recordZone = (): string => zone ?? readerZone();
 export function learnZone(said: unknown): string {
   /* THE ZONE ALREADY HELD IS NOT CHECKED AGAIN: a formatter made to test it cost about 10 ms of a cold phone's first draw. */
   if (said === zone && zone !== null) return zone;
-  if (typeof said === 'string' && said !== '') {
-    try {
-      new Intl.DateTimeFormat('en', { timeZone: said });
-      zone = said;
-    } catch {
-      /* not a zone: the one already held stays */
-    }
-  }
+  /* CHECKED BY THE FORMATTER `dayIn` KEEPS FOR IT (`knowsZone`), which the first "today" drawn then takes, and not by
+     one made only to throw (speed6, 2 Nov). Anything else is not a zone: the one already held stays. */
+  if (typeof said === 'string' && said !== '' && knowsZone(said)) zone = said;
   return recordZone();
 }
 

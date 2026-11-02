@@ -648,6 +648,14 @@ function calendarIn(zone: string): Intl.DateTimeFormat {
   return found;
 }
 
+/**
+ * Whether `Intl` knows a zone, read by making the very formatter `dayIn` keeps for it (speed6, 2 Nov): a formatter made
+ * only to check a zone cost about 20 to 30 ms of a cold phone's first screen, and `dayIn` then made its own anyway.
+ */
+export function knowsZone(zone: string): boolean {
+  return zone === 'UTC' || calendarIn(zone) !== calendarIn('UTC');
+}
+
 /** The zone "today" is counted in: the one named, else the browser's own, else UTC. */
 export function readerZone(zone?: string): string {
   if (zone) return zone;

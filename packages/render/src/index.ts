@@ -275,6 +275,7 @@ export {
   dayIn,
   timeIn,
   readerZone,
+  knowsZone,
   inWords,
   since,
   sinceWords,
