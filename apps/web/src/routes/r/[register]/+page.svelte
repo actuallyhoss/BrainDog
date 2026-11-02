@@ -114,6 +114,7 @@
   import BulkBar from './parts/BulkBar.svelte';
   import ListCards from './parts/ListCards.svelte';
   import ListPeople from './parts/ListPeople.svelte';
+  import PeopleOrder from './parts/PeopleOrder.svelte';
   import ListOrgs from './parts/ListOrgs.svelte';
   import ListRuns from './parts/ListRuns.svelte';
   import ListKpis from './parts/ListKpis.svelte';
@@ -1275,7 +1276,7 @@
        it the stored set means the reverse: in the set, drawn. */
     columnsFor(id, decl, hidden.has('seq'))
       .filter((c) => c.field === 'seq' || !hidden.has(c.field))
-      .filter((c) => !sameOnEvery(c.field))
+      .filter((c) => !sameOnEvery(c.field) && !emptyRider(c.field))
       .map((c) => weighed(c, c.field === decl?.title, result.entries))
       .map((c) => ((anyLate || lateSeen) && c.field === deadlineOf(decl) ? { ...c, width: '27ch' } : c)),
   );
@@ -1291,6 +1292,19 @@
     if (spec?.type !== 'enum') return false;
     const first = result.entries[0]?.fields[field];
     return typeof first === 'string' && first !== '' && result.entries.every((e) => e.fields[field] === first);
+  }
+
+  /**
+   * A COLUMN THAT ONLY RIDES WITH ANOTHER IS NOT DRAWN WHILE IT IS EMPTY ON EVERY ROW (pages polish, 2 Nov): Tasks opened
+   * with a Client column beside Project (`qualifies:`) that was blank down all 27 rows. Only such a rider, only a link,
+   * only over three rows or more in hand and only once the whole list is in hand, so a column never comes and goes as
+   * pages arrive. Display still lists it, and the first row that names a client brings it back.
+   */
+  function emptyRider(field: string): boolean {
+    if (!decl || cursor !== null || result.entries.length < 3) return false;
+    const spec = decl.fields.find((f) => f.id === field);
+    if (spec?.qualifies === undefined || spec.type !== 'ref') return false;
+    return result.entries.every((e) => e.fields[field] === null || e.fields[field] === undefined || e.fields[field] === '');
   }
 
   /* THE MONEY COLUMNS WHERE EVERY AMOUNT IN HAND IS WHOLE, which the table draws without their ".00" (`wholeMoney`). */
@@ -3513,6 +3527,9 @@
         <!-- THE TOOLBAR'S END (money F7): how the list is drawn, then its "⋯" with Display (`v`) and Save as a view, then
              the one way to add, the list's primary, named with what it adds. Below 640 the head holds the "+" and the
              "⋯", so this end is not drawn. -->
+        <!-- RECENT OR A TO Z, WHERE PEOPLE ARE IN GROUPS, at the toolbar's start where nothing else stands on People, rather
+             than on a row of its own under it (pages polish, 2 Nov). A phone keeps it in the "⋯". -->
+        {#if view === 'groups' && meetsOf(decl) && !orgRoleOf(decl) && result.total > 0}<PeopleOrder />{/if}
         <div class="list-views">
           {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable ? iconFor(decl.icon, 'rows') : null} groupsWord={runsList(decl) || kpisList(decl) ? 'List' : undefined} onview={setView} />{/if}
           <!-- ONE "⋯" FOR THE LIST: how it is drawn and its views first, then what the list itself offers (a row with every

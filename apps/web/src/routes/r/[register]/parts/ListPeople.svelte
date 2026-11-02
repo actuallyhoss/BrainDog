@@ -26,7 +26,7 @@
   import { ownMenu, type MenuAt } from '$lib/ui/context-menu.ts';
   import { foldPeople, folds, lastDayOf, letterPeople, meetsOf, orgFieldOf, roleFieldOf, seenWords, type Member } from '../folk.ts';
   import { daySaid, localDay } from '../[seq]/said.ts';
-  import { peopleOrder, setPeopleOrder } from './people-order.svelte.ts';
+  import { peopleOrder } from './people-order.svelte.ts';
 
   let {
     register,
@@ -50,9 +50,8 @@
   } = $props();
 
   /* RECENT OR A TO Z (29 October): by when you last spoke, which is what People is read for most days, or by name, for
-     finding somebody you know by name. One choice with the phone's "⋯" Sort (`people-order.svelte.ts`). */
+     finding somebody you know by name. Chosen in the list's toolbar (`PeopleOrder.svelte`) and the phone's "⋯" Sort. */
   const order = $derived(peopleOrder.value);
-  const setOrder = setPeopleOrder;
   /* YOU ARE THE LIST'S FIRST ROW, MARKED You, AND IN NO GROUP (29 October): the record is yours, so you stand above the
      people you know rather than among them by when you last spoke, and no count of them includes you. */
   const selfPart = $derived(meetsOf(decl)?.self);
@@ -134,10 +133,6 @@
 {/snippet}
 
 <div class="people">
-  <div class="order" role="group" aria-label={seenWords.orderBy}>
-    <button type="button" class="tap" aria-pressed={order === 'recent'} onclick={() => setOrder('recent')}>{seenWords.recent}</button>
-    <button type="button" class="tap" aria-pressed={order === 'az'} onclick={() => setOrder('az')}>{seenWords.az}</button>
-  </div>
   {#if you}
     <ul class="ledger ledger-lead">
       <li>{@render person(you, orgOf(you))}</li>
@@ -217,11 +212,13 @@
 
 <style>
   /* THE BANDS, 24 APART, each a quiet heading over its rows. The tile's own padding is the list's edge. */
+  /* A STEP OF AIR UNDER THE TOOLBAR, where Recent and A to Z stood as a row of their own (pages polish, 2 Nov). */
   .people {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
+    padding-block-start: var(--sp-2);
   }
 
   .bands {
@@ -229,41 +226,6 @@
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
-  }
-
-  /* RECENT OR A TO Z: two quiet words at the head of the list, the one in use in ink on the tile's tint. */
-  .order {
-    display: inline-flex;
-    gap: 2px;
-    align-self: flex-start;
-    padding: 2px;
-    border-radius: var(--r-pop);
-    background: var(--tile-2);
-  }
-
-  .order button {
-    min-block-size: 32px;
-    padding: 0 var(--sp-3);
-    border: 0;
-    border-radius: calc(var(--r-pop) - 2px);
-    background: none;
-    color: var(--ink-2);
-    font: inherit;
-    font-size: var(--fs-meta);
-    cursor: pointer;
-  }
-
-  .order button[aria-pressed='true'] {
-    background: var(--tile);
-    color: var(--ink);
-    font-weight: var(--fw-medium);
-    box-shadow: 0 0 0 1px var(--rule);
-  }
-
-  @media (pointer: coarse) {
-    .order button {
-      min-block-size: var(--tap);
-    }
   }
 
   /* TWO COLUMNS OF THE SAME ROWS FROM 1280 (1 Nov, L7): a band was one 1100px column of 56px rows, a name at one end
@@ -278,13 +240,6 @@
     }
 
     .band > .ledger > li:nth-child(2) > :global(.line::after) {
-      display: none;
-    }
-  }
-
-  /* ON A PHONE THE ORDER IS THE "⋯"'S SORT (L3), and the row it stood on alone goes. */
-  @media (width < 640px) {
-    .order {
       display: none;
     }
   }

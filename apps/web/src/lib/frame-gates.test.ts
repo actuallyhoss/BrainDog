@@ -163,7 +163,7 @@ const SHADOWS: Record<string, readonly string[]> = {
   'apps/web/src/routes/decide/[id]/Proposed.svelte': ['.swatch'], // edge
   'apps/web/src/routes/addons/+page.svelte': ['.find', '.sort-select'], // edge
   'apps/web/src/routes/addons/[id]/Listing.svelte': ['.narrow-only'], // line
-  'apps/web/src/routes/r/[register]/parts/ListPeople.svelte': ['.order button[aria-pressed=\'true\']'], // edge
+  'apps/web/src/routes/r/[register]/parts/PeopleOrder.svelte': ['.order button[aria-pressed=\'true\']'], // edge
   'apps/web/src/routes/r/[register]/parts/ListBoard.svelte': ['.bcard[data-cursor]', '.bcard[data-picked]', '.bcard:not([data-picked], [data-cursor]):hover'], // edge
   'apps/web/src/routes/scripts/[id]/ScriptForm.svelte': ['.field[data-wrong], .lines[data-wrong], .code[data-wrong]'], // edge
   'apps/web/src/routes/settings/[area]/areas/Appearance.svelte': ['.swatch', '.swatch::before', '.tick'], // edge, edge under a thumb, ring
