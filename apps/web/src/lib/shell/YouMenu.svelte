@@ -1,6 +1,6 @@
 <!--
   The face, top-right: the person's letter, and under it the records they can open (the one they are in ticked), then
-  what is theirs as a person: how they sign in, the keyboard keys and Sign out. Settings is the sidebar's, at its foot.
+  Settings, then what is theirs as a person: how they sign in, the keyboard keys and Sign out. Settings is also at the sidebar's foot.
 -->
 <script lang="ts">
   import { BASE, at } from '../at.ts';
@@ -13,7 +13,7 @@
 
   let { phone = false }: { phone?: boolean } = $props();
 
-  const words = { you: 'You', account: 'Account', keys: 'Keyboard keys', signing: 'Signing in' } as const;
+  const words = { you: 'You', account: 'Account', keys: 'Keyboard keys', signing: 'Signing in', settings: 'Settings' } as const;
   const name = $derived(frame.person || words.you);
   const others = $derived(frame.records.filter((r) => r.name !== frame.record));
 
@@ -52,6 +52,7 @@
     {/each}
     {#if frame.refused}<span class="you-mi" role="menuitem" aria-disabled="true">{frame.refused}</span>{/if}
     {#if frame.record || others.length > 0 || frame.refused}<hr />{/if}
+    <a class="you-mi" role="menuitem" href={at('/settings')}><Icon name="settings" size="s" />{words.settings}</a>
     <a class="you-mi" role="menuitem" href={at('/settings/signing-in')}><Icon name="key" size="s" />{words.signing}</a>
     <!-- THE KEYS ARE A KEYBOARD'S: a phone is not offered them. -->
     {#if !phone}<button type="button" class="you-mi" role="menuitem" onclick={() => (frame.keys = true)}><Icon name="keyboard" size="s" />{words.keys}</button>{/if}
