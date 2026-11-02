@@ -1,0 +1,411 @@
+{
+  "pack": "weather",
+  "version": "1.2.2",
+  "icon": "sun",
+  "title": "Weather",
+  "summary": "The weather where you are, today and the next six days, from Open-Meteo: free, with no key and no account. Set your town on this page and it is kept in step every three hours.",
+  "changes": "Its Weather widget for Today opens Wide, the smallest a card is drawn at, where it said Small, which Today could not take, and says the sky, the high and the chance of rain, which fit its frame; the low and the town were cut off at its foot.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "config": {
+    "place": {
+      "type": "text",
+      "default": "",
+      "label": "Place",
+      "note": "Your town as you would say it, such as Cairo or Alexandria, Egypt. Empty asks for nothing."
+    },
+    "units": {
+      "type": "enum",
+      "values": [
+        "celsius",
+        "fahrenheit"
+      ],
+      "default": "celsius",
+      "label": "Temperatures in",
+      "note": "Celsius or Fahrenheit."
+    }
+  },
+  "widgets": [
+    {
+      "id": "weather-today",
+      "title": "Weather",
+      "group": "Life",
+      "for": "personal",
+      "kind": "cards",
+      "block": {
+        "kind": "cards",
+        "source": "register.weather",
+        "where": "day is today",
+        "columns": [
+          {
+            "field": "what",
+            "as": "title"
+          },
+          {
+            "field": "high",
+            "label": "High",
+            "as": "figure"
+          },
+          {
+            "field": "rain",
+            "label": "Rain",
+            "as": "fact"
+          }
+        ],
+        "limit": 1,
+        "empty": "Set your town on the Weather page.",
+        "icon": "cloud"
+      },
+      "blanks": [],
+      "sizes": [
+        "wide"
+      ],
+      "size": "wide",
+      "needs": [
+        "register.weather"
+      ],
+      "example": {
+        "figures": [
+          {
+            "label": "Partly cloudy · low 14°",
+            "said": "22°"
+          }
+        ]
+      },
+      "says": "Today’s weather where you are: the sky, the high and the chance of rain.",
+      "icon": "cloud",
+      "words": [
+        "weather",
+        "rain",
+        "temperature",
+        "forecast",
+        "sun"
+      ]
+    },
+    {
+      "id": "weather-week",
+      "title": "The week's weather",
+      "group": "Life",
+      "for": "personal",
+      "kind": "table",
+      "block": {
+        "kind": "table",
+        "source": "register.weather",
+        "where": "day after yesterday",
+        "columns": [
+          {
+            "field": "day",
+            "label": "Day"
+          },
+          {
+            "field": "what",
+            "label": "Sky"
+          },
+          {
+            "field": "high",
+            "label": "High"
+          },
+          {
+            "field": "low",
+            "label": "Low"
+          },
+          {
+            "field": "rain",
+            "label": "Rain"
+          }
+        ],
+        "order": [
+          {
+            "field": "day",
+            "dir": "asc"
+          }
+        ],
+        "limit": 7,
+        "empty": "Set your town on the Weather page.",
+        "icon": "cloud"
+      },
+      "blanks": [],
+      "sizes": [
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "tall",
+      "needs": [
+        "register.weather"
+      ],
+      "example": {
+        "rows": [
+          {
+            "title": "Partly cloudy",
+            "meta": "Today · 22°, low 14°"
+          },
+          {
+            "title": "Mostly clear",
+            "meta": "Tomorrow · 23°, low 15°"
+          },
+          {
+            "title": "Light rain",
+            "meta": "The day after · 19°, low 13°, rain 60%"
+          }
+        ]
+      },
+      "icon": "cloud"
+    }
+  ],
+  "declarations": [
+    {
+      "register": "weather",
+      "name": "Weather",
+      "icon": "sun",
+      "one": "day of weather",
+      "holds": "the weather forecast where you are, one row a day, from Open-Meteo",
+      "title": "what",
+      "mobile": [
+        "day",
+        "what",
+        "high"
+      ],
+      "pack": "weather",
+      "fields": [
+        {
+          "id": "what",
+          "label": "Sky",
+          "type": "text",
+          "search": true
+        },
+        {
+          "id": "day",
+          "label": "Day",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "place",
+          "label": "Where",
+          "type": "text"
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "type": "decimal",
+          "unit": "°"
+        },
+        {
+          "id": "low",
+          "label": "Low",
+          "type": "decimal",
+          "unit": "°"
+        },
+        {
+          "id": "rain",
+          "label": "Chance of rain",
+          "type": "int",
+          "min": 0,
+          "max": 100,
+          "unit": "%"
+        },
+        {
+          "id": "code",
+          "label": "Weather code",
+          "type": "int"
+        },
+        {
+          "id": "unit",
+          "label": "In",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "script": "weather_poll",
+      "title": "Ask Open-Meteo for the weather where you are",
+      "pack": "weather",
+      "runs": {
+        "every": "3h"
+      },
+      "egress": [
+        "https://geocoding-api.open-meteo.com",
+        "https://api.open-meteo.com"
+      ],
+      "keys": [],
+      "reads": [
+        "weather"
+      ],
+      "writes": [
+        "weather"
+      ],
+      "limits": {
+        "fetches": 2,
+        "writes": 20
+      },
+      "source": "/**\n * The weather where you are, from Open-Meteo, free and with no key: today and the next six days, one row a day in\n * Weather, kept in step every three hours.\n *\n * THE PLACE IS A SETTING, A NAME AS A PERSON SAYS IT (\"Cairo\", \"Alexandria, Egypt\"). It is looked up once a run on\n * Open-Meteo's own place search, the first answer taken, and the forecast asked for there in the place's own time\n * zone, so \"today\" is the day it is where the weather is. No place set, and nothing is asked: the run says so.\n *\n * ONE ROW A DAY, FOUND BY ITS DAY AND KEPT IN STEP. A day already held is updated where the forecast moved and left\n * alone where it did not; a new day is written. A day that has gone stays as it was last forecast, which is the\n * nearest thing to what it was. A place changed in the settings writes its days over the old place's.\n *\n * WHAT THE SKY IS SAID IN WORDS, from the World Meteorological Organization's code Open-Meteo sends (`SKY`), so a\n * widget says \"Light rain\" and never \"61\".\n *\n * NOTHING OUTSIDE `run` IS READ: the text of this file is the script (`weather.pack.json`).\n */\n\nexport default async function run(ctx) {\n  const GEO = 'https://geocoding-api.open-meteo.com/v1/search';\n  const FORECAST = 'https://api.open-meteo.com/v1/forecast';\n  const DAYS = 7;\n  const SKY = {\n    0: 'Clear', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Cloudy', 45: 'Fog', 48: 'Freezing fog',\n    51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle', 56: 'Freezing drizzle', 57: 'Freezing drizzle',\n    61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 66: 'Freezing rain', 67: 'Freezing rain',\n    71: 'Light snow', 73: 'Snow', 75: 'Heavy snow', 77: 'Snow grains',\n    80: 'Light showers', 81: 'Showers', 82: 'Heavy showers', 85: 'Snow showers', 86: 'Heavy snow showers',\n    95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Thunderstorm with hail',\n  };\n  const config = ctx.config && typeof ctx.config === 'object' ? ctx.config : {};\n  const place = typeof config.place === 'string' ? config.place.trim() : '';\n  if (place === '') {\n    ctx.log('No place is set, so the weather was not asked for. Set one on this add-on\\'s page.');\n    return null;\n  }\n  const fahrenheit = config.units === 'fahrenheit';\n\n  const found = await ctx.fetch(`${GEO}?name=${encodeURIComponent(place)}&count=1&language=en&format=json`);\n  if (!found.ok) throw new Error(`Open-Meteo's place search answered ${found.status}, so the weather was not asked for this time.`);\n  const hit = ((await found.json()).results || [])[0];\n  if (!hit || typeof hit.latitude !== 'number' || typeof hit.longitude !== 'number') {\n    ctx.log(`Open-Meteo knows no place called \"${place}\". Try the town and its country, such as \"Cairo, Egypt\".`);\n    return null;\n  }\n  const where = [hit.name, hit.country].filter((s) => typeof s === 'string' && s !== '').join(', ');\n\n  const asked =\n    `${FORECAST}?latitude=${hit.latitude}&longitude=${hit.longitude}` +\n    '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +\n    `&timezone=auto&forecast_days=${DAYS}${fahrenheit ? '&temperature_unit=fahrenheit' : ''}`;\n  const answered = await ctx.fetch(asked);\n  if (!answered.ok) throw new Error(`Open-Meteo answered ${answered.status}, so the weather stays as it was.`);\n  const daily = (await answered.json()).daily || {};\n  const days = Array.isArray(daily.time) ? daily.time : [];\n  const num = (list, i) => (Array.isArray(list) && typeof list[i] === 'number' ? list[i] : null);\n\n  const held = new Map();\n  for (const r of await ctx.record.list('weather', { field: 'day', in: days })) held.set(String(r.fields.day), r);\n\n  let wrote = 0;\n  for (let i = 0; i < days.length; i++) {\n    const day = days[i];\n    if (typeof day !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(day)) continue;\n    const code = num(daily.weather_code, i);\n    const fields = {\n      what: code !== null && SKY[code] ? SKY[code] : 'Unknown',\n      day,\n      place: where,\n      high: num(daily.temperature_2m_max, i),\n      low: num(daily.temperature_2m_min, i),\n      rain: num(daily.precipitation_probability_max, i),\n      code,\n      unit: fahrenheit ? '°F' : '°C',\n    };\n    const row = held.get(day);\n    if (row === undefined) {\n      ctx.write('weather', fields);\n      wrote += 1;\n      continue;\n    }\n    const patch = {};\n    for (const [k, v] of Object.entries(fields)) if (row.fields[k] !== v && !(v === null && (row.fields[k] === undefined || row.fields[k] === null))) patch[k] = v;\n    if (Object.keys(patch).length === 0) continue;\n    ctx.update(`weather#${row.seq}`, patch, row.version);\n    wrote += 1;\n  }\n  ctx.log(wrote === 0 ? `The forecast for ${where} is as it was.` : `The forecast for ${where}: ${wrote} ${wrote === 1 ? 'day' : 'days'} written.`);\n  return { place: where, wrote };\n}\n"
+    },
+    {
+      "metric": "weather-days",
+      "name": "Days of weather ahead",
+      "pack": "weather",
+      "source": "register.weather",
+      "where": "day after yesterday",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "weather-high-today",
+      "name": "Today's high",
+      "pack": "weather",
+      "source": "register.weather",
+      "where": "day is today",
+      "value": {
+        "max": "high"
+      },
+      "format": "decimal",
+      "target": {
+        "gte": -100
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "weather-low-today",
+      "name": "Today's low",
+      "pack": "weather",
+      "source": "register.weather",
+      "where": "day is today",
+      "value": {
+        "min": "low"
+      },
+      "format": "decimal",
+      "target": {
+        "gte": -100
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "weather",
+      "title": "Weather",
+      "pack": "weather",
+      "nav": {
+        "section": "Life",
+        "order": 10
+      },
+      "icon": "sun",
+      "requires": [
+        "register.weather"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "heading": "No forecast yet",
+          "icon": "sun",
+          "span": 12,
+          "when": {
+            "metric": "weather-days",
+            "lt": 1
+          },
+          "body": "Set your town, and the forecast arrives within three hours. [Set your town](/addons/weather?set=place)"
+        },
+        {
+          "kind": "cards",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "weather-days",
+            "gt": 0
+          },
+          "source": "register.weather",
+          "where": "day is today",
+          "columns": [
+            {
+              "field": "what",
+              "as": "title"
+            },
+            {
+              "field": "high",
+              "label": "High",
+              "as": "figure"
+            },
+            {
+              "field": "low",
+              "label": "Low",
+              "as": "fact"
+            },
+            {
+              "field": "rain",
+              "label": "Rain",
+              "as": "fact"
+            },
+            {
+              "field": "place",
+              "label": "Where",
+              "as": "fact"
+            }
+          ],
+          "limit": 1,
+          "empty": "Today's forecast has not arrived yet."
+        },
+        {
+          "kind": "table",
+          "heading": "The next days",
+          "icon": "calendar-days",
+          "span": 12,
+          "when": {
+            "metric": "weather-days",
+            "gt": 0
+          },
+          "source": "register.weather",
+          "where": "day after today",
+          "columns": [
+            {
+              "field": "day",
+              "label": "Day",
+              "width": "12ch"
+            },
+            {
+              "field": "what",
+              "label": "Sky",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "high",
+              "label": "High",
+              "width": "8ch"
+            },
+            {
+              "field": "low",
+              "label": "Low",
+              "width": "8ch"
+            },
+            {
+              "field": "rain",
+              "label": "Rain",
+              "width": "8ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "day",
+              "dir": "asc"
+            }
+          ],
+          "limit": 6,
+          "empty": "Nothing past today yet."
+        }
+      ]
+    }
+  ]
+}

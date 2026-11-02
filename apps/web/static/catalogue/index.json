@@ -7824,8 +7824,40 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.1",
+      "latest": "1.2.2",
       "versions": [
+        {
+          "version": "1.2.2",
+          "checksum": "fd08203224c84a4ed60576bdc86265dea10c9308051ec2bc6c102d85cd50d4f3",
+          "bytes": 14310,
+          "published_at": "2026-11-02T14:28:28.708Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Weather"
+            ],
+            "pages": [
+              "Weather"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "geocoding-api.open-meteo.com",
+                "line": "CALLS OUT geocoding-api.open-meteo.com and api.open-meteo.com · every 3h · no key",
+                "key": null
+              }
+            ],
+            "widgets": [
+              "Weather",
+              "The week's weather"
+            ]
+          },
+          "notes": "Its Weather widget for Today opens Wide, the smallest a card is drawn at, where it said Small, which Today could not take, and says the sky, the high and the chance of rain, which fit its frame; the low and the town were cut off at its foot.",
+          "preview": true
+        },
         {
           "version": "1.2.1",
           "checksum": "f9ee472014620e72e34813362ad80133d6f5018db2516a23e815a74d85c13f41",
