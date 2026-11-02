@@ -167,8 +167,14 @@
     list-style: none;
   }
 
+  /* A STEP UNDER THE TILE'S HEADING AND MORE AIR BETWEEN LEARNINGS (pages pass, 2 Nov): the week's date sat flush under
+     "Over time", and each learning's three lines ran into the next one's tag 16px on. */
+  .evo {
+    padding-block-start: var(--sp-2);
+  }
+
   .evo-week + .evo-week {
-    margin-block-start: var(--sp-4);
+    margin-block-start: var(--sp-5);
   }
 
   .evo-when {
@@ -183,7 +189,7 @@
     position: relative;
     display: grid;
     gap: 2px;
-    padding-block: var(--sp-2);
+    padding-block: var(--sp-3);
     padding-inline-start: var(--sp-4);
     border-inline-start: 1px solid var(--rule);
     min-inline-size: 0;
@@ -191,7 +197,7 @@
 
   .evo-dot {
     position: absolute;
-    inset-block-start: calc(var(--sp-2) + 6px);
+    inset-block-start: calc(var(--sp-3) + 6px);
     inset-inline-start: -4px;
     inline-size: 7px;
     block-size: 7px;

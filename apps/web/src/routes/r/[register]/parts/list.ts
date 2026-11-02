@@ -660,7 +660,8 @@ function runsSaid(entries: readonly Entry[], open: number, now: number): string 
 const words = {
   open: (n: number) => `${n} open`,
   atWork: (n: number) => `${n} at work`,
-  quietRuns: (n: number) => `${n} active but quiet`,
+  /* "QUIET", the word the rows under it and the Agents page say for an open run gone silent (pages pass, 2 Nov). */
+  quietRuns: (n: number) => `${n} quiet`,
   aMonth: (said: string) => `${said} a month`,
   finished: (n: number) => `${n} finished`,
   toSettle: (n: number) => `${n} to settle`,
