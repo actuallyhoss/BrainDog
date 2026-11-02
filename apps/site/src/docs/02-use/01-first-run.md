@@ -1,22 +1,20 @@
 # Making your BrainDog
 
-Your BrainDog holds your lists, your pages and the history of every change. Making one takes a sentence about who you are, an email address, and a minute.
+Your BrainDog holds your lists, your pages and the history of every change. Making one takes a short conversation, an email address, and a minute.
 
 ## Early access
 
 BrainDog is in early access, so sign-up is by invitation. Without one, the sign-up page asks your name, your email and what you would use it for, and your invitation comes to that address when there is room. Open the link in it to start.
 
-## Say who you are
+## A short conversation
 
-The first screen asks one thing: **Who are you?** Answer in a sentence, in your own words: your name, and what you want to keep track of. "I'm Mariam. I run a candle shop and want to keep track of orders, stock and what I owe suppliers."
+BrainDog says hello and asks **What do you do?** Tap one of the answers, such as I freelance or I run a small business, or type a sentence or two in your own words.
 
-As you type, the words it understood light up, and your BrainDog is drawn beside them: its pages, with examples so you can see their shape. None of it is saved, and nothing you type leaves your device until you press **That's me**. When you press it, BrainDog's model may read the sentence once, to understand it better.
+Then it asks the follow-ups your answers call for, one at a time: what you are working on right now, the money side, which currency, who you work with, your name, which AI tools you use, and what to keep track of first. A topic your answers already settled is skipped, so most people get three to five questions, and never more than six. Every question can be skipped, and **That's enough, build it** ends the conversation whenever you like.
 
-Under **What I heard**, each phrase says what it became. Tap one to change it or take it out.
+Each answer gets a line back saying what it added: "Added Fenwick, Brightside and Acme as clients.", "Money will be kept in US Dollar.", or a plain thanks. A household is asked about bills and saving rather than work, and a two-person startup is asked its co-founder's name.
 
-## One question
-
-If there is something your sentence could not settle, such as which currency you use, BrainDog asks it, once. Pick an answer, or skip it. There is never a second question.
+Your BrainDog forms beside the conversation as you answer: its places, with examples so you can see their shape. Take out anything you do not want with one press. Nothing is kept until you give your email at the end. Each answer you send may be read once by BrainDog's model, to choose a better next question; when the model is slow or not there, simple rules on your device answer instead, and the conversation goes on the same way.
 
 ## Keep it
 
@@ -26,7 +24,7 @@ Give your email | Press Email me a link | On the same step
 Open the link | It works once, and lasts a day | In your mail, on this device
 ```
 
-Open the link on the device you started on, so everything you said and changed goes with it. On another device, the link carries your sentence, or the start of it if it was long, and you can add the rest once your BrainDog is made.
+Open the link on the device you started on, so everything you said and changed goes with it. On another device, the link carries what you said, or the start of it if it was long, and you can add the rest once your BrainDog is made.
 
 If your invitation was mailed to the address you give, that address is already proved, so no second email comes and it goes straight on.
 
@@ -48,9 +46,15 @@ If part of it could not be added, it says so. Press **Try again** and only the m
 
 Then it opens. You can connect an agent straight away, or skip that and start on Today.
 
+## Your first Today
+
+Your first Today offers a few first entries drawn from what you said, such as a client's invoice to send, your co-founder, or the thing you said to keep track of first. Each one has **Keep**, **Change** and **Not this**. An invoice asks only how much. While BrainDog is still reading the conversation for anything else, Today says so, and more may arrive as drafts a little later. Nothing is kept until you press Keep.
+
+To bring in what you already have, use **Import contacts** on People and **Import a statement** on Money. See [Lists and rows](/docs/use/lists-and-rows) and [Money](/docs/use/money).
+
 ## Invited to someone else's
 
-If somebody invited you to their BrainDog, you do not make one. Open the link in the invitation, press Accept, and prove the address is yours from the mail it sends. You land in their BrainDog at the level they gave you, and you are asked for a passkey, because that is how you come back. See [Sharing and access](/docs/use/sharing).
+If somebody invited you to their BrainDog, you do not make one. Open the invitation mail and press **Join**. The mail itself proves the address is yours, so there is nothing more to wait for. You land in their BrainDog with the role they gave you, Today says once what that role lets you do, and you are asked for a passkey, because that is how you come back. See [Sharing and access](/docs/use/sharing).
 
 ## What next
 

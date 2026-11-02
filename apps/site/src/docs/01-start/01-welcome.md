@@ -28,10 +28,10 @@ Slash is built into BrainDog. Press ⌘J, or Ctrl+J off a Mac, and ask. Ask what
 ## Your agents
 
 <!-- launch: codex -->
-Claude, Codex, Cursor and anything else that speaks MCP can read and write your BrainDog once you allow it. When an agent wants to change something, you get a question first, and its name stays on the change. Agents and scripts use your API keys without ever seeing them.
+Claude, Codex, Cursor and anything else that speaks MCP can read and write your BrainDog once you allow it. When an agent wants to change something, you get a question first, unless you let your own agents act without asking, and its name stays on the change either way. Agents and scripts use your API keys without ever seeing them.
 <!-- /launch -->
 <!-- launch: !codex -->
-Claude, Cursor and anything else that speaks MCP can read and write your BrainDog once you allow it. When an agent wants to change something, you get a question first, and its name stays on the change. Agents and scripts use your API keys without ever seeing them.
+Claude, Cursor and anything else that speaks MCP can read and write your BrainDog once you allow it. When an agent wants to change something, you get a question first, unless you let your own agents act without asking, and its name stays on the change either way. Agents and scripts use your API keys without ever seeing them.
 <!-- /launch -->
 
 ## Things that arrive on their own
@@ -41,14 +41,14 @@ Forward bank texts and receipts by email, point a webhook at your BrainDog, or c
 ## Your first hour
 
 ```steps
-Make your BrainDog | Say who you are, and it is made around you | On the sign-up page
-Bring in what you keep | Forward an email, or connect Stripe or Mercury | In the inbox
+Make your BrainDog | Answer a few short questions, and it is made around you | On the sign-up page
+Bring in what you keep | Import a bank statement or your contacts, forward an email, or connect Stripe or Mercury | On Money, on People, or in the inbox
 Connect an agent | Paste the MCP address, or run one command | From your agent
 Ask Slash for a page | Press ⌘J and say what you want to see | On any page
 ```
 
 ## Where to go next
 
-- [Making your BrainDog](/docs/use/first-run): the sentence, the one question, and the link.
+- [Making your BrainDog](/docs/use/first-run): the short conversation, the link, and your first Today.
 - [How agents connect](/agents): the MCP address, and what an agent can do once it is in.
 - The rest of these docs, from the list of sections beside this page.
