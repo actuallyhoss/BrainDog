@@ -396,6 +396,7 @@
   }
   .st-file-list li {
     display: flex;
+    align-items: baseline;
     justify-content: space-between;
     gap: 12px;
   }
