@@ -417,6 +417,10 @@ final class AppModel {
 
     /// The first time something waits on him: the ask, once, never again whatever he answered.
     func considerAskingPush() async {
+        #if DEBUG
+        /* A walk on a simulator nobody sits at: the system's ask would stand over every shot, with nobody to answer it. */
+        if UserDefaults.standard.string(forKey: "braindogPress") != nil { return }
+        #endif
         guard !UserDefaults.standard.bool(forKey: "push.asked"), await Push.status() == .notDetermined else { return }
         UserDefaults.standard.set(true, forKey: "push.asked")
         _ = await askPush()

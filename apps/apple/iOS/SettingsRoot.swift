@@ -59,6 +59,8 @@ struct SettingsRoot: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s3) {
                 ForEach(groups) { group in
+                    /* WHAT ONLY THIS PHONE HOLDS sits under You, beside Notifications, whose kinds it rings for. */
+                    if group.title != groups.first?.title, groups.dropFirst().first?.title == group.title { PhoneTile() }
                     Tile(group.title) {
                         VStack(spacing: 0) {
                             ForEach(Array(group.areas.enumerated()), id: \.element.id) { index, area in
@@ -77,8 +79,6 @@ struct SettingsRoot: View {
                         }
                     }
                 }
-
-                PhoneTile()
 
                 Tile(Words.about) {
                     VStack(alignment: .leading, spacing: Space.s2) {

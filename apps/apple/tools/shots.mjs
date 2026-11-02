@@ -16,7 +16,7 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { argv, exit } from 'node:process';
@@ -31,6 +31,8 @@ const opt = (name) => {
 const only = opt('only')?.split(',') ?? null;
 const themes = (opt('themes') ?? 'light,dark').split(',');
 const out = join(homedir(), 'Developer', 'braindog', '.notes', 'shots', 'apps', milestone);
+/* `--server http://localhost:5203`: another lane's web dev server may hold 5183. */
+const server = opt('server') ?? 'http://localhost:5183';
 
 /** Each screen: its name, the launch press (`go:` steps joined by `;;`, three seconds apart), and how long to wait. */
 const WALKS = {
@@ -63,6 +65,24 @@ const WALKS = {
     ['share-photo', 'go:share:Paid £34 for lunch with Nadia today|photo', 9],
     ['tell-widget-opens', 'go:tab:/;;tellLink', 10],
   ],
+  /* M4 and M5's second pass: a push as it lands (sent with `simctl push`, see PUSHES below), the native phone settings
+     with Face ID lock and Say what it is about, the lock cover, the press-and-hold actions, and the new widgets. */
+  ios4: [
+    ['settings-phone', 'go:settings', 9],
+    ['lock-cover', 'go:tab:/;;lock', 8],
+    ['quick-tell', 'go:quick:tell', 8],
+    ['quick-needs', 'go:quick:needs', 8],
+    ['quick-search', 'go:quick:search', 8],
+    ['widgets-due-number', 'go:widgets2', 9],
+  ],
+};
+
+/* Pushes for the walk, shown on the lock screen and as a banner over the app: what Apple would carry (`apns.ts`). */
+const PUSHES = {
+  ios4: [
+    ['push-question', { aps: { alert: { title: 'BrainDog', body: 'Something in your BrainDog needs you' }, sound: 'default', category: 'question', 'mutable-content': 1 }, open: '/decide/SG1', kind: 'needs' }],
+    ['push-mention', { aps: { alert: { title: 'BrainDog', body: 'Someone mentioned you in a comment' }, sound: 'default', category: 'open', 'mutable-content': 1 }, open: '/decide/SG2/thread', kind: 'people' }],
+  ],
 };
 
 const walk = WALKS[milestone];
@@ -84,10 +104,21 @@ for (const theme of themes) {
   spawnSync('xcrun', ['simctl', 'ui', udid, 'appearance', theme]);
   for (const [name, press, wait] of walk) {
     if (only && !only.includes(name)) continue;
-    spawnSync('node', [join(apple, 'tools', 'build.mjs'), 'sim', '--server', 'http://localhost:5183', '--launch', '--press', press], { stdio: 'ignore' });
+    spawnSync('node', [join(apple, 'tools', 'build.mjs'), 'sim', '--server', server, '--launch', '--press', press], { stdio: 'ignore' });
     await sleep(wait * 1000);
     const file = join(out, `${name}-${theme}.png`);
     spawnSync('xcrun', ['simctl', 'io', udid, 'screenshot', file], { stdio: 'ignore' });
+    console.log(`  ${name}-${theme}.png`);
+  }
+  for (const [name, payload] of PUSHES[milestone] ?? []) {
+    if (only && !only.includes(name)) continue;
+    spawnSync('node', [join(apple, 'tools', 'build.mjs'), 'sim', '--server', server, '--launch', '--press', 'go:tab:/'], { stdio: 'ignore' });
+    await sleep(8000);
+    const file = join(out, `${name}.apns`);
+    writeFileSync(file, JSON.stringify(payload));
+    spawnSync('xcrun', ['simctl', 'push', udid, 'dog.brain.app', file], { stdio: 'ignore' });
+    await sleep(3000);
+    spawnSync('xcrun', ['simctl', 'io', udid, 'screenshot', join(out, `${name}-${theme}.png`)], { stdio: 'ignore' });
     console.log(`  ${name}-${theme}.png`);
   }
 }

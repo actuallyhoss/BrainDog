@@ -8,10 +8,10 @@ plan is `loop/plans/apps-2026-11-02/PLAN.md`; what each milestone did is beside 
 |---|---|---|
 | `BrainDog` | `dog.brain.app` | the iPhone (and iPad) app |
 | `BrainDogMac` | `dog.brain.desktop` | the Mac app (the id the Tauri shell held, kept) |
-| `WidgetsiOS`, `WidgetsMac` | `….widgets` | WidgetKit: Needs you, Key numbers, Tell (M5) |
+| `WidgetsiOS`, `WidgetsMac` | `….widgets` | WidgetKit: Needs you, Key numbers, Due next, Today number (picked), Tell, and Tell in Control Center (M5) |
 | `ShareiOS`, `ShareMac` | `….share` | the share extension: words, a link, a photo or a PDF into Tell (M5) |
 | `Shared/` | | App Intents and App Shortcuts, compiled into both apps: Tell BrainDog, What needs me, Open Needs you |
-| `NotifyService` | `dog.brain.app.notify` | the notification service extension (M4) |
+| `NotifyService` | `dog.brain.app.notify` | the notification service extension: a push's real words, read on the phone (M4) |
 | `Packages/BrainDogKit` | | everything they share: client, session, sign-in, the bridge, the web screen, Look B, Tell |
 
 The team is Quartz Apps LLC, `MG86668Z52`. iOS 26 and macOS 14 at least.
@@ -68,6 +68,31 @@ screen's own control calls; a Release build has none of it.
   file field of the list the first entry goes to (`PUT /api/files`), and the receipt says when no list keeps one.
 - A Debug build draws the widgets and the share sheet over the app for the walk (`go:widgets`, `go:share:…`,
   `iOS/Gallery.swift`): nobody can add a widget or press Share on a simulator without a finger.
+
+## Push (M4)
+
+- **Server**: the app registers Apple's token through the web's own `subscribePush`, as
+  `apns://<production|sandbox>/dog.brain.app/<hex>`, so it is a row in `push_sub` beside the browsers and rings for
+  exactly what a browser does (questions waiting, the record's alarms, mentions and hand-overs, agents, summaries), held
+  by the person's own switches (`push.off`) and the record's quiet hours. The deliverer sends it to Apple with the team's
+  key (`apps/worker/src/apns.ts`): one fixed line for its kind, `category`, the BrainDog as `thread-id`, and `open`.
+  The key is three Worker secrets, never set by an agent:
+  `wrangler secret put APNS_KEY_ID|APNS_TEAM_ID --env <env>` and `wrangler secret put APNS_KEY --env <env> < AuthKey_<id>.p8`.
+- **App**: asked the first time Needs you holds something, from Settings › On this iPhone, and from the web's
+  Notifications (`pushAsk`, which now answers). The service extension reads the question with the app session and shows
+  its words and the suggested answer ("Say what it is about", on by default); Accept appears only where the web's one
+  press would answer it, Later on every question. The badge is the Needs you count; a tap opens `/decide/<id>` in the
+  BrainDog it came from. Try one on the simulator with `xcrun simctl push booted dog.brain.app <file.apns>`
+  (`tools/shots.mjs ios4` writes two).
+
+## Outside the app, second pass (M5)
+
+- **Home Screen press-and-hold**: Tell BrainDog, Needs you, Search. **Control Center**: Tell BrainDog (also for the
+  Action button), running the app's own Open Tell intent (`Shared/Open.swift`, compiled into the widgets too).
+- **Handoff**: the page in front is the current `dog.brain.page` activity on both apps, with its address as
+  `webpageURL`, so it continues on the other app or in Safari. **Spotlight**: pages and lists by name, gone on sign-out.
+- **Lock with Face ID**: off by default, in Settings › On this iPhone; asks at open and after five minutes away, and
+  covers the app switcher's picture while on.
 
 ## The Mac app (M6)
 
