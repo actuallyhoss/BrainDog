@@ -151,8 +151,29 @@ export const HOUSE_SEED: Seed = {
   action: { accent: HOUSE_ACCENT, light: BRAND_RED, dark: '#E05148', pressed: { light: '#B3322C' } },
 };
 
-export const HOUSE = build(HOUSE_SEED, HOUSE_PROFILE, 'house');
-export const HIGH_CONTRAST = build(HOUSE_SEED, HIGH_CONTRAST_PROFILE, 'high-contrast');
+/**
+ * BUILT ON FIRST USE, NOT AT LOAD (2 Nov): the four palettes are solved by a search, and solving all four when the
+ * module loads put the Worker over Cloudflare's startup CPU limit (deploy refused, code 10021). Each is now solved the
+ * first time anything reads it, once, and kept; reading it looks exactly like reading the object it was.
+ */
+function lazy<T extends object>(make: () => T): T {
+  let made: T | undefined;
+  const real = (): T => (made ??= make());
+  return new Proxy({} as T, {
+    get: (_, k) => Reflect.get(real(), k),
+    has: (_, k) => Reflect.has(real(), k),
+    ownKeys: () => Reflect.ownKeys(real()),
+    getOwnPropertyDescriptor: (_, k) => {
+      const d = Reflect.getOwnPropertyDescriptor(real(), k);
+      return d === undefined ? undefined : { ...d, configurable: true };
+    },
+    getPrototypeOf: () => Reflect.getPrototypeOf(real()),
+    set: (_, k, v) => Reflect.set(real(), k, v),
+  });
+}
+
+export const HOUSE = lazy(() => build(HOUSE_SEED, HOUSE_PROFILE, 'house'));
+export const HIGH_CONTRAST = lazy(() => build(HOUSE_SEED, HIGH_CONTRAST_PROFILE, 'high-contrast'));
 
 /**
  * The environment palettes, re-exported so a build has one place to ask.
@@ -180,6 +201,6 @@ export type { Environment } from './environment.ts';
  * logo would be indistinguishable to the reader the floor exists for. The window the 20° intent-hue
  * rule leaves for orange is hues 47–55, and the mark separation is ≤1.4 across all of it.
  */
-export const ALPHA_SEED = environmentSeed(HOUSE_SEED);
-export const ALPHA = build(ALPHA_SEED, HOUSE_PROFILE, 'alpha');
-export const ALPHA_HIGH_CONTRAST = build(ALPHA_SEED, HIGH_CONTRAST_PROFILE, 'alpha-high-contrast');
+export const ALPHA_SEED = lazy(() => environmentSeed(HOUSE_SEED));
+export const ALPHA = lazy(() => build(ALPHA_SEED, HOUSE_PROFILE, 'alpha'));
+export const ALPHA_HIGH_CONTRAST = lazy(() => build(ALPHA_SEED, HIGH_CONTRAST_PROFILE, 'alpha-high-contrast'));
