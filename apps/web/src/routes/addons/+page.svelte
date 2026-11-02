@@ -160,6 +160,12 @@
 
   /* A STORE THAT DID NOT ANSWER SAYS SO, WITH TRY AGAIN, and never as a store with nothing in it. */
   let retry = $state(false);
+  /* THE SHELVES WAIT FOR THE STORE AND THE RECORD (verify6, 2 Nov): drawn from the starters first, a cold open then
+     pushed them down twice, once for the chips row the store's shelves bring (0.36 of the phone's screen moved) and
+     once for From BrainDog landing over them (0.08 at 1512). Until both have answered or refused, the chips row holds
+     its place and the shelves are not drawn, so they arrive into empty room and nothing moves. */
+  let recordRead = $state(false);
+  const settled = $derived((kennel !== null || kennelRefused !== null) && recordRead);
   function readStore(): void {
     kennelRefused = null;
     void readHostCatalogue(fetch).then((got) => {
@@ -189,24 +195,32 @@
     readStore();
     void readCounts(fetch).then((got) => (counts = got));
     void read(async () => {
-      const client = createClient({ base: apiBase() });
-      const chosen = await choose(client);
-      if (!chosen.first.ok) return false;
-      states = chosen.first.value;
-      /* THE SIGNS AND THE OPEN QUESTIONS ARE ASKED AFTER, and a refusal of either is no suggestion, never an error here.
-         AWAITED INSIDE THE READ, so the screen is drawn once with what it suggests: the phone was captured before they
-         landed, and "Suggested for you" led on the laptop and was missing on the phone. */
-      await Promise.allSettled([
-        client
-          .call<{ signs?: unknown }>('signs')
-          .then((out) => (signs = out.ok && Array.isArray(out.value?.signs) ? (out.value.signs as SignRead[]) : null)),
-        client.governance({ register: 'suggestion', status: 'open', limit: 50 }).then((out) => {
-          const rows = out.ok && Array.isArray(out.value) ? (out.value as { question?: unknown }[]) : [];
-          questions = rows.flatMap((r) => (typeof r.question === 'string' ? [r.question] : []));
-        }),
-      ]);
-      return true;
+      try {
+        return await readRecord();
+      } finally {
+        recordRead = true;
+      }
     });
+  }
+
+  async function readRecord(): Promise<boolean> {
+    const client = createClient({ base: apiBase() });
+    const chosen = await choose(client);
+    if (!chosen.first.ok) return false;
+    states = chosen.first.value;
+    /* THE SIGNS AND THE OPEN QUESTIONS ARE ASKED AFTER, and a refusal of either is no suggestion, never an error here.
+       AWAITED INSIDE THE READ, so the screen is drawn once with what it suggests: the phone was captured before they
+       landed, and "Suggested for you" led on the laptop and was missing on the phone. */
+    await Promise.allSettled([
+      client
+        .call<{ signs?: unknown }>('signs')
+        .then((out) => (signs = out.ok && Array.isArray(out.value?.signs) ? (out.value.signs as SignRead[]) : null)),
+      client.governance({ register: 'suggestion', status: 'open', limit: 50 }).then((out) => {
+        const rows = out.ok && Array.isArray(out.value) ? (out.value as { question?: unknown }[]) : [];
+        questions = rows.flatMap((r) => (typeof r.question === 'string' ? [r.question] : []));
+      }),
+    ]);
+    return true;
   }
   $effect(() => drew('ready'));
 </script>
@@ -239,7 +253,9 @@
       <Icon name="search" size="s" />
       <input class="find-input" type="search" bind:value={query} aria-label={words.searchLabel} placeholder={words.searchHint} autocomplete="off" enterkeyhint="search" />
     </div>
-    {#if chips.length > 1}
+    {#if !settled && !kennelRefused}
+      <div class="chips-held" aria-hidden="true"></div>
+    {:else if chips.length > 1}
       <Segmented class="chips" role="group" aria-label={words.categoriesLabel}>
         <button type="button" class="segment chip" aria-pressed={chip === null} data-on={chip === null ? '' : undefined} onclick={() => (picked = null)}>
           {store.all}<span class="n">{total}</span>
@@ -261,6 +277,7 @@
 
   <!-- A CHIP PRESSED CHANGES EVERY SHELF UNDER IT AT ONCE: the shelves shown fade out and the chosen one up in their place
        (`Swap`, skills pass 2 Nov), where they swapped in one frame. Keyed on the chip alone, so a search typed does not fade. -->
+  {#if settled}
   <Swap key={chip}>
   <div class="shelves">
   {#if suggested.length > 0}
@@ -336,6 +353,7 @@
   {/each}
   </div>
   </Swap>
+  {/if}
 </div>
 {/if}
 
@@ -371,6 +389,18 @@
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
+  }
+
+  /* The chips row's room while the store is read: the Segmented's own height, and on a phone the whole row it wraps to. */
+  .chips-held {
+    min-block-size: 36px;
+  }
+
+  @media (width < 640px) {
+    .chips-held {
+      flex: 1 1 100%;
+      min-block-size: 48px;
+    }
   }
 
   .tools .chip {
