@@ -203,50 +203,8 @@
     white-space: nowrap;
   }
 
-  /* WHERE A ROW APPLIES: drawn by `packages/render/svelte/p/Table.svelte` and `Cards.svelte` in a column `as: scope`,
-     the render package's twin of `lib/ui/ScopeChip.svelte`. The project's mark in its own hue or the globe, then the
-     name, and nothing round them (a category is its small coloured mark and its name, not a chip). */
-  .scope-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-1);
-    min-inline-size: 0;
-    max-inline-size: 100%;
-    min-block-size: var(--ctl-h-sm);
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    font-weight: 500;
-    line-height: var(--lh-tight);
-    vertical-align: middle;
-  }
-
-  .scope-glyph {
-    flex: none;
-    inline-size: var(--icon-s);
-    block-size: var(--icon-s);
-  }
-
-  .scope-mark {
-    flex: none;
-    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
-  }
-
-  /* A PROJECT'S MARK IN A SCOPE CHIP IS ITS SLOT'S COLOUR (domains lane, 2 Nov), the colour its well and its dot wear. */
-  .scope-mark[data-slot='blue'] { color: var(--cat-blue); }
-  .scope-mark[data-slot='violet'] { color: var(--cat-violet); }
-  .scope-mark[data-slot='pink'] { color: var(--cat-pink); }
-  .scope-mark[data-slot='teal'] { color: var(--cat-teal); }
-  .scope-mark[data-slot='sky'] { color: var(--cat-sky); }
-  .scope-mark[data-slot='yellow'] { color: var(--cat-yellow); }
-  .scope-mark[data-slot='lime'] { color: var(--cat-lime); }
-  .scope-mark[data-slot='slate'] { color: var(--cat-slate); }
-
-  .scope-name {
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  /* WHERE A ROW APPLIES (a column `as: scope`) is drawn by `packages/render/svelte/p/Table.svelte`, which brings its
+     own rules for the chip, its mark and its name, so this sheet that every screen waits on does not carry them. */
 
   /* ── rows: spec, params ─────────────────────────────────────────────────── */
 

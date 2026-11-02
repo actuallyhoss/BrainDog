@@ -734,4 +734,53 @@
     background: var(--tile-2);
     color: var(--ink);
   }
+
+  @layer components {
+    /* WHERE A ROW APPLIES: a column `as: scope`, drawn here and in `RowsWindow.svelte` (only ever loaded by this file),
+       the render package's twin of `lib/ui/ScopeChip.svelte`. The project's mark in its own hue or the globe, then the
+       name, and nothing round them (a category is its small coloured mark and its name, not a chip). HERE AND NOT IN
+       `blocks.css` (speed4, 2 Nov), so the sheet every screen waits on does not carry them; in the same layer it was in,
+       so what overrides it still does. Global, so no scoping class lands on a chip `toHTML` draws too. */
+    :global(.scope-chip) {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-1);
+      min-inline-size: 0;
+      max-inline-size: 100%;
+      min-block-size: var(--ctl-h-sm);
+      color: var(--ink-2);
+      font-size: var(--fs-meta);
+      font-weight: 500;
+      line-height: var(--lh-tight);
+      vertical-align: middle;
+    }
+
+    :global(.scope-glyph) {
+      flex: none;
+      inline-size: var(--icon-s);
+      block-size: var(--icon-s);
+    }
+
+    :global(.scope-mark) {
+      flex: none;
+      color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    }
+
+    /* A PROJECT'S MARK IN A SCOPE CHIP IS ITS SLOT'S COLOUR (domains lane, 2 Nov), the colour its well and its dot wear. */
+    :global(.scope-mark[data-slot='blue']) { color: var(--cat-blue); }
+    :global(.scope-mark[data-slot='violet']) { color: var(--cat-violet); }
+    :global(.scope-mark[data-slot='pink']) { color: var(--cat-pink); }
+    :global(.scope-mark[data-slot='teal']) { color: var(--cat-teal); }
+    :global(.scope-mark[data-slot='sky']) { color: var(--cat-sky); }
+    :global(.scope-mark[data-slot='yellow']) { color: var(--cat-yellow); }
+    :global(.scope-mark[data-slot='lime']) { color: var(--cat-lime); }
+    :global(.scope-mark[data-slot='slate']) { color: var(--cat-slate); }
+
+    :global(.scope-name) {
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
 </style>

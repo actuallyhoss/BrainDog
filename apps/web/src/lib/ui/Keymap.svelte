@@ -171,10 +171,15 @@
     padding-block-start: 0;
   }
 
+  /* The ellipsis and the one line are its own: the skin's `.scope-name` it used to lean on now arrives with the table. */
   .scope-name {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* THE KEY COLUMN IS AS WIDE AS THE LONGEST CHORD IN THE WHOLE SHEET and no wider, so the words beside it start at one

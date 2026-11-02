@@ -1,0 +1,132 @@
+/**
+ * EVERY VIEW TRANSITION'S RULES, out of `app.css` (speed4, 2 Nov): the work's cross-fade on a page change, the tab bar,
+ * the toasts and a docked panel held still through it, the top bar's words handing over, and a theme change as one
+ * picture. Nothing here draws a still screen, so the sheet every screen waits on does not carry it: the root layout asks
+ * for it once the first screen has drawn (`+layout.svelte`), long before anyone presses anything. `page-out` and
+ * `page-in` are used by `PageTabs.svelte` and the settings sheet's tab row too, also only in a transition.
+ */
+
+@layer components {
+  /* A NEW SCREEN CROSS-FADES IN THE WORK'S PLACE AND NOWHERE ELSE. The shell names the work `page` (`+layout.svelte`)
+     and wraps a navigation in a view transition where the browser has one; the rest of the window is the root, which
+     is told not to animate, so the rail and the docked panel stay where they are. `normal`, because the browser blends
+     the two halves of a pair by adding their light, and a root that does not fade would flash white. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  /* ONE MOTION PER PAGE CHANGE (motion F6, section 3): the old picture leaves fast and THEN the new one arrives with a 4px
+     rise, so two layouts are never on screen at once (fluid F3). Leaving is shorter than arriving, and the two together
+     last `--d-page`. The group itself does not move; the shell waits a moment for the new screen to say it has drawn
+     before the new picture is taken (`+layout.svelte`). */
+  ::view-transition-group(page) {
+    animation-duration: var(--d-page);
+    animation-timing-function: var(--ease-out);
+  }
+
+  ::view-transition-old(page) {
+    animation: page-out var(--d-exit) var(--ease-in) both;
+  }
+
+  ::view-transition-new(page) {
+    animation: page-in calc(var(--d-page) - var(--d-exit)) var(--ease-out) var(--d-exit) both;
+  }
+
+  @keyframes page-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      translate: 0 4px;
+    }
+  }
+
+  /* ASKED FOR LESS MOTION, A PAGE CHANGE IS CUT (motion section 3): the new page is simply there, with no rise and no
+     fade. A theme change is cut the same way, below. */
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(page),
+    ::view-transition-new(page) {
+      animation: none;
+    }
+  }
+
+  /* THE TAB BAR AND THE TOASTS ARE HELD STILL THROUGH A PAGE CHANGE (motion F3). On a phone `.body` runs under the
+     fixed tab bar, so its two pictures were painted over the real bar and its labels dropped out for the fade. Named
+     (`TabBar.svelte` `.tabs`, `Toasts.svelte` `.stack`) and played nothing, they stay where they are. */
+  ::view-transition-group(tabbar),
+  ::view-transition-old(tabbar),
+  ::view-transition-new(tabbar),
+  ::view-transition-group(toasts),
+  ::view-transition-old(toasts),
+  ::view-transition-new(toasts) {
+    animation: none;
+  }
+
+  /* THE TOP BAR'S WHERE-YOU-ARE HANDS OVER IN PLACE (ui pass, 1 Nov; `TopBar.svelte`): the old words leave over the exit's
+     step and then the new ones fade up, in one box of one size, so nothing scales and the two never cross. It snapped
+     with the rest of the bar while the work under it cross-faded. */
+  ::view-transition-group(bar-crumb) {
+    animation-duration: var(--d-page);
+  }
+
+  ::view-transition-old(bar-crumb) {
+    animation: page-out var(--d-exit) var(--ease-in) both;
+  }
+
+  ::view-transition-new(bar-crumb) {
+    animation: crumb-in calc(var(--d-page) - var(--d-exit)) var(--ease-out) var(--d-exit) both;
+  }
+
+  @keyframes crumb-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* A DOCKED PANEL STAYS WHERE IT IS THROUGH THE FADE. It is named `dock` for the moment (`Panel.svelte`), so it is not
+     painted into the work's two pictures; held on both sides of a navigation, the new picture stands over the old one
+     with nothing played, and the panel does not move or dip. One the new screen does not draw fades with the work. */
+  ::view-transition-group(dock) {
+    animation-duration: var(--d-page);
+    animation-timing-function: var(--ease-standard);
+  }
+
+  ::view-transition-old(dock):not(:only-child),
+  ::view-transition-new(dock):not(:only-child) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  /* A THEME CHANGE IS ONE EVEN CHANGE (motion F15): the old picture of the whole window fades off over the new one in
+     `--d-swap`, and every other transition is off for that frame, so eighteen controls do not each fade at their own
+     speed after the page has changed. `pref.ts` sets `data-retheme` round the view transition and takes it off after. */
+  html[data-retheme] *,
+  html[data-retheme] *::before,
+  html[data-retheme] *::after {
+    transition: none !important;
+  }
+
+  /* THE OLD PICTURE IS ON TOP, or it fades under the new one, which is drawn whole, and the change is a cut (fluid F11). */
+  html[data-retheme]::view-transition-old(root) {
+    z-index: var(--z-raise);
+    animation: page-out var(--d-swap) var(--ease-standard) both;
+    mix-blend-mode: normal;
+  }
+
+  html[data-retheme]::view-transition-new(root) {
+    animation: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html[data-retheme]::view-transition-old(root) {
+      z-index: auto;
+      animation: none;
+    }
+  }
+}

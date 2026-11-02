@@ -16,7 +16,8 @@ import { fileURLToPath } from 'node:url';
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 const shell = read('../lib/shell/AppFrame.svelte');
 const code = shell.replace(/<!--[\s\S]*?-->/gu, '').replace(/\/\*[\s\S]*?\*\//gu, '');
-const sheet = read('../app.css');
+/* The view transitions' rules left `app.css` for a sheet asked after the first draw (speed4, 2 Nov); both are read. */
+const sheet = read('../app.css') + read('../lib/motion/transitions.css');
 const css = sheet.replace(/\/\*[\s\S]*?\*\//gu, '');
 
 const tokens = read('../../../../packages/skin/tokens.css');
