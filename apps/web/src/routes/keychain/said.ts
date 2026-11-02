@@ -39,9 +39,11 @@ export type Said = { kind: 'held' } | { kind: 'absent'; fix: string } | { kind: 
 
 export const words = {
   /** The Keys section over a record with no such register. */
-  noList: 'There is no Keys list yet.',
+  noList: 'No keys yet',
   /** What to do about it, after the record's own sentence. A record grows a Keys register when Agents goes in. */
-  noListHow: 'Keys arrive with Agents, part of BrainDog. Turn it on in Settings › Agents and this section fills itself.',
+  /* WHAT WILL BE HERE, NOT THE RECORD'S OWN REFUSAL (empty states, 2 Nov): a new record read "There is no Keys list yet."
+     over "There is no register called keys.", two lines about a list and none about keys. */
+  noListHow: 'The keys you hand your agents are kept here, sealed. They come with the Agents add-on.',
   browse: 'Browse add-ons',
   /** The Keys section when the record refused the read rather than lacking the list. */
   notYours: 'Your keys could not be listed here.',
@@ -106,7 +108,7 @@ export type Tell = { kind: 'no-data-yet' | 'no-permission'; title: string; body:
 export function tellOf(said: Said): Tell | null {
   if (said.kind === 'held') return null;
   return said.kind === 'absent'
-    ? { kind: 'no-data-yet', title: words.noList, body: `${said.fix} ${words.noListHow}` }
+    ? { kind: 'no-data-yet', title: words.noList, body: words.noListHow }
     : { kind: 'no-permission', title: words.notYours, body: plainOr(said.fix, words.keysHow) };
 }
 

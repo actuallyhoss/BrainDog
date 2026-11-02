@@ -333,7 +333,15 @@ export function heroFactsOf(f: FactsIn, numbers: Numbers): HeroFacts {
   if (run) facts.push(`${runSaid(run, f.now)}.`);
   if (f.about !== '' && fold(f.about) !== fold(f.next)) facts.push(/[.!?]$/u.test(f.about) ? f.about : `${f.about}.`);
   const kept = facts.filter((s) => fold(s) !== fold(f.next));
-  const headline = kept[0] ?? (open.length > 0 ? `${plural(open.length, 'task is', 'tasks are')} open on ${f.name}.` : `Nothing on ${f.name} has a date yet.`);
+  /* A PROJECT WITH NO WORK YET SAYS SO (empty states, 2 Nov): a new project's hero read "Nothing on Launch site has a date
+     yet." in its largest words, of tasks it did not have, and offered no way to add one. */
+  const headline =
+    kept[0] ??
+    (open.length > 0
+      ? `${plural(open.length, 'task is', 'tasks are')} open on ${f.name}.`
+      : f.tasks.length === 0
+        ? `No ${f.called.many} on ${f.name} yet.`
+        : `Nothing on ${f.name} has a date yet.`);
   const lede = kept.slice(1, 3).join(' ') || null;
 
   const red: Act =
@@ -351,7 +359,9 @@ export function heroFactsOf(f: FactsIn, numbers: Numbers): HeroFacts {
       ? { said: 'Fix the numbers feed', href: f.hrefs.feed }
       : open.length > 1 && f.hrefs.work && red?.href !== f.hrefs.work
         ? { said: `Open all ${open.length} tasks`, href: f.hrefs.work }
-        : null;
+        : f.tasks.length === 0 && f.hrefs.work
+          ? { said: `Add a ${f.called.one}`, href: f.hrefs.work }
+          : null;
   return { headline, lede, red, soft };
 }
 

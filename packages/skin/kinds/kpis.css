@@ -77,8 +77,15 @@
     line-height: 18px;
   }
 
-  .kpi-none {
+  /* NO READING YET, IN WORDS WHERE THE FIGURE STANDS: body text in the quiet ink, never the figure's face, whatever size
+     the lead, a tile or a row would draw a figure at (hence the doubled class). */
+  .kpi-figure.kpi-none.kpi-none {
     color: var(--ink-3);
+    font-family: var(--font-ui);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-regular);
+    line-height: 1.4;
+    letter-spacing: normal;
   }
 
   .kpi-meta {

@@ -172,7 +172,7 @@ export const KPI_FIX: Readonly<Record<KpiSource, string>> = {
   figure: 'Check the lists it reads',
 };
 
-export const KPI_NO_VALUE = 'No value yet';
+export const KPI_NO_VALUE = 'No reading yet';
 export const kpiStaleSaid = (day: string): string => `Not updated since ${day}`;
 export const kpiLeftSaid = (n: number, currency: string): string => `${n} reading${n === 1 ? '' : 's'} in ${currency} left out`;
 

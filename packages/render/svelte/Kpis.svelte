@@ -114,7 +114,10 @@
         >{/if}
     </p>
   {:else}
-    <p class="kpi-figure kpi-none num" aria-label={k.stale?.said}>—</p>
+    <!-- NO READING IS SAID IN WORDS, WHERE THE FIGURE WOULD BE (empty states, 2 Nov): a dash stood alone under the name on
+         Today, whose board hides the stale line under it, so a new number read as a broken one. The stale line under
+         it then says nothing more, and keeps its way to add a reading. -->
+    <p class="kpi-figure kpi-none">{k.stale?.said ?? ''}</p>
   {/if}
 {/snippet}
 
@@ -143,9 +146,9 @@
 {#snippet foot(k: KpiView)}
   {#if k.stale}
     <div class="kpi-stale">
-      <p class="kpi-stale-said">
+      {#if k.figure}<p class="kpi-stale-said">
         <svg class="kpi-clock" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"></circle><path d="M8 4.75V8l2.25 1.5"></path></svg>{k.stale.said}
-      </p>
+      </p>{/if}
       {#if fix}{@render fix(k)}{:else if onfix}<button type="button" class="kpi-fix" onclick={() => onfix(k.input)}>{k.stale.fix}</button>{/if}
     </div>
   {/if}
@@ -215,7 +218,7 @@
             {:else}
               {@render change(k, true)}
             {/if}
-            {#if k.stale && !(k.why && state(k) === 'stale')}
+            {#if k.stale && k.figure && !(k.why && state(k) === 'stale')}
               <p class="kpi-stale-said">
                 <svg class="kpi-clock" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"></circle><path d="M8 4.75V8l2.25 1.5"></path></svg>{k.stale.said}
               </p>

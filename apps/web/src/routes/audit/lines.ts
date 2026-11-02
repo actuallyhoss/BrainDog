@@ -996,7 +996,9 @@ export function whoPartsOf(answer: unknown): WhoPart[] | null {
 export function whoSaid(parts: readonly WhoPart[]): string {
   const said = parts.map((p, i) => {
     const who = p.label === 'BrainDog' ? p.label : p.label.toLowerCase();
-    return i === 0 ? `${p.label} made ${count(p.value)} ${p.value === 1 ? 'change' : 'changes'}` : `${who} ${count(p.value)}`;
+    /* EVERY NAME AS IT IS SAID MID-SENTENCE, THE FIRST TOO (empty states, 2 Nov): a new record read "Over the last 30 days
+       You made 9 changes". BrainDog keeps its capital, being a name. */
+    return i === 0 ? `${who} made ${count(p.value)} ${p.value === 1 ? 'change' : 'changes'}` : `${who} ${count(p.value)}`;
   });
   return `Over the last 30 days ${said[0]}${said.length > 1 ? `, ${listed(said.slice(1))}` : ''}.`;
 }
