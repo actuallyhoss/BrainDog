@@ -425,9 +425,9 @@
   }
 
   /* IN A NARROW TILE THE AMOUNT GOES UNDER THE NAME (2 Nov): Due soon at 1280 is about 230 wide, and beside its amount a
-     name had 70px, so "iOS contract…" and "Tidepool / payout" were cut and broken. Under 300 the name has the line and
+     name had 70px, so "iOS contract…" and "Tidepool / payout" were cut and broken. Under 240 the name has the line and
      the amount sits under it, on the same text edge. */
-  @container days (width < 300px) {
+  @container days (width < 240px) {
     .hd-line {
       flex-wrap: wrap;
       row-gap: 2px;
