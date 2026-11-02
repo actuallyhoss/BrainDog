@@ -36,13 +36,15 @@
 {#if !LAUNCH.billing}
   <PageHead title={e.title} lead={e.lede} />
 
-  <section class="wrap early">
+  <section class="wrap early cols">
     <article class="plan">
-      <p class="pname">{e.plan.name} <b class="num">{e.plan.price}</b></p>
+      <div class="ptop">
+        <p class="pname">{e.plan.name} <b class="num">{e.plan.price}</b></p>
+        <div class="go"><Start /></div>
+      </div>
       <ul>
         {#each e.plan.lines(TABLE.free) as line (line)}<li>{line}</li>{/each}
       </ul>
-      <div class="go"><Start /></div>
     </article>
     <p class="later">{e.later.say}</p>
   </section>
@@ -108,32 +110,50 @@
 {/if}
 
 <style>
-  /* The skin's own .sec is a group heading with a hairline under it; this one is a plain section. */
+  /* The skin's own .sec is a group heading with a hairline under it; this one is a plain section, a band step apart. */
   .sec {
     display: block;
-    padding-block: 120px 0;
+    padding-block: var(--band-pad) 0;
     border-block-end: 0;
   }
 
   /* THE QUESTIONS' BAND FOLLOWS ON THE SAME GROUND, so its own padding is the space between them. */
   .early {
-    padding-block: 64px 0;
+    padding-block: var(--first-pad) 0;
   }
 
-
-  /* THE ONE PLAN, on the night: its name and $0, what it holds, and the start button. */
+  /**
+   * THE ONE PLAN, on the night and across the column (polish, 2 November): its name, $0 and the start button on the
+   * left, what it holds on the right, on the same twelve columns as the questions under it, so what Free holds starts
+   * where the questions do. At 640 wide it left half the page empty beside it.
+   */
   .plan {
-    max-inline-size: 640px;
-    padding: 32px;
+    display: grid;
+    grid-template-columns: subgrid;
+    row-gap: 24px;
+    padding: var(--site-tile-pad);
     border-radius: 16px;
     background: var(--night);
     color: var(--on-night);
+    --focus: var(--on-night);
+  }
+
+  .plan > * {
+    grid-column: 1 / -1;
+    min-inline-size: 0;
+  }
+
+  .ptop {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
   }
 
   .pname {
     margin: 0;
-    font: 600 28px/1.1 var(--head);
-    letter-spacing: -0.035em;
+    font: 600 var(--t-feature) / 1.1 var(--head);
+    letter-spacing: -0.03em;
   }
 
   .pname b {
@@ -145,10 +165,11 @@
   .plan ul {
     display: grid;
     gap: 12px;
-    margin: 24px 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--t-site-17);
+    font-size: var(--t-say);
+    line-height: 1.5;
   }
 
   .plan li::before {
@@ -162,37 +183,43 @@
     vertical-align: middle;
   }
 
-  .plan .go {
-    margin-block-start: 32px;
-  }
-
   /* WHAT COMES LATER, one plain line under the plan. */
   .later {
-    margin: 20px 0 0;
+    margin: 0;
+    padding-block-start: 8px;
     color: var(--ink2);
-    font-size: var(--t-site-17);
+    font-size: var(--t-text);
     line-height: 1.55;
   }
 
-
-  @media (max-width: 760px) {
-    .plan {
-      padding: 24px 20px;
+  @media (width >= 1060px) {
+    .ptop {
+      grid-column: 1 / span 4;
+      justify-content: space-between;
     }
 
+    .plan ul {
+      grid-column: 5 / -1;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-content: start;
+      column-gap: 16px;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .plan .go,
     .plan .go :global(.btn) {
       inline-size: 100%;
     }
 
-    .early {
-      padding-block: 40px 0;
+    .ptop {
+      align-items: stretch;
     }
-
   }
 
   .sec .say {
     margin: 16px 0 0;
-    font-size: var(--t-site-19);
+    font-size: var(--t-say);
     color: var(--ink2);
     max-width: 30em;
   }
@@ -204,11 +231,5 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  @media (max-width: 760px) {
-    .sec {
-      padding-block-start: 96px;
-    }
   }
 </style>

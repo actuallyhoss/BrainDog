@@ -107,7 +107,7 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-rows: auto auto;
-    margin-block-start: 32px;
+    margin-block-start: var(--head-gap);
     background: var(--band-slash-tile);
     border-radius: 16px;
     overflow: hidden;
@@ -309,17 +309,20 @@
     background: var(--red-fill);
   }
 
+  /* THE LINE UNDER THE DRAWING, at the text step and a tile's gap below it. */
   .addons {
-    max-inline-size: 48em;
+    max-inline-size: 60ch;
     margin-block-start: 20px;
     color: var(--ink2);
-    font-size: var(--t-site-15);
-    line-height: 1.5;
+    font-size: var(--t-text);
+    line-height: 1.55;
+    text-wrap: pretty;
   }
 
+  /* STACKED BELOW 1060, the line sits the grid's own 16 under its title, as a line under a title does on every page. */
   @media (max-width: 1059px) {
     .head .band-say {
-      margin-block-start: 16px;
+      margin-block-start: 0;
     }
 
     .mwin {

@@ -59,4 +59,14 @@
     inline-size: 18px;
     block-size: 18px;
   }
+
+  /* A WAY ON'S ARROW FOLLOWS ITS LAST WORD (`.onward` in `app.css`): inline, 16 whatever size was asked for, set on the
+     words' middle, so a way on that wraps keeps its arrow with it. */
+  :global(.onward) > .icon[data-size] {
+    display: inline-block;
+    inline-size: 16px;
+    block-size: 16px;
+    margin-inline-start: 6px;
+    vertical-align: -3px;
+  }
 </style>

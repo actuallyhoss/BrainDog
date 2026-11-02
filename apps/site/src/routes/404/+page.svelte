@@ -48,14 +48,14 @@
 
 <style>
   .pages {
-    padding-block: 56px 96px;
+    padding-block: var(--first-pad) var(--band-pad);
   }
 
   .say {
     margin: 0 0 12px;
     color: var(--muted);
     font-family: var(--ui);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     font-weight: 600;
     letter-spacing: 0;
   }
@@ -71,14 +71,16 @@
     gap: 0 32px;
     max-inline-size: 820px;
     margin: 0;
-    padding: 12px 24px;
+    padding: 6px 24px;
     background: var(--paper);
     border-radius: 16px;
     list-style: none;
   }
 
-  li {
-    border-block-end: 1px solid var(--rule);
+  /* A HAIRLINE BETWEEN ROWS and none under the last: each row but the first draws the line above it. It was drawn under
+     every link, so the tile ended on two loose lines. */
+  li:nth-child(n + 3) {
+    border-block-start: 1px solid var(--rule);
   }
 
   a {
@@ -87,21 +89,28 @@
     justify-content: space-between;
     gap: 12px;
     min-block-size: var(--tap);
+    padding-block: 2px;
     color: var(--ink);
-    font-size: var(--t-site-16);
+    font-size: var(--t-text);
     font-weight: 500;
     text-decoration: none;
   }
 
-  a:hover span {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  @media (hover: hover) {
+    a:hover span {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
   }
 
   @media (max-width: 640px) {
     ul {
       grid-template-columns: minmax(0, 1fr);
       padding-inline: 16px;
+    }
+
+    li:nth-child(2) {
+      border-block-start: 1px solid var(--rule);
     }
   }
 </style>

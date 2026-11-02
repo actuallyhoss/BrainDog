@@ -45,101 +45,96 @@
 
 <section class="board" aria-label={s.kept.title}>
   <div class="wrap facts">
-    <!-- Two stacks at a desk, each tile as tall as what it holds; one column of six on a phone. -->
-    <div class="stack span-8">
-      {#if db}
-        <section class="fact split" aria-labelledby="db-title">
-          <div class="say-it">
-            {@render head('db-title', db.glyph, db.title)}
-            <p class="fact-text">{db.text}</p>
-          </div>
-          <div class="records" role="img" aria-label={d.records}>
-            {#each [1, 2, 3, 4] as n}
-              <span class="record" aria-hidden="true">
-                <span class="glyph"><Icon name="server" /></span>
-                <span class="record-name" class:mine={n === 1}>{d.recordName(n)}</span>
-              </span>
-            {/each}
-          </div>
-        </section>
-      {/if}
-
-      {#if passkey}
-        <section class="fact split" aria-labelledby="passkey-title">
-          <div class="say-it">
-            {@render head('passkey-title', passkey.glyph, passkey.title)}
-            <p class="fact-text">{passkey.text}</p>
-          </div>
-          <div class="signin" role="img" aria-label={d.signinLabel}>
-            {#each d.signin as way, i (way)}
-              <span class="way" class:not={i === 3} aria-hidden="true">
-                <span class="glyph" class:ink={i === 0}><Icon name={i === 0 ? 'mail' : i === 1 ? 'globe' : i === 2 ? 'key' : 'x'} /></span>{way}
-              </span>
-            {/each}
-          </div>
-        </section>
-      {/if}
-
-      {#if token}
-        <section class="fact split" aria-labelledby="token-title">
-          <div class="say-it">
-            {@render head('token-title', token.glyph, token.title)}
-            <p class="fact-text">{token.text}</p>
-          </div>
-          <a class="how" href={d.reachHref}>{d.reachLink}<Icon name="arrow-right" size="s" /></a>
-        </section>
-      {/if}
-    </div>
-
-    <div class="stack span-4">
-      {#if keys}
-        <section class="fact" aria-labelledby="keys-title">
-          {@render head('keys-title', keys.glyph, keys.title)}
-          <p class="fact-text">{keys.text}</p>
-          <div class="seal" role="img" aria-label={d.sealedLabel}>
-            {#each d.sealed as step, i}
-              {#if i > 0}<span class="seal-arrow" aria-hidden="true"><Icon name="arrow" size="m" /></span>{/if}
-              <span class="seal-step" aria-hidden="true">
-                <span class="glyph l" class:ink={i === 1}><Icon name={i === 0 ? 'key' : i === 1 ? 'lock' : 'server'} /></span>
-                <span class="seal-word">{step}</span>
-              </span>
-            {/each}
-          </div>
-          <p class="note">{d.sealedNote}</p>
-        </section>
-      {/if}
-
-      {#if nights}
-        <section class="fact" aria-labelledby="nights-title">
-          {@render head('nights-title', nights.glyph, nights.title)}
-          <p class="fact-text">{nights.text}</p>
-          <div class="nights" role="img" aria-label={d.nights}>
-            <span class="night-row" aria-hidden="true">
-              {#each NIGHTS as i}<span class="night" class:last={i === NIGHTS.length - 1}></span>{/each}
+    <!-- ROWS OF TWO in the order the facts are told, the wide tile and the narrow one changing sides each row; one
+         column of six on a phone, in the same order. -->
+    {#if db}
+      <section class="fact span-8 split" aria-labelledby="db-title">
+        <div class="say-it">
+          {@render head('db-title', db.glyph, db.title)}
+          <p class="fact-text">{db.text}</p>
+        </div>
+        <div class="records" role="img" aria-label={d.records}>
+          {#each [1, 2, 3, 4] as n}
+            <span class="record" aria-hidden="true">
+              <span class="glyph"><Icon name="server" /></span>
+              <span class="record-name" class:mine={n === 1}>{d.recordName(n)}</span>
             </span>
-            <span class="night-ends" aria-hidden="true"><span>{d.nightsFrom}</span><span>{d.nightsTo}</span></span>
-          </div>
-          <p class="note ink">{d.nightsRead}</p>
-        </section>
-      {/if}
+          {/each}
+        </div>
+      </section>
+    {/if}
 
-      {#if exported}
-        <section class="fact" aria-labelledby="export-title">
-          {@render head('export-title', exported.glyph, exported.title)}
-          <p class="fact-text">{exported.text}</p>
-          <div class="export" role="img" aria-label={exported.text}>
-            <span class="export-row" aria-hidden="true">
-              <span class="glyph"><Icon name="download" /></span>
-              <span class="export-words">
-                <span class="export-name">{d.exportName}</span>
-                <span class="export-note">{d.exportNote}</span>
-              </span>
+    {#if keys}
+      <section class="fact span-4" aria-labelledby="keys-title">
+        {@render head('keys-title', keys.glyph, keys.title)}
+        <p class="fact-text">{keys.text}</p>
+        <div class="seal" role="img" aria-label={d.sealedLabel}>
+          {#each d.sealed as step, i}
+            {#if i > 0}<span class="seal-arrow" aria-hidden="true"><Icon name="arrow" size="m" /></span>{/if}
+            <span class="seal-step" aria-hidden="true">
+              <span class="glyph l" class:ink={i === 1}><Icon name={i === 0 ? 'key' : i === 1 ? 'lock' : 'server'} /></span>
+              <span class="seal-word">{step}</span>
             </span>
-          </div>
-          <a class="how" href={d.exportHref}>{d.exportLink}<Icon name="arrow-right" size="s" /></a>
-        </section>
-      {/if}
-    </div>
+          {/each}
+        </div>
+        <p class="note">{d.sealedNote}</p>
+      </section>
+    {/if}
+
+    {#if nights}
+      <section class="fact span-4" aria-labelledby="nights-title">
+        {@render head('nights-title', nights.glyph, nights.title)}
+        <p class="fact-text">{nights.text}</p>
+        <div class="nights" role="img" aria-label={d.nights}>
+          <span class="night-row" aria-hidden="true">
+            {#each NIGHTS as i}<span class="night" class:last={i === NIGHTS.length - 1}></span>{/each}
+          </span>
+          <span class="night-ends" aria-hidden="true"><span>{d.nightsFrom}</span><span>{d.nightsTo}</span></span>
+        </div>
+        <p class="note ink">{d.nightsRead}</p>
+      </section>
+    {/if}
+
+    {#if passkey}
+      <section class="fact span-8 split" aria-labelledby="passkey-title">
+        <div class="say-it">
+          {@render head('passkey-title', passkey.glyph, passkey.title)}
+          <p class="fact-text">{passkey.text}</p>
+        </div>
+        <div class="signin" role="img" aria-label={d.signinLabel}>
+          {#each d.signin as way, i (way)}
+            <span class="way" class:not={i === 3} aria-hidden="true">
+              <span class="glyph" class:ink={i === 0}><Icon name={i === 0 ? 'mail' : i === 1 ? 'globe' : i === 2 ? 'key' : 'x'} /></span>{way}
+            </span>
+          {/each}
+        </div>
+      </section>
+    {/if}
+
+    {#if token}
+      <section class="fact span-6" aria-labelledby="token-title">
+        {@render head('token-title', token.glyph, token.title)}
+        <p class="fact-text">{token.text}</p>
+        <p class="on"><a class="onward" href={d.reachHref}>{d.reachLink}<Icon name="arrow-right" size="s" /></a></p>
+      </section>
+    {/if}
+
+    {#if exported}
+      <section class="fact span-6" aria-labelledby="export-title">
+        {@render head('export-title', exported.glyph, exported.title)}
+        <p class="fact-text">{exported.text}</p>
+        <div class="export" role="img" aria-label={exported.text}>
+          <span class="export-row" aria-hidden="true">
+            <span class="glyph"><Icon name="download" /></span>
+            <span class="export-words">
+              <span class="export-name">{d.exportName}</span>
+              <span class="export-note">{d.exportNote}</span>
+            </span>
+          </span>
+        </div>
+        <p class="on"><a class="onward" href={d.exportHref}>{d.exportLink}<Icon name="arrow-right" size="s" /></a></p>
+      </section>
+    {/if}
 
     <section class="fact span-12 split report" aria-labelledby="report-title">
       <div class="say-it">
@@ -172,64 +167,24 @@
 <style>
   /* ── The board and its tiles ─────────────────────────────────────────── */
 
-  /* THE BOARD: one flat ground under the head, the tiles on it a gap apart. It runs on to the footer with no strip of
-     the page's white between: its own padding is the room at the page's end. */
+  /* THE BOARD: one flat ground under the head, the tiles on it a gap apart, at the page's first step under the head and
+     its band step at the end. It runs on to the footer with no strip of the page's white between. */
   .board {
     margin-block-end: 0;
-    padding-block: 56px 96px;
+    padding-block: var(--first-pad) var(--band-pad);
     background: var(--board);
   }
 
-  /* TWO STACKS AT A DESK, eight columns and four, each tile as tall as what it holds, so none stands half empty beside
-     a taller one; the shorter stack shares what is left among its tiles, so both end level above the report. One
-     column below 900, in the order the facts are told. */
+  /**
+   * ROWS OF TWO ON TWELVE COLUMNS (polish, 2 November): the facts in the order they are told, eight and four, then four
+   * and eight, then six and six, and the report across. Each row's tiles share its height, so every gutter runs
+   * straight across the board. They were two stacks whose gaps never met, and on a phone the tiles were put back in
+   * order by hand. One column below 900.
+   */
   .facts {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
-  }
-
-  .stack {
-    display: contents;
-  }
-
-  @media (width >= 900px) {
-    .stack {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      min-inline-size: 0;
-    }
-
-    .stack > * {
-      flex-grow: 1;
-    }
-  }
-
-  @media (width < 900px) {
-    .stack > section[aria-labelledby='keys-title'] {
-      order: 1;
-    }
-
-    .stack > section[aria-labelledby='nights-title'] {
-      order: 2;
-    }
-
-    .stack > section[aria-labelledby='passkey-title'] {
-      order: 3;
-    }
-
-    .stack > section[aria-labelledby='token-title'] {
-      order: 4;
-    }
-
-    .stack > section[aria-labelledby='export-title'] {
-      order: 5;
-    }
-
-    .report {
-      order: 6;
-    }
   }
 
   @media (width >= 900px) {
@@ -241,6 +196,10 @@
       grid-column: span 4;
     }
 
+    .span-6 {
+      grid-column: span 6;
+    }
+
     .span-8 {
       grid-column: span 8;
     }
@@ -250,19 +209,20 @@
     }
   }
 
-  /* A TILE: flat and opaque, radius 16, no edge and no shadow. */
+  /* A TILE: flat and opaque, radius 16, no edge and no shadow, padded as every tile is. */
   .fact {
     display: flex;
     flex-direction: column;
     gap: 20px;
     min-inline-size: 0;
-    padding: clamp(20px, 1.6vw + 14px, 32px);
+    padding: var(--site-tile-pad);
     background: var(--tile);
     border-radius: 16px;
     color: var(--ink);
   }
 
-  /* A TILE IN TWO HALVES at a desk: the words, and the drawing of what they say. One column below 1100. */
+  /* A TILE IN TWO HALVES at a desk: the words, and the drawing of what they say beside them, level with the middle of
+     the tile. One column at 1200 and under. */
   .split {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -270,38 +230,23 @@
     align-content: start;
   }
 
-  /* The database tile's drawing goes under its words at 1200 and under. */
   @media (width > 1200px) {
     .split {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      align-items: start;
+      align-items: center;
+      align-content: stretch;
+    }
+
+    .split > .say-it {
+      align-self: start;
     }
   }
 
-  .how {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    align-self: flex-start;
-    min-block-size: 32px;
-    color: var(--ink);
-    font-size: var(--t-site-15);
-    font-weight: 600;
-    text-decoration: none;
+  /* THE WAY ON AT THE FOOT OF ITS TILE, so the two in a row sit on one line. */
+  .on {
+    margin: auto 0 0;
+    padding-block-start: 4px;
   }
-
-  .how:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
-  }
-
-  @media (pointer: coarse) {
-    .how {
-      min-block-size: var(--tap);
-    }
-  }
-
-
 
   .say-it {
     display: flex;
@@ -315,16 +260,17 @@
     align-items: center;
     gap: 12px;
     color: var(--ink);
-    font-size: var(--t-site-21);
+    font-size: var(--t-card);
     line-height: 1.2;
-    letter-spacing: -0.035em;
+    letter-spacing: -0.02em;
   }
 
   .fact-text {
     margin: 0;
+    max-inline-size: 34em;
     color: var(--ink2);
-    font-size: var(--t-site-body);
-    line-height: var(--lh-site-body);
+    font-size: var(--t-text);
+    line-height: 1.6;
     text-wrap: pretty;
   }
 
@@ -332,7 +278,7 @@
   .note {
     margin: 0;
     color: var(--muted);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     line-height: 1.5;
   }
 
@@ -340,7 +286,8 @@
     color: var(--ink);
   }
 
-  /* THE GLYPH'S SQUARE: 32 (or 40) on the board's own fill, radius 8; `ink` is the chosen form. */
+  /* THE GLYPH'S SQUARE: 32 (or 40) on the board's own fill, the control radius every well takes; `ink` is the
+     chosen form. */
   .glyph {
     display: inline-grid;
     flex: none;
@@ -348,7 +295,7 @@
     inline-size: 32px;
     block-size: 32px;
     background: var(--board);
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
     color: var(--ink2);
   }
 
@@ -388,7 +335,7 @@
   /* "Yours" in ink, the three "Someone else's" in the muted ink. */
   .record-name {
     color: var(--muted);
-    font-size: var(--t-site-small);
+    font-size: var(--t-meta);
     font-weight: 500;
   }
 
@@ -417,7 +364,7 @@
 
   .seal-word {
     color: var(--ink2);
-    font-size: var(--t-site-small);
+    font-size: var(--t-meta);
     line-height: 1.35;
     overflow-wrap: anywhere;
   }
@@ -458,7 +405,7 @@
     display: flex;
     justify-content: space-between;
     color: var(--muted);
-    font-size: var(--t-site-small);
+    font-size: var(--t-meta);
   }
 
   /* ── A passkey ───────────────────────────────────────────────────────── */
@@ -476,7 +423,7 @@
     align-items: center;
     gap: 12px;
     color: var(--ink);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     font-weight: 500;
   }
 
@@ -513,13 +460,13 @@
 
   .export-name {
     color: var(--ink);
-    font-size: var(--t-site-small);
+    font-size: var(--t-meta);
     font-weight: 600;
   }
 
   .export-note {
     color: var(--muted);
-    font-size: var(--t-site-small);
+    font-size: var(--t-meta);
   }
 
   /* ── Report a vulnerability ──────────────────────────────────────────── */
@@ -551,7 +498,7 @@
   .after-title {
     color: var(--muted);
     font-family: var(--ui);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     font-weight: 500;
   }
 
@@ -581,20 +528,20 @@
     background: var(--board);
     border-radius: 8px;
     color: var(--ink2);
-    font-size: var(--t-site-small);
+    font-size: var(--t-meta);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
 
   .step-what {
     color: var(--ink);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     font-weight: 600;
   }
 
   .step-when {
     color: var(--muted);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
   }
 
   @media (width >= 1100px) {
@@ -622,16 +569,12 @@
       inline-size: 24px;
       block-size: 24px;
       margin: 0;
-      font-size: var(--t-site-13);
+      font-size: var(--t-meta);
     }
 
     .step-when {
-      font-size: var(--t-site-14);
+      font-size: var(--t-meta);
       text-align: end;
-    }
-
-    .board {
-      padding-block: 24px 64px;
     }
 
     .night-row {

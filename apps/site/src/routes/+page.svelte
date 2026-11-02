@@ -105,7 +105,7 @@
   /* Two lines at 1440, three at 390. */
   h1 {
     max-inline-size: 18ch;
-    font-size: clamp(48px, 6.4vw, 92px);
+    font-size: var(--t-display);
     line-height: 0.98;
     letter-spacing: -0.05em;
     text-wrap: balance;
@@ -115,7 +115,7 @@
     max-inline-size: 30em;
     margin: 24px 0 0;
     color: var(--on-night-2);
-    font-size: var(--t-site-20);
+    font-size: var(--t-lead);
     line-height: 1.5;
     text-wrap: pretty;
   }
@@ -130,7 +130,7 @@
   .early {
     margin: 16px 0 0;
     color: var(--on-night-2);
-    font-size: var(--t-site-14);
+    font-size: var(--t-meta);
   }
 
   .early b {
@@ -145,7 +145,7 @@
     gap: 8px 16px;
     margin: 24px 0 0;
     color: var(--on-night-2);
-    font-size: var(--t-site-14);
+    font-size: var(--t-meta);
   }
 
   .maker {
@@ -185,11 +185,7 @@
      mark's line behind the desk's top edge rather than the buttons. */
   @media (max-width: 760px) {
     .copy {
-      padding-block: 32px;
-    }
-
-    .lead {
-      font-size: var(--t-site-18);
+      padding-block: 32px 40px;
     }
 
     .hero-mark {
@@ -209,9 +205,16 @@
     }
 
     /* THE MAKERS AT 20 WITH THEIR NAMES (plan F13): as bare marks at 16 they read as specks, and a stranger cannot name
-       a mark. Two to a line if the names need it. */
+       a mark. "Works with" takes its own line and the makers sit two by two under it: in one wrapping row the last
+       maker was left alone on a second line. */
     .works {
-      gap: 10px 16px;
+      display: grid;
+      grid-template-columns: repeat(2, max-content);
+      gap: 12px 28px;
+    }
+
+    .works-say {
+      grid-column: 1 / -1;
     }
 
     .maker :global(svg.agent-mark[data-sized]) {

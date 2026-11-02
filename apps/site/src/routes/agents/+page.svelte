@@ -41,7 +41,7 @@
     <h2>{a.gets.title}</h2>
     <ul class="plain">
       {#each a.gets.lines as item, i (item)}
-        <li><span class="ico"><Icon name={GETS[i] ?? 'check'} /></span>{item}</li>
+        <li><span class="ico"><Icon name={GETS[i] ?? 'check'} /></span><span>{item}</span></li>
       {/each}
     </ul>
   </div>
@@ -49,7 +49,7 @@
     <h2>{a.cannot.title}</h2>
     <ul class="plain">
       {#each a.cannot.lines as item, i (item)}
-        <li><span class="ico"><Icon name={CANNOT[i] ?? 'x'} /></span>{item}</li>
+        <li><span class="ico"><Icon name={CANNOT[i] ?? 'x'} /></span><span>{item}</span></li>
       {/each}
     </ul>
   </div>
@@ -67,9 +67,9 @@
 
 <section class="wrap dev" aria-labelledby="dev-title">
   <h2 id="dev-title">{a.dev.title}</h2>
-  <ul>
+  <ul class="onwards">
     {#each a.dev.links as link (link.href)}
-      <li><a href={link.href}>{link.label}<Icon name="arrow-right" size="s" /></a></li>
+      <li><a class="onward" href={link.href}>{link.label}<Icon name="arrow-right" size="s" /></a></li>
     {/each}
   </ul>
 </section>
@@ -82,19 +82,21 @@
     margin-block-start: 40px;
   }
 
+  /* THE PAGE'S SECTIONS ON THE SITE'S STEPS (polish, 2 November): the first one the first step under the night head,
+     the rest a band step apart, each title at the feature step. They were 96 apart on a desk and 64 on a phone. */
   .lists {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 56px;
-    padding-block-start: 96px;
+    gap: 48px 56px;
+    padding-block-start: var(--first-pad);
   }
 
   .lists h2,
   .dev h2 {
-    margin: 0 0 20px;
-    font-size: var(--t-site-28);
+    margin: 0 0 24px;
+    font-size: var(--t-feature);
     line-height: 1.1;
-    letter-spacing: -0.035em;
+    letter-spacing: -0.03em;
   }
 
   .plain {
@@ -105,14 +107,20 @@
     list-style: none;
   }
 
+  /* EACH LINE BESIDE ITS ICON, the icon level with the first line when the words run to two. */
   .plain li {
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr);
-    gap: 12px;
-    align-items: center;
+    gap: 14px;
+    align-items: start;
     color: var(--ink2);
-    font-size: var(--t-site-17);
+    font-size: var(--t-say);
     line-height: 1.5;
+  }
+
+  .plain li > span:last-child {
+    padding-block-start: calc((32px - 1.5em) / 2);
+    text-wrap: pretty;
   }
 
   /* AN 18PX ICON IN A 32PX WELL, as the app's tile heads draw theirs. */
@@ -121,7 +129,7 @@
     place-items: center;
     inline-size: 32px;
     block-size: 32px;
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
     background: var(--paper);
     color: var(--ink2);
   }
@@ -132,7 +140,7 @@
   }
 
   .brief {
-    padding-block-start: 96px;
+    padding-block-start: var(--band-pad);
   }
 
   .split {
@@ -144,40 +152,11 @@
   }
 
   .dev {
-    padding-block: 96px;
+    padding-block: var(--band-pad);
   }
 
-  .dev ul {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px 32px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    font-size: var(--t-site-16);
-  }
-
-
-  .dev a {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-block-size: 32px;
-    color: var(--ink);
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .dev a:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
-  }
-
-  @media (pointer: coarse) {
-    .dev a {
-      min-block-size: var(--tap);
-    }
+  .dev h2 {
+    margin-block-end: 16px;
   }
 
   @media (max-width: 1060px) {
@@ -188,21 +167,11 @@
 
     .lists {
       grid-template-columns: minmax(0, 1fr);
-      gap: 48px;
     }
   }
 
   @media (max-width: 760px) {
-    .lists,
-    .brief {
-      padding-block-start: 64px;
-    }
-
-    .dev {
-      padding-block: 64px;
-    }
-
-    .dev ul {
+    .dev .onwards {
       flex-direction: column;
       align-items: flex-start;
     }

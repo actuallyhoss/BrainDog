@@ -44,52 +44,58 @@
 <Seo title="{text.title} · BrainDog" description={text.description} path="/legal/{data.name}" noindex={data.text === null} />
 <PageHead title={text.title} lead={text.description} />
 
-<section class="wrap sheet-band">
-  <article class="sheet" aria-label={text.title}>
-    {#if data.text === null}
-      <p class="doc-p">{l.pending}</p>
-    {:else}
-      {#if sections.length > 2}
-        <nav class="toc" aria-labelledby="toc-title">
-          <h2 class="toc-title" id="toc-title">{l.contents}</h2>
-          <ol>
-            {#each sections as s (s.id)}<li><a href="#{s.id}">{s.text}</a></li>{/each}
-          </ol>
-        </nav>
-      {/if}
-      {#each data.text as block, at}
-        {#if block.kind === 'h2'}
-          <h2 class="doc-h2" id={idAt(at)}>{block.text}</h2>
-        {:else if block.kind === 'h3'}
-          <h3 class="doc-h3">{block.text}</h3>
-        {:else if block.kind === 'ul'}
-          <ul class="doc-ul">
-            {#each block.items as item}
-              <li>{item}</li>
-            {/each}
-          </ul>
-        {:else}
-          <p class="doc-p">{block.text}</p>
+<section class="sheet-board">
+  <div class="wrap">
+    <article class="sheet" aria-label={text.title}>
+      {#if data.text === null}
+        <p class="doc-p">{l.pending}</p>
+      {:else}
+        {#if sections.length > 2}
+          <nav class="toc" aria-labelledby="toc-title">
+            <h2 class="toc-title" id="toc-title">{l.contents}</h2>
+            <ol>
+              {#each sections as s (s.id)}<li><a href="#{s.id}">{s.text}</a></li>{/each}
+            </ol>
+          </nav>
         {/if}
-      {/each}
-    {/if}
-  </article>
+        {#each data.text as block, at}
+          {#if block.kind === 'h2'}
+            <h2 class="doc-h2" id={idAt(at)}>{block.text}</h2>
+          {:else if block.kind === 'h3'}
+            <h3 class="doc-h3">{block.text}</h3>
+          {:else if block.kind === 'ul'}
+            <ul class="doc-ul">
+              {#each block.items as item}
+                <li>{item}</li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="doc-p">{block.text}</p>
+          {/if}
+        {/each}
+      {/if}
+    </article>
+  </div>
 </section>
 
 <style>
-  .sheet-band {
-    padding-block: 56px 96px;
+  /* THE BOARD THE TRUST PAGES SHARE (`Parts.svelte`), at the page's first step under the head and its band step at the
+     end, running on to the footer. The sheet was the paper grey on the page's white, an edge too faint to see. */
+  .sheet-board {
+    padding-block: var(--first-pad) var(--band-pad);
+    background: var(--board);
   }
 
-  /* ONE SHEET: a legal text is read line by line, so the whole of it keeps the 68ch measure at 17/28 on one flat paper
-     tile, radius 16, no edge and no shadow; its sections headed in Lexend at the title step (28), their parts at 19. */
+  /* ONE SHEET: a legal text is read line by line, so the whole of it keeps the 68ch measure at 16/26 on one flat tile,
+     radius 16, no edge and no shadow; its sections headed in Lexend at the feature step, their parts at the card step. */
   .sheet {
+    --sheet-pad: clamp(24px, 2.5vw + 12px, 48px);
     display: flex;
     flex-direction: column;
     gap: 16px;
-    max-inline-size: calc(68ch + 2 * clamp(20px, 3vw + 8px, 56px));
-    padding: clamp(24px, 3vw + 8px, 56px);
-    background: var(--paper);
+    max-inline-size: calc(68ch + 2 * var(--sheet-pad));
+    padding: var(--sheet-pad);
+    background: var(--tile);
     border-radius: 16px;
     color: var(--ink);
   }
@@ -101,9 +107,9 @@
   .doc-h2 {
     margin: 24px 0 0;
     color: var(--ink);
-    font-size: var(--fs-page);
+    font-size: var(--t-feature);
     line-height: 1.2;
-    letter-spacing: -0.035em;
+    letter-spacing: -0.03em;
   }
 
   .doc-h2:first-child {
@@ -125,7 +131,7 @@
     margin: 0 0 10px;
     color: var(--muted);
     font-family: var(--ui);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     font-weight: 600;
     letter-spacing: 0;
   }
@@ -136,7 +142,7 @@
     columns: 2;
     column-gap: 32px;
     color: var(--muted);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     line-height: 1.5;
   }
 
@@ -150,9 +156,11 @@
     text-decoration: none;
   }
 
-  .toc a:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  @media (hover: hover) {
+    .toc a:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
   }
 
   @media (pointer: coarse) {
@@ -175,17 +183,17 @@
   .doc-h3 {
     margin: 8px 0 0;
     color: var(--ink);
-    font-size: var(--t-site-19);
+    font-size: var(--t-card);
     line-height: 1.3;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
   }
 
   .doc-p,
   .doc-ul {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-site-body);
-    line-height: var(--lh-site-body);
+    font-size: var(--t-text);
+    line-height: 1.65;
     overflow-wrap: anywhere;
     text-wrap: pretty;
   }
@@ -199,13 +207,8 @@
   }
 
   @media (width < 640px) {
-    .sheet-band {
-      padding-block: 24px 64px;
-    }
-
-    /* A STEP SMALLER ON A PHONE, so a section's name keeps to one or two lines. */
+    /* A SECTION'S NAME ON A PHONE keeps to one or two lines: the feature step is 24 there. */
     .doc-h2 {
-      font-size: var(--t-site-22);
       line-height: 1.2;
     }
   }

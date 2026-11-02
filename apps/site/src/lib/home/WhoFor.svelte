@@ -36,17 +36,17 @@
           </svg>
           <p class="fig"><b>{w.small.figure}</b> <span>{w.small.figureSay}</span></p>
         </div>
-        <a class="go" href={w.small.href}>{w.small.link}<Icon name="arrow-right" size="s" /></a>
+        <a class="onward" href={w.small.href}>{w.small.link}<Icon name="arrow-right" size="s" /></a>
       </article>
 
-      <article class="ftile c4 night">
+      <article class="ftile c4 ink">
         <span class="fwell"><Icon name="terminal" /></span>
         <h3>{w.build.title}</h3>
         <p class="say">{w.build.say}</p>
         <div class="draw term" aria-hidden="true">
           {#each w.build.lines as line, i}<p class:first={i === 0}>{line}</p>{/each}
         </div>
-        <a class="go" href={w.build.href}>{w.build.link}<Icon name="arrow-right" size="s" /></a>
+        <a class="onward" href={w.build.href}>{w.build.link}<Icon name="arrow-right" size="s" /></a>
       </article>
 
       <article class="ftile c4 blue">
@@ -58,7 +58,7 @@
             <p class="due"><span>{c.name}</span><span class="when">{c.when}</span><b class="num">{usd(c.cents)}</b></p>
           {/each}
         </div>
-        <a class="go" href={w.life.href}>{w.life.link}<Icon name="arrow-right" size="s" /></a>
+        <a class="onward" href={w.life.href}>{w.life.link}<Icon name="arrow-right" size="s" /></a>
       </article>
     </div>
   </div>
@@ -66,13 +66,13 @@
 
 <style>
   .trio {
-    margin-block-start: 32px;
+    margin-block-start: var(--head-gap);
   }
 
   .ftile {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     min-inline-size: 0;
   }
 
@@ -86,7 +86,7 @@
     --well-ink: var(--cat-amber);
   }
 
-  .night {
+  .ink {
     --well: color-mix(in srgb, var(--ink) 8%, transparent);
     --well-ink: var(--ink);
   }
@@ -111,18 +111,20 @@
     block-size: 20px;
   }
 
+  /* A TILE'S TITLE AT THE CARD STEP every tile on the site takes, and its line at the text step. */
   h3 {
-    margin-block-start: 4px;
-    font-size: var(--t-site-24);
-    line-height: 1.15;
-    letter-spacing: -0.03em;
+    margin-block-start: 6px;
+    font-size: var(--t-card);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
   }
 
   .say {
     margin: 0;
-    font-size: var(--t-site-15);
-    line-height: 1.5;
+    font-size: var(--t-text);
+    line-height: 1.55;
     color: var(--ink2);
+    text-wrap: pretty;
   }
 
   .draw {
@@ -202,27 +204,9 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .go {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+  /* THE WAY ON is the site's one (`.onward`), at the tile's foot. */
+  .onward {
     align-self: flex-start;
-    min-block-size: 32px;
-    color: inherit;
-    font-size: var(--t-site-15);
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .go:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
-  }
-
-  @media (pointer: coarse) {
-    .go {
-      min-block-size: var(--tap);
-    }
   }
 
   /* ON A PHONE each tile is one plain line, its icon and its way on with the arrow: the drawings and the sentences
@@ -235,7 +219,6 @@
 
     .trio {
       gap: 8px;
-      margin-block-start: 20px;
     }
 
     .ftile {
@@ -256,9 +239,9 @@
       white-space: nowrap;
     }
 
-    .go {
+    .onward {
       align-self: center;
-      font-size: var(--t-site-16);
+      font-size: var(--t-text);
     }
   }
 </style>

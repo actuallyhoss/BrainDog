@@ -12,9 +12,10 @@
   import { shell } from '../copy/shell.ts';
   import { APP, SIGNUP } from '../links.ts';
 
-  let { size = 'md', tone = 'red' }: { size?: 'md' | 'sm'; tone?: 'red' } = $props();
+  /* `lg` is a page's 48px action, `md` the header's 40 and `sm` the 34 inside a tile (`.btn` in `app.css`). */
+  let { size = 'lg', tone = 'red' }: { size?: 'lg' | 'md' | 'sm'; tone?: 'red' } = $props();
 
-  const cls = $derived(`btn ${tone}${size === 'sm' ? ' sm' : ''}`);
+  const cls = $derived(`btn ${tone}${size === 'lg' ? '' : ` ${size}`}`);
 </script>
 
 <a class="{cls} when-out" href={SIGNUP} rel="external">{shell.nav.start}</a>

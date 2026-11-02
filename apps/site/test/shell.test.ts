@@ -82,7 +82,7 @@ test('the signed-in rules beat a component\'s own display: !important, because a
 });
 
 test('Start draws both states: Get early access signed out (while sign-up is by invite), Open BrainDog signed in', async () => {
-  const Start = await component<{ size?: 'md' | 'sm'; tone?: 'red' }>('Start');
+  const Start = await component<{ size?: 'lg' | 'md' | 'sm'; tone?: 'red' }>('Start');
   const { body } = render(Start, { props: {} });
   assert.equal(shell.nav.start, LAUNCH.invite ? 'Get early access' : 'Start free', 'one key says the start button (SF13)');
   assert.match(body, new RegExp(`<a class="btn red when-out" href="https://app.brain.dog/signup" rel="external">${shell.nav.start}</a>`));

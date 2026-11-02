@@ -53,7 +53,8 @@ export const home = {
       title: 'Build with AI',
       say: `${sayList(['Claude', 'Cursor', 'Codex'])} start every session from your brief and leave a note when they're done.`,
       lines: ['braindog · context', 'Tidepool, building. Next: ship webhook retries.', "Cursor: onboarding copy waits on Dana's icons."],
-      link: 'Connect your tools',
+      /* The hero's own words for the same page, so one way to /agents has one name. */
+      link: 'Connect your AI tools',
       href: '/agents',
     },
     /* YOUR OWN LIFE (29 October): personal use as much as business. Money is a whole section of the app now, with

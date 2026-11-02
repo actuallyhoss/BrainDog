@@ -32,8 +32,9 @@
   p {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-site-17);
+    font-size: var(--t-say);
     line-height: 1.5;
+    text-wrap: pretty;
   }
 
   b {

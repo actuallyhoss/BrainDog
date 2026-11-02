@@ -58,12 +58,85 @@
     /* The app's two smallest steps, read here where they are still the app's, for the drawings. */
     --t-app-xs: var(--fs-cap);
     --t-app-sm: var(--fs-meta);
+
+    /**
+     * THE PAGE'S TYPE ROLES (polish, 2 November). Every page used to set its own heading: a band's title was 54 on the
+     * home page, 51 on Slash and 48 on the pages for one kind of person, a tile's title 21, 22 or 24, and in Geist on
+     * the docs where every other title is Lexend. One role, one size, on every page; the steps above stay for the
+     * drawings of the app, which keep the app's own scale.
+     *
+     *   display   the home page's slogan, 48 on a phone to 92 at a desk
+     *   page      an inner page's name on the night ground, 44 to 80
+     *   section   a band's or a section's title, 34 to 52
+     *   feature   a lead tile's title or a sub-section's, 24 to 28
+     *   card      a tile's title, 20 to 22
+     *   lead      the line under a page's name, 18 to 20
+     *   say       the line under a section's title, 16 to 18
+     *   text      words in a tile, 16;  label  a tile's small heading, a way on, 15;  meta  14
+     */
+    --t-display: clamp(48px, 6.4vw, 92px);
+    --t-page: clamp(44px, 5.6vw, 80px);
+    --t-section: clamp(34px, 2.5vw + 16px, 52px);
+    --t-feature: clamp(24px, 0.8vw + 16.5px, 28px);
+    --t-card: clamp(20px, 0.4vw + 16.5px, 22px);
+    --t-lead: clamp(18px, 0.4vw + 14.5px, 20px);
+    --t-say: clamp(16px, 0.4vw + 12.5px, 18px);
+    --t-text: 16px;
+    --t-label: 15px;
+    --t-meta: 14px;
+
+    /**
+     * THE PAGE'S SPACING ROLES, on the skin's scale at both ends (40 and 96, 24 and 40, 20 and 32) and fluid between,
+     * so a band, a section and a tile keep one rhythm on every page instead of 40, 56, 64, 72 or 96 by the page.
+     *
+     *   band-pad    above and below a band or a section, 40 on a phone (six bands at 48 each way were a screen of
+     *               ground) to 96 at a desk
+     *   first-pad   above the first section under a page's night head, which the change of ground already marks
+     *   head-gap    from a section's title (and its line) to what it shows
+     *   tile-pad    inside a tile
+     */
+    --band-pad: clamp(40px, 5.33vw + 19.2px, 96px);
+    --first-pad: clamp(32px, 2.8vw + 24px, 64px);
+    --head-gap: clamp(24px, 1.5vw + 18px, 40px);
+    --site-tile-pad: clamp(20px, 1.2vw + 15px, 32px);
   }
 
   @media (width >= 640px) {
     :root {
       --site-gutter: clamp(calc(2 * var(--inset)), 3vw + 8px, 56px);
     }
+  }
+
+  /**
+   * ONE PALETTE ON EVERY PAGE (polish, 2 November). The site draws with two palettes: Look B's (`--page`, `--paper`,
+   * `--ink2`, `--muted`, the bands and the desk) and the app's (`--board`, `--tile`, `--rule`, `--ink-3` ...), which the
+   * a11y and block sheets read. They agree in light. In dark the app's are the app's red-leaning board, so the home
+   * page was cool navy while Security, Support, Legal and the docs drew warm brown tiles on near-black, and a hairline on
+   * a navy tile was brown. The app's roles take Look B's values here, the ones the desk already draws the app with, so
+   * every page and every block is one family in both schemes; the drawings that want the app's own colours set them.
+   */
+  html {
+    --board: var(--desk-board);
+    --tile: var(--desk-tile);
+    --tile-2: var(--desk-tile-2);
+    --hover: var(--desk-hover);
+    --rule: var(--desk-rule);
+    --ink-2: var(--ink2);
+    --ink-3: var(--muted);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme='light']) {
+      --ink: var(--on-night);
+      --rule-strong: var(--faint);
+      --focus: var(--on-night);
+    }
+  }
+
+  html[data-theme='dark'] {
+    --ink: var(--on-night);
+    --rule-strong: var(--faint);
+    --focus: var(--on-night);
   }
 
   /* THE GROUND, flat and painted once on the document: the page's white, or its dark under the dark scheme. */
@@ -142,9 +215,9 @@
     margin-block-start: var(--sp-6);
   }
 
-  main > :last-child {
-    margin-block-end: var(--inset);
-  }
+  /* NOTHING SITS BETWEEN THE PAGE'S LAST SECTION AND THE FOOTER (polish, 2 November). A 12px margin here showed a
+     stripe of the page's white between a grey band (the home page's last ask, every early access strip) and the black
+     footer; each page's last section ends on its own padding now. */
 
   /* ── The tile grid ───────────────────────────────────────────────────────── */
 
@@ -349,30 +422,74 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* A link that leads on: ink words and an arrow that leans towards where it goes. */
+  /**
+   * A WAY ON, AND THERE IS ONE (polish, 2 November): the words in the ink at 15/600 and an arrow that follows the last
+   * word, so a long one ("Developer details: MCP, the command line and tokens") wraps with its arrow and never leaves it
+   * at the far edge. Every "For small businesses", "How we keep it safe", "How Slash works" and "For developers" link on
+   * the site is this one; each page drew its own (15 or 16 or 17, 400 to 600, ink, muted or red) before. On a night
+   * ground it takes the night's ink. The arrow is `Icon.svelte`'s, drawn inline there by `.onward > .icon`.
+   *
+   * 44 TALL UNDER A THUMB without moving a line: the padding grows the target and the negative margin gives it back.
+   */
   .onward {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-block-size: var(--tap);
+    display: inline-block;
+    padding-block: 6px;
+    margin-block: -6px;
     color: var(--ink);
-    font-size: var(--t-site-small);
+    font-size: var(--t-label);
     font-weight: 600;
+    line-height: 1.4;
     text-decoration: none;
+    text-wrap: pretty;
   }
 
-  .onward:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  .night .onward,
+  .band--tools .onward,
+  .onward.on-night {
+    color: var(--on-night);
   }
 
-  @media (prefers-reduced-motion: no-preference) {
-    .onward svg {
-      transition: transform var(--d-state) var(--ease-out);
+  @media (pointer: coarse) {
+    .onward {
+      padding-block: 12px;
+      margin-block: -12px;
+    }
+  }
+
+  @media (hover: hover) {
+    .onward:hover {
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 4px;
+    }
+  }
+
+  /* THE ARROW LEANS TOWARDS WHERE IT GOES under the pointer, 3px over the swap step; under reduced motion it holds still
+     and the underline says the same. */
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) {
+    .onward > svg {
+      transition: translate var(--d-swap) var(--ease-out);
     }
 
-    .onward:hover svg {
-      transform: translateX(3px);
+    .onward:hover > svg {
+      translate: 3px 0;
+    }
+  }
+
+  /* A ROW OF WAYS ON, wrapping on a phone: the agents page's developer links, the other page for one kind of person. */
+  .onwards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 32px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Under a thumb each way on is 44 tall, so two rows sit 24 apart and their targets meet without overlapping. */
+  @media (pointer: coarse) {
+    .onwards {
+      row-gap: 24px;
     }
   }
 
@@ -385,6 +502,10 @@
    * is the quiet one, so a kept page's plain button stays drawn.
    *
    * THE PRESS IS A FILL CHANGE, never a move (SPEC 2.A.1), which `a11y.css` stills under reduced motion.
+   *
+   * THREE SIZES AND ONE SHAPE (polish, 2 November): 48 with radius 12 for a page's actions, 40 with radius 10 in the
+   * header (`.md`), and 34 with radius 9 inside a tile or a drawing (`.sm`), so the corner is about a quarter of the
+   * height at every size; 16, 15 and 14 for the words. The header drew its own 40 at radius 9 before.
    */
   .btn {
     display: inline-flex;
@@ -399,17 +520,18 @@
     box-shadow: inset 0 0 0 1px var(--rule);
     color: var(--ink);
     cursor: pointer;
-    font: 500 15.5px/1 var(--ui);
+    font: 500 16px/1 var(--ui);
     text-decoration: none;
     white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
     transition:
-      background var(--d-press) var(--ease-out),
+      background-color var(--d-press) var(--ease-out),
       scale var(--d-menu) var(--ease-out);
   }
 
   /* A PRESS IS A FILL AND A GIVE (ui pass, 1 Nov, as in the app): the button sinks to 98% while held. Under reduced
      motion only the fill changes. */
-  .btn:active {
+  .btn:not(:disabled):active {
     scale: 0.98;
     transition-duration: var(--d-press);
   }
@@ -418,10 +540,6 @@
     .btn:active {
       scale: none;
     }
-  }
-
-  .btn:hover {
-    background: var(--soft);
   }
 
   .btn svg {
@@ -436,10 +554,6 @@
     color: var(--on-red);
   }
 
-  .btn.red:hover {
-    background: var(--red-fill-hover);
-  }
-
   .btn.red:active {
     background: var(--red-fill-press);
   }
@@ -449,10 +563,6 @@
     background: color-mix(in srgb, var(--on-night) 8%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--on-night) 14%, transparent);
     color: var(--on-night);
-  }
-
-  .btn.ghost:hover {
-    background: color-mix(in srgb, var(--on-night) 14%, transparent);
   }
 
   .btn.line {
@@ -469,10 +579,6 @@
     color: var(--page);
   }
 
-  .btn.ink:hover {
-    background: var(--ink2);
-  }
-
   /* THE OLD FILLED BUTTON, ink, which a kept page may still draw until its own builder moves it to `Start`. */
   .btn-primary {
     background: var(--ink);
@@ -480,8 +586,33 @@
     color: var(--page);
   }
 
-  .btn-primary:hover {
-    background: var(--ink2);
+  /* HOVER ONLY WHERE THERE IS A POINTER TO HOVER WITH: on a phone a tapped button kept its hover fill and read as
+     chosen. Every kind of button answers it now; the outlined one drew none, because its own fill was the later rule. */
+  @media (hover: hover) {
+    .btn:hover,
+    .btn.line:hover {
+      background: var(--soft);
+    }
+
+    .btn.red:hover {
+      background: var(--red-fill-hover);
+    }
+
+    .btn.ghost:hover {
+      background: color-mix(in srgb, var(--on-night) 14%, transparent);
+    }
+
+    .btn.ink:hover,
+    .btn-primary:hover {
+      background: var(--ink2);
+    }
+  }
+
+  .btn.md {
+    block-size: 40px;
+    padding: 0 16px;
+    border-radius: 10px;
+    font-size: var(--t-label);
   }
 
   .btn.sm,
@@ -559,6 +690,17 @@
     color: var(--on-night);
   }
 
+  /**
+   * A FOCUS RING THAT SHOWS ON THE NIGHT (polish, 2 November). The ring is the ink, and in light the ink is the night's
+   * own near-black, so a key moving through the header, a page's head, the AI band, the footer or a black card lit
+   * nothing (1.01 to 1 against the ground). On every night surface the ring is the night's ink instead.
+   */
+  .night,
+  .band--tools,
+  .card.dark {
+    --focus: var(--on-night);
+  }
+
   /* SIGNED IN OR NOT, decided before the first paint by `/signed-in.js` (`lib/site/signed-in.ts`). Both are in the
      HTML; with scripting off the page reads as signed out. THEY ARE !important because this file is in a layer and
      a component's own unlayered rule (the phone menu's links draw display: flex) would otherwise win and keep
@@ -571,11 +713,12 @@
     display: none !important;
   }
 
-  /* THE BIG CARDS of an inner page: paper, the black one and the red one, flat, radius 16 like every tile. */
+  /* THE BIG CARDS of an inner page: paper, the black one and the red one, flat, radius 16 like every tile, padded as
+     every tile is (`--site-tile-pad`). */
   .card {
     position: relative;
     overflow: hidden;
-    padding: 40px;
+    padding: var(--site-tile-pad);
     border-radius: 16px;
   }
 
@@ -594,11 +737,12 @@
     color: var(--on-red);
   }
 
+  /* A CARD'S TITLE IS A SECTION'S: each card on an inner page is one thing the page shows, said at the section step. */
   .card h2 {
     max-inline-size: 14ch;
-    font-size: clamp(30px, 3.4vw, 48px);
-    line-height: 1;
-    letter-spacing: -0.045em;
+    font-size: var(--t-section);
+    line-height: 1.02;
+    letter-spacing: -0.04em;
     text-wrap: balance;
   }
 
@@ -608,10 +752,10 @@
 
   /* A CARD'S ONE LINE under its title. */
   .say {
-    max-inline-size: 25em;
-    margin: 18px 0 0;
-    font-size: var(--t-site-18);
-    line-height: 1.5;
+    max-inline-size: 30em;
+    margin: 16px 0 0;
+    font-size: var(--t-say);
+    line-height: 1.55;
     text-wrap: pretty;
   }
 
@@ -654,16 +798,17 @@
     block-size: 18px;
   }
 
-  /* A TABLE OF PLANS OR FIGURES, which scrolls inside its own box on a phone and never the page. */
+  /* A TABLE OF PLANS OR FIGURES, which scrolls inside its own box on a phone and never the page, a section's head gap
+     under the words it answers. */
   .tablebox {
     overflow-x: auto;
-    margin-block-start: 28px;
+    margin-block-start: var(--head-gap);
   }
 
   .ptable {
     inline-size: 100%;
     border-collapse: collapse;
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
   }
 
   .ptable th,
@@ -690,20 +835,25 @@
   .faq {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 34px 56px;
-    margin-block-start: 40px;
+    gap: 32px 56px;
+    margin-block-start: var(--head-gap);
   }
 
   .faq h3 {
     margin-block-end: 8px;
-    font-size: var(--t-site-21);
-    letter-spacing: -0.03em;
+    font-size: var(--t-card);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
   }
 
   .faq p {
     margin: 0;
+    max-inline-size: 60ch;
     color: var(--ink2);
-    font-size: var(--t-site-16);
+    font-size: var(--t-text);
+    line-height: 1.55;
+    text-wrap: pretty;
   }
 
   /* THE SLASH KEY, a 60px cap with the / in red, on the page or (`.on-night`) on the night ground. */
@@ -741,14 +891,6 @@
     .wrap {
       padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
     }
-
-    .card {
-      padding: 24px 20px;
-    }
-
-    .say {
-      font-size: var(--t-site-16-5);
-    }
   }
 
   /* ── The home's full-bleed bands ────────────────────────────── */
@@ -756,9 +898,12 @@
   /**
    * A BAND IS ONE IDEA, EDGE TO EDGE, on its own ground (`--band-*` in Look B), so two neighbours never share one in
    * either scheme. Its content sits in `.wrap`; its tiles are flat, radius 16, with no border or shadow.
+   *
+   * ITS AIR IS THE PAGE'S ONE BAND STEP (`--band-pad`, 40 on a phone to 96 at a desk), the step every inner page's
+   * sections take too: 64 here with 54px titles read as crowded beside inner pages at 96.
    */
   .band[class*='band--'] {
-    padding-block: 64px;
+    padding-block: var(--band-pad);
   }
 
   .band--who {
@@ -795,12 +940,13 @@
     color: var(--ink);
   }
 
-  /* A BAND'S HEADING: two lines at 1440, heavy and tight; its one line under it at 18/1.5. */
+  /* A BAND'S HEADING: two lines at 1440, heavy and tight, at the section step every page's sections share; its one line
+     under it at the say step. */
   .band-h2 {
     margin: 0;
     max-inline-size: 17ch;
-    font: 600 clamp(34px, 3.8vw, 54px) / 1 var(--head);
-    letter-spacing: -0.045em;
+    font: 600 var(--t-section) / 1.02 var(--head);
+    letter-spacing: -0.04em;
     text-wrap: balance;
   }
 
@@ -808,8 +954,8 @@
     max-inline-size: 34em;
     margin: 16px 0 0;
     color: var(--ink2);
-    font-size: var(--t-site-18);
-    line-height: 1.5;
+    font-size: var(--t-say);
+    line-height: 1.55;
     text-wrap: pretty;
   }
 
@@ -868,30 +1014,10 @@
     }
   }
 
+  /* A TILE ON A BAND: flat, radius 16, the site's one tile padding (20 on a phone to 32 at a desk). */
   .ftile {
-    padding: 24px;
+    padding: var(--site-tile-pad);
     border-radius: 16px;
-  }
-
-  @media (max-width: 1059px) {
-    .band[class*='band--'] {
-      padding-block: 56px;
-    }
-  }
-
-  /* A PHONE'S BANDS SIT CLOSER: six bands at 48 each way were a screen of ground. */
-  @media (max-width: 760px) {
-    .band[class*='band--'] {
-      padding-block: 40px;
-    }
-
-    .ftile {
-      padding: 20px;
-    }
-
-    .band-say {
-      font-size: var(--t-site-16);
-    }
   }
 
   /**

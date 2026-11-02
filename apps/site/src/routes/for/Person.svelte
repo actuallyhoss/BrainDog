@@ -68,9 +68,9 @@
 
   <!-- ── The other page written for someone else: only its link, the words its name (site 2b) ── -->
   <nav class="others" aria-label={f.others}>
-    <ul>
+    <ul class="onwards">
       {#each others as c (c.id)}
-        <li><a class="more" href={w.moreFor[c.id].href}>{f.who[c.id].nav}<Icon name="arrow" size="m" /></a></li>
+        <li><a class="onward" href={w.moreFor[c.id].href}>{f.who[c.id].nav}<Icon name="arrow-right" size="s" /></a></li>
       {/each}
     </ul>
   </nav>
@@ -83,10 +83,10 @@
 
   .sub {
     max-inline-size: 34em;
-    margin: 18px 0 0;
+    margin: 16px 0 0;
     color: var(--on-night-2);
-    font-size: var(--t-site-18);
-    line-height: 1.5;
+    font-size: var(--t-say);
+    line-height: 1.55;
     text-wrap: pretty;
   }
 
@@ -94,16 +94,17 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
-    margin-block-start: 34px;
+    gap: 8px;
+    margin-block-start: 32px;
   }
 
   /* ── The cards, one under another ────────────────────────────────────── */
 
+  /* THE CARDS AT THE PAGE'S STEPS: the first step under the night head, a band step before the strip, 16 apart. */
   .story {
     display: grid;
     gap: 16px;
-    padding-block: 96px;
+    padding-block: var(--first-pad) var(--band-pad);
   }
 
   /* ── What it does for you ────────────────────────────────────────────── */
@@ -111,7 +112,7 @@
   .split {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 56px;
+    gap: 48px;
     align-items: center;
   }
 
@@ -132,17 +133,9 @@
 
   /* ── The pages written for someone else ──────────────────────────────── */
 
+  /* THE OTHER PAGE, the site's one way on (`.onward`), in the ink: it was the only red link on the page. */
   .others {
-    padding-block-start: 32px;
-  }
-
-  .others ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 32px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
+    padding-block-start: var(--head-gap);
   }
 
   @media (max-width: 1060px) {
@@ -153,11 +146,6 @@
   }
 
   @media (max-width: 760px) {
-    .story {
-      gap: 12px;
-      padding-block: 56px;
-    }
-
     .actions :global(.btn) {
       flex: 1 1 auto;
     }

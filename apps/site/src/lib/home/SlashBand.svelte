@@ -24,10 +24,13 @@
   let at = $state(0);
   let typed = $state(ASKS[0]?.q ?? '');
   let phase: Phase = $state('answer');
+  /* Set by the first pick, so an answer settles in only when a reader asked for it, never on the page's first draw. */
+  let picked = $state(false);
   let stop = () => {};
 
   function pick(i: number) {
     stop();
+    picked = true;
     at = i;
     stop = typeInto(ASKS[i]?.q ?? '', (f) => ((typed = f.typed), (phase = f.phase)), { think });
   }
@@ -46,14 +49,14 @@
           <button type="button" class="try" aria-pressed={at === i} onclick={() => pick(i)}>{ASKS[i]!.q}</button>
         {/each}
       </div>
-      <a class="go" href="/slash">{words.more}<Icon name="arrow-right" size="s" /></a>
+      <p class="on"><a class="onward" href="/slash">{words.more}<Icon name="arrow-right" size="s" /></a></p>
     </div>
     <div class="c7 open">
       <div class="bar">
         <span class="sl" aria-hidden="true">/</span>
         <span class="typed">{typed}</span><span class="caret" aria-hidden="true"></span>
       </div>
-      <div class="drop" aria-live="polite" aria-busy={phase !== 'answer'}>
+      <div class="drop" class:picked aria-live="polite" aria-busy={phase !== 'answer'}>
         {#if phase === 'thinking' && think}
           <p class="thinking"><i></i>{think}</p>
         {:else if phase === 'answer'}
@@ -120,11 +123,13 @@
     background: var(--band-slash-tile);
     color: var(--ink);
     font-size: var(--t-site-15);
-    transition: background var(--d-state, 90ms) ease-out;
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  .try:hover {
-    background: var(--desk-hover);
+  @media (hover: hover) {
+    .try:hover {
+      background: var(--desk-hover);
+    }
   }
 
   .try[aria-pressed='true'] {
@@ -136,21 +141,9 @@
     outline-offset: 2px;
   }
 
-  .go {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-block-size: 32px;
-    margin-block-start: 20px;
-    color: var(--ink);
-    font-size: var(--t-site-15);
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .go:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
+  /* THE WAY ON TO THE SLASH PAGE, the site's one (`.onward`), a tile's gap under the tries. */
+  .on {
+    margin: 24px 0 0;
   }
 
   /* THE BAR AND ITS ANSWER: one width, one plain tile with a hairline and radius 12, the answer attached under the bar. */
@@ -190,7 +183,10 @@
     inline-size: 1.5px;
     block-size: 20px;
     background: var(--ink);
-    animation: blink 1s steps(2) infinite;
+    /* IT BLINKS FOR A FEW SECONDS AND THEN HOLDS STILL: a caret blinking for as long as the page is open pulled the eye
+       back to a picture that had already said its piece. Four blinks, under the five seconds after which anything that
+       blinks on its own needs a way to stop it. */
+    animation: blink 1s steps(2) 4;
   }
 
   @keyframes blink {
@@ -210,6 +206,25 @@
     border-radius: 0 0 12px 12px;
   }
 
+  /* AN ANSWER THE READER ASKED FOR SETTLES IN: each tile fades up 4px over the swap step as it arrives, so the new
+     answer reads as the one to that question and not a page that jumped. The first, in the HTML, is simply there. */
+  @media (prefers-reduced-motion: no-preference) {
+    .drop.picked > :global(*) {
+      animation: settle var(--d-swap) var(--ease-out) both;
+    }
+  }
+
+  @keyframes settle {
+    from {
+      opacity: 0;
+      translate: 0 4px;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+
   .thinking {
     display: flex;
     align-items: center;
@@ -225,12 +240,6 @@
     block-size: 6px;
     border-radius: 50%;
     background: var(--muted);
-  }
-
-  @media (pointer: coarse) {
-    .go {
-      min-block-size: var(--tap);
-    }
   }
 
   @media (max-width: 1059px) {

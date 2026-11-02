@@ -2,8 +2,8 @@
   The docs' section nav: the search, then every section with its pages, the open page marked.
 
   FLAT ON THE BOARD, NO TILE (LAUNCH 103 job 7): the search field, "All sections", then each section's
-  name with its pages under it, and the page you are on on the tile's fill with a red mark at its start and in bold,
-  so it is told by more than colour.
+  name with its pages under it, and the page you are on on the tile's fill with an ink mark at its start and in bold,
+  so it is told by more than colour (the mark was red; red is the start button's alone since 1 Nov).
 
   TWO DRAWINGS OF ONE LIST, and only one is ever shown. At 900px and wider it is a column beside the page that stays in
   view as the page scrolls. Below 900px it is a disclosure at the top of the page, closed, so the page's first words
@@ -64,7 +64,7 @@
     gap: var(--sp-2);
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-site-16);
+    font-size: var(--t-text);
     font-weight: 600;
     cursor: pointer;
     list-style: none;
@@ -78,8 +78,18 @@
     flex: 1;
   }
 
+  .nav-open :global(svg:last-child) {
+    transition: rotate var(--d-swap) var(--ease-out);
+  }
+
   .nav-phone[open] .nav-open :global(svg:last-child) {
-    transform: rotate(180deg);
+    rotate: 180deg;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nav-open :global(svg:last-child) {
+      transition: none;
+    }
   }
 
   .nav-in {
@@ -100,26 +110,27 @@
     min-block-size: 36px;
     padding-inline: 10px;
     border-inline-start: 3px solid transparent;
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
     color: var(--ink2);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     font-weight: 500;
     line-height: 20px;
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .nav-home:hover,
-  .nav-page:hover {
-    background: var(--tile);
-    color: var(--ink);
+  @media (hover: hover) {
+    .nav-home:hover,
+    .nav-page:hover {
+      background: var(--tile);
+      color: var(--ink);
+    }
   }
 
-  /* THE OPEN PAGE: the tile's fill, the ink, bold, and the red mark at its start. */
-  .nav-page[aria-current='page'],
-  .nav-page[aria-current='page']:hover {
+  /* THE OPEN PAGE: the tile's fill, the ink, bold, and the ink's mark at its start. */
+  .nav-page[aria-current='page'] {
     background: var(--tile);
-    border-inline-start-color: var(--red);
+    border-inline-start-color: var(--ink);
     color: var(--ink);
     font-weight: 600;
   }
@@ -141,7 +152,7 @@
     margin: var(--sp-5) 0 var(--sp-1);
     padding-inline: 13px;
     color: var(--muted);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     font-weight: 600;
   }
 
@@ -167,6 +178,7 @@
       gap: 2px;
       max-block-size: calc(100vh - 2 * var(--sp-5));
       overflow-y: auto;
+      overscroll-behavior: contain;
     }
 
   }

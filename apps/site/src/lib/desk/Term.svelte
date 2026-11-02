@@ -1,6 +1,7 @@
 <!--
-  A terminal with an agent at work: each line shows in turn, 230 ms apart, the first time it comes into view
-  (`autoplay="visible"`, the default) or as soon as it is drawn (`"now"`).
+  A terminal with an agent at work: each line shows in turn, 70 ms apart, the first time it comes into view
+  (`autoplay="visible"`, the default) or as soon as it is drawn (`"now"`). The whole session is there in under a second
+  (polish, 2 November: at 230 apart it took three, a slow reveal of words the page wants read).
 
   EVERY LINE IS IN THE HTML AND SHOWING. Only once the script runs, and only when motion is allowed, do the lines go
   quiet to play in; with scripting off or reduced motion the whole session is there at once. No <pre>: the lines are
@@ -27,7 +28,7 @@
     const timers: ReturnType<typeof setTimeout>[] = [];
     const play = (): void => {
       shown = 0;
-      lines.forEach((_, i) => timers.push(setTimeout(() => (shown = i + 1), 160 + i * 230)));
+      lines.forEach((_, i) => timers.push(setTimeout(() => (shown = i + 1), 120 + i * 70)));
     };
     let io: IntersectionObserver | undefined;
     if (autoplay === 'now' || typeof IntersectionObserver !== 'function') play();
@@ -74,7 +75,7 @@
 
   .line.shown {
     opacity: 1;
-    transition: opacity 0.25s;
+    transition: opacity var(--d-enter) var(--ease-out);
   }
 
   .line[data-tone='dim'] {

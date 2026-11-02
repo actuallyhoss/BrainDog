@@ -9,7 +9,7 @@
   group should meet the same page each time. Each page builds its list of parts from its copy and the launch flags, so
   a part that is not true yet is left out of the list rather than drawn empty.
 
-  THE PROSE IS 17/28 AT A 68CH MEASURE, inside the 45-to-75 band every typographic reference agrees on. A part's
+  THE PROSE IS 16/26 AT A 68CH MEASURE, inside the 45-to-75 band every typographic reference agrees on. A part's
   action is an outlined button and never red: the one solid red a page carries is "Start free".
 -->
 <script lang="ts" module>
@@ -93,11 +93,12 @@
      the page's white between: its own padding is the room at the page's end. */
   .board {
     margin-block-end: 0;
-    padding-block: 56px 96px;
+    padding-block: var(--first-pad) var(--band-pad);
     background: var(--board);
   }
 
-  /* TWELVE COLUMNS AT A DESK, a part saying how many it takes; one column below 900. */
+  /* TWELVE COLUMNS AT A DESK, a part saying how many it takes and each as tall as what it holds: a short part drawn
+     as tall as the long one beside it stood mostly empty. One column below 900. */
   .parts {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -127,13 +128,13 @@
     }
   }
 
-  /* A TILE: flat and opaque, radius 16, no edge and no shadow. */
+  /* A TILE: flat and opaque, radius 16, no edge and no shadow, padded as every tile is. */
   .part {
     display: flex;
     flex-direction: column;
     gap: 16px;
     min-inline-size: 0;
-    padding: clamp(20px, 1.6vw + 14px, 32px);
+    padding: var(--site-tile-pad);
     background: var(--tile);
     border-radius: 16px;
     color: var(--ink);
@@ -144,12 +145,12 @@
     align-items: center;
     gap: 12px;
     color: var(--ink);
-    font-size: var(--t-site-21);
+    font-size: var(--t-card);
     line-height: 1.2;
-    letter-spacing: -0.035em;
+    letter-spacing: -0.02em;
   }
 
-  /* THE GLYPH'S SQUARE: 32 on the board's own fill, radius 8. */
+  /* THE GLYPH'S SQUARE: 32 on the board's own fill, at the control radius every well takes. */
   .glyph {
     display: inline-grid;
     flex: none;
@@ -157,7 +158,7 @@
     inline-size: 32px;
     block-size: 32px;
     background: var(--board);
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
     color: var(--ink2);
   }
 
@@ -165,8 +166,8 @@
     max-inline-size: 68ch;
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-site-body);
-    line-height: var(--lh-site-body);
+    font-size: var(--t-text);
+    line-height: 1.6;
     overflow-wrap: anywhere;
     text-wrap: pretty;
   }
@@ -187,10 +188,15 @@
     align-items: start;
     padding-block: 12px;
     color: var(--ink);
-    font-size: var(--t-site-body);
-    line-height: var(--lh-site-body);
+    font-size: var(--t-text);
+    line-height: 1.6;
     overflow-wrap: anywhere;
     text-wrap: pretty;
+  }
+
+  /* The line level with its number's square on its first line. */
+  .part-lines li > span:last-child {
+    padding-block-start: calc((32px - 1.6em) / 2);
   }
 
   .part-lines li + li {
@@ -203,9 +209,9 @@
     inline-size: 32px;
     block-size: 32px;
     background: var(--board);
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
     color: var(--ink2);
-    font-size: var(--t-site-small);
+    font-size: var(--t-meta);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
@@ -230,15 +236,17 @@
     gap: 12px;
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-site-16);
+    font-size: var(--t-text);
     font-weight: 500;
     text-decoration: none;
     overflow-wrap: anywhere;
   }
 
-  .part-links a:hover span {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  @media (hover: hover) {
+    .part-links a:hover span {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
   }
 
   .part-do {
@@ -254,9 +262,4 @@
     overflow-wrap: anywhere;
   }
 
-  @media (width < 640px) {
-    .board {
-      padding-block: 24px 64px;
-    }
-  }
 </style>

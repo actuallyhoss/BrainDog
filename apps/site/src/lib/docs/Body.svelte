@@ -7,7 +7,8 @@
   reading, where Page lays blocks on twelve, and its `##` headings need anchors for the contents list, which the
   renderer's prose does not give. So `partsOf` cuts the headings out of the prose and this file draws them with ids.
 
-  ONE SHEET ON --paper, read at 68ch (LAUNCH 103 job 7): `head` first, which the page fills with the
+  ONE SHEET ON --tile, read at 68ch (LAUNCH 103 job 7; the tile's white since 2 November, as the trust pages' tiles on
+  their board: the paper grey on the board's grey was an edge nobody could see): `head` first, which the page fills with the
   ways to take it as text, then the opening and each `##` part in turn, a heading with its anchor and no tile round it.
 
   Nothing here is interactive: a board or a task list on a docs page is drawn read-only, which is what the renderer
@@ -100,18 +101,20 @@
 </div>
 
 <style>
-  /* THE SHEET: flat --paper, radius 24 as the site's cards are, no edge and no shadow, on the board the page lays it on. */
+  /* THE SHEET: flat, radius 16 as every tile on the site, no edge and no shadow, on the board the page lays it on, padded
+     as the legal texts' sheet is. */
   .doc-body {
     display: grid;
     gap: var(--sp-6);
     min-inline-size: 0;
-    padding: 44px 48px 52px;
-    background: var(--paper);
-    border-radius: 24px;
+    padding: clamp(24px, 2.5vw + 12px, 48px);
+    background: var(--tile);
+    border-radius: 16px;
     color: var(--ink);
   }
 
   .doc-head {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -124,13 +127,13 @@
     min-inline-size: 0;
   }
 
-  /* THE SITE'S READING TEXT, 17/28 in the second ink, at a measure a line can be read in. */
+  /* THE SITE'S READING TEXT, 16/26 in the second ink as the legal texts are, at a measure a line can be read in. */
   .doc-text {
     max-inline-size: 68ch;
     min-inline-size: 0;
     color: var(--ink2);
-    font-size: var(--t-site-body);
-    line-height: var(--lh-site-body);
+    font-size: var(--t-text);
+    line-height: 1.65;
   }
 
   /* A THUMB'S TARGET WITHOUT MOVING A LINE: 13px above and below takes a 19px link past 44, and the negative margin
@@ -147,10 +150,10 @@
     max-inline-size: 34ch;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-site-21);
+    font-size: var(--t-feature);
     font-weight: 600;
-    line-height: 1.25;
-    letter-spacing: -0.025em;
+    line-height: 1.2;
+    letter-spacing: -0.03em;
     text-wrap: balance;
     scroll-margin-block-start: 24px;
   }
@@ -158,14 +161,22 @@
   .doc-text :global(h3) {
     margin-block: var(--sp-5) var(--sp-2);
     color: var(--ink);
-    font-size: var(--t-site-18);
+    font-size: var(--t-card);
     font-weight: 600;
+    line-height: 1.3;
     letter-spacing: -0.02em;
   }
 
+  /* A LINK IN THE TEXT IS THE INK, underlined at 40 in a hundred and firm under the pointer: red is the start button's
+     alone (1 Nov). */
   .doc-text :global(a) {
-    color: var(--red-ink);
+    color: var(--ink);
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
     text-underline-offset: 3px;
+  }
+
+  .doc-text :global(a:hover) {
+    text-decoration-color: currentColor;
   }
 
   .doc-text > :global(:first-child) {
@@ -194,18 +205,19 @@
     white-space: normal;
   }
 
-  /* CODE SITS IN A WELL OF THE TILE'S FILL ON THE PAPER, and a long line scrolls inside it, never the page. */
+  /* CODE SITS IN A WELL OF THE TILE'S SECOND FILL ON THE SHEET, and a long line scrolls inside it, never the page. */
   .doc-text :global(pre) {
     position: relative;
     max-inline-size: 100%;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
     padding: var(--sp-4);
-    background: var(--tile);
+    background: var(--tile-2);
     border: 0;
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font-family: var(--mono);
-    font-size: var(--t-site-14-5);
+    font-size: var(--t-meta);
     line-height: 1.6;
   }
 
@@ -221,15 +233,17 @@
     min-block-size: 28px;
     padding: 0 10px;
     border: 1px solid var(--rule);
-    border-radius: 8px;
-    background: var(--paper);
+    border-radius: var(--r-ctl);
+    background: var(--tile);
     color: var(--ink2);
-    font: 500 13px/1 var(--ui);
+    font: 500 var(--t-meta)/1 var(--ui);
     cursor: pointer;
   }
 
-  .doc-text :global(.code-copy:hover) {
-    color: var(--ink);
+  @media (hover: hover) {
+    .doc-text :global(.code-copy:hover) {
+      color: var(--ink);
+    }
   }
 
   @media (pointer: coarse) {
@@ -242,7 +256,7 @@
 
   .doc-text :global(:not(pre) > code) {
     padding: 1px 5px;
-    background: var(--tile);
+    background: var(--tile-2);
     border-radius: 6px;
     font-family: var(--mono);
     font-size: 0.88em;
@@ -251,7 +265,6 @@
   @media (max-width: 760px) {
     .doc-body {
       gap: var(--sp-5);
-      padding: 24px 20px 32px;
     }
   }
 </style>

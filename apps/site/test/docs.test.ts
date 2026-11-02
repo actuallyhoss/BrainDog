@@ -104,7 +104,7 @@ test('/llms.txt names every doc, and the build serves each doc as a page and as 
 
 /**
  * THE DOCS IN LOOK B (LAUNCH 103 job 7), read off the source because no browser runs here: the index
- * opens on `PageHead` with the search in its slot, a page reads on one sheet of paper with its nav and contents flat
+ * opens on `PageHead` with the search in its slot, a page reads on one sheet with its nav and contents flat
  * on the board, and nothing in the docs still draws the old tiles, wells, glass or palette.
  */
 const SRC = new URL('../src/', import.meta.url);
@@ -135,12 +135,12 @@ test('the docs draw no tile, well, glass or old palette, and their buttons are q
   assert.match(source('lib/docs/CopyText.svelte'), /class="btn quiet sm"/);
 });
 
-test('a doc page puts its title on a night strip and its text on paper at 68ch', () => {
+test('a doc page puts its title on a night strip and its text on one sheet at 68ch', () => {
   const page = source('routes/docs/[section]/[slug]/+page.svelte');
   assert.match(page, /<header class="night strip">[\s\S]*<h1 class="doc-title"/, 'the title is not on the night strip');
   assert.match(page, /\.board \{[^}]*background: var\(--board\)/, 'the nav and contents are not on the board');
   const body = source('lib/docs/Body.svelte');
-  assert.match(body, /\.doc-body \{[^}]*background: var\(--paper\)/, 'the page is not on paper');
+  assert.match(body, /\.doc-body \{[^}]*background: var\(--tile\)/, 'the page is not on its sheet');
   assert.match(body, /max-inline-size: 68ch/, 'the reading measure is not 68ch');
 });
 

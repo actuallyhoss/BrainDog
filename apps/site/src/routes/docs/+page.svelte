@@ -38,7 +38,7 @@
 
 <Seo title={w.meta.title} description={w.meta.description} path="/docs" />
 <PageHead title={w.title} lead={w.lede}>
-  <a class="more" href="/llms.txt" data-sveltekit-reload>{w.forAgents}<Icon name="arrow" size="m" /></a>
+  <p class="for-agents"><a class="onward" href="/llms.txt" data-sveltekit-reload>{w.forAgents}<Icon name="arrow-right" size="s" /></a></p>
   <div class="head-search">
     <Search index={data.index} id="docs-search" night />
   </div>
@@ -53,7 +53,7 @@
       {#if section.id === 'start'}
         <li class="sec start">
           <div class="sec-head">
-            <Icon name={section.glyph} size="m" />
+            <span class="glyph"><Icon name={section.glyph} size="m" /></span>
             <h2 class="sec-title">{section.label}</h2>
           </div>
           <ul class="start-links">
@@ -66,7 +66,7 @@
       {@const first = section.pages[0]?.path ?? null}
       <li class="sec">
         <div class="sec-head">
-          <Icon name={section.glyph} size="m" />
+          <span class="glyph"><Icon name={section.glyph} size="m" /></span>
           <h2 class="sec-title">
             {#if first}<a class="sec-link" href={first}>{section.label}</a>{:else}{section.label}{/if}
           </h2>
@@ -92,9 +92,9 @@
 </section>
 
 <style>
-  /* THE LINK FOR AGENTS IS ON THE NIGHT GROUND, so it takes the night's text: the page's red is for the paper. */
-  .more {
-    color: var(--on-night);
+  /* THE LINK FOR AGENTS: the site's one way on, in the night's ink on the night ground (`.night .onward`). */
+  .for-agents {
+    margin: 24px 0 0;
   }
 
   /* THE SEARCH IN THE HEAD'S SLOT, under the link for agents, at a width a field reads well at. */
@@ -104,7 +104,7 @@
   }
 
   .secs {
-    padding-block: 56px 96px;
+    padding-block: var(--first-pad) var(--band-pad);
   }
 
   /* THREE COLUMNS OF CARDS AT A DESK, two between, one on a phone; Start here across the top. */
@@ -127,7 +127,7 @@
     grid-column: 1 / -1;
   }
 
-  /* A CARD: flat --paper, radius 24, no edge and no shadow, as the design's plans are. */
+  /* A CARD: flat --paper, radius 16, no edge and no shadow, padded as every tile is. */
   /* The product's section kind (`kinds/section.css`) used to reach these cards by their class names on every page, and
      this page drew with what it set: the centring, the UI face on the title and the count's weight. The kind's sheet
      now loads only where blocks are drawn, so the card says them itself. */
@@ -138,7 +138,7 @@
     align-content: start;
     gap: var(--sp-3);
     min-inline-size: 0;
-    padding: 28px 28px 24px;
+    padding: var(--site-tile-pad);
     border-block-end: 0;
     background: var(--paper);
     border-radius: 16px;
@@ -163,10 +163,23 @@
   .sec-head {
     display: flex;
     align-items: center;
-    gap: 10px;
-    color: var(--muted);
+    gap: 12px;
   }
 
+  /* A SECTION'S GLYPH IN ITS SQUARE, as every tile's head on the trust pages draws it: 32, the control radius, the
+     tile's lifted fill on the card. */
+  .glyph {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    background: var(--band-yours-tile);
+    border-radius: var(--r-ctl);
+    color: var(--ink2);
+  }
+
+  /* A SECTION'S NAME IN LEXEND at the card step, as every tile's title on the site (it was the only one in Geist). */
   .sec-title {
     display: flex;
     flex: 1;
@@ -174,12 +187,11 @@
     gap: var(--sp-3);
     min-inline-size: 0;
     margin: 0;
-    font-family: var(--font-ui);
     color: var(--ink);
-    font-size: var(--t-site-21);
+    font-size: var(--t-card);
     font-weight: 600;
     line-height: 1.2;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
   }
 
   .sec-link {
@@ -198,16 +210,18 @@
     }
   }
 
-  .sec-link:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  @media (hover: hover) {
+    .sec-link:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
   }
 
   .sec-blurb,
   .sec-empty {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     line-height: 1.5;
   }
 
@@ -235,9 +249,9 @@
     min-block-size: var(--tap);
     padding-inline: 10px;
     margin-inline: -10px;
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
     color: var(--ink);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     font-weight: 500;
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
@@ -248,8 +262,11 @@
     color: var(--muted);
   }
 
-  .sec-page:hover {
-    background: var(--tile);
+  /* Under the pointer the row takes the card's lifted fill, which is seen on the card in both schemes. */
+  @media (hover: hover) {
+    .sec-page:hover {
+      background: var(--band-yours-tile);
+    }
   }
 
   @media (width >= 700px) {
@@ -261,16 +278,6 @@
   @media (width >= 1060px) {
     .cards {
       grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-  }
-
-  @media (max-width: 760px) {
-    .secs {
-      padding-block: 32px 64px;
-    }
-
-    .sec {
-      padding: 22px 20px 18px;
     }
   }
 </style>

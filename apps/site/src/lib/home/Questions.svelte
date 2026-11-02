@@ -27,7 +27,7 @@
     <summary>{item.q}<Icon name="chevron-down" /></summary>
     <p>
       {item.a}
-      {#if item.link}<a class="more" href={item.link.href}>{item.link.label}<Icon name="arrow-right" size="s" /></a>{/if}
+      {#if item.link}<a class="onward" href={item.link.href}>{item.link.label}<Icon name="arrow-right" size="s" /></a>{/if}
     </p>
   </details>
 {/snippet}
@@ -56,11 +56,14 @@
   .aside {
     margin: 16px 0 0;
     color: var(--ink2);
-    font-size: var(--t-site-16);
+    font-size: var(--t-text);
+    line-height: 1.55;
   }
 
+  /* THE ADDRESS IN THE INK, UNDERLINED: red is the start button's alone (1 Nov). */
   .aside a {
-    color: var(--red);
+    color: var(--ink);
+    text-decoration-thickness: 1px;
     text-underline-offset: 3px;
   }
 
@@ -94,10 +97,11 @@
     justify-content: space-between;
     gap: 16px;
     min-block-size: 56px;
-    padding: 0 20px;
+    padding: 14px 20px;
     cursor: pointer;
-    font-size: var(--t-site-17);
+    font-size: var(--t-text);
     font-weight: 600;
+    line-height: 1.4;
     list-style: none;
   }
 
@@ -110,7 +114,7 @@
     inline-size: 20px;
     block-size: 20px;
     color: var(--ink2);
-    transition: rotate 160ms ease-out;
+    transition: rotate var(--d-swap) var(--ease-out);
   }
 
   details[open] > summary :global(.icon) {
@@ -144,29 +148,19 @@
     padding: 0 20px 20px;
     max-inline-size: 40em;
     color: var(--ink2);
-    font-size: var(--t-site-16);
+    font-size: var(--t-text);
     line-height: 1.55;
+    text-wrap: pretty;
   }
 
-  .more {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+  /* A WAY ON AFTER AN ANSWER is the site's one (`.onward`), a word's space after it. */
+  details p .onward {
     margin-inline-start: 4px;
-    color: var(--ink);
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-
-  .more:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
   }
 
   @media (max-width: 1059px) {
     .qs {
-      margin-block-start: 24px;
+      margin-block-start: var(--head-gap);
     }
   }
 

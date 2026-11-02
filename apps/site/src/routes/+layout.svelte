@@ -124,7 +124,7 @@
       {#if under}<span class="links-under" data-moving={sliding ? '' : undefined} aria-hidden="true" style:translate="{under.x}px {under.y}px" style:inline-size="{under.w}px" style:opacity={under.w > 0 ? 1 : 0}></span>{/if}
     </nav>
 
-    <div class="go"><Start size="sm" /></div>
+    <div class="go"><Start size="md" /></div>
 
     <!-- THE PHONE'S HEADER IS ONE ROW: the brand, the start button and this 44px button, which holds the links. -->
     <details class="menu" bind:open={menuOpen} bind:this={menu}>
@@ -227,7 +227,7 @@
     gap: 24px;
     margin-inline-start: auto;
     color: var(--on-night-2);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
   }
 
   .links a,
@@ -236,10 +236,15 @@
     text-decoration: none;
   }
 
-  .links a:hover,
-  .links :global(a:hover),
   .links a[aria-current] {
     color: var(--on-night);
+  }
+
+  @media (hover: hover) {
+    .links a:hover,
+    .links :global(a:hover) {
+      color: var(--on-night);
+    }
   }
 
   /* THE CURRENT LINK, UNDERLINED: by itself without scripting, by the sliding bar with it. */
@@ -299,12 +304,6 @@
   .go {
     display: flex;
     flex: none;
-  }
-
-  .go :global(.btn) {
-    block-size: 40px;
-    padding-inline: 16px;
-    font-size: var(--t-site-15);
   }
 
   @media (pointer: coarse) {
@@ -378,15 +377,20 @@
     padding-inline: 12px;
     border-radius: 8px;
     color: var(--on-night);
-    font-size: var(--t-site-16);
+    font-size: var(--t-text);
     font-weight: 500;
     text-decoration: none;
   }
 
-  .menu-panel a:hover,
-  .menu-panel :global(.menu-link:hover),
   .menu-panel a[aria-current] {
     background: var(--night-rule);
+  }
+
+  @media (hover: hover) {
+    .menu-panel a:hover,
+    .menu-panel :global(.menu-link:hover) {
+      background: var(--night-rule);
+    }
   }
 
   @media (max-width: 760px) {
@@ -406,7 +410,7 @@
     .go :global(.btn) {
       block-size: 34px;
       padding-inline: 12px;
-      font-size: var(--t-site-14);
+      font-size: var(--t-meta);
     }
 
     .menu {
@@ -441,27 +445,29 @@
 
   /* ── The footer ─────────────────────────────────────────────────────────── */
 
+  /* THE FOOTER ON THE NIGHT, with the page's band air above it at a desk (64, 48 on a phone) rather than a tighter 48:
+     it closes the page, so it takes room like a band does. */
   .site-foot {
-    padding: 48px 0 calc(28px + env(safe-area-inset-bottom, 0px));
+    padding: clamp(48px, 2.2vw + 32px, 64px) 0 calc(32px + env(safe-area-inset-bottom, 0px));
     border-block-start: 1px solid var(--foot-rule);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
   }
 
   .foot {
     display: grid;
     grid-template-columns: 1.5fr repeat(3, 1fr);
-    gap: 28px;
+    gap: 32px;
   }
 
   .foot h2 {
-    margin: 0 0 12px;
+    margin: 0 0 14px;
     color: var(--on-night-2);
-    font: 500 14px/1 var(--ui);
+    font: 500 var(--t-meta) / 1 var(--ui);
   }
 
   .foot ul {
     display: grid;
-    gap: 8px;
+    gap: 10px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -472,17 +478,34 @@
     text-decoration: none;
   }
 
-  .foot ul a:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  /* 44 TALL UNDER A THUMB: each link grows to the site's tap height and the rows close up to meet, so the targets touch
+     without overlapping and the words keep their places at the list's ends. */
+  @media (pointer: coarse) {
+    .foot ul {
+      gap: 0;
+      margin-block: -10px;
+    }
+
+    .foot a {
+      display: inline-block;
+      padding-block: 10px;
+      line-height: 24px;
+    }
+  }
+
+  @media (hover: hover) {
+    .foot ul a:hover {
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
   }
 
   .owner {
-    margin: 32px 0 0;
+    margin: 40px 0 0;
     padding-block-start: 20px;
     border-block-start: 1px solid var(--night-rule);
     color: var(--on-night-2);
-    font-size: var(--t-site-small);
+    font-size: var(--t-meta);
   }
 
   @media (max-width: 1060px) {
@@ -495,10 +518,16 @@
     }
   }
 
+  /* A PHONE'S FOOTER IS TWO COLUMNS: three at 390 squeezed "Teams and agencies" onto two lines. The brand takes its own
+     row above them. */
   @media (max-width: 760px) {
     .foot {
-      gap: 24px 12px;
-      font-size: var(--t-site-14);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 32px 16px;
+    }
+
+    .owner {
+      margin-block-start: 32px;
     }
   }
 

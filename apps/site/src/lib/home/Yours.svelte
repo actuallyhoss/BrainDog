@@ -35,6 +35,7 @@
     min-inline-size: 0;
     background: var(--night);
     color: var(--on-night);
+    --focus: var(--on-night);
   }
 
   .words {
@@ -42,25 +43,30 @@
     min-inline-size: 0;
   }
 
+  /* THE LAST ASK'S TITLE AT THE FEATURE STEP, and its two lines at the text step: what early access is in the night's
+     second ink, then what Free holds in its first. The second line was a size larger than the first. */
   h3 {
-    font-size: var(--t-site-28);
+    font-size: var(--t-feature);
     line-height: 1.1;
-    letter-spacing: -0.035em;
+    letter-spacing: -0.03em;
   }
 
   .say {
-    max-inline-size: 40em;
+    max-inline-size: 60ch;
     margin: 12px 0 0;
     color: var(--on-night-2);
-    font-size: var(--t-site-16);
-    line-height: 1.5;
+    font-size: var(--t-text);
+    line-height: 1.55;
+    text-wrap: pretty;
   }
 
   .figs {
-    margin: 8px 0 0;
+    margin: 6px 0 0;
     color: var(--on-night);
-    font-size: var(--t-site-17);
-    line-height: 1.45;
+    font-size: var(--t-text);
+    font-weight: 500;
+    line-height: 1.55;
+    text-wrap: pretty;
   }
 
   .go-btn {
@@ -68,10 +74,6 @@
   }
 
   @media (max-width: 760px) {
-    h3 {
-      font-size: var(--t-site-24);
-    }
-
     .go-btn {
       flex: 1 1 100%;
     }

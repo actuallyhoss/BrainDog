@@ -107,7 +107,7 @@
         <li><Icon name={point.icon as IconName} size="m" />{point.text}</li>
       {/each}
     </ul>
-    <a class="safe" href={y.href}>{y.link}<Icon name="arrow-right" size="s" /></a>
+    <p class="on"><a class="onward" href={y.href}>{y.link}<Icon name="arrow-right" size="s" /></a></p>
   </div>
 </section>
 
@@ -122,7 +122,7 @@
 
   .body {
     align-items: start;
-    margin-block-start: 32px;
+    margin-block-start: var(--head-gap);
   }
 
   ul {
@@ -217,9 +217,16 @@
     font-size: var(--t-site-14);
   }
 
-  /* WHAT GOT DONE, on the band's ground itself; each reason on its own line at 13px, in the second ink. */
+  /* WHAT GOT DONE, on the band's ground itself; each reason on its own line at 13px, in the second ink. Its heading
+     sits on the line the tile's heading beside it sits on: the tile's padding less the heading's own 8 above it. */
   .done {
     color: var(--ink);
+  }
+
+  @media (width >= 1060px) {
+    .done {
+      padding-block-start: calc(var(--site-tile-pad) - 8px);
+    }
   }
 
   .done .hd .n,
@@ -271,7 +278,7 @@
   }
 
   .fresh {
-    animation: across 200ms ease-out both;
+    animation: across var(--d-page) var(--ease-out) both;
   }
 
   @keyframes across {
@@ -314,21 +321,9 @@
     font-weight: 600;
   }
 
-  .safe {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-block-size: 32px;
-    margin-block-start: 16px;
-    color: var(--ink);
-    font-size: var(--t-site-15);
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .safe:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
+  /* THE WAY ON TO HOW IT IS KEPT SAFE, the site's one (`.onward`), a tile's gap under the promises. */
+  .on {
+    margin-block-start: 24px;
   }
 
   @media (max-width: 1059px) {
@@ -338,10 +333,6 @@
   }
 
   @media (pointer: coarse) {
-    .safe {
-      min-block-size: var(--tap);
-    }
-
     .undo {
       display: inline-flex;
       align-items: center;
@@ -356,9 +347,10 @@
     }
   }
 
+  /* STACKED BELOW 1060, the line sits the grid's own 16 under its title, as a line under a title does on every page. */
   @media (max-width: 1059px) {
     .head .band-say {
-      margin-block-start: 16px;
+      margin-block-start: 0;
     }
   }
 
@@ -374,10 +366,6 @@
   }
 
   @media (max-width: 760px) {
-    .body {
-      margin-block-start: 24px;
-    }
-
     .keeps {
       grid-template-columns: minmax(0, 1fr);
       gap: 10px;

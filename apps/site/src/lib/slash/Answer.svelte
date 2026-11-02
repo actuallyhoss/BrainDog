@@ -81,7 +81,7 @@
   {/if}
   <div class="t read">
     <span class="sub">{ask.read}</span>
-    {#each ask.actions as a (a.label)}<button type="button" class="btn sm {a.tone === 'tint' ? 'red' : 'quiet'}">{a.label}</button>{/each}
+    {#each ask.actions as a (a.label)}<button type="button" class="btn sm {a.tone === 'tint' ? 'ink' : 'quiet'}">{a.label}</button>{/each}
   </div>
 {:else if find}
   <p class="thd">{w.found(find.count)}<span class="r">{find.aside}</span></p>
@@ -128,8 +128,10 @@
   <div class="propose" class:done={answered !== null} bind:this={box} aria-live="polite">
     {#if answered === null}
       <span class="sub">{make.from}</span>
-      <button type="button" class="btn red sm" onclick={() => answer(true)}>{make.yes}</button>
-      <button type="button" class="btn quiet sm" onclick={() => answer(false)}>{w.notNow}</button>
+      <span class="acts">
+        <button type="button" class="btn ink sm" onclick={() => answer(true)}>{make.yes}</button>
+        <button type="button" class="btn quiet sm" onclick={() => answer(false)}>{w.notNow}</button>
+      </span>
     {:else if answered.yes}
       <span class="ok"><Glyph name="check" size={16} /></span>
       <span class="said">{w.added(make.where)}</span>
@@ -192,6 +194,8 @@
   .rule-sub { margin-block-start: 10px; }
   .propose { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: var(--tile); font-size: var(--t-site-13-5); }
   .propose .sub { flex: 1; min-width: 11em; }
+  /* THE TWO ANSWERS STAY TOGETHER: in a narrow drawing they go under the line as a pair, never one on each row. */
+  .propose .acts { display: flex; gap: 8px; margin-inline-start: auto; }
   .propose .said { flex: 1; }
   .ok { display: inline-flex; color: var(--good); }
   .undo { all: unset; cursor: pointer; font-size: var(--t-site-13); font-weight: 500; color: var(--red); }

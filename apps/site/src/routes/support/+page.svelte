@@ -53,6 +53,6 @@
 
 <style>
   .write {
-    margin: 28px 0 0;
+    margin: 32px 0 0;
   }
 </style>

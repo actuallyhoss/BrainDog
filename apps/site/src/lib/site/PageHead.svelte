@@ -21,13 +21,15 @@
 </section>
 
 <style>
+  /* THE HEAD'S AIR: 64 above at a desk, under the header's own 64, and 72 below, a step more because the ground
+     changes under it; 40 and 48 on a phone. */
   .page-head {
-    padding-block: 64px;
+    padding-block: clamp(40px, 2.2vw + 32px, 64px) clamp(48px, 2.3vw + 39px, 72px);
   }
 
   h1 {
     max-inline-size: 14ch;
-    font-size: clamp(44px, 5.6vw, 80px);
+    font-size: var(--t-page);
     line-height: 0.95;
     letter-spacing: -0.05em;
     text-wrap: balance;
@@ -35,18 +37,13 @@
     hyphens: auto;
   }
 
+  /* THE LINE UNDER THE NAME at the lead step the home page's own line takes (20 at a desk, 18 on a phone). */
   .lead {
-    max-inline-size: 31em;
-    margin: 28px 0 0;
+    max-inline-size: 34em;
+    margin: 24px 0 0;
     color: var(--on-night-2);
-    font-size: clamp(1.08rem, 1.55vw, 1.32rem);
+    font-size: var(--t-lead);
     line-height: 1.5;
     text-wrap: pretty;
-  }
-
-  @media (max-width: 760px) {
-    .page-head {
-      padding-block: 36px 44px;
-    }
   }
 </style>

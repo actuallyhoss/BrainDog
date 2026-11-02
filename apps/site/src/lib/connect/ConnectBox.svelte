@@ -161,9 +161,14 @@
     cursor: pointer;
   }
 
-  .ctabs button:hover,
   .ctabs button[aria-selected='true'] {
     color: var(--on-night);
+  }
+
+  @media (hover: hover) {
+    .ctabs button:hover {
+      color: var(--on-night);
+    }
   }
 
   .ctabs button[aria-selected='true'] {
@@ -276,10 +281,11 @@
     color: var(--on-night);
   }
 
+  /* THE SITE'S ONE RING, the night's ink on the night (`--focus`): it was red here, the start button's colour. */
   .ctabs button:focus-visible,
   .vbtn:focus-visible,
   .cbox-copy:focus-visible {
-    outline: 2px solid var(--red);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
@@ -295,6 +301,14 @@
   @media (max-width: 760px) {
     .cbox:not([data-tone='night']) {
       padding: 16px;
+    }
+  }
+
+  /* FOUR TOOLS, TWO BY TWO ON A PHONE: in one wrapping row the last one was left alone on a second line. */
+  @media (max-width: 520px) {
+    .ctabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 

@@ -3,7 +3,7 @@
   product's renderer, and the list of its parts.
 
   THE LOOK IS LOOK B'S (LAUNCH 103 job 7): the strip carries on from the header's night, then the board.
-  The page is one sheet of --paper read at 68ch (`Body`); the nav and "On this page" are flat on the board with no tile
+  The page is one sheet read at 68ch (`Body`); the nav and "On this page" are flat on the board with no tile
   round them, and stay in view as the page scrolls. From 900px the nav and the page; below 900px the nav is a closed
   disclosure at the top and the list of parts is not drawn, because on a phone the page itself is the list; there the
   part in view is named in one line that stays at the top as the page scrolls (plan F24), and on a desk the list marks
@@ -96,9 +96,10 @@
       {#if inViewText}<a class="in-view" href={`#${inView}`} aria-label={`${w.inView}: ${inViewText}`}>{inViewText}</a>{/if}
       <Body src={doc.src}>
         {#snippet head()}
-          <CopyText text={doc.src} />
-          <a class="btn quiet sm" href={`${doc.path}.md`} data-sveltekit-reload>{w.raw}</a>
-          {#if edit}<a class="btn quiet sm" href={edit}>{w.edit}</a>{/if}
+          <CopyText text={doc.src}>
+            <a class="btn quiet sm" href={`${doc.path}.md`} data-sveltekit-reload>{w.raw}</a>
+            {#if edit}<a class="btn quiet sm" href={edit}>{w.edit}</a>{/if}
+          </CopyText>
         {/snippet}
       </Body>
 
@@ -148,7 +149,7 @@
     gap: 6px;
     margin: 0;
     color: var(--on-night-2);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
   }
 
   .doc-crumb {
@@ -165,24 +166,28 @@
     }
   }
 
-  .doc-crumb:hover {
-    color: var(--on-night);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  @media (hover: hover) {
+    .doc-crumb:hover {
+      color: var(--on-night);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
   }
 
+  /* A DOC'S NAME AT THE SECTION STEP: the strip is slimmer than a page's head, so its title is a step under a page's. */
   .doc-title {
     max-inline-size: 22ch;
     margin: 0;
-    font-size: clamp(2.1rem, 3.8vw, 3.2rem);
+    font-size: var(--t-section);
     line-height: 1.02;
-    letter-spacing: -0.045em;
+    letter-spacing: -0.04em;
     text-wrap: balance;
   }
 
-  /* THE BOARD under the strip, flat and full width, down to the footer with no gap above it. */
+  /* THE BOARD under the strip, flat and full width, down to the footer with no gap above it: a section's head gap over
+     the sheet, and the band step under it. */
   .board {
-    padding-block: var(--sp-6) 72px;
+    padding-block: var(--head-gap) var(--band-pad);
     margin-block-end: 0;
     background: var(--board);
   }
@@ -205,32 +210,30 @@
     display: none;
   }
 
-  /* THE PAGES BEFORE AND AFTER, flat on the paper: the direction with its arrow, then the title. */
+  /* THE PAGES BEFORE AND AFTER: the direction with its arrow, then the title. */
   .pager {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-3);
   }
 
+  /* THE PAGES BEFORE AND AFTER are tiles as the sheet is, so they are seen on the board (the paper grey was not). */
   .pager-link {
     display: grid;
     gap: 4px;
     min-block-size: var(--tap);
     padding: 18px 22px;
-    background: var(--paper);
+    background: var(--tile);
     border-radius: 16px;
     color: var(--ink);
     text-decoration: none;
-    transition: background var(--d-state) var(--ease-out);
   }
 
-  .pager-link:hover {
-    background: var(--tile);
-  }
-
-  .pager-link:hover .pager-title {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  @media (hover: hover) {
+    .pager-link:hover .pager-title {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
   }
 
   .pager-dir {
@@ -238,11 +241,11 @@
     align-items: center;
     gap: 6px;
     color: var(--muted);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
   }
 
   .pager-title {
-    font-size: var(--t-site-16-5);
+    font-size: var(--t-text);
     font-weight: 600;
   }
 
@@ -252,7 +255,7 @@
     padding-inline: 10px;
     color: var(--muted);
     font-family: var(--ui);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     font-weight: 600;
   }
 
@@ -269,17 +272,19 @@
     align-items: center;
     min-block-size: 36px;
     padding: 6px 10px;
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
     color: var(--ink2);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     line-height: 20px;
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .contents-link:hover {
-    background: var(--tile);
-    color: var(--ink);
+  @media (hover: hover) {
+    .contents-link:hover {
+      background: var(--tile);
+      color: var(--ink);
+    }
   }
 
   .contents-link[aria-current] {
@@ -300,7 +305,7 @@
     background: var(--board);
     border-block-end: 1px solid var(--rule);
     color: var(--ink);
-    font-size: var(--t-site-15);
+    font-size: var(--t-label);
     font-weight: 600;
     text-decoration: none;
     text-overflow: ellipsis;
@@ -356,10 +361,6 @@
   @media (max-width: 760px) {
     .strip-in {
       padding-block: 20px 32px;
-    }
-
-    .board {
-      padding-block: var(--sp-4) 48px;
     }
   }
 </style>

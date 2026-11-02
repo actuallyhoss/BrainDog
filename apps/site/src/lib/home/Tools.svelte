@@ -40,7 +40,7 @@
         <ConnectBox tone="night" />
       </div>
     </div>
-    <a class="dev" href={words.devHref}>{words.dev}<Icon name="arrow-right" size="s" /></a>
+    <p class="on"><a class="onward" href={words.devHref}>{words.dev}<Icon name="arrow-right" size="s" /></a></p>
   </div>
 </section>
 
@@ -54,7 +54,7 @@
   }
 
   .body {
-    margin-block-start: 32px;
+    margin-block-start: var(--head-gap);
   }
 
   .ftile {
@@ -63,10 +63,11 @@
     color: var(--on-night);
   }
 
+  /* A TILE'S SMALL HEADING, as every tile's on the site: 15/600 in the tile's ink. */
   .hd {
     margin: 0 0 16px;
-    color: var(--on-night-2);
-    font: 500 14px/1.2 var(--ui);
+    color: var(--on-night);
+    font: 600 var(--t-label) / 1.2 var(--ui);
   }
 
   .stream {
@@ -110,40 +111,19 @@
     display: none;
   }
 
-  .dev {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-block-size: 32px;
-    margin-block-start: 16px;
-    color: var(--on-night-2);
-    font-size: var(--t-site-15);
-    text-decoration: none;
+  /* THE ONE QUIET WAY ON FOR A DEVELOPER, the site's one (`.onward`), in the night's ink, a tile's gap under the tiles. */
+  .on {
+    margin: 24px 0 0;
   }
 
-  .dev:hover {
-    color: var(--on-night);
-    text-decoration: underline;
-    text-underline-offset: 4px;
-  }
-
-  @media (pointer: coarse) {
-    .dev {
-      min-block-size: var(--tap);
-    }
-  }
-
+  /* STACKED BELOW 1060, the line sits the grid's own 16 under its title, as a line under a title does on every page. */
   @media (max-width: 1059px) {
     .head .band-say {
-      margin-block-start: 16px;
+      margin-block-start: 0;
     }
   }
 
   @media (max-width: 760px) {
-    .body {
-      margin-block-start: 24px;
-    }
-
     /* ON A PHONE, TWO NOTES SAY IT, and the connect line is the hero's button and the /agents page's. */
     .note:nth-child(n + 3),
     .connect {

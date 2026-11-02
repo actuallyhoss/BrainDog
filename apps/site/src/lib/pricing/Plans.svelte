@@ -67,6 +67,7 @@
   }
 
   .plan.free {
+    --focus: var(--on-night);
     background: var(--night);
     color: var(--on-night);
   }
