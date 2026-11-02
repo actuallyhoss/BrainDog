@@ -16,7 +16,7 @@
   import { LIST_LEVELS } from '$lib/record/may.ts';
   import { ROLES, ROLE_ORDER } from '$lib/sharing/roles.ts';
   /* THE WRITES THIS AREA MAKES, and the one reading of what the record answered to each. */
-  import { addException, dropException, moveLevel, removeAccess, suspendPerson, type Wrote } from '$lib/record/settings-write.ts';
+  import { addException, dropException, handOverTo, moveLevel, removeAccess, suspendPerson, type Wrote } from '$lib/record/settings-write.ts';
   /* The rows of one list a grant reaches, picked with the exception and said back under it. */
   import { ruleRead, rulesHeld, ruleValue } from '$lib/record/settings-write.ts';
   import { labelOf } from '$lib/record/api.ts';
@@ -247,6 +247,20 @@
     if (peopleFrom !== 'live') cannotWrite();
     else if (p.suspended) void settle(() => suspendPerson(apiBase(), p, false), copy.accessLetBack(p.name));
     else void settle(() => suspendPerson(apiBase(), p, true), copy.accessStopped(p.name));
+  }
+
+  /* ── handing the BrainDog over (collab pass, 2 Nov) ──
+     ONE PRESS, ONE CONFIRM, ONE WRITE. Making somebody an owner and then stepping yourself down was two presses on two
+     rows, and the second was refused here ("You cannot change your own level here"), so ownership could not move at
+     all without a second owner's help. Now it is one sentence of what changes, the reauth the app already asks for a
+     stale sign-in, and the record's `handOver`, which does both halves in one transaction. */
+  let handing = $state<Person | null>(null);
+  const recordName = $derived(shell.index.name || copy.handOverThis);
+  async function handOver(p: Person) {
+    const done = await settle(() => handOverTo(apiBase(), p), copy.handedOver(said(p), recordName));
+    handing = null;
+    /* WHAT YOU MAY DO HERE CHANGED, so the whole app reads it again: the rail, Settings and every control. */
+    if (done) setTimeout(() => location.reload(), 1200);
   }
 
   function takeAway(p: Person) {
@@ -566,6 +580,9 @@
               <!-- STOP IS NOT FOR YOURSELF, for the reason your own level is not: it is the press that removes your own
                    way back to this screen. Nor for the last owner, who would leave the record with nobody to let anybody
                    back in. -->
+              {#if anOwner && p.level !== 'owner' && !p.suspended}
+                <Button weight="bare" disabled={peopleBusy} aria-haspopup="dialog" onclick={() => (handing = p)}>{copy.handOverPress}</Button>
+              {/if}
               <Button
                 weight="bare"
                 disabled={lastOwner(p) || self(p) || peopleBusy}
@@ -777,6 +794,19 @@
       <p class="hint" id="own-level">{copy.ownLevel}</p>
     </div>
   </Tile>
+  <Sheet open={handing !== null} onclose={() => (handing = null)} title={handing ? copy.handOverTitle(said(handing), recordName) : ''}>
+    {#if handing}
+      <div class="hand">
+        <p>{copy.handOverThey(said(handing))}</p>
+        <p>{copy.handOverYou}</p>
+        <p class="hint">{copy.handOverBack(said(handing))}</p>
+        <div class="hand-do">
+          <Button weight="primary" disabled={peopleBusy} aria-busy={peopleBusy} onclick={() => handing && void handOver(handing)}>{copy.handOverDo}</Button>
+          <Button weight="quiet" onclick={() => (handing = null)}>{copy.handOverKeep}</Button>
+        </div>
+      </div>
+    {/if}
+  </Sheet>
 {/if}
 
 <!--
@@ -1554,5 +1584,20 @@
     .role {
       transition: none;
     }
+  }
+
+  .hand {
+    display: grid;
+    gap: var(--sp-3);
+  }
+  .hand p {
+    margin: 0;
+    text-wrap: pretty;
+  }
+  .hand-do {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
   }
 </style>

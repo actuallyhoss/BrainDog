@@ -11870,6 +11870,25 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     removeMember: (by: string, person: string, why?: string): Result<null> => transaction(() => moved(remove(memberDeps(), by, person, why))),
 
+    /**
+     * HAND THE RECORD OVER (collab pass, 2 Nov): `to` becomes an owner and `by` steps down to `decide`, in ONE transaction,
+     * so there is never a moment with no owner and never one where the hand-over half happened. Each half is the same
+     * `invite` a level change is, so each writes its own `access.grant` or `access.revoke` with `why`. The record's method
+     * checks who may ask; this checks only that `to` is somebody else already on the record and not stopped.
+     */
+    handOver: (by: string, to: string, why?: string): Result<Member> =>
+      transaction(() => {
+        if (to === by) return no<Member>('VALUE_MALFORMED', 'You already own it. Pick somebody else.', { at: 'person' });
+        const on = sql.one<{ suspended_at: string | null }>('SELECT p.suspended_at FROM member m JOIN person p ON p.id = m.person_id WHERE m.person_id = ? LIMIT 1', to);
+        if (on === undefined) return no<Member>('REF_UNKNOWN', 'Only somebody already on this BrainDog can be given it. Invite them first.', { at: 'person' });
+        if (on.suspended_at !== null) return no<Member>('FORBIDDEN', 'They are stopped. Let them back in first.', { at: 'person' });
+        const raised = invite(memberDeps(), by, { person: to, level: 'owner', ...(why === undefined ? {} : { why }) });
+        if (!raised.ok) return raised;
+        const lowered = invite(memberDeps(), by, { person: by, level: 'decide', ...(why === undefined ? {} : { why }) });
+        if (!lowered.ok) throw new Error('refusal' in lowered ? lowered.refusal.fix : 'The hand-over could not step you down.');
+        return moved(raised);
+      }),
+
     /* ── agent tokens ───────────────────────────────────── */
 
     /** Mint one. The secret exists once, in the answer, and is stored nowhere. */

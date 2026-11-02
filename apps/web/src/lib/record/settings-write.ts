@@ -206,6 +206,14 @@ export async function suspendPerson(base: string, p: Person, suspended: boolean,
   return wrote(await clientOf(base, io).suspendMember({ person: p.id, suspended }));
 }
 
+/**
+ * Hand the record over to somebody already on it: they become an owner and you step down to Can decide, in one write.
+ * A sign-in older than fifteen minutes is asked for again in place (`at: 'proof'`), and the call sent again.
+ */
+export async function handOverTo(base: string, p: Person, io?: Fetch): Promise<Wrote<unknown>> {
+  return wrote(await clientOf(base, io).handOver({ person: p.id }));
+}
+
 /** Take somebody off the record. The record refuses the last owner. */
 export async function removeAccess(base: string, p: Person, io?: Fetch): Promise<Wrote<unknown>> {
   return wrote(await clientOf(base, io).removeMember({ person: p.id }));

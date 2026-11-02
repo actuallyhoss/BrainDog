@@ -14,4 +14,7 @@ import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
   { name: 'suspendMember', group: 'ADMIN', writes: true, what: 'Stop somebody without taking them off, or let them back in. Everything they held is kept. Never the last owner.' },
+  /* HANDING THE RECORD OVER (collab pass, 2 Nov): an owner, signed in within fifteen minutes, makes somebody already here
+     an owner and steps down to `decide`, in one write. ADMIN for the same reason. */
+  { name: 'handOver', group: 'ADMIN', writes: true, what: 'Make somebody already here an owner, and step down to Can decide, in one write.' },
 ];

@@ -685,6 +685,16 @@ export const account = {
   inviteNoMail: 'Nothing is emailed: copy the link and send it to them yourself.',
   /* COLLAB PASS (2 Nov): the roles side by side, from wherever access is given. */
   rolesCompare: 'What each role can do',
+  /* HANDING THE BRAINDOG OVER (collab pass, 2 Nov). */
+  handOverPress: 'Make owner',
+  handOverThis: 'this BrainDog',
+  handOverTitle: (who: string, record: string) => `Hand ${record} to ${who}?`,
+  handOverThey: (who: string) => `${who} becomes an owner: people, add-ons, settings, Keys, export and deleting it are theirs.`,
+  handOverYou: 'You stay on as Can decide. You keep seeing and changing everything, and lose what only an owner does.',
+  handOverBack: (who: string) => `Only ${who} can make you an owner again. You confirm it's you first.`,
+  handOverDo: 'Hand it over',
+  handOverKeep: 'Keep it',
+  handedOver: (who: string, record: string) => `${who} owns ${record} now. You can decide here.`,
   inviteLinkReady: (email: string) => `For ${email}. Shown once, so copy it now.`,
   inviteCopyLink: 'Copy link',
   inviteAddsOnlyNext: 'You add through your own agent. Make its key next.',

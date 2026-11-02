@@ -1629,7 +1629,7 @@
       <!-- WHAT WAS SHARED WITH A GUEST, ONCE A SHARE (§3.4). Its own chunk: only somebody a share let in loads it. -->
       {#if data.me.grant !== undefined && !data.me.owner}
         {#await import('$lib/sharing/Welcome.svelte') then { default: Welcome }}<Welcome shell={data} />{/await}
-      {:else if !data.me.owner && data.me.lists === null && data.me.level !== 'owner'}
+      {:else if !data.me.owner && data.me.lists === null && data.me.level !== 'owner' && page.route.id === '/'}
         <!-- AND WHAT A ROLE LETS A NEW COLLEAGUE DO, once a role on this device (collab pass, 2 Nov). Its own chunk too. -->
         {#await import('$lib/sharing/RoleWelcome.svelte') then { default: RoleWelcome }}<RoleWelcome shell={data} />{/await}
       {/if}

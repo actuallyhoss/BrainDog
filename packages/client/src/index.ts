@@ -2985,6 +2985,8 @@ export function createClient(options: ClientOptions) {
      */
     suspendMember: (args: { person: string; suspended: boolean }) =>
       call<Answer<'suspendMember'>>('suspendMember', args as Record<string, unknown>),
+    /** Make somebody already here an owner and step down to Can decide, in one write (collab pass, 2 Nov). */
+    handOver: (args: { person: string; why?: string }) => call<Answer<'handOver'>>('handOver', args as Record<string, unknown>),
     /** Hand one open question to the person who decides it, or take it back with `to` left out. ADMIN. The wire name is `setDecider`. */
     handQuestion: (args: { id: string; to?: string | null }) => call<{ id: string; decider: string | null }>('setDecider', args as Record<string, unknown>),
     /** `reach` opens something beyond the scope, and only an owner's whole-record token uses it: `['inbox']` reads the money inbox. */

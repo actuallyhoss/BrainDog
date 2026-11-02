@@ -1327,7 +1327,7 @@ export const BYPASS_PREF = 'agents.bypass' satisfies PrefKey;
  *     with a browser session, and no token reaches it at all.
  *   - The switch itself is set only by the owner signed in to the app (`setPref`), so no agent turns it on for itself.
  */
-export const NEVER_BYPASS: ReadonlySet<string> = new Set(['setPref', 'createToken', 'createReportKey', 'ingestMint', 'deviceApprove', 'deleteRecord', 'erase', 'restore', 'import', 'export']);
+export const NEVER_BYPASS: ReadonlySet<string> = new Set(['handOver', 'setPref', 'createToken', 'createReportKey', 'ingestMint', 'deviceApprove', 'deleteRecord', 'erase', 'restore', 'import', 'export']);
 /** What a change landed without asking carries in its note, beside the reason, so the log says why nobody was asked. */
 export const BYPASS_NOTE = 'Agents act without asking';
 /** "Agents' suggestions wait apart": the owner's own switch, on unless it is `false` (`apartOn` in the kernel). */
@@ -15816,6 +15816,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (joined.ok && kernel.meetsList() !== null && !isOrganisationAddress(email))
         kernel.meet({ ...(name ? { name } : {}), email, where: 'accepted an invitation' }, { actor: id, principal: { kind: 'person' } }, { viewer: null });
       return tail(joined);
+    },
+
+    /**
+     * Hand this BrainDog over (collab pass, 2 Nov): somebody already on it becomes an owner, and the owner asking steps
+     * down to Can decide, in one write. An owner, in a browser, signed in within the last fifteen minutes, as inviting
+     * asks, and never an agent, the switch that lets agents act without asking included (`NEVER_BYPASS`). It moves who
+     * holds this BrainDog and nothing the host keeps about who pays for it.
+     */
+    async handOver(args: { person: string; why?: string }, ctx: CallContext) {
+      const stop = admin(ctx, 'hand this BrainDog over', 'handOver');
+      if (stop) return { ok: false as const, refusal: stop };
+      if (ctx.principal.kind !== 'person') return no('NEEDS_BROWSER_SESSION', 'Hand it over from the app, signed in.', { at: 'principal' });
+      if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
+        return { ok: false as const, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Confirm it is you to hand this BrainDog over. Nothing was changed.', at: 'proof' } };
+      if (typeof args?.person !== 'string' || args.person === '') return no('REQUIRED_MISSING', 'Who should own it?', { at: 'person' });
+      const why = typeof args.why === 'string' && args.why.trim() !== '' ? args.why.trim().slice(0, 280) : 'Handed over ownership.';
+      return tail(kernel.handOver(actorOf(ctx), args.person, why));
     },
 
     /** Take somebody off. Never the last owner, and every register they held is revoked out loud. */
