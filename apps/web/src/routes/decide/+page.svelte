@@ -46,6 +46,7 @@
   import { fromInput, keyAct, queueAct } from './press.ts';
   import type { Improved } from './improved.ts';
   import { askerOf as cardAsker } from '$lib/decide/card.ts';
+  import { cardNow, loadCard } from '$lib/decide/card-load.ts';
   import { listen } from '$lib/page/listen.svelte.ts';
   import PageView from '$lib/page/PageView.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -408,7 +409,19 @@
   });
   /* ONE LEAD TILE ACROSS THE BOARD, THE REST A COMPACT QUEUE UNDER IT: the first group's first question, whole. */
   const led = $derived(shaped ? leadOf(shaped.blocks, shaped.first === 'quick' ? [GROUP_KEY.quick, GROUP_KEY.money] : [GROUP_KEY.money, GROUP_KEY.quick]) : null);
-  const drawn = $derived<Opened | null>(got && got.from === 'live' && led ? { ...got, page: { page: got.page.page, blocks: led.blocks } } : got);
+  /* THE QUESTIONS WAIT FOR THEIR CARD, AND DRAW ONCE WITH IT: the card's code comes beside the read (`card-load.ts`), and
+     on a slow phone the read won, so every question stood as an empty row for a frame or two and the lead then grew
+     248px over the rest (0.55 of the phone's layout shift). The screen is held open until it lands, as Today holds its
+     page reader. A card that fails to load lets the page draw as before. */
+  let cardIn = $state(cardNow() !== null);
+  if (cardNow() === null) {
+    const held = opened();
+    void loadCard().then(
+      () => ((cardIn = true), closed(true, held)),
+      () => ((cardIn = true), closed(false, held)),
+    );
+  }
+  const drawn = $derived<Opened | null>(!cardIn ? null : got && got.from === 'live' && led ? { ...got, page: { page: got.page.page, blocks: led.blocks } } : got);
   /* NOTHING TO DRAW AT ALL: the head says so, and the other queue is offered when something waits in it. */
   const cleared = $derived(shaped !== null && !shaped.drawsAny);
   /* THE HEAD'S LINE IS THE RECORD'S, and there is none with no question waiting: the head is then the page's name, and
@@ -475,7 +488,7 @@
        sticks inside this screen's own box either way, and on a phone the page's menu is raised to the end of the
        sentence only where the sentence is the sibling before the page (`PageView`, look fault N). So the sheet for
        asking a question is drawn after the page, not here. -->
-  <PageHead icon="decide" title={said('decide')} sentence={headLine} needs={cleared ? undefined : shaped?.sentence.needs || undefined}>
+  <PageHead icon="decide" title={said('decide')} heldLines={1} sentence={headLine} needs={cleared ? undefined : shaped?.sentence.needs || undefined}>
     {#snippet actions()}
       <!-- NOT OVER A CLEARED PAGE (UI pass 1 Nov): with no line beside it the "⋯" stood alone on a row of its own above
            "Nothing needs you", offering Select with nothing to select. -->

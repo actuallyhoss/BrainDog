@@ -301,6 +301,8 @@
      IT DRAWS IS IN THE PAGE'S OWN ANSWER (`shape`, scope 2026-10-24 A20), so it asks the record nothing, and each answer
      of the page, read again when the record moves, is handed to it. A page that carries none has no parts. */
   const shapeBox = $state<ShapeBox>({ hold: null });
+  /* A PART'S CODE THAT DID NOT ARRIVE does not hold the page in its bars: it draws without the shape, as before. */
+  let partsFailed = $state(false);
   setContext(SHAPE_KEY, shapeBox);
   const shapeSaid = $derived(mode === 'page' ? ((live?.page.page as { shape?: unknown } | undefined)?.shape ?? null) : null);
   $effect(() => {
@@ -313,14 +315,17 @@
         shapeBox.hold = null;
         return;
       }
-      void import('./shape-hold.svelte.ts').then(({ ShapeHold }) => {
+      /* AND THE CODE ITS PARTS ARE DRAWN BY, BEFORE THE HOLD IS SET: the blocks drew as bare headings while
+         `ProjectPart` was on its way, and the hero then landed over them and pushed the page 304px down (0.6 of a
+         project page's layout shift). Until both are in, the page waits in its bars (`partWaits`). */
+      void Promise.all([import('./shape-hold.svelte.ts'), import('./ProjectPart.svelte')]).then(([{ ShapeHold }]) => {
         if (about?.register !== of.register || about.seq !== of.seq || said !== shapeSaid) return;
         const hold = shapeBox.hold ?? new ShapeHold();
         hold.owner = isOwner;
         hold.modelLine = line;
         hold.follow(of.register, of.seq, said);
         if (shapeBox.hold !== hold) shapeBox.hold = hold;
-      });
+      }, () => (partsFailed = true));
     });
   });
   $effect(() => () => shapeBox.hold?.stop());
@@ -1063,7 +1068,7 @@
   <div class="pull" role="status" style:transform={`translateY(${pullBusy ? 16 : pulled - 24}px)`}>{pullBusy ? 'Refreshing' : pulled >= PULL_AT / 2 ? 'Let go to refresh' : 'Pull to refresh'}</div>
 {/if}
 
-{#if got === null}
+{#if got === null || (got.from === 'live' && projectPage && shapeBox.hold === null && !partsFailed && !arranging)}
   {#if railed}
     <!-- THE HEAD FROM THE RAIL'S OWN ENTRY, AND BARS ONLY FOR THE BLOCKS, until the record answers. -->
     <!-- A PAGE ONE ROW MADE (a project's) WAITS IN THE HEAD IT WILL HAVE: the way back and no name row, its hero holding

@@ -165,6 +165,11 @@
     };
   }
 
+  /* A READ THAT HANGS DOES NOT HOLD WHAT THE SHELL ALREADY HAS: after this long the tiles draw from it, as before. */
+  let readLate = $state(false);
+  const lateAt = setTimeout(() => (readLate = true), 2500);
+  onDestroy(() => clearTimeout(lateAt));
+
   $effect(() => {
     if (shown === 'idle' && read === null) {
       const held = registers;
@@ -370,7 +375,11 @@
     <!-- NOT AN ERROR AND NOT A RESULT. Arriving here with no query is the ordinary way in from the
          nav, and `19 §6`'s `no-data-yet` is the state for a surface waiting on you rather than on
          the record. -->
-    {#if jumps > 0}
+    {#if read === null && !readLate}
+      <!-- THE TILES WAIT FOR THEIR READS, AND DRAW ONCE, IN THEIR PLACES: drawn from what the shell held first, Projects and
+           Lists stood at the top and were pushed down when Changed lately and People landed over them (0.41 of a phone's
+           layout shift). Nothing is under them, so arriving whole moves nothing. -->
+    {:else if jumps > 0}
       <section class="jump" aria-labelledby="jump-title">
         <h2 class="jump-title" id="jump-title">{words.jumpTo}</h2>
         <div class="jump-grid">

@@ -167,6 +167,8 @@
    * THE LINE UNDER THE TITLE, drawn once the record has answered: how many keys, how often opened, and a machine asking
    * as its red phrase. The machines clause only for a reader the record let list them.
    */
+  /** Words of the usual length for the line under the title, set unseen while it is on its way so it holds their room. */
+  const HELD_LIKE = '6 keys. 3 have no value yet.';
   const sentence = $derived(
     from === 'live'
       ? sentenceOf({ keys, listed: index.kind === 'held', counts, asking: waiting.length, seesMachines: devices.kind === 'held', retired })
@@ -743,7 +745,9 @@
 
 <svelte:head><title>{titleOf(copy.keychain)}</title></svelte:head>
 
-<PageHead icon="vault" title={copy.keychain} count={index.kind === 'held' ? keys.length : undefined} sentence={sentence?.text} needs={sentence?.needs}>
+<!-- THE SENTENCE ON ITS WAY HOLDS THE ROOM A USUAL ONE TAKES (`HELD_LIKE`): held empty, the line took no width, Add a key
+     stood beside it on a phone, and the page dropped 32px when the words came and pushed the buttons under them. -->
+<PageHead icon="vault" title={copy.keychain} count={index.kind === 'held' ? keys.length : undefined} sentence={sentence?.text} needs={sentence?.needs} heldLines={1} heldText={HELD_LIKE}>
   {#snippet actions()}
     <!-- ONE KEYS PLACE (AG16): the list of the same rows is this place's Table view. -->
     <KeyViews on="keys" />
