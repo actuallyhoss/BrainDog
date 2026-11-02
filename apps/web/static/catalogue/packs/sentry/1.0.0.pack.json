@@ -224,7 +224,7 @@
       "after": "Errors",
       "note": "The project's open issues on Sentry, newest first, each with a link to it.",
       "block": {
-        "kind": "table",
+        "kind": "link",
         "heading": "Open on Sentry",
         "icon": "triangle-alert",
         "span": 12,
@@ -232,29 +232,13 @@
         "where": "thing is {{name}}, open is true",
         "columns": [
           {
-            "field": "what",
-            "label": "Issue",
-            "width": "minmax(18ch,2fr)"
+            "field": "what"
           },
           {
-            "field": "events",
-            "label": "Events",
-            "width": "8ch"
+            "field": "link"
           },
           {
-            "field": "users",
-            "label": "People",
-            "width": "8ch"
-          },
-          {
-            "field": "last_seen",
-            "label": "Last seen",
-            "width": "12ch"
-          },
-          {
-            "field": "link",
-            "label": "On Sentry",
-            "width": "10ch"
+            "field": "culprit"
           }
         ],
         "order": [
@@ -589,7 +573,7 @@
       },
       "format": "int",
       "target": {
-        "lte": 0
+        "gte": 0
       },
       "window": "30d",
       "compare": "none"
@@ -605,7 +589,7 @@
       },
       "format": "int",
       "target": {
-        "lte": 0
+        "gte": 0
       },
       "window": "30d",
       "compare": "none"
@@ -621,7 +605,7 @@
       },
       "format": "int",
       "target": {
-        "lte": 0
+        "gte": 0
       },
       "window": "30d",
       "compare": "none"
@@ -653,7 +637,7 @@
       },
       "format": "int",
       "target": {
-        "lte": 0
+        "gte": 0
       },
       "window": "30d",
       "compare": "none"
@@ -685,7 +669,7 @@
       },
       "format": "int",
       "target": {
-        "lte": 0
+        "gte": 0
       },
       "window": "30d",
       "compare": "none"
@@ -749,7 +733,7 @@
           "body": "{{sentry-unlinked}} Sentry projects are not linked to a project of yours, so their numbers sit on their own. Pick one under Your project in Sentry projects below."
         },
         {
-          "kind": "table",
+          "kind": "link",
           "heading": "Worth a look",
           "icon": "triangle-alert",
           "span": 12,
@@ -761,24 +745,13 @@
           "where": "open is true, alarm is set",
           "columns": [
             {
-              "field": "what",
-              "label": "Issue",
-              "width": "minmax(18ch,2fr)"
+              "field": "what"
             },
             {
-              "field": "project_name",
-              "label": "Project",
-              "width": "minmax(9ch,12ch)"
+              "field": "link"
             },
             {
-              "field": "why",
-              "label": "Why",
-              "width": "minmax(14ch,1fr)"
-            },
-            {
-              "field": "link",
-              "label": "On Sentry",
-              "width": "10ch"
+              "field": "why"
             }
           ],
           "order": [
@@ -826,11 +799,6 @@
               "field": "last_seen",
               "label": "Last seen",
               "width": "12ch"
-            },
-            {
-              "field": "link",
-              "label": "On Sentry",
-              "width": "10ch"
             }
           ],
           "order": [

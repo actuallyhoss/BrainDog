@@ -6118,9 +6118,9 @@
       "versions": [
         {
           "version": "1.0.0",
-          "checksum": "d9ef2f32c3873ebaafa93857ac01c524badd720e770ae4ca243c14a0743dd1e5",
-          "bytes": 41624,
-          "published_at": "2026-11-02T12:49:34.984Z",
+          "checksum": "8e08d1ffa29b8eb994a66a6c19f2392fb31e3969d262bd0cef1ecf66eabc4483",
+          "bytes": 40711,
+          "published_at": "2026-11-02T12:55:31.726Z",
           "bump": null,
           "reach": {
             "modules": [
