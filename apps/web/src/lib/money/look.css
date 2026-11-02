@@ -420,31 +420,32 @@
 /* ── the phone ────────────────────────────────────────────────────────────── */
 
 @container stat (inline-size < 480px) {
-  /* THE HERO'S FIGURES TWO BY TWO, label over figure, as a phone's finance app draws them, not four rows. */
+  /* THE HERO'S FIGURES ONE A ROW, the label at the start and the figure at the end, its note under the label
+     (leftovers9). Two by two, In and Out sat in half the tile each, about 150px at 390, and a five-figure amount
+     with "Bills and usual spending" under it filled its half to the rule: a wider amount would wrap or crowd it. A row
+     a figure keeps every amount whole and right-aligned, as a column of figures reads. */
   [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) {
-    flex: 1 1 40%;
+    flex: 1 1 100%;
     margin-inline: 0;
-    padding-inline: 0 var(--sp-2);
+    padding-inline: 0;
     grid-template-areas:
-      'label glyph'
-      'figure figure'
-      'note note';
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
+      'label glyph figure'
+      'note note note';
+    grid-template-columns: fit-content(100%) minmax(0, 1fr) auto;
+    align-items: baseline;
     padding-block: var(--sp-3);
     border-block-start: 1px solid var(--rule);
+    border-inline-start: 0;
   }
 
   [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-figure {
-    justify-self: start;
+    justify-self: end;
     font-size: var(--fs-head);
-    text-align: start;
+    text-align: end;
   }
 
-  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:nth-child(odd):not(:first-child) {
-    margin-inline: 0;
-    padding-inline: var(--sp-3) 0;
-    border-inline-start: 1px solid var(--rule);
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-note:empty {
+    display: none;
   }
 
   [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child > :is(.cell-trend, .cell-trend-ahead) {
