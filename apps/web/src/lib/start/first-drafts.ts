@@ -494,7 +494,8 @@ export function retitled(d: FirstDraft, title: string): FirstDraft {
 export function summaryOf(reply: Pick<SetupReply, 'summary'>): string | null {
   const s = reply.summary.replace(/\s+/gu, ' ').trim();
   if (s.length < 12 || s.length > 160) return null;
-  return s;
+  /* AS A SENTENCE (onboarding11: Marta's card read "get on top of our household money", her own words lifted whole). */
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /**
