@@ -13008,6 +13008,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         keepWords(today);
         return out;
       };
+      let aboutOf: Map<string, { register: string; seq: number | null } | null> | undefined;
       const lintDeps = {
         pages: () => kernel.pages(),
         page: (slug: string) => kernel.page(slug),
@@ -13022,6 +13023,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         /* EACH CLOSED FIELD'S VALUES THAT HAVE NO NAME: the web draws a named value by its name, and only an unnamed one
            (`vm`) prints as its key, so only those are a key where a name goes. */
         keysOf: lintKeysOf,
+        /* THE TEXTS OF THE ROW A PAGE IS MADE FOR, so a project's line that is its own next step is read as his words. */
+        rowWords: (slug: string): string[] => {
+          aboutOf ??= new Map(kernel.pages().map((p) => [p.slug, p.about] as const));
+          const about = aboutOf.get(slug);
+          if (!about || about.seq === null) return [];
+          const row = kernel.get({ register: about.register, seq: about.seq });
+          return row ? Object.values(row.fields).filter((v): v is string => typeof v === 'string') : [];
+        },
         now: () => Date.now(),
       };
       let run = lintRunOf(today);

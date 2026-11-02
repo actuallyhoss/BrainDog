@@ -52,6 +52,12 @@ export type PageLintDeps = {
    * its name and an unnamed one as its key, so a cell holding one prints a key where a name goes (`bare-key`).
    */
   keysOf?: KeysOf;
+  /**
+   * THE WORDS OF THE ROW A PAGE IS MADE FOR, its text fields as written, for a page a template made about a row. A part
+   * that says one of them and nothing else is his words, as a note is: Ferment & Co's line is its next step, "Pack the
+   * Hart Street Grocer order", and the copy rules read "pack" in it as the word for an add-on (leftovers 2 Nov, 7).
+   */
+  rowWords?: (slug: string) => readonly string[];
 };
 
 /**
@@ -198,7 +204,10 @@ function answerFindings(b: BlockResult, part: string, waiting: number | null): O
   if ((b.refusals ?? []).length > 0) out.push({ rule: 'refused', part, said: 'Draws nothing, because BrainDog could not read what it asks for.' });
   const rows = (b.rows ?? []).length;
   if (b.matched === 0 && rows > 0) out.push({ rule: 'none-matched', part, said: `Says nothing matched while it holds ${integer(rows)}.` });
-  if (b.kind === 'queue' && !b.where && rows === 0 && waiting !== null && waiting > 0)
+  /* A QUEUE'S QUESTIONS ARE ITS `queue`, NOT ITS ROWS (leftovers 2 Nov, 7): Today's Needs you drew "GitHub renews in 11
+     days" while the sign said it showed no questions, so Health counted Today as printing something raw. */
+  const asked = Array.isArray((b as { queue?: unknown }).queue) ? ((b as { queue: unknown[] }).queue.length) : 0;
+  if (b.kind === 'queue' && !b.where && rows === 0 && asked === 0 && waiting !== null && waiting > 0)
     out.push({ rule: 'questions-hidden', part, said: `Shows no questions while ${integer(waiting)} wait.` });
   return out;
 }
@@ -300,9 +309,12 @@ export type PageRead = { cells: number; cut: { part: string; read: number; held:
  * named by its heading with its figures filled, or by the page's title where it has none; a cell's part adds its column.
  * `read`, when given, is told how many cells were read and which blocks held more rows than were.
  */
-export function lintAnswer(page: PageResult, waiting: number | null, typesOf?: TypesOf, read?: PageRead, keysOf?: KeysOf): PageFinding[] {
+export function lintAnswer(page: PageResult, waiting: number | null, typesOf?: TypesOf, read?: PageRead, keysOf?: KeysOf, rowWords: readonly string[] = []): PageFinding[] {
   const title = page.title;
   const out: PageFinding[] = [];
+  /* A PART THAT SAYS ONE OF ITS ROW'S OWN TEXTS AND NOTHING ELSE IS HIS (`rowWords`). */
+  const own = new Set(rowWords.map((w) => w.replace(/\s+/gu, ' ').trim().toLowerCase()).filter((w) => w !== ''));
+  const his = (html: string): boolean => own.size > 0 && own.has(plain(html).replace(/[.!?]$/u, '').toLowerCase());
   for (const b of page.blocks) {
     if (b.drawn === false) continue;
     const name = b.heading ? (plain(drawn(b.heading, b.values)) || title) : title;
@@ -313,7 +325,7 @@ export function lintAnswer(page: PageResult, waiting: number | null, typesOf?: T
     const body = typeof written === 'string' && b.kind === 'note' && (b as { lead?: unknown }).lead === true ? leadDrawn(written, b.values, (b as { said?: unknown }).said) : written;
     /* A DOCUMENT IS HIS, as a project's note is. A note that is not one is the declaration's own sentence. */
     if (typeof body === 'string' && body.trim() !== '' && !/^\{\{\w+\}\}$/u.test(body.trim()))
-      parts.push({ name, html: drawn(body, b.values), theirs: b.document === true });
+      parts.push({ name, html: drawn(body, b.values), theirs: b.document === true || his(drawn(body, b.values)) });
     if (b.empty && b.matched === 0 && (b.rows ?? []).length === 0) parts.push({ name, html: drawn(b.empty, b.values) });
     const found: LintFinding[] = parts.flatMap((p) => lintPart(p));
     /* AND ITS CELLS, which the web draws from the rows: a time or an id a cell prints raw is on the page as surely as a
@@ -402,7 +414,7 @@ export function roundStep(deps: PageLintDeps, part: RoundPart, stop: (drawn: num
       const answer = deps.page(p.slug);
       if (answer.ok) title = answer.value.title;
       const pageRead: PageRead = { cells: 0, cut: [] };
-      found = answer.ok ? lintAnswer(answer.value, out.waiting, deps.typesOf, pageRead, deps.keysOf) : [{ page: title, part: title, rule: 'no-draw', said: NO_DRAW }];
+      found = answer.ok ? lintAnswer(answer.value, out.waiting, deps.typesOf, pageRead, deps.keysOf, deps.rowWords?.(p.slug) ?? []) : [{ page: title, part: title, rule: 'no-draw', said: NO_DRAW }];
       out.cells += pageRead.cells;
       out.cut.push(...pageRead.cut.map((c) => ({ page: title, ...c })));
     } catch {
