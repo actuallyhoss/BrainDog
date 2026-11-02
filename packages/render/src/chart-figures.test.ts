@@ -87,7 +87,7 @@ test('A HOME OF EGYPTIAN POUNDS READS AS THE WRITER WRITES IT, compact on the ax
   assert.match(plan.top, /8m$/u);
   assert.equal(plan.bottom, said(-400_000_000, 'EGP', 'EGP', 'axis'));
   assert.equal(plan.bottom.codePointAt(0), 0x2212, 'a true minus in front, never a hyphen');
-  assert.deepEqual(plan.ticks.map((t) => t.label), [800_000_000, 0, -400_000_000].map((m) => (m === 0 ? '0' : said(m, 'EGP', 'EGP', 'axis'))));
+  assert.deepEqual(plan.ticks.map((t) => t.label), [800_000_000, 0, -400_000_000].map((m) => said(m, 'EGP', 'EGP', 'axis')));
   assert.equal(plan.buckets[1]!.net, said(250_000_000, 'EGP', 'EGP', 'exact'));
 });
 
