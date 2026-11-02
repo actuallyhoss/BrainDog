@@ -44,6 +44,12 @@
 
   const faultsFor = (key: string): string[] => faults.filter((f) => f.key === key).map((f) => f.say);
   const isBranch = (n: Node): boolean => 'if' in n.step;
+  /* WHICH ARM HOLDS STEPS WHEN THE OTHER HOLDS NONE: that arm takes the width and the empty one keeps only its pill. */
+  const leanOf = (n: Node): 'then' | 'else' | undefined => {
+    const then = (n.then ?? []).length;
+    const otherwise = (n.else ?? []).length;
+    return then > 0 && otherwise === 0 ? 'then' : otherwise > 0 && then === 0 ? 'else' : undefined;
+  };
 </script>
 
 <ol class="flow-list" data-list={list} data-arm={list === ROOT ? undefined : ''}>
@@ -60,7 +66,7 @@
     <li class="step">
       <FlowCard {flow} {node} {list} {at} count={nodes.length} faults={faultsFor(node.key)} />
       {#if isBranch(node)}
-        <div class="arms">
+        <div class="arms" data-lean={leanOf(node)}>
           <section class="arm" aria-label={words.then}>
             <p class="arm-head">{words.then}</p>
             <FlowList {flow} list={armOf(node.key, 'then')} nodes={node.then ?? []} {faults} />
@@ -162,6 +168,32 @@
     block-size: var(--sp-3);
     inset-inline-start: 50%;
     border-inline-start: 1px solid var(--rule);
+  }
+
+  /* ONE ARM WITH STEPS AND ONE WITHOUT (leftovers 7, 2 Nov): the empty arm is only its "Add a step" pill, so it keeps a
+     slim column and the arm with the steps takes the rest, rather than a card squeezed into half the canvas beside an
+     empty half. The fork and the join are drawn to the two new centres: the wide arm's is half of what is left once the
+     gap and the slim column are taken, and the slim arm's is half of its own width, plus the far arm's 1px as above. */
+  @container (width >= 560px) {
+    .arms[data-lean] {
+      --arm-slim: 10rem;
+    }
+
+    .arms[data-lean='then'] {
+      grid-template-columns: minmax(0, 1fr) var(--arm-slim);
+    }
+
+    .arms[data-lean='then']::before {
+      inset-inline: calc((100% - var(--sp-3) - var(--arm-slim)) / 2) calc(var(--arm-slim) / 2 - 1px);
+    }
+
+    .arms[data-lean='else'] {
+      grid-template-columns: var(--arm-slim) minmax(0, 1fr);
+    }
+
+    .arms[data-lean='else']::before {
+      inset-inline: calc(var(--arm-slim) / 2) calc((100% - var(--sp-3) - var(--arm-slim)) / 2 - 1px);
+    }
   }
 
   .arm {
