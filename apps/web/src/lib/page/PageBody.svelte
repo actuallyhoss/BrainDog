@@ -1954,12 +1954,12 @@
   }
 
   .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='danger']) {
-    background: color-mix(in srgb, var(--red) 12%, var(--tile));
+    background: var(--red-tint);
     color: var(--red);
   }
 
   .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='earn']) {
-    background: color-mix(in srgb, var(--good) 12%, var(--tile));
+    background: var(--good-tint);
     color: var(--good);
   }
 
