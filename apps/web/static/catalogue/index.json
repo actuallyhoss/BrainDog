@@ -263,8 +263,40 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.1",
+      "latest": "2.0.2",
       "versions": [
+        {
+          "version": "2.0.2",
+          "checksum": "7d71466104390f9f3582bacb0e28919478f27d37326dbcfb1b55b045a9b787e8",
+          "bytes": 26536,
+          "published_at": "2026-11-02T15:10:56.941Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Events"
+            ],
+            "pages": [
+              "Events"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "calendar.google.com",
+                "line": "CALLS OUT calendar.google.com, outlook.office365.com and outlook.live.com · every 1h · key \"Calendar link\" to the host its keychain entry opens",
+                "key": "Calendar link"
+              }
+            ],
+            "widgets": [
+              "Next meetings",
+              "Today's events"
+            ]
+          },
+          "notes": "The Events page says nothing is coming up, and how to connect the calendar if it is not, in a plain note rather than the large lead, since a connected calendar can be empty too. The Next meetings widget puts what the event is first, so a narrow widget still says it.",
+          "preview": true
+        },
         {
           "version": "2.0.1",
           "checksum": "4bb794e5effe57ae479c2ac724af8ccb4f2671b5b31a88692f19d2451df2eb8e",
@@ -6255,8 +6287,60 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.0.1",
       "versions": [
+        {
+          "version": "1.0.1",
+          "checksum": "dce18c6a4f2c532238eaf2cd6f41fe7e3b9c46d7bb6e227b86500c243146757f",
+          "bytes": 40757,
+          "published_at": "2026-11-02T15:10:56.941Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Sentry projects",
+              "Sentry issues"
+            ],
+            "pages": [
+              "Errors"
+            ],
+            "rules": [
+              "Ring the bell for an issue worth a look",
+              "Ask about an issue that hit many people"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "us.sentry.io",
+                "line": "CALLS OUT us.sentry.io, de.sentry.io and sentry.io · every 1h · key \"Sentry token\" to the host its keychain entry opens",
+                "key": "Sentry token"
+              }
+            ],
+            "widgets": [
+              "Errors",
+              "Errors worth a look"
+            ],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": true
+              },
+              {
+                "id": "page.project",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "The Errors page and widget no longer say Sentry is not connected when it is and simply has nothing yet, and the note about Sentry projects not linked to yours reads right for one.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "8e08d1ffa29b8eb994a66a6c19f2392fb31e3969d262bd0cef1ecf66eabc4483",

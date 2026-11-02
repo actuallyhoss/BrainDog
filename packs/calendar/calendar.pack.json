@@ -1,10 +1,10 @@
 {
   "pack": "calendar",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "icon": "calendar",
   "title": "Calendar",
   "summary": "Your calendar's next events, read every hour from its secret ICS link in Google Calendar or Outlook, into a list you, your widgets and your agents can read. The link stays in your keys. Nothing is written back to the calendar.",
-  "changes": "Says to put the link in your keys where Install asks for it, or from a terminal with braindog keys put \"Calendar link\", which reads it from standard input.",
+  "changes": "The Events page says nothing is coming up, and how to connect the calendar if it is not, in a plain note rather than the large lead, since a connected calendar can be empty too. The Next meetings widget puts what the event is first, so a narrow widget still says it.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -33,16 +33,16 @@
         "where": "gone is not true, day after yesterday",
         "columns": [
           {
+            "field": "what",
+            "label": "What"
+          },
+          {
             "field": "day",
             "label": "Day"
           },
           {
             "field": "time",
             "label": "At"
-          },
-          {
-            "field": "what",
-            "label": "What"
           }
         ],
         "order": [
@@ -322,13 +322,14 @@
       "blocks": [
         {
           "kind": "note",
-          "lead": true,
+          "heading": "Nothing coming up",
+          "icon": "calendar",
           "span": 12,
           "when": {
             "metric": "events-ahead",
             "lt": 1
           },
-          "body": "Nothing here yet. Put your calendar's secret ICS link from Google or Outlook in your keys as Calendar link, and the next events arrive within the hour."
+          "body": "Nothing is on your calendar in the next sixty days. If it is not connected yet, put its secret ICS link from Google or Outlook in your keys as Calendar link, and the next events arrive within the hour."
         },
         {
           "kind": "note",

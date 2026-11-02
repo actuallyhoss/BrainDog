@@ -1,0 +1,414 @@
+{
+  "format": 1,
+  "made_at": "2026-11-02T15:10:56.941Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Nothing has come from Sentry yet. If it is not connected, make a token in Sentry (Settings, Developer Settings, Custom Integrations, Create New Integration, Internal Integration, with Read on Project, Issue & Event and Organization), put it in your keys as Sentry token, and set your organization. Your projects arrive within the hour. [Set it up](/addons/sentry?set=org)",
+          "heading": "No Sentry projects yet",
+          "icon": "triangle-alert",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "sentry-projects-held"
+          },
+          "key": "k0m067sn",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Open",
+              "metric": "sentry-open"
+            },
+            {
+              "label": "New in a day",
+              "metric": "sentry-new-24h"
+            },
+            {
+              "label": "Worth a look",
+              "metric": "sentry-worth-a-look"
+            }
+          ],
+          "kind": "stat",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "sentry-projects-held"
+          },
+          "key": "k0va60i7",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Open",
+              "metric": "sentry-open",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 2,
+                "unit": null,
+                "rows": 2,
+                "refusals": [],
+                "held": 2,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "New in a day",
+              "metric": "sentry-new-24h",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 2,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Worth a look",
+              "metric": "sentry-worth-a-look",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 2,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "sentry-open": {
+              "name": "Open errors",
+              "source": "register.sentry_issues",
+              "where": "open is true",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "sentry-new-24h": {
+              "name": "New errors in a day",
+              "source": "register.sentry_issues",
+              "where": "open is true, first_seen after -1d",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "sentry-worth-a-look": {
+              "name": "Errors worth a look",
+              "source": "register.sentry_issues",
+              "where": "open is true, alarm is set",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "body": "Sentry projects not linked to a project of yours: {{sentry-unlinked}}. Their numbers sit on their own until you pick one under Your project in Sentry projects below.",
+          "icon": "link",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "sentry-unlinked"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "sentry-unlinked": 1
+          },
+          "read_as": {
+            "sentry-unlinked": "figure"
+          },
+          "figures": {
+            "sentry-unlinked": {
+              "name": "Sentry projects not linked",
+              "source": "register.sentry_projects",
+              "where": "gone is not true, thing is empty",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "link"
+            },
+            {
+              "field": "why"
+            }
+          ],
+          "empty": "Nothing needs a look.",
+          "heading": "Worth a look",
+          "icon": "triangle-alert",
+          "kind": "link",
+          "limit": 10,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "last_seen"
+            }
+          ],
+          "source": "register.sentry_issues",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "sentry-worth-a-look"
+          },
+          "where": "open is true, alarm is set",
+          "key": "k09n1yly",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Issue",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "project_name",
+              "label": "Project",
+              "width": "minmax(9ch,12ch)"
+            },
+            {
+              "field": "events",
+              "label": "Events",
+              "width": "8ch"
+            },
+            {
+              "field": "users",
+              "label": "People",
+              "width": "8ch"
+            },
+            {
+              "field": "last_seen",
+              "label": "Last seen",
+              "width": "12ch"
+            }
+          ],
+          "empty": "Nothing open on Sentry.",
+          "heading": "Open issues",
+          "icon": "list",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "last_seen"
+            }
+          ],
+          "source": "register.sentry_issues",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "sentry-projects-held"
+          },
+          "where": "open is true",
+          "key": "k0eth01a",
+          "rows": [
+            {
+              "id": "01M6ED0GXD6Z53GMAX5J2NWRE7",
+              "register": "sentry_issues",
+              "seq": 2,
+              "fields": {
+                "wide": false,
+                "what": "Request timed out on /api/checkout",
+                "project": "web-app",
+                "project_name": "Web app",
+                "issue_id": "4410022",
+                "short_id": "WEB-APP-1G",
+                "events": 12,
+                "events_24h": 12,
+                "users": 6,
+                "level": "error",
+                "open": true
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T15:10:56.941Z",
+              "updated_at": "2026-11-02T15:10:56.941Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ED0GXD6Z53GMAX5EVGYAXC",
+              "register": "sentry_issues",
+              "seq": 1,
+              "fields": {
+                "wide": false,
+                "what": "TypeError: Cannot read properties of undefined (reading 'id')",
+                "project": "web-app",
+                "project_name": "Web app",
+                "issue_id": "4410021",
+                "short_id": "WEB-APP-1F",
+                "events": 88,
+                "events_24h": 40,
+                "users": 21,
+                "level": "error",
+                "open": true
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T15:10:56.941Z",
+              "updated_at": "2026-11-02T15:10:56.941Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "slug",
+              "label": "Sentry project",
+              "width": "minmax(12ch,1fr)"
+            },
+            {
+              "field": "thing",
+              "label": "Your project",
+              "width": "minmax(10ch,14ch)"
+            },
+            {
+              "field": "unresolved",
+              "label": "Open",
+              "width": "7ch"
+            },
+            {
+              "field": "new_24h",
+              "label": "New",
+              "width": "7ch"
+            },
+            {
+              "field": "events_24h",
+              "label": "Events",
+              "width": "8ch"
+            },
+            {
+              "field": "users_24h",
+              "label": "People",
+              "width": "8ch"
+            }
+          ],
+          "empty": "No Sentry projects yet.",
+          "heading": "Sentry projects",
+          "icon": "projects",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "slug"
+            }
+          ],
+          "source": "register.sentry_projects",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "sentry-projects-held"
+          },
+          "where": "gone is not true",
+          "key": "k10qckr7",
+          "rows": [
+            {
+              "id": "01M6ED0GXD6Z53GMAX5892ZJ86",
+              "register": "sentry_projects",
+              "seq": 1,
+              "fields": {
+                "gone": false,
+                "slug": "web-app",
+                "name": "Web app",
+                "platform": "javascript",
+                "unresolved": 12,
+                "new_24h": 2,
+                "events_24h": 140,
+                "users_24h": 31
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T15:10:56.941Z",
+              "updated_at": "2026-11-02T15:10:56.941Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        }
+      ],
+      "icon": "triangle-alert",
+      "nav": {
+        "order": 40,
+        "section": "Projects"
+      },
+      "pack": "sentry",
+      "page": "sentry",
+      "requires": [
+        "register.sentry_issues",
+        "register.sentry_projects"
+      ],
+      "title": "Errors",
+      "read_at": "2026-11-02T15:10:56.941Z",
+      "zone": "UTC",
+      "look": {
+        "look": "sentry",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

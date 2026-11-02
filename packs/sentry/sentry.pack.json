@@ -1,10 +1,10 @@
 {
   "pack": "sentry",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "icon": "triangle-alert",
   "title": "Sentry",
   "summary": "What is breaking in your apps, from Sentry every hour: open issues, new ones, error events and people hit, on each project's page and on Today. An issue that is new and serious, comes back or spikes rings the bell. Reads only; nothing is sent to Sentry.",
-  "changes": "First version: Sentry projects linked to your projects, their open issues, four numbers a project that chart like any feed, a bell for an issue worth a look and a question when one hits many people.",
+  "changes": "The Errors page and widget no longer say Sentry is not connected when it is and simply has nothing yet, and the note about Sentry projects not linked to yours reads right for one.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "uses": [
@@ -80,7 +80,7 @@
         "back": 14,
         "bucket": "day",
         "limit": 4,
-        "empty": "Connect Sentry on the Sentry add-on's page, and open errors show here within the hour.",
+        "empty": "No open errors from Sentry yet. Not connected? Set it up on the Sentry add-on's page.",
         "icon": "triangle-alert"
       },
       "blanks": [],
@@ -690,14 +690,14 @@
       "blocks": [
         {
           "kind": "note",
-          "heading": "Not connected yet",
+          "heading": "No Sentry projects yet",
           "icon": "triangle-alert",
           "span": 12,
           "when": {
             "metric": "sentry-projects-held",
             "lt": 1
           },
-          "body": "Make a token in Sentry (Settings, Developer Settings, Custom Integrations, Create New Integration, Internal Integration, with Read on Project, Issue & Event and Organization), put it in your keys as Sentry token, and set your organization. Your projects arrive within the hour. [Set it up](/addons/sentry?set=org)"
+          "body": "Nothing has come from Sentry yet. If it is not connected, make a token in Sentry (Settings, Developer Settings, Custom Integrations, Create New Integration, Internal Integration, with Read on Project, Issue & Event and Organization), put it in your keys as Sentry token, and set your organization. Your projects arrive within the hour. [Set it up](/addons/sentry?set=org)"
         },
         {
           "kind": "stat",
@@ -730,7 +730,7 @@
             "metric": "sentry-unlinked",
             "gt": 0
           },
-          "body": "{{sentry-unlinked}} Sentry projects are not linked to a project of yours, so their numbers sit on their own. Pick one under Your project in Sentry projects below."
+          "body": "Sentry projects not linked to a project of yours: {{sentry-unlinked}}. Their numbers sit on their own until you pick one under Your project in Sentry projects below."
         },
         {
           "kind": "link",
