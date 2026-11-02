@@ -1894,9 +1894,13 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .menu-open:hover::before,
-  .launcher:hover::before {
-    background: color-mix(in srgb, var(--ink) 5%, var(--tile));
+  /* ONLY UNDER A POINTER THAT HOVERS (skills pass follow-up, 2 Nov): on a phone a tap left the fill latched on the menu
+     button until the next tap elsewhere. */
+  @media (hover: hover) and (pointer: fine) {
+    .menu-open:hover::before,
+    .launcher:hover::before {
+      background: color-mix(in srgb, var(--ink) 5%, var(--tile));
+    }
   }
 
   /**

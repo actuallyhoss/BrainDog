@@ -1622,6 +1622,14 @@
   grid-row: 2;
 }
 
+/* AND ON A PHONE UNDER THE BUTTONS, which take the sentence's second row there (skills pass follow-up, 2 Nov): the tabs
+   on row 2 as well lay over Add a movement, Share and More at 390, so none of the three could be pressed. */
+@media (width < 640px) {
+  .hosted[data-money] .block-slot[data-lead]:has(> .lead-head[data-barred]):has(> .block[data-kind='note'][data-form='lead']) > .book-scope {
+    grid-row: 3;
+  }
+}
+
 /* A PAGE WITH NO SENTENCE AND NOTHING UNDER ITS HEAD (a bill's, an account's on a phone-wide desk) drew Show the data,
    Share and More on a row of their own above its first tile (coordinator's live check, 1 Nov). On a desk the first tile
    rises into that row and the buttons sit at its top end, where a sentence would have stood beside them. */

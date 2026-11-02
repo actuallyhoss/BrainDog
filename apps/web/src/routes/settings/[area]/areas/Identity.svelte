@@ -893,7 +893,9 @@
     cursor: pointer;
   }
 
-  .add-name:hover {
-    text-decoration-color: currentColor;
+  @media (hover: hover) and (pointer: fine) {
+    .add-name:hover {
+      text-decoration-color: currentColor;
+    }
   }
 </style>

@@ -529,9 +529,21 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .menu :global([role^='menuitem']:hover),
   .menu :global([role^='menuitem']:focus-visible) {
     background: var(--hover);
+  }
+
+  /* HOVER ONLY UNDER A POINTER THAT HOVERS (skills pass follow-up, 2 Nov): on a phone's bottom sheet a tap latched the
+     fill on the item touched. */
+  @media (hover: hover) and (pointer: fine) {
+    .menu :global([role^='menuitem']:hover) {
+      background: var(--hover);
+    }
+
+    .menu :global([role^='menuitem'][aria-disabled='true']:hover),
+    .menu :global([role^='menuitem']:disabled:hover) {
+      background: none;
+    }
   }
 
   /* THE RING INSIDE THE ROW, so the menu's edge never clips it. */
@@ -544,11 +556,6 @@
   .menu :global([role^='menuitem']:disabled) {
     color: var(--ink-3);
     cursor: default;
-  }
-
-  .menu :global([role^='menuitem'][aria-disabled='true']:hover),
-  .menu :global([role^='menuitem']:disabled:hover) {
-    background: none;
   }
 
   /* THE PLACE YOU ARE IN, among a menu of places. */

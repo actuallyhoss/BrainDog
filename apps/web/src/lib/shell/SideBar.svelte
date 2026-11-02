@@ -1059,10 +1059,22 @@
     fill: currentColor;
   }
 
-  .s-item:hover > .s-pin,
   .s-item:has(> .s-row:focus-visible) > .s-pin,
   .s-pin:focus-visible {
     opacity: 1;
+  }
+
+  /* HOVER ONLY UNDER A POINTER THAT HOVERS (skills pass follow-up, 2 Nov): a tap on a row in the phone's drawer latched
+     the hover, showed the pin and hid the row's late count. */
+  @media (hover: hover) and (pointer: fine) {
+    .s-item:hover > .s-pin {
+      opacity: 1;
+    }
+
+    .s-item:hover:has(> .s-row .s-late, > .s-row .s-dot) > .s-row .s-late,
+    .s-item:hover:has(> .s-row .s-late, > .s-row .s-dot) > .s-row .s-dot {
+      visibility: hidden;
+    }
   }
 
   /* A PINNED ROW KEEPS ITS PIN IN VIEW only where nothing else sits at its end. */
@@ -1072,11 +1084,6 @@
 
   .s-item:not(:has(> .s-row .s-late, > .s-row .s-dot)) > .s-pin[data-on] {
     opacity: 1;
-  }
-
-  .s-item:hover:has(> .s-row .s-late, > .s-row .s-dot) > .s-row .s-late,
-  .s-item:hover:has(> .s-row .s-late, > .s-row .s-dot) > .s-row .s-dot {
-    visibility: hidden;
   }
 
   /* THE OPEN PROJECT'S PARTS: under its name, a hairline at their start, the one in view in ink. Never lit: the
@@ -1173,10 +1180,15 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .s-grip:hover::after,
   .s-grip:focus-visible::after,
   .s-grip:active::after {
     background: var(--rule-strong);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .s-grip:hover::after {
+      background: var(--rule-strong);
+    }
   }
 
   /* A PART SCROLLED TO STOPS UNDER THE PAGE'S STICKY NAME ROW. */

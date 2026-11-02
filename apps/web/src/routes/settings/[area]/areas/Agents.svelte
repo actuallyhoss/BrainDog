@@ -1070,8 +1070,10 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .agent-row:has(.agent:hover) {
-    background: var(--hover);
+  @media (hover: hover) and (pointer: fine) {
+    .agent-row:has(.agent:hover) {
+      background: var(--hover);
+    }
   }
 
   .agent-row > :global(.agent-face) {

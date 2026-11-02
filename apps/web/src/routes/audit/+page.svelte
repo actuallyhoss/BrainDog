@@ -1159,11 +1159,18 @@
     font-weight: 500;
   }
 
-  .mi:hover,
   .mi:focus-visible {
     background: var(--hover);
     color: var(--ink);
   }
+
+  @media (hover: hover) and (pointer: fine) {
+    .mi:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
+  }
+
 
   .mi-name {
     flex: 1;

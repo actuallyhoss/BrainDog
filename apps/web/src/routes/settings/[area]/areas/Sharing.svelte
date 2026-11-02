@@ -532,9 +532,11 @@
     overflow-wrap: anywhere;
   }
 
-  .share-open:hover .share-said {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  @media (hover: hover) and (pointer: fine) {
+    .share-open:hover .share-said {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
   }
 
   .share[data-ended] {

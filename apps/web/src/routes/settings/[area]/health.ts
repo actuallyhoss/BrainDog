@@ -58,8 +58,12 @@ export type Sign = {
   to?: string;
 };
 
-/** The word of the link at the line's end, to where the signs are shown. */
-export const LOOK = 'Look';
+/** The words of the link at the line's end, to where the signs are shown. They name the place (skills pass follow-up,
+    2 Nov): a bare "Look" read as nothing to somebody moving through the page's links. */
+export const LOOK = 'Open Health';
+
+/** The words of the link at the line's end when the failure waits as a question. */
+export const LOOK_QUESTION = 'Open it in Needs you';
 
 /** The word of the link at the line's end when what needs a look is a copy: Backups, where the copies are. */
 export const BACKUPS = 'Backups';
@@ -240,7 +244,7 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
         : lead?.sign === ARRIVALS && more.inboxAt
         ? { text: OPEN_THEM, href: more.inboxAt }
         : headed
-          ? { text: LOOK, href: lead!.to! }
+          ? { text: LOOK_QUESTION, href: lead!.to! }
           : aboutCopies(named) && more.backupsAt
           ? { text: BACKUPS, href: more.backupsAt }
           : more.signsAt
