@@ -19,7 +19,7 @@ export const packs = {
        words.ts`). "Pack" stays the word in the docs, where the file format is. */
     title: 'Add-ons',
     /* What an add-on is rests on `packages/declare/src/catalogue.ts`: `reachOf` counts the lists, pages, rules and hosts. */
-    lede: 'New lists, pages and rules for the work you do. Each one shows what it adds before anything changes.',
+    lede: 'New lists, pages and rules for the work you do, from Stripe and Mercury to Sentry, Calendar and Weather. Each one shows what it adds before anything changes.',
 
     search: 'Search add-ons',
     searchHint: 'Rent, invoices, Stripe',

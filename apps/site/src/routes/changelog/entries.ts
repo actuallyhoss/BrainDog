@@ -87,6 +87,94 @@ export type Entry = {
  */
 export const ENTRIES: Entry[] = [
   {
+    date: '2026-11-02',
+    kind: 'shipped',
+    title: 'Invite people by email, in roles with plain names',
+    body:
+      'An invitation is mailed as it is made, naming who sent it and what the role lets them do. The roles are Owner, Can decide, Can edit, Can add and Can view.',
+    commits: ['689417173', '0377eb343'],
+  },
+  {
+    date: '2026-11-02',
+    kind: 'shipped',
+    title: 'Hand your BrainDog over with Make owner',
+    body:
+      'An owner can make somebody already on it the owner in one confirmed press, and stays on as Can decide. No agent can do it.',
+    commits: ['bd9cac8f8'],
+  },
+  {
+    date: '2026-11-02',
+    kind: 'shipped',
+    title: 'Mention someone with @, and their phone rings',
+    body:
+      'Typing @ in a comment offers the people who can see that row. A colleague is rung when they are mentioned, handed a row or someone joins from their invitation.',
+    commits: ['05e13ce26', '33fdaf968', 'c4a43627a'],
+  },
+  {
+    date: '2026-11-02',
+    kind: 'shipped',
+    title: 'See who else is on the same page',
+    body:
+      'Faces of the people on the same row, list or page show beside the bell. Nobody learns where you are unless they can open that page too.',
+    commits: ['81a3dc240'],
+  },
+  {
+    date: '2026-11-02',
+    kind: 'changed',
+    title: 'Read-only links to a project, with or without money',
+    body:
+      'A link to a project page shows where it stands, its next step and its work. With money left off, every amount stays out, including ones typed in notes.',
+    commits: ['d99d63001', 'd66038238'],
+  },
+  {
+    date: '2026-11-02',
+    kind: 'shipped',
+    title: 'Import contacts and bank statements',
+    body:
+      'People takes a contacts CSV or vCard and skips anyone already there. Money takes a bank statement as CSV, and each filing choice becomes a rule for the next one.',
+    commits: ['599d519f7', '784f82134', '2ce57c16d'],
+  },
+  {
+    date: '2026-11-02',
+    kind: 'changed',
+    title: 'The sign-up chat asks better questions',
+    body:
+      'The first chat offers taps for who you work with, like an accountant or contractors, and says each answer back as a sentence. It no longer invents tasks.',
+    commits: ['a2e903c28', 'cfb414c68'],
+  },
+  {
+    date: '2026-11-02',
+    kind: 'shipped',
+    title: 'Sentry in the add-on store, and Stripe and Mercury read only',
+    body:
+      'The Sentry add-on links Sentry projects to yours, with their open issues and error numbers. Stripe and Mercury say which read-only key to make. Weather and Calendar draw better on Today.',
+    commits: ['dd1bf3944', '6230e27d6', '31787f040', '265db20f8', 'd42666e55'],
+  },
+  {
+    date: '2026-11-02',
+    kind: 'changed',
+    title: 'One switch lets your own agents act without asking',
+    body:
+      'Settings, Agents has a switch for the owner. It never covers keys, inviting or removing people, handing over, exporting everything or paying. Agents also read scripts and automations by name.',
+    commits: ['d94234cce', '887ea6f66', 'ece5e2361'],
+  },
+  {
+    date: '2026-11-02',
+    kind: 'changed',
+    title: 'Dark mode is grey, and pages stop jumping',
+    body:
+      'Dark mode lost its red tint and reads grey. Today, Search, Needs you, Keychain, Add-ons and project pages now draw in place without shifting as they load.',
+    commits: ['fa3f844df', '77a128882', '750d4cb53', '2eda61853'],
+  },
+  {
+    date: '2026-11-02',
+    kind: 'shipped',
+    title: 'A self-host can invite people without mail',
+    body:
+      'The operator runs invite with an email on the server, and it prints a join link in that terminal only. Activity names the operator as the one who sent it.',
+    commits: ['c0fcca8f4'],
+  },
+  {
     date: '2026-10-26',
     kind: 'changed',
     title: 'The Vault is now the Keychain',

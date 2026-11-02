@@ -118,7 +118,7 @@ export const trust = {
         {
           title: 'What an AI tool can do',
           glyph: 'agent',
-          text: 'An AI tool can read, suggest and write, and nothing more. Opening keys, erasing data, restoring a copy or deleting everything needs you, signed in.',
+          text: 'An AI tool can read, suggest and write, and nothing more. Opening keys, inviting people, handing over, restoring a copy or deleting everything needs you, signed in, even when you let your own agents act without asking.',
         },
         // apps/web/src/routes/settings/[area]/areas/Export.svelte; docs/12-SECURITY.md §8 (the export).
         {

@@ -14,6 +14,7 @@
    *   money    Your money, in one place: the app's Money home on Maya's two books, and the add-ons.
    *   chores   it does the filing, you make the calls, and it stays yours: the questions the desk does not show,
    *            and under them the floor and the three promises that keep it yours.
+   *   together bring in the people you work with: roles, mentions and faces, read-only links (2 November).
    *   tools    night: your AI tools share one memory, the notes and the connect line.
    *   slash    Press ⌘J and ask anything, the bar and its answer.
    *   yours    Free while in early access: the page's last call to action.
@@ -38,6 +39,7 @@
   import Chores from '$lib/home/Chores.svelte';
   import MoneyBand from '$lib/home/MoneyBand.svelte';
   import SlashBand from '$lib/home/SlashBand.svelte';
+  import Together from '$lib/home/Together.svelte';
   import Tools from '$lib/home/Tools.svelte';
   import WhoFor from '$lib/home/WhoFor.svelte';
   import Yours from '$lib/home/Yours.svelte';
@@ -72,6 +74,7 @@
 <WhoFor />
 <MoneyBand />
 <Chores />
+<Together />
 <Tools />
 <SlashBand />
 <Yours />

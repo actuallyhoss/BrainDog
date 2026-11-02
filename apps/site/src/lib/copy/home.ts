@@ -23,7 +23,7 @@ export const home = {
     title: 'Give your business a memory.',
     /* No mechanism in the promise: no event, log, row or ledger (`test/content.test.ts`). */
     /* PERSONAL USE AS MUCH AS BUSINESS (29 October), said lightly: your work, your money, your life. */
-    sub: 'One place that remembers your work, your money and your life, and tells you what needs you today. Your AI tools read from it too.',
+    sub: 'One place that remembers your work, your money and your life, and tells you what needs you today. The people you work with and your AI tools use it too.',
     secondary: 'Connect your AI tools',
     works: 'Works with',
     /* The makers, once each: Claude, not "Claude Code" (§47 his notes). Their marks are `@braindog/skin/agent-marks.ts`. */
@@ -79,7 +79,7 @@ export const home = {
     left: (left: string) => `${left} left`,
     over: (over: string) => `${over} over`,
     of: (spent: string, of: string, period: string) => `${spent} of ${of} ${period}`,
-    addons: 'Add what you need: subscriptions, splitting costs with friends, investments and gold, property, insurance, debts, goals, trips, certificates and zakat.',
+    addons: 'Import a bank statement and each line is filed, and your choices become rules so the next one files itself. From the add-on store: Stripe and Mercury read only, subscriptions, splitting costs with friends, investments and gold, property, insurance, debts, goals, trips and zakat.',
   },
 
   chores: {
@@ -87,7 +87,7 @@ export const home = {
     say: 'Filing, naming and sorting just happen, each with a reason and an undo. You only see what needs a person.',
     waits: 'Waits for you',
     done: 'Done on its own',
-    floor: 'Money, keys, sharing and deletes always wait for your yes. No rule and no AI tool can change that.',
+    floor: 'Money, keys, sharing and deletes wait for your yes. Only you can let your own agents skip that, and keys and people stay yours even then.',
     /* The figures beside the two headings, and the line the drawing says once nothing waits. */
     today: (n: number) => `${n} today`,
     empty: 'Nothing needs you. Everything else is handled.',
@@ -97,9 +97,34 @@ export const home = {
     undo: 'Undo',
   },
 
+  /* WORKING TOGETHER (2 November): the five roles in the app's words, invitations by mail, @ mentions that ring a
+     colleague's phone, faces of who else is here, and read-only links with or without money
+     (`docs/02-use/09-sharing.md`). A second person joins on any plan while billing is off (`teamsStop` in the worker). */
+  together: {
+    title: 'Bring in the people you work with.',
+    say: 'Invite someone by email and pick what they can do in plain words. Everyone works in the same place, and every change says who made it.',
+    roles: {
+      title: 'Roles in plain words',
+      say: 'Can view, Can add, Can edit or Can decide, or only the lists you pick. When you step back, Make owner hands it over.',
+    },
+    mention: {
+      title: 'Mention someone, and their phone rings',
+      say: 'Type @ in a comment and pick a name. They hear about it, and you see their face when they are on the same page.',
+      comment: 'can you check the April invoice before Friday?',
+    },
+    link: {
+      title: 'Share a page with a link',
+      say: 'A read-only link to one page, a project included, for a day, a week or a month. Money stays off it unless you add it.',
+      rows: ['Tidepool, read only', 'Works for 7 days', 'Money left off'],
+    },
+    imports: 'Bring your contacts in from a CSV or vCard, and anyone already here is skipped.',
+    link2: 'How sharing works',
+    href: `${DOCS}/use/sharing`,
+  },
+
   tools: {
     title: 'Your AI tools share one memory.',
-    say: "Each one starts from your brief and leaves a note when it's done. Nothing gets explained twice.",
+    say: "Each one starts from your brief, reads your scripts and automations by name, and leaves a note when it's done. Nothing gets explained twice.",
     notes: 'Notes on Tidepool',
     connect: 'Connect yours in one line',
     /* The one place home names the protocol, for the developer who came for it. */
@@ -129,7 +154,7 @@ export const home = {
 
   free: {
     title: 'Free while in early access.',
-    say: "BrainDog is invite only for now. Ask for an invite and we'll email you when it's ready.",
+    say: "BrainDog is invite only for now. Ask for an invite and we'll email you when it's ready. A short chat about your work sets it up.",
     /* The figures are `TABLE.free`'s, said in ONE SENTENCE, NOT A ROW OF STATS (the
        site's own rule, §47): "Free: every feature, 3 AI tools and 20 Slash questions a month." */
     figures: (tools: number, questions: number): string => `Free: every feature, ${tools} AI tools and ${questions} Slash questions a month.`,
@@ -158,7 +183,12 @@ export const home = {
       },
       {
         q: 'Can an AI tool spend money or delete things?',
-        a: 'No. Money, keys, sharing and deletes always wait for your yes, and every change has a name on it and an undo.',
+        a: 'Not unless you say so. Money, keys, sharing and deletes wait for your yes. You can let your own agents act without asking, but never on keys, people, ownership, export or paying, and every change has a name on it and an undo.',
+      },
+      {
+        q: 'Can my team use it?',
+        a: 'Yes. Invite people by email, each with their own sign-in and a role in plain words, or share one page with a read-only link. Amounts stay hidden from anybody outside your team unless you show them.',
+        link: { label: 'How sharing works', href: `${DOCS}/use/sharing` },
       },
       {
         q: 'Is my data safe?',

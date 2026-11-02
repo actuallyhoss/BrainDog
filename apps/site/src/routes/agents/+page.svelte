@@ -24,8 +24,9 @@
   const a = agents.agents;
 
   /* One glyph a line, in the lists' order: the brief, a person, the undo; then a key, money, the clock of the trail. */
-  const GETS: readonly IconName[] = ['today', 'person', 'undo'];
-  const CANNOT: readonly IconName[] = ['lock', 'card', 'clock'];
+  const GETS: readonly IconName[] = ['today', 'person', 'code', 'undo'];
+  /* A key; money; people, which the switch never covers; the clock of the trail. */
+  const CANNOT: readonly IconName[] = ['lock', 'card', 'users', 'clock'];
 
 </script>
 

@@ -23,6 +23,7 @@ export const agents = {
       lines: [
         "Your brief first: where things stand, what's next and what waits on you.",
         `Names, never codes, so it talks about ${DANA} and ${TIDEPOOL} the way you do.`,
+        'Your scripts and automations, read by their names.',
         'A receipt and an undo for everything it writes.',
       ],
     },
@@ -30,7 +31,8 @@ export const agents = {
       title: "What it can't do",
       lines: [
         'See a key. It uses them from the Keychain, by name.',
-        'Move money, share or delete without your yes.',
+        'Move money or delete without your yes, unless you switch that on for your own agents.',
+        'Invite or remove people, hand over the BrainDog or pay, switch or no switch.',
         'Hide what it did. Everything it writes carries its name.',
       ],
     },
@@ -42,7 +44,7 @@ export const agents = {
       title: 'For developers',
       links: [
         { label: 'The command line', href: `${DOCS}/agents/cli` },
-        { label: 'Scopes and tokens', href: `${DOCS}/agents/scopes` },
+        { label: 'Scopes, tokens and the switch', href: `${DOCS}/agents/scopes` },
         { label: 'All agent docs', href: `${DOCS}/agents/connect` },
       ],
     },

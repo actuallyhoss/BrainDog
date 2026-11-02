@@ -43,8 +43,8 @@ export const forPages = {
         /* Inbox is docs/07 §4; Needs you (once Decide, `apps/web/src/routes/decide/`) is where every proposal waits. */
         sub:
           'Keep your bills, budgets, subscriptions, savings and habits in one record, with your net worth and ' +
-          'any gold you hold counted in. Bills that arrive are filed for you, and anything that would move money ' +
-          'waits for your answer in Needs you.',
+          'any gold you hold counted in. Import a bank statement and each line is filed, then your choices file the ' +
+          'next one. Anything that would move money waits for your answer in Needs you.',
         rows: [
           {
             head: 'Bills file themselves',
@@ -111,8 +111,8 @@ export const forPages = {
         said: 'I run it on my own. Who owes me, and how long does the money last?',
         /* Automations are `apps/web/src/routes/automations/`; Needs you (once Decide) is `apps/web/src/routes/decide/`. */
         sub:
-          'Keep your money, customers and invoices in one place. A late invoice is put to you to chase, and ' +
-          'receipts file themselves.',
+          'Keep your money, customers and invoices in one place. Import your bank statements and your contacts to ' +
+          'start. A late invoice is put to you to chase, and receipts file themselves.',
         rows: [
           {
             head: 'Money in and out, month by month',
@@ -140,14 +140,16 @@ export const forPages = {
         nav: 'For teams and agencies',
         title: 'For teams and agencies · BrainDog',
         description:
-          'Invite your team, each with their own sign-in and a role. Everyone sees what is theirs, and every change says who made it.',
+          'Invite your team by email, each with their own sign-in and a role in plain words. Everyone sees what is theirs, and every change says who made it.',
         tag: 'For teams and agencies',
         said: "We run projects for clients. What's open, who has it, and what's late?",
         /* THE DOCS' WORDS (`docs/02-use/09-sharing.md`): a second person joins with their own sign-in, at a role or on the
            parts they are given; an agent sees what its person sees. Cloud Plus is not named while billing is off. */
         sub:
-          'Give each client a project and invite your team, each with their own sign-in: Viewer, Member or Admin, or ' +
-          'only the parts you choose, so Money can stay yours. Everyone sees what is next, and every change says who made it.',
+          'Give each client a project and invite your team by email, each with their own sign-in: Can view, Can add, Can ' +
+          'edit or Can decide, or only the parts you choose, so Money can stay yours. Mention someone with @ and their ' +
+          'phone rings. Send a client a read-only link to their project, with or without money. Everyone sees what is ' +
+          'next, and every change says who made it.',
         rows: [
           {
             head: 'The board and the numbers together',
@@ -174,14 +176,14 @@ export const forPages = {
         nav: 'For new projects',
         title: 'For new projects · BrainDog',
         description:
-          'Starting something with no template for it? Say what it is, and Slash sets up the areas, the ' +
-          'path and the budget.',
+          'Starting something with no template for it? Say what it is in a short chat, and BrainDog sets up ' +
+          'the areas, the path and the budget.',
         tag: 'For new projects',
         said: 'I am starting something new, and there is no template for it.',
         /* First run, `apps/web/src/routes/start/`: Slash proposes the lists and pages, and you accept them. */
         sub:
-          'Say what you are starting. Slash sets up the areas, the path and the budget, and you change ' +
-          'whatever you like after that.',
+          'Tell it what you are starting in a short chat. It sets up the areas, the path and the budget as you ' +
+          'answer, and you change whatever you like after that.',
         rows: [
           {
             head: 'A path, one step at a time',

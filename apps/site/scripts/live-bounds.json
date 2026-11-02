@@ -1,6 +1,6 @@
 {
   "about": "What the live site is held to, read by scripts/shot.mjs. Heights are the document's at 1440 wide, by page. Colours are the light scheme's: the red, the red under the pointer, the red a link is written in, and the ink (packages/skin/house.css).",
-  "heights": { "/": 5658 },
+  "heights": { "/": 7200 },
   "colours": ["#CF413A", "#B3322C", "#BB2C29", "#101318"],
   "outsideScripts": 0,
   "cookies": 0

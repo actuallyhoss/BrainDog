@@ -915,8 +915,15 @@
   .band--chores {
     background: var(--band-yours);
     color: var(--ink);
-    /* IN DARK ITS GREY AND THE AI BAND'S UNDER IT ARE A STEP APART, so the seam is drawn: the footer's hairline, which is
-       the night itself in light and so not seen there. */
+  }
+
+  /* THE TOGETHER BAND (2 November) sits between the chores' grey and the AI band's night, so it takes the Slash band's
+     white ground, which neither neighbour wears, and its tiles take that band's grey. */
+  .band--together {
+    background: var(--band-slash);
+    color: var(--ink);
+    /* IN DARK ITS GROUND AND THE AI BAND'S UNDER IT ARE A STEP APART, so the seam is drawn: the footer's hairline, which
+       is the night itself in light and so not seen there (it was the chores band's until this band came between). */
     border-block-end: 1px solid var(--foot-rule);
   }
 

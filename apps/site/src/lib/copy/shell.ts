@@ -43,8 +43,8 @@ export const shell = {
       description: 'The licence BrainDog is published under, and its Terms of Service and Privacy Policy.',
     },
     download: {
-      title: 'BrainDog for Mac',
-      description: 'The BrainDog app for Mac: your BrainDog in its own window, with a shortcut to Slash from anywhere.',
+      title: 'BrainDog for iPhone and Mac',
+      description: 'The BrainDog apps for iPhone and Mac are coming. Until then, BrainDog works in any browser.',
     },
     changelog: {
       title: 'Changelog · BrainDog',

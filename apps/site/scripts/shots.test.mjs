@@ -116,7 +116,7 @@ const inBounds = () => ({
   build: '1',
   at: '2026-10-13T00:00:00.000Z',
   routes: {
-    '/': { height: 5658, link: null, button: '#101318', buttonHover: '#B3322C', outside: [], cookies: [] },
+    '/': { height: 7200, link: null, button: '#101318', buttonHover: '#B3322C', outside: [], cookies: [] },
     '/pricing': { height: 9000, link: '#BB2C29', button: '#CF413A', buttonHover: '#b3322c', outside: [], cookies: [] },
   },
 });
@@ -129,7 +129,7 @@ function planted(path, fact) {
 }
 
 test('the bounds are the ones the site is held to', () => {
-  assert.equal(BOUNDS.heights['/'], 5658);
+  assert.equal(BOUNDS.heights['/'], 7200);
   for (const red of ['#CF413A', '#B3322C']) assert.ok(BOUNDS.colours.includes(red), `${red} is not a colour in bounds`);
   assert.equal(BOUNDS.outsideScripts, 0);
   assert.equal(BOUNDS.cookies, 0);

@@ -35,7 +35,7 @@ const NEVER = /\b(rows?|list items?|entit(?:y|ies)|register|schemas?|slugs?|MCP|
 
 test('home.ts holds the words of site 2a at the key paths the ledger reads', () => {
   assert.equal(home.hero.title, 'Give your business a memory.');
-  assert.equal(home.hero.sub, 'One place that remembers your work, your money and your life, and tells you what needs you today. Your AI tools read from it too.');
+  assert.equal(home.hero.sub, 'One place that remembers your work, your money and your life, and tells you what needs you today. The people you work with and your AI tools use it too.');
   assert.equal(home.hero.secondary, 'Connect your AI tools');
   assert.equal(home.hero.works, 'Works with');
   assert.deepEqual(
@@ -53,9 +53,15 @@ test('home.ts holds the words of site 2a at the key paths the ledger reads', () 
     home.chores.say,
     'Filing, naming and sorting just happen, each with a reason and an undo. You only see what needs a person.',
   );
-  assert.equal(home.chores.floor, 'Money, keys, sharing and deletes always wait for your yes. No rule and no AI tool can change that.');
+  assert.equal(
+    home.chores.floor,
+    'Money, keys, sharing and deletes wait for your yes. Only you can let your own agents skip that, and keys and people stay yours even then.',
+  );
   assert.equal(home.tools.title, 'Your AI tools share one memory.');
-  assert.equal(home.tools.say, "Each one starts from your brief and leaves a note when it's done. Nothing gets explained twice.");
+  assert.equal(
+    home.tools.say,
+    "Each one starts from your brief, reads your scripts and automations by name, and leaves a note when it's done. Nothing gets explained twice.",
+  );
   assert.equal(home.slash.title, 'Press ⌘J and ask anything.');
   assert.equal(home.yours.title, 'It stays yours.');
   assert.deepEqual(home.yours.points.map((p) => p.text), [
@@ -64,7 +70,7 @@ test('home.ts holds the words of site 2a at the key paths the ledger reads', () 
     'AI tools use your keys without ever seeing them.',
   ]);
   assert.equal(home.free.title, 'Free while in early access.');
-  assert.equal(home.faq.questions.length, 6);
+  assert.equal(home.faq.questions.length, 7);
   assert.ok(!('closing' in home), 'home has no recap close (site F1)');
 });
 

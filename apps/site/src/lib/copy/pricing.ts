@@ -62,6 +62,7 @@ export const pricing = {
           `${grouped(f.agents)} AI tools connected`,
           `${grouped(f.credits)} Slash questions a month`,
           `${grouped(f.allowance.runs)} automation runs a month`,
+          'Invite the people you work with',
           'Export any time',
         ],
       },

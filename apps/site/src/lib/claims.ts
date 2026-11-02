@@ -41,11 +41,19 @@ export type Claim = {
 
 export const CLAIMS: readonly Claim[] = [
   /* The home page (`copy/home.ts`, spread into `site`, so `hero.sub` is its `home.hero.sub`). */
-  { id: 'ai-tools-read', said: 'Your AI tools read from it too.', where: 'hero.sub', state: 'true' },
+  { id: 'ai-tools-read', said: 'The people you work with and your AI tools use it too.', where: 'hero.sub', state: 'true' },
   { id: 'today-each-morning', said: 'on one page each morning', where: 'who.small.say', state: 'true' },
   { id: 'agents-leave-a-note', said: "leaves a note when it's done", where: 'tools.say', state: 'true' },
   { id: 'chores-reason-undo', said: 'each with a reason and an undo', where: 'chores.say', state: 'true' },
-  { id: 'floor-waits', said: 'Money, keys, sharing and deletes always wait for your yes.', where: 'chores.floor', state: 'true' },
+  { id: 'floor-waits', said: 'Money, keys, sharing and deletes wait for your yes.', where: 'chores.floor', state: 'true' },
+  { id: 'floor-switch', said: 'Only you can let your own agents skip that, and keys and people stay yours even then.', where: 'chores.floor', state: 'true' },
+  { id: 'together-invite-mail', said: 'Invite someone by email and pick what they can do in plain words.', where: 'together.say', state: 'true' },
+  { id: 'together-make-owner', said: 'When you step back, Make owner hands it over.', where: 'together.roles.say', state: 'true' },
+  { id: 'together-mention', said: 'Type @ in a comment and pick a name.', where: 'together.mention.say', state: 'true' },
+  { id: 'together-link-money', said: 'Money stays off it unless you add it.', where: 'together.link.say', state: 'true' },
+  { id: 'together-contacts', said: 'Bring your contacts in from a CSV or vCard, and anyone already here is skipped.', where: 'together.imports', state: 'true' },
+  { id: 'statement-rules', said: 'your choices become rules so the next one files itself', where: 'money.addons', state: 'true' },
+  { id: 'scripts-by-name', said: 'reads your scripts and automations by name', where: 'tools.say', state: 'true' },
   { id: 'slash-card-yes', said: 'Money, keys, sharing and deletes wait for your yes.', where: 'slash.say', state: 'true' },
   { id: 'undo-any-change', said: 'Every change has a name on it, and an undo.', where: 'yours.points.0.text', state: 'true' },
   { id: 'export-any-time', said: 'Export everything as one file, any time.', where: 'yours.points.1.text', state: 'true' },
@@ -61,9 +69,10 @@ export const CLAIMS: readonly Claim[] = [
   /* The connect page (`copy/agents.ts`). */
   { id: 'mcp-approve-once', said: 'no key is copied anywhere', where: 'agents.lead', state: 'true' },
   { id: 'agent-sees-no-key', said: 'See a key. It uses them from the Keychain, by name.', where: 'agents.cannot.lines.0', state: 'true' },
-  { id: 'agent-asks-first', said: 'Move money, share or delete without your yes.', where: 'agents.cannot.lines.1', state: 'true' },
-  { id: 'agent-signs-writes', said: 'Hide what it did. Everything it writes carries its name.', where: 'agents.cannot.lines.2', state: 'true' },
-  { id: 'agent-write-undo', said: 'A receipt and an undo for everything it writes.', where: 'agents.gets.lines.2', state: 'true' },
+  { id: 'agent-asks-first', said: 'Move money or delete without your yes, unless you switch that on for your own agents.', where: 'agents.cannot.lines.1', state: 'true' },
+  { id: 'switch-never', said: 'Invite or remove people, hand over the BrainDog or pay, switch or no switch.', where: 'agents.cannot.lines.2', state: 'true' },
+  { id: 'agent-signs-writes', said: 'Hide what it did. Everything it writes carries its name.', where: 'agents.cannot.lines.3', state: 'true' },
+  { id: 'agent-write-undo', said: 'A receipt and an undo for everything it writes.', where: 'agents.gets.lines.3', state: 'true' },
   { id: 'five-apps-connect', said: `${APPS_AND} can read your BrainDog, suggest changes and leave notes.`, where: 'agents.lead', state: 'true' },
 
   /* The pricing page (`copy/pricing.ts`, `pricing`): the early access page while billing is off, then the plans. */
@@ -94,7 +103,7 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'no-shared-table', said: 'Nothing is shared between customers', where: 'security.kept.facts.0.text', state: 'true' },
   { id: 'sealed-copies', said: 'Every night a copy is sealed to a key kept outside Cloudflare', where: 'security.kept.facts.2.text', state: 'true' },
   { id: 'no-password', said: 'There is no password to steal.', where: 'security.kept.facts.3.text', state: 'true' },
-  { id: 'token-reach', said: 'Opening keys, erasing data, restoring a copy or deleting everything needs you, signed in.', where: 'security.kept.facts.4.text', state: 'true' },
+  { id: 'token-reach', said: 'Opening keys, inviting people, handing over, restoring a copy or deleting everything needs you, signed in, even when you let your own agents act without asking.', where: 'security.kept.facts.4.text', state: 'true' },
   { id: 'report-before-signup', said: 'The address for reporting a weakness is published here before sign-up opens.', where: 'security.report.pending', state: 'not-yet' },
 
   /* The packs pages (`copy/packs.ts`). */
