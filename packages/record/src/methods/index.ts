@@ -135,6 +135,16 @@ export type RecordDeps = {
   figure?: ((name: string, ctx: CallContext) => { amount: number; currency: string } | null) | undefined;
   /** An owner in a browser, and no token of any kind. */
   admin: (ctx: CallContext, reads?: string, method?: string) => Refusal | null;
+  /**
+   * The owner a token acts for as himself on this call, or `null`: his "Let agents do everything without asking" is on
+   * (`bypass`), or he told it to and it sent his words (`word`). `index.ts`'s `agentFor`. Absent, nobody.
+   */
+  agentFor?: ((ctx: CallContext) => string | null) | undefined;
+  /**
+   * A question this agent just filed, answered now as his own `decide` when `agentFor` names him, with the Undo every
+   * decision has (`index.ts`'s `bypassAccept`); `null` leaves it waiting on him. Absent, it always waits.
+   */
+  landNow?: ((ctx: CallContext, id: string) => Promise<{ decision: string } | null>) | undefined;
   /** The keychain's gate: an owner in a browser, proved within `FRESH`. */
   keychain: (ctx: CallContext) => Refusal | null;
   /** A list named at all, and a row number that is one, before anything is looked up. */

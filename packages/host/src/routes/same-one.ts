@@ -17,6 +17,6 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'sameOne', group: 'DATA', writes: true, what: 'Ask whether two or more people you hold are the same one. It opens one question on Decide and merges nothing until somebody answers it.',
+  { name: 'sameOne', group: 'DATA', writes: true, what: 'Ask whether two or more people you hold are the same one. It opens one question on Decide; the owner\'s own agent, while he lets it act or told it to, merges them at once, with Undo.',
     takes: { register: 'text', rows: 'json' } },
 ];

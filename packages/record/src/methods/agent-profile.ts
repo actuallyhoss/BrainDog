@@ -43,7 +43,7 @@ export const ON_WORD = 'On their word, passed as said, only money and keys still
  * `index.ts`): the May line `context` says, so the agent acts instead of asking, and knows what still waits.
  */
 export const BYPASS_SAYS =
-  'The owner lets you do everything without asking: write, delete, money, settings, add-ons, automations and sharing land at once, each logged with your name and undoable. Still theirs in BrainDog: reading or depositing a key, making keys, inviting, stopping or removing people or changing what they can do, deleting or exporting all of BrainDog, changing the owner and paying. This holds after reading things from outside BrainDog too, and such a change says so beside it.';
+  "The owner lets you do everything without asking: write, delete, money, settings, add-ons, automations, sharing, the team, making keys, imports and exports land at once, each logged with your name and undoable. Still theirs in BrainDog: giving the BrainDog away, deleting it, erasing a person for good, reading a key's value and paying. This holds after reading things from outside BrainDog too, and such a change says so beside it.";
 
 /**
  * The one sentence a row's ceiling, lists and projects come to: "Writes Tasks and Learnings; money, keys and deletes are

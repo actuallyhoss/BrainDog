@@ -10,8 +10,11 @@
  * resource (`braindog:calls`), read when wanted, so the tool list pays for one tool.
  *
  * WHAT NEVER GOES THROUGH IT, whatever the record would say: a call that carries a key's value in or out (the keychain,
- * minting a token, an ingest address, a sealed file), the runner's job protocol, and the four that end or replace a
- * whole BrainDog. A key is deposited with `braindog keys put`, which reads standard input, and nowhere else.
+ * a sealed file), the runner's job protocol, and the three the owner always keeps: deleting the whole BrainDog, erasing a
+ * person for good and giving the BrainDog away (`deleteRecord`, `erase`, `handOver`). A key is deposited with
+ * `braindog keys put`, which reads standard input, and nowhere else. Minting a key, an ingest address, letting a device
+ * in, an import and a restore go to the record, which lets the owner's own agent make them while he lets agents do
+ * everything without asking, or on his word sent as `said`, and refuses anybody else (the owner's word of 2 Nov).
  *
  * A CALL ONLY AN OWNER IN A BROWSER MAKES IS ASKED INSTEAD, WHERE ASKING CAN SAY IT: turning an add-on on or off,
  * installing one, its settings, and a declaration, each the `propose` body the app's Decide already applies. Asked, it
@@ -35,20 +38,15 @@ const KEYCHAIN_OPEN: ReadonlySet<string> = new Set(['listGrants', 'keyUses', 'ke
 
 /** Calls never made through this door, each with why, said when one is asked for. */
 export const NEVER: Readonly<Record<string, string>> = {
-  createToken: 'it answers a new key, and a key never travels through an agent',
   createOwnToken: 'it answers a new key, and a key never travels through an agent',
-  createReportKey: 'it answers a new key, and a key never travels through an agent',
-  ingestMint: 'it answers a secret address, which is shown once to the owner',
-  deviceApprove: 'it lets a machine in, which the owner does on that machine',
   openShare: 'a link is signed by the app for the owner in a browser',
   sealedPut: 'a sealed file is the owner’s own, in the app',
   sealedGet: 'a sealed file is the owner’s own, in the app',
   sealedList: 'a sealed file is the owner’s own, in the app',
   sealedDelete: 'a sealed file is the owner’s own, in the app',
-  import: 'it replaces a whole BrainDog, which the owner does in the app',
-  restore: 'it puts a whole BrainDog back, which the owner does in the app',
   erase: 'it erases a person for good, which the owner does in the app',
   deleteRecord: 'it deletes this BrainDog, which only the owner does, in the app',
+  handOver: 'it gives this BrainDog away, which only the owner does, in the app',
   reads: 'call each read with its own act',
 };
 

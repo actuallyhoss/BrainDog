@@ -6,7 +6,10 @@
  * "Merging happens on Decide" (`mergeShaped` in `index.ts`), and the only things that put the question on Decide were a
  * meeting, the nightly pass and a model's answer. So somebody looking at the same person twice could only wait.
  *
- * IT ASKS AND MERGES NOTHING. The question filed is the one the nightly pass and a model's answer file for the same
+ * IT ASKS AND MERGES NOTHING, BUT FOR HIS OWN AGENT while he lets it act as him or tells it to (`agentFor`): then the
+ * question is answered at once as his decision, with the same Undo (the owner's word of 2 Nov, "fully inclusive").
+ *
+ * OTHERWISE IT ASKS AND MERGES NOTHING. The question filed is the one the nightly pass and a model's answer file for the same
  * people (`people.ts`'s `askOrExtend`): the same sentence, the same card, the same rows written on a yes, with what
  * the others hold carried onto the one kept. Decide stays the only place a merge is made, so Undo stays the way back.
  * Picked twice, the second pick answers the question already waiting and opens nothing.
@@ -30,7 +33,7 @@ type Who = Pick<WriteContext, 'actor' | 'principal' | 'session'>;
 type SameVerb = { askSame?: (w: Who, args: { rows: readonly string[] }) => Result<{ id: string; asked: boolean } | null> };
 
 /** What `sameOne` answers: the question on Decide, and whether this call put it there or added somebody to it. */
-export type SameOne = { question: string; opened: boolean };
+export type SameOne = { question: string; opened: boolean; merged?: { decision: string } };
 
 /** The most people one question asks about, as the kernel's `CLUSTER_MOST` has it. */
 export const SAME_MOST = 12;
@@ -108,7 +111,10 @@ export function methods(deps: RecordDeps) {
          it, because he has said they are somebody else or it already asks about as many as one question does. */
       if (out.value === null)
         return no('TRANSITION_ILLEGAL', 'A question about some of them is already waiting on Decide, and the others could not be added to it. Answer that one first.', { at: 'rows' });
-      return tail({ ok: true as const, value: { question: out.value.id, opened: out.value.asked } });
+      /* HIS OWN AGENT, WHILE HE LETS IT ACT AS HIM OR ON HIS WORD (`agentFor`), MERGES THEM NOW: the question is answered
+         at once as his own decision, through its run, so the merge is the one Decide makes and Undo takes it back. */
+      const landed = deps.agentFor?.(ctx) == null ? null : ((await deps.landNow?.(ctx, out.value.id)) ?? null);
+      return tail({ ok: true as const, value: { question: out.value.id, opened: out.value.asked, ...(landed === null ? {} : { merged: { decision: landed.decision } }) } });
     },
   };
 }

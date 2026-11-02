@@ -684,6 +684,17 @@ export type CallContext = {
   bypass?: string | undefined;
 
   /**
+   * The owner an agent acts for ON HIS WORD, for one call, and the words he said: his switch is off, but he told the agent
+   * to do this, and the agent sent his words as `said` beside the call's own arguments (the owner's word of 2 Nov, "fully
+   * inclusive"). It opens the doors `bypass` opens, for that call alone, and the log keeps his words beside what it did.
+   *
+   * SET ONLY BY THE RECORD ITSELF, in the same wrapper as `bypass`, after `wordOf` has said this key is his own, at
+   * write, and that "Agents may answer when you tell them" is on. Never for a method in `NEVER_BYPASS`, and never for a
+   * method that reads `said` as its own (`create`, `update`, `propose` and the rest of `SAID_OWN`).
+   */
+  word?: { by: string; said: string } | undefined;
+
+  /**
    * When this caller last proved who they are, in epoch milliseconds: a passkey, a link or the server key.
    *
    * SET ONLY BY A HOST, AND ONLY FROM A SESSION ROW'S `authed_at`, which rotation never moves. The keychain
@@ -1325,26 +1336,25 @@ export const ON_WORD_PREF = 'agents.answer_on_word' satisfies PrefKey;
 /**
  * "Let agents do everything without asking": the owner's own switch, `on` or `off`, absent is off (`bypassOf`). Set only
  * by an owner signed in to the app (`setPref`, held to `admin`'s door and a recent sign-in to turn on), never by a token,
- * a share link, a team member or a press in a chat, so no agent turns it on for itself.
+ * a share link, a team member or a press in a chat, so no agent turns it on for itself. His own agent, while it is on,
+ * may turn it off, since only an agent it already lets through reaches `setPref` as him.
  */
 export const BYPASS_PREF = 'agents.bypass' satisfies PrefKey;
 /**
- * WHAT "LET AGENTS DO EVERYTHING WITHOUT ASKING" NEVER REACHES, by the record method's name. Each is one sentence:
+ * WHAT "LET AGENTS DO EVERYTHING WITHOUT ASKING" NEVER REACHES, by the record method's name. The owner's word of 2 Nov:
+ * "i NEED YOU to make the make claude act on your behalf thing to be fully inclusive, i want such action to go through".
+ * So his own write agent, while his switch is on, goes through every door he does, and only three stay his in the app:
+ *   - Giving this BrainDog's ownership away (`handOver`).
+ *   - Deleting the whole BrainDog (`deleteRecord`), and erasing a person for good, which no Undo puts back (`erase`).
+ * Two rules stand beside these and are not doors of their own:
  *   - A key's value never travels in a call or a row: it is deposited with `braindog keys put`, which reads standard
- *     input, and read only where it is read today; no token reaches the keychain (`keychain`), bypass or not.
- *   - Making a key, a report key, a webhook's token or a device's sign-in stays the owner's in the app, since each hands
- *     out a credential once (`createToken`, `createReportKey`, `ingestMint`, `deviceApprove`).
- *   - Deleting the whole BrainDog, erasing for good, putting back an old copy over it, or loading one in, stays the
- *     owner's in the app (`deleteRecord`, `erase`, `restore`, `import`).
- *   - Exporting all of BrainDog as a file, which can go to anyone, stays the owner's in the app (`export`).
- *   - Changing who the owner is stays the owner's in the app (`handOver`).
- *   - Who is on the team and what they hold stays the owner's (or an Admin's) in the app: inviting somebody or changing
- *     their level, stopping them, or taking them off (`invite`, `suspendMember`, `removeMember`, decided 2 Nov).
- *   - Paying, charging a card or changing a plan stays the owner's in the app: billing is the account's door, signed in
- *     with a browser session, and no token reaches it at all.
- *   - The switch itself is set only by the owner signed in to the app (`setPref`), so no agent turns it on for itself.
+ *     input, and read only where it is read today; no token reaches the keychain (`keychain`), bypass or not, an export
+ *     made by an agent is always the redacted one, and an agent never lets a device into the keychain.
+ *   - An agent never makes an owner, touches an owner, or changes the owner it acts for (`teamKeeps`).
+ * Paying, charging a card or changing a plan is billing, the account's door, signed in with a browser session, which no
+ * token reaches at all.
  */
-export const NEVER_BYPASS: ReadonlySet<string> = new Set(['handOver', 'invite', 'suspendMember', 'removeMember', 'setPref', 'createToken', 'createReportKey', 'ingestMint', 'deviceApprove', 'deleteRecord', 'erase', 'restore', 'import', 'export']);
+export const NEVER_BYPASS: ReadonlySet<string> = new Set(['handOver', 'deleteRecord', 'erase']);
 /** What a change landed without asking carries in its note, beside the reason, so the log says why nobody was asked. */
 export const BYPASS_NOTE = 'Agents act without asking';
 /** "Agents' suggestions wait apart": the owner's own switch, on unless it is `false` (`apartOn` in the kernel). */
@@ -3134,10 +3144,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const bypassOf = (ctx: CallContext): string | null => {
     const p = ctx.principal;
+    if (p.kind !== 'token') return null;
+    return bypassOn(p.person) ? ownKeyOf(ctx) : null;
+  };
+
+  /**
+   * The owner whose own whole-record write key this is, or `null`: everything `bypassOf` asks but his switch. An answer
+   * on his word (`CallContext.word`) is held to it too, so only his own key, never a job's, a report key or a narrowed
+   * one, carries his word through a door.
+   */
+  const ownKeyOf = (ctx: CallContext): string | null => {
+    const p = ctx.principal;
     if (p.kind !== 'token' || p.level !== 'owner' || p.scope !== 'write') return null;
     if (ctx.preview !== undefined || ctx.pressedIn !== undefined || ctx.ordered !== undefined || ctx.onWord !== undefined || ctx.operation !== undefined) return null;
     if ((ctx.registers ?? '*') !== '*') return null;
-    if (!bypassOn(p.person)) return null;
+    if (kernel.access(p.person)?.level !== 'owner') return null;
     const row = sql.one<{ person_id: string | null; scope: string; label: string | null }>('SELECT person_id, scope, label FROM token WHERE id = ?', p.id);
     if (row === undefined || row.person_id !== p.person || row.scope !== 'write') return null;
     const label = row.label ?? '';
@@ -3145,6 +3166,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const profile = profileOf(ctx);
     if (profile !== null && mayOf(p.scope, profile.ceiling) !== 'write') return null;
     return p.person;
+  };
+
+  /**
+   * The owner a token acts for as himself on this call, or `null`: his switch is on (`bypass`), or he told it to and it
+   * sent his words (`word`). Both are set only by the record's wrapper, and both are read again here against what the
+   * record holds now, so a switch turned off or an owner moved down mid-call opens nothing.
+   */
+  const agentFor = (ctx: CallContext): string | null => {
+    if (ctx.principal.kind !== 'token') return null;
+    const person = ctx.principal.person;
+    if (ctx.bypass === person && bypassOn(person)) return person;
+    if (ctx.word !== undefined && ctx.word.by === person && kernel.access(person)?.level === 'owner') return person;
+    return null;
   };
 
   /**
@@ -3371,20 +3405,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* A PRESS IN A CHAT ANSWERS A QUESTION AND REACHES NOTHING AN OWNER DOES IN A BROWSER (`pressedIn`). */
     if (ctx.pressedIn !== undefined) return pressedNot;
     if (ctx.ordered !== undefined) return orderedNot;
-    if (ctx.onWord !== undefined) return onWordNot;
+    /* AN ANSWER ON HIS WORD (`onWord`, his `decide` made through `instructionsMine`) REACHES WHAT HIS SWITCH DOES (the
+       owner's word of 2 Nov, "fully inclusive"): every door but the three `NEVER_BYPASS` keeps his, which `ownerKeeps`
+       refuses by name besides, and the keychain, which `keychain` still refuses. */
+    if (ctx.onWord !== undefined) return method !== undefined && NEVER_BYPASS.has(method) ? onWordNot : allows(ctx, 'owner', listName);
     if (ctx.operation !== undefined) {
       if (method === undefined || ctx.operation !== method || ctx.principal.kind !== 'person') return allows(ctx, 'owner', listName);
       const { operation: _spent, ...approver } = ctx;
       return allows(approver, 'owner', listName);
     }
-    /* HIS AGENTS, WHILE HE LETS THEM DO EVERYTHING WITHOUT ASKING (`bypassOf`): admitted as he is, for every door but
-       those `NEVER_BYPASS` keeps his, which the wrapper never marks and which are refused here by name besides. */
-    if (ctx.principal.kind === 'token' && ctx.bypass !== undefined && ctx.bypass === ctx.principal.person && !(method !== undefined && NEVER_BYPASS.has(method)) && bypassOn(ctx.bypass))
-      return null;
+    /* HIS AGENTS, WHILE HE LETS THEM DO EVERYTHING WITHOUT ASKING (`bypassOf`), OR ON HIS WORD FOR THIS ONE CALL (`word`):
+       admitted as he is, for every door but those `NEVER_BYPASS` keeps his, which the wrapper never marks and which are
+       refused here by name besides. */
+    if (agentFor(ctx) !== null && !(method !== undefined && NEVER_BYPASS.has(method))) return null;
     if (ctx.principal.kind === 'token')
       return {
         code: 'NEEDS_BROWSER_SESSION',
-        fix: reads === undefined ? 'Open this from the app; a token cannot change what this BrainDog is.' : `Open this from the app; a token cannot ${reads}.`,
+        fix:
+          (reads === undefined ? 'Open this from the app; a token cannot change what this BrainDog is' : `Open this from the app; a token cannot ${reads}`) +
+          ' unless the owner lets his agents do everything without asking, or told you to: then send his words as said.',
         at: 'principal',
       };
     return allows(ctx, 'owner', listName);
@@ -3397,14 +3436,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const team = (ctx: CallContext, reads?: string): Refusal | null =>
     ctx.operation === undefined && ctx.preview === undefined && ctx.principal.kind === 'person' && ctx.principal.level === 'decide' ? null : admin(ctx, reads);
 
+  /**
+   * THE THREE DOORS NO AGENT EVER OPENS (`NEVER_BYPASS`): giving the ownership away, deleting the whole BrainDog, erasing
+   * a person for good. Refused by name here besides `admin`, to any token, an answer on his word and a press or an order
+   * from a chat, whatever his switches say, so a door the owner keeps stays his whichever way it is reached.
+   */
+  const ownerKeeps = (ctx: CallContext, what: string): Refusal | null =>
+    ctx.principal.kind === 'token' || ctx.onWord !== undefined || ctx.word !== undefined || ctx.pressedIn !== undefined || ctx.ordered !== undefined
+      ? { code: 'NEEDS_BROWSER_SESSION', fix: `Only you ${what}, signed in to BrainDog. No agent does that, even while agents act without asking.`, at: 'principal' }
+      : null;
+
   /** An Admin can neither hand out the owner's rung nor touch somebody who holds it. Owners are the only ones who do. */
   const teamKeeps = (ctx: CallContext, args: { person?: string; level?: Level; registers?: Record<string, Level> }): Refusal | null => {
-    /* AN AGENT ACTING WITHOUT ASKING (`bypassOf`) NEVER REACHES HERE since team changes joined `NEVER_BYPASS` (2 Nov):
-       the wrapper never marks `invite`, `suspendMember` or `removeMember`. Kept as the second lock: even so marked, it
-       would never make an owner, touch one, or change the owner it acts for. */
-    if (ctx.principal.kind === 'token' && ctx.bypass !== undefined) {
+    /* AN AGENT ACTING WITHOUT ASKING (`bypassOf`) INVITES, STOPS, REMOVES AND MOVES PEOPLE AS HIS OWNER DOES (the owner's
+       word of 2 Nov, "fully inclusive"), and this is its lock: it never makes an owner, touches one, or changes the
+       owner it acts for. */
+    const actsFor = ctx.principal.kind === 'token' && (ctx.bypass !== undefined || ctx.word !== undefined) ? ctx.principal.person : ctx.onWord !== undefined && ctx.principal.kind === 'person' ? ctx.principal.id : null;
+    if (actsFor !== null) {
       const grants = args.level === 'owner' || Object.values(args.registers ?? {}).includes('owner');
-      const holds = args.person !== undefined && (args.person === ctx.principal.person || kernel.members().some((m) => m.person_id === args.person && m.level === 'owner'));
+      const holds = args.person !== undefined && (args.person === actsFor || kernel.members().some((m) => m.person_id === args.person && m.level === 'owner'));
       if (grants || holds) return { code: 'NEEDS_BROWSER_SESSION', fix: 'Changing who the owner is stays with the owner, signed in to BrainDog, even while agents act without asking.', at: 'person' };
       return null;
     }
@@ -9569,22 +9619,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * this agent to some lists or projects, no run yet, or an accept `decide` refused.
    */
   const bypassAccept = async (ctx: CallContext, id: string, kind: unknown): Promise<{ landed: true; decision: string; undo: { decision: string }; rung: 'tell' } | null> => {
-    if (ctx.bypass === undefined || ctx.principal.kind !== 'token' || ctx.bypass !== ctx.principal.person || !bypassOn(ctx.bypass)) return null;
+    /* OR ON HIS WORD FOR THIS ONE CALL (`word`, set by the wrapper): the question it filed is answered with his words. */
+    const by = agentFor(ctx);
+    if (by === null || ctx.principal.kind !== 'token') return null;
     if (typeof kind !== 'string' || kind === 'options') return null;
     const profile = profileOf(ctx);
     if (profile !== null && (profile.lists_write !== null || profile.projects !== null)) return null;
     const found = kernel.findRun(ctx.session ?? {}, ctx.principal.id);
     if (found === null) return null;
     const run = kernel.nameOf(found.id);
-    const by = ctx.bypass;
     const byName = personNamed(sql, by);
+    const said = ctx.bypass === by ? BYPASS_NOTE : (ctx.word?.said ?? BYPASS_NOTE);
+    const reason = said === BYPASS_NOTE ? `${BYPASS_NOTE}: ${byName} lets ${run} act on its own.` : `${byName} told ${run}: "${said}"`;
     const as: CallContext = { principal: { kind: 'person', id: by, level: 'owner' }, registers: '*', credentialed: true, onWord: run };
-    const out = await api.decide({ id, decide: { option: 'accept', reason: `${BYPASS_NOTE}: ${byName} lets ${run} act on its own.` } }, as);
+    const out = await api.decide({ id, decide: { option: 'accept', reason } }, as);
     if (!out.ok) return null;
     const decided = (typeof out.value === 'object' && out.value !== null ? out.value : {}) as { decision?: unknown; batch?: unknown };
     const decision = typeof decided.decision === 'string' ? decided.decision : null;
     if (decision === null) return null;
-    kernel.keepWordAnswer({ run, decision, by, byName, said: BYPASS_NOTE, batch: typeof decided.batch === 'string' ? decided.batch : undefined });
+    kernel.keepWordAnswer({ run, decision, by, byName, said, batch: typeof decided.batch === 'string' ? decided.batch : undefined });
     return { landed: true, decision, undo: { decision }, rung: 'tell' };
   };
 
@@ -11560,7 +11613,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const got = kernel.metric(filled, {});
     return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
   };
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.catalogueShelf === undefined ? {} : { catalogueShelf: deps.catalogueShelf }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, previewAs: (args, ctx) => api.previewPage(args as never, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.catalogueShelf === undefined ? {} : { catalogueShelf: deps.catalogueShelf }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), agentFor, landNow: (ctx, id) => bypassAccept(ctx, id, 'rowset'), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, previewAs: (args, ctx) => api.previewPage(args as never, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -14383,7 +14436,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async setPref(args: { key: string; value: unknown }, ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
-      if (ctx.principal.kind !== 'person') return no('FORBIDDEN', 'What a rail shows belongs to a person, and a token is not one.', { at: 'principal' });
+      /* HIS OWN AGENT, WHILE HE LETS IT ACT AS HIM OR ON HIS WORD (`agentFor`), SETS HIS OWN SETTINGS AS HE WOULD. */
+      const self = ctx.principal.kind === 'person' ? ctx.principal.id : agentFor(ctx);
+      if (self === null) return no('FORBIDDEN', 'What a rail shows belongs to a person, and a token is not one.', { at: 'principal' });
       const extra = stray((args ?? {}) as Record<string, unknown>, ['key', 'value']);
       if (extra) return { ok: false as const, refusal: extra };
       if (!PREF_KEYS.includes(args?.key as PrefKey))
@@ -14460,6 +14515,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const owner = admin(ctx, 'let agents do everything without asking');
         if (owner) return { ok: false as const, refusal: owner };
         if (value !== null && value !== 'on' && value !== 'off') return no('VALUE_MALFORMED', `${key} is on or off, or null to take it away.`, { at: 'value', allowed: ['on', 'off'] });
+        /* AN AGENT MAY TURN IT OFF, NEVER ON: only he hands every agent his reach, in Settings > Agents. */
+        if (value === 'on' && ctx.principal.kind !== 'person')
+          return no('NEEDS_BROWSER_SESSION', 'Only you turn on "Let agents do everything without asking", in Settings > Agents.', { at: 'principal' });
         if (value === 'on' && ctx.provedAt !== undefined && clock.now() - ctx.provedAt > kernel.lockAfter() * 60_000)
           return no('NEEDS_BROWSER_SESSION', 'Sign in again to let agents do everything without asking.', { at: 'proof' });
         kept = value as 'on' | 'off' | null;
@@ -14513,7 +14571,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           return no('VALUE_MALFORMED', 'packs.known_keys maps each add-on to the ids of at most 8 publisher keys seen for it, at most 200 add-ons, or null to take it away.', { at: 'value' });
         kept = Object.fromEntries(entries.map(([k, v]) => [k, [...new Set(v as string[])]]));
       }
-      kernel.setPref(ctx.principal.id, key, kept);
+      kernel.setPref(self, key, kept);
       return ok({ key, value: kept });
     },
 
@@ -16302,7 +16360,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * holds this BrainDog and nothing the host keeps about who pays for it.
      */
     async handOver(args: { person: string; why?: string }, ctx: CallContext) {
-      const stop = admin(ctx, 'hand this BrainDog over', 'handOver');
+      const stop = ownerKeeps(ctx, 'hand this BrainDog over') ?? admin(ctx, 'hand this BrainDog over', 'handOver');
       if (stop) return { ok: false as const, refusal: stop };
       if (ctx.principal.kind !== 'person') return no('NEEDS_BROWSER_SESSION', 'Hand it over from the app, signed in.', { at: 'principal' });
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
@@ -16526,8 +16584,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          may have set to five minutes: approving a `vault` grant hands a machine what opening the keychain here would, so
          a proof the keychain itself would refuse does not approve one either. */
       const proved = ctx.provedAt;
+      const agent = ctx.principal.kind === 'token';
       const locked = (reach: string): Refusal | null =>
-        reach === 'vault' && proved !== undefined && clock.now() - proved > kernel.lockAfter() * 60_000
+        reach === 'vault' && agent
+          ? { code: 'NEEDS_BROWSER_SESSION', fix: 'Only you let a device into the keychain, signed in to BrainDog. An agent never does.', at: 'principal' }
+          : reach === 'vault' && proved !== undefined && clock.now() - proved > kernel.lockAfter() * 60_000
           ? { code: 'NEEDS_BROWSER_SESSION', fix: 'Sign in again to let a device into the keychain.', at: 'proof' }
           : null;
       return tail(await kernel.deviceApprove(actorOf(ctx), args ?? ({} as never), locked));
@@ -16606,6 +16667,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          A KEYCHAIN WHOSE KEY HAS NO ID is one wrapped by a passphrase (`vault_key.kek_id` is null there),
          and it used to be told it had no keychain. It is refused at `vault_key` rather than `kek_id`, so
          a caller is not sent to name a key that does not exist. */
+      /* AN AGENT'S EXPORT IS ALWAYS THE REDACTED ONE: a key's sealed bytes never leave through a token, bypass or not. */
+      if (args?.redactGrants === false && ctx.principal.kind === 'token')
+        return no('NEEDS_BROWSER_SESSION', 'An agent exports without the sealed bytes of the keys. Leave out redactGrants, or export the full file from the app.', { at: 'redactGrants' });
       if (args?.redactGrants === false) {
         const held = kernel.wrappingKey();
         const keys = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM vault_key')?.n ?? 0);
@@ -16761,7 +16825,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * AN OWNER IN A BROWSER, and no token of any kind: an erasure cannot be undone, and PITR must not be used to undo it.
      */
     async erase(args: EraseRequest, ctx: CallContext): Promise<Result<EraseReport>> {
-      const stop = admin(ctx);
+      const stop = ownerKeeps(ctx, 'erase somebody for good') ?? admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       const extra = stray((args ?? {}) as Record<string, unknown>, ['subjects', 'personId', 'basis']);
       if (extra) return { ok: false as const, refusal: extra };
@@ -16780,7 +16844,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * NOTHING RUNS AFTER THE HOST'S PART, not even the alarm's tail, because there is no record left to arm it on.
      */
     async deleteRecord(args: { slug: string }, ctx: CallContext): Promise<Result<{ slug: string; deleted: true; kept?: string; removed?: number }>> {
-      const stop = admin(ctx);
+      const stop = ownerKeeps(ctx, 'delete this BrainDog') ?? admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!destroy) return { ok: false as const, refusal: NO_DELETE };
       if (ctx.provedAt !== undefined && clock.now() - ctx.provedAt > FRESH)
@@ -17997,12 +18061,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const eventMark = (): number => sql.one<{ n: number | null }>('SELECT MAX(rowid) AS n FROM event')?.n ?? 0;
   const signBypassed = (name: string, ctx: CallContext, before: number): void => {
     try {
-      const owner = ctx.bypass;
+      const owner = ctx.bypass ?? ctx.word?.by;
       if (owner === undefined) return;
       const n = sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM event WHERE rowid > ? AND actor = ?', before, owner)?.n ?? 0;
       if (n === 0) return;
       const what = name.replace(/([A-Z])/gu, ' $1').toLowerCase();
-      const line = `${BYPASS_NOTE}: did ${what} as ${personNamed(sql, owner)}, ${String(n)} change${n === 1 ? '' : 's'}.`;
+      /* ON HIS WORD, HIS WORDS: the line says what he told the agent, as an answer on his word keeps them. */
+      const why = ctx.bypass === undefined && ctx.word !== undefined ? `On ${nameMid(personNamed(sql, owner))}'s word: "${ctx.word.said}"` : BYPASS_NOTE;
+      const line = `${why}: did ${what} as ${personNamed(sql, owner)}, ${String(n)} change${n === 1 ? '' : 's'}.`;
       const run = kernel.runFor(writerOf(ctx), line);
       if (!run.ok || run.value.opened) return;
       kernel.update(SESSION, run.value.run.id, {}, { ...writerOf(ctx), note: line });
@@ -18013,28 +18079,67 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /* ONE DERIVED CONTEXT A GIVEN ONE, so what is kept by a context's identity (`bindings`, `todayDraws`) still finds it. */
   const bypassMarked = new WeakMap<CallContext, CallContext>();
   const unmarked = new WeakMap<CallContext, CallContext>();
+  /* ON HIS WORD, FOR ONE CALL (`CallContext.word`): a token's call to any door but `NEVER_BYPASS`'s, sent with `said`, his
+     words, beside the call's own arguments, while his switch is off. `said` is taken off the arguments before the method
+     reads them, so a call that takes none is not refused for it. The methods below read `said` as their own and are
+     left as they are: a write on his word is `onWordWrite`'s, a question's answer `instructionsMine`'s. */
+  const wordMarked = new WeakSet<CallContext>();
+  const SAID_OWN: ReadonlySet<string> = new Set(['create', 'update', 'propose', 'instruct', 'instructionsMine', 'slashForm']);
+  const isArgs = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v) && !isCtx(v);
   for (const [name, method] of Object.entries(api)) {
     if (typeof method !== 'function') continue;
     (api as Record<string, unknown>)[name] = function (this: unknown, ...argv: unknown[]) {
       const at = argv.findIndex(isCtx);
+      /* WHY HIS WORD DID NOT CARRY THIS CALL, said in place of a door's refusal so the agent is told the real reason. */
+      let wordNot: Refusal | null = null;
       if (at >= 0) {
         const given = argv[at] as CallContext;
         const owner = NEVER_BYPASS.has(name) || given.principal.kind !== 'token' ? null : bypassOf(given);
-        if (owner === null && given.bypass !== undefined) {
+        /* A CONTEXT THIS WRAPPER MARKED ON HIS WORD KEEPS IT for the calls its method makes through `api`, as `bypass` is
+           worked out again for each; any other `word` is a host's or a caller's, and dropped. */
+        const keepWord = given.word !== undefined && wordMarked.has(given) && !NEVER_BYPASS.has(name);
+        if (owner === null && (given.bypass !== undefined || (given.word !== undefined && !keepWord))) {
           let bare = unmarked.get(given);
           if (bare === undefined) {
-            const { bypass: _dropped, ...rest } = given;
+            const { bypass: _dropped, word: _unsaid, ...rest } = given;
             unmarked.set(given, (bare = rest));
           }
           argv[at] = bare;
-        } else if (owner !== null && given.bypass !== owner) {
+        } else if (owner !== null && (given.bypass !== owner || given.word !== undefined)) {
           let lifted = bypassMarked.get(given);
-          if (lifted === undefined || lifted.bypass !== owner) bypassMarked.set(given, (lifted = { ...given, bypass: owner }));
+          if (lifted === undefined || lifted.bypass !== owner) {
+            const { word: _unsaid, ...rest } = given;
+            bypassMarked.set(given, (lifted = { ...rest, bypass: owner }));
+          }
           argv[at] = lifted;
+        }
+        const sent = at > 0 ? argv[0] : undefined;
+        if (owner === null && !SAID_OWN.has(name) && given.principal.kind === 'token' && isArgs(sent) && typeof sent.said === 'string') {
+          const { said, ...rest } = sent;
+          argv[0] = rest;
+          if (!NEVER_BYPASS.has(name)) {
+            const base = argv[at] as CallContext;
+            const word = ownKeyOf(base) === null ? null : wordOf(base, said);
+            if (word === null) wordNot = { code: 'FORBIDDEN', fix: 'Only the owner\'s own key, at write over the whole BrainDog, carries his word. Ask with propose.', at: 'said' };
+            else if (!word.ok) wordNot = 'refusal' in word ? word.refusal : { code: 'FORBIDDEN', fix: 'His word does not carry this call. Ask with propose.', at: 'said' };
+            else {
+              const marked: CallContext = { ...base, word: { by: word.value.by, said: word.value.said } };
+              wordMarked.add(marked);
+              argv[at] = marked;
+            }
+          }
         }
       }
       const ctx = at >= 0 ? (argv[at] as CallContext) : undefined;
-      if (ctx?.bypass === undefined || ANSWERED_AS_WORD.has(name) || signing.has(ctx)) return (method as (...a: unknown[]) => unknown).apply(this, argv);
+      if (wordNot !== null) {
+        /* A DOOR THAT REFUSED A TOKEN IS ANSWERED WITH WHY HIS WORD DID NOT OPEN IT. */
+        const told = wordNot;
+        const swap = (v: unknown): unknown =>
+          typeof v === 'object' && v !== null && (v as { ok?: unknown }).ok === false && (v as { refusal?: Refusal }).refusal?.code === 'NEEDS_BROWSER_SESSION' ? { ok: false, refusal: told } : v;
+        const out = (method as (...a: unknown[]) => unknown).apply(this, argv);
+        return out instanceof Promise ? out.then(swap) : swap(out);
+      }
+      if ((ctx?.bypass === undefined && ctx?.word === undefined) || ANSWERED_AS_WORD.has(name) || signing.has(ctx!)) return (method as (...a: unknown[]) => unknown).apply(this, argv);
       /* THE OUTERMOST CALL SIGNS, ONCE: a method that calls another through `api` hands it the same context. */
       signing.add(ctx);
       const before = eventMark();

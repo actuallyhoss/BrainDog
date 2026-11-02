@@ -15,7 +15,8 @@ export const onWordWords = {
   /* THE SAME AS THE AGENT IS TOLD (`ON_WORD` in `packages/record/src/methods/agent-profile.ts`): on his word, changes
      and deletes go through; money and keys are asked. NOT "ALWAYS": with "Let agents do everything without asking" on
      (`bypass.ts`), money goes through too, and only what `NEVER_BYPASS` keeps still waits (`BYPASS_SAYS`). */
-  on: 'When you tell an agent to do something, it does it, deletes included, and notes that you said so. You can undo it. Money and keys still wait for you, unless agents may do everything without asking.',
+  /* HIS WORD REACHES WHAT THE SWITCH DOES (2 Nov): team, sharing, settings and the rest, all but the three he keeps. */
+  on: 'When you tell an agent to do something, it does it, deletes, your team and sharing included, and notes your words. You can undo it. Money and keys still wait for you, unless agents may do everything without asking.',
   off: 'Deletes, money and keys wait for you here, even when you told the agent.',
 } as const;
 

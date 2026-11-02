@@ -7,10 +7,15 @@
  * file decides whether a share may be kept: the grammar's rules (`checkShare`), never an owner as the target, the Plus
  * hook for somebody not on the record yet, and the inline confirm (§6, default 1).
  *
- * AGENTS NEVER SHARE. The owner's and Admin's methods are `team`, which refuses every token
- * `NEEDS_BROWSER_SESSION`; the grantee's two refuse a token the same way before anything else, because a person
- * shares and their agents do not, whatever the token's scope. `sharing` is this file's list of shares; `shares` was
- * already the page links' (`shares.ts`), and one surface keeps one method per name.
+ * AGENTS SHARE ONLY AS THE OWNER (the owner's word of 2 Nov, "fully inclusive"). The owner's and Admin's methods are
+ * `team`, which refuses every token `NEEDS_BROWSER_SESSION` but his own agent's while he lets his agents do everything
+ * without asking, or told it to and it sent his words as `said` (`agentFor`); the grantee's two refuse a token the same
+ * way. Such a call is his own: made as him, and its inline confirm is his call. `sharing` is this file's list of shares;
+ * `shares` was already the page links' (`shares.ts`), and one surface keeps one method per name.
+ *
+ * WHAT A SHARE IS ABOUT AND WHO IT IS WITH ARE TAKEN AS AN AGENT CAN NAME THEM (`resolved`): a project by its handle
+ * (`things#9`) or its exact name, rows by their handles, and a person by their People row (`people#16`), each read back
+ * to the id the grammar keeps before anything checks it.
  *
  * SEEING AS SOMEBODY CHANGES NOTHING HERE EITHER: `team` refuses under `ctx.preview`, and `shareOnward` asks `write`,
  * which `allows` refuses there.
@@ -19,6 +24,7 @@
 import {
   checkShare,
   instant,
+  keyOf,
   moneyText,
   SHARE_TEMPLATES,
   lensOf,
@@ -156,8 +162,11 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const refuse = (code: string, fix: string, at: string): Result<never> => ({ ok: false, refusal: { code, fix, at } });
 
 /** A token is never a sharer: the one sentence every share route gives one, before it reads anything. */
-const AGENTS_NEVER: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; an agent cannot share or see what is shared.', at: 'principal' };
-const personOnly = (ctx: CallContext): Refusal | null => (ctx.principal.kind === 'person' ? null : AGENTS_NEVER);
+const AGENTS_NEVER: Refusal = {
+  code: 'NEEDS_BROWSER_SESSION',
+  fix: 'Open this from the app; an agent shares only while the owner lets his agents do everything without asking, or told it to: then send his words as said.',
+  at: 'principal',
+};
 
 /** A person as a sentence says them: their name, else their address. */
 const personName = (sql: Pick<Sql, 'one'>, id: string): string | undefined => {
@@ -271,6 +280,85 @@ export function methods(deps: RecordDeps) {
   const { kernel, sql, scoped, clock } = deps;
   const team = deps.team ?? ((ctx: CallContext, reads?: string) => deps.admin(ctx, reads));
 
+  /** The owner this call is his agent's for (`agentFor`), or `null`. */
+  const agentOf = (ctx: CallContext): string | null => deps.agentFor?.(ctx) ?? null;
+  /** A person, or the owner's own agent acting as him. */
+  const personOnly = (ctx: CallContext): Refusal | null => (ctx.principal.kind === 'person' || agentOf(ctx) !== null ? null : AGENTS_NEVER);
+  /** Who a share is made by: the person, or the owner a token acts for. */
+  const actor = (ctx: CallContext): string => (ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id);
+
+  /**
+   * A share as an agent can name it, read back to the ids the grammar keeps (`resolved` in the file's head): a project
+   * by its handle or its exact name, rows by their handles, a person by their People row. An id that is already one is
+   * left as it is. Nothing found, or more than one, is refused plainly.
+   */
+  const resolved = (s: Share, catalog: LensCatalog): Share | Refusal => {
+    const what = s.what as unknown as Record<string, unknown>;
+    let target: Record<string, unknown> = what;
+    if (typeof what.project === 'string') {
+      const id = projectId(what.project, catalog);
+      if (typeof id !== 'string') return id;
+      target = { ...what, project: id };
+    } else if (typeof what.list === 'string' && Array.isArray(what.rows)) {
+      const list = what.list;
+      const ids: string[] = [];
+      for (const r of what.rows as unknown[]) {
+        if (typeof r !== 'string' || r.trim() === '') return { code: 'VALUE_MALFORMED', fix: 'rows is a list of rows, each by its handle such as tasks#9.', at: 'what.rows' };
+        const row = kernel.get(r.trim());
+        if (row === null) return { code: 'REF_UNKNOWN', fix: `Nothing here is called ${r.trim()}.`, at: 'what.rows' };
+        if (row.register !== list) return { code: 'REF_REGISTER_MISMATCH', fix: `${r.trim()} is not in ${catalog.lists.find((l) => l.id === list)?.name ?? list}.`, at: 'what.rows' };
+        if (!ids.includes(row.id)) ids.push(row.id);
+      }
+      target = { ...what, rows: ids };
+    }
+    let who = s.who;
+    if (who.kind === 'person') {
+      const found = personId(who.id, catalog);
+      if (typeof found !== 'string' && 'code' in found) return found;
+      who = typeof found === 'string' ? { kind: 'person', id: found } : found;
+    }
+    return { ...s, who, what: target as unknown as ShareTarget };
+  };
+
+  /** A project's row id from its id, its handle (`things#9`) or its exact name. */
+  const projectId = (said: string, catalog: LensCatalog): string | Refusal => {
+    const projects = catalog.lists.find((l) => l.role === 'projects');
+    const text = said.trim();
+    if (projects === undefined || text === '') return said;
+    const row = kernel.get(text);
+    if (row !== null) return row.register === projects.id ? row.id : { code: 'REF_REGISTER_MISMATCH', fix: `${text} is not a project. Name a project by its handle or its name.`, at: 'what.project' };
+    const title = projects.fields.find((f) => f.title)?.id;
+    if (title === undefined) return { code: 'REF_UNKNOWN', fix: `No project is called ${text}.`, at: 'what.project' };
+    const wanted = text.toLowerCase();
+    const hits = sql
+      .all<{ id: string; t: unknown }>("SELECT id, json_extract(fields, '$.' || ?) AS t FROM entry WHERE register = ? AND deleted_at IS NULL", title, projects.id)
+      .filter((r) => typeof r.t === 'string' && r.t.trim().toLowerCase() === wanted);
+    if (hits.length === 0) return { code: 'REF_UNKNOWN', fix: `No project is called ${text}. Name it by its handle, such as ${projects.id}#1, or by its exact name.`, at: 'what.project' };
+    if (hits.length > 1) return { code: 'NAME_AMBIGUOUS', fix: `${String(hits.length)} projects are called ${text}. Name the one you mean by its handle.`, at: 'what.project' };
+    return hits[0]!.id;
+  };
+
+  /**
+   * A person's id from their id or their People row (`people#16`): the person on this BrainDog whose address that row
+   * holds, else, when nobody here has it, that address itself, so the share waits for them there.
+   */
+  const personId = (said: string, _catalog: LensCatalog): string | Refusal | { kind: 'email'; id: string } => {
+    const text = said.trim();
+    if (sql.one('SELECT 1 AS y FROM person WHERE id = ?', text) !== undefined) return text;
+    const row = kernel.get(text);
+    if (row === null) return said;
+    if (row.register !== kernel.meetsList()?.register) return { code: 'REF_REGISTER_MISMATCH', fix: `${text} is not somebody in People. Name a person by their People row.`, at: 'who' };
+    const keys = sql.all<{ key: string }>("SELECT key FROM entity_key WHERE row_id = ? AND key LIKE 'email:%'", row.id).map((k) => k.key);
+    const emails = keys.map((k) => k.slice('email:'.length));
+    if (emails.length === 0) return { code: 'REF_UNKNOWN', fix: `${kernel.titleOfRow(row.id) ?? text} has no address here, so there is nobody to share with. Add their email first.`, at: 'who' };
+    const people = sql.all<{ id: string; email: string | null }>('SELECT id, email FROM person WHERE email IS NOT NULL').filter((p) => p.email !== null && keys.includes(keyOf('email', p.email) ?? ''));
+    const ids = [...new Set(people.map((p) => p.id))];
+    if (ids.length === 1) return ids[0]!;
+    if (ids.length > 1) return { code: 'NAME_AMBIGUOUS', fix: `${text} matches ${String(ids.length)} people here. Share with one of them by id.`, at: 'who' };
+    if (emails.length > 1) return { code: 'NAME_AMBIGUOUS', fix: `${text} has ${String(emails.length)} addresses. Share by the email you mean.`, at: 'who' };
+    return { kind: 'email', id: emails[0]! };
+  };
+
   /** The grammar of a share as a caller sent it: what `checkShare` reads, and nothing it does not. */
   const grammarOf = (s: unknown): Share | null => {
     if (!isObj(s)) return null;
@@ -353,6 +441,8 @@ export function methods(deps: RecordDeps) {
    * one the share goes ahead, and the owner's Today says so (slice 10). A deny never asks.
    */
   const unconfirmed = (ctx: CallContext, s: Share): Refusal | null => {
+    /* HIS OWN AGENT'S CALL, WHILE HE LETS IT ACT AS HIM OR TOLD IT TO, IS HIS CONFIRM. */
+    if (agentOf(ctx) !== null) return null;
     if (s.effect !== 'allow' || ctx.confirmable !== true) return null;
     const outsider = s.who.kind === 'email' && (s.can === 'edit' || s.can === 'manage');
     /* AN END PAST THE LONGEST A TEMPLATE RUNS IS NO END: a share dated to the year 9999 lasts as long as one with none. */
@@ -716,12 +806,14 @@ export function methods(deps: RecordDeps) {
     async share(args: { id?: unknown; share?: unknown; note?: unknown; template?: unknown; bundle?: unknown } | undefined, ctx: CallContext): Promise<Result<Shared>> {
       const stop = team(ctx);
       if (stop) return { ok: false, refusal: stop };
-      const s = grammarOf(args?.share);
-      if (s === null) return refuse('REQUIRED_MISSING', 'A share says who, what and at which rung: view, comment, edit or manage.', 'share');
+      const sent = grammarOf(args?.share);
+      if (sent === null) return refuse('REQUIRED_MISSING', 'A share says who, what and at which rung: view, comment, edit or manage.', 'share');
       const id = typeof args?.id === 'string' && args.id !== '' ? args.id : undefined;
       const was = id === undefined ? null : kernel.shareKept(id);
       if (id !== undefined && (was === null || was.revoked_at)) return refuse('REF_UNKNOWN', 'There is no live share with that id. Share it again instead.', 'id');
       const catalog = kernel.catalog();
+      const s = resolved(sent, catalog);
+      if ('code' in s) return { ok: false, refusal: s };
       const bad = (await refusalOf(ctx, s, catalog, id)) ?? adminKeeps(ctx, s, was);
       if (bad) return { ok: false, refusal: bad };
       const confirm = unconfirmed(ctx, s);
@@ -730,7 +822,7 @@ export function methods(deps: RecordDeps) {
       const note = text(args?.note);
       const template = text(args?.template);
       const bundle = text(args?.bundle);
-      const out = kernel.shareSave(ctx.principal.id, {
+      const out = kernel.shareSave(actor(ctx), {
         ...s,
         ...(id === undefined ? {} : { id }),
         ...(note === undefined ? {} : { note }),
@@ -748,7 +840,7 @@ export function methods(deps: RecordDeps) {
     async sharedOut(_args: Record<string, never> | undefined, ctx: CallContext): Promise<Result<SharedOut | null>> {
       const stop = team(ctx);
       if (stop) return { ok: false, refusal: stop };
-      return ok(sharedOut(sql, kernel.catalog(), kernel.sharesKept(), ctx.principal.id, ctx.confirmable === true, clock.now()));
+      return ok(sharedOut(sql, kernel.catalog(), kernel.sharesKept(), actor(ctx), ctx.confirmable === true, clock.now()));
     },
 
     /** Stop one share at once, and every share made onward from it (§2.2, `parent_id`). Revoking never asks to confirm. */
@@ -761,7 +853,7 @@ export function methods(deps: RecordDeps) {
       const mine = adminKeeps(ctx, null, was);
       if (mine) return { ok: false, refusal: mine };
       const why = typeof args?.why === 'string' && args.why.trim() !== '' ? args.why.trim().slice(0, 500) : null;
-      const ended = kernel.shareRevoke(ctx.principal.id, id, why);
+      const ended = kernel.shareRevoke(actor(ctx), id, why);
       /* WHO EACH ENDED SHARE REACHED, READ AFTER IT ENDED: a group's members are still its members. */
       return deps.tail(ok({ ended, left: leftOf(ended.flatMap(reachedBy)) }));
     },
@@ -779,14 +871,14 @@ export function methods(deps: RecordDeps) {
       if (args?.retire === true) {
         if (live === null) return refuse('REQUIRED_MISSING', 'Which group? Retiring one needs its id.', 'id');
         const why = typeof args.why === 'string' && args.why.trim() !== '' ? args.why.trim().slice(0, 500) : null;
-        const ended = kernel.groupRetire(ctx.principal.id, live.id, why);
+        const ended = kernel.groupRetire(actor(ctx), live.id, why);
         return deps.tail(ok({ ...groupOf(kernel.groupKept(live.id)!), ended, left: leftOf(live.people) }));
       }
       const name = typeof args?.name === 'string' ? args.name.trim().replace(/\s+/g, ' ') : '';
       if (name === '') return refuse('REQUIRED_MISSING', 'A group needs a name, such as Accountants.', 'name');
       if ([...name].length > GROUP_NAME_MOST || /[\p{Cc}\p{Cf}]/u.test(name))
         return refuse('VALUE_MALFORMED', `A group's name is plain words, at most ${GROUP_NAME_MOST} characters.`, 'name');
-      const out = kernel.groupSave(ctx.principal.id, { ...(id === undefined ? {} : { id }), name });
+      const out = kernel.groupSave(actor(ctx), { ...(id === undefined ? {} : { id }), name });
       if (!out.ok) return out;
       return deps.tail(ok({ ...groupOf(kernel.groupKept(out.value.id)!), ended: [] as string[], left: [] as string[] }));
     },
@@ -801,15 +893,17 @@ export function methods(deps: RecordDeps) {
       const group = typeof args?.group === 'string' ? args.group : '';
       const g = group === '' ? null : kernel.groupKept(group);
       if (g === null || g.retired_at !== null) return refuse('REF_UNKNOWN', 'There is no group by that id.', 'group');
-      const person = typeof args?.person === 'string' ? args.person : '';
+      const named = typeof args?.person === 'string' ? personId(args.person, kernel.catalog()) : '';
+      if (typeof named !== 'string' && 'code' in named) return { ok: false as const, refusal: named };
+      const person = typeof named === 'string' ? named : '';
       if (person === '' || sql.one('SELECT 1 AS y FROM person WHERE id = ?', person) === undefined)
-        return refuse('REF_UNKNOWN', 'There is nobody here by that id.', 'person');
+        return refuse('REF_UNKNOWN', 'There is nobody here by that id. Name somebody on this BrainDog by their id or their People row.', 'person');
       if (typeof args?.in !== 'boolean') return refuse('REQUIRED_MISSING', 'Put them in the group, or take them out?', 'in');
       if (args.in && owners().includes(person)) return refuse('FORBIDDEN', 'An owner already holds everything here, so a group adds nothing.', 'person');
       /* AN ADMIN NEITHER PUTS THEMSELVES IN A GROUP NOR TAKES THEMSELVES OUT: either changes what they hold. */
       if (ctx.principal.kind === 'person' && ctx.principal.level !== 'owner' && person === ctx.principal.id)
         return refuse('FORBIDDEN', 'Only an owner can change what you can do here.', 'person');
-      const said = kernel.groupMember(ctx.principal.id, g.id, person, args.in) ?? [];
+      const said = kernel.groupMember(actor(ctx), g.id, person, args.in) ?? [];
       return deps.tail(ok({ ...groupOf(kernel.groupKept(g.id)!), said, left: args.in ? [] : leftOf([person]) }));
     },
 
@@ -817,9 +911,11 @@ export function methods(deps: RecordDeps) {
     async sharePreview(args: { share?: unknown } | undefined, ctx: CallContext): Promise<Result<SharePreview>> {
       const stop = team(ctx, 'preview a share');
       if (stop) return { ok: false, refusal: stop };
-      const s = grammarOf(args?.share);
-      if (s === null) return refuse('REQUIRED_MISSING', 'A share says who, what and at which rung: view, comment, edit or manage.', 'share');
+      const sent = grammarOf(args?.share);
+      if (sent === null) return refuse('REQUIRED_MISSING', 'A share says who, what and at which rung: view, comment, edit or manage.', 'share');
       const catalog = kernel.catalog();
+      const s = resolved(sent, catalog);
+      if ('code' in s) return { ok: false, refusal: s };
       const bad = checkShare(s, catalog, { owners: owners() });
       if (bad) return { ok: false, refusal: bad };
       const lists = reachOf(s, catalog);
@@ -834,7 +930,7 @@ export function methods(deps: RecordDeps) {
       const catalog = kernel.catalog();
       const now = clock.now();
       const n = names(catalog);
-      const held = sharesFor(sql, ctx.principal.id) ?? [];
+      const held = sharesFor(sql, actor(ctx)) ?? [];
       const denies = held.filter((s) => s.effect === 'deny');
       /* WHO SHARED IT, BY NAME: the kept row's maker, which the lens's own copy of the share does not carry. */
       const byOf = (id: string): string | null => {
@@ -853,7 +949,7 @@ export function methods(deps: RecordDeps) {
                UNION SELECT who AS id FROM share WHERE who_kind = 'person' AND effect = 'allow' AND revoked_at IS NULL`,
             )
             .map((r) => r.id)
-            .filter((id) => id !== ctx.principal.id && !own.has(id) && onRecord(id));
+            .filter((id) => id !== actor(ctx) && !own.has(id) && onRecord(id));
           return [...new Set(ids)].flatMap((id) => {
             const name = personName(sql, id);
             return name === undefined ? [] : [{ id, name }];
@@ -898,7 +994,7 @@ export function methods(deps: RecordDeps) {
       const agent = personOnly(ctx);
       const stop = scoped(ctx, 'write');
       if (agent ?? stop) return { ok: false, refusal: (agent ?? stop)! };
-      const me = ctx.principal.id;
+      const me = actor(ctx);
       const from = typeof args?.from === 'string' ? args.from : '';
       const parent = (sharesFor(sql, me) ?? []).find((s) => s.id === from && s.who.kind === 'person' && s.effect === 'allow');
       if (parent === undefined) return refuse('REF_UNKNOWN', 'You hold no share by that id. Pick one from what you can see here.', 'from');
@@ -907,7 +1003,9 @@ export function methods(deps: RecordDeps) {
       if ((parent.when?.until !== undefined && Date.parse(parent.when.until) <= now) || (parent.when?.from !== undefined && Date.parse(parent.when.from) > now))
         return refuse('FORBIDDEN', 'Your share is not on right now, so you cannot share it on.', 'from');
 
-      const who = typeof args?.who === 'string' ? args.who : '';
+      const whoSaid = typeof args?.who === 'string' ? personId(args.who, kernel.catalog()) : '';
+      if (typeof whoSaid !== 'string' && 'code' in whoSaid) return { ok: false, refusal: whoSaid };
+      const who = typeof whoSaid === 'string' ? whoSaid : '';
       if (who === '' || who === me) return refuse('REQUIRED_MISSING', 'Share it on with somebody else on this BrainDog, by id.', 'who');
       if (sql.one('SELECT 1 AS y FROM person WHERE id = ?', who) === undefined || !onRecord(who))
         return refuse('REF_UNKNOWN', 'You can share on only with somebody already here.', 'who');
@@ -915,7 +1013,13 @@ export function methods(deps: RecordDeps) {
       if (can !== 'view' && can !== 'comment' && can !== 'edit') return refuse('OUT_OF_BOUNDS', 'You can share it on at view, comment or edit, never manage.', 'can');
 
       const catalog = kernel.catalog();
-      const what = inside(parent.what, isObj(args?.what) ? (args.what as ShareTarget) : undefined, catalog);
+      let target: ShareTarget | undefined = isObj(args?.what) ? (args.what as ShareTarget) : undefined;
+      if (target !== undefined) {
+        const named = resolved({ effect: 'allow', who: { kind: 'person', id: who }, what: target, can }, catalog);
+        if ('code' in named) return { ok: false, refusal: named };
+        target = named.what;
+      }
+      const what = inside(parent.what, target, catalog);
       if (what === null) return refuse('OUT_OF_BOUNDS', 'That reaches past what you manage. Pick something inside it.', 'what');
       /* `$me` IS READ FOR WHOEVER HOLDS A SHARE, so a condition on your own rows handed on would reach theirs instead. */
       if (JSON.stringify(what).includes('"$me"'))
