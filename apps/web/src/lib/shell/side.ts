@@ -369,9 +369,20 @@ export function sideModel(o: {
     if (by !== undefined && !folded.has(by)) folded.set(by, l);
   }
   const taken = new Set([...folded.values()].map((l) => l.id));
+  /* A LIST WHOSE PAGE ALREADY STANDS UNDER A PLACE IS THAT ROW, NOT ONE MORE UNDER MORE LISTS (pages pass, 2 Nov): the
+     Profiles add-on files its page under Agents and its list has no place of its own, so the rail said Profiles under
+     Agents and Profiles again under More lists. Such a list goes home to the place whose page bears its name, where
+     `once` keeps the page as the row and the list as an address it answers for. Only a list More lists would have held,
+     and only by a row the place already draws, so a list with no other place is never dropped. */
+  const pageAt = new Map<string, string>();
+  for (const p of o.places) for (const r of [...(o.views[p.key] ?? []), ...o.tools.filter((t) => t.home === p.key)]) if (!pageAt.has(word(r.label))) pageAt.set(word(r.label), p.key);
+  const homeOf = (l: SideList): string | undefined => {
+    const home = o.homes.get(l.id);
+    return home === IN_MORE ? (pageAt.get(word(l.name)) ?? home) : home;
+  };
   const rows = (home: string): SideLink[] =>
     o.lists
-      .filter((l) => !taken.has(l.id) && !l.facts?.projects && o.homes.get(l.id) === home)
+      .filter((l) => !taken.has(l.id) && !l.facts?.projects && homeOf(l) === home)
       .flatMap((l) => [{ href: `/r/${l.id}`, label: l.name, icon: l.icon, ...shownCount(l) }, ...l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' }))]);
   const own = (key: string): SideLink[] => [...o.tools, ...(o.waiting ?? []).map(({ section: _, ...w }) => w)].filter((t) => t.home === key).map(({ home: _, ...t }) => t);
   const viewsOf = (l: SideList | undefined): SideLink[] => (l ? l.views.map((v) => ({ href: v.href, label: v.name, icon: 'doc' })) : []);
