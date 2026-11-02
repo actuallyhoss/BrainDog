@@ -102,10 +102,9 @@
 /* A TILE IS A TILE, AS ON EVERY OTHER PAGE (1 Nov, "perfect the ui"): Money drew its tiles as cards with a hairline
    edge and a lift, hid each heading's well and ruled a line under every head, so it read as another app beside Today
    and Agents. The tile fill alone tells a tile from the board, and the heading row is the one every tile starts with.
-   Only the name keeps Money's medium weight. */
-[data-money] .block-slot > .block-bar .block-name {
-  font-weight: var(--fw-medium);
-}
+   AND ITS NAME IS AT EVERY TILE'S WEIGHT (domains lane, 2 Nov; Look B, a tile heading is 15/600): Money's names stood at
+   500, so Reports drew "Paid most" at 500 over "Against last month" at 600 on one screen, and Money read a step quieter
+   than Today beside it. */
 
 /* A LEDGER TILE'S HEAD RULE IS INSET AS EVERY OTHER TILE'S (design pass, 1 Nov): `timeline.css` ran it from edge to
    edge of the tile, so on Money the Ledger's head line was 40px wider than Coming up's beside it. */
