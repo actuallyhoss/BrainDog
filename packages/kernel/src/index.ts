@@ -235,7 +235,7 @@ import { RELATIVE_DAY } from './flow-lint.ts';
 import { capability } from './capabilities.ts';
 import { carryPins } from './pairs.ts';
 import { linkPatternFault, pruneFirings } from './rules.ts';
-import { runway, type Horizon, type Leg, type Runway } from './forecast.ts';
+import { REST_DAYS_SETTING, runway, type Horizon, type Leg, type Runway } from './forecast.ts';
 import { WALK_SOURCE } from './money-figures.ts';
 import { referencedBy } from './referenced.ts';
 import { createJob, sweepJobs } from './jobs.ts';
@@ -6377,6 +6377,25 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * has the same failure — the invoice slips a week, the reminder does not, and it fires about a
    * date that is no longer true.
    */
+  /**
+   * Re-arm the reminders of every row whose repeat moves off a rest day, after the rest days changed. The rows that carry
+   * such a field and stand, how many were armed again.
+   */
+  function rearmRestDays(): number {
+    let n = 0;
+    transaction(() => {
+      for (const [register, decl] of registers) {
+        const moves = (decl.fields as readonly Remindable[]).some((f) => f.repeat?.workday !== undefined && f.repeat.workday !== 'none');
+        if (!moves) continue;
+        for (const row of sql.all<Record<string, unknown>>(`SELECT ${COLUMNS} FROM entry WHERE register = ? AND deleted_at IS NULL`, register)) {
+          rediary(hydrate(row));
+          n++;
+        }
+      }
+    });
+    return n;
+  }
+
   function rediary(entry: Entry): void {
     const decl = registers.get(entry.register);
     if (!decl) return;
@@ -13063,7 +13082,20 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     setPackConfig(id: string, values: unknown, opts: { actor?: string; batch?: string } = {}) {
       const refused = schemaRefusal(state);
       if (refused) return refused;
-      return writePackConfig(sql, clock.now(), id, values, opts, transaction, mint);
+      const out = writePackConfig(sql, clock.now(), id, values, opts, transaction, mint);
+      if (!out.ok || !out.value.changed.includes(REST_DAYS_SETTING)) return out;
+      /* REST DAYS HOLD AT ONCE (2 Nov fix pass). The walk and the reminders read them live (`restDaysOf`), but a reminder
+         is armed when its row is written, so a bill's reminder stayed on the day the old rest days gave it until somebody
+         touched the row, and the answer here said the change waited for Money's next install. Measured on his record:
+         Friday and Saturday saved, and the reminders still kept Saturday and Sunday. So every row with a repeat that moves
+         off a rest day has its reminders armed again now, in one transaction, from the setting as it now reads. */
+      rearmRestDays();
+      const rest = out.value.changed.filter((k) => k !== REST_DAYS_SETTING);
+      const said =
+        rest.length === 0
+          ? `Saved the rest days for ${id}. Due days and reminders follow them now.`
+          : `${out.value.said} The rest days hold now.`;
+      return ok({ ...out.value, said });
     },
 
     /** Every pack's setting values, by pack id, as a plan fills `{{config:}}` from them. */
