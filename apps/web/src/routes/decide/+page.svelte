@@ -77,6 +77,7 @@
   import { words } from './words.ts';
   import { waitsNow } from '$lib/home/waits.svelte.ts';
   import { leadOf } from './lead.ts';
+  import { columnOrder } from './column-order.ts';
 
   let { data } = $props();
 
@@ -421,7 +422,18 @@
       () => ((cardIn = true), closed(false, held)),
     );
   }
-  const drawn = $derived<Opened | null>(!cardIn ? null : got && got.from === 'live' && led ? { ...got, page: { page: got.page.page, blocks: led.blocks } } : got);
+  /* UNDER THE LEAD, EACH COLUMN IN ITS OWN ORDER (`column-order.ts`): due sooner, then hard to undo, then the newest, so
+     a question an agent just asked is at the top of its column. The lead keeps the record's ranking. */
+  const columned = $derived(
+    led
+      ? led.blocks.map((b) =>
+          b.kind === 'queue' && (b.key === GROUP_KEY.money || b.key === GROUP_KEY.quick) && Array.isArray(b.queue)
+            ? { ...b, queue: columnOrder(b.queue, shell.me?.person ?? null) }
+            : b,
+        )
+      : null,
+  );
+  const drawn = $derived<Opened | null>(!cardIn ? null : got && got.from === 'live' && columned ? { ...got, page: { page: got.page.page, blocks: columned } } : got);
   /* NOTHING TO DRAW AT ALL: the head says so, and the other queue is offered when something waits in it. */
   const cleared = $derived(shaped !== null && !shaped.drawsAny);
   /* THE HEAD'S LINE IS THE RECORD'S, and there is none with no question waiting: the head is then the page's name, and

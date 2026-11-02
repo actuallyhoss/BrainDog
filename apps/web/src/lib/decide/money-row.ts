@@ -5,6 +5,9 @@
  * printing it whole, so the amount, how late and the answer each have their own place. A question worded any other
  * way is not a money row, and its card draws it as it always did.
  *
+ * A SERVICE ABOUT TO RENEW IS THE SAME ROW (2 Nov): "kiln.example renews in 12 days for £14. Keep it?" is its name, the
+ * amount, "Renews in 12 days" (never red, since nothing is late) and Keep it and Cancel it, beside the invoices in Money.
+ *
  * And what an answer leaves (today F7): the outcome with its object ("Chased Invoice 2026-041: brand system for
  * £4,800"), never only the option's name.
  *
@@ -23,16 +26,35 @@ export type MoneyRow = {
   asks: string;
   /** Money owed to you (a chase), as against money you owe. */
   owed: boolean;
+  /** What the date is: money that fell `due`, or a service that `renews`. A renewal is not late, so it is not red. */
+  kind: 'due' | 'renews';
+  /** Days from now to the date: below nought when it is late, so a column can put the soonest first. */
+  days: number;
 };
 
 /** "X was due 38 days ago, £4,800. Chase it?" The amount runs to the full stop a space follows, so "£12.50." is whole. */
 const DUE = /^(.+?) was due (\d+) days? ago, (.+?)\.\s+(.+\?)$/u;
+
+/* "kiln.example renews in 12 days for £14. Keep it?" (estate's `renew-soon`), and today and tomorrow as the record says
+   them. The same row as money that fell due: what it is, the amount, when, and Keep it and Cancel it as its answers. */
+const RENEWS = /^(.+?) renews (today|tomorrow|in (\d+) days?) for (.+?)\.\s+(.+\?)$/u;
+
+/** When it renews, as the row says it. */
+const renewWords = (n: number): string => (n === 0 ? 'Renews today' : n === 1 ? 'Renews tomorrow' : `Renews in ${n.toLocaleString('en-GB')} days`);
 
 /** How late, as the row says it. */
 const lateWords = (n: number): string => (n === 0 ? 'Due today' : `${n.toLocaleString('en-GB')} ${n === 1 ? 'day' : 'days'} late`);
 
 /** The question's sentence as a row, or `null` for a question that is not worded as money that fell due. */
 export function moneyRowOf(question: string, answers: readonly string[] = []): MoneyRow | null {
+  const r = RENEWS.exec(question.trim());
+  if (r) {
+    const [, title, when, n, amount, asks] = r as unknown as [string, string, string, string | undefined, string, string];
+    if (!/\d/u.test(amount)) return null;
+    const days = when === 'today' ? 0 : when === 'tomorrow' ? 1 : Number(n);
+    const said = answers.some((a) => `${a.trim()}?`.toLowerCase() === asks.trim().toLowerCase());
+    return { title: title.trim(), amount: amount.trim(), late: renewWords(days), asks: said ? '' : asks.trim(), owed: false, kind: 'renews', days };
+  }
   const m = DUE.exec(question.trim());
   if (!m) return null;
   const [, title, days, amount, asks] = m as unknown as [string, string, string, string, string];
@@ -40,7 +62,7 @@ export function moneyRowOf(question: string, answers: readonly string[] = []): M
   const owed = /\bchase\b/iu.test(asks) || answers.some((a) => /^chase\b/iu.test(a));
   /* "Chase it?" BESIDE A BUTTON THAT SAYS "Chase £4,800" SAYS NOTHING MORE, so it is left off the row. */
   const said = answers.some((a) => `${a.trim()}?`.toLowerCase() === asks.trim().toLowerCase());
-  return { title: title.trim(), amount: amount.trim(), late: lateWords(Number(days)), asks: said ? '' : asks.trim(), owed };
+  return { title: title.trim(), amount: amount.trim(), late: lateWords(Number(days)), asks: said ? '' : asks.trim(), owed, kind: 'due', days: -Number(days) };
 }
 
 /** The answer that names the amount: "Chase it" becomes "Chase £4,800". Any other answer keeps its words. */

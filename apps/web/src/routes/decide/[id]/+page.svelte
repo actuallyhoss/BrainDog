@@ -1366,9 +1366,10 @@
                   onpress={pressMerge}
                 />
               {:else if moneyRow}
-                <!-- MONEY THAT FELL DUE: its answers as the card's buttons, "Chase £4,800" leading, then Not yet. -->
+                <!-- MONEY THAT FELL DUE: its answers as the card's buttons, "Chase £4,800" leading, then Not yet. A renewal leads
+                     with its first answer, Keep it, as its card fills it. -->
                 <div class="dc-actions">
-                  {#each question.options as option (option.key)}{@render answer(option, question, amountAnswer(option.title, moneyRow.amount), /^chase\b/iu.test(option.title.trim()) || (!question.options.some((o) => /^chase\b/iu.test(o.title.trim())) && suggestedKey === option.key))}{/each}
+                  {#each question.options as option (option.key)}{@render answer(option, question, amountAnswer(option.title, moneyRow.amount), /^chase\b/iu.test(option.title.trim()) || (!question.options.some((o) => /^chase\b/iu.test(o.title.trim())) && suggestedKey === option.key) || (moneyRow.kind === 'renews' && suggestedKey === undefined && option.key === question.options[0]?.key))}{/each}
                   {@render later()}
                 </div>
                 {#if willDo}<p class="dc-will">{willDo}</p>{/if}

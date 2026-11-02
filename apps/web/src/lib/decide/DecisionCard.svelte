@@ -752,10 +752,10 @@
        foot. The question in full is on its own page, which the title opens. THE WELL IS NEUTRAL here as on Today
        (polish 8, VERIFY P7): the late word carries the red, once. -->
   <article class="queue-card dc dc-row" aria-busy={busy} data-selected={chosenForAll ? '' : undefined} data-compact={compact ? '' : undefined} bind:this={cardEl} {@attach heard}>
-    <span class="dr-well"><IconWell name={row.owed ? 'arrowDown' : 'money'} size="l" /></span>
+    <span class="dr-well"><IconWell name={row.kind === 'renews' ? 'service' : row.owed ? 'arrowDown' : 'money'} size="l" /></span>
     <svelte:element this={questionLevel} class="queue-question dr-title" dir="auto"><a class="dc-open tap" href={at(card.href)}><span data-own>{row.title}</span></a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</svelte:element>
     <span class="dr-amount num">{row.amount}</span>
-    <p class="dr-meta"><span class="dr-late">{row.late}</span>{#if row.asks}<span class="dr-asks" dir="auto">{' · '}{row.asks}</span>{/if}</p>
+    <p class="dr-meta"><span class="dr-late" data-kind={row.kind} data-soon={row.kind === 'renews' && row.days <= 7 ? '' : undefined}>{row.late}</span>{#if row.asks}<span class="dr-asks" dir="auto">{' · '}{row.asks}</span>{/if}</p>
     {#if drawn}
       <div class="dc-actions dr-actions" data-inline>
         {@render inlineButtons(row.amount)}
@@ -1593,6 +1593,17 @@
 
   .dr-late {
     color: var(--red);
+    font-weight: 600;
+  }
+
+  /* A RENEWAL IS NOT LATE (2 Nov): its when is in the second ink, and amber within the week it renews, never red. */
+  .dr-late[data-kind='renews'] {
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+
+  .dr-late[data-kind='renews'][data-soon] {
+    color: var(--warn);
     font-weight: 600;
   }
 
