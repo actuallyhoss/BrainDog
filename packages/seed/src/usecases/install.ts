@@ -215,7 +215,7 @@ export type ModuleOptions = {
 export function moduleDocument(u: UseCase | null, id: string, options: ModuleOptions): Body | null {
   /* THE AGENTS PACK IS A MODULE TOO, so a sentence that mentions agents adds it rather than saying it is not here. It
      carries no example rows of anybody's. */
-  if (id === AGENTS_PACK.manifest.id) return agentsPackDocument();
+  if (id === AGENTS_PACK.manifest.id) return agentsPackDocument(options.holds === undefined ? {} : { holds: options.holds });
   const bare = firstPartyDocument(id);
   if (!bare) return null;
   const mine = new Set(((bare.declarations ?? []) as Body[]).flatMap((d) => (typeof d.register === 'string' ? [d.register] : [])));

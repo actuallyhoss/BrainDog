@@ -158,7 +158,7 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
   }));
   return [
     ...modules,
-    { id: 'agents', kind: 'pack', title: 'agents', summary: String(agents.summary ?? ''), modules: before(AGENTS_PACK.manifest.requires), version: AGENTS_PACK.manifest.version, signals: AGENTS_SIGNALS, doc: () => agentsPackDocument(), skills: AGENTS_SKILLS },
+    { id: 'agents', kind: 'pack', title: 'agents', summary: String(agents.summary ?? ''), modules: before(AGENTS_PACK.manifest.requires), version: AGENTS_PACK.manifest.version, signals: AGENTS_SIGNALS, doc: ({ holds }) => agentsPackDocument({ holds }), skills: AGENTS_SKILLS },
     ...useCases,
   ];
 }

@@ -588,6 +588,8 @@
   /* THE LINES THE OFFER DRAWS ARE THE LINES INSTALL APPROVES. The record refuses an install that adds a
      call without them, and this screen shows every one through `CallsOut` before Install is pressed. */
   let offerApprove: string[] = [];
+  /** The document the offer was planned on, so Install sends the same one. */
+  let offerDoc: Record<string, unknown> | null = null;
 
   async function offerPack(c: ReturnType<typeof createClient>) {
     const busy = opened();
@@ -597,7 +599,9 @@
       closed(true, busy);
       return;
     }
-    const planned = await c.planPack({ doc: seed.agentsPackDocument(), source: { kind: 'local' } });
+    /* CUT TO THE LISTS THIS RECORD HOLDS (agents 1.32.0): with no Projects it goes in with no Where it applies. */
+    offerDoc = seed.agentsPackDocument({ holds: packs.value.filter((p) => p.disabled_at === null).flatMap((p) => p.registers) });
+    const planned = await c.planPack({ doc: offerDoc, source: { kind: 'local' } });
     closed(true, busy);
     offerSaid = '';
     const diff = planned.ok ? (planned.value as { diff?: { calls_out?: unknown; approve?: unknown } }).diff : undefined;
@@ -610,7 +614,7 @@
     if (!offer || installing || seedPacks === null) return;
     installing = true;
     const busy = opened();
-    const out = wrote(await clientOf().installPack({ doc: seedPacks.agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash, ...(offerApprove.length > 0 ? { approve: offerApprove } : {}) }));
+    const out = wrote(await clientOf().installPack({ doc: offerDoc ?? seedPacks.agentsPackDocument(), source: { kind: 'local' }, planHash: offer.planHash, ...(offerApprove.length > 0 ? { approve: offerApprove } : {}) }));
     closed(true, busy);
     installing = false;
     if (out.ok) {

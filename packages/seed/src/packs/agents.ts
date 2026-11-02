@@ -2,9 +2,11 @@
  * The agents pack: what an agent finds out, the skills it uses, the keys it is handed, and the tools
  * it runs, each at a project or everywhere.
  *
- * IT REQUIRES `things` AND NOTHING ELSE. Every module can be switched off, People included,
+ * IT REQUIRES NOTHING, SINCE 1.32.0. Every module can be switched off, People included,
  * so no field here points at a person. A row applies to a project or to
- * everywhere, and a record without People loses nothing this pack holds.
+ * everywhere, and a record without People loses nothing this pack holds. Projects is a link (`LINKS` below): a record
+ * without them gets the lists with no Where it applies, as a household that uses ChatGPT does (onboarding7), and was
+ * given Projects only because Agents leaned on it.
  *
  * A KEY'S ROW IS AN INDEX. `value` names the grant the Keychain sealed a key into, and only the Keychain
  * door writes it: a create naming it is refused, so no seed row and no pack seed can carry one.
@@ -868,20 +870,52 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      1.30.0 IS WORDS, SO IT IS MINOR (AP32, 1 Nov): How the brain changed is called What changed, as a page and as the
      foot's first door. Its address stays /p/brain. No list, field or figure goes.
      1.31.0 TAKES A BLOCK OFF A PAGE, SO IT IS MINOR (the lists review, L40): What changed draws its learnings once, on
-     the timeline, where a block of cards said the same six over it. No list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.31.0', requires: ['register.things'] },
+     the timeline, where a block of cards said the same six over it. No list, field or figure goes.
+     1.32.0 REQUIRES NOTHING, SO IT IS MINOR (onboarding7, 2 Nov): `project` on the four lists is a link to Projects and
+     no longer a need, so a household answering the AI tools question gets Agents and no Projects. On a record that
+     holds Projects the document is as 1.31.0's; on one that does not, the field goes with what reads it (`LINKS`). */
+  manifest: { id: 'agents', version: '1.32.0', requires: [] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,
 };
 
 /**
+ * THE FIELDS THAT ONLY LINK, by the list they point at, SINCE 1.32.0: where a row applies is a project when the record
+ * holds Projects, and the row applies everywhere when it does not.
+ */
+const LINKS: Readonly<Record<string, string>> = { project: 'things' };
+
+/** A declaration with the link fields in `gone` taken out, and what reads them: its `same:` scope, its short form, a column. */
+function cut(d: Record<string, unknown>, gone: ReadonlySet<string>): Record<string, unknown> {
+  if (gone.size === 0) return d;
+  const out: Record<string, unknown> = { ...d };
+  if (Array.isArray(d.fields)) out.fields = (d.fields as { id: string }[]).filter((f) => !gone.has(f.id));
+  if (Array.isArray(d.mobile)) out.mobile = (d.mobile as string[]).filter((f) => !gone.has(f));
+  const same = d.same as Same | undefined;
+  if (same?.within !== undefined && gone.has(same.within)) {
+    const { within: _, ...rest } = same;
+    out.same = rest;
+  }
+  if (Array.isArray(d.blocks))
+    out.blocks = (d.blocks as Record<string, unknown>[]).map((b) =>
+      Array.isArray(b.columns) ? { ...b, columns: (b.columns as { field?: string }[]).filter((c) => c.field === undefined || !gone.has(c.field)) } : b,
+    );
+  return out;
+}
+
+/**
  * The pack as a document `@braindog/declare` reads.
  *
  * `requires` IS NOT IN IT, because the document format names packs it depends on and not registers.
  * The seed's installer checks the manifest's registers before the document is read.
+ *
+ * `holds`, WHEN SAID, IS EVERY LIST THE RECORD WILL HOLD, and a link (`LINKS`) to one not among them is left out with what
+ * reads it. Absent keeps every link, the document as it always was.
  */
-export function agentsPackDocument(): Record<string, unknown> {
+export function agentsPackDocument(options: { holds?: Iterable<string> } = {}): Record<string, unknown> {
+  const held = options.holds === undefined ? null : new Set(options.holds);
+  const gone = new Set(held === null ? [] : Object.entries(LINKS).flatMap(([field, list]) => (held.has(list) ? [] : [field])));
   return {
     pack: AGENTS_PACK.manifest.id,
     version: AGENTS_PACK.manifest.version,
@@ -891,14 +925,19 @@ export function agentsPackDocument(): Record<string, unknown> {
     requires: { format: 1, primitives: 1, packs: {} },
     /* Every register carries `tags`, as the seed's own do, so a pack seed can be marked `example`. */
     declarations: [
-      ...Object.values(AGENTS_REGISTERS).map(({ id, ...rest }) => ({
-        register: id,
-        ...rest,
-        fields: [...rest.fields, { id: 'tags', type: 'list', of: 'text' }],
-      })),
+      ...Object.values(AGENTS_REGISTERS).map(({ id, ...rest }) =>
+        cut(
+          {
+            register: id,
+            ...rest,
+            fields: [...rest.fields, { id: 'tags', type: 'list', of: 'text' }],
+          },
+          gone,
+        ),
+      ),
       /* The figures before the pages that draw them. */
       ...Object.values(AGENTS_METRICS),
-      ...Object.values(AGENTS_PAGES),
+      ...Object.values(AGENTS_PAGES).map((p) => cut(p as Record<string, unknown>, gone)),
     ],
   };
 }

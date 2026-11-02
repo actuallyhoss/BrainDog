@@ -149,7 +149,9 @@ export type Offer = {
  */
 export async function packDocument(id: string, installed?: readonly PackState[], usecase?: string): Promise<Record<string, unknown> | null> {
   const seed = await import('@braindog/seed/packs');
-  if (id === seed.AGENTS_PACK.manifest.id) return seed.agentsPackDocument();
+  /* AGENTS LINKS TO PROJECTS AND NO LONGER NEEDS THEM (1.32.0), so it is cut to the lists the record holds as well. */
+  if (id === seed.AGENTS_PACK.manifest.id)
+    return seed.agentsPackDocument(installed === undefined ? {} : { holds: installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers) });
   if (installed === undefined) return seed.firstPartyDocument(id);
   const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
   const { useCase } = await import('@braindog/seed/usecases');

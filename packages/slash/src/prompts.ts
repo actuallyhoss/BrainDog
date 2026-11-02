@@ -260,13 +260,16 @@ What you asked so far, one a line as about: question; [skipped] or [answered: ..
 Their answers, in the same order, inside its fence, JSON-encoded:
 %SAID%
 
+Already known from their answers, one a line as topic: their words. Never ask about anything on this list again, not even for more of it (which ones, what kind, how many, how often): it is answered. The one thing still worth asking about someone on it is a name they did not give, such as their editors' names:
+%KNOWN%
+
 Reply with:
 case: the one use case id closest to them, or null.
 parts: up to four part ids from the list above that their words point at, each as [part id, the one to three words of theirs that point at it].
 cur: the ISO 4217 code of a currency they typed, or null.
 about, q, taps: your next question. about is one of the topics still open:
 %OPEN%
-Pick the one their answers so far say least about and that would change their BrainDog most. Ask only about that topic as its line says it, and about is the topic the question asks: a question about which currency is currency, never money. Never ask about something they did not raise, such as categories, budgets, taxes, rates or goals. Never ask what they already said, even in passing: being paid is money said, a currency named is the currency, a client named is their work. q is one warm, plain line of at most 100 characters, about their own things by name where they gave one, never with the words list, register, record, module, part, pack or field: "Who else works with you?", never "Who else should I add to your people list?". taps are two to four likely answers they could tap, at most 24 characters each, never a name they already gave as something else: a client is not offered as a project. Never ask which of the things they named to add first: every one is added. When you have enough, about and q are null and taps is empty.`;
+Pick the one their answers so far say least about and that would change their BrainDog most. Ask only about that topic as its line says it, and about is the topic the question asks: a question about which currency is currency, never money. Never ask about something they did not raise, such as categories, budgets, taxes, rates or goals. Never ask what they already said, even in passing, or anything on the known list: being paid is money said, sponsors named are money said, content they make is their work, a currency named is the currency, a client named is their work. q is one warm, plain line of at most 100 characters, about their own things by name where they gave one, never with the words list, register, record, module, part, pack or field: "Who else works with you?", never "Who else should I add to your people list?". taps are two to four likely answers they could tap, at most 24 characters each, never a name they already gave as something else: a client is not offered as a project. Never ask which of the things they named to add first: every one is added. When you have enough, about and q are null and taps is empty.`;
 
 /**
  * The result schemas, sent to the provider as `jsonSchema` and re-checked by hand when the reply lands.
@@ -639,7 +642,7 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
     system: TURN_SYSTEM,
     user: TURN_USER,
     schema: TURN_SCHEMA,
-    slots: ['%USECASES%', '%MODULES%', '%ASKED%', '%SAID%', '%OPEN%'],
+    slots: ['%USECASES%', '%MODULES%', '%ASKED%', '%SAID%', '%KNOWN%', '%OPEN%'],
     walks: false,
   },
   mapping: {

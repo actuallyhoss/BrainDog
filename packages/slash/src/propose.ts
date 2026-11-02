@@ -1338,11 +1338,61 @@ const TURN_TOPICS: readonly (readonly [SetupAbout, string])[] = [
   ['first', 'first: what to keep track of first'],
 ];
 
-/** The topics a turn may still ask about: those not asked yet (`asked`), one a line, or a line saying there are none. */
-const openLines = (asked: string | undefined): string => {
+/**
+ * WHAT THEIR ANSWERS ALREADY SAY, BY TOPIC (onboarding7, the creator walk: "Money comes from Twitch subs, YouTube ads and a
+ * few sponsors" was asked "Which sponsors do you work with?", and a weekly series and three streams a week was asked what
+ * content they make). Each clause of what they typed, cut at a stop or a comma, is put under every topic its words
+ * belong to. The turn is handed these as a list it may not ask about again (`TURN_USER`'s `%KNOWN%`), and a topic whose
+ * whole answer is here is not offered at all (`openLines`).
+ */
+const KNOWN_WORDS: readonly (readonly [SetupAbout, RegExp])[] = [
+  ['work', /\b(?:work(?:ing)? on|build(?:ing)?|projects?|products?|apps?|series|streams?|streaming|videos|channel|content|podcasts?|episodes?|redesign|website|launch(?:ing)?|beta|clients?|retainers?|course|studies|homework|shop|store|stream(?:er)?|youtuber|creator)\b/iu],
+  ['money', /\b(?:paid|pay(?:s|ing)?|invoic\w*|bills?|rent|salary|income|revenue|subs|subscriptions?|ads|sponsors?\w*|payouts?|fees?|retainers?|payroll|raised|funding|pre-?seed|costs?|expenses?|money|earn\w*|sales|sell(?:ing)?|saving\w*)\b|[$£€¥₹₩₺₦]/iu],
+  ['people', /\b(?:editors?|partner|co-?founders?|team|staff|employees?|assistants?|accountant|bookkeeper|freelancers?|contractors?|wife|husband|sister|brother|kids|family|friends?|moderators?|manager|landlord|of us|[a-z]+-person)\b/iu],
+  ['tools', /\b(?:claude|chatgpt|gpt|cursor|copilot|gemini|codex|descript|perplexity|notion|figma|ai tools?)\b/iu],
+];
+const KNOWN_LINE = 140;
+
+/** Their words by topic, each topic once with the clauses that speak to it, in the order they were typed. */
+export const knownOf = (said: string): Map<SetupAbout, string[]> => {
+  const out = new Map<SetupAbout, string[]>();
+  const clauses = said.split(/(?<!\d)[.;!?\n]+|,(?!\d)/u).map((c) => c.trim().replace(/^(?:and|but|so)\s+/iu, '')).filter((c) => c.length > 2);
+  for (const c of clauses)
+    for (const [topic, words] of KNOWN_WORDS) if (words.test(c)) out.set(topic, [...(out.get(topic) ?? []), c]);
+  return out;
+};
+
+/** The known topics, one a line as `topic: their words`, or a line saying nothing is known yet. */
+const knownLines = (said: string): string => {
+  const lines = [...knownOf(said)].map(([topic, cs]) => {
+    const line = `${topic}: ${cs.join('; ')}`;
+    return line.length <= KNOWN_LINE ? line : `${line.slice(0, KNOWN_LINE - 1)}…`;
+  });
+  return lines.length > 0 ? lines.join('\n') : 'nothing yet';
+};
+
+/**
+ * WHETHER THEY GAVE A NAME AMONG THE PEOPLE THEY SAID: a capitalised word straight after who they are ("My editors Kai
+ * and Rosa", "my partner Sam"), never the name of their app. Without one, who they work with is still worth one question: their names.
+ */
+const PEOPLE_NAMED = /\b(?:editors?|partner|co-?founders?|assistants?|accountant|bookkeeper|wife|husband|sister|brother|moderators?|manager|landlord)(?:\s+(?:is|are|called|named)|,)?\s+\p{Lu}\p{Ll}+/u;
+const peopleNamed = (clauses: readonly string[]): boolean => clauses.some((c) => PEOPLE_NAMED.test(c));
+
+/**
+ * The topics a turn may still ask about: those not asked yet (`asked`) and not already answered in their words
+ * (`knownOf`: what they work on and their money, once said, are said; who they work with once a name is given), one a
+ * line, or a line saying there are none.
+ */
+const openTopics = (asked: string | undefined, said = ''): Set<SetupAbout> => {
   const done = askedAbouts(asked);
-  const open = TURN_TOPICS.filter(([t]) => !done.has(t)).map(([, line]) => line);
-  return open.length > 0 ? open.join('\n') : 'none: every topic is asked, so about and q are null.';
+  const known = knownOf(said);
+  const told = (t: SetupAbout): boolean => (t === 'work' || t === 'money' ? known.has(t) : t === 'people' ? peopleNamed(known.get('people') ?? []) : false);
+  return new Set(TURN_TOPICS.filter(([t]) => !done.has(t) && !told(t)).map(([t]) => t));
+};
+const openLines = (asked: string | undefined, said = ''): string => {
+  const open = openTopics(asked, said);
+  const lines = TURN_TOPICS.filter(([t]) => open.has(t)).map(([, line]) => line);
+  return lines.length > 0 ? lines.join('\n') : 'none: every topic is asked, so about and q are null.';
 };
 
 /**
@@ -1371,7 +1421,8 @@ const turnOf = (raw: Record<string, unknown>, ask: SetupAsk, by: string): SetupA
     draft: null,
     /* ONLY A TOPIC THE TURN WAS OFFERED (`TURN_TOPICS`): a question about anything else ("your main expense category")
        is dropped here, and the page asks the rules' next. */
-    ask: about === '' || question === '' || !TURN_TOPICS.some(([t]) => t === about) ? null : { about, question, choices: Array.isArray(raw['taps']) ? raw['taps'] : [] },
+    /* AND ONLY ONE STILL OPEN (`openTopics`): a question about what their words already answered is dropped as well. */
+    ask: about === '' || question === '' || !openTopics(ask.asked, ask.said).has(about as SetupAbout) ? null : { about, question, choices: Array.isArray(raw['taps']) ? raw['taps'] : [] },
   };
   return { ...setupOf(reading, ask, by), quick: true };
 };
@@ -1403,7 +1454,8 @@ const setupStep = async (raw: SetupAsk, asking: Asking): Promise<Result<SetupAns
       '%MODULES%': partLines(ask.offer),
       '%ASKED%': asked,
       '%SAID%': fenced('said', said),
-      '%OPEN%': openLines(ask.asked),
+      '%OPEN%': openLines(ask.asked, said),
+      '%KNOWN%': fenced('known', knownLines(said)),
     });
     return out.ok ? ok(turnOf(out.value.value, { ...ask, said }, out.value.by)) : out;
   }

@@ -461,6 +461,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.32.0',
+      notes: 'Agents no longer needs Projects. Without Projects, a learning, skill, key or tool applies everywhere, and once Projects is on it can say which project.',
+    },
+    {
       version: '1.31.0',
       notes: 'What changed shows each learning once, on its timeline, where cards of the same learnings stood over it.',
     },

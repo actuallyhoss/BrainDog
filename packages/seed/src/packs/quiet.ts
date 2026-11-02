@@ -255,7 +255,9 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
    */
   const documentOf = async (id: string): Promise<Body | null> => {
     if (isFirstParty(id)) return port.document(id);
-    if (id === AGENTS_PACK.manifest.id) return agentsPackDocument();
+    /* AGENTS FOR THE LISTS THE RECORD HOLDS TOO, SINCE 1.32.0: a record made without Projects holds its lists with no
+       Where it applies, and the whole document would be refused every night for a link to a list it does not hold. */
+    if (id === AGENTS_PACK.manifest.id) return port.holds ? agentsPackDocument({ holds: await port.holds() }) : agentsPackDocument();
     const usecase = USE_CASE_PACK.exec(id)![1]!;
     /* CUT TO THE LISTS THE RECORD HOLDS, AS THE FIRST INSTALL WAS (UP1, 31 Oct). Uncut, a Personal record made without
        People met Personal 2.9.1's Project partner over People's list and was refused every night, and a founder's made
