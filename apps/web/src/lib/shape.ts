@@ -143,6 +143,8 @@ const NAME_RULES: readonly NameRule[] = [
   /* THE PEOPLE THEY PAY TO DO THE WORK, BY THE WORK (onboarding6, the creator walk: "my editors Kai and Rosa" were never
      drafted): an editor, an assistant, a designer they hire is somebody they contract. */
   { at: new RegExp(`\\b(?:${either('editor|video editor|assistant|virtual assistant|moderator|designer|developer|bookkeeper|cleaner|nanny|babysitter')})s?\\s+(?:(?:called|named|are|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'contractor', word: true },
+  /* THE PEOPLE WHO WORK THERE, NAMED (onboarding8, the shop walk: "two part-time staff, Ellie and Tom" drafted nobody). */
+  { at: new RegExp(`\\b(?:${either('staff|employee|team member')})s?,?\\s+(?:(?:called|named|are|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'collaborator' },
   { at: new RegExp(`\\b(?:${either('partner|cofounder|co-founder|collaborator')})s?\\s+(?:(?:called|named|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'collaborator' },
   { at: new RegExp(`\\b(?:${either('run|runs|running|own|owns|build|builds|building|make|makes|making|started|founded')}|working on)\\s+${LIST}`, 'gu'), register: 'things' },
   { at: new RegExp(`\\b(?:called|named)\\s+${LIST}`, 'gu'), register: 'things' },
@@ -150,7 +152,8 @@ const NAME_RULES: readonly NameRule[] = [
 
 /** The work word a rule matched on, as a note: "editors Kai and Rosa" is "Editor". */
 const workWord = (matched: string): string => {
-  const w = (/^\s*([\p{L} ]+?)s?\s+(?:called|named|are|is\s+)?\p{Lu}/u.exec(matched)?.[1] ?? '').trim().replace(/\s+(?:called|named|are|is)$/u, '');
+  /* "editors are Kai" is an editor (onboarding8: the "are" was left on, and Kai was drafted as one of "your editorss"). */
+  const w = (/^\s*([\p{L} ]+?)s?\s+(?:(?:called|named|are|is)\s+)?\p{Lu}/u.exec(matched)?.[1] ?? '').trim().replace(/\s+(?:called|named|are|is)$/u, '');
   return w === '' ? '' : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 };
 
