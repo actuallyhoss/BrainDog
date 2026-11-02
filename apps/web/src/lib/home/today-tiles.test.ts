@@ -94,7 +94,7 @@ test('THE WEEK STRIP: fourteen days from two days ago, a dot a thing in its proj
   const days = weekDays(dated, TODAY);
   assert.equal(days.length, 14);
   assert.equal(days[0]!.date, '2026-09-27');
-  assert.deepEqual(days[0]!.items, [{ colour: 'oklch(var(--mark-l) var(--mark-c) 30)', late: true, label: 'Task 1' }]);
+  assert.deepEqual(days[0]!.items, [{ colour: 'var(--cat-pink-fill)', late: true, label: 'Task 1' }]);
   assert.equal(days[2]!.date, TODAY);
   assert.equal(days[2]!.items.length, 1);
   assert.equal(weekReading(dated, TODAY), 'One is late, from Sunday. One is due today. The next 11 days hold 3 more, one of them money.');

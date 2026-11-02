@@ -56,6 +56,7 @@
 -->
 <script lang="ts">
   import Icon from './Icon.svelte';
+  import { slotOf } from './face.ts';
   import Define from './Define.svelte';
   import { at, here } from '../at.ts';
   import { copy } from '../copy.ts';
@@ -348,7 +349,7 @@
       <div class="name-row">
         <h1 class="page-name" tabindex="-1" bind:this={heading}
           >{#if well}<span class="name-well">{@render well()}</span
-            >{:else if icon}<span class="name-icon" style={hue === undefined ? undefined : `--hue:${hue}`} data-hue={hue === undefined ? undefined : ''}
+            >{:else if icon}<span class="name-icon" style={hue === undefined ? undefined : `--slot-ink:var(--cat-${slotOf(hue)})`} data-hue={hue === undefined ? undefined : ''}
               ><Icon name={icon} size="xl" /></span
             >{/if}<span class="name-words" dir="auto">{#each nameWords as word, n}{n > 0 ? ' ' : ''}<span class="word">{word}</span>{/each}</span>
         </h1>
@@ -563,8 +564,10 @@
     vertical-align: middle;
   }
 
+  /* A PAGE ABOUT ONE THING WEARS ITS SLOT'S COLOUR (domains lane, 2 Nov), the colour its well and its dot wear, and not
+     its hue at the mark's lightness, which drew a project at hue 30 red here and pink everywhere else. */
   .name-icon[data-hue] {
-    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    color: var(--slot-ink, var(--ink-2));
   }
 
   /* Beside the name on its baseline, at the sentence's size in the quiet ink. */

@@ -383,6 +383,18 @@
     background: var(--ink-3);
   }
 
+  /* THE DOT IS THE PROJECT'S SLOT (domains lane, 2 Nov), its fill, as `ScopeChip`, the rail and Work's filters draw it.
+     The hue drawn as it was, at the mark's lightness and chroma, made one project two colours; `--hue` above is the
+     fallback for a host that sends no slot. */
+  .cards-scope-dot[data-slot='blue'] { background: var(--cat-blue-fill); }
+  .cards-scope-dot[data-slot='violet'] { background: var(--cat-violet-fill); }
+  .cards-scope-dot[data-slot='pink'] { background: var(--cat-pink-fill); }
+  .cards-scope-dot[data-slot='teal'] { background: var(--cat-teal-fill); }
+  .cards-scope-dot[data-slot='sky'] { background: var(--cat-sky-fill); }
+  .cards-scope-dot[data-slot='yellow'] { background: var(--cat-yellow-fill); }
+  .cards-scope-dot[data-slot='lime'] { background: var(--cat-lime-fill); }
+  .cards-scope-dot[data-slot='slate'] { background: var(--cat-slate-fill); }
+
   .cards-fact {
     display: contents;
     font-size: var(--fs-meta);
@@ -493,6 +505,18 @@
   .cards-item[style*='--hue'] > .cards-head > .cards-mark {
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
   }
+
+  /* AND WHERE THE HOST SENDS THE SLOT (`data-slot`, domains lane, 2 Nov) THE MARK IS THE PROJECT'S WELL: the slot's tint
+     with the glyph in the slot's colour, as `IconWell` draws a project everywhere else. The hue rule above stays for a
+     host that sends only the number. */
+  .cards-item[data-slot='blue'] > .cards-head > .cards-mark { background: var(--cat-blue-tint); color: var(--cat-blue); }
+  .cards-item[data-slot='violet'] > .cards-head > .cards-mark { background: var(--cat-violet-tint); color: var(--cat-violet); }
+  .cards-item[data-slot='pink'] > .cards-head > .cards-mark { background: var(--cat-pink-tint); color: var(--cat-pink); }
+  .cards-item[data-slot='teal'] > .cards-head > .cards-mark { background: var(--cat-teal-tint); color: var(--cat-teal); }
+  .cards-item[data-slot='sky'] > .cards-head > .cards-mark { background: var(--cat-sky-tint); color: var(--cat-sky); }
+  .cards-item[data-slot='yellow'] > .cards-head > .cards-mark { background: var(--cat-yellow-tint); color: var(--cat-yellow); }
+  .cards-item[data-slot='lime'] > .cards-head > .cards-mark { background: var(--cat-lime-tint); color: var(--cat-lime); }
+  .cards-item[data-slot='slate'] > .cards-head > .cards-mark { background: var(--cat-slate-tint); color: var(--cat-slate); }
 
   /* A CARD'S `picture` LEADS IT at 16:9, cut to fit, on the well a missing picture would leave, so a card whose file
      has not loaded yet is the same height as it will be. The title under it names the card. */

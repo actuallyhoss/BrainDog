@@ -167,7 +167,7 @@ test('A CELL NAMING A PROJECT IS SAID IN THE CARD\'S META LINE: "on", the projec
   const body = render(Block, { props: { block, opts } }).body.replace(/<!--[\s\S]*?-->/gu, '');
   const lines = [...body.matchAll(/<p class="cards-scope[^"]*">(.*?)<\/p>/gu)].map((m) => m[1]!);
   assert.equal(lines.length, 3);
-  assert.match(lines[0]!, /^on <span class="cards-scope-dot[^"]*" style="--hue:20" aria-hidden="true"><\/span><span class="scope-name[^"]*">Oxbow\.gg<\/span>$/u);
+  assert.match(lines[0]!, /^on <span class="cards-scope-dot[^"]*" style="--hue:20" data-slot="pink" aria-hidden="true"><\/span><span class="scope-name[^"]*">Oxbow\.gg<\/span>$/u);
   assert.match(lines[1]!, /style="--hue:200"/u);
   assert.match(lines[2]!, /^<span class="scope-name[^"]*">Everywhere<\/span>$/u, 'a row for every project is not "on" one');
   assert.doesNotMatch(body, /<dt>Project<\/dt>/u, 'never a fact in the label column');

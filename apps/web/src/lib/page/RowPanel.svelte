@@ -35,6 +35,7 @@
   import type { Entry, Fields } from '$lib/record/schema.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import { slotOf } from '$lib/ui/face.ts';
   import { isGlyph } from '$lib/ui/icons.ts';
   import Panel from '$lib/ui/Panel.svelte';
   import RowForm from '$lib/ui/RowForm.svelte';
@@ -297,7 +298,7 @@
             bind:this={markButton}
             type="button"
             class="p-mark"
-            style="--hue:{identity.hue}"
+            style="--slot-ink:var(--cat-{slotOf(identity.hue)});--slot-tint:var(--cat-{slotOf(identity.hue)}-tint)"
             data-retired={identity.retired ? '' : undefined}
             aria-label={MARK_WORDS.change}
             aria-expanded={picking ? 'true' : 'false'}
@@ -307,7 +308,7 @@
             {#if markGlyph}<Icon name={markGlyph} size="l" />{:else if markDrawn}{markDrawn}{/if}
           </button>
         {:else}
-          <span class="p-mark" style="--hue:{identity.hue}" data-retired={identity.retired ? '' : undefined} aria-hidden="true"
+          <span class="p-mark" style="--slot-ink:var(--cat-{slotOf(identity.hue)});--slot-tint:var(--cat-{slotOf(identity.hue)}-tint)" data-retired={identity.retired ? '' : undefined} aria-hidden="true"
             >{#if markGlyph}<Icon name={markGlyph} size="l" />{:else if markDrawn}{markDrawn}{/if}</span
           >
         {/if}
@@ -384,10 +385,12 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--hover);
+    /* THE ROW'S SLOT, AS ITS WELL EVERYWHERE ELSE (domains lane, 2 Nov): the slot's tint and its colour, and not its hue at
+       the mark's lightness on a grey. */
+    background: var(--slot-tint, var(--hover));
     border: 0;
     border-radius: var(--r-ctl);
-    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    color: var(--slot-ink, var(--ink-2));
     font: inherit;
     font-size: var(--fs-body);
     font-weight: 600;
@@ -395,6 +398,7 @@
   }
 
   .p-mark[data-retired] {
+    background: var(--hover);
     color: var(--ink-3);
   }
 
@@ -409,7 +413,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     button.p-mark:hover {
-      background: var(--tile-2);
+      background: color-mix(in oklab, var(--slot-tint, var(--hover)) 90%, var(--ink));
     }
   }
 

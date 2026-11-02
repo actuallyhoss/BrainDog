@@ -231,6 +231,16 @@
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
   }
 
+  /* A PROJECT'S MARK IN A SCOPE CHIP IS ITS SLOT'S COLOUR (domains lane, 2 Nov), the colour its well and its dot wear. */
+  .scope-mark[data-slot='blue'] { color: var(--cat-blue); }
+  .scope-mark[data-slot='violet'] { color: var(--cat-violet); }
+  .scope-mark[data-slot='pink'] { color: var(--cat-pink); }
+  .scope-mark[data-slot='teal'] { color: var(--cat-teal); }
+  .scope-mark[data-slot='sky'] { color: var(--cat-sky); }
+  .scope-mark[data-slot='yellow'] { color: var(--cat-yellow); }
+  .scope-mark[data-slot='lime'] { color: var(--cat-lime); }
+  .scope-mark[data-slot='slate'] { color: var(--cat-slate); }
+
   .scope-name {
     min-inline-size: 0;
     overflow: hidden;

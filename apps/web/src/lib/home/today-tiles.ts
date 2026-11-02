@@ -10,7 +10,7 @@
 import type { Lane } from '../viz/swimlanes.ts';
 import type { WeekDay, WeekItem } from '../viz/weekstrip.ts';
 import { addDays, daySaid, daysBetween, weekdayOf } from '../work/board.ts';
-import { exponentOf, writeAmount } from 'braindog-render';
+import { exponentOf, slotOf, writeAmount } from 'braindog-render';
 
 import { homeCurrency } from '../record/api.ts';
 import type { DayRow, DueRow, Forecast, SessionRow, SinceRow, TaskRow } from '../record/today-live.ts';
@@ -164,9 +164,13 @@ export function sentenceOf({ needYou, late = null, lateThings = 0, lateRead = la
 
 /* ── the week strip ─────────────────────────────────────────────────────── */
 
-/** The colour a project is drawn in: its hue at the theme's mark lightness and chroma, as its face is. */
+/**
+ * The colour a project is drawn in: its slot's fill, as its well, its card and the rail draw it (domains lane, 2 Nov). Its
+ * hue drawn as it was, at the mark's lightness and chroma, made a project at hue 30 a red dot here and pink everywhere
+ * else; the hue only picks the slot (`slotOf`).
+ */
 export const projectColour = (hue: number | null | undefined): string | null =>
-  typeof hue === 'number' && Number.isFinite(hue) ? `oklch(var(--mark-l) var(--mark-c) ${hue})` : null;
+  typeof hue === 'number' && Number.isFinite(hue) ? `var(--cat-${slotOf(hue)}-fill)` : null;
 
 /** A task on no project, and a bill, in greys that read as a small dot: a task a step darker, because it is work. */
 const TASK_GREY = 'color-mix(in srgb, var(--ink) 76%, var(--tile))';

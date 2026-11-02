@@ -34,7 +34,8 @@
   import { cellNamesNothing, glyphPath, glyphWaits } from '../src/inline.ts';
   import { hueOf } from '../src/cards.ts';
   import { pictureSrc } from '../src/gallery.ts';
-  import { hrefFor, trendNewest, written } from '../src/html.ts';
+  import { hrefFor, runSlotStyle, trendNewest, written } from '../src/html.ts';
+  import { slotOf } from '../src/slot.ts';
   import { AMOUNT_SPACE } from '../src/money.ts';
   import { CARD_EDIT_PAUSE, editAfter, type CardEdit } from '../src/card-edit.ts';
   import { mostOf, showAllSaid, type MostKeys } from '../src/most.ts';
@@ -285,7 +286,7 @@
 <!-- WHERE A ROW APPLIES, IN THE CARD'S META LINE (agents F7): "on ● Kiln", the project's dot in its hue and its
      name, as words and not a fact in the label column, where "on" sat 96px from "Kiln". A row for every project says
      "Everywhere". The dot is hidden from a screen reader, which reads "on Kiln". -->
-{#snippet scopeLine(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<p class="cards-scope">{#if everywhere}<span class="scope-name">{said}</span>{:else}{CARDS_ON}{' '}<span class="cards-scope-dot" style={m?.hue === null || m?.hue === undefined ? undefined : `--hue:${m.hue}`} aria-hidden="true"></span><span class="scope-name">{said}</span>{/if}</p>{/snippet}
+{#snippet scopeLine(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<p class="cards-scope">{#if everywhere}<span class="scope-name">{said}</span>{:else}{CARDS_ON}{' '}<span class="cards-scope-dot" style={m?.hue === null || m?.hue === undefined ? undefined : `--hue:${m.hue}`} data-slot={m?.hue === null || m?.hue === undefined ? undefined : slotOf(m.hue)} aria-hidden="true"></span><span class="scope-name">{said}</span>{/if}</p>{/snippet}
 
 {#snippet labelled(i: number)}{#if label(i)}<span class="cards-label">{label(i)}</span>{/if}{/snippet}
 
@@ -299,8 +300,8 @@
     href={hrefFor(opts, `/r/session/${f.seq}`)}
     data-live={f.live}
     aria-label={RUN_OPEN}
-    ><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style="--run-hue:{f.hue}"
-      ><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--tile))"
+    ><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style={runSlotStyle(f.hue)}
+      ><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:var(--run-wash)"
       ></circle>{#if f.live !== 'stopped'}<circle
           class="cards-run-ring"
           cx="18"
@@ -309,7 +310,7 @@
           fill="none"
           stroke-width="2.5"
           stroke-dasharray={f.live === 'quiet' ? '4 3' : undefined}
-          style="stroke:oklch(var(--mark-l) var(--mark-c) var(--run-hue))"
+          style="stroke:var(--run-ring)"
         ></circle>{/if}{#if m}{@const fill = agentMarkFill(m.tone)}<path
           class="cards-run-agent"
           d={m.d}
@@ -374,6 +375,7 @@
         data-intent={r.tone}
         data-quiet={isDimmed(L, r.cells, opts.runs?.[n]) ? '' : undefined}
         style={hue === null ? undefined : `--hue:${hue}`}
+        data-slot={hue === null ? undefined : slotOf(hue)}
       >
         {#if picture}<img class="cards-picture" src={hrefFor(opts, picture)} alt="" loading="lazy" />{/if}
         <div class="cards-head">

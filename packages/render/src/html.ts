@@ -1221,6 +1221,15 @@ function amount(cell: string, o: RenderOptions): string {
 }
 
 /**
+ * A RUN'S FACE WEARS ITS SLOT (domains lane, 2 Nov), as `AgentFace` does: the disc is the slot's tint and the ring its
+ * fill. The run's hue drawn as it was, at the mark's lightness and chroma, was a colour no other mark of that run had.
+ */
+export const runSlotStyle = (hue: number): string => {
+  const s = slotOf(hue);
+  return `--run-wash:var(--cat-${s}-tint);--run-ring:var(--cat-${s}-fill)`;
+};
+
+/**
  * A run's face, mirroring `Cards.svelte`'s `runFace` snippet: the kind's glyph on a disc washed in the
  * run's hue, ringed in that hue while the run is open, solid while it works and dashed once it has gone quiet, and a
  * door to the run's page.
@@ -1229,7 +1238,7 @@ function runFaceHtml(f: RunFace, o: RenderOptions): string {
   const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (o.icon?.(f.glyph) ?? null);
   const ring =
     f.live !== 'stopped'
-      ? `<circle class="cards-run-ring" cx="18" cy="18" r="16.5" fill="none" stroke-width="2.5"${f.live === 'quiet' ? ' stroke-dasharray="4 3"' : ''} style="stroke:oklch(var(--mark-l) var(--mark-c) var(--run-hue))"></circle>`
+      ? `<circle class="cards-run-ring" cx="18" cy="18" r="16.5" fill="none" stroke-width="2.5"${f.live === 'quiet' ? ' stroke-dasharray="4 3"' : ''} style="stroke:var(--run-ring)"></circle>`
       : '';
   /* THE MAKER'S MARK WHERE THE HOST DRAWS ONE, filled in its tone and centred in the disc; else the kind's glyph. */
   const m = runMarkOf(f, o.agentMark);
@@ -1239,7 +1248,7 @@ function runFaceHtml(f: RunFace, o: RenderOptions): string {
     : d
       ? `<path d="${escape(d)}" transform="translate(9 9) scale(0.75)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`
       : '';
-  return `<a class="cards-face cards-run tap" style="background:none" href="${escape(hrefFor(o, `/r/session/${f.seq}`))}" data-live="${f.live}" aria-label="${escape(RUN_OPEN)}"><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style="--run-hue:${f.hue}"><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--tile))"></circle>${ring}${path}</svg></a>`;
+  return `<a class="cards-face cards-run tap" style="background:none" href="${escape(hrefFor(o, `/r/session/${f.seq}`))}" data-live="${f.live}" aria-label="${escape(RUN_OPEN)}"><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style="${runSlotStyle(f.hue)}"><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:var(--run-wash)"></circle>${ring}${path}</svg></a>`;
 }
 
 /**
@@ -1353,7 +1362,7 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
          from 0 to 359 writes no style at all. THE PICTURE LEADS THE CARD where the host serves the file, and is hidden
          from a screen reader because the title under it names the card. */
       const hue = L.hue >= 0 ? hueOf(said(r, L.hue)) : null;
-      const tinted = hue === null ? '' : ` style="--hue:${hue}"`;
+      const tinted = hue === null ? '' : ` style="--hue:${hue}" data-slot="${slotOf(hue)}"`;
       const src = L.picture >= 0 ? pictureSrc(r.cells[L.picture] ?? '', o.file) : null;
       const picture = src ? `<img class="cards-picture" src="${escape(hrefFor(o, src))}" alt="" loading="lazy">` : '';
       return `<li class="cards-item"${leading}${toneAttrs(r.tone)}${quiet}${tinted}>${picture}<div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${reply}${helpers}${middle}${facts}${next}${who}</li>`;

@@ -118,7 +118,7 @@ test('A CARD\'S HUE IS A TURN FROM 0 TO 359 IN DIGITS, and the two roles are rol
   const L = cardLayout(['title', 'hue', 'picture']);
   assert.deepEqual([L.hue, L.picture], [1, 2]);
   const html = toHTML(parse('```cards\ntitle | hue\nKiln | 120\nSite | 400\n```', { page: true }));
-  assert.match(html, /<li class="cards-item" style="--hue:120">/u);
+  assert.match(html, /<li class="cards-item" style="--hue:120" data-slot="lime">/u);
   assert.match(html, /<li class="cards-item"><div class="cards-head"><h3 class="cards-title">Site/u, 'no style where the cell is no turn');
   assert.doesNotMatch(html, />120</u, 'a hue is never printed');
 });
