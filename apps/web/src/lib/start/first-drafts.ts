@@ -301,8 +301,19 @@ export function peopleAround(said: string): { names: string[]; detail: string } 
 
 /** The to-do sign-up draws from "invoices" kept first (`todosFor` in `chat.ts`): "Send Fenwick's invoice". */
 const INVOICE_TODO = /^send (?:(.+?)'s invoice|this month's invoices)\.?$/iu;
-/** How long an invoice drafted on the first day is given to be paid: the usual thirty days. */
+/** How long an invoice to one client drafted on the first day is given to be paid: the usual thirty days. */
 const INVOICE_DAYS = 30;
+
+/**
+ * THE LAST DAY OF THE MONTH `today` FALLS IN (leftovers9). A month's bills, a month's invoices or sponsor deals, and a
+ * payment to people are the month's: rent, the phone and pay all fall at its end, so "due 30 Nov" reads as the bill
+ * does, where thirty days from the 2nd said 2 Dec, a day into the next month. One invoice to one client keeps the
+ * usual thirty days, which is what its terms say.
+ */
+function monthEnd(today: string): string {
+  const d = new Date(`${today}T00:00:00Z`);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+}
 
 /** The to-dos a creator's "sponsor deals, paying editors" draws (`todosFor`): "Log this month's sponsor deals", "Pay Kai and Rosa". */
 const SPONSOR_TODO = /^log this month's sponsor deals\.?$/iu;
@@ -315,26 +326,27 @@ const PAY_TODO = /^pay (.+?)\.?$/iu;
  * (`INVOICE_TODO`), and since onboarding7 a creator's sponsor deals (money in) and the editors they pay (money out),
  * which drew nothing on a Today with Money and no Tasks; since onboarding11 a household's bills (money out).
  */
-function moneyTodo(said: string): { title: string; direction: 'owed_to_me' | 'owed_by_me' } | null {
+function moneyTodo(said: string): { title: string; direction: 'owed_to_me' | 'owed_by_me'; monthEnd: boolean } | null {
   const s = said.trim();
   const invoice = INVOICE_TODO.exec(s);
   if (invoice !== null) {
     const client = invoice[1]?.trim() ?? '';
-    return { title: client === '' ? "This month's invoices" : `Invoice to ${client}`, direction: 'owed_to_me' };
+    return client === '' ? { title: "This month's invoices", direction: 'owed_to_me', monthEnd: true } : { title: `Invoice to ${client}`, direction: 'owed_to_me', monthEnd: false };
   }
-  if (SPONSOR_TODO.test(s)) return { title: "This month's sponsor deals", direction: 'owed_to_me' };
+  if (SPONSOR_TODO.test(s)) return { title: "This month's sponsor deals", direction: 'owed_to_me', monthEnd: true };
   /* A HOUSEHOLD'S BILLS, MONEY OUT (onboarding11: Marta kept "Bills" first, was drawn "Write down this month's bills",
      and her Today, with Money and no Tasks, offered nothing; Tell reads that line as nothing without a Tasks list). */
-  if (BILLS_TODO.test(s)) return { title: "This month's bills", direction: 'owed_by_me' };
+  if (BILLS_TODO.test(s)) return { title: "This month's bills", direction: 'owed_by_me', monthEnd: true };
   const pay = PAY_TODO.exec(s);
-  if (pay !== null) return { title: `Pay ${pay[1]!.trim()}`, direction: 'owed_by_me' };
+  if (pay !== null) return { title: `Pay ${pay[1]!.trim()}`, direction: 'owed_by_me', monthEnd: true };
   return null;
 }
 
 /**
  * THE FIRST INVOICE, IN MONEY (2 Nov, a walk: an agency that keeps "clients, invoices" first opened a Today with nothing,
  * since a small business has no Tasks to keep "Send Northwind's invoice" in). Where the BrainDog keeps bills and invoices
- * and no tasks, that to-do is an invoice to be paid to them: money in, open, due in thirty days, asking only how much.
+ * and no tasks, that to-do is an invoice to be paid to them: money in, open, due in thirty days (a month's bills, invoices
+ * and payments at the month's end, `monthEnd`), asking only how much.
  * Where there are tasks, it stays a task, as it was.
  */
 function invoiceDraft(said: string, lists: readonly TellList[], from: { today?: string; currency?: string | null }): FirstDraft | null {
@@ -347,7 +359,7 @@ function invoiceDraft(said: string, lists: readonly TellList[], from: { today?: 
   const title = m.title;
   const due = new Date(`${from.today}T00:00:00Z`);
   due.setUTCDate(due.getUTCDate() + INVOICE_DAYS);
-  const day = due.toISOString().slice(0, 10);
+  const day = m.monthEnd ? monthEnd(from.today) : due.toISOString().slice(0, 10);
   return {
     key: `${owed.id}:${plain(title)}`,
     rows: [{ register: owed.id, fields: { what: title, direction: m.direction, state: 'open', due: day } }],
@@ -355,7 +367,7 @@ function invoiceDraft(said: string, lists: readonly TellList[], from: { today?: 
     list: owed.name,
     titleField: 'what',
     title,
-    detail: `${m.direction === 'owed_to_me' ? 'money in' : 'money out'}, due in ${INVOICE_DAYS} days, in ${owed.name}`,
+    detail: `${m.direction === 'owed_to_me' ? 'money in' : 'money out'}, ${m.monthEnd ? 'due at the end of the month' : `due in ${INVOICE_DAYS} days`}, in ${owed.name}`,
     amount: null,
     day,
     by: 'rules',
