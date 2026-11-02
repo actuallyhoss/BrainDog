@@ -299,8 +299,8 @@
   const USAGE = 'Usage';
   const foot = $derived<SideLink[]>([
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' }] : []),
-    { href: '/packs', label: copy.packs, icon: 'packs' },
-    { href: '/usage', label: USAGE, icon: 'observe' },
+    /* ADD-ONS AND USAGE ARE THE OWNER'S (collab pass, 2 Nov): a colleague can install nothing and pays for nothing. */
+    ...(data.me.owner ? [{ href: '/packs', label: copy.packs, icon: 'packs' } as SideLink, { href: '/usage', label: USAGE, icon: 'observe' } as SideLink] : []),
     { href: '/settings', label: copy.settings, icon: 'settings' },
   ]);
 

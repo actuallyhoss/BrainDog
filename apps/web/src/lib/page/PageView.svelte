@@ -1115,7 +1115,9 @@
         <!-- ONE SHARE ON AN ACCOUNT (audit of 30 October, 19): its first choice is sharing the account, the sheet
              `AccountShare.svelte` draws, where Share and "Share this account" stood side by side. -->
         {@const account = accountPage && sharable ? about : null}
-        {#if only}<only.ShareMenu {slug} project={projectPage} people={account ? () => (accountAsk += 1) : sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={account ? copy.accountShareOpen : copy.shareWithPeopleOpen} />{/if}
+        <!-- ONLY TO SOMEBODY WHO MAY SHARE (collab pass, 2 Nov): a contractor shared one project was offered Share, and every
+             choice in it refused her at the press. -->
+        {#if only && sharable}<only.ShareMenu {slug} project={projectPage} people={account ? () => (accountAsk += 1) : sharing && sharable ? () => (sharingOpen = true) : undefined} peopleLabel={account ? copy.accountShareOpen : copy.shareWithPeopleOpen} />{/if}
         {#if sharing && sharable && !account && only}<only.ShareLazy bind:open={sharingOpen} subject={sharing} />{/if}
         {#if account}{#await import('$lib/money/AccountShare.svelte') then { default: AccountShare }}<AccountShare part="sheet" ask={accountAsk} seq={account.seq} name={account.title} />{/await}{/if}
         <ChangePage

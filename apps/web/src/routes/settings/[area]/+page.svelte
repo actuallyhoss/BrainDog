@@ -132,7 +132,20 @@
   /** The record could not draw it (a refused boot, a host without `previewPage`), so the chooser's list stands in. */
   let indexDown = $state(false);
   /** The groups the chooser draws: the house order until a declared index is read, then that index's. */
-  let groups = $state<readonly AreaGroup[]>(DEFAULT_GROUPS);
+  let declaredGroups = $state<readonly AreaGroup[]>(DEFAULT_GROUPS);
+  /* A COLLEAGUE'S INDEX LEAVES OUT WHAT ONLY AN OWNER DOES (collab pass, 2 Nov): a contractor shared one project was shown
+     Keychain, What comes in, Add-ons, Billing, Usage, Tidy up, Backups, Export and Delete, each a page of refusals.
+     Their addresses still open, so a link still lands, and the record still refuses every write there. */
+  const OWNERS_AREAS: ReadonlySet<string> = new Set(['ingest', 'addons', 'billing', 'tidy', 'backups', 'export', 'delete']);
+  const OWNERS_PLACES: ReadonlySet<string> = new Set(['/keychain', '/usage', '/p/health']);
+  const owner = $derived(Boolean((shell.me as { owner?: boolean }).owner) || shell.me.level === 'owner');
+  const groups = $derived<readonly AreaGroup[]>(
+    owner
+      ? declaredGroups
+      : declaredGroups
+          .map((g) => ({ ...g, areas: g.areas.filter((a) => !OWNERS_AREAS.has(a.id)), ...(g.outside ? { outside: g.outside.filter((o) => !OWNERS_PLACES.has(o.href)) } : {}) }))
+          .filter((g) => g.areas.length > 0),
+  );
   let indexAsked = false;
 
   async function readIndex(): Promise<void> {
@@ -159,7 +172,7 @@
     if (out?.from === 'live') {
       indexGot = out;
       indexDown = false;
-      groups = groupsOf(out.page.blocks);
+      declaredGroups = groupsOf(out.page.blocks);
     } else indexDown = true;
   }
 
@@ -517,7 +530,7 @@
   <!-- THE INDEX, DRAWN BY THE ONE READER: Home's body mode, with no head of its own under this one. Where the record
        cannot draw it, the chooser's list is the index, so nobody is left on a page of nothing. -->
   <div class="settings-index">
-    {#if indexDown}
+    {#if indexDown || !owner}
       <div class="settings-place" data-index=""><SettingsIndex {groups} /></div>
     {:else}
       <PageView slug={SETTINGS_PAGE} got={indexGot} mode="home" reread={readIndex} />

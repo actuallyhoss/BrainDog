@@ -24,6 +24,7 @@
   TWO WAYS IN, as `HandSheet.svelte` has: a menu binds `open`, and a header asks for `trigger`, which draws the button.
 -->
 <script lang="ts">
+  import { RUNG_LINES } from './roles.ts';
   import { page } from '$app/state';
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
@@ -431,6 +432,8 @@
                 >
               {/each}
             </Segmented>
+            <!-- WHAT THE RUNG LETS THEM DO, one line under it (collab pass, 2 Nov), in the words Who can do what uses. -->
+            <p class="share-rung-line">{RUNG_LINES[s.can] ?? ''}</p>
           </div>
         </div>
 
@@ -882,5 +885,12 @@
     .share-select {
       min-block-size: var(--tap);
     }
+  }
+
+  .share-rung-line {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--fs-meta);
+    color: var(--ink-2);
+    text-wrap: pretty;
   }
 </style>
