@@ -3419,7 +3419,7 @@
           onmoved={refresh}
         />
       {:else}
-      <div class="list-tools" data-uncounted={unsaid ? '' : undefined} data-tight={toolsTight ? '' : undefined} {@attach fitTools}>
+      <div class="list-tools" data-uncounted={unsaid ? '' : undefined} data-tight={toolsTight ? '' : undefined} data-tools-bare={bare && !siftable ? '' : undefined} {@attach fitTools}>
         <!-- THE SEARCH AND THE FILTERS, which draw themselves only while there is something to sift, and the phone's
              filter sheet behind its one button. Which filters are on is the address, read and written here. -->
         <ChipsBar
@@ -3783,6 +3783,22 @@
   .list-tools > :global(.bar) {
     flex: 1 1 auto;
     min-inline-size: 0;
+  }
+
+  /* A LIST THAT HOLDS NOTHING HAS ONLY ITS "⋯" IN ITS HEAD (its Add is the empty state's own), and that row was a band
+     of air over the empty state, most at 390 (empty states, 2 Nov). The "⋯" stands in the tile's corner instead, where
+     the head's end would be, and the empty state starts at the tile's top. */
+  .list-tools[data-tools-bare] {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    z-index: 1;
+    padding-block-start: inherit;
+    padding-inline-end: inherit;
+  }
+
+  :global(.list-tile:has(> [data-tools-bare])) {
+    position: relative;
   }
 
   .list-views {
