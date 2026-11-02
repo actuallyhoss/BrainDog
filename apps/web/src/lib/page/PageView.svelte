@@ -706,6 +706,18 @@
     return pageOfLedger(live.page.page.requires, ledgerHere) ? '/add/statement' : null;
   });
   const importItem = $derived(importHref ? [{ label: 'Import a statement', icon: 'upload' as const, href: importHref }] : []);
+  /* ── People's own: Import contacts (2 Nov, a walk: a contacts file had no door) ──────────────────
+     A PAGE THAT DRAWS PEOPLE offers it in its ⋯ menu, to whoever may add to People; People's home with nobody in it but
+     the owner says it under the head too, as the one thing to do there first. */
+  const peopleHere = $derived(
+    mode === 'page' && !!live && !!shell?.me && may(shell, 'append', 'people') && (live.page.page.requires ?? []).some((r) => r.replace(/^register\./u, '') === 'people'),
+  );
+  const contactsItem = $derived(peopleHere ? [{ label: 'Import contacts', icon: 'upload' as const, href: '/add/contacts' }] : []);
+  const peopleEmpty = $derived.by(() => {
+    if (!peopleHere || !live || live.page.page.identity || showSource || !headsSection(shell?.nav ?? [], slug)) return false;
+    const count = (id: string): number => (shell?.index?.registers ?? []).find((r) => r.id === id)?.count ?? 0;
+    return count('people') <= 1 && count('organisations') === 0;
+  });
   /* MONEY'S HOME OPENS ON ITS SETUP while there is no home currency or no account (`setup.ts`): the first page of its
      section, drawing the ledger, for the owner of a record that answered. */
   const setupFacts = $derived.by((): SetupFacts | null => {
@@ -1169,6 +1181,7 @@
                 ? [{ label: words.showData, icon: 'rows' as const, href: dataHref }]
                 : []),
             ...importItem,
+            ...contactsItem,
           ]}
         />
       {/if}
@@ -1282,6 +1295,9 @@
         {/await}
       {/if}
     {/snippet}
+    {#if peopleEmpty}
+      <p class="people-import">Have a contacts file from your phone, Google or Outlook? <a href={at('/add/contacts')}>Import contacts</a></p>
+    {/if}
     <div class="body-wrap" data-project={projectPage ? '' : undefined} style={projectStyle}>
     {#snippet laidOut(blocks: LiveBlock[], placed: ((i: number) => { key: string; area: string; size: string } | null) | null, inside: import('svelte').Snippet<[number]> | null)}
       <PageBody
@@ -1440,6 +1456,20 @@
   /* THE PAGE'S BODY, which on a project's page carries the project's colour down to every chart (`projectStyle`). */
   .body-wrap {
     display: contents;
+  }
+
+  /* PEOPLE WITH NOBODY BUT YOU: the one line that says where a contacts file goes, a plain link in ink. */
+  .people-import {
+    margin: 0;
+    padding-inline: var(--gutter);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+  }
+
+  .people-import a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   /* MORE ABOUT, FOLDED (proj F1): one tile, its heading, a 13px line naming what is inside, and Show at the right. */

@@ -275,3 +275,16 @@ export const MONEY_IMPORT: Command = {
   aliases: ['csv', 'bank statement', 'import transactions'],
   when: (live) => live.ledger === true,
 };
+
+/**
+ * IMPORT CONTACTS: a contacts CSV or vCard into People and their organisations, on its own screen (`routes/add/contacts`).
+ * Offered wherever People can be added to.
+ */
+export const PEOPLE_IMPORT: Command = {
+  id: 'c-people-import',
+  title: 'Import contacts',
+  href: '/add/contacts',
+  group: copy.commands,
+  icon: 'upload',
+  aliases: ['contacts', 'vcard', 'vcf', 'address book', 'import people'],
+};
