@@ -47,6 +47,13 @@
     text-size-adjust: 100%;
   }
 
+  /* NO WORD LEFT ALONE ON A PARAGRAPH'S LAST LINE (live check of 2 Nov): a sentence, a note or a heading that wraps takes
+     a word down with its last one, so "glance.", "Ledger." and "Accountants." never stand alone. Zero weight, so any
+     component that sets its own wrap (a balanced head, a figure that must not move) keeps it. */
+  :where(p, h1, h2, h3, h4, dd, figcaption, blockquote) {
+    text-wrap: pretty;
+  }
+
   /* A LINK IN THE RECORD IS INK WITH A QUIET UNDERLINE. Red is kept for what needs him, the one primary action
      and what is late, each of which says so on its own class; an ordinary link ("See what it changes", "1 more",
      "Show all") read as one more alarm. The shared base keeps red for the marketing site's documents. */
