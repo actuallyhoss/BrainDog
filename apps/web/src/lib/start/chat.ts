@@ -332,6 +332,8 @@ export function settled(topic: Topic, w: Where): boolean {
     case 'closest':
       return w.placed;
     case 'work':
+      /* A SHOP THAT SAID WHAT IT SELLS ("We sell candles and cards") is not asked "What do you sell?" (onboarding8). */
+      if (kindOf(s, w.usecase) === 'shop' && /\b(?:we|i)\s+(?:sell|make|stock)\s+\p{L}/iu.test(s)) return true;
       return NAMED_WORK.test(s.replace(w.name ?? '\u0000', '')) || (w.proposal?.rows.length ?? 0) >= 2;
     case 'money':
       return MONEY_WORDS.test(s);
@@ -539,6 +541,9 @@ const WORK_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
   shop: ['New products', 'A sale', 'Restocking'],
 };
 
+/** A question about who works with them or shares their money: "Who else works with you at the agency?", "Who else is on your team?". */
+const WHO_WITH = /\bwho\b.*\b(?:with you|works?|team|helps?|shares?|household|building)\b/iu;
+
 /** The model's question, held to what the screen can say and to a topic not yet asked, or `null`. */
 function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): ChatAsk | null {
   if (!m) return null;
@@ -571,17 +576,25 @@ function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): 
   /* WHO ELSE, WITH THE RULES' TAPS FOR THEIR KIND (onboarding8: the model offered an agency "New team member" and "Another
      client"): the model's words for the question, and answers they could really tap (`peopleTaps`). Where the rules ask
      somebody by name (a co-founder, the editors), that question stands instead. */
+  /* AND ONLY A QUESTION ABOUT WHO WORKS OR SHARES WITH THEM KEEPS ITS WORDS (onboarding8: the shop was asked "Who are
+     the suppliers you buy from?" over taps about who works in the shop); any other is the rules' own. */
   if (topic === 'people') {
     const r = rulesAsk('people', w);
     if (r === null || r.role !== undefined) return r;
-    return { ...r, question, by: 'model' };
+    return WHO_WITH.test(question) ? { ...r, question, by: 'model' } : r;
   }
+  /* MONEY IS THE RULES' QUESTION, ITS WORDS AND ITS TAPS (onboarding8: Leo was asked "How do you handle money for
+     Tidepool?" with "subscriptions", "revenue" and "expenses"): what comes in and goes out, in their kind's words, each
+     tap said back as a sentence. */
+  if (topic === 'money') return rulesAsk('money', w);
   /* NO TAP RE-OFFERS A NAME ALREADY SAID AS SOMETHING ELSE (`namedIn`): a client is not offered as a project. */
   const named = namedIn(w);
   const choices: Choice[] = [];
   for (const c of m.choices) {
     const v = c.trim();
-    if (fits(v, CHOICE_MOST) && !named.has(v.toLowerCase()) && !INSIDE_WORDS.test(v) && !choices.some((x) => x.value === v)) choices.push(tap(v));
+    /* A TAP STARTS WITH A CAPITAL, as every other button does ("Subscriptions", never "subscriptions"). */
+    const t = v.charAt(0).toLocaleUpperCase() + v.slice(1);
+    if (fits(t, CHOICE_MOST) && !named.has(t.toLowerCase()) && !INSIDE_WORDS.test(t) && !choices.some((x) => x.value === t)) choices.push(tap(t));
   }
   /* WHERE THAT LEFT FEWER THAN TWO: plain examples for their work, or none (what first is the rules' own, above). */
   if (choices.length < 2 && m.choices.length > 0) {
@@ -602,6 +615,8 @@ function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): 
 export function nextAsk(w: Where): ChatAsk | null {
   if (w.turns.length >= ASKS_MOST) return null;
   const asked = askedOf(w.turns);
+  /* WHAT FIRST ENDS IT (onboarding8: Priya was asked who she works with after what to keep first, and Omar his name). */
+  if (asked.has('first')) return null;
   const open = ORDER.filter((t) => !asked.has(t) && !settled(t, w));
   /* THE LAST QUESTION LEFT IS "WHAT FIRST", so the conversation ends on what it will keep. */
   const room = ASKS_MOST - w.turns.length;
@@ -626,7 +641,7 @@ export function nextAsk(w: Where): ChatAsk | null {
   const m = modelAsk(w.model, w, asked);
   /* WHAT FIRST IS THE LAST QUESTION, FROM THE MODEL TOO (onboarding7: Marta was asked it second, and the turns ran out
      before anybody asked who shares the money with her). While another topic is open and there is room, it waits. */
-  const early = m !== null && m.topic === 'first' && only === null && open.some((t) => !KEPT_FOR_LAST.includes(t));
+  const early = m !== null && m.topic === 'first' && (open.includes('name') || (only === null && open.some((t) => !KEPT_FOR_LAST.includes(t))));
   if (m !== null && !early && (only === null || only.includes(m.topic))) return m;
   for (const t of open) {
     if (only !== null && !only.includes(t)) continue;
@@ -680,9 +695,12 @@ export function saidOf(ask: ChatAsk, answer: string): string {
   const tappedChoice = ask.choices.find((c) => c.label.toLocaleLowerCase() === a.toLocaleLowerCase());
   const tapped = tappedChoice !== undefined;
   if (tappedChoice?.say !== undefined) return tappedChoice.say;
-  /* WHO, SAID SHORT ("My partner Sam") IS SAID AS WHO THEY WORK OR SHARE WITH, not left as a fragment of a sentence. */
-  const shortWho = ask.topic === 'people' && plain(a).split(' ').length < 5 && /^(?:my|our)\b/iu.test(a);
-  if (ask.topic === 'what' || (whole(a) && !tapped && !shortWho)) return sentence(a);
+  /* WHO, SAID WITHOUT A SUBJECT ("My partner Sam", "Two part-time staff, Ellie and Tom") IS SAID AS WHO THEY WORK OR
+     SHARE WITH, not left as a fragment; "My team does most of the work" is a sentence already. */
+  const shortWho = ask.topic === 'people' && (ask.role !== undefined || plain(a).split(' ').length < 5 || !/^(?:my|our)\b/iu.test(a)) && !/^(?:i|i['’]m|we|we['’]re|it|it['’]s|they|there)\b/iu.test(a);
+  /* WHAT THEY WORK ON, SAID AS A THING ("A website rebuild for Northwind and …") is what they are working on. */
+  const aThing = ask.topic === 'work' && /^(?:a|an|the)\s/iu.test(a);
+  if (ask.topic === 'what' || (whole(a) && !tapped && !shortWho && !aThing)) return sentence(a);
   const low = a.charAt(0).toLowerCase() + a.slice(1);
   switch (ask.topic) {
     case 'work':
@@ -691,6 +709,11 @@ export function saidOf(ask: ChatAsk, answer: string): string {
     case 'money':
       return sentence(a);
     case 'people':
+      /* "MY EDITORS KAI AND ROSA" ANSWERS "What are your editors' names?" with the names: the role said before them is off. */
+      if (ask.role !== undefined) {
+        const bare = a.replace(new RegExp(`^(?:(?:my|our)\\s+)?${ask.role.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?:\\s+(?:are|is))?\\s+`, 'iu'), '');
+        if (bare !== a && bare !== '') return saidOf(ask, bare);
+      }
       /* THE ONE THEY WORK WITH, BY NAME: "Dan" is "My co-founder is Dan.", which first Today drafts in People. */
       if (ask.role !== undefined && BARE_NAME.test(a) && !/^just me$/iu.test(a) && !/s$/u.test(ask.role)) return `My ${ask.role} is ${capital(a)}.`;
       /* THE EDITORS, BY NAME: "Kai and Rosa" is "My editors are Kai and Rosa.", which the rules keep as contractors. */

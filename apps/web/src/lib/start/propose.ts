@@ -1271,7 +1271,8 @@ const CLIENT_LIST = `${CLIENT_NAME}(?:(?:\\s*,\\s*(?:and\\s+)?|\\s+and\\s+|\\s+&
 /* "three clients, Fenwick, Brightside and Acme", "clients like Fenwick and Acme", "my clients are Fenwick and Acme". */
 const AFTER_CLIENTS = new RegExp(String.raw`\b(?:[Cc]lients?|[Cc]ustomers?)\b(?:\s+(?:are|is|include|including|like|called|named|such as))?\s*[,:]?\s+(${CLIENT_LIST})`, 'gu');
 /* "a checkout redesign for Fenwick", "a brand refresh for Kettle & Co": work done for somebody named. */
-const WORK_FOR = new RegExp(String.raw`\b(?:redesign|rebuild|refresh|website|site|app|campaign|brand(?:ing)?|audit|logo|shoot|project|retainer|work)\s+for\s+(${CLIENT_NAME})`, 'gu');
+/* And a contract with somebody named (onboarding8, a consultant: "one big contract with Halden Group"). */
+const WORK_FOR = new RegExp(String.raw`\b(?:(?:redesign|rebuild|refresh|website|site|app|campaign|brand(?:ing)?|audit|logo|shoot|project|retainer|work|rollout)\s+for|(?:contract|retainer|engagement)\s+with)\s+(${CLIENT_NAME})`, 'gu');
 /* Words with a capital that name no client: the days and months, and "I". */
 const NOT_CLIENT = /^(?:i|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december)$/iu;
 

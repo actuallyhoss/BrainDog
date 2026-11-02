@@ -376,6 +376,9 @@ export function draftsFromTold(
       continue;
     }
     if (ABOUT_ME.test(said) && !DOING.test(said)) continue;
+    /* WHAT THEY KEEP FIRST IS NO THING TO DO (onboarding8: the shop's Today offered "To keep track of stock and
+       suppliers"): its to-dos are drawn from it already (`todosFor`). */
+    if (/^first\s+i\s+want\s+to\s+keep\s+track\s+of\b/iu.test(said.trim())) continue;
     const rows = told.rows;
     /* ONE FIELD STILL NEEDED IN THE WHOLE SENTENCE IS ASKED ON THE CARD; MORE IS NO DRAFT. */
     if (rows.length === 0 || rows.reduce((n, r) => n + r.missing.length, 0) > 1) continue;
