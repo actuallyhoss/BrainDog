@@ -685,6 +685,12 @@
       align-self: start;
     }
 
+    /* WITH NOTHING WAITING, HANDLED IS THE FIRST ROW (2 Nov): held at the second, it went under "Decided lately", so the
+       fold of old answers read before what BrainDog did today. */
+    .body[data-board] :global(.page:not([data-narrow]):not(:has(> .block-slot:is([data-key='decide-money'], [data-key='decide-quick'], [data-key='decide-lead']))) > .page-strip[data-opens]) {
+      grid-row: 1;
+    }
+
     /* THE LEAD TILE IS THE BOARD'S FIRST ROW, ACROSS IT, and the groups and Handled are the row under it. */
     .body[data-board] :global(.page:not([data-narrow]) .block-slot[data-key='decide-lead']) {
       grid-row: 1;
