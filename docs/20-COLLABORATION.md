@@ -126,6 +126,20 @@ than a filtered read.
   `counts.inbox` goes to an owner and to a token an owner gave the `inbox` reach, as `inbox` itself
   does, and is `null` for anybody else.
 
+**What a person reads (2 Nov).** The app says the five levels in one set of words, everywhere access is given:
+Owner, Can decide (an Admin, where a sentence needs a noun), Can edit, Can add and Can view, each with one line of what
+it lets them do and one of what it does not (`apps/web/src/lib/sharing/roles.ts`). A list's own level uses the same
+three words, and a share's rungs (View, Comment, Edit, Manage) each carry a line too. Settings > Who can do what
+(`/settings/roles`) lays the roles side by side, thirteen things by five roles, and a colleague's first Today says once
+the role they joined with. The words describe the ladder; they decide nothing.
+
+**Handing ownership over (2 Nov).** An owner presses Make owner on a colleague's row. One confirmed write, with the
+app's reauth when the sign-in is stale and the session's proof time checked on the server: the record's `handOver`
+makes the colleague an owner and the caller Can decide, in one transaction, with two access events saying why. It is
+in `NEVER_BYPASS`, so no token reaches it, switch on or off. The old owner's tokens drop to Can decide at once, since a
+token's level follows its person, and the links he made stop opening. Who pays (the Directory's `dir_record.owner`)
+does not move; that is the owner's call still to make.
+
 **`decide` is a level none of the four surveyed products has.** Verified across Notion's six
 levels, Airtable's five, Retool's three and Linear's role set: not one has a permission meaning
 *"this person settles questions."* That is one line in the pitch, because the fourth verb *is* the
@@ -199,10 +213,10 @@ the job named beside it.
 | Question | Taken | Held by | If it is reversed |
 |---|---|---|---|
 | A project's lanes: four or five | **Four**: Building, Earning, Parked, Finished (stored `building`, `earning`, `parked`, `retired`) | `packages/seed/src/modules/portfolio.ts:170-178`, the `lane` field; the projects in play are filtered on two of them at `packages/seed/src/usecases/personal.ts:590`; held by `packages/seed/test/portfolio-lanes.test.ts` | Five (Earning, Shipping, Exploring, Maintain, Retired): the lane field gains `exploring` and `maintain`, shows `building` as Shipping and `retired` as Retired, keeps the stored values, and needs a ruling on where `parked` goes, since the five do not name it; Portfolio's version moves |
-| Share links in production | **Off.** Opening sign-up to strangers (§42) does not switch them on | The four routes of `packages/host/src/routes/shares.ts:17-22` are in no table (`packages/host/src/routes/index.ts:16-31`), so no host serves them | On: a later change adds the one import line and the one spread line |
+| Share links in production | **Taken Off on 8 October, and since switched on.** The routes of `packages/host/src/routes/shares.ts` are in the table (`SHARES` in `packages/host/src/routes/index.ts`), and a host can still switch read-only links off, where Share says so | `packages/host/src/routes/index.ts` | Off: the spread line comes out again |
 | Who accepts a suggested change | **Any member who may decide accepts a change to a list or a page. Only an owner accepts an add-on, a setting, an arrangement, or anything that runs unattended** | `packages/record/src/index.ts:9349-9369`, the accept path of `decide`: `pack`, `settings` and `arrange` are held to the owner, then `runsUnattended`; held by `packages/record/test/accept-unattended.test.ts` and `accept-rule-level.test.ts` | Owner only: `change` joins the kinds held to the owner, and `accept-unattended.test.ts` gains the case |
 | Whose reach an automation runs with | **Its maker's, as they are now.** Its maker is whoever put its live version in; while they are an owner it runs as the record does, held to a colleague's lens once they are not, and stopped, saying why, once they reach nothing | `makerOf` in `packages/kernel/src/index.ts`, read at every firing and every turn of a run; held by `packages/record/test/automation-maker-lens.test.ts` | The owner's reach always: `makerOf` answers `null` for everybody |
-| The levels an invitation offers on one list | **Reads, Adds only and Edits. Never Decides or Owner** | `LIST_LEVELS` at `apps/web/src/lib/record/may.ts:38`; the record does not honour either on one list (above, *A level on one list*) | Offering Decides on one list is a new requirement, since the record would have to honour it first |
+| The levels an invitation offers on one list | **Can view, Can add and Can edit. Never Can decide or Owner** | `LIST_LEVELS` at `apps/web/src/lib/record/may.ts:38`; the record does not honour either on one list (above, *A level on one list*) | Offering Decides on one list is a new requirement, since the record would have to honour it first |
 | A colleague who cannot read People | **Reads "Someone on this record"** for every other member | `namesFor` at `packages/record/src/index.ts:6388-6394`: the owner, and a member who may read People while the People module is on, are told names; nobody else is | Names for everyone: `namesFor` admits every member |
 | Services on a founder's record | **Installed only when the founder's words point at it** (domains, hosting, renewals), **otherwise offered at its first renewal**, because a first run must be "not overwhelming" | Not yet: a founder's use case installs Estate, and with it Services, on day 0 today (`modules` at `packages/seed/src/usecases/founder.ts:275`). A later change builds the default | Every founder on day 0: the default keeps Services among what a founder's use case cannot stand without |
 
@@ -217,7 +231,7 @@ the default on every record until it is reversed.
 |---|---|---|
 | **0 · A collaborator's own agent** | they write through an agent token of their own. Any member mints one from Settings > Agents in a sign-in proved in the last fifteen minutes (`createOwnToken`, then `ownTokens` and `revokeOwnToken`, all DATA, a person in a browser and never a token); it writes as them and is capped by their own levels at every call, so an "Adds only" colleague, who cannot open the app, adds rows through MCP. She makes her agent's key in the app, on the one screen Accept opens for her (Settings, Agents), and her first read says so: the record's refusal names that screen, and Home draws its one button under the sentence. The owner's `listTokens` names whose each token is, and `revokeToken` ends any of them | ~0d |
 | **1 · Shared read-only links** | a signed token per page. **Every shared page is also a landing page** | ~1d |
-| **2 · A second person with a login** | largely absorbed by Phase A's auth-for-strangers work — the invitation flow is [12-SECURITY](12-SECURITY.md) §3, and it is two methods: `invite({ email, levels })`, ADMIN, the owner mints the link; `acceptInvite`, INTERNAL, the host calls at acceptance with the Directory's verified person, and that writes the `member` rows and their `access.grant` events ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.6, §5.11). *An earlier draft had one method doing both* | ~4d |
+| **2 · A second person with a login** | largely absorbed by Phase A's auth-for-strangers work — the invitation flow is [12-SECURITY](12-SECURITY.md) §3, and it is two methods: `invite({ email, levels })`, ADMIN, the owner mints the link; `acceptInvite`, INTERNAL, the host calls at acceptance with the Directory's verified person, and that writes the `member` rows and their `access.grant` events ([45-SPEC-RECORD](45-SPEC-RECORD.md) §5.6, §5.11). *An earlier draft had one method doing both.* Since 2 Nov the host mails the invitation at once (`POST /auth/invite` with `send: true`, a signed-in session required), naming the inviter and the role, and for an address new to the host the proof rides in the same mail, so one mail and one Join is enough. Copy link stays. A join's side effects are signed by the record (`system`), never by the joiner | ~4d |
 | **3 · Collaborate on decisions** | comments, and the gate itself | ~3d |
 | 4 · Real-time co-editing | **not this year.** ~15–20d plus permanent maintenance | — |
 
@@ -452,8 +466,14 @@ most `THREAD_MOST` comments and replies. A search reads comments among the newes
 older comment is still read whole in its thread. The kernel's half is `packages/kernel/src/api/comments.ts`;
 the record's is `packages/record/src/methods/comments.ts`.
 
-Mentions and notifications between colleagues are not built; the paragraph below is the design
-they will follow.
+**Mentions (built 2 Nov).** A comment that names somebody with @, by whole or first name, on a row, a question or
+a decision (written to its question's thread), tells that person: a line under For you in their bell, and a ring on
+their phone through `kernel.tellColleague` (§7). The name match is one function for rows and questions (`namedIn` in
+`packages/record/src/methods/comments.ts`). Nobody is told about a thing they cannot see: each named person's own
+context is made from `kernel.access(person)`, and the row's lens or the question's sight check must answer for them, or
+nothing rings. The writer is never told about their own comment. A tap on a question's ring opens `/decide/<id>/thread`.
+Subscriptions are not built: a mention tells the person once, and enrols them in nothing. The paragraph below is the
+design subscriptions will follow.
 
 **Subscription is thread-level or record-level, and the distinction is precise.** From Linear: an
 @mention **in the body** subscribes you to the record; an @mention **in a comment thread**
@@ -473,6 +493,21 @@ What is worth building, and what is theatre.
 | An **activity feed** scoped to what your ceiling permits | avatar stacks on a business record |
 | **Read marks on decisions** — who has seen the thing that binds them | "currently viewing" — and the mark itself is a column on `member`, `seen_at`, written with `MAX()` only, by `markRead` — a person principal's call, never a token's — and never an entry row, so a read is never a write ([30-BLUEPRINT](30-BLUEPRINT.md) §1) |
 | **A held-question count**, so a cap is visible rather than silent | — |
+
+**Who else is here (built 2 Nov), on the poll that already ran.** Every open tab asks `version` every 1.5 to 6 s; it now
+sends `at`, the page's path, and the record answers `here`: the names of the other people on that path in the last 30
+s. They are kept in a Map in the record object's memory: no row, no log line, no socket and no new door, and gone when
+the object sleeps. Only people, only others, and only names the reader may already know (`namesFor`). A reader held to
+some lists is here, and hears who is, only on a row or page they can read, so presence never tells a contractor which
+hidden row the owner is on. The app draws up to three 20px faces before the bell, "+n" past them, and the names in the
+label ("Mira Chen and Sam Okafor are here too"). This is the "currently viewing" of the table above in its cheapest
+form, kept because it costs nothing new; live cursors and typing indicators stay theatre.
+
+**Two people on one row (2 Nov).** An open row reads itself again in place when the poll's version moves (row,
+history, links, comments), and waits while a field is open. A save that meets `conflict` over a field the other person
+did not touch is sent again at the new version and lands; one over the same field keeps the box open with the typed
+words and says "Somebody else changed this while you typed. Save again to put yours in its place, or Cancel to keep
+theirs."
 
 ### Multiple people, each running multiple agents
 
@@ -513,6 +548,14 @@ filtered to a folder.
 **2 · Name every cap.** Linear retains *"up to 2,000 open notifications… when this limit is
 exceeded, notifications are automatically archived"* — and does not support archiving manually. A
 cap that evicts silently is a hole. Every cap in BrainDog says what it held back.
+
+**Phones ring for colleagues (built 2 Nov).** `kernel.tellColleague` rings one person's own phones
+(`personPushSubs` in `push.ts`) when a row is handed to them, when a comment @mentions them (§5), and, for the inviter,
+when somebody joins from their invitation. The push carries no content (`{ sub, cause, open, kind }`), never rings the
+person who did it, nor anybody who no longer reaches the record or cannot see the row, once per cause, inside the
+record's quiet hours, and at most six an hour per person. Its kind is `people`, with its own switch in Settings >
+Notifications. A member held to some lists cannot hold a phone (`subscribePush` refuses), so no narrowed reader is
+rung. Mail for a mention is not built.
 
 **3 · Resolution reasons, from GitHub.** Closing a suggestion or a comment records **why**:
 *Addressed · Won't fix · Incorrect*. GitHub's own rationale — *"selecting one of these options
