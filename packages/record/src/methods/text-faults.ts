@@ -10,8 +10,10 @@
  *
  * A COUNT BOUNDS EVERY WALK, NEVER THE CLOCK. A Worker's clock stands still while synchronous code runs, so a time limit
  * never fires there (`page-lint.ts`). A walk reads at most `Budget.pages` pages and `Budget.rows` document rows, and
- * `truncated` says when it stopped short. A reader the night's answer is not true for (a grant held to some lists or
- * rows, rows private to somebody else) gets a small walk of its own, `DAY`, and the kept answer is never cut to them.
+ * `truncated` says when it stopped short. On the Cloud the night's walk is also cut into shares of an alarm
+ * (`keepTextFaultsStep`): it was one step of its own, uncapped, after the lint (F35). A reader the night's answer is
+ * not true for (a grant held to some lists or rows, rows private to somebody else) gets a small walk of its own, `DAY`,
+ * and the kept answer is never cut to them.
  *
  * NO SECOND SCANNER. Which paths name nothing is the kernel's answer: a page's blocks carry `unnamed`, and a document
  * off any page is read as a note block over its own row (`kernel.block` with `here`), as `checkPaths` reads one. A
@@ -32,6 +34,7 @@ import type { Result } from '@braindog/ports';
 import { TYPED } from 'braindog-render';
 
 import { ROUND_HOLDER, ROUND_KEPT, ROUND_PAGES, keptRoundIn, pagesToLint, type KeptFinding } from '../page-lint.ts';
+import type { TickBudget } from '../tick-budget.ts';
 import { hostSourcesOf } from '../sources/index.ts';
 import { textFaultLine, textFaults, type LongText, type TextFault, type TextPage, type TextPart } from '../text-check.ts';
 import type { CallContext } from '../index.ts';
@@ -118,7 +121,7 @@ function walker(deps: RecordDeps) {
   type Walk = ReturnType<typeof kernel.pageWalk>;
 
   /** Whether a block is held from the caller, as the census holds it, so its words are not read for them. */
-  const held = (ctx: CallContext, b: BlockResult, listsOf: Lists): boolean => {
+  const heldFrom = (ctx: CallContext, b: BlockResult, listsOf: Lists): boolean => {
     const lists = listsOf(b as unknown as PageBlock);
     const source = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
     return (
@@ -152,8 +155,12 @@ function walker(deps: RecordDeps) {
   /**
    * Every document field of every list the caller may read, each with the paths in it that name nothing to them. A row
    * is read through the caller's own grant on the list (`whereFor`), so a member held to some rows reads only those.
+   *
+   * A WALK IN STEPS, A GENERATOR: it yields after each batch of rows it lists and each document it reads, with what that
+   * cost (`ROWS_COST`, `DOC_COST`), so the night's walk in an alarm stops where its share is spent and goes on in the
+   * next (`keepTextFaultsStep`). The walk it reads through is the holder's, handed a fresh one for every alarm.
    */
-  const documents = (ctx: CallContext, left: Left, walk: Walk): (LongText & { key: string })[] => {
+  function* documents(ctx: CallContext, left: Left, held: Held): Generator<number, (LongText & { key: string })[]> {
     const out: (LongText & { key: string })[] = [];
     for (const [id, list] of kernel.registers()) {
       if (readable(ctx, id) !== null) continue;
@@ -171,6 +178,7 @@ function walker(deps: RecordDeps) {
         }
         const limit = Math.min(500, TEXT_ROWS_MOST - read, left.rows);
         const got = kernel.list({ register: id, limit, reads: (other: string) => readable(ctx, other) === null, ...(cursor ? { cursor } : {}) }, rule);
+        yield ROWS_COST;
         if (!got.ok) break;
         for (const row of got.value.rows as Entry[]) {
           read += 1;
@@ -182,23 +190,24 @@ function walker(deps: RecordDeps) {
             if (typeof text !== 'string' || (!text.includes('{{') && !/^(?:`{3,}|~{3,})/m.test(text))) continue;
             let unnamed: string[];
             try {
-              unnamed = walk.block({ kind: 'note', body: text } as unknown as PageBlock, { here: row }).unnamed ?? [];
+              unnamed = held.walk.block({ kind: 'note', body: text } as unknown as PageBlock, { here: row }).unnamed ?? [];
             } catch {
               unnamed = [];
             }
             const paths = [...text.replace(/`[^`]*`/g, ' ').matchAll(/\{\{([^{}:]*)\}\}/g)].map((m) => (m[1] ?? '').trim());
-            const shut = paths.filter((p) => !own.includes(p) && !unnamed.includes(p) && hidden(ctx, p, walk.blockRegisters));
+            const shut = paths.filter((p) => !own.includes(p) && !unnamed.includes(p) && hidden(ctx, p, held.walk.blockRegisters));
             out.push({
               key: `${id}#${row.seq}`, ...(typeof row.seq === 'number' ? { at: { list: id, seq: row.seq } } : {}), list: list.name, row: name, field: f.label?.trim() || words(f.id), text,
               unnamed: [...unnamed.filter((p) => !own.includes(p)), ...shut], own, ownLists,
             });
+            yield DOC_COST;
           }
         }
         cursor = got.value.cursor;
       }
     }
     return out;
-  };
+  }
 
   /** The names the caller may be told of: the figures, and each list they read with its count and its states. */
   const namesFor = (ctx: CallContext, texts: readonly string[], walk: Walk) => {
@@ -223,7 +232,7 @@ function walker(deps: RecordDeps) {
    * a document per block it draws and does not hold from them. A part that is a document already gathered for the row
    * the page is about is left out, and that document is told the page's title.
    */
-  const pagesFor = (ctx: CallContext, docs: (LongText & { key: string })[], budget: Budget, left: Left, walk: Walk): TextPage[] => {
+  function* pagesFor(ctx: CallContext, docs: (LongText & { key: string })[], budget: Budget, left: Left, held: Held): Generator<number, TextPage[]> {
     const opens = (p: { registers: string[]; about: { register: string } | null }): boolean =>
       (p.registers.length === 0 || p.registers.some((id) => readable(ctx, id) === null)) && (p.about === null || readable(ctx, p.about.register) === null);
     const listed = kernel.pages().filter(opens);
@@ -237,11 +246,13 @@ function walker(deps: RecordDeps) {
       drawn += 1;
       let answer: PageResult;
       try {
-        const got = walk.page(p.slug);
+        const got = held.walk.page(p.slug);
         if (!got.ok) continue;
         answer = got.value;
       } catch {
         continue;
+      } finally {
+        yield PAGE_COST;
       }
       const key = p.about ? `${p.about.register}#${p.about.seq}` : null;
       const mine = key === null ? [] : docs.filter((d) => d.key === key);
@@ -251,7 +262,7 @@ function walker(deps: RecordDeps) {
       const days = at > 0 ? Math.floor((clock.now() - at) / DAY_MS) : null;
       const parts: TextPart[] = [];
       for (const b of answer.blocks) {
-        if (b.drawn === false || held(ctx, b, walk.blockRegisters)) continue;
+        if (b.drawn === false || heldFrom(ctx, b, held.walk.blockRegisters)) continue;
         const name = typeof b.heading === 'string' && b.heading.trim() !== '' ? b.heading.trim() : answer.title;
         const unnamed = [...(b.unnamed ?? [])];
         if (typeof b.heading === 'string' && b.heading.includes('{{')) parts.push({ name, text: b.heading, unnamed, page: true });
@@ -272,17 +283,21 @@ function walker(deps: RecordDeps) {
       out.push({ title: answer.title, slug: p.slug, parts });
     }
     return out;
-  };
+  }
 
-  /** One walk for this caller within the budget: every fault in the pages and documents they may read. */
-  const walk = (ctx: CallContext, budget: Budget): Omit<TextFaultsRead, 'computedAt'> => {
-    /* ONE WALK FOR THE WHOLE CALL (`pageWalk`): a figure two pages read is read once, and so is every declaration the
-       lists of a block are named from. It writes nothing, so nothing it kept can change under it. */
-    const one = kernel.pageWalk({ hostSources: hostSourcesOf({ kernel, ctx, readable }), viewer: viewerOfRead(ctx) });
+  /**
+   * ONE WALK FOR THE CALL (`pageWalk`): a figure two pages read is read once, and so is every declaration the lists of a
+   * block are named from. It writes nothing, so nothing it kept can change under it; a walk in steps is handed a fresh
+   * one for each alarm (`Held`), since the record may be written between two.
+   */
+  const pageWalkFor = (ctx: CallContext): Walk => kernel.pageWalk({ hostSources: hostSourcesOf({ kernel, ctx, readable }), viewer: viewerOfRead(ctx) });
+
+  /** One walk for this caller within the budget, in steps: every fault in the pages and documents they may read. */
+  function* walking(ctx: CallContext, budget: Budget, held: Held): Generator<number, Omit<TextFaultsRead, 'computedAt'>> {
     const left: Left = { rows: budget.rows, cut: false };
-    const docs = documents(ctx, left, one);
-    const pages = pagesFor(ctx, docs, budget, left, one);
-    const names = namesFor(ctx, [...docs.map((d) => d.text), ...pages.flatMap((p) => p.parts.map((x) => x.text))], one);
+    const docs = yield* documents(ctx, left, held);
+    const pages = yield* pagesFor(ctx, docs, budget, left, held);
+    const names = namesFor(ctx, [...docs.map((d) => d.text), ...pages.flatMap((p) => p.parts.map((x) => x.text))], held.walk);
     const found = textFaults(pages, docs.map(({ key: _key, ...d }) => d), names);
     return {
       count: found.faults.length,
@@ -291,10 +306,21 @@ function walker(deps: RecordDeps) {
       faults: found.faults.slice(0, FAULTS_MOST),
       truncated: found.faults.length > FAULTS_MOST || left.cut,
     };
+  }
+
+  /** One walk for this caller within the budget, in one go. */
+  const walk = (ctx: CallContext, budget: Budget): Omit<TextFaultsRead, 'computedAt'> => {
+    const gen = walking(ctx, budget, { walk: pageWalkFor(ctx) });
+    for (;;) {
+      const step = gen.next();
+      if (step.done === true) return step.value;
+    }
   };
 
   /** The night's answer as kept, or `null` before the first night. */
   const night = (): TextFaultsKept | null => keptIn(kernel.prefsOf(HOLDER)[KEPT]);
+
+  const SIGNS: CallContext = { principal: { kind: 'system', id: 'signs' } };
 
   return {
     shared,
@@ -303,15 +329,72 @@ function walker(deps: RecordDeps) {
     /** The night's walk, made as the system and kept with its time. Called by `lintTick` and nothing else. */
     keep(): TextFaultsRead {
       const at = clock.now();
-      const value = walk({ principal: { kind: 'system', id: 'signs' } }, NIGHT);
+      const value = walk(SIGNS, NIGHT);
       kernel.setPref(HOLDER, KEPT, { at, value } satisfies TextFaultsKept);
       return toRead({ at, value });
+    },
+    /**
+     * The night's walk in steps, within `budget`, the walk under way kept in this object (`WORDS_RUNS`). Answers `true`
+     * while there is more to walk; the answer is kept, with the time the walk began, when the last step ends.
+     */
+    keepStep(budget: TickBudget): boolean {
+      let run = WORDS_RUNS.get(kernel);
+      if (run === undefined) {
+        const held: Held = { walk: pageWalkFor(SIGNS) };
+        run = { at: clock.now(), held, steps: walking(SIGNS, NIGHT, held) };
+        WORDS_RUNS.set(kernel, run);
+      } else run.held.walk = pageWalkFor(SIGNS);
+      for (;;) {
+        let step: IteratorResult<number, Omit<TextFaultsRead, 'computedAt'>>;
+        try {
+          step = run.steps.next();
+        } catch (e) {
+          /* A WALK THAT THREW IS OVER: its steps are spent, and the last answer stands. */
+          WORDS_RUNS.delete(kernel);
+          throw e;
+        }
+        if (step.done === true) {
+          WORDS_RUNS.delete(kernel);
+          kernel.setPref(HOLDER, KEPT, { at: run.at, value: step.value } satisfies TextFaultsKept);
+          return false;
+        }
+        budget.spend(step.value);
+        if (budget.spent()) return true;
+      }
     },
   };
 }
 
+/** The walk a step reads through, handed a fresh one for each alarm of a walk in steps. */
+type Held = { walk: ReturnType<RecordDeps['kernel']['pageWalk']> };
+
+/**
+ * WHAT ONE STEP OF THE WORDS' WALK COSTS, in a tick's units (a page drawn is one, `TickBudget`): a page drawn, one batch
+ * of up to 500 rows listed for their documents, and one document's words read as a note over its row. On his record the
+ * walk was one tick of its own after the lint (F35), drawing up to `ROUND_PAGES` pages and reading every document at once.
+ */
+const PAGE_COST = 1;
+const ROWS_COST = 0.5;
+const DOC_COST = 0.1;
+
+/**
+ * THE NIGHT'S WALK UNDER WAY, per record (its kernel), kept in the object's memory between alarms: when it began, the
+ * walk it reads through, and the steps left. An object that restarts begins again (`keepWords` in `index.ts` says how
+ * often a day).
+ */
+const WORDS_RUNS = new WeakMap<object, { at: number; held: Held; steps: Generator<number, Omit<TextFaultsRead, 'computedAt'>> }>();
+
+/** Whether the night's walk of this record is under way in this object (`keepTextFaultsStep`). */
+export const textFaultsUnderway = (deps: Pick<RecordDeps, 'kernel'>): boolean => WORDS_RUNS.has(deps.kernel);
+
 /** The night's walk, kept (see the header). */
 export const keepTextFaults = (deps: RecordDeps): TextFaultsRead => walker(deps).keep();
+
+/**
+ * The night's walk, a share of it a tick (`TickBudget`): the walk under way goes on, or one begins, and `true` while
+ * more is left. The answer is kept when it ends, as `keepTextFaults` keeps it.
+ */
+export const keepTextFaultsStep = (deps: RecordDeps, budget: TickBudget): boolean => walker(deps).keepStep(budget);
 
 /**
  * The kept answer put away, so the next night pass finds nothing kept and walks again (an erasure names rows it held).

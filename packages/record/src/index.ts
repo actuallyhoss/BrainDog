@@ -258,7 +258,7 @@ import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from
 import { drewCostWhy } from './design-agent.ts';
 import { drawingsOf, drewDraft, drewFiled, DREW_MODEL_PREF } from './drew.ts';
 import { censusSlices, methods as censusMethods, type CensusPart } from './methods/pages-census.ts';
-import { dropTextFaults, keepTextFaults } from './methods/text-faults.ts';
+import { dropTextFaults, keepTextFaults, keepTextFaultsStep, textFaultsUnderway } from './methods/text-faults.ts';
 import { todayOf, type TodayAnswer, type TodayAsks } from './today.ts';
 import { shapeAnswerOf, type ShapeAsks } from './project-shape.ts';
 import { HOST_SOURCES, hostSourcesOf } from './sources/index.ts';
@@ -6529,6 +6529,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const LINT_LAST = 'pages-clean.last';
   /** The day the record's words were last walked for `textFaults`, kept apart from the lint's so a deploy day still gets one. */
   const WORDS_LAST = 'text-faults.last';
+  /** The words' walk in slices begun today, and how many times (`keepWords`): an object that restarts begins it once more. */
+  const WORDS_RUN = 'text-faults.run';
+  const WORDS_TRIES = 2;
   /** Today's lint under way in slices (`lintTick` with a budget): its day, the step it is on, its round so far. */
   const LINT_RUN = 'pages-clean.run';
   /** How far `headlinesHeldFrom` read the pages: the place it stopped and the count so far. */
@@ -11501,6 +11504,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* The last answer stands. */
     }
   };
+  /**
+   * `keepWords` IN SLICES (F35, perf2): a share of the walk a tick (`keepTextFaultsStep`), the walk under way kept in this
+   * object, and `true` while more is left. It was one tick of its own after the lint, every page and every document at
+   * once (143 ms on the seed, one uncapped step on his record). A walk begun today and lost with the object that walked it
+   * is begun again, `WORDS_TRIES` times a day at most, so a walk that kills its object cannot run all day; the last
+   * answer stands meanwhile. One that throws is not tried again today, as before.
+   */
+  const keepWordsSliced = (today: string, budget: TickBudget): boolean => {
+    try {
+      if (!textFaultsUnderway(methodDeps())) {
+        const prefs = kernel.prefsOf(LINT_HOLDER);
+        const raw = prefs[WORDS_RUN] as { day?: unknown; tries?: unknown } | null | undefined;
+        const tries = raw !== null && typeof raw === 'object' && raw.day === today && Number.isSafeInteger(raw.tries) ? (raw.tries as number) : 0;
+        if (prefs[WORDS_LAST] === today && (tries === 0 || tries >= WORDS_TRIES)) return false;
+        kernel.setPref(LINT_HOLDER, WORDS_LAST, today);
+        kernel.setPref(LINT_HOLDER, WORDS_RUN, { day: today, tries: tries + 1 });
+      }
+      const more = keepTextFaultsStep(methodDeps(), budget);
+      if (!more) kernel.setPref(LINT_HOLDER, WORDS_RUN, null);
+      return more;
+    } catch {
+      /* The last answer stands, and the walk waits for tomorrow. */
+      kernel.setPref(LINT_HOLDER, WORDS_RUN, null);
+      return false;
+    }
+  };
 
   /**
    * The record's own person's keys, for `context`: every row of the list `meet` writes that its `self` part marks, read
@@ -13159,6 +13188,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       };
       let run = lintRunOf(today);
       if (run === null) {
+        /* IN SLICES THE WORDS' WALK IS A SHARE A TICK TOO (`keepWordsSliced`), after the day's lint and its signs. */
+        if (kernel.prefsOf(LINT_HOLDER)[LINT_LAST] === today && sliced) {
+          kept(null, false);
+          return keepWordsSliced(today, budget) ? ({ ran: false, why: 'later', more: true } as const) : ({ ran: false, why: 'today' } as const);
+        }
         if (kernel.prefsOf(LINT_HOLDER)[LINT_LAST] === today) return kept({ ran: false, why: 'today' } as const);
         kernel.setPref(LINT_HOLDER, LINT_LAST, today);
         run = { day: today, step: 'round', round: roundBegun(lintDeps) };
