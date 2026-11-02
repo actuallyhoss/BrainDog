@@ -554,8 +554,9 @@
     </div>
   </Tile>
 {:else if alone}
-  <!-- ONE PERSON IS THE TILE'S SENTENCE AND NOTHING ELSE: there is nobody to list and nobody to compare. -->
-  <Tile icon="users" title={copy.whoCanSee}>
+  <!-- ONE PERSON IS THE TILE'S SENTENCE AND NOTHING ELSE: there is nobody to list and nobody to compare. Its glyph is the
+       tile's own in every state, so the two faces stay Groups' alone. -->
+  <Tile icon="user-check" title={copy.whoCanSee}>
     <p class="reading">{copy.onlyPerson}</p>
   </Tile>
 {:else}
