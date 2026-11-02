@@ -45,6 +45,8 @@
   const WROTE = 'Written by BrainDog from this project’s figures';
   /* THE RUNS-ON LINES SHOWN BEFORE "AND N MORE". */
   const LINES_SHOWN = 6;
+  /* "AND N MORE" OPENS THE REST IN PLACE (2 Nov): it was words, not a button, so the other four could not be reached. */
+  let runsOpen = $state(false);
   /* THREE OF EACH COLUMN OF WORK, and how many more. */
   const SHOWN = 3;
   const hours = (t: number, day0: number) => Math.max(0, Math.min(1, (t - day0) / 86_400_000));
@@ -375,8 +377,8 @@
     <!-- WHAT IT RUNS ON AND WHEN EACH RENEWS, from its services, the soonest first; the numbers feed as one line that
          says whether it is quiet, its setup behind it; then the keys, tools and skills its agents used. -->
     <Tile icon="plug" title="Runs on" count={runsLines.length} class="t-runs" id="part-runs" data-part="Runs on" data-part-icon="plug" data-part-count={runsLines.length}>
-      <ul class="r-list">
-        {#each runsLines.slice(0, LINES_SHOWN) as l, n (n)}
+      <ul class="r-list" id="part-runs-list">
+        {#each runsOpen ? runsLines : runsLines.slice(0, LINES_SHOWN) as l, n (n)}
           <li class="r-row" data-tone={l.tone}>
             <Icon name={l.icon} size="s" />
             <span class="r-words">
@@ -387,7 +389,7 @@
           </li>
         {/each}
       </ul>
-      {#if runsLines.length > LINES_SHOWN}<p class="r-more">and {runsLines.length - LINES_SHOWN} more</p>{/if}
+      {#if runsLines.length > LINES_SHOWN}<button type="button" class="r-more tap" aria-expanded={runsOpen} aria-controls="part-runs-list" onclick={() => (runsOpen = !runsOpen)}>{runsOpen ? 'Show fewer' : `and ${runsLines.length - LINES_SHOWN} more`}</button>{/if}
     </Tile>
   {:else if part === 'agents-here' && read}
     {#snippet dayBar(now: number)}
@@ -1419,9 +1421,23 @@
   }
 
   .r-more {
+    display: block;
     margin: var(--sp-2) 0 0;
-    color: var(--ink-3);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+    font: inherit;
     font-size: var(--fs-meta);
+    text-decoration: underline;
+    text-decoration-color: var(--rule-strong);
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .r-more:hover {
+    color: var(--ink);
+    text-decoration-color: currentColor;
   }
 
   /* ── the agents ── */
