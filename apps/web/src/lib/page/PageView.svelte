@@ -530,8 +530,17 @@
   const arranging = $derived(arrangement.editing);
   /** Whether the page hosts its rows and questions now: at its own address, read, and not being arranged. */
   const hosting = $derived(mode === 'page' && !arranging && !showSource);
-  /** Whether the filter strip is drawn: on a hosted page the record says may be narrowed. */
-  const strip = $derived(hosting && filters.length > 0);
+  /**
+   * NOTHING TO NARROW IS NO STRIP (empty states, 2 Nov): a new Ledger drew "This month 0, Last month 0, Before that 0" and
+   * four more noughts over a page with no lines, and Reports the same over nothing at all. While no choice is made and every
+   * choice the record offers counts nought (or there are none), the strip waits for the first entry. A choice already in
+   * the address keeps it, so a filter that matched nothing can still be let go.
+   */
+  const nothingToNarrow = $derived(
+    Object.keys(chosen).length === 0 && filters.every((f) => f.values.every((v) => v.count === 0)),
+  );
+  /** Whether the filter strip is drawn: on a hosted page the record says may be narrowed, with something to narrow. */
+  const strip = $derived(hosting && filters.length > 0 && !nothingToNarrow);
   /**
    * WHAT FOLLOWS A PROJECT'S SHAPE WAITS FOR IT, on a page about a project's row, until the shape's reads are back. Which
    * blocks are drawn hangs on what the shape says (`withoutRepeats`), and the shape's hold fills the screen under the

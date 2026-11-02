@@ -1439,24 +1439,26 @@
 /* THE SEARCH ON THE HEAD'S ROW, BESIDE SHARE AND MORE, NOT UNDER A ROW THAT HELD THEM ALONE. The Ledger says nothing
    above its search until a line waits to be filed, so its head drew Share and More on a row of their own: 52px of board
    at a desk, 56 on a phone, before the search. The search rises into that row, as wide as it was on a desk and as wide
-   as the row leaves it beside the buttons on a phone; the row under it no longer catches a press meant for Share. */
-.hosted[data-money] > .page-head[data-titled]:has(.name-unseen):has(+ .head-below) + .head-below {
+   as the row leaves it beside the buttons on a phone; the row under it no longer catches a press meant for Share.
+   ONLY WHILE THE ROW SAYS NOTHING (empty states, 2 Nov): an empty Ledger says what will be there in that row, and the
+   search rose over the sentence and hid it ("nds here."). With a sentence the search keeps its own row under it. */
+.hosted[data-money] > .page-head[data-titled]:has(.name-unseen):not(:has(.head-said)):has(+ .head-below) + .head-below {
   margin-block-start: -48px;
   pointer-events: none;
 }
 
-.hosted[data-money] > .page-head[data-titled]:has(.name-unseen):has(+ .head-below) + .head-below > * {
+.hosted[data-money] > .page-head[data-titled]:has(.name-unseen):not(:has(.head-said)):has(+ .head-below) + .head-below > * {
   pointer-events: auto;
 }
 
-.hosted[data-money] > .page-head[data-titled]:has(.name-unseen):has(+ .head-below) + .head-below .head-search {
+.hosted[data-money] > .page-head[data-titled]:has(.name-unseen):not(:has(.head-said)):has(+ .head-below) + .head-below .head-search {
   flex: 0 1 auto;
   inline-size: 384px;
   max-inline-size: calc(100% - 156px);
 }
 
 @media (width < 900px) {
-  .hosted[data-money] > .page-head[data-titled]:has(.name-unseen):has(+ .head-below) + .head-below {
+  .hosted[data-money] > .page-head[data-titled]:has(.name-unseen):not(:has(.head-said)):has(+ .head-below) + .head-below {
     margin-block-start: -54px;
   }
 }
