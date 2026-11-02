@@ -1319,6 +1319,26 @@ const at = (said: string, needle: string): number => (needle === '' ? -1 : said.
  * A NAME KEEPS PEOPLE, as it does from the rules, so the words have somewhere to be kept; a use case keeps every module
  * it stands on, and every module whatever it leans on (`closeOver`).
  */
+/**
+ * WHAT FORMS FOLLOWS THE KIND (2 Nov, onboarding5, the model run: Marta, keeping her household's bills and rent, was
+ * given "Send this month's invoices"). A model's entry that speaks of clients, invoices, customers, sales, payroll or
+ * orders is kept only where the person typed that word, and never for a household (the personal use case on its own),
+ * which has none of them whatever was typed.
+ */
+const BUSINESS_WORDS = /\b(invoic|client|customer|retainer|payroll|sales?\b|orders?\b)/giu;
+const HOUSEHOLD: ReadonlySet<string> = new Set(['personal']);
+export function fitsTheKind(fields: Record<string, unknown>, usecase: string | null, also: readonly string[], sentence: string): boolean {
+  const text = Object.values(fields).filter((v): v is string => typeof v === 'string').join(' ');
+  const found = [...text.matchAll(BUSINESS_WORDS)].map((m) => m[1]!.toLowerCase());
+  if (found.length === 0) return true;
+  if (usecase !== null && HOUSEHOLD.has(usecase) && also.every((a) => HOUSEHOLD.has(a))) return false;
+  const typed = sentence.toLowerCase();
+  return found.every((w) => typed.includes(w.replace(/s$/u, '')));
+}
+
+/** The words of ours a person never reads: what a model writes to them that holds one is not said (2 Nov, "people list"). */
+export const INSIDE_WORDS = /\b(?:lists?|registers?|records?|modules?|packs?|fields?)\b/iu;
+
 export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeContext, rules: Proposal): Proposal {
   const offers = [...BUNDLED, ...(ctx.catalogue ?? []).filter((o) => !BUNDLED.some((b) => b.id === o.id))];
   const known = new Set(offers.map((o) => o.id));
@@ -1345,7 +1365,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
   /* EACH PHRASE IS LOOKED FOR IN THE SENTENCE AS TYPED, and lit where it was found; the name is not a phrase of the
      model's, it is the first line, which becomes them. */
   const nameAt = name === null ? -1 : at(sentence, name);
-  const found = reply.heard.map((h) => ({ phrase: h.phrase.trim(), became: h.became.trim().slice(0, 80), at: at(sentence, h.phrase.trim()) })).filter((h) => h.at >= 0);
+  const found = reply.heard.map((h) => ({ phrase: h.phrase.trim(), became: h.became.trim().slice(0, 80), at: at(sentence, h.phrase.trim()) })).filter((h) => h.at >= 0 && !INSIDE_WORDS.test(h.became));
   /* A PHRASE THE PERSON REFUSED IS NEVER SAID AS HEARD, whoever read it: "orders" in "I don't take orders" is not a
      line that became Orders. The same reading the rules give (`refusedIn`), over the sentence as typed. */
   const no = refusedIn(sentence, found.map((h) => ({ at: h.at, text: h.phrase })));
@@ -1366,6 +1386,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
   const rows: Proposal['rows'] = [];
   for (const one of reply.rows.slice(0, 5)) {
     /* A CLIENT IS SOMEBODY BEFORE ITS LIST IS LOOKED FOR (`clientNotProject`): Projects may not be kept at all. */
+    if (!fitsTheKind(one.fields, u?.usecase ?? rules.usecase ?? null, beside.map((b) => b.usecase), sentence)) continue;
     const r = one.list === 'things' ? ((c) => ({ list: c.register, fields: c.fields }))(clientNotProject({ register: one.list, fields: one.fields }, sentence, modules)) : one;
     const list = listById(r.list, modules);
     const fields = list ? entryOf(list, r.fields, currency) : null;
@@ -1378,7 +1399,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
     if (word !== '' && word.length <= 40 && at(sentence, word) >= 0 && listById(n.list, modules) && names[n.list] === undefined) names[n.list] = word.charAt(0).toUpperCase() + word.slice(1);
   }
 
-  const summary = reply.summary.trim();
+  const summary = INSIDE_WORDS.test(reply.summary) ? '' : reply.summary.trim();
   const kept = rows.length > 0 ? rows : rules.rows;
   const out = {
     name,

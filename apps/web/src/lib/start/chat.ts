@@ -22,7 +22,7 @@ import { currencyChoices, type CurrencyEnv } from '../../routes/start/building.t
 import { closeOver } from '../shape.ts';
 import { PEOPLE } from '../who.ts';
 import type { ModelAsk } from '../signup.ts';
-import { placesOf, YOU, type HeardLine, type Proposal } from './propose.ts';
+import { INSIDE_WORDS, placesOf, YOU, type HeardLine, type Proposal } from './propose.ts';
 
 /** What a question is about: the first question (`what`), the rules' own, and every topic the model may ask about. */
 export type Topic = 'what' | 'closest' | 'work' | 'money' | 'currency' | 'people' | 'tools' | 'name' | 'first' | 'kind' | 'things' | 'who_for';
@@ -76,6 +76,8 @@ export const chatWords = {
   adds: (items: readonly string[]) => `That adds ${and(items)}.`,
   thanks: ['Got it.', 'Thanks.', 'Noted.', 'Good to know.'] as const,
   currencyIs: (name: string) => `Money will be kept in ${name}.`,
+  /** Said back to the name of the one they work with: "Got it, Dan's in as your co-founder." */
+  inAs: (name: string, role: string) => `Got it, ${name}'s in as your ${role}.`,
   caseIs: (title: string) => `I'll set it up as ${title}.`,
   callYou: (name: string) => `Nice to meet you, ${name}.`,
   /** Asked once more where an answer to the name question held no name BrainDog could be sure of (`nameIn`). */
@@ -464,7 +466,9 @@ function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): 
   if (!MODEL_TOPICS.has(topic) || asked.has(topic)) return null;
   if ((topic === 'currency' || topic === 'money' || topic === 'tools') && settled(topic, w)) return null;
   const question = m.question.trim();
-  if (!fits(question, QUESTION_MOST) || raisesNew(question, w.said)) return null;
+  /* NO WORD OF OURS REACHES THEM (2 Nov, onboarding5: "Who else should I add to your people list?"): a question that
+     says list, record, module and the like is the rules' to ask. */
+  if (!fits(question, QUESTION_MOST) || raisesNew(question, w.said) || INSIDE_WORDS.test(question)) return null;
   /* A CURRENCY IS A CODE THIS DEVICE KNOWS: the model's words, the rules' taps. */
   if (topic === 'currency') {
     const r = rulesAsk('currency', w);
@@ -475,7 +479,7 @@ function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): 
   const choices: Choice[] = [];
   for (const c of m.choices) {
     const v = c.trim();
-    if (fits(v, CHOICE_MOST) && !named.has(v.toLowerCase()) && !choices.some((x) => x.value === v)) choices.push(tap(v));
+    if (fits(v, CHOICE_MOST) && !named.has(v.toLowerCase()) && !INSIDE_WORDS.test(v) && !choices.some((x) => x.value === v)) choices.push(tap(v));
   }
   /* WHERE THAT LEFT FEWER THAN TWO: plain examples for their work, the rules' own taps for what first, or none. */
   if (choices.length < 2 && m.choices.length > 0) {
@@ -697,6 +701,9 @@ export function ackOf(
   if (laid.name) return chatWords.callYou(laid.name);
   /* NO NAME HEARD IS NOT "GOT IT": the question asked again says so (`nameAgain`), or nothing does. */
   if (ask.topic === 'name') return null;
+  /* THE ONE THEY WORK WITH, SAID BACK BY NAME (2 Nov, onboarding5: "Dan" was answered "Noted."). */
+  const mate = ask.topic === 'people' && ask.role !== undefined ? plain(answer) : '';
+  if (mate !== '' && BARE_NAME.test(mate) && !/^just me$/iu.test(mate) && !NO.test(mate)) return chatWords.inAs(capital(mate), ask.role!);
   const came = after.filter((p) => !before.includes(p));
   /* WHAT THE ANSWER ADDED BY NAME COMES FIRST (1 Nov, a live run answered "Clients Fenwick and Acme" with "Good to know"):
      "Added Fenwick and Acme as clients.", and the places it turned on after it. */
@@ -933,7 +940,10 @@ function todosFor(firstSaid: string, clients: readonly string[], have: readonly 
   const add = (s: string) => {
     if (!out.includes(s) && !have.some((h) => h.toLowerCase() === s.toLowerCase())) out.push(s);
   };
-  if (/\binvoic|\bbill(?:ing|s)?\b|\bgetting paid|\bpayments?\b/u.test(first)) add(one ? `Send ${one}'s invoice` : "Send this month's invoices");
+  /* BILLS ARE PAID, NOT SENT (2 Nov, onboarding5: Marta's household kept "bills" first and was drafted "Send this month's
+     invoices", which the full reading then kept as hers). Only invoicing words draw an invoice to send. */
+  if (/\binvoic|\bbilling\b|\bgetting paid/u.test(first)) add(one ? `Send ${one}'s invoice` : "Send this month's invoices");
+  else if (/\bbills?\b|\bpayments?\b/u.test(first)) add("Write down this month's bills");
   if (/\bdeadlines?|\bdue dates?|\bschedule/u.test(first)) add(two ? `Set up deadlines for ${two}` : "Write down this month's deadlines");
   if (/\bprojects?\b/u.test(first)) add(one ? `List the work for ${one}` : 'List the projects on now');
   if (/\bclients?\b|\bcustomers?\b/u.test(first) && one) add(`Add a contact at ${one}`);
