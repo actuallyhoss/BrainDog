@@ -14,6 +14,8 @@
  * is only what was paid. GOLD WITH A COUNT AND A RATE IS VALUED EVEN WITH NO COST: a bracelet nobody knows the price of
  * is still worth its grams, it only has no gain.
  *
+ * A HOLDING WITH NO BUYS AND NO PRICE EACH keeps the cost somebody wrote on it, and is costed by that.
+ *
  * WHAT IT GAINED is its worth less its cost, and the gain over the cost as a percent, said only when something other
  * than the cost priced it and both are in one currency. A holding that stands at what it cost has no gain, not a gain
  * of nought.
@@ -114,6 +116,10 @@ async function work(ctx, row, current, today, repriced) {
     if (first && f.acquired_on !== first) next.acquired_on = first;
   } else if (number(qty) && amount(f.unit_cost)) {
     cost = { amount: Math.round(qty * f.unit_cost.amount), currency: f.unit_cost.currency };
+  } else if (amount(f.cost)) {
+    /* A COST WRITTEN ON THE HOLDING ITSELF, with no buys and nothing paid each: the gold bar bought for £3,100 and valued
+       by the gold rate. Its gain is its worth less that, so Worth now less Paid in is Gain on the page. */
+    cost = f.cost;
   }
   const gram = f.kind === 'gold' ? rateFor(current, f.karat) : null;
   if (!number(qty) || (cost === null && !amount(f.price) && !gram)) {
