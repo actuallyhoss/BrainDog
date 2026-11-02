@@ -63,6 +63,7 @@
   import { heard, said } from '$lib/voice.svelte.ts';
   import { homeSlugOf } from '$lib/voice.ts';
   import type { LiveBlock, LivePageDecl, Opened } from '$lib/record/page-live.ts';
+  import type { TodayAnswer } from './today-read.ts';
   import { landing } from '$lib/record/landing.ts';
   import { may } from '$lib/record/may.ts';
   import { live as moving } from '$lib/data/live.svelte.ts';
@@ -677,13 +678,15 @@
 
   /** A kept board drawn from the record's one `today` read, or `null` to read it as a page. */
   async function keptToday(slug: string, fresh: boolean): Promise<Opened | null> {
-    const [m, t, tiles] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts')]);
+    const [m, t, tiles, h] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts'), import('./handled.ts')]);
     const base = apiBase();
     let declared: Record<string, unknown> | null = null;
     let version: number | undefined;
     let answered: unknown = null;
+    let beside: Promise<TodayAnswer | null> | null = null;
     const drawn = await m.drawnOf({ page: slug, blocks: [] }, base, undefined, async (client) => {
       const asked = await t.askToday(client, base, {}, fresh, slug, [], untrack(() => narrow.current) ? 'phone' : 'wide');
+      beside = t.lastToday(base);
       /* IN TODAY'S WORDS, where it was kept with older ones (`kept-words.ts`, A5). */
       const out = asked.ok ? { ...asked, value: keptWordsNow(asked.value) } : asked;
       if (out.ok) {
@@ -703,6 +706,7 @@
     await tiles.tilesLanded(answered);
     const { blocks: kept, ...declOwn } = decl;
     declaredBlocks = Array.isArray(kept) ? (kept as Record<string, unknown>[]) : [];
+    besideOf(base, h, await (beside ?? Promise.resolve(null)));
     tilesBeside(base);
     return {
       from: 'live',
@@ -746,12 +750,14 @@
        a cold phone's Today for a widget it does not draw. */
     if (asked.blocks.some((b) => (b as { key?: unknown }).key === 'projects')) void import('./ProjectCards.svelte').catch(() => null);
     /* WITH EVERY TILE'S PART BESIDE IT, in the record's one `today` read (`today-read.ts`), which the tiles take theirs from. */
-    const [m, t, tiles] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts')]);
+    const [m, t, tiles, h] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts'), import('./handled.ts')]);
     const base = apiBase();
     /* AND THE SHOWN TILES' OWN CODE THE MOMENT THE ANSWER SAYS WHICH THEY ARE (`tile-code.ts`), beside the page reader's. */
     let answered: unknown = null;
+    let beside: Promise<TodayAnswer | null> | null = null;
     let drawn = await m.drawnOf(asked, base, undefined, async (client) => {
       const out = await t.askToday(client, base, asked as unknown as Record<string, unknown>, fresh, null, leftOut, shape);
+      beside = t.lastToday(base);
       if (out.ok) {
         tiles.askTiles((out.value as { blocks?: unknown }).blocks);
         answered = (out.value as { blocks?: unknown }).blocks;
@@ -775,6 +781,7 @@
       tiles.askReads(answered, { base, owner: data.me?.owner === true });
       /* AND THE TILES' CODE IN HAND, so they draw with the page and not a frame after it, moving what is under them. */
       await tiles.tilesLanded(answered);
+      besideOf(base, h, await (beside ?? Promise.resolve(null)));
       const at = drawn.now;
       const blocks = withLeft(drawn.blocks, body.blocks, left, (b) => leftBlock(b, at) as unknown as LiveBlock);
       return {
@@ -1364,6 +1371,19 @@
    * (`today-read.ts`) that are Home's own, taken as the body lands. A host without `today` holds none, and each is asked
    * by itself, as before.
    */
+  /**
+   * AND THE SAME PARTS TAKEN FROM THE ANSWER THE BODY WAS JUST DRAWN FROM, BEFORE THE PAGE IS HANDED OVER (speed5): taken
+   * after it, through `tilesBeside`'s own imports and the held answer, "BrainDog handled 1 today" landed under Needs you
+   * about 130 ms after a cold phone's Today drew and pushed every tile under it down 60 px. Its code is fetched with the
+   * reader's, so nothing here waits. `tilesBeside` still runs after, for the offer and for a record that sent none.
+   */
+  function besideOf(base: string, m: typeof import('./handled.ts'), got: TodayAnswer | null): void {
+    if (got === null) return;
+    const found = m.handledOf({ ok: true, value: got.handled });
+    keepPart('handled', base, (handled = found && found.rows.length > 0 ? found : null));
+    handledHeard();
+    if (data.me?.owner && !data.stale) sharedNow = sharedFrom(got.shared);
+  }
   function tilesBeside(base: string): void {
     const ver = asOf();
     /* THE BOARD'S LAST CELL, asked apart from Today's read once it has landed (`askOffer`), once a version. */

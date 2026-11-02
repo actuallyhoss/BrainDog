@@ -237,6 +237,16 @@ export function todayHeld(base: string, now: number = Date.now()): Promise<Today
   return h.token === token ? h.answer : null;
 }
 
+/**
+ * THE ANSWER OF THE LAST `today` READ FROM `base`, whatever version was heard since it was asked: the one a screen is about
+ * to draw, for the parts beside its body (what was handled, what is shared out). `todayHeld` says no to it once a version
+ * has been heard, which on a cold open is often before the read lands, and the foot's line then waited on a read of its
+ * own and drew after the page (speed5).
+ */
+export function lastToday(base: string): Promise<TodayAnswer | null> | null {
+  return held !== null && held.base === base ? held.answer : null;
+}
+
 /** The project cards' parts for the projects list `register`, from the held answer, or `null` to ask for them. */
 export async function cardsHeld(base: string, register: string): Promise<TodayCards | null> {
   const got = await (todayHeld(base) ?? Promise.resolve(null));
