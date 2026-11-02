@@ -475,6 +475,19 @@ export const scriptWords = (note: string): string =>
  *
  * `governed` is a line about a question or a decision, whose name is somebody's own words and so is quoted.
  */
+/**
+ * A LINE ABOUT SOMEBODY'S ACCESS, AS ONE SENTENCE WITH THEM IN IT (empty states, 2 Nov): "Gave you access", "Gave Kim
+ * access", "Took access away from Kim". The verb and the person were set side by side, "Gave access You", which read as
+ * a label and a name. `null` for any other kind, which is said as it was.
+ */
+export function accessSaid(kind: string, who: { name: string; you: boolean }): string | null {
+  /* "Someone on this record" is said inside the sentence in lower case. */
+  const name = who.name.startsWith('Someone ') ? `s${who.name.slice(1)}` : who.name;
+  if (kind === 'access.grant') return who.you ? 'Gave you access' : `Gave ${name} access`;
+  if (kind === 'access.revoke') return who.you ? 'Took your access away' : `Took access away from ${name}`;
+  return null;
+}
+
 export function lineSaid(word: string, thing: string | null, note: string, governed: boolean, now: number = Date.now()): LineSaid {
   const name = thing?.trim() ?? '';
   let rest = note.trim();

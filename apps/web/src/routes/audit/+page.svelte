@@ -85,6 +85,7 @@
     isBookkeeping,
     keepsBooks,
     keyOf,
+    accessSaid,
     lineSaid,
     LANE_SPAN_MS,
     lanesOf,
@@ -729,6 +730,9 @@
     clock,
   )}
   {@const note = said.note}
+  <!-- SOMEBODY'S ACCESS IS ONE SENTENCE WITH THEM IN IT ("Gave you access"), not the verb beside their name. -->
+  {@const access = pass === null && declared === null && e.target ? (targetSaid(e.target, me, names) ?? null) : null}
+  {@const accessLine = access === null ? null : accessSaid(e.kind, access)}
   <!-- WHO DID IT, and before them who asked, where a question asked and answered in one moment is one line (`oneDecision`). -->
   {@const did = ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : said.done ? didSaid(e.by, me, names, e.run_by ?? null, said.done) : by.name}
   {@const doer = e.asked ? whoWords.askedThen(actorSaid(e.asked, me, names).name, said.done ? did : didSaid(e.by, me, names, e.run_by ?? null, 'answered')) : did}
@@ -749,6 +753,7 @@
         {#if t.fold}<span class="line-title">{minuteSaid(e.kind, kindOf(e.kind).word, t.count)}</span>
         {:else if pass !== null}<span class="line-title">{pass.said}</span>
         {:else if declared !== null}<span class="line-title">{declared}</span>
+        {:else if accessLine !== null}<span class="line-title">{accessLine}</span>
         {:else}<span class="line-title"
             >{#if said.verb}<span class="verb">{said.verb}</span>{/if}{#if thing}{said.verb ? ' ' : ''}{#if thing.href}<a class="target tap" href={at(thing.href)}
                   >{said.quoted ? '“' : ''}<bdi class="target-name" data-own>{thing.text}</bdi>{said.quoted ? '”' : ''}</a
