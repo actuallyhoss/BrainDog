@@ -43,8 +43,10 @@ export const runsWords = {
   agentEnded: (when: string) => `finished ${when}`,
   agentStopped: (when: string) => `stopped ${when}`,
   agentName: 'An agent',
-  /* HOW AN AGENT RUN STANDS, WITHOUT WHEN, for a row that says when in a column of its own (the Agents page's Recent runs). */
-  outcome: { working: 'At work', left: 'Left a step', ended: 'Finished', stopped: 'Stopped', open: 'Last heard' },
+  /* HOW AN AGENT RUN STANDS, WITHOUT WHEN, for a row that says when in a column of its own (the Agents page's Recent runs).
+     A RUN STILL OPEN BUT SILENT IS QUIET (pages pass, 2 Nov), the word Working now and the list of runs use: "Last heard 2h
+     ago" read as a state beside Finished and Stopped, and the when column already says how long. */
+  outcome: { working: 'At work', left: 'Left a step', ended: 'Finished', stopped: 'Stopped', open: 'Quiet' },
   /** A run that said nothing of what it did, where it worked. */
   agentIn: (who: string, repo: string) => `${who} in ${repo}`,
   /** A run that said nothing of what it did: its agent's run. */

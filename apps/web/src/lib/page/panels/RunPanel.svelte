@@ -104,7 +104,11 @@
   let parts = $state.raw<RunParts>({});
   const settled = $derived(from !== 'reading' && rowRead && (held === null || partsRead));
   let beside = false;
-  const talk = $derived(held ? runTalk(held, parts) : []);
+  /* WHAT IT SAID IT IS DOING IS NOT SAID A THIRD TIME (pages pass, 2 Nov): the run's page is titled by it, and its live
+     row says it again under the agent's name, so the part under its own heading repeated the title word for word. It
+     stays where it differs from the title, a run whose page is named some other way. */
+  const sameAsTitle = (line: string): boolean => line.trim().replace(/[.…]+$/u, '') === title.trim().replace(/[.…]+$/u, '');
+  const talk = $derived(held ? runTalk(held, parts).filter((t) => !(t.key === 'doing' && t.lines.length === 1 && sameAsTitle(t.lines[0] ?? ''))) : []);
   /* WHERE THE RUN IS NOW, in the record's six words (`presence-words.ts`), read off its row as it lands: a run that
      finished says Ended, one that handed on a step says Left a step, one carried in by an import says From before. */
   const now = $derived.by(() => {
@@ -473,6 +477,14 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+  }
+
+  /* PROSE TO A READABLE MEASURE (pages pass, 2 Nov): a step left or a note under a part ran the whole tile, 1150px
+     on a desk, where the eye loses the next line. */
+  .run-next,
+  .run-said,
+  .run-sure {
+    max-inline-size: var(--measure);
   }
 
   .run-next {

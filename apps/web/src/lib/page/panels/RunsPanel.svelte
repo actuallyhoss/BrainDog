@@ -233,6 +233,16 @@
     text-align: end;
   }
 
+  /* THE END COLUMNS LINE UP DOWN THE TILE ON A DESK (pages pass, 2 Nov): each row's end was one run of words, so
+     "Portage Last heard 2h ago" and "Marlow & Co Finished 1d ago" started their how-it-ended at different places and
+     the eye could not run down it. How it ended now takes a column at least as wide as its longest usual word, and
+     when keeps its own; a longer note (an automation waiting on a computer) still takes what it needs. */
+  @container (width >= 560px) {
+    .runs-said {
+      min-inline-size: 6.5em;
+    }
+  }
+
   .runs-note {
     margin: 0 0 var(--sp-2);
     color: var(--ink-3);
