@@ -228,7 +228,7 @@
 {#snippet bunchOf(b: Bunch, ended: boolean)}
   <li class="bunch">
     <h3 class="bunch-name" dir="auto">
-      <Icon name={b.kind === 'group' ? 'user-plus' : 'user-check'} size="s" />
+      <Icon name={b.kind === 'group' ? 'people' : 'user-check'} size="s" />
       <span>{b.name}</span>
     </h3>
     <ul class="shares">
@@ -348,7 +348,7 @@
     </Tile>
   {/if}
 
-  <Tile icon="user-plus" title={copy.sharingGroups} count={groups?.length || undefined}>
+  <Tile icon="people" title={copy.sharingGroups} count={groups?.length || undefined}>
     {#if (groups ?? []).length === 0}
       <!-- THE LINE RUNS TO THE TILE (G19): the empty title's balanced wrap broke it at half the width on a phone. -->
       <div class="groups-none"><Empty kind="no-data-yet" compact title={copy.sharingNoGroups} /></div>
@@ -356,7 +356,7 @@
       <ul class="bunches">
         {#each groups ?? [] as g (g.id)}
           <li class="bunch group" in:lineIn out:dismiss animate:flip={settle()}>
-            <h3 class="bunch-name" dir="auto"><Icon name="user-plus" size="s" /><span>{g.name}</span></h3>
+            <h3 class="bunch-name" dir="auto"><Icon name="people" size="s" /><span>{g.name}</span></h3>
             <p class="share-when">{copy.sharingGroupSize(g.people.length)} · {copy.sharingGroupHolds(g.shares)}</p>
             {#if g.people.length > 0}
               <ul class="shares">

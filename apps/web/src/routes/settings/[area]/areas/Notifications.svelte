@@ -46,8 +46,7 @@
     pushRefused: 'Notifications are off for BrainDog. Turn them on in the device’s Settings, under Notifications.',
     /* A SELF-HOST RINGS NO PHONE AND NO BROWSER (selfhost lane, 2 Nov): push goes out through BrainDog Cloud's keys, so this
        area drew nothing at all there and a colleague waited for a ring that never came. Said once, with where news lands. */
-    selfPush: 'No phone or browser notifications here',
-    selfPushLine: 'This BrainDog runs on its own server, which can’t ring phones or browsers. Anything handed to you or mentioning you waits in the bell and in Needs you.',
+    selfPushLine: 'This BrainDog runs on its own server, so it can’t ring phones or browsers. Anything handed to you or mentioning you waits in the bell and in Needs you.',
   } as const;
 
   /**
@@ -283,9 +282,10 @@
       </div>
     </Tile>
   {:else if props.shell.host === 'self-host'}
-    <!-- Laid flat inside the push wrapper as `PushToggle`'s own tile is, so the wrapper is drawn once. -->
-    <Tile class="section" data-surface="tile">
-      <StateRow icon="phone" title={words.selfPush} line={words.selfPushLine} />
+    <!-- Laid flat inside the push wrapper as `PushToggle`'s own tile is, so the wrapper is drawn once, and headed as that
+         tile is, so it is not the one tile on the area with no heading row. -->
+    <Tile class="section" data-surface="tile" icon="phone" title={copy.pushTitle}>
+      <p class="said-once">{words.selfPushLine}</p>
     </Tile>
   {:else}
     <div class="push-switch"><PushToggle host={props.shell.host} onchange={turned} /></div>
