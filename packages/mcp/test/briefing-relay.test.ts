@@ -75,7 +75,7 @@ test('THE RECORD IS SAID BY ITS NAME, then its slug, never an id, and BrainDog w
 });
 
 test('AN AGENT ACTING FOR A COLLEAGUE IS TOLD WHAT IT CAN REACH, once, after the card or in the plan as its record drew it', () => {
-  const reach = 'You act for Sam: Kiln, view; amounts hidden';
+  const reach = 'You act for Sam and can view Kiln. Amounts are hidden from you.';
   const card = 'BrainDog · run S6 · project Kiln\nMore     call context';
   const out = briefed({ context: { ...FULL, card, reach }, look, home: null });
   assert.equal(out.value.reach, reach);

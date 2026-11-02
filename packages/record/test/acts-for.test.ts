@@ -1,6 +1,6 @@
 /**
- * An agent acting for a colleague is told in one line what it can reach (`acts-for.ts`): "You act
- * for Sam: Kiln, view; amounts hidden." Said by `context` as its Reach line, never cut, never an id; nothing for an
+ * An agent acting for a colleague is told in one plain sentence what it can reach (`acts-for.ts`): "You act
+ * for Sam and can view Kiln. Amounts are hidden from you." Said by `context` as its Reach line, never cut, never an id; nothing for an
  * owner's agent or a person.
  */
 
@@ -60,7 +60,7 @@ test('SAM\'S AGENT IS TOLD WHAT HIS SHARE REACHES, BY NAME, AND THAT AMOUNTS ARE
   const { namesOf } = await import('../src/methods/sharing.ts');
   const { sharesFor } = await import('@braindog/kernel');
   const line = actsFor(ctx, api.kernel.catalog(), namesOf(sql, api.kernel.catalog()), sharesFor(sql, 'p_sam') ?? []);
-  assert.equal(line, 'You act for Sam: Kiln, view; amounts hidden');
+  assert.equal(line, 'You act for Sam and can view Kiln. Amounts are hidden from you.');
   assert.doesNotMatch(line!, /p_sam|sh_|tok_|01[0-9A-HJKMNP-TV-Z]{20}/u);
 });
 
@@ -77,7 +77,7 @@ test('A MEMBER\'S AGENT IS TOLD ITS ROLE, AND A LIST HELD TO SOME ROWS SAYS SO',
   const { namesOf } = await import('../src/methods/sharing.ts');
   const names = namesOf(sql, api.kernel.catalog());
   const whole: CallContext = { principal: { kind: 'token', id: 't', scope: 'write', person: 'p_sam', level: 'write' } };
-  assert.equal(actsFor(whole, api.kernel.catalog(), names, []), 'You act for Sam: everything, edit');
+  assert.equal(actsFor(whole, api.kernel.catalog(), names, []), 'You act for Sam and can edit everything.');
   const narrow: CallContext = {
     principal: { kind: 'token', id: 't', scope: 'write', person: 'p_sam', level: null },
     registers: ['tasks'],
@@ -85,7 +85,7 @@ test('A MEMBER\'S AGENT IS TOLD ITS ROLE, AND A LIST HELD TO SOME ROWS SAYS SO',
     wheres: { tasks: { field: 'what', is: 'Glaze' } },
     hides: { tasks: ['what'] },
   } as CallContext;
-  assert.equal(actsFor(narrow, api.kernel.catalog(), names, []), 'You act for Sam: tasks (some rows), view; some fields hidden');
+  assert.equal(actsFor(narrow, api.kernel.catalog(), names, []), 'You act for Sam and can view some rows of tasks. Some fields are hidden from you.');
 });
 
 test('THE PLAN SAYS IT AS ITS REACH LINE, BEFORE MAY, AND NEVER CUTS IT', () => {
@@ -94,7 +94,7 @@ test('THE PLAN SAYS IT AS ITS REACH LINE, BEFORE MAY, AND NEVER CUTS IT', () => 
     told: [],
     who: { who: 'Claude Code on MacBook', placed: false, also: null, next: null, signs: null, waiting: null, learned: null, update: null, step: null },
     may: 'You only read: ask for any change with propose.',
-    reach: 'You act for Sam: Kiln, view; amounts hidden',
+    reach: 'You act for Sam and can view Kiln. Amounts are hidden from you.',
     rules: [],
     brief: null,
     others: [],
@@ -105,7 +105,7 @@ test('THE PLAN SAYS IT AS ITS REACH LINE, BEFORE MAY, AND NEVER CUTS IT', () => 
   };
   const plan = planContext(facts, { budget: 1 });
   assert.deepEqual(plan.sections.map((s) => s.id).slice(0, 1), ['reach']);
-  assert.match(planText(plan), /^Reach +You act for Sam: Kiln, view; amounts hidden$/mu);
+  assert.match(planText(plan), /^Reach +You act for Sam and can view Kiln\. Amounts are hidden from you\.$/mu);
   const script = planContext({ ...facts, who: null });
   assert.ok(script.sections.some((s) => s.id === 'reach'), 'a script key is told what it reaches');
 });

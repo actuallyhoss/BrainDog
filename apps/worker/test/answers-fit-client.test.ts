@@ -208,6 +208,7 @@ const BOOT = {
   names: optional(map('string')),
   home: or('string', 'null'),
   host: optional(is('cloud', 'self-host')),
+  image: optional('boolean'),
   pages: optional(
     list(
       keys({
