@@ -122,6 +122,11 @@ export type MailVars = {
    * opened on another device. Anything but six digits is left out, and the letter is the link alone, as it always was.
    */
   code?: string | undefined;
+  /**
+   * Notification settings in the app (`https://<PUBLIC_HOST>/<slug>/settings/notifications`), for the footer's line
+   * saying where to choose which mails come. `sendMail` fills it for `SETTINGS_KINDS`; empty, and the line is left out.
+   */
+  settings?: string | undefined;
 };
 
 /** One letter: its subject, its text, and the same words as simple HTML. */
@@ -360,8 +365,26 @@ function actionOf(kind: MailKind, record: string): string {
 const HOME = 'https://brain.dog';
 const MARK_SRC = `${HOME}/email/mark.png`;
 
-/** Who sends BrainDog's mail: the last line of every footer. */
-export const SENDER = 'BrainDog is run by Quartz Apps LLC.';
+/*
+ * NO COMPANY LINE IN THE FOOTER (2 Nov, his ask: "remove quartz reference from the email please"). It was the last line
+ * of every mail, html and text, and said who runs BrainDog; the footer now says why the mail came, where to choose
+ * which mails come, and where to write.
+ */
+
+/**
+ * THE KINDS WHOSE FOOTER SAYS WHERE TO CHOOSE WHICH MAILS COME: mail to somebody who has a BrainDog and is told about it.
+ * Not a sign-in link, an invitation or a sign-up (the reader may have no account), not a security notice and not the
+ * billing ladder, which Notification settings cannot turn off, so the line would promise a choice there is not.
+ */
+const SETTINGS_KINDS: ReadonlySet<MailKind> = new Set<MailKind>(['welcome', 'usage.notice']);
+
+/** Where a record's Notification settings are, under its name when the name is one the app reads as a record. */
+export function settingsLink(host: string | undefined, slug: string | undefined): string {
+  const at = (host ?? '').trim().toLowerCase();
+  if (!/^[a-z0-9.-]{1,253}(?::\d{1,5})?$/u.test(at)) return '';
+  const name = (slug ?? '').trim();
+  return `https://${at}${/^[a-z][a-z0-9-]{0,30}[a-z0-9]$/u.test(name) ? `/${name}` : ''}/settings/notifications`;
+}
 
 /**
  * THE SYSTEM'S OWN FACE, because a mail cannot load one. Geist first for the reader who has it installed, then each
@@ -477,7 +500,7 @@ const preheader = (text: string): string =>
   `${h(text)}${'&#847;&zwnj;&nbsp;'.repeat(60)}</div>`;
 
 /** What a page is made of: the subject as its title, the preheader, the body's HTML, and the footer's lines. */
-type Page = { subject: string; preheader: string; body: string; why: string; support: string };
+type Page = { subject: string; preheader: string; body: string; why: string; support: string; settings?: string };
 
 /**
  * The page every mail is drawn in: the mark and the name, a white card on a soft ground, and a quiet footer.
@@ -488,10 +511,12 @@ type Page = { subject: string; preheader: string; body: string; why: string; sup
 function page(p: Page): string {
   const footer = [
     `<p style="margin:0 0 8px">${h(`This mail is from BrainDog, sent ${p.why}.`)}</p>`,
+    ...(p.settings
+      ? [`<p style="margin:0 0 8px">Choose which mails you get in <a href="${h(p.settings)}" target="_blank" style="color:${L.dim};text-decoration:underline">Notification settings</a>.</p>`]
+      : []),
     ...(p.support
       ? [`<p style="margin:0 0 8px">Write to <a href="mailto:${h(p.support)}" style="color:${L.dim};text-decoration:underline">${h(p.support)}</a> with any question.</p>`]
       : []),
-    `<p style="margin:0">${h(SENDER)}</p>`,
   ].join('');
   return (
     '<!doctype html>' +
@@ -528,7 +553,7 @@ function page(p: Page): string {
     p.body +
     `</td></tr></table>` +
     `</td></tr>` +
-    /* THE FOOTER: who sent it and why, where to write, and where post reaches the company. */
+    /* THE FOOTER: why it was sent, where to choose which mails come, and where to write. */
     `<tr><td class="bd-dim" style="padding:24px 8px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${L.dim}">${footer}</td></tr>` +
     `</table>` +
     '<!--[if mso]></td></tr></table><![endif]-->' +
@@ -537,9 +562,13 @@ function page(p: Page): string {
   );
 }
 
-/** The footer's lines as plain text, under a letter's own: why it was sent, where to write, and who sends it. */
-const textFooter = (why: string, support: string): string =>
-  [`This mail is from BrainDog, sent ${why}.`, ...(support ? [`Write to ${support} with any question.`] : []), SENDER].join('\n');
+/** The footer's lines as plain text, under a letter's own: why it was sent, where to choose which mails come, where to write. */
+const textFooter = (why: string, support: string, settings = ''): string =>
+  [
+    `This mail is from BrainDog, sent ${why}.`,
+    ...(settings ? [`Choose which mails you get in Notification settings: ${settings}`] : []),
+    ...(support ? [`Write to ${support} with any question.`] : []),
+  ].join('\n');
 
 /**
  * A kind's letter, with every value in it made safe: a line of text, and escaped in the HTML.
@@ -567,11 +596,12 @@ export function letterOf(kind: MailKind, vars: MailVars = {}): Letter {
     from: flat(vars.from),
     days: flat(vars.days),
     code: flat(vars.code),
+    settings: SETTINGS_KINDS.has(kind) && /^https:\/\/\S+$/u.test(flat(vars.settings)) ? flat(vars.settings) : '',
   };
   const { subject, parts } = partsOf(kind, v);
   const line = (p: Part): string => ('say' in p ? p.say : 'code' in p ? `${p.lead}\n\n${spacedCode(p.code)}` : shown(p.link));
   /* A BLANK LINE BETWEEN PARAGRAPHS, AS THE SIGN-IN LETTER HAS ALWAYS HAD, and the footer's lines together under them. */
-  const text = [parts.map(line).join('\n\n'), textFooter(WHY[kind], v.support)].join('\n\n');
+  const text = [parts.map(line).join('\n\n'), textFooter(WHY[kind], v.support, v.settings)].join('\n\n');
 
   const at = parts.findIndex((p) => 'link' in p);
   /* THE HAIRLINE GOES ABOVE THE FIRST QUIET LINE AFTER THE LINK, which is the line straight after it in every letter
@@ -586,7 +616,7 @@ export function letterOf(kind: MailKind, vars: MailVars = {}): Letter {
     })
     .join('');
   const first = parts.find((p): p is { say: string } => 'say' in p)?.say ?? '';
-  const html = page({ subject: flat(subject), preheader: first, body, why: WHY[kind], support: v.support });
+  const html = page({ subject: flat(subject), preheader: first, body, why: WHY[kind], support: v.support, settings: v.settings });
   return { subject: flat(subject), text, html };
 }
 
@@ -701,7 +731,41 @@ const recordWhy = (because: string): string =>
  * table as rows with hairlines, a paragraph as itself. The dialect's first `# name` is the subject already, so the card
  * does not say it twice. Every word is escaped; the record wrote them and a person may have typed any of them.
  */
-export function recordLetter(subject: string, source: string, because = '', support = ''): Letter {
+/**
+ * What a record's mail may point at beside its words, each an absolute https address or left out: the row a notice is
+ * about in the app (`open`, the one button), the same row somewhere else (`link`, a quiet line named by its field's
+ * label), and the record's Notification settings (`settings`, the footer's line).
+ */
+export type RecordAbout = { open?: string | undefined; link?: string | undefined; linkLabel?: string | undefined; settings?: string | undefined };
+
+/** An address a letter may print and link: https, one line, no space. Anything else is no address. */
+const httpsOf = (value: string | undefined): string => {
+  const at = flat(value);
+  return /^https:\/\/[^\s"'<>]{1,2000}$/u.test(at) ? at : '';
+};
+
+/**
+ * What the quiet second link says, from its field's label: "On Sentry" is "Open in Sentry", any other label is "Open"
+ * and the label, and no label is the link's own host, so a link never reads as "Click here".
+ */
+export function linkWords(label: string | undefined, href: string): string {
+  const said = flat(label);
+  const on = /^on\s+(.{1,40})$/iu.exec(said);
+  if (on) return `Open in ${on[1]}`;
+  if (said !== '') return `Open ${said.charAt(0).toLowerCase()}${said.slice(1)}`;
+  try {
+    return `Open on ${new URL(href).hostname.replace(/^www\./u, '')}`;
+  } catch {
+    return 'Open the link';
+  }
+}
+
+/** The quiet link under the button: one line in the footer's ink, underlined. */
+const quietLink = (words: string, href: string): string =>
+  `<p class="bd-dim" style="margin:0 0 8px;font-family:${FONT};font-size:14px;line-height:21px;color:${L.dim}">` +
+  `<a href="${h(href)}" target="_blank" style="color:${L.dim};text-decoration:underline">${h(words)}</a></p>`;
+
+export function recordLetter(subject: string, source: string, because = '', support = '', about: RecordAbout = {}): Letter {
   const title = flat(subject);
   const chunks = chunksOf(source);
   /* THE CARD'S TITLE IS THE SUBJECT, so a body that opens with the same words (a digest's `# name`, a notice's own
@@ -712,14 +776,22 @@ export function recordLetter(subject: string, source: string, because = '', supp
      dropped wherever it is and not only at the top. */
   const card = (said ? chunks.slice(1) : chunks).filter((c) => !(c.kind === 'heading' && c.level === 1 && c.words === title));
   const why = recordWhy(because);
-  const text = [plainOf(chunks), textFooter(why, flat(support))].filter((s) => s !== '').join('\n\n');
+  /* A NOTICE ABOUT A ROW OPENS IT (2 Nov, the first Sentry alarm was its line and nothing else): one button to the row
+     in BrainDog, and the same row where it came from as a quiet line under it. A digest has neither. */
+  const open = httpsOf(about.open);
+  const link = httpsOf(about.link);
+  const away = link ? linkWords(about.linkLabel, link) : '';
+  const settings = httpsOf(about.settings);
+  const opens = [...(open ? [`Open in BrainDog: ${open}`] : []), ...(link ? [`${away}: ${link}`] : [])].join('\n');
+  const text = [plainOf(chunks), opens, textFooter(why, flat(support), settings)].filter((s) => s !== '').join('\n\n');
   const first = card.find((c) => c.kind === 'para');
   const html = page({
     subject: title,
     preheader: first?.kind === 'para' ? first.lines.join(' ') : title,
-    body: htmlOf(card),
+    body: htmlOf(card) + (open ? button('Open in BrainDog', open) : '') + (link ? quietLink(away, link) : ''),
     why,
     support: flat(support),
+    settings,
   });
   return { subject: title, text, html };
 }
@@ -739,6 +811,8 @@ export type MailEnv = {
   AUTH_MAIL_FROM?: string | undefined;
   MAIL_FROM?: string | undefined;
   SUPPORT_ADDRESS?: string | undefined;
+  /** Where the app is served (`app.brain.dog`), for the footer's link to Notification settings. Unset, and it is left out. */
+  PUBLIC_HOST?: string | undefined;
 };
 
 type Binding = { send(message: Outgoing): Promise<unknown> };
@@ -809,7 +883,8 @@ export async function mailOutcome(env: MailEnv, kind: MailKind, to: string, vars
       op({ op: 'mail', kind, ok: false, why: 'no-link' }, 'error');
       return 'host';
     }
-    const letter = letterOf(kind, { ...vars, support: vars.support ?? env.SUPPORT_ADDRESS });
+    const settings = vars.settings ?? (SETTINGS_KINDS.has(kind) ? settingsLink(env.PUBLIC_HOST, vars.record) : '');
+    const letter = letterOf(kind, { ...vars, support: vars.support ?? env.SUPPORT_ADDRESS, settings });
     try {
       await binding.send({ from: { email: from, name: SENDER_NAME }, to: address, ...letter });
     } catch (e) {

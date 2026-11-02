@@ -908,6 +908,10 @@ export function notify(deps: DigestDeps, said: Notice): void {
       subject: said.say.slice(0, 120),
       text: said.because ? `${said.say}\n\n${said.because}` : said.say,
       ...marked,
+      /* THE ROW THE NOTICE IS ABOUT, for the mail's button and its quiet link (`rules.ts` `aboutOf`). The Worker makes
+         the app's address of `open` and draws both; a payload without them is the mail it always was. */
+      ...(said.about?.open ? { open: said.about.open } : {}),
+      ...(said.about?.link ? { link: said.about.link, ...(said.about.linkLabel ? { link_label: said.about.linkLabel } : {}) } : {}),
     });
 }
 
@@ -930,4 +934,6 @@ export type Notice = {
    * It rides the queued push and mail so the caller can answer `told`, and is never shown to a person.
    */
   cause?: string | undefined;
+  /** The row it is about, for the mail only: its page, and the first link out the row holds (`rules.ts` `aboutOf`). */
+  about?: { open?: string; link?: string; linkLabel?: string } | undefined;
 };

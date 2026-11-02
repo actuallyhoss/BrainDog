@@ -3214,6 +3214,25 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
     ...(env.EMAIL === undefined ? {} : { email: (m: Mail) => env.EMAIL!.send(m) }),
     from: env.MAIL_FROM || env.AUTH_MAIL_FROM,
     support: env.SUPPORT_ADDRESS,
+    /* WHERE THIS RECORD OPENS IN THE APP, for a mail's button and its Notification settings line: `PUBLIC_HOST` and the
+       record's name, asked of the Directory once a pass and only when a mail goes. A name that cannot be read is the
+       host alone, which opens the record the reader is signed in to. */
+    app: (() => {
+      let asked: Promise<string | null> | null = null;
+      return () =>
+        (asked ??= (async () => {
+          const host = (env.PUBLIC_HOST ?? '').trim();
+          if (host === '') return null;
+          let slug: string | null = null;
+          try {
+            const recId = await record.recId();
+            slug = recId ? await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).slugOf(recId) : null;
+          } catch {
+            slug = null;
+          }
+          return slug ? `https://${host}/${slug}` : `https://${host}`;
+        })());
+    })(),
     /* EVERY JOB THAT WAS SENT, COUNTED IN THE ACCOUNT'S LEDGER AND NEVER LIMITED, by the record's own object, which knows
        the record id the ledger is keyed by. The kind and the id cross the RPC and nothing of the payload does. */
     counted: (job) => record.countDelivery({ id: job.id, kind: job.kind }),

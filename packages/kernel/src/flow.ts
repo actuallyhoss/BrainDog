@@ -1760,7 +1760,7 @@ function act(
        an arrival may still reach one, and says so here rather than acting on no row. `notify`, `suggest` and `create`
        need no row, and are taken. */
     if ('notify' in action) {
-      if (action.notify.urgent === true) r.interrupt({ actor, say: action.notify.say });
+      if (action.notify.urgent === true) r.interrupt({ actor, say: action.notify.say, ...(typeof action.notify.because === 'string' ? { because: action.notify.because } : {}) });
       else deps.note(actor, action.notify.say);
       return { ok: true, stop: false, answer: null };
     }

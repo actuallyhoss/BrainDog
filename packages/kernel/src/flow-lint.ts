@@ -490,7 +490,7 @@ function carriedIn(text: string, carried: ReadonlyMap<string, Carried>): { name:
 export function passFilled(path: readonly string[]): boolean {
   if (path[0] === 'create') return path[1] === 'fields' && path.length === 3;
   const at = path.join('.');
-  return at === 'set.to' || at === 'note' || at === 'notify.say' || at === 'schedule.note' || at === 'suggest.question' || at === 'link.to.value';
+  return at === 'set.to' || at === 'note' || at === 'notify.say' || at === 'notify.because' || at === 'schedule.note' || at === 'suggest.question' || at === 'link.to.value';
 }
 
 /**
@@ -519,6 +519,7 @@ function placeOf(path: readonly string[], spec: Record<string, unknown>): string
   const named: Record<string, string> = {
     note: 'a note',
     'notify.say': 'a notification',
+    'notify.because': 'the reason a notification mails',
     'schedule.note': 'a reminder',
     'suggest.question': 'a question in the queue',
     'link.to.value': 'the value it links by',
@@ -1230,7 +1231,11 @@ function fillSites(action: Record<string, unknown>, at: string): { where: string
   }
   if ('set' in action) out.push({ where: `${at}.set.to`, value: of(action.set, 'to') });
   if ('note' in action) out.push({ where: `${at}.note`, value: action.note });
-  if ('notify' in action) out.push({ where: `${at}.notify.say`, value: of(action.notify, 'say') });
+  if ('notify' in action) {
+    out.push({ where: `${at}.notify.say`, value: of(action.notify, 'say') });
+    /* THE REASON THE MAIL CARRIES, filled from the row as the line is, so a secret is refused in it too. */
+    if (of(action.notify, 'because') !== undefined) out.push({ where: `${at}.notify.because`, value: of(action.notify, 'because') });
+  }
   if ('schedule' in action) out.push({ where: `${at}.schedule.note`, value: of(action.schedule, 'note') });
   if ('link' in action) out.push({ where: `${at}.link.to.value`, value: of(of(action.link, 'to'), 'value') });
   if ('suggest' in action) out.push({ where: `${at}.suggest.question`, value: of(action.suggest, 'question') });

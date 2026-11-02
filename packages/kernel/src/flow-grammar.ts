@@ -148,7 +148,7 @@ function argTables(): { TRIGGER_ARGS: Record<Trigger, readonly Arg[]>; STEP_ARGS
       of(may('link.to.also', 'text', 'field'), 'link.to.register'),
     ],
     note: [need('note', 'text')],
-    notify: [need('notify.say', 'text'), may('notify.tone', 'text'), may('notify.urgent', 'boolean')],
+    notify: [need('notify.say', 'text'), may('notify.because', 'text'), may('notify.tone', 'text'), may('notify.urgent', 'boolean')],
     schedule: [need('schedule.in', 'later'), need('schedule.note', 'text'), may('schedule.kind', 'text')],
     create: [may('create.register', 'text', 'list'), of(may('create.each', 'list', 'field'), 'create.register'), need('create.bound', 'number'), may('create.fields', 'map')],
     suggest: [need('suggest.question', 'text'), may('suggest.options', 'list')],

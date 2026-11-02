@@ -69,7 +69,8 @@ export type RuleAction =
   | { move: string }
   | { link: { field: string; to: LinkTo } }
   | { note: string }
-  | { notify: { say: string; tone?: string; urgent?: boolean } }
+  /** `because` is the reason the mail carries under the line (`digest.ts` `Notice`), filled from the row as `say` is. */
+  | { notify: { say: string; because?: string; tone?: string; urgent?: boolean } }
   /**
    * Come back to this row later. `07 §6`'s fourth shape, and the one that was missing.
    *
@@ -250,7 +251,7 @@ export type RulesDeps = {
    * this file is the rule engine. A second copy of the rate limit here would be a second answer to
    * "have we interrupted this person already", and the two would disagree on the day it mattered.
    */
-  interrupt: (said: { actor: string; say: string; because?: string; url?: string }) => void;
+  interrupt: (said: { actor: string; say: string; because?: string; url?: string; about?: NoticeAbout }) => void;
   /**
    * Arm one `rule` schedule row: come back to this row at that time.
    *
@@ -426,7 +427,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
     /* A NOTICE, NOT A STRING. `urgent` was declared, printed in the install diff as "interrupts
        you", and then flattened into the same list a plain `note` goes in — so a rule saying
        "Payment failed" wrote an event and nothing left the record. 09 §4: `true` interrupts. */
-    const notes: { text: string; urgent: boolean }[] = [];
+    const notes: { text: string; urgent: boolean; because?: string }[] = [];
     /* HELD LIKE THE NOTES ARE, until the write has happened. A rule whose write the register then
        refuses has not done anything, and a reminder about what it did not do is worse than silence. */
     const later: { in: string; note: string }[] = [];
@@ -570,7 +571,8 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
       } else if ('notify' in action) {
         const text = said(action.notify.say, `then[${i}].notify.say`, 'a notification');
         if (text === null) continue;
-        notes.push({ text, urgent: action.notify.urgent === true });
+        const because = action.notify.because === undefined ? null : said(action.notify.because, `then[${i}].notify.because`, 'a notification');
+        notes.push({ text, urgent: action.notify.urgent === true, ...(because ? { because } : {}) });
         did.push('notify');
       } else if ('schedule' in action) {
         const note = said(action.schedule.note, `then[${i}].schedule.note`, 'a reminder');
@@ -632,7 +634,17 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
          "batch by default" means: it lands in the digest. */
       /* IT OPENS THE ROW'S LIST (`/r/<list>`), a path a push may carry (`PUSH_OPEN`), where `/<id>` was none and every
          such push opened Today; and the list says its kind, so a bill's notice is `money` (`pushKindOf`). */
-      if (one.urgent) deps.interrupt({ actor: `rule:${rule.rule}`, say: one.text, url: `/r/${fired.entry.register}` });
+      /* AND THE MAIL NAMES THE ROW ITSELF (`about`): its own page, for the mail's one button, and the first link the row
+         holds to somewhere else, with that field's label, for a quiet second link. A notice said only its line, and the
+         mail had nothing to open (2 Nov, the first Sentry alarm). */
+      if (one.urgent)
+        deps.interrupt({
+          actor: `rule:${rule.rule}`,
+          say: one.text,
+          url: `/r/${fired.entry.register}`,
+          ...(one.because ? { because: one.because } : {}),
+          about: aboutOf(deps.schemaOf(fired.register), fired.entry),
+        });
       else deps.note(fired.entry, `rule:${rule.rule}`, one.text, fired.batch);
 
     /* THE EXPANSION IS LAST, and it shares the triggering write's batch — so "undo this expansion"
@@ -1009,6 +1021,27 @@ export function linkPatternFault(pattern: string): string | null {
   }
   const shape = unsafeShape(pattern);
   return shape === null ? null : UNSAFE[shape];
+}
+
+/**
+ * What a mail about one row may point at (`digest.ts` `Notice.about`): the row's own page in the app, and the first
+ * https link the row holds, with the label of the field it is in. Nothing a field of the row keeps sealed: a url field
+ * is never one.
+ */
+export type NoticeAbout = { open?: string; link?: string; linkLabel?: string };
+
+/** `NoticeAbout` for one row of `schema`: its page by its number, and the first https value of a `url` field. */
+export function aboutOf(schema: Schema | null, entry: Entry): NoticeAbout {
+  const about: NoticeAbout = {};
+  if (entry.seq !== null && /^[a-z][a-z0-9_]*$/u.test(entry.register)) about.open = `/r/${entry.register}/${entry.seq}`;
+  for (const [field, spec] of Object.entries(schema?.fields ?? {})) {
+    const value = entry.fields[field];
+    if (spec.type !== 'url' || typeof value !== 'string' || !/^https:\/\/[^\s]{1,2000}$/u.test(value)) continue;
+    about.link = value;
+    if (spec.label) about.linkLabel = spec.label;
+    break;
+  }
+  return about;
 }
 
 /* ── the sentence a rule writes ──────────────────────────────────────────── */

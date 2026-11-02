@@ -52,6 +52,11 @@ export type Transports = {
   from?: string | undefined;
   /** Where a reader may write with a question, named in the mail's footer: `SUPPORT_ADDRESS`. Blank, and it names none. */
   support?: string | undefined;
+  /**
+   * Where this record opens in the app, `https://<PUBLIC_HOST>/<slug>`, asked only when a mail is sent: the start of a
+   * notice's button and of the footer's Notification settings. Absent or `null`, and the mail has neither.
+   */
+  app?: (() => Promise<string | null>) | undefined;
   /** `fetch`, narrowed to what a webhook needs: the address, the raw body, and the headers that go with it. */
   post?: ((url: string, body: string, headers: Record<string, string>) => Promise<{ ok: boolean; status: number }>) | undefined;
   /** How a named signing key is opened. Absent, and a post that names one is refused rather than sent bare. */
@@ -341,7 +346,21 @@ export function makeDeliver(transports: Transports): Deliver {
         throw new Error(`a notify.email goes to at most ${MAX_RECIPIENTS} addresses, and this one names ${to.length}`);
       /* THE RECORD'S WORDS, DRAWN IN THE HOUSE LETTER: its block dialect as headings, figures and rows in the HTML, and
          as plain lines in the text, each with the footer that says what the mail is. */
-      const letter = recordLetter(subject, text(payload.text), text(payload.because), transports.support ?? '');
+      /* AND WHAT IT OPENS: the row's page in the app, the row's own link elsewhere, and the record's Notification
+         settings. The record names the row by its path (`/r/<list>/<n>`) and never by an address, so the host is this
+         deployment's own. A base that cannot be asked is a mail without the button, never a mail not sent. */
+      let base: string | null = null;
+      try {
+        base = transports.app ? await transports.app() : null;
+      } catch {
+        base = null;
+      }
+      const path = text(payload.open);
+      const letter = recordLetter(subject, text(payload.text), text(payload.because), transports.support ?? '', {
+        ...(base && /^\/r\/[a-z0-9_]{1,64}\/\d{1,12}$/u.test(path) ? { open: `${base}${path}` } : {}),
+        ...(text(payload.link) ? { link: text(payload.link), linkLabel: text(payload.link_label) } : {}),
+        ...(base ? { settings: `${base}/settings/notifications` } : {}),
+      });
       await transports.email({ from, to, subject: letter.subject, text: letter.text, html: letter.html });
       await count(transports, job);
       return;
