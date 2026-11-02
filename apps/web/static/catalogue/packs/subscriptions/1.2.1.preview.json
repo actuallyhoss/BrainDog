@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-30T22:48:40.107Z",
+  "made_at": "2026-11-02T14:00:21.019Z",
   "pages": [
     {
       "blocks": [
@@ -33,8 +33,76 @@
           "rows": [],
           "matched": 0,
           "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "values": {
+            "subs-count": 4,
+            "subs-month": {
+              "amount": 11347,
+              "currency": "USD"
+            },
+            "subs-year": {
+              "amount": 136164,
+              "currency": "USD"
+            }
+          },
+          "read_as": {
+            "subs-count": "figure",
+            "subs-month": "figure",
+            "subs-year": "figure"
+          },
+          "figures": {
+            "subs-count": {
+              "name": "Subscriptions",
+              "source": "register.recurring",
+              "where": "state is live, subscription is true",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "subs-month": {
+              "name": "Subscriptions a month",
+              "source": "register.recurring",
+              "where": "state is live, subscription is true, direction is out",
+              "value": {
+                "sum": {
+                  "product": [
+                    "amount",
+                    {
+                      "by": "every",
+                      "lookup": "per_month"
+                    }
+                  ]
+                }
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "subs-year": {
+              "name": "Subscriptions a year",
+              "source": "register.recurring",
+              "where": "state is live, subscription is true, direction is out",
+              "value": {
+                "sum": {
+                  "product": [
+                    "amount",
+                    {
+                      "by": "every",
+                      "lookup": "per_year"
+                    }
+                  ]
+                }
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
         },
         {
           "body": "Mark the repeating payments below that are subscriptions, or add one.",
@@ -49,7 +117,9 @@
           "key": "k0xe07gw",
           "rows": [],
           "matched": 0,
-          "refusals": []
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
         },
         {
           "columns": [
@@ -89,9 +159,52 @@
           },
           "where": "state is live, direction is out, subscription is not true",
           "key": "k012r9p5",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Payment",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "13ch"
+            },
+            {
+              "field": "every",
+              "label": "How often",
+              "width": "14ch"
+            }
+          ],
+          "heading": "Other repeating payments",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "amount"
+            }
+          ],
+          "source": "register.recurring",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "subs-count"
+          },
+          "where": "state is live, direction is out, subscription is not true",
+          "key": "k0pnzx47",
           "rows": [
             {
-              "id": "01M67G0FDBBH2FH9MGGAX0QFJ3",
+              "id": "01M6E8Z88V8WG0ZAWA7A4DGAZS",
               "register": "recurring",
               "seq": 1,
               "fields": {
@@ -113,8 +226,8 @@
               },
               "state": "live",
               "version": 1,
-              "created_at": "2026-10-30T22:48:40.107Z",
-              "updated_at": "2026-10-30T22:48:40.107Z",
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
               "deleted_at": null
             }
           ],
@@ -163,8 +276,158 @@
           "rows": [],
           "matched": 0,
           "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "readings": [
+            {
+              "label": "A month",
+              "metric": "subs-month",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 11347,
+                "unit": "USD",
+                "rows": 4,
+                "refusals": [],
+                "backs": [
+                  "recurring#2",
+                  "recurring#3",
+                  "recurring#4",
+                  "recurring#5"
+                ],
+                "held": 5,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "A year",
+              "metric": "subs-year",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 136164,
+                "unit": "USD",
+                "rows": 4,
+                "refusals": [],
+                "backs": [
+                  "recurring#2",
+                  "recurring#3",
+                  "recurring#4",
+                  "recurring#5"
+                ],
+                "held": 5,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Renew in 30 days",
+              "metric": "subs-renew-30d",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 3,
+                "unit": null,
+                "rows": 3,
+                "refusals": [],
+                "held": 5,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Trials ending",
+              "metric": "subs-trials",
+              "target": {
+                "lte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 5,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "subs-month": {
+              "name": "Subscriptions a month",
+              "source": "register.recurring",
+              "where": "state is live, subscription is true, direction is out",
+              "value": {
+                "sum": {
+                  "product": [
+                    "amount",
+                    {
+                      "by": "every",
+                      "lookup": "per_month"
+                    }
+                  ]
+                }
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "subs-year": {
+              "name": "Subscriptions a year",
+              "source": "register.recurring",
+              "where": "state is live, subscription is true, direction is out",
+              "value": {
+                "sum": {
+                  "product": [
+                    "amount",
+                    {
+                      "by": "every",
+                      "lookup": "per_year"
+                    }
+                  ]
+                }
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "subs-renew-30d": {
+              "name": "Subscriptions renewing in 30 days",
+              "source": "register.recurring",
+              "where": "state is live, subscription is true, next_due after yesterday, next_due before +31d",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "subs-trials": {
+              "name": "Free trials ending in 14 days",
+              "source": "register.recurring",
+              "where": "state is live, subscription is true, trial_ends after yesterday, trial_ends before +15d",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            }
+          }
         },
         {
           "columns": [
@@ -250,11 +513,36 @@
           },
           "where": "state is live, subscription is true, cancel_by after yesterday, cancel_by before +15d",
           "key": "k1xksf6p",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88V8WG0ZAWAAK4578B2",
+              "register": "recurring",
+              "seq": 4,
+              "fields": {
+                "weekend": "leave",
+                "post": false,
+                "what": "Gym",
+                "direction": "out",
+                "amount": {
+                  "amount": 2999,
+                  "currency": "USD"
+                },
+                "every": "monthly",
+                "next_due": "2026-11-16",
+                "state": "live",
+                "subscription": true,
+                "used": "never",
+                "cancel_by": "2026-11-12"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
         },
         {
           "columns": [
@@ -299,11 +587,40 @@
           },
           "where": "state is live, subscription is true, price_up_on after -90d",
           "key": "k0judwsu",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88V8WG0ZAWAA6K7P58X",
+              "register": "recurring",
+              "seq": 3,
+              "fields": {
+                "weekend": "leave",
+                "post": false,
+                "what": "Adobe Creative Cloud",
+                "direction": "out",
+                "amount": {
+                  "amount": 5999,
+                  "currency": "USD"
+                },
+                "every": "monthly",
+                "next_due": "2026-11-06",
+                "state": "live",
+                "subscription": true,
+                "used": "sometimes",
+                "price_was": {
+                  "amount": 5499,
+                  "currency": "USD"
+                },
+                "price_up_on": "2026-10-03"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
         },
         {
           "columns": [
@@ -336,11 +653,91 @@
           },
           "where": "state is live, subscription is true, next_due after yesterday, next_due before +31d",
           "key": "k1lv51nm",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88V8WG0ZAWAA6K7P58X",
+              "register": "recurring",
+              "seq": 3,
+              "fields": {
+                "weekend": "leave",
+                "post": false,
+                "what": "Adobe Creative Cloud",
+                "direction": "out",
+                "amount": {
+                  "amount": 5999,
+                  "currency": "USD"
+                },
+                "every": "monthly",
+                "next_due": "2026-11-06",
+                "state": "live",
+                "subscription": true,
+                "used": "sometimes",
+                "price_was": {
+                  "amount": 5499,
+                  "currency": "USD"
+                },
+                "price_up_on": "2026-10-03"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E8Z88V8WG0ZAWA9QNXY2EY",
+              "register": "recurring",
+              "seq": 2,
+              "fields": {
+                "weekend": "leave",
+                "post": false,
+                "what": "Netflix",
+                "direction": "out",
+                "amount": {
+                  "amount": 1549,
+                  "currency": "USD"
+                },
+                "every": "monthly",
+                "next_due": "2026-11-11",
+                "state": "live",
+                "subscription": true,
+                "used": "often"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E8Z88V8WG0ZAWAAK4578B2",
+              "register": "recurring",
+              "seq": 4,
+              "fields": {
+                "weekend": "leave",
+                "post": false,
+                "what": "Gym",
+                "direction": "out",
+                "amount": {
+                  "amount": 2999,
+                  "currency": "USD"
+                },
+                "every": "monthly",
+                "next_due": "2026-11-16",
+                "state": "live",
+                "subscription": true,
+                "used": "never",
+                "cancel_by": "2026-11-12"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 3,
+          "refusals": []
         },
         {
           "body": "You hardly use {{subs-unused}} of them, and they cost {{subs-unused-month}} a month.",
@@ -356,8 +753,51 @@
           "rows": [],
           "matched": 0,
           "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "values": {
+            "subs-unused": 1,
+            "subs-unused-month": {
+              "amount": 2999,
+              "currency": "USD"
+            }
+          },
+          "read_as": {
+            "subs-unused": "figure",
+            "subs-unused-month": "figure"
+          },
+          "figures": {
+            "subs-unused": {
+              "name": "Hardly used",
+              "source": "register.recurring",
+              "where": "state is live, subscription is true, used is hardly or never",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            },
+            "subs-unused-month": {
+              "name": "A month on what you hardly use",
+              "source": "register.recurring",
+              "where": "state is live, subscription is true, direction is out, used is hardly or never",
+              "value": {
+                "sum": {
+                  "product": [
+                    "amount",
+                    {
+                      "by": "every",
+                      "lookup": "per_month"
+                    }
+                  ]
+                }
+              },
+              "format": "money",
+              "target": {
+                "lte": 0
+              }
+            }
+          }
         },
         {
           "heading": "A month, by category",
@@ -375,8 +815,54 @@
           "rows": [],
           "matched": 0,
           "refusals": [],
+          "readings": [
+            {
+              "metric": "subs-month-by-category",
+              "reading": {
+                "value": 11347,
+                "unit": "USD",
+                "rows": 4,
+                "refusals": [],
+                "backs": [
+                  "recurring#2",
+                  "recurring#3",
+                  "recurring#4",
+                  "recurring#5"
+                ],
+                "held": 5,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true,
+                "groups": [],
+                "more": 0
+              }
+            }
+          ],
+          "figures": {
+            "subs-month-by-category": {
+              "name": "Subscriptions a month, by category",
+              "source": "register.recurring",
+              "where": "state is live, subscription is true, direction is out",
+              "value": {
+                "sum": {
+                  "product": [
+                    "amount",
+                    {
+                      "by": "every",
+                      "lookup": "per_month"
+                    }
+                  ]
+                }
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              },
+              "group_by": "category"
+            }
+          },
           "drawn": false,
-          "why": "when"
+          "why": "unsaid"
         },
         {
           "columns": [
@@ -427,11 +913,116 @@
           "span": 12,
           "where": "subscription is true, state is not ended",
           "key": "k1jztu91",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88V8WG0ZAWAA6K7P58X",
+              "register": "recurring",
+              "seq": 3,
+              "fields": {
+                "weekend": "leave",
+                "post": false,
+                "what": "Adobe Creative Cloud",
+                "direction": "out",
+                "amount": {
+                  "amount": 5999,
+                  "currency": "USD"
+                },
+                "every": "monthly",
+                "next_due": "2026-11-06",
+                "state": "live",
+                "subscription": true,
+                "used": "sometimes",
+                "price_was": {
+                  "amount": 5499,
+                  "currency": "USD"
+                },
+                "price_up_on": "2026-10-03"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E8Z88V8WG0ZAWA9QNXY2EY",
+              "register": "recurring",
+              "seq": 2,
+              "fields": {
+                "weekend": "leave",
+                "post": false,
+                "what": "Netflix",
+                "direction": "out",
+                "amount": {
+                  "amount": 1549,
+                  "currency": "USD"
+                },
+                "every": "monthly",
+                "next_due": "2026-11-11",
+                "state": "live",
+                "subscription": true,
+                "used": "often"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E8Z88V8WG0ZAWAAK4578B2",
+              "register": "recurring",
+              "seq": 4,
+              "fields": {
+                "weekend": "leave",
+                "post": false,
+                "what": "Gym",
+                "direction": "out",
+                "amount": {
+                  "amount": 2999,
+                  "currency": "USD"
+                },
+                "every": "monthly",
+                "next_due": "2026-11-16",
+                "state": "live",
+                "subscription": true,
+                "used": "never",
+                "cancel_by": "2026-11-12"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E8Z88V8WG0ZAWAB6HAYWNW",
+              "register": "recurring",
+              "seq": 5,
+              "fields": {
+                "weekend": "leave",
+                "post": false,
+                "what": "Notion",
+                "direction": "out",
+                "amount": {
+                  "amount": 9600,
+                  "currency": "USD"
+                },
+                "every": "yearly",
+                "next_due": "2027-03-02",
+                "state": "live",
+                "subscription": true,
+                "used": "often"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 4,
+          "refusals": []
         },
         {
           "heading": "Add a subscription",
@@ -445,49 +1036,6 @@
           "matched": 0,
           "refusals": [],
           "fills": {}
-        },
-        {
-          "columns": [
-            {
-              "field": "what",
-              "label": "Payment",
-              "width": "minmax(16ch,1fr)"
-            },
-            {
-              "align": "end",
-              "field": "amount",
-              "label": "Amount",
-              "width": "13ch"
-            },
-            {
-              "field": "every",
-              "label": "How often",
-              "width": "14ch"
-            }
-          ],
-          "heading": "Other repeating payments",
-          "icon": "rows",
-          "kind": "table",
-          "limit": 12,
-          "order": [
-            {
-              "dir": "asc",
-              "field": "amount"
-            }
-          ],
-          "source": "register.recurring",
-          "span": 12,
-          "when": {
-            "gt": 0,
-            "metric": "subs-count"
-          },
-          "where": "state is live, direction is out, subscription is not true",
-          "key": "k0pnzx47",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
         },
         {
           "fold": true,
@@ -558,19 +1106,20 @@
         "register.recurring"
       ],
       "title": "Subscriptions",
-      "read_at": "2026-10-30T22:48:40.107Z",
+      "read_at": "2026-11-02T14:00:21.019Z",
       "zone": "UTC",
       "look": {
         "look": "subscriptions",
-        "basis": "r1vqtrms",
+        "basis": "r18ncvre",
         "by": "rule",
-        "lead": "k012r9p5",
+        "lead": "k0pnzx47",
         "hide": [
-          "k1jztu91"
+          "k0xwusxn",
+          "k06winm1"
         ],
         "next": {
           "row": "recurring#1",
-          "text": "Studio rent is 29 days late"
+          "text": "Studio rent is 32 days late"
         }
       },
       "declared_version": 1

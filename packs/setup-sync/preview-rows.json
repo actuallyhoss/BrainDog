@@ -1,0 +1,5 @@
+[
+  {"register": "carry", "fields": {"name": "Shell profile", "kind": "files", "mac": "~/.zshrc", "state": "on"}},
+  {"register": "carry", "fields": {"name": "SSH keys", "kind": "sign_ins", "mac": "~/.ssh", "state": "on"}},
+  {"register": "carry", "fields": {"name": "Editor settings", "kind": "files", "mac": "~/Library/Application Support/Code/User", "state": "on"}}
+]

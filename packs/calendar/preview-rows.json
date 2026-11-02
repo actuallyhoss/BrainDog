@@ -1,0 +1,5 @@
+[
+  {"register": "events", "fields": {"what": "Standup", "day": {"day": "+0"}, "time": "09:30"}},
+  {"register": "events", "fields": {"what": "Lunch with Sam", "day": {"day": "+0"}, "time": "13:00", "place": "Dishoom"}},
+  {"register": "events", "fields": {"what": "Design review", "day": {"day": "+2"}, "time": "15:00"}}
+]

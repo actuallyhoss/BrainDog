@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-30T19:15:57.332Z",
+  "made_at": "2026-11-02T14:00:21.019Z",
   "pages": [
     {
       "blocks": [
@@ -61,11 +61,47 @@
           "source": "register.cash_counts",
           "span": 12,
           "key": "k02ah0bg",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "empty"
+          "rows": [
+            {
+              "id": "01M6E8Z88V56FXXQD4FTVBTH94",
+              "register": "cash_counts",
+              "seq": 1,
+              "fields": {
+                "account": "01M6E8Z88V56FXXQD4BQM5KYA2",
+                "counted": {
+                  "amount": 24000,
+                  "currency": "USD"
+                },
+                "on": "2026-10-31",
+                "note": "Petty cash tin"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E8Z88V56FXXQD4FZCX7S6K",
+              "register": "cash_counts",
+              "seq": 2,
+              "fields": {
+                "account": "01M6E8Z88V56FXXQD4BQM5KYA2",
+                "counted": {
+                  "amount": 31000,
+                  "currency": "USD"
+                },
+                "on": "2026-10-03"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
         }
       ],
       "icon": "money",
@@ -78,7 +114,7 @@
         "register.cash_counts"
       ],
       "title": "Cash counts",
-      "read_at": "2026-10-30T19:15:57.332Z",
+      "read_at": "2026-11-02T14:00:21.019Z",
       "zone": "UTC",
       "look": {
         "look": "cash-counts",

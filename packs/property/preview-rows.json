@@ -1,0 +1,3 @@
+[
+  {"register": "plans", "fields": {"name": "Flat on Elm Street", "state": "open", "price": {"amount": 32000000, "currency": "USD"}, "value": {"amount": 34500000, "currency": "USD"}, "developer": "Northgate Homes", "delivers_on": {"day": "+400"}, "make_how": "down_equal", "make_first": {"day": "-200"}, "make_parts": 36, "make_every": "monthly", "make_down": {"amount": 3200000, "currency": "USD"}}}
+]

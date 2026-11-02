@@ -1,7 +1,465 @@
 {
   "format": 1,
-  "made_at": "2026-11-01T01:28:01.487Z",
+  "made_at": "2026-11-02T14:00:21.019Z",
   "pages": [
+    {
+      "blocks": [
+        {
+          "body": "No instalments for Flat on Elm Street yet.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "plan-parts:Flat on Elm Street"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "says": [
+            {
+              "body": "{{plan-parts-paid:Flat on Elm Street}} of {{plan-parts:Flat on Elm Street}} parts paid, the last due on {{plan-last-due:Flat on Elm Street}}. [Property](/p/properties) has what it is worth and your equity.",
+              "when": {
+                "empty": false,
+                "metric": "property-value-of:Flat on Elm Street"
+              }
+            },
+            {
+              "body": "{{plan-parts-paid:Flat on Elm Street}} of {{plan-parts:Flat on Elm Street}} parts paid, the last due on {{plan-last-due:Flat on Elm Street}}."
+            }
+          ],
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Flat on Elm Street"
+              },
+              {
+                "gte": 1,
+                "metric": "plan-parts-open:Flat on Elm Street"
+              }
+            ]
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "says": [
+            {
+              "body": "{{plan-parts-paid:Flat on Elm Street}} of {{plan-parts:Flat on Elm Street}} parts paid, and nothing is left. The last was due on {{plan-last-due:Flat on Elm Street}}. [Property](/p/properties) has what it is worth and your equity.",
+              "when": {
+                "empty": false,
+                "metric": "property-value-of:Flat on Elm Street"
+              }
+            },
+            {
+              "body": "{{plan-parts-paid:Flat on Elm Street}} of {{plan-parts:Flat on Elm Street}} parts paid, and nothing is left. The last was due on {{plan-last-due:Flat on Elm Street}}."
+            }
+          ],
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Flat on Elm Street"
+              },
+              {
+                "lt": 1,
+                "metric": "plan-parts-open:Flat on Elm Street"
+              }
+            ]
+          },
+          "key": "k08lez9h-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid",
+              "metric": "plan-paid:Flat on Elm Street"
+            },
+            {
+              "label": "Left",
+              "metric": "plan-left:Flat on Elm Street"
+            },
+            {
+              "label": "Late",
+              "metric": "plan-late:Flat on Elm Street"
+            }
+          ],
+          "heading": "Where it stands",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 12,
+          "tone": "bad",
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Flat on Elm Street"
+              },
+              {
+                "gte": 1,
+                "metric": "plan-parts-open:Flat on Elm Street"
+              },
+              {
+                "gt": 0,
+                "metric": "plan-late:Flat on Elm Street"
+              }
+            ]
+          },
+          "key": "k0jacd2u",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid",
+              "metric": "plan-paid:Flat on Elm Street"
+            },
+            {
+              "label": "Left",
+              "metric": "plan-left:Flat on Elm Street"
+            }
+          ],
+          "heading": "Where it stands",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 12,
+          "tone": "bad",
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Flat on Elm Street"
+              },
+              {
+                "gte": 1,
+                "metric": "plan-parts-open:Flat on Elm Street"
+              },
+              {
+                "lte": 0,
+                "metric": "plan-late:Flat on Elm Street"
+              }
+            ]
+          },
+          "key": "k0jacd2u-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid",
+              "metric": "plan-paid:Flat on Elm Street"
+            }
+          ],
+          "heading": "Where it stands",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 12,
+          "tone": "bad",
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Flat on Elm Street"
+              },
+              {
+                "lt": 1,
+                "metric": "plan-parts-open:Flat on Elm Street"
+              }
+            ]
+          },
+          "key": "k0jacd2u-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid",
+              "metric": "plan-parts-paid-by-plan:Flat on Elm Street"
+            },
+            {
+              "label": "Parts",
+              "metric": "plan-parts-by-plan:Flat on Elm Street"
+            },
+            {
+              "label": "Next due",
+              "metric": "plan-next-due-by-plan:Flat on Elm Street"
+            },
+            {
+              "label": "Left",
+              "metric": "plan-left-by-plan:Flat on Elm Street"
+            },
+            {
+              "label": "Left after",
+              "metric": "plan-after-next-by-plan:Flat on Elm Street"
+            }
+          ],
+          "empty": "No parts of Flat on Elm Street yet.",
+          "heading": "Parts paid",
+          "icon": "credit-card",
+          "kind": "progress",
+          "span": 12,
+          "when": {
+            "gte": 1,
+            "metric": "plan-parts:Flat on Elm Street"
+          },
+          "key": "k0px7fce",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "amount"
+            },
+            {
+              "field": "due"
+            },
+            {
+              "field": "note"
+            }
+          ],
+          "empty": "Nothing left to pay on Flat on Elm Street.",
+          "heading": "Upcoming",
+          "icon": "calendar-clock",
+          "kind": "todo",
+          "limit": 6,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "where": "plan is Flat on Elm Street, state is open",
+          "key": "k0foinoo",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            },
+            {
+              "field": "settled",
+              "label": "Paid on",
+              "width": "13ch"
+            },
+            {
+              "field": "paid_by",
+              "label": "Paid by",
+              "width": "minmax(10ch,18ch)"
+            }
+          ],
+          "empty": "Nothing paid on Flat on Elm Street yet.",
+          "heading": "Paid",
+          "icon": "receipt",
+          "kind": "table",
+          "limit": 120,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "where": "plan is Flat on Elm Street, state is paid",
+          "key": "k0122i0w",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "fold": true,
+          "heading": "Every part still to come",
+          "icon": "calendar-clock",
+          "kind": "section",
+          "span": 12,
+          "key": "k0zxpvfj",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "left_after",
+              "label": "Left after",
+              "width": "15ch"
+            }
+          ],
+          "empty": "Nothing left to pay on Flat on Elm Street.",
+          "kind": "table",
+          "limit": 120,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "where": "plan is Flat on Elm Street, state is open",
+          "key": "k13g77aq",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            }
+          ],
+          "heading": "Cancelled",
+          "icon": "calendar-x",
+          "kind": "table",
+          "limit": 120,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "when": {
+            "gte": 1,
+            "metric": "plan-parts-cancelled:Flat on Elm Street"
+          },
+          "where": "plan is Flat on Elm Street, state is cancelled",
+          "key": "k0y2324n",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "register": "plans"
+      },
+      "icon": "calendar",
+      "nav": {
+        "order": 30,
+        "section": "Money"
+      },
+      "pack": "money-core",
+      "page": "flat-on-elm-street",
+      "requires": [
+        "register.plans",
+        "register.installments"
+      ],
+      "title": "Flat on Elm Street",
+      "read_at": "2026-11-02T14:00:21.019Z",
+      "zone": "UTC",
+      "param": {
+        "register": "plans",
+        "seq": 1,
+        "title": "Flat on Elm Street"
+      },
+      "look": {
+        "look": "money-plan",
+        "basis": "r0fvuo47",
+        "by": "rule",
+        "hide": [
+          "k0122i0w",
+          "k0zxpvfj",
+          "k13g77aq"
+        ]
+      }
+    },
     {
       "blocks": [
         {
@@ -16,7 +474,9 @@
           "key": "k08lez9h",
           "rows": [],
           "matched": 0,
-          "refusals": []
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
         },
         {
           "body": "{{property-equity}} equity in {{property-value}}. {{property-left}} left to pay.",
@@ -31,8 +491,57 @@
           "rows": [],
           "matched": 0,
           "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "values": {
+            "property-equity": 0,
+            "property-value": {
+              "amount": 34500000,
+              "currency": "USD"
+            },
+            "property-left": 0
+          },
+          "read_as": {
+            "property-equity": "figure",
+            "property-value": "figure",
+            "property-left": "figure"
+          },
+          "figures": {
+            "property-equity": {
+              "name": "Property equity",
+              "source": "register.plans",
+              "where": "equity is set",
+              "value": {
+                "sum": "equity"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "property-value": {
+              "name": "Property worth now",
+              "source": "register.plans",
+              "where": "value is set",
+              "value": {
+                "sum": "value"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "property-left": {
+              "name": "Property left to pay",
+              "source": "register.plans",
+              "where": "value is set",
+              "value": {
+                "sum": "left"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
         },
         {
           "cells": [
@@ -65,8 +574,115 @@
           "rows": [],
           "matched": 0,
           "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "readings": [
+            {
+              "label": "Worth now",
+              "metric": "property-value",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 34500000,
+                "unit": "USD",
+                "rows": 1,
+                "refusals": [],
+                "backs": [
+                  "plans#1"
+                ],
+                "held": 1,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Paid so far",
+              "metric": "property-paid",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 1,
+                "refusals": [],
+                "held": 1,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Left to pay",
+              "metric": "property-left",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 1,
+                "refusals": [],
+                "held": 1,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "property-equity": {
+              "name": "Property equity",
+              "source": "register.plans",
+              "where": "equity is set",
+              "value": {
+                "sum": "equity"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "property-value": {
+              "name": "Property worth now",
+              "source": "register.plans",
+              "where": "value is set",
+              "value": {
+                "sum": "value"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "property-paid": {
+              "name": "Property paid so far",
+              "source": "register.plans",
+              "where": "value is set",
+              "value": {
+                "sum": "paid"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "property-left": {
+              "name": "Property left to pay",
+              "source": "register.plans",
+              "where": "value is set",
+              "value": {
+                "sum": "left"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
         },
         {
           "columns": [
@@ -126,11 +742,42 @@
           "span": 12,
           "where": "value is set",
           "key": "k13bzi62",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "empty"
+          "rows": [
+            {
+              "id": "01M6E8Z88V15PFG6SXTK6KRS6J",
+              "register": "plans",
+              "seq": 1,
+              "fields": {
+                "name": "Flat on Elm Street",
+                "state": "open",
+                "price": {
+                  "amount": 32000000,
+                  "currency": "USD"
+                },
+                "value": {
+                  "amount": 34500000,
+                  "currency": "USD"
+                },
+                "developer": "Northgate Homes",
+                "delivers_on": "2027-12-07",
+                "make_how": "down_equal",
+                "make_first": "2026-04-16",
+                "make_parts": 36,
+                "make_every": "monthly",
+                "make_down": {
+                  "amount": 3200000,
+                  "currency": "USD"
+                }
+              },
+              "state": "open",
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
         }
       ],
       "icon": "building",
@@ -145,7 +792,7 @@
         "register.installments"
       ],
       "title": "Property",
-      "read_at": "2026-11-01T01:28:01.487Z",
+      "read_at": "2026-11-02T14:00:21.019Z",
       "zone": "UTC",
       "look": {
         "look": "properties",
@@ -153,6 +800,360 @@
         "by": "rule"
       },
       "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "No parts yet.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "plan-parts:Flat on Elm Street"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "{{property-equity-of:Flat on Elm Street}} equity. {{plan-parts-paid:Flat on Elm Street}} of {{plan-parts:Flat on Elm Street}} parts paid, {{property-left-of:Flat on Elm Street}} left.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gte": 1,
+                "metric": "plan-parts:Flat on Elm Street"
+              },
+              {
+                "empty": false,
+                "metric": "property-equity-of:Flat on Elm Street"
+              }
+            ]
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Equity",
+              "metric": "property-equity-of:Flat on Elm Street"
+            },
+            {
+              "label": "Worth now",
+              "metric": "property-value-of:Flat on Elm Street"
+            },
+            {
+              "label": "Paid so far",
+              "metric": "property-paid-of:Flat on Elm Street"
+            },
+            {
+              "label": "Next due",
+              "metric": "plan-next-due:Flat on Elm Street"
+            }
+          ],
+          "heading": "Where it stands",
+          "icon": "building",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gte": 1,
+            "metric": "plan-parts:Flat on Elm Street"
+          },
+          "key": "k0jacd2u",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "plan"
+            },
+            {
+              "field": "state"
+            }
+          ],
+          "empty": "No parts yet.",
+          "heading": "Parts paid",
+          "icon": "credit-card",
+          "kind": "progress",
+          "source": "register.installments",
+          "span": 12,
+          "when": {
+            "gte": 1,
+            "metric": "plan-parts:Flat on Elm Street"
+          },
+          "where": "plan is Flat on Elm Street, state is not cancelled",
+          "key": "k0v7ih93",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "back": 24,
+          "empty": "Nothing paid yet.",
+          "heading": "Paid in all, over time",
+          "icon": "chart-column",
+          "kind": "series",
+          "series": [
+            {
+              "label": "Paid in all",
+              "metric": "property-paid-by-month:Flat on Elm Street"
+            }
+          ],
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "plan-parts-paid:Flat on Elm Street"
+          },
+          "key": "k1pvzcjp",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when",
+          "figures": {
+            "property-paid-by-month": {
+              "name": "Paid in all by one plan, by quarter",
+              "source": "register.installments",
+              "where": "plan is {{it}}, state is paid",
+              "value": {
+                "max": "paid_to_date"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              },
+              "group_by": "due"
+            }
+          }
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid a month",
+              "metric": "property-loan-monthly-of:Flat on Elm Street"
+            },
+            {
+              "label": "Interest in all",
+              "metric": "property-loan-interest-of:Flat on Elm Street"
+            }
+          ],
+          "heading": "The loan",
+          "icon": "landmark",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "empty": false,
+            "metric": "property-loan-monthly-of:Flat on Elm Street"
+          },
+          "key": "k19guup0",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "left_after",
+              "label": "Left after",
+              "width": "15ch"
+            }
+          ],
+          "empty": "Nothing left to pay.",
+          "heading": "Upcoming",
+          "icon": "calendar-clock",
+          "kind": "table",
+          "limit": 6,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "where": "plan is Flat on Elm Street, state is open",
+          "key": "k0r0jis4",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "fold": true,
+          "heading": "Every part still to come",
+          "icon": "calendar-clock",
+          "kind": "section",
+          "span": 12,
+          "key": "k0zxpvfj",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "left_after",
+              "label": "Left after",
+              "width": "15ch"
+            }
+          ],
+          "kind": "table",
+          "limit": 120,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "where": "plan is Flat on Elm Street, state is open",
+          "key": "k13g77aq",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "Description",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            },
+            {
+              "field": "settled",
+              "label": "Paid on",
+              "width": "13ch"
+            },
+            {
+              "align": "end",
+              "field": "paid_to_date",
+              "label": "Paid in all",
+              "width": "15ch"
+            }
+          ],
+          "empty": "Nothing paid yet.",
+          "heading": "Paid",
+          "icon": "receipt",
+          "kind": "table",
+          "limit": 120,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "due"
+            }
+          ],
+          "source": "register.installments",
+          "span": 12,
+          "where": "plan is Flat on Elm Street, state is paid",
+          "key": "k0122i0w",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "register": "plans",
+        "where": "value is set"
+      },
+      "icon": "building",
+      "nav": {
+        "order": 35,
+        "section": "Money"
+      },
+      "pack": "property",
+      "page": "flat-on-elm-street-1",
+      "requires": [
+        "register.plans",
+        "register.installments"
+      ],
+      "title": "Flat on Elm Street, property",
+      "read_at": "2026-11-02T14:00:21.019Z",
+      "zone": "UTC",
+      "param": {
+        "register": "plans",
+        "seq": 1,
+        "title": "Flat on Elm Street"
+      },
+      "look": {
+        "look": "property",
+        "basis": "r04xg2ld",
+        "by": "rule",
+        "hide": [
+          "k0zxpvfj",
+          "k13g77aq",
+          "k0122i0w"
+        ]
+      }
     }
   ]
 }

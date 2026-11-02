@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-30T19:15:57.332Z",
+  "made_at": "2026-11-02T14:00:21.019Z",
   "pages": [
     {
       "blocks": [
@@ -11,7 +11,7 @@
           "source": "register.notes",
           "key": "k17y3jgk",
           "rows": [],
-          "matched": 0,
+          "matched": 3,
           "refusals": []
         },
         {
@@ -48,11 +48,49 @@
           "source": "register.notes",
           "span": 12,
           "key": "k0ez5mxk",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88V1VD2QAB1QQV5R2ER",
+              "register": "notes",
+              "seq": 3,
+              "fields": {
+                "text": "Ask Sam whether the new brief still needs the dark version."
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E8Z88V1VD2QAB1QJVS3PGJ",
+              "register": "notes",
+              "seq": 2,
+              "fields": {
+                "text": "Idea: a smaller card for print runs under 100."
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E8Z88V1VD2QAB1QEYHGZT4",
+              "register": "notes",
+              "seq": 1,
+              "fields": {
+                "text": "Call the accountant about the VAT question before Friday."
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 3,
+          "refusals": []
         }
       ],
       "icon": "doc",
@@ -65,15 +103,12 @@
         "register.notes"
       ],
       "title": "Pad",
-      "read_at": "2026-10-30T19:15:57.332Z",
+      "read_at": "2026-11-02T14:00:21.019Z",
       "zone": "UTC",
       "look": {
         "look": "pad",
-        "basis": "r1o5kanr",
-        "by": "rule",
-        "hide": [
-          "k0ez5mxk"
-        ]
+        "basis": "r0wh6eni",
+        "by": "rule"
       },
       "declared_version": 1
     }

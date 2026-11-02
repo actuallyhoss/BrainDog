@@ -1,0 +1,5 @@
+[
+  {"register": "fixed_dates", "fields": {"what": "Quarterly tax return", "day": {"day": "+12"}, "kind": "deadline", "comes_round": "no"}},
+  {"register": "fixed_dates", "fields": {"what": "Design fair", "day": {"day": "+25"}, "until": {"day": "+28"}, "kind": "event", "comes_round": "yearly"}},
+  {"register": "fixed_dates", "fields": {"what": "Rent review", "day": {"day": "+60"}, "kind": "deadline", "comes_round": "yearly"}}
+]

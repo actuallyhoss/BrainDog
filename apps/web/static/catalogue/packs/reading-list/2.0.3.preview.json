@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-31T04:13:59.969Z",
+  "made_at": "2026-11-02T14:00:21.019Z",
   "pages": [
     {
       "blocks": [
@@ -25,8 +25,25 @@
           "span": 12,
           "where": "state is reading",
           "key": "k1y7b9dd",
-          "rows": [],
-          "matched": 0,
+          "rows": [
+            {
+              "id": "01M6E8Z88VBBRNXSE3EG5QB2AF",
+              "register": "readings",
+              "seq": 1,
+              "fields": {
+                "name": "The Design of Everyday Things",
+                "by": "Don Norman",
+                "kind": "book",
+                "state": "reading"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
           "refusals": []
         },
         {
@@ -50,11 +67,26 @@
           "span": 12,
           "where": "state is queued",
           "key": "k0m96brs",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88VBBRNXSE3ETJT52Q0",
+              "register": "readings",
+              "seq": 3,
+              "fields": {
+                "name": "A Pattern Language",
+                "by": "Christopher Alexander",
+                "kind": "book",
+                "state": "queued"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
         },
         {
           "columns": [
@@ -84,11 +116,28 @@
           "span": 12,
           "where": "state is finished",
           "key": "k0hzyn33",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88VBBRNXSE3EP44NPB7",
+              "register": "readings",
+              "seq": 2,
+              "fields": {
+                "name": "Shape Up",
+                "by": "Ryan Singer",
+                "kind": "book",
+                "state": "finished",
+                "finished": "2026-10-13",
+                "thoughts": "Six-week cycles fit a small team well."
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
         }
       ],
       "icon": "doc",
@@ -101,16 +150,12 @@
         "register.readings"
       ],
       "title": "Reading",
-      "read_at": "2026-10-31T04:13:59.969Z",
+      "read_at": "2026-11-02T14:00:21.019Z",
       "zone": "UTC",
       "look": {
         "look": "reading",
-        "basis": "r0mvzb5w",
-        "by": "rule",
-        "hide": [
-          "k0m96brs",
-          "k0hzyn33"
-        ]
+        "basis": "r0wh6eni",
+        "by": "rule"
       },
       "declared_version": 1
     }

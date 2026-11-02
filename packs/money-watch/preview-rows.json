@@ -1,0 +1,4 @@
+[
+  {"register": "money_flags", "fields": {"what": "Netflix charged twice", "flag": "twice", "payee": "Netflix", "amount": {"amount": 1549, "currency": "USD"}, "on": {"day": "-3"}, "found": {"day": "-2"}}},
+  {"register": "money_flags", "fields": {"what": "Gym paid again this month", "flag": "repeats", "payee": "PureGym", "amount": {"amount": 2999, "currency": "USD"}, "on": {"day": "-6"}, "found": {"day": "-5"}}}
+]

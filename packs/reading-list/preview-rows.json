@@ -1,0 +1,5 @@
+[
+  {"register": "readings", "fields": {"name": "The Design of Everyday Things", "by": "Don Norman", "kind": "book", "state": "reading"}},
+  {"register": "readings", "fields": {"name": "Shape Up", "by": "Ryan Singer", "kind": "book", "state": "finished", "finished": {"day": "-20"}, "thoughts": "Six-week cycles fit a small team well."}},
+  {"register": "readings", "fields": {"name": "A Pattern Language", "by": "Christopher Alexander", "kind": "book", "state": "queued"}}
+]

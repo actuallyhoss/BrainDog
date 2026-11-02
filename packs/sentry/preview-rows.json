@@ -1,0 +1,5 @@
+[
+  {"register": "sentry_projects", "fields": {"slug": "web-app", "name": "Web app", "platform": "javascript", "unresolved": 12, "new_24h": 2, "events_24h": 140, "users_24h": 31}},
+  {"register": "sentry_issues", "fields": {"what": "TypeError: Cannot read properties of undefined (reading 'id')", "project": "web-app", "project_name": "Web app", "issue_id": "4410021", "short_id": "WEB-APP-1F", "events": 88, "events_24h": 40, "users": 21, "level": "error", "open": true}},
+  {"register": "sentry_issues", "fields": {"what": "Request timed out on /api/checkout", "project": "web-app", "project_name": "Web app", "issue_id": "4410022", "short_id": "WEB-APP-1G", "events": 12, "events_24h": 12, "users": 6, "level": "error", "open": true}}
+]

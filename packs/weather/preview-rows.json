@@ -1,0 +1,5 @@
+[
+  {"register": "weather", "fields": {"day": {"day": "+0"}, "place": "London", "high": 14, "low": 8, "rain": 40, "code": 3, "unit": "C", "what": "Cloudy"}},
+  {"register": "weather", "fields": {"day": {"day": "+1"}, "place": "London", "high": 12, "low": 7, "rain": 80, "code": 61, "unit": "C", "what": "Rain"}},
+  {"register": "weather", "fields": {"day": {"day": "+2"}, "place": "London", "high": 15, "low": 9, "rain": 10, "code": 1, "unit": "C", "what": "Mostly sunny"}}
+]

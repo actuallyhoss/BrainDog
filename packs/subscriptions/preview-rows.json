@@ -1,0 +1,6 @@
+[
+  {"register": "recurring", "fields": {"what": "Netflix", "direction": "out", "amount": {"amount": 1549, "currency": "USD"}, "every": "monthly", "next_due": {"day": "+9"}, "state": "live", "subscription": true, "used": "often"}},
+  {"register": "recurring", "fields": {"what": "Adobe Creative Cloud", "direction": "out", "amount": {"amount": 5999, "currency": "USD"}, "every": "monthly", "next_due": {"day": "+4"}, "state": "live", "subscription": true, "used": "sometimes", "price_was": {"amount": 5499, "currency": "USD"}, "price_up_on": {"day": "-30"}}},
+  {"register": "recurring", "fields": {"what": "Gym", "direction": "out", "amount": {"amount": 2999, "currency": "USD"}, "every": "monthly", "next_due": {"day": "+14"}, "state": "live", "subscription": true, "used": "never", "cancel_by": {"day": "+10"}}},
+  {"register": "recurring", "fields": {"what": "Notion", "direction": "out", "amount": {"amount": 9600, "currency": "USD"}, "every": "yearly", "next_due": {"day": "+120"}, "state": "live", "subscription": true, "used": "often"}}
+]

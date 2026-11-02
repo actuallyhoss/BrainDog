@@ -1,0 +1,5 @@
+[
+  {"register": "revenue_bands", "fields": {"band": "now", "amount": {"amount": 600000, "currency": "USD"}, "at": "2026-11-01T09:00:00Z"}},
+  {"register": "revenue_bands", "fields": {"band": "next", "amount": {"amount": 900000, "currency": "USD"}, "at": "2026-11-01T09:00:00Z"}},
+  {"register": "revenue_bands", "fields": {"band": "later", "amount": {"amount": 1500000, "currency": "USD"}, "at": "2026-11-01T09:00:00Z"}}
+]

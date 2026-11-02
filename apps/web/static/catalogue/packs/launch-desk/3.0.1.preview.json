@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-25T20:51:43.807Z",
+  "made_at": "2026-11-02T14:00:21.019Z",
   "pages": [
     {
       "blocks": [
@@ -15,7 +15,9 @@
           "key": "k08lez9h",
           "rows": [],
           "matched": 0,
-          "refusals": []
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
         },
         {
           "body": "{{essentials-done}} of the {{essentials}} essential step(s) are done.",
@@ -29,8 +31,40 @@
           "rows": [],
           "matched": 0,
           "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "values": {
+            "essentials-done": 1,
+            "essentials": 2
+          },
+          "read_as": {
+            "essentials-done": "figure",
+            "essentials": "figure"
+          },
+          "figures": {
+            "essentials-done": {
+              "name": "Essential steps done",
+              "source": "register.steps",
+              "where": "priority is essential, done is true",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "essentials": {
+              "name": "Essential steps",
+              "source": "register.steps",
+              "where": "priority is essential",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
         },
         {
           "body": "All {{essentials}} essential step(s) are done.",
@@ -100,12 +134,31 @@
           "source": "register.steps",
           "span": 12,
           "key": "k0fhka72",
-          "rows": [],
-          "matched": 0,
+          "rows": [
+            {
+              "id": "01M6E8Z88V4J7E6M8GWM3W2VWP",
+              "register": "steps",
+              "seq": 2,
+              "fields": {
+                "done": false,
+                "what": "Pick three plans",
+                "part": "01M6E8Z88V4J7E6M8GWFYMNRGD",
+                "priority": "essential"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
           "refusals": [],
-          "open": 0,
-          "done_now": [],
-          "next": null
+          "open": 1,
+          "done_now": [
+            false
+          ],
+          "next": 0
         },
         {
           "columns": [
@@ -130,11 +183,26 @@
           "span": 12,
           "where": "done is true",
           "key": "k19x0k91",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88V4J7E6M8GWJEN9FPZ",
+              "register": "steps",
+              "seq": 1,
+              "fields": {
+                "what": "Write the headline",
+                "part": "01M6E8Z88V4J7E6M8GW9K8QN25",
+                "priority": "essential",
+                "done": true
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
         },
         {
           "empty": "No parts yet.",
@@ -143,10 +211,8 @@
           "source": "register.parts",
           "key": "k1j9v6fg",
           "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "empty"
+          "matched": 2,
+          "refusals": []
         },
         {
           "columns": [
@@ -187,12 +253,45 @@
           "source": "register.parts",
           "span": 12,
           "key": "k0wue50h",
-          "rows": [],
-          "matched": 0,
+          "rows": [
+            {
+              "id": "01M6E8Z88V4J7E6M8GW9K8QN25",
+              "register": "parts",
+              "seq": 1,
+              "fields": {
+                "name": "Landing page",
+                "what": "The page people see first",
+                "big": true,
+                "progress": 40
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E8Z88V4J7E6M8GWFYMNRGD",
+              "register": "parts",
+              "seq": 2,
+              "fields": {
+                "name": "Pricing",
+                "what": "What it costs and why",
+                "progress": 10
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
           "refusals": [],
-          "nexts": [],
-          "drawn": false,
-          "why": "empty"
+          "nexts": [
+            null,
+            "Pick three plans"
+          ]
         },
         {
           "heading": "When it falls due",
@@ -226,9 +325,9 @@
           "matched": 0,
           "refusals": [],
           "window": {
-            "from": "2026-10-01",
-            "to": "2026-12-31",
-            "today": "2026-10-25"
+            "from": "2026-11-01",
+            "to": "2027-01-31",
+            "today": "2026-11-02"
           },
           "drawn": false,
           "why": "when"
@@ -304,20 +403,557 @@
         "register.notes"
       ],
       "title": "Desk",
-      "read_at": "2026-10-25T20:51:43.807Z",
+      "read_at": "2026-11-02T14:00:21.019Z",
       "zone": "UTC",
       "look": {
         "look": "desk",
-        "basis": "r0n2mw6v",
+        "basis": "r18b6ojy",
         "by": "rule",
         "hide": [
-          "k19x0k91",
           "k1v2sidp",
           "k0kqejvi",
           "k0ez5mxk"
         ]
       },
       "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "The page people see first",
+          "kind": "note",
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "priority"
+            }
+          ],
+          "empty": "No steps for this part yet.",
+          "first": 5,
+          "heading": "The path",
+          "kind": "steps",
+          "order": [
+            {
+              "dir": "asc",
+              "field": "rank"
+            }
+          ],
+          "short": {
+            "label": "Essentials",
+            "where": "priority is essential"
+          },
+          "source": "register.steps",
+          "span": 12,
+          "where": "part is Landing page",
+          "key": "k0bcbydc",
+          "rows": [],
+          "matched": 1,
+          "refusals": [],
+          "open": 0,
+          "done_now": [],
+          "next": null,
+          "short_now": []
+        },
+        {
+          "empty": "Nothing learned here yet.",
+          "fold": true,
+          "heading": "Learned on the way",
+          "kind": "section",
+          "source": "register.lessons",
+          "where": "part is Landing page",
+          "key": "k1lo3qdk",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "lesson"
+            },
+            {
+              "field": "body"
+            }
+          ],
+          "empty": "Nothing learned here yet.",
+          "heading": "Learned on the way",
+          "kind": "table",
+          "source": "register.lessons",
+          "span": 12,
+          "where": "part is Landing page",
+          "key": "k0ofsqgf",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "area": "rail",
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "ring",
+              "field": "progress"
+            },
+            {
+              "as": "hue",
+              "field": "hue"
+            },
+            {
+              "as": "picture",
+              "field": "picture"
+            }
+          ],
+          "empty": "This part is not on the list.",
+          "kind": "cards",
+          "source": "register.parts",
+          "where": "name is Landing page",
+          "key": "k0wue50h",
+          "rows": [
+            {
+              "id": "01M6E8Z88V4J7E6M8GW9K8QN25",
+              "register": "parts",
+              "seq": 1,
+              "fields": {
+                "name": "Landing page",
+                "what": "The page people see first",
+                "big": true,
+                "progress": 40
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "area": "rail",
+          "empty": "No call about this part is waiting.",
+          "heading": "Calls about this part",
+          "kind": "queue",
+          "source": "governance.open",
+          "where": "about is Landing page",
+          "key": "k045tuz1",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "queue": [],
+          "waiting": {
+            "stale": 0,
+            "hardToUndo": 0
+          },
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "area": "rail",
+          "heading": "A thought",
+          "kind": "capture",
+          "register": "notes",
+          "where": "about is parts#1",
+          "key": "k0bvfna5",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {
+            "about": "01M6E8Z88V4J7E6M8GW9K8QN25"
+          }
+        },
+        {
+          "area": "rail",
+          "columns": [
+            {
+              "as": "title",
+              "field": "text"
+            },
+            {
+              "as": "reply",
+              "field": "reply"
+            }
+          ],
+          "empty": "Nothing on the pad about this part yet.",
+          "kind": "cards",
+          "limit": 6,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "seq"
+            }
+          ],
+          "source": "register.notes",
+          "where": "about is parts#1",
+          "key": "k0ez5mxk",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "area": "rail",
+          "columns": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "status"
+            },
+            {
+              "field": "phone"
+            },
+            {
+              "field": "email"
+            }
+          ],
+          "empty": "Nobody is helping with this part yet.",
+          "heading": "Who helps",
+          "kind": "table",
+          "source": "register.contacts",
+          "where": "part is Landing page",
+          "key": "k0sspywd",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "register": "parts"
+      },
+      "layout": {
+        "rail": 4
+      },
+      "nav": {
+        "order": 20,
+        "section": "Launch",
+        "tabs": true
+      },
+      "page": "landing-page",
+      "requires": [
+        "register.parts",
+        "register.steps",
+        "register.lessons",
+        "register.contacts",
+        "register.notes"
+      ],
+      "title": "Landing page",
+      "read_at": "2026-11-02T14:00:21.019Z",
+      "zone": "UTC",
+      "param": {
+        "register": "parts",
+        "seq": 1,
+        "title": "Landing page"
+      },
+      "look": {
+        "look": "part",
+        "basis": "r008r2fb",
+        "by": "rule",
+        "hide": [
+          "k1lo3qdk",
+          "k0ofsqgf",
+          "k045tuz1",
+          "k0ez5mxk",
+          "k0sspywd"
+        ]
+      }
+    },
+    {
+      "blocks": [
+        {
+          "body": "What it costs and why",
+          "kind": "note",
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "priority"
+            }
+          ],
+          "empty": "No steps for this part yet.",
+          "first": 5,
+          "heading": "The path",
+          "kind": "steps",
+          "order": [
+            {
+              "dir": "asc",
+              "field": "rank"
+            }
+          ],
+          "short": {
+            "label": "Essentials",
+            "where": "priority is essential"
+          },
+          "source": "register.steps",
+          "span": 12,
+          "where": "part is Pricing",
+          "key": "k0bcbydc",
+          "rows": [
+            {
+              "id": "01M6E8Z88V4J7E6M8GWM3W2VWP",
+              "register": "steps",
+              "seq": 2,
+              "fields": {
+                "done": false,
+                "what": "Pick three plans",
+                "part": "01M6E8Z88V4J7E6M8GWFYMNRGD",
+                "priority": "essential"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": [],
+          "open": 1,
+          "done_now": [
+            false
+          ],
+          "next": 0,
+          "short_now": [
+            true
+          ]
+        },
+        {
+          "empty": "Nothing learned here yet.",
+          "fold": true,
+          "heading": "Learned on the way",
+          "kind": "section",
+          "source": "register.lessons",
+          "where": "part is Pricing",
+          "key": "k1lo3qdk",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "lesson"
+            },
+            {
+              "field": "body"
+            }
+          ],
+          "empty": "Nothing learned here yet.",
+          "heading": "Learned on the way",
+          "kind": "table",
+          "source": "register.lessons",
+          "span": 12,
+          "where": "part is Pricing",
+          "key": "k0ofsqgf",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "area": "rail",
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "ring",
+              "field": "progress"
+            },
+            {
+              "as": "hue",
+              "field": "hue"
+            },
+            {
+              "as": "picture",
+              "field": "picture"
+            }
+          ],
+          "empty": "This part is not on the list.",
+          "kind": "cards",
+          "source": "register.parts",
+          "where": "name is Pricing",
+          "key": "k0wue50h",
+          "rows": [
+            {
+              "id": "01M6E8Z88V4J7E6M8GWFYMNRGD",
+              "register": "parts",
+              "seq": 2,
+              "fields": {
+                "name": "Pricing",
+                "what": "What it costs and why",
+                "progress": 10
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "area": "rail",
+          "empty": "No call about this part is waiting.",
+          "heading": "Calls about this part",
+          "kind": "queue",
+          "source": "governance.open",
+          "where": "about is Pricing",
+          "key": "k045tuz1",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "queue": [],
+          "waiting": {
+            "stale": 0,
+            "hardToUndo": 0
+          },
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "area": "rail",
+          "heading": "A thought",
+          "kind": "capture",
+          "register": "notes",
+          "where": "about is parts#2",
+          "key": "k0bvfna5",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {
+            "about": "01M6E8Z88V4J7E6M8GWFYMNRGD"
+          }
+        },
+        {
+          "area": "rail",
+          "columns": [
+            {
+              "as": "title",
+              "field": "text"
+            },
+            {
+              "as": "reply",
+              "field": "reply"
+            }
+          ],
+          "empty": "Nothing on the pad about this part yet.",
+          "kind": "cards",
+          "limit": 6,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "seq"
+            }
+          ],
+          "source": "register.notes",
+          "where": "about is parts#2",
+          "key": "k0ez5mxk",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "area": "rail",
+          "columns": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "status"
+            },
+            {
+              "field": "phone"
+            },
+            {
+              "field": "email"
+            }
+          ],
+          "empty": "Nobody is helping with this part yet.",
+          "heading": "Who helps",
+          "kind": "table",
+          "source": "register.contacts",
+          "where": "part is Pricing",
+          "key": "k0sspywd",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "register": "parts"
+      },
+      "layout": {
+        "rail": 4
+      },
+      "nav": {
+        "order": 20,
+        "section": "Launch",
+        "tabs": true
+      },
+      "page": "pricing",
+      "requires": [
+        "register.parts",
+        "register.steps",
+        "register.lessons",
+        "register.contacts",
+        "register.notes"
+      ],
+      "title": "Pricing",
+      "read_at": "2026-11-02T14:00:21.019Z",
+      "zone": "UTC",
+      "param": {
+        "register": "parts",
+        "seq": 2,
+        "title": "Pricing"
+      },
+      "look": {
+        "look": "part",
+        "basis": "r008r2fb",
+        "by": "rule",
+        "hide": [
+          "k1lo3qdk",
+          "k0ofsqgf",
+          "k045tuz1",
+          "k0ez5mxk",
+          "k0sspywd"
+        ]
+      }
     },
     {
       "blocks": [
@@ -364,7 +1000,7 @@
           "key": "k117kqxc",
           "rows": [
             {
-              "id": "01M5TDARHZ16XRQGDZHMYKBXPB",
+              "id": "01M6E8Z88V4J7E6M8GW5YK0MNS",
               "register": "checks",
               "seq": 1,
               "fields": {
@@ -379,8 +1015,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-25T20:51:43.807Z",
-              "updated_at": "2026-10-25T20:51:43.807Z",
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
               "deleted_at": null
             }
           ],
@@ -503,7 +1139,7 @@
         "register.lines"
       ],
       "title": "Numbers",
-      "read_at": "2026-10-25T20:51:43.807Z",
+      "read_at": "2026-11-02T14:00:21.019Z",
       "zone": "UTC",
       "look": {
         "look": "numbers",

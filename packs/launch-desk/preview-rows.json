@@ -1,0 +1,6 @@
+[
+  {"register": "parts", "fields": {"name": "Landing page", "what": "The page people see first", "big": true, "progress": 40}},
+  {"register": "parts", "fields": {"name": "Pricing", "what": "What it costs and why", "progress": 10}},
+  {"register": "steps", "fields": {"what": "Write the headline", "part": "parts#1", "priority": "essential", "done": true}},
+  {"register": "steps", "fields": {"what": "Pick three plans", "part": "parts#2", "priority": "essential"}}
+]

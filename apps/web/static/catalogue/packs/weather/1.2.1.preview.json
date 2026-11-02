@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-30T22:20:51.314Z",
+  "made_at": "2026-11-02T14:00:21.019Z",
   "pages": [
     {
       "blocks": [
@@ -17,7 +17,9 @@
           "key": "k0igodgz",
           "rows": [],
           "matched": 0,
-          "refusals": []
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
         },
         {
           "columns": [
@@ -58,11 +60,30 @@
           },
           "where": "day is today",
           "key": "k149ujf7",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88VE4658B3PE3T8PM82",
+              "register": "weather",
+              "seq": 1,
+              "fields": {
+                "day": "2026-11-02",
+                "place": "London",
+                "high": 14,
+                "low": 8,
+                "rain": 40,
+                "code": 3,
+                "unit": "C",
+                "what": "Cloudy"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
         },
         {
           "columns": [
@@ -111,11 +132,50 @@
           },
           "where": "day after today",
           "key": "k1b771y1",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88VE4658B3PE9EMH07T",
+              "register": "weather",
+              "seq": 2,
+              "fields": {
+                "day": "2026-11-03",
+                "place": "London",
+                "high": 12,
+                "low": 7,
+                "rain": 80,
+                "code": 61,
+                "unit": "C",
+                "what": "Rain"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E8Z88VE4658B3PEFMYBJ3C",
+              "register": "weather",
+              "seq": 3,
+              "fields": {
+                "day": "2026-11-04",
+                "place": "London",
+                "high": 15,
+                "low": 9,
+                "rain": 10,
+                "code": 1,
+                "unit": "C",
+                "what": "Mostly sunny"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
         }
       ],
       "icon": "sun",
@@ -129,7 +189,7 @@
         "register.weather"
       ],
       "title": "Weather",
-      "read_at": "2026-10-30T22:20:51.314Z",
+      "read_at": "2026-11-02T14:00:21.019Z",
       "zone": "UTC",
       "look": {
         "look": "weather",

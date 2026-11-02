@@ -1,0 +1,5 @@
+[
+  {"register": "holdings", "fields": {"label": "Gold bar, 50 g", "kind": "gold", "karat": "24k", "unit": "gram", "qty": 50, "cost": {"amount": 310000, "currency": "USD"}, "acquired_on": {"day": "-400"}}},
+  {"register": "holdings", "fields": {"label": "Global index fund", "kind": "fund", "unit": "share", "qty": 42.5, "unit_cost": {"amount": 11000, "currency": "USD"}, "price": {"amount": 12440, "currency": "USD"}, "priced_on": {"day": "-1"}, "acquired_on": {"day": "-300"}}},
+  {"register": "holdings", "fields": {"label": "Apple", "kind": "stock", "unit": "share", "code": "AAPL", "qty": 10, "unit_cost": {"amount": 17200, "currency": "USD"}, "price": {"amount": 22800, "currency": "USD"}, "priced_on": {"day": "-1"}, "acquired_on": {"day": "-500"}}}
+]

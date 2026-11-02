@@ -1,0 +1,3 @@
+[
+  {"register": "recipes", "fields": {"name": "Hours a week", "how": "sum", "of": "hours", "unit": "hours"}}
+]

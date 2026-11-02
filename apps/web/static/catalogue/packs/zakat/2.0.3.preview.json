@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-11-01T01:30:54.338Z",
+  "made_at": "2026-11-02T14:00:21.019Z",
   "pages": [
     {
       "blocks": [
@@ -99,7 +99,8 @@
                 "unit": null,
                 "rows": 0,
                 "refusals": [],
-                "held": 0,
+                "held": 1,
+                "unsaid": true,
                 "delta": null,
                 "why": "no comparison asked for",
                 "met": true
@@ -117,7 +118,8 @@
                 "unit": null,
                 "rows": 0,
                 "refusals": [],
-                "held": 0,
+                "held": 1,
+                "unsaid": true,
                 "delta": null,
                 "why": "no comparison asked for",
                 "met": true
@@ -135,7 +137,8 @@
                 "unit": null,
                 "rows": 0,
                 "refusals": [],
-                "held": 0,
+                "held": 1,
+                "unsaid": true,
                 "delta": null,
                 "why": "no comparison asked for",
                 "met": true
@@ -378,7 +381,8 @@
                 "unit": null,
                 "rows": 0,
                 "refusals": [],
-                "held": 0,
+                "held": 1,
+                "unsaid": true,
                 "delta": null,
                 "why": "no comparison asked for",
                 "met": true
@@ -400,7 +404,7 @@
             }
           },
           "drawn": false,
-          "why": "empty"
+          "why": "unsaid"
         },
         {
           "cells": [
@@ -430,7 +434,8 @@
                 "unit": null,
                 "rows": 0,
                 "refusals": [],
-                "held": 0,
+                "held": 1,
+                "unsaid": true,
                 "delta": null,
                 "why": "no comparison asked for",
                 "met": true
@@ -452,7 +457,7 @@
             }
           },
           "drawn": false,
-          "why": "empty"
+          "why": "unsaid"
         },
         {
           "cells": [
@@ -486,7 +491,8 @@
                 "unit": null,
                 "rows": 0,
                 "refusals": [],
-                "held": 0,
+                "held": 1,
+                "unsaid": true,
                 "delta": null,
                 "why": "no comparison asked for",
                 "met": true
@@ -504,7 +510,8 @@
                 "unit": null,
                 "rows": 0,
                 "refusals": [],
-                "held": 0,
+                "held": 1,
+                "unsaid": true,
                 "delta": null,
                 "why": "no comparison asked for",
                 "met": true
@@ -538,7 +545,7 @@
             }
           },
           "drawn": false,
-          "why": "empty"
+          "why": "unsaid"
         },
         {
           "body": "{{zakat-total}} in all. 2.5% of it is {{zakat-due}}.",
@@ -617,11 +624,25 @@
           "source": "register.zakat_basis",
           "span": 12,
           "key": "k19fu5kb",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E8Z88VC6ZT9RZXMDFABPQF",
+              "register": "zakat_basis",
+              "seq": 1,
+              "fields": {
+                "label": "This year",
+                "mode": "gold",
+                "hawl_on": "2026-04-16"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-02T14:00:21.019Z",
+              "updated_at": "2026-11-02T14:00:21.019Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
         },
         {
           "heading": "Mark zakat as given",
@@ -700,15 +721,14 @@
         "register.holdings"
       ],
       "title": "Zakat",
-      "read_at": "2026-11-01T01:30:54.338Z",
+      "read_at": "2026-11-02T14:00:21.019Z",
       "zone": "UTC",
       "look": {
         "look": "zakat",
-        "basis": "r1g8ju3w",
+        "basis": "r1og6vna",
         "by": "rule",
         "hide": [
           "k142zm13",
-          "k19fu5kb",
           "k0ehwwva"
         ]
       },

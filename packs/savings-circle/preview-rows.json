@@ -1,0 +1,3 @@
+[
+  {"register": "plans", "fields": {"name": "Family circle", "state": "open", "circle_members": 10, "circle_part": {"amount": 50000, "currency": "USD"}, "circle_turn": 4, "circle_first": {"day": "-60"}}}
+]

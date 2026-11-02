@@ -1,0 +1,4 @@
+[
+  {"register": "cash_counts", "fields": {"account": "accounts#1", "counted": {"amount": 24000, "currency": "USD"}, "on": {"day": "-2"}, "note": "Petty cash tin"}},
+  {"register": "cash_counts", "fields": {"account": "accounts#1", "counted": {"amount": 31000, "currency": "USD"}, "on": {"day": "-30"}}}
+]

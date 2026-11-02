@@ -1,0 +1,5 @@
+[
+  {"register": "splits", "fields": {"what": "Dinner out", "on": {"day": "-3"}, "with": "Sam", "kind": "cost", "paid_by": "me", "amount": {"amount": 8400, "currency": "USD"}, "my_share": 50, "state": "open"}},
+  {"register": "splits", "fields": {"what": "Train tickets", "on": {"day": "-10"}, "with": "Ana", "kind": "cost", "paid_by": "them", "amount": {"amount": 6200, "currency": "USD"}, "my_share": 50, "state": "open"}},
+  {"register": "splits", "fields": {"what": "Groceries", "on": {"day": "-12"}, "with": "Sam", "kind": "cost", "paid_by": "me", "amount": {"amount": 4600, "currency": "USD"}, "my_share": 50, "state": "open"}}
+]
