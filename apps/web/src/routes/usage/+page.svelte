@@ -152,6 +152,10 @@
   /* AND WHETHER ANY TILE IS: an empty row of tiles still took its gaps, a band of nothing between the months and the list
      (audit 6f AF22), on a month whose runs were all rules', which no day is kept for. */
   const tiled = $derived(view !== null && (view.records.length > 0 || weekly || parts !== null || heat !== null));
+  /** Whether the allowance tile says the empty month itself: drawn, with limits, and nothing used against any of them. */
+  const idleTile = $derived(
+    tiled && view !== null && view.current && view.records.some((r) => r.meters.length > 0) && view.records.every((r) => ringsOf(r).every((m) => m.share === 0)),
+  );
 
   /**
    * THIS PAGE'S OWN WORDS. The rest are `actions.ts`'s
@@ -159,8 +163,12 @@
    */
   /* The empty month's words. */
   const usageWords = {
-    seeAgents: 'Agents',
     seeAutomations: 'Automations',
+    /* WHAT FILLS AN EMPTY MONTH, AND THE WAY TO START IT (empty states, 2 Nov). Agents, `/p/agents`, is a page a new
+       record does not have yet, so the way in is connecting one. */
+    idle: 'Each run of an automation or an agent counts here.',
+    idleRules: 'Automations count here each time they run.',
+    connect: 'Connect an agent',
     moreActions: (n: number) => `${n} more`,
     fewer: 'Show the top five',
   } as const;
@@ -295,6 +303,7 @@
         {#each view.records as r (r.name)}
           {@const rings = ringsOf(r)}
           {@const bound = rings.find((m) => m.binding)}
+          {@const used = rings.some((m) => m.share > 0)}
           <Tile
             data-wide=""
             lead
@@ -302,7 +311,12 @@
             title={!hosted ? reading.monthTitle(view.current, view.month) : view.current ? reading.allowance : reading.allowanceIn(monthWords(view.month))}
             meta={view.records.length > 1 ? [r.name, r.plan].filter(Boolean).join(' · ') : (r.plan ?? undefined)}
           >
-            {#if rings.length > 0}
+            {#if rings.length > 0 && !used}
+              <!-- NOTHING USED IS NO RINGS (empty states, 2 Nov): four rings of 0% said one thing four times on a new record,
+                   under a sentence that already says it. The plan's limits are the line below; what fills the month and
+                   the way to start it are said here, in the tile, rather than in a card stranded under it. -->
+              <p class="reading">{view.current && (view.fired ?? 0) === 0 ? usageWords.idle : usageWords.idleRules}</p>
+            {:else if rings.length > 0}
               <ul class="rings">
                 {#each rings as m (m.key)}
                   <li class="ring">
@@ -323,9 +337,16 @@
               <p class="reading">{words.noLimit}</p>
             {/if}
             <!-- THE SLASH LINE HERE when there is no allowance of asks to draw a ring against, which is every host today. -->
-            {#if r.slash && !asksOf(r)}<p class="slash-line">{r.slash}</p>{/if}
+            {#if r.slash && !asksOf(r) && !(rings.length > 0 && !used)}<p class="slash-line">{r.slash}</p>{/if}
             <!-- THE PLAN'S LIMITS IN ONE SENTENCE, then extra usage: its running amount, and the cap where one may be set. -->
             {#if r.planLine}<p class="aside-line">{r.planLine}</p>{/if}
+            <!-- THE WAY TO START AN EMPTY MONTH, last in the tile, under what the month's limits are. -->
+            {#if rings.length > 0 && !used && view.current}
+              <div class="idle-act">
+                {#if (view.fired ?? 0) > 0}<Button weight="quiet" href="/automations">{usageWords.seeAutomations}</Button>
+                {:else}<Button weight="quiet" href="/settings/agents">{usageWords.connect}</Button>{/if}
+              </div>
+            {/if}
             {#if r.extra}<p class="aside-line">{r.extra}</p>{/if}
             {#if r.extraUse && capOffered(r.record)}
               <ExtraCap record={r.record} on={r.extraUse.on} cap={r.extraUse.cap} onset={usage.reread} />
@@ -369,7 +390,9 @@
       </div>{/if}
 
       <!-- A MONTH WITH NO RUNS SAYS SO ONCE, in place of the lists it would have. -->
-      {#if view.totals.runs === 0}
+      {#if view.totals.runs === 0 && idleTile}
+        <!-- SAID IN THE ALLOWANCE TILE, above. -->
+      {:else if view.totals.runs === 0}
         <!-- WHAT WOULD BE COUNTED, AND WHERE IT RUNS FROM (money F14): the tile said a month was empty and stopped. -->
         <Empty
           kind="no-data-yet"
@@ -378,7 +401,7 @@
         >
           {#snippet actions()}
             {#if (view.fired ?? 0) > 0}<Button weight="quiet" href="/automations">{usageWords.seeAutomations}</Button>
-            {:else}<Button weight="quiet" href="/p/agents">{usageWords.seeAgents}</Button>{/if}
+            {:else}<Button weight="quiet" href="/settings/agents">{usageWords.connect}</Button>{/if}
           {/snippet}
         </Empty>
       {:else if sliced.length === 0}
@@ -572,6 +595,12 @@
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 20px;
+  }
+
+  /* THE WAY TO START AN EMPTY MONTH, under its line in the allowance tile. */
+  .idle-act {
+    display: flex;
+    margin-block-start: var(--sp-3);
   }
 
   .slash-line {

@@ -93,13 +93,16 @@
 
   /* THE ASKS BY DAY, newest first as the lines below are, the busiest day in ink and the rest greys. */
   const busiest = $derived(spent && spent.days.length > 0 ? spent.days.reduce((a, b) => (b.asks > a.asks ? b : a)) : null);
+  /* NOTHING ASKED AND NOTHING IN THE BACKGROUND IS ONE LINE, NOT TWO RINGS OF NOUGHT (empty states, 2 Nov): a new record
+     drew "0 of 20" and "0 of 600" in two tiles over a sentence saying nothing was asked. */
+  const quiet = $derived(!!status && !!spent && status.asks.used === 0 && (background?.used ?? 0) === 0 && spent.days.length === 0 && !atCap(status));
   const bars = $derived(spent ? spent.days.map((d) => ({ label: d.label, value: d.asks, tone: busiest && d.day === busiest.day ? 'ink' : undefined })) : []);
 </script>
 
 {#if status && spent}
   <Tile class="section" data-surface="tile" title={words.title}>
     <div class="section-body">
-      <div class="spent-tiles">
+      {#if !quiet}<div class="spent-tiles">
         {#if mine}
           <Tile icon="slash" title={said.asks}>
             {#if metered(status)}
@@ -143,7 +146,7 @@
             <p class="spent-reading">{said.busiest(busiest.label, busiest.asks)}{#if !spent.whole}{' '}{words.partial}{/if}</p>
           </Tile>
         {/if}
-      </div>
+      </div>{/if}
 
       {#if !spent.whole && !(busiest && busiest.asks > 0)}<p class="spent-said spent-gap">{words.partial}</p>{/if}
 
