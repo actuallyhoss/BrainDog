@@ -97,18 +97,40 @@ screen's own control calls; a Release build has none of it.
 ## The Mac app (M6)
 
 - **One window**, no title bar of its own: the traffic lights stand in the web's 56px bar, centred on it, 16 from the
-  edge, and the web leaves them 88 (`MacBar`, `Mac/WindowChrome.swift`). A press on the bar's empty part moves the
-  window and a double press zooms it (`ShellScript.js`, as a title bar does). Size and place are remembered.
-- **Menus**: BrainDog (Settings…, Open at Login, Sign out), File (Tell BrainDog… ⌘T), Edit, View (Reload ⌘R, Actual
-  Size ⌘0, Zoom In ⌘=, Zoom Out ⌘−, full screen), Go (Back ⌘[, Forward ⌘], Today ⌘1, Needs you ⌘2, Search or Go To ⌘K,
-  Ask ⌘J), Window, Help.
-- **Settings window** (⌘,): open at login (`SMAppService`), the menu bar, text size; who is signed in, Sign out.
+  edge, and the web leaves them 88 at the start of that row (`MacBar`, `--shell-lead`), never as height above it
+  (`Mac/WindowChrome.swift`). A press on the bar's empty part moves the window and a double press zooms it (or does what
+  the person set for a title bar) (`ShellScript.js`). Size and place are remembered.
+- **The quick panel** (`Mac/QuickPanel.swift`, `Mac/HotKey.swift`): Option+Space in any app opens a floating Tell / Search
+  panel, 640 wide in the top third of the screen, without taking the front from the app the person is in. Tell reads
+  each line with the same `tell-core.js` and shows what it becomes; Enter adds them in one `capture` (Undo on the
+  receipt), ⇧Enter is a new line, ⌘Enter asks about it in the window. Search finds a place or an entry and Enter opens it
+  in the window. Tab switches, Escape or a press elsewhere closes. The keys are a Carbon hot key held exclusively: when
+  another app owns them Settings says so. Changed or turned off in Settings › Shortcut.
+- **Menus**: BrainDog (Check for Updates…, Settings…, Open at Login, Sign out), File (New Tell… ⌘N, Quick Panel with its
+  keys), Edit, View (Reload ⌘R, Actual Size ⌘0, Zoom In ⌘=, Zoom Out ⌘−, full screen), Go (Back ⌘[, Forward ⌘], then
+  Today ⌘1, Needs you ⌘2 and the web's own places and the record's pages, ⌘3 onward; Settings in BrainDog ⌥⌘,; Search or
+  Go To ⌘K, Ask ⌘J), Window, Help (brain.dog/docs, /support).
+- **Settings window** (⌘,), three tabs: General (open at login, the menu bar, text size, updates), Shortcut (the quick
+  panel's keys), Signing in (who, which BrainDog, the role, Sign out, Passkeys and Devices in BrainDog's own Settings).
 - **Menu bar**: the Needs you glyph and the count; its panel lists the first three questions, Tell and Open BrainDog.
   **Dock badge**: the count. The app stays open with its window closed while the menu bar holds the count.
+- **Offline** (`Mac/Offline.swift`): the page's own kept copy (its service worker and IndexedDB, which WKWebView runs on
+  the Mac with no App-Bound Domains); a first load that reaches nothing and has nothing kept says so with Try again.
+  Today's last picture covers the page at launch until it has drawn, as on the iPhone.
+- **Links**: `braindog://open?path=`, `braindog://tell`, `braindog://quick`, and universal links on app.brain.dog (the
+  same addresses as the iPhone app's, `apps/worker/src/apple.ts`) open in the window; the sign-in link signs in.
+- **Updates** (`Mac/Updates.swift`): Sparkle 2, pinned, reading `https://brain.dog/mac/appcast.xml`
+  (`apps/site/static/mac/appcast.xml`, empty). Off until a build is signed by the team and carries `SUPublicEDKey`; until
+  then Settings says why and Check for Updates… is dimmed. Making the key: Sparkle's `generate_keys` once on this Mac
+  (the private half stays in its keychain), the public half into `project.yml`; each release signs its dmg with
+  `sign_update` and adds an `<item>` to the feed.
 - **Tell window**: the same composer as the iPhone's Tell sheet. Page notifications show while the app runs; exports go
   to Downloads.
-- Screenshots: `node apps/apple/tools/mac-shots.mjs` once signed in (`build.mjs mac --press email:…`, then `code:…`); the
-  app draws its own pictures (`Mac/Shots.swift`), since a shell may not record the screen.
+- Screenshots: `node apps/apple/tools/mac-shots.mjs --out mac6 --server http://localhost:5183` once signed in
+  (`build.mjs mac --quiet --press email:…`, then `--launch --press code:…`). `--quiet` (and every walk) launches in the
+  background and never brings the app forward, and its windows are clear and deaf to the mouse, so the native pictures
+  (panel, Settings, Tell, offline) can be taken while someone uses the Mac; the window's page draws only with `--front`
+  (WebKit answers nothing for an app opened in the background), so take `window*` when nobody is at it. The app draws its own pictures (`Mac/Shots.swift`), since a shell may not record the screen.
 - A Mac build signed to run locally keeps its session in a file in its own sandbox container, because the login keychain
   asks the person at the screen again after every rebuild (`Session.swift`, Debug only).
 

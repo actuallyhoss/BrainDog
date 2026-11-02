@@ -52,6 +52,7 @@ struct BrainDogMac: App {
 
 /// The app stays open with its window closed while the menu bar holds the count; the Dock's icon opens the window again.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         #if DEBUG
         /* `-braindogAppearance light|dark`: the screenshot walk draws both without changing this Mac's own setting. */
@@ -59,6 +60,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
         case "light": NSApp.appearance = NSAppearance(named: .aqua)
         default: break
+        }
+        /* A QUIET WALK'S WINDOWS ARE CLEAR FROM THE MOMENT THEY SHOW (`Links.hide`). */
+        if MacModel.quiet {
+            NotificationCenter.default.addObserver(forName: NSWindow.didUpdateNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated {
+                    for window in NSApp.windows where window.isVisible && window.alphaValue > 0.02 {
+                        window.alphaValue = 0.02
+                        window.ignoresMouseEvents = true
+                    }
+                }
+            }
         }
         #endif
     }
@@ -155,6 +167,7 @@ enum Links {
             for (i, step) in steps.components(separatedBy: ";;").enumerated() {
                 if i > 0 { try? await Task.sleep(for: .seconds(3)) }
                 let model = MacModel.shared
+                hide()
                 switch step {
                 case let s where s.hasPrefix("tell:"): model.openTell(prefill: String(s.dropFirst(5)).replacingOccurrences(of: "|", with: "\n"))
                 case "settings": model.openSettings?()
@@ -168,6 +181,9 @@ enum Links {
                     let parts = rest.split(separator: ":", maxSplits: 1).map(String.init)
                     let words = (parts.count > 1 ? parts[1] : "").replacingOccurrences(of: "|", with: "\n")
                     QuickPanel.shared.show(mode: parts.first == "search" ? .search : .tell, text: words)
+                case let s where s.hasPrefix("offlineshot:"):
+                    /* The offline page as the window draws it at 1512 wide (AppKit's own cache draws a SwiftUI window empty). */
+                    Shots.view(MacOffline {}.frame(width: 1512, height: 945).environment(\.font, Typeface.body), name: String(s.dropFirst(12)))
                 case let s where s.hasPrefix("quickshot:"):
                     Shots.other(titled: "Quick panel", name: String(s.dropFirst(10)))
 
@@ -185,6 +201,17 @@ enum Links {
                 default: model.go(step)
                 }
             }
+        }
+    }
+
+    /// A QUIET WALK DRAWS ITS WINDOWS WHERE NOBODY SEES THEM: in front, so WebKit and AppKit draw them as they would on
+    /// screen, but clear and deaf to the mouse, so the person at this Mac sees and clicks only what they were using.
+    static func hide() {
+        guard MacModel.quiet else { return }
+        for window in NSApp.windows where window.isVisible || window === MacModel.shared.desk.webView.window {
+            window.alphaValue = 0.02
+            window.ignoresMouseEvents = true
+            window.orderFrontRegardless()
         }
     }
     #endif

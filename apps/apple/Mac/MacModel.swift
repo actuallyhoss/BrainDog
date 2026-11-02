@@ -215,7 +215,7 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         let goto = response.notification.request.content.userInfo["goto"] as? String
         await MainActor.run {
-            NSApp.activate()
+            if !Self.quiet { NSApp.activate() }
             self.openWindow?("main")
             if let goto { self.desk.go(goto) }
         }
@@ -235,13 +235,22 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
 
     /// The window in front, where it was.
     func front() {
-        NSApp.activate()
+        if !Self.quiet { NSApp.activate() }
         openWindow?("main")
+    }
+
+    /// A Debug walk launched in the background (`-braindogQuiet YES`): the app never takes the Mac from the person at it.
+    static var quiet: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "braindogQuiet")
+        #else
+        false
+        #endif
     }
 
     func openTell(prefill: String = "", mode: TellModel.Mode = .tell) {
         tell.opened(prefill: prefill, mode: mode)
-        NSApp.activate()
+        if !Self.quiet { NSApp.activate() }
         openWindow?("tell")
     }
 

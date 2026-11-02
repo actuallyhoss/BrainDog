@@ -41,7 +41,14 @@ final class QuickPanel: NSObject, NSWindowDelegate {
         let at = NSPoint(x: (area.midX - size.width / 2).rounded(), y: (area.maxY - area.height * 0.22).rounded())
         top = at
         panel.setFrameTopLeftPoint(at)
-        panel.makeKeyAndOrderFront(nil)
+        /* A QUIET DEBUG WALK only shows it: taking the keys would take them from the person at this Mac. */
+        if MacModel.quiet {
+            panel.alphaValue = 0
+            panel.ignoresMouseEvents = true
+            panel.orderFrontRegardless()
+        } else {
+            panel.makeKeyAndOrderFront(nil)
+        }
     }
 
     func close() {
@@ -67,6 +74,8 @@ final class QuickPanel: NSObject, NSWindowDelegate {
         panel.delegate = self
         let host = NSHostingController(rootView: QuickPanelView(model: model))
         host.sizingOptions = [.preferredContentSize]
+        /* NO ROOM FOR A TITLE BAR: the panel has none to show, so its content starts at its top edge. */
+        host.safeAreaRegions = []
         panel.contentViewController = host
         panel.onEscape = { [weak self] in self?.close() }
         self.panel = panel

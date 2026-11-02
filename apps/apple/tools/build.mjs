@@ -31,6 +31,8 @@ const press = pressAt >= 0 ? rest[pressAt + 1] : null;
 /* `--appearance light|dark`: the Mac app draws in that, whatever this Mac is set to (Debug only). */
 const lookAt = rest.indexOf('--appearance');
 const appearance = lookAt >= 0 ? rest[lookAt + 1] : null;
+/* `--quiet`: the Mac app opens behind whatever is in front and never brings itself forward (a walk on a Mac someone uses). */
+const quiet = rest.includes('--quiet');
 /* `--launch`: launch what was built last, again, without building. */
 const again = rest.includes('--launch');
 
@@ -84,8 +86,8 @@ try {
     const ours = spawnSync('pgrep', ['-f', join(app, 'Contents', 'MacOS', 'BrainDog')], { encoding: 'utf8' }).stdout.split('\n').filter(Boolean);
     for (const pid of ours) spawnSync('kill', [pid]);
     if (ours.length > 0) spawnSync('sleep', ['1']);
-    const args = [...(server ? ['-braindogServer', server] : []), ...(press ? ['-braindogPress', press] : []), ...(appearance ? ['-braindogAppearance', appearance] : [])];
-    run('open', ['-n', app, ...(args.length ? ['--args', ...args] : [])]);
+    const args = [...(server ? ['-braindogServer', server] : []), ...(press ? ['-braindogPress', press] : []), ...(appearance ? ['-braindogAppearance', appearance] : []), ...(quiet ? ['-braindogQuiet', 'YES'] : [])];
+    run('open', [...(quiet ? ['-g'] : []), '-n', app, ...(args.length ? ['--args', ...args] : [])]);
     console.log('  launched the Mac app');
   } else {
     throw new Error(`There is no mode called ${mode}: check, sim or mac.`);
