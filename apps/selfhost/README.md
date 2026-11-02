@@ -79,6 +79,18 @@ The server says each of these in one line when it starts. None is an error.
   When they are set, the start signs in to the mail server without sending anything and says `mail: signed in` or
   `mail: could not reach or sign in`. The domain of `BRAINDOG_MAIL_FROM` needs SPF and DKIM set up at your mail
   provider, or sign-in links land in spam.
+- Inviting people needs mail. Somebody new proves their address by opening a mail before they join, so without mail
+  an invitation can only be used by an address that already signs in here. The invite sheet says so before you press
+  and shows the link to copy. With mail on, the invitation is mailed at once, naming you and the BrainDog, and one
+  press of Join is enough. The owner also needs a passkey before anybody else can join.
+- Phone and browser notifications: off. They go out through BrainDog Cloud's keys, which a self-host does not have.
+  Settings, Notifications says so; what is handed to somebody or mentions them waits in their bell and Needs you.
+- The iPhone and Mac apps: they sign in to BrainDog Cloud only for now. Asked to sign in here, the server answers that
+  in plain words; use the app in a browser instead.
+
+Everything else works here as on the Cloud: roles and Settings, Who can do what; handing ownership to a colleague;
+read-only links to a page or a project; seeing who else is on a page; mentions; importing contacts and bank statements.
+The daily page checks run once a day in one go rather than in slices, since one process has no time limit per run.
 - Model: off until someone adds their own key in the app (Settings, Keys). Nothing else needs it.
 - Billing: always off. Nothing is charged or counted.
 - Turnstile: off. Self-host has no public sign-up.
