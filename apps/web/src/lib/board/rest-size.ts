@@ -17,15 +17,43 @@ import { sizesOf, type WidgetSize } from 'braindog-render';
 /** How many rows a frame one row tall shows whole: a wide, and a small. */
 export const ONE_ROW_HOLDS: Readonly<Partial<Record<WidgetSize, number>>> = { wide: 2, small: 1 };
 
-/** The size a widget of `kind` is laid at, at rest, holding `rows` rows (`null` where they are not counted). */
-export function restSize(kind: string, size: WidgetSize, rows: number | null): WidgetSize {
+/**
+ * AND HOW MANY OF THE DESK'S OWN LINES (what is late, who is working) ONE ROW SHOWS WHOLE: one. Theirs are tall lines, a
+ * face, a name, what it is doing and what it holds, as Home's `DESK_LAPTOP` says in cutting them to one in a one-row frame.
+ */
+export const DESK_ONE_ROW_HOLDS: Readonly<Partial<Record<WidgetSize, number>>> = { wide: 1, small: 1 };
+
+/** Whether a block as Home draws it is one of the desk's own tiles, whose lines are tall (`DESK_ONE_ROW_HOLDS`). */
+export const deskLines = (b: { desk?: { kind: string } | undefined }): boolean => b.desk?.kind === 'late' || b.desk?.kind === 'working';
+
+/** The size two rows tall of the same width: a wide's is a large, a small's a tall. */
+const TALLER: Readonly<Partial<Record<WidgetSize, WidgetSize>>> = { wide: 'large', small: 'tall' };
+
+/**
+ * The size a widget of `kind` is laid at, at rest, holding `rows` rows (`null` where they are not counted). `holds` is how
+ * many of its rows a one-row frame shows whole.
+ *
+ * `grow`: A ONE-ROW FRAME THAT CANNOT HOLD WHAT IT MUST SHOW IS LAID ACROSS TWO ROWS, for the desk's own tiles, whose every
+ * line is a person at work or a thing late (skills pass 3, 2 Nov). Working now chosen wide, with Claude and Codex at
+ * work, drew both runs in a card 203px tall inside a frame of one row (185px), its foot padding cut to about 5; the only
+ * cure inside the frame hid Codex behind "1 more". Laid across two rows, the frame at rest is as tall as the card and no
+ * taller (`Board.svelte`, T5), and the tiles beside it close up under their own.
+ */
+export function restSize(
+  kind: string,
+  size: WidgetSize,
+  rows: number | null,
+  { holds = ONE_ROW_HOLDS, grow = false }: { holds?: Readonly<Partial<Record<WidgetSize, number>>>; grow?: boolean } = {},
+): WidgetSize {
   if (rows === null) return size;
   const can = sizesOf(kind);
+  const taller = TALLER[size];
+  if (grow && taller !== undefined && rows > (holds[size] ?? Infinity) && can.includes(taller)) return taller;
   /* A TALL GOES SMALL, or wide where its kind has no small (People's faces are cards): the same room, one row tall. */
   const tries: WidgetSize[] = size === 'large' ? ['wide'] : size === 'tall' ? ['small', 'wide'] : [];
   const to = tries.find((s) => can.includes(s));
   if (to === undefined) return size;
-  return rows <= (ONE_ROW_HOLDS[to] ?? 0) ? to : size;
+  return rows <= (holds[to] ?? 0) ? to : size;
 }
 
 /** The lists a drawn block carries its rows in. */

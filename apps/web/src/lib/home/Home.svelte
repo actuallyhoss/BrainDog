@@ -125,7 +125,8 @@
   import type EditCoverOf from '$lib/board/EditCover.svelte';
   import type DraftMarkOf from '$lib/board/DraftMark.svelte';
   import { BoardModel, boardWords } from '$lib/board/board.svelte.ts';
-  import { restSize, rowsOf } from '$lib/board/rest-size.ts';
+  import { DESK_ONE_ROW_HOLDS, deskLines, restSize, rowsOf } from '$lib/board/rest-size.ts';
+  import { WORKING_MOST } from '$lib/home/desk.ts';
   import { leftBlock, phoneAsk, withLeft } from '$lib/home/phone-ask.ts';
   import { fitted, widgetsOf, type Phone } from '$lib/board/board-widgets.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -1028,10 +1029,23 @@
       recordNow(),
       named,
     );
-    /* WHO IS WORKING SHOWS WHAT ITS FRAME HOLDS; All agents has the rest. */
+    /* WHO IS WORKING SHOWS WHAT ITS FRAME HOLDS, as it is laid (`workingLaid`); All agents has the rest. */
     if (!board) return desk;
-    return desk.map((b) => (b.desk?.kind === 'working' && b.desk.rows.length > sized('working') ? { ...b, desk: { ...b.desk, rows: b.desk.rows.slice(0, sized('working')) } } : b));
+    const most = DESK_SHOWS[workingLaid()];
+    return desk.map((b) => (b.desk?.kind === 'working' && b.desk.rows.length > most ? { ...b, desk: { ...b.desk, rows: b.desk.rows.slice(0, most) } } : b));
   });
+
+  /**
+   * HOW MANY RUNS WORKING NOW DRAWS: what `boot` counted at work, the four it names at most (`WORKING_MOST`). Not the rows
+   * the desk was cut to, since the tile draws every run `presence` says is open, whatever it was handed.
+   */
+  const workingRuns = (rows: number | null): number => Math.min(WORKING_MOST, Math.max(rows ?? 0, workingNow().length));
+  /** The size Working now is laid at on a laptop at rest: two rows tall where one cannot hold its runs (`restSize`). */
+  function workingLaid(): WidgetSize {
+    const size = boardModel.sizeNow('working');
+    const kind = boardWidgets.find((w) => w.key === 'working')?.kind;
+    return kind === undefined || boardModel.onPhone ? size : restSize(kind, size, workingRuns(null), { holds: DESK_ONE_ROW_HOLDS, grow: true });
+  }
 
   /** How many lines of the desk's own tiles (what is late, who is working) each frame holds: theirs are tall lines. */
   const DESK_LAPTOP: Readonly<Record<import('braindog-render').WidgetSize, number>> = { small: 1, wide: 1, tall: 3, large: 3, full: 1 };
@@ -1126,10 +1140,13 @@
     if (!board || !deskedRaw || boardModel.onPhone) return out;
     const kinds = new Map(boardWidgets.map((w) => [w.key, w.kind] as const));
     const counted = new Map<string, number | null>();
+    /* THE DESK'S OWN TILES, whose lines are tall: one to a row (`DESK_ONE_ROW_HOLDS`). */
+    const tall = new Set<string>();
     for (const b of deskedRaw) {
       const k = boardKeyOf(b);
       if (!k || !kinds.has(k) || counted.has(k)) continue;
       counted.set(k, b.drawn || k === 'needs-you' ? rowsOf(b as unknown as Parameters<typeof rowsOf>[0]) : null);
+      if (deskLines(b)) tall.add(k);
     }
     /* NEEDS YOU WITH NOTHING ASKED IS ITS FOOT ALONE, the calm line, and a red sign's line under it when there is one. A
        question is a tall line with its answers, so with any asked it keeps its frame. */
@@ -1139,7 +1156,7 @@
     if (kinds.has('arrivals')) counted.set('arrivals', landedKit ? landedKit.arrivalsOf(landed).length : landed.length);
     for (const [k, rows] of counted) {
       const size = boardModel.sizeNow(k);
-      const at = restSize(kinds.get(k)!, size, rows);
+      const at = restSize(kinds.get(k)!, size, k === 'working' ? workingRuns(rows) : rows, tall.has(k) ? { holds: DESK_ONE_ROW_HOLDS, grow: true } : undefined);
       if (at !== size) out.set(k, at);
     }
     return out;
