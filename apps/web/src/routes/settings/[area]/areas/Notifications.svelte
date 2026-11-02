@@ -8,7 +8,7 @@
   import { sendTest, testWords } from '$lib/ui/push.ts';
   import type { Call } from '$lib/ui/webhook-doors.ts';
   import { copy } from '$lib/copy.ts';
-  import { isApp, macNotifications, setMacNotifications } from '$lib/shell.ts';
+  import { askPush, inIosApp, isApp, macNotifications, pushNative, setMacNotifications } from '$lib/shell.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -41,6 +41,9 @@
     interrupts: 'Urgent only, at most hourly: expiring keys, held runs, urgent rules.',
     mac: 'Mac notifications',
     macLine: 'New questions and handoffs, once each',
+    /* WHAT THE APP'S OWN ASK SAYS WHEN IT ANSWERS (`askPush`). */
+    pushGiven: 'This device is told when something interrupts you.',
+    pushRefused: 'Notifications are off for BrainDog. Turn them on in the device’s Settings, under Notifications.',
   } as const;
 
   /**
@@ -149,6 +152,22 @@
     kindLine = out && 'refusal' in out ? out.refusal.fix : copy.recordNotReached;
   }
 
+  /* IN AN APP THAT ASKS ITSELF (`pushNative`, `shell.ts`): the turn-on press is the app's own notification permission,
+     never the web's subscription, which a web view cannot keep. Where the app says it was given, the test and the kinds
+     are drawn as they are for a rung browser; where it says nothing, the line stays as it was. */
+  const native = pushNative();
+  let nativeBusy = $state(false);
+  let nativeLine = $state('');
+  async function turnOnNative(): Promise<void> {
+    if (nativeBusy) return;
+    nativeBusy = true;
+    const given = await askPush();
+    nativeBusy = false;
+    if (given === null) return;
+    turned(given);
+    nativeLine = given ? words.pushGiven : words.pushRefused;
+  }
+
   async function test() {
     if (testing) return;
     testing = true;
@@ -239,13 +258,29 @@
 {#snippet macSwitch()}
   <button type="button" class="switch" role="switch" aria-checked={mac} aria-label={words.mac} onclick={flipMac}><span class="switch-track"></span></button>
 {/snippet}
-{#if isApp}
+<!-- NOT IN THE IPHONE APP, whose notifications are the record's pushes (`macNotifications` in `shell.ts`). -->
+{#if isApp && !inIosApp}
   <Tile>
     <StateRow icon="monitor" title={words.mac} line={words.macLine} action={macSwitch} />
   </Tile>
 {/if}
 <div class="push tile">
-  <div class="push-switch"><PushToggle host={props.shell.host} onchange={turned} /></div>
+  {#if native}
+    <!-- THE APP'S OWN ASK, in the web's push row's words: the permission is native's, the subscription its own. -->
+    <Tile class="section" data-surface="tile" title={copy.pushTitle}>
+      <div class="section-body">
+        <p class="hint">{copy.pushHow}</p>
+        {#if !rung}
+          <div class="row-actions">
+            <Button weight="primary" disabled={nativeBusy} aria-busy={nativeBusy} onclick={() => void turnOnNative()}>{copy.pushTurnOn}</Button>
+          </div>
+        {/if}
+        <p class="said" role="status">{nativeLine}</p>
+      </div>
+    </Tile>
+  {:else}
+    <div class="push-switch"><PushToggle host={props.shell.host} onchange={turned} /></div>
+  {/if}
   {#if rung}
     <div class="push-test">
       <Button weight="quiet" disabled={testing} onclick={() => void test()}>{testing ? testWords.pressing : testWords.send}</Button>
@@ -340,6 +375,13 @@
 
   .push:not(:has(section)) {
     display: none;
+  }
+
+  /* THE APP'S OWN ASK, laid out as `PushToggle` lays the web's. */
+  .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
   }
 
   .push-test {

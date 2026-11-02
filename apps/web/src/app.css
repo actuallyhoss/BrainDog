@@ -39,6 +39,27 @@
     overscroll-behavior: none;
   }
 
+  /* IN THE IPHONE APP THE DOCUMENT IS THE SCROLLER (`data-shell="ios"`, `lib/shell.ts`; the frame's half is in
+     `AppFrame.svelte`): the web view's own scroll view is what native's pull to refresh, its shrinking tab bar and a tap
+     on the status bar hear, and it bounces as every native list does. While a modal is open the page under it holds
+     still, as `.body` under a sheet always did. */
+  html[data-shell='ios'],
+  html[data-shell='ios'] body {
+    block-size: auto;
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+
+  html[data-shell='ios']:has(dialog:modal) {
+    overflow: hidden;
+  }
+
+  /* AND NATIVE'S TAB BAR IS NOT THE WEB'S: what clears the web's bar (the toasts, a bulk bar, the work's foot) clears
+     only what the safe area says is under native's, which native reports and the web never measures. */
+  html[data-shell='ios'] {
+    --tabbar: env(safe-area-inset-bottom, 0px);
+  }
+
   /* A TAP IS A TAP AT ONCE: no wait to see whether it was the first half of a double-tap zoom, which a phone browser
      otherwise holds every tap for. Pinch zoom stays. And the text stays the size it was set in when the phone turns. */
   html {

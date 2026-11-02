@@ -34,6 +34,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { haptic } from '$lib/shell.ts';
   import { isGlyph } from '$lib/ui/icons.ts';
   import { focusOnceDrawn } from '$lib/ui/keep-focus.ts';
   import { noteWith } from '$lib/tell/kept-note.ts';
@@ -215,6 +216,8 @@
       },
     });
     sending = false;
+    /* ADD IS FELT IN THE IPHONE APP (`shell.ts`): what was added, or that the record kept none of it. */
+    haptic(out.ok ? 'success' : 'warning');
     /* THE FIELD KEEPS THE FOCUS (AH20): the next thing is typed straight away, never from the top of the page. AND THE
        SLIM LINE TAKES IT WHEN THIS CARD MAKES WAY FOR IT (AJ7): the first Add it by a click left the focus on a button
        that was gone, so it is watched for until the line is drawn, and moved off the pressed button too. */

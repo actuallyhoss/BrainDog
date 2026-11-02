@@ -42,6 +42,7 @@
 import { untrack } from 'svelte';
 
 import { keysSaid } from '../record/names.ts';
+import { haptic } from '../shell.ts';
 
 export type Toast = {
   id: number;
@@ -105,6 +106,10 @@ class Toasts {
 
       this.items = next.slice(-CAP);
       this.#arm(id);
+      /* AND THE IPHONE APP'S HAND FEELS IT BY ITS TONE (`shell.ts`): a change kept, or a refusal. A toast that only
+         reports is not felt. Nothing in a browser. */
+      if (opts.intent === 'good') haptic('success');
+      else if (opts.intent === 'warn' || opts.intent === 'bad') haptic('warning');
       return id;
     });
   }

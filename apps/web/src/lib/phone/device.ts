@@ -5,6 +5,7 @@
  * EVERY BROWSER GLOBAL IS READ INSIDE A FUNCTION, so the module loads anywhere and asks only when called.
  */
 
+import { haptic as shellHaptic, shellFeels } from '../shell.ts';
 import { links } from './splash.ts';
 
 type Nav = Navigator & { standalone?: boolean; vibrate?(p: number | number[]): boolean };
@@ -104,8 +105,11 @@ let iosSwitch: HTMLLabelElement | null = null;
  * turned, inside the press that asked for it. Nothing anywhere else, and never on a mouse.
  *
  * `light` for a step (a pull let go, a sheet let go), `done` for something saved, `warn` for something refused.
+ *
+ * IN THE IPHONE APP THE ENGINE IS NATIVE'S (`shell.ts`): the same three, as its press, success and warning.
  */
 export function haptic(kind: 'light' | 'done' | 'warn' = 'light'): void {
+  if (shellFeels()) return shellHaptic(kind === 'light' ? 'press' : kind === 'done' ? 'success' : 'warning');
   const n = nav();
   if (!n || !mq('(pointer: coarse)')) return;
   if (typeof n.vibrate === 'function') {

@@ -26,6 +26,7 @@ const localTab = () => import('./local-tab.ts');
 const wipeLocal = (): Promise<void> => localTab().then((m) => m.wipeLocal());
 import { dropShell, forget, hear, hearShell, keep } from './offline.ts';
 import { forgetSignedOut } from '../record/signed-out.ts';
+import { shellSignedOut } from '../shell.ts';
 
 /**
  * `state` is what the hairline draws.
@@ -190,6 +191,8 @@ function asker(base: string): () => Promise<number> {
         void forget().catch(() => undefined);
         void wipeLocal();
         forgetSignedOut();
+        /* AND AN APP THAT SIGNS IN ITSELF IS TOLD, once: native signs him in again over the page (`shell.ts`). */
+        shellSignedOut();
       }
       /* A PERSON WHOSE ACCESS ENDED IS TOLD SO, within one poll of the share stopping: 1.5 s on a focused tab. */
       if ('refusal' in out && endedBy(out.refusal)) end(out.refusal.fix);

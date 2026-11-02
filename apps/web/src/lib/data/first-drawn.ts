@@ -8,15 +8,22 @@
  * `boot` meanwhile, so nothing moves for the wait.
  *
  * ONCE A TAB: a later screen has drawn its first already, and nothing waits.
+ *
+ * AND THE NATIVE APPS ARE TOLD (`shellReady` in `shell.ts`): the iPhone's launch picture of Today sits over the page
+ * until this moment and then fades, so nothing half drawn is ever seen. A browser has no shell, and is told nothing.
  */
+
+import { shellReady } from '../shell.ts';
 
 let heard: (() => void) | null = null;
 const drawn = new Promise<void>((done) => (heard = done));
 
 /** The first screen has drawn what it opened on. */
 export function drewFirst(): void {
-  heard?.();
+  if (heard === null) return;
+  heard();
   heard = null;
+  shellReady();
 }
 
 /** Whether the tab's first screen has drawn already: a screen opened after it is not the first open. */

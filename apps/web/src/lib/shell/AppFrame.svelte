@@ -21,13 +21,19 @@
   or a failed poll of `/api/version`, never the browser's guess. Once it IS detected, it is shown as
   what it is: writes will fail.
 
+  IN THE IPHONE APP THE FRAME IS THE WORK ALONE (`data-shell="ios"`, apps plan §3.3). Native draws the nav bar with the
+  page's name (`shellTitle`), the tab bar from the web's own four (`shellPlaces`), the way back, the bell and the face, so
+  this draws no top bar, no sidebar or rail, no tab bar, no search corner, and nothing of `Phone.svelte`'s; and the
+  document is the one scroller there, so native's pull to refresh and its bars hear the scroll. The Mac app keeps this
+  frame whole, under its title bar's room (`--shell-inset`).
+
   THE PHONE HAS NO FLOATING SEARCH DISC. Below 900px search is the 44px button in each screen's
   head bar (`PageHead.svelte`); the disc sat over the header of every screen, under the 44px floor,
   and twice on `/search`.
 -->
 <script lang="ts">
   import { BASE, apiBase, at, here, slugOf } from '$lib/at.ts';
-  import { appPath, isApp, macNotifications, notify, onShell, setBadge, windowFocused } from '$lib/shell.ts';
+  import { appPath, inIosApp, isApp, macNotifications, notify, onShell, setBadge, shellPlaces, shellTitle, windowFocused } from '$lib/shell.ts';
   import { handoffAlert, instructionAlert, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
   /* THE STYLESHEETS AND `applyInset()` ARE THE ROOT LAYOUT'S (`routes/+layout.svelte`), in the order they always had,
      so the light frame and this one draw on the same skin. */
@@ -49,7 +55,7 @@
   import Toasts from '$lib/ui/Toasts.svelte';
   import StepUp from '$lib/reauth/StepUp.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { follow, followGrant, live, readingAs } from '$lib/data/live.svelte.ts';
+  import { follow, followGrant, live, readingAs, reread } from '$lib/data/live.svelte.ts';
   import { timingOpened } from '$lib/data/timing.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette carries its commands, its search and Slash's drawing, so importing them
@@ -111,9 +117,15 @@
       /* A download has no browser bar to show it in the app: say where the file went. */
       onShell('saved', (name) => toasts.push(copy.savedToDownloads(name ?? ''))),
       onShell('unsaved', (name) => toasts.push(copy.notSaved(name ?? ''), { intent: 'warn' })),
+      /* THE NATIVE PULL TO REFRESH: every screen reads again, through the same mark a pull in the page moves. */
+      onShell('refresh', () => void reread()),
     ];
     return () => stops.forEach((stop) => stop());
   });
+
+  /* IN THE IPHONE APP, where native draws the bars and the tabs (`shell.ts`): read once, as the shell is there before
+     any script runs. */
+  const ios = inIosApp;
 
   /* THE ROOT LOAD'S ANSWER (`routes/+layout.ts`), handed over by the root layout as Kit hands a layout its `data`. */
   let { data, children }: { data: FrameData; children: Snippet } = $props();
@@ -457,10 +469,11 @@
   /* THE SIDEBAR IS THE BAR SHAPE'S: the full column beside the work from 1,280 (`sideOn`), and narrower, or hidden, its
      56px rail of the places (`railOn`), never nothing. From the rail the full sidebar opens as a drawer over the page
      from the left (`sideOver`), never from the right, and the menu shape's one button opens the same drawer. */
+  /* NONE OF THE THREE IN THE IPHONE APP, at any width: native's tabs and its search tab are the way to every place. */
   let sideOver = $state(false);
-  const sideOn = $derived(navPrefs.shape === 'bar' && !narrow && deskWide && sideShown);
-  const railOn = $derived(navPrefs.shape === 'bar' && !narrow && !sideOn);
-  const overOn = $derived(!narrow && sideOver && !sideOn);
+  const sideOn = $derived(!ios && navPrefs.shape === 'bar' && !narrow && deskWide && sideShown);
+  const railOn = $derived(!ios && navPrefs.shape === 'bar' && !narrow && !sideOn);
+  const overOn = $derived(!ios && !narrow && sideOver && !sideOn);
   /* THE PROJECTS PLACE is the one whose own things are projects' pages, else the section called Projects: its heading
      is the sidebar's projects part, never a place of its own. */
   /* ONLY A PLACE WHOSE THINGS ARE PROJECTS (AH13): a Guide's milestone pages are its things too, and taken for projects
@@ -604,6 +617,11 @@
       return own.length > 0 ? { ...t, near: [...t.near, ...own.map((k) => k.href)] } : t;
     }),
   );
+  /* THE NATIVE TAB BAR IS THE WEB'S FOUR (`shellPlaces`), said as the shell opens and again only when they change, so
+     "his five win" holds in the app as on the phone's web bar. Nothing in a browser. */
+  $effect(() => {
+    if (isApp) shellPlaces(phoneTabs);
+  });
   /* THE ONE LIT ROW, and the crumb the bar says it in. */
   /* AN ADDRESS WHOSE FIRST WORD NAMES NO RECORD THAT ANSWERED is a page that is not here (`routes/+page.svelte`), not this
      record's Today: the bar said "Today" and lit it over "No page called nope-not-here" (skills pass 2 Nov). Nothing is
@@ -620,6 +638,13 @@
   const sideLit = $derived(lit ?? (frame.up?.href ? litOf(frame.up.href, model) : null));
   $effect.pre(() => {
     frame.here = crumb.at(-1)?.label ?? '';
+  });
+  /* THE NATIVE NAV BAR SAYS WHAT THE PHONE'S BAR SAYS (`PageHead`'s `where`): where you are, else the page's own name,
+     once the move has drawn it. A moment with neither (a head between screens) leaves the last name standing. */
+  $effect(() => {
+    if (!isApp) return;
+    const name = frame.here || frame.title;
+    if (name !== '') shellTitle(name);
   });
   /* SUGGESTED CHANGES, AT THE SIDEBAR'S FOOT WHEN ANY WAIT: an update that adds a page lands hidden. */
   const penWaits = $derived(penCount(data.pen, (id) => navPrefs.isDismissed(id)));
@@ -817,6 +842,8 @@
   const newScreen = (from: URL | undefined, to: URL | undefined): boolean =>
     !from || !to || from.pathname !== to.pathname || placeOf(here(from.pathname), from.searchParams) !== placeOf(here(to.pathname), to.searchParams);
   const scroller = (): HTMLElement | null => document.getElementById('main');
+  /* WHAT SCROLLS: the work, and in the iPhone app the document itself (see the foot of this file). */
+  const pane = (): HTMLElement | null => (ios ? (document.scrollingElement as HTMLElement | null) : scroller());
   let fromPalette = false;
 
   /**
@@ -846,7 +873,7 @@
   }
 
   function keepPlace(nav: { from: { url: URL } | null; to: { url: URL } | null; type: string }): void {
-    const el = scroller();
+    const el = pane();
     if (!el || !nav.from) return;
     const from = placeKey(nav.from.url);
     remember(scrolls, from, el.scrollTop);
@@ -904,11 +931,13 @@
       const move = moves;
       void waitFor(() => {
         const el = scroller();
-        return moves !== move || (el !== null && el.dataset.screen !== undefined && el.scrollHeight - el.clientHeight >= y);
+        const at = pane();
+        return moves !== move || (el !== null && at !== null && el.dataset.screen !== undefined && at.scrollHeight - at.clientHeight >= y);
       }, 1500).then(() => {
         const el = scroller();
-        if (!el || moves !== move) return;
-        el.scrollTop = y;
+        const at = pane();
+        if (!el || !at || moves !== move) return;
+        at.scrollTop = y;
         /* A SCREEN THAT DRAWS AGAIN WHEN ITS FRESH ANSWER LANDS (Needs you's queue) is short for a frame and drops the
            place to the top (VERIFY H4). So for 1.5s a drop below `y` is put back, until the reader scrolls themselves. */
         let own = false;
@@ -916,7 +945,7 @@
         const hands = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
         for (const h of hands) addEventListener(h, mine, { capture: true, passive: true, once: true });
         void waitFor(() => {
-          const now = scroller();
+          const now = pane();
           /* AND NEVER OVER THE NEXT SCREEN: two Backs in a row put the second screen at the first one's place. */
           if (own || now === null || moves !== move) return true;
           if (now.scrollTop < y - 1 && now.scrollHeight - now.clientHeight >= y) now.scrollTop = y;
@@ -1583,6 +1612,7 @@
           {/if}
         </div>
       {/if}
+      {#if !ios}
       <div class="bar-slot">
         {#if shape === 'bar'}
           <TopBar {crumb} onfind={openPalette} />
@@ -1597,6 +1627,7 @@
           </button>
         {/if}
       </div>
+      {/if}
       {#if overOn}
         <!-- UNDER 1,280, OR ON THE MENU SHAPE, THE FULL SIDEBAR SLIDES IN FROM THE LEFT over its rail and the page; a press
              beside it, Esc or a move closes it. -->
@@ -1660,9 +1691,12 @@
     {/key}
   </div>
 
-  <div class="tab-slot">
-    <TabBar tabs={phoneTabs} menu={MENU} live={workingNow().length > 0} nowhere={stray} />
-  </div>
+  <!-- NOT IN THE IPHONE APP: its tab bar is native's, made from the same four (`shellPlaces`). -->
+  {#if !ios}
+    <div class="tab-slot">
+      <TabBar tabs={phoneTabs} menu={MENU} live={workingNow().length > 0} nowhere={stray} />
+    </div>
+  {/if}
 
   <!-- THE PHONE'S OWN WAYS (`lib/phone/Phone.svelte`): the status bar's colour, the iPhone's launch pictures, back from the
        left edge in the Home Screen app, and the two asks. Its own chunk, a moment after the shell has drawn. -->
@@ -1679,7 +1713,7 @@
     surface that reaches anything in the record. Below 900px the rule under it hides it, because the
     tab bar is the navigation there whatever the shape says.
   -->
-  {#if shape === 'menu'}
+  {#if shape === 'menu' && !ios}
     <button type="button" class="launcher tap" onclick={openPalette} aria-label={copy.paletteLabel}>
       <Icon name="search" size="l" />
     </button>
@@ -1777,6 +1811,36 @@
   .live[data-state='offline'] {
     display: block;
     background: var(--warn-fill);
+  }
+
+  /**
+   * THE IPHONE APP'S FRAME IS THE WORK ALONE, AND THE DOCUMENT SCROLLS (`data-shell="ios"`, set by `applyInset`).
+   *
+   * Native draws the nav bar, the tab bar and the way back, and pays the notch and the home indicator itself, so the work
+   * keeps no room for bars it does not draw: no grid row for a top bar, and at its foot only what the safe area says is
+   * under native's tab bar (`--tabbar`, which `app.css` makes the bottom inset alone there). A page's own head then opens
+   * 12 under native's bar, the phone's head row less its bar (`PageHead.svelte`).
+   *
+   * ONE SCROLLER STILL, BUT THE DOCUMENT'S. `.body` was the one thing that scrolled, which the web view's own scroll view
+   * never saw: native's pull to refresh, the tab bar that shrinks as you scroll and a tap on the status bar all hang on
+   * it. So in the app `html` and `body` scroll (`app.css`) and the frame grows with the work. Back's place is kept and put
+   * back on the document (`pane` above).
+   */
+  :global(html[data-shell='ios']) .shell {
+    display: block;
+    block-size: auto;
+    overflow: visible;
+  }
+
+  :global(html[data-shell='ios']) .body {
+    overflow: visible;
+    padding-block-end: var(--tabbar);
+  }
+
+  :global(html[data-shell='ios']) .bare {
+    block-size: auto;
+    min-block-size: 100dvh;
+    overflow: visible;
   }
 
   /* A SURFACE WITH NO SHELL SCROLLS ITSELF. Same architecture as `.body` below — one container, one

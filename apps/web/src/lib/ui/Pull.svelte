@@ -15,6 +15,10 @@
 
   THE OFFLINE LINE is the one banner (`Banner.svelte`), in the warn tint, drawn while the poll says offline and something on screen came from the copy: "Offline, showing what
   you last saw at 14:02.", and that nothing changed here can be saved until he is back online.
+
+  IN THE IPHONE APP THE PULL IS NATIVE'S (`UIRefreshControl` on the web view, which sends `refresh`, `AppFrame.svelte`):
+  the document scrolls there, so this one would read every swipe down as a pull, and it stands down. The offline line
+  stays.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -24,6 +28,7 @@
   import { settled } from '$lib/ui/screen.svelte.ts';
   import Banner from './Banner.svelte';
   import { haptic } from '$lib/phone/device.ts';
+  import { inIosApp } from '$lib/shell.ts';
 
   /** How far, in CSS pixels, a pull from the top travels before letting go reads again. */
   const FAR = 72;
@@ -74,7 +79,7 @@
 
   $effect(() => {
     const panel = spot?.parentElement;
-    if (!panel) return;
+    if (!panel || inIosApp) return;
     let from: number | null = null;
     const start = (e: TouchEvent) => {
       const t = e.touches.item(0);

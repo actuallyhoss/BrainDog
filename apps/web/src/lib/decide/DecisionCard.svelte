@@ -80,6 +80,7 @@
   import { answeredLine, answerRowOf, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, leadOf, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
   import { leave, pointerOff, settle, snapshot } from './settle.ts';
   import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
+  import { haptic } from '$lib/shell.ts';
   import { step } from '$lib/funnel.ts';
   import { othersLine, namer } from '../../routes/decide/[id]/decider.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -392,6 +393,8 @@
       }
       mergeLine = '';
       answerTakenBack(question.id);
+      /* THE REFUSAL IS FELT IN THE IPHONE APP (`shell.ts`), as the press that sent it was. */
+      haptic('warning');
       /* A REFUSED ANSWER OPENS THE CARD BACK OUT OF ITS LINE as Undo does, rather than in one jump. */
       if (out.from === 'refused' && out.wants === 'reason') {
         await morph(() => (phase = 'asking'));
@@ -417,8 +420,9 @@
     mergeLine = said;
     answeredAt = new Date().toISOString();
     /* THE COUNT MOVES ON THE PRESS (`waits.svelte.ts`): the rail, the tab and the head say one less now, not after the
-       six seconds of Undo and the poll that follows the write. */
+       six seconds of Undo and the poll that follows the write. AND THE IPHONE APP'S HAND FEELS THE ANSWER (`shell.ts`). */
     answerPressed(question.id);
+    haptic('success');
     await morph(() => {
       phase = 'answered';
       holding = hold(() => {
@@ -576,6 +580,7 @@
     if (reason.trim() === '') return reveal();
     answeredAt = new Date().toISOString();
     answerPressed(question.id);
+    haptic('success');
     void morph(() => (phase = 'answered'));
     void send(chosen, reason);
   }

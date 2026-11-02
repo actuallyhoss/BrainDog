@@ -15,6 +15,7 @@
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
+  import { inIosApp } from '$lib/shell.ts';
   import { titleOf } from '$lib/title.ts';
   import { onDestroy, tick, untrack } from 'svelte';
   import { afterNavigate, goto } from '$app/navigation';
@@ -1596,8 +1597,9 @@
        the window never scrolls, the sentinel never enters the viewport, and an observer with the
        default root fires exactly once, at load, and never again. Measured: page one drew and eight
        scrolls to the bottom added nothing. */
+    /* IN THE IPHONE APP THE DOCUMENT IS THE SCROLLER (`AppFrame.svelte`), so there the root is the viewport again. */
     const io = new IntersectionObserver((entries) => entries[0]?.isIntersecting && more(), {
-      root: body?.closest('#main') ?? null,
+      root: inIosApp ? null : (body?.closest('#main') ?? null),
       rootMargin: '600px',
     });
     io.observe(el);
@@ -1800,7 +1802,8 @@
     const scroller = body?.closest('#main');
     if (!el || !scroller) return;
     const row = el.getBoundingClientRect();
-    const box = scroller.getBoundingClientRect();
+    /* THE WINDOW'S BOX IN THE IPHONE APP, where the document scrolls and `#main` is as tall as the list. */
+    const box = inIosApp ? { top: 0, bottom: innerHeight } : scroller.getBoundingClientRect();
     if (row.top >= box.top && row.bottom <= box.bottom) return;
     el.scrollIntoView({ block: 'nearest' });
   }

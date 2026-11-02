@@ -20,6 +20,7 @@ import type LightFrame from '$lib/shell/LightFrame.svelte';
 import { light, type FrameData } from '$lib/shell/light.ts';
 /* SEE AS PUTS ITS HEADER ON THE TAB'S FETCH AS THIS LOADS, before the first `boot` is asked (`see-as.svelte.ts`). */
 import { exitSeeAs, seeingAs } from '$lib/sharing/see-as.svelte.ts';
+import { shellSignedOut } from '$lib/shell.ts';
 
 export const ssr = false;
 export const prerender = false;
@@ -180,6 +181,9 @@ async function shellOf({ url, fetch, depends }: Event): Promise<FrameData> {
      `/acme/`, and `/start` with them: it is spared the redirect below and not this one. The bare address drew the
      sample business until the sample left the app. */
   const signIn = booted.from === 'refused' ? signInFirst(booted.code, url) : null;
+  /* IN AN APP THAT SIGNS IN ITSELF (`shellSignedOut`, `shell.ts`), native is told and the web's sign-in page is never
+     drawn: the load waits for the page native loads again once he is back in, as a See as that ended does above. */
+  if (signIn && shellSignedOut()) return new Promise<never>(() => undefined);
   if (signIn) redirect(307, signIn);
 
   /* THE VOICE THE RECORD SPEAKS IN, as `boot` says it (`voice`): heard at once, since nothing is asked to hear it. A host

@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
   import { BASE, at } from '../at.ts';
+  import { shellSignedOut } from '../shell.ts';
   import { copy } from '../copy/frame.ts';
   import { levelWord } from '../record/switcher.ts';
   import Icon from '../ui/Icon.svelte';
@@ -21,7 +22,8 @@
      the page where it is and says so. */
   function signOut(): void {
     void import('../auth.ts')
-      .then((m) => m.signOutAndLeave(`${BASE}/signin`))
+      /* IN AN APP THAT SIGNS IN ITSELF, native takes it from here (`shellSignedOut`): never the web's sign-in page. */
+      .then((m) => m.signOutAndLeave(`${BASE}/signin`, (to) => void (shellSignedOut() || location.assign(to))))
       .then(
         (out) => {
           if (!out.ok) toasts.push(copy.signOutFailed, { intent: 'warn' });

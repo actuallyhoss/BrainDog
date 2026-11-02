@@ -51,6 +51,11 @@
   page's actions at its end. `named` is the exception: a page whose name is its content (a question, a row, a run) keeps
   its name as its heading, and the bar's crumb ends at the place it sits in.
 
+  IN THE IPHONE APP THE PHONE'S BAR IS NATIVE'S (`inIosApp`, `shell.ts`): the page's name goes to the native nav bar
+  (`shellTitle`, from the frame), which also holds the way back, the bell and the face, so the bar here is not drawn, a
+  headless head keeps its actions in its own row, and the name's row opens 12 under native's bar. The `h1` stays, unseen
+  where the bar says the name, for a screen reader and the focus a move lands.
+
   `below` IS WHAT GOES UNDER THE SENTENCE: the line a task is typed into on a phone, or a page-level switch, full width.
   `led` AND `over` ARE KEPT FOR THE PAGES THAT PASS THEM, and change nothing: the header is the same on every page.
 -->
@@ -61,6 +66,7 @@
   import { at, here } from '../at.ts';
   import { copy } from '../copy.ts';
   import { openPalette } from '../palette/open.svelte.ts';
+  import { inIosApp } from '../shell.ts';
   import Bell from '../shell/Bell.svelte';
   import HereFaces from '$lib/shell/HereFaces.svelte';
   import { barTitled, frame, narrow } from '../shell/frame.svelte.ts';
@@ -190,7 +196,7 @@
   /* A HEADLESS HEAD'S ACTIONS RIDE IN THE PHONE'S BAR. Below 900px the bar already holds the way back, so the head had
      nothing left but Share and the "⋯", a row of their own over an empty start (Kiln at 390). They go in the bar
      instead, before the search button, the same bare 44 squares, and the head is not drawn. */
-  const barred = $derived(headless && narrow.current);
+  const barred = $derived(headless && narrow.current && !inIosApp);
 
   /* THE SEARCH BUTTON IS NOT DRAWN ON `/search`, which is the search: two ways to one place side by side read as two. */
   const searching = $derived(here(page.url.pathname) === '/search');
@@ -289,6 +295,7 @@
   away, and a sticky element sticks only inside its parent's box. Its title repeats the `h1` for the eye once the `h1`
   has gone, so it is hidden from a screen reader, which has already met the heading.
 -->
+{#if !inIosApp}
 <div class="head-bar" bind:this={bar} data-under={under ? '' : undefined} data-past={past && !titled ? '' : undefined}>
   {#if wayBack}
     <a class="back tap" href={at(back!)} aria-label={kicker}>
@@ -314,8 +321,10 @@
     <YouMenu phone />
   </span>
 </div>
+{/if}
 <!-- THE SHELL'S BANNERS, UNDER THE BAR ON A PHONE (collab pass 2, 2 Nov): drawn by the shell over the page, they sat above
-     this bar and pushed it half a screen down. On a desk the shell draws them over the work, as before. -->
+     this bar and pushed it half a screen down. On a desk the shell draws them over the work, as before. In the iPhone app
+     there is no web bar, and they head the page under native's. -->
 {#if narrow.current && frame.banners}<div class="head-banners">{@render frame.banners()}</div>{/if}
 {#if crumb && !headless && !tiled && !crumbed && !titled}
   <!-- Over the name and scrolling with the page: the row that stays is the name's. -->
@@ -331,7 +340,7 @@
     {#if tiled}
       <!-- THE NAME IS THE LEAD TILE'S. -->
     {:else if headless}
-      {#if back && kicker && !crumbed}
+      {#if back && kicker && !crumbed && !inIosApp}
         <a class="head-back tap" href={at(back)}><span class="back-mark"><Icon name="chevron" size="m" /></span>{kicker}</a>
       {/if}
     {:else if titled}
