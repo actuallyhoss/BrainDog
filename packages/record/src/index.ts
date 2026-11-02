@@ -10070,6 +10070,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const HERE_MS = 30_000;
   const HERE_MOST = 200;
   const herePaths = new Map<string, { at: string; seen: number }>();
+  const hereSees = (ctx: CallContext, path: string): boolean => {
+    if (readsAcross(ctx) && allows(ctx, 'read') === null) return true;
+    const [, top, a, b, more] = path.split('/');
+    if (more !== undefined || typeof a !== 'string' || a === '') return false;
+    if (top === 'p') return b === undefined && visiblePages(ctx).some((p) => p.slug === a);
+    if (top !== 'r') return false;
+    if (b === undefined || b === '') return readable(ctx, a) === null;
+    const seq = Number(b);
+    if (!Number.isInteger(seq) || seq < 1 || kernel.register(a) === undefined) return false;
+    const row = kernel.get({ register: a, seq });
+    return row !== null && sightOf(ctx, `entry:${row.id}`) !== null;
+  };
   const hereFor = (ctx: CallContext, at: unknown): string[] | undefined => {
     if (ctx.principal.kind !== 'person' || typeof at !== 'string') return undefined;
     const path = at.split(/[?#]/u)[0] ?? '';
@@ -10077,6 +10089,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const now = clock.now();
     const me = ctx.principal.id;
     herePaths.delete(me);
+    /* ONLY ON A PAGE THEY MAY OPEN (security pass, 2 Nov): a contractor shared Kiln who said `at: /r/things/2` heard
+       "Sam" on Harbour, a row she cannot see, and Sam was told she was there too. A reader held to some lists or rows
+       is here, and hears who is, only on a row, a list or a page of the record she may see. */
+    if (!hereSees(ctx, path)) return [];
     herePaths.set(me, { at: path, seen: now });
     if (herePaths.size > HERE_MOST) for (const key of [...herePaths.keys()].slice(0, herePaths.size - HERE_MOST)) herePaths.delete(key);
     const others = [...herePaths.entries()].filter(([who, h]) => who !== me && h.at === path && now - h.seen <= HERE_MS);
