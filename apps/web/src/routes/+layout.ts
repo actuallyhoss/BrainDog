@@ -160,6 +160,16 @@ async function shellOf({ url, fetch, depends }: Event): Promise<FrameData> {
     }
   }
   const booted = await live.readBoot(api);
+  /* SOMEBODY WHO MAY ONLY ADD IS REMEMBERED ON THIS DEVICE BY THE ADDRESS `app.html` ASKS `boot` AT (collab pass 3), so
+     its early asks stop at `boot`: the lists, Today and the page were each a 403 on every open. A live answer forgets it. */
+  if (typeof location !== 'undefined')
+    try {
+      const u = new URL(`${api}/api/boot`, location.href).href;
+      if (booted.from === 'refused' && booted.at === 'level.append') localStorage.setItem('bd_add_only', u);
+      else if (booted.from === 'live' && localStorage.getItem('bd_add_only') === u) localStorage.removeItem('bd_add_only');
+    } catch {
+      /* blocked storage: the early asks go on as before */
+    }
   /* A HOST NOBODY REACHED IS NO REFUSAL: the last copy and the local copy stay, since offline is when they earn their
      keep. Any refusal the record gave takes both. */
   const unreached = booted.from === 'refused' && booted.code === 'UNREACHABLE';

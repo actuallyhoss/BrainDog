@@ -134,6 +134,9 @@
   let pop = $state<HTMLElement>();
   let stay: (() => void) | null = null;
 
+  /** Somebody who may only add is refused `boot`, and with it every line a bell would say. */
+  const addOnly = $derived((page.data as { refused?: { at?: string } | null } | undefined)?.refused?.at === 'level.append');
+
   let SentTray = $state<typeof SentTrayView | null>(null);
   $effect(() => {
     /* WHAT WAS SENT IS AN OWNER'S READ (`sentList`), so a colleague's bell never asks for it (collab pass 3: a 403 on every
@@ -325,6 +328,8 @@
 {/snippet}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- NO BELL FOR SOMEBODY WHO MAY ONLY ADD (collab pass 3): the record refuses her its news, and an open bell asked for it. -->
+{#if !addOnly}
 <div class="bell" data-phone={phone ? '' : undefined} bind:this={root} onfocusout={onFocusOut}>
   <button
     bind:this={button}
@@ -374,6 +379,7 @@
     </Sheet>
   {/if}
 </div>
+{/if}
 
 <style>
   .bell {

@@ -112,9 +112,15 @@
     void ask();
   }
 
+  /** Why somebody who is not an owner makes no read-only link, said without asking the record. */
+  const ONLY_OWNER = 'Only the owner can make a read-only link to a page.';
+
   /** Ask `shareable`. An answer for a sheet opened again since is dropped, so the newest ask is the one drawn. */
   async function ask() {
     const n = (asks += 1);
+    /* NOT ASKED FOR SOMEBODY WHO IS NOT AN OWNER (collab pass 3): `shareable` is ADMIN and answered them a 403 on every
+       page they opened. They read why here instead. */
+    if (shell.me?.owner !== true) return void (can = { state: 'no', why: ONLY_OWNER });
     const said = await shareableOnce(apiBase(), createClient({ base: apiBase() }));
     if (n !== asks) return;
     can = said.can ? { state: 'yes' } : linksOff(said) ? { state: 'off' } : { state: 'no', why: said.why ?? words.shareOff };
@@ -130,7 +136,7 @@
 
   /* ── as a template ───────────────────────────────────────────────────── */
 
-  type Shell = { index?: { registers?: { id: string; name: string }[] }; people?: { id: string; name: string }[] };
+  type Shell = { index?: { registers?: { id: string; name: string }[] }; people?: { id: string; name: string }[]; me?: { owner?: boolean } };
   const shell = $derived(page.data as Shell);
 
   /** A list by the name this record gives it, as the rail says it. */
