@@ -512,8 +512,9 @@
   }
 
   /* AND THE BAR IS IN THE FLOW, UNDER WHAT IT ASKS ABOUT (Maya's Today at 390): a phone's frame is as tall as what is drawn
-     in it, so a bar laid over its foot covered the widget's own figures ("Spent, 30 days $19,901" under Keep). */
-  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key] > [data-draft-mark]) {
+     in it, so a bar laid over its foot covered the widget's own figures ("Spent, 30 days $19,901" under Keep). A laptop's
+     frame at rest closes up the same way (T5), and its Spending lost the same figures under Keep (live check of 2 Nov). */
+  .board-root:not([data-editing]) .board :global([data-board-key] > [data-draft-mark]) {
     position: static;
     order: 2;
     flex: none;
@@ -521,22 +522,23 @@
   }
 
   /* AND THE "N MORE" A FRAME WITH NONE OF ITS OWN IS GIVEN (`fit.ts`) TAKES ITS OWN LINE under what it kept, as the
-     frame no longer ends below the rows with room for it laid over: in the flow, after the block. A part of Today's own
+     frame no longer ends below the rows with room for it laid over: in the flow, after the block. On a laptop at rest too
+     (live check of 2 Nov): Your work this week's "1 more" sat on its last task, and Projects' "2 more" on a card. A part of Today's own
      (Working now) is a card inside a bare frame, so its count stays laid over the card's foot, and the card makes room. */
-  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-more]::after) {
+  .board-root:not([data-editing]) .board :global([data-board-key][data-more]::after) {
     position: static;
     order: 1;
     flex: none;
     padding-block-start: var(--sp-2);
   }
 
-  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-more]:has(> .desk-part)::after) {
+  .board-root:not([data-editing]) .board :global([data-board-key][data-more]:has(> .desk-part)::after) {
     position: absolute;
     inset-inline-start: var(--sp-4);
     padding-block-start: 0;
   }
 
-  .board-root:not([data-editing]) .board[data-cols='2'] :global([data-board-key][data-more] > .desk-part > .tile) {
+  .board-root:not([data-editing]) .board :global([data-board-key][data-more] > .desk-part > .tile) {
     padding-block-end: calc(var(--sp-4) + 24px);
   }
 
