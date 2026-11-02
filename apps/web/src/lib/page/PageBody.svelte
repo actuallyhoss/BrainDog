@@ -1925,13 +1925,26 @@
 
   /* AND UNDER A THUMB EVERY LINK OF A NOTE IS 44 BY 44, the foot's doors and a sentence's one link alike ("3 keys have no
      value. Add them in the Keychain", whose number is a tag of its own, so `:only-child` above never reached it). */
+  /* A LINK INSIDE A SENTENCE KEEPS ITS LINE (mobile pass, 2 Nov). Grown as a box, Money's opening line ("Invoices late:
+     $3,200 to come in. $149 to pay on the card") was two lines 33px apart at 360, and the link could not wrap. Where the
+     line holds words as well as links, the target grows by a `::before`, as `.tap` grows one, and the words stay put. */
   @media (pointer: coarse) {
-    .block-slot :global(.block[data-kind='note'] p > a) {
+    .block-slot :global(.block[data-kind='note'] p:not(:has(> :not(a))) > a) {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       min-block-size: var(--tap);
       min-inline-size: var(--tap);
+    }
+
+    .block-slot :global(.block[data-kind='note'] p:has(> :not(a)) > a) {
+      position: relative;
+    }
+
+    .block-slot :global(.block[data-kind='note'] p:has(> :not(a)) > a::before) {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
     }
   }
 
