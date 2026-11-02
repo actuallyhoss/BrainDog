@@ -18,10 +18,14 @@
   WHAT A ROW SAYS UNDER ITS NAME IS FOR THE PHONE. There this list is all a person sees, and the line is how they tell
   the areas apart before opening one. Beside an open area the list is as narrow as the rail, where the line could only
   be drawn cut, and the area it describes is already on screen, so from 900px up a row is its glyph and its name.
+
+  IN THE IPHONE APP BILLING IS NOT A ROW (App Store 3.1.1): its place in the group holds the one plain line saying where
+  the plan is managed, as words, never a link.
 -->
 <script lang="ts">
   import { at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
+  import { inIosApp } from '$lib/shell.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { ONLY_WIDE, rowsOf, type AreaGroup } from './place.ts';
@@ -35,6 +39,9 @@
       <h2 class="group-title">{g.title}</h2>
       <ul class="area-rows">
         {#each rowsOf(g) as a (a.href)}
+          {#if inIosApp && a.id === 'billing'}
+            <li><p class="area-said">{copy.planManaged}</p></li>
+          {:else}
           <!-- `wide-only` is one of `settings.css`'s shared rules: the row is not drawn below 900px. -->
           <li class={a.id !== undefined && ONLY_WIDE.has(a.id) ? 'wide-only' : undefined}>
             <a class="area-row" href={at(a.href)} aria-current={a.id !== undefined && a.id === current ? 'page' : undefined}>
@@ -46,6 +53,7 @@
               <span class="go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
             </a>
           </li>
+          {/if}
         {/each}
       </ul>
     </div>
@@ -53,6 +61,17 @@
 </nav>
 
 <style>
+  /* THE PLAN'S LINE IN THE IPHONE APP: a row's height and its words' start, in the quiet ink, and nothing to press. */
+  .area-said {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--rail-item-h);
+    margin: 0;
+    padding-inline: var(--sp-2);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
   .index {
     display: flex;
     flex-direction: column;

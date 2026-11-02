@@ -4,12 +4,15 @@
   of the record on screen, or on a self-host the one line that says there is nothing to bill; then where usage and the
   export are. A free record says Free and offers the paid plans quietly, or says they are coming soon while they are.
   A limit reached is said in red under the bars, kindly: what waits, what still works, when it comes back, and the way on.
+
+  IN THE IPHONE APP NONE OF IT (App Store 3.1.1, apps plan §3.4): one plain line says where the plan is managed, with no
+  link, no price and no way to pay, and nothing of the Cloud's billing is asked. The Mac app draws Billing as usual.
 -->
 <script lang="ts">
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { apiBase } from '$lib/at.ts';
-  import { openOutside } from '$lib/shell.ts';
+  import { inIosApp, openOutside } from '$lib/shell.ts';
   import { readUsage, words as actionWords, type Meter, type UsageView } from '$lib/record/actions.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import {
@@ -42,7 +45,7 @@
   /* THE CLOUD IS THE ONLY HOST THAT BILLS, and the only one with `/account/billing`: a self-host answers 404, which
      `read()` would draw as a refusal on a screen that has nothing wrong with it. So the question is asked only where
      `boot` said the host is the Cloud, and everywhere else the key is `null` and nothing is asked. */
-  const hosted = $derived(hostedHere(shell));
+  const hosted = $derived(!inIosApp && hostedHere(shell));
   const bill = read(() => (hosted ? 'account-billing' : null), readBilling, { empty: (v) => v.records.length === 0 });
 
   /**
@@ -223,6 +226,11 @@
 </div>
 {/snippet}
 
+{#if inIosApp}
+  <Tile icon="money" title={tileWords.planTitle}>
+    <p class="hint">{copy.planManaged}</p>
+  </Tile>
+{:else}
 {#if limits.bars.length > 0}
   <Tile icon="money" title={tileWords.planTitle} meta={resets ? tileWords.monthMeta(month.day, month.of, resets) : undefined} lead>
     {#if figure}<p class="figure num">{figure}</p>{/if}
@@ -376,6 +384,7 @@
       {@render foot()}
     </div>
   </Tile>
+{/if}
 {/if}
 
 

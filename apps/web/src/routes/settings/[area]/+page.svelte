@@ -55,6 +55,7 @@
   import { AREAS, DEFAULT_GROUPS, SETTINGS_INDEX, SETTINGS_PAGE, areaOf, groupsOf, labelIn, type AreaGroup } from './place.ts';
   import Menu from '$lib/ui/Menu.svelte';
   import { openSettings } from './settings-state.svelte.ts';
+  import { inIosApp } from '$lib/shell.ts';
   import SettingsIndex from './SettingsIndex.svelte';
   /* THE ROWS EVERY AREA SHARES, scoped under `.settings-place` below; the file says why it is global. */
   import './settings.css';
@@ -530,7 +531,9 @@
   <!-- THE INDEX, DRAWN BY THE ONE READER: Home's body mode, with no head of its own under this one. Where the record
        cannot draw it, the chooser's list is the index, so nobody is left on a page of nothing. -->
   <div class="settings-index">
-    {#if indexDown || !owner}
+    <!-- IN THE IPHONE APP THE INDEX IS THE CHOOSER'S LIST, in the order the record's index gives (`groups`), since the
+         drawn index's Billing row is a link and the app shows the plan as a line (`SettingsIndex`). -->
+    {#if indexDown || !owner || inIosApp}
       <div class="settings-place" data-index=""><SettingsIndex {groups} /></div>
     {:else}
       <PageView slug={SETTINGS_PAGE} got={indexGot} mode="home" reread={readIndex} />

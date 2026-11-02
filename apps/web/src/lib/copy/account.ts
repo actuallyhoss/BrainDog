@@ -768,6 +768,10 @@ export const account = {
     `Read-only since ${since}, and deleted on ${deleted} unless it is paid. Export is always available.`,
   billingLapsed: 'Read-only until it is paid. Export is always available.',
   billingNotBilled: 'Not billed',
+  /* THE IPHONE APP'S ONE LINE ABOUT THE PLAN (App Store 3.1.1): where it is managed, as words, never a link or a price. */
+  planManaged: 'Your plan is managed at brain.dog.',
+  /* AND WHAT A SHARE SAYS THERE where the plan has none, with no plan named. */
+  shareNotOnPlan: 'Sharing is not turned on for this BrainDog.',
   billingManage: 'Manage payment',
   billingPayAgain: 'Pay again',
   billingOpening: 'Opening the payment page',

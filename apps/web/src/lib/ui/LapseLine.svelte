@@ -13,6 +13,9 @@
   IN THE FLOW, NEVER FIXED, AND DRAWN AS THE ONE BANNER (`Banner.svelte`): the
   red tint with the red lock, "Pay again" primary and "Export" quiet. It sits where the layout mounts it and pushes the
   screen down, so it can never cover the phone's tab bar, and at 390 its buttons stack under its sentence.
+
+  IN THE IPHONE APP NOTHING HERE PAYS (App Store 3.1.1): a lapsed record keeps its sentence and Export, with the one line
+  saying where the plan is managed in place of Pay again, and a late payment, which locks nothing, is not drawn at all.
 -->
 <script module lang="ts">
   import { readBilling, type BillingAnswer, type Said } from '../../routes/settings/billing.ts';
@@ -23,7 +26,7 @@
 
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
-  import { openOutside } from '$lib/shell.ts';
+  import { inIosApp, openOutside } from '$lib/shell.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere, lapseLines, paymentPage, thisRecord } from '../../routes/settings/billing.ts';
@@ -86,16 +89,18 @@
 
 {#if lines && here}
   <Banner tone="late" icon="lock">
-    {lines.fix}{#if lines.deletes}{' '}{lines.deletes}{/if}
+    {lines.fix}{#if lines.deletes}{' '}{lines.deletes}{/if}{#if inIosApp}{' '}{copy.planManaged}{/if}
     {#snippet actions()}
-      <Button weight="primary" onclick={payAgain} aria-busy={going} disabled={going}
-        >{going ? copy.billingOpening : copy.billingPayAgain}</Button
-      >
+      {#if !inIosApp}
+        <Button weight="primary" onclick={payAgain} aria-busy={going} disabled={going}
+          >{going ? copy.billingOpening : copy.billingPayAgain}</Button
+        >
+      {/if}
       <Button href="/settings/export"><Icon name="download" size="m" />{copy.export}</Button>
     {/snippet}
   </Banner>
 {/if}
-{#if behind && here && !lines}
+{#if behind && here && !lines && !inIosApp}
   <Banner tone="warn" icon="money">
     {copy.billingPastDueLine}
     {#snippet actions()}

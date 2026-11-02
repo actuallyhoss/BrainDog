@@ -7,7 +7,8 @@
   button here. Drawn only for somebody who may share, and never while the record is seen as somebody.
 
   ON FREE OR CLOUD, SHARING IS PLUS'S: the button is one plain line, "Sharing comes with Plus", and a menu that asks to
-  open the sheet gets the same line as a toast. The sheet is never opened to refuse.
+  open the sheet gets the same line as a toast. The sheet is never opened to refuse. IN THE IPHONE APP NO PLAN IS NAMED
+  (App Store 3.1.1): the button is not drawn, and a menu's ask says only that sharing is not on here.
 -->
 <script module lang="ts">
   import { readBilling } from '../../routes/settings/billing.ts';
@@ -23,6 +24,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { inIosApp } from '$lib/shell.ts';
   import { hostedHere, type BillingAnswer } from '../../routes/settings/billing.ts';
   import { canShare, needsPlus } from './may-share.ts';
   import { seeingAs } from './see-as.svelte.ts';
@@ -53,7 +55,7 @@
   $effect(() => {
     if (open && plus) {
       open = false;
-      toasts.push(copy.shareNeedsPlus);
+      toasts.push(inIosApp ? copy.shareNotOnPlan : copy.shareNeedsPlus);
     }
   });
   /* ONCE OPENED, KEPT: the sheet stays mounted so it can close the way it came and open again at once. */
@@ -64,7 +66,9 @@
 </script>
 
 {#if allowed}
-  {#if trigger && plus}
+  {#if trigger && plus && inIosApp}
+    <!-- NOTHING TO PRESS AND NO PLAN NAMED. -->
+  {:else if trigger && plus}
     <span class="share-plus">{copy.shareNeedsPlus}</span>
   {:else if trigger}
     <Button onclick={() => (open = true)}><Icon name="external" size="s" />{trigger}</Button>

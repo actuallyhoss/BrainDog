@@ -14,10 +14,14 @@
 
   ON `/start`, SAYING WHO YOU ARE LEADS (`describe`): the ink press opens `/signup`, which builds a
   free BrainDog from the answer, and the paid name is the quieter way under it, never the lead.
+
+  IN THE IPHONE APP THERE IS NO PAID NAME (App Store 3.1.1): no price and no payment page, only the free way where it is
+  offered, and the one line saying where the plan is managed.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { copy } from '$lib/copy.ts';
+  import { inIosApp } from '$lib/shell.ts';
   import { firstRun } from '$lib/first-run.ts';
   import { billing, checkout, hold, zone, type Held } from '$lib/signup.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -84,7 +88,9 @@
     <div class="own-lead"><Button weight="primary" href="/signup">{firstRun.noRecordDescribe}</Button></div>
   {/if}
 
-  {#if open === false}
+  {#if inIosApp}
+    <p class="own-why">{copy.planManaged}</p>
+  {:else if open === false}
     {#if !describe}<p class="own-why">{copy.signupClosedWhy}</p>{/if}
   {:else}
     {#if describe}<h2 class="own-paid">{firstRun.noRecordPaid}</h2>{/if}

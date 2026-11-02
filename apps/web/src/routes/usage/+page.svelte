@@ -57,6 +57,7 @@
   import { asksOf, byProject, daysSaid, earlierOf, groupName, heatOf, offCloud, projectParts, projectsSaid, placeOf, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
   import { extraOffered, hostedHere, readBilling, type BillingAnswer } from '../settings/billing.ts';
   import ExtraCap from './ExtraCap.svelte';
+  import { inIosApp } from '$lib/shell.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
 
   /* THE MONTH AND THE PROJECT ARE THE ADDRESS'S, so the switcher is two links, Back returns to the month before, and
@@ -347,8 +348,9 @@
                 {:else}<Button weight="quiet" href="/settings/agents">{usageWords.connect}</Button>{/if}
               </div>
             {/if}
-            {#if r.extra}<p class="aside-line">{r.extra}</p>{/if}
-            {#if r.extraUse && capOffered(r.record)}
+            <!-- NEITHER IN THE IPHONE APP (App Store 3.1.1): what extra usage costs and the cap on it are bought at brain.dog. -->
+            {#if r.extra && !inIosApp}<p class="aside-line">{r.extra}</p>{/if}
+            {#if r.extraUse && capOffered(r.record) && !inIosApp}
               <ExtraCap record={r.record} on={r.extraUse.on} cap={r.extraUse.cap} onset={usage.reread} />
             {/if}
           </Tile>
