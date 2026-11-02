@@ -368,6 +368,26 @@
     }
   }
 
+  /* AND IN THE PHONE'S BAR THE WORD IS THE GLYPH'S NAME AND NOT DRAWN (leftovers 4, 2 Nov): a page whose hero holds its
+     name hands Share and More to the bar (`PageHead`'s `bar-actions`), and beside them, search, the bell and the face the
+     name had about 40px at 390 ("Kiln websi", "Ferme & Co"). The glyph alone there, as under 360px below; the head's own
+     row, where there is room, keeps the word (Q46), and the sheet it opens is titled Share. */
+  @media (width < 900px) {
+    :global(.bar-actions) .share-trigger {
+      inline-size: var(--tap);
+      padding-inline: 0;
+    }
+
+    :global(.bar-actions) .share-word {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
   /* UNDER 360PX THE WORD IS THE GLYPH'S NAME AND NOT DRAWN. At 320 the bar holds the way back, Share with its word, the
      page's more, search, the bell and the face, 326px of it, and the page's name had none; the glyph alone is the 44
      square it was before Q46, and a screen reader still reads Share. */
