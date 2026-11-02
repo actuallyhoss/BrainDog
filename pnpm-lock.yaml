@@ -440,6 +440,8 @@ importers:
 
   packs/flow-check: {}
 
+  packs/gmail: {}
+
   packs/goals: {}
 
   packs/harbour-look: {}

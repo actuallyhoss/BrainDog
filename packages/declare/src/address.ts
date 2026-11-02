@@ -81,7 +81,7 @@ function originOf(address: string): string | null {
  * What one walk may let stand: the places whose whole value may be an address, and for a script's `source` the origins
  * its `egress` names.
  */
-type Allowed = { whole: Set<string>; source?: { at: string; origins: Set<string> } };
+type Allowed = { whole: Set<string>; source?: { at: string; origins: Set<string> }; recipe?: { ats: Set<string>; origins: Set<string> } };
 
 /** Whether a block's written rows are being read: a page, a block, or a block added to another pack's page. */
 type Walk = { allowed: Allowed; blocks: boolean; out: Refusal[] };
@@ -95,6 +95,22 @@ function judge(text: string, at: string, w: Walk): void {
   if (found.length === 0) return;
   /* THE WHOLE VALUE AND NOTHING BESIDE IT, so an allowed place cannot carry a second address in its words. */
   if (w.allowed.whole.has(at) && found.length === 1 && text.trim() === found[0]) return;
+  /* A DOOR'S CONNECT RECIPE: text a person copies into another service, shown as words and never loaded, so it may name
+     the hosts its `connect.names` lists, which the plan shows before install, and no other. */
+  const recipe = w.allowed.recipe;
+  if (recipe !== undefined && recipe.ats.has(at)) {
+    const stray = found.find((a) => {
+      const origin = originOf(a);
+      return origin === null || !recipe.origins.has(origin);
+    });
+    if (stray === undefined) return;
+    w.out.push({
+      code: 'REMOTE_ASSET',
+      fix: `${at} names the address ${shown(stray)}, and its host is not one the recipe's connect.names lists. A recipe names only the hosts it says it reaches.`,
+      at,
+    });
+    return;
+  }
   const source = w.allowed.source;
   if (source !== undefined && source.at === at) {
     const stray = found.find((a) => {
@@ -163,6 +179,18 @@ function allowedIn(kind: string, id: string, body: Obj): Allowed {
   if (kind === 'ingest') {
     whole.add(`${id}.url`);
     whole.add(`${id}.fetch.base`);
+    const connect = isObj(body.connect) ? body.connect : null;
+    if (connect !== null) {
+      const ats = new Set<string>();
+      const origins = new Set<string>();
+      for (const [i, host] of (Array.isArray(connect.names) ? connect.names : []).entries()) {
+        whole.add(`${id}.connect.names[${i}]`);
+        const origin = typeof host === 'string' ? originOf(host) : null;
+        if (origin !== null) origins.add(origin);
+      }
+      for (const i of (Array.isArray(connect.files) ? connect.files : []).keys()) ats.add(`${id}.connect.files[${i}].text`);
+      return { whole, recipe: { ats, origins } };
+    }
   }
   if (kind === 'digest') whole.add(`${id}.webhook.url`);
   if (kind === 'register') for (const i of urlFields(body).values()) whole.add(`${id}.fields[${i}].default`);
