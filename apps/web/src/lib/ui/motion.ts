@@ -40,6 +40,18 @@ export function swapInPlace(): void {
 }
 
 /**
+ * A SCREEN STILL DRAWING ITS FIRST ANSWER MOVES NO ROW (speed6, 2 Nov): before the work says it has drawn (`data-screen`
+ * on `#main`), a row that arrives or leaves is the screen settling, not the record changing, as `calm` in `lib/motion`
+ * reads it. Each one measured its own height to open or close, and between them the page was laid out again, once a
+ * row: about 40 ms of a cold Work on a throttled phone, for motion that ended where it began.
+ */
+const settling = (): boolean => {
+  if (typeof document === 'undefined') return false;
+  const main = document.getElementById('main');
+  return main !== null && !main.hasAttribute('data-screen');
+};
+
+/**
  * A PLACE'S FIRST DRAW ARRIVES IN ORDER (fluid F6): its first tiles rise one after another, `gap` apart
  * (`--d-stagger`), `most` of them, each over a page's `--d-page`, so the last is still by `by`. The rest are simply
  * there. Never on a way back, and never under reduced motion. Home's sheet writes the same numbers as `nth-child` delays.
@@ -93,7 +105,7 @@ const gapCss = (gap: ReturnType<typeof gapOf>, part: number): string => (gap ? `
  * to make room, while it rises 8px into place on the spring (`--ease-spring`) and fades in, over `--form-in`.
  */
 export function rowIn(node: Element): TransitionConfig {
-  if (swapping) return { duration: 0 };
+  if (swapping || settling()) return { duration: 0 };
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
   const gap = gapOf(node);
@@ -111,7 +123,7 @@ export function rowIn(node: Element): TransitionConfig {
  * rows under it rise into place. Over `--form-out` and half of `--form-settle`.
  */
 export function rowOut(node: Element): TransitionConfig {
-  if (swapping) return { duration: 0 };
+  if (swapping || settling()) return { duration: 0 };
   if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
   const h = (node as HTMLElement).offsetHeight;
   const gap = gapOf(node);
