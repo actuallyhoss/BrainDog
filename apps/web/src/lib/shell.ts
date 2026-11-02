@@ -163,7 +163,13 @@ export function onShell(event: ShellEvent, fn: (arg?: string) => void): () => vo
 export function applyInset(): void {
   const root = (globalThis as { document?: Document }).document?.documentElement;
   if (!root) return;
-  root.style.setProperty('--shell-inset', `${isApp ? (shell()?.inset ?? (inIosApp ? 0 : 78)) : 0}px`);
+  const room = isApp ? (shell()?.inset ?? (inIosApp ? 0 : 78)) : 0;
+  /* THE MAC APP'S 78 IS ROOM BESIDE THE TRAFFIC LIGHTS, NOT ABOVE THEM (apps M01, 2 November): read as height it put a
+     78px empty strip over the bar and the sidebar's head, 134 tall in all. In the Mac app the lights sit in the bar's
+     own row, so the room is `--shell-lead`, at the start of that row, and nothing is added above it. The desktop app
+     keeps its overlay title bar's room above. */
+  root.style.setProperty('--shell-inset', `${inMacApp ? 0 : room}px`);
+  root.style.setProperty('--shell-lead', `${inMacApp ? room : 0}px`);
   if (inIosApp || inMacApp) root.dataset.shell = shellKind();
 }
 

@@ -473,6 +473,8 @@
     box-sizing: border-box;
     /* The Mac app's title bar sits above the head; --shell-inset is 0 in a browser. */
     padding: calc(20px + var(--shell-inset, 0px)) var(--gutter) 0;
+    /* And in the Mac app, a head drawn with no frame round it starts after the traffic lights (`--shell-lead`). */
+    padding-inline-start: max(var(--gutter), var(--shell-lead, 0px));
   }
 
   /* THE NAME ROW IS THE LEAD TILE'S: no box here, and what `actions` keeps is drawn in the page's flow, which while it

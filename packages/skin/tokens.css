@@ -280,6 +280,8 @@
     --sticky: 52px;
     /* Room for the Mac app's title bar; shell.ts sets it, 0 in a browser. */
     --shell-inset: 0px;
+    /* Room beside the Mac app's traffic lights, at the start of the bar's row; shell.ts sets it, 0 elsewhere. */
+    --shell-lead: 0px;
     /* The rail, 240 wide (the board's own left column, flat); the shell adds `--inset` round it. `--inset` is the window inset of the rail and the
        docked panel, and the gap between tiles; the panel is 440. */
     --rail: 240px;

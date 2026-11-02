@@ -1898,12 +1898,15 @@
     grid-column: 1 / -1;
     grid-row: 1;
     padding: var(--shell-inset, 0px) 0 0;
+    /* THE MAC APP'S TRAFFIC LIGHTS IN THIS ROW: what of their room the sidebar's column does not already give. */
+    padding-inline-start: max(0px, calc(var(--shell-lead, 0px) - var(--side-col, 0px)));
     background: var(--nav);
     border-block-end: 1px solid var(--rule);
   }
 
   .shell[data-shape='bar'] .body {
     --shell-inset: 0px;
+    --shell-lead: 0px;
   }
 
   /* THE SIDEBAR'S COLUMN, THE WINDOW'S FULL HEIGHT: its width the device's (`--side-col`), or the rail's 56. The bar and
