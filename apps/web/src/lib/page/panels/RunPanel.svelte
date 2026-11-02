@@ -96,6 +96,10 @@
   /* ── the step it left ──────────────────────────────────────────────────── */
 
   let step = $state.raw<StepLeft | null>(null);
+  /** Whether its row, and what was said beside it, have been read, landed or not. */
+  let rowRead = $state(false);
+  let partsRead = $state(false);
+  const settled = $derived(from !== 'reading' && rowRead && (held === null || partsRead));
   /* THE RUN'S OWN ROW AND WHAT WAS READ BESIDE IT, which the conversation is said from (`run-talk.ts`). */
   let held = $state.raw<RunRow | null>(null);
   let parts = $state.raw<RunParts>({});
@@ -138,16 +142,22 @@
   }
 
   async function readStep(handle: string) {
-    const row = await runRow(handle);
+    const row = await runRow(handle).catch(() => null);
     if (handle !== run) return;
     held = row;
+    rowRead = true;
     if (!row) return void (step = null);
     /* WHAT IS SAID BESIDE THE ROW is read once for a run, and drawn as it lands: the row's own parts do not wait. */
     if (!beside) {
       beside = true;
-      void readRunParts(apiBase(), row).then((read) => {
-        if (handle === run) parts = read;
-      });
+      void readRunParts(apiBase(), row)
+        .then((read) => {
+          if (handle === run) parts = read;
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (handle === run) partsRead = true;
+        });
     }
     /* WHO TOOK IT, BY NAME: the taker's own row, read once, and never its handle. */
     const by = typeof row.fields.taken_by === 'string' ? await runRow(row.fields.taken_by) : null;
@@ -161,6 +171,8 @@
       step = null;
       held = null;
       parts = {};
+      rowRead = false;
+      partsRead = false;
       beside = false;
       closing = false;
       why = '';
@@ -350,7 +362,13 @@
   {/each}
 {/snippet}
 
-<section class="run" aria-label={runWords.heading} aria-busy={from === 'reading'}>
+<section class="run" aria-label={runWords.heading} aria-busy={!settled}>
+  <!-- THE BARS WHILE ANY OF ITS THREE READS IS OUT, A PART OF THEIR OWN, given back whole when they have all landed: drawn
+       in What it changed, that part stayed while its row, its plan and what was said beside it landed over it one by
+       one and pushed it down (0.02 to 0.03 on a cold open). -->
+  {#if !settled}
+  <div class="run-part"><Waiting rows={3} /></div>
+  {:else}
   <!-- AN OPEN RUN SAYS WHERE IT IS ON ITS LIVE ROW, from the record's clock, so the word is not said twice. -->
   {#if now && !(meRow && toldIt)}<p class="run-now">{now}</p>{/if}
   {#if meRow && toldIt}
@@ -373,11 +391,6 @@
       <Instructions threads={toldViews} {mark} ontakeback={(k) => void takeBackIt(k)} onundo={(k) => void undoIt(k)} />
     </div>
   {/if}
-  <!-- THE BARS WHILE IT IS READ ARE A PART OF THEIR OWN, given back whole when the run lands: drawn in What it changed,
-       that part stayed and the parts said before it landed over it and pushed it down (0.02 to 0.03 on a cold open). -->
-  {#if from === 'reading'}
-  <div class="run-part"><Waiting rows={3} /></div>
-  {:else}
   {@render spoken(BEFORE)}
   <div class="run-part" role="group" aria-label={didSaid}>
     {#if talk.length > 0}<h3 class="run-meta run-head">{didSaid}</h3>{/if}
@@ -401,7 +414,6 @@
       </div>
     {/if}
   </div>
-  {/if}
   {@render spoken(BETWEEN)}
   {#if step}
     <div class="run-part run-step" role="group" aria-label={stepSaid.heading}>
@@ -424,6 +436,7 @@
     </div>
   {/if}
   {@render spoken(AFTER)}
+  {/if}
 </section>
 
 <style>
