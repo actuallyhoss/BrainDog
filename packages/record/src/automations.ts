@@ -529,6 +529,43 @@ export type RunsPage = { before?: string | undefined; limit?: number | undefined
 
 type Declared = { id: string; version: number; body: string; pack_id: string | null };
 
+/**
+ * A caller held to some rows of a list a rule touches, as the record's door reads them (sec3, 2 Nov): which runs she is
+ * shown, by the row that started each, which rows an inline rule wrote she is shown, and a run's sentence as she is
+ * shown it. `null` where she reads every list whole, and nothing is held.
+ *
+ * WHY. A contractor shared one project's tasks was handed every run of a Tasks rule, the other projects' among them,
+ * and a failure's words quoting a row of another project, on the canvas and through MCP alike.
+ */
+export type RunsHeld = {
+  /** The ids among these runs she is shown: a run started by a row she reads, and none started by no row. */
+  runs: (runs: readonly { id: string; trigger: string }[]) => Set<string>;
+  /** The ids among these rows she is shown. */
+  rows: (ids: readonly string[]) => Set<string>;
+  /** A run's or a step's words as she is shown them: as said, or one plain line when they name a row held from her. */
+  said: (words: string | null) => string | null;
+};
+
+type RunRead = { id: string; trigger: string; state: RunState; started_at: string; finished_at: string | null; say: string | null };
+
+/** Every run of one rule she is shown, newest first. */
+const heldRuns = (sql: Sql, bare: string, held: RunsHeld): RunRead[] => {
+  const all = sql.all<RunRead>('SELECT id, trigger, state, started_at, finished_at, say FROM automation_run WHERE rule = ? ORDER BY started_at DESC, rowid DESC', bare);
+  const shown = held.runs(all);
+  return all.filter((r) => shown.has(r.id));
+};
+
+/** The instants an inline rule's work landed on rows she is shown, one a write, as `writesOf` counts them. */
+const heldWrites = (sql: Sql, bare: string, held: RunsHeld): string[] => {
+  const all = sql.all<{ target: string; ts: string }>(
+    `SELECT target, max(ts) AS ts FROM event WHERE actor = ? AND target_kind = 'entry' AND target LIKE 'entry:%' AND kind <> 'note'
+      GROUP BY coalesce(batch, id), target`,
+    `rule:${bare}`,
+  );
+  const shown = held.rows([...new Set(all.map((w) => w.target.slice('entry:'.length)))]);
+  return all.filter((w) => shown.has(w.target.slice('entry:'.length))).map((w) => w.ts);
+};
+
 /** The most entries one idle sentence counts. Past it the sentence says "1,000 or more", and the read stays one page. */
 export const IDLE_COUNTED_MOST = 1_000;
 
@@ -647,10 +684,11 @@ function scriptOf(sql: Sql, body: Body): { id: string; title: string } | null {
   return { id, title: typeof title === 'string' && title.trim() !== '' ? title.trim() : id };
 }
 
-function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: Body } {
+function row(sql: Sql, d: Declared, nowMs: number, held: RunsHeld | null = null): { row: AutomationRow; body: Body } {
   const body = JSON.parse(d.body) as Body;
   const bare = d.id.slice('rule.'.length);
   const script = scriptOf(sql, body);
+  if (held !== null) return { body, row: heldRow(sql, d, body, bare, script, nowMs, held) };
   /* THE CLOCK ROW `flow.ts` KEYS `flow.every:<id>`, which the install arms one interval out. `firing` counts as armed:
      the drain holds a row there while it takes the turn, and the next due time is written back when it lets go. */
   const next = sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'rule' AND key = ? AND state IN ('pending', 'firing')", `flow.every:${bare}`);
@@ -738,6 +776,52 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
   };
 }
 
+/**
+ * One rule's row as a caller held to some rows is shown it: every count, the last run and when it last fired worked out
+ * from the runs and writes she is shown (`RunsHeld`), so how often it ran on rows she cannot see is not told either.
+ */
+function heldRow(sql: Sql, d: Declared, body: Body, bare: string, script: AutomationRow['script'], nowMs: number, held: RunsHeld): AutomationRow {
+  const next = sql.one<{ due_at: string }>("SELECT due_at FROM schedule WHERE kind = 'rule' AND key = ? AND state IN ('pending', 'firing')", `flow.every:${bare}`);
+  const monthFrom = `${new Date(nowMs).toISOString().slice(0, 7)}-01T00:00:00.000Z`;
+  const weekFrom = new Date(nowMs - 7 * 86_400_000).toISOString();
+  const runs = heldRuns(sql, bare, held);
+  const last = runs[0];
+  const month = { runs: 0, done: 0, failed: 0, cancelled: 0 };
+  for (const r of runs) {
+    if (r.started_at < monthFrom) continue;
+    month.runs += 1;
+    if (r.state === 'done' || r.state === 'failed' || r.state === 'cancelled') month[r.state] += 1;
+  }
+  const inline = pathOf(body) === 'inline';
+  const times = inline ? heldWrites(sql, bare, held).sort().reverse() : runs.map((r) => r.started_at);
+  const lastFired = times[0] ?? null;
+  const fired = times.length;
+  return {
+    id: d.id,
+    rule: bare,
+    name: typeof body.name === 'string' && body.name.trim() !== '' ? body.name : script && script.title !== script.id ? script.title : bare,
+    script,
+    version: d.version,
+    trigger: triggerOf(body),
+    path: pathOf(body),
+    register: subjectOf(body),
+    project: typeof body.project === 'string' ? body.project : null,
+    enabled: body.enabled !== false,
+    pack: d.pack_id,
+    next: next?.due_at ?? null,
+    open: runs.filter((r) => r.state === 'pending' || r.state === 'running' || r.state === 'waiting').length,
+    last: last ? { run: last.id, state: last.state, at: last.finished_at ?? last.started_at, say: held.said(last.say) } : null,
+    lastFired,
+    month,
+    fired,
+    last_at: lastFired,
+    why_idle: fired > 0 ? null : idleSaid(sql, d.id, body),
+    week: times.filter((t) => t >= weekFrom).length,
+    month_fired: times.filter((t) => t >= monthFrom).length,
+    family: familyOf(body),
+  };
+}
+
 const LIVE = "kind = 'rule' AND superseded_at IS NULL AND retired = 0";
 
 /**
@@ -751,11 +835,11 @@ const LIVE = "kind = 'rule' AND superseded_at IS NULL AND retired = 0";
  * reached the member invited to Inbox alone. Who may see a rule is every list its body touches, which only the body
  * says, and a rule held back costs no query of its runs.
  */
-export function automations(sql: Sql, nowMs: number, shown: (id: string, body: Body) => boolean = () => true): AutomationRow[] {
+export function automations(sql: Sql, nowMs: number, shown: (id: string, body: Body) => boolean = () => true, held: RunsHeld | null = null): AutomationRow[] {
   return sql
     .all<Declared>(`SELECT id, version, body, pack_id FROM declaration WHERE ${LIVE} ORDER BY id`)
     .filter((d) => shown(d.id, JSON.parse(d.body) as Body))
-    .map((d) => row(sql, d, nowMs).row);
+    .map((d) => row(sql, d, nowMs, held).row);
 }
 
 /* ── the names one automation's body points at ─────────────────────── */
@@ -908,14 +992,24 @@ const seenIn = (sql: Sql, body: Body): ((list: string) => boolean) => {
  * `names` IS HELD TO `sees`, the caller's sight of one list. Without it, the lists the body itself names are the sight,
  * since the read is refused to anybody who cannot read them; nothing else gets a name.
  */
-export function automation(sql: Sql, named: string, nowMs: number, page: RunsPage = {}, sees?: (list: string) => boolean): Automation | null {
+export function automation(sql: Sql, named: string, nowMs: number, page: RunsPage = {}, sees?: (list: string) => boolean, held: RunsHeld | null = null): Automation | null {
   const id = named.startsWith('rule.') ? named : `rule.${named}`;
   const d = sql.one<Declared>(`SELECT id, version, body, pack_id FROM declaration WHERE id = ? AND ${LIVE}`, id);
   if (!d) return null;
-  const { row: shown, body } = row(sql, d, nowMs);
+  const { row: shown, body } = row(sql, d, nowMs, held);
   const limit = Math.min(Math.max(1, Math.floor(page.limit ?? RUNS_SHOWN)), RUNS_PAGE_MOST);
+  type Read = Omit<AutomationRun, 'steps' | 'trigger'> & { trigger: string };
+  /* HELD: THE RUNS SHE IS SHOWN, PAGED HERE. A `before` she is not shown is refused by the door before this. */
+  const heldPage = (h: RunsHeld): Read[] => {
+    const all = sql.all<Read>('SELECT id, version, state, trigger, actor, started_at, finished_at, say FROM automation_run WHERE rule = ? ORDER BY started_at DESC, rowid DESC', shown.rule);
+    const seen = h.runs(all);
+    const mine = all.filter((r) => seen.has(r.id));
+    const at = page.before === undefined ? -1 : mine.findIndex((r) => r.id === page.before);
+    const from = page.before === undefined ? 0 : at < 0 ? mine.length : at + 1;
+    return mine.slice(from, from + limit + 1);
+  };
   /* ONE MORE THAN THE PAGE, so whether an older page exists is read here and not asked again. */
-  const read = sql.all<Omit<AutomationRun, 'steps' | 'trigger'> & { trigger: string }>(
+  const read = held !== null ? heldPage(held) : sql.all<Read>(
     page.before === undefined
       ? 'SELECT id, version, state, trigger, actor, started_at, finished_at, say FROM automation_run WHERE rule = ? ORDER BY started_at DESC, rowid DESC LIMIT ?'
       : `SELECT r.id, r.version, r.state, r.trigger, r.actor, r.started_at, r.finished_at, r.say
@@ -937,10 +1031,12 @@ export function automation(sql: Sql, named: string, nowMs: number, page: RunsPag
       } catch {
         /* A row this build did not write keeps the default: every run of a rule began as a write until it had `on:`. */
       }
+      const steps = sql.all<AutomationRun['steps'][number]>('SELECT n, kind, state, answer, at FROM automation_step WHERE run = ? ORDER BY n', r.id);
       return {
         ...r,
         trigger: kind,
-        steps: sql.all<AutomationRun['steps'][number]>('SELECT n, kind, state, answer, at FROM automation_step WHERE run = ? ORDER BY n', r.id),
+        ...(held === null ? {} : { say: held.said(r.say) }),
+        steps: held === null ? steps : steps.map((st) => ({ ...st, answer: held.said(st.answer) })),
       };
     });
   return { ...shown, body, runs, older, names: namesOf(sql, body, sees ?? seenIn(sql, body)) };

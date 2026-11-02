@@ -224,6 +224,7 @@ import {
   SAID_DEPTH,
   automation as oneAutomation,
   automations as listAutomations,
+  type RunsHeld,
   deeperThan,
   listsReached,
   nestedPast,
@@ -7137,7 +7138,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        Admin. The page read now hands the kernel her lens (`seesFor`), and the feed, the queue and what went quiet draw
        her what `recentHistory` and `governance` answer her: `readsAcross`, which is `readsEveryList` less the personal
        lists she is not shown. */
-    const whole = typeof b.source === 'string' && (b.source.startsWith('governance.') || b.source === 'exceptions') ? readsAcross(ctx) : wholeRecord(ctx);
+    /* AND WHAT RUNS ON A SCHEDULE NAMES HOSTS AND KEY LABELS (sec3, 2 Nov): a colleague with one field of People hidden
+       was drawn the payroll sync that fills People on a page, its host and key, while `actions` now holds it from her.
+       The block draws every action and script, so it asks what `actions` asks of an action about no list. */
+    const whole =
+      typeof b.source === 'string' &&
+      (b.source.startsWith('governance.') || b.source === 'exceptions' || b.source === 'actions' || b.source === 'actions.blocking' || b.source === 'scripts')
+        ? readsAcross(ctx)
+        : wholeRecord(ctx);
     /* NOR DOES A GRANT NARROWED TO SOME OF A LIST'S ROWS (`wheres`) READ ALL OF IT: the kernel's feed names every row
        written, and a token held to the paper jobs was drawn "File at court" off a feed block (measured). */
     const narrow = Object.keys(ctx.wheres ?? {}).length > 0;
@@ -7736,6 +7744,69 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    *   - `allows`, which reads the principal's one level and is what `guard` wraps, so a door that calls it bare
    *     (the `ACROSS` check in `page`) is asking about the record and not about her.
    */
+  /**
+   * What a caller held to some rows is shown of automation runs (`RunsHeld`, sec3 2 Nov), or `null` for one who reads every
+   * list whole and is shown every run. A run is hers when the row that started it is one she reads; a clock's, a
+   * button's or any run started by no row is not. A run's words, and a step's, are shown when every row they name, by
+   * its spoken id (`tasks#7`), its id or its title, is one she reads, and are one plain line otherwise.
+   */
+  const runsHeldFor = (ctx: CallContext): RunsHeld | null => {
+    if (readsAcross(ctx)) return null;
+    const rows = (ids: readonly string[]): Set<string> => {
+      const by = new Map<string, string[]>();
+      for (const [id, row] of kernel.getEach(ids, { includeDeleted: true })) if (row) by.set(row.register, [...(by.get(row.register) ?? []), id]);
+      const out = new Set<string>();
+      for (const [register, of] of by) if (readable(ctx, register) === null) for (const id of sight.admitted(ctx, register, of)) out.add(id);
+      return out;
+    };
+    const entryOf = (trigger: string): string | null => {
+      try {
+        const e = (JSON.parse(trigger) as { entry?: unknown }).entry;
+        return typeof e === 'string' && e !== '' ? e : null;
+      } catch {
+        return null;
+      }
+    };
+    /* THE TITLES OF THE ROWS HELD FROM HER on the lists she reads some of, read once a call and only when words come. */
+    let unseen: string[] | null = null;
+    const unseenTitles = (): string[] => {
+      if (unseen !== null) return unseen;
+      unseen = [];
+      for (const [list, decl] of kernel.registers()) {
+        if (readable(ctx, list) !== null || kernel.scope(ctx, list) === undefined || !decl.title) continue;
+        const all = sql.all<{ id: string; t: unknown }>("SELECT id, json_extract(fields, '$.' || ?) AS t FROM entry WHERE register = ? AND deleted_at IS NULL", decl.title, list);
+        const shown = sight.admitted(ctx, list, all.map((r) => r.id));
+        for (const r of all) if (!shown.has(r.id) && typeof r.t === 'string' && r.t.trim().length >= 3) unseen.push(r.t.trim().toLowerCase());
+      }
+      return unseen;
+    };
+    const HELD_WORDS = 'It names a row you can\'t see, so its words are not shown here.';
+    const said = (words: string | null): string | null => {
+      if (words === null || words === '') return words;
+      const named: string[] = [];
+      for (const m of words.matchAll(/\b([a-z][a-z0-9_]{0,31})#(\d+)\b/gu)) {
+        const id = sql.one<{ id: string }>('SELECT id FROM entry WHERE register = ? AND seq = ?', m[1] ?? '', Number(m[2]))?.id;
+        if (id !== undefined) named.push(id);
+      }
+      for (const m of words.matchAll(/\b[0-9A-HJKMNP-TV-Z]{26}\b/gu)) if (sql.one('SELECT 1 AS y FROM entry WHERE id = ?', m[0])) named.push(m[0]);
+      if (named.length > 0) {
+        const shown = rows(named);
+        if (named.some((id) => !shown.has(id))) return HELD_WORDS;
+      }
+      const lower = words.toLowerCase();
+      return unseenTitles().some((t) => lower.includes(t)) ? HELD_WORDS : words;
+    };
+    return {
+      runs: (runs) => {
+        const started = new Map(runs.map((r) => [r.id, entryOf(r.trigger)] as const));
+        const shown = rows([...new Set([...started.values()].filter((e): e is string => e !== null))]);
+        return new Set([...started].filter(([, e]) => e !== null && shown.has(e)).map(([id]) => id));
+      },
+      rows,
+      said,
+    };
+  };
+
   const sees = (ctx: CallContext, names: Iterable<string>): boolean =>
     [...names].every((name) => (name === READS_ACROSS ? wholeRecord(ctx) : name === ANY_LIST ? readsEveryList(ctx) : readable(ctx, name) === null));
 
@@ -15496,7 +15567,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async actions(ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
-      return ok(kernel.actions());
+      /* HELD ONE ACTION AT A TIME TO WHOEVER READS WHAT IT FILLS, AND ALL OF IT (sec3, 2 Nov), as `scripts` holds a
+         script. This asked `read` of the record alone, so a colleague at Can decide with one field of People hidden was
+         handed the payroll sync that fills People: its host, the label of the key it opens and what the provider last
+         answered. An action that files in a list is shown to a caller who reads that list whole, and the list its
+         project row lives in too; one that files nothing, or names a list this build cannot find, to a caller who reads
+         every list a grant can reach whole (`readsAcross`), as a clock script is. */
+      const whole = (list: string): boolean => readable(ctx, list) === null && sight.whole(ctx, list) && kernel.scope(ctx, list) === undefined;
+      const across = readsAcross(ctx);
+      return ok(
+        kernel.actions().filter((a) => {
+          if (across) return true;
+          if (typeof a.writes !== 'string' || a.writes === '' || !kernel.register(a.writes)) return false;
+          const home = a.project_row ? kernel.get(a.project_row.id)?.register : undefined;
+          return whole(a.writes) && (home === undefined || whole(home));
+        }),
+      );
     },
 
     /**
@@ -15521,6 +15607,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const extra = stray((args ?? {}) as Record<string, unknown>, ['rule', 'before', 'limit']);
       if (extra) return { ok: false as const, refusal: extra };
       const shown = (id: string, body: Record<string, unknown>): boolean => sees(ctx, liveTouches(id, body));
+      const held = runsHeldFor(ctx);
       const named = args?.rule;
       /* `before` AND `limit` PAGE ONE RULE'S RUNS, AND ONLY THAT. The list of every automation carries no runs to
          page, so either key without `rule` is a key this call does not take there. */
@@ -15528,7 +15615,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         for (const key of ['before', 'limit'] as const)
           if (args?.[key] !== undefined)
             return no('FIELD_UNKNOWN', `${key} pages one automation's runs, so it goes with rule. Without rule this call takes nothing, and answers every automation you can read.`, { at: key, allowed: ['rule'] });
-        return ok(listAutomations(sql, clock.now(), shown));
+        return ok(listAutomations(sql, clock.now(), shown, held));
       }
       if (typeof named !== 'string' || named === '') return no('VALUE_MALFORMED', 'An automation is named by its id, such as chase or rule.chase.', { at: 'rule' });
       const limit = args?.limit;
@@ -15536,14 +15623,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('VALUE_MALFORMED', `limit is how many runs one page holds, a whole number from 1 to ${RUNS_PAGE_MOST}.`, { at: 'limit' });
       const before = args?.before;
       if (before !== undefined && (typeof before !== 'string' || before === '')) return no('VALUE_MALFORMED', 'before is the id of a run, as the last page named it under older.', { at: 'before' });
-      const found = oneAutomation(sql, named, clock.now(), { before, limit }, (list) => sees(ctx, [list]));
+      const found = oneAutomation(sql, named, clock.now(), { before, limit }, (list) => sees(ctx, [list]), held);
       if (found === null || !shown(found.id, found.body)) {
         const id = named.startsWith('rule.') ? named : `rule.${named}`;
         return no('DECLARATION_UNKNOWN', `There is no automation called ${id}${id.endsWith('.') ? '' : '.'}`, { at: 'rule' });
       }
       /* A `before` THAT IS NO RUN OF THIS RULE IS SAID, not answered as an empty page, which would read as "no older runs".
          Asked only once the rule is shown, so it tells nothing about a rule the caller may not read. */
-      if (before !== undefined && !sql.one<{ y: number }>('SELECT 1 AS y FROM automation_run WHERE id = ? AND rule = ?', before, found.rule))
+      const beforeRun = before === undefined ? undefined : sql.one<{ id: string; trigger: string }>('SELECT id, trigger FROM automation_run WHERE id = ? AND rule = ?', before, found.rule);
+      if (before !== undefined && (!beforeRun || (held !== null && !held.runs([beforeRun]).has(beforeRun.id))))
         return no('REF_UNKNOWN', `before is ${before}, and ${found.id} has no run by that id.`, { at: 'before' });
       return ok(found);
     },
