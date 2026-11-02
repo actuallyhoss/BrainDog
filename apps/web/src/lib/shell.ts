@@ -54,7 +54,7 @@ interface Shell {
   title?(name: string, sub?: string): void;
   /** The tabs the web would draw, for the native tab bar. */
   places?(tabs: readonly ShellPlace[]): void;
-  /** M2: native pushes a screen for this address instead of the page moving in place. Declared, not used yet. */
+  /** Native pushes a screen for this address instead of the page moving in place (the iPhone's stacks). */
   visit?(path: string, opts: { mode: VisitMode }): void;
 }
 
@@ -271,6 +271,32 @@ export function shellTitle(name: string, sub?: string): void {
   titled = said;
   if (sub === undefined) s.title(name);
   else s.title(name, sub);
+}
+
+/**
+ * A LINK PRESSED IN THE IPHONE APP BECOMES A NATIVE PUSH (apps plan §3.3, Stacks): the address goes to native, which
+ * shows it on a screen of its own over this one, so the swipe back is the system's and this screen stays as it was.
+ * True when native took it, and the caller leaves the page where it is; false anywhere else, and the link moves the
+ * page as it always did.
+ */
+export function shellVisit(path: string, mode: VisitMode = 'push'): boolean {
+  if (!inIosApp) return false;
+  const s = shell();
+  if (!s?.visit) return false;
+  s.visit(path, { mode });
+  return true;
+}
+
+/**
+ * TELL IN THE IPHONE APP IS THE NATIVE SHEET (apps plan §3.9): one composer, the same reader, whatever field it was
+ * opened from. True when native took it, and the caller draws nothing of its own; false anywhere else.
+ */
+export function shellTell(prefill = ''): boolean {
+  if (!inIosApp) return false;
+  const s = shell();
+  if (!s?.tell) return false;
+  s.tell(prefill);
+  return true;
 }
 
 let placed = '';

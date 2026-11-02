@@ -34,7 +34,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { haptic } from '$lib/shell.ts';
+  import { haptic, shellTell } from '$lib/shell.ts';
   import { isGlyph } from '$lib/ui/icons.ts';
   import { focusOnceDrawn } from '$lib/ui/keep-focus.ts';
   import { noteWith } from '$lib/tell/kept-note.ts';
@@ -536,7 +536,15 @@
       aria-keyshortcuts="Meta+Enter Control+Enter"
       bind:value={typed}
       bind:this={field}
-      onfocus={() => void runOf()}
+      onfocus={(e) => {
+        /* IN THE IPHONE APP THE FIELD OPENS THE NATIVE TELL SHEET, with what was typed (`shellTell`): one composer. */
+        if (!bank && shellTell(typed)) {
+          e.currentTarget.blur();
+          typed = '';
+          return;
+        }
+        void runOf();
+      }}
       onkeydown={keyed}
     ></textarea>
     {#if rows.length > 0}

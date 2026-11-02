@@ -33,7 +33,7 @@
 -->
 <script lang="ts">
   import { BASE, apiBase, at, here, slugOf } from '$lib/at.ts';
-  import { appPath, inIosApp, isApp, macNotifications, notify, onShell, setBadge, shellPlaces, shellTitle, windowFocused } from '$lib/shell.ts';
+  import { appPath, inIosApp, isApp, macNotifications, notify, onShell, setBadge, shellPlaces, shellTitle, shellVisit, windowFocused } from '$lib/shell.ts';
   import { handoffAlert, instructionAlert, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
   /* THE STYLESHEETS AND `applyInset()` ARE THE ROOT LAYOUT'S (`routes/+layout.svelte`), in the order they always had,
      so the light frame and this one draw on the same skin. */
@@ -126,6 +126,26 @@
   /* IN THE IPHONE APP, where native draws the bars and the tabs (`shell.ts`): read once, as the shell is there before
      any script runs. */
   const ios = inIosApp;
+
+  /* A LINK TO ANOTHER SCREEN IS A NATIVE PUSH IN THE IPHONE APP (apps plan §3.3): native shows the address on a screen
+     of its own, so the swipe back is the system's and this screen keeps its place. Caught before Kit's own click handler
+     (capture, and Kit skips a press already prevented), so nothing here moves and no screen is half left. The same
+     screen answering (a `?view=`, a filter, a `#part`) stays in place, as does anything a browser would not follow here:
+     another window, a download, a press with a key held, another origin. A browser and the Mac app never get here. */
+  $effect(() => {
+    if (!ios) return;
+    const pressed = (e: MouseEvent): void => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.('a[href]');
+      if (!(a instanceof HTMLAnchorElement) || a.hasAttribute('download') || (a.target !== '' && a.target !== '_self')) return;
+      const to = new URL(a.href, location.href);
+      if (to.origin !== location.origin || to.pathname === location.pathname) return;
+      if (appPath(to.pathname) === null) return;
+      if (shellVisit(`${to.pathname}${to.search}${to.hash}`)) e.preventDefault();
+    };
+    addEventListener('click', pressed, { capture: true });
+    return () => removeEventListener('click', pressed, { capture: true });
+  });
 
   /* THE ROOT LOAD'S ANSWER (`routes/+layout.ts`), handed over by the root layout as Kit hands a layout its `data`. */
   let { data, children }: { data: FrameData; children: Snippet } = $props();
