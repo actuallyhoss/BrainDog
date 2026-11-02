@@ -133,6 +133,31 @@ const WHY = {
   escalating: 'Happening a lot more than usual',
 };
 
+/* WHAT THE ALARM SAYS HAPPENED, after the issue's own title, so the bell and the mail's subject read as one line:
+   "Crumb.gg: Failed to send follow-up is back (121 people)". */
+const NEWS = {
+  new: 'is new and high priority',
+  regressed: 'is back',
+  escalating: 'is happening a lot more than usual',
+};
+
+/** People, counted as a person reads it: "1 person", "121 people". */
+const peopleOf = (n) => (n === 1 ? '1 person' : `${n} people`);
+
+/**
+ * Why an alarm is worth a look, with its numbers: the kind, the people it hit so far and, when Sentry counted any, the
+ * events in the last day. The mail under the bell says it as its reason.
+ */
+export function whyOf(kind, users, day) {
+  const events = day > 0 ? `, ${day === 1 ? '1 event' : `${day} events`} in the last day` : '';
+  return `${WHY[kind]}, ${peopleOf(users)} hit so far${events}`;
+}
+
+/** The alarm's line after the issue's title: what happened and how many it reached, "is back (121 people)". */
+export function newsOf(kind, users) {
+  return `${NEWS[kind]} (${peopleOf(users)})`;
+}
+
 /** The events an issue had in the last day: the sum of its hourly stats, which Sentry sends as `[[seconds, count], ...]`. */
 export function eventsInDay(issue) {
   const hours = issue?.stats?.['24h'];
@@ -359,7 +384,8 @@ export default async function run(ctx) {
       open: true,
       alarm: alarm === '' ? null : alarm,
       turns: alarm !== '' && alarm !== was ? turns + 1 : turns,
-      why: alarm === '' ? null : `${WHY[kind]}, ${users === 1 ? '1 person' : `${users} people`} hit so far`,
+      why: alarm === '' ? null : whyOf(kind, users, eventsInDay(issue)),
+      news: alarm === '' ? null : newsOf(kind, users),
       wide: alarm !== '' && users >= many,
     };
     if (!row) {

@@ -6376,8 +6376,60 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.1",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "6df2968dfc383a9ad9302d6b0be53f75da17738cad7a974a25ae04bc82624f0a",
+          "bytes": 48228,
+          "published_at": "2026-11-02T17:16:26.886Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Sentry projects",
+              "Sentry issues"
+            ],
+            "pages": [
+              "Errors"
+            ],
+            "rules": [
+              "Ring the bell for an issue worth a look",
+              "Ask about an issue that hit many people"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "us.sentry.io",
+                "line": "CALLS OUT us.sentry.io, de.sentry.io and sentry.io · every 1h · key \"Sentry token\" to the host its keychain entry opens",
+                "key": "Sentry token"
+              }
+            ],
+            "widgets": [
+              "Errors",
+              "Errors worth a look"
+            ],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": true
+              },
+              {
+                "id": "page.project",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "The mail an alarm sends says what happened in its subject, \"Crumb.gg: Failed to send follow-up is back (121 people)\", gives the reason with its numbers (people hit so far and events in the last day), and opens the issue in BrainDog, with a quiet link to it on Sentry. Issues keep a new What happened field for that line.",
+          "preview": true
+        },
         {
           "version": "1.1.1",
           "checksum": "5b04f06ac08b147f0cf5e745db866ea0059032f779d6ecd47baae724a3e1813b",
