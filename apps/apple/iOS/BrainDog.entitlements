@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The iPhone app, signed by the team. Passkeys need both names to vouch for the app (webcredentials, answered by
+  /.well-known/apple-app-site-association in apps/worker/src/apple.ts); the mailed sign-in link and the pages it opens
+  are universal links (applinks); the app, its widgets, share and notification extensions share one session through the
+  App Group and the Keychain group; push is APNs (M4).
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:brain.dog</string>
+		<string>webcredentials:app.brain.dog</string>
+		<string>applinks:app.brain.dog</string>
+	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.dog.brain</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)dog.brain.shared</string>
+	</array>
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

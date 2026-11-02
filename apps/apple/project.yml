@@ -1,0 +1,283 @@
+# BrainDog for iPhone and Mac: one XcodeGen project (loop/plans/apps-2026-11-02/PLAN.md, 3.1).
+#
+# THE .xcodeproj IS GENERATED AND NEVER COMMITTED: `xcodegen generate` in this folder makes it, so builders in
+# worktrees never meet over a pbxproj. `node tools/build.mjs` generates it before every build.
+#
+# SIGNING. The team is Quartz Apps LLC, MG86668Z52 (the one Roomy uses). Until Xcode is signed in to it, builds run
+# unsigned (`CODE_SIGNING_ALLOWED=NO`) or signed to run locally (`-`), which `tools/build.mjs` passes; the restricted
+# entitlements (associated domains, app groups, keychain sharing, push) are only in the Release files.
+
+name: BrainDog
+options:
+  bundleIdPrefix: dog.brain
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "14.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  groupSortPosition: top
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: MG86668Z52
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: NO
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    DEAD_CODE_STRIPPING: YES
+
+packages:
+  BrainDogKit:
+    path: Packages/BrainDogKit
+
+targets:
+  # ── iPhone ────────────────────────────────────────────────────────────────────────────────────────────────────────
+  BrainDog:
+    type: application
+    platform: iOS
+    sources:
+      - path: iOS
+      - path: Assets.xcassets
+      - path: BrainDog.icon
+        buildPhase: resources
+    dependencies:
+      - package: BrainDogKit
+      - target: WidgetsiOS
+      - target: ShareiOS
+      - target: NotifyService
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dog.brain.app
+        PRODUCT_NAME: BrainDog
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: BrainDog
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_CFBundleDisplayName: BrainDog
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: iOS/BrainDog.debug.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: iOS/BrainDog.entitlements
+    info:
+      path: iOS/Info.plist
+      properties:
+        CFBundleDisplayName: BrainDog
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen:
+          UIColorName: LaunchGround
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations~ipad:
+          [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        NSFaceIDUsageDescription: BrainDog can ask for Face ID before it opens, if you turn that on in Settings.
+        NSCameraUsageDescription: To photograph a receipt or a document you add to BrainDog.
+        NSPhotoLibraryUsageDescription: To add a photo you choose to BrainDog.
+        CFBundleURLTypes:
+          - CFBundleURLName: dog.brain.app
+            CFBundleURLSchemes: [braindog]
+        # The web app's host. A Debug build may be pointed elsewhere with `-braindogServer <url>` (Server.swift).
+        BrainDogServer: https://app.brain.dog
+        BrainDogAppGroup: group.dog.brain
+        BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
+
+  # ── Mac ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+  BrainDogMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: Mac
+      - path: Assets.xcassets
+      - path: BrainDog.icon
+        buildPhase: resources
+    dependencies:
+      - package: BrainDogKit
+      - target: WidgetsMac
+      - target: ShareMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dog.brain.desktop
+        PRODUCT_NAME: BrainDog
+        ASSETCATALOG_COMPILER_APPICON_NAME: BrainDog
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+      configs:
+        # Signed to run locally there is no profile, and macOS kills an app that claims a restricted entitlement
+        # without one; the Debug file keeps only the sandbox and its doors.
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: Mac/BrainDogMac.debug.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Mac/BrainDogMac.entitlements
+    info:
+      path: Mac/Info.plist
+      properties:
+        CFBundleDisplayName: BrainDog
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: © Quartz Apps LLC
+        CFBundleURLTypes:
+          - CFBundleURLName: dog.brain.desktop
+            CFBundleURLSchemes: [braindog]
+        BrainDogServer: https://app.brain.dog
+        BrainDogAppGroup: $(TeamIdentifierPrefix)dog.brain
+        BrainDogKeychainGroup: ""
+
+  # ── Extensions (empty in M0; filled in M4 and M5) ─────────────────────────────────────────────────────────────────
+  WidgetsiOS:
+    type: app-extension
+    platform: iOS
+    sources: [Widgets]
+    dependencies:
+      - package: BrainDogKit
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dog.brain.app.widgets
+        PRODUCT_NAME: BrainDogWidgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SKIP_INSTALL: YES
+    info:
+      path: Widgets/Info-iOS.plist
+      properties:
+        CFBundleDisplayName: BrainDog
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
+  WidgetsMac:
+    type: app-extension
+    platform: macOS
+    sources: [Widgets]
+    dependencies:
+      - package: BrainDogKit
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dog.brain.desktop.widgets
+        PRODUCT_NAME: BrainDogWidgets
+        SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: Widgets/Widgets-Mac.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+    info:
+      path: Widgets/Info-Mac.plist
+      properties:
+        CFBundleDisplayName: BrainDog
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
+  ShareiOS:
+    type: app-extension
+    platform: iOS
+    sources: [Share]
+    dependencies:
+      - package: BrainDogKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dog.brain.app.share
+        PRODUCT_NAME: BrainDogShare
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SKIP_INSTALL: YES
+    info:
+      path: Share/Info-iOS.plist
+      properties:
+        CFBundleDisplayName: BrainDog
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 1
+
+  ShareMac:
+    type: app-extension
+    platform: macOS
+    sources: [Share]
+    dependencies:
+      - package: BrainDogKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dog.brain.desktop.share
+        PRODUCT_NAME: BrainDogShare
+        SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: Share/Share-Mac.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+    info:
+      path: Share/Info-Mac.plist
+      properties:
+        CFBundleDisplayName: BrainDog
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 1
+
+  NotifyService:
+    type: app-extension
+    platform: iOS
+    sources: [NotifyService]
+    dependencies:
+      - package: BrainDogKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dog.brain.app.notify
+        PRODUCT_NAME: BrainDogNotify
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SKIP_INSTALL: YES
+    info:
+      path: NotifyService/Info.plist
+      properties:
+        CFBundleDisplayName: BrainDog
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
+
+schemes:
+  BrainDog:
+    build:
+      targets:
+        BrainDog: all
+    run:
+      config: Debug
+      commandLineArguments:
+        "-braindogServer http://localhost:5183": false
+    archive:
+      config: Release
+  BrainDogMac:
+    build:
+      targets:
+        BrainDogMac: all
+    run:
+      config: Debug
+      commandLineArguments:
+        "-braindogServer http://localhost:5183": false
+    archive:
+      config: Release

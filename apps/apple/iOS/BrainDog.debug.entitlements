@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  A Debug build signed to run locally on the simulator. The same doors as the Release file, with `?mode=developer` on
+  the associated domains so a signed Debug build reads the AASA straight from the server rather than Apple's cache.
+  The simulator embeds these without a profile; a device build needs the team's.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:brain.dog?mode=developer</string>
+		<string>webcredentials:app.brain.dog?mode=developer</string>
+		<string>applinks:app.brain.dog?mode=developer</string>
+	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.dog.brain</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)dog.brain.shared</string>
+	</array>
+</dict>
+</plist>
