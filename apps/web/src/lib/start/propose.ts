@@ -1249,8 +1249,11 @@ export function clientsNamed(said: string): string[] {
     const v = n.trim().replace(/[.’']+$/u, '');
     if (v !== '' && !NOT_CLIENT.test(v) && [...v].length <= 40 && !out.some((x) => x.toLocaleLowerCase() === v.toLocaleLowerCase())) out.push(v);
   };
-  for (const m of said.matchAll(AFTER_CLIENTS)) for (const n of (m[1] ?? '').split(/\s*,\s*(?:and\s+)?|\s+and\s+/u)) add(n);
-  for (const m of said.matchAll(WORK_FOR)) add(m[1] ?? '');
+  /* SENTENCE BY SENTENCE, so a name never runs on into the next one ("Kettle & Co. Retainers and invoices"). */
+  for (const one of said.split(/(?<=[.!?;])\s+/u)) {
+    for (const m of one.matchAll(AFTER_CLIENTS)) for (const n of (m[1] ?? '').split(/\s*,\s*(?:and\s+)?|\s+and\s+/u)) add(n);
+    for (const m of one.matchAll(WORK_FOR)) add(m[1] ?? '');
+  }
   return out.slice(0, 6);
 }
 

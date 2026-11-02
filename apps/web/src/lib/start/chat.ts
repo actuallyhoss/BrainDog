@@ -107,7 +107,8 @@ export type Kind = 'freelance' | 'founder' | 'student' | 'shop' | 'team' | 'busi
 
 export function kindOf(said: string, usecase: string | null): Kind {
   const s = said.toLowerCase();
-  if (/\b(freelanc\w*|consult\w*|contractor|self-employed|independent|my clients|a client|\d+ clients|clients in)\b/u.test(s)) return 'freelance';
+  /* "Freelancers" are people they hire (2 Nov, an agency that pays freelancers was told "That adds Freelance"). */
+  if (/\b(freelanc(?:e|er|ing)|consult\w*|contractor|self-employed|independent|my clients|a client|\d+ clients|clients in)\b/u.test(s)) return 'freelance';
   if (usecase === 'founder' || /\b(start-?up|saas|founder|co-?founder|our product|my product|an app|our app)\b/u.test(s)) return 'founder';
   if (usecase === 'student' || /\b(student|studying|study|university|uni|college|school|degree|thesis|course(work|s)?)\b/u.test(s)) return 'student';
   if (usecase === 'shop' || /\b(shop|store|etsy|orders|sell)\b/u.test(s)) return 'shop';

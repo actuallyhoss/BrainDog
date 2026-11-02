@@ -160,6 +160,7 @@
     entriesSaid,
     currencyUnclear,
     firstAsk,
+    firstTurnsOn,
     namedCurrency,
     nextAsk,
     QUICK_MS as CHAT_QUICK_MS,
@@ -785,7 +786,8 @@
         /* THE FIRST ANSWER SETTLES WHAT KIND OF BRAINDOG IT IS, so a later answer adds parts and never swaps it. */
         if (q.topic === 'what' && chosen === null && p.usecase !== null) chosen = p.usecase;
         /* THE PART THE QUESTION WAS ABOUT COMES ON with any answer that is not a no (`TURNS_ON`). */
-        const part = TURNS_ON[q.topic];
+        /* AND "DEADLINES" OR "TASKS" KEPT FIRST KEEPS WORK, where the first to-dos wait (`firstTurnsOn`), as on `/start`. */
+        const part = TURNS_ON[q.topic] ?? (q.topic === 'first' && text !== null ? (firstTurnsOn(text) ?? undefined) : undefined);
         if (part !== undefined && !(q.topic === 'people' && /^just me$/iu.test(text ?? '')) && !modules.includes(part)) {
           amends = { ...amends, on: [...new Set([...(amends.on ?? []), part])], off: (amends.off ?? []).filter((x) => x !== part) };
         }
