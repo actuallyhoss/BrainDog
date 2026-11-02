@@ -36,6 +36,7 @@
   import { copy } from '../copy/frame.ts';
   import type { Snippet } from 'svelte';
   import { overlays } from '../a11y/keys.svelte.ts';
+  import { backCloses } from './back.svelte.ts';
   import Icon from './Icon.svelte';
   import { haptic } from '../phone/device.ts';
   import { PHONE_WIDTH, Pull, scrims, settled, unstall } from './panel.ts';
@@ -152,6 +153,9 @@
   function close() {
     open = false;
   }
+
+  /* A BACK GESTURE CLOSES THE SHEET ON TOP, as Escape does, and the page stays (`back.svelte.ts`). */
+  backCloses(() => open === true, close);
 
   /**
    * `onclose` FIRES FROM THE ELEMENT'S OWN EVENT AND FROM NOWHERE ELSE, which is what makes it fire

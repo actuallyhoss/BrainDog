@@ -106,6 +106,7 @@
   import AttachPicker from '../send/AttachPicker.svelte';
   import { sendWords, targets as readTargets, type Attached, type Target } from '../send/send.ts';
   import Menu from '../ui/Menu.svelte';
+  import { backCloses } from '../ui/back.svelte.ts';
   import { pageOf, threadWords, type PageContext } from './slash-chat.ts';
   import type { About, SlashStatus } from '@braindog/client';
 
@@ -254,6 +255,8 @@
     dismissed = true;
     open = false;
   }
+  /* A BACK GESTURE PUTS THE SEARCH AWAY, as Escape does, rather than leaving the page under it (`ui/back.svelte.ts`). */
+  backCloses(() => open, dismiss);
   function focusBack(): void {
     const to = returnTo;
     returnTo = null;
