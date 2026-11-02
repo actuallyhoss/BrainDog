@@ -184,19 +184,28 @@
 </script>
 
 <div class="health" data-health>
-  {#if unchecked}
-    <section class="health-part" aria-labelledby="health-pages">
-      <h2 class="health-h" id="health-pages">{words.pages}</h2>
-      <p class="health-said">{words.notYet}</p>
-    </section>
+  <!-- WHAT IS ALWAYS HERE COMES FIRST, AND WHAT IS READ COMES UNDER IT (leftovers8). The pointer to Health and Read what you
+       already have stood under the parts, and each part that landed pushed them down a phone's screen: 0.662 on a cold
+       open, the walk of pages and notes landing on top last of all. Now nothing that is drawn at once stands under
+       anything that is read. -->
+  <!-- HEALTH COUNTS SOMETHING ELSE, its checks, and the two pages point at each other so neither count is read as the
+       other's. -->
+  {#if shell.pages.includes('health')}
+    <p class="health-reading">{words.health} <a class="tap" href={at('/p/health')}>{words.healthGo}</a></p>
   {/if}
-  {#if faults}<faults.Part found={faults.found} lists={shell.lists} />{/if}
-  {#if stale}<stale.Part rows={stale.rows} />{/if}
-  {#if matched}<matched.Part rows={matched.rows} />{/if}
-  {#if learned}<learned.Part found={learned.found} />{/if}
-  {#if named}<named.Part found={named.found} />{/if}
-  {#if hues}<hues.Part found={hues.found} />{/if}
-  {#if imported}<imported.Part found={imported.found} />{/if}
+  <!-- READ WHAT YOU ALREADY HAVE: the record's walk linking old payments, runs and services to who and what they are
+       about, a dry look first and then Do it. Tidying the record, so it is here and not in the sharing screen. -->
+  {#if s.anOwner}<Understand />{/if}
+  <!-- THE QUICK PARTS ARE DRAWN TOGETHER, once all of them have answered, in the reading line's place: one by one, each
+       moved the line and the parts before it. -->
+  {#if quick || heard}
+    {#if stale}<stale.Part rows={stale.rows} />{/if}
+    {#if matched}<matched.Part rows={matched.rows} />{/if}
+    {#if learned}<learned.Part found={learned.found} />{/if}
+    {#if named}<named.Part found={named.found} />{/if}
+    {#if hues}<hues.Part found={hues.found} />{/if}
+    {#if imported}<imported.Part found={imported.found} />{/if}
+  {/if}
   {#if !any && !heard && !quick && !late}
     <p class="health-reading" role="status">{words.reading}</p>
   {:else if !any && !heard && !quick}
@@ -209,19 +218,19 @@
   {:else if !any}
     <Empty kind="cleared" title={words.clear} body={unchecked ? words.clearBodyUnchecked : words.clearBody} />
   {/if}
+  <!-- THE LONG WALK OF PAGES AND NOTES LANDS LAST, SO IT IS DRAWN LAST, where its line stood. -->
+  {#if unchecked}
+    <section class="health-part" aria-labelledby="health-pages">
+      <h2 class="health-h" id="health-pages">{words.pages}</h2>
+      <p class="health-said">{words.notYet}</p>
+    </section>
+  {/if}
+  {#if faults}<faults.Part found={faults.found} lists={shell.lists} />{/if}
   <!-- ONCE A PART HAS LANDED THE READING LINE GOES: what is drawn says the record answered, and "Reading the record for
        anything to tidy." under it read as stuck. Only the long walk of pages and notes is still said while it runs. -->
   {#if quick && !heard && !any}
     <p class="health-reading" role="status">{words.readingPages}</p>
   {/if}
-  <!-- HEALTH COUNTS SOMETHING ELSE, its checks, and the two pages point at each other so neither count is read as the
-       other's. -->
-  {#if shell.pages.includes('health')}
-    <p class="health-reading">{words.health} <a class="tap" href={at('/p/health')}>{words.healthGo}</a></p>
-  {/if}
-  <!-- READ WHAT YOU ALREADY HAVE: the record's walk linking old payments, runs and services to who and what they are
-       about, a dry look first and then Do it. Tidying the record, so it is here and not in the sharing screen. -->
-  {#if s.anOwner}<Understand />{/if}
 </div>
 
 <style>

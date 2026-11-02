@@ -560,8 +560,13 @@
   /* THE SAME COUNT OVER EVERYTHING READ, whatever the chips narrow, for the line under the title (`awaySaid`). */
   const whole = $derived(tallyOf(kept, me, names, listSaid));
   /* The line under the title, below `whole`, which it reads. */
+  /* THE LIVE LOG IS STILL ON ITS WAY, and the page draws its bars. */
+  const waiting = $derived(Boolean(route.data.live) && !live && !refused);
+  /* NOT SAID FROM THE FIRST SIXTY WHILE THE WHOLE LOG IS COMING (leftovers8): "More than 60 changes since you were last
+     here. Agents made 13 of the newest 60." took two lines on a phone and became "195 changes ... Agents made 8." a beat
+     later, one line, and the page under it moved twice. */
   const lead = $derived(
-    (unseen ? awaySaid(unseen.actors, me, names, unseen.capped, unseen.byWho, { total: whole.total, agents: whole.groups.find((g) => g.group === 'agent')?.count ?? 0 }) : '') || undefined,
+    waiting ? undefined : (unseen ? awaySaid(unseen.actors, me, names, unseen.capped, unseen.byWho, { total: whole.total, agents: whole.groups.find((g) => g.group === 'agent')?.count ?? 0 }) : '') || undefined,
   );
   const busy = $derived(busyOf(kept, clock));
   const topKinds = $derived(
@@ -870,12 +875,14 @@
     <Empty kind="error" title={refused}>
       {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
-  {:else if route.data.live && !live}
+  {:else if waiting}
     <!-- Bars while the live log is on its way, rather than a blank page under the title. -->
     <Waiting />
   {/if}
 
-  <div class="board">
+  <!-- NOT DRAWN UNDER THE BARS (leftovers8): the board stood empty below them, 24px tall, and rose 260px up a phone's
+       screen when they went (0.24 on a cold open). It comes in their place once the log is read. -->
+  {#if !waiting}<div class="board">
     {#if tiles && !phone}
       <!-- THE TILES FIRST IN THE DOCUMENT, so a screen reader meets what the stream means before the stream; at 1440
            they stand in a column to its right. On a phone they come after the first day of the stream (money F11), so
@@ -939,7 +946,7 @@
       {/if}
       {#if olderFix}<p class="foot">{olderFix}</p>{/if}
     </div>
-  </div>
+  </div>{/if}
 </div>
 
 <style>

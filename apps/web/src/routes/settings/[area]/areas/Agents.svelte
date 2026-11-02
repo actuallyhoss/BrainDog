@@ -970,6 +970,20 @@
 {/if}
 
 <style>
+  /* WHAT STANDS UNDER YOUR AGENTS WAITS UNSEEN WHILE IT READS (leftovers8): Your agents drew its Loading at a third of
+     its height, Answering was drawn under it, and the list landing pushed Answering 205px down a phone's screen (0.121 on
+     a cold open). The tiles after it keep their place in the layout, unseen, until it has answered, and never longer than
+     2.5s, so a read that hangs hides nothing for good. */
+  :global([data-part='your-agents']:has([aria-busy='true']) ~ section.tile) {
+    visibility: hidden;
+    animation: agents-under-shown 0s linear 2.5s forwards;
+  }
+  @keyframes agents-under-shown {
+    to {
+      visibility: visible;
+    }
+  }
+
   /* THE CONNECTED TILE'S ROWS: the face or the 32px well, the name over what is known about it, what it can
      do in two words, and Revoke at the end, at a two-line row's height with a hairline between each. */
   .whos {
