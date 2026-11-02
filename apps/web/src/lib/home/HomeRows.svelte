@@ -317,6 +317,7 @@
   .home-days {
     display: flex;
     flex-direction: column;
+    container: days / inline-size;
   }
 
   .hd {
@@ -404,6 +405,27 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
+  }
+
+  /* A NAME BREAKS BETWEEN WORDS, never inside one ("Corpora / tion ta…" at 1280, 2 Nov), unless one word is wider than
+     the line. */
+  .hd-line .hl-title {
+    overflow-wrap: break-word;
+  }
+
+  /* IN A NARROW TILE THE AMOUNT GOES UNDER THE NAME (2 Nov): Due soon at 1280 is about 230 wide, and beside its amount a
+     name had 70px, so "iOS contract…" and "Tidepool / payout" were cut and broken. Under 300 the name has the line and
+     the amount sits under it, on the same text edge. */
+  @container days (width < 300px) {
+    .hd-line {
+      flex-wrap: wrap;
+      row-gap: 2px;
+      padding-block: var(--sp-1);
+    }
+
+    .hd-line .hl-title {
+      flex-basis: 100%;
+    }
   }
 
   /* TWO ITEMS ON ONE DATE ARE TWO ITEMS: a rule and a step of air between them, each held to two lines. */
