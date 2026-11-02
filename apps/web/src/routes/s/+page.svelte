@@ -20,7 +20,7 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { parse } from 'braindog-render';
+  import { dateSaid, parse } from 'braindog-render';
   import { Block, Markdown, Table } from 'braindog-render/svelte';
   /* THE KINDS' AND THE CHARTS' SHEETS, as a declared page loads them (`PageView`), so a note's bar is bars here too. */
   import '@braindog/skin/blocks-kinds.css';
@@ -28,13 +28,14 @@
   import { titleOf } from '$lib/title.ts';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { readShared, words, type SharedRead } from '$lib/record/share-write.ts';
+  import { readShared, words, type SharedProject, type SharedRead } from '$lib/record/share-write.ts';
   import Mark from '$lib/ui/Mark.svelte';
   import Lockup from '$lib/ui/Lockup.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import { openOutside } from '$lib/shell.ts';
   /* The href stays for the context menu and screen readers; the click goes through the one door. */
   const outside = (e: MouseEvent) => {
@@ -89,6 +90,21 @@
   });
 
   const head = $derived(got === null ? null : headOf(got));
+
+  /* A DAY IN THE RECORD'S ZONE, said as the app says one ("14 Nov"), for a project's work and what happened on it. */
+  const daySaid = (iso: string): string => {
+    const day = /^\d{4}-\d{2}-\d{2}$/u.test(iso)
+      ? iso
+      : (() => {
+          const t = Date.parse(iso);
+          if (!Number.isFinite(t)) return iso.slice(0, 10);
+          const parts = new Intl.DateTimeFormat('en-CA', { timeZone: where.zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(t));
+          const get = (k: string) => parts.find((x) => x.type === k)?.value ?? '';
+          return `${get('year')}-${get('month')}-${get('day')}`;
+        })();
+    return dateSaid(day, where.now);
+  };
+  const openCount = (pr: SharedProject): number => pr.work.reduce((n, w) => n + w.open.length + w.more, 0);
 
   /* TWO COLUMNS FROM 900 UP, as the owner's page (`PageBody.svelte`'s `wide`). */
   const wide = new MediaQuery('(width >= 900px)', true);
@@ -204,14 +220,92 @@
     </div>
   {:else}
     {@const p = got.page}
+    {@const pr = p.project}
+    {@const leadLine = shown.lead ?? (pr ? words.projectOpen(openCount(pr), pr.work[0]?.one ?? 'task', pr.work[0]?.many ?? 'tasks', pr.name) : null)}
     <article class="page" aria-labelledby="shared-title" lang={p.language}>
       <div class="head">
         <h1 class="title" id="shared-title">{head.title}</h1>
-        {#if shown.lead}<p class="lead">{shown.lead}</p>{/if}
+        {#if leadLine}<p class="lead">{leadLine}</p>{/if}
         <p class="until">{head.line}</p>
       </div>
 
-      {#if p.empty || shown.blocks.length === 0}
+      {#if pr}
+        <!-- A PAGE OF ONE PROJECT (collab pass 2, 2 Nov): what a stranger may read of it, as the owner's page lays it out:
+             where it stands and its work on the left, what happened and its note beside them; one column on a phone. -->
+        <div class="proj">
+          <div class="proj-main">
+            {#if pr.lane || pr.about || pr.next}
+              <Tile lead icon="thing" title={words.projectStands} meta={pr.lane ?? undefined}>
+                {#if pr.about}<p class="proj-about">{pr.about}</p>{/if}
+                {#if pr.next}
+                  <div class="proj-next">
+                    <span class="proj-label">{words.projectNext}</span>
+                    <p class="proj-step"><span class="proj-tick" aria-hidden="true"><Icon name="circle" size="s" /></span><span>{pr.next}</span></p>
+                  </div>
+                {/if}
+              </Tile>
+            {/if}
+            {#each pr.work as w, wi (wi)}
+              <Tile icon="task" title={words.projectOpenHead(w.list)} count={w.open.length + w.more > 0 ? words.projectOpenCount(w.open.length + w.more) : undefined}>
+                {#if w.open.length === 0}
+                  <p class="proj-quiet">{words.projectNoneOpen(w.many)}</p>
+                {:else}
+                  <ul class="proj-rows">
+                    {#each w.open as t, ti (ti)}
+                      <li class="proj-row">
+                        <span class="proj-tick" aria-hidden="true"><Icon name="circle" size="s" /></span>
+                        <span class="proj-what"><span class="proj-title">{t.title}</span>{#if t.state}<span class="proj-meta">{t.state}</span>{/if}</span>
+                        {#if t.due}<span class="proj-when num">{words.projectDue(daySaid(t.due))}</span>{/if}
+                      </li>
+                    {/each}
+                  </ul>
+                  {#if w.more > 0}<p class="proj-quiet">{words.sharedMore(w.more)}</p>{/if}
+                {/if}
+                {#if w.done.length > 0}
+                  <div class="proj-done">
+                    <h3 class="proj-label">{words.projectDone}</h3>
+                    <ul class="proj-rows">
+                      {#each w.done as t, ti (ti)}
+                        <li class="proj-row is-done">
+                          <span class="proj-tick good" aria-hidden="true"><Icon name="check" size="s" /></span>
+                          <span class="proj-what"><span class="proj-title">{t.title}</span></span>
+                          {#if t.on}<span class="proj-when num">{daySaid(t.on)}</span>{/if}
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
+              </Tile>
+            {/each}
+          </div>
+          {#if pr.happened.length > 0 || pr.notes}
+            <div class="proj-rail">
+              {#if pr.happened.length > 0}
+                <Tile icon="history" title={words.projectHappened}>
+                  <ul class="proj-rows">
+                    {#each pr.happened as h, hi (hi)}
+                      <li class="proj-line"><span class="proj-day num">{daySaid(h.at)}</span><span class="proj-said">{h.said}</span></li>
+                    {/each}
+                  </ul>
+                </Tile>
+              {/if}
+              {#if pr.notes}
+                <Tile icon="doc" title={words.projectNotes}>
+                  <div class="document note">
+                    {#each segmentsOf(pr.notes) as segment, n (n)}
+                      {#if segment.type === 'block'}<Block block={segment} {opts} />{:else if segment.type === 'markdown'}<Markdown {segment} {opts} />{/if}
+                    {/each}
+                  </div>
+                </Tile>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/if}
+
+      {#if pr && shown.blocks.length === 0}
+        <!-- The project said it all: no line saying the page has nothing. -->
+      {:else if p.empty || shown.blocks.length === 0}
         <section class="part tile"><p class="part-body">{p.empty ?? words.sharedNothing}</p></section>
       {:else}
         {@const areas = areasOf(shown.blocks, p.layout)}
@@ -478,6 +572,150 @@
     color: var(--ink-3);
     font-size: var(--fs-body);
     line-height: 22px;
+  }
+
+  /* ── A shared project (collab pass 2): two columns from 900 up, the rail a third; rows with hairlines between ── */
+
+  .proj {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--tile-gap);
+    align-items: start;
+  }
+
+  .proj-main,
+  .proj-rail {
+    display: grid;
+    gap: var(--tile-gap);
+    min-inline-size: 0;
+  }
+
+  @media (width >= 900px) {
+    .proj {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    }
+  }
+
+  .proj-about {
+    margin: 0;
+    max-inline-size: 68ch;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .proj-next {
+    display: grid;
+    gap: var(--sp-1);
+  }
+
+  .proj-label {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+    line-height: 18px;
+  }
+
+  .proj-step {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    line-height: 22px;
+  }
+
+  .proj-rows {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .proj-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    min-block-size: var(--row-h-2, 52px);
+    padding-block: var(--sp-2);
+  }
+
+  .proj-row + .proj-row,
+  .proj-line + .proj-line {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .proj-tick {
+    display: inline-grid;
+    place-items: center;
+    color: var(--ink-3);
+  }
+
+  .proj-tick.good {
+    color: var(--good);
+  }
+
+  .proj-what {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  .proj-title {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 22px;
+    overflow-wrap: anywhere;
+  }
+
+  .is-done .proj-title {
+    color: var(--ink-2);
+  }
+
+  .proj-meta,
+  .proj-when,
+  .proj-day {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .proj-when {
+    white-space: nowrap;
+  }
+
+  .proj-done {
+    display: grid;
+    gap: var(--sp-2);
+    padding-block-start: var(--sp-2);
+  }
+
+  .proj-quiet {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .proj-line {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    column-gap: var(--sp-3);
+    padding-block: var(--sp-3);
+  }
+
+  .proj-said {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 22px;
+    overflow-wrap: anywhere;
+  }
+
+  .proj-day {
+    padding-block-start: 2px;
   }
 
   /* ── Tables: hairlines between the rows and none round the table ──────────────────────── */

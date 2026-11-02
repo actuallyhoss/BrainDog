@@ -35,7 +35,7 @@
  * never said is a host that cannot, so links ship switched off until somebody switches them on.
  */
 
-import { NOBODY, instant, isMoneyFormat, isMoneyUnit, sourceReadsWhole, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
+import { NOBODY, instant, isMoneyFormat, maskMoneyText, isMoneyUnit, sourceReadsWhole, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 import { TYPED, dateSaid, formatTyped, kindSpec, splitRow, writeAmount, type TypedForm } from 'braindog-render';
 import { ok } from '@braindog/ports';
@@ -104,6 +104,32 @@ export type SharedPage = {
   /** One calm line when no block of the page can be shown through a link, and `null` while one can. */
   empty: string | null;
   blocks: Record<string, unknown>[];
+  /**
+   * WHAT A PAGE OF ONE PROJECT SAYS ABOUT IT (collab pass 2, 2 Nov), or absent for any other page: the owner's page is
+   * drawn from `project` blocks the app works out across the record, which no link may carry, so a link to Harbour
+   * rebrand drew one "At a glance" tile. This is the part of that a stranger may read, worked out here as nobody.
+   */
+  project?: SharedProject;
+};
+
+/** One piece of work on a shared project: its words, its state in the list's own word, and its deadline day if it has one. */
+export type SharedTask = { title: string; state: string; done: boolean; due: string | null; on: string | null };
+
+/**
+ * A project as a link shows it. Names only: no id, no person, no address, no amount on a link that keeps money off.
+ *   - `lane` its status word, `about` its one line, `next` its next step (its own, else its first open piece of work);
+ *   - `work` each list of work that points at it (a team's Tickets), its open rows first, and what was finished lately;
+ *   - `notes` its note as written, links into the record said as their words;
+ *   - `happened` what moved on it lately, said without who.
+ */
+export type SharedProject = {
+  name: string;
+  lane: string | null;
+  about: string | null;
+  next: string | null;
+  work: { list: string; one: string; many: string; open: SharedTask[]; more: number; done: SharedTask[] }[];
+  notes: string | null;
+  happened: { at: string; said: string }[];
 };
 
 /**
@@ -1509,6 +1535,119 @@ export function methods(deps: RecordDeps) {
       person,
     ) !== undefined;
 
+  /** How many open pieces of work a shared project lists, and how many finished, before "and 3 more". */
+  const OPEN_SHOWN = 12;
+  const DONE_SHOWN = 5;
+  const HAPPENED_SHOWN = 6;
+  const NOTES_MOST = 2_000;
+
+  /**
+   * A PAGE OF ONE PROJECT, AS A LINK MAY SAY IT (collab pass 2, 2 Nov), or `undefined` for any other page.
+   *
+   * READ AS NOBODY, as the link's blocks are: a row kept private is not here, a personal list and the agents' runs are
+   * never read, a money list never (its rows are amounts), and on a link that keeps money off every amount written in a
+   * title or a note is taken out (`maskMoneyText`). The work is every list that declares when its rows are finished and
+   * points at the project's list (a team's Tickets point at Projects), so a use case's own work list is found without a
+   * name in the code. Nobody is named: not who did a thing, not who a thing is for.
+   */
+  const projectOf = (slug: string, money: boolean, lists: ReadonlyMap<string, RegisterDecl>): SharedProject | undefined => {
+    const here = kernel.pages().find((p) => p.slug === slug);
+    if (here === undefined || here.about === null || typeof here.row !== 'string') return undefined;
+    const register = here.about.register;
+    const decl = lists.get(register);
+    const row = kernel.get(here.row);
+    if (decl === undefined || row === null || row.deleted_at !== null) return undefined;
+    const personal = new Set(kernel.personalLists());
+    const hidden = (id: string): boolean => sql.one('SELECT 1 AS x FROM entry_private WHERE entry_id = ? LIMIT 1', id) !== undefined;
+    if (personal.has(register) || NEVER_READ.has(register) || hidden(row.id)) return undefined;
+    const masked = (t: string): string => (money ? t : maskMoneyText(t));
+    const words = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? masked(wordsShown(v.trim())).replace(SPOKEN_ID, '').trim() || null : null);
+    const enumWord = (list: RegisterDecl, field: string | undefined, v: unknown): string => {
+      if (typeof v !== 'string' || v === '') return '';
+      const f = field === undefined ? undefined : list.fields.find((x) => x.id === field);
+      const said = f?.labels?.[v];
+      return typeof said === 'string' && said !== '' ? said : idSaid(v);
+    };
+    const laneField = decl.state ?? decl.fields.find((f) => f.id === 'lane' && f.type === 'enum')?.id;
+    const titleOfRow = (list: RegisterDecl, r: Entry): string | null => words(r.fields[list.title]);
+
+    /* THE WORK: lists that say when a row is finished, and point at this one. */
+    const work: SharedProject['work'] = [];
+    const moved: { at: string; said: string }[] = [];
+    let firstOpen: string | null = null;
+    for (const list of lists.values()) {
+      if (list.id === register || personal.has(list.id) || NEVER_READ.has(list.id) || moneyList(list) || (list.done ?? []).length === 0) continue;
+      const links = list.fields.filter((f) => f.type === 'ref' && f.to === register && f.retired !== true).map((f) => f.id);
+      if (links.length === 0) continue;
+      const got = kernel.list({ register: list.id, where: links.length === 1 ? { field: links[0]!, is: row.id } : { any: links.map((f) => ({ field: f, is: row.id })) }, limit: 200 });
+      if (!got.ok) continue;
+      const due = list.fields.find((f) => f.type === 'day' && f.deadline === true)?.id;
+      const finishedOn = list.fields.find((f) => f.type === 'day' && /done|finished|closed/u.test(f.id))?.id;
+      const finished = new Set(list.done ?? []);
+      const state = list.state;
+      const rows = got.value.rows.filter((r) => r.deleted_at === null && !hidden(r.id));
+      const shownTask = (r: Entry): SharedTask | null => {
+        const title = titleOfRow(list, r);
+        if (title === null) return null;
+        const v = state === undefined ? undefined : r.fields[state];
+        const day = (k: string | undefined): string | null => (k !== undefined && typeof r.fields[k] === 'string' ? String(r.fields[k]) : null);
+        return { title, state: enumWord(list, state, v), done: typeof v === 'string' && finished.has(v), due: day(due), on: day(finishedOn) ?? (typeof v === 'string' && finished.has(v) ? r.updated_at.slice(0, 10) : null) };
+      };
+      const all = rows.map(shownTask).filter((t): t is SharedTask => t !== null);
+      /* OPEN FIRST, THE ONES WITH A DAY BY THEIR DAY; FINISHED, NEWEST FIRST AND NOT DROPPED ONES TWICE. */
+      const open = all.filter((t) => !t.done).sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999'));
+      const done = all.filter((t) => t.done).sort((a, b) => (b.on ?? '').localeCompare(a.on ?? ''));
+      if (open.length === 0 && done.length === 0) continue;
+      firstOpen ??= open[0]?.title ?? null;
+      const one = typeof (list as { one?: unknown }).one === 'string' ? String((list as { one?: unknown }).one) : 'task';
+      work.push({ list: list.name, one, many: manyOf(one), open: open.slice(0, OPEN_SHOWN), more: Math.max(0, open.length - OPEN_SHOWN), done: done.slice(0, DONE_SHOWN) });
+
+      /* WHAT MOVED: a row added, and a row whose state changed, newest first, in words and with nobody named. */
+      const titles = new Map<string, string | null>(rows.map((r) => [`entry:${r.id}`, titleOfRow(list, r)]));
+      if (titles.size > 0) {
+        const marks = [...titles.keys()].map(() => '?').join(', ');
+        const lines = sql.all<{ ts: string; kind: string; target: string; field: string | null; to_v: string | null }>(
+          `SELECT ts, kind, target, field, to_v FROM event WHERE target IN (${marks}) AND (kind = 'create' OR kind = 'state' OR (kind = 'edit' AND field = ?)) ORDER BY rowid DESC LIMIT 40`,
+          ...titles.keys(),
+          state ?? '',
+        );
+        for (const l of lines) {
+          const t = titles.get(l.target);
+          if (!t) continue;
+          if (l.kind === 'create') {
+            moved.push({ at: l.ts, said: `Added ${t}` });
+            continue;
+          }
+          let to: unknown = l.to_v;
+          try {
+            to = l.to_v === null ? null : JSON.parse(l.to_v);
+          } catch {
+            /* a word as written */
+          }
+          if (typeof to !== 'string' || to === '') continue;
+          const raw = (list.fields.find((f) => f.id === state)?.values ?? []).find((v) => v === to || enumWord(list, state, v) === to) ?? to;
+          moved.push({ at: l.ts, said: finished.has(raw) ? `Finished ${t}` : `${t} moved to ${enumWord(list, state, raw)}` });
+        }
+      }
+    }
+
+    /* AND ITS OWN NOTE, AS WRITTEN, links into the record said as their words. */
+    const noteField = decl.fields.find((f) => f.type === 'document' && f.retired !== true)?.id;
+    const note = noteField === undefined ? null : words(row.fields[noteField]);
+    const about = decl.fields.find((f) => f.id === 'about' && f.type === 'text') ? words(row.fields.about) : null;
+    const next = words(row.fields.next) ?? firstOpen;
+    moved.sort((a, b) => b.at.localeCompare(a.at));
+    return {
+      name: titleOfRow(decl, row) ?? here.title,
+      lane: laneField === undefined ? null : enumWord(decl, laneField, row.fields[laneField]) || null,
+      about,
+      next,
+      work,
+      notes: note === null ? null : note.length > NOTES_MOST ? `${note.slice(0, NOTES_MOST).replace(/\s+\S*$/u, '')}…` : note,
+      happened: moved.slice(0, HAPPENED_SHOWN),
+    };
+  };
+
   /**
    * THE PAGE AS A LINK WOULD SHOW IT, or `null` for a page the kernel would not draw: read as nobody, with no key number
    * leading a card, in the words the owner reads, and money on or off as the link says. `sharedPage` answers it to a
@@ -1541,7 +1680,12 @@ export function methods(deps: RecordDeps) {
       if (sql.one('SELECT 1 AS x FROM entry_private WHERE entry_id = ? LIMIT 1', row.id) !== undefined) return undefined;
       return kernel.titleOfRow(row.id) ?? undefined;
     };
-    return shownPage(out.value, expires_at, lists, { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money, moneyFigure, refSaid });
+    const shown = shownPage(out.value, expires_at, lists, { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money, moneyFigure, refSaid });
+    const found = projectOf(slug, money, lists);
+    /* ITS NOTE ONCE: where the page's own blocks already draw it, the project does not draw it again. */
+    const project = found !== undefined && found.notes !== null && shown.blocks.some((b) => b.kind === 'note' && typeof b.body === 'string' && b.body.trim() !== '') ? { ...found, notes: null } : found;
+    /* A PROJECT WITH SOMETHING TO SAY IS NOT AN EMPTY PAGE, whatever its blocks drew. */
+    return project === undefined ? shown : { ...shown, project, empty: null };
   };
 
   return {
@@ -1569,7 +1713,7 @@ export function methods(deps: RecordDeps) {
          block with nothing a stranger can read (a heading over no rows, the owner's own "empty" line), and an empty Money
          kept blocks here and drew none there, so the sheet never warned. The owner reads all of it already. */
       if (shown === null) return ok(can);
-      return ok(shown.blocks.length === 0 ? { ...can, empty: true } : { ...can, page: shown });
+      return ok(shown.blocks.length === 0 && shown.project === undefined ? { ...can, empty: true } : { ...can, page: shown });
     },
 
     /**

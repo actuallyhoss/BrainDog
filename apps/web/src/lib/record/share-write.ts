@@ -86,6 +86,18 @@ export const words = {
   sharedNothing: 'This page has nothing a link can show.',
   sharedYes: 'Yes',
   sharedNo: 'No',
+  /* A SHARED PROJECT (collab pass 2): what is open on it, its next step, what was finished, what happened, its note. */
+  projectOpen: (n: number, one: string, many: string, name: string) =>
+    n === 0 ? `Nothing is open on ${name}.` : `${n.toLocaleString('en')} ${n === 1 ? one : many} ${n === 1 ? 'is' : 'are'} open on ${name}.`,
+  projectNext: 'Next step',
+  projectStands: 'Where it stands',
+  projectOpenHead: (list: string) => list,
+  projectOpenCount: (n: number) => `${n.toLocaleString('en')} open`,
+  projectNoneOpen: (many: string) => `No ${many} are open.`,
+  projectDone: 'Finished lately',
+  projectDue: (day: string) => `Due ${day}`,
+  projectHappened: 'What happened',
+  projectNotes: 'Notes',
 } as const;
 
 /** How long a link can be made for, in days, as `openShare` takes it: 1 to 90, and 30 unless said. */
@@ -299,6 +311,22 @@ export type SharedPage = {
   /** The page's two columns, as the owner's page lays them: the rail's width in twelfths, or `null` for one column. */
   layout: Layout | null;
   blocks: SharedBlock[];
+  /** A page of one project, as a link may say it (collab pass 2): its work, its note and what happened. `null` for any other page. */
+  project?: SharedProject | null;
+};
+
+/** One piece of work on a shared project, in words. */
+export type SharedTask = { title: string; state: string; done: boolean; due: string | null; on: string | null };
+
+/** A project as the record lets a link say it: names only, nobody named, no id, no address. */
+export type SharedProject = {
+  name: string;
+  lane: string | null;
+  about: string | null;
+  next: string | null;
+  work: { list: string; one: string; many: string; open: SharedTask[]; more: number; done: SharedTask[] }[];
+  notes: string | null;
+  happened: { at: string; said: string }[];
 };
 
 /** What the reader draws: the page, a link that does not open, or a record it could not reach. */
@@ -534,7 +562,41 @@ function pageOf(v: Record<string, unknown>): SharedPage | null {
     empty: text(v.empty),
     layout: layoutOf(v),
     blocks: (Array.isArray(v.blocks) ? v.blocks : []).map(blockShared),
+    project: projectShared(v.project),
   };
+}
+
+/** A day as the record keeps one ("2026-11-14"), or `null`. */
+const dayOf = (x: unknown): string | null => (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(x) ? x.slice(0, 10) : null);
+
+const taskShared = (x: unknown): SharedTask | null =>
+  isObject(x) && typeof x.title === 'string' && x.title.trim() !== ''
+    ? { title: x.title, state: typeof x.state === 'string' ? x.state : '', done: x.done === true, due: dayOf(x.due), on: dayOf(x.on) }
+    : null;
+
+const tasksShared = (x: unknown): SharedTask[] => (Array.isArray(x) ? x.map(taskShared).filter((t): t is SharedTask => t !== null) : []);
+
+/** A shared project as the record sends it, each part kept only in its shape, or `null` for a page that is not one. */
+function projectShared(x: unknown): SharedProject | null {
+  if (!isObject(x) || typeof x.name !== 'string') return null;
+  const work = (Array.isArray(x.work) ? x.work : []).flatMap((w) =>
+    isObject(w) && typeof w.list === 'string'
+      ? [
+          {
+            list: w.list,
+            one: typeof w.one === 'string' && w.one !== '' ? w.one : 'task',
+            many: typeof w.many === 'string' && w.many !== '' ? w.many : 'tasks',
+            open: tasksShared(w.open),
+            more: typeof w.more === 'number' && Number.isFinite(w.more) && w.more > 0 ? Math.trunc(w.more) : 0,
+            done: tasksShared(w.done),
+          },
+        ]
+      : [],
+  );
+  const happened = (Array.isArray(x.happened) ? x.happened : []).flatMap((h) =>
+    isObject(h) && typeof h.at === 'string' && typeof h.said === 'string' && h.said.trim() !== '' ? [{ at: h.at, said: h.said }] : [],
+  );
+  return { name: x.name, lane: text(x.lane), about: text(x.about), next: text(x.next), work, notes: text(x.notes), happened };
 }
 
 /** A field id said as words, for a column the owner gave no label: `due_on` is "Due on". */
