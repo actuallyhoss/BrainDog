@@ -164,6 +164,8 @@ export const words = {
   back: 'Back',
   next: 'Next',
   finish: 'Finish',
+  /* A BANK ACCOUNT'S LINES COME NEXT, from the statement its bank exports. */
+  finishImport: 'Finish and import a statement',
   finishing: 'Setting up…',
   skip: 'Skip setup',
   needName: 'Give the account a name.',

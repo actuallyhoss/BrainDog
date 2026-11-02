@@ -13,6 +13,7 @@
   import { focusWhenDrawn } from '$lib/ui/keep-focus.ts';
   import { onMount, untrack } from 'svelte';
   import { invalidateAll } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import { at } from '$lib/at.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -105,7 +106,11 @@
   let busy = $state(false);
   let finished = $state.raw<Finished | null>(null);
 
-  async function finish(): Promise<void> {
+  /**
+   * FINISH, AND WHERE TO GO AFTER (2 Nov, a walk: a new person added their bank account and the setup never said a
+   * statement could come next, so the account sat at its one balance). `then` is a path; the setup closes either way.
+   */
+  async function finish(then: string | null = null): Promise<void> {
     if (busy || !read) return;
     busy = true;
     said = null;
@@ -126,6 +131,7 @@
       if (out.failed.length === 0 && out.left.length === 0) {
         toasts.push(words.done, { intent: 'good' });
         onclose();
+        if (then !== null) return void goto(at(then));
         /* AND MONEY'S OWN HEADING once the board is drawn in its place, where the focus would have fallen to the page. */
         focusWhenDrawn(() => document.querySelector<HTMLElement>('main h1'));
       } else {
@@ -237,6 +243,7 @@
       {#if place > 0}<Button disabled={busy} onclick={() => ((place -= 1), (said = null))}>{words.back}</Button>{/if}
       {#if step === 'addons'}
         <Button weight="primary" disabled={busy || read === null} onclick={() => void finish()}>{busy ? words.finishing : words.finish}</Button>
+        {#if steps.includes('account') && (kind === 'bank' || kind === 'card')}<Button disabled={busy || read === null} onclick={() => void finish('/add/statement')}>{words.finishImport}</Button>{/if}
       {:else}
         <Button weight="primary" onclick={next}>{words.next}</Button>
       {/if}

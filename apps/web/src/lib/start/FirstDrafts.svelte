@@ -68,7 +68,7 @@
      what the card opens with while the model reads. Its code and the reader come after the card, as Tell's own do. */
   let rules = $state.raw<FirstDraft[]>([]);
   let merge = $state.raw<((m: readonly FirstDraft[], r: readonly FirstDraft[]) => FirstDraft[]) | null>(null);
-  let fill = $state.raw<((d: FirstDraft, value: string) => FirstDraft) | null>(null);
+  let fill = $state.raw<((d: FirstDraft, value: string | number) => FirstDraft) | null>(null);
   let named = $state.raw<typeof clientNamed | null>(null);
   /**
    * THE ORGANISATIONS THIS BRAINDOG KEEPS, READ ONCE FOR THE CARD (work 1.23.0, 2 Nov): the build has just written the

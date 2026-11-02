@@ -14,7 +14,8 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { apiBase, at } from '$lib/at.ts';
-  import { money } from 'braindog-render';
+  import { dayShort } from 'braindog-render';
+  import Money from '$lib/ui/Money.svelte';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import { BYTES_MOST, type Export } from '$lib/start/export.ts';
   import { balancesOf, freshOf, guessRoles, linesOf, readStatement, rolesMissing, fieldsOf, ROLES, words, type Held, type Roles, type Sign } from '$lib/money/statement.ts';
@@ -147,7 +148,6 @@
     heldKey = '';
   }
 
-  const say = (minor: number): string => money(minor, account?.currency ?? '');
   const sample = (column: string | null): string => (column && exp ? (exp.entries.find((e) => (e[column] ?? '').trim() !== '')?.[column] ?? '') : '');
 </script>
 
@@ -213,7 +213,7 @@
     {:else}
       <section class="st-step" aria-labelledby="st-columns">
         <div class="st-row">
-          <h2 class="st-label" id="st-columns">{words.columns}{#if exp.file !== words.pastedName} <span class="st-quiet">{exp.file}</span>{/if}</h2>
+          <h2 class="st-label" id="st-columns">{words.columns}{#if exp.file !== words.pastedName}{' '}<span class="st-quiet">{exp.file}</span>{/if}</h2>
           <Button weight="quiet" size="sm" onclick={again}>{words.other}</Button>
         </div>
         <label class="st-check"><input type="checkbox" checked={two} onchange={(e) => setTwo(e.currentTarget.checked)} /> {words.twoColumns}</label>
@@ -261,10 +261,11 @@
               <tbody>
                 {#each shown as l (l.at)}
                   <tr data-already={already.has(l.at) ? '' : undefined}>
-                    <td class="st-day">{l.day}</td>
+                    <td class="st-day">{dayShort(l.day)}</td>
                     <td class="st-what">{l.what}{#if already.has(l.at)}<span class="st-tag">{words.already}</span>{/if}</td>
-                    <td class="st-num" data-way={l.way}>{l.way === 'in' ? '+' : '−'}{say(l.amount)}</td>
-                    {#if roles.balance}<td class="st-num st-quiet">{l.balance === null ? '' : say(l.balance)}</td>{/if}
+                    <!-- IN THE MONEY EVERY OTHER SCREEN DRAWS (£2,400.00, not GBP 2,400.00), so the preview reads as the Ledger will. -->
+                    <td class="st-num" data-way={l.way}>{l.way === 'in' ? '+' : '−'}<Money minor={l.amount} currency={account.currency} home={account.currency} /></td>
+                    {#if roles.balance}<td class="st-num st-quiet">{#if l.balance !== null}<Money minor={l.balance} currency={account.currency} home={account.currency} />{/if}</td>{/if}
                   </tr>
                 {/each}
               </tbody>
