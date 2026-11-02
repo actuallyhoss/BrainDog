@@ -7729,7 +7729,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       at: String(r.opened_at ?? ''),
       kind,
       question: nameSpoken(questionOf(sql, String(r.id)) ?? ''),
-      why: typeof body.context === 'string' ? body.context : '',
+      /* AN AGENT THAT SAYS ITS REASON AS `why` (as an option says its own `because`) is read too, so its card says why. */
+      why: typeof body.context === 'string' ? body.context : typeof body.why === 'string' ? body.why : '',
       /* MONEY CHANGED ON A ROW IS ALWAYS HARD TO UNDO, so a card that moves it is never accepted with Enter (`BAND_SQL`
          ranks it so, as `costOf` does). The floor is asked as well, since it reads a money field cleared, which no body
          spells. A new row that records an amount (`records`) moves nothing and is deleted like any row, so it is not. */

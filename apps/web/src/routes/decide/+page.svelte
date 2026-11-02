@@ -713,6 +713,18 @@
     max-inline-size: var(--measure, 72ch);
   }
 
+  /* AND THE AMOUNT STANDS BESIDE ITS TITLE, not at the end of a 72ch row it does not fill (2 Nov): "£4,800" floated in
+     the middle of the tile, half a page from "Invoice 2026-041" and over nothing. */
+  .body :global(.block-slot[data-key='decide-lead'] .dc-row) {
+    grid-template-columns: 32px minmax(0, max-content) auto;
+    justify-content: start;
+  }
+
+  .body :global(.block-slot[data-key='decide-lead'] .dc-row > .dr-amount) {
+    margin-inline-start: var(--sp-3);
+  }
+
+
   /* A MONEY QUESTION'S TITLE IS A QUESTION'S SIZE HERE (T18): 15 beside Quick's 17. Today's tile keeps its 15. */
   .body :global(.dc-row > .dr-title) {
     font-size: var(--fs-head);
@@ -913,7 +925,9 @@
     min-block-size: var(--tap);
     margin-block-start: var(--tile-gap);
     border-radius: var(--r-ctl);
-    background: none;
+    /* A QUIET BUTTON ON THE BOARD IS THE TILE'S COLOUR (2 Nov): bare, "2 more" floated alone in the middle of the
+       column's foot and did not read as something to press. */
+    background: var(--tile);
     color: var(--ink-2);
     font-size: var(--fs-body);
     font-weight: 500;

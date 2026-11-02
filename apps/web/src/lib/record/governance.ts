@@ -173,7 +173,8 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
           { key: 'reject', title: copy.rejectIt, body: '' },
         ];
   /* THE REASONING IS THE QUESTION'S, written by whoever opened it (`body.context`), and it is drawn above the options. */
-  const context = said(body.context).trim();
+  /* An agent that wrote its reason as `why` is read the same, so the page says why it asks (2 Nov). */
+  const context = (said(body.context).trim() || said(body.why).trim());
   /* THE RECORD'S OWN BAND WHERE IT SENDS ONE (`cost`): it has read which fields the history withholds, and a browser
      weighing the body alone cannot. Without one the body is weighed here, as before. */
   const band = (COSTS as readonly string[]).includes(text(row.cost)) ? (text(row.cost) as ReturnType<typeof costOf>) : costOf(text(row.body_kind), row.body);

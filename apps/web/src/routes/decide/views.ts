@@ -21,7 +21,7 @@
  */
 
 import { day, relative, since, spoken } from 'braindog-render';
-import type { QueueQuestion } from '@braindog/kernel';
+import { pressedOnly, type QueueQuestion } from '@braindog/kernel';
 import { createClient } from '@braindog/client';
 import { everyGovernance, governancePage, type Governor, type Read } from '../../lib/record/governance.ts';
 import { moneyInText, namesAmount } from '../../lib/record/money.ts';
@@ -487,13 +487,23 @@ export function decidedOf(b: Answered, now: number): LiveBlock {
   const { source: _source, ...plain } = b;
   const shell = blockOf({ ...plain, rows: [] }, new Map(), now);
   const { cannot: _cannot, ...rest } = shell;
-  const columns = shell.columns;
+  /* THE QUESTION AND WHY HAVE THE ROOM, what was chosen and when only what they need (2 Nov): four equal columns cut
+     "Install Reading list 2.0.3 from a catalo…" while "just now" sat in a quarter of the row. */
+  const WIDTHS: Record<string, string> = { question: 'minmax(0, 5fr)', answer_label: 'minmax(7rem, 2fr)', reason: 'minmax(0, 4fr)', at: '6.5rem' };
+  const columns = shell.columns.map((c) => {
+    const width = WIDTHS[c.field];
+    if (width === undefined) return c;
+    const { gives: _gives, room: _room, ...plain } = c as typeof c & { gives?: unknown; room?: unknown };
+    return { ...plain, width } as typeof c;
+  });
   const got = (Array.isArray(b.rows) ? b.rows : []) as Entryish[];
   const cell = (f: Record<string, unknown>, field: string): string => {
     const v = f[field];
     if (field === 'at') return typeof v === 'string' ? since(v, now) : '';
     if (field === 'answer_label') return typeof v === 'string' && v !== '' ? moneyInText(v) : answerWord(f.answer);
     if (field === 'answer') return answerWord(v);
+    /* NO WHY IS NO WHY: the sentence the record writes for a press with none is not a reason anybody gave. */
+    if (field === 'reason') return typeof v === 'string' && !pressedOnly(v.trim()) && !/^Answered in one press\b/u.test(v.trim()) ? moneyInText(v) : '';
     /* THE QUESTION ALONE, as its page and its card title it (`ask.ts`). */
     if (field === 'question') return typeof v === 'string' ? askOf(spoken(moneyInText(v))).ask : '';
     return typeof v === 'string' ? moneyInText(v) : v === null || v === undefined ? '' : String(v);
@@ -506,7 +516,7 @@ export function decidedOf(b: Answered, now: number): LiveBlock {
   const matched = typeof b.matched === 'number' ? b.matched : rows.length;
   /* `latest` IS WHEN THE NEWEST WAS DECIDED, which the calm line says once nothing waits. */
   const latest = typeof got[0]?.fields?.at === 'string' ? got[0].fields.at : null;
-  return { ...rest, source: 'governance.decided', rows, shown: rows.length, total: Math.max(rows.length, matched), latest } as LiveBlock;
+  return { ...rest, columns, source: 'governance.decided', rows, shown: rows.length, total: Math.max(rows.length, matched), latest } as LiveBlock;
 }
 
 /* `accept` and `reject` are what a question with no options of its own was answered with. */

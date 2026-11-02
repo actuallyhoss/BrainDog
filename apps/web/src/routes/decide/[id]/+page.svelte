@@ -972,6 +972,8 @@
   const picking = $derived(pickable.length > 0 && costed);
   /* A NEW ROW, OR ROWS THE TICKS DO NOT DRAW, field by field: what accepting adds is read before the press (`createsOf`). */
   const creates = $derived(question && live && !merge && pickable.length === 0 && costed ? createsOf(live.rowset, live.registers, plainOf(live.registers, live.names)) : []);
+  /* WHAT IT CHANGES LEADS when it is entries changed and the answers are the record's two (`doesPart`). */
+  const changesFirst = $derived(two && !story && !preview && (updates.length > 0 || creates.length > 0 || picking));
   /** What accepting would call out, while it can still be approved. */
   const calling = $derived(from === 'live' && live !== null && live.calls.length > 0 && costed);
   /* WHAT ACCEPTING DOES HAS SOMETHING TO SAY: an arrangement, what a proposal puts in place, the rows to tick, the rows
@@ -1118,6 +1120,103 @@
          56px on a phone. -->
     <PageHead named kicker={copy.decide} back="/decide" title={headed.ask} count={joined} countOf={(n) => (n === 1 ? 'change' : 'changes')} sentence={headed.detail} actions={asking && me.owner ? whoMore : undefined} />
   </div>
+      <!-- A CHANGE OF ENTRIES IS READ BEFORE ITS TWO ANSWERS (2 Nov): Accept and Decline stood over "Before and after",
+           so the press came before the thing it presses on. An arrangement, longer and with its own ticks and keys, keeps
+           its answers on top. -->
+      {#snippet doesPart()}{#if question}
+      <!-- WHAT IT CHANGES, under the answers in their own tile (beside them it left half the board empty under
+           two buttons): what an arrangement does, what a proposal puts in place, the rows to tick,
+           the rows it changes, what it calls out, and what deciding late costs. Each under its own small heading, open, read
+           before the press and never in the way of it. -->
+      {#if asking && doesAny}
+              <section class="does" aria-labelledby="does-title" data-first={changesFirst ? '' : undefined}>
+                <h2 class="gate-h" id="does-title">{gate.changes}</h2>
+                <div class="does-parts">
+                  {#if story && !settled}
+                    <section class="changed" aria-label={story.lead}>
+                      <Arranged arranged={story} />
+                    </section>
+                  {/if}
+
+                  {#if preview && !settled}
+                    <section class="changed">
+                      <h3 class="does-h">{copy.proposalWillAppear}</h3>
+                      <Proposed proposed={preview} />
+                      <!-- A SCRIPT'S SOURCE, WHOLE AND FOLDED: it is what runs, and code keeps its lines, which a line of the
+                           preview cannot. A scrolling box a keyboard can reach, as the canvas's written body is. -->
+                      {#each preview.appears.filter((a) => a.source !== undefined) as a, i (i)}
+                        <details class="source-fold">
+                          <summary>{copy.proposalSource(a.title)}</summary>
+                          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                          <pre class="source" tabindex="0">{a.source}</pre>
+                        </details>
+                      {/each}
+                    </section>
+                  {/if}
+
+                  {#if picking}
+                    <section class="changed">
+                      <h3 class="does-h">{pickWords.heading}</h3>
+                      <p class="pick-hint">{pickWords.hint}</p>
+                      <ul class="picks">
+                        {#each pickable as row (row.n)}
+                          <li>
+                            <label class="pick">
+                              <input
+                                type="checkbox"
+                                checked={!unticked.includes(row.n)}
+                                aria-label={pickWords.keep(row.title)}
+                                onchange={(e) => {
+                                  unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n];
+                                  noneTicked = false;
+                                }}
+                              />
+                              <span class="pick-title">{row.title}</span>
+                              {#if row.detail}<span class="pick-detail">{row.detail}</span>{/if}
+                            </label>
+                          </li>
+                        {/each}
+                      </ul>
+                      {#if picked}<p class="pick-hint" role="status">{pickWords.some(picked.length, pickable.length)}</p>{/if}
+                    </section>
+                  {/if}
+
+                  {#if creates.length}
+                    <section class="changed">
+                      <h3 class="does-h">{pickWords.heading}</h3>
+                      <Changes updates={creates} />
+                    </section>
+                  {/if}
+
+                  {#if updates.length}
+                    <section class="changed">
+                      <h3 class="does-h">{changeWords.heading}</h3>
+                      <Changes {updates} />
+                    </section>
+                  {/if}
+
+                  <!-- WHAT ACCEPTING WOULD CALL OUT, before the press: every host, how often, the key by label and the fields
+                       sent, as the record worked them out when the proposal was filed. -->
+                  {#if calling && live}
+                    <section class="changed">
+                      <h3 class="does-h">{installWords.heading}</h3>
+                      <dl class="calls-out">
+                        <CallsOut calls={live.calls} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.acceptApproves} />
+                      </dl>
+                    </section>
+                  {/if}
+
+                  <!-- WHAT DECIDING LATE COSTS, as whoever asked wrote it. What getting it wrong costs is said in the button. -->
+                  {#if costed && question.cost}
+                    <section class="cost">
+                      <h3 class="does-h">{copy.costOfDelay}</h3>
+                      <p class="cost-body">{symbolText(question.cost)}</p>
+                    </section>
+                  {/if}
+                </div>
+              </section>
+            {/if}
+      {/if}{/snippet}
   {#snippet whoMore()}
     <Button weight="bare" size="sm" aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>
   {/snippet}
@@ -1254,7 +1353,8 @@
             <!-- NAMED BY A HEADING OF ITS OWN, one level under the question, so each option's name under it is the level
                  after it and a heading list reads question, options, each option. Said to a screen reader only: the eye
                  reads the cards as the answers without a word over them. -->
-            <section class="options" aria-labelledby="options-h">
+            {#if changesFirst}{@render doesPart()}{/if}
+            <section class="options" aria-labelledby="options-h" data-after={changesFirst ? '' : undefined}>
               <h2 class="dc-sr" id="options-h">{merge ? mergeWords.heading : copy.theOptions}</h2>
               {#if merge}
                 <!-- WHO IS WHO: each name and where it was seen, and one press each, held for its Undo. -->
@@ -1285,7 +1385,7 @@
                      what it does, its drawing, and its own button at the foot. The suggested one's button is the primary, the
                      rest quiet, and one press decides. One that cannot be taken back asks first, in its own card; where the
                      suggestion is such a one, no button is red. -->
-                <ul class="dc-options" data-across={question.options.length <= 3 ? '' : undefined} style:--across={question.options.length}>
+                <ul class="dc-options" data-across={question.options.length <= 2 ? '' : undefined} style:--across={question.options.length}>
                   {#each question.options as option}
                     <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list; where the body
                          holds no reason, the words `questionOf` made of it. -->
@@ -1421,98 +1521,7 @@
               </section>
             {/if}
       {/if}
-      <!-- WHAT IT CHANGES, under the answers in their own tile (beside them it left half the board empty under
-           two buttons): what an arrangement does, what a proposal puts in place, the rows to tick,
-           the rows it changes, what it calls out, and what deciding late costs. Each under its own small heading, open, read
-           before the press and never in the way of it. -->
-      {#if asking && doesAny}
-              <section class="does" aria-labelledby="does-title">
-                <h2 class="gate-h" id="does-title">{gate.changes}</h2>
-                <div class="does-parts">
-                  {#if story && !settled}
-                    <section class="changed" aria-label={story.lead}>
-                      <Arranged arranged={story} />
-                    </section>
-                  {/if}
-
-                  {#if preview && !settled}
-                    <section class="changed">
-                      <h3 class="does-h">{copy.proposalWillAppear}</h3>
-                      <Proposed proposed={preview} />
-                      <!-- A SCRIPT'S SOURCE, WHOLE AND FOLDED: it is what runs, and code keeps its lines, which a line of the
-                           preview cannot. A scrolling box a keyboard can reach, as the canvas's written body is. -->
-                      {#each preview.appears.filter((a) => a.source !== undefined) as a, i (i)}
-                        <details class="source-fold">
-                          <summary>{copy.proposalSource(a.title)}</summary>
-                          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                          <pre class="source" tabindex="0">{a.source}</pre>
-                        </details>
-                      {/each}
-                    </section>
-                  {/if}
-
-                  {#if picking}
-                    <section class="changed">
-                      <h3 class="does-h">{pickWords.heading}</h3>
-                      <p class="pick-hint">{pickWords.hint}</p>
-                      <ul class="picks">
-                        {#each pickable as row (row.n)}
-                          <li>
-                            <label class="pick">
-                              <input
-                                type="checkbox"
-                                checked={!unticked.includes(row.n)}
-                                aria-label={pickWords.keep(row.title)}
-                                onchange={(e) => {
-                                  unticked = e.currentTarget.checked ? unticked.filter((n) => n !== row.n) : [...unticked, row.n];
-                                  noneTicked = false;
-                                }}
-                              />
-                              <span class="pick-title">{row.title}</span>
-                              {#if row.detail}<span class="pick-detail">{row.detail}</span>{/if}
-                            </label>
-                          </li>
-                        {/each}
-                      </ul>
-                      {#if picked}<p class="pick-hint" role="status">{pickWords.some(picked.length, pickable.length)}</p>{/if}
-                    </section>
-                  {/if}
-
-                  {#if creates.length}
-                    <section class="changed">
-                      <h3 class="does-h">{pickWords.heading}</h3>
-                      <Changes updates={creates} />
-                    </section>
-                  {/if}
-
-                  {#if updates.length}
-                    <section class="changed">
-                      <h3 class="does-h">{changeWords.heading}</h3>
-                      <Changes {updates} />
-                    </section>
-                  {/if}
-
-                  <!-- WHAT ACCEPTING WOULD CALL OUT, before the press: every host, how often, the key by label and the fields
-                       sent, as the record worked them out when the proposal was filed. -->
-                  {#if calling && live}
-                    <section class="changed">
-                      <h3 class="does-h">{installWords.heading}</h3>
-                      <dl class="calls-out">
-                        <CallsOut calls={live.calls} hosted={hostedHere(page.data as unknown as Shell)} note={installWords.acceptApproves} />
-                      </dl>
-                    </section>
-                  {/if}
-
-                  <!-- WHAT DECIDING LATE COSTS, as whoever asked wrote it. What getting it wrong costs is said in the button. -->
-                  {#if costed && question.cost}
-                    <section class="cost">
-                      <h3 class="does-h">{copy.costOfDelay}</h3>
-                      <p class="cost-body">{symbolText(question.cost)}</p>
-                    </section>
-                  {/if}
-                </div>
-              </section>
-            {/if}
+      {#if !changesFirst}{@render doesPart()}{/if}
     </Tile>
     {#if aside}
     <Tile class="gate-aside">
@@ -1864,6 +1873,18 @@
     border-block-start: 1px solid var(--rule);
   }
 
+  /* LEADING, it takes no rule over it, and the answers under it take one: they are the form's foot. */
+  .does[data-first] {
+    margin-block-start: 0;
+    padding-block-start: 0;
+    border-block-start: 0;
+  }
+
+  .options[data-after] {
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
+  }
+
   .gate-h {
     margin: 0;
     color: var(--ink);
@@ -1986,10 +2007,13 @@
 
   /* ── not now, and the reason the record asks for ───────────────────────── */
 
+  /* PUTTING IT OFF IS ITS OWN STEP UNDER THE ANSWERS, a hairline over it, so its field is not read as an answer's. */
   .commit {
     display: flex;
     flex-direction: column;
     max-inline-size: var(--measure);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
   }
 
   .commit-label {
@@ -2316,7 +2340,8 @@
   }
 
   /* ── the options as cards (today F9) ──────────────────────────────────
-     TWO OR THREE SIDE BY SIDE where each has 240px, stacked on a phone: the name 17/600, what it does in the second ink,
+     TWO SIDE BY SIDE where each has 240px, and three or more one under the other (2 Nov: three left one card alone on
+     a second row), stacked on a phone: the name 17/600, what it does in the second ink,
      its drawing, and its own button at the foot, the cards of a row as tall as the tallest. */
   .dc-options {
     display: grid;
@@ -2478,8 +2503,9 @@
     max-inline-size: calc(var(--q-max) + var(--gutter) * 2);
   }
 
+  /* A LITTLE WIDER THAN THE TEXT'S MEASURE, so a question of one sentence is one line on a desk. */
   .q-head :global(.page-head .page-name) {
-    max-inline-size: var(--q-text);
+    max-inline-size: calc(var(--q-text) + 180px);
     font-size: var(--fs-figure);
     line-height: calc(28 / 22);
     letter-spacing: -0.01em;
