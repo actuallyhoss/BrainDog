@@ -40,11 +40,11 @@ Settings › Agents has one switch for the owner: **Let your agents do everythin
 
 The switch never covers:
 
-- seeing or adding a key, or making new keys;
+- seeing or adding a key, or making new tokens, report keys or door addresses;
 - inviting people, changing what they can do, stopping or removing them;
-- deleting or exporting all of BrainDog;
+- deleting, exporting or importing all of BrainDog, putting a copy back, or erasing a person;
 - changing the owner, or handing ownership over;
-- paying.
+- the switch itself, and paying.
 
 Those stay yours in the app, switch on or off. The switch covers only the owner's own agents, with a key that writes across the whole BrainDog. A colleague's agents are never covered: they ask, and never do more than their person may.
 
