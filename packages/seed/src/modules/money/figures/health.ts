@@ -61,8 +61,27 @@ const RANGE_FIGURES: Record<string, SeedMetric> = Object.fromEntries(
         compare: 'none',
       },
     ],
+    /* AND HOW FAR OUT WENT PAST IN, SINCE money-core 3.37.0 (verify3, 2 Nov): Reports said "−$12,536 left" of a range
+       that spent more than came in. The same sum turned over, read only where `left-` is under nought. */
+    [`over-${key}`, overOf(`over-${key}`, `More out than in, ${words}`, where)],
   ]),
 );
+
+/** What went out past what came in over `where`: `left-`'s sum with its sign turned, so a range that overspent says it as a positive amount. */
+function overOf(metric: string, name: string, where: string): SeedMetric {
+  return {
+    metric,
+    name,
+    source: 'register.transactions',
+    where: `${MOVED}, ${where}`,
+    value: { sum: { product: ['amount', { lookup: 'sign', by: 'direction' }] } },
+    lookups: { sign: { in: -1, out: 1 } },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  };
+}
 
 /**
  * THE FIRST DAY MONEY MOVED IN REPORTS' WHOLE WINDOW (finish F55), the day its All line starts from: "The last 13 months"
@@ -228,5 +247,6 @@ export const HEALTH_FIGURES: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  'over-month': overOf('over-month', 'More out than in this month', 'on at least bom'),
   ...RANGE_FIGURES,
 };

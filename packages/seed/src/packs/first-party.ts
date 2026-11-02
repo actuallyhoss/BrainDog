@@ -955,12 +955,16 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   people 4.4.0: People on a new record says it holds only you (`page.people`).
  *   portfolio 1.31.0: Numbers says what it will list while it holds no reading (`metric.readings-held`, `page.all-numbers`).
  *   estate 2.8.0: Services says what it holds without a past month or "the record" (`register.services`).
+ * - money-core 3.37.0 (leftovers5, 2 Nov): Reports says a range that spent more than came in as "$12,536 more out than
+ *   in", not "−$12,536 left", over five figures added (`metric.over-month`, `metric.over-last`, `metric.over-three`,
+ *   `metric.over-year`, `metric.over-all`), its line split into two notes of six sentences at most (`page.money-reports`).
+ *   Ids added, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.31.0',
   people: '4.4.1',
-  'money-core': '3.36.0',
+  'money-core': '3.37.0',
   estate: '2.8.0',
   work: '1.24.0',
 };

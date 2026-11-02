@@ -210,6 +210,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.37.0', notes: 'Reports says a stretch that spent more than came in as how much more went out, not as a minus left over.' },
     { version: '3.36.0', notes: 'A book with no account draws no Cash ahead of nothing, and its Accounts says what adding one brings. The Ledger, Coming up, Forecast and Reports each say what will be there and how to start while they are empty, and the Ledger draws its month only once something moved.' },
     { version: '3.35.0', notes: 'Putting an account in a book takes what it already holds with it, so a book counts the money the account spent before. A book says This month only while money came in or went out, and its accounts and Add an account each take the whole row.' },
     {
