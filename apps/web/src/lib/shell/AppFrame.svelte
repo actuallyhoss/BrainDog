@@ -778,7 +778,16 @@
    * no runes so a test runner can load it, it takes the window as an argument so a test can hand
    * it one it owns, and its return value is the teardown, which is its whole public surface.
    */
-  $effect(() => watchKeyboard(window));
+  /* FROM THE NEXT FRAME (speed4, 2 Nov): its first read of the window's height laid out the page while it was still being
+     built, about 14 ms of a cold phone's first draw, and no keyboard is up before the first frame. */
+  $effect(() => {
+    let stop: (() => void) | null = null;
+    const frame = requestAnimationFrame(() => (stop = watchKeyboard(window)));
+    return () => {
+      cancelAnimationFrame(frame);
+      stop?.();
+    };
+  });
 
   /**
    * THE FREEZE WATCHDOG (`lib/watchdog.ts`): the first block of the page over two seconds is said once, with the path

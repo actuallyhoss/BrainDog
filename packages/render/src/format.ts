@@ -653,9 +653,13 @@ export function readerZone(zone?: string): string {
   if (zone) return zone;
   /* `'window' in globalThis` AND NOT `typeof window`: this package is checked without the DOM's types,
      and a worker or a test has no window, so text drawn there counts in UTC unless it names a zone. */
-  if ('window' in globalThis) return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  /* READ ONCE A PAGE: a formatter made on every call to learn it was a hot spot of a cold phone's first draw (speed4). */
+  if ('window' in globalThis) return (browserZone ??= Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
   return 'UTC';
 }
+
+/** The browser's own zone, once `readerZone` has read it. */
+let browserZone: string | undefined;
 
 /**
  * THE ONE DAY AN INSTANT FALLS ON, `YYYY-MM-DD`, in a zone: the record's where the caller holds it, else the reader's

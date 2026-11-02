@@ -23,6 +23,8 @@ export const recordZone = (): string => zone ?? readerZone();
  * so a host that sent nothing, or nonsense, leaves the reader's own zone in place.
  */
 export function learnZone(said: unknown): string {
+  /* THE ZONE ALREADY HELD IS NOT CHECKED AGAIN: a formatter made to test it cost about 10 ms of a cold phone's first draw. */
+  if (said === zone && zone !== null) return zone;
   if (typeof said === 'string' && said !== '') {
     try {
       new Intl.DateTimeFormat('en', { timeZone: said });
