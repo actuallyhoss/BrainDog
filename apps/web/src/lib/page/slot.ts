@@ -105,7 +105,10 @@ export function slotPick(
     return answer ? [{ question, answer: { key: answer.key, label: answer.label, because: answer.because }, own: isOwn(question) }] : [];
   });
   const row = o.row ?? null;
-  return answerable.find((p) => aboutPage(p.question, o.page, row)) ?? (o.own === false ? null : answerable.find((p) => p.own)) ?? null;
+  /* A DRAWING IS NEVER BORROWED: it is a change to one page, so it is offered on that page and waits in Needs you
+     everywhere else. Lent as BrainDog's own, "I drew Pocketlab's plan as a path of stages" headed every Money page,
+     Agents, Dashboard and Scripts (live verify, 2 Nov). */
+  return answerable.find((p) => aboutPage(p.question, o.page, row)) ?? (o.own === false ? null : answerable.find((p) => p.own && !isDrawing(p.question))) ?? null;
 }
 
 /** What a page tells the slot about itself: its address, the row it is about, and the template it was drawn from. */
