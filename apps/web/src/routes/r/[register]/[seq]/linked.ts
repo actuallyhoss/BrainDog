@@ -14,6 +14,7 @@
 
 import type { Fields, RegisterDecl } from '../../../../lib/record/schema.ts';
 import { amountField, signedSaid, wayOf } from '../../../../lib/record/money-way.ts';
+import { readable } from 'braindog-render';
 import { rowWords } from './said.ts';
 
 const DAY = 86_400_000;
@@ -123,6 +124,37 @@ export function linkedCells(
     })
     .slice(1)
     .filter((c) => c !== '');
+}
+
+/**
+ * A LINE OF A LIST THAT DECLARES A TABLE, LED BY WHO IT WAS WITH (leftovers9). The Ledger's table opens on its day, so an
+ * organisation's page read "6 Oct" over "HALDEN TYPE CO · +$3,200": the date led and the payee was the bank's capitals.
+ * Where a list declares a table, the line leads with its first column of words (`lead`, as a phone's card does in
+ * `RowCards`), said as a person writes it (`readable`: "Halden Type Co", short initialisms kept), the amount stands at
+ * the end with its way, and what is left, the day first, is the quiet line under the name. `null` for a list with no
+ * table, which keeps its own first column.
+ */
+export function pointedLine(
+  decl: RegisterDecl | undefined,
+  columns: readonly { field: string }[],
+  cells: readonly (string | null)[],
+  fields: Readonly<Record<string, unknown>> | undefined,
+  say: (text: string) => string,
+): { title: string; amount: string | null; rest: string[] } | null {
+  if (!decl || !Array.isArray((decl as { table?: unknown }).table)) return null;
+  const words = (id: string): boolean => id === decl.title || decl.fields.find((f) => f.id === id)?.type === 'text';
+  const at = columns.findIndex((c, i) => words(c.field) && (cells[i] ?? '') !== '');
+  if (at < 0) return null;
+  const figure = amountField(decl)?.id;
+  const way = fields ? wayOf(decl, fields as Readonly<Fields>) : null;
+  let amount: string | null = null;
+  const rest: string[] = [];
+  cells.forEach((c, i) => {
+    if (i === at || !c) return;
+    if (columns[i]?.field === figure && amount === null) amount = signedSaid(say(c), way);
+    else rest.push(say(c));
+  });
+  return { title: readable(cells[at]!), amount, rest };
 }
 
 /**

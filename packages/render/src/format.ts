@@ -956,11 +956,13 @@ const SMALL_WORDS = new Set(['a', 'an', 'and', 'at', 'by', 'for', 'in', 'of', 'o
 /** Short words that are words, said with a capital: months, days, company endings and the common nouns of a bank line. */
 const SHORT_NAMES = new Set([
   'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
-  'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun', 'ltd', 'co', 'inc', 'plc', 'llc',
-  'tax', 'fee', 'pay', 'end', 'new', 'set', 'day', 'net', 'gas', 'car', 'bus', 'cab', 'bar', 'box', 'top', 'one', 'two', 'all', 'out', 'off', 'our', 'per',
+  'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun', 'ltd', 'co', 'inc', 'plc',
+  'tax', 'fee', 'pay', 'end', 'new', 'set', 'day', 'net', 'gas', 'car', 'bus', 'cab', 'bar', 'box', 'top', 'one', 'two', 'all', 'out', 'off', 'our', 'per', 'ads', 'app',
 ]);
 /** Longer initialisms a bank line holds that could be said as a word, kept in capitals: the terms of a transfer. */
 const LONG_INITIALS = new Set(['IBAN', 'SWIFT', 'DVLA']);
+/** A company ending written in capitals however the rest is said (leftovers9): "Northwind Apps LLC", where it read "Llc". */
+const ENDINGS_IN_CAPITALS = new Set(['LLC']);
 /**
  * A WORD NOBODY COULD SAY IS INITIALS: four capitals or more with no vowel in them ("HMRC") are read letter by letter,
  * so they keep their capitals. A rule and not a list of names, because whose initials a bank line carries is the
@@ -993,8 +995,10 @@ export function readable(text: string): string {
       .map((word) => {
         const bare = word.replace(/['’]/gu, '');
         const low = word.toLowerCase();
-        if (LONG_INITIALS.has(bare) || unsayable(bare)) return word;
+        if (LONG_INITIALS.has(bare) || ENDINGS_IN_CAPITALS.has(bare) || unsayable(bare)) return word;
         if (!lead && parts.length === 1 && SMALL_WORDS.has(low)) return low;
+        /* A SMALL WORD THAT OPENS THE NAME TAKES A CAPITAL (leftovers9): "THE FISH SHACK" read "THE Fish Shack". */
+        if (lead && parts.length === 1 && SMALL_WORDS.has(low)) return word.charAt(0) + word.slice(1).toLowerCase();
         if (bare.length <= 3 && !joined && !SHORT_NAMES.has(low)) return word;
         return word.charAt(0) + word.slice(1).toLowerCase();
       })

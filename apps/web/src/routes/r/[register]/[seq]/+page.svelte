@@ -95,7 +95,7 @@
   import { choicesOf, finishOf, stateSaid } from './lead.ts';
   import { addedSaid, daySaid, dueSaid, importKeysOnly, keyHeld, keySentence, localDay, rowWords, sentenceOf } from './said.ts';
   import { KEYS_REGISTER } from '$lib/record/keychain.ts';
-  import { linkedCells, linkedState, pointingOrder } from './linked.ts';
+  import { linkedCells, linkedState, pointedLine, pointingOrder } from './linked.ts';
   import {
     aboutOf,
     figureReader,
@@ -1855,7 +1855,8 @@
                 {@const stood = fields ? linkedState(relDecl, fields, clock, r.tone, moneySaid) : { text: null, tone: r.tone }}
                 <!-- AND NOT ITS STATE TWICE, "Doing · Kiln" beside "Doing, due in 10 days", NOR A LINK THIS ROW SAYS ITSELF. -->
                 {@const said = stood.text?.trim().toLowerCase() ?? ''}
-                {@const rest = linkedCells(relDecl, rel.columns, r.cells, fields, (c) => moneyInText(c, homeCurrency())).filter((c) => {
+                {@const line = pointedLine(relDecl, rel.columns, r.cells, fields, (c) => moneyInText(c, homeCurrency()))}
+                {@const rest = (line ? line.rest : linkedCells(relDecl, rel.columns, r.cells, fields, (c) => moneyInText(c, homeCurrency()))).filter((c) => {
                   const w = c.trim().toLowerCase();
                   return !(said !== '' && (w === said || said.startsWith(`${w}, `))) && !ownLinks.has(w);
                 })}
@@ -1864,9 +1865,10 @@
                 <li>
                   <a class="item item-link" href={at(r.href ?? '')}>
                     <span class="item-main">
-                      <span class="item-title" dir="auto">{moneyInText(r.cells[0] || r.key, homeCurrency())}</span>
+                      <span class="item-title" dir="auto">{line ? line.title : moneyInText(r.cells[0] || r.key, homeCurrency())}</span>
                       {#if rest.length > 0}<span class="item-detail">{rest.join(' · ')}</span>{/if}
                     </span>
+                    {#if line?.amount}<span class="item-amount num" data-in={line.amount.startsWith('+') ? '' : undefined}>{line.amount}</span>{/if}
                     {#if tone || stands}
                       <span class="item-when item-stands" data-intent={tone}
                         >{#if tone}<span class="glyph" role={stands ? undefined : 'img'} aria-hidden={stands ? 'true' : undefined} aria-label={stands ? undefined : TONES[tone].label}>{TONES[tone].glyph}</span>{/if}{#if stands}<span
@@ -2726,6 +2728,25 @@
     line-height: 18px;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
+  }
+
+  /* A POINTING LINE'S AMOUNT AT ITS END, as a list's amounts stand (`pointedLine`): in ink with its minus, money in green
+     with its plus. Its own track, so a line with a state as well keeps both. */
+  .item:has(> .item-amount) {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .item-amount {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-align: end;
+  }
+
+  .item-amount[data-in] {
+    color: var(--good);
   }
 
   .item-when {
