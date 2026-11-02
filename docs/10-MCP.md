@@ -117,8 +117,8 @@ Instead:
 | `record_index` | the cheap orientation call: registers, counts and the version | 1 |
 | `context` | the briefing for where the session stands: its project, open work, questions waiting on the person, people, the keys and servers it may use by name, skills and learnings, and everything global | 1 |
 | `schema` / `history` | a register's fields, read before a write; the writes that made one row | 2 |
-| `get` | one row, by the id a person says: `obligations#41`, a prefixed id such as `S42` or `LN7`, or the row id a ref field holds | 1 |
-| `list` | a register plus a `where:` tree, a limit and a cursor | 1 |
+| `get` | one row, by the id a person says: `obligations#41`, a prefixed id such as `S42` or `LN7`, or the row id a ref field holds. A script or an automation by its id or whole title, with dashes, spaces and case read as the id's underscores (`packages/mcp/src/scripts.ts`), with its runs and the rules that start it. A lone search hit answered for a name nothing has opens "Nothing is called X; search found this one:" | 1 |
+| `list` | a register plus a `where:` tree, a limit and a cursor. `scripts` and `automations` (or `rules`), where the record has no list of that name, answer a line each. A register named by one word of one list's name is refused with that list as `try` | 1 |
 | `search` | FTS5 over everything the token can read, with how many matched, and a sentence when fewer came back than that | 1 |
 | `activity` | the record's whole log lately, newest first: each write, the row it touched and who made it, for a session picking up after another | 1 |
 | `governance` | what was proposed, decided and predicted | 1 |
