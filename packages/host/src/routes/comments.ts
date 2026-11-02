@@ -14,6 +14,8 @@ import type { Route } from '../index.ts';
 export const ROUTES: readonly Route[] = [
   { name: 'comments', group: 'READ+', writes: false, what: 'The comments on one row, question or decision you can read, oldest first, with their replies and how each was resolved.',
     takes: { on: 'text' } },
+  { name: 'mentionable', group: 'READ+', writes: false, what: 'The people an @ may name on one row, question or decision you can read: those who may see it, by name. It changes nothing.',
+    takes: { on: 'text' } },
   { name: 'comment', group: 'DATA', writes: true, what: 'Say something about one row, question or decision you can read, or reply under a comment on it, in 280 characters or fewer.' },
   { name: 'resolveComment', group: 'DATA', writes: true, what: 'Resolve a comment as addressed, wont-fix or incorrect, with the reason. Its author, or somebody who may change what it is on.' },
 ];

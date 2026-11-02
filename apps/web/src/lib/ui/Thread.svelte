@@ -26,6 +26,7 @@
     commentWords as words,
     COMMENT_MOST,
     overBy,
+    readMentionable,
     readThread,
     resolveComment,
     sayComment,
@@ -33,6 +34,7 @@
     WAYS,
     type Heard,
     type Line,
+    type Mentionable,
     type Way,
   } from '$lib/record/comments.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -70,10 +72,20 @@
 
   const threads = $derived(heard?.from === 'live' ? threadsOf(heard.lines) : []);
 
-  /* WHO AN "@" OFFERS (`MentionPicker`): the people the page names, less the reader. */
+  /* WHO AN "@" OFFERS (`MentionPicker`): the people the record says may see what the thread is on, less the reader,
+     asked once a box is entered (`readMentionable`), so a name is never offered that the mention would not ring. */
   let newField = $state<HTMLInputElement | null>(null);
   let replyField = $state<HTMLInputElement | null>(null);
-  const mentionable = $derived([...people].filter(([id, name]) => id !== me && name.trim() !== '').map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)));
+  let mentionable = $state<Mentionable[]>([]);
+  let mentionsFor = '';
+  function askMentionable() {
+    const target = on;
+    if (mentionsFor === target) return;
+    mentionsFor = target;
+    void readMentionable(apiBase(), target).then((got) => {
+      if (mentionsFor === target) mentionable = got;
+    });
+  }
   const now = $derived(heard?.from === 'live' ? heard.now : Date.now());
   const over = $derived(overBy(body));
   const replyOver = $derived(overBy(replyText));
@@ -224,7 +236,7 @@
                 <form class="box" onsubmit={(e) => reply(e, c.id)}>
                   <label class="box-label" for="{uid}-reply">{words.replyLabel(who(c.by).name)}</label>
                   <div class="box-line">
-                    <input id="{uid}-reply" class="box-input" type="text" autocomplete="off" bind:value={replyText} bind:this={replyField} />
+                    <input id="{uid}-reply" class="box-input" type="text" autocomplete="off" bind:value={replyText} bind:this={replyField} onfocus={askMentionable} />
                     <MentionPicker field={replyField} people={mentionable} />
                     <Button weight="primary" type="submit" disabled={!replyText.trim() || replyOver > 0 || writing}>{words.addReply}</Button>
                     <Button weight="bare" onclick={() => (replyingTo = null)}>{words.cancel}</Button>
@@ -261,7 +273,7 @@
            "Add a comment" over an empty box said the same thing twice, a line apart (UI pass 20 Oct, W2-A). -->
       <label class="sr-only" for="{uid}-new">{words.addLabel}</label>
       <div class="box-line">
-        <input id="{uid}-new" class="box-input" type="text" autocomplete="off" placeholder={words.addLabel} bind:value={body} bind:this={newField} />
+        <input id="{uid}-new" class="box-input" type="text" autocomplete="off" placeholder={words.addLabel} bind:value={body} bind:this={newField} onfocus={askMentionable} />
         <MentionPicker field={newField} people={mentionable} />
         {#if body.trim()}<Button weight="primary" type="submit" disabled={over > 0 || writing}>{words.add}</Button>{/if}
       </div>

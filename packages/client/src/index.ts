@@ -3247,6 +3247,8 @@ export function createClient(options: ClientOptions) {
        caller cannot see is answered as a thing that is not there. */
     /** Every comment and reply on one thing, oldest first, each comment with how it was resolved. */
     comments: (on: string) => call<Answer<'comments'>>('comments', { on }),
+    /** The people an @ may name on one thing: those who may see it, by name, the caller left out. */
+    mentionable: (on: string) => call<Answer<'mentionable'>>('mentionable', { on }),
     /** Say something about one thing, or reply under a comment on it with `reply_to`, in 280 characters or fewer. */
     comment: (args: { on: string; body: string; reply_to?: string }) => call<Answer<'comment'>>('comment', args as Record<string, unknown>),
     /** Resolve a comment with the reason. Its author may, and so may somebody who may change what it is on. */

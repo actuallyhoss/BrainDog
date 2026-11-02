@@ -64,7 +64,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
-  import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
+  import { COMMENT_MOST, readMentionable, sayComment, type Mentionable } from '$lib/record/comments.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
   import { may as mayOf } from '$lib/record/may.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -345,11 +345,13 @@
   let noteFix = $state('');
   let noteBusy = $state(false);
   let noteField = $state<HTMLInputElement | null>(null);
-  /* WHO AN "@" IN THE NOTE OFFERS (`MentionPicker`): the people on this record, less the reader. */
-  const mentionable = $derived([...names].filter(([id, name]) => id !== me?.person && name.trim() !== '').map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)));
+  /* WHO AN "@" IN THE NOTE OFFERS (`MentionPicker`): the people the record says may see this question, less the reader,
+     asked when the note opens (`readMentionable`), by the check a mention on a question rings by. */
+  let mentionable = $state<Mentionable[]>([]);
 
   async function openNote() {
     note = 'open';
+    void readMentionable(apiBase(), `suggestion:${question.id}`).then((got) => (mentionable = got));
     await tick();
     noteField?.focus();
   }

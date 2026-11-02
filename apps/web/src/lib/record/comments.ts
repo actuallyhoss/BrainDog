@@ -139,3 +139,20 @@ export async function resolveComment(base: string, args: { id: string; as: Way; 
   const out = (await createClient({ base }).resolveComment(args)) as { ok: true } | Failed;
   return out.ok ? { ok: true } : failedOf(out);
 }
+
+/** One person an @ may name: who may see what the thread is on (`mentionable` on the record). */
+export type Mentionable = { id: string; name: string };
+
+/**
+ * WHO AN @ MAY NAME ON ONE THING, asked of the record, which answers the people who may see it by the same check a
+ * mention rings by, so the list never offers a name the record would keep quiet. Empty when it does not answer: an
+ * @ list that offers nobody is safer than one that offers somebody who cannot see the row.
+ */
+export async function readMentionable(base: string, on: string): Promise<Mentionable[]> {
+  try {
+    const out = (await createClient({ base }).mentionable(on)) as { ok: true; value: Mentionable[] } | Failed;
+    return out.ok && Array.isArray(out.value) ? out.value : [];
+  } catch {
+    return [];
+  }
+}

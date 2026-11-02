@@ -83,12 +83,33 @@ export function methods(deps: RecordDeps) {
     return out;
   };
 
+  /**
+   * WHETHER ONE PERSON MAY SEE WHAT A THREAD IS ON, asked as them: their own context, made from what the record says
+   * they hold (`kernel.access`, the lens), as a door would make it, then `sightOf`. The one check the ring on a question
+   * asks and the one the @ list asks (`mentionable`), so the names offered are the names that would be told.
+   */
+  const seenBy = (id: string, target: string): boolean => {
+    const held = kernel.access(id);
+    if (held === null) return false;
+    const theirs: CallContext = {
+      principal: { kind: 'person', id, level: held.level },
+      ...(held.registers === null ? {} : { registers: held.registers }),
+      ...(Object.keys(held.levels).length > 0 ? { levels: held.levels } : {}),
+      ...(held.wheres === undefined ? {} : { wheres: held.wheres }),
+      ...(held.writes === undefined ? {} : { writes: held.writes }),
+      ...(held.hides === undefined ? {} : { hides: held.hides }),
+      ...(held.nots === undefined ? {} : { nots: held.nots }),
+      ...(held.grant === undefined ? {} : { grant: held.grant }),
+    };
+    return sightOf(theirs, target) !== null;
+  };
+
   const ringNamed = (entry: string, list: string, body: string, comment: string, by: string): void => {
     const named = namedIn(body, by);
     if (named.length === 0) return;
     const row = kernel.get(entry);
     if (row === null || typeof row.seq !== 'number') return;
-    for (const id of named) kernel.tellColleague(id, { by, cause: `mention.${comment}.${id}`, open: `/r/${list}/${row.seq}`, about: entry });
+    for (const id of named) if (seenBy(id, `entry:${entry}`)) kernel.tellColleague(id, { by, cause: `mention.${comment}.${id}`, open: `/r/${list}/${row.seq}`, about: entry });
   };
 
   /**
@@ -106,19 +127,7 @@ export function methods(deps: RecordDeps) {
     if (named.length === 0) return;
     const question = target.slice('suggestion:'.length);
     for (const id of named) {
-      const held = kernel.access(id);
-      if (held === null) continue;
-      const theirs: CallContext = {
-        principal: { kind: 'person', id, level: held.level },
-        ...(held.registers === null ? {} : { registers: held.registers }),
-        ...(Object.keys(held.levels).length > 0 ? { levels: held.levels } : {}),
-        ...(held.wheres === undefined ? {} : { wheres: held.wheres }),
-        ...(held.writes === undefined ? {} : { writes: held.writes }),
-        ...(held.hides === undefined ? {} : { hides: held.hides }),
-        ...(held.nots === undefined ? {} : { nots: held.nots }),
-        ...(held.grant === undefined ? {} : { grant: held.grant }),
-      };
-      if (sightOf(theirs, target) === null) continue;
+      if (!seenBy(id, target)) continue;
       kernel.tellColleague(id, { by, cause: `mention.${comment}.${id}`, open: `/decide/${question}/thread` });
     }
   };
@@ -240,6 +249,27 @@ export function methods(deps: RecordDeps) {
         else ringNamedOn(at.target, args.body, written.value.id, actorOf(ctx));
       }
       return tail(written);
+    },
+
+    /**
+     * WHO AN @ MAY NAME ON ONE THING (leftovers 7, 2 Nov): the people with a name here, not suspended and not the caller,
+     * who may see it, asked by `seenBy`, the check a mention rings by. READ+, answered only on a thing the caller sees,
+     * and a thing she may not see is answered as one that is not there. Names and ids only, nothing of what they hold.
+     */
+    async mentionable(args: { on: string }, ctx: CallContext): Promise<Result<{ id: string; name: string }[]>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      const at = targetOf(ctx, args?.on);
+      if (at === null) return no('REF_UNKNOWN', NOTHING, { at: 'on' });
+      const me = ctx.principal.kind === 'person' ? ctx.principal.id : null;
+      const people = sql.all<{ id: string; name: string | null }>('SELECT id, name FROM person WHERE name IS NOT NULL AND suspended_at IS NULL');
+      const out: { id: string; name: string }[] = [];
+      for (const p of people) {
+        const name = (p.name ?? '').trim();
+        if (name === '' || p.id === me) continue;
+        if (seenBy(p.id, at.target)) out.push({ id: p.id, name });
+      }
+      return ok(out.sort((a, b) => a.name.localeCompare(b.name)));
     },
 
     /**

@@ -17,7 +17,7 @@
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { actor, handlesSaid } from '$lib/record/names.ts';
-  import { commentWords, COMMENT_MOST, overBy, readThread, resolveComment, sayComment, threadsOf, WAYS, type Heard, type Line, type Way } from '$lib/record/comments.ts';
+  import { commentWords, COMMENT_MOST, overBy, readMentionable, readThread, resolveComment, sayComment, threadsOf, WAYS, type Heard, type Line, type Mentionable, type Way } from '$lib/record/comments.ts';
   import type { Line as Event } from '$lib/record/history-live.ts';
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
@@ -101,11 +101,21 @@
 
   const who = (by: string) => actor(by, me || null, people);
 
-  /* WHO AN "@" OFFERS: the people on this record by name, the owner and colleagues, less the reader (`MentionPicker`).
-     The page reads the names the first time a box is entered, as it does once somebody else has spoken. */
+  /* WHO AN "@" OFFERS (`MentionPicker`): the people the record says may see this row, less the reader, asked the first
+     time a box is entered (`readMentionable`), by the check a mention rings by, so no name is offered that stays quiet. */
   let newField = $state<HTMLTextAreaElement | null>(null);
   let replyField = $state<HTMLTextAreaElement | null>(null);
-  const mentionable = $derived([...people].filter(([id, name]) => id !== me && name.trim() !== '').map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)));
+  let mentionable = $state<Mentionable[]>([]);
+  let mentionsFor = '';
+  function entered() {
+    onnames?.();
+    const target = on;
+    if (mentionsFor === target) return;
+    mentionsFor = target;
+    void readMentionable(apiBase(), target).then((got) => {
+      if (mentionsFor === target) mentionable = got;
+    });
+  }
 
   /** One write, then the thread again, whose new line is the answer, so a write that lands needs no toast. */
   async function send(write: () => ReturnType<typeof sayComment>): Promise<boolean> {
@@ -181,7 +191,7 @@
 
 <form class="composer" onsubmit={add}>
   <label class="vh" for="{uid}-new">{words.composer}</label>
-  <textarea id="{uid}-new" class="composer-input" rows="1" autocomplete="off" placeholder={words.composer} bind:value={body} bind:this={newField} onfocus={() => onnames?.()} {onkeydown}></textarea>
+  <textarea id="{uid}-new" class="composer-input" rows="1" autocomplete="off" placeholder={words.composer} bind:value={body} bind:this={newField} onfocus={entered} {onkeydown}></textarea>
   <MentionPicker field={newField} people={mentionable} />
   {#if body.trim()}
     <div class="composer-acts">
@@ -240,7 +250,7 @@
             {#if replyingTo === c.id}
               <form class="box" onsubmit={(e) => reply(e, c.id)}>
                 <label class="vh" for="{uid}-reply">{commentWords.replyLabel(who(c.by).name)}</label>
-                <textarea id="{uid}-reply" class="composer-input" rows="1" autocomplete="off" placeholder={commentWords.replyLabel(who(c.by).name)} bind:value={replyText} bind:this={replyField} onfocus={() => onnames?.()}></textarea>
+                <textarea id="{uid}-reply" class="composer-input" rows="1" autocomplete="off" placeholder={commentWords.replyLabel(who(c.by).name)} bind:value={replyText} bind:this={replyField} onfocus={entered}></textarea>
                 <MentionPicker field={replyField} people={mentionable} />
                 {#if replyOver > 0}<p class="over" role="status">{commentWords.tooLong(replyOver)}</p>{/if}
                 <div class="box-acts">
