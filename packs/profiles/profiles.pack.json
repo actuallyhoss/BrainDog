@@ -1,10 +1,10 @@
 {
   "pack": "profiles",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "icon": "people",
   "title": "Profiles",
   "summary": "Each setup your agents run under: the app, the account it signs in as, how it is paid for and the projects it serves, with every machine it is on and whether each copy still matches. Kept for you alone, so nobody you share with sees it.",
-  "changes": "An empty Profiles page says what a profile is and offers Add your first setup, where it said Nothing here yet over an empty At a glance.",
+  "changes": "Profiles opens on one line saying how many profiles there are and how many machines are out of step or near a limit, where a box of two figures said 1 over your limit under Out of step. Paused profiles come after the ones in use, and each limit says it is a share used. A machine says which profile it holds where it is the only one of that profile, in place of its folder.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -255,15 +255,11 @@
           "when": { "metric": "profiles-held", "is": 0 }
         },
         {
-          "kind": "stat",
-          "heading": "At a glance",
-          "icon": "gauge",
+          "kind": "note",
+          "lead": true,
           "span": 12,
           "when": { "metric": "profiles-held", "gt": 0 },
-          "cells": [
-            { "metric": "profiles-out-of-step", "label": "Out of step" },
-            { "metric": "profiles-near-limit", "label": "Near a limit" }
-          ]
+          "body": "{{profiles-held}} profile(s), {{profiles-out-of-step}} machine(s) out of step, {{profiles-near-limit}} near a limit"
         },
         {
           "kind": "cards",
@@ -276,11 +272,11 @@
             { "field": "name", "as": "title" },
             { "field": "app", "label": "App", "as": "fact" },
             { "field": "who", "label": "Signs in as", "as": "fact" },
-            { "field": "five_hour_pct", "label": "5 hour limit used", "as": "fact" },
-            { "field": "seven_day_pct", "label": "7 day limit used", "as": "ring" },
+            { "field": "five_hour_pct", "label": "5 hours, % used", "as": "fact" },
+            { "field": "seven_day_pct", "label": "7 days, % used", "as": "ring" },
             { "field": "resets_at", "label": "Resets", "as": "when" }
           ],
-          "order": [{ "field": "name", "dir": "asc" }],
+          "order": [{ "field": "state", "dir": "asc" }, { "field": "name", "dir": "asc" }],
           "empty": "No profiles yet. Add one for each app and account your agents run under."
         },
         {
@@ -293,8 +289,8 @@
           "group": "copy_of",
           "columns": [
             { "field": "host", "as": "title" },
+            { "field": "copy_of", "label": "Profile", "as": "fact" },
             { "field": "drift", "label": "Out of step", "as": "fact" },
-            { "field": "dir", "label": "Folder", "as": "fact" },
             { "field": "last_applied", "label": "Last applied", "as": "fact" },
             { "field": "heard", "label": "Last heard", "as": "when" }
           ],

@@ -4817,8 +4817,59 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.3.0",
+      "latest": "1.4.0",
       "versions": [
+        {
+          "version": "1.4.0",
+          "checksum": "ea4e67e199d74ead0068051d4368c0f4cf95ce61f2b4acaa809be750bab768f7",
+          "bytes": 13209,
+          "published_at": "2026-11-02T17:44:10.575Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "agents",
+              "people"
+            ],
+            "lists": [
+              "Profiles",
+              "Places"
+            ],
+            "pages": [
+              "Profiles"
+            ],
+            "rules": [
+              "Ask about a machine whose profile has been out of step for two days",
+              "Mark a machine not heard from in fourteen days"
+            ],
+            "examples": 2,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.credentials",
+                "writes": true
+              },
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.tools",
+                "writes": true
+              },
+              {
+                "id": "register.skills",
+                "writes": true
+              },
+              {
+                "id": "page.agents",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "Profiles opens on one line saying how many profiles there are and how many machines are out of step or near a limit, where a box of two figures said 1 over your limit under Out of step. Paused profiles come after the ones in use, and each limit says it is a share used. A machine says which profile it holds where it is the only one of that profile, in place of its folder.",
+          "preview": true
+        },
         {
           "version": "1.3.0",
           "checksum": "93da16daa76128b52b56da525b7142f292758c307dcf2fdcefb43e2cf8dc7265",

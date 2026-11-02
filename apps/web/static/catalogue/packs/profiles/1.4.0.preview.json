@@ -1,0 +1,369 @@
+{
+  "format": 1,
+  "made_at": "2026-11-02T17:44:10.575Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "A profile is one setup your agents run under: the app, the account it signs in as, and the machines it is on.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "is": 0,
+            "metric": "profiles-held"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add your first setup",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "profiles",
+          "span": 12,
+          "when": {
+            "is": 0,
+            "metric": "profiles-held"
+          },
+          "key": "k07g4tbq",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "{{profiles-held}} profile(s), {{profiles-out-of-step}} machine(s) out of step, {{profiles-near-limit}} near a limit",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "profiles-held"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "profiles-held": 4,
+            "profiles-out-of-step": 0,
+            "profiles-near-limit": 0
+          },
+          "read_as": {
+            "profiles-held": "figure",
+            "profiles-out-of-step": "figure",
+            "profiles-near-limit": "figure"
+          },
+          "figures": {
+            "profiles-held": {
+              "name": "Profiles kept",
+              "source": "register.profiles",
+              "where": "state is not retired",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "profiles-out-of-step": {
+              "name": "Profiles out of step",
+              "source": "register.profile_places",
+              "where": "state is not retired, drift is set",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            },
+            "profiles-near-limit": {
+              "name": "Profiles near a limit",
+              "source": "register.profiles",
+              "where": "state is not retired, seven_day_pct more than 79",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            }
+          }
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "fact",
+              "field": "app",
+              "label": "App"
+            },
+            {
+              "as": "fact",
+              "field": "who",
+              "label": "Signs in as"
+            },
+            {
+              "as": "fact",
+              "field": "five_hour_pct",
+              "label": "5 hours, % used"
+            },
+            {
+              "as": "ring",
+              "field": "seven_day_pct",
+              "label": "7 days, % used"
+            },
+            {
+              "as": "when",
+              "field": "resets_at",
+              "label": "Resets"
+            }
+          ],
+          "empty": "No profiles yet. Add one for each app and account your agents run under.",
+          "heading": "Profiles",
+          "icon": "bot",
+          "kind": "cards",
+          "order": [
+            {
+              "dir": "asc",
+              "field": "state"
+            },
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.profiles",
+          "span": 12,
+          "where": "state is not retired",
+          "key": "k0xqh3ub",
+          "rows": [
+            {
+              "id": "01M6ENS32F2F47GK3TFQX8JJKY",
+              "register": "profiles",
+              "seq": 1,
+              "fields": {
+                "name": "Everyday",
+                "app": "claude_code",
+                "who": "my own account",
+                "paid_by": "subscription",
+                "rules": "Keep answers short. Ask before deleting anything.",
+                "state": "active",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "active",
+              "version": 1,
+              "created_at": "2026-11-02T17:44:10.575Z",
+              "updated_at": "2026-11-02T17:44:10.575Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ENS32F2F47GK3TG0HY04GG",
+              "register": "profiles",
+              "seq": 4,
+              "fields": {
+                "name": "Side projects",
+                "app": "codex",
+                "paid_by": "subscription",
+                "state": "active",
+                "five_hour_pct": 12,
+                "seven_day_pct": 30
+              },
+              "state": "active",
+              "version": 1,
+              "created_at": "2026-11-02T17:44:10.575Z",
+              "updated_at": "2026-11-02T17:44:10.575Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ENS32F2F47GK3TFYPX550Q",
+              "register": "profiles",
+              "seq": 3,
+              "fields": {
+                "name": "Studio Claude",
+                "app": "claude_code",
+                "paid_by": "subscription",
+                "state": "active",
+                "five_hour_pct": 40,
+                "seven_day_pct": 62
+              },
+              "state": "active",
+              "version": 1,
+              "created_at": "2026-11-02T17:44:10.575Z",
+              "updated_at": "2026-11-02T17:44:10.575Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6ENS32F2F47GK3TFTGPEJMA",
+              "register": "profiles",
+              "seq": 2,
+              "fields": {
+                "name": "Second account",
+                "app": "codex",
+                "who": "a second account",
+                "paid_by": "key",
+                "state": "paused",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "paused",
+              "version": 1,
+              "created_at": "2026-11-02T17:44:10.575Z",
+              "updated_at": "2026-11-02T17:44:10.575Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 4,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "host"
+            },
+            {
+              "as": "fact",
+              "field": "copy_of",
+              "label": "Profile"
+            },
+            {
+              "as": "fact",
+              "field": "drift",
+              "label": "Out of step"
+            },
+            {
+              "as": "fact",
+              "field": "last_applied",
+              "label": "Last applied"
+            },
+            {
+              "as": "when",
+              "field": "heard",
+              "label": "Last heard"
+            }
+          ],
+          "empty": "No machine has set up a profile yet. Each machine adds itself here when it applies one.",
+          "group": "copy_of",
+          "heading": "Where each one is set up",
+          "icon": "laptop",
+          "kind": "cards",
+          "order": [
+            {
+              "dir": "asc",
+              "field": "host"
+            }
+          ],
+          "source": "register.profile_places",
+          "span": 12,
+          "where": "state is not retired",
+          "key": "k1agkk94",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fold": 3,
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "as": "who",
+              "field": "agent"
+            },
+            {
+              "as": "reply",
+              "field": "doing_said"
+            },
+            {
+              "as": "fact",
+              "field": "seat",
+              "label": "Profile"
+            },
+            {
+              "as": "fact",
+              "field": "host",
+              "label": "Machine"
+            },
+            {
+              "as": "scope",
+              "field": "project"
+            },
+            {
+              "as": "when",
+              "field": "last_seen"
+            }
+          ],
+          "empty": "No agent has run under a profile in the last day.",
+          "heading": "Runs under each profile",
+          "icon": "session",
+          "kind": "cards",
+          "limit": 24,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "state"
+            },
+            {
+              "dir": "desc",
+              "field": "last_seen"
+            }
+          ],
+          "source": "register.session",
+          "span": 12,
+          "when": {
+            "reader": "owner"
+          },
+          "where": "seat is set, last_seen after -1d",
+          "key": "k1g8cac3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "scopes": [],
+          "scope_marks": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "bot",
+      "nav": {
+        "order": 50,
+        "section": "Agents"
+      },
+      "page": "profiles",
+      "requires": [
+        "register.profiles",
+        "register.profile_places",
+        "register.session"
+      ],
+      "title": "Profiles",
+      "read_at": "2026-11-02T17:44:10.575Z",
+      "zone": "UTC",
+      "look": {
+        "look": "profiles",
+        "basis": "r0r9fzgu",
+        "by": "rule",
+        "hide": [
+          "k1agkk94",
+          "k1g8cac3"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

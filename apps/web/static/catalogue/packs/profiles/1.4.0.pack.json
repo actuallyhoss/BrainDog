@@ -1,0 +1,346 @@
+{
+  "pack": "profiles",
+  "version": "1.4.0",
+  "icon": "people",
+  "title": "Profiles",
+  "summary": "Each setup your agents run under: the app, the account it signs in as, how it is paid for and the projects it serves, with every machine it is on and whether each copy still matches. Kept for you alone, so nobody you share with sees it.",
+  "changes": "Profiles opens on one line saying how many profiles there are and how many machines are out of step or near a limit, where a box of two figures said 1 over your limit under Out of step. Paused profiles come after the ones in use, and each limit says it is a share used. A machine says which profile it holds where it is the only one of that profile, in place of its folder.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "agents": "^1.13.0",
+      "people": ">=3.3.0 <5.0.0"
+    }
+  },
+  "extends": {
+    "register.tools": {
+      "fields": [
+        { "id": "profiles", "label": "Profiles", "type": "list", "of": "ref", "to": "profiles" },
+        { "id": "belongs_to", "label": "Belongs to", "type": "ref", "to": "people" }
+      ],
+      "values": {
+        "kind": ["plugin"]
+      },
+      "labels": {
+        "kind": {
+          "plugin": "Plugin"
+        }
+      }
+    },
+    "register.skills": {
+      "fields": [
+        { "id": "profiles", "label": "Profiles", "type": "list", "of": "ref", "to": "profiles" }
+      ]
+    },
+    "register.credentials": {
+      "fields": [
+        { "id": "belongs_to", "label": "Belongs to", "type": "ref", "to": "people" }
+      ]
+    }
+  },
+  "adds": [
+    {
+      "page": "page.agents",
+      "after": "Needs a look",
+      "note": "A line in Needs a look while a machine is out of step with its profile, for the owner alone, with the way to the Profiles page.",
+      "block": {
+        "kind": "note",
+        "tone": "warn",
+        "span": 12,
+        "when": { "all": [{ "metric": "profiles-out-of-step", "gt": 0 }, { "reader": "owner" }] },
+        "body": "Profiles out of step: {{profiles-out-of-step}}. [See where](/p/profiles)"
+      }
+    },
+    {
+      "page": "page.agents",
+      "note": "His profiles at the foot of the page, folded shut and for the owner alone, since the lists are his and nobody else's.",
+      "block": { "kind": "section", "heading": "Profiles", "icon": "bot", "span": 12, "fold": true, "when": { "reader": "owner" } }
+    },
+    {
+      "page": "page.agents",
+      "note": "Each profile in use: the app, what it signs in as and the projects it serves.",
+      "block": {
+        "kind": "cards",
+        "span": 12,
+        "source": "register.profiles",
+        "where": "state is active",
+        "columns": [
+          { "field": "name", "as": "title" },
+          { "field": "app", "label": "App", "as": "fact" },
+          { "field": "who", "label": "Signs in as", "as": "fact" },
+          { "field": "serves", "label": "Projects", "as": "fact" }
+        ],
+        "order": [{ "field": "name", "dir": "asc" }],
+        "limit": 12,
+        "when": { "reader": "owner" },
+        "empty": "No profile is in use yet."
+      }
+    },
+    {
+      "page": "page.agents",
+      "note": "The way to every machine each profile is on, and what no longer matches there.",
+      "block": { "kind": "note", "span": 12, "when": { "reader": "owner" }, "body": "[Where each one is set up](/p/profiles)" }
+    }
+  ],
+  "declarations": [
+    {
+      "register": "profiles",
+      "name": "Profiles",
+      "one": "profile",
+      "icon": "bot",
+      "holds": "each setup your agents run under: the app, the account it signs in as, how it is paid for and the projects it serves",
+      "title": "name",
+      "role": "profiles",
+      "personal": true,
+      "state": "state",
+      "done": ["retired"],
+      "mobile": ["name", "app", "who"],
+      "fields": [
+        { "id": "name", "label": "Name", "type": "text", "required": true, "max": 64, "search": true },
+        {
+          "id": "app",
+          "label": "App",
+          "type": "enum",
+          "values": ["claude_code", "codex", "cursor"],
+          "labels": { "claude_code": "Claude Code", "codex": "Codex", "cursor": "Cursor" },
+          "default": "claude_code",
+          "required": true,
+          "index": true
+        },
+        { "id": "who", "label": "Signs in as", "type": "text", "max": 120 },
+        {
+          "id": "paid_by",
+          "label": "Billing",
+          "type": "enum",
+          "values": ["subscription", "key"],
+          "labels": { "subscription": "Subscription", "key": "API key" },
+          "default": "subscription",
+          "required": true
+        },
+        { "id": "key", "label": "API key", "type": "ref", "to": "credentials" },
+        { "id": "serves", "label": "Projects", "type": "list", "of": "ref", "to": "things" },
+        { "id": "rules", "label": "Rules", "type": "document" },
+        { "id": "overlay", "label": "Settings", "type": "json" },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": ["active", "paused", "retired"],
+          "labels": { "active": "Active", "paused": "Paused", "retired": "Retired" },
+          "default": "active",
+          "required": true,
+          "index": true
+        },
+        { "id": "five_hour_pct", "label": "5 hour limit used", "type": "int", "min": 0, "max": 100 },
+        { "id": "seven_day_pct", "label": "7 day limit used", "type": "int", "min": 0, "max": 100, "index": true },
+        { "id": "resets_at", "label": "Limit resets", "type": "instant" },
+        { "id": "beat_at", "label": "Limits last sent", "type": "instant" },
+        { "id": "tags", "type": "list", "of": "text" }
+      ]
+    },
+    {
+      "register": "profile_places",
+      "name": "Places",
+      "one": "place",
+      "icon": "laptop",
+      "holds": "every machine each profile is set up on, written by that machine: what it holds and what no longer matches",
+      "title": "host",
+      "personal": true,
+      "state": "state",
+      "done": ["retired"],
+      "mobile": ["host", "copy_of", "drift"],
+      "fields": [
+        { "id": "copy_of", "label": "Profile", "type": "ref", "to": "profiles", "required": true, "index": true },
+        { "id": "host", "label": "Machine", "type": "text", "required": true, "max": 120, "search": true },
+        { "id": "dir", "label": "Folder", "type": "text", "max": 512 },
+        { "id": "build", "label": "Command line build", "type": "text", "max": 64 },
+        { "id": "hooks", "label": "Hooks present", "type": "bool" },
+        { "id": "last_applied", "label": "Last applied", "type": "instant" },
+        { "id": "drift", "label": "Out of step", "type": "list", "of": "text" },
+        { "id": "since", "label": "Out of step since", "type": "day", "index": true },
+        { "id": "rules_hash", "label": "Rules file hash", "type": "text", "max": 128 },
+        { "id": "heard", "label": "Last heard", "type": "instant", "index": true },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": ["live", "stale", "retired"],
+          "labels": { "live": "Live", "stale": "Not heard from", "retired": "Retired" },
+          "default": "live",
+          "required": true,
+          "index": true
+        },
+        { "id": "tags", "type": "list", "of": "text" }
+      ]
+    },
+    {
+      "metric": "profiles-out-of-step",
+      "name": "Profiles out of step",
+      "source": "register.profile_places",
+      "where": "state is not retired, drift is set",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "profiles-near-limit",
+      "name": "Profiles near a limit",
+      "source": "register.profiles",
+      "where": "state is not retired, seven_day_pct more than 79",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "profiles-held",
+      "name": "Profiles kept",
+      "source": "register.profiles",
+      "where": "state is not retired",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "rule": "profile-drifted",
+      "name": "Ask about a machine whose profile has been out of step for two days",
+      "register": "profile_places",
+      "when": "state is live, drift is set, since before yesterday",
+      "then": [
+        {
+          "suggest": {
+            "question": "{{host}} has been out of step with its profile for two days. Apply the profile there again?",
+            "options": ["Apply it", "Leave it"]
+          }
+        }
+      ],
+      "once_per": ["entry", "since"]
+    },
+    {
+      "rule": "place-quiet",
+      "name": "Mark a machine not heard from in fourteen days",
+      "register": "profile_places",
+      "when": "state is live, heard before -14d",
+      "then": [{ "move": "stale" }],
+      "once_per": ["entry", "heard"]
+    },
+    {
+      "page": "profiles",
+      "title": "Profiles",
+      "nav": { "section": "Agents", "order": 50 },
+      "icon": "bot",
+      "requires": ["register.profiles", "register.profile_places", "register.session"],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "profiles-held", "is": 0 },
+          "body": "A profile is one setup your agents run under: the app, the account it signs in as, and the machines it is on."
+        },
+        {
+          "kind": "capture",
+          "heading": "Add your first setup",
+          "icon": "plus",
+          "span": 12,
+          "register": "profiles",
+          "when": { "metric": "profiles-held", "is": 0 }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "profiles-held", "gt": 0 },
+          "body": "{{profiles-held}} profile(s), {{profiles-out-of-step}} machine(s) out of step, {{profiles-near-limit}} near a limit"
+        },
+        {
+          "kind": "cards",
+          "heading": "Profiles",
+          "icon": "bot",
+          "span": 12,
+          "source": "register.profiles",
+          "where": "state is not retired",
+          "columns": [
+            { "field": "name", "as": "title" },
+            { "field": "app", "label": "App", "as": "fact" },
+            { "field": "who", "label": "Signs in as", "as": "fact" },
+            { "field": "five_hour_pct", "label": "5 hours, % used", "as": "fact" },
+            { "field": "seven_day_pct", "label": "7 days, % used", "as": "ring" },
+            { "field": "resets_at", "label": "Resets", "as": "when" }
+          ],
+          "order": [{ "field": "state", "dir": "asc" }, { "field": "name", "dir": "asc" }],
+          "empty": "No profiles yet. Add one for each app and account your agents run under."
+        },
+        {
+          "kind": "cards",
+          "heading": "Where each one is set up",
+          "icon": "laptop",
+          "span": 12,
+          "source": "register.profile_places",
+          "where": "state is not retired",
+          "group": "copy_of",
+          "columns": [
+            { "field": "host", "as": "title" },
+            { "field": "copy_of", "label": "Profile", "as": "fact" },
+            { "field": "drift", "label": "Out of step", "as": "fact" },
+            { "field": "last_applied", "label": "Last applied", "as": "fact" },
+            { "field": "heard", "label": "Last heard", "as": "when" }
+          ],
+          "order": [{ "field": "host", "dir": "asc" }],
+          "empty": "No machine has set up a profile yet. Each machine adds itself here when it applies one."
+        },
+        {
+          "kind": "cards",
+          "heading": "Runs under each profile",
+          "icon": "session",
+          "span": 12,
+          "source": "register.session",
+          "where": "seat is set, last_seen after -1d",
+          "columns": [
+            { "field": "agent", "as": "who" },
+            { "field": "doing_said", "as": "reply" },
+            { "field": "seat", "label": "Profile", "as": "fact" },
+            { "field": "host", "label": "Machine", "as": "fact" },
+            { "field": "project", "as": "scope" },
+            { "field": "last_seen", "as": "when" }
+          ],
+          "order": [{ "field": "state", "dir": "asc" }, { "field": "last_seen", "dir": "desc" }],
+          "limit": 24,
+          "when": { "reader": "owner" },
+          "empty": "No agent has run under a profile in the last day."
+        }
+      ]
+    }
+  ],
+  "seeds": [
+    {
+      "register": "profiles",
+      "fields": {
+        "name": "Everyday",
+        "app": "claude_code",
+        "who": "my own account",
+        "paid_by": "subscription",
+        "rules": "Keep answers short. Ask before deleting anything.",
+        "state": "active"
+      }
+    },
+    {
+      "register": "profiles",
+      "fields": {
+        "name": "Second account",
+        "app": "codex",
+        "who": "a second account",
+        "paid_by": "key",
+        "state": "paused"
+      }
+    }
+  ]
+}
