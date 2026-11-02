@@ -1,0 +1,1314 @@
+{
+  "usecase": "personal",
+  "version": "2.11.0",
+  "title": "Personal",
+  "summary": "Your money, bills, savings and goals.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "individual",
+  "tone": "warm and plain",
+  "signals": [
+    "personal",
+    "my life",
+    "life admin",
+    "my money",
+    "money",
+    "personal finance",
+    "finances",
+    "budget",
+    "budgets",
+    "budgeting",
+    "spending",
+    "savings",
+    "saving up",
+    "save up",
+    "savings goal",
+    "bills",
+    "rent",
+    "payday",
+    "pay day",
+    "debt",
+    "household",
+    "groceries",
+    "under control",
+    "side project",
+    "side projects",
+    "passion project",
+    "passion projects",
+    "hobby",
+    "hobbies",
+    "habit",
+    "habits",
+    "goals",
+    "my goals",
+    "running",
+    "gym",
+    "fitness",
+    "marathon",
+    "training for",
+    "diet",
+    "reading more",
+    "family"
+  ],
+  "modules": [
+    "portfolio",
+    "people",
+    "money-core"
+  ],
+  "needs": [
+    "people",
+    "money-core"
+  ],
+  "voice": {
+    "home": "Day to day",
+    "right_now": "This month",
+    "needs_you": "Worth a look",
+    "nothing_needs_you": "Nothing needs you right now",
+    "since_away": "Since you last looked",
+    "lists": "My things",
+    "overdue": "Running late",
+    "nothing_now": "Nothing needs you right now. Enjoy your day.",
+    "nothing_due": "No bill or plan falls due in the next two weeks.",
+    "fills_with": "Bills coming up, what you are saving toward and what changed since you last looked show up here as your lists fill.",
+    "record_empty": "Nothing here yet",
+    "no_questions": "Nothing to decide",
+    "inbox_clear": "Nothing new has come in",
+    "add_first": "Add the first one"
+  },
+  "labels": {
+    "obligations": "Bills",
+    "obligations:one": "bill",
+    "obligations:holds": "your bills, subscriptions and pay days, each with a date and how often it comes round",
+    "obligations.category.premises": "Home",
+    "obligations.category.contractors": "Transport",
+    "obligations.category.production": "Food",
+    "obligations.category.software": "Subscriptions",
+    "obligations.category.professional": "Health",
+    "obligations.category.events": "Fun",
+    "obligations.category.client_work": "Pay",
+    "obligations.category.licensing": "Other income",
+    "things": "Projects",
+    "things:one": "project",
+    "things:holds": "the things you make and do for the love of it, and how each one is going",
+    "things.lane.building": "Active",
+    "things.lane.earning": "Ongoing",
+    "things.lane.parked": "On hold",
+    "things.lane.retired": "Finished",
+    "things.revenue": "Money made",
+    "people:holds": "the people in your life worth keeping track of: family, friends, a landlord, a plumber",
+    "people.role.client": "Work contact",
+    "people.role.contractor": "Hired help",
+    "people.role.accountant": "Tax and accounts",
+    "people.role.collaborator": "Project partner",
+    "savings_goals": "Savings goals",
+    "goals": "Goals",
+    "goal_log": "Progress",
+    "put_by": "Money saved",
+    "project_steps": "Project steps"
+  },
+  "pack": {
+    "pack": "usecase-personal",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "extends": {
+      "register.people": {
+        "values": {
+          "role": [
+            "family",
+            "friend",
+            "landlord",
+            "tradesperson",
+            "adviser"
+          ]
+        }
+      }
+    },
+    "hands": {
+      "metric.budgets-set": "money-core"
+    },
+    "declarations": [
+      {
+        "register": "savings_goals",
+        "name": "Savings goals",
+        "one": "savings goal",
+        "icon": "star",
+        "holds": "what you are saving for, how much it takes and how much is saved",
+        "title": "name",
+        "mobile": [
+          "name",
+          "target",
+          "by"
+        ],
+        "state": "state",
+        "done": [
+          "reached"
+        ],
+        "fields": [
+          {
+            "id": "name",
+            "label": "Saving for",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "target",
+            "label": "Target",
+            "type": "money",
+            "required": true
+          },
+          {
+            "id": "saved",
+            "label": "Saved before logging",
+            "type": "money"
+          },
+          {
+            "id": "by",
+            "label": "By",
+            "type": "day",
+            "index": true
+          },
+          {
+            "id": "account",
+            "label": "Kept in",
+            "type": "ref",
+            "to": "accounts",
+            "index": true
+          },
+          {
+            "id": "state",
+            "label": "Status",
+            "type": "enum",
+            "values": [
+              "saving",
+              "paused",
+              "reached"
+            ],
+            "labels": {
+              "saving": "Saving",
+              "paused": "Paused",
+              "reached": "Reached"
+            },
+            "default": "saving",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "goals",
+        "name": "Goals",
+        "one": "goal",
+        "icon": "check",
+        "holds": "the goals and habits you keep, what you aim for and how far you have got",
+        "title": "what",
+        "mobile": [
+          "what",
+          "kind",
+          "target"
+        ],
+        "state": "state",
+        "done": [
+          "done"
+        ],
+        "fields": [
+          {
+            "id": "what",
+            "label": "Goal",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "kind",
+            "label": "Kind",
+            "type": "enum",
+            "values": [
+              "habit",
+              "goal"
+            ],
+            "labels": {
+              "habit": "Habit",
+              "goal": "Goal"
+            },
+            "default": "goal",
+            "index": true
+          },
+          {
+            "id": "done",
+            "label": "Done before logging",
+            "type": "decimal"
+          },
+          {
+            "id": "target",
+            "label": "Aim",
+            "type": "decimal",
+            "required": true
+          },
+          {
+            "id": "unit",
+            "label": "Counted in",
+            "type": "text"
+          },
+          {
+            "id": "by",
+            "label": "By",
+            "type": "day",
+            "index": true
+          },
+          {
+            "id": "state",
+            "label": "Status",
+            "type": "enum",
+            "values": [
+              "active",
+              "paused",
+              "done"
+            ],
+            "labels": {
+              "active": "Active",
+              "paused": "Paused",
+              "done": "Done"
+            },
+            "default": "active",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "goal_log",
+        "name": "Progress",
+        "one": "progress entry",
+        "icon": "check",
+        "holds": "each run, book or night in that counts toward a habit or a goal, and how much",
+        "title": "what",
+        "mobile": [
+          "what",
+          "goal",
+          "on"
+        ],
+        "fields": [
+          {
+            "id": "what",
+            "label": "What",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "goal",
+            "label": "Counts toward",
+            "type": "ref",
+            "to": "goals",
+            "index": true
+          },
+          {
+            "id": "amount",
+            "label": "How much",
+            "type": "decimal",
+            "required": true,
+            "default": 1
+          },
+          {
+            "id": "on",
+            "label": "Day",
+            "type": "day",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "text"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "put_by",
+        "name": "Money saved",
+        "one": "saving",
+        "icon": "money",
+        "holds": "each amount set aside toward a savings goal, and when",
+        "title": "what",
+        "mobile": [
+          "what",
+          "amount",
+          "on"
+        ],
+        "fields": [
+          {
+            "id": "what",
+            "label": "What",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "saving",
+            "label": "Toward",
+            "type": "ref",
+            "to": "savings_goals",
+            "index": true
+          },
+          {
+            "id": "amount",
+            "label": "Amount",
+            "type": "money",
+            "required": true
+          },
+          {
+            "id": "on",
+            "label": "Day",
+            "type": "day",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "text"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "project_steps",
+        "name": "Project steps",
+        "one": "project step",
+        "icon": "task",
+        "holds": "the steps each project takes, and which are done",
+        "title": "what",
+        "steps": {
+          "of": "thing",
+          "done": "done"
+        },
+        "mobile": [
+          "what",
+          "thing",
+          "done"
+        ],
+        "fields": [
+          {
+            "id": "what",
+            "label": "Step",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "thing",
+            "label": "Project",
+            "type": "ref",
+            "to": "things",
+            "index": true
+          },
+          {
+            "id": "done",
+            "label": "Done",
+            "type": "bool",
+            "default": false,
+            "index": true
+          },
+          {
+            "id": "by",
+            "label": "By",
+            "type": "day",
+            "index": true
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "text"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "metric": "logged-this-week-by-goal",
+        "name": "Logged this week, by goal",
+        "source": "register.goal_log",
+        "where": {
+          "field": "on",
+          "gte": "bow"
+        },
+        "value": {
+          "sum": "amount"
+        },
+        "group_by": "goal",
+        "format": "decimal",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "logged-by-goal",
+        "name": "Logged, by goal",
+        "source": "register.goal_log",
+        "value": {
+          "sum": "amount"
+        },
+        "group_by": "goal",
+        "format": "decimal",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "put-by-by-goal",
+        "name": "Saved, by savings goal",
+        "source": "register.put_by",
+        "value": {
+          "sum": "amount"
+        },
+        "group_by": "saving",
+        "format": "money",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "saved-toward-goals",
+        "name": "Saved toward goals",
+        "source": "register.put_by",
+        "value": {
+          "sum": "amount"
+        },
+        "format": "money",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "savings-active",
+        "name": "Savings goals on the go",
+        "source": "register.savings_goals",
+        "where": "state is not paused",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "goals-active",
+        "name": "Goals on the go",
+        "source": "register.goals",
+        "where": "state is active, kind is goal",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "habits-active",
+        "name": "Habits on the go",
+        "source": "register.goals",
+        "where": "state is active, kind is habit",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "savings-held",
+        "name": "Savings goals kept",
+        "source": "register.savings_goals",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "goals-held",
+        "name": "Goals and habits",
+        "source": "register.goals",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "goal-log-held",
+        "name": "Logged",
+        "source": "register.goal_log",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "put-by-held",
+        "name": "Money saved",
+        "source": "register.put_by",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "steps-left",
+        "name": "Steps left on a project",
+        "source": "register.project_steps",
+        "where": "thing is {{it}}, done is false",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "steps-done",
+        "name": "Steps done on a project",
+        "source": "register.project_steps",
+        "where": "thing is {{it}}, done is true",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "page": "home-personal",
+        "title": "Day to day",
+        "icon": "home",
+        "requires": [
+          "register.accounts",
+          "register.categories",
+          "register.things",
+          "register.project_steps",
+          "register.goals",
+          "register.goal_log",
+          "register.savings_goals"
+        ],
+        "blocks": [
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "body": "{{cash-now}} in my accounts, {{arriving-30d}} coming in and {{leaving-30d}} going out in the next 30 days"
+          },
+          {
+            "kind": "queue",
+            "heading": "{{config:voice_needs_you}}",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "limit": 5,
+            "when": {
+              "metric": "questions-open",
+              "gt": 0
+            },
+            "empty": "{{config:voice_nothing_needs_you}}"
+          },
+          {
+            "kind": "link",
+            "heading": "Bring your money in",
+            "icon": "plug",
+            "span": 12,
+            "when": {
+              "metric": "cash-accounts",
+              "lt": 1
+            },
+            "authored": [
+              {
+                "cells": [
+                  "Add an account",
+                  "/r/accounts?new=1",
+                  "What is in it today, and every figure on Home starts from it"
+                ]
+              },
+              {
+                "cells": [
+                  "Forward a bank message",
+                  "/settings/ingest",
+                  "What you spent files itself from the texts your bank sends"
+                ]
+              },
+              {
+                "cells": [
+                  "Find an add-on for your bank",
+                  "/packs/browse?q=money",
+                  "Balances and payments arrive on their own"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "capture",
+            "heading": "Name something you are saving for",
+            "icon": "piggy-bank",
+            "span": 12,
+            "register": "savings_goals",
+            "when": {
+              "metric": "savings-held",
+              "lt": 1
+            }
+          },
+          {
+            "kind": "capture",
+            "heading": "Name something you are making",
+            "icon": "rocket",
+            "span": 12,
+            "register": "things",
+            "where": "lane is building",
+            "when": {
+              "metric": "projects-live",
+              "lt": 1
+            }
+          },
+          {
+            "kind": "timeline",
+            "heading": "Coming up",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "deadlines",
+            "horizon": 14,
+            "columns": [
+              {
+                "field": "day"
+              },
+              {
+                "field": "title"
+              },
+              {
+                "field": "amount",
+                "sign": {
+                  "field": "direction",
+                  "minus": "out"
+                }
+              }
+            ],
+            "limit": 12,
+            "empty": "Nothing falls due in the next two weeks."
+          },
+          {
+            "kind": "progress",
+            "heading": "Budget left",
+            "icon": "wallet",
+            "span": 12,
+            "when": {
+              "metric": "budgets-set",
+              "gt": 0
+            },
+            "source": "register.categories",
+            "where": "state is live, direction is out, budget is set",
+            "columns": [
+              {
+                "field": "name"
+              },
+              {
+                "field": "budget"
+              }
+            ],
+            "spent": "spent-by-category-month",
+            "order": [
+              {
+                "field": "seq",
+                "dir": "asc"
+              }
+            ],
+            "limit": 10,
+            "empty": "No budget yet. Give a category the most you mean to spend on it in a month, and what is left shows here."
+          },
+          {
+            "kind": "cards",
+            "heading": "My projects",
+            "icon": "rocket",
+            "span": 12,
+            "source": "register.things",
+            "where": "lane is building or earning",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "lane",
+                "label": "Status",
+                "as": "fact"
+              },
+              {
+                "field": "what",
+                "label": "Next",
+                "as": "next"
+              }
+            ],
+            "order": [
+              {
+                "field": "seq",
+                "dir": "asc"
+              }
+            ],
+            "limit": 6,
+            "when": {
+              "metric": "projects-live",
+              "gt": 0
+            },
+            "empty": "No projects on the go. Add one you make or do for the love of it, and its next step shows here."
+          },
+          {
+            "kind": "progress",
+            "heading": "Goals",
+            "icon": "goal",
+            "span": 12,
+            "when": {
+              "metric": "goals-active",
+              "gt": 0
+            },
+            "source": "register.goals",
+            "where": "state is active, kind is goal",
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "target"
+              },
+              {
+                "field": "unit"
+              }
+            ],
+            "toward": "logged-by-goal",
+            "order": [
+              {
+                "field": "seq",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "No goals yet. Add one, like running a hundred kilometres, and log each step toward it."
+          },
+          {
+            "kind": "progress",
+            "heading": "Habits this week",
+            "icon": "repeat",
+            "span": 12,
+            "when": {
+              "metric": "habits-active",
+              "gt": 0
+            },
+            "source": "register.goals",
+            "where": "state is active, kind is habit",
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "target"
+              },
+              {
+                "field": "unit"
+              }
+            ],
+            "toward": "logged-this-week-by-goal",
+            "order": [
+              {
+                "field": "seq",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "No habits yet. Add one, like running three times a week, and log each time."
+          },
+          {
+            "kind": "section",
+            "heading": "{{config:voice_since_away}}",
+            "icon": "history",
+            "span": 12,
+            "fold": true
+          },
+          {
+            "kind": "feed",
+            "span": 12,
+            "source": "activity",
+            "since": "seen",
+            "first": 8,
+            "empty": "Nothing new since you last looked."
+          }
+        ]
+      },
+      {
+        "page": "goals",
+        "title": "Goals",
+        "nav": {
+          "section": "Goals",
+          "order": 10,
+          "place": 20
+        },
+        "icon": "star",
+        "requires": [
+          "register.savings_goals",
+          "register.goals",
+          "register.goal_log",
+          "register.put_by"
+        ],
+        "blocks": [
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "when": {
+              "all": [
+                {
+                  "metric": "goals-active",
+                  "gte": 1
+                },
+                {
+                  "metric": "habits-active",
+                  "gte": 1
+                }
+              ]
+            },
+            "body": "{{saved-toward-goals}} saved so far, {{goals-active}} goal(s) and {{habits-active}} habit(s) on the go"
+          },
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "when": {
+              "metric": "habits-active",
+              "lt": 1
+            },
+            "body": "{{saved-toward-goals}} saved so far, {{goals-active}} goal(s) on the go"
+          },
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "when": {
+              "all": [
+                {
+                  "metric": "goals-active",
+                  "lt": 1
+                },
+                {
+                  "metric": "habits-active",
+                  "gte": 1
+                }
+              ]
+            },
+            "body": "{{saved-toward-goals}} saved so far, {{habits-active}} habit(s) on the go"
+          },
+          {
+            "kind": "capture",
+            "heading": "Add a goal or a habit",
+            "icon": "plus",
+            "span": 12,
+            "register": "goals"
+          },
+          {
+            "kind": "capture",
+            "heading": "Name something you are saving for",
+            "icon": "piggy-bank",
+            "span": 12,
+            "register": "savings_goals",
+            "when": {
+              "metric": "savings-held",
+              "lt": 1
+            }
+          },
+          {
+            "kind": "progress",
+            "heading": "Savings goals",
+            "icon": "piggy-bank",
+            "span": 12,
+            "source": "register.savings_goals",
+            "where": "state is not paused",
+            "columns": [
+              {
+                "field": "name"
+              },
+              {
+                "field": "target"
+              },
+              {
+                "field": "by"
+              }
+            ],
+            "toward": "put-by-by-goal",
+            "order": [
+              {
+                "field": "seq",
+                "dir": "asc"
+              }
+            ],
+            "limit": 6,
+            "empty": "No savings goal yet. Add one and how close you are shows here."
+          },
+          {
+            "kind": "progress",
+            "heading": "Habits this week",
+            "icon": "repeat",
+            "span": 12,
+            "source": "register.goals",
+            "where": "state is active, kind is habit",
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "target"
+              },
+              {
+                "field": "unit"
+              }
+            ],
+            "toward": "logged-this-week-by-goal",
+            "order": [
+              {
+                "field": "seq",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "No habits yet. Add one, like running three times a week, and log each time."
+          },
+          {
+            "kind": "progress",
+            "heading": "Goals",
+            "icon": "goal",
+            "span": 12,
+            "source": "register.goals",
+            "where": "state is active, kind is goal",
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "target"
+              },
+              {
+                "field": "unit"
+              }
+            ],
+            "toward": "logged-by-goal",
+            "order": [
+              {
+                "field": "seq",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "No goals yet. Add one, like running a hundred kilometres, and log each step toward it."
+          },
+          {
+            "kind": "section",
+            "heading": "Lately",
+            "icon": "history",
+            "span": 12,
+            "fold": true
+          },
+          {
+            "kind": "table",
+            "heading": "Logged lately",
+            "icon": "notebook-pen",
+            "span": 12,
+            "when": {
+              "metric": "goal-log-held",
+              "gt": 0
+            },
+            "source": "register.goal_log",
+            "columns": [
+              {
+                "field": "what",
+                "label": "What",
+                "width": "minmax(14ch,1fr)"
+              },
+              {
+                "field": "goal",
+                "label": "Toward",
+                "width": "minmax(12ch,1fr)"
+              },
+              {
+                "field": "amount",
+                "label": "How much",
+                "width": "9ch",
+                "align": "end"
+              },
+              {
+                "field": "on",
+                "label": "Day",
+                "width": "12ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "on",
+                "dir": "desc"
+              }
+            ],
+            "limit": 8,
+            "empty": "Nothing logged yet. Add a run or a book finished and it counts toward its goal."
+          },
+          {
+            "kind": "table",
+            "heading": "Saved lately",
+            "icon": "piggy-bank",
+            "span": 12,
+            "when": {
+              "metric": "put-by-held",
+              "gt": 0
+            },
+            "source": "register.put_by",
+            "columns": [
+              {
+                "field": "what",
+                "label": "What",
+                "width": "minmax(14ch,1fr)"
+              },
+              {
+                "field": "saving",
+                "label": "Toward",
+                "width": "minmax(12ch,1fr)"
+              },
+              {
+                "field": "amount",
+                "label": "Amount",
+                "width": "12ch",
+                "align": "end"
+              },
+              {
+                "field": "on",
+                "label": "Day",
+                "width": "12ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "on",
+                "dir": "desc"
+              }
+            ],
+            "limit": 8,
+            "empty": "Nothing saved yet. Add what you set aside and it counts toward its goal."
+          },
+          {
+            "kind": "table",
+            "heading": "Every goal",
+            "icon": "list",
+            "span": 12,
+            "when": {
+              "metric": "goals-held",
+              "gt": 0
+            },
+            "source": "register.goals",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Goal",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "kind",
+                "label": "Kind",
+                "width": "9ch"
+              },
+              {
+                "field": "state",
+                "label": "Status",
+                "width": "10ch"
+              },
+              {
+                "field": "by",
+                "label": "By",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "limit": 20,
+            "empty": "No goals yet."
+          }
+        ]
+      },
+      {
+        "page": "my-project",
+        "title": "{{name}}",
+        "for": {
+          "register": "things",
+          "where": "lane is building or earning"
+        },
+        "nav": {
+          "section": "Projects",
+          "order": 20
+        },
+        "icon": "thing",
+        "requires": [
+          "register.things",
+          "register.project_steps"
+        ],
+        "blocks": [
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "body": "{{about}}"
+          },
+          {
+            "kind": "progress",
+            "heading": "Progress",
+            "icon": "gauge",
+            "span": 12,
+            "source": "register.project_steps",
+            "where": "thing is {{name}}",
+            "columns": [
+              {
+                "field": "thing"
+              },
+              {
+                "field": "done"
+              }
+            ],
+            "empty": "{{name}} has no steps yet. Add the first and its progress shows here."
+          },
+          {
+            "kind": "todo",
+            "heading": "Still to do",
+            "icon": "list-todo",
+            "span": 12,
+            "when": {
+              "metric": "steps-left:{{name}}",
+              "gt": 0
+            },
+            "source": "register.project_steps",
+            "where": "thing is {{name}}, done is false",
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "by"
+              }
+            ],
+            "order": [
+              {
+                "field": "by",
+                "dir": "asc"
+              }
+            ],
+            "limit": 12,
+            "empty": "Nothing left to do on {{name}}."
+          },
+          {
+            "kind": "table",
+            "heading": "Done",
+            "icon": "circle-check",
+            "span": 12,
+            "when": {
+              "metric": "steps-done:{{name}}",
+              "gt": 0
+            },
+            "source": "register.project_steps",
+            "where": "thing is {{name}}, done is true",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Step",
+                "width": "minmax(16ch,1fr)"
+              }
+            ],
+            "limit": 12,
+            "empty": "Nothing done yet."
+          }
+        ]
+      }
+    ]
+  },
+  "skills": [
+    {
+      "name": "bill-reminder",
+      "trigger": "the day before a bill is due, to say what is going out and from which account"
+    }
+  ],
+  "nav": [],
+  "links": [],
+  "over": {}
+}

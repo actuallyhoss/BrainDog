@@ -1,0 +1,191 @@
+{
+  "usecase": "business",
+  "version": "1.7.3",
+  "title": "Small business",
+  "summary": "Money in and out, clients and subscriptions.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "individual",
+  "tone": "plain, the house voice",
+  "signals": [
+    "business",
+    "small business",
+    "my business",
+    "studio",
+    "agency",
+    "freelance",
+    "freelancer",
+    "freelancing",
+    "consultancy",
+    "consulting",
+    "clients",
+    "client",
+    "customers",
+    "invoice",
+    "invoices",
+    "invoicing",
+    "domains",
+    "hosting",
+    "subscriptions",
+    "contractors",
+    "accountant",
+    "vat",
+    "bookkeeping",
+    "retainer",
+    "foundry",
+    "streamer",
+    "youtuber",
+    "content creator",
+    "creator",
+    "sponsors",
+    "sponsorships",
+    "brand deals"
+  ],
+  "modules": [],
+  "voice": {
+    "coming_up": "Falling due",
+    "nothing_due": "No invoice, bill or renewal falls due in the next two weeks.",
+    "fills_with": "Money coming in, money going out, the questions waiting on you and what changed while you were away show up here as your lists fill."
+  },
+  "labels": {},
+  "pack": {
+    "pack": "usecase-business",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "page": "home-business",
+        "title": "Today",
+        "icon": "home",
+        "requires": [
+          "register.session"
+        ],
+        "blocks": [
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "body": "{{questions-open}} question(s) need your call"
+          },
+          {
+            "kind": "stat",
+            "lead": true,
+            "heading": "What you have",
+            "icon": "wallet",
+            "span": 12,
+            "source": "figures.home"
+          },
+          {
+            "kind": "table",
+            "heading": "Gone quiet",
+            "icon": "history",
+            "span": 12,
+            "source": "exceptions",
+            "columns": [
+              {
+                "field": "subject",
+                "label": "What"
+              },
+              {
+                "field": "since",
+                "label": "Last seen"
+              },
+              {
+                "field": "was",
+                "label": "Before"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "table",
+            "heading": "Due this week",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "deadlines",
+            "horizon": 7,
+            "columns": [
+              {
+                "field": "title",
+                "label": "Description",
+                "width": "minmax(14ch,1fr)"
+              },
+              {
+                "field": "amount",
+                "label": "Amount",
+                "width": "15ch",
+                "align": "end",
+                "sign": {
+                  "field": "direction",
+                  "minus": "out"
+                }
+              },
+              {
+                "field": "day",
+                "label": "Due",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "limit": 8,
+            "empty": "Nothing is due this week."
+          },
+          {
+            "kind": "queue",
+            "heading": "Needs your call",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "limit": 5,
+            "when": {
+              "metric": "questions-open",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "table",
+            "heading": "Working now",
+            "icon": "session",
+            "span": 12,
+            "source": "sessions.working",
+            "when": {
+              "metric": "runs-working",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "agent",
+                "label": "Agent"
+              },
+              {
+                "field": "doing",
+                "label": "Doing"
+              },
+              {
+                "field": "last_seen",
+                "label": "Last seen"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "feed",
+            "heading": "What changed",
+            "icon": "history",
+            "span": 12,
+            "source": "activity",
+            "first": 8,
+            "empty": "Nothing has changed yet."
+          }
+        ]
+      }
+    ]
+  },
+  "skills": [],
+  "nav": [],
+  "links": [],
+  "over": {}
+}
