@@ -348,3 +348,23 @@ export function readModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, 
 export function fileModelSign(kernel: ModelSignKernel, sql: Sql, nowMs: number, more: ModelSignMore = {}): Result<{ sign: string; day: string }> {
   return kernel.signRead('model-answers', readModelSign(kernel, sql, nowMs, more));
 }
+
+/**
+ * `fileModelSign` WHEN THE READING MOVED, for a host that asks on every alarm (F35): what was filed is kept as `last`, the
+ * record's day and the reading, and the same again files nothing. Each filing replaced today's row with a new `read_at`,
+ * and the record's lint takes a newer `read_at` for a sign that moved (`keepSignsMoved`), so every alarm made the next
+ * one read every sign again. Answers what is filed now, which the host hands back next time; `last` again when nothing was.
+ */
+export function fileModelSignMoved(kernel: ModelSignKernel, sql: Sql, nowMs: number, last: string | null, more: ModelSignMore = {}): string | null {
+  const reading = readModelSign(kernel, sql, nowMs, more);
+  const tz = (typeof kernel.identity === 'function' ? kernel.identity()?.tz : null) || 'UTC';
+  let day: string;
+  try {
+    day = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(nowMs);
+  } catch {
+    day = new Date(nowMs).toISOString().slice(0, 10);
+  }
+  const key = JSON.stringify([day, reading]);
+  if (key === last) return last;
+  return kernel.signRead('model-answers', reading).ok ? key : last;
+}

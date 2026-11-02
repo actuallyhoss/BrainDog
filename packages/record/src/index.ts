@@ -19,7 +19,7 @@ import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import { keptRound, pagesCleanReading, ROUND_HOLDER, ROUND_KEPT, roundBegun, roundEnded, roundOf, roundPartOf, roundStep, ROUND_MS, unworded, type RoundPart } from './page-lint.ts';
 import { TICK_PAGES, UNBOUNDED, type TickBudget } from './tick-budget.ts';
-import { SIGNS_KEPT, SIGNS_REKEEP_MS, agentSaid, clientName, fileRecordSigns, keptNow, keptSigns, readArrivedSign, type KeptSign } from './signs.ts';
+import { SIGNS_KEPT, SIGNS_MOVED_MS, SIGNS_REKEEP_MS, agentSaid, clientName, fileRecordSigns, keptNow, keptSigns, readArrivedSign, type KeptSign } from './signs.ts';
 import { appendReadRefusal } from './append-refusal.ts';
 import { trialsLeft } from './script-try-cap.ts';
 import {
@@ -6199,12 +6199,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * reads every page once a day already, so the sign the host files on every alarm reads a pref and no page.
    */
   const headlinesHeld = (): { written: number; pages: number } => {
+    const { written, pages } = headlinesHeldFrom({ at: 0, written: 0, pages: 0 }, UNBOUNDED);
+    return { written, pages };
+  };
+  /**
+   * `headlinesHeld` A FEW PAGES A TICK (F35): the count so far and the place in `kernel.pages()` it stopped, and `done`
+   * once every page was read. It was the last lint tick's, beside the record's signs and the words' walk, and that one
+   * tick read every page again in one go. A page drawn is one unit of `budget`, asked after each, so every tick moves on.
+   */
+  const headlinesHeldFrom = (from: HeldPart, budget: TickBudget): HeldPart & { done: boolean } => {
     const prefs = kernel.prefsOf(SLASH);
     const pressing = pressingRead(slashDay());
-    let written = 0;
-    let pages = 0;
-    for (const p of kernel.pages()) {
+    let { written, pages } = from;
+    const listed = kernel.pages();
+    let at = Math.max(0, Math.min(from.at, listed.length));
+    let drawn = 0;
+    for (; at < listed.length; at++) {
+      if (drawn > 0 && budget.spent()) return { at, written, pages, done: false };
+      const p = listed[at]!;
       if (p.nav === null || p.about !== null || p.slug === HOME_PAGE) continue;
+      drawn += 1;
+      budget.spend();
       const read = kernel.page(p.slug, undefined, { viewer: NOBODY });
       if (!read.ok) continue;
       const lead = leadBlockOf(read.value.blocks);
@@ -6222,7 +6237,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stored.facts !== undefined && facts() !== stored.facts) continue;
       written += 1;
     }
-    return { written, pages };
+    return { at, written, pages, done: true };
   };
 
   /**
@@ -6427,14 +6442,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const WORDS_LAST = 'text-faults.last';
   /** Today's lint under way in slices (`lintTick` with a budget): its day, the step it is on, its round so far. */
   const LINT_RUN = 'pages-clean.run';
-  type LintRun = { day: string; step: 'round' | 'census' | 'signs'; round: RoundPart; census?: CensusPart; said?: { state: 'green' | 'red' | 'none'; findings: number; pages: number } };
+  /** How far `headlinesHeldFrom` read the pages: the place it stopped and the count so far. */
+  type HeldPart = { at: number; written: number; pages: number };
+  type LintRun = {
+    day: string;
+    step: 'round' | 'census' | 'held' | 'signs';
+    round: RoundPart;
+    census?: CensusPart;
+    held?: HeldPart;
+    said?: { state: 'green' | 'red' | 'none'; findings: number; pages: number };
+  };
+  const heldPartOf = (raw: unknown): HeldPart | undefined => {
+    if (raw === null || typeof raw !== 'object') return undefined;
+    const h = raw as Partial<HeldPart>;
+    return Number.isSafeInteger(h.at) && Number.isSafeInteger(h.written) && Number.isSafeInteger(h.pages) ? { at: h.at!, written: h.written!, pages: h.pages! } : undefined;
+  };
   /** Today's lint under way, or `null` for none (done, never begun in slices, another day's, or a shape an older build kept). */
   const lintRunOf = (today: string): LintRun | null => {
     const raw = kernel.prefsOf(LINT_HOLDER)[LINT_RUN] as Partial<LintRun> | undefined;
-    if (raw === undefined || raw === null || raw.day !== today || (raw.step !== 'round' && raw.step !== 'census' && raw.step !== 'signs')) return null;
+    if (raw === undefined || raw === null || raw.day !== today || (raw.step !== 'round' && raw.step !== 'census' && raw.step !== 'held' && raw.step !== 'signs')) return null;
     const round = roundPartOf(raw.round);
     const census = raw.census !== undefined && raw.census !== null && typeof raw.census === 'object' && Array.isArray(raw.census.order) && Array.isArray(raw.census.pages) ? raw.census : undefined;
-    return round === null ? null : { day: today, step: raw.step, round, ...(census === undefined ? {} : { census }), ...(raw.said === undefined ? {} : { said: raw.said }) };
+    const held = heldPartOf(raw.held);
+    return round === null
+      ? null
+      : { day: today, step: raw.step, round, ...(census === undefined ? {} : { census }), ...(held === undefined ? {} : { held }), ...(raw.said === undefined ? {} : { said: raw.said }) };
   };
   const slashDailyState = () => {
     const prefs = kernel.prefsOf(SLASH);
@@ -11347,6 +11379,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * THE ALARM'S `keepSigns`, ONLY WHEN SOMETHING A SIGN READS MOVED: the record (`changeStamp`) or a sign's own reading
    * (`sign_reading`), or `SIGNS_REKEEP_MS` passed, which is well inside the quarter hour a kept reading is trusted for
    * (`keptNow`), so the briefing still reads a pref. Every tick read every sign again, and ticks in slices come seconds apart.
+   * AND NOT MORE THAN ONCE A `SIGNS_MOVED_MS` WHILE THINGS MOVE: a record agents write to moves between any two alarms.
    */
   /** How many pages say the model's line now (`HEADLINES_HELD`), kept for the model sign. A count that throws keeps yesterday's. */
   const keepHeld = (today: string): void => {
@@ -11360,7 +11393,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const keepSignsMoved = (): void => {
     const now = clock.now();
     const stamp = changeStamp() + String(sql.one<{ r: string | null }>('SELECT max(read_at) AS r FROM sign_reading')?.r ?? '');
-    if (signsKeptAt !== null && signsKeptAt.stamp === stamp && now - signsKeptAt.at < SIGNS_REKEEP_MS && now >= signsKeptAt.at) return;
+    if (signsKeptAt !== null && now >= signsKeptAt.at && now - signsKeptAt.at < (signsKeptAt.stamp === stamp ? SIGNS_REKEEP_MS : SIGNS_MOVED_MS)) return;
     keepSigns();
     signsKeptAt = { stamp, at: now };
   };
@@ -13000,14 +13033,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const today = new Date(clock.now()).toISOString().slice(0, 10);
       const sliced = opts.budget !== undefined;
       const budget = opts.budget ?? UNBOUNDED;
-      const kept = <T>(out: T): T => {
+      const kept = <T>(out: T, words = true): T => {
         try {
           keepSignsMoved();
         } catch {
           /* The briefing reads the signs itself until one is kept. */
         }
         /* THE WORDS' WALK COMES LAST, after the round and every sign, so it costs the night's other work nothing. */
-        keepWords(today);
+        if (words) keepWords(today);
         return out;
       };
       let aboutOf: Map<string, { register: string; seq: number | null } | null> | undefined;
@@ -13100,14 +13133,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const filed = kernel.signRead('pages-clean', reading);
           if (!filed.ok) throw new Error(`pages-clean was not filed: ${'refusal' in filed ? filed.refusal.fix : 'the record changed under it'}`);
           const { census: _counted, ...rest } = run;
-          run = { ...rest, step: 'signs', said: { state: reading.state, findings: round.findings.length, pages: round.pages } };
-          /* THE RECORD'S SIGNS READ THE WHOLE BRIEFING: a tick of their own. */
+          run = { ...rest, step: sliced ? 'held' : 'signs', said: { state: reading.state, findings: round.findings.length, pages: round.pages } };
+          /* THE PAGES' HEADLINES ARE COUNTED NEXT, A FEW PAGES A TICK (`headlinesHeldFrom`), THEN THE RECORD'S SIGNS, which
+             read the whole briefing, on a tick of their own. Both were this one tick's after the census, with the words'
+             walk too: on his record that tick read every page again and spent up to 24 s of CPU (31 Oct, 1 Nov). */
           if (sliced) return later(run);
+        }
+        if (sliced && run.step === 'held') {
+          const part = headlinesHeldFrom(run.held ?? { at: 0, written: 0, pages: 0 }, budget);
+          if (!part.done) return later({ ...run, held: { at: part.at, written: part.written, pages: part.pages } });
+          kernel.setPref(SLASH, HEADLINES_HELD, { day: today, written: part.written, pages: part.pages });
+          const { held: _held, ...rest } = run;
+          return later({ ...rest, step: 'signs' });
         }
         if (sliced) {
           /* KEPT BEFORE THE STEP RUNS: the record's signs the platform cut are not read again today. */
           keep(null);
-          keepHeld(today);
         }
         /* AND THE RECORD'S TWO SIGNS (`signs.ts`): whether a new session's briefing is true, and whether agents were given
            the tool list. A system principal reads the whole briefing, as a session in that repository would be handed it. */
@@ -13118,7 +13159,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         );
         if (signs.refused.length > 0) throw new Error(`signs were not filed: ${signs.refused.join('; ')}`);
         const said = run.said ?? { state: 'none' as const, findings: 0, pages: 0 };
-        return kept({ ran: true as const, state: said.state, findings: said.findings, pages: said.pages });
+        /* IN SLICES THE WORDS' WALK IS THE NEXT TICK'S (`keepWords` on the `today` path), not this one's beside the signs. */
+        return kept({ ran: true as const, state: said.state, findings: said.findings, pages: said.pages }, !sliced);
       } catch (e) {
         /* A STEP THAT THROWS ENDS TODAY'S ROUND, as it always did: what is after it waits for tomorrow. */
         if (sliced) keep(null);

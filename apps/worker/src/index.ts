@@ -38,7 +38,7 @@ import { withCalls } from '@braindog/mcp';
 import { MIN_CLI } from '@braindog/mcp/build';
 import { slashTools } from '@braindog/mcp/slash-tools';
 import { INVITE_GONE, UNBOUND_REFUSED, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type KeychainGrant, type Waiting } from '@braindog/kernel';
-import { createRecordApi, tickBudget, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
+import { createRecordApi, tickBudget, type CallContext, type TickBudget, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
@@ -65,7 +65,7 @@ import { serveAsks, type ModelJobInference, type SlashAnswer } from '@braindog/h
 import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/host/model-jobs';
 
 import { alarmScheduler } from './alarm.ts';
-import { fileModelSign } from '@braindog/host/sign-model';
+import { fileModelSignMoved } from '@braindog/host/sign-model';
 import { slashDue, slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
 import { PLAN_AGENTS, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
 import { fallbackWire, includedCandidates, includedInference } from './slash.ts';
@@ -488,6 +488,27 @@ const ALARM_STEP_PAGES = 10;
 
 /** A step slower than this writes an `alarm-step` line with its time. */
 const SLOW_STEP_MS = 5_000;
+
+/**
+ * A share of one alarm (`tickBudget`) that also counts what it was spent on, for the `alarm-work` line. THE CLOCK CANNOT
+ * SAY WHERE AN ALARM'S CPU WENT: it stands still while a page draws, so a step that drew ten pages in 2 s of CPU measures
+ * nothing and writes no `alarm-step` line (on 1 November an alarm spent 19.5 s of CPU and named no step). The pages each
+ * step drew are what it cost.
+ */
+const countedShare = (): { budget: TickBudget; used: () => number } => {
+  const inner = tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES);
+  let used = 0;
+  return {
+    budget: {
+      spend: (n = 1) => {
+        used += n;
+        inner.spend(n);
+      },
+      spent: () => inner.spent(),
+    },
+    used: () => used,
+  };
+};
 
 /** Where an object keeps whether its record's billing has lapsed, beside `BOOTED` and outside the record (`setLapsed`). */
 const LAPSED = 'braindog.lapsed';
@@ -1159,6 +1180,40 @@ export class Record$ extends DurableObject<Env> {
    */
   override async alarm(): Promise<void> {
     if (this.#gone || this.#armed) return;
+    /* ONE ALARM AT A TIME, AND A REQUEST'S WAKE WHILE ONE RUNS IS ONE MORE AFTER IT (`#wakeOwed`), never one each. */
+    this.#alarming = true;
+    try {
+      await this.#alarmPass();
+    } finally {
+      this.#alarming = false;
+    }
+    const owed = this.#wakeOwed;
+    this.#wakeOwed = null;
+    if (owed === 'soon') await this.#soon();
+    else if (owed === 'look')
+      try {
+        if (!this.#gone && !this.#armed && !(await this.lapsed())) await this.#lookSoon(await this.#record());
+      } catch (e) {
+        console.error('slash: the owed wake could not be asked:', e instanceof Error ? e.message : String(e));
+      }
+  }
+
+  /**
+   * Whether an alarm is running in this object now, and what a request asked of it meanwhile (`#soon`, `#lookSoon`).
+   *
+   * WHY (F35, 2 November): agents' bridges pulse in bursts, seven within two seconds, and every pulse asked whether the
+   * look was due and set the alarm for now. While an alarm ran the platform reads no alarm set, so each pulse set one
+   * more, and his record ran four to six alarms one after another every half minute, one for each pulse, for two hours
+   * from 00:00 UTC: 459 alarms and 351 s of CPU, with requests and a bank's text queued behind each. A wake asked while
+   * one runs is now kept as owed and asked once, when it ends.
+   */
+  #alarming = false;
+  #wakeOwed: 'soon' | 'look' | null = null;
+
+  /** What `fileModelSignMoved` last filed in this object, so an alarm whose reading did not move files nothing. */
+  #modelSignLast: string | null = null;
+
+  async #alarmPass(): Promise<void> {
     const api = await this.#record();
     /* THE DOORS FIRST, AND ON A LAPSED RECORD TOO: a step that waited behind the lapse would keep asking for the alarm. */
     await this.#doors(api);
@@ -1197,14 +1252,16 @@ export class Record$ extends DurableObject<Env> {
          read in one go, the look up to 49 s and the lint up to 27 s, and the platform reset the object. Now each stops
          when its share is spent, keeps where it stopped, and answers `more`, and the alarm is set for now below, so the
          rest is the next alarm's and requests are answered in between. */
-      looked = await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore, budget: tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES) }), false);
+      const lookShare = countedShare();
+      const lintShare = countedShare();
+      looked = await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore, budget: lookShare.budget }), false);
       /* AND THE RECORD LINTS ITS OWN PAGES, at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
       linted = await this.#step(
         api,
         'lint',
         () =>
           api
-            .lintTick({ budget: tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES) })
+            .lintTick({ budget: lintShare.budget })
             .then((out) => out.ran === false && out.more === true)
             .catch((e: unknown) => {
               console.error('lint:', e instanceof Error ? e.message : String(e));
@@ -1214,13 +1271,18 @@ export class Record$ extends DurableObject<Env> {
       );
       /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
          replaces the earlier one, so each alarm may file it; the provider's last words ride along from `#modelFailed`. */
+      /* ONLY WHEN THE READING MOVED (`fileModelSignMoved`): each filing gave the sign a new `read_at`, which the lint reads as
+         a sign that moved, so every alarm read every sign again. */
       await this.#step(api, 'signs', (): void => {
         try {
-          fileModelSign(api.kernel, guardedSql(this.ctx.storage), Date.now());
+          this.#modelSignLast = fileModelSignMoved(api.kernel, guardedSql(this.ctx.storage), Date.now(), this.#modelSignLast);
         } catch (e) {
           console.error('signs:', e instanceof Error ? e.message : String(e));
         }
       });
+      /* WHAT THIS ALARM DREW AND WHAT IT LEFT FOR THE NEXT, when it drew anything: the clock cannot say (`countedShare`). */
+      if (lookShare.used() + lintShare.used() > 0)
+        op({ op: 'alarm-work', rec: recOf(api), look: lookShare.used(), lint: lintShare.used(), more: ([['act', more], ['ask', asked], ['model', modelled], ['look', looked], ['lint', linted]] as const).filter(([, m]) => m).map(([n]) => n).join(' ') });
     } catch (e) {
       const said = e instanceof Error ? e.message : String(e);
       op({ op: 'alarm-step', rec: recOf(api), threw: true, error: said }, 'error');
@@ -1289,8 +1351,12 @@ export class Record$ extends DurableObject<Env> {
     }
   }
 
-  /** The alarm, set for now unless it is already set sooner. */
+  /** The alarm, set for now unless it is already set sooner; owed to the end of one that is running. */
   async #soon(): Promise<void> {
+    if (this.#alarming) {
+      this.#wakeOwed = 'soon';
+      return;
+    }
     try {
       const at = await this.#alarm.get();
       if (at === null || at > Date.now()) await this.#alarm.set(Date.now());
@@ -1304,6 +1370,11 @@ export class Record$ extends DurableObject<Env> {
    * An alarm already set for sooner is left as it is.
    */
   async #lookSoon(api: RecordApi): Promise<void> {
+    /* WHILE AN ALARM RUNS ITS LOOK IS UNDER WAY: asked once more when it ends (`#wakeOwed`), not one alarm a request. */
+    if (this.#alarming) {
+      this.#wakeOwed ??= 'look';
+      return;
+    }
     if (!(await slashDue(api))) return;
     try {
       const at = await this.#alarm.get();

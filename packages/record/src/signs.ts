@@ -649,6 +649,12 @@ export const SIGNS_KEPT = 'briefing.signs';
 export const SIGNS_KEPT_MS = 15 * MIN;
 /** How long the alarm leaves a kept reading as it is while nothing a sign reads moved: inside `SIGNS_KEPT_MS`, so a briefing still reads the pref. */
 export const SIGNS_REKEEP_MS = 10 * MIN;
+/**
+ * And the least time between two keeps when something did move (F35): agents write all day, and every alarm, seconds
+ * apart while a look or a lint goes in slices, read every sign again. A kept reading is trusted for `SIGNS_KEPT_MS`, so a
+ * minute's lag on a sign is well inside what a briefing already reads.
+ */
+export const SIGNS_MOVED_MS = MIN;
 
 /**
  * One red sign as a briefing names it: its name and its sentence, and both as a reader without the inbox is told them.
