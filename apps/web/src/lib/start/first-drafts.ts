@@ -32,6 +32,7 @@ import { PEOPLE } from '../who.ts';
 import type { SetupOffer, SetupReply } from './ask.ts';
 
 import { nameEnd } from './name-end.ts';
+import { saidTodo } from './todo-said.ts';
 import { entryOf, FILLABLE, listDocument, listsOf, useCaseOfList, type List } from './lists.ts';
 
 /** One entry of a draft, as the record's capture takes it. */
@@ -147,6 +148,8 @@ export type DraftsFrom = {
   built: readonly DraftRow[];
   /** The person's own name, who is no draft in People. */
   me: string | null;
+  /** The words read, so a to-do the model drafted is kept only where its words are theirs (`saidTodo`). */
+  said?: string;
 };
 
 /** The keys the build already wrote, and the person: what no draft may be. */
@@ -200,6 +203,9 @@ export function draftsOf(reply: Pick<SetupReply, 'rows'>, from: DraftsFrom): Fir
     if (title === '' || seen.has(key) || (me !== '' && plain(title) === me)) continue;
     /* A TASK IS A THING TO DO, written as one: an answer the model took for one is no draft. */
     if (list.id === 'tasks' && !readsAsTodo(title)) continue;
+    /* AND IN THEIR WORDS (onboarding10, 2 Nov: "Set up deadlines for Brightside" from "deadlines" and a client said
+       apart): a to-do whose thing and whoever it is for were never said together is the model's, not theirs. */
+    if (list.id === 'tasks' && from.said !== undefined && !saidTodo(title, from.said)) continue;
     seen.add(key);
     const money = Object.values(fields).find(isMoney) ?? null;
     out.push({

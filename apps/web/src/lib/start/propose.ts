@@ -39,6 +39,7 @@ import { currencyWord, placeCurrency } from './place-currency.ts';
 import type { ArrivesBy } from './made.ts';
 import { entryOf, knownCurrency, listById, listsOf } from './lists.ts';
 import { nameEnd } from './name-end.ts';
+import { saidTodo } from './todo-said.ts';
 
 export type Proposal = {
   /** The person's name, where the sentence puts one unmistakably. */
@@ -1470,6 +1471,8 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
   for (const one of reply.rows.slice(0, 5)) {
     /* A CLIENT IS SOMEBODY BEFORE ITS LIST IS LOOKED FOR (`clientNotProject`): Projects may not be kept at all. */
     if (!fitsTheKind(one.fields, u?.usecase ?? rules.usecase ?? null, beside.map((b) => b.usecase), sentence)) continue;
+    /* A TO-DO IN THEIR WORDS OR NONE (onboarding10, `saidTodo`): its thing and whoever it is for said together. */
+    if (one.list === 'tasks' && typeof one.fields['what'] === 'string' && !saidTodo(one.fields['what'], sentence)) continue;
     const r = one.list === 'things' ? ((c) => ({ list: c.register, fields: c.fields }))(clientNotProject({ register: one.list, fields: one.fields }, sentence, modules)) : one;
     const list = listById(r.list, modules);
     const fields = list ? entryOf(list, r.fields, currency) : null;

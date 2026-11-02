@@ -23,6 +23,7 @@ import { closeOver } from '../shape.ts';
 import { PEOPLE } from '../who.ts';
 import type { ModelAsk } from '../signup.ts';
 import { nameEnd } from './name-end.ts';
+import { saidTodo } from './todo-said.ts';
 import { INSIDE_WORDS, placesOf, YOU, type HeardLine, type Proposal } from './propose.ts';
 
 /** What a question is about: the first question (`what`), the rules' own, and every topic the model may ask about. */
@@ -1099,7 +1100,8 @@ function firstOf(turns: readonly ChatTurn[]): string {
  * Today, never written unasked.
  */
 export function todosOf(turns: readonly ChatTurn[], clients: readonly string[], have: readonly string[] = [], crew: readonly string[] = []): string[] {
-  return todosFor(firstOf(turns), clients, have, crew);
+  const said = turns.flatMap((t) => (t.answer === null ? [] : [t.answer.trim()])).join('\n');
+  return todosFor(firstOf(turns), clients, have, crew, said);
 }
 
 /**
@@ -1110,7 +1112,7 @@ export function todosOf(turns: readonly ChatTurn[], clients: readonly string[], 
  */
 export function withTodos(said: string, clients: readonly string[], crew: readonly string[] = []): string {
   const first = /\bFirst I want to keep track of ([^.]+)\./u.exec(said)?.[1] ?? '';
-  const todos = first === '' ? [] : todosFor(first, clients, [], crew);
+  const todos = first === '' ? [] : todosFor(first, clients, [], crew, said);
   return [said.trim(), ...todos.map((t) => `${t}.`)].filter((x) => x !== '').join(' ');
 }
 
@@ -1118,27 +1120,32 @@ export function withTodos(said: string, clients: readonly string[], crew: readon
  * `crew` IS WHO THEY PAY TO DO THE WORK, BY NAME (onboarding7, the creator walk: "Sponsor deals, paying editors" kept
  * first drew no to-do at all): the editors, assistants and the like the reading kept as contractors. "Paying editors"
  * is "Pay Kai and Rosa", and sponsor deals are this month's to log.
+ *
+ * EACH ONE IN THEIR WORDS OR NOT AT ALL (onboarding10, 2 Nov: Priya's "deadlines" and her client Brightside, said apart,
+ * drew "Set up deadlines for Brightside"). Each to-do is tried for each client they named, in order, and then without
+ * one, and the first whose words stand together in one sentence of what they typed is kept (`saidTodo`); a to-do with
+ * none is not drawn.
  */
-function todosFor(firstSaid: string, clients: readonly string[], have: readonly string[] = [], crew: readonly string[] = []): string[] {
+function todosFor(firstSaid: string, clients: readonly string[], have: readonly string[] = [], crew: readonly string[] = [], said = ''): string[] {
   const first = firstSaid.toLowerCase();
   const c = clients.filter((x) => x.trim() !== '');
-  const one = c[0] ?? null;
-  const two = c[1] ?? one;
+  const words = said.trim() === '' ? firstSaid : `${said}\n${firstSaid}`;
   const out: string[] = [];
-  const add = (s: string) => {
-    if (!out.includes(s) && !have.some((h) => h.toLowerCase() === s.toLowerCase())) out.push(s);
+  const add = (...tries: string[]) => {
+    const s = tries.find((t) => saidTodo(t, words));
+    if (s !== undefined && !out.includes(s) && !have.some((h) => h.toLowerCase() === s.toLowerCase())) out.push(s);
   };
   /* BILLS ARE PAID, NOT SENT (2 Nov, onboarding5: Marta's household kept "bills" first and was drafted "Send this month's
      invoices", which the full reading then kept as hers). Only invoicing words draw an invoice to send. */
-  if (/\binvoic|\bbilling\b|\bgetting paid/u.test(first)) add(one ? `Send ${one}'s invoice` : "Send this month's invoices");
+  if (/\binvoic|\bbilling\b|\bgetting paid/u.test(first)) add(...c.map((x) => `Send ${x}'s invoice`), "Send this month's invoices");
   else if (/\bbills?\b|\bpayments?\b/u.test(first)) add("Write down this month's bills");
-  if (/\bdeadlines?|\bdue dates?|\bschedule/u.test(first)) add(two ? `Set up deadlines for ${two}` : "Write down this month's deadlines");
-  if (/\bprojects?\b/u.test(first)) add(one ? `List the work for ${one}` : 'List the projects on now');
-  if (/\bclients?\b|\bcustomers?\b/u.test(first) && one) add(`Add a contact at ${one}`);
+  if (/\bdeadlines?|\bdue dates?|\bschedule/u.test(first)) add(...c.map((x) => `Set up deadlines for ${x}`), "Write down this month's deadlines");
+  if (/\bprojects?\b/u.test(first)) add(...c.map((x) => `List the work for ${x}`), 'List the projects on now');
+  if (/\bclients?\b|\bcustomers?\b/u.test(first)) add(...c.map((x) => `Add a contact at ${x}`));
   if (/\bsponsors?(?:hips?)?\b|\bbrand deals?\b/u.test(first)) add("Log this month's sponsor deals");
   const paid = /\bpay(?:ing|ments? to)?\s+(?:my\s+|the\s+|our\s+)?(editors?|assistants?|moderators?|designers?|developers?|freelancers?|contractors?|team|staff)\b/u.exec(first);
   const crewNamed = crew.filter((x) => x.trim() !== '');
-  if (paid) add(crewNamed.length > 0 ? `Pay ${and(crewNamed.slice(0, 3))}` : `Pay the ${paid[1]}`);
+  if (paid) add(...(crewNamed.length > 0 ? [`Pay ${and(crewNamed.slice(0, 3))}`] : []), `Pay the ${paid[1]}`);
   return out.slice(0, 3);
 }
 

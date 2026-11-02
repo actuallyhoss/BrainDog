@@ -165,7 +165,7 @@ async function read(b: Begin, at = Date.now()): Promise<void> {
     if (over() || firstDrafts.now === null) return;
     if (!out.ok) return void set({ ...firstDrafts.now, state: 'none' });
     /* AND THE LISTS BY THE PERSON'S OWN WORDS, after the entries: a rename is kept by the record's `renameList`. */
-    const drafts = [...draftsOf(out.value, { modules, currency: b.currency, built: b.built, me: b.me }), ...renamesOf(out.value, { modules })];
+    const drafts = [...draftsOf(out.value, { modules, currency: b.currency, built: b.built, me: b.me, said: b.said }), ...renamesOf(out.value, { modules })];
     set({ ...firstDrafts.now, state: drafts.length > 0 ? 'ready' : 'none', summary: summaryOf(out.value), drafts, found: drafts.length, closed: false });
   } catch {
     if (!over() && firstDrafts.now !== null) set({ ...firstDrafts.now, state: 'none' });
