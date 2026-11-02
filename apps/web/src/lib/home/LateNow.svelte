@@ -223,6 +223,15 @@
     border-block-start: 1px solid var(--rule);
   }
 
+  /* A LINE WITH NO TICK STARTS ON THE TILE'S EDGE (leftovers 4): a bill has no tick, and the empty column's gap stood its
+     name 16px in from the heading over it ("Northbound invoice 1042" under "Late"). */
+  .ln:not(:has(> .ln-tick)) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title amount'
+      'when acts';
+  }
+
   .ln-title {
     grid-area: title;
     min-inline-size: 0;
@@ -319,6 +328,13 @@
         'tick title amount'
         'tick when when'
         'tick acts acts';
+    }
+
+    .ln[data-bill]:not(:has(> .ln-tick)) {
+      grid-template-areas:
+        'title amount'
+        'when when'
+        'acts acts';
     }
 
     .ln-acts {
