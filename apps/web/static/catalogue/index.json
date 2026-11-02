@@ -6108,6 +6108,81 @@
     },
     {
       "kind": "pack",
+      "id": "sentry",
+      "title": "Sentry",
+      "summary": "What is breaking in your apps, from Sentry every hour: open issues, new ones, error events and people hit, on each project's page and on Today. An issue that is new and serious, comes back or spikes rings the bell. Reads only; nothing is sent to Sentry.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "d9ef2f32c3873ebaafa93857ac01c524badd720e770ae4ca243c14a0743dd1e5",
+          "bytes": 41624,
+          "published_at": "2026-11-02T12:49:34.984Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Sentry projects",
+              "Sentry issues"
+            ],
+            "pages": [
+              "Errors"
+            ],
+            "rules": [
+              "Ring the bell for an issue worth a look",
+              "Ask about an issue that hit many people"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "us.sentry.io",
+                "line": "CALLS OUT us.sentry.io, de.sentry.io and sentry.io · every 1h · key \"Sentry token\" to the host its keychain entry opens",
+                "key": "Sentry token"
+              }
+            ],
+            "widgets": [
+              "Errors",
+              "Errors worth a look"
+            ],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": true
+              },
+              {
+                "id": "page.project",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "First version: Sentry projects linked to your projects, their open issues, four numbers a project that chart like any feed, a bell for an issue worth a look and a question when one hits many people."
+        }
+      ],
+      "categories": [
+        "modules",
+        "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "unlisted": true,
+      "icon": "triangle-alert"
+    },
+    {
+      "kind": "pack",
       "id": "setup-sync",
       "title": "Setup sync",
       "summary": "What each of your machines carries to the next: settings files, your own programs, tool sign-ins and work not yet pushed, locked on the machine before it leaves, so BrainDog keeps only what it cannot open. A new machine joins with your sync passphrase and is set up again in under an hour. Kept for you alone.",
