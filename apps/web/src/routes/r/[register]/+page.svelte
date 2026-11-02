@@ -3343,7 +3343,9 @@
         <Button onclick={refresh}>{copy.tryAgain}</Button>
       </p>
     {:else if foundRoom}
-      <!-- A SEARCH THIS DEVICE ANSWERED, said as that until the record's own answer replaces it, in room held for it. -->
+      <!-- A SEARCH THIS DEVICE ANSWERED, said as that until the record's own answer replaces it: to a screen reader only, as
+           the rows' copy mark says it on screen. A line drawn over the list pushed the filters down under the pointer on
+           the press that asked for it (live check of 2 Nov: Done, then All, landed 14px off). -->
       <p class="stale found-here" data-from-device={searchedHere && fromCopy ? '' : undefined} role="status">
         <span class:unsaid={!(searchedHere && fromCopy)}>{copy.foundHere}</span>
       </p>
@@ -3876,6 +3878,16 @@
   /* THE ROOM STAYS AND THE WORDS GO: hidden, not removed, so the line keeps its height (`foundRoom`). */
   .found-here .unsaid {
     visibility: hidden;
+  }
+
+  /* AND THE LINE TAKES NO ROOM OF ITS OWN: heard, not drawn, so nothing over the list moves when it comes and goes. */
+  .stale.found-here {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* A DIM NOTE, WITH ITS ONE CONTROL BESIDE IT. It wraps, because at 320px a word and a button on one line is the button
