@@ -1,19 +1,17 @@
 /**
- * THE HERO'S DRAWING OF THE APP (`src/lib/product/`), as a reader with scripting off receives it, and the shared asks
- * it moves.
+ * THE HERO'S LIVE DESK (`src/lib/desk/`), as a reader with scripting off receives it, and the shared asks it moves.
  *
- * SINCE THE REDO OF 2 NOVEMBER the hero draws the app's Today as it is on 1 November, in the app's own window
- * (`Window.svelte`): the rail with its places, the bar with the page's name, and on the board Needs you, Cash ahead,
- * Working now and Numbers (`Today.svelte`). Everything a reader can read is in the HTML; the rail and the bars are
- * hidden from a screen reader as the picture they are. No <img>: every section is the product's own parts, never a
- * picture of them (§23, §47).
+ * ALL FIVE PLACES ARE IN THE HTML (20 October). Since 29 October the desk is drawn in the app's frame: a sidebar
+ * whose buttons open five panes (Today, Needs you, Money, Agents and a project), and only the chosen one shows once the
+ * script runs; with scripting off a <noscript> rule lays all five out one under another. So the served page must hold
+ * the sidebar with its places, five panes, Today's greeting, and that rule. No <img>: every band is the product's own parts, never a picture of them (§23, §47).
  *
  * THE SAME CHECKS RUN TWICE. Once over the desk rendered on the server here, which needs no build, and once over the
  * built `index.html`, which waits for a build newer than the desk (`built.ts`): an older build holds someone else's
  * page, and under `SITE_BUILT=1` a missing one is a failure, not a skip.
  *
- * THE DRAWING'S ASKS ARE ONE STATE (`needs.svelte.ts`) its Needs you tile and the rail's count both read, and the
- * filing section asks other things from a store of its own. The reducer is held to the order here, and the module itself is
+ * THE DESK'S ASKS ARE ONE STATE (`needs.svelte.ts`) its Today, its Needs you and its count all read, and the chores
+ * band asks other things from a store of its own. The reducer is held to the order here, and the module itself is
  * compiled and driven the way a page drives it.
  */
 import { test } from 'node:test';
@@ -25,8 +23,8 @@ import { compile, compileModule } from 'svelte/compiler';
 import { render } from 'svelte/server';
 import type { Component } from 'svelte';
 
-import { ASKED, NEEDS, FOUNDER } from '../src/lib/demo/maya.ts';
-import { frame, today } from '../src/lib/copy/product.ts';
+import { ASKED, NEEDS } from '../src/lib/demo/maya.ts';
+import { DESK, TABS } from '../src/lib/desk/words.ts';
 import { BUILD, STRICT, missing, when } from './built.ts';
 
 registerHooks({
@@ -48,7 +46,7 @@ registerHooks({
 
 /* By URL, so the type checker, which reads no Svelte here, does not look for the files. */
 const load = async <T>(path: string): Promise<T> => (await import(new URL(path, import.meta.url).href)) as T;
-const { default: Today } = await load<{ default: Component<Record<string, never>> }>('../src/lib/product/Today.svelte');
+const { default: Desk } = await load<{ default: Component<Record<string, never>> }>('../src/lib/desk/Desk.svelte');
 type Store = { open: string[]; done: string[]; answer(id: string, yes: boolean): void; undo(id: string): void };
 type Move = { kind: 'answer'; id: string; yes: boolean } | { kind: 'undo'; id: string };
 type State = { open: readonly string[]; done: readonly string[] };
@@ -59,7 +57,7 @@ const shared = await load<{
   step: (s: State, m: Move, order: readonly string[]) => State;
 }>('../src/lib/desk/needs.svelte.ts');
 
-const DESK_DIR = new URL('../src/lib/product/', import.meta.url);
+const DESK_DIR = new URL('../src/lib/desk/', import.meta.url);
 const INDEX = new URL('index.html', BUILD);
 
 /* Spelled by code point, so this file holds none. */
@@ -79,38 +77,48 @@ const words = (html: string): string =>
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ');
 
-/** Today's head as it reads before the script tells the hour: the morning's greeting. */
-const GREETING = today.greet(9, FOUNDER.short);
+/** Today's head as it reads before the script tells the hour: the greeting alone (DIRECTION §51). */
+const GREETING = 'Good morning, Maya';
 
-/** Today's promises over one piece of HTML, whichever way it was made. */
-function holdsToday(html: string, where: string): void {
-  const said = words(html);
-  assert.ok(said.includes(GREETING), `${where}: Today opens on the greeting "${GREETING}"`);
-  for (const title of [today.needs, today.cash, today.working, today.numbers]) assert.ok(said.includes(title), `${where}: the ${title} tile`);
-  for (const n of NEEDS) assert.ok(said.includes(n.what), `${where}: Needs you holds "${n.what}"`);
-  assert.match(html, /class="tile-count late num"[^>]*>2</, `${where}: the count on Needs you says 2`);
-  for (const n of ASKED) assert.ok(!said.includes(n.ask), `${where}: Today does not repeat the filing section's "${n.ask}"`);
+/** The desk's promises over one page of HTML, whichever way it was made. */
+function holdsTheDesk(html: string, where: string): void {
+  const side = html.match(/<nav class="places[^"]*"[^>]*>([\s\S]*?)<\/nav>/);
+  assert.ok(side, `${where} has no sidebar`);
+  const opens = [...side[1]!.matchAll(/<button[^>]*id="desk-tab-([a-z]+)"[^>]*>/g)].map((m) => m[1]);
+  assert.deepEqual(opens, ['today', 'needs', 'money', 'agents', 'projects'], `${where}: the five places that open, in the sidebar's order`);
+  assert.deepEqual([...opens].sort(), [...TABS].sort(), `${where}: every pane has its place`);
+  const named = words(side[1]!);
+  for (const t of TABS) if (t !== 'projects') assert.ok(named.includes(DESK.tabs[t]), `${where}: the sidebar names ${DESK.tabs[t]}`);
+  assert.ok(named.includes(DESK.more.work) && named.includes(DESK.more.people), `${where}: Work and People are in the frame`);
+  assert.match(side[1]!, /<button[^>]*id="desk-tab-today"[^>]*aria-current="page"|<button[^>]*aria-current="page"[^>]*id="desk-tab-today"/, `${where}: Today is chosen`);
+
+  const panels = html.match(/id="desk-pane-[a-z]+"/g) ?? [];
+  assert.equal(panels.length, 5, `${where} holds five panes`);
+  for (const t of TABS) assert.match(html, new RegExp(`id="desk-pane-${t}"`), `${where} has the ${t} pane`);
+  assert.ok(html.indexOf('id="desk-pane-today"') < html.indexOf('id="desk-pane-needs"'), 'Today comes first');
+  assert.ok(words(html).includes(GREETING), `${where}: Today opens on the greeting "${GREETING}"`);
+
+  const rule = html.match(/<noscript>\s*<style[^>]*>([\s\S]*?)<\/style>\s*<\/noscript>/);
+  assert.ok(rule, `${where} has no <noscript><style> rule`);
+  assert.match(rule[1]!, /\.desk-pane\s*\{\s*display:\s*block\s*!important/, 'every place shows with scripting off');
+  assert.match(rule[1]!, /\.desk-pane-name\s*\{\s*display:\s*block/, 'each place is headed by its name');
+  assert.match(rule[1]!, /aria-current='page'\]/, 'the sidebar stops marking a place as chosen');
+
   assert.doesNotMatch(html, /<img\b/i, `${where} draws no picture of the product`);
-  assert.ok(!said.includes(EM_DASH), `${where} has an em dash a person reads`);
+  assert.ok(!words(html).includes(EM_DASH), `${where} has an em dash a person reads`);
 }
 
-/** The window round it, in the built page: the app's frame, named, its rail and bars a picture. */
-function holdsTheWindow(html: string, where: string): void {
-  const win = html.match(/<figure class="win shot[^"]*"[^>]*aria-label="([^"]*)"/);
-  assert.ok(win, `${where} has no window`);
-  assert.equal(win[1]!.replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, '&'), frame.label, `${where}: the window is named`);
-  const rail = html.match(/<aside class="rail[^"]*"[^>]*aria-hidden="true"[^>]*>([\s\S]*?)<\/aside>/);
-  assert.ok(rail, `${where}: the rail is there, hidden from a screen reader as the picture it is`);
-  for (const p of frame.places) assert.ok(words(rail[1]!).includes(p.label), `${where}: the rail names ${p.label}`);
-}
-
-test('Today rendered on the server holds its greeting, its four tiles and both asks', () => {
-  const { body, head } = render(Today, { props: {} });
+test('the desk rendered on the server holds every place, Today\'s greeting and the noscript rule', () => {
+  const { body, head } = render(Desk, { props: {} });
   const html = head + body;
-  holdsToday(html, 'the server-rendered Today');
+  holdsTheDesk(html, 'the server-rendered desk');
+  for (const n of NEEDS) assert.ok(words(html).includes(n.ask), `Needs you holds "${n.ask}"`);
+  assert.match(html, /<span class="count[^"]*"[^>]*>2<\/span>/, 'the count on Needs you says 2');
+  for (const n of ASKED) assert.ok(!words(html).includes(n.ask), `the desk does not repeat the chores band's "${n.ask}"`);
+  assert.doesNotMatch(html, /id="desk-drop"/, 'the bar is closed until pressed');
   const visible = words(body);
-  assert.doesNotMatch(visible, /\b(rows?|list items?|entity|entities|schema|slug|MCP)\b/i, 'no never-word in Today');
-  assert.doesNotMatch(visible, /\b[0-9A-HJKMNP-TV-Z]{26}\b/, 'no id in Today');
+  assert.doesNotMatch(visible, /\b(rows?|list items?|entity|entities|schema|slug|MCP)\b/i, 'no never-word on the desk');
+  assert.doesNotMatch(visible, /\b[0-9A-HJKMNP-TV-Z]{26}\b/, 'no id on the desk');
 });
 
 test('the asks move in order: yes moves across first, Not now drops, Undo goes back to its first place', () => {
@@ -146,21 +154,19 @@ test("the desk's asks start open in the record order, and Today, Needs you and t
   /* Read afresh through `shared`, which the asserts above have not narrowed. */
   shared.needs.open.push('a copy');
   assert.equal(shared.needs.open.includes('a copy'), false, 'a reader gets a copy, never the state itself');
-  /* The filing section's questions are their own: answering one leaves Today's alone. */
+  /* The chores band's questions are their own: answering one leaves the desk's alone. */
   assert.deepEqual(asked.open, ASKED.map((n) => n.id));
   asked.answer(ASKED[0]!.id, true);
   assert.deepEqual(needs.open, [ids[0]]);
 });
 
-/* THE BUILT PAGE IS READ ONLY WHEN IT IS NEWER THAN EVERY FILE OF THE DRAWING, unless the step has just built it. */
+/* THE BUILT PAGE IS READ ONLY WHEN IT IS NEWER THAN EVERY DESK FILE, unless the step has just built it. */
 const newest = Math.max(...readdirSync(DESK_DIR).map((f) => statSync(new URL(f, DESK_DIR)).mtimeMs));
 const STALE =
   !STRICT && existsSync(INDEX) && statSync(INDEX).mtimeMs < newest
-    ? 'apps/site/build is older than src/lib/product, so it holds an older home page; build the site to read this one'
+    ? 'apps/site/build is older than src/lib/desk, so it holds an older home page; build the site to read this one'
     : null;
 
-test('the built home page holds Today whole, in the app\'s window, for a reader without scripting', when(missing(['index.html']) ?? STALE), () => {
-  const html = readFileSync(INDEX, 'utf8');
-  holdsToday(html, 'index.html');
-  holdsTheWindow(html, 'index.html');
+test('the built home page holds the desk whole for a reader without scripting', when(missing(['index.html']) ?? STALE), () => {
+  holdsTheDesk(readFileSync(INDEX, 'utf8'), 'index.html');
 });

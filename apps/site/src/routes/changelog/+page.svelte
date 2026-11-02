@@ -123,7 +123,7 @@
 <PageHead title={copy.title} lead={copy.lede}>
   <p class="head-row">
     <span class="head-count num">{copy.count(ITEMS.length, DAYS.length)}</span>
-    <a class="onward" href={FEED}>{copy.follow}<Icon name="arrow-right" size="s" /></a>
+    <a class="more" href={FEED}>{copy.follow}<Icon name="arrow" size="m" /></a>
   </p>
 </PageHead>
 
@@ -224,12 +224,13 @@
   }
 
   .head-count {
-    color: var(--ink-2);
+    color: var(--on-night-2);
     font-size: var(--t-site-15);
   }
 
-  .head-row .onward {
+  .head-row .more {
     margin: 0;
+    color: var(--on-night);
   }
 
   /* ── The board ─────────────────────────────────────────────────────────── */
@@ -294,8 +295,8 @@
     border: 0;
     border-radius: 999px;
     background: transparent;
-    color: var(--ink-2);
-    font: 500 var(--t-site-14) / 1 var(--font-ui);
+    color: var(--ink2);
+    font: 500 var(--t-site-14) / 1 var(--ui);
     white-space: nowrap;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
@@ -308,12 +309,12 @@
 
   .seg[aria-pressed='true'] {
     background: var(--ink);
-    color: var(--board);
+    color: var(--page);
   }
 
   .seg-n {
     margin-inline-start: 2px;
-    color: var(--ink-3);
+    color: var(--muted);
     font-weight: 400;
   }
 
@@ -346,7 +347,7 @@
   }
 
   .chart-span {
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-site-14);
   }
 
@@ -376,7 +377,7 @@
     inset-inline-start: 0;
     inset-block-end: -8px;
     inline-size: calc(var(--axis) - 6px);
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-app-xs);
     line-height: 16px;
     text-align: end;
@@ -408,15 +409,15 @@
     block-size: calc(var(--v) * 100%);
     min-block-size: 3px;
     border-radius: 3px 3px 1px 1px;
-    background: var(--chart-track);
+    background: var(--bar);
   }
 
   .bar.most {
-    background: var(--chart-1);
+    background: var(--chart);
   }
 
   .x-day {
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-app-xs);
     text-align: center;
     white-space: nowrap;
@@ -444,7 +445,7 @@
 
   .month-tally {
     margin: 0;
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-site-15);
   }
 
@@ -503,7 +504,7 @@
     flex: 1;
     min-inline-size: 0;
     overflow: hidden;
-    color: var(--ink-2);
+    color: var(--ink2);
     font-size: var(--t-site-15);
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -516,7 +517,7 @@
   .day-n {
     flex: none;
     margin-inline-start: auto;
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-site-14);
   }
 
@@ -524,7 +525,7 @@
     display: grid;
     flex: none;
     place-items: center;
-    color: var(--ink-3);
+    color: var(--muted);
     transition: transform var(--d-state) var(--ease-out);
   }
 
@@ -562,7 +563,7 @@
     padding-inline: 8px 10px;
     border-radius: 999px;
     box-shadow: inset 0 0 0 1px var(--rule);
-    color: var(--ink-2);
+    color: var(--ink2);
     font-size: var(--t-site-13);
     font-weight: 500;
   }
@@ -576,7 +577,7 @@
   .entry-title {
     margin: 0;
     color: var(--ink);
-    font-family: var(--font-ui);
+    font-family: var(--ui);
     font-size: var(--t-site-16);
     font-weight: 600;
     line-height: 1.5;
@@ -588,7 +589,7 @@
     position: relative;
     display: inline-flex;
     margin-inline-start: 6px;
-    color: var(--ink-3);
+    color: var(--muted);
     vertical-align: -0.1em;
     opacity: 0.6;
     transition: opacity var(--d-state) var(--ease-out);
@@ -613,7 +614,7 @@
   .entry-body {
     max-inline-size: 68ch;
     margin: 0;
-    color: var(--ink-2);
+    color: var(--ink2);
     font-size: var(--t-site-15);
     line-height: 1.55;
     text-wrap: pretty;
@@ -621,7 +622,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .seg[aria-pressed='false']:hover {
-      background: var(--tile-2);
+      background: var(--soft);
       color: var(--ink);
     }
 

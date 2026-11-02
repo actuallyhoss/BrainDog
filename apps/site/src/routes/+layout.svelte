@@ -1,30 +1,35 @@
 <!--
-  The site shell: the bar, the page, and the footer, in the app's own frame (the redo of 2 November).
+  The site shell: the night header, the page, and the dark footer (the site design of 17 October).
 
-  THE BAR IS THE APP'S BAR: `--nav` (white in light, the crimson #2E0C18 in dark) with its hairline under it, and it
-  stays at the top as the app's does. It holds the mark and the name, Slash, Agents, Pricing, Security and Docs
-  (`nav.ts`), "Sign in", and "Get early access" in ink: the page's own red is its main action, one red to a screen
-  (Look B). Signed in, the last two become "Open BrainDog" (`lib/site/Start.svelte`, `signed-in.ts`). The place you
-  are on wears the app's selected fill, `--nav-selected`, as the rail's current place does, and the fill slides to the
-  next place on a page change. At 760 and under the links go into a 44px menu beside the start button.
+  THE HEADER IS ON THE NIGHT GROUND AND SCROLLS AWAY WITH THE PAGE, 64px tall. Every page opens on the night ground
+  too (its own head, `lib/site/PageHead.svelte`, or the home page's hero), so the band runs on from the header
+  unbroken. It holds the brand, Slash, Agents, Pricing, Security and Docs (`nav.ts`), "Sign in", and "Get early
+  access" in red. Signed in, the last two become "Open BrainDog" (`lib/site/Start.svelte`, `signed-in.ts`).
+  At 760 and under the links go and the button stays at the right, small, with a 44px menu beside it holding the links.
 
-  THE FOOTER IS THE APP'S CHROME TOO, `--nav` with its hairline over it: the brand with nothing under it, then Product,
-  Who it's for and Help (`lib/site/footer.ts`).
+  THE FOOTER IS PLAIN TEXT COLUMNS: the brand with nothing under it, Product, Who it's for and Help.
 
-  NOTHING HERE IS NEEDED TO READ THE SITE. The nav is links, the scheme follows the operating system or the one chosen
-  in BrainDog (`/signed-in.js`), and every page is finished HTML. Scripting adds the sliding fill and closing the phone
-  menu after a tap, on Escape or on a tap outside it; without scripting the menu is a native disclosure.
+  NOTHING HERE IS NEEDED TO READ THE SITE. The nav is links, the theme follows the operating system, and every page is
+  finished HTML. Scripting adds one thing: closing the phone menu after a tap, on a press of Escape or on a tap outside
+  it; without scripting it is a native disclosure that opens and closes on its own 44px button, and a link inside it
+  loads the next page anyway.
 
   `header .brand` is read by `scripts/product.mjs`, which draws the shared card from the built home page.
 -->
 <script lang="ts">
   import '@braindog/skin/tokens.css';
-  /* AND THE PALETTE THIS BUILD IS FOR: `BRAINDOG_ENV` aliases this specifier (`vite.config.ts`), so an alpha build
-     resolves it to `alpha.css` and ships one palette. The same five sheets the app's root layout imports, in its order:
-     the site has no palette of its own. */
+  /* AND THE PALETTE THIS BUILD IS FOR, which `tokens.css` used to `@import` on everybody's behalf.
+     `BRAINDOG_ENV` aliases this specifier, so an alpha build resolves it to `alpha.css` and ships
+     one palette rather than two (28 §4). */
   import '@braindog/skin/house.css';
+  /* LOOK B, the site design's colours and faces. */
+  import '@braindog/skin/look-b.css';
   import '@braindog/skin/base.css';
   import '@braindog/skin/a11y.css';
+  /* The product's blocks, whose rows, icon wells and section heads every page draws with. Their kinds and charts are
+     100 KB more that only a page drawing blocks waits on, so `lib/app/Page.svelte` and `lib/docs/Body.svelte` bring
+     those. */
+  import '@braindog/skin/blocks.css';
   import '../app.css';
 
   import { afterNavigate, onNavigate } from '$app/navigation';
@@ -42,7 +47,7 @@
   let menuOpen = $state(false);
   let menu: HTMLDetailsElement | undefined = $state();
 
-  /* THE BAR'S LINKS ARE `nav.ts`'s, so each page appears the day its route does and never before. */
+  /* THE HEADER'S LINKS ARE `nav.ts`'s, so each page appears the day its route does and never before. */
   const links = LIVE.filter((p) => p.header).map((p) => ({ href: p.path, label: p.label }));
   const groups = footerGroups();
 
@@ -52,12 +57,12 @@
     menuOpen = false;
   });
 
-  /* THE SELECTED FILL SLIDES TO THE NEXT PLACE ON A PAGE CHANGE, as the app's lit row does (`$lib/motion/lit.ts`): one
-     `--nav-selected` box behind the row of links, moved and sized to the current link over `--d-swap` on the out curve,
-     and gone where no link is current. Placed still on its first draw, so a page opening does not slide it in; a reader
-     who asked for less motion sees it jump. Without scripting the current link wears the fill itself. */
+  /* THE CURRENT LINK'S UNDERLINE SLIDES TO THE NEXT ON A PAGE CHANGE (plan F11, as the app's lit row does with
+     `litSlide`): one 2px bar under the row of links, moved and sized to the link of the page you are on over `--d-swap`
+     on the out curve, and faded where no link is current. Placed still on its first draw, so a page opening does not
+     slide it in; a reader who asked for less motion sees it jump. Without scripting the current link underlines itself. */
   let row: HTMLElement | undefined = $state();
-  let lit = $state<{ x: number; w: number } | null>(null);
+  let under = $state<{ x: number; y: number; w: number } | null>(null);
   let sliding = $state(false);
   $effect(() => {
     void page.url.pathname;
@@ -65,8 +70,8 @@
     if (!box) return;
     const place = () => {
       const a = box.querySelector<HTMLElement>('a[aria-current="page"]');
-      if (a) lit = { x: a.offsetLeft, w: a.offsetWidth };
-      else if (lit) lit = { ...lit, w: 0 };
+      if (a) under = { x: a.offsetLeft, y: a.offsetTop + a.offsetHeight / 2 + 14, w: a.offsetWidth };
+      else if (under) under = { ...under, w: 0 };
     };
     place();
     const ready = requestAnimationFrame(() => (sliding = true));
@@ -78,8 +83,8 @@
     };
   });
 
-  /* A PAGE CHANGE CROSS-FADES where the browser has view transitions, and the bar holds still. Not for a reader who
-     asked for less motion, nor for a jump within one page. */
+  /* A PAGE CHANGE CROSS-FADES (`app.css`, ui pass of 1 Nov) where the browser has view transitions, and the header holds
+     still. Not for a reader who asked for less motion, nor for a jump within one page. */
   onNavigate((nav) => {
     if (typeof document.startViewTransition !== 'function') return;
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -103,34 +108,25 @@
   };
 </script>
 
-<svelte:head>
-  <!-- A PHONE'S OWN BAR TAKES THE SITE BAR'S COLOUR, the app's `--nav` for each scheme, read from the palette this build
-       ships (`vite.config.ts`), so the browser's chrome and the bar are one band, as in the app. -->
-  <meta name="theme-color" content={__SITE_NAV__.light} media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content={__SITE_NAV__.dark} media="(prefers-color-scheme: dark)" />
-</svelte:head>
-
 <svelte:window onclick={outside} onkeydown={escape} />
 
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="bar">
-  <div class="wrap bar-in">
-    <a class="brand" href="/" aria-label="{site.product} home"><Mark height={22} />{site.product}</a>
+<header class="nav night">
+  <div class="wrap bar">
+    <a class="brand" href="/" aria-label="{site.product} home"><Mark height={24} tone="inherit" />{site.product}</a>
 
-    <nav class="links" aria-label="Site" bind:this={row} data-slides={lit ? '' : undefined}>
-      {#if lit}<span class="links-lit" data-moving={sliding ? '' : undefined} aria-hidden="true" style:translate="{lit.x}px 0" style:inline-size="{lit.w}px" style:opacity={lit.w > 0 ? 1 : 0}></span>{/if}
+    <nav class="links" aria-label="Site" bind:this={row} data-slides={under ? '' : undefined}>
       {#each links as link}
         <a href={link.href} aria-current={here(link.href) ? 'page' : undefined}>{link.label}</a>
       {/each}
+      <SignIn />
+      {#if under}<span class="links-under" data-moving={sliding ? '' : undefined} aria-hidden="true" style:translate="{under.x}px {under.y}px" style:inline-size="{under.w}px" style:opacity={under.w > 0 ? 1 : 0}></span>{/if}
     </nav>
 
-    <div class="go">
-      <SignIn class="signin" />
-      <Start tone="ink" />
-    </div>
+    <div class="go"><Start size="sm" /></div>
 
-    <!-- THE PHONE'S BAR IS ONE ROW: the brand, the start button and this 44px button, which holds the links. -->
+    <!-- THE PHONE'S HEADER IS ONE ROW: the brand, the start button and this 44px button, which holds the links. -->
     <details class="menu" bind:open={menuOpen} bind:this={menu}>
       <summary class="menu-btn" aria-label={site.nav.menu}>
         <Icon name={menuOpen ? 'close' : 'menu'} size="l" />
@@ -152,11 +148,11 @@
 
 <main id="main">{@render children()}</main>
 
-<footer class="site-foot">
+<footer class="night site-foot">
   <div class="wrap">
     <div class="foot">
-      <div class="foot-brand">
-        <a class="brand" href="/" aria-label="{site.product} home"><Mark height={22} />{site.product}</a>
+      <div>
+        <a class="brand" href="/" aria-label="{site.product} home"><Mark height={24} tone="inherit" />{site.product}</a>
       </div>
       {#each groups as group}
         <nav aria-label={group.title}>
@@ -182,8 +178,8 @@
     inset-inline-start: 8px;
     z-index: var(--z-hint);
     padding-inline: 16px;
-    background: var(--tile);
-    border-radius: var(--r-ctl);
+    background: var(--page);
+    border-radius: 8px;
     color: var(--ink);
     transform: translateY(-200%);
   }
@@ -192,88 +188,85 @@
     transform: none;
   }
 
-  /* ── The bar ─────────────────────────────────────────────────────────────── */
+  /* ── The header ─────────────────────────────────────────────────────────── */
 
-  /* THE APP'S BAR: `--nav` with the hairline under it, held at the top. */
-  .bar {
-    position: sticky;
-    inset-block-start: 0;
-    z-index: var(--z-sheet);
-    background: var(--nav);
-    border-block-end: 1px solid var(--rule);
+  /* ON THE NIGHT GROUND, NOT STICKY: it scrolls away with the page, as the design draws it. */
+  .nav {
+    position: relative;
+    z-index: var(--z-hint);
     /* HELD STILL through a page change's cross-fade (`app.css`). */
     view-transition-name: site-bar;
   }
 
-  .bar-in {
+  .bar {
     display: flex;
     align-items: center;
-    gap: var(--sp-6);
-    block-size: var(--bar-h);
+    gap: 28px;
+    block-size: 64px;
   }
 
-  /* THE BRAND: the mark in the house red and the name in Lexend 600, the footer's the same. */
+  /* THE BRAND: the mark in red and the name in Lexend 600, the footer's the same. */
   .brand {
     display: flex;
     flex: none;
     align-items: center;
-    gap: 9px;
-    color: var(--ink);
-    font: 600 19px/1 var(--font-display);
+    gap: 10px;
+    color: inherit;
+    font: 600 20px/1 var(--head);
     letter-spacing: -0.02em;
     text-decoration: none;
   }
 
+  .brand :global(.mark) {
+    color: var(--red-fill);
+  }
+
   .links {
-    position: relative;
     display: flex;
     align-items: center;
-    gap: 2px;
-    font-size: var(--fs-ctl);
-    font-weight: 500;
+    gap: 24px;
+    margin-inline-start: auto;
+    color: var(--on-night-2);
+    font-size: var(--t-site-15);
   }
 
-  .links a {
-    position: relative;
-    z-index: var(--z-raise);
-    display: inline-flex;
-    align-items: center;
-    block-size: 34px;
-    padding-inline: 12px;
-    border-radius: var(--r-ctl);
-    color: var(--ink-2);
+  .links a,
+  .links :global(a) {
+    color: inherit;
     text-decoration: none;
-    transition:
-      background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out);
   }
 
-  .links a:hover {
-    background: var(--hover);
-    color: var(--ink);
-  }
-
-  /* THE CURRENT PLACE: the app's selected fill, by itself without scripting and by the sliding box with it. */
+  .links a:hover,
+  .links :global(a:hover),
   .links a[aria-current] {
-    background: var(--nav-selected);
-    color: var(--ink);
+    color: var(--on-night);
+  }
+
+  /* THE CURRENT LINK, UNDERLINED: by itself without scripting, by the sliding bar with it. */
+  .links {
+    position: relative;
+  }
+
+  .links a[aria-current] {
+    text-decoration: underline 2px;
+    text-underline-offset: 10px;
   }
 
   .links[data-slides] a[aria-current] {
-    background: transparent;
+    text-decoration: none;
   }
 
-  .links-lit {
+  .links-under {
     position: absolute;
-    inset-block-start: calc(50% - 17px);
+    inset-block-start: 0;
     left: 0;
-    block-size: 34px;
-    border-radius: var(--r-ctl);
-    background: var(--nav-selected);
+    block-size: 2px;
+    border-radius: 1px;
+    background: var(--on-night);
     pointer-events: none;
   }
 
-  .links-lit[data-moving] {
+  .links-under[data-moving] {
     transition:
       translate var(--d-swap) var(--ease-out),
       inline-size var(--d-swap) var(--ease-out),
@@ -281,49 +274,41 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .links-lit[data-moving] {
+    .links-under[data-moving] {
       transition: none;
     }
   }
 
+  /* 44 tall under a thumb, on a tablet wide enough to show the links. */
   @media (pointer: coarse) {
-    .links a {
-      block-size: var(--tap);
+    .links a,
+    .links :global(a) {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-block-size: var(--tap);
+      min-inline-size: var(--tap);
     }
 
-    .links-lit {
-      inset-block-start: calc(50% - 22px);
-      block-size: var(--tap);
+    .brand {
+      min-block-size: var(--tap);
     }
+
   }
 
   .go {
     display: flex;
     flex: none;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-inline-start: auto;
   }
 
-  .go :global(.signin) {
-    display: inline-flex;
-    align-items: center;
-    block-size: 34px;
-    padding-inline: 12px;
-    border-radius: var(--r-ctl);
-    color: var(--ink-2);
-    font-size: var(--fs-ctl);
-    font-weight: 500;
-    text-decoration: none;
-  }
-
-  .go :global(.signin:hover) {
-    background: var(--hover);
-    color: var(--ink);
+  .go :global(.btn) {
+    block-size: 40px;
+    padding-inline: 16px;
+    font-size: var(--t-site-15);
   }
 
   @media (pointer: coarse) {
-    .go :global(.signin) {
+    .go :global(.btn) {
       block-size: var(--tap);
     }
   }
@@ -339,8 +324,8 @@
     place-items: center;
     inline-size: var(--tap);
     block-size: var(--tap);
-    border-radius: var(--r-ctl);
-    color: var(--ink);
+    border-radius: 8px;
+    color: var(--on-night);
     cursor: pointer;
     list-style: none;
   }
@@ -349,28 +334,28 @@
     display: none;
   }
 
-  /* SHUT, THE PANEL IS NOT DRAWN AT ALL, so nothing in it can be reached or measured past the phone's edge. */
+  /* SHUT, THE PANEL IS NOT DRAWN AT ALL. A closed disclosure's content is skipped, but its links' boxes still answer a
+     measurement, at their own widths and past the phone's edge; taking it out of the layout leaves nothing to reach. */
   .menu:not([open]) .menu-panel {
     display: none;
   }
 
   .menu[open] .menu-btn {
-    background: var(--nav-selected);
+    background: var(--night-2);
   }
 
-  /* UNDER THE BAR, the column's width: one flat tile with the floating edge (`--rule-strong`, the design system's one
-     edge for what floats), a 44px line per page. It drops in from the button over the menu's step; shutting is at once,
-     as a disclosure's is. A fade alone under reduced motion. */
+  /* UNDER THE HEADER, the column's width: one flat tile on the night ground, a 44px line per page. */
   .menu-panel {
     position: absolute;
-    inset-block-start: calc(100% + 8px);
-    inset-inline: var(--site-gutter);
+    inset-block-start: 100%;
+    inset-inline: 16px;
     display: flex;
     flex-direction: column;
-    padding: var(--sp-2);
-    background: var(--tile);
-    border: 1px solid var(--rule-strong);
-    border-radius: var(--r-tile);
+    padding: 8px;
+    background: var(--night-2);
+    border-radius: 16px;
+    /* IT DROPS IN FROM THE BUTTON (ui pass, 1 Nov): 4px and 98% to its place over the menu's step, from the button's
+       corner; shutting is at once, as a disclosure's is. A fade alone under reduced motion. */
     transform-origin: 100% 0;
     transition:
       opacity var(--d-menu) var(--ease-out),
@@ -384,18 +369,6 @@
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .menu-panel {
-      transition: opacity var(--d-menu) var(--ease-out);
-    }
-
-    @starting-style {
-      .menu[open] .menu-panel {
-        transform: none;
-      }
-    }
-  }
-
   .menu-panel a,
   .menu-panel :global(.menu-link) {
     display: flex;
@@ -403,31 +376,37 @@
     justify-content: space-between;
     min-block-size: var(--tap);
     padding-inline: 12px;
-    border-radius: var(--r-ctl);
-    color: var(--ink);
+    border-radius: 8px;
+    color: var(--on-night);
     font-size: var(--t-site-16);
     font-weight: 500;
     text-decoration: none;
   }
 
-  .menu-panel a :global(svg) {
-    color: var(--ink-3);
-  }
-
   .menu-panel a:hover,
   .menu-panel :global(.menu-link:hover),
   .menu-panel a[aria-current] {
-    background: var(--tile-2);
+    background: var(--night-rule);
   }
 
   @media (max-width: 760px) {
-    .bar-in {
-      gap: var(--sp-2);
+    .bar {
+      gap: 8px;
+      block-size: 64px;
     }
 
-    .links,
-    .go :global(.signin) {
+    .links {
       display: none;
+    }
+
+    .go {
+      margin-inline-start: auto;
+    }
+
+    .go :global(.btn) {
+      block-size: 34px;
+      padding-inline: 12px;
+      font-size: var(--t-site-14);
     }
 
     .menu {
@@ -435,8 +414,21 @@
     }
   }
 
-  /* THE NARROWEST PHONES: the brand, the start button and the menu stay on the one row. */
+  /* AND STILL 44 UNDER A THUMB, as every small button on the site (`app.css`): the rule above is later than the one that
+     gave it 44, and a phone got a 34px start button. */
+  @media (max-width: 760px) and (pointer: coarse) {
+    .go :global(.btn) {
+      block-size: var(--tap);
+    }
+  }
+
+  /* THE NARROWEST PHONES: the brand, "Get early access" and the menu came to 340 in a 320 window, and the menu went off
+     its edge. The brand's name steps down and the spaces close up, so all three stay on the one row. */
   @media (max-width: 359px) {
+    .bar {
+      gap: 6px;
+    }
+
     .brand {
       gap: 6px;
       font-size: var(--t-site-17);
@@ -450,23 +442,21 @@
   /* ── The footer ─────────────────────────────────────────────────────────── */
 
   .site-foot {
-    padding: clamp(40px, 3vw + 28px, 64px) 0 calc(28px + env(safe-area-inset-bottom, 0px));
-    background: var(--nav);
-    border-block-start: 1px solid var(--rule);
-    color: var(--ink);
+    padding: 48px 0 calc(28px + env(safe-area-inset-bottom, 0px));
+    border-block-start: 1px solid var(--foot-rule);
     font-size: var(--t-site-15);
   }
 
   .foot {
     display: grid;
-    grid-template-columns: 1.6fr repeat(3, 1fr);
-    gap: var(--sp-6);
+    grid-template-columns: 1.5fr repeat(3, 1fr);
+    gap: 28px;
   }
 
   .foot h2 {
     margin: 0 0 12px;
-    color: var(--ink-3);
-    font: 500 var(--t-site-small) / 20px var(--font-ui);
+    color: var(--on-night-2);
+    font: 500 14px/1 var(--ui);
   }
 
   .foot ul {
@@ -477,23 +467,21 @@
     list-style: none;
   }
 
-  .foot ul a {
-    color: var(--ink-2);
+  .foot a {
+    color: inherit;
     text-decoration: none;
   }
 
   .foot ul a:hover {
-    color: var(--ink);
     text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
     text-underline-offset: 3px;
   }
 
   .owner {
-    margin: clamp(32px, 2vw + 24px, 48px) 0 0;
+    margin: 32px 0 0;
     padding-block-start: 20px;
-    border-block-start: 1px solid var(--rule);
-    color: var(--ink-3);
+    border-block-start: 1px solid var(--night-rule);
+    color: var(--on-night-2);
     font-size: var(--t-site-small);
   }
 
@@ -509,15 +497,8 @@
 
   @media (max-width: 760px) {
     .foot {
-      gap: var(--sp-5) var(--sp-3);
+      gap: 24px 12px;
       font-size: var(--t-site-14);
-    }
-  }
-
-  /* ON A PHONE, TWO GROUPS TO A ROW, so "Teams and agencies" keeps to one line. */
-  @media (max-width: 480px) {
-    .foot {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 

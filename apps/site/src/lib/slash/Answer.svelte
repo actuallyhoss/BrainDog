@@ -9,9 +9,8 @@
            its yes button and Not now. Yes says "Added to <where>." with Undo; Not now says "Nothing changed." with
            Back. Both go back to the draft, and a new question starts fresh.
 
-  IT DRAWS ON ITS CALLER'S TILE (the redo of 2 November): its parts stacked, a hairline between them, nothing filled
-  but the bars' track, and no answer in red: a suggested answer is ink, because the page's one red is its own main
-  action. Server-side it renders whole, so a reader with scripting off has the finished answer.
+  It draws the tiles side by side in its caller's grid: the scene's drop, the desk's bar and the page's Mini each
+  give the gap. Server-side it renders whole, so a reader with scripting off has the finished answer.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
@@ -82,7 +81,7 @@
   {/if}
   <div class="t read">
     <span class="sub">{ask.read}</span>
-    {#each ask.actions as a (a.label)}<button type="button" class="btn sm {a.tone === 'tint' ? 'ink' : ''}">{a.label}</button>{/each}
+    {#each ask.actions as a (a.label)}<button type="button" class="btn sm {a.tone === 'tint' ? 'red' : 'quiet'}">{a.label}</button>{/each}
   </div>
 {:else if find}
   <p class="thd">{w.found(find.count)}<span class="r">{find.aside}</span></p>
@@ -129,351 +128,86 @@
   <div class="propose" class:done={answered !== null} bind:this={box} aria-live="polite">
     {#if answered === null}
       <span class="sub">{make.from}</span>
-      <button type="button" class="btn ink sm" onclick={() => answer(true)}>{make.yes}</button>
-      <button type="button" class="btn sm" onclick={() => answer(false)}>{w.notNow}</button>
+      <button type="button" class="btn red sm" onclick={() => answer(true)}>{make.yes}</button>
+      <button type="button" class="btn quiet sm" onclick={() => answer(false)}>{w.notNow}</button>
     {:else if answered.yes}
       <span class="ok"><Glyph name="check" size={16} /></span>
       <span class="said">{w.added(make.where)}</span>
-      <button type="button" class="btn bare sm" onclick={() => answer(null)}>{w.undo}</button>
+      <button type="button" class="undo" onclick={() => answer(null)}>{w.undo}</button>
     {:else}
       <span class="said sub">{w.nothing}</span>
-      <button type="button" class="btn bare sm" onclick={() => answer(null)}>{w.back}</button>
+      <button type="button" class="undo" onclick={() => answer(null)}>{w.back}</button>
     {/if}
   </div>
 {/if}
 
 <style>
-  /* ONE PART OF THE ANSWER: the parts read top to bottom, a hairline between them. */
-  .t {
-    min-inline-size: 0;
-    padding-block: 12px;
-  }
-
-  .t + .t,
-  .t + .read,
-  .draft + .propose,
-  .t + .propose {
-    border-block-start: 1px solid var(--rule);
-  }
-
-  .t:first-child {
-    padding-block-start: 4px;
-  }
-
-  .who {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    margin-block-end: 8px;
-  }
-
-  .who b {
-    font-size: var(--t-site-small);
-    font-weight: 600;
-  }
-
+  .t { background: var(--tile); border-radius: 14px; padding: 16px; min-width: 0; }
+  .who { display: flex; align-items: center; gap: 9px; margin-block-end: 8px; }
+  .who b { font-weight: 600; font-size: var(--t-site-small); }
   .pface {
-    display: grid;
-    flex: none;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    border-radius: var(--r-ctl);
-    background: var(--ph-tint);
-    color: var(--ph);
+    width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none;
+    background: var(--ph-tint); color: var(--ph);
   }
-
-  .brief {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-site-17);
-    line-height: 1.5;
-    text-wrap: pretty;
+  .brief { font-size: var(--t-site-18); line-height: 1.5; margin: 0; text-wrap: pretty; }
+  .fig { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .late { color: var(--red); font-weight: 600; }
+  .hbar { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 12px; align-items: center; padding: 7px 0; font-size: var(--t-site-small); }
+  .meter { display: block; height: 6px; border-radius: 4px; background: var(--bar); overflow: hidden; }
+  .meter i { display: block; height: 100%; border-radius: 4px; background: var(--ink2); }
+  .num { font-variant-numeric: tabular-nums; }
+  .when2 { color: var(--muted); font-size: var(--t-site-12); }
+  .spark-t { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .sub { display: block; color: var(--muted); font-size: var(--t-site-12-5); margin: 0; }
+  .big { font: 600 27px/1.05 var(--head); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .spark { width: 140px; height: 44px; overflow: visible; flex: none; }
+  .spark { --pf-line: var(--ph); }
+  .spark .l { fill: none; stroke: var(--pf-line); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+  .spark .a { fill: color-mix(in srgb, var(--pf-line) 12%, transparent); stroke: none; }
+  .read { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 14px; }
+  .read .sub { flex: 1; min-width: 10em; }
+  .thd { display: flex; align-items: center; gap: 8px; margin: 2px 4px 0; font: 500 12.5px/1.2 var(--ui); color: var(--muted); }
+  .t .thd { margin: 0 0 10px; }
+  .r { margin-inline-start: auto; }
+  .hit { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--tile); min-width: 0; }
+  .agent { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; flex: none; background: var(--soft); color: var(--ink); box-shadow: inset 0 0 0 1px var(--rule); }
+  .grow { flex: 1; min-width: 0; }
+  .grow b { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .grow span { display: block; color: var(--muted); font-size: var(--t-site-12-5); }
+  mark { background: var(--red-tint); color: inherit; border-radius: 3px; padding: 0 1px; }
+  .tag { font-size: var(--t-site-11-5); color: var(--muted); white-space: nowrap; }
+  .draft { background: var(--tile); border-radius: 14px; overflow: hidden; min-width: 0; }
+  .draft-top { display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
+  .draft-top b { display: block; font: 600 16px/1.2 var(--head); letter-spacing: -0.02em; }
+  .draft-top span { display: block; color: var(--muted); font-size: var(--t-site-12); }
+  .dtbox { overflow-x: auto; }
+  .dtbox:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .dt { width: 100%; border-collapse: collapse; font-size: var(--t-site-13-5); }
+  .dt th { text-align: start; font-weight: 500; color: var(--muted); font-size: var(--t-site-12); padding: 6px 16px; border-block-start: 1px solid var(--rule2); }
+  .dt td { padding: 8px 16px; border-block-start: 1px solid var(--rule2); white-space: nowrap; }
+  .dt .n { text-align: end; font-variant-numeric: tabular-nums; }
+  .draft-foot { padding: 10px 16px; color: var(--muted); font-size: var(--t-site-12-5); border-block-start: 1px solid var(--rule2); }
+  .rule-s { margin: 0; font-size: var(--t-site-18); line-height: 1.55; text-wrap: pretty; }
+  .rule-s b { font-weight: 600; border-block-end: 2px solid var(--faint); }
+  .rule-sub { margin-block-start: 10px; }
+  .propose { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: var(--tile); font-size: var(--t-site-13-5); }
+  .propose .sub { flex: 1; min-width: 11em; }
+  .propose .said { flex: 1; }
+  .ok { display: inline-flex; color: var(--good); }
+  .undo { all: unset; cursor: pointer; font-size: var(--t-site-13); font-weight: 500; color: var(--red); }
+  .undo:hover { text-decoration: underline; }
+  .undo:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+  @media (pointer: coarse) {
+    .undo { min-height: 44px; display: inline-flex; align-items: center; padding: 0 6px; }
   }
-
-  .fig {
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .late {
-    color: var(--red);
-    font-weight: 600;
-  }
-
-  .hbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 88px auto;
-    align-items: center;
-    gap: 12px;
-    padding: 6px 0;
-    color: var(--ink);
-    font-size: var(--t-site-small);
-  }
-
-  .meter {
-    display: block;
-    block-size: 6px;
-    overflow: hidden;
-    border-radius: var(--r-xs);
-    background: var(--chart-track);
-  }
-
-  .meter i {
-    display: block;
-    block-size: 100%;
-    border-radius: var(--r-xs);
-    background: var(--chart-1);
-  }
-
-  .num {
-    font-variant-numeric: tabular-nums;
-  }
-
-  .when2 {
-    color: var(--ink-3);
-    font-size: var(--t-site-12);
-  }
-
-  .spark-t {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .sub {
-    display: block;
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--t-site-13);
-  }
-
-  .big {
-    font: 600 var(--fs-figure) / 1.1 var(--font-display);
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .spark {
-    --pf-line: var(--ph);
-
-    flex: none;
-    inline-size: 140px;
-    block-size: 44px;
-    overflow: visible;
-  }
-
-  .spark .l {
-    fill: none;
-    stroke: var(--pf-line);
-    stroke-width: 1.75;
-    stroke-linejoin: round;
-    stroke-linecap: round;
-  }
-
-  .spark .a {
-    fill: color-mix(in srgb, var(--pf-line) 8%, transparent);
-    stroke: none;
-  }
-
-  .read {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    padding-block: 12px 0;
-  }
-
-  .read .sub {
-    flex: 1;
-    min-inline-size: 10em;
-  }
-
-  .thd {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 0 8px;
-    color: var(--ink-3);
-    font: 500 var(--t-site-13) / 1.2 var(--font-ui);
-  }
-
-  .r {
-    margin-inline-start: auto;
-  }
-
-  .hit {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-inline-size: 0;
-    padding: 9px 0;
-  }
-
-  .hit + .hit {
-    border-block-start: 1px solid var(--rule);
-  }
-
-  .agent {
-    display: grid;
-    flex: none;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
-    color: var(--ink-2);
-  }
-
-  .grow {
-    flex: 1;
-    min-inline-size: 0;
-  }
-
-  .grow b {
-    display: block;
-    overflow: hidden;
-    font-weight: 500;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .grow span {
-    display: block;
-    color: var(--ink-3);
-    font-size: var(--t-site-13);
-  }
-
-  /* THE MATCHED LETTERS in a category tint, never red: red is kept for the start button and for late. */
-  mark {
-    padding: 0 1px;
-    border-radius: 3px;
-    background: var(--cat-yellow-tint);
-    color: inherit;
-  }
-
-  .tag {
-    color: var(--ink-3);
-    font-size: var(--t-site-12);
-    white-space: nowrap;
-  }
-
-  .draft {
-    min-inline-size: 0;
-  }
-
-  .draft-top {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding-block: 4px 12px;
-  }
-
-  .draft-top b {
-    display: block;
-    font: 600 var(--fs-body) / 1.3 var(--font-ui);
-  }
-
-  .draft-top span {
-    display: block;
-    color: var(--ink-3);
-    font-size: var(--t-site-12);
-  }
-
-  .dtbox {
-    overflow-x: auto;
-  }
-
-  .dtbox:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-  }
-
-  .dt {
-    inline-size: 100%;
-    border-collapse: collapse;
-    font-size: var(--t-site-13-5);
-  }
-
-  .dt th {
-    padding: 6px 12px 6px 0;
-    border-block-start: 1px solid var(--rule);
-    color: var(--ink-3);
-    font-size: var(--t-site-12);
-    font-weight: 500;
-    text-align: start;
-  }
-
-  .dt td {
-    padding: 8px 12px 8px 0;
-    border-block-start: 1px solid var(--rule);
-    white-space: nowrap;
-  }
-
-  .dt .n {
-    text-align: end;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .draft-foot {
-    padding-block: 10px;
-    border-block-start: 1px solid var(--rule);
-    color: var(--ink-3);
-    font-size: var(--t-site-12-5);
-  }
-
-  .rule-s {
-    margin: 0;
-    font-size: var(--t-site-17);
-    line-height: 1.55;
-    text-wrap: pretty;
-  }
-
-  .rule-s b {
-    font-weight: 600;
-    border-block-end: 2px solid var(--rule-strong);
-  }
-
-  .rule-sub {
-    margin-block-start: 10px;
-  }
-
-  .propose {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    padding-block: 12px 0;
-    font-size: var(--t-site-13-5);
-  }
-
-  .propose .sub {
-    flex: 1;
-    min-inline-size: 11em;
-  }
-
-  .propose .said {
-    flex: 1;
-  }
-
-  .ok {
-    display: inline-flex;
-    color: var(--good);
-  }
-
   @media (max-width: 760px) {
-    .grow b {
-      white-space: normal;
-    }
-
-    .tag {
-      display: none;
-    }
-
-    .hbar {
-      grid-template-columns: minmax(0, 1fr) 56px auto;
-    }
+    .grow b { white-space: normal; }
+    .tag { display: none; }
+    .hbar { grid-template-columns: minmax(0, 1fr) 56px auto; }
+    .hbar:nth-child(n + 4) { display: none; }
+    /* The table fits a phone without scrolling: 10px between columns, the box's own 16 at its edges. */
+    .dt th, .dt td { padding-inline: 5px; }
+    .dt :is(th, td):first-child { padding-inline-start: 16px; }
+    .dt :is(th, td):last-child { padding-inline-end: 16px; }
   }
 </style>

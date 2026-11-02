@@ -5,8 +5,7 @@
   a path the build has no file for answers a 404 status with this page in the site's own shell,
   rather than a blank white page. It is not in the sitemap and asks not to be indexed.
 
-  THE HEAD (the redo of 2 November), then every page `nav.ts` knows exists, each a 44px link with its arrow in one of
-  the app's tiles, so it names
+  THE NIGHT HEAD, then every page `nav.ts` knows exists, each a 44px link with its arrow in one flat tile, so it names
   a page the day its folder lands and a reader who arrived by accident is one press from somewhere real.
 
   FIRST THE THREE NEAREST THE ADDRESS (plan F29, as the app's not-found screen offers them): this page is one file for
@@ -49,13 +48,13 @@
 
 <style>
   .pages {
-    padding-block: clamp(32px, 2vw + 24px, 48px) clamp(48px, 4vw + 32px, 96px);
+    padding-block: 56px 96px;
   }
 
   .say {
     margin: 0 0 12px;
-    color: var(--ink-3);
-    font-family: var(--font-ui);
+    color: var(--muted);
+    font-family: var(--ui);
     font-size: var(--t-site-15);
     font-weight: 600;
     letter-spacing: 0;
@@ -73,8 +72,8 @@
     max-inline-size: 820px;
     margin: 0;
     padding: 12px 24px;
-    background: var(--tile);
-    border-radius: var(--r-tile);
+    background: var(--paper);
+    border-radius: 16px;
     list-style: none;
   }
 

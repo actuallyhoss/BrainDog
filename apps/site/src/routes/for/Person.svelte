@@ -1,7 +1,6 @@
 <!--
   One page written for one kind of person, `/for/<who>`: what they would say, three things BrainDog does for them, each
-  one of the app's tiles with its drawing from their example record on the board beside its words (the redo of
-  2 November), the link to the other page shown today, and the early access strip.
+  drawn from their example record, the link to the other page shown today, and the early access strip.
 
   THE UI PASS OF 20 OCTOBER took the drawn record window off these pages: it showed an older app (its tabs,
   a Page and Source switch) and drew the first row's chart twice. The home page's desk is the app as it is; each row
@@ -47,118 +46,120 @@
 <PageHead title={person.tag} lead={person.said}>
   <p class="sub">{person.sub}</p>
   <div class="actions">
-    <Start size="lg" />
+    <Start />
   </div>
 </PageHead>
 
-<section class="section" aria-label={person.tag}>
-  <div class="wrap">
-    <div class="tiles">
-      <!-- ── What it does for you, one tile a thing ─────────────────────── -->
-      {#each person.rows as row (row.head)}
-        <article class="tile lead does reveal">
-          <div class="words">
-            <h2>{row.head}</h2>
-            <p class="tile-say">{row.said}</p>
-          </div>
-          <div class="drawing">
-            <Page src={fence(row.draw.page, row.draw.at)} layout={[{ at: 0, cols: 12 }]} now={DRAWN_ON} canvas />
-          </div>
-        </article>
-      {/each}
-    </div>
+<section class="wrap story">
+  <!-- ── What it does for you, one card a thing ─────────────────────────── -->
+  {#each person.rows as row (row.head)}
+    <article class="card paper does">
+      <div class="split">
+        <div class="head">
+          <h2>{row.head}</h2>
+          <p class="say">{row.said}</p>
+        </div>
+        <div class="drawing">
+          <Page src={fence(row.draw.page, row.draw.at)} layout={[{ at: 0, cols: 12 }]} now={DRAWN_ON} canvas />
+        </div>
+      </div>
+    </article>
+  {/each}
 
-    <!-- ── The other page written for someone else: only its link, the words its name (site 2b) ── -->
-    {#if others.length}
-      <nav class="others" aria-label={f.others}>
-        <ul>
-          {#each others as c (c.id)}
-            <li><a class="onward" href={w.moreFor[c.id].href}>{f.who[c.id].nav}<Icon name="arrow-right" size="s" /></a></li>
-          {/each}
-        </ul>
-      </nav>
-    {/if}
-  </div>
+  <!-- ── The other page written for someone else: only its link, the words its name (site 2b) ── -->
+  <nav class="others" aria-label={f.others}>
+    <ul>
+      {#each others as c (c.id)}
+        <li><a class="more" href={w.moreFor[c.id].href}>{f.who[c.id].nav}<Icon name="arrow" size="m" /></a></li>
+      {/each}
+    </ul>
+  </nav>
 </section>
 
 <EarlyStrip />
 
 <style>
-  /* ── The head: the answer under the question, and the start button ──── */
+  /* ── The head: the answer under the question, and the two actions ──────── */
 
   .sub {
-    max-inline-size: 40rem;
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--t-site-16);
-    line-height: 1.6;
+    max-inline-size: 34em;
+    margin: 18px 0 0;
+    color: var(--on-night-2);
+    font-size: var(--t-site-18);
+    line-height: 1.5;
     text-wrap: pretty;
   }
 
   .actions {
-    margin-block-start: var(--sp-3);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-block-start: 34px;
   }
 
-  /* ── What it does for you: the words, and the record's own page drawn on the board ── */
+  /* ── The cards, one under another ────────────────────────────────────── */
 
-  .does {
+  .story {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-5);
+    gap: 16px;
+    padding-block: 96px;
   }
 
-  .words {
+  /* ── What it does for you ────────────────────────────────────────────── */
+
+  .split {
     display: grid;
-    align-content: center;
-    gap: var(--sp-3);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 56px;
+    align-items: center;
   }
 
-  .words h2 {
-    color: var(--ink);
-    font-size: clamp(22px, 0.6vw + 19px, 28px);
-    line-height: 1.15;
-    letter-spacing: -0.02em;
+  .head h2 {
+    margin: 0;
   }
 
-  /* THE DRAWING SITS ON THE BOARD, as a page's blocks do in the app, in a well of the tile. */
+  /* The drawing sits on the paper tile, so its own raised surfaces (a rule's steps) take the page's ground, or they
+     vanish into the tile. */
   .drawing {
+    --tile-2: var(--page);
     min-inline-size: 0;
-    padding: var(--sp-4);
-    border-radius: var(--r-pop);
-    background: var(--board);
   }
 
   .drawing :global(.block) {
     margin-block-end: 0;
   }
 
-  @media (width >= 1060px) {
-    .does {
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      gap: var(--sp-7);
-      align-items: center;
-    }
-  }
-
   /* ── The pages written for someone else ──────────────────────────────── */
 
   .others {
-    padding-block-start: var(--sp-4);
+    padding-block-start: 32px;
   }
 
   .others ul {
     display: flex;
     flex-wrap: wrap;
-    gap: 0 var(--sp-6);
+    gap: 0 32px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  @media (max-width: 640px) {
-    .actions,
+  @media (max-width: 1060px) {
+    .split {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 32px;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .story {
+      gap: 12px;
+      padding-block: 56px;
+    }
+
     .actions :global(.btn) {
-      inline-size: 100%;
+      flex: 1 1 auto;
     }
   }
 </style>

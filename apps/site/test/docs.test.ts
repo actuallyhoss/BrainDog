@@ -122,14 +122,12 @@ test('the docs index opens on the page head with the search in it', () => {
   const index = source('routes/docs/+page.svelte');
   const head = index.slice(index.indexOf('<PageHead'), index.indexOf('</PageHead>'));
   assert.ok(head.length > 0, 'routes/docs/+page.svelte draws no PageHead');
-  assert.match(head, /<Search\b/, 'the search is not in the head');
-  assert.doesNotMatch(head, /\bnight\b/, 'the head has no night ground (the redo of 2 November)');
+  assert.match(head, /<Search\b[^>]*\bnight\b/, 'the search is not in the head, drawn for the night ground');
   assert.match(head, /href="\/llms\.txt"/, 'the link for agents left the head');
 });
 
-test('the docs draw no band, glass or old palette, and their buttons are quiet and small', () => {
-  /* THE SHEET IS ONE OF THE APP'S TILES and a section's glyph sits in its well since the redo of 2 November. */
-  const old = /class="[^"]*\b(tiles|band|glass|btn-sm|btn-primary|night)\b|var\(--(bg|s1|dim|line|e1|r-lg|on-ink|hover-wash|paper|night[a-z0-9-]*|on-night[a-z0-9-]*)\)/;
+test('the docs draw no tile, well, glass or old palette, and their buttons are quiet and small', () => {
+  const old = /class="[^"]*\b(tile|tiles|well|band|glass|btn-sm|btn-primary)\b|var\(--(bg|s1|dim|line|e1|r-lg|on-ink|hover-wash)\)/;
   const wrong = DRAWN.filter((rel) => old.test(source(rel))).map((rel) => `${rel}: ${source(rel).match(old)?.[0]}`);
   assert.deepEqual(wrong, [], wrong.join('\n'));
   const page = source('routes/docs/[section]/[slug]/+page.svelte');
@@ -137,13 +135,12 @@ test('the docs draw no band, glass or old palette, and their buttons are quiet a
   assert.match(source('lib/docs/CopyText.svelte'), /class="btn quiet sm"/);
 });
 
-test('a doc page puts its title in a head on the board and its text on a tile at 68ch', () => {
+test('a doc page puts its title on a night strip and its text on paper at 68ch', () => {
   const page = source('routes/docs/[section]/[slug]/+page.svelte');
-  assert.match(page, /<header class="strip">[\s\S]*<h1 class="doc-title"/, 'the title is not in the head');
-  assert.doesNotMatch(page, /addEventListener\('scroll'/, 'the part in view is found by an observer, not on every scroll');
+  assert.match(page, /<header class="night strip">[\s\S]*<h1 class="doc-title"/, 'the title is not on the night strip');
+  assert.match(page, /\.board \{[^}]*background: var\(--board\)/, 'the nav and contents are not on the board');
   const body = source('lib/docs/Body.svelte');
-  assert.match(body, /class="tile doc-body"/, 'the page is not one of the app\'s tiles');
-  assert.match(body, /\.doc-body \{[^}]*background: var\(--tile\)/, 'the page is not on the tile');
+  assert.match(body, /\.doc-body \{[^}]*background: var\(--paper\)/, 'the page is not on paper');
   assert.match(body, /max-inline-size: 68ch/, 'the reading measure is not 68ch');
 });
 

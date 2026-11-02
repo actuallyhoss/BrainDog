@@ -42,18 +42,14 @@ export type Claim = {
 export const CLAIMS: readonly Claim[] = [
   /* The home page (`copy/home.ts`, spread into `site`, so `hero.sub` is its `home.hero.sub`). */
   { id: 'ai-tools-read', said: 'Your AI tools read from it too.', where: 'hero.sub', state: 'true' },
-  { id: 'agents-leave-a-note', said: "leave a note when they're done", where: 'tools.say', state: 'true' },
-  { id: 'mcp-approve-once-home', said: 'You approve each one once, and no key is copied anywhere.', where: 'tools.approve', state: 'true' },
-  { id: 'slash-figure-opens', said: 'every figure opens what it came from', where: 'tools.slash.say', state: 'true' },
-  { id: 'chores-reason-undo', said: 'each with a reason and an undo', where: 'filing.say', state: 'true' },
-  { id: 'floor-waits', said: 'Money, keys, sharing and deletes always wait for your yes.', where: 'filing.floor.say', state: 'true' },
+  { id: 'today-each-morning', said: 'on one page each morning', where: 'who.small.say', state: 'true' },
+  { id: 'agents-leave-a-note', said: "leaves a note when it's done", where: 'tools.say', state: 'true' },
+  { id: 'chores-reason-undo', said: 'each with a reason and an undo', where: 'chores.say', state: 'true' },
+  { id: 'floor-waits', said: 'Money, keys, sharing and deletes always wait for your yes.', where: 'chores.floor', state: 'true' },
+  { id: 'slash-card-yes', said: 'Money, keys, sharing and deletes wait for your yes.', where: 'slash.say', state: 'true' },
   { id: 'undo-any-change', said: 'Every change has a name on it, and an undo.', where: 'yours.points.0.text', state: 'true' },
   { id: 'export-any-time', said: 'Export everything as one file, any time.', where: 'yours.points.1.text', state: 'true' },
   { id: 'keys-unseen', said: 'AI tools use your keys without ever seeing them.', where: 'yours.points.2.text', state: 'true' },
-  { id: 'own-database-home', said: "Nothing is shared between customers, so no one else's search can reach yours.", where: 'yours.points.3.text', state: 'true' },
-  { id: 'no-password-home', said: 'Sign in with your email, Google or a passkey. No password to steal.', where: 'yours.points.4.text', state: 'true' },
-  { id: 'sealed-copies-home', said: 'A sealed copy every night, to a key kept outside Cloudflare.', where: 'yours.points.5.text', state: 'true' },
-  { id: 'nothing-lost-home', said: 'Nothing you make now is lost.', where: 'free.laterSay', state: 'true' },
   { id: 'invite-only', said: 'BrainDog is invite only for now.', where: 'free.say', state: 'true', flag: 'signup' },
 
   /* The Slash page (`copy/slash.ts`, its own export `slashPage`, which the ledger reads beside `site`). */
@@ -64,7 +60,6 @@ export const CLAIMS: readonly Claim[] = [
 
   /* The connect page (`copy/agents.ts`). */
   { id: 'mcp-approve-once', said: 'no key is copied anywhere', where: 'agents.lead', state: 'true' },
-  { id: 'mcp-opens-once', said: 'BrainDog opens once, and you approve it.', where: 'agents.steps.items.2', state: 'true' },
   { id: 'agent-sees-no-key', said: 'See a key. It uses them from the Keychain, by name.', where: 'agents.cannot.lines.0', state: 'true' },
   { id: 'agent-asks-first', said: 'Move money, share or delete without your yes.', where: 'agents.cannot.lines.1', state: 'true' },
   { id: 'agent-signs-writes', said: 'Hide what it did. Everything it writes carries its name.', where: 'agents.cannot.lines.2', state: 'true' },

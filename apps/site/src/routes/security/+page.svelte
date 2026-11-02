@@ -1,9 +1,9 @@
 <!--
   Security: how a record is kept, one fact to a tile, each drawn, and how to report a weakness.
 
-  THE HEAD, THEN THE BOARD (the redo of 2 November): the page's name and its one line in `PageHead`, then the app's
-  tiles, a fact to each, flat and opaque with no edge and no shadow, each heading the app's (its well and its name).
-  Restyled, not redesigned: the facts, the drawings and the report are the ones this page has always had.
+  THE NIGHT HEAD, THEN THE BOARD (Look B): the page's name and its one line in `PageHead`, then one flat
+  board of tiles, a fact to each, flat and opaque with no edge and no shadow. Restyled, not redesigned: the facts, the
+  drawings and the report are the ones this page has always had.
 
   EVERY FACT NAMES ITS SOURCE in a comment beside it in `copy/trust.ts`, and says only what is built. A fact that stops
   being true is fixed there, where the file it rests on is named. The drawings beside the facts say nothing the fact
@@ -12,7 +12,7 @@
 
   THE REPORTING ADDRESS IS THE SUPPORT ADDRESS, `SUPPORT_EMAIL`. While it is empty the last tile says when it arrives,
   and neither the address nor the repository's promise about mail is drawn, because nobody would be reading it. The
-  address is a plain button and never red: red is kept for the start button.
+  address is a plain outlined button and never red: the one solid red a page carries is "Start free".
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
@@ -48,7 +48,7 @@
     <!-- Two stacks at a desk, each tile as tall as what it holds; one column of six on a phone. -->
     <div class="stack span-8">
       {#if db}
-        <section class="tile lead fact split" aria-labelledby="db-title">
+        <section class="fact split" aria-labelledby="db-title">
           <div class="say-it">
             {@render head('db-title', db.glyph, db.title)}
             <p class="fact-text">{db.text}</p>
@@ -65,7 +65,7 @@
       {/if}
 
       {#if passkey}
-        <section class="tile lead fact split" aria-labelledby="passkey-title">
+        <section class="fact split" aria-labelledby="passkey-title">
           <div class="say-it">
             {@render head('passkey-title', passkey.glyph, passkey.title)}
             <p class="fact-text">{passkey.text}</p>
@@ -81,7 +81,7 @@
       {/if}
 
       {#if token}
-        <section class="tile lead fact split" aria-labelledby="token-title">
+        <section class="fact split" aria-labelledby="token-title">
           <div class="say-it">
             {@render head('token-title', token.glyph, token.title)}
             <p class="fact-text">{token.text}</p>
@@ -93,7 +93,7 @@
 
     <div class="stack span-4">
       {#if keys}
-        <section class="tile lead fact" aria-labelledby="keys-title">
+        <section class="fact" aria-labelledby="keys-title">
           {@render head('keys-title', keys.glyph, keys.title)}
           <p class="fact-text">{keys.text}</p>
           <div class="seal" role="img" aria-label={d.sealedLabel}>
@@ -110,7 +110,7 @@
       {/if}
 
       {#if nights}
-        <section class="tile lead fact" aria-labelledby="nights-title">
+        <section class="fact" aria-labelledby="nights-title">
           {@render head('nights-title', nights.glyph, nights.title)}
           <p class="fact-text">{nights.text}</p>
           <div class="nights" role="img" aria-label={d.nights}>
@@ -124,7 +124,7 @@
       {/if}
 
       {#if exported}
-        <section class="tile lead fact" aria-labelledby="export-title">
+        <section class="fact" aria-labelledby="export-title">
           {@render head('export-title', exported.glyph, exported.title)}
           <p class="fact-text">{exported.text}</p>
           <div class="export" role="img" aria-label={exported.text}>
@@ -141,14 +141,14 @@
       {/if}
     </div>
 
-    <section class="tile lead fact span-12 split report" aria-labelledby="report-title">
+    <section class="fact span-12 split report" aria-labelledby="report-title">
       <div class="say-it">
         {@render head('report-title', 'shield', s.report.title)}
         {#if address === ''}
           <p class="fact-text">{s.report.pending}</p>
         {:else}
           <p class="fact-text">{s.report.body}</p>
-          <p class="go"><a class="btn" href="mailto:{address}"><Icon name="mail" size="m" />{address}</a></p>
+          <p class="go"><a class="btn line" href="mailto:{address}"><Icon name="mail" size="m" />{address}</a></p>
         {/if}
       </div>
       {#if address !== ''}
@@ -175,7 +175,9 @@
   /* THE BOARD: one flat ground under the head, the tiles on it a gap apart. It runs on to the footer with no strip of
      the page's white between: its own padding is the room at the page's end. */
   .board {
-    padding-block: clamp(32px, 2vw + 24px, 48px) clamp(48px, 4vw + 32px, 96px);
+    margin-block-end: 0;
+    padding-block: 56px 96px;
+    background: var(--board);
   }
 
   /* TWO STACKS AT A DESK, eight columns and four, each tile as tall as what it holds, so none stands half empty beside
@@ -184,7 +186,7 @@
   .facts {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--tile-gap);
+    gap: 16px;
   }
 
   .stack {
@@ -195,7 +197,7 @@
     .stack {
       display: flex;
       flex-direction: column;
-      gap: var(--tile-gap);
+      gap: 16px;
       min-inline-size: 0;
     }
 
@@ -248,9 +250,16 @@
     }
   }
 
-  /* A TILE (`app.css`): flat and opaque, radius 16, no edge and no shadow. */
+  /* A TILE: flat and opaque, radius 16, no edge and no shadow. */
   .fact {
-    gap: var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-inline-size: 0;
+    padding: clamp(20px, 1.6vw + 14px, 32px);
+    background: var(--tile);
+    border-radius: 16px;
+    color: var(--ink);
   }
 
   /* A TILE IN TWO HALVES at a desk: the words, and the drawing of what they say. One column below 1100. */
@@ -272,13 +281,12 @@
   .how {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     align-self: flex-start;
     min-block-size: 32px;
-    margin-block-start: auto;
     color: var(--ink);
-    font-size: var(--t-site-small);
-    font-weight: 500;
+    font-size: var(--t-site-15);
+    font-weight: 600;
     text-decoration: none;
   }
 
@@ -302,29 +310,28 @@
     min-inline-size: 0;
   }
 
-  /* THE APP'S HEADING ROW: the glyph in its well and the name at 17/600. */
   .fact-head {
     display: flex;
     align-items: center;
     gap: 12px;
     color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--fs-head);
-    line-height: 24px;
+    font-size: var(--t-site-21);
+    line-height: 1.2;
+    letter-spacing: -0.035em;
   }
 
   .fact-text {
     margin: 0;
-    color: var(--ink-2);
-    font-size: var(--t-site-15);
-    line-height: 1.6;
+    color: var(--ink2);
+    font-size: var(--t-site-body);
+    line-height: var(--lh-site-body);
     text-wrap: pretty;
   }
 
   /* THE LINE UNDER A DRAWING that says what it means, in the second ink, or (`.ink`) the first. */
   .note {
     margin: 0;
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-site-15);
     line-height: 1.5;
   }
@@ -333,16 +340,16 @@
     color: var(--ink);
   }
 
-  /* THE GLYPH'S WELL: 32 (or 40) on the tile's second fill, radius 8; `ink` is the chosen form. */
+  /* THE GLYPH'S SQUARE: 32 (or 40) on the board's own fill, radius 8; `ink` is the chosen form. */
   .glyph {
     display: inline-grid;
     flex: none;
     place-items: center;
-    inline-size: var(--well-l);
-    block-size: var(--well-l);
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
-    color: var(--ink-2);
+    inline-size: 32px;
+    block-size: 32px;
+    background: var(--board);
+    border-radius: 8px;
+    color: var(--ink2);
   }
 
   .glyph.l {
@@ -352,7 +359,7 @@
 
   .glyph.ink {
     background: var(--ink);
-    color: var(--tile);
+    color: var(--page);
   }
 
   /* ── One database per record ─────────────────────────────────────────── */
@@ -370,8 +377,8 @@
     align-items: flex-start;
     gap: 12px;
     padding: 16px;
-    background: var(--tile-2);
-    border-radius: var(--r-pop);
+    background: var(--board);
+    border-radius: 12px;
   }
 
   .record .glyph {
@@ -380,7 +387,7 @@
 
   /* "Yours" in ink, the three "Someone else's" in the muted ink. */
   .record-name {
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-site-small);
     font-weight: 500;
   }
@@ -409,7 +416,7 @@
   }
 
   .seal-word {
-    color: var(--ink-2);
+    color: var(--ink2);
     font-size: var(--t-site-small);
     line-height: 1.35;
     overflow-wrap: anywhere;
@@ -419,7 +426,7 @@
     display: grid;
     place-items: center;
     block-size: 40px;
-    color: var(--ink-3);
+    color: var(--muted);
   }
 
   /* ── Nightly copies ──────────────────────────────────────────────────── */
@@ -439,18 +446,18 @@
   }
 
   .night {
-    background: var(--chart-track);
+    background: var(--bar);
     border-radius: 3px;
   }
 
   .night.last {
-    background: var(--chart-1);
+    background: var(--chart);
   }
 
   .night-ends {
     display: flex;
     justify-content: space-between;
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-site-small);
   }
 
@@ -474,7 +481,7 @@
   }
 
   .way.not {
-    color: var(--ink-3);
+    color: var(--muted);
     font-weight: 400;
   }
 
@@ -511,7 +518,7 @@
   }
 
   .export-note {
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-site-small);
   }
 
@@ -542,8 +549,8 @@
   }
 
   .after-title {
-    color: var(--ink-3);
-    font-family: var(--font-ui);
+    color: var(--muted);
+    font-family: var(--ui);
     font-size: var(--t-site-15);
     font-weight: 500;
   }
@@ -571,9 +578,9 @@
     inline-size: 32px;
     block-size: 32px;
     margin-block-end: 4px;
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
-    color: var(--ink-2);
+    background: var(--board);
+    border-radius: 8px;
+    color: var(--ink2);
     font-size: var(--t-site-small);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
@@ -586,7 +593,7 @@
   }
 
   .step-when {
-    color: var(--ink-3);
+    color: var(--muted);
     font-size: var(--t-site-15);
   }
 
@@ -621,6 +628,10 @@
     .step-when {
       font-size: var(--t-site-14);
       text-align: end;
+    }
+
+    .board {
+      padding-block: 24px 64px;
     }
 
     .night-row {

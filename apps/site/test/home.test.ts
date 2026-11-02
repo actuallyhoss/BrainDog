@@ -6,9 +6,9 @@
  * reads, with no em dash and none of the words a reader never meets (`docs/54-WRITING.md`), but for the one quiet link
  * and the one answer that name the protocol for a developer. No paid plan is named while billing is off.
  *
- * THE BUILT PAGE reads completely with scripting off: one h1, the hero and five sections in order with everything they
- * draw already in the HTML (the redo of 2 November), the makers by name, no picture, and no solid red but the start
- * button. Those checks read `apps/site/build` and skip, saying why, until it has been built.
+ * THE BUILT PAGE reads completely with scripting off: one h1, the seven bands in order with everything they draw already
+ * in the HTML, the makers by name, no picture, and no solid red but the start button. Those checks read
+ * `apps/site/build` and skip, saying why, until it has been built.
  */
 
 import { test } from 'node:test';
@@ -33,37 +33,39 @@ function strings(value: unknown, path = 'home'): [string, string][] {
 /* The words the site never says in prose (docs/54-WRITING.md), whole words and either case. */
 const NEVER = /\b(rows?|list items?|entit(?:y|ies)|register|schemas?|slugs?|MCP|packs?|credentials?|snapshots?)\b/i;
 
-test('home.ts holds the words of the redo at the key paths the ledger reads', () => {
+test('home.ts holds the words of site 2a at the key paths the ledger reads', () => {
   assert.equal(home.hero.title, 'Give your business a memory.');
   assert.equal(home.hero.sub, 'One place that remembers your work, your money and your life, and tells you what needs you today. Your AI tools read from it too.');
   assert.equal(home.hero.secondary, 'Connect your AI tools');
+  assert.equal(home.hero.works, 'Works with');
   assert.deepEqual(
     home.hero.makers.map((m) => m.name),
     APP_NAMES,
   );
-  assert.equal(home.filing.title, 'It does the filing. You make the calls.');
-  assert.equal(
-    home.filing.say,
-    'Payments, receipts and notes are filed on their own, each with a reason and an undo. Only what needs a person waits for you.',
+  assert.equal(home.who.title, "Who it's for");
+  assert.deepEqual(
+    [home.who.small.title, home.who.build.title, home.who.life.title],
+    ['Run a small business', 'Build with AI', 'Keep your own life in order'],
   );
-  assert.equal(home.filing.floor.say, 'Money, keys, sharing and deletes always wait for your yes. No rule and no AI tool can change that.');
+  assert.deepEqual([home.who.small.href, home.who.build.href, home.who.life.href], ['/for/founders', '/agents', '/docs/use/money']);
+  assert.equal(home.chores.title, 'It does the filing, you make the calls, and it stays yours.');
+  assert.equal(
+    home.chores.say,
+    'Filing, naming and sorting just happen, each with a reason and an undo. You only see what needs a person.',
+  );
+  assert.equal(home.chores.floor, 'Money, keys, sharing and deletes always wait for your yes. No rule and no AI tool can change that.');
   assert.equal(home.tools.title, 'Your AI tools share one memory.');
-  assert.match(home.tools.say, /start from your brief and leave a note when they're done\. Nothing gets explained twice\.$/);
-  assert.equal(home.tools.slash.title, 'Or ask BrainDog itself');
-  assert.equal(home.money.title, 'Your money, in one place.');
+  assert.equal(home.tools.say, "Each one starts from your brief and leaves a note when it's done. Nothing gets explained twice.");
+  assert.equal(home.slash.title, 'Press ⌘J and ask anything.');
   assert.equal(home.yours.title, 'It stays yours.');
   assert.deepEqual(home.yours.points.map((p) => p.text), [
     'Every change has a name on it, and an undo.',
     'Export everything as one file, any time.',
     'AI tools use your keys without ever seeing them.',
-    "Nothing is shared between customers, so no one else's search can reach yours.",
-    'Sign in with your email, Google or a passkey. No password to steal.',
-    'A sealed copy every night, to a key kept outside Cloudflare.',
   ]);
   assert.equal(home.free.title, 'Free while in early access.');
   assert.equal(home.faq.questions.length, 6);
   assert.ok(!('closing' in home), 'home has no recap close (site F1)');
-  assert.ok(!('who' in home) && !('chores' in home) && !('slash' in home), 'the bands of 1 November are gone');
 });
 
 /* THE ONE LINK AND THE ONE ANSWER THAT NAME THE PROTOCOL, for the developer who came for it (site 2a sections 4 and 7). */
@@ -112,18 +114,17 @@ test('the hero is section.hero with the slogan and the .sub sentence', when(NO_B
   assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*One place that remembers your work/);
 });
 
-test('the five sections after the hero, in order, and no close after them', when(NO_BUILD), () => {
+test('the five bands and the ask, in order, and no close after them', when(NO_BUILD), () => {
   const said = text(page());
-  /* THE QUESTIONS ARE THE PRICING PAGE'S (plan F12, 1 Nov). */
-  const order = [home.filing.title, home.tools.title, home.money.title, home.yours.title, home.free.title];
+  /* "IT STAYS YOURS" IS THE CHORES BAND'S, and the questions are the pricing page's (plan F12, 1 Nov). */
+  const order = [home.who.title, home.money.title, home.chores.title, home.tools.title, home.slash.title, home.free.title];
   let at = 0;
   for (const heading of order) {
     const found = said.indexOf(heading, at);
     assert.ok(found >= 0, `"${heading}" is on the page after the one before it`);
     at = found + heading.length;
   }
-  assert.equal([...page().matchAll(/<section\b[^>]*class="[^"]*\bsection\b/g)].length, 5, 'five section.section');
-  assert.doesNotMatch(page(), /\bband--/, 'no band of its own ground: every section is on the board');
+  assert.equal([...page().matchAll(/<section\b[^>]*class="[^"]*\bband--/g)].length, 7, 'seven section.band');
   assert.doesNotMatch(said, /Start your record\./, 'the recap close is gone');
 });
 
@@ -144,17 +145,18 @@ test('the only solid red button in the served page is the start button', when(NO
   }
 });
 
-test('with scripting off, every section says what it draws', when(NO_BUILD), async () => {
-  const { ASKED, HANDLED, NEEDS, NOTES, ASKS, FOUNDER } = await import('../src/lib/demo/maya.ts');
-  const { today } = await import('../src/lib/copy/product.ts');
+test('with scripting off, every band says what it draws', when(NO_BUILD), async () => {
+  const { ASKED, EVIDENCE, HANDLED, NEEDS, NOTES, ASKS, FOUNDER } = await import('../src/lib/demo/maya.ts');
+  const { DESK } = await import('../src/lib/desk/words.ts');
   const said = text(page());
-  /* TODAY OPENS ON THE GREETING, the morning's in the prerendered page. */
-  assert.ok(said.includes(today.greet(9, FOUNDER.short)), "Today's greeting, in plain text");
-  for (const n of NEEDS) assert.ok(said.includes(n.what), `Needs you's "${n.what}"`);
+  /* TODAY OPENS ON THE GREETING ALONE since 30 October (DIRECTION §51), where it read a line of counts. */
+  assert.ok(said.includes(DESK.greet(9, FOUNDER.short)), "Today's greeting, in plain text");
+  for (const n of NEEDS) assert.ok(said.includes(n.ask), `the desk's ask "${n.ask}"`);
+  assert.ok(said.includes(EVIDENCE.inv.head), "the first need's facts are there");
   for (const n of NOTES) assert.ok(said.includes(n.text), `the note "${n.text}"`);
-  assert.ok(said.includes(ASKED[0]!.ask), `the first question that waits, "${ASKED[0]!.ask}"`);
-  for (const h of HANDLED) assert.ok(said.includes(h.text), `the filing "${h.text}"`);
-  assert.ok(said.includes(ASKS[0]!.q), "Slash's first question");
-  assert.ok(said.includes(home.filing.floor.say), 'the floor');
+  for (const n of ASKED) assert.ok(said.includes(n.ask), `the chores band's ask "${n.ask}"`);
+  for (const h of HANDLED) assert.ok(said.includes(h.text), `the chore "${h.text}"`);
+  assert.ok(said.includes(ASKS[0]!.q), "the Slash band's first question");
+  assert.ok(said.includes(home.chores.floor), 'the floor');
   for (const p of home.yours.points) assert.ok(said.includes(p.text), `what keeps it yours: "${p.text}"`);
 });

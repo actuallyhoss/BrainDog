@@ -96,7 +96,7 @@ if (BRAND && brand !== BRAND) {
   process.exit(1);
 }
 
-/* EACH CARD IS ITS PAGE'S HEAD, SHRUNK TO FIT: the ground it sits on, the mark and wordmark at the top, and the
+/* EACH CARD IS ITS PAGE'S HEAD, SHRUNK TO FIT: the section's own ground, the mark and wordmark at the top, and the
    page's h1 with the line under it across the lower half. The ground is read off the section that holds the h1, so a
    card follows whatever ground the page gives it. The classes the build gave the lifted elements keep the page's
    rules for colour and face; the rules below only size and place them, since a 1200-wide card is not the 1440-wide
@@ -108,17 +108,7 @@ for (const path of CARD_PATHS) {
     const mark = document.querySelector('header .brand');
     const section = title?.closest('section');
     if (!title || !mark || !section) return false;
-    /* THE GROUND THE HEAD SITS ON: its own, or since the redo of 2 November (a page's head on the app's board, with no
-       fill of its own) the first ground behind it, down to the document's. */
-    const clear = (c) => c === 'transparent' || /^rgba\([^)]*,\s*0\)$/.test(c);
-    let ground = getComputedStyle(document.documentElement).backgroundColor;
-    for (let n = section; n; n = n.parentElement) {
-      const c = getComputedStyle(n).backgroundColor;
-      if (!clear(c)) {
-        ground = c;
-        break;
-      }
-    }
+    const ground = getComputedStyle(section).backgroundColor;
     const card = document.createElement('div');
     card.className = 'og-card';
     card.style.color = getComputedStyle(title).color;
@@ -127,7 +117,7 @@ for (const path of CARD_PATHS) {
     const h = title.cloneNode(true);
     h.classList.add('og-title');
     words.append(h);
-    const sub = section.querySelector('.lead, .lede, .sub');
+    const sub = section.querySelector('.lead, .sub');
     if (sub) {
       /* A card holds two short lines under the title, so a long lead keeps its first sentences up to about 150
          characters, whole, and never ends cut mid-word. */

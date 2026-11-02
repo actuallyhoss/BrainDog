@@ -39,10 +39,6 @@ export const CENTS = {
   googleWorkspace: 15_600,
   figmaBill: 6_400,
   monthlyBurn: 344_000,
-  /* THE NEXT 30 DAYS, as the app's Cash ahead says them: in is the Tidepool payout, the Shopify payout and Northbound's
-     invoice; out is this month's bills, the rent and the cards, so out less in is the month's burn above. */
-  in30: 1_393_500,
-  out30: 1_737_500,
 } as const;
 
 /**
@@ -50,7 +46,7 @@ export const CENTS = {
  * with the slot's foreground and its tint (`--cat-<slot>`, `--cat-<slot>-tint` in Look B). Never red or orange, so
  * nothing in a category reads as late.
  */
-export type Slot = 'blue' | 'violet' | 'pink' | 'teal' | 'sky' | 'yellow' | 'lime' | 'slate';
+export type Slot = 'blue' | 'violet' | 'pink' | 'teal' | 'sky' | 'amber' | 'lime' | 'slate';
 
 /** The two custom properties a drawing sets to paint something in its slot: `--ph` and `--ph-tint`. */
 export const slotVars = (slot: Slot): string => `--ph:var(--cat-${slot});--ph-tint:var(--cat-${slot}-tint)`;
@@ -64,7 +60,7 @@ export type Project = { name: string; hue: number; slot: Slot; icon: IconName; l
 /** Her four projects, in the order the desk draws them. */
 export const PROJECTS: Record<ProjectId, Project> = {
   tidepool: { name: 'Tidepool', hue: 198, slot: 'sky', icon: 'cloud', lane: 'Building' },
-  ferment: { name: 'Ferment & Co', hue: 32, slot: 'yellow', icon: 'box', lane: 'Earning' },
+  ferment: { name: 'Ferment & Co', hue: 32, slot: 'amber', icon: 'box', lane: 'Earning' },
   northbound: { name: 'Northbound', hue: 262, slot: 'violet', icon: 'target', lane: 'Client' },
   pocketlab: { name: 'Pocketlab', hue: 152, slot: 'teal', icon: 'rocket', lane: 'Building' },
 };
@@ -224,16 +220,6 @@ export const TODAY: {
   },
 };
 
-/**
- * TODAY'S NUMBERS, the app's Numbers tile (the 1 November Today): one figure a project, with the project's dot and
- * which way it went. A `trend` of `up` is good news here; nothing on the tile is red.
- */
-export const NUMBERS: { project: ProjectId; label: string; big: string; unit: string; change: string; trend: 'up' | 'down' }[] = [
-  { project: 'tidepool', label: 'Revenue a month', big: usd(CENTS.tidepoolPayout), unit: '', change: 'Up 6% on February', trend: 'up' },
-  { project: 'pocketlab', label: 'Beta users', big: '412', unit: 'people', change: 'Up 57 this week', trend: 'up' },
-  { project: 'ferment', label: 'Orders this week', big: '128', unit: 'orders', change: 'Up 7 on last week', trend: 'up' },
-];
-
 /** The AI tools Maya has connected, as the desk's Agents place lists them. */
 export const CONNECTED: { agent: AgentId; name: string; seen: string; live: boolean }[] = [
   { agent: 'claude' as const, name: 'Claude', seen: 'working now', live: true },
@@ -328,27 +314,27 @@ export type Need = {
 export const NEEDS: Need[] = [
   {
     id: 'chase',
-    what: 'Northbound invoice 1042',
+    what: 'Northbound invoice',
     sub: '4 days late · Sam Patel',
     late: true,
     amount: usd(CENTS.northboundInvoice),
     ask: `Northbound's ${usd(CENTS.northboundInvoice)} invoice is 4 days late. Chase it?`,
     why: 'A reminder in your words is drafted. Northbound usually pays in 9 days.',
-    yes: `Chase ${usd(CENTS.northboundInvoice)}`,
-    no: 'Not yet',
+    yes: 'Chase it',
+    no: 'Not now',
     done: 'Reminder to Sam Patel drafted in your words',
     evidence: 'inv',
   },
   {
     id: 'pay',
-    what: 'Dana Reyes, Tidepool icons',
-    sub: 'Due Friday · with the salaries',
+    what: 'Dana Reyes',
+    sub: 'due Friday · Tidepool icons',
     late: false,
     amount: usd(CENTS.danaInvoice),
     ask: `Dana Reyes sent a ${usd(CENTS.danaInvoice)} invoice, due Friday. Pay it with the salaries?`,
     why: 'Her invoice came in Monday. You paid her last three with the salaries.',
     yes: 'Plan it for Friday',
-    no: 'Not yet',
+    no: 'Not now',
     done: "Dana's invoice is planned for Friday, with the salaries",
     evidence: 'dana',
   },
@@ -607,14 +593,14 @@ export const MAKES: Make[] = [
 ];
 
 /**
- * THE MONEY SECTION ON THE HOME PAGE: Maya's money across her two books, hers and Ferment & Co's, as the app's Money
- * home draws it on 1 November: cash over the last 12 weeks, the accounts, this month's budgets and what is coming up.
- * The two bank balances add up to the cash now, $48,210; the card is owed, so it is not counted there.
+ * THE MONEY BAND ON THE HOME PAGE: Maya's money across her two books, hers and Ferment & Co's, as the app's Money home
+ * draws it (the 27 October rebuild): the accounts, this month's budgets and what is coming up. The two bank balances add
+ * up to the desk's "$48,210 across 2 accounts"; the card is owed, so it is not counted there.
  */
 export const MONEY_BAND: {
   accounts: { name: string; book: string; cents: number; icon: IconName }[];
-  /** CASH, THE LAST 12 WEEKS, in thousands of dollars week by week, as the Money home's line draws it; the last is today's. */
-  cash: number[];
+  /** NET WORTH, SINCE the 30 October Money look: cash, what the add-ons hold (her gold among it) less what is owed, week by week. */
+  worth: { cents: number; change: string; series: number[]; parts: { name: string; cents: number; icon: IconName }[] };
   budgets: { name: string; spent: number; of: number; icon: IconName; period: string }[];
   coming: { name: string; when: string; cents: number; icon: IconName }[];
 } = {
@@ -623,7 +609,17 @@ export const MONEY_BAND: {
     { name: 'Everyday checking', book: 'Maya', cents: 683_000, icon: 'bank' },
     { name: 'Amex', book: 'Maya', cents: -124_000, icon: 'card' },
   ],
-  cash: [44.9, 45.6, 45.1, 46.8, 46.2, 47.4, 46.9, 48.8, 47.6, 49.1, 48.4, 48.21],
+  worth: {
+    cents: 6_212_000,
+    change: 'Up 4% in 12 weeks',
+    series: [57.1, 57.6, 57.2, 58.4, 58.9, 58.6, 59.8, 60.4, 60.1, 61.2, 61.7, 62.1],
+    parts: [
+      { name: 'Cash', cents: 4_821_000, icon: 'cash' },
+      { name: 'Gold, 40 g', cents: 1_045_000, icon: 'coins' },
+      { name: 'Index fund', cents: 470_000, icon: 'trend-up' },
+      { name: 'Owed on the card', cents: -124_000, icon: 'card' },
+    ],
+  },
   budgets: [
     { name: 'Groceries', spent: 41_200, of: 60_000, icon: 'store', period: 'this month' },
     { name: 'Eating out', spent: 23_800, of: 20_000, icon: 'tag', period: 'this month' },

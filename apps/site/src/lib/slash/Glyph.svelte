@@ -1,6 +1,6 @@
 <!--
   One glyph of the site's set (`icons.ts`) at the drawing's own size, 18px unless the caller says otherwise, in
-  currentColor and the app's stroke of 1.75. Always decorative: every glyph sits beside its words.
+  currentColor and the prototype's stroke of 1.8. Always decorative: every glyph sits beside its words.
 -->
 <script lang="ts">
   import { GLYPHS, type IconName } from '../icons.ts';
@@ -15,7 +15,7 @@
     flex: none;
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.75;
+    stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
   }

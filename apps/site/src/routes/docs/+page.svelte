@@ -1,9 +1,9 @@
 <!--
   /docs: the page's head with the search in it, then every section of the docs as a card with its pages.
 
-  THE LOOK IS THE APP'S (the redo of 2 November): `PageHead` on the board, holding the search and the link for agents
-  in its slot, then the sections as the app's tiles, each with its glyph in a well, its name, its sentence and its
-  pages as a quiet list. No bare page count: a number with no word beside it read as noise.
+  THE LOOK IS LOOK B'S (LAUNCH 103 job 7): `PageHead` on the night ground, holding the search and the
+  link for agents in its slot, then the sections as flat --paper cards on the page, each with its name,
+  its sentence and its pages as a quiet list. No bare page count: a number with no word beside it read as noise.
 
   A SECTION WITH NO PAGE YET IS STILL A CARD, saying so, because the sections are the shape of the docs
   and each fills as its pages are written. Its title links nowhere until it has a page to open, so no card sends a reader
@@ -38,9 +38,9 @@
 
 <Seo title={w.meta.title} description={w.meta.description} path="/docs" />
 <PageHead title={w.title} lead={w.lede}>
-  <a class="onward" href="/llms.txt" data-sveltekit-reload>{w.forAgents}<Icon name="arrow-right" size="s" /></a>
+  <a class="more" href="/llms.txt" data-sveltekit-reload>{w.forAgents}<Icon name="arrow" size="m" /></a>
   <div class="head-search">
-    <Search index={data.index} id="docs-search" />
+    <Search index={data.index} id="docs-search" night />
   </div>
 </PageHead>
 
@@ -53,7 +53,7 @@
       {#if section.id === 'start'}
         <li class="sec start">
           <div class="sec-head">
-            <span class="well"><Icon name={section.glyph} /></span>
+            <Icon name={section.glyph} size="m" />
             <h2 class="sec-title">{section.label}</h2>
           </div>
           <ul class="start-links">
@@ -66,7 +66,7 @@
       {@const first = section.pages[0]?.path ?? null}
       <li class="sec">
         <div class="sec-head">
-          <span class="well"><Icon name={section.glyph} /></span>
+          <Icon name={section.glyph} size="m" />
           <h2 class="sec-title">
             {#if first}<a class="sec-link" href={first}>{section.label}</a>{:else}{section.label}{/if}
           </h2>
@@ -92,14 +92,19 @@
 </section>
 
 <style>
+  /* THE LINK FOR AGENTS IS ON THE NIGHT GROUND, so it takes the night's text: the page's red is for the paper. */
+  .more {
+    color: var(--on-night);
+  }
+
   /* THE SEARCH IN THE HEAD'S SLOT, under the link for agents, at a width a field reads well at. */
   .head-search {
-    inline-size: min(100%, 560px);
-    margin-block-start: var(--sp-3);
+    max-inline-size: 560px;
+    margin-block-start: var(--sp-5);
   }
 
   .secs {
-    padding-block: clamp(32px, 2vw + 24px, 48px) clamp(48px, 4vw + 32px, 96px);
+    padding-block: 56px 96px;
   }
 
   /* THREE COLUMNS OF CARDS AT A DESK, two between, one on a phone; Start here across the top. */
@@ -107,12 +112,12 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    gap: var(--tile-gap);
+    gap: 16px;
   }
 
   .col {
     display: grid;
-    gap: var(--tile-gap);
+    gap: 16px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -122,7 +127,7 @@
     grid-column: 1 / -1;
   }
 
-  /* A CARD IS THE APP'S TILE: flat, radius 16, no edge and no shadow. */
+  /* A CARD: flat --paper, radius 24, no edge and no shadow, as the design's plans are. */
   /* The product's section kind (`kinds/section.css`) used to reach these cards by their class names on every page, and
      this page drew with what it set: the centring, the UI face on the title and the count's weight. The kind's sheet
      now loads only where blocks are drawn, so the card says them itself. */
@@ -133,10 +138,10 @@
     align-content: start;
     gap: var(--sp-3);
     min-inline-size: 0;
-    padding: clamp(16px, 0.8vw + 13px, 24px);
+    padding: 28px 28px 24px;
     border-block-end: 0;
-    background: var(--tile);
-    border-radius: var(--r-tile);
+    background: var(--paper);
+    border-radius: 16px;
   }
 
   /* START HERE's three links sit side by side at a desk. */
@@ -159,7 +164,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    color: var(--ink-3);
+    color: var(--muted);
   }
 
   .sec-title {
@@ -171,9 +176,10 @@
     margin: 0;
     font-family: var(--font-ui);
     color: var(--ink);
-    font-size: var(--fs-head);
+    font-size: var(--t-site-21);
     font-weight: 600;
-    line-height: 24px;
+    line-height: 1.2;
+    letter-spacing: -0.03em;
   }
 
   .sec-link {
@@ -200,13 +206,13 @@
   .sec-blurb,
   .sec-empty {
     margin: 0;
-    color: var(--ink-2);
+    color: var(--ink2);
     font-size: var(--t-site-15);
     line-height: 1.5;
   }
 
   .sec-empty {
-    color: var(--ink-3);
+    color: var(--muted);
   }
 
   /* THE PAGES SIT IN THE CARD AS A LIST, with a hairline between them and the tile's fill under the pointer. */
@@ -229,7 +235,7 @@
     min-block-size: var(--tap);
     padding-inline: 10px;
     margin-inline: -10px;
-    border-radius: var(--r-ctl);
+    border-radius: 8px;
     color: var(--ink);
     font-size: var(--t-site-15);
     font-weight: 500;
@@ -239,11 +245,11 @@
 
   .sec-page :global(svg) {
     flex: none;
-    color: var(--ink-3);
+    color: var(--muted);
   }
 
   .sec-page:hover {
-    background: var(--hover);
+    background: var(--tile);
   }
 
   @media (width >= 700px) {
@@ -258,4 +264,13 @@
     }
   }
 
+  @media (max-width: 760px) {
+    .secs {
+      padding-block: 32px 64px;
+    }
+
+    .sec {
+      padding: 22px 20px 18px;
+    }
+  }
 </style>

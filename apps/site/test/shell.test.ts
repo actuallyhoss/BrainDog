@@ -21,7 +21,7 @@ import { HELD, LAUNCH } from '../src/lib/launch.ts';
 import { SOURCE } from '../src/lib/links.ts';
 import { PAGES, reachable } from '../src/lib/nav.ts';
 import { footerGroups } from '../src/lib/site/footer.ts';
-import { PREF, SIGNED_IN, isSignedIn, schemeOf } from '../src/lib/site/signed-in.ts';
+import { SIGNED_IN, isSignedIn } from '../src/lib/site/signed-in.ts';
 
 registerHooks({
   load(url, context, next) {
@@ -62,31 +62,9 @@ test('/signed-in.js and isSignedIn agree on every cookie', () => {
   }
 });
 
-test('/signed-in.js imports nothing and names the two cookies the app sets', () => {
+test('/signed-in.js imports nothing and names the one cookie', () => {
   assert.ok(!/\bimport\b|\bexport\b/.test(SCRIPT), 'signed-in.js is a plain script, loaded before any module');
-  assert.ok(SCRIPT.includes(`'${SIGNED_IN}'`), 'signed-in.js does not read bd_in');
-  assert.ok(SCRIPT.includes(`'${PREF}'`), 'signed-in.js does not read bd_pref');
-});
-
-/* THE SCHEME THE APP'S SETTINGS CHOSE, put on the page the way the app's shell puts it (the redo of 2 November). */
-test('/signed-in.js and schemeOf agree on the scheme and contrast in bd_pref', () => {
-  const attrs = (cookie: string): Record<string, string> => {
-    const set: Record<string, string> = {};
-    runInNewContext(SCRIPT, { document: { cookie, documentElement: { dataset: {}, setAttribute: (k: string, v: string) => (set[k] = v) } } });
-    return set;
-  };
-  const pref = (value: unknown): string => `${PREF}=${encodeURIComponent(JSON.stringify(value))}`;
-  const cases: [string, Record<string, string>, ReturnType<typeof schemeOf>][] = [
-    [pref({ scheme: 'dark' }), { 'data-scheme': 'dark' }, { scheme: 'dark' }],
-    [`a=1; ${pref({ scheme: 'light', contrast: true })}`, { 'data-scheme': 'light', 'data-theme': 'hc' }, { scheme: 'light', contrast: true }],
-    [pref({ scheme: 'sepia', contrast: 'yes' }), {}, {}],
-    [`${PREF}=not-json`, {}, {}],
-    ['', {}, {}],
-  ];
-  for (const [cookie, onPage, read] of cases) {
-    assert.deepEqual(attrs(cookie), onPage, `/signed-in.js on ${JSON.stringify(cookie)}`);
-    assert.deepEqual(schemeOf(cookie), read, `schemeOf(${JSON.stringify(cookie)})`);
-  }
+  assert.ok(SCRIPT.includes(`'${SIGNED_IN}'`), 'signed-in.js reads a cookie other than bd_in');
 });
 
 test('app.html loads /signed-in.js in the head, blocking, then /seen.js deferred, and carries no inline script', () => {
@@ -104,7 +82,7 @@ test('the signed-in rules beat a component\'s own display: !important, because a
 });
 
 test('Start draws both states: Get early access signed out (while sign-up is by invite), Open BrainDog signed in', async () => {
-  const Start = await component<{ size?: 'md' | 'sm' | 'lg'; tone?: 'red' | 'ink' }>('Start');
+  const Start = await component<{ size?: 'md' | 'sm'; tone?: 'red' }>('Start');
   const { body } = render(Start, { props: {} });
   assert.equal(shell.nav.start, LAUNCH.invite ? 'Get early access' : 'Start free', 'one key says the start button (SF13)');
   assert.match(body, new RegExp(`<a class="btn red when-out" href="https://app.brain.dog/signup" rel="external">${shell.nav.start}</a>`));
@@ -112,8 +90,6 @@ test('Start draws both states: Get early access signed out (while sign-up is by 
   const small = render(Start, { props: { size: 'sm' } }).body;
   assert.match(small, /class="btn red sm when-out"/);
   assert.match(small, /class="btn red sm when-in"/);
-  /* THE BAR'S IS INK, the strong neutral, so a screen's one red is its page's own start button. */
-  assert.match(render(Start, { props: { tone: 'ink' } }).body, /class="btn ink when-out"/);
 });
 
 test('SignIn is drawn only while signed out, and the early access strip ends on Start', async () => {
@@ -130,8 +106,7 @@ test('PageHead draws one h1 and its lead', async () => {
   const PageHead = await component<{ title: string; lead?: string }>('PageHead');
   const head = render(PageHead, { props: { title: 'Free for one person.', lead: 'Every plan has the whole app.' } }).body;
   assert.equal(head.match(/<h1\b/g)?.length, 1);
-  assert.match(head, /class="page-head"/, 'the head is on the board, as every section is (the redo of 2 November)');
-  assert.doesNotMatch(head, /\bnight\b/, 'the head has no night ground');
+  assert.match(head, /class="night/);
   assert.ok(head.includes('Every plan has the whole app.'));
 });
 
