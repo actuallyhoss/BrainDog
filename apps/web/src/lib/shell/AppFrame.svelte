@@ -706,7 +706,12 @@
   });
   /* THE PERSON READING, by the name the record told them, for the face: a guest's own name comes with `me`, since
      `names` names nobody to her, so her face is her own letter and never the "Y" of "You". */
-  const personName = $derived((data.me.person && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? '') : '').trim() || (data.me.name ?? '').trim());
+  const personName = $derived(
+    (data.me.person && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? '') : '').trim() ||
+      (data.me.name ?? '').trim() ||
+      /* AND WITH NO NAME AT ALL, THE ADDRESS THEY SIGN IN WITH, as Signing in draws the face: "M", never the "Y" of "You". */
+      (data.me.email ?? '').trim(),
+  );
 
   /* `g 1`–`9` COUNT WHAT IS ON SCREEN: the places, in the order drawn, the sidebar's on the bar shape. */
   const numbered = $derived(navPrefs.shape === 'bar' ? sidePlaces : rail.places);

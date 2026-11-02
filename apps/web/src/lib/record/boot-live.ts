@@ -149,6 +149,8 @@ export type Shell = ShellBase & {
      * her own first letter, never the "Y" of "You". Absent where the record knows no name.
      */
     name?: string;
+    /** Their own sign-in address, which `boot` sends only while it holds no name for them: the face is its first letter. */
+    email?: string;
     level: string;
     owner: boolean;
     /* THE SWITCHER'S OWN ROW, so a record where somebody holds some lists arrives with `level: null` and `held`. */
@@ -1332,6 +1334,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
       records: record ? [{ slug: record.slug, name: record.name, level }] : [],
       lists: held,
       ...(typeof b.me?.name === 'string' && b.me.name.trim() !== '' ? { name: b.me.name.trim() } : {}),
+      ...((email) => (typeof email === 'string' && email.trim() !== '' ? { email: email.trim() } : {}))((b.me as { email?: unknown } | undefined)?.email),
       ...((levels) => (levels === null ? {} : { levels }))(levelsFrom((b.me as Record<string, unknown> | undefined)?.levels)),
       ...(b.me?.prefs ? { prefs: b.me.prefs as Prefs } : {}),
       ...grantFrom(b.me),

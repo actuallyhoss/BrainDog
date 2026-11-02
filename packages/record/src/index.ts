@@ -1533,6 +1533,11 @@ export type Boot = {
     kind: 'person' | 'token' | 'system';
     person: string | null;
     name: string | null;
+    /**
+     * The person's own sign-in address, sent only while the record holds no name for them, so the face on the bar is the
+     * address's first letter as Signing in draws it, never the "Y" of "You". A person only.
+     */
+    email?: string;
     level: HeldLevel | null;
     /**
      * The level the caller holds on each list, by id: a grant naming the list, else the record-wide level, and no key for
@@ -10562,6 +10567,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const pagesByRow: NonNullable<Boot['pagesByRow']> = [
       ...new Set([...opens.filter(fleeting), ...listed.filter((page) => !kept.has(page))].map((page) => page.about!.register)),
     ];
+    /* A GUEST HOLDS NO MEMBER ROW AND STILL HAS A NAME, the one the record keeps for her, so her face on the bar is
+       her own first letter and never the "Y" of "You". */
+    const myName =
+      person === null
+        ? null
+        : (kernel.members().find((m) => m.person_id === person)?.name ?? sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', person)?.name ?? null);
     return {
       record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawn } : null,
       ...drawn,
@@ -10571,12 +10582,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            principal that is neither a person nor a token reads as the record's own, with no level. */
         kind: p.kind === 'person' || p.kind === 'token' ? p.kind : 'system',
         person,
-        /* A GUEST HOLDS NO MEMBER ROW AND STILL HAS A NAME, the one the record keeps for her, so her face on the bar is
-           her own first letter and never the "Y" of "You". */
-        name:
-          person === null
-            ? null
-            : (kernel.members().find((m) => m.person_id === person)?.name ?? sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', person)?.name ?? null),
+        name: myName,
+        /* AND A PERSON THE RECORD HOLDS NO NAME FOR IS THE FIRST LETTER OF THEIR ADDRESS, as Signing in draws them. */
+        ...(p.kind === 'person' && person !== null && (myName === null || myName.trim() === '')
+          ? ((email) => (typeof email === 'string' && email.trim() !== '' ? { email: email.trim() } : {}))(sql.one<{ email: string | null }>('SELECT email FROM person WHERE id = ?', person)?.email)
+          : {}),
         level: p.kind === 'person' || p.kind === 'token' ? p.level : null,
         levels: levelsOf(ctx),
         ...(ctx.grant === undefined ? {} : { grant: { ...ctx.grant } }),
