@@ -605,12 +605,16 @@ export function mayaRecord(today) {
     ['task:deck', 'Send the sprint review deck', 'done', 'normal', 'thing:northbound', 'track:sprint', -5, null],
     ['task:books', 'Send Leo the receipts for October', 'open', 'normal', null, null, 3, null],
   ];
+  /* WHO THE WORK IS FOR, where it is for a client (leftovers 2 Nov, 12): a task's card says its client beside its
+     project, and with none filed the demo never showed one. */
+  const CLIENTS = { 'task:hart': 'org:hart', 'task:sprint': 'org:northbound', 'task:deck': 'org:northbound' };
   for (const [key, what, state, priority, thing, track, by, agent, why] of tasks)
     add('tasks', key, {
       what,
       state,
       priority,
       ...(thing ? { thing: ref(thing) } : {}),
+      ...(CLIENTS[key] ? { client: ref(CLIENTS[key]) } : {}),
       ...(track ? { track: ref(track) } : {}),
       by: plus(today, by),
       ...(state === 'done' ? { done_on: plus(today, by) } : {}),

@@ -289,32 +289,53 @@ async function make(values) {
   const dropped = new Map();
   const counts = new Map();
   let register = null;
-  for (const r of plan.rows) {
-    if (r.register !== register) {
-      if (register) say(`    ${counts.get(register)} ${register}`);
-      register = r.register;
+  /* THREE MONTHS OF HISTORY ARE WRITTEN WITH THE LEDGER'S PER-LINE AUTOMATIONS OFF, AND THEY ARE SWITCHED BACK ON AFTER
+     (leftovers 2 Nov, 10). Each of her 143 lines started three scripts (filing it in its account's book, finding what it
+     paid, and letting it replace a posted line), and a rule may start one script at most 100 times a day
+     (`RULE_CALLS_PER_DAY`), so the 101st line onwards failed each of them: 116 failed runs on the day she was made, and
+     the hourly look-again then failed too, about 129 a week on Health, Settings and Automations. None of the three has
+     work to do on her history: her accounts are in no book, the plan links each paid bill itself (`settles`), and
+     nothing is posted for a repeating line yet. Each is the rule's own switch (`setAutomation`), the one Automations
+     presses, and a run cut off half way switches them back on in its `finally`. */
+  const QUIET = ['entry-takes-book', 'payment-matches', 'posted-replaced'];
+  const quieted = [];
+  const ledgerLines = plan.rows.filter((r) => r.register === 'transactions').length;
+  if (ledgerLines > 0)
+    for (const rule of QUIET) {
+      const off = await host.call('setAutomation', { rule, enabled: false }, owner).catch(() => null);
+      if (off?.changed) quieted.push(rule);
     }
-    const again = named.get(`${r.register}:${String(r.fields.name ?? '').toLowerCase()}`);
-    if (again) {
-      made.set(r.key, again);
+  try {
+    for (const r of plan.rows) {
+      if (r.register !== register) {
+        if (register) say(`    ${counts.get(register)} ${register}`);
+        register = r.register;
+      }
+      const again = named.get(`${r.register}:${String(r.fields.name ?? '').toLowerCase()}`);
+      if (again) {
+        made.set(r.key, again);
+        counts.set(r.register, (counts.get(r.register) ?? 0) + 1);
+        continue;
+      }
+      const has = declared.get(r.register);
+      const fields = Object.fromEntries(
+        Object.entries(r.fields).filter(([k]) => {
+          if (has.has(k)) return true;
+          dropped.set(`${r.register}.${k}`, (dropped.get(`${r.register}.${k}`) ?? 0) + 1);
+          return false;
+        }),
+      );
+      const row = await host.call('create', { register: r.register, fields: resolved(fields, made), op_id: `${values.slug}-${r.key}` }, owner).catch((e) => {
+        throw new Refused(`Writing ${r.label} (${r.register})`, e.refusal ?? { fix: e.message });
+      });
+      made.set(r.key, row);
       counts.set(r.register, (counts.get(r.register) ?? 0) + 1);
-      continue;
     }
-    const has = declared.get(r.register);
-    const fields = Object.fromEntries(
-      Object.entries(r.fields).filter(([k]) => {
-        if (has.has(k)) return true;
-        dropped.set(`${r.register}.${k}`, (dropped.get(`${r.register}.${k}`) ?? 0) + 1);
-        return false;
-      }),
-    );
-    const row = await host.call('create', { register: r.register, fields: resolved(fields, made), op_id: `${values.slug}-${r.key}` }, owner).catch((e) => {
-      throw new Refused(`Writing ${r.label} (${r.register})`, e.refusal ?? { fix: e.message });
-    });
-    made.set(r.key, row);
-    counts.set(r.register, (counts.get(r.register) ?? 0) + 1);
+  } finally {
+    for (const rule of quieted) await host.call('setAutomation', { rule, enabled: true }, owner).catch(() => say(`    could not switch ${rule} back on: switch it on in Automations`));
   }
   if (register) say(`    ${counts.get(register)} ${register}`);
+  if (quieted.length > 0) say(`    wrote the history with ${quieted.length} per-line automations off, and switched them back on`);
   if (dropped.size > 0) say(`    left out, as this record's lists have no such field: ${[...dropped].map(([f, n]) => `${f} (${n})`).join(', ')}`);
 
   /* 5. TODAY'S WIDGETS, from the gallery, each once. A TODAY THE RECORD DOES NOT KEEP YET is drawn by the app from what
