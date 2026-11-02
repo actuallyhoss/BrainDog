@@ -91,7 +91,12 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       lead: true,
       span: 12,
       when: { metric: 'out-by-month', lt: 1 },
-      body: 'Nothing has moved yet.',
+      /* AND HOW IT FILLS, SINCE money-core 3.36.0 (empty states, 2 Nov): "Nothing has moved yet." said what was missing
+         and not what would come, over a strip of noughts. */
+      says: [
+        { when: { metric: 'cash-accounts', is: 0 }, body: 'Where your money goes, month by month, shows here once an account brings payments in. [Add an account](/p/money).' },
+        { body: 'Nothing has moved yet. Where your money goes, month by month, shows here as payments reach the [Ledger](/p/money-ledger).' },
+      ],
     },
     {
       /* TWELVE MONTHS, EACH WAY, AND WHAT WAS LEFT. No months ahead: Forecast is where the months ahead are read. */

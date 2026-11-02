@@ -139,6 +139,23 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
+   * HOW MANY ACCOUNTS ONE BOOK HOLDS AS CASH, SINCE money-core 3.36.0 (empty states, 2 Nov), read once per book as
+   * `book-cash` is: what a book's Cash ahead is drawn on. A book with no account drew a twelve-week walk of £0 that
+   * "stays above zero", a chart of nothing; Money's own Cash ahead waits for `cash-accounts` the same way.
+   */
+  'book-accounts': {
+    metric: 'book-accounts',
+    name: 'Accounts in one book',
+    source: 'register.accounts',
+    where: `${HELD}, book is {{it}}`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
    * HOW MANY PAYMENTS LEFT ONE BOOK THIS MONTH, SINCE money-core 3.8.0, read once per book as `book-cash` is: what a
    * book's Where this month's money went is drawn on, over its own clauses, so a book with nothing spent this month
    * draws no split with no parts in it. A count and not a sum, because a sum over two currencies is two amounts and the

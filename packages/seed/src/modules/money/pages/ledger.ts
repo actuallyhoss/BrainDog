@@ -93,6 +93,18 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
       body: '{{txn-uncategorised}} line(s) to file.',
     },
     {
+      /* A LEDGER WITH NO LINES SAYS WHAT WILL BE HERE AND HOW IT FILLS, SINCE money-core 3.36.0 (empty states, 2 Nov): it
+         said "Nothing in Ledger yet. What you add or mention lands here." under a search over nothing. */
+      kind: 'note',
+      lead: true,
+      span: 12,
+      when: { metric: 'ledger-newest-days', empty: true },
+      says: [
+        { when: { metric: 'cash-accounts', is: 0 }, body: 'Every payment in and out is listed here by day, once an account brings them in. [Add an account](/p/money).' },
+        { body: 'Every payment in and out is listed here by day. [Bring in a statement](/add/statement) to fill it.' },
+      ],
+    },
+    {
       /* THE MONTH IN THREE NUMBERS, the Ledger's own: what went out and came in over thirty days, moves between your own
          accounts left out, and how many lines a bank add-on, an agent or a rule added for you. How many wait for a
          category is the line above.
@@ -123,7 +135,14 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
         { metric: 'spent-30d', label: 'Spent' },
         { metric: 'received-30d', label: 'Received' },
       ],
-      when: { any: [{ metric: 'filed-for-you-30d', lte: 0 }, { metric: 'filed-for-you-30d', empty: true }] },
+      /* AND ONLY ONCE SOMETHING MOVED IN THE THIRTY DAYS, SINCE money-core 3.36.0 (empty states, 2 Nov): a new Ledger
+         drew this tile with nothing in it but "Nothing matched." */
+      when: {
+        all: [
+          { any: [{ metric: 'filed-for-you-30d', lte: 0 }, { metric: 'filed-for-you-30d', empty: true }] },
+          { any: [{ metric: 'spent-30d', gt: 0 }, { metric: 'received-30d', gt: 0 }] },
+        ],
+      },
     },
     {
       /* NOT FILED YET, ON ITS OWN AND FIRST, newest first, only while there is any: the lines with no category that are
@@ -168,6 +187,9 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
       order: [{ field: 'on', dir: 'desc' }],
       limit: LEDGER_PAGE_LINES,
       empty: 'No lines match.',
+      /* NOT ON A LEDGER WITH NO LINES, SINCE money-core 3.36.0: the line at the top says what will be here, and this tile
+         said "No lines match." under it, of a search nobody made. */
+      when: { metric: 'ledger-newest-days', empty: false },
       /* THE DOOR TO THE FILING RULES OVER THE LINES THEY FILE, SINCE money-core 3.34.0 (next-money, M8): it was a tile of
          its own after the last line, and the list folds at thirty, so a one-line tile under "Show 30 more" was never
          reached. The line over the lines is the tile's own (`writtenLine` in the app's `record/blocks.ts`). */

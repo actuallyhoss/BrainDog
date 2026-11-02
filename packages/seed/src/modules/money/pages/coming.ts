@@ -54,6 +54,15 @@ export const MONEY_COMING_PAGE: SeedPage = {
   pack: 'money-core',
   blocks: [
     {
+      /* NOTHING KEPT THAT FALLS DUE, SINCE money-core 3.36.0 (empty states, 2 Nov): the line below has no figure to say
+         then, and the page said "Nothing in Coming up yet. What you add or mention lands here." */
+      kind: 'note',
+      lead: true,
+      span: 12,
+      when: { all: [{ metric: 'bills-held', is: 0 }, { metric: 'repeating-held', is: 0 }] },
+      body: 'Bills, invoices and payments that repeat are listed here by the day each falls due. [Add a bill](/r/obligations).',
+    },
+    {
       /* THE LINE, FROM THE WALK'S OWN FIGURES: what comes in and goes out in the next thirty days, as Cash ahead counts it. */
       kind: 'note',
       lead: true,

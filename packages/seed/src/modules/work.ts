@@ -434,6 +434,21 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  /**
+   * HOW MANY OPEN TASKS HAVE A DUE DAY, SINCE work 1.24.0 (empty states, 2 Nov): the tasks the Timeline places, over its
+   * own clauses, so its line can say what will stand there while nothing does.
+   */
+  'tasks-dated': {
+    metric: 'tasks-dated',
+    name: 'Open tasks with a due day',
+    source: 'register.tasks',
+    where: 'by is set, state is not done or dropped',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
   'tasks-overdue': {
     metric: 'tasks-overdue',
     name: 'Past their date',
@@ -951,7 +966,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         lead: true,
         span: 12,
-        when: { metric: 'tasks-late-yours', is: 0 },
+        /* AND ONLY WHILE SOMETHING IS OPEN, SINCE work 1.24.0 (empty states, 2 Nov): a new Work said "Nothing is open right
+           now" and then "None of your tasks is late" under it, of tasks that did not exist. The first line says it all. */
+        when: { all: [{ metric: 'tasks-late-yours', is: 0 }, { metric: 'open-tasks', gt: 0 }] },
         /* THE QUESTIONS SECOND HERE, SINCE work 1.19.0: first they would put "Nothing" in the middle of the line, and
            the writer leaves a clause at nought out and never mends a capital. */
         /* SAID OF WHAT IT COUNTS (Q6 of 29 October): "Nothing late" stood beside Today's "Late and urgent 6", which
@@ -1286,7 +1303,12 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         lead: true,
         span: 12,
-        body: '{{tasks-overdue}} past their date, {{tasks-due-7d}} due in 7 days',
+        /* AND WHAT WILL STAND HERE WHILE NOTHING DOES, SINCE work 1.24.0 (empty states, 2 Nov): with no dated task both
+           clauses are left out, and the page said "Nothing in Timeline yet. What you add or mention lands here." */
+        says: [
+          { when: { metric: 'tasks-dated', is: 0 }, body: 'No task has a due day yet. Give one a day on [Work](/p/work).' },
+          { body: '{{tasks-overdue}} past their date, {{tasks-due-7d}} due in 7 days' },
+        ],
       },
       {
         /* TASKS BY DUE DAY, NOT IN PLAY (finish F52): "In play 15" counted tasks where in play means projects everywhere

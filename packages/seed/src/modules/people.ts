@@ -605,6 +605,12 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
            ("Fenwick and Acme, 2 clients"); more, or clients in both lists, are counted. A clause at nought is left out,
            so a record of people alone reads as it did. */
         says: [
+          /* JUST YOU, SINCE people 4.4.0 (empty states, 2 Nov): every clause below is nought on a new record, so the page
+             said "Nothing in People yet" over a list that holds you. */
+          {
+            when: { all: [{ metric: 'people-count', is: 0 }, { metric: 'organisations-count', is: 0 }, { metric: 'questions-open-in:people', is: 0 }] },
+            body: 'Just you so far.',
+          },
           {
             when: { all: [{ metric: 'organisations-clients', gt: 0 }, { metric: 'organisations-clients', lte: 3 }, { metric: 'people-clients', is: 0 }] },
             body: '{{questions-open-in:people}} question(s) for you, {{organisations-clients.names}}, {{organisations-clients}} client(s), {{people-count}} person(s) besides you, {{organisations-not-clients}} other organisation(s)',

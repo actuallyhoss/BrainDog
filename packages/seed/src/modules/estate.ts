@@ -39,7 +39,9 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
     /* WHO A SERVICE IS WITH, AND NOT A REGISTRAR, since estate 1.3.0. A registrar is what a domain is held with, and
        Services holds hosting, subscriptions and certificates as well, so the line named one kind of provider as if it
        were all of them, and `tools/gates/shell-words.mjs` had to exempt it as a use-case word in the core. */
-    holds: 'a renewal date, who it is with and a cost, so the record can tell you what is due in October',
+    /* SAID AS A PERSON SAYS IT, SINCE estate 2.8.0 (empty states, 2 Nov): "so the record can tell you what is due in
+       October" named a month that had passed and called his BrainDog a record. */
+    holds: 'a renewal date, who it is with and a cost, so you are told what renews before it does',
     title: 'name',
     mobile: ['name', 'cost', 'renews'],
     state: 'state',

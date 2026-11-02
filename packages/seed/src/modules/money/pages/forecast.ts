@@ -33,6 +33,15 @@ const CASH_AHEAD: Record<string, unknown> = {
 const NOTHING_IN = 'With nothing coming in it lasts to {{lasts-no-income.on}}.';
 const LINES: Record<string, unknown>[] = [
   {
+    /* NO ACCOUNT, NO WALK, SINCE money-core 3.36.0 (empty states, 2 Nov): Cash ahead waits for one (`cash-accounts`), and
+       the page said "Nothing in Forecast yet. What you add or mention lands here." */
+    kind: 'note',
+    lead: true,
+    span: 12,
+    when: { metric: 'cash-accounts', is: 0 },
+    body: 'Where your cash is heading is drawn here, week by week, once Money has an account. [Add an account](/p/money).',
+  },
+  {
     kind: 'note',
     lead: true,
     span: 12,

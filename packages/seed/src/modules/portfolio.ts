@@ -578,6 +578,19 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  /* HOW MANY READINGS NUMBERS HOLDS, SINCE portfolio 1.31.0 (empty states, 2 Nov): the example left out, as every count of
+     Numbers is. What the Numbers page's line is drawn on while it holds none. */
+  'readings-held': {
+    metric: 'readings-held',
+    name: 'Readings',
+    source: 'register.datapoints',
+    where: 'source is not example',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
   /* HOW LONG SINCE A MEASURE WAS LAST READ, in days, `{{it}}` the measure's name in Numbers: `kpi-stale:Daily active
      players`. Held to the days a key number with no cadence may go quiet (`KPI_LIST.stale.days`), so a reading of 23
      misses it; one with a cadence is held to twice it by the reader. The example left out, and up to today, as every
@@ -1322,7 +1335,12 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'note',
         lead: true,
         span: 12,
-        body: 'What your projects report, newest first.',
+        /* WHAT WILL BE HERE WHILE NOTHING IS, SINCE portfolio 1.31.0 (empty states, 2 Nov): a new Numbers said "What your
+           projects report, newest first." over no number and a link to an empty table. */
+        says: [
+          { when: { metric: 'readings-held', is: 0 }, body: 'No project has reported a number yet. [Add a key number](/r/kpis).' },
+          { body: 'What your projects report, newest first.' },
+        ],
       },
       {
         key: 'numbers-by-project',
@@ -1346,6 +1364,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         icon: 'rows',
         span: 12,
         authored: [{ cells: ['Open every reading as a table', '/r/datapoints?rows=1', 'Every reading on its own line, newest first'] }],
+        /* ONLY ONCE THERE IS A READING, SINCE portfolio 1.31.0: a link to an empty table under the line saying none came. */
+        when: { metric: 'readings-held', gt: 0 },
       },
     ],
   },

@@ -945,14 +945,24 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   (`rule.account-files-book`, handing `script.book_from_account` the account), a book's This month is drawn only while
  *   something came in or went out (`page.money-book`), and its Accounts and Add an account each take the whole row. A
  *   rule added, no id taken away, so a minor step.
+ * - empty states (2 Nov), five packs, each a minor step for a figure added or a line said:
+ *   money-core 3.36.0: a book's Cash ahead waits for an account in it (`metric.book-accounts`, `page.money-book`), and its
+ *   Accounts tile says what one brings; the Ledger, Coming up, Forecast and Reports each say what will be there and the
+ *   way in while they hold nothing (`page.money-ledger`, `page.money-coming`, `page.money-forecast`, `page.money-reports`),
+ *   and the Ledger's month is drawn only once something moved.
+ *   work 1.24.0: Work says nothing of late tasks while none is open (`page.work`), and the Timeline says what will stand
+ *   on it (`metric.tasks-dated`, `page.roadmap`).
+ *   people 4.4.0: People on a new record says it holds only you (`page.people`).
+ *   portfolio 1.31.0: Numbers says what it will list while it holds no reading (`metric.readings-held`, `page.all-numbers`).
+ *   estate 2.8.0: Services says what it holds without a past month or "the record" (`register.services`).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
-  portfolio: '1.30.2',
-  people: '4.3.0',
-  'money-core': '3.35.0',
-  estate: '2.7.0',
-  work: '1.23.0',
+  portfolio: '1.31.0',
+  people: '4.4.0',
+  'money-core': '3.36.0',
+  estate: '2.8.0',
+  work: '1.24.0',
 };
 
 type Body = Record<string, unknown>;

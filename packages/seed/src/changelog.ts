@@ -20,6 +20,7 @@ export type ModuleChange = { version: string; notes: string };
 
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
+    { version: '1.31.0', notes: 'Numbers with no reading yet says what it will list and how to add a key number, rather than a line about readings over none.' },
     {
       version: '1.30.2',
       notes: 'A card\'s key number is ticked as "Shown first".',
@@ -147,6 +148,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '4.4.0', notes: 'People on a new BrainDog says it holds only you so far, and who to add, rather than that it holds nothing.' },
     { version: '4.3.0', notes: 'People\'s first line counts people and organisations apart, and names your clients while there are a few: "Fenwick and Acme, 2 clients".' },
     { version: '4.2.2', notes: 'People says who may be listed twice in plainer words.' },
     { version: '4.2.1', notes: 'People says how many organisations and shops you deal with in one count, the one their list shows.' },
@@ -207,6 +209,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.36.0', notes: 'A book with no account draws no Cash ahead of nothing, and its Accounts says what adding one brings. The Ledger, Coming up, Forecast and Reports each say what will be there and how to start while they are empty, and the Ledger draws its month only once something moved.' },
     { version: '3.35.0', notes: 'Putting an account in a book takes what it already holds with it, so a book counts the money the account spent before. A book says This month only while money came in or went out, and its accounts and Add an account each take the whole row.' },
     {
       version: '3.34.0',
@@ -368,6 +371,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
+    { version: '2.8.0', notes: 'Services says what it holds in plainer words, without naming a month.' },
     { version: '2.7.0', notes: 'Services names each domain that points at nothing, with who it is with, when it renews and what it costs, and Next ninety days says what each renewal costs where it said the name twice. A service\'s own page leads with what its next renewal takes, and one with no cost written shows no empty figure.' },
     { version: '2.6.1', notes: 'A service that costs nothing is no longer asked about before it renews, and the answers to that question say what each one does.' },
     { version: '2.6.0', notes: 'The Services page is called Services, as the menu says, and Lapsing says when each service lapses and why, from its own note.' },
@@ -391,6 +395,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    { version: '1.24.0', notes: 'Work says nothing of late tasks while none is open, and the Timeline says what will stand on it while no task has a due day.' },
     { version: '1.23.0', notes: 'A task can say which client it is for. A task with a client and no project is filed under its client, not under Needs a project, and Work\'s lists say the client beside the task.' },
     { version: '1.22.0', notes: 'Timeline with no dated task says what will stand on it and how a task gets there.' },
     { version: '1.21.0', notes: 'On a BrainDog more than one person shares, Yours is the tasks assigned to you or to nobody, and a task assigned to a colleague is theirs. The field reads Assigned to, where it read Owner.' },

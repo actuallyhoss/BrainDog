@@ -43,6 +43,16 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
   pack: 'money-core',
   blocks: [
     ...againstNotes(),
+    {
+      /* A BOOK WITH NO ACCOUNT SAYS SO, AND WHAT ONE BRINGS, SINCE money-core 3.36.0 (empty states, 2 Nov): its Cash
+         ahead waits for an account (below), and the page opened on "Nothing moved in Studio." with no word of the way in.
+         Add an account is the tile under it. */
+      kind: 'note',
+      lead: true,
+      span: 12,
+      when: { metric: 'book-accounts:{{name}}', is: 0 },
+      body: 'No account in {{name}} yet. Add one, and where its cash is heading is drawn here.',
+    },
     /* NO "WHAT YOU HAVE" TILE, SINCE money-core 3.34.0 (next-money, M32): it said the book's cash, and Cash ahead beside
        it says the same from today, so "$6,830" stood three times in one row. Cash ahead is the book's hero now, the
        whole row. */
@@ -67,6 +77,10 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       late: 'days-late-in',
       under: 30,
       empty: 'Nothing dated ahead yet.',
+      /* ONLY ONCE THE BOOK HOLDS AN ACCOUNT, SINCE money-core 3.36.0 (empty states, 2 Nov): with none the walk opened on
+         nought and drew twelve weeks of £0 that "stays above zero to 25 Jan 2027". The Accounts tile under it says what
+         an account brings, and Add an account under that is the way in. */
+      when: { metric: 'book-accounts:{{name}}', gt: 0 },
     },
     {
       /* THIS BOOK'S MONTH IN ONE ROW: what came in, what went out and what is left, each read once a
