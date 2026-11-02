@@ -1775,8 +1775,12 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
     /* AND WHAT THE READER PICKED, so a line can say the months a strip narrows the blocks to (`when: { picked }`). */
     const on = filters && filters.picked.size > 0 ? { ...at, picked: filters.picked } : at;
     /* A PAGE'S LINE OVER A LIST THE READER NARROWED IS SAID OF WHAT IS SHOWN (31 October, AG15): Work narrowed to Kiln
-       said "1 late, 3 waiting on you." over a Waiting on you of one. */
-    const lined = b !== null && typeof b === 'object' && b.kind === 'note' && b.lead === true ? figuresNarrowed(on, clauses) : on;
+       said "1 late, 3 waiting on you." over a Waiting on you of one. AND SO ARE ITS FIGURES (skills pass follow-up,
+       2 Nov): the Ledger narrowed to 33 Coffee lines still said Spent $19,901 and Received $16,531, the whole ledger's,
+       under "Last 30 days". A stat's figure over the list the reader narrowed takes the same choices; a figure over
+       another list, or over a field no filter names, is read as it always was. */
+    const figured = b !== null && typeof b === 'object' && ((b.kind === 'note' && b.lead === true) || b.kind === 'stat');
+    const lined = figured ? figuresNarrowed(on, clauses) : on;
     const read = rowNamed(deps, found.row, readBlock(clauses.size > 0 || log ? narrowed(lined, b, clauses, log) : lined, b));
     if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
     const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
