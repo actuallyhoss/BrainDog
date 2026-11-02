@@ -493,11 +493,13 @@ const SLOW_STEP_MS = 5_000;
  * A share of one alarm (`tickBudget`) that also counts what it was spent on, for the `alarm-work` line. THE CLOCK CANNOT
  * SAY WHERE AN ALARM'S CPU WENT: it stands still while a page draws, so a step that drew ten pages in 2 s of CPU measures
  * nothing and writes no `alarm-step` line (on 1 November an alarm spent 19.5 s of CPU and named no step). The pages each
- * step drew are what it cost.
+ * step drew are what it cost. AND WHAT IT PASSED OVER BECAUSE NOTHING IT READ MOVED (`kept`): the look's later walks keep
+ * what each page read, and draw again only the pages whose reads moved (F35, perf2).
  */
-const countedShare = (): { budget: TickBudget; used: () => number } => {
+const countedShare = (): { budget: TickBudget; used: () => number; kept: () => number } => {
   const inner = tickBudget(() => Date.now(), ALARM_STEP_MS, ALARM_STEP_PAGES);
   let used = 0;
+  let kept = 0;
   return {
     budget: {
       spend: (n = 1) => {
@@ -505,8 +507,12 @@ const countedShare = (): { budget: TickBudget; used: () => number } => {
         inner.spend(n);
       },
       spent: () => inner.spent(),
+      kept: (n = 1) => {
+        kept += n;
+      },
     },
     used: () => used,
+    kept: () => kept,
   };
 };
 
@@ -1281,8 +1287,16 @@ export class Record$ extends DurableObject<Env> {
         }
       });
       /* WHAT THIS ALARM DREW AND WHAT IT LEFT FOR THE NEXT, when it drew anything: the clock cannot say (`countedShare`). */
-      if (lookShare.used() + lintShare.used() > 0)
-        op({ op: 'alarm-work', rec: recOf(api), look: lookShare.used(), lint: lintShare.used(), more: ([['act', more], ['ask', asked], ['model', modelled], ['look', looked], ['lint', linted]] as const).filter(([, m]) => m).map(([n]) => n).join(' ') });
+      if (lookShare.used() + lintShare.used() + lookShare.kept() > 0)
+        op({
+          op: 'alarm-work',
+          rec: recOf(api),
+          look: lookShare.used(),
+          lookKept: lookShare.kept(),
+          /* THE WORDS' WALK SPENDS PARTS OF A UNIT (a document read is a tenth of a page), so the lint's is said to a tenth. */
+          lint: Math.round(lintShare.used() * 10) / 10,
+          more: ([['act', more], ['ask', asked], ['model', modelled], ['look', looked], ['lint', linted]] as const).filter(([, m]) => m).map(([n]) => n).join(' '),
+        });
     } catch (e) {
       const said = e instanceof Error ? e.message : String(e);
       op({ op: 'alarm-step', rec: recOf(api), threw: true, error: said }, 'error');

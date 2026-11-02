@@ -77,7 +77,9 @@ import {
   sessionDeclaration,
   type BindGrantArgs,
   type CreateRecordArgs,
+  type DrawSeen,
   type Entry,
+  WHOLE_RECORD,
   type Kernel,
   FORMAT_VERSION,
   KERNEL_MIGRATION,
@@ -183,6 +185,7 @@ import {
   HEADLINE_ITEMS_MOST,
   HEADLINE_LOOK_MS,
   LOOK_REWALK_MS,
+  PAGE_SEEN_MS,
   HEADLINE_ANSWER_TOKENS,
   HEADLINE_PAGES_MOST,
   HEADLINES_ASKED,
@@ -5763,6 +5766,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the ask) or owes one a wait (`HEADLINES_OWED`) settles nothing, so the next tick walks again as it did.
    */
   let headlinesSettled: { day: string; stamp: string; at: number } | null = null;
+  /**
+   * EACH PAGE A WALK DREW, WITH WHAT IT FOUND AND WHAT IT READ (F35, perf2): what the kernel watched the draw read
+   * (`drawsOf`: the lists, as a held figure is held by them, and every read past them as it was asked), the lists the
+   * page names (`registers`), the stamp of all of it then (`drawStamper`), its kept line and the basis it was last asked
+   * at, what was pressing on its lists, the day, and when. A later walk of the same day does not draw again a page whose
+   * stamp, line, ask and facts are the same, for `PAGE_SEEN_MS` at most: it would read the same and find the same, owed
+   * nothing, or owed what it was owed (`due`), which waits for its ask (`HEADLINE_OWED_MS`) and goes to it as found.
+   *
+   * WHY. Agents write to his record all day, so from the second walk on every quarter hour's walk drew every page (the
+   * record had moved), each page about half a second of CPU there, to find the one or two whose figures a write touched.
+   *
+   * A LINE IT DID NOT SHOW IS THE MOST A MISS COSTS: a page's line is sent only while what it was written from still
+   * holds (`headlineFor`), so a page passed over that did move says its rules' line until the next walk draws it.
+   *
+   * WHAT IS ALWAYS DRAWN: a page whose draw the kernel could not keep (one that read a vital sign or wrote: `seen` is
+   * `null`); one an object before this one had found owed (`redo`); and every page of the day's first walk. Kept in
+   * memory, so an object that restarts draws every page once, as before.
+   */
+  type PageSeen = {
+    day: string;
+    at: number;
+    seen: DrawSeen;
+    lists: string[];
+    stamp: string;
+    kept: string;
+    facts: { lists: string[]; facts: string | undefined } | null;
+    due: HeadlineDue | null;
+  };
+  const pagesSeen = new Map<string, PageSeen>();
 
   const slashHeadlines = async (today: string, again = false, budget: TickBudget = UNBOUNDED): Promise<{ said: string[]; dropped: string[]; cut?: true }> => {
     const out = await headlinesWalk(today, again, budget);
@@ -5821,6 +5853,54 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       walk = { day: today, again, order: ordered.map((p) => p.slug), at: 0, due: first, stamp: changeStamp(), redo: [] };
     }
     const bySlug = new Map(listed.map((p) => [p.slug, p] as const));
+    /* WHAT A PAGE NOT DRAWN AGAIN IS KEPT BY (`pagesSeen`): its kept line and the basis it was last asked at, beside its reads. */
+    const keptOf = (slug: string): string => JSON.stringify([prefs[headlineKey(slug)] ?? null, asked.bases[slug] ?? null]);
+    /** What the page `dueOf` last drew is pressing by: the lists its blocks read, and the facts named from them. */
+    let factsSeen: { lists: string[]; facts: string | undefined } | null = null;
+    const stampOf = kernel.drawStamper();
+    /**
+     * What a later walk found on this page when nothing it read moved since: `{ due }`, owed nothing (`null`) or what it
+     * was owed, a copy. `null` when the page is to be drawn.
+     */
+    const unmoved = (p: (typeof listed)[number]): { due: HeadlineDue | null } | null => {
+      if (!again) return null;
+      const was = pagesSeen.get(p.slug);
+      if (was === undefined) return null;
+      const now = clock.now();
+      if (was.day !== today || now < was.at || now - was.at >= PAGE_SEEN_MS || was.kept !== keptOf(p.slug)) return null;
+      /* AND WHAT IS PRESSING ON ITS LISTS IS WHAT IT WAS, which this tick read once for every page before any was drawn. */
+      if (was.facts !== null) {
+        const named = pressingOf(pressing, new Set(was.facts.lists));
+        if (factsBasis(named.items, named.question) !== was.facts.facts) return null;
+      }
+      if (stampOf(was.seen, was.lists) !== was.stamp) return null;
+      if (was.due === null) return { due: null };
+      try {
+        return { due: structuredClone(was.due) };
+      } catch {
+        return null;
+      }
+    };
+    /** `dueOf`, with what the draw read and what it found kept for a later walk (`pagesSeen`). */
+    const drawnDue = (p: (typeof listed)[number]): HeadlineDue | null => {
+      factsSeen = null;
+      const read = kernel.drawsOf(() => dueOf(p));
+      /* AND THE LISTS THE PAGE NAMES, as a reader is held from it: a row's page is filled from its row before it is drawn. */
+      const lists = [...new Set([...p.registers, ...(p.about === null ? [] : [p.about.register])])].filter((l) => l !== WHOLE_RECORD);
+      if (read.seen === null) pagesSeen.delete(p.slug);
+      else
+        pagesSeen.set(p.slug, {
+          day: today,
+          at: clock.now(),
+          seen: read.seen,
+          lists,
+          stamp: stampOf(read.seen, lists),
+          kept: keptOf(p.slug),
+          facts: factsSeen,
+          due: read.value === null ? null : structuredClone(read.value),
+        });
+      return read.value;
+    };
     /** What one page is owed, drawn now, or `null` for a page that does not draw, has no figures, or is owed nothing. */
     const dueOf = (p: (typeof listed)[number]): HeadlineDue | null => {
       const row = p.about !== null;
@@ -5832,8 +5912,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const lead = row ? tiledLead(plain, read.value.blocks) : plain;
       const basis = headlineBasis(p.slug, lead);
       /* WHAT IS LATE OR DUE ON A LIST IS NOT NAMED ON A PAGE ABOUT ONE ROW: the late task may be another project's. */
-      const named = row ? { items: [], question: undefined } : pressingOf(pressing, listsRead(read.value.blocks));
+      const factsLists = row ? null : listsRead(read.value.blocks);
+      const named = factsLists === null ? { items: [], question: undefined } : pressingOf(pressing, factsLists);
       const facts = factsBasis(named.items, named.question);
+      factsSeen = factsLists === null ? null : { lists: [...factsLists], facts };
       if (!owed(p.slug, basis, facts)) return null;
       /* HOW FAR EACH FIGURE MOVED, asked of the record in one block over every figure the note names, so the model can say
          "up on last month" from the record's own arithmetic rather than its guess. */
@@ -5917,7 +5999,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       budget.spend();
       /* KEPT BEFORE THE PAGE IS DRAWN, NAMED AS UNDER WAY: an object reset in the draw goes on without it. */
       keepPlace(slug);
-      const d = dueOf(p);
+      const d = drawnDue(p);
       if (d !== null) due0.push(d);
     }
     while (going.at < going.order.length) {
@@ -5930,12 +6012,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (p === undefined) continue;
       /* A PAGE DECLARED `home` IS NOT ASKED AS A PAGE: its pref is Home's line. */
       if (p.nav === null || p.slug === HOME_PAGE) continue;
+      /* A LATER WALK DOES NOT DRAW A PAGE NOTHING IT READ MOVED ON (`pagesSeen`): it finds what it found, at none of the tick. */
+      const found = unmoved(p);
+      if (found !== null) {
+        budget.kept?.();
+        if (found.due !== null) due0.push(found.due);
+        continue;
+      }
       drawn++;
       budget.spend();
       /* KEPT BEFORE THE PAGE IS DRAWN, ITS PLACE ALREADY PAST IT AND THE PAGE NAMED AS UNDER WAY: an object reset in the
          draw goes on from the next, and says the page it left out. */
       keepPlace(p.slug);
-      const d = dueOf(p);
+      const d = drawnDue(p);
       if (d !== null) due0.push(d);
     }
     /* THE WALK HAS READ WHAT IT WILL: a page it left unread, or one it had to draw again and did not, is one

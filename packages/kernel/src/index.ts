@@ -185,7 +185,7 @@ import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
 import { COST_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
-import { HELD_SHORT_MS, HeldReadings, notice, traceOf, within, type ReadTrace } from './held-readings.ts';
+import { drawTraceOf, HELD_SHORT_MS, HeldReadings, notice, noticeDraw, shifted, traceOf, within, withinDraw, type DrawSeen, type DrawTrace, type ReadTrace } from './held-readings.ts';
 import { HeldSigns, heldOn, noticeSign, signTraceOf, tablesWritten, wroteNothing, type SignHeldOn, type SignTrace } from './held-signs.ts';
 import { localDays, readableZone } from './measures.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type ReadMemo, type Reading } from './metrics.ts';
@@ -740,6 +740,7 @@ export { cutOffReadable, endedByCutOff, isBuild } from './token.ts';
 export { AGENTS_KEY, agentCap, agentsFull, liveAgents, type AgentCap } from './token.ts';
 export { CHILD_MINUTES_MOST } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
+export type { DrawSeen } from './held-readings.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
 export type { Member, Grant, Held as AccessHeld } from './members.ts';
 export { EPOCH as ACCESS_EPOCH, bumpEpoch, epochOf, LensCache, sharesFor, narrowsOf, catalogOf, gateFieldsOf } from './shares.ts';
@@ -1789,12 +1790,17 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   const traces: ReadTrace[] = [];
   /* AND BY THE SIGNS BEING READ NOW (`signsHeldNow`), which hold by every table they read (`held-signs.ts`). */
   const signTraces: SignTrace[] = [];
+  /* AND BY THE DRAWS BEING WATCHED NOW (`drawsOf`), which keep what they read past the lists to ask it again. */
+  const drawTraces: DrawTrace[] = [];
   let muted = 0;
   let knownList = (_word: string): boolean => false;
+  /* WHETHER AN INSTANT IS A DAY'S EDGE, in the record's zone or in Greenwich, which a draw's read keeps where it is (`noticeDraw`). Set once the zone can be read. */
+  let dayEdge = (_ms: number): boolean => false;
   const noted = (text: string, params: readonly Param[]): void => {
     if (muted > 0) return;
     for (const t of traces) notice(t, text, params, knownList);
     for (const t of signTraces) noticeSign(t, text, params, knownList);
+    for (const t of drawTraces) noticeDraw(t, text, params, knownList, dayEdge);
   };
   /* EVERY WRITE IS COUNTED BY THE TABLE IT WRITES (`tablesWritten`), and one this cannot read moves every table: a sign
      held over a table is read again once the table has been written (`signsHeldNow`). Counted as it is sent, so a write
@@ -1814,11 +1820,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       moment?.drop();
       if (/^\s*ROLLBACK\b/iu.test(text)) dropHeld();
       for (const t of traces) t.whole = true;
+      for (const t of drawTraces) t.whole = true;
       wrote(text);
       raw.exec(text, ...params);
     },
     all: <T = Row>(text: string, ...params: Param[]): T[] => {
-      if (traces.length > 0 || signTraces.length > 0) noted(text, params);
+      if (traces.length > 0 || signTraces.length > 0 || drawTraces.length > 0) noted(text, params);
       if (reads(text)) return raw.all<T>(text, ...params);
       moment?.drop();
       const out = raw.all<T>(text, ...params);
@@ -1826,7 +1833,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return out;
     },
     one: <T = Row>(text: string, ...params: Param[]): T | undefined => {
-      if (traces.length > 0 || signTraces.length > 0) noted(text, params);
+      if (traces.length > 0 || signTraces.length > 0 || drawTraces.length > 0) noted(text, params);
       if (reads(text)) return raw.one<T>(text, ...params);
       moment?.drop();
       const out = raw.one<T>(text, ...params);
@@ -7291,6 +7298,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     listsSeen = null;
   };
   knownList = (word) => registers.has(word);
+  dayEdge = (ms) => {
+    muted++;
+    try {
+      const zone = readableZone(recordTz());
+      return dayAt(zone, ms) !== dayAt(zone, ms - 1) || dayAt('UTC', ms) !== dayAt('UTC', ms - 1);
+    } finally {
+      muted--;
+    }
+  };
   const daysIn = new Map<string, (ms: number) => string>();
   /** The day where the record is, in `tz`, at `now`. */
   const dayAt = (tz: string, now: number): string => {
@@ -7318,6 +7334,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const held = store.get(key, day, now, stampOf);
     if (held !== undefined) {
       for (const t of traces) within(t, held);
+      for (const t of drawTraces) within(t, held);
       return structuredClone(held.value);
     }
     const trace = traceOf();
@@ -7370,6 +7387,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     };
     return readSigns(sql, now, tz, (sign, read) => {
       for (const t of traces) t.whole = true;
+      for (const t of drawTraces) t.whole = true;
       if (depth > 0) return read(() => undefined);
       const key = JSON.stringify([sign, zone]);
       const held = signsHeld.get(key, day, now, stampOf);
@@ -7396,24 +7414,31 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * days beside it, read first, moved. Each value is kept with what making it read, and every reading being read when it
    * is handed out notes that too (`within`), as a held reading's lists are noted by the reading around it.
    */
+  /* AND A DRAW BEING WATCHED (`drawsOf`) IS HANDED WHAT MAKING IT READ PAST THE LISTS TOO (`draw`), kept only when a draw
+     was watched as it was made: a value made with none watching hands a draw its lists alone, and `whole` if it read past them. */
   const readMemo = (): ReadMemo => {
-    const kept = new Map<string, { value: unknown; read: ReadTrace }>();
+    const kept = new Map<string, { value: unknown; read: ReadTrace; draw: DrawTrace | null }>();
     return {
       once: <T>(key: string, make: () => T): T => {
         const was = kept.get(key);
         if (was !== undefined) {
           for (const t of traces) within(t, was.read);
+          for (const t of drawTraces) if (was.draw === null) within(t, was.read);
+          else withinDraw(t, was.draw);
           return was.value as T;
         }
         const read = traceOf();
+        const draw = drawTraces.length > 0 ? drawTraceOf() : null;
         traces.push(read);
+        if (draw !== null) drawTraces.push(draw);
         let value: T;
         try {
           value = make();
         } finally {
           traces.pop();
+          if (draw !== null) drawTraces.pop();
         }
-        kept.set(key, { value, read });
+        kept.set(key, { value, read, draw });
         return value;
       },
     };
@@ -10798,6 +10823,61 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           ...registersOfBlock(block, deps.metric, near),
           ...(sourceModule(block.source)?.everyList ? (watched ??= watchedLists().map((l) => l.id)) : []),
         ],
+      };
+    },
+
+    /**
+     * WHAT `make` READ, WATCHED SO IT CAN BE TOLD LATER WHETHER IT WOULD READ THE SAME (`DrawTrace`, `held-readings.ts`):
+     * the lists its statements bound the list column to, a held reading it was handed counted by the lists that one read,
+     * and every read the lists cannot version or that bound an instant, kept as asked, and when. `seen` is `null` for a
+     * draw nothing can keep: one that wrote, read a vital sign, was handed a held figure that bound an instant, or asked a
+     * statement this cannot read. For a host that keeps what it found from a draw and draws again only once what it read
+     * moved (the look's later walks of the pages, `slashHeadlinesAgain`), stamped by `drawStamper`.
+     */
+    drawsOf: <T,>(make: () => T): { value: T; seen: DrawSeen | null } => {
+      const trace = drawTraceOf();
+      drawTraces.push(trace);
+      let value: T;
+      try {
+        value = make();
+      } finally {
+        drawTraces.pop();
+      }
+      for (const t of drawTraces) withinDraw(t, trace);
+      return { value, seen: trace.whole || trace.instant ? null : { lists: [...trace.lists].sort(), reads: [...trace.reads.values()], at: clock.now() } };
+    },
+
+    /**
+     * WHAT A DRAW SEEN BY `drawsOf` WOULD READ NOW, AS ONE STRING: its lists by their versions, as a held reading is
+     * stamped (`listsStamp`), and each read it kept asked again, its instants moved on by the time gone since the draw
+     * (`shifted`), its answer folded in. Two equal stamps are a draw that would read the same, on the same day. One
+     * stamper asks each list once, so it is for stamps with no write between them.
+     */
+    drawStamper: (): ((seen: DrawSeen, more?: readonly string[]) => string) => {
+      const once: Stamps = { rows: new Map() };
+      return (seen, more = []) => {
+        muted++;
+        try {
+          const lists = listsStamp([...new Set([...seen.lists, ...more])].sort(), once);
+          let hash = 0x811c9dc5;
+          let length = 0;
+          const gone = clock.now() - seen.at;
+          for (const r of seen.reads) {
+            let said: string;
+            try {
+              said = JSON.stringify(sql.all(r.text, ...shifted(r, gone)), (_k, v: unknown) => (typeof v === 'bigint' ? String(v) : v instanceof Uint8Array ? [...v] : v));
+            } catch (e) {
+              said = `!${e instanceof Error ? e.message : String(e)}`;
+            }
+            for (let i = 0; i < said.length; i++) hash = Math.imul(hash ^ said.charCodeAt(i), 0x01000193) >>> 0;
+            hash = Math.imul(hash ^ 0x1f, 0x01000193) >>> 0;
+            length += said.length;
+          }
+          /* FNV-1a over every answer, with how long they ran: a page's reads past the lists are a few dozen small answers. */
+          return JSON.stringify([lists, seen.reads.length, length, hash]);
+        } finally {
+          muted--;
+        }
       };
     },
 

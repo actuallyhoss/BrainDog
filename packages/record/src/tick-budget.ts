@@ -25,6 +25,11 @@ export type TickBudget = {
   spend(n?: number): void;
   /** Whether the step should stop before its next unit. */
   spent(): boolean;
+  /**
+   * Count `n` units passed over because nothing they read moved since they were last done (a page of the look's later
+   * walks whose lists stand, `slashHeadlinesAgain`). Spends nothing; a host that counts what its alarm did says it.
+   */
+  kept?(n?: number): void;
 };
 
 /** A budget that never runs out: one tick does everything, as a caller that hands none always had. */

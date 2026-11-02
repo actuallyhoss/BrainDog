@@ -90,6 +90,14 @@ export const HEADLINE_LOOK_MS = 15 * 60_000;
  */
 export const LOOK_REWALK_MS = 3 * 60 * 60_000;
 
+/**
+ * HOW LONG A LATER WALK OF THE DAY PASSES OVER A PAGE WHOSE LISTS STAND (F35, perf2). A page found owed nothing is kept
+ * with the lists it read and their versions, and a later walk draws it again only once one of them moved, or after this:
+ * what a page says moves with the clock too (a bill comes due, a window of thirty days slides), and the walk itself
+ * trusts a record with no new line for `LOOK_REWALK_MS`. So every page is drawn at least once an hour while the walks run.
+ */
+export const PAGE_SEEN_MS = 60 * 60_000;
+
 /** Slash's pref counting the day's headline asks, and the basis each page was last asked at that day. Not `headline.`, so no page's slug can be it. */
 export const HEADLINES_ASKED = 'headlines.asked';
 

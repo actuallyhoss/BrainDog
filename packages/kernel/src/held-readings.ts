@@ -70,6 +70,95 @@ export function notice(trace: ReadTrace, text: string, params: readonly Param[],
   for (const p of params) if (typeof p === 'string' && !known(p) && INSTANT.test(p)) trace.instant = true;
 }
 
+/**
+ * WHAT ONE DRAW READ, WATCHED SO A HOST CAN TELL LATER WHETHER IT WOULD READ THE SAME (`drawsOf` in `index.ts`): the
+ * lists, as a held reading's trace names them, and beside them every read the lists cannot version, as it was asked
+ * (`reads`): a row by its id, a row's lines in the log, the open questions, a pref, a person's name. A held reading
+ * cannot keep those, so it reads past the lists (`whole`); a draw keeps the statements themselves and asks them again
+ * when it is stamped (`drawStamper`), which is what it would read then.
+ *
+ * AND EVERY READ THAT BINDS AN INSTANT, list or not, with which of its values to move by the time gone since the draw
+ * (`shift`): a question deferred until now, the runs of the last fifteen minutes. A day's edge (`edge`) is not moved:
+ * the day is the host's to keep. So a read whose window the clock alone moved answers as it would now.
+ *
+ * `whole` here is only a write, a statement this cannot read, a vital sign (held in the kernel's memory and read by no
+ * statement), an instant written some other way, a held figure that bound one (`instant`, handed in by `within`, whose
+ * statements this draw never saw), or more reads than `DRAW_READS_MOST`.
+ */
+export type DrawRead = { text: string; params: readonly Param[]; shift: readonly number[] };
+export type DrawTrace = ReadTrace & { reads: Map<string, DrawRead> };
+
+/** A draw as `drawsOf` hands it back to be stamped later: its lists, its reads to ask again, and when it was drawn. */
+export type DrawSeen = { lists: string[]; reads: DrawRead[]; at: number };
+
+/** A fresh draw's trace. */
+export const drawTraceOf = (): DrawTrace => ({ ...traceOf(), reads: new Map() });
+
+/** The most reads one draw keeps to ask again; past it the draw is `whole` and kept by nothing. */
+export const DRAW_READS_MOST = 4_000;
+
+/** An instant as the kernel writes one (`toISOString`), the only form a draw's read is moved in. */
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
+
+/**
+ * Note in a draw's trace what one read names: its lists as `notice` names them, and the read itself when no list
+ * versions it or it binds an instant, with the values to move (`shift`). `edge` says whether an instant is a day's edge.
+ */
+export function noticeDraw(trace: DrawTrace, text: string, params: readonly Param[], known: (word: string) => boolean, edge: (ms: number) => boolean): void {
+  if (trace.whole) return;
+  const read = readsOf(text, params, known);
+  if (read.writes || read.unsure) {
+    trace.whole = true;
+    return;
+  }
+  for (const list of read.lists) trace.lists.add(list);
+  const shift: number[] = [];
+  let bound = false;
+  params.forEach((p, i) => {
+    if (typeof p !== 'string' || known(p) || !INSTANT.test(p)) return;
+    bound = true;
+    const ms = Date.parse(p);
+    if (!ISO.test(p) || !Number.isFinite(ms)) trace.whole = true;
+    else if (!edge(ms)) shift.push(i);
+  });
+  if (trace.whole) return;
+  if (!bound && read.loose === 0 && read.tables.every((t) => HELD_TABLES.has(t))) return;
+  let key: string;
+  try {
+    key = JSON.stringify([text, params]);
+  } catch {
+    /* A bound value JSON cannot say (a big integer) is a read this cannot keep. */
+    trace.whole = true;
+    return;
+  }
+  if (trace.reads.has(key)) return;
+  if (trace.reads.size >= DRAW_READS_MOST) {
+    trace.whole = true;
+    return;
+  }
+  trace.reads.set(key, { text, params: [...params], shift });
+}
+
+/** The values of a read moved on by `ms`, as `shift` says: what the same read binds `ms` later. */
+export function shifted(read: DrawRead, ms: number): Param[] {
+  if (read.shift.length === 0 || ms === 0) return [...read.params];
+  return read.params.map((p, i) => (read.shift.includes(i) && typeof p === 'string' ? new Date(Date.parse(p) + ms).toISOString() : p));
+}
+
+/** What a draw inside another read, read by the outer one too: its lists, a held figure's instant, and each of its reads. */
+export function withinDraw(outer: DrawTrace, inner: DrawTrace): void {
+  within(outer, inner);
+  if (outer.whole) return;
+  for (const [key, r] of inner.reads) {
+    if (outer.reads.has(key)) continue;
+    if (outer.reads.size >= DRAW_READS_MOST) {
+      outer.whole = true;
+      return;
+    }
+    outer.reads.set(key, r);
+  }
+}
+
 /** What `inner` read, read by `outer` too: a reading inside another is one of the things the outer one read. */
 export function within(outer: ReadTrace, inner: { lists: Iterable<string>; instant: boolean; whole?: boolean }): void {
   for (const list of inner.lists) outer.lists.add(list);
