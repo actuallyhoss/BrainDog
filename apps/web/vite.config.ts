@@ -76,6 +76,13 @@ const layoutDeps = new Map<string, Set<string>>();
 /**
  * AND NO LIST NAMES A CHUNK THE ENTRY ITSELF IMPORTS. Those are running before any list is read, so
  * naming them preloads nothing. The set is read from the bundle before Vite writes the lists.
+ *
+ * THAT RULE IS FOR THE LISTS IN KIT'S APP ENTRY ALONE (speed3, 2 Nov). With Rolldown every route node is an entry, so
+ * `entryGraph` is every chunk any route reaches, and a list anywhere else that dropped it named its target and nothing
+ * more: Home's `import()` of the page reader found the reader's ~90 chunks a level later, once the reader had landed. A
+ * list outside Kit's entry now leaves out only what its own chunk already has in hand (`hostGraph`), and costs the entry
+ * nothing. Cold Today on a throttled phone over HTTP/2, 2056 to 1777 ms; Work 2386 to 2106 (loop/speed3-2026-11-02).
+ * The entry's own lists stay as they were: whole lists there were 5 KB past its fail line.
  */
 const entryGraph = new Set<string>();
 
@@ -105,6 +112,8 @@ const entryGraphPlugin: Plugin = {
       lightFrame.clear();
       kitEntry.clear();
       lightDeps.clear();
+      hostGraphs.clear();
+      bundleSeen = bundle;
       const walk = (into: Set<string>, file: string) => {
         const chunk = bundle[file];
         if (into.has(file) || chunk?.type !== 'chunk') return;
@@ -124,10 +133,31 @@ const entryGraphPlugin: Plugin = {
   },
 };
 
+/**
+ * WHAT A CHUNK OUTSIDE KIT'S ENTRY HAS IN HAND WHEN ITS `import()` RUNS: Kit's entry and its own static graph. Its lists
+ * leave out those and nothing more, read once per chunk from the bundle `entryGraphPlugin` saw.
+ */
+const hostGraphs = new Map<string, Set<string>>();
+let bundleSeen: Record<string, { type: string; imports?: string[] }> = {};
+const hostGraph = (host: string): Set<string> => {
+  let got = hostGraphs.get(host);
+  if (got !== undefined) return got;
+  got = new Set(kitEntry);
+  const walk = (file: string) => {
+    const chunk = bundleSeen[file];
+    if (got!.has(file) || chunk?.type !== 'chunk') return;
+    got!.add(file);
+    for (const next of chunk.imports ?? []) walk(next);
+  };
+  walk(host);
+  hostGraphs.set(host, got);
+  return got;
+};
+
 function resolveDependencies(file: string, deps: string[], { hostId, hostType }: { hostId: string; hostType: 'html' | 'js' }) {
   if (hostType !== 'js') return deps;
   if (lightFrame.has(file)) return [...new Set([...deps.filter((d) => d === file || !kitEntry.has(d)), ...lightDeps])];
-  const kept = deps.filter((d) => d === file || !entryGraph.has(d));
+  const kept = deps.filter((d) => d === file || !(kitEntry.has(hostId) ? entryGraph : hostGraph(hostId)).has(d));
   if (/(?:^|\/)nodes\/0\.[\w-]+\.js$/u.test(file)) {
     layoutDeps.set(hostId, new Set(kept));
     return kept;
