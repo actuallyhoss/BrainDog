@@ -16,7 +16,7 @@ import { createClient } from '@braindog/client';
 
 import type { Ledger } from './ledger.ts';
 
-/** One category the record holds, by its row id, name and way. */
+/** One category the record holds, by its row id, name and way; `id` is `''` for a starter one it will be made as. */
 export type Category = { id: string; name: string; way: 'in' | 'out' | null };
 
 /** One line just added and the category offered for it. */
@@ -35,7 +35,12 @@ const SALES = /\b(payment|invoice|ltd|limited|inc|llc|plc|gmbh)\b/iu;
 
 /** The category a line's payee points at, among those the record holds and only one of its own way, or `null`. */
 export function suggestCategory(what: string, way: 'in' | 'out', held: readonly Category[]): Category | null {
-  const named = (name: string): Category | null => held.find((c) => c.name.trim().toLowerCase() === name.toLowerCase() && (c.way === null || c.way === way)) ?? null;
+  /* A STARTER THE RECORD DOES NOT HOLD YET IS OFFERED BY NAME AND MADE ON THE PRESS (a new record keeps no categories
+     until one is made), unless it holds one of that name the other way. */
+  const named = (name: string): Category | null => {
+    const same = held.filter((c) => c.name.trim().toLowerCase() === name.toLowerCase());
+    return same.find((c) => c.way === null || c.way === way) ?? (same.length === 0 ? { id: '', name, way } : null);
+  };
   if (way === 'in') return PAY.test(what) ? named('Pay') : SALES.test(what) ? named('Sales') : null;
   for (const [re, name] of OUT_WORDS) if (re.test(what)) return named(name);
   return null;
@@ -65,7 +70,19 @@ export async function fileLines(base: string, ledger: Ledger, offered: readonly 
   const c = ledger.category;
   if (c === null) return 0;
   const client = createClient({ base });
-  const queue = [...offered];
+  /* THE STARTERS NOT HELD YET ARE MADE FIRST, once each, with their way. */
+  const made = new Map<string, string>();
+  for (const o of offered) {
+    if (o.category.id !== '' || made.has(o.category.name)) continue;
+    const fields: Record<string, unknown> = { [c.title]: o.category.name };
+    if (c.way && o.category.way) fields[c.way.field] = o.category.way === 'in' ? c.way.in : c.way.out;
+    const out = await client.create({ register: c.list, fields }).catch(() => null);
+    if (out?.ok) made.set(o.category.name, (out.value as { id: string }).id);
+  }
+  const queue = offered.flatMap((o) => {
+    const id = o.category.id !== '' ? o.category.id : made.get(o.category.name);
+    return id === undefined ? [] : [{ ...o, category: { ...o.category, id } }];
+  });
   let done = 0;
   const worker = async (): Promise<void> => {
     for (let o = queue.shift(); o !== undefined; o = queue.shift()) {
@@ -83,6 +100,8 @@ export const filingWords = {
   sentence: 'A category for each, by who it was paid to or from. Nothing is filed until you press.',
   file: (n: number) => (n === 1 ? 'File 1 line' : `File ${n} lines`),
   filing: 'Filing…',
+  /** Beside a category the press makes, since the BrainDog holds none of that name yet. */
+  fresh: 'new',
   filed: (n: number) => `Filed ${n === 1 ? '1 line' : `${n} lines`}.`,
   left: (n: number) => `${n === 1 ? '1 line has' : `${n} lines have`} no category yet. Open ${n === 1 ? 'it' : 'one'} in the Ledger to file it.`,
 } as const;

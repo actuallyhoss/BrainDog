@@ -146,7 +146,9 @@
   async function add(): Promise<void> {
     const l = loader.value;
     if (!l || !account || !split || (split.fresh.length === 0 && fills.length === 0) || adding) return;
-    const rows = split.fresh.map((line) => fieldsOf(line, l.ledger, account.id, l.balance));
+    /* THE LINES AS PRESSED: the Ledger is read again after the write, which empties `split` for a moment. */
+    const fresh = split.fresh;
+    const rows = fresh.map((line) => fieldsOf(line, l.ledger, account.id, l.balance));
     const balances = fills;
     adding = { done: 0, of: rows.length };
     const out = await addLines(base, l.ledger.list, rows, (done) => (adding = { done, of: rows.length }));
@@ -159,7 +161,7 @@
     filed = null;
     const cats = await loadCategories(base, l.ledger);
     if (cats === null) return;
-    const lines = split.fresh;
+    const lines = fresh;
     const offers: Offered[] = [];
     let unfiled = 0;
     lines.forEach((line, i) => {
@@ -202,12 +204,12 @@
       {#if result.added > 0 && result.filled > 0}<p class="st-quiet">{words.filled(result.filled)}</p>{/if}
       {#if result.missed > 0}<p class="st-warn">{words.missed(result.missed)} {result.why}</p>{/if}
       {#if offered && offered.offers.length > 0}
-        <section class="st-file" aria-labelledby="st-file-h">
+        <section class="st-filing" aria-labelledby="st-file-h">
           {#if filed === null}
             <h3 class="st-label" id="st-file-h">{filingWords.title(offered.offers.length)}</h3>
             <p class="st-quiet">{filingWords.sentence}</p>
             <ul class="st-file-list">
-              {#each offered.offers as o (o.seq)}<li><span>{o.what}</span><span class="st-quiet">{o.category.name}</span></li>{/each}
+              {#each offered.offers as o (o.seq)}<li><span>{o.what}</span><span class="st-quiet">{o.category.name}{o.category.id === '' ? `, ${filingWords.fresh}` : ''}</span></li>{/each}
             </ul>
             <Button weight="primary" onclick={fileAll} disabled={filing}>{filing ? filingWords.filing : filingWords.file(offered.offers.length)}</Button>
           {:else}
@@ -373,7 +375,7 @@
     font-weight: 500;
   }
 
-  .st-file {
+  .st-filing {
     display: grid;
     gap: var(--space-2, 8px);
     justify-items: start;
