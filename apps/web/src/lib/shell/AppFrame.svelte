@@ -69,6 +69,7 @@
   import type SideBarView from '$lib/shell/SideBar.svelte';
   import { SIDE_KEY, sideKept } from '$lib/shell/side.ts';
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
+  import type NameAskView from '$lib/sharing/NameAsk.svelte';
   import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
   import { KEYS_REGISTER } from '$lib/record/keys-register.ts';
@@ -157,6 +158,15 @@
   let Keymap = $state<typeof KeymapView | null>(null);
   /* AND THE COPY'S HAIRLINE: invisible until a screen drawn from the local copy holds it, so it can land after the shell. */
   let CopyMark = $state<typeof CopyMarkView | null>(null);
+  /* THE NAME ASK, LOADED THE MOMENT IT IS DUE and drawn through `{#if}`, its room held until it lands (`shellBanners`). It
+     was an `{#await}` whose waiting branch held the room; on Activity and the settings pages on a cold phone the head
+     drew the banners with neither the room nor the banner, and the banner came 118 ms later, 162px tall (widgets-empty,
+     2 Nov). A plain `{#if}` draws the room in the same frame as the head, wherever the banners are drawn. */
+  let NameAsk = $state<typeof NameAskView | null>(null);
+  const asking = $derived(nameAskDue(data, apiBase()));
+  $effect(() => {
+    if (asking && NameAsk === null) void import('$lib/sharing/NameAsk.svelte').then((m) => (NameAsk = m.default), () => undefined);
+  });
   /* THE FRAME'S OWN CODE THAT NO SCREEN DRAWS FROM WAITS FOR THE FIRST SCREEN TO BE DRAWN AND AT REST (`rested`, 5 s at
      most), or for the moment it is asked for. Asked as the shell mounted, the palette (and the decision card and Slash
      it carries), the key sheet, the copy's mark, the freeze watchdog and the link reads were about 150 KB racing
@@ -1588,8 +1598,8 @@
   <!-- YOUR NAME, ASKED ONCE of somebody the record holds none for (collab pass 3). Its own chunk: only they load it. -->
   <!-- ITS ROOM IS HELD WHILE ITS CODE COMES (nojump, 2 Nov), and only where it will draw (`name-ask.ts`): it came a beat
        after the page, 150px tall on a phone, and pushed the whole screen down. -->
-  {#if nameAskDue(data, apiBase())}
-    {#await import('$lib/sharing/NameAsk.svelte')}<div class="banner-room" aria-hidden="true"></div>{:then { default: NameAsk }}<NameAsk shell={data} />{/await}
+  {#if asking}
+    {#if NameAsk}<NameAsk shell={data} />{:else}<div class="banner-room" aria-hidden="true"></div>{/if}
   {/if}
   <!-- WHAT WAS SHARED WITH A GUEST, ONCE A SHARE (§3.4). Its own chunk: only somebody a share let in loads it. -->
   {#if data.me.grant !== undefined && !data.me.owner}
