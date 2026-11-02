@@ -178,7 +178,7 @@
               {#each m.months as x, n (x.key)}
                 {@const tall = Math.max(x.value > 0 ? 4 : 1, Math.round((x.value / peak(m)) * 100))}
                 <li title="{monthLong(x.key)}: {format(x.value, m.currency)}" style:--bar="{tall}%">
-                  <span class="mval num" data-last={n === m.months.length - 1 ? '' : undefined}>{format(x.value, m.currency)}</span>
+                  <span class="mval num" data-last={n === m.months.length - 1 && x.value !== 0 ? '' : undefined}>{format(x.value, m.currency)}</span>
                   <span class="col" data-partial={x.partial} style:block-size="{tall}%"></span>
                   <span class="mname">{ticks.has(n) ? monthName(x.key) : ''}</span>
                 </li>
@@ -582,6 +582,8 @@
     pointer-events: none;
   }
 
+  /* THE NEWEST MONTH SAYS ITS FIGURE, AND A NEWEST MONTH AT NOUGHT SAYS NONE (leftovers9, Sam 2 Nov: "remove any $0
+     cards"): a month just begun drew "$0" over its stub. Its figure still shows on a hover, as every month's does. */
   .mval[data-last] {
     opacity: 1;
   }

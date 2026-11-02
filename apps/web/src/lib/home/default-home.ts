@@ -1173,13 +1173,19 @@ const CASH_NOW = 'cash-now';
  * the next figure took its place and its size: right after "Rent 12,000 due on the 1st every month" the tile's headline
  * was "In, 30 days EGP 0", with the rent going out small beside it or not at all. With no cash now, a figure that reads
  * nought is left out, so the tile leads with the money that does move (the rent going out), and a tile with nothing
- * left to say is not drawn. Once an account is open the tile is as it came: a nought beside a balance is a fact.
+ * left to say is not drawn. Once an account is open, cash now stands and a nought beside it is left off as well.
  */
 function cashDrawn(b: LiveBlock): LiveBlock {
   const all = b.metrics ?? [];
   const now = all.find((m) => m.id === CASH_NOW);
   /* A CASH NOW OVER NO ACCOUNT HOLDS NOTHING (`nothingHeld`) and is not drawn, though it reads nought. */
-  if (now !== undefined && now.value !== MISSING && !now.nothingHeld) return b;
+  if (now !== undefined && now.value !== MISSING && !now.nothingHeld) {
+    /* BESIDE A BALANCE, MONEY IN OR OUT AT NOUGHT IS LEFT OFF TOO (leftovers9, Sam 2 Nov: "remove any $0 cards"): Today
+       read "In, 30 days $0" beside "Cash now $12,500" on a record nothing is due to come into. Money's own hero keeps
+       its nought, where it answers the page; Today says what moves. */
+    const moving = all.filter((m) => m.id === CASH_NOW || !nought(m.value));
+    return moving.length === all.length ? b : { ...b, metrics: moving };
+  }
   const metrics = all.filter((m) => m.id !== CASH_NOW && m.value !== MISSING && !m.nothingHeld && !nought(m.value));
   if (metrics.length === all.length) return b;
   return metrics.length === 0 ? { ...b, metrics, drawn: false } : { ...b, metrics };

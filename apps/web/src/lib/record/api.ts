@@ -1493,6 +1493,8 @@ export type Metric = {
    * nothing. A widget on Today whose every figure is one says its own `empty:` line in its frame instead (`widget-empty.ts`).
    */
   readNone?: boolean | undefined;
+  /** Money that added up no row and came to nought, which a page being read leaves off (`drawn.ts` `noughtOverNone`). */
+  noughtOverNone?: boolean | undefined;
 };
 
 /* ── the third state of a figure ──────────────────────────────────────────

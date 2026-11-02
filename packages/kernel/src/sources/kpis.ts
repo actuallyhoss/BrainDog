@@ -541,6 +541,10 @@ function kpisBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
     const guessed = rank.kpiKind(k);
     const s = k.source === 'figure' ? figureSeries(k, project, deps, kit) : readSeries(k, guessed, project, readings, deps, kit);
     const kind = rank.kpiKind({ ...k, unit: s.unit ?? null });
+    /* A NUMBER THAT HAS ONLY EVER SAID NOUGHT IS LEFT OFF (leftovers9, Sam 2 Nov: "remove any $0 cards"): a tile reading
+       "$0" over a line along nought tells nobody anything. One with a target is kept, since there nought answers whether
+       it is met, and so is one that could not be read, which says why. */
+    if (!s.refusal && (k.target === null || k.target === undefined) && s.points.length > 0 && s.points.every((p) => pointNumber(p, null) === 0)) continue;
     /* THE TARGET IN THE UNITS IT IS JUDGED IN: minor units of its currency for money, and none in another currency. */
     const money = rank.isMoneyUnit(s.unit);
     const currency = money ? s.unit!.toUpperCase() : null;

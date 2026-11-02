@@ -237,7 +237,11 @@ export function numbersOf(f: Pick<FactsIn, 'name' | 'readings' | 'today' | 'form
     every0.filter((m) => !all.includes(m)),
     f.format,
   );
-  const cells = all.slice(0, most).map((m): NumberCell => {
+  /* A NUMBER THAT HAS ONLY EVER SAID NOUGHT DRAWS NO CELL (leftovers9, Sam 2 Nov: "remove any $0 cards"): "Monthly
+     revenue $0, flat" on a project that has earned nothing yet. It still counts as a number the feed sent, so the feed's
+     age and Runs on read it as before; the kernel leaves such a measure and key number off the record's own tiles too. */
+  const said = all.filter((m) => m.points.some((p) => p.v !== 0));
+  const cells = said.slice(0, most).map((m): NumberCell => {
     const last = m.points.at(-1)!;
     const age = Math.max(0, daysBetween(last.at.slice(0, 10), f.today));
     const stale = age > Math.max(2 * m.every, 2);
@@ -275,7 +279,7 @@ export function numbersOf(f: Pick<FactsIn, 'name' | 'readings' | 'today' | 'form
     banner: allStale
       ? { said: `Nothing has arrived for ${plural(age, 'day', 'days')}.`, why: fromImport ? `Every reading came from an import, and that stopped on ${daySaid(newest!, f.today)}.` : `The last came on ${daySaid(newest!, f.today)}.` }
       : null,
-    more: Math.max(0, all.length - most),
+    more: Math.max(0, said.length - most),
     newest,
     age,
     plan,

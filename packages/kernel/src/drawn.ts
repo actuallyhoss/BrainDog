@@ -72,6 +72,8 @@ export type Drawable = {
   box?: unknown;
   /** The glyph a block names for its tile's heading, which a box's own glyph may echo (`unechoed`). */
   icon?: unknown;
+  /** How a stat is drawn; `lead` is a page's hero, whose noughts answer the page (`noughtOverNone`). */
+  form?: unknown;
 };
 
 type Obj = Record<string, unknown>;
@@ -142,13 +144,24 @@ const figuresOf = (b: Drawable): readonly unknown[] => (Array.isArray(b.metrics)
 const unsaidFigure = (f: unknown): boolean => isObj(f) && (f.unsaid === true || (isObj(f.reading) && f.reading.unsaid === true));
 
 /**
+ * MONEY THAT ADDED UP NO ROW AND CAME TO NOUGHT (leftovers9, Sam 2 Nov: "remove any $0 cards"): a project's "Revenue $0"
+ * or Today's "Owed to you $0" over a list that holds rows, none of them this figure's. The app's tile says so
+ * (`noughtOverNone`), and so does the record's reading by its rows, its value and a currency for its unit. Money that
+ * read rows and came to nought, a budget with nothing left, is an answer and is kept, and so is a page's hero (`form:
+ * lead`), where "In $0" this month is what Money says.
+ */
+const noughtOverNone = (f: Obj): boolean =>
+  f.noughtOverNone === true ||
+  (isObj(f.reading) && f.reading.beyond === undefined && f.reading.rows === 0 && f.reading.value === 0 && typeof f.reading.unit === 'string' && /^[A-Z]{3}$/u.test(f.reading.unit));
+
+/**
  * A FIGURE THAT SAYS NOTHING ON A PAGE BEING READ: one that adds up a field no row has filled in (`unsaidFigure`), and
  * one over a list that holds no row at all, whose zero the record calls not news (the app's `nothingHeld`, the record's
  * `held: 0`). A figure the record refused says why, and is never idle.
  */
-function idle(f: unknown, alone = false): boolean {
+function idle(f: unknown, alone = false, hero = false): boolean {
   if (!isObj(f) || f.refusal !== undefined) return false;
-  if (unsaidFigure(f) || f.nothingHeld === true) return true;
+  if (unsaidFigure(f) || f.nothingHeld === true || (!hero && noughtOverNone(f))) return true;
   if (!isObj(f.reading) || f.reading.held !== 0) return false;
   /* A WALK THAT NEVER WENT UNDER says so by `beyond` ('Lasts past ...'), which is the whole of a tile drawn alone; in a
      row of several figures over nothing held it is an empty part, and the row of noughts beside it is not drawn for it. */
@@ -162,13 +175,14 @@ function idle(f: unknown, alone = false): boolean {
  */
 function told<B extends Drawable>(b: B): B {
   if (keeps(b)) return b;
+  const hero = b.form === 'lead';
   if (Array.isArray(b.metrics)) {
     const alone = b.metrics.length === 1;
-    return b.metrics.some((f) => idle(f, alone)) ? ({ ...b, metrics: b.metrics.filter((f) => !idle(f, alone)) } as B) : b;
+    return b.metrics.some((f) => idle(f, alone, hero)) ? ({ ...b, metrics: b.metrics.filter((f) => !idle(f, alone, hero)) } as B) : b;
   }
   if (Array.isArray(b.readings) && !partsOf(b)) {
     const alone = b.readings.length === 1;
-    if (b.readings.some((f) => idle(f, alone))) return { ...b, readings: b.readings.filter((f) => !idle(f, alone)) } as B;
+    if (b.readings.some((f) => idle(f, alone, hero))) return { ...b, readings: b.readings.filter((f) => !idle(f, alone, hero)) } as B;
   }
   return b;
 }
@@ -191,7 +205,7 @@ export function holdsNothing(b: Drawable): boolean {
     none(b.authored) &&
     matchedCount(b) === 0 &&
     (typeof b.total !== 'number' || b.total === 0) &&
-    figuresOf(b).every((f, _, all) => idle(f, all.length === 1)) &&
+    figuresOf(b).every((f, _, all) => idle(f, all.length === 1, b.form === 'lead')) &&
     none(b.measures) &&
     none(b.latest) &&
     none(b.readOnce) &&

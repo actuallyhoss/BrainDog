@@ -206,6 +206,13 @@ const newestFirst = (a: MeasureSeries & { ms: number }, b: MeasureSeries & { ms:
   b.ms - a.ms || a.name.localeCompare(b.name) || (a.of ?? '').localeCompare(b.of ?? '');
 
 /**
+ * A MEASURE THAT HAS ONLY SAID NOUGHT IS NOT DRAWN (leftovers9, Sam 2 Nov: "remove any $0 cards"): "Monthly revenue
+ * $0, flat" on a project and on the Dashboard, its newest reading nought and every point in the period and the one
+ * before nought or none. One reading that was anything else keeps the whole measure, its noughts with it.
+ */
+const spoke = (m: MeasureSeries): boolean => !(m.latest !== null && m.latest.value === 0 && [...m.now, ...m.was].every((v) => v === null || v === 0));
+
+/**
  * Every measure the readings hold, each over its period and the period before: those that moved most first, then the
  * rest newest reading first. What a `stat` over readings draws as tiles, where a single reading is still a figure.
  *
@@ -214,7 +221,7 @@ const newestFirst = (a: MeasureSeries & { ms: number }, b: MeasureSeries & { ms:
  * (Today 3).
  */
 export function measureSeries(readings: Iterable<RawReading>, opts: MeasureOpts): MeasureSeries[] {
-  const all = seriesOf(readings, opts);
+  const all = seriesOf(readings, opts).filter(spoke);
   const moved = all.filter((m) => pointsIn(m) >= 2).sort((a, b) => movedBy(b) - movedBy(a) || newestFirst(a, b));
   const still = all.filter((m) => pointsIn(m) < 2).sort(newestFirst);
   return [...moved, ...still].slice(0, opts.most ?? MEASURES_MOST).map(({ ms: _ms, ...m }) => m);
@@ -230,7 +237,7 @@ export function measureSeries(readings: Iterable<RawReading>, opts: MeasureOpts)
  * neither. Both are cut to `most`, the lines by how much they moved, the latest readings newest first.
  */
 export function measureLines(readings: Iterable<RawReading>, opts: MeasureOpts): MeasureLines {
-  const all = seriesOf(readings, opts);
+  const all = seriesOf(readings, opts).filter(spoke);
   const most = opts.most ?? MEASURES_MOST;
   const lines = all
     .filter((m) => pointsIn(m) >= 2)
