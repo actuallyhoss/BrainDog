@@ -344,10 +344,16 @@
     to.focus();
   }
 
+  /* WHICH WAY THE LAST PRESS TRIED, so a key the server refused is said as the key, and its box is marked (domains lane,
+     2 Nov): "That did not sign you in. Try again." named no fix, and the box that held the wrong key read as fine. */
+  let lastHow = $state<How | null>(null);
+  const keyRefused = $derived(view.name === 'rejected' && !view.closed && lastHow === 'key');
+
   /** One press: the step says it is out, and what came back decides the next one. */
   async function run<T>(how: How, work: () => Promise<Said<T>>, then: (value: T) => void) {
     if (step.at === 'asking') return;
     pressed = true;
+    lastHow = how;
     fromGoogle = null;
     step = { at: 'asking', how };
     held = false;
@@ -609,7 +615,7 @@
           <Empty
             kind="error"
             title={view.closed ? copy.closedTitle : (view.fix ?? copy.rejectedTitle)}
-            body={view.closed ? copy.closedNext : copy.rejectedNext(wayCount(view.ways) > 1)}
+            body={view.closed ? copy.closedNext : keyRefused ? copy.keyRefusedNext : copy.rejectedNext(wayCount(view.ways) > 1)}
           />
         </div>
       {:else if view.name === 'link-expired'}
@@ -778,6 +784,7 @@
                     autocapitalize="none"
                     required
                     aria-describedby="in-key-why"
+                    aria-invalid={keyRefused ? 'true' : undefined}
                     value={key}
                     oninput={(e) => (key = e.currentTarget.value)}
                   />

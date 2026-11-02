@@ -145,13 +145,19 @@
 
 <style>
   /* AS WORDS' CURRENCY ROW IS DRAWN (`Words.svelte` `.pick`), so the two read as one tile's two rows. */
+  /* ONE WIDTH FOR BOTH SELECTS (domains lane, 2 Nov): each took the width of its longest choice, so the currency and
+     the time zone, two rows of one tile, started at two left edges. */
   .pick {
     display: grid;
-    grid-template-columns: var(--well) minmax(0, 1fr) auto;
+    grid-template-columns: var(--well) minmax(0, 1fr) minmax(0, 20rem);
     align-items: center;
     column-gap: var(--sp-3);
     min-block-size: var(--row-h-2);
     max-inline-size: calc(var(--measure) + var(--sp-9));
+  }
+
+  .pick > select {
+    inline-size: 100%;
   }
 
   .pick-label {

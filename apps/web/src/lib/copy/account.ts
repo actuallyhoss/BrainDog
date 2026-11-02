@@ -589,6 +589,8 @@ export const account = {
   signingIn: 'Signing you in',
   rejectedTitle: 'That did not sign you in',
   rejectedNext: (others: boolean) => (others ? 'Try again, or use another way in below.' : 'Try again.'),
+  /* THE KEY ITSELF WAS WRONG: what to check, and where it came from. */
+  keyRefusedNext: 'Check the key your server started with, then paste it in again.',
   closedTitle: 'The server could not check that just now',
   closedNext: 'Nobody was let in. Try again in a minute.',
   lockedTitle: (minutes: number) => `Sign-in is paused for ${minutes === 1 ? 'a minute' : `${minutes} minutes`}`,

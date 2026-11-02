@@ -88,6 +88,10 @@
     browse: 'Browse starters',
     currencyNow: (code: string) => (code ? `Home currency is now ${currencySaid(code)}.` : 'No home currency now.'),
     called: 'Called',
+    /* EACH BOX NAMES ITS LIST TO A SCREEN READER (domains lane, 2 Nov): all twenty-two said "Called", and the list each
+       renames was only its placeholder, which a filled box does not read. */
+    calledFor: (list: string) => `What ${list} is called`,
+    oneFor: (list: string) => `What one of ${list} is called`,
     /* NO "a" OR "an" BEFORE A WORD NOBODY HAS TYPED YET: "One is a update" and "One is a item" were on this screen. */
     one: 'One is called',
     says: 'What it says',
@@ -453,7 +457,7 @@
                         class="field-input"
                         id="w-{name.setting}"
                         type="text"
-                        aria-label={words.called}
+                        aria-label={words.calledFor(name.fallback)}
                         value={valueIn(name)}
                         placeholder={name.fallback}
                         oninput={(e) => (rename(l.list, name, l.one, typedIn(e)), soon())}
@@ -467,7 +471,7 @@
                         class="field-input"
                         id="w-{one.setting}"
                         type="text"
-                        aria-label={words.one}
+                        aria-label={words.oneFor(nameOf(l.list))}
                         value={valueIn(one)}
                         placeholder={one.fallback}
                         oninput={(e) => ((typed[one.setting] = typedIn(e)), (oneTyped[l.list] = true), soon())}
@@ -485,7 +489,7 @@
                       class="field-input"
                       id="w-list-{r.id}"
                       type="text"
-                      aria-label={words.called}
+                      aria-label={words.calledFor(r.name)}
                       value={r.name}
                       disabled={busy}
                       onchange={(e) => void renameOther(r, e)}
@@ -564,13 +568,19 @@
 
 <style>
   /* THE CURRENCY, AS ONE ROW: its well, its name, and its select at the row's end, where every settings control sits. */
+  /* ONE WIDTH FOR BOTH SELECTS (domains lane, 2 Nov): each took the width of its longest choice, so the currency and
+     the time zone, two rows of one tile, started at two left edges. */
   .pick {
     display: grid;
-    grid-template-columns: var(--well) minmax(0, 1fr) auto;
+    grid-template-columns: var(--well) minmax(0, 1fr) minmax(0, 20rem);
     align-items: center;
     column-gap: var(--sp-3);
     min-block-size: var(--row-h-2);
     max-inline-size: calc(var(--measure) + var(--sp-9));
+  }
+
+  .pick > select {
+    inline-size: 100%;
   }
 
   .pick-label {

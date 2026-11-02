@@ -69,7 +69,9 @@
 </script>
 
 <span class="sb" data-size={size === 'sm' ? 'sm' : undefined} bind:this={root} role="group" aria-label={sendWords.sheet}>
-  <button type="button" class="sb-main tap" disabled={sending} aria-busy={sending} aria-label={sendWords.sendToFull(last.label)} title={sendWords.sendToFull(last.label)} onclick={() => void now()}>
+  <!-- BUSY, NEVER DISABLED, WHILE IT SENDS (domains lane, 2 Nov): a disabled button drops the focus it holds to the page,
+       so a keyboard that pressed Send to Slash started again from the top. `now()` ignores a second press. -->
+  <button type="button" class="sb-main tap" aria-disabled={sending ? 'true' : undefined} aria-busy={sending} aria-label={sendWords.sendToFull(last.label)} title={sendWords.sendToFull(last.label)} onclick={() => void now()}>
     <Icon name="slash" size="s" /><span class="sb-words">{sendWords.sendToFull(last.label)}</span><span class="sb-short" aria-hidden="true">{sendWords.short}</span>
   </button>
   <button type="button" class="sb-more tap" aria-label={sendWords.more} aria-haspopup="dialog" title={sendWords.more} onclick={() => openHere()}>
@@ -135,18 +137,18 @@
     text-overflow: ellipsis;
   }
 
-  .sb-main:active:not(:disabled),
+  .sb-main:active:not([aria-disabled='true']),
   .sb-more:active {
     background: color-mix(in oklab, var(--ink) 8%, var(--sb-fill));
   }
 
-  .sb-main:disabled {
+  .sb-main[aria-disabled='true'] {
     color: var(--ink-3);
     cursor: progress;
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .sb-main:hover:not(:disabled):not(:active),
+    .sb-main:hover:not([aria-disabled='true']):not(:active),
     .sb-more:hover:not(:active) {
       background: var(--hover);
     }
