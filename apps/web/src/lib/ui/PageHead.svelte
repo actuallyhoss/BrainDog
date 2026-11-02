@@ -280,6 +280,28 @@
     return () => watch.disconnect();
   });
 
+  /* A WORD TOO WIDE FOR THE NAME'S COLUMN ENDS IN AN ELLIPSIS (design pass 2 Nov). Two lines cannot break a word, so on a
+     project page at 390, with Share, More, Search, a face of who else is here, the bell and the account beside it,
+     "Kiln website" was cut to "Kiln / websit" with nothing to say it went on. Read off the bar as the greeting's fit is,
+     and the name then takes one line with an ellipsis, as a name of one word does. */
+  let cut = $state(false);
+  $effect(() => {
+    const el = whereEl;
+    void whereShown;
+    cut = false;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let needs = 0;
+    const fit = () => {
+      if (!cut && el.scrollWidth > el.clientWidth + 1) {
+        needs = el.scrollWidth;
+        cut = true;
+      } else if (cut && el.clientWidth >= needs) cut = false;
+    };
+    const watch = new ResizeObserver(fit);
+    watch.observe(el);
+    return () => watch.disconnect();
+  });
+
   /* THE SENTENCE AS WORDS, cut into its figures and the phrase that needs him (`shell/headline.ts`). */
   const parts = $derived(typeof sentence === 'string' ? partsOf(stopped(sentence), needs) : null);
 
@@ -306,8 +328,8 @@
   {/if}
   <div class="bar-lead" data-greets={shortGreeting(where) !== null ? '' : undefined}>
     <!-- WHERE YOU ARE, the same words the desk's crumb ends on, and over it the page's name once it has scrolled away. -->
-    <p class="bar-where" dir="auto" data-word={/\s/u.test(whereShown.trim()) ? undefined : ''} bind:this={whereEl}>{whereShown}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
-    <p class="bar-title" dir="auto" data-word={/\s/u.test(title.trim()) ? undefined : ''} aria-hidden="true">{title}</p>
+    <p class="bar-where" dir="auto" data-word={!cut && /\s/u.test(whereShown.trim()) ? undefined : ''} bind:this={whereEl}>{whereShown}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
+    <p class="bar-title" dir="auto" data-word={!cut && /\s/u.test(title.trim()) ? undefined : ''} aria-hidden="true">{title}</p>
   </div>
   <span class="bar-end">
     {#if barred && actions}<span class="head-actions bar-actions">{@render actions()}</span>{/if}

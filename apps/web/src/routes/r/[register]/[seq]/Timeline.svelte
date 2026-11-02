@@ -196,7 +196,7 @@
   {#if body.trim()}
     <div class="composer-acts">
       {#if over > 0}<p class="over" role="status">{commentWords.tooLong(over)}</p>{/if}
-      <Button weight="primary" size="sm" type="submit" disabled={over > 0 || writing}>{words.send}</Button>
+      <Button weight="ink" size="sm" type="submit" disabled={over > 0 || writing}>{words.send}</Button>
     </div>
   {/if}
 </form>
@@ -254,7 +254,7 @@
                 <MentionPicker field={replyField} people={mentionable} />
                 {#if replyOver > 0}<p class="over" role="status">{commentWords.tooLong(replyOver)}</p>{/if}
                 <div class="box-acts">
-                  <Button weight="primary" size="sm" type="submit" disabled={!replyText.trim() || replyOver > 0 || writing}>{commentWords.addReply}</Button>
+                  <Button weight="ink" size="sm" type="submit" disabled={!replyText.trim() || replyOver > 0 || writing}>{commentWords.addReply}</Button>
                   <Button weight="bare" size="sm" onclick={() => (replyingTo = null)}>{commentWords.cancel}</Button>
                 </div>
               </form>
@@ -267,7 +267,7 @@
                 <label class="box-label" for="{uid}-why">{commentWords.why}</label>
                 <input id="{uid}-why" class="box-input" type="text" autocomplete="off" maxlength={COMMENT_MOST} bind:value={why} />
                 <div class="box-acts">
-                  <Button weight="primary" size="sm" type="submit" disabled={!why.trim() || writing}>{commentWords.resolveAction}</Button>
+                  <Button weight="ink" size="sm" type="submit" disabled={!why.trim() || writing}>{commentWords.resolveAction}</Button>
                   <Button weight="bare" size="sm" onclick={() => (resolving = null)}>{commentWords.cancel}</Button>
                 </div>
               </form>

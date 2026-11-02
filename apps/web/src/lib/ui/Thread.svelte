@@ -238,7 +238,7 @@
                   <div class="box-line">
                     <input id="{uid}-reply" class="box-input" type="text" autocomplete="off" bind:value={replyText} bind:this={replyField} onfocus={askMentionable} />
                     <MentionPicker field={replyField} people={mentionable} />
-                    <Button weight="primary" type="submit" disabled={!replyText.trim() || replyOver > 0 || writing}>{words.addReply}</Button>
+                    <Button weight="ink" type="submit" disabled={!replyText.trim() || replyOver > 0 || writing}>{words.addReply}</Button>
                     <Button weight="bare" onclick={() => (replyingTo = null)}>{words.cancel}</Button>
                   </div>
                   {#if replyOver > 0}<p class="box-over" role="status">{words.tooLong(replyOver)}</p>{/if}
@@ -252,7 +252,7 @@
                   <label class="box-label" for="{uid}-why">{words.why}</label>
                   <div class="box-line">
                     <input id="{uid}-why" class="box-input" type="text" autocomplete="off" maxlength={COMMENT_MOST} bind:value={why} />
-                    <Button weight="primary" type="submit" disabled={!why.trim() || writing}>{words.resolveAction}</Button>
+                    <Button weight="ink" type="submit" disabled={!why.trim() || writing}>{words.resolveAction}</Button>
                     <Button weight="bare" onclick={() => (resolving = null)}>{words.cancel}</Button>
                   </div>
                 </form>
@@ -275,7 +275,7 @@
       <div class="box-line">
         <input id="{uid}-new" class="box-input" type="text" autocomplete="off" placeholder={words.addLabel} bind:value={body} bind:this={newField} onfocus={askMentionable} />
         <MentionPicker field={newField} people={mentionable} />
-        {#if body.trim()}<Button weight="primary" type="submit" disabled={over > 0 || writing}>{words.add}</Button>{/if}
+        {#if body.trim()}<Button weight="ink" type="submit" disabled={over > 0 || writing}>{words.add}</Button>{/if}
       </div>
       {#if over > 0}<p class="box-over" role="status">{words.tooLong(over)}</p>{/if}
     </form>

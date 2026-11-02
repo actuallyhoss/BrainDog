@@ -10,6 +10,7 @@
   import { page } from '$app/state';
   import { live } from '$lib/data/live.svelte.ts';
   import Face from '$lib/ui/Face.svelte';
+  import { arrive, depart } from '$lib/motion/index.ts';
 
   const SHOWN = 3;
   const names = $derived(live.hereAt === page.url.pathname ? live.here : []);
@@ -20,7 +21,10 @@
 
 {#if names.length > 0}
   <span class="here" role="img" aria-label={said} title={said}>
-    {#each names.slice(0, SHOWN) as n (n)}<span class="here-face"><Face name={n} size="s" kind="person" /></span>{/each}
+    <!-- SOMEBODY COMING OR GOING IS SEEN (motion pass 2 Nov): a face grows in from 80% on the spring and sinks out, so a
+         change in who is here reads as a change and not a flicker. Still in a screen's first second, a fade under reduced
+         motion (`arrive`, `depart`). -->
+    {#each names.slice(0, SHOWN) as n (n)}<span class="here-face" in:arrive|global={{ rise: 0, from: 0.8 }} out:depart|global><Face name={n} size="s" kind="person" /></span>{/each}
     {#if names.length > SHOWN}<span class="here-more num" aria-hidden="true">+{names.length - SHOWN}</span>{/if}
   </span>
 {/if}
