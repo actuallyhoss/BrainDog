@@ -4144,7 +4144,11 @@ function aheadOf(
   if (!held?.ok || typeof held.value.value !== 'number') return {};
   const DAY = 86_400_000;
   const days = Math.max(1, Math.round(span / DAY));
-  const walk = deps.runway(held.value.value, decl.legs as Leg[], days);
+  /* ONE DAY PAST THE WINDOW'S LAST, SO THAT DAY IS WALKED WHOLE (verify3, 2 Nov): the walk ends at now plus its days,
+     so a movement on the last day was in it before that hour and out after it. Money and Today said "Lowest $30,107 on
+     23 Jan" where Forecast, walking further, said "$28,611 on 25 Jan, after Figma", Figma's bill falling on the 84th day.
+     The line below still stops at the window's last day, so nothing past it is drawn or counted. */
+  const walk = deps.runway(held.value.value, decl.legs as Leg[], days + 1);
   if (!walk || walk.currency === null || (held.value.unit !== null && held.value.unit !== walk.currency)) return {};
   const today = localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs);
   const at = (n: number): string => new Date(Date.parse(`${today}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);

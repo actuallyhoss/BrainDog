@@ -583,7 +583,7 @@ export function runway(
     const named = leg.everyday!.already?.filter((l) => !l.everyday).map((l) => readLeg(l, new Set<string>()));
     /* A LEG NAMED AS ALREADY WALKED THAT CANNOT BE READ SAYS SO ONCE, and not again when the walk reads it too. */
     for (const r of named ?? []) if (r.stopped && !refusals.some((x) => x.fix === r.stopped!.fix)) refusals.push(r.stopped);
-    const measured = everydayOf(deps, leg, named ?? reads, today, until);
+    const measured = everydayOf(deps, leg, named ?? reads, today);
     if (!Array.isArray(measured)) {
       refusals.push(measured);
       continue;
@@ -740,7 +740,7 @@ export function runway(
  * ADDED UP IN SQL, NOT ROW BY ROW, because three months of a card is more rows than the `CAP` a walked leg may carry and
  * nothing here needs a row: only a sum for each month and currency.
  */
-function everydayOf(deps: ForecastDeps, leg: Leg, already: readonly LegRead[], today: string, until: number): Everyday[] | Refusal {
+function everydayOf(deps: ForecastDeps, leg: Leg, already: readonly LegRead[], today: string): Everyday[] | Refusal {
   const want = leg.everyday?.months ?? EVERYDAY_MONTHS;
   if (!Number.isInteger(want) || want < 1 || want > EVERYDAY_MONTHS_CAP)
     return {
@@ -792,7 +792,7 @@ function everydayOf(deps: ForecastDeps, leg: Leg, already: readonly LegRead[], t
     const counted = months.filter((m) => began.get(c)! < m && spent.has(`${c} ${m}`));
     if (counted.length === 0) return { currency: c, months: [], spent: 0, planned: 0, monthly: 0, why: EVERYDAY_NO_MONTH };
     const average = Math.round(counted.reduce((sum, m) => sum + spent.get(`${c} ${m}`)!, 0) / counted.length);
-    const planned = plannedOf(already, c, counted, today, until);
+    const planned = plannedOf(already, c, counted, today);
     const monthly = Math.max(0, average - planned);
     return { currency: c, months: counted, spent: average, planned, monthly, ...(monthly === 0 ? { why: EVERYDAY_COVERED } : {}) };
   });
@@ -803,9 +803,15 @@ function everydayOf(deps: ForecastDeps, leg: Leg, already: readonly LegRead[], t
  * live repeating line of money out, and the monthly average of the one-off money out that fell due in the months counted.
  *
  * RENT WRITTEN AS A REPEATING LINE IS ALSO PAID THROUGH THE BANK, so the measure holds it and so does the walk. A line
- * that has ended, or does not start inside this walk, moves nothing in it and takes nothing off.
+ * that has ended takes nothing off.
+ *
+ * A LINE IS LIVE WHEN IT FALLS DUE WITHIN ONE OF ITS OWN CYCLES FROM TODAY, NOT WITHIN THE WALK (verify3, 2 Nov). Read
+ * against the walk's end, a line first due in March was taken off the everyday figure of a year's walk and not of a
+ * twelve-week one, so the first twelve weeks of the two walks were two different futures: Money and Today said "Lowest
+ * $30,107 on 23 Jan" where Forecast, which walks a year and shows twelve weeks, said "$28,611 on 25 Jan". A line that
+ * starts later than one cycle from now was not in the months measured either, so it is not paid twice by leaving it in.
  */
-function plannedOf(already: readonly LegRead[], currency: string, months: readonly string[], today: string, until: number): number {
+function plannedOf(already: readonly LegRead[], currency: string, months: readonly string[], today: string): number {
   let repeating = 0;
   let once = 0;
   for (const { stopped, rows } of already) {
@@ -816,7 +822,8 @@ function plannedOf(already: readonly LegRead[], currency: string, months: readon
         if (months.includes(row.first.slice(0, 7))) once += row.amount;
         continue;
       }
-      if ((row.last !== null && row.last < today) || noon(row.first) > until) continue;
+      const cycleDays = row.cadence.kind === 'months' ? row.cadence.months * 31 : row.cadence.kind === 'weeks' ? row.cadence.weeks * 7 : 16;
+      if ((row.last !== null && row.last < today) || noon(row.first) > noon(today) + cycleDays * DAY_MS) continue;
       repeating +=
         row.cadence.kind === 'months' ? row.amount / row.cadence.months : row.cadence.kind === 'weeks' ? (row.amount * 52) / (12 * row.cadence.weeks) : row.amount * 2;
     }
