@@ -130,7 +130,21 @@ export function withAdds(own: readonly PageBlock[], adds: readonly PageAddition[
        be the same block twice. */
     if (heading !== undefined && own.some((b) => b.kind === a.block.kind && b.heading === heading)) continue;
     const at = a.after === undefined ? -1 : own.findIndex((b) => b.heading === a.after);
-    (at < 0 ? last : after[at]!).push({ block: a.block, added: a.pack });
+    if (at >= 0) {
+      after[at]!.push({ block: a.block, added: a.pack });
+      continue;
+    }
+    /* AFTER ANOTHER ADDITION, WHEN THAT IS WHAT IT NAMES (2 Nov): Sentry adds Errors after Where it stands and Open on
+       Sentry after Errors, and Errors is no block of the page's own, so Open on Sentry went to the foot of a project's
+       page, under More about and Runs on, a screen away from the figures it explains. It goes straight after the addition
+       it names, wherever that one went, and to the foot only when nothing on the page has that heading. */
+    const group = a.after === undefined ? -1 : [...after, last].findIndex((g) => g.some((x) => x.block.heading === a.after));
+    if (group < 0) {
+      last.push({ block: a.block, added: a.pack });
+      continue;
+    }
+    const into = group === after.length ? last : after[group]!;
+    into.splice(into.findIndex((x) => x.block.heading === a.after) + 1, 0, { block: a.block, added: a.pack });
   }
   return [...own.flatMap((block, i) => [{ block: columns[i] ?? block }, ...after[i]!]), ...last];
 }
