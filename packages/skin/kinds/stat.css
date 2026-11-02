@@ -287,7 +287,10 @@
     white-space: nowrap;
   }
 
+  /* THE DAYS RUN THE WAY THE LINE IS DRAWN (domains lane, 2 Nov): the drawing does not mirror, so under a right-to-left
+     page "Today" stood at the right end of a line that starts at the left. */
   .trend-days {
+    direction: ltr;
     display: flex;
     justify-content: space-between;
     gap: 0.75em;

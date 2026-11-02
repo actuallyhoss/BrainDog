@@ -718,7 +718,7 @@
     gap: 5px;
     block-size: 22px;
     padding: 0 8px;
-    border-radius: 7px;
+    border-radius: var(--r-ctl);
     background: var(--tile-2, var(--hover));
     color: var(--ink-2);
     font-size: var(--fs-cap, 12px);

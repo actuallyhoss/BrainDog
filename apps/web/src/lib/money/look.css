@@ -651,6 +651,13 @@
   font-size: var(--fs-meta);
 }
 
+/* AND A GROUP AFTER ANOTHER STARTS A STEP FURTHER DOWN (domains lane, 2 Nov): "Card · 1 account" sat 18px under the bank's
+   cards, which stand 12 apart, so the label read as the last card's caption and not the next group's name. Twice the gap
+   inside a group, at least, between two. */
+[data-money] .block-slot > .block[data-kind='cards'] + .document:has(+ .block[data-kind='cards']) p {
+  margin-block-start: var(--sp-5);
+}
+
 [data-money] .block-slot > .document:has(+ .block[data-kind='cards']) strong {
   color: var(--ink-2);
   font-weight: var(--fw-semi);

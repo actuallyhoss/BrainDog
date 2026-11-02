@@ -472,7 +472,10 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
     font-size: var(--fs-body);
   }
 
-  .dc-choice .queue-key {
+  /* AND ON THE ANSWER BUTTONS (domains lane, 2 Nov): "1 Keep it", "2 Cancel it" drew a number key on a phone, which
+     has none (Look B: what only a keyboard can use is not offered on a phone). */
+  .dc-choice .queue-key,
+  .dc-btn .queue-key {
     display: none;
   }
 }
