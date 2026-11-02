@@ -178,7 +178,7 @@ test('STALE after two of its periods, or fourteen days with none, with the fix i
   const none = { name: 'Players', source: 'agent' as const };
   assert.equal(kpiView({ ...none, points: days([1], '2026-10-08', 1) }, { now: NOW }).stale, null);
   assert.equal(kpiView({ ...none, points: days([1], '2026-10-06', 1) }, { now: NOW }).stale?.fix, KPI_FIX.agent);
-  assert.deepEqual(kpiView({ ...none, points: [] }, { now: NOW }).stale, { said: 'No value yet', fix: 'Ask Claude to report it' });
+  assert.deepEqual(kpiView({ ...none, points: [] }, { now: NOW }).stale, { said: 'No reading yet', fix: 'Ask Claude to report it' });
   assert.equal(kpiView({ ...none, points: days([1], '2025-10-02', 1) }, { now: NOW }).stale?.said, 'Not updated since 2 Oct 2025', 'another year says its year');
 });
 
@@ -229,7 +229,7 @@ test('the project form draws the lead with its chart, the grid, the off-target w
   assert.match(body, /<span class="kpi-change" data-tone="good" data-dir="up">/u);
   assert.match(body, /<p class="kpi-target" data-state="off">(?:<!--[^>]*-->)*Off target: 33 of 50 people by 1 Oct<\/p>/u);
   assert.match(body, /<button type="button" class="kpi-fix">Ask Claude to report it<\/button>/u);
-  assert.match(body, /No value yet/u);
+  assert.match(body, /No reading yet/u);
   assert.doesNotMatch(body, /style="[^"]*--chart-1/u, 'inside a project the page sets the colour');
 });
 

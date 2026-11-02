@@ -108,12 +108,12 @@ test('A PART TAKES ITS COLOUR FROM A FOURTH CELL: a slot by name, or a stored hu
    account is money owed on it, and the legend says so where a share would be. */
 test('AN AMOUNT BELOW NOUGHT SAYS IT IS OWED where a share would be; a count below nought says nothing', () => {
   const html = toHTML(parse('```split\nHSBC | $9,074.01 USD\nStripe available | −$9.61 USD\n```'));
-  assert.match(html, /<span class="split-label">Stripe available<\/span><span class="split-value num">−[^<]*9\.61[^<]*<\/span><span class="split-share num">owed<\/span>/u);
+  assert.match(html, /<span class="split-label">Stripe available<\/span><span class="split-value num">−[^<]*10<\/span><span class="split-share num">owed<\/span>/u);
   assert.match(html, /<td class="num">owed<\/td>/u, 'and the fold of numbers says it too');
   assert.doesNotMatch(toHTML(parse('```split\nOpen | 9\nMoved back | −2\n```')), /owed/u);
 });
 
-test('a split legend says its figures as one set: all whole, or all to the same places (audit 2 B13)', () => {
-  assert.deepEqual(splitFigures(['£174.23', '£58.00', '£10.02']), ['£174.23', '£58.00', '£10.02']);
+test('a split legend says its figures as one set, a set of totals, so all whole (audit 2 B13, polish5 2 Nov)', () => {
+  assert.deepEqual(splitFigures(['£174.23', '£58.00', '£10.02']), ['£174', '£58', '£10']);
   assert.deepEqual(splitFigures(['£174.00', '£58.00']), ['£174', '£58']);
 });

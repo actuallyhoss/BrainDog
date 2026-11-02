@@ -62,7 +62,7 @@ test('and every one of them has a sentence, so no enum reaches a screen', () => 
    */
   const append = copy.levelMeans.append ?? '';
   assert.doesNotMatch(append, /the rest|their own|what they filed|own rows/i, `append implies a partial read: "${append}"`);
-  assert.match(append, /read nothing|no read|cannot read|reads nothing/i, `append does not say it reads nothing: "${append}"`);
+  assert.match(append, /read nothing|no read|cannot read|reads nothing|sees nothing/i, `append does not say it reads nothing: "${append}"`);
   /* AND NOTHING ELSE. A sentence for a level that does not exist is a sentence nobody reads. */
   for (const key of Object.keys(copy.levelMeans))
     assert.ok((LEVELS as readonly string[]).includes(key), `levelMeans.${key} is not a level`);

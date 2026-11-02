@@ -114,10 +114,11 @@ test('a series of counts by week says each week by its day on a narrow chart, an
   assert.deepEqual(seriesPlan([['Month', 'in: Paid'], ['Sep 2026', '1'], ['Oct 2026', '2']]).buckets.map((b) => b.short), ['Sep', 'Oct'], 'a month is its name');
 });
 
-test('ONE TABLE SAYS ITS MONEY ONE WAY: where one amount of a currency has pence, each of that currency does', () => {
-  assert.deepEqual(evenPlaces(['£11,050', '£19,516.90', '−£8,466.90', '—']), ['£11,050.00', '£19,516.90', '−£8,466.90', '—']);
-  /* ANOTHER CURRENCY IS ITS OWN SET, and a count is no money at all. */
-  assert.deepEqual(evenPlaces(['E£400', '£1.50', '12h']), ['E£400', '£1.50', '12h']);
+test('ONE TABLE SAYS ITS MONEY ONE WAY: a table of months is totals, so every amount in it is said whole', () => {
+  /* SINCE 2 NOV (polish5, one rule a set): "£389.90" beside "£6,880" is "£390", half a unit rounding away from nought. */
+  assert.deepEqual(evenPlaces(['£11,050', '£19,516.90', '−£8,466.90', '—']), ['£11,050', '£19,517', '−£8,467', '—']);
+  /* ANOTHER CURRENCY IS ITS OWN FIGURE, and a count is no money at all. */
+  assert.deepEqual(evenPlaces(['E£400', '£1.50', '12h']), ['E£400', '£2', '12h']);
 });
 
 test('A CELL DRAWN BY ITS SIGN ALONE IS READ BY ITS CURRENCY, never copied as a shape', () => {
