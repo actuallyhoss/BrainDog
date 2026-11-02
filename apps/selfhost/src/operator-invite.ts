@@ -118,7 +118,7 @@ export async function operatorInvite(args: readonly string[], deps: OperatorDeps
 
     const what = level ? LEVEL_WORDS[level] : 'what is shared with them';
     const lists = Object.keys(registers).length;
-    say(`Invitation for ${email} on ${slug}: ${what}${lists ? `, on ${lists} ${lists === 1 ? 'list' : 'lists'}` : ''}. The link they had before no longer works.`);
+    say(`Invitation for ${email} on ${slug}: ${what}${lists ? `, on ${lists} ${lists === 1 ? 'list' : 'lists'}` : ''}.${waiting ? ' The link the app made for them before no longer works.' : ''}`);
 
     let link = `${origin}/invite#${token}`;
     if (dirSql.one(KNOWN, email)) {
@@ -140,7 +140,7 @@ export async function operatorInvite(args: readonly string[], deps: OperatorDeps
       }
       link = `${origin}/invite#${token}&proof=${proving.mail.link}`;
       if (!sql.one('SELECT 1 AS x FROM member LIMIT 1') || !dirSql.one('SELECT 1 AS x FROM dir_passkey LIMIT 1'))
-        say('The owner has no passkey yet, and nobody else can join until they add one (Settings, Sign-in). The link stays good until then, for a day.');
+        say('The owner has no passkey yet, and nobody else can join until they add one (Settings, Signing in). The link lasts a day, so it works once they have.');
     }
     say('Send them this link yourself. It is printed here only, works once, and runs out in a day:');
     say('');
