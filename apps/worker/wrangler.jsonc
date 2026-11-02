@@ -780,6 +780,13 @@
      dead-letters with a sentence that names both settings (`vapidKeys` in `src/vapid.ts`). Not under
      `secrets.required`, for the reason `KEK` is not.
 
+     `APNS_KEY_ID`, `APNS_TEAM_ID` AND `APNS_KEY` ARE THE iPHONE APP'S PUSH (`src/apns.ts`): the ten-character id Apple
+     shows beside a key made under Certificates, Identifiers & Profiles > Keys with Apple Push Notifications on, the team
+     id MG86668Z52, and the whole AuthKey_<id>.p8 file, each put with `wrangler secret put <NAME> --env <environment>`
+     (`wrangler secret put APNS_KEY --env production < AuthKey_XXXXXXXXXX.p8`). One key serves the sandbox and production
+     hosts both. All three, or an iPhone's row in `push_sub` is passed over and a browser's push is unaffected. Not under
+     `secrets.required`, for the reason `KEK` is not.
+
      `STRIPE_SECRET_KEY` AND `STRIPE_WEBHOOK_SECRET` ARE BILLING'S TWO, and `TURNSTILE_SECRET` IS SIGN-UP'S.
      The first is Stripe's secret key, `sk_test_...` while `BILLING` is `test` and
      `sk_live_...` only once the owner turns billing live; the second is the signing secret Stripe shows for the endpoint

@@ -93,6 +93,7 @@ import { CUT_HOLD_MS, CUTS_TO_HOLD, cutAgain, cutsOf, heldUntil, resetSaid, type
 import { isHeld, redeliver, serveHeld, sweepHeld, type HeldDeps, type HeldMessage } from './held.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars } from './mail.ts';
 import { delivers, leasedOpener, leasedTarget, makeDeliver, recordDelivers, type Mail, type PushAddress } from './deliver.ts';
+import { apnsKeyed, apnsKeys, fetchApns } from './apns.ts';
 import { fetchPush, pushKeyOf, servesPushKey, vapidKeys } from './vapid.ts';
 import { NO_SHARE_KEY, linkOpened, opensShare, serveShared, sharedNone, type SharedDoor } from '@braindog/host';
 /* NAMED APART FOR THE LINK'S DOOR, so the front doors' own limiter can import the same two functions under their own
@@ -346,6 +347,13 @@ type Env = {
   VAPID_PUBLIC?: string;
   /** Web Push's private key, a secret put with `wrangler secret put VAPID_PRIVATE`. Unset, and no push is leased. */
   VAPID_PRIVATE?: string;
+  /**
+   * The iPhone app's push (`apns.ts`): Apple's key id, the team id and the whole AuthKey .p8 file, three secrets put with
+   * `wrangler secret put APNS_KEY_ID|APNS_TEAM_ID|APNS_KEY --env <environment>`. All three, or no iPhone is rung.
+   */
+  APNS_KEY_ID?: string;
+  APNS_TEAM_ID?: string;
+  APNS_KEY?: string;
   /**
    * The front doors' two budgets, `ratelimits` in `wrangler.jsonc`: 600 reads and 120 writes a minute for one caller,
    * keyed by `limitKey` (the token, the person, or for `/auth/*` the address) and spent by `ROUTES`' `writes`.
@@ -3382,14 +3390,18 @@ async function drainOutbox(env: Env, id: string): Promise<void> {
      a pair that is not one reaches every push as `vapidKeys`' sentence rather than as a 403 from each service. The
      contact address a push service writes to is the one this deployment already sends mail from. */
   const keyed = delivers(env).includes('notify.push');
+  const webKeyed = (env.VAPID_PUBLIC ?? '').trim() !== '' && (env.VAPID_PRIVATE ?? '').trim() !== '';
+  const pushTarget = leasedTarget(async (args) => (await record.pushTargetFor(args)) as unknown as Result<PushAddress | null>);
   const deliver = makeDeliver({
-    ...(keyed
+    /* AND APPLE, FOR THE iPHONE APP'S ROWS, where the three APNs secrets are set (`apns.ts`). */
+    ...(apnsKeyed(env) ? { apns: { key: await apnsKeys(env), send: fetchApns, target: pushTarget } } : {}),
+    ...(keyed && webKeyed
       ? {
           push: {
             vapid: await vapidKeys(env.VAPID_PUBLIC ?? '', env.VAPID_PRIVATE ?? ''),
             subject: `mailto:${env.MAIL_FROM || env.AUTH_MAIL_FROM || ''}`,
             send: fetchPush,
-            target: leasedTarget(async (args) => (await record.pushTargetFor(args)) as unknown as Result<PushAddress | null>),
+            target: pushTarget,
           },
         }
       : {}),

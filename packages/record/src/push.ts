@@ -49,8 +49,19 @@ function bytesOf(text: string): Uint8Array | null {
   }
 }
 
+/**
+ * AN APPLE DEVICE TOKEN IS AN ENDPOINT TOO (apps plan M4, 3 Nov): the iPhone app registers the token Apple gave it as
+ * `apns://<production|sandbox>/<bundle id>/<hex token>` over its app session, through this same call, so it lands in
+ * `push_sub` beside the browsers and every rule that picks who a push rings (owners, the person named, `push.off`, quiet
+ * hours, one an hour) holds for the phone as it does for a browser, with no table of its own. It carries no keys: Apple
+ * is reached with the deployment's own key (`apps/worker/src/apns.ts`), and nothing is encrypted to the phone. The
+ * deliverer tells the two apart by the scheme.
+ */
+export const APNS_ENDPOINT = /^apns:\/\/(production|sandbox)\/[A-Za-z0-9.-]{1,155}\/[0-9a-f]{64,200}$/u;
+
 /** An endpoint as the record keeps it, or `null`. */
 function endpointOf(value: unknown): string | null {
+  if (typeof value === 'string' && APNS_ENDPOINT.test(value)) return value;
   if (typeof value !== 'string' || value.length > ENDPOINT_MOST) return null;
   let url: URL;
   try {
@@ -80,8 +91,13 @@ export function readPushSub(args: unknown): Result<PushSub> {
   if (given.endpoint === undefined) return no('REQUIRED_MISSING', "endpoint is the push service's address the browser gave.", { at: 'endpoint' });
   const endpoint = endpointOf(given.endpoint);
   if (endpoint === null)
-    return no('VALUE_MALFORMED', `endpoint is an https address of at most ${ENDPOINT_MOST} characters, with no user or password in it.`, { at: 'endpoint' });
+    return no('VALUE_MALFORMED', `endpoint is an https address of at most ${ENDPOINT_MOST} characters, with no user or password in it, or an app's apns:// device token.`, { at: 'endpoint' });
   const keys = given.keys;
+  /* A PHONE'S TOKEN HAS NO KEYS, and one sent with keys is a browser's subscription pasted into the wrong shape. */
+  if (APNS_ENDPOINT.test(endpoint)) {
+    if (keys !== undefined && keys !== null) return no('FIELD_UNKNOWN', 'An apns:// endpoint is an Apple device token and takes no keys.', { at: 'keys' });
+    return ok({ endpoint, p256dh: '', auth: '' });
+  }
   if (keys === undefined || keys === null) return no('REQUIRED_MISSING', 'keys is { p256dh, auth }, as the browser gave them.', { at: 'keys' });
   if (typeof keys !== 'object' || Array.isArray(keys)) return no('VALUE_MALFORMED', 'keys is { p256dh, auth }, as the browser gave them.', { at: 'keys' });
   const { p256dh, auth, ...more } = keys as Record<string, unknown>;

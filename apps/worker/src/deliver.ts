@@ -28,6 +28,7 @@ import { fixOf, type Result } from '@braindog/ports';
 import { unwrap, type KeyStore } from './keys.ts';
 import { recordLetter } from './mail.ts';
 import { PUSH_BODY_HEADERS, encryptPush, pushHeaders, type PushSend, type Vapid } from './vapid.ts';
+import { apnsKeyed, apnsPayload, isApns, sendApns, type Apns, type ApnsSend } from './apns.ts';
 
 /**
  * One message as Email Service takes it: `to` is one address or up to fifty, and `from` is required. The text and the
@@ -68,6 +69,12 @@ export type Transports = {
    * that sentence rather than a 403.
    */
   push?: { vapid: Vapid | string; subject: string; send: PushSend; target: PushTargetOf } | undefined;
+  /**
+   * APNs, for the iPhone app's rows in `push_sub` (`apns://…`, `apns.ts`): the key as `apnsKeys` read it, the POST, and
+   * the same addresser as Web Push. Absent when this deployment has no APNs key, and then a phone's push is passed over
+   * (sent nothing, counted nothing) rather than walked to a dead letter; a browser's push is unaffected either way.
+   */
+  apns?: { key: Apns | string; send: ApnsSend; target: PushTargetOf } | undefined;
   /**
    * Counts one job this host sent, in the account's ledger and never against its allowance: `Record$.countDelivery` on
    * the Worker. Asked only once a send has succeeded; absent, nothing is counted.
@@ -138,8 +145,16 @@ export const DELIVERS: OutboxKind[] = ['notify.email', 'notify.webhook', 'erase.
  * has always done with a push, and it goes the day the second half is set. Whether the two halves are a pair is
  * `vapidKeys`' question, asked when a push is delivered, because this answer is read on every pass and costs nothing.
  */
-export function delivers(env: { VAPID_PUBLIC?: string | undefined; VAPID_PRIVATE?: string | undefined }): OutboxKind[] {
-  const keyed = (env.VAPID_PUBLIC ?? '').trim() !== '' && (env.VAPID_PRIVATE ?? '').trim() !== '';
+export function delivers(env: {
+  VAPID_PUBLIC?: string | undefined;
+  VAPID_PRIVATE?: string | undefined;
+  APNS_KEY_ID?: string | undefined;
+  APNS_TEAM_ID?: string | undefined;
+  APNS_KEY?: string | undefined;
+}): OutboxKind[] {
+  /* OR AN APNs KEY (apps plan M4): a deployment that rings only iPhones leases a push too. Whichever half a row needs and
+     this deployment lacks, that row is passed over in `makeDeliver`, never dead-lettered. */
+  const keyed = ((env.VAPID_PUBLIC ?? '').trim() !== '' && (env.VAPID_PRIVATE ?? '').trim() !== '') || apnsKeyed(env);
   return keyed ? [...DELIVERS, 'notify.push'] : DELIVERS;
 }
 
@@ -405,9 +420,8 @@ export function makeDeliver(transports: Transports): Deliver {
     }
 
     if (job.kind === 'notify.push') {
-      if (!transports.push) throw new Error('this deployment has no VAPID keys, so it sends no push: set VAPID_PUBLIC and VAPID_PRIVATE');
-      const { vapid, subject, send, target } = transports.push;
-      if (typeof vapid === 'string') throw new Error(vapid);
+      if (!transports.push && !transports.apns) throw new Error('this deployment has no VAPID keys, so it sends no push: set VAPID_PUBLIC and VAPID_PRIVATE');
+      const target = (transports.push ?? transports.apns)!.target;
       /* ONE SUBSCRIPTION PER JOB, NAMED BY ID (`51 §5`, `payload.sub`), because the ack says whether THAT phone is gone.
          The job carries the id and never the endpoint: the outbox travels in every `.brain` file and `push_sub` does
          not, so the address is asked of the record under this job's lease. This line once read `sub.endpoint` while the
@@ -426,6 +440,35 @@ export function makeDeliver(transports: Transports): Deliver {
       const found = await target(job);
       if (found === null) return;
       const address = found.endpoint;
+      /* AN iPHONE'S TOKEN GOES TO APPLE (`apns.ts`): the fixed line for its kind, where a tap opens, and the BrainDog as
+         the thread, which is the record's name in the app's address and nothing it holds. No APNs key here, and the
+         phone is passed over: nothing was sent, so nothing is counted and nothing is dead-lettered. */
+      if (isApns(address)) {
+        if (!transports.apns) {
+          console.warn(`deliveries: ${job.id} rings an iPhone and this deployment has no APNs key (APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY)`);
+          return;
+        }
+        const { key } = transports.apns;
+        if (typeof key === 'string') throw new Error(key);
+        const open = found.open && /^\/[a-z0-9][a-z0-9-]{0,63}(\/[A-Za-z0-9_/-]{0,200})?$/u.test(found.open) ? found.open : null;
+        let record: string | null = null;
+        try {
+          const base = transports.app ? await transports.app() : null;
+          record = base ? (new URL(base).pathname.split('/').filter(Boolean)[0] ?? null) : null;
+        } catch {
+          record = null;
+        }
+        const sent = await sendApns(key, transports.apns.send, address, apnsPayload({ open, kind: found.kind, record }));
+        if (sent === 'gone') return { gone: true };
+        await count(transports, job);
+        return;
+      }
+      if (!transports.push) {
+        console.warn(`deliveries: ${job.id} rings a browser and this deployment has no VAPID keys`);
+        return;
+      }
+      const { vapid, subject, send } = transports.push;
+      if (typeof vapid === 'string') throw new Error(vapid);
       /* The endpoint was written by a browser and stored by the record, so it is data somebody else supplied, and it
          goes through the same `postable()` as a webhook: a push to the metadata service is still a request to it. */
       const endpoint = postable(address);
