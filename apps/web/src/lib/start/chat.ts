@@ -22,6 +22,7 @@ import { currencyChoices, type CurrencyEnv } from '../../routes/start/building.t
 import { closeOver } from '../shape.ts';
 import { PEOPLE } from '../who.ts';
 import type { ModelAsk } from '../signup.ts';
+import { nameEnd } from './name-end.ts';
 import { INSIDE_WORDS, placesOf, YOU, type HeardLine, type Proposal } from './propose.ts';
 
 /** What a question is about: the first question (`what`), the rules' own, and every topic the model may ask about. */
@@ -932,8 +933,8 @@ export function splitNames(answer: string): string[] {
   const out: string[] = [];
   for (const n of plain(answer)
     .replace(/^(?:i\s+(?:also\s+)?use|we\s+use|mostly|just|only)\s+/iu, '')
-    .split(/\s*(?:,|\band\b|&|\+|\/|\bplus\b)\s*/iu)
-    .map((x) => x.trim().replace(/^(?:the|a|an)\s+/iu, ''))) {
+    .split(/\s*(?:,|;|\.\s|\band\b|&|\+|\/|\bplus\b)\s*/iu)
+    .map((x) => nameEnd(x.replace(/^(?:the|a|an)\s+/iu, '')))) {
     if (n !== '' && [...n].length <= 40 && !out.some((x) => x.toLowerCase() === n.toLowerCase())) out.push(n);
   }
   return out;

@@ -31,6 +31,7 @@ import type { TellList, Told } from '../tell/read.ts';
 import { PEOPLE } from '../who.ts';
 import type { SetupOffer, SetupReply } from './ask.ts';
 
+import { nameEnd } from './name-end.ts';
 import { entryOf, FILLABLE, listDocument, listsOf, useCaseOfList, type List } from './lists.ts';
 
 /** One entry of a draft, as the record's capture takes it. */
@@ -125,7 +126,8 @@ export function draftOffer(modules: readonly string[]): SetupOffer {
   };
 }
 
-const plain = (s: unknown): string => (typeof s === 'string' ? s.replace(/\s+/gu, ' ').trim().toLowerCase() : '');
+/* COMPARED AS NAMES (`nameEnd`), so a draft of "Kettle & Co." is the "Kettle & Co" the build already wrote. */
+const plain = (s: unknown): string => (typeof s === 'string' ? nameEnd(s).toLowerCase() : '');
 
 /** The list a register is, among the modules held. */
 const listIn = (register: string, modules: readonly string[]): List | null => {
@@ -171,7 +173,7 @@ export function renamesOf(reply: Pick<SetupReply, 'names'>, from: Pick<DraftsFro
   const out: FirstDraft[] = [];
   for (const n of reply.names ?? []) {
     const list = listIn(n.list, from.modules);
-    const name = typeof n.name === 'string' ? n.name.replace(/\s+/gu, ' ').trim() : '';
+    const name = typeof n.name === 'string' ? nameEnd(n.name) : '';
     if (list === null || name === '' || name.length > 40 || /[{}\n]/u.test(name)) continue;
     const was = from.names?.[list.id] ?? list.name;
     if (plain(was) === plain(name) || out.some((d) => d.rename?.list === list.id)) continue;

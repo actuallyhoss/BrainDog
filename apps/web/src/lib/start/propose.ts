@@ -38,6 +38,7 @@ import { offerOf } from './offer.ts';
 import { currencyWord, placeCurrency } from './place-currency.ts';
 import type { ArrivesBy } from './made.ts';
 import { entryOf, knownCurrency, listById, listsOf } from './lists.ts';
+import { nameEnd } from './name-end.ts';
 
 export type Proposal = {
   /** The person's name, where the sentence puts one unmistakably. */
@@ -1268,11 +1269,14 @@ export function householdPeople<P extends Pick<Proposal, 'usecase' | 'also' | 'r
 const CLIENT_NAME = String.raw`\p{Lu}\p{Ll}[\p{L}\p{N}'’-]*(?:\s+(?:&\s+)?\p{Lu}[\p{L}\p{N}'’.-]*)*`;
 const CLIENT_LIST = `${CLIENT_NAME}(?:(?:\\s*,\\s*(?:and\\s+)?|\\s+and\\s+|\\s+&\\s+)${CLIENT_NAME})*`;
 /* "three clients, Fenwick, Brightside and Acme", "clients like Fenwick and Acme", "my clients are Fenwick and Acme". */
-const AFTER_CLIENTS = new RegExp(String.raw`\b(?:clients?|customers?)\b(?:\s+(?:are|is|include|including|like|called|named|such as))?\s*[,:]?\s+(${CLIENT_LIST})`, 'gu');
+const AFTER_CLIENTS = new RegExp(String.raw`\b(?:[Cc]lients?|[Cc]ustomers?)\b(?:\s+(?:are|is|include|including|like|called|named|such as))?\s*[,:]?\s+(${CLIENT_LIST})`, 'gu');
 /* "a checkout redesign for Fenwick", "a brand refresh for Kettle & Co": work done for somebody named. */
 const WORK_FOR = new RegExp(String.raw`\b(?:redesign|rebuild|refresh|website|site|app|campaign|brand(?:ing)?|audit|logo|shoot|project|retainer|work)\s+for\s+(${CLIENT_NAME})`, 'gu');
 /* Words with a capital that name no client: the days and months, and "I". */
 const NOT_CLIENT = /^(?:i|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december)$/iu;
+
+/* WHERE ONE SENTENCE ENDS: a stop and a space, except after a company's short word when its ending follows ("Co. Ltd"). */
+const SENTENCE_GAP = /(?<=[!?;]|(?<!\b(?:Co|Bros|Corp|Inc|St)\.)(?<=\.)|\b(?:Co|Bros|Corp|Inc|St)\.(?!\s+(?:Ltd|Limited|LLC|LLP|Inc|PLC|plc|GmbH|Group|Holdings|Partners)\b))\s+/u;
 
 /**
  * THE CLIENTS A SENTENCE NAMES (2 Nov, a walk with no model: "I work with three clients, Fenwick, Brightside and Acme"
@@ -1282,11 +1286,12 @@ const NOT_CLIENT = /^(?:i|monday|tuesday|wednesday|thursday|friday|saturday|sund
 export function clientsNamed(said: string): string[] {
   const out: string[] = [];
   const add = (n: string) => {
-    const v = n.trim().replace(/[.’']+$/u, '');
+    const v = nameEnd(n).replace(/[’']+$/u, '');
     if (v !== '' && !NOT_CLIENT.test(v) && [...v].length <= 40 && !out.some((x) => x.toLocaleLowerCase() === v.toLocaleLowerCase())) out.push(v);
   };
-  /* SENTENCE BY SENTENCE, so a name never runs on into the next one ("Kettle & Co. Retainers and invoices"). */
-  for (const one of said.split(/(?<=[.!?;])\s+/u)) {
+  /* SENTENCE BY SENTENCE, so a name never runs on into the next one ("Kettle & Co. Retainers and invoices"), but never
+     inside a name whose short word goes on to its ending ("Smith & Co. Ltd", `NAME_GOES_ON`). */
+  for (const one of said.split(SENTENCE_GAP)) {
     for (const m of one.matchAll(AFTER_CLIENTS)) for (const n of (m[1] ?? '').split(/\s*,\s*(?:and\s+)?|\s+and\s+/u)) add(n);
     for (const m of one.matchAll(WORK_FOR)) add(m[1] ?? '');
   }

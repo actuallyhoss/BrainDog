@@ -1114,6 +1114,17 @@ const ISO = /^[A-Z]{3}$/u;
 const lower = (s: string): string => s.toLocaleLowerCase();
 const oneLine = (s: string, bytes: number): string => firstBytes(s.replace(/\s+/gu, ' ').trim(), bytes);
 const textOf = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+/**
+ * A NAME WITHOUT THE STOP OF THE SENTENCE IT WAS SAID IN ("a brand refresh for Kettle & Co." is Kettle & Co): what
+ * the sentence ended on is taken off; a dot inside a name ("Smith & Co. Ltd") and the dots of initials ("U.S.") stay.
+ * The browser holds an entry's title to the same end (`apps/web/src/lib/start/name-end.ts`).
+ */
+const nameEnd = (v: string): string => {
+  const t = v.replace(/\s+/gu, ' ').trim().replace(/^["“”]+/u, '').replace(/[\s,;:!?…"“”]+$/u, '');
+  return /(?:^|[\s.])\p{L}\.(?:\p{L}\.)+$/u.test(t) ? t : t.replace(/[\s.,;:!?…"“”]+$/u, '');
+};
+/** The fields an entry is called by: each a name, held to `nameEnd`. */
+const TITLE_FIELDS: ReadonlySet<string> = new Set(['name', 'what', 'title']);
 
 /**
  * WHAT THE MODEL SAID, HELD TO WHAT IT WAS OFFERED AND WHAT WAS TYPED. An id outside the offer is dropped, a phrase not in
@@ -1128,7 +1139,7 @@ export const setupOf = (raw: Record<string, unknown>, ask: SetupAsk, by: string)
   const lists = new Map(ask.offer.modules.flatMap((m) => m.lists.map((l) => [l.id, new Set(l.fields)] as const)));
   const typed = (s: string): boolean => s !== '' && said.includes(lower(s));
   const usecase = cases.has(textOf(raw['usecase'])) ? textOf(raw['usecase']) : null;
-  const name = textOf(raw['name']);
+  const name = nameEnd(textOf(raw['name']));
   const currency = textOf(raw['currency']).toUpperCase();
   const draft = oneLine(textOf(raw['draft']), 400);
   const heard: SetupAnswer['heard'] = [];
@@ -1149,7 +1160,7 @@ export const setupOf = (raw: Record<string, unknown>, ask: SetupAsk, by: string)
     const fields = isRecord(r) && isRecord(r['fields']) ? r['fields'] : null;
     const own = lists.get(list);
     if (!own || fields === null) continue;
-    const kept = Object.fromEntries(Object.entries(fields).filter(([k]) => own.has(k)));
+    const kept = Object.fromEntries(Object.entries(fields).filter(([k]) => own.has(k)).map(([k, v]) => [k, TITLE_FIELDS.has(k) && typeof v === 'string' ? nameEnd(v) : v]));
     if (Object.keys(kept).length > 0) rows.push({ list, fields: kept });
   }
   const held = { name: typed(name) && name.length <= 60 ? name : null, currency: ISO.test(currency) ? currency : null };

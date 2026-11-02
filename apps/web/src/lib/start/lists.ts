@@ -17,6 +17,7 @@ import { MODULE_ORDER, USE_CASES, useCaseDocument } from '@braindog/seed/usecase
 import { moduleDocument } from '@braindog/seed/usecases/install';
 import { moduleName } from '@braindog/seed/usecases/names';
 import { exponentOf } from 'braindog-render';
+import { nameEnd } from './name-end.ts';
 
 export type Field = { id: string; type: string; label: string; required: boolean; fallback: boolean; values: readonly string[] };
 export type List = { id: string; name: string; module: string; title: string; fields: readonly Field[] };
@@ -160,6 +161,13 @@ export function entryOf(list: List, fields: Readonly<Record<string, unknown>>, c
     if (!Object.hasOwn(fields, f.id)) continue;
     const v = fits(f, fields[f.id], currency);
     if (v !== undefined) out[f.id] = v;
+  }
+  /* AN ENTRY'S TITLE IS A NAME, never the end of the sentence it came from ("Kettle & Co." is Kettle & Co, `nameEnd`). */
+  const title = out[list.title];
+  if (typeof title === 'string') {
+    const t = nameEnd(title);
+    if (t === '') return null;
+    out[list.title] = t;
   }
   if (out[list.title] === undefined) return null;
   return list.fields.every((f) => !f.required || f.fallback || out[f.id] !== undefined) ? out : null;
