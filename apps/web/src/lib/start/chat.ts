@@ -659,6 +659,19 @@ export function nextAsk(w: Where): ChatAsk | null {
  */
 export const TURNS_ON: Partial<Record<Topic, string>> = { money: 'money-core', people: 'people', tools: 'agents' };
 
+/* Paid subscriptions named in a tools answer: "ChatGPT Plus", "a Claude Pro subscription", "$20 a month". */
+const PAID = /\b(?:subscriptions?|subscribed?|plans?|pro|plus|premium|team plan|paid|pay|paying|seats?|licen[cs]es?|per month|a month|monthly)\b|[$£€]\s?\d/iu;
+
+/**
+ * WHAT A TOOLS ANSWER MAY NOT TURN ON (onboarding9, 2 Nov: Leo's "Cursor, Claude" was answered "That adds Services and
+ * Agents."). The AI tools they use are Agents, and nothing else comes on with that answer; Services only where the
+ * answer names a paid subscription. The parts that came on with it otherwise, by id, which the caller holds off.
+ */
+export function toolsHeldBack(before: readonly string[], after: readonly string[], answer: string): string[] {
+  const keep = new Set(['agents', 'tools', ...(PAID.test(answer) ? ['estate'] : [])]);
+  return after.filter((m) => !before.includes(m) && !keep.has(m));
+}
+
 /**
  * AND WHAT AN ANSWER TO "WHAT FIRST" ASKS FOR BY ITS OWN WORDS: deadlines, to-dos or tasks keep Work, where the first
  * to-dos drawn from them wait (`todosOf`). `null` where it names none.
@@ -881,6 +894,9 @@ function kindOfEntry(r: Entry): { one: string; many: string } | null {
   if (r.register === 'people' && HOME_ROLES.has(role)) return { one: note !== '' && note.length <= 20 ? `your ${note}` : (HOME_ROLES.get(role) ?? 'family'), many: role === 'family' ? 'family' : 'people in your life' };
   /* AND SOMEBODY PAID FOR THE WORK, BY THE WORK ("Kai and Rosa as your editors"), where the words named it. */
   if (r.register === 'people' && role === 'contractor' && note !== '' && note.length <= 20) return { one: `your ${note}`, many: `your ${note}s` };
+  /* A CO-FOUNDER OR BUSINESS PARTNER BY THAT WORD (People 4.5.0's roles): "Dan as your co-founder". */
+  if (r.register === 'people' && role === 'cofounder') return { one: 'your co-founder', many: 'your co-founders' };
+  if (r.register === 'people' && role === 'partner') return { one: 'your business partner', many: 'your business partners' };
   if (r.register === 'people') return { one: 'someone you work with', many: 'people you work with' };
   if (r.register === 'organisations') return { one: 'an organisation', many: 'organisations' };
   if (r.register === 'things') return { one: 'a project', many: 'projects' };

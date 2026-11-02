@@ -153,6 +153,7 @@
   import Forming from '../start/Forming.svelte';
   import {
     ackOf,
+    toolsHeldBack,
     askedLines,
     atLeast,
     caseTitle,
@@ -786,6 +787,7 @@
     const adds = text === null ? '' : saidOf(q, text);
     const value = text === null ? null : valueOf(q, text);
     const before = placeNames();
+    const modsBefore = [...modules];
     const rowsBefore = read?.rows ?? [];
     const s = adds === '' ? sentence : joinTurns(sentence, adds);
     const turned: ChatTurn = { ask: q, answer: text, at: Date.now(), ack: null };
@@ -829,6 +831,14 @@
         if (named !== null) currencyPick = named;
       }
       await tick();
+      /* A TOOLS ANSWER TURNS ON AGENTS AND NOTHING ELSE (`toolsHeldBack`): Services only for a paid subscription named. */
+      if (q.topic === 'tools' && text !== null) {
+        const held = toolsHeldBack(modsBefore, modules, text);
+        if (held.length > 0) {
+          amends = { ...amends, off: [...new Set([...(amends.off ?? []), ...held])], on: (amends.on ?? []).filter((x) => !held.includes(x)) };
+          await tick();
+        }
+      }
       /* WHAT IT ADDED BY NAME (`entriesSaid`), as `/start` says it: "Added Fenwick and Acme as clients." */
       laid.entries = q.topic === 'tools' ? null : entriesSaid(rowsBefore, read?.rows ?? []);
       chatTurns = [...chatTurns.filter((t) => t !== turned), { ...turned, ack: ackOf(q, text, before, placeNames(), all.length, laid) }];

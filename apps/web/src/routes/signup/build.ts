@@ -72,7 +72,10 @@ export function replyOf(draft: Draft, extra: Extra | null): Reply | null {
  */
 export function picked(p: Pick<Proposal, 'usecase' | 'also' | 'modules'> | null, usecase: string | null): { one: UseCase | null; beside: UseCase[]; modules: string[] } {
   const one = caseOf(usecase ?? p?.usecase ?? null);
-  const beside = p && one && one.usecase === p.usecase ? p.also.flatMap((id) => caseOf(id) ?? []) : [];
+  /* ONE KIND PER RECORD (onboarding9, 2 Nov: the shop's money answer, "supplier invoices going out", added Small business
+     beside Shop). The use case is the one kind the record is made as; another heard beside it brings no lists of its
+     own, and what the words asked for still comes as parts (`p.modules`). */
+  const beside: UseCase[] = [];
   /* WHAT EACH USE CASE STANDS ON (`standsOn`, its `needs`), as the record installs it, and not all it may grow into: a
      household is Money and its own lists, and was shown Projects "needed by Personal" (onboarding6). */
   const asked = new Set([...(p?.modules ?? []), ...[one, ...beside].flatMap((c) => (c ? standsOn(c) : []))]);

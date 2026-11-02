@@ -46,7 +46,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
-  import { standsOn, USE_CASES } from '@braindog/seed/usecases';
+  import { standsOn, USE_CASES, type UseCase } from '@braindog/seed/usecases';
   import { dayOf } from '@braindog/seed/usecases/install';
   import { moduleName } from '@braindog/seed/usecases/names';
   import { apiBase, at } from '$lib/at.ts';
@@ -132,6 +132,7 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import {
     ackOf,
+    toolsHeldBack,
     agentsNamed,
     askedLines,
     atLeast,
@@ -495,6 +496,7 @@
       agentsSaid = agentsNamed(text);
     }
     const rowsBefore = proposal?.rows ?? [];
+    const keptBefore = [...kept];
     if (q.topic === 'closest' && value !== null) {
       caseByHand = true;
       chosen = value;
@@ -530,6 +532,15 @@
       if (!currencyByHand) {
         const named = namedCurrency(sentence, deviceOf());
         if (named !== null) currency = named;
+      }
+      /* A TOOLS ANSWER TURNS ON AGENTS AND NOTHING ELSE (`toolsHeldBack`): Services only for a paid subscription named. */
+      if (q.topic === 'tools' && text !== null) {
+        const held = toolsHeldBack(keptBefore, kept, text);
+        if (held.length > 0) {
+          kept = kept.filter((x) => !held.includes(x));
+          offByHand = new Set([...offByHand, ...held]);
+          onByHand = new Set([...onByHand].filter((x) => !held.includes(x)));
+        }
       }
       await tick();
       /* WHAT IT ADDED BY NAME (`entriesSaid`): the clients, people and projects this answer brought, never the tools,
@@ -671,7 +682,8 @@
 
   const u = $derived(caseOf(chosen));
   /* THE USE CASES BESIDE IT belong to the proposal they were heard with, so choosing another use case leaves them out. */
-  const also = $derived(proposal && chosen === proposal.usecase ? proposal.also.flatMap((id) => caseOf(id) ?? []) : []);
+  /* ONE KIND PER RECORD (onboarding9): no use case stacked beside the one it is made as (`picked` in signup/build.ts). */
+  const also = $derived<UseCase[]>([]);
   const cases = $derived(u ? [u, ...also] : []);
 
   /** Whether the person opened the other use cases beside the one chosen. */
@@ -900,7 +912,7 @@
   const caseParts = $derived.by<PartOf[]>(() => {
     if (proposal !== null) return cases.map((c) => casePart({ ...c, title: caseTitle(c, sentence) }, proposal?.heard ?? [], caseByHand));
     if (live === null) return [];
-    return [live.usecase, ...live.also].flatMap((id) => caseOf(id) ?? []).map((c) => casePart({ ...c, title: caseTitle(c, sentence) }, live?.heard ?? [], false));
+    return [live.usecase].flatMap((id) => caseOf(id) ?? []).map((c) => casePart({ ...c, title: caseTitle(c, sentence) }, live?.heard ?? [], false));
   });
   const moduleParts = $derived.by<PartOf[]>(() => {
     if (proposal !== null)
