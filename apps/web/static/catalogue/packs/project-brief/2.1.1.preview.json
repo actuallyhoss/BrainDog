@@ -1,0 +1,244 @@
+{
+  "format": 1,
+  "made_at": "2026-11-02T14:15:45.718Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "blockers",
+              "label": "In the way",
+              "width": "minmax(24ch,2fr)"
+            }
+          ],
+          "empty": "Nothing is in the way of a project in play.",
+          "heading": "In the way",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.things",
+          "span": 12,
+          "where": "lane is building or earning, blockers is set",
+          "key": "k1d42gcq",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "about",
+              "label": "One line",
+              "width": "minmax(24ch,2fr)"
+            },
+            {
+              "field": "stage",
+              "label": "Stage",
+              "width": "12ch"
+            },
+            {
+              "field": "lane",
+              "label": "Status",
+              "width": "10ch"
+            }
+          ],
+          "empty": "No project is in play.",
+          "heading": "What each one is",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.things",
+          "span": 12,
+          "where": "lane is building or earning",
+          "key": "k0spuz2c",
+          "rows": [
+            {
+              "id": "01M6E9VF9P2KN8TW3VE0J5A316",
+              "register": "things",
+              "seq": 1,
+              "fields": {
+                "draft": false,
+                "name": "Kiln",
+                "about": "A variable type family, licensed direct",
+                "lane": "earning",
+                "health": "at_risk",
+                "next": "Settle how Kiln is licensed, before the September issue announces it",
+                "progress": 60,
+                "aim": "2026-09-20",
+                "agent": "claude",
+                "revenue": {
+                  "amount": 1840000,
+                  "currency": "GBP"
+                },
+                "earned_before": {
+                  "amount": 1412000,
+                  "currency": "GBP"
+                },
+                "since": "2024-03-11",
+                "mark": "tag",
+                "hue": 265,
+                "note": "```chips\n● | 3 | cuts\n● | 2 | clients | good\n● | 1 | open question | warn\n```\n\n# Kiln\n\nEarning · a variable type family, licensed direct. {{money:1840000 GBP}} in the last twelve months, and\nearning since March 2024.\n\n## 1 · Where the money comes from\n\n```bar | Revenue by channe…",
+                "repos": [
+                  "https://git.kiln.example/type/kiln-type.git",
+                  "git@git.kiln.example:type/kiln-site.git"
+                ],
+                "folders": [
+                  "/Users/studio/Code/kiln-type",
+                  "/Users/studio/Code/kiln-site"
+                ],
+                "domains": [
+                  "kiln.example",
+                  "kilnfonts.example"
+                ],
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "earning",
+              "version": 1,
+              "created_at": "2026-11-02T14:15:45.718Z",
+              "updated_at": "2026-11-02T14:15:45.718Z",
+              "deleted_at": null,
+              "clipped": true
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "ring",
+              "field": "progress",
+              "label": ""
+            },
+            {
+              "as": "next",
+              "field": "what",
+              "label": "Next step"
+            }
+          ],
+          "empty": "No project is in play.",
+          "heading": "The plan",
+          "kind": "cards",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.things",
+          "span": 12,
+          "where": "lane is building or earning",
+          "key": "k01nlv1m",
+          "rows": [
+            {
+              "id": "01M6E9VF9P2KN8TW3VE0J5A316",
+              "register": "things",
+              "seq": 1,
+              "fields": {
+                "draft": false,
+                "name": "Kiln",
+                "about": "A variable type family, licensed direct",
+                "lane": "earning",
+                "health": "at_risk",
+                "next": "Settle how Kiln is licensed, before the September issue announces it",
+                "progress": 60,
+                "aim": "2026-09-20",
+                "agent": "claude",
+                "revenue": {
+                  "amount": 1840000,
+                  "currency": "GBP"
+                },
+                "earned_before": {
+                  "amount": 1412000,
+                  "currency": "GBP"
+                },
+                "since": "2024-03-11",
+                "mark": "tag",
+                "hue": 265,
+                "note": "```chips\n● | 3 | cuts\n● | 2 | clients | good\n● | 1 | open question | warn\n```\n\n# Kiln\n\nEarning · a variable type family, licensed direct. {{money:1840000 GBP}} in the last twelve months, and\nearning since March 2024.\n\n## 1 · Where the money comes from\n\n```bar | Revenue by channe…",
+                "repos": [
+                  "https://git.kiln.example/type/kiln-type.git",
+                  "git@git.kiln.example:type/kiln-site.git"
+                ],
+                "folders": [
+                  "/Users/studio/Code/kiln-type",
+                  "/Users/studio/Code/kiln-site"
+                ],
+                "domains": [
+                  "kiln.example",
+                  "kilnfonts.example"
+                ],
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "earning",
+              "version": 1,
+              "created_at": "2026-11-02T14:15:45.718Z",
+              "updated_at": "2026-11-02T14:15:45.718Z",
+              "deleted_at": null,
+              "clipped": true
+            }
+          ],
+          "matched": 1,
+          "refusals": [],
+          "nexts": [
+            null
+          ]
+        }
+      ],
+      "icon": "thing",
+      "nav": {
+        "order": 20,
+        "section": "Projects"
+      },
+      "page": "briefs",
+      "requires": [
+        "register.things",
+        "register.plan_steps"
+      ],
+      "title": "Briefs",
+      "read_at": "2026-11-02T14:15:45.718Z",
+      "zone": "UTC",
+      "look": {
+        "look": "briefs",
+        "basis": "r0j4k3xj",
+        "by": "rule",
+        "hide": [
+          "k1d42gcq"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+[
+  {"register": "receipts", "fields": {"picture": {"file": "sample-receipt.png"}, "shop": "Leyland SDM", "on": {"day": "-2"}, "amount": {"amount": 4870, "currency": "GBP"}, "state": "waiting"}},
+  {"register": "receipts", "fields": {"picture": {"file": "sample-receipt.png"}, "shop": "Pret A Manger", "on": {"day": "-5"}, "amount": {"amount": 1185, "currency": "GBP"}, "state": "alone", "note": "Lunch with the printer"}},
+  {"register": "receipts", "fields": {"picture": {"file": "sample-receipt.png"}, "shop": "Ryman", "on": {"day": "-9"}, "amount": {"amount": 2399, "currency": "GBP"}, "state": "waiting"}}
+]

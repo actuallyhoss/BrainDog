@@ -341,7 +341,7 @@ for (const [id, { where, doc }] of packs) {
   if (!had || values.previews) {
     /* A PREVIEW THAT THROWS IS A PREVIEW NOT MADE. The web build runs this tool, so a scratch record that fails in a way
        the record does not answer as a refusal is said here, beside the pack, and the build goes on without it. */
-    const made = await makePreview(doc, new Map([...packs].map(([k, v]) => [k, v.doc])), now, samplesOf(where)).catch((e) => ({ ok: false, why: `making it threw: ${e instanceof Error ? e.message : String(e)}` }));
+    const made = await makePreview(doc, new Map([...packs].map(([k, v]) => [k, v.doc])), now, samplesOf(where), join(packsDir, where.slice('packs/'.length))).catch((e) => ({ ok: false, why: `making it threw: ${e instanceof Error ? e.message : String(e)}` }));
     if (made.ok) {
       files.set(path, `${JSON.stringify(made.preview, null, 2)}\n`);
       said.push(`${where} previewed as ${path}`);

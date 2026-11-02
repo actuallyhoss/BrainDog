@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-30T18:09:05.083Z",
+  "made_at": "2026-11-02T14:15:45.718Z",
   "pages": [
     {
       "blocks": [
@@ -15,11 +15,37 @@
           "refusals": [],
           "values": {
             "receipts-missing": 0,
-            "receipts-waiting": 0
+            "receipts-waiting": 2
           },
           "read_as": {
             "receipts-missing": "figure",
             "receipts-waiting": "figure"
+          },
+          "figures": {
+            "receipts-missing": {
+              "name": "Lines wanting a receipt",
+              "source": "register.transactions",
+              "where": "receipt_wanted is true, receipt is empty, state is cleared, on at least bom-1m",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            },
+            "receipts-waiting": {
+              "name": "Receipts waiting for their line",
+              "source": "register.receipts",
+              "where": "state is waiting",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            }
           }
         },
         {
@@ -76,8 +102,64 @@
           "rows": [],
           "matched": 0,
           "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "readings": [
+            {
+              "label": "Waiting for a line",
+              "metric": "receipts-waiting",
+              "target": {
+                "lte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 2,
+                "unit": null,
+                "rows": 2,
+                "refusals": [],
+                "held": 3,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": false
+              }
+            }
+          ],
+          "figures": {
+            "receipts-missing": {
+              "name": "Lines wanting a receipt",
+              "source": "register.transactions",
+              "where": "receipt_wanted is true, receipt is empty, state is cleared, on at least bom-1m",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            },
+            "receipts-waiting": {
+              "name": "Receipts waiting for their line",
+              "source": "register.receipts",
+              "where": "state is waiting",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            },
+            "receipts-kept-month": {
+              "name": "Lines with a receipt this month",
+              "source": "register.transactions",
+              "where": "receipt is set, on at least bom",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
         },
         {
           "heading": "Add a receipt",
@@ -202,11 +284,60 @@
           },
           "where": "state is waiting",
           "key": "k1o1lvxb",
-          "rows": [],
-          "matched": 0,
-          "refusals": [],
-          "drawn": false,
-          "why": "when"
+          "rows": [
+            {
+              "id": "01M6E9VF9P153SR3D0KDVN8JDQ",
+              "register": "receipts",
+              "seq": 1,
+              "fields": {
+                "picture": {
+                  "sha256": "361ac91c453c96c511ae9507734ecffe3bd09bb969842ee0f43629f603ebfa6f",
+                  "mime": "image/png",
+                  "bytes": 262,
+                  "name": "sample-receipt.png"
+                },
+                "shop": "Leyland SDM",
+                "on": "2026-10-31",
+                "amount": {
+                  "amount": 4870,
+                  "currency": "GBP"
+                },
+                "state": "waiting"
+              },
+              "state": "waiting",
+              "version": 1,
+              "created_at": "2026-11-02T14:15:45.718Z",
+              "updated_at": "2026-11-02T14:15:45.718Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6E9VF9P153SR3D0KSD25V39",
+              "register": "receipts",
+              "seq": 3,
+              "fields": {
+                "picture": {
+                  "sha256": "361ac91c453c96c511ae9507734ecffe3bd09bb969842ee0f43629f603ebfa6f",
+                  "mime": "image/png",
+                  "bytes": 262,
+                  "name": "sample-receipt.png"
+                },
+                "shop": "Ryman",
+                "on": "2026-10-24",
+                "amount": {
+                  "amount": 2399,
+                  "currency": "GBP"
+                },
+                "state": "waiting"
+              },
+              "state": "waiting",
+              "version": 1,
+              "created_at": "2026-11-02T14:15:45.718Z",
+              "updated_at": "2026-11-02T14:15:45.718Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
         },
         {
           "columns": [
@@ -266,7 +397,7 @@
         "register.transactions"
       ],
       "title": "Receipts",
-      "read_at": "2026-10-30T18:09:05.083Z",
+      "read_at": "2026-11-02T14:15:45.718Z",
       "zone": "UTC",
       "look": {
         "look": "receipts",
