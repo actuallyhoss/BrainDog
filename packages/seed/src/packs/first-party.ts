@@ -969,12 +969,14 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  * - money-core 3.38.1 (fin-ledger-cols, 2 Nov): the Ledger's table opens on Date, Payee (the bank's words where no name
  *   was given, then the description), Account, Category and Amount, declared by the list's new `table` key (`register.transactions`), where it
  *   opened on Description, an import's copy of the category. No id added or taken away, so a patch.
+ * - money-core 3.38.2 (verify5, 2 Nov): Reports' spending ring is the six largest categories and everything else, where
+ *   it drew five, as `limit` counts the rest among its parts (`page.money-reports`). No id added or taken away, so a patch.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.31.0',
   people: '4.4.1',
-  'money-core': '3.38.1',
+  'money-core': '3.38.2',
   estate: '2.8.0',
   work: '1.24.0',
 };

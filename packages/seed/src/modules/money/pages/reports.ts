@@ -208,8 +208,10 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       columns: [{ field: 'category' }, { field: 'amount' }],
       unset: 'No category yet',
       /* SIX PARTS AND EVERYTHING ELSE, SINCE money-core 3.38.0 (ui2 money, F9): thirteen categories drew thirteen hues
-         round one ring, past the seven a ring keeps apart. The six largest, the rest as one part, as Paid most does. */
-      limit: 6,
+         round one ring, past the seven a ring keeps apart. The six largest, the rest as one part, as Paid most does.
+         SEVEN PARTS, SINCE money-core 3.38.1 (verify5, 2 Nov): `limit` counts Everything else among its parts, so 6 drew
+         five categories and the rest. */
+      limit: 7,
       when: { metric: 'out-by-month', gt: 0 },
       empty: 'Nothing went out.',
     },

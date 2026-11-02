@@ -210,6 +210,8 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.38.2', notes: 'Reports draws the six largest categories and everything else, where it drew five.' },
+    { version: '3.38.1', notes: 'The Ledger table opens on date, payee, account, category and amount.' },
     { version: '3.38.0', notes: 'Forecast says what is left on one plan as a figure, not a chart of one bar. A bill says which way it is owed, a book asks when its money runs out, and Reports draws the six largest categories and everything else.' },
     { version: '3.37.1', notes: 'Reports says a stretch with nothing in as what went out and nothing in yet, not the same amount twice.' },
     { version: '3.37.0', notes: 'Reports says a stretch that spent more than came in as how much more went out, not as a minus left over.' },
