@@ -242,11 +242,9 @@
   {#snippet enumSaid(row: TableRow, field: string, value: string)}
     {#if field === decl.state}
       {@const stored = String(rowAt(Number(row.key.split('#')[1]))?.fields[field] ?? '')}
-      {@const f = fieldOf(field)}
-      <!-- THE STATE A ROW IS BORN IN IS NOT SAID (1 Nov, L9): "Open" down every row of Tasks said nothing, so the column
-           names only what moved, Doing, Blocked or Done, and a screen reader still hears the word. -->
-      {#if f?.default !== undefined && stored === String(f.default) && dotOf(decl, stored) === 'open'}<span class="unsaid">{copy.valueWord(value)}</span>
-      {:else}<span class="state" data-stand={dotOf(decl, stored)}><StateDot state={dotOf(decl, stored)} /><span class="enum">{copy.valueWord(value)}</span></span>{/if}
+      <!-- EVERY STATE IS SAID, THE ONE A ROW IS BORN IN TOO (pages polish, 2 Nov): from 1 Nov (L9) "Open" was left blank,
+           so a blank cell meant Open on a laptop while the phone's card said it, and an empty cell read as a value missing. -->
+      <span class="state" data-stand={dotOf(decl, stored)}><StateDot state={dotOf(decl, stored)} /><span class="enum">{copy.valueWord(value)}</span></span>
     {:else}<span class="enum">{copy.valueWord(value)}</span>{/if}
   {/snippet}
   <!-- ANY OTHER VALUE: an amount as the column draws it, and a late row's deadline with how late it is before the day. -->
@@ -755,14 +753,6 @@
   }
 
   /* HEARD AND NOT SEEN: the state a row was born in, which the column leaves out (L9). */
-  .unsaid {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
 
   /* A FINISHED ROW IS QUIETER THAN AN OPEN ONE (1 Nov, L10): Done rows stood in full ink among the open, so the eye had
      to read the state to find the work left. Every cell of one takes the third ink, which still clears 4.5 on the tile. */
