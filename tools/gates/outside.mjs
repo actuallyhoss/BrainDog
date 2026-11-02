@@ -96,6 +96,9 @@ const EVENTS = [
   { project: 'marlow-site', 'count()': 3, 'count_unique(user)': 2 },
 ];
 
+/* THE STUB'S SENTRY, HANDED OUT SO A WALK CAN MOVE IT BETWEEN HOURS: add a project, regress an issue, resolve one. */
+export const SENTRY = { projects: PROJECTS, issues: ISSUES, events: EVENTS };
+
 function sentry(path, query, empty) {
   const org = `/api/0/organizations/${SENTRY_ORG}`;
   if (path === `${org}/projects/`) return [200, empty ? [] : PROJECTS];

@@ -496,6 +496,9 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
     ...(outside === undefined
       ? {}
       : {
+          /* THE KERNEL AND ITS DATABASE, for a walk that sets quiet hours or counts what the outbox holds. */
+          kernel: running.api.kernel,
+          sql: running.sql,
           /* EVERY SCRIPT DUE AT THE RECORD'S NOW, AND ONE PASS. The clock stands at `NOW`, so a script that ran once is
              next due an hour after a moment that never comes. */
           again: async () => {
