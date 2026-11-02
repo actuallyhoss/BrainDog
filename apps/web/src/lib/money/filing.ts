@@ -20,7 +20,7 @@ import type { Ledger } from './ledger.ts';
 export type Category = { id: string; name: string; way: 'in' | 'out' | null };
 
 /** One line just added and the category offered for it. */
-export type Offered = { seq: number; what: string; category: Category };
+export type Offered = { seq: number; what: string; category: Category; way?: 'in' | 'out' };
 
 /** The words on a bank line that point at a starter category, money out. */
 const OUT_WORDS: readonly [RegExp, string][] = [
@@ -65,10 +65,54 @@ export async function loadCategories(base: string, ledger: Ledger): Promise<Cate
   });
 }
 
-/** File each line offered under its category, a few at a time; the count filed. */
-export async function fileLines(base: string, ledger: Ledger, offered: readonly Offered[]): Promise<number> {
+/** The list the record files a line by its text from (`txn-categorise` in the seed's Money rules). */
+const FILING_RULES = 'filing_rules';
+
+/**
+ * THE TEXT A FILING RULE MATCHES, as the start of the line: its words up to the first one with a digit in it, so next
+ * month's reference still fits ("FENWICK LTD INVOICE 1041" is "FENWICK LTD INVOICE", "NETFLIX.COM" stays). A start of
+ * fewer than three letters is the whole text.
+ */
+export function stemOf(what: string): string {
+  const words = what.replace(/\s+/gu, ' ').trim().split(' ');
+  const cut = words.findIndex((w) => /\d/u.test(w));
+  const stem = (cut < 0 ? words : words.slice(0, cut)).join(' ').trim();
+  return stem.replace(/[^\p{L}]/gu, '').length >= 3 ? stem : what.trim();
+}
+
+/** Which text of a line a rule reads, by the Ledger field the import writes the line's words into; `null` for neither. */
+const readsOf = (title: string): 'description' | 'payee' | null => (title === 'what' ? 'description' : title === 'counterparty_text' ? 'payee' : null);
+
+/**
+ * FILING CHOICES BECOME FILING RULES, ON THE SAME PRESS (2 Nov, onboarding5): each payee filed is kept as a rule that
+ * files a line starting with its text under the same category, the same way, so the next statement files itself as it
+ * lands (the record's `txn-categorise` reads these rules inside the write). A text a rule already matches is not made
+ * twice. The count made; nothing is made where the record has no rules list.
+ */
+async function keepAsRules(base: string, ledger: Ledger, filed: readonly Offered[]): Promise<number> {
+  const reads = readsOf(ledger.title);
+  if (reads === null || filed.length === 0) return 0;
+  const client = createClient({ base });
+  const got = await client.list({ register: FILING_RULES, limit: 500 }).catch(() => null);
+  if (!got?.ok) return 0;
+  const held = new Set((got.value.rows as { fields: Record<string, unknown> }[]).map((r) => String(r.fields['match'] ?? '').trim().toLowerCase()));
+  let made = 0;
+  for (const o of filed) {
+    const match = stemOf(o.what);
+    if (match === '' || held.has(match.toLowerCase())) continue;
+    held.add(match.toLowerCase());
+    const out = await client
+      .create({ register: FILING_RULES, fields: { match, match_by: 'starts', reads, direction: o.way ?? o.category.way ?? 'either', category: o.category.id, state: 'on' } })
+      .catch(() => null);
+    if (out?.ok) made++;
+  }
+  return made;
+}
+
+/** File each line offered under its category, a few at a time, and keep each choice as a rule; the count filed and made. */
+export async function fileLines(base: string, ledger: Ledger, offered: readonly Offered[]): Promise<{ filed: number; rules: number }> {
   const c = ledger.category;
-  if (c === null) return 0;
+  if (c === null) return { filed: 0, rules: 0 };
   const client = createClient({ base });
   /* THE STARTERS NOT HELD YET ARE MADE FIRST, once each, with their way. */
   const made = new Map<string, string>();
@@ -83,6 +127,7 @@ export async function fileLines(base: string, ledger: Ledger, offered: readonly 
     const id = o.category.id !== '' ? o.category.id : made.get(o.category.name);
     return id === undefined ? [] : [{ ...o, category: { ...o.category, id } }];
   });
+  const filing = [...queue];
   let done = 0;
   const worker = async (): Promise<void> => {
     for (let o = queue.shift(); o !== undefined; o = queue.shift()) {
@@ -91,13 +136,38 @@ export async function fileLines(base: string, ledger: Ledger, offered: readonly 
     }
   };
   await Promise.all(Array.from({ length: 4 }, worker));
-  return done;
+  return { filed: done, rules: await keepAsRules(base, ledger, filing) };
+}
+
+/** The lines among those just added that the record's own filing rules filed as they landed, by sequence. */
+export async function filedOnArrival(base: string, ledger: Ledger, seqs: readonly number[]): Promise<Set<number>> {
+  const c = ledger.category;
+  const out = new Set<number>();
+  if (c === null || seqs.length === 0) return out;
+  const client = createClient({ base });
+  const queue = [...seqs];
+  const worker = async (): Promise<void> => {
+    for (let seq = queue.shift(); seq !== undefined; seq = queue.shift()) {
+      const got = await client.get(ledger.list, seq).catch(() => null);
+      const v = got?.ok ? (got.value as { fields?: Record<string, unknown>; row?: { fields?: Record<string, unknown> } }) : null;
+      const cat = v?.fields?.[c.field] ?? v?.row?.fields?.[c.field];
+      if (typeof cat === 'string' && cat !== '') out.add(seq);
+    }
+  };
+  await Promise.all(Array.from({ length: 4 }, worker));
+  return out;
 }
 
 /** The words the offer says. */
 export const filingWords = {
   title: (n: number) => (n === 1 ? 'File this line?' : `File these ${n} lines?`),
   sentence: 'A category for each, by who it was paid to or from. Nothing is filed until you press.',
+  /** Said under the offer: the press also keeps each choice, so the next statement files itself. */
+  next: 'Each choice is kept, so the next statement from these payees files itself.',
+  /** After the press, where it kept choices as rules. */
+  kept: 'Your next statement from these payees will file itself.',
+  /** Lines the kept choices filed as the statement landed. */
+  self: (n: number) => `${n === 1 ? '1 line' : `${n} lines`} filed ${n === 1 ? 'itself' : 'themselves'}, the way you filed them last time.`,
   file: (n: number) => (n === 1 ? 'File 1 line' : `File ${n} lines`),
   filing: 'Filing…',
   /** Beside a category the press makes, since the BrainDog holds none of that name yet. */

@@ -20,7 +20,7 @@
   import { BYTES_MOST, type Export } from '$lib/start/export.ts';
   import { balancesOf, freshOf, guessRoles, linesOf, readStatement, rolesMissing, fieldsOf, ROLES, signSaid, words, type Held, type Roles, type Sign } from '$lib/money/statement.ts';
   import { addLines, fillBalances, heldFor, loadStatement, type Added, type Into, type Loaded } from '$lib/money/statement-live.ts';
-  import { fileLines, filingWords, loadCategories, suggestCategory, type Offered } from '$lib/money/filing.ts';
+  import { fileLines, filedOnArrival, filingWords, loadCategories, suggestCategory, type Offered } from '$lib/money/filing.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -162,21 +162,23 @@
     const cats = await loadCategories(base, l.ledger);
     if (cats === null) return;
     const lines = fresh;
+    /* A LINE THE KEPT CHOICES FILED AS IT LANDED (`keepAsRules` in `filing.ts`) is not offered again, and is said. */
+    const self = await filedOnArrival(base, l.ledger, (out.seqs ?? []).flatMap((s) => (s === null ? [] : [s])));
     const offers: Offered[] = [];
     let unfiled = 0;
     lines.forEach((line, i) => {
       const seq = out.seqs?.[i] ?? null;
-      if (seq === null) return;
+      if (seq === null || self.has(seq)) return;
       const c = suggestCategory(line.what, line.way, cats);
       if (c === null) unfiled++;
-      else offers.push({ seq, what: line.what, category: c });
+      else offers.push({ seq, what: line.what, category: c, way: line.way });
     });
-    offered = { offers, unfiled };
+    offered = { offers, unfiled, self: self.size };
   }
 
-  let offered = $state.raw<{ offers: Offered[]; unfiled: number } | null>(null);
+  let offered = $state.raw<{ offers: Offered[]; unfiled: number; self: number } | null>(null);
   let filing = $state(false);
-  let filed = $state<number | null>(null);
+  let filed = $state<{ filed: number; rules: number } | null>(null);
   async function fileAll(): Promise<void> {
     const l = loader.value;
     if (!l || !offered || filing) return;
@@ -203,17 +205,19 @@
       <h2>{result.added === 0 && result.filled > 0 ? words.filled(result.filled) : words.added(result.added, result.account)}</h2>
       {#if result.added > 0 && result.filled > 0}<p class="st-quiet">{words.filled(result.filled)}</p>{/if}
       {#if result.missed > 0}<p class="st-warn">{words.missed(result.missed)} {result.why}</p>{/if}
+      {#if offered && offered.self > 0}<p class="st-quiet">{filingWords.self(offered.self)}</p>{/if}
       {#if offered && offered.offers.length > 0}
         <section class="st-filing" aria-labelledby="st-file-h">
           {#if filed === null}
             <h3 class="st-label" id="st-file-h">{filingWords.title(offered.offers.length)}</h3>
-            <p class="st-quiet">{filingWords.sentence}</p>
+            <p class="st-quiet">{filingWords.sentence} {filingWords.next}</p>
             <ul class="st-file-list">
               {#each offered.offers as o (o.seq)}<li><span>{o.what}</span><span class="st-quiet">{o.category.name}{o.category.id === '' ? `, ${filingWords.fresh}` : ''}</span></li>{/each}
             </ul>
             <Button weight="primary" onclick={fileAll} disabled={filing}>{filing ? filingWords.filing : filingWords.file(offered.offers.length)}</Button>
           {:else}
-            <h3 class="st-label" id="st-file-h">{filingWords.filed(filed)}</h3>
+            <h3 class="st-label" id="st-file-h">{filingWords.filed(filed.filed)}</h3>
+            {#if filed.rules > 0}<p class="st-quiet">{filingWords.kept}</p>{/if}
           {/if}
           {#if offered.unfiled > 0}<p class="st-quiet">{filingWords.left(offered.unfiled)}</p>{/if}
         </section>
