@@ -170,13 +170,14 @@
           {/if}
           {#if months}
             {@const m = months.m}
-            {@const ticks = new Set([0, Math.floor((m.months.length - 1) / 2), m.months.length - 1])}
+            {@const ticks = new Set(m.months.length <= 6 ? m.months.map((_, n) => n) : [0, Math.floor((m.months.length - 1) / 2), m.months.length - 1])}
             <p class="bars-name">{months.title}</p>
             <ol class="months" aria-label="{monthLong(m.months[0]!.key)} to {monthLong(m.months.at(-1)!.key)}">
               {#each m.months as x, n (x.key)}
-                <li title="{monthLong(x.key)}: {format(x.value, m.currency)}">
+                {@const tall = Math.max(x.value > 0 ? 4 : 1, Math.round((x.value / peak(m)) * 100))}
+                <li title="{monthLong(x.key)}: {format(x.value, m.currency)}" style:--bar="{tall}%">
                   <span class="mval num" data-last={n === m.months.length - 1 ? '' : undefined}>{format(x.value, m.currency)}</span>
-                  <span class="col" data-partial={x.partial} style:block-size="{Math.max(x.value > 0 ? 4 : 1, Math.round((x.value / peak(m)) * 100))}%"></span>
+                  <span class="col" data-partial={x.partial} style:block-size="{tall}%"></span>
                   <span class="mname">{ticks.has(n) ? monthName(x.key) : ''}</span>
                 </li>
               {/each}
@@ -557,9 +558,11 @@
     background: var(--ph-2, color-mix(in oklab, var(--ph-fill, var(--ph)) 45%, var(--tile)));
   }
 
+  /* THE FIGURE STANDS ON ITS OWN BAR (ui-work 2 Nov): pinned to the top of the band, a month at nought had its "$0"
+     floating 70px over a hairline. */
   .mval {
     position: absolute;
-    inset-block-start: -18px;
+    inset-block-end: calc(var(--bar, 100%) + 4px);
     color: var(--ink);
     font-size: var(--fs-cap);
     white-space: nowrap;

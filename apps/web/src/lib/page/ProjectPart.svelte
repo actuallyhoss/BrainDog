@@ -1158,8 +1158,14 @@
        column it stood over a 330px empty band at 1512 on Kiln, two runs and then nothing down to the box to tell them.
        A column ending short of its neighbour is the board's background; a hole inside a tile reads as something
        missing. */
-    .shape-row[data-cols] .shape-col > .shape-part[data-shape='agents-here']:not([data-empty]),
-    .shape-row[data-cols] .shape-col > .shape-part[data-shape='agents-here']:not([data-empty]):has(~ .shape-part[data-empty]):not(:has(~ .shape-part:not([data-empty]))) {
+    /* AND DATES AND NUMBERS IN THE COLUMNS TOO (ui-work 2 Nov): Northbound's one date stood in a 400px tile at 1280,
+       grown to end level with Tasks, Runs on and What happened; the rule above held them only outside the columns. */
+    .shape-row[data-cols] .shape-col > .shape-part:is([data-shape='agents-here'], [data-shape='dates'], [data-shape='numbers']):not([data-empty]),
+    .shape-row[data-cols] .shape-col > .shape-part:is([data-shape='agents-here'], [data-shape='dates'], [data-shape='numbers']):not([data-empty]):has(~ .shape-part[data-empty]):not(:has(~ .shape-part:not([data-empty]))) {
+      flex-grow: 0;
+    }
+
+    .shape-row[data-cols] .shape-col > .shape-part:is([data-shape='dates'], [data-shape='numbers']):not([data-empty]) > :global(:last-child) {
       flex-grow: 0;
     }
   }
