@@ -36,11 +36,11 @@
 
 {#if ahead && run}<span class="{cls}-ahead"
     ><svg class={cls} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={named}
-      ><path class="trend-area" d={run.area}></path><path class="trend-line" d={run.d} vector-effect="non-scaling-stroke"></path><path
+      ><path class="trend-area" d={run.area}></path>{#if run.zero}<path class="trend-zero" d={run.zero} vector-effect="non-scaling-stroke"></path>{/if}<path class="trend-line" d={run.d} vector-effect="non-scaling-stroke"></path><path
         class="trend-today"
         d={ahead.today}
         vector-effect="non-scaling-stroke"
-      ></path><path class="trend-low" d={ahead.low} vector-effect="non-scaling-stroke"></path></svg
+      ></path><path class="trend-low" d={ahead.low} vector-effect="non-scaling-stroke" data-below={run.below ? '' : undefined}></path></svg
     ><span class="trend-days" aria-hidden="true"><span>{TREND_TODAY}</span><span>{ahead.to}</span></span></span
   >{:else if t && cls === 'cell-trend' && t.bars}<svg class={cls} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={name}
     ><path class="trend-bar" d={t.bars} vector-effect="non-scaling-stroke"></path></svg

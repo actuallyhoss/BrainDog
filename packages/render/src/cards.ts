@@ -181,7 +181,7 @@ const NO_VALUE = 'no value';
  * after it, because a dip to zero claims the value was zero (05 §7.4). `said` keeps what the author
  * wrote, so the accessible name reads the same numbers the shape was drawn from.
  */
-export function trendOf(value: string): { d: string; area: string; end: string; said: string[]; bars: string | null } | null {
+export function trendOf(value: string): { d: string; area: string; end: string; said: string[]; bars: string | null; zero: string | null; below: boolean } | null {
   const tokens = runTokens(value);
   const numbers = tokens.map((t) => {
     const n = t === '' ? Number.NaN : Number(t.replace(/−/gu, '-').replace(/,(?=\d{3}(?!\d))/gu, ''));
@@ -233,7 +233,10 @@ export function trendOf(value: string): { d: string; area: string; end: string; 
       ? numbers.flatMap((v, i) => (v === null ? [] : [`M${at(((i + 0.5) / n) * 1000)} 100V${at(hi === 0 ? 96 : 100 - Math.max(4, (v / hi) * 90))}`])).join(' ')
       : null;
   close();
-  return { d, area, end, said: numbers.map((n, i) => (n === null ? NO_VALUE : tokens[i]!)), bars };
+  /* NOUGHT, WHERE THE LINE CROSSES IT (Look B: the zero rule solid): a walk that dips below nothing is read against
+     where nothing is, and its lowest mark says so (`below`). */
+  const zero = lo < 0 && hi > 0 ? `M0 ${at(y(0))}H1000` : null;
+  return { d, area, end, said: numbers.map((n, i) => (n === null ? NO_VALUE : tokens[i]!)), bars, zero, below: lo < 0 };
 }
 
 const AHEAD = /^@(\d{4}-\d{2}-\d{2})\s+/u;

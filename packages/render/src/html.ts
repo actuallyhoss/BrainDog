@@ -488,7 +488,7 @@ function trendSvg(cls: string, label: string, value: string, o: RenderOptions): 
   if (ahead) {
     const run = trendOf(ahead.run)!;
     const named = `${plain(inline(label, o)) || TREND}, ${TREND_TODAY.toLowerCase()} to ${ahead.to}: ${run.said.join(', ')}`;
-    return `<span class="${cls}-ahead"><svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(named)}"><path class="trend-area" d="${run.area}"></path><path class="trend-line" d="${run.d}" vector-effect="non-scaling-stroke"></path><path class="trend-today" d="${ahead.today}" vector-effect="non-scaling-stroke"></path><path class="trend-low" d="${ahead.low}" vector-effect="non-scaling-stroke"></path></svg><span class="trend-days" aria-hidden="true"><span>${escape(TREND_TODAY)}</span><span>${escape(ahead.to)}</span></span></span>`;
+    return `<span class="${cls}-ahead"><svg class="${cls}" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(named)}"><path class="trend-area" d="${run.area}"></path>${run.zero ? `<path class="trend-zero" d="${run.zero}" vector-effect="non-scaling-stroke"></path>` : ''}<path class="trend-line" d="${run.d}" vector-effect="non-scaling-stroke"></path><path class="trend-today" d="${ahead.today}" vector-effect="non-scaling-stroke"></path><path class="trend-low" d="${ahead.low}" vector-effect="non-scaling-stroke"${run.below ? ' data-below=""' : ''}></path></svg><span class="trend-days" aria-hidden="true"><span>${escape(TREND_TODAY)}</span><span>${escape(ahead.to)}</span></span></span>`;
   }
   const t = trendOf(plain(inline(value, o)));
   if (!t) return '';

@@ -283,6 +283,23 @@
     stroke-linecap: round;
   }
 
+  /* NOUGHT UNDER A WALK THAT CROSSES IT, a solid hairline, and the lowest mark in the late red when it is below nought
+     (Look B: money below nought is red). The line's ends may stand on the box's edge, so the box does not clip their
+     dots in half. */
+  .trend-zero {
+    fill: none;
+    stroke: var(--rule-strong);
+    stroke-width: 1px;
+  }
+
+  .trend-low[data-below] {
+    stroke: var(--red);
+  }
+
+  .cell-trend-ahead > .cell-trend {
+    overflow: visible;
+  }
+
   .trend-days > span {
     white-space: nowrap;
   }
