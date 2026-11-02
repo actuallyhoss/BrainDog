@@ -341,8 +341,34 @@ function addOnlyAt(base: string): Said | null {
   }
 }
 
+/**
+ * WHETHER THIS DEVICE HAS SEEN `boot` ANSWER THE READER AT `base` (`bd_reads`, kept by the root layout), so it knows they
+ * read (final polish, 2 Nov). Until it has, the first open asks `whoami` before `boot` (`app.html` too): somebody at
+ * "Adds only" opening the record on a new device got one `boot` 403 before anything here knew who she was. Once a `boot`
+ * has answered, every open asks `boot` at once as before, so a reader pays the one extra ask once a device.
+ * Storage that will not answer counts as known, so a blocked store asks as it always did.
+ */
+export function readsKnown(base: string): boolean {
+  try {
+    if (typeof location === 'undefined') return true;
+    const u = new URL(`${base}/api/boot`, location.href).href;
+    return ` ${localStorage.getItem('bd_reads') ?? ''} `.includes(` ${u} `);
+  } catch {
+    return true;
+  }
+}
+
 /** Whether `whoami` at `base` says the caller still may only add: asked early by `app.html` where it was, else now. */
 async function stillAddsOnly(base: string): Promise<boolean> {
+  return (await whoFirst(base)).append;
+}
+
+/**
+ * `whoami` at `base`, asked early by `app.html` where it was, else now: whether it says the caller may only add, and the
+ * refusal when it was signed out, which `boot` gives in the same words (so a device that never saw anybody asks no `boot`
+ * to hear it twice). Any other refusal is left to `boot`, since an older record refuses `whoami` to somebody `boot` answers.
+ */
+async function whoFirst(base: string): Promise<{ append: boolean; out: Said | null }> {
   const url = `${base}/api/whoami`;
   const held = (globalThis as { __bdWho?: { url?: unknown; at?: unknown } }).__bdWho;
   const early = held && held.url === url && held.at instanceof Promise ? (held.at as Promise<Response>) : null;
@@ -351,7 +377,11 @@ async function stillAddsOnly(base: string): Promise<boolean> {
   const said = await createClient({ base, ...(io ? { fetch: io } : {}) })
     .whoami()
     .catch(() => null);
-  return said?.ok === true && (said.value as { level?: unknown } | null)?.level === 'append';
+  const refused = said && said.ok === false ? (said as { refusal?: Partial<Said> }).refusal : null;
+  return {
+    append: said?.ok === true && (said.value as { level?: unknown } | null)?.level === 'append',
+    out: refused && refused.code === 'UNAUTHORIZED' && typeof refused.fix === 'string' ? { code: refused.code, fix: refused.fix } : null,
+  };
 }
 
 /** The record whose every list's declaration was asked beside `boot` and handed to the client (`firstOpen`). */
@@ -415,6 +445,15 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
       kept = null;
       refusal = addOnly;
       return { from: 'refused', ...addOnly };
+    }
+    /* AND A DEVICE THAT HAS NEVER SEEN THE READER ASKS `whoami` FIRST (`readsKnown`), so her first open is no 403 either. */
+    const who = !addOnly && !early && !io && !readsKnown(base) ? await whoFirst(base) : null;
+    if (who && (who.append || who.out)) {
+      const said = saidOf(who.out ?? { code: 'LEVEL_REQUIRED', fix: copy.appendOnlyFix, at: APPEND_AT });
+      holdLists(base, null);
+      kept = null;
+      refusal = said;
+      return { from: 'refused', ...said };
     }
     const client = createClient({ base, ...(first ? { fetch: first } : {}) });
     const out = await client.boot();

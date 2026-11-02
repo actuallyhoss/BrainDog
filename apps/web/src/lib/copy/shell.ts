@@ -355,6 +355,12 @@ export const shell = {
    */
   notShared: { title: "This isn't shared with you", body: 'Ask whoever shared this BrainDog with you if you need it.' },
   /**
+   * WHAT SOMEBODY AT "ADDS ONLY" IS TOLD WHEN `whoami` SAID SO BEFORE ANY `boot` WAS ASKED (final polish, 2 Nov): her very
+   * first open on a device. The record's own sentence for her (`APPEND_READ_FIX` in `packages/record/src/append-refusal.ts`),
+   * word for word, so the screen reads the same whichever of the two said it.
+   */
+  appendOnlyFix: 'You can add to this BrainDog and you cannot read it here. You add through an agent of your own. Make its key in Settings, under Agents.',
+  /**
    * A place with nothing in it yet, said as its own list where its first step names it: "No trips yet." from its box
    * "Add a trip" (design pass 1 Nov, M29), the box under it being the way to add the first. Otherwise by its name and how
    * it fills (audit 11-01 AP8): "Nothing in People yet. What you add or mention lands here." Never a bare "Nothing here yet".

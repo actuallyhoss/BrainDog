@@ -14248,9 +14248,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND SOMEBODY WHO MAY ONLY ADD IS ANSWERED TOO (collab pass 4): every read of the record is refused her, and this
          was as well, so the app learnt what she may do from a 403 on every page. What is said here is about her and her
          grant, never about the record. */
-      if (stop && !addsOnly(ctx)) return { ok: false as const, refusal: stop };
+      if (stop && !addsOnly(ctx)) {
+        /* AND SOMEBODY `boot` ANSWERS IS ANSWERED HERE TOO (final polish, 2 Nov): a contractor held to one project reads
+           his part, so a device that has never seen him asks this before `boot` and was refused it. Otherwise the refusal
+           is the one `boot` gives, so the app need not ask `boot` to hear it again. */
+        const part = scoped(ctx, 'read');
+        if (part) return { ok: false as const, refusal: part };
+      }
       /* AND SHE OPENED THE RECORD, which `boot` wrote down before the app asked her this in its place. */
-      if (stop) markOpened(ctx);
+      if (stop && addsOnly(ctx)) markOpened(ctx);
 
       const p = ctx.principal;
       const may = NEEDS.filter((need) => allows(ctx, need) === null);

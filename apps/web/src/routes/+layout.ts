@@ -185,9 +185,15 @@ async function shellOf({ url, fetch, depends }: Event): Promise<FrameData> {
         localStorage.setItem('bd_add_only', u);
         /* AND WHAT SHE WAS TOLD, so the next open draws it from `whoami` and asks no `boot` (`addOnlyAt`, collab pass 4). */
         localStorage.setItem('bd_add_only_said', JSON.stringify({ code: booted.code, fix: booted.fix, at: booted.at }));
-      } else if (booted.from === 'live' && localStorage.getItem('bd_add_only') === u) {
-        localStorage.removeItem('bd_add_only');
-        localStorage.removeItem('bd_add_only_said');
+      } else if (booted.from === 'live') {
+        if (localStorage.getItem('bd_add_only') === u) {
+          localStorage.removeItem('bd_add_only');
+          localStorage.removeItem('bd_add_only_said');
+        }
+        /* AND THAT THIS DEVICE HAS SEEN THE READER READ HERE (`readsKnown`), so the next open asks `boot` at once and no
+           `whoami` first. The last twelve records, newest last. */
+        const reads = (localStorage.getItem('bd_reads') ?? '').split(' ').filter((r) => r !== '' && r !== u);
+        localStorage.setItem('bd_reads', [...reads.slice(-11), u].join(' '));
       }
     } catch {
       /* blocked storage: the early asks go on as before */
