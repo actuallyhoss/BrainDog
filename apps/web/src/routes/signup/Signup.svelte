@@ -131,7 +131,6 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
-  import { withChip } from '$lib/who.ts';
   import {
     browserCurrencyEnv,
     casePart,
@@ -194,7 +193,6 @@
     | 'closed'
     | 'invite-only'
     | 'describe'
-    | 'question'
     | 'keep'
     | 'sent'
     | 'verifying'
@@ -392,7 +390,7 @@
 
   /* THE READ'S SLOT LEAVES WITH THE DESCRIBE AND QUESTION STEPS, and its widget with it. */
   $effect(() => {
-    if (step === 'describe' || step === 'question' || readWidget === null) return;
+    if (step === 'describe' || readWidget === null) return;
     try {
       turnstileOf()?.remove(readWidget);
     } catch {
@@ -440,9 +438,8 @@
   let amends = $state.raw<Amend>(NO_AMEND);
   let opened = $state<string | null>(null);
   let nameDraft = $state('');
-  /** The answer to the one question once given or skipped, and the one tapped or typed before Continue. */
+  /** The answer to the one question, where a draft kept from before the mail holds one (`replyOf`). */
   let reply = $state.raw<Reply | null>(null);
-  let pick = $state<string | null>(null);
 
   /* THE DEVICE'S CURRENCY GOES IN WITH THE WORDS, so a shop in Cairo keeps EGP without being asked (`zoneCurrency`). */
   /* THE CATALOGUE'S USE CASES ARE LISTENED FOR TOO (`heardOf`), once the host's catalogue answers. The host builds the
@@ -535,8 +532,6 @@
   const QUICK_MS = 1200;
   /** The words a model's reading is still out for, after the press went on without it: the build says it is still reading. */
   let lateFor = $state<string | null>(null);
-  /** A model's reading that answered while the one question was on screen, laid on once it is answered. */
-  let lateHeld = $state.raw<{ said: string; proposal: Proposal } | null>(null);
   /** The words a late reading landed on, so the build says it was read again. */
   let landed = $state<string | null>(null);
 
@@ -549,11 +544,9 @@
       (p) => {
         if (lateFor === s) lateFor = null;
         if (p.by === undefined || p.by === 'rules' || sentence !== s) return p;
-        /* LATE, ITS QUESTION IS NOT ASKED: the person has gone on, and the rules' question (or none) stood. While the one
-           question is on screen the reading waits, so the question does not change under the person's thumb. */
-        if (late && step === 'question') lateHeld = { said: s, proposal: p };
-        /* IN THE CONVERSATION A LATE QUESTION IS KEPT, for the next turn, where its topic is still open (`nextAsk`). */
-        else pressed = { said: s, proposal: p, ask: late && step !== 'describe' ? null : ask };
+        /* LATE, ITS QUESTION IS NOT ASKED where the person has gone on; IN THE CONVERSATION A LATE QUESTION IS KEPT, for
+           the next turn, where its topic is still open (`nextAsk`). */
+        pressed = { said: s, proposal: p, ask: late && step !== 'describe' ? null : ask };
         if (late) landed = s;
         return p;
       },
@@ -579,14 +572,6 @@
     return reading(s);
   }
 
-  /* THE LATE READING, ONCE THE QUESTION IS ANSWERED OR LEFT: laid on as any model reading is, for these very words. */
-  $effect(() => {
-    const held = lateHeld;
-    if (held === null || step === 'question') return;
-    lateHeld = null;
-    if (held.said === sentence) pressed = { said: held.said, proposal: held.proposal, ask: null };
-  });
-
   /* THE CURRENCIES THIS DEVICE POINTS AT, for the one question when it is the currency. */
   let device: CurrencyEnv | null = null;
   const deviceOf = (): CurrencyEnv => (device ??= browserCurrencyEnv(locale, typeof navigator === 'undefined' ? [] : [...(navigator.languages ?? [])], here));
@@ -599,14 +584,11 @@
   const ruled = $derived(base === null ? null : oneQuestion(base, sentence, deviceOf()));
   /** The model's question, where its reading of these very words carried one. */
   const modelAsk = $derived(pressed !== null && pressed.said === sentence && live === pressed.proposal ? pressed.ask : null);
-  /** The words as they stood once the model's question was answered by telling it more, or skipped: nothing more is asked of them. */
-  let toldOnce = $state<string | null>(null);
   /**
    * THE ONE QUESTION ON SCREEN (`reply` is the answer it fills, or `null` for words told more): the model's in place of
    * the rules', never beside it, and the rules' where the model asked nothing or did not read.
    */
   const q = $derived.by((): Shown | null => {
-    if (toldOnce === sentence) return null;
     if (modelAsk === null) return ruled === null ? null : { ...ruled, reply: ruled.about };
     const as = answeredAs(modelAsk, ruled?.about ?? null);
     if (as !== null && ruled !== null) return { ...ruled, question: modelAsk.question, reply: as };
@@ -633,13 +615,6 @@
 
   /** The sentence cut at the very words heard, for the marks under the field. */
   const lit = $derived(litIn(sentence, read?.heard ?? []));
-
-  /* ENTER GOES ON AND SHIFT+ENTER STARTS A NEW LINE, as a chat box does, because the field is one answer. */
-  function enter(e: KeyboardEvent) {
-    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
-    e.preventDefault();
-    void next();
-  }
 
   /* THE MARKS SCROLL WITH THE WORDS, since they sit under the field rather than in it. */
   let marks = $state<HTMLElement | undefined>(undefined);
@@ -697,40 +672,6 @@
   /* WHERE THINGS WILL BE KEPT, with a use case picked by hand in place of the one heard. */
   const places = $derived(read === null ? undefined : chosen === null ? read.places : placesOf({ ...read, usecase: chosen, also: [] }));
 
-  /** What is asked before keeping: the one question, or what it is closest to where nothing was placed. */
-  const asks = $derived(sentence.trim() === '' ? null : q !== null ? 'one' : !placed ? 'closest' : null);
-  /** Whether that is already answered: the reply is to this very question, or a use case was picked. */
-  const answered = $derived(asks === 'one' ? reply !== null && q !== null && reply.about === q.reply : asks === 'closest' ? chosen !== null : true);
-
-  /* "THAT'S ME": read again now, so a press straight after the last key acts on every word; then the one question, or
-     straight on to keep. */
-  async function next(): Promise<void> {
-    if (sentence.trim() === '') {
-      field?.focus();
-      return;
-    }
-    /* ONE READ AT A TIME: a second press while the first is out does nothing. */
-    if (readingNow) return;
-    /* THE WORDS AS THEY ARE KEPT, trimmed now, so the reading's marks sit on the very words that are kept and mailed. */
-    if (sentence !== sentence.trim()) sentence = sentence.trim();
-    const s = sentence;
-    const p = await readPressed(s);
-    /* TYPED ON WHILE IT READ: the new words are the rules' to light, and the press is pressed again. */
-    if (sentence !== s) return;
-    live = p;
-    liveFor = s;
-    opened = null;
-    await tick();
-    if (!answered) {
-      pick = asks === 'one' ? (q?.suggested ?? null) : null;
-      step = 'question';
-      await tick();
-      document.getElementById('first-q')?.focus();
-      return;
-    }
-    await keep();
-  }
-
   /* ── the conversation (1 Nov) ────────────────────────────────────────────── */
 
   /** The questions asked and answered, and the one being asked now (`$lib/start/chat.ts`). */
@@ -742,7 +683,7 @@
   let modelReads = 0;
   /* EACH QUESTION THE MODEL WILL READ THE ANSWER TO HAS ITS BOT-CHECK ANSWER ASKED FOR AS IT IS SHOWN (`humanAhead`). */
   $effect(() => {
-    if (asking !== null && door !== null && modelReads < READS_MOST && readSlot !== null && siteKey !== null && (step === 'describe' || step === 'question')) humanAhead();
+    if (asking !== null && door !== null && modelReads < READS_MOST && readSlot !== null && siteKey !== null && step === 'describe') humanAhead();
   });
 
   const placeNames = (): string[] => parts.filter((p) => p.on && !leanedOnly(p)).map((p) => p.name);
@@ -868,63 +809,6 @@
     said = null;
     await tick();
     (signedIn ? document.getElementById('keep-h') : document.getElementById('up-email'))?.focus();
-  }
-
-  /*
-   * THE ANSWER, OR SKIPPED (`null`): a value on the reading, written nowhere until the build. AN ANSWER TO THE MODEL'S
-   * QUESTION THAT THE RULES WOULD NOT ASK (what kind, what things, who for) is the person telling it more: the words gain
-   * it, and this press reads them once again. Either way it was the one question, and nothing more is asked of them.
-   */
-  /* CONTINUE IS NEVER GREYED FOR AN ANSWER NOT GIVEN YET (first F16): pressed with none, the first answer takes focus
-     and one line says what to do. */
-  let askBox = $state<HTMLElement | undefined>(undefined);
-  let pickWhy = $state(false);
-  function unpicked(): void {
-    pickWhy = true;
-    askBox?.querySelector<HTMLElement>('button, input')?.focus();
-  }
-
-  /*
-   * ENTER ANSWERS (1 Nov, keyboard first): on a choice it is that choice, and on the field what is typed; with nothing
-   * chosen it says so, as Continue does. On "What is it closest to?" a chip is chosen and the step goes on.
-   */
-  function askEnter(e: KeyboardEvent): void {
-    if (e.key !== 'Enter' || e.isComposing || e.shiftKey || readingNow) return;
-    const opt = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-value]') : null;
-    if (asks === 'closest') {
-      if (opt?.dataset.value) chosen = opt.dataset.value;
-      if (chosen === null) return;
-      e.preventDefault();
-      void keep();
-      return;
-    }
-    e.preventDefault();
-    const v = opt?.dataset.value ?? pick;
-    if (v === undefined || v === null || v.trim() === '') return unpicked();
-    pick = v;
-    void answerIt(v);
-  }
-
-  async function answerIt(value: string | null): Promise<void> {
-    const v = value === null || value.trim() === '' ? null : value.trim();
-    if (asks === 'one' && q !== null && q.reply !== null) reply = { about: q.reply, value: v };
-    else if (asks === 'one' && q !== null) {
-      if (v !== null) {
-        if (readingNow) return;
-        const s = withChip(sentence, v);
-        sentence = s;
-        const p = await readPressed(s);
-        if (sentence !== s) return;
-        live = p;
-        liveFor = s;
-      }
-      toldOnce = sentence;
-    }
-    await keep();
-  }
-
-  function pickCase(id: string) {
-    chosen = chosen === id ? null : id;
   }
 
   /* ── a line heard, changed by hand ─────────────────────────────────────── */
@@ -1539,7 +1423,7 @@
   /** Whether the build is being written into the record now, so its tiles are the whole screen (`Making.svelte`). */
   const watching = $derived(step === 'making' && watched !== null);
   /** Whether the build stands beside the words: while describing, asking and keeping. */
-  const showBuild = $derived(step === 'describe' || step === 'question' || step === 'keep');
+  const showBuild = $derived(step === 'describe' || step === 'keep');
   /**
    * Whether the step is one column, drawn in the entry sheet as sign in is (first F5): every step but the three that
    * stand beside the build, and the build being written, which takes the whole board.
@@ -1555,7 +1439,7 @@
 <svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
 {#snippet signInLink()}
-  {#if step === 'describe' || step === 'question' || step === 'keep'}
+  {#if step === 'describe' || step === 'keep'}
     <!-- ON A PHONE A QUIET 44PX "Sign in"; FROM 640 THE SENTENCE in the second ink with only "Sign in" a link (first F9). -->
     <span class="have-wide">{words.haveAsk} <a class="have-link" href={at('/signin')}>{copy.signIn}</a></span>
     <span class="have-narrow"><Button href="/signin">{copy.signIn}</Button></span>
@@ -1611,45 +1495,6 @@
         {#if i > 0 || plan === 'free'}<li><Icon name="check" size="s" />{line}</li>{/if}
       {/each}
     </ul>
-  {:else if step === 'question'}
-    <button type="button" class="link plain back" onclick={edit}>{words.back}</button>
-    <h1 class="entry-title" id="first-q" tabindex="-1">{words.questionTitle}</h1>
-    {#if asks === 'one' && q !== null}
-      <p class="entry-lede" id="first-q-ask">{q.question}</p>
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="ask-box" bind:this={askBox} onkeydown={askEnter}>
-      {#if q.reply === 'currency'}
-        <Currency bind:value={pick} {locale} choices={q.choices.map((c) => ({ code: c.value, name: c.label, why: c.means ?? '' }))} suggested={q.suggested} find={q.find} />
-      {:else if q.choices.length === 0}
-        <span class="field field-lg"><input class="field-input" type="text" autocomplete={q.about === 'name' ? 'name' : 'off'} maxlength="60" aria-labelledby="first-q-ask" bind:value={pick} /></span>
-      {:else}
-        <div class="opts" role="radiogroup" aria-labelledby="first-q-ask">
-          {#each q.choices as c (c.value)}
-            <button type="button" class="opt" role="radio" data-value={c.value} aria-checked={pick === c.value} onclick={() => (pick = c.value)}>
-              <span class="opt-name">{#if pick === c.value}<Icon name="check" size="s" />{/if}{c.label}</span>
-              {#if c.means}<span class="opt-means">{c.means}</span>{/if}
-            </button>
-          {/each}
-        </div>
-      {/if}
-      </div>
-      {#if pickWhy && (pick === null || pick.trim() === '')}<p class="need" role="status">{words.pickOne}</p>{/if}
-      <p class="quiet">{q.only}</p>
-      <div class="go sticky">
-        <Button weight="primary" disabled={readingNow} onclick={() => (pick === null || pick.trim() === '' ? unpicked() : void answerIt(pick))}>{readingNow ? firstRun.whoReading : words.questionNext}</Button>
-        <Button weight="bare" disabled={readingNow} onclick={() => void answerIt(null)}>{words.questionSkip}</Button>
-      </div>
-    {:else}
-      <p class="entry-lede">{words.closest}</p>
-      <p class="quiet">{words.closestWhy}</p>
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <div class="chips" role="group" aria-label={firstRun.mineFor} onkeydown={askEnter}>
-        {#each USE_CASES as one (one.usecase)}
-          <Button weight="quiet" data-value={one.usecase} aria-pressed={chosen === one.usecase} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
-        {/each}
-      </div>
-      <div class="go sticky"><Button weight="primary" disabled={chosen === null} onclick={() => void keep()}>{words.questionNext}</Button></div>
-    {/if}
   {:else if step === 'keep'}
     <h1 class="entry-title" id="keep-h" tabindex="-1">{words.keepTitle}</h1>
     {@render saidLine()}
@@ -1850,7 +1695,7 @@
       <div class="go"><Button weight="primary" onclick={() => void waitForRecord(held)}>{copy.signupCheckAgain}</Button></div>
     {/if}
   {/if}
-  {#if (step === 'describe' || step === 'question') && siteKey !== null}
+  {#if step === 'describe' && siteKey !== null}
     <!-- THE READ'S OWN BOT CHECK, drawn only when Cloudflare needs the person to do something (`freshHuman`). -->
     <div class="read-human" role="group" aria-label={copy.signupHuman} bind:this={readSlot}></div>
   {/if}
@@ -1886,8 +1731,9 @@
               onremove={step === 'describe' || step === 'keep' ? partOut : undefined}
               onrestore={step === 'describe' || step === 'keep' ? partBack : undefined}
             />
-            <!-- THE MODEL STILL READING AFTER THE PRESS WENT ON (1 Nov): said, so a build that changes in a moment is expected;
-                 and once it lands, that it did. One slot, so the line coming and going moves nothing above it. -->
+            <!-- A TURN'S MODEL READING STILL OUT AFTER THE CONVERSATION WENT ON WITH THE RULES' (1 Nov; onboarding10: the only
+                 reading this page asks is a turn's, the whole one is the record's once made): said, so a build that changes
+                 in a moment is expected, and once it lands, that it did. One slot, so the line moves nothing above it. -->
             <p class="late" role="status" data-late={lateFor !== null && lateFor === sentence ? 'reading' : landed === sentence ? 'landed' : undefined}>
               {lateFor !== null && lateFor === sentence ? words.stillReading : landed === sentence ? words.readAgain : ''}
             </p>
@@ -2199,75 +2045,6 @@
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 22px;
-  }
-
-  /* ── The one question ──────────────────────────────────────────────────── */
-
-  /* THE ANSWERS: full-width rectangles on the field's fill, each its name and what choosing it means; the chosen one in
-     the selected row's tint and with a tick, never the colour alone. */
-  .opts {
-    display: grid;
-    gap: var(--sp-2);
-  }
-
-  .opt {
-    display: grid;
-    gap: var(--sp-1);
-    inline-size: 100%;
-    min-block-size: var(--tap);
-    padding: var(--sp-3) var(--sp-4);
-    border: 0;
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
-    color: var(--ink);
-    font: inherit;
-    text-align: start;
-    cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  .opt[aria-checked='true'] {
-    background: var(--chosen);
-  }
-
-  .opt-name {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    font-size: var(--fs-body);
-    font-weight: 500;
-  }
-
-  .opt-means {
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-  }
-
-  .back {
-    align-self: flex-start;
-  }
-
-  .ask-box {
-    display: grid;
-    min-inline-size: 0;
-  }
-
-  /* WHAT TO DO WHEN CONTINUE WAS PRESSED WITH NOTHING CHOSEN: the second ink, never an alarm. */
-  .need {
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    line-height: 18px;
-  }
-
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-  }
-
-  .chips :global(.btn[aria-pressed='true']) {
-    background: var(--hover);
   }
 
   /* ── Keep it ───────────────────────────────────────────────────────────── */

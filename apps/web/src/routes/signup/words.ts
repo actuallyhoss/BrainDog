@@ -33,11 +33,8 @@ export const words = {
   nameLabel: 'Your name',
   keepLine: 'Done',
   next: "That's me",
-  /** When nothing in the sentence could be placed: the use cases to choose from, as /start offers them. */
-  closest: 'What is it closest to?',
-  closestWhy: 'Pick the closest, or say a little more.',
 
-  /** While the model's reading is still out after the press went on with the rules' (1 Nov): what it finds lands on the build. */
+  /** While a turn's reading is still out after the conversation went on with the rules' (1 Nov): what it finds lands on the build. */
   stillReading: 'Reading it once more. Anything else it finds shows up here.',
   /** Once a late reading landed and changed the build. */
   readAgain: 'Read again, and this is what it found.',
@@ -52,13 +49,6 @@ export const words = {
   setPlaced: (place: string) => `You said ${place}.`,
   setUse: (zone: string) => `Use ${zone} time`,
 
-  /** The one question (`lib/start/question.ts`), on its own step, with the way back to the words. */
-  questionTitle: 'One thing I could not guess',
-  questionNext: 'Continue',
-  questionSkip: 'Skip it',
-  /** Under the answers when Continue was pressed with none chosen. */
-  pickOne: 'Pick one, or skip it.',
-  back: 'Back',
 
   /** The second step: the sentence kept, and one email. */
   keepTitle: 'Keep it',
