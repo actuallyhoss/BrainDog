@@ -86,11 +86,11 @@ export const shell = {
 
   /** The early access line: the hero's under its buttons, and the strip that closes an inner page. */
   early: {
-    strong: 'Early access, invite only.',
-    rest: "It's free while we open it up.",
+    strong: 'Invite only for now.',
+    rest: 'Free while we open it up.',
   },
 
-  /** The dark footer: the brand with no blurb, three groups of plain links (`lib/site/footer.ts`) and the owner. */
+  /** The footer, in the app's bar colour: the brand, three groups of plain links (`lib/site/footer.ts`) and the owner. */
   footer: {
     groups: {
       product: 'Product',

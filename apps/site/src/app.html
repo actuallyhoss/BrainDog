@@ -16,19 +16,17 @@
     <!-- THE TAB DRAWS THE SMALL MARK (`MARK_SMALL`), on the 16-pixel grid a tab shows it on; `mark.svg` is the whole mark. -->
     <link rel="icon" href="%sveltekit.assets%/mark-small.svg" type="image/svg+xml" />
 
-    <!-- NO PREFERENCE COOKIE HERE, unlike the app. This site sets no cookie, so the scheme is whatever
-         the operating system says. That is also the honest default for a page somebody arrives at once,
-         from a search result, having never chosen anything.
-
-         IT READS ONE, and only one: bd_in, which the app sets beside its session and clears at sign-out,
-         holding the record's address and nothing that signs anyone in. The script below reads it before the first
-         paint and marks the page signed in, so "Start free" and "Sign in" become "Open BrainDog" with
-         nothing flickering. A file and not an inline script, because the CSP allows only this origin's
+    <!-- THE SCHEME IS THE APP'S. With nothing chosen it is the operating system's. A scheme (or high contrast) chosen in
+         BrainDog's Settings lives in the app's `bd_pref` cookie, and where this page can read it the script below puts
+         it on the page before the first paint (`data-scheme`, `data-theme`) exactly as the app's shell does. The app
+         writes that cookie for its own host today; once it writes it for brain.dog, as the Worker writes `bd_in`, the
+         site wears the chosen scheme with no change here. It also reads `bd_in`, which the app sets beside its session,
+         and marks the page signed in, so "Get early access" and "Sign in" become "Open BrainDog" with nothing
+         flickering. It sets no cookie. A file and not an inline script, because the CSP allows only this origin's
          scripts; tiny and blocking on purpose (src/lib/site/signed-in.ts says what it mirrors).
 
-         This comment ships in the bytes, so it holds to the same rule the copy does: no em dashes
-         anywhere in the served HTML, which is a thing `grep` can check rather than a thing somebody
-         has to remember. -->
+         This comment ships in the bytes, so it holds to the same rule the copy does: no em dashes anywhere in the
+         served HTML, which is a thing `grep` can check rather than a thing somebody has to remember. -->
     <script src="/signed-in.js"></script>
     <!-- The visit count (src/lib/site/seen.ts): deferred, so it never holds up the first paint. -->
     <script src="/seen.js" defer></script>

@@ -143,7 +143,7 @@ test('the served connect page: one h1, the five names, every way in a <pre>, no 
   for (const app of CONNECT) assert.ok(text.includes(app.name), `${app.name} is named`);
   assert.equal((html.match(/<pre\b/gu) ?? []).length, CONNECT.flatMap((a) => a.ways).length, 'a <pre> for each way in');
   /* Outside the row for developers, which names it on purpose (site 2b). */
-  const outside = prose(html.replace(/<section class="wrap dev[\s\S]*?<\/section>/u, ''));
+  const outside = prose(html.replace(/<section class="tile lead dev[\s\S]*?<\/section>/u, ''));
   assert.doesNotMatch(outside, /\bMCP\b/u, 'MCP in prose');
   assert.match(text, /For developers/u, 'the row for developers is on the page');
   assert.ok(!html.includes(EM_DASH), 'an em dash in the served page');

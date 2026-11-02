@@ -1,16 +1,16 @@
 <!--
-  The trust pages' one skeleton: the night head, then a board of tiles. /support and /legal draw with it.
+  The trust pages' one skeleton: the head, then the app's tiles. /support and /legal draw with it.
 
-  THE HEAD IS `PageHead`: the page's name and its one line on the night ground, as every page of the
-  site opens. Under it is one flat board (Look B), and every part is a tile on it: flat and opaque, radius 16, no edge
-  and no shadow, headed by its glyph and its title in Lexend.
+  THE HEAD IS `PageHead`: the page's name and its one line on the board, as every page of the site opens (the redo of
+  2 November). Under it every part is one of the app's tiles: flat and opaque, radius 16, no edge and no shadow,
+  headed the app's way, its glyph in a well and its name at 17/600.
 
   ONE FILE FOR THE TRUST PAGES, because they are read and never sold, and a reader arriving from the footer's Trust
   group should meet the same page each time. Each page builds its list of parts from its copy and the launch flags, so
   a part that is not true yet is left out of the list rather than drawn empty.
 
-  THE PROSE IS 17/28 AT A 68CH MEASURE, inside the 45-to-75 band every typographic reference agrees on. A part's
-  action is an outlined button and never red: the one solid red a page carries is "Start free".
+  THE PROSE IS 16/26 AT A 68CH MEASURE, inside the 45-to-75 band every typographic reference agrees on. A part's
+  action is a plain button and never red: red is kept for the start button.
 -->
 <script lang="ts" module>
   import type { IconName } from '$lib/icons.ts';
@@ -48,7 +48,7 @@
   <div class="wrap parts">
     {#each parts as part (part.id)}
       <section
-        class="part"
+        class="tile lead part"
         class:span-5={part.span === 5}
         class:span-6={part.span === 6}
         class:span-7={part.span === 7}
@@ -81,7 +81,7 @@
           </ul>
         {/if}
         {#if part.action}
-          <p class="part-do"><a class="btn line" href={part.action.href}>{part.action.label}</a></p>
+          <p class="part-do"><a class="btn" href={part.action.href}>{part.action.label}</a></p>
         {/if}
       </section>
     {/each}
@@ -92,16 +92,14 @@
   /* THE BOARD: one flat ground under the head, the tiles on it a gap apart. It runs on to the footer with no strip of
      the page's white between: its own padding is the room at the page's end. */
   .board {
-    margin-block-end: 0;
-    padding-block: 56px 96px;
-    background: var(--board);
+    padding-block: clamp(32px, 2vw + 24px, 48px) clamp(48px, 4vw + 32px, 96px);
   }
 
   /* TWELVE COLUMNS AT A DESK, a part saying how many it takes; one column below 900. */
   .parts {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
+    gap: var(--tile-gap);
     align-items: start;
   }
 
@@ -127,44 +125,37 @@
     }
   }
 
-  /* A TILE: flat and opaque, radius 16, no edge and no shadow. */
+  /* A TILE (`app.css`): flat and opaque, radius 16, no edge and no shadow. */
   .part {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    min-inline-size: 0;
-    padding: clamp(20px, 1.6vw + 14px, 32px);
-    background: var(--tile);
-    border-radius: 16px;
-    color: var(--ink);
+    gap: var(--sp-4);
   }
 
+  /* THE APP'S HEADING ROW: the glyph in its well and the name at 17/600. */
   .part-head {
     display: flex;
     align-items: center;
     gap: 12px;
     color: var(--ink);
-    font-size: var(--t-site-21);
-    line-height: 1.2;
-    letter-spacing: -0.035em;
+    font-family: var(--font-ui);
+    font-size: var(--fs-head);
+    line-height: 24px;
   }
 
-  /* THE GLYPH'S SQUARE: 32 on the board's own fill, radius 8. */
   .glyph {
     display: inline-grid;
     flex: none;
     place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
-    background: var(--board);
-    border-radius: 8px;
-    color: var(--ink2);
+    inline-size: var(--well-l);
+    block-size: var(--well-l);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
   }
 
   .part-body {
     max-inline-size: 68ch;
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-body);
     line-height: var(--lh-site-body);
     overflow-wrap: anywhere;
@@ -202,9 +193,9 @@
     place-items: center;
     inline-size: 32px;
     block-size: 32px;
-    background: var(--board);
-    border-radius: 8px;
-    color: var(--ink2);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font-size: var(--t-site-small);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
@@ -254,9 +245,4 @@
     overflow-wrap: anywhere;
   }
 
-  @media (width < 640px) {
-    .board {
-      padding-block: 24px 64px;
-    }
-  }
 </style>

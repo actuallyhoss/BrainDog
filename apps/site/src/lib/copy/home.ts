@@ -1,16 +1,17 @@
 /**
- * The home page's words, band by band: the hero, who it's for, the chores, your AI tools, Slash, yours and free, and
- * the questions.
+ * The home page's words, section by section: the hero, the filing, your AI tools, your money, what keeps it yours, and
+ * free while in early access (the redo of 2 November). The questions are the pricing page's, which reads them here.
  *
- * THE HOME PAGE: one product picture, the desk, then six
- * full-bleed bands that each say one new thing, and no recap close. The words are the review's, with the spec's
- * changes (the early access line). The claims ledger (`lib/claims.ts`) reads these key paths, so a key that moves
- * moves there too.
+ * ONE IDEA A SECTION, said once: what it is (the hero), that it does the filing and leaves you the calls, that every AI
+ * tool you use reads the same memory, your money, that it stays yours, and what it costs. Each heading is one plain
+ * sentence and each line under it one or two more. The claims ledger (`lib/claims.ts`) reads these key paths, so a key
+ * that moves moves there too.
  *
- * THE DRAWINGS' NAMES AND FIGURES ARE NOT HERE. Maya Okafor's record is one file, `lib/demo/maya.ts`, and every band
- * draws from it. The early access figures are `lib/plans.ts`, read by the page and never typed.
+ * THE DRAWINGS' NAMES AND FIGURES ARE NOT HERE. Maya Okafor's record is one file, `lib/demo/maya.ts`, and every section
+ * draws from it; the app's own words in a drawing are `copy/product.ts`. The early access figures are `lib/plans.ts`,
+ * read by the page and never typed.
  */
-import { APPS_AND, listed, sayList } from '../agents.ts';
+import { APPS_AND, listed } from '../agents.ts';
 import { DOCS, SECURITY, SUPPORT_EMAIL } from '../links.ts';
 import { LAUNCH } from '../launch.ts';
 
@@ -21,12 +22,12 @@ export const home = {
   hero: {
     /* THE SLOGAN, word for word, with its full stop. */
     title: 'Give your business a memory.',
-    /* No mechanism in the promise: no event, log, row or ledger (`test/content.test.ts`). */
-    /* PERSONAL USE AS MUCH AS BUSINESS (29 October), said lightly: your work, your money, your life. */
+    /* No mechanism in the promise: no event, log, row or ledger (`test/content.test.ts`). Personal use as much as
+       business (29 October), said lightly: your work, your money, your life. */
     sub: 'One place that remembers your work, your money and your life, and tells you what needs you today. Your AI tools read from it too.',
     secondary: 'Connect your AI tools',
-    works: 'Works with',
-    /* The makers, once each: Claude, not "Claude Code" (§47 his notes). Their marks are `@braindog/skin/agent-marks.ts`. */
+    /* The makers, once each, named under the AI tools heading: Claude, not "Claude Code" (§47 his notes). Their marks are
+       `@braindog/skin/agent-marks.ts`. */
     makers: (
       [
         { id: 'claude', name: 'Claude' },
@@ -38,40 +39,63 @@ export const home = {
     ).filter((maker) => listed(maker.name)),
   },
 
-  /* WHO IT'S FOR: three readers, each a tile with its own fill, icon and drawing. */
-  who: {
-    title: "Who it's for",
-    small: {
-      title: 'Run a small business',
-      say: "See who owes you, what's due and how long the cash lasts, on one page each morning.",
-      figure: '14 months',
-      figureSay: 'of cash at this pace',
-      link: 'For small businesses',
-      href: '/for/founders',
-    },
-    build: {
-      title: 'Build with AI',
-      say: `${sayList(['Claude', 'Cursor', 'Codex'])} start every session from your brief and leave a note when they're done.`,
-      lines: ['braindog · context', 'Tidepool, building. Next: ship webhook retries.', "Cursor: onboarding copy waits on Dana's icons."],
-      link: 'Connect your tools',
-      href: '/agents',
-    },
-    /* YOUR OWN LIFE (29 October): personal use as much as business. Money is a whole section of the app now, with
-       budgets, bills and a book of your own beside a company's. The rows in its drawing are Maya's (`MONEY_BAND`). */
-    life: {
-      title: 'Keep your own life in order',
-      say: "Budgets, bills, subscriptions, net worth and trips in a book of your own. It tells you what's due before it's late.",
-      link: 'For your own money',
-      href: '/docs/use/money',
+  /* IT DOES THE FILING, YOU MAKE THE CALLS: what happened on its own today, each with its reason and an undo; the
+     questions only a person answers; and the floor no rule and no AI tool can move. */
+  filing: {
+    title: 'It does the filing. You make the calls.',
+    say: 'Payments, receipts and notes are filed on their own, each with a reason and an undo. Only what needs a person waits for you.',
+    done: 'Done on its own',
+    today: (n: number) => `${n} today`,
+    undo: 'Undo',
+    undone: 'Put back where it was',
+    redo: 'Redo',
+    /* NOT "NEEDS YOU", the app's place, which the hero's Today already names for its own two: these are the calls the
+       section's heading promises, and the floor under them is "Always your call". */
+    waits: 'Your call',
+    askedBy: 'asked by',
+    /* The line under the one question drawn, so the count beside the heading is what a reader can account for. */
+    after: (n: number) => (n === 1 ? '1 more waits after this one.' : `${n} more wait after this one.`),
+    empty: 'Nothing needs you. Everything else is handled.',
+    floor: {
+      title: 'Always your call',
+      say: 'Money, keys, sharing and deletes always wait for your yes. No rule and no AI tool can change that.',
+      parts: ['Money', 'Keys', 'Sharing', 'Deletes'],
+      yes: 'Your yes',
     },
   },
 
-  /* MONEY, A WHOLE SECTION (the 27 October rebuild): accounts, the ledger, budgets, the forecast, coming up, payees and
-     reports, and the add-ons that hang off it. The add-on names are the catalogue's own (`packs/`). */
+  /* EVERY AI TOOL YOU USE READS THE SAME MEMORY: the brief each starts from, the notes each leaves, the line that
+     connects one, and BrainDog's own, Slash. */
+  tools: {
+    title: 'Your AI tools share one memory.',
+    say: `${APPS_AND} start from your brief and leave a note when they're done. Nothing gets explained twice.`,
+    brief: 'What Claude reads first',
+    briefSay: 'Where things stand, what is next and what waits on you.',
+    notes: 'Notes on Tidepool',
+    notesSay: 'What each one did, in its own name.',
+    connect: 'Connect yours in one line',
+    approve: 'You approve each one once, and no key is copied anywhere.',
+    /* The one place home names the protocol, for the developer who came for it. */
+    dev: 'Developer details: MCP, the command line and tokens',
+    devHref: CONNECT_DOCS,
+    slash: {
+      title: 'Or ask BrainDog itself',
+      say: 'Press ⌘J anywhere and ask in plain words. Slash answers with your numbers, and every figure opens what it came from.',
+      more: 'How Slash works',
+    },
+  },
+
+  /* MONEY, A WHOLE SECTION OF THE APP (the 27 October rebuild): cash and how long it lasts, every account in its book,
+     budgets that say what is left, and what is coming up. The add-on names are the catalogue's own (`packs/`). */
   money: {
     title: 'Your money, in one place.',
-    say: 'Your net worth, every account, budgets that say what is left, bills and a forecast that says if cash runs short. For a business, for you, or both in separate books.',
-    worth: 'Net worth',
+    say: 'Every account, what is coming up and how long the cash lasts. For a business, for you, or both in separate books.',
+    /* THE MONEY HOME'S OWN WORDS over Maya's figures: its lead tile and its "Over time" line. */
+    cash: 'Cash now',
+    across: 'In 2 accounts',
+    lasts: 'Lasts about 14 months at this pace',
+    weeks: 'Cash, the last 12 weeks',
+    today: 'Today',
     accounts: 'Accounts',
     budgets: 'Budgets',
     coming: 'Coming up',
@@ -79,48 +103,24 @@ export const home = {
     over: (over: string) => `${over} over`,
     of: (spent: string, of: string, period: string) => `${spent} of ${of} ${period}`,
     addons: 'Add what you need: subscriptions, splitting costs with friends, investments and gold, property, insurance, debts, goals, trips, certificates and zakat.',
-  },
-
-  chores: {
-    title: 'It does the filing, you make the calls, and it stays yours.',
-    say: 'Filing, naming and sorting just happen, each with a reason and an undo. You only see what needs a person.',
-    waits: 'Waits for you',
-    done: 'Done on its own',
-    floor: 'Money, keys, sharing and deletes always wait for your yes. No rule and no AI tool can change that.',
-    /* The figures beside the two headings, and the line the drawing says once nothing waits. */
-    today: (n: number) => `${n} today`,
-    empty: 'Nothing needs you. Everything else is handled.',
-    /* The line under the one question drawn, so the count beside the heading is what a reader can account for. */
-    after: (n: number) => (n === 1 ? '1 more waits after this one.' : `${n} more wait after this one.`),
-    askedBy: 'asked by',
-    undo: 'Undo',
-  },
-
-  tools: {
-    title: 'Your AI tools share one memory.',
-    say: "Each one starts from your brief and leaves a note when it's done. Nothing gets explained twice.",
-    notes: 'Notes on Tidepool',
-    connect: 'Connect yours in one line',
-    /* The one place home names the protocol, for the developer who came for it. */
-    dev: 'Developer details: MCP, the command line and tokens',
-    devHref: CONNECT_DOCS,
-  },
-
-  slash: {
-    name: 'Slash',
-    /* ⌘J IS ASK, as the app's bar shows it; / is find (audit E18). */
-    title: 'Press ⌘J and ask anything.',
-    say: 'Ask about your business in plain words and it answers with your numbers. Ask for a change and it makes it, with an undo. Money, keys, sharing and deletes wait for your yes.',
-    tries: 'Try',
-    more: 'How Slash works',
+    /* WHERE TO READ ON, for a business and for yourself: the two links the old "Who it's for" tiles carried, so the
+       home page still sends a reader on to each. */
+    more: [
+      { label: 'For small businesses', href: '/for/founders' },
+      { label: 'For your own money', href: `${DOCS}/use/money` },
+    ],
   },
 
   yours: {
     title: 'It stays yours.',
+    say: 'Your BrainDog is its own database, and you can take all of it with you whenever you like.',
     points: [
       { icon: 'history', text: 'Every change has a name on it, and an undo.' },
       { icon: 'download', text: 'Export everything as one file, any time.' },
       { icon: 'key', text: 'AI tools use your keys without ever seeing them.' },
+      { icon: 'server', text: "Nothing is shared between customers, so no one else's search can reach yours." },
+      { icon: 'shield', text: 'Sign in with your email, Google or a passkey. No password to steal.' },
+      { icon: 'lock', text: 'A sealed copy every night, to a key kept outside Cloudflare.' },
     ],
     link: 'How we keep it safe',
     href: SECURITY,
@@ -128,10 +128,14 @@ export const home = {
 
   free: {
     title: 'Free while in early access.',
-    say: "BrainDog is invite only for now. Ask for an invite and we'll email you when it's ready.",
-    /* The figures are `TABLE.free`'s, said in ONE SENTENCE, NOT A ROW OF STATS (the
-       site's own rule, §47): "Free: every feature, 3 AI tools and 20 Slash questions a month." */
-    figures: (tools: number, questions: number): string => `Free: every feature, ${tools} AI tools and ${questions} Slash questions a month.`,
+    say: "BrainDog is invite only for now. Ask for an invite and we'll email you when there's room.",
+    plan: 'Free',
+    price: '$0',
+    later: 'Cloud and Cloud Plus',
+    laterSay: 'Coming soon, priced at launch. Nothing you make now is lost.',
+    pricing: 'See pricing',
+    /* The figures are `TABLE.free`'s, said in ONE SENTENCE, NOT A ROW OF STATS (the site's own rule, §47). */
+    figures: (tools: number, questions: number): string => `Every feature, ${tools} AI tools and ${questions} Slash questions a month.`,
   },
 
   faq: {
@@ -169,7 +173,7 @@ export const home = {
         /* THE PAID PLANS BY THE BILLING FLAG: coming soon while it is off, and the pricing page's own figures once it is on. */
         a: LAUNCH.billing
           ? "Nothing: Free is $0. Cloud and Cloud Plus are monthly plans for more AI tools, questions and runs; the pricing page has each price."
-          : "Nothing: Free is $0. Cloud and Cloud Plus are coming soon, priced at launch. Sign-up is invite only for now: ask for an invite and we'll email you when it's ready.",
+          : "Nothing: Free is $0. Cloud and Cloud Plus are coming soon, priced at launch. Sign-up is invite only for now: ask for an invite and we'll email you when there's room.",
         link: { label: 'Pricing', href: '/pricing' },
       },
     ],

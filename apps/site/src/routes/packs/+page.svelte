@@ -113,17 +113,17 @@
   </div>
 </section>
 
-<section class="band band--make" aria-labelledby="make-title">
-  <div class="wrap cols">
-    <div class="c6 make-say">
-      <h2 id="make-title" class="band-h2">{m.title}</h2>
-      <p class="band-say">{m.say}</p>
+<section class="section make" aria-labelledby="make-title">
+  <div class="wrap make-cols">
+    <div class="make-say">
+      <h2 id="make-title" class="h2">{m.title}</h2>
+      <p class="lede">{m.say}</p>
       <p class="make-go">
-        <a class="btn ghost" href={m.firstHref}>{m.first}<Icon name="arrow" size="m" /></a>
-        <a class="more" href={m.publishHref}>{m.publish}<Icon name="arrow" size="m" /></a>
+        <a class="btn" href={m.firstHref}>{m.first}<Icon name="arrow-right" size="m" /></a>
+        <a class="onward" href={m.publishHref}>{m.publish}<Icon name="arrow-right" size="s" /></a>
       </p>
     </div>
-    <figure class="c6 term">
+    <figure class="term">
       <figcaption class="term-hd">{m.terminal}</figcaption>
       <pre class="term-body"><code>{#each m.steps as step, i (step)}{#if i > 0}{'\n'}{/if}<span class="prompt" aria-hidden="true">$ </span>{step}{/each}</code></pre>
     </figure>
@@ -154,13 +154,13 @@
     min-block-size: 48px;
     padding-inline: 14px;
     border-radius: 12px;
-    background: var(--night-2);
-    box-shadow: inset 0 0 0 1px var(--night-rule);
-    color: var(--on-night-2);
+    background: var(--tile-2);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink-2);
   }
 
   .field:focus-within {
-    outline: 2px solid var(--on-night);
+    outline: 2px solid var(--ink);
     outline-offset: 2px;
   }
 
@@ -172,7 +172,7 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--on-night);
+    color: var(--ink);
     font: inherit;
     font-size: var(--t-site-16);
     /* focus-ok: the field around it draws the ring on focus-within. */
@@ -180,7 +180,7 @@
   }
 
   .field input::placeholder {
-    color: var(--on-night-2);
+    color: var(--ink-2);
   }
 
   .ours-all {
@@ -188,7 +188,7 @@
     align-items: center;
     gap: 8px;
     margin: 0;
-    color: var(--on-night-2);
+    color: var(--ink-2);
     font-size: var(--t-site-15);
   }
 
@@ -236,8 +236,8 @@
     border: 0;
     border-radius: 999px;
     background: transparent;
-    color: var(--ink2);
-    font: 500 var(--t-site-14) / 1 var(--ui);
+    color: var(--ink-2);
+    font: 500 var(--t-site-14) / 1 var(--font-ui);
     white-space: nowrap;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
@@ -250,11 +250,11 @@
 
   .seg[aria-pressed='true'] {
     background: var(--ink);
-    color: var(--page);
+    color: var(--board);
   }
 
   .seg-n {
-    color: var(--muted);
+    color: var(--ink-3);
     font-weight: 400;
   }
 
@@ -265,14 +265,14 @@
 
   .shown {
     margin: 0;
-    color: var(--muted);
+    color: var(--ink-3);
     font-size: var(--t-site-14);
   }
 
   .none,
   .no-match p {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-17);
   }
 
@@ -327,11 +327,11 @@
     block-size: 40px;
     border-radius: 10px;
     background: var(--board);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .kind {
-    color: var(--muted);
+    color: var(--ink-3);
     font-size: var(--t-site-13);
     font-weight: 500;
   }
@@ -371,7 +371,7 @@
     display: -webkit-box;
     margin: 0;
     overflow: hidden;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-15);
     line-height: 1.5;
     -webkit-box-orient: vertical;
@@ -396,7 +396,7 @@
     margin-block-start: auto;
     padding-block-start: 14px;
     border-block-start: 1px solid var(--rule);
-    color: var(--muted);
+    color: var(--ink-3);
     font-size: var(--t-site-14);
   }
 
@@ -408,7 +408,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .seg[aria-pressed='false']:hover {
-      background: var(--soft);
+      background: var(--tile-2);
       color: var(--ink);
     }
 
@@ -435,16 +435,21 @@
 
   /* ── Make your own ─────────────────────────────────────────────────────── */
 
-  .band--make {
-    background: var(--band-ai);
-    color: var(--on-night);
+  .make-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-6);
   }
 
-  .band--make .band-say {
-    color: var(--on-night-2);
+  @media (width >= 900px) {
+    .make-cols {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   .make-say {
+    display: grid;
+    gap: var(--sp-3);
     align-self: center;
   }
 
@@ -456,9 +461,8 @@
     margin: 28px 0 0;
   }
 
-  .make-go .more {
+  .make-go .onward {
     margin: 0;
-    color: var(--on-night);
   }
 
   /* A TERMINAL, drawn: the band's own tile, the four commands of the first add-on in the mono face. */
@@ -467,12 +471,12 @@
     margin: 0;
     padding: 20px 24px 24px;
     border-radius: 16px;
-    background: var(--band-ai-tile);
+    background: var(--tile);
   }
 
   .term-hd {
     margin-block-end: 14px;
-    color: var(--on-night-2);
+    color: var(--ink-2);
     font-size: var(--t-site-14);
     font-weight: 500;
   }
@@ -481,12 +485,12 @@
   .term-body {
     margin: 0;
     overflow-x: auto;
-    color: var(--on-night);
+    color: var(--ink);
     font: 400 var(--t-site-14) / 2 var(--font-mono);
   }
 
   .prompt {
-    color: var(--on-night-2);
+    color: var(--ink-2);
     user-select: none;
   }
 

@@ -3,8 +3,8 @@
   the app's too, one copy in `packages/skin/agent-marks.ts`, so a path changed there changes on both.
   `id` names either an agent the record knows or one of the apps a person connects (ChatGPT, VS Code), and `markOf`
   draws both. `agent` is the older name for the same thing, kept for the pages that still pass it.
-  Claude wears its clay, VS Code its blue and Gemini its own; the marks drawn in black or white take the ink of what
-  holds them. Always decoration: the agent's name is in words beside every one.
+  Claude wears its clay and Gemini its own, as in the app; the marks drawn in black or white, VS Code's among them,
+  take the ink of what holds them. Always decoration: the agent's name is in words beside every one.
 -->
 <script lang="ts">
   import { markOf, type AppMark, type MarkedAgent } from '@braindog/skin/agent-marks.ts';
@@ -42,10 +42,6 @@
 
   .agent-mark[data-tone='claude'] {
     fill: var(--agent-claude);
-  }
-
-  .agent-mark[data-tone='vscode'] {
-    fill: var(--agent-vscode);
   }
 
   .agent-mark[data-tone='gemini'] {

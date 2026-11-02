@@ -1,5 +1,5 @@
 <!--
-  One docs page's body, drawn by the product's own renderer from its dialect text, on one sheet of paper.
+  One docs page's body, drawn by the product's own renderer from its dialect text, on one sheet.
 
   THE SAME DRAWERS `lib/app/Page.svelte` USES (`Block`, `Markdown` and `Degraded` from the renderer's Svelte half, over
   the skin's block styles), so a block on a docs page is the block a record draws, and a row written wrong degrades to
@@ -7,7 +7,7 @@
   reading, where Page lays blocks on twelve, and its `##` headings need anchors for the contents list, which the
   renderer's prose does not give. So `partsOf` cuts the headings out of the prose and this file draws them with ids.
 
-  ONE SHEET ON --paper, read at 68ch (LAUNCH 103 job 7): `head` first, which the page fills with the
+  ONE SHEET, one of the app's tiles, read at 68ch: `head` first, which the page fills with the
   ways to take it as text, then the opening and each `##` part in turn, a heading with its anchor and no tile round it.
 
   Nothing here is interactive: a board or a task list on a docs page is drawn read-only, which is what the renderer
@@ -85,7 +85,7 @@
   {/each}
 {/snippet}
 
-<div class="doc-body" bind:this={sheet}>
+<div class="tile doc-body" bind:this={sheet}>
   {#if head}<div class="doc-head">{@render head()}</div>{/if}
   {#each groups as group, g (g)}
     {#if group.heading}
@@ -100,14 +100,14 @@
 </div>
 
 <style>
-  /* THE SHEET: flat --paper, radius 24 as the site's cards are, no edge and no shadow, on the board the page lays it on. */
+  /* THE SHEET: one of the app's tiles, radius 16, no edge and no shadow, on the board the page lays it on. */
   .doc-body {
     display: grid;
     gap: var(--sp-6);
     min-inline-size: 0;
-    padding: 44px 48px 52px;
-    background: var(--paper);
-    border-radius: 24px;
+    padding: clamp(20px, 2vw + 12px, 44px) clamp(20px, 2.4vw + 12px, 48px) clamp(28px, 2vw + 16px, 52px);
+    background: var(--tile);
+    border-radius: var(--r-tile);
     color: var(--ink);
   }
 
@@ -128,7 +128,7 @@
   .doc-text {
     max-inline-size: 68ch;
     min-inline-size: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-body);
     line-height: var(--lh-site-body);
   }
@@ -164,7 +164,7 @@
   }
 
   .doc-text :global(a) {
-    color: var(--red-ink);
+    color: var(--red);
     text-underline-offset: 3px;
   }
 
@@ -194,17 +194,17 @@
     white-space: normal;
   }
 
-  /* CODE SITS IN A WELL OF THE TILE'S FILL ON THE PAPER, and a long line scrolls inside it, never the page. */
+  /* CODE SITS IN A WELL OF THE TILE'S SECOND FILL, and a long line scrolls inside it, never the page. */
   .doc-text :global(pre) {
     position: relative;
     max-inline-size: 100%;
     overflow-x: auto;
     padding: var(--sp-4);
-    background: var(--tile);
+    background: var(--tile-2);
     border: 0;
     border-radius: 8px;
     color: var(--ink);
-    font-family: var(--mono);
+    font-family: var(--font-mono);
     font-size: var(--t-site-14-5);
     line-height: 1.6;
   }
@@ -220,11 +220,11 @@
     inset-inline-end: 8px;
     min-block-size: 28px;
     padding: 0 10px;
-    border: 1px solid var(--rule);
-    border-radius: 8px;
-    background: var(--paper);
-    color: var(--ink2);
-    font: 500 13px/1 var(--ui);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--tile);
+    color: var(--ink-2);
+    font: 500 var(--t-site-13) / 1 var(--font-ui);
     cursor: pointer;
   }
 
@@ -242,16 +242,15 @@
 
   .doc-text :global(:not(pre) > code) {
     padding: 1px 5px;
-    background: var(--tile);
+    background: var(--tile-2);
     border-radius: 6px;
-    font-family: var(--mono);
+    font-family: var(--font-mono);
     font-size: 0.88em;
   }
 
   @media (max-width: 760px) {
     .doc-body {
       gap: var(--sp-5);
-      padding: 24px 20px 32px;
     }
   }
 </style>

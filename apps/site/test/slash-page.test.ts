@@ -3,12 +3,13 @@
  *
  *   node --test apps/site/test/slash-page.test.ts
  *
- * FOUR THINGS HOLD. The page's words are the early access copy, with the
+ * THREE THINGS HOLD. The page's words are the early access copy, with the
  * count of asks read off `plans.ts` and no word the writing guide refuses. Every answer the made-up record holds renders
- * on the server whole, the way the prerender writes it, so a reader with scripting off has it. The typing paints the
- * finished frame at once under reduced motion and sets no timer. And the built `slash.html` has its one h1, the three
- * modes, how asks are counted and the first answer's figure in plain text, and the home page's Slash band is that
- * first answer: those parts read `build/`, and a missing build is a skip that says so.
+ * on the server whole, the way the prerender writes it, so a reader with scripting off has it. And the built
+ * `slash.html` has its one h1, the three modes, how asks are counted and the first answer's figure in plain text, and
+ * the home page's Slash tile is that first answer: those parts read `build/`, and a missing build is a skip that says
+ * so. NOTHING TYPES ANY MORE (the redo of 2 November): an answer is there from the first draw, because motion never
+ * delays reading, so the typing and its timers are gone.
  *
  * THE COMPONENTS ARE COMPILED INTO THE TEMP DIRECTORY with `svelte/compiler`, as `src/lib/Decide.test.ts` does, each
  * `.svelte` it imports compiled beside it and each `.ts` module pointed back at its source.
@@ -24,7 +25,6 @@ import { pathToFileURL } from 'node:url';
 import { slashDrawing, slashPage } from '../src/lib/copy/slash.ts';
 import { ASKS, FINDS, MAKES } from '../src/lib/demo/maya.ts';
 import { TABLE } from '../src/lib/plans.ts';
-import { typeInto, type Clock, type Frame } from '../src/lib/slash/typing.ts';
 import { BUILD, missing, when } from './built.ts';
 
 const SITE = new URL('../', import.meta.url);
@@ -158,14 +158,14 @@ test('every answer the made-up record holds renders on the server, whole', async
   }
 });
 
-test("the home page's Slash band is the first Ask, asked and answered, before any script runs", when(missing(['index.html'])), () => {
+test("the home page's Slash tile is the first Ask, asked and answered, before any script runs", when(missing(['index.html'])), () => {
   const first = ASKS[0]!;
   const html = readFileSync(new URL('index.html', BUILD), 'utf8');
-  const at = html.search(/<section\b[^>]*class="[^"]*\bband--slash\b/);
-  assert.ok(at >= 0, 'index.html has no Slash band');
-  const said = text(html.slice(at, html.indexOf('</section>', at)));
-  assert.ok(said.includes(first.q), `the band has no question typed in: ${said.slice(0, 300)}`);
-  for (const f of figures(first.lead)) assert.ok(said.includes(f), `the band lost the figure ${f}`);
+  const at = html.indexOf('id="slash-title"');
+  assert.ok(at >= 0, 'index.html has no Slash tile');
+  const said = text(html.slice(at, html.indexOf('id="connect-title"', at)));
+  assert.ok(said.includes(first.q), `the tile has no question in its bar: ${said.slice(0, 300)}`);
+  for (const f of figures(first.lead)) assert.ok(said.includes(f), `the tile lost the figure ${f}`);
   assert.ok(!said.includes('\u2014'));
 });
 
@@ -174,44 +174,6 @@ test('the Slash page draws each mode small, its question over its answer', async
     const said = text(await render('Mini', { mode }));
     assert.ok(said.includes(q), `the ${mode} drawing lost its question`);
   }
-});
-
-/* ---- the typing ---- */
-
-const fakeClock = () => {
-  const due: { at: number; fn: () => void; id: number }[] = [];
-  let next = 0;
-  const clock: Clock = {
-    later: (fn, ms) => (due.push({ at: ms, fn, id: next }), next++),
-    cancel: (h) => {
-      const i = due.findIndex((d) => d.id === h);
-      if (i >= 0) due.splice(i, 1);
-    },
-  };
-  const run = () => [...due].sort((a, b) => a.at - b.at || a.id - b.id).forEach((d) => d.fn());
-  return { clock, run, due };
-};
-
-test('under reduced motion the question and its answer are set at once, and no timer is set', () => {
-  const frames: Frame[] = [];
-  const clock: Clock = { later: () => assert.fail('a timer was set under reduced motion'), cancel: () => {} };
-  typeInto('What do I owe this month?', (f) => frames.push(f), { think: 'Reading your record', reduced: true, clock });
-  assert.deepEqual(frames, [{ typed: 'What do I owe this month?', phase: 'answer' }]);
-});
-
-test('with motion, it types letter by letter, reads, then answers, and a stop cancels what is left', () => {
-  const frames: Frame[] = [];
-  const { clock, run } = fakeClock();
-  typeInto('dana', (f) => frames.push(f), { think: 'Reading your record', reduced: false, clock });
-  run();
-  assert.deepEqual(
-    frames.map((f) => `${f.phase}:${f.typed}`),
-    ['typing:', 'typing:d', 'typing:da', 'typing:dan', 'typing:dana', 'thinking:dana', 'answer:dana'],
-  );
-  const none: Frame[] = [];
-  const f2 = fakeClock();
-  typeInto('stripe', (f) => none.push(f), { think: null, reduced: false, clock: f2.clock })();
-  assert.equal(f2.due.length, 0, 'a stop left frames to come');
 });
 
 /* ---- the built page ---- */

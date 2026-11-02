@@ -10,17 +10,26 @@
   Copy writes to the clipboard and says Copied for 1.6 s; when the browser refuses, the code is selected instead so
   the reader can copy it by hand.
 
-  `tone="night"` is for a black card that already draws the dark tile (the home page's): the box drops its own.
+  ON A TILE (the redo of 2 November): the app's segmented control for the apps, the code in the tile's well in Geist
+  Mono, and Copy as a quiet button. A pane chosen after the first draw comes up in place over `--d-swap` with the
+  app's 2px settle, so a change of app reads as a change and not a jump.
+
+  `tone="night"` is kept for a caller that still passes it, and draws the same box.
+
+  EACH APP'S NAME IS A HEADING ONE LEVEL UNDER THE BOX'S OWN: `level` says which, 3 under the connect page's h2 and 4
+  under the home page's h3 tile, so the outline a screen reader or a search engine reads stays whole.
 -->
 <script lang="ts">
   import AgentMark from '../AgentMark.svelte';
   import { CONNECT, CONNECT_WORDS as W, COPIED_MS, hintParts } from './apps.ts';
 
-  let { tone }: { tone?: 'night' } = $props();
+  let { tone, level = 3 }: { tone?: 'night'; level?: 3 | 4 } = $props();
 
   const uid = $props.id();
   let cur = $state(0);
   let way = $state(0);
+  /** Whether the reader has chosen an app or a way yet: a pane shown before that is the first draw and is still. */
+  let moved = $state(false);
   /** What each way's Copy button says, by `app-way`. */
   let said = $state<Record<string, string>>({});
   const tabs: HTMLButtonElement[] = [];
@@ -28,6 +37,7 @@
   const timers: Record<string, ReturnType<typeof setTimeout>> = {};
 
   const pick = (i: number, focus = false): void => {
+    moved = true;
     cur = (i + CONNECT.length) % CONNECT.length;
     way = 0;
     if (focus) tabs[cur]?.focus();
@@ -81,7 +91,7 @@
   </style>
 </noscript>
 
-<div class="cbox" data-tone={tone}>
+<div class="cbox" data-tone={tone} data-moved={moved ? '' : undefined}>
   <div class="ctabs" role="tablist" aria-label={W.tabs}>
     {#each CONNECT as app, i (app.id)}
       <button
@@ -101,7 +111,7 @@
   {#each CONNECT as app, i (app.id)}
     {@const many = app.ways.length > 1}
     <div class="cbox-pane" role="tabpanel" id="{uid}-pane-{app.id}" aria-labelledby="{uid}-tab-{app.id}" hidden={i !== cur}>
-      <h2 class="cbox-name"><AgentMark id={app.id} size={16} />{app.name}</h2>
+      <svelte:element this={`h${level}`} class="cbox-name"><AgentMark id={app.id} size={16} />{app.name}</svelte:element>
       {#each app.ways as w, j (w.where)}
         {@const key = `${app.id}-${j}`}
         <div class="cbox-way" hidden={many && i === cur ? j !== way : false}>
@@ -110,7 +120,7 @@
               {#if many}
                 <span class="cbox-ways" role="group" aria-label={W.ways}>
                   {#each app.ways as o, k (o.where)}
-                    <button type="button" class="vbtn" aria-pressed={k === j} onclick={() => (way = k)}>{o.where}</button>
+                    <button type="button" class="vbtn" aria-pressed={k === j} onclick={() => ((moved = true), (way = k))}>{o.where}</button>
                   {/each}
                 </span>
               {/if}
@@ -130,44 +140,56 @@
 
 <style>
   .cbox {
+    container: cbox / inline-size;
     min-inline-size: 0;
-    padding: 22px;
-    border-radius: 16px;
-    background: var(--night-2);
-    color: var(--on-night);
+    color: var(--ink);
   }
 
-  .cbox[data-tone='night'] {
-    padding: 0;
-    background: none;
-  }
-
+  /* THE APPS, the app's segmented control: a well's track, the chosen one on the segment's own fill. */
   .ctabs {
     display: flex;
     flex-wrap: wrap;
     gap: 2px;
-    margin-block-end: 12px;
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    margin-block-end: var(--sp-3);
+    padding: 3px;
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
   }
 
   .ctabs button {
-    all: unset;
+    /* NOT `all: unset`, which would take the a11y layer's focus ring with it. */
+    appearance: none;
+    margin: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    padding: 8px 11px;
-    border-radius: 8px;
-    font: 500 14px/1 var(--ui);
-    color: var(--on-night-2);
+    block-size: 30px;
+    padding-inline: 10px;
+    border-radius: 6px;
+    color: var(--ink-2);
     cursor: pointer;
+    font: 500 var(--fs-ctl) / 1 var(--font-ui);
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
-  .ctabs button:hover,
-  .ctabs button[aria-selected='true'] {
-    color: var(--on-night);
+  @media (hover: hover) {
+    .ctabs button:hover {
+      color: var(--ink);
+    }
   }
 
   .ctabs button[aria-selected='true'] {
-    background: var(--night-tint-2);
+    background: var(--segment-on);
+    color: var(--ink);
   }
 
   .cbox-pane[hidden],
@@ -175,13 +197,25 @@
     display: none;
   }
 
+  /* A PANE CHOSEN AFTER THE FIRST DRAW comes up in place (the app's swap): nothing beside it moves. */
+  .cbox[data-moved] .cbox-pane:not([hidden]),
+  .cbox[data-moved] .cbox-way:not([hidden]) {
+    animation: swap-in var(--d-swap) var(--ease-out) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cbox[data-moved] .cbox-pane:not([hidden]),
+    .cbox[data-moved] .cbox-way:not([hidden]) {
+      animation: none;
+    }
+  }
+
   .cbox-name {
     display: flex;
     align-items: center;
     gap: 8px;
     margin: 0 0 10px;
-    font: 600 17px/1.2 var(--head);
-    letter-spacing: -0.035em;
+    font: 600 var(--fs-head) / 1.2 var(--font-ui);
   }
 
   /* Named in words for a screen reader; the tab already says it on screen. */
@@ -195,21 +229,22 @@
     white-space: nowrap;
   }
 
+  /* THE CODE, in the tile's well: where it goes over it, then the line itself in Geist Mono. */
   .code {
     overflow: hidden;
-    border-radius: 12px;
-    background: var(--term);
-    color: var(--term-ink);
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
+    color: var(--ink);
   }
 
   .code-bar {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 8px 8px 14px;
-    border-block-end: 1px solid var(--night-rule);
-    color: var(--on-night-2);
-    font: 500 13px/1 var(--ui);
+    padding: 6px 6px 6px 14px;
+    border-block-end: 1px solid var(--rule);
+    color: var(--ink-3);
+    font: 500 var(--fs-meta) / 1 var(--font-ui);
   }
 
   .cbox-where {
@@ -227,60 +262,65 @@
   }
 
   .code-bar code {
-    font: 400 13px/1 var(--mono);
+    font: 400 var(--fs-meta) / 1 var(--font-mono);
   }
 
   .vbtn,
   .cbox-copy {
-    all: unset;
+    /* NOT `all: unset`, which would take the a11y layer's focus ring with it. */
+    appearance: none;
+    margin: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
     cursor: pointer;
-    border-radius: 8px;
-    font: 500 13px/1 var(--ui);
+    border-radius: 6px;
+    font: 500 var(--fs-meta) / 1 var(--font-ui);
   }
 
-  /* The secondary light of the night, not the terminal's dim grey: that grey is 4.45 to 1 on the dark terminal. */
   .vbtn {
-    padding: 6px 8px;
-    color: var(--on-night-2);
+    padding: 7px 8px;
+    color: var(--ink-2);
   }
 
   .vbtn[aria-pressed='true'] {
-    background: var(--night-tint-2);
-    color: var(--on-night);
+    background: var(--tile);
+    color: var(--ink);
   }
 
   .cbox-copy {
     flex: none;
-    padding: 6px 10px;
-    background: var(--night-2);
-    color: var(--on-night);
+    padding: 7px 10px;
+    background: var(--tile);
+    color: var(--ink);
+  }
+
+  @media (hover: hover) {
+    .cbox-copy:hover {
+      background: var(--hover);
+    }
   }
 
   pre {
     margin: 0;
-    padding: 15px 16px;
-    font: 400 14px/1.6 var(--mono);
+    padding: 14px 16px;
+    font: 400 var(--t-site-14) / 1.6 var(--font-mono);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
 
   .hint {
     margin: 12px 0 0;
-    font-size: var(--t-site-15);
-    line-height: 1.45;
-    color: var(--on-night-2);
+    color: var(--ink-2);
+    font-size: var(--t-site-14);
+    line-height: 1.5;
   }
 
   .hint code {
-    font: 400 0.92em/1 var(--mono);
-    color: var(--on-night);
-  }
-
-  .ctabs button:focus-visible,
-  .vbtn:focus-visible,
-  .cbox-copy:focus-visible {
-    outline: 2px solid var(--red);
-    outline-offset: 2px;
+    color: var(--ink);
+    font: 400 0.92em/1 var(--font-mono);
   }
 
   @media (pointer: coarse) {
@@ -292,16 +332,19 @@
     }
   }
 
-  @media (max-width: 760px) {
-    .cbox:not([data-tone='night']) {
-      padding: 16px;
-    }
-  }
-
   @media (forced-colors: active) {
     .ctabs button[aria-selected='true'],
     .vbtn[aria-pressed='true'] {
       outline: 2px solid Highlight;
+    }
+  }
+
+  /* NARROW, THE FOUR APPS TAKE TWO ROWS OF TWO rather than three and one. */
+  @container cbox (width < 400px) {
+    .ctabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      inline-size: auto;
     }
   }
 </style>

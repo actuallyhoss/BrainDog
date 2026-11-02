@@ -8,16 +8,19 @@
   filters nothing with scripting off is a control that cannot act. Without a script the section list
   beside it is the way in.
 
-  THE FIELD IS LOOK B'S: the label above it, a flat fill a step off the ground it sits on, radius 8,
-  44 high, the search glyph at its start and a 2px ring in the ground's ink on focus. The hits are a list under it.
-  `night` draws it on the night ground of the docs' PageHead, in the night's inks; otherwise it sits on the board.
+  ITS ROOM IS HELD UNTIL THEN (the redo of 2 November): an empty box the field's height stands in its place, so the
+  sections and the rail under it do not jump down when it arrives (the layout shift Lighthouse counted on every docs
+  page). With scripting off there is no field, so there is no room either (`scripting: none`).
+
+  THE FIELD IS THE APP'S: the label above it, the tile's fill on the board, radius 8, 44 high, the search glyph at its
+  start and the app's focus ring round the whole field. The hits are a list under it.
 -->
 <script lang="ts">
   import Icon from '../Icon.svelte';
   import { search, type Entry } from './pages.ts';
   import { docsWords } from './words.ts';
 
-  let { index, id, night = false }: { index: readonly Entry[]; id: string; night?: boolean } = $props();
+  let { index, id }: { index: readonly Entry[]; id: string } = $props();
 
   const w = docsWords.search;
 
@@ -39,7 +42,7 @@
 </script>
 
 {#if live}
-  <div class="search" class:night role="search">
+  <div class="search" role="search">
     <label class="search-label" for={id}>{w.label}</label>
     <span class="search-field">
       <Icon name="search" size="m" />
@@ -69,6 +72,8 @@
       </ul>
     {/if}
   </div>
+{:else}
+  <div class="search-room" aria-hidden="true"></div>
 {/if}
 
 <style>
@@ -85,9 +90,21 @@
   }
 
   .search-label {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-15);
     font-weight: 500;
+  }
+
+  /* THE FIELD'S HEIGHT BEFORE IT IS DRAWN: the label's line, the gap, and the field. */
+  .search-room {
+    font-size: var(--t-site-15);
+    block-size: calc(1lh + var(--sp-2) + var(--tap));
+  }
+
+  @media (scripting: none) {
+    .search-room {
+      display: none;
+    }
   }
 
   .search-field {
@@ -98,12 +115,12 @@
     padding-inline: var(--sp-3);
     background: var(--tile);
     border-radius: 8px;
-    color: var(--muted);
+    color: var(--ink-3);
   }
 
-  /* THE FIELD DRAWS THE RING, offset 2 in ink, so the input inside it draws none of its own. */
+  /* THE FIELD DRAWS THE APP'S RING, so the input inside it draws none of its own. */
   .search-field:focus-within {
-    outline: 2px solid var(--ink);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
@@ -124,12 +141,12 @@
   }
 
   .search-input::placeholder {
-    color: var(--muted);
+    color: var(--ink-3);
   }
 
   .search-said {
     margin: 0;
-    color: var(--muted);
+    color: var(--ink-3);
     font-size: var(--t-site-15);
   }
 
@@ -154,7 +171,7 @@
     min-block-size: var(--tap);
     padding: var(--sp-2);
     border-radius: 8px;
-    color: var(--ink2);
+    color: var(--ink-2);
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
   }
@@ -175,44 +192,10 @@
   }
 
   .hit-where {
-    color: var(--muted);
+    color: var(--ink-3);
   }
 
   .hit-line {
     overflow-wrap: anywhere;
-  }
-
-  /* ON THE NIGHT GROUND: the night's second fill under the field, its two inks for the words, its hairline. */
-  .night .search-label,
-  .night .search-said,
-  .night .hit-where,
-  .night .search-hit {
-    color: var(--on-night-2);
-  }
-
-  .night .search-field {
-    background: var(--night-2);
-    color: var(--on-night-2);
-  }
-
-  .night .search-field:focus-within {
-    outline-color: var(--on-night);
-  }
-
-  .night .search-input,
-  .night .hit-title {
-    color: var(--on-night);
-  }
-
-  .night .search-input::placeholder {
-    color: var(--on-night-2);
-  }
-
-  .night .search-hits li + li {
-    border-block-start-color: var(--night-rule);
-  }
-
-  .night .search-hit:hover {
-    background: var(--night-tint-2);
   }
 </style>

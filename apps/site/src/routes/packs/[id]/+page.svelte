@@ -172,14 +172,14 @@
     gap: 8px;
     min-block-size: var(--tap);
     margin-block-end: 20px;
-    color: var(--on-night-2);
+    color: var(--ink-2);
     font-size: var(--t-site-15);
     font-weight: 500;
     text-decoration: none;
   }
 
   .back:hover {
-    color: var(--on-night);
+    color: var(--ink);
   }
 
   .meta-row {
@@ -188,7 +188,7 @@
     align-items: center;
     gap: 8px 20px;
     margin: 24px 0 0;
-    color: var(--on-night-2);
+    color: var(--ink-2);
     font-size: var(--t-site-15);
   }
 
@@ -199,9 +199,9 @@
     min-block-size: 28px;
     padding-inline: 12px;
     border-radius: 999px;
-    background: var(--night-2);
-    box-shadow: inset 0 0 0 1px var(--night-rule);
-    color: var(--on-night);
+    background: var(--tile-2);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink);
     font-size: var(--t-site-14);
     font-weight: 500;
   }
@@ -223,7 +223,7 @@
   .install-note {
     margin: 0;
     max-inline-size: 36ch;
-    color: var(--on-night-2);
+    color: var(--ink-2);
     font-size: var(--t-site-15);
     line-height: 1.5;
   }
@@ -266,7 +266,7 @@
   .note {
     margin: 0;
     max-inline-size: 52em;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-15);
     line-height: 1.5;
   }
@@ -296,12 +296,12 @@
     block-size: 32px;
     border-radius: 8px;
     background: var(--board);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .sheet-title {
     color: var(--ink);
-    font: 600 var(--t-site-17) / 1.2 var(--head);
+    font: 600 var(--t-site-17) / 1.2 var(--font-display);
     letter-spacing: -0.02em;
   }
 
@@ -321,8 +321,8 @@
   }
 
   .count {
-    color: var(--muted);
-    font-family: var(--ui);
+    color: var(--ink-3);
+    font-family: var(--font-ui);
     font-size: var(--t-site-15);
     font-weight: 500;
     letter-spacing: 0;
@@ -330,7 +330,7 @@
 
   .plain {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-15);
     line-height: 1.5;
   }
@@ -355,7 +355,7 @@
   }
 
   .fact dt {
-    color: var(--muted);
+    color: var(--ink-3);
     font-size: var(--t-site-14);
   }
 
@@ -415,7 +415,7 @@
     inset-inline-start: 0;
     inline-size: 10px;
     block-size: 10px;
-    border: 2px solid var(--muted);
+    border: 2px solid var(--ink-3);
     border-radius: 50%;
     background: var(--tile);
     box-sizing: border-box;
@@ -441,13 +441,13 @@
   }
 
   .version-day {
-    color: var(--muted);
+    color: var(--ink-3);
     font-size: var(--t-site-14);
   }
 
   .version-said {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-14);
     line-height: 1.5;
   }

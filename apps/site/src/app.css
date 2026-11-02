@@ -1,78 +1,90 @@
 /**
- * The site's own half of the stylesheet. Everything else is `@braindog/skin`, and the colours and faces are Look B's
- * (`look-b.css`).
+ * brain.dog's own half of the stylesheet, drawn on the app's tokens and nothing else.
  *
- * THE LOOK IS THE SITE DESIGN OF 17 OCTOBER as the redesign rebuilt it: a dark night band at the top of every page (the header, then the page's own head), then
- * full-bleed colour bands, each on its own ground in both schemes, with flat radius-16 tiles inside, and a dark
- * footer. No glass, no gradients, no glows, no shadows. Titles are Lexend 600 set tight, every other word is Geist.
- * Red is the app's two tokens: `--red-fill` under white words (the start button, and in the drawn app a count) and
- * `--red` for red words and marks (late, needs you, links). The only solid red button on a page is Start free (1 Nov).
+ * THE SITE AND THE APP ARE ONE THING (the redo of 2 November). The layout imports the app's own skin, the same five
+ * sheets `apps/web` imports (`tokens.css`, the generated palette `house.css`, `base.css`, `a11y.css`), so every colour
+ * here is a role the theme generator writes for both schemes and for high contrast: the board under everything, flat
+ * tiles on it, the bar and the footer in the app's `--nav` (white in light, the crimson #2E0C18 in dark), ink in three
+ * steps and one red. No colour is written in this file, and no sheet of the site's own palette is imported any more
+ * (`@braindog/theme/look-b.css` hand-set a navy dark mode and black page heads the app never had).
  *
- * WHAT EVERY PAGE DRAWS THE SAME WAY IS HERE, and a page's own sheet only places it: the column (`.wrap`), the night
- * ground, the buttons, the cards, the tables, the questions and the key cap, beside the older tile grid the kept
- * pages still draw (`.in`, `.band`, `.tile`) until each is restyled. A component's own look is in the component.
+ * THE SCHEME IS THE APP'S: the visitor's operating system, or the scheme chosen in BrainDog's Settings, from the app's
+ * `bd_pref` cookie wherever this page can read it, which `/signed-in.js` puts on the page before the first paint
+ * (`data-scheme`, and `data-theme="hc"` for high contrast), exactly as the app's shell does. `house.css` answers both.
+ *
+ * WHAT IS HERE is what only a marketing page needs: the column, the type of a page meant to be read once, the tiles
+ * and wells the pages are built from, the buttons (the app's four weights, `apps/web/src/lib/ui/Button.svelte`, on
+ * the same tokens), and the motion every page shares (the skin's steps; nothing under reduced motion).
  */
 
 @layer components {
   :root {
-    /* The one width every page's content, the bar and the footer share, so their edges line up. Wide enough that a
-       laptop is filled to its gutters (never a narrow column floating in empty space). */
-    --site-max: 1360px;
-    /* The page's gutter: the window inset (12) on a phone, then growing with the window from twice it to 56 on a desk. */
-    --site-gutter: var(--inset);
+    /* THE COLUMN every page, the bar and the footer share, so their edges line up; the app's own fluid gutter round
+       it (16 on a phone, 40 on a wide desk). */
+    --site-max: 1200px;
+    --site-gutter: var(--gutter);
+    /* The bar: the app's phone bar is 56; at a desk the site's is 64. */
+    --bar-h: 56px;
 
     /**
-     * THE SITE'S TYPE, beside the app's steps (the design system): the hero's heading is 56/60 at a desk, every other heading
-     * is `--fs-hero` (34/40), and text for reading is 17/28. The hero steps down in a straight line to 40 at 390, so a
-     * phone's first screen still holds the slogan and the action under it.
+     * THE SITE'S TYPE, beside the app's steps. Lexend 600 for the page's names and the big figures, Geist for every
+     * other word (the design system). A marketing page is read once and from further away than a record, so its
+     * headings sit a step or two above the app's 28 and 34, and stop well short of shouting: the hero's heading is
+     * 64 at a desk and 40 on a phone, a section's 40 and 28.
      */
-    --t-site-hero: clamp(40px, 34.06px + 1.524vw, 56px);
-    --lh-site-hero: 1.072;
-    --t-site-body: clamp(16px, 15.63px + 0.095vw, 17px);
-    --lh-site-body: 1.647;
+    --t-hero: clamp(40px, 2.6vw + 28px, 64px);
+    --t-page: clamp(34px, 1.4vw + 26px, 48px);
+    --t-h2: clamp(28px, 1.2vw + 22px, 40px);
+    --t-lead: clamp(17px, 0.25vw + 16px, 19px);
+    --t-site-body: 16px;
+    --lh-site-body: 1.6;
     --t-site-small: 14px;
-    /* THE SITE DESIGN'S OTHER STEPS, named once here so a component reads a step and not a size. */
+
+    /* THE STEPS THE KEPT DRAWINGS AND THE DOCS READ, named once here so a component reads a step and not a size. */
     --t-site-11-5: 11.5px;
     --t-site-12: 12px;
     --t-site-12-5: 12.5px;
+    --t-site-13: 13px;
     --t-site-13-5: 13.5px;
+    --t-site-14: 14px;
     --t-site-14-5: 14.5px;
     --t-site-15: 15px;
     --t-site-16: 16px;
     --t-site-16-5: 16.5px;
+    --t-site-17: 17px;
     --t-site-18: 18px;
     --t-site-19: 19px;
-    --t-site-21: 21px;
-    /* The steps the bands, the desk and the early access pages read (UI pass, 20 October). */
-    --t-site-13: 13px;
-    --t-site-14: 14px;
-    --t-site-17: 17px;
     --t-site-20: 20px;
+    --t-site-21: 21px;
     --t-site-22: 22px;
     --t-site-24: 24px;
     --t-site-28: 28px;
+    --t-site-hero: var(--t-hero);
+
     /* A slot's tint, set inline by `slotVars` (`demo/maya.ts`); the tile until one is. */
-    --ph-tint: var(--tile);
+    --ph: var(--ink-2);
+    --ph-tint: var(--tile-2);
     /* The one stacking step the site's own pages need above the shared `--z-raise`. */
     --z-site-lift: 2;
-    /* The app's two smallest steps, read here where they are still the app's, for the drawings. */
+    /* The app's two smallest steps, read where a drawing keeps the app's scale. */
     --t-app-xs: var(--fs-cap);
     --t-app-sm: var(--fs-meta);
   }
 
-  @media (width >= 640px) {
+  @media (width >= 761px) {
     :root {
-      --site-gutter: clamp(calc(2 * var(--inset)), 3vw + 8px, 56px);
+      --bar-h: 64px;
     }
   }
 
-  /* THE GROUND, flat and painted once on the document: the page's white, or its dark under the dark scheme. */
+  /* THE GROUND IS THE APP'S BOARD, painted on the document so overscroll and the first frame show it too. Anchors land
+     below the bar, which stays at the top as the app's does. */
   html {
-    background: var(--page);
+    background: var(--board);
     scroll-behavior: smooth;
+    scroll-padding-block-start: calc(var(--bar-h) + var(--sp-4));
   }
 
-  /* Somebody who has asked their system to stop animating things did not mean "except when I click an anchor". */
   @media (prefers-reduced-motion: reduce) {
     html {
       scroll-behavior: auto;
@@ -80,79 +92,95 @@
   }
 
   body {
-    background: var(--page);
+    background: var(--board);
     color: var(--ink);
-    font-family: var(--ui);
+    font-family: var(--font-ui);
     font-size: var(--t-site-body);
-    font-variant-numeric: tabular-nums;
+    line-height: var(--lh-site-body);
     /**
-     * NOTHING ON THE SITE IS SET UNDER 14PX, and this is where that holds. The app's two
-     * smallest steps are 12 and 13, sized for a dense record read at a desk; raising them here lifts every label on a
-     * page at once. It is set on `body` and not `:root` so `:root` still holds the app's values for the rule below.
+     * NOTHING ON THE SITE IS SET UNDER 14PX outside a drawing of the app. The app's two smallest steps are 12 and 13,
+     * sized for a record read at a desk; raising them here lifts every label on a page at once. Set on `body` and not
+     * `:root`, so `:root` still holds the app's values for the drawings below.
      */
     --fs-cap: var(--t-site-small);
     --fs-meta: var(--t-site-small);
   }
 
   /**
-   * THE DRAWINGS OF THE APP KEEP THE APP'S SCALE. A drawing is a picture of the record at its own size, with its labels
-   * at the sizes the app sets them, and a 13px label grown to 14 inside a drawn window pushes its rows out of the frame
-   * they were drawn to fit. Each root here is one drawing, and every figure that says it is a picture with `role="img"`.
+   * A DRAWING OF THE APP KEEPS THE APP'S SCALE. Each root here is one picture of the record at its own size, its
+   * labels at the sizes the app sets them.
    */
-  :where(.app, .phone, .decide, .palette, .flow-figure, [role='img']) {
+  :where(.app, .phone, .decide, .palette, .flow-figure, .shot, [role='img']) {
     --fs-cap: var(--t-app-xs);
     --fs-meta: var(--t-app-sm);
   }
 
-  /* TITLES ARE LEXEND 600 (as on harbour.example), loaded at that one weight; a page sets each one's size and
-     its tight spacing. Every other word is Geist, a group's small label included. */
   h1,
-  h2,
-  h3 {
+  h2 {
     margin: 0;
-    font-family: var(--head);
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  h3,
+  h4 {
+    margin: 0;
+    font-family: var(--font-ui);
     font-weight: 600;
   }
 
-  h4 {
-    font-family: var(--ui);
-  }
+  /* ── The column and the section ─────────────────────────────────────────── */
 
-  /* ── The column and the band ─────────────────────────────────────────────── */
-
-  .in {
-    max-inline-size: calc(var(--site-max) + 2 * var(--site-gutter));
+  .wrap {
+    box-sizing: content-box;
+    max-inline-size: var(--site-max);
     margin-inline: auto;
     padding-inline: var(--site-gutter);
   }
 
-  /* A BAND IS ONE IDEA: a row of tiles on the ground. Bands sit one inset apart, as the tiles inside them do, so a
-     page reads as one board; the first band leaves room under the floating bar. */
-  .band {
-    display: block;
+  /**
+   * A SECTION IS ONE IDEA: its heading and one sentence stacked, then its tiles. Sections sit on the one board with
+   * the same air between them, so a page reads as one surface and never flips its ground.
+   */
+  .section {
+    padding-block: clamp(48px, 4vw + 32px, 96px) 0;
   }
 
-  .band:not([class*='band--']) + .band:not([class*='band--']) {
-    margin-block-start: var(--inset);
+  .section:last-child {
+    padding-block-end: clamp(48px, 4vw + 32px, 96px);
   }
 
-  /* A PAGE THAT OPENS ON THE NIGHT GROUND joins the header's band with no gap; one that opens on the page's white
-     leaves room under it. */
-  main > :first-child:not(.night) {
-    margin-block-start: var(--sp-6);
+  .section-head {
+    display: grid;
+    gap: var(--sp-3);
+    max-inline-size: 46rem;
+    margin-block-end: clamp(24px, 1.5vw + 18px, 40px);
   }
 
-  main > :last-child {
-    margin-block-end: var(--inset);
+  .section-head h2 {
+    color: var(--ink);
+    font-size: var(--t-h2);
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+  }
+
+  .section-head p {
+    margin: 0;
+    max-inline-size: 60ch;
+    color: var(--ink-2);
+    font-size: var(--t-lead);
+    line-height: 1.55;
+    text-wrap: pretty;
   }
 
   /* ── The tile grid ───────────────────────────────────────────────────────── */
 
-  /* TWELVE COLUMNS, ONE INSET APART. A tile says how many it takes; below 900 every tile takes the row. */
+  /* TWELVE COLUMNS, THE APP'S TILE GAP APART. A tile says how many it takes; below 900 every tile takes the row. */
   .tiles {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: var(--inset);
+    gap: var(--tile-gap);
     align-items: stretch;
   }
 
@@ -162,33 +190,13 @@
   }
 
   @media (width >= 900px) {
-    .tiles > .span-3 {
-      grid-column: span 3;
-    }
-
-    .tiles > .span-4 {
-      grid-column: span 4;
-    }
-
-    .tiles > .span-5 {
-      grid-column: span 5;
-    }
-
-    .tiles > .span-6 {
-      grid-column: span 6;
-    }
-
-    .tiles > .span-7 {
-      grid-column: span 7;
-    }
-
-    .tiles > .span-8 {
-      grid-column: span 8;
-    }
-
-    .tiles > .span-9 {
-      grid-column: span 9;
-    }
+    .tiles > .span-3 { grid-column: span 3; }
+    .tiles > .span-4 { grid-column: span 4; }
+    .tiles > .span-5 { grid-column: span 5; }
+    .tiles > .span-6 { grid-column: span 6; }
+    .tiles > .span-7 { grid-column: span 7; }
+    .tiles > .span-8 { grid-column: span 8; }
+    .tiles > .span-9 { grid-column: span 9; }
   }
 
   /* Between a phone and a desk, the small tiles pair up rather than each taking a whole row. */
@@ -202,25 +210,25 @@
   /* ── The tile ────────────────────────────────────────────────────────────── */
 
   /**
-   * CONTENT IS AN OPAQUE TILE (the design system): the tile fill, radius 22, level one, and no border. It never holds a
-   * tile and never sits on glass. A tile that leads a band, with a heading and words to read, takes the lead padding.
+   * CONTENT IS AN OPAQUE TILE (the design system): the tile fill on the board, radius 16, no border and no shadow. It
+   * never holds a tile. A tile that leads, with a heading and words to read, takes the lead padding.
    */
   .tile {
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
-    padding: 20px;
+    min-inline-size: 0;
+    padding: var(--tile-pad);
     background: var(--tile);
     border-radius: var(--r-tile);
     color: var(--ink);
   }
 
   .tile.lead {
-    gap: var(--sp-5);
-    padding: clamp(24px, 1.2vw + 19px, 32px);
+    padding: clamp(16px, 0.8vw + 13px, 24px);
   }
 
-  /* THE HEADING ROW: an icon well, the title, a count, and a link or a meta line at the end. */
+  /* THE HEADING ROW, the app's: a 28 well with its 18 glyph, the title at 15/600, a count, and a link at the end. */
   .tile-head {
     display: flex;
     align-items: center;
@@ -232,6 +240,7 @@
   .tile-title {
     margin: 0;
     color: var(--ink);
+    font-family: var(--font-ui);
     font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
@@ -241,6 +250,10 @@
     color: var(--ink-3);
     font-size: var(--fs-body);
     font-weight: 600;
+  }
+
+  .tile-count.late {
+    color: var(--red);
   }
 
   .tile-meta {
@@ -254,7 +267,27 @@
     margin-inline-start: auto;
   }
 
-  /* THE ICON WELL: 28 (or 32) square, radius 9, the 18px glyph in the second ink. `ink` is the chosen form. */
+  /* A TILE'S OWN WORDS: a title a person reads (17/600) and a sentence under it in the second ink. */
+  .tile-name {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--fs-head);
+    font-weight: 600;
+    line-height: 24px;
+  }
+
+  .tile-say {
+    margin: 0;
+    max-inline-size: 52ch;
+    color: var(--ink-2);
+    font-size: var(--t-site-15);
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+
+  /* THE ICON WELL: 28 (32, 40) square, radius 8, the 18px glyph in the second ink, the tile's second fill. A well on
+     the board takes the tile's own fill. It never takes a tone in a heading. */
   .well {
     display: inline-grid;
     flex: none;
@@ -263,7 +296,7 @@
     block-size: var(--well);
     background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .well.l {
@@ -271,25 +304,46 @@
     block-size: var(--well-l);
   }
 
-  .well.ink {
-    background: var(--ink);
-    color: var(--on-red);
+  .well.xl {
+    inline-size: 40px;
+    block-size: 40px;
   }
 
-  /* THE FIGURE A TILE HOLDS, and the one written line under its chart that says what the chart means. */
+  .well.on-board {
+    background: var(--tile);
+  }
+
+  .well.ink {
+    background: var(--ink);
+    color: var(--tile);
+  }
+
+  /* A PROJECT'S WELL wears its slot (`slotVars`), as the app's rail and cards do. */
+  .well.slot {
+    background: var(--ph-tint);
+    color: var(--ph);
+  }
+
+  /* THE FIGURE A TILE HOLDS, Lexend 600 as the app's tile figure, and the one written line under a chart. */
   .figure {
     margin: 0;
     color: var(--ink);
+    font-family: var(--font-display);
     font-size: var(--fs-figure);
     font-weight: 600;
-    line-height: 1.133;
-    letter-spacing: -0.02em;
+    line-height: var(--lh-figure);
+    letter-spacing: -0.015em;
     font-variant-numeric: tabular-nums;
+  }
+
+  .figure.big {
+    font-size: var(--fs-hero);
+    letter-spacing: -0.025em;
   }
 
   .reading {
     margin: 0;
-    color: var(--ink);
+    color: var(--ink-2);
     font-size: var(--t-site-small);
     line-height: 20px;
     text-wrap: pretty;
@@ -300,48 +354,55 @@
     font-size: var(--t-site-small);
   }
 
+  .late {
+    color: var(--red);
+  }
+
+  .good {
+    color: var(--good);
+  }
+
   /* ── Headings and reading text ───────────────────────────────────────────── */
 
-  /* The hero's heading: 56/60 at a desk, one colour, one plain sentence. */
+  /* The hero's heading: one colour, one plain sentence. */
   .display {
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--t-site-hero);
+    font-size: var(--t-hero);
     font-weight: 600;
-    line-height: var(--lh-site-hero);
-    letter-spacing: -0.03em;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
     text-wrap: balance;
   }
 
-  /* Every other heading on the site: `--fs-hero`, 34/40, one plain sentence in one colour. */
   .h2 {
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--fs-hero);
+    font-size: var(--t-h2);
     font-weight: 600;
-    line-height: 1.176;
+    line-height: 1.1;
     letter-spacing: -0.025em;
     text-wrap: balance;
   }
 
-  /* A heading inside a band that is not the band's own: a tile's title set larger, for a tile that is read. */
   .h3 {
     margin: 0;
     color: var(--ink);
+    font-family: var(--font-ui);
     font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
 
-  /* Text for reading: 17/28 in the second ink. */
+  /* Text for reading: the lead step in the second ink. */
   .lede {
     margin: 0;
     max-inline-size: 60ch;
-    color: var(--ink2);
-    font-size: var(--t-site-body);
-    line-height: var(--lh-site-body);
+    color: var(--ink-2);
+    font-size: var(--t-lead);
+    line-height: 1.55;
     text-wrap: pretty;
   }
 
@@ -349,67 +410,86 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* A link that leads on: ink words and an arrow that leans towards where it goes. */
+  /* A LINK THAT LEADS ON: ink words and an arrow that leans towards where it goes, 44 tall under a thumb. */
   .onward {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-block-size: var(--tap);
+    min-block-size: 32px;
     color: var(--ink);
     font-size: var(--t-site-small);
-    font-weight: 600;
+    font-weight: 500;
     text-decoration: none;
   }
 
-  .onward:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  @media (hover: hover) {
+    .onward:hover {
+      text-decoration: underline;
+      text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+      text-underline-offset: 3px;
+    }
   }
 
-  @media (prefers-reduced-motion: no-preference) {
+  @media (pointer: coarse) {
+    .onward {
+      min-block-size: var(--tap);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) {
     .onward svg {
-      transition: transform var(--d-state) var(--ease-out);
+      transition: translate var(--d-state) var(--ease-out);
     }
 
     .onward:hover svg {
-      transform: translateX(3px);
+      translate: 3px 0;
     }
   }
 
   /* ── Buttons ─────────────────────────────────────────────────────────────── */
 
   /**
-   * THE SITE DESIGN'S BUTTONS: a 48px rectangle, radius 12, in Geist 500. `.red` is the solid red
-   * with white words: the start button (`lib/site/Start.svelte`) and a drawing's suggested answer; `.ghost`
-   * sits on the night ground, `.line` and `.quiet` on the page, and `.sm` is the 34px one. A `.btn` with none of these
-   * is the quiet one, so a kept page's plain button stays drawn.
+   * THE APP'S BUTTON (`apps/web/src/lib/ui/Button.svelte`) on the same tokens: a rectangle told by its fill, radius 8,
+   * the label at 14 medium, no border on any weight. `.red` is the one main action, the start button
+   * (`site/Start.svelte`), one to a screen: red only for the one main action. `.ink` is the strong neutral, the
+   * start button in the bar where the red is the page's. `.quiet` is the default, the tile's fill on the board and the
+   * tile's second fill on a tile; `.bare` is words. `.lg` is the hero's 44, `.sm` the 28 of a row's verbs.
    *
-   * THE PRESS IS A FILL CHANGE, never a move (SPEC 2.A.1), which `a11y.css` stills under reduced motion.
+   * A HOVER IS A FILL; A PRESS IS A FILL AND A GIVE: the button sinks to 98% while held and comes back as it lets go.
+   * Under reduced motion only the fill changes.
    */
   .btn {
+    --btn-fill: var(--tile);
+
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    block-size: 48px;
-    padding: 0 20px;
-    background: var(--tile);
+    gap: var(--sp-2);
+    box-sizing: border-box;
+    min-block-size: 36px;
+    padding: 0 var(--sp-4);
+    background: var(--btn-fill);
     border: 0;
-    border-radius: 12px;
-    box-shadow: inset 0 0 0 1px var(--rule);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     cursor: pointer;
-    font: 500 15.5px/1 var(--ui);
+    font: 500 var(--fs-ctl) / 20px var(--font-ui);
     text-decoration: none;
     white-space: nowrap;
     transition:
       background var(--d-press) var(--ease-out),
+      color var(--d-press) var(--ease-out),
       scale var(--d-menu) var(--ease-out);
   }
 
-  /* A PRESS IS A FILL AND A GIVE (ui pass, 1 Nov, as in the app): the button sinks to 98% while held. Under reduced
-     motion only the fill changes. */
-  .btn:active {
+  :where(.tile, .menu-panel) .btn {
+    --btn-fill: var(--tile-2);
+  }
+
+  /* HOVER ONLY WHERE THERE IS ONE, as the app's button: a phone reports `:hover` on the last thing tapped and keeps it,
+     so a hover there reads as a stuck choice. A press is a fill and a give everywhere, never on a disabled button. */
+  .btn:not(:disabled):active {
+    background: color-mix(in oklab, var(--ink) 9%, var(--btn-fill));
     scale: 0.98;
     transition-duration: var(--d-press);
   }
@@ -420,149 +500,132 @@
     }
   }
 
-  .btn:hover {
-    background: var(--soft);
-  }
-
   .btn svg {
-    inline-size: 17px;
-    block-size: 17px;
+    flex: none;
   }
 
-  /* The solid red is `--red-fill`, which clears 4.5 to 1 under white text in both themes; `--red` stays for red words. */
   .btn.red {
     background: var(--red-fill);
-    box-shadow: none;
     color: var(--on-red);
   }
 
-  .btn.red:hover {
-    background: var(--red-fill-hover);
-  }
-
-  .btn.red:active {
+  .btn.red:not(:disabled):active {
     background: var(--red-fill-press);
   }
 
-  /* The design's white at 8 and 14 in a hundred over the night, mixed from the night's own ink. */
-  .btn.ghost {
-    background: color-mix(in srgb, var(--on-night) 8%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--on-night) 14%, transparent);
-    color: var(--on-night);
-  }
-
-  .btn.ghost:hover {
-    background: color-mix(in srgb, var(--on-night) 14%, transparent);
-  }
-
-  .btn.line {
-    background: transparent;
-    box-shadow: inset 0 0 0 1px var(--rule);
-    color: var(--ink);
-  }
-
-  /* AN ANSWER IN A DRAWING OF THE APP: ink, as the app draws a suggested answer, so the one solid red on a page stays
-     Start free (1 Nov). */
   .btn.ink {
     background: var(--ink);
-    box-shadow: none;
-    color: var(--page);
+    color: var(--tile);
   }
 
-  .btn.ink:hover {
-    background: var(--ink2);
+  .btn.ink:not(:disabled):active {
+    background: color-mix(in oklab, var(--tile) 22%, var(--ink));
   }
 
-  /* THE OLD FILLED BUTTON, ink, which a kept page may still draw until its own builder moves it to `Start`. */
-  .btn-primary {
-    background: var(--ink);
-    box-shadow: none;
-    color: var(--page);
+  .btn.bare {
+    background: transparent;
+    color: var(--ink-2);
   }
 
-  .btn-primary:hover {
-    background: var(--ink2);
-  }
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled):not(:active) {
+      background: color-mix(in oklab, var(--ink) 5%, var(--btn-fill));
+    }
 
-  .btn.sm,
-  .btn-sm {
-    block-size: 34px;
-    padding: 0 13px;
-    border-radius: 9px;
-    /* The design's 13.5, held at the site's floor of 14. */
-    font-size: var(--t-site-small);
-  }
+    .btn.red:hover:not(:disabled):not(:active) {
+      background: var(--red-fill-hover);
+    }
 
-  /* 44 on both axes under a thumb, whatever the button's own size. */
-  @media (pointer: coarse) {
-    .btn.sm,
-    .btn-sm {
-      block-size: var(--tap);
+    .btn.ink:hover:not(:disabled):not(:active) {
+      background: color-mix(in oklab, var(--tile) 14%, var(--ink));
+    }
+
+    .btn.bare:hover:not(:disabled):not(:active) {
+      background: var(--hover);
+      color: var(--ink);
     }
   }
 
-  /* THE KEY CAP: an 18px cap in the tile's second fill, radius 6, in the mono face. A glyph and not a sentence, so it
-     keeps the app's 12 where the site's words are 14. */
+  .btn.lg {
+    min-block-size: 44px;
+    padding-inline: 20px;
+    font-size: var(--t-site-15);
+  }
+
+  .btn.sm {
+    min-block-size: var(--btn-h-sm);
+    padding-inline: var(--sp-3);
+  }
+
+  /* 44 UNDER A THUMB, whatever size was asked for: the product's target size. */
+  @media (pointer: coarse) {
+    .btn,
+    .btn.sm {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* ── Small parts ─────────────────────────────────────────────────────────── */
+
+  /* A key as the app's bar prints it: Geist Mono on the well's fill. */
   .kbd {
     display: inline-grid;
     place-items: center;
-    min-inline-size: 18px;
-    block-size: 18px;
-    padding-inline: 4px;
+    min-inline-size: 20px;
+    block-size: 20px;
+    padding: 0 5px;
     background: var(--tile-2);
     border-radius: var(--r-xs);
-    color: var(--ink2);
-    font-family: var(--font-mono);
-    font-size: var(--t-app-xs);
-    font-weight: 500;
-    line-height: 1;
+    color: var(--ink-2);
+    font: 500 var(--fs-cap) / 1 var(--font-mono);
   }
 
-  /* A pill of words in the tile's second fill: a category, a door, what a pack adds. */
+  /* A short label in a 28-tall radius-8 box (the app's Chip). With a dot it is a state. */
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-block-size: 30px;
-    padding-inline: 12px;
+    block-size: 28px;
+    padding: 0 10px;
     background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
-    font-size: var(--t-site-small);
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
     font-weight: 500;
     white-space: nowrap;
   }
 
+  /* A state's dot, 6px, beside its word and never alone (the app's StateDot). */
+  .dot {
+    display: inline-block;
+    flex: none;
+    inline-size: var(--dot);
+    block-size: var(--dot);
+    border-radius: var(--r-round);
+    background: var(--ink-3);
+  }
 
-  /* Read by a screen reader and not drawn. */
+  .dot.live {
+    background: var(--live);
+  }
+
+  .dot.late {
+    background: var(--red);
+  }
+
   .sr {
     position: absolute;
     inline-size: 1px;
     block-size: 1px;
+    margin: -1px;
+    padding: 0;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+    border: 0;
   }
 
-  /* ── The site design's shared parts ──────────────────────── */
-
-  /* THE COLUMN: 1200 wide, 24 in from the window's edge, 16 on a phone, and clear of a notch either side. */
-  .wrap {
-    max-inline-size: 1200px;
-    margin-inline: auto;
-    padding-inline: max(24px, env(safe-area-inset-left, 0px)) max(24px, env(safe-area-inset-right, 0px));
-  }
-
-  /* THE NIGHT GROUND: the header, each page's own head, the footer and the black card. */
-  .night {
-    background: var(--night);
-    color: var(--on-night);
-  }
-
-  /* SIGNED IN OR NOT, decided before the first paint by `/signed-in.js` (`lib/site/signed-in.ts`). Both are in the
-     HTML; with scripting off the page reads as signed out. THEY ARE !important because this file is in a layer and
-     a component's own unlayered rule (the phone menu's links draw display: flex) would otherwise win and keep
-     "Sign in" on the page of someone who is signed in. */
+  /* SIGNED IN OR NOT (`/signed-in.js`): both are in the HTML, and the page's mark says which is drawn. */
   html[data-in] .when-out {
     display: none !important;
   }
@@ -571,93 +634,11 @@
     display: none !important;
   }
 
-  /* THE BIG CARDS of an inner page: paper, the black one and the red one, flat, radius 16 like every tile. */
-  .card {
-    position: relative;
-    overflow: hidden;
-    padding: 40px;
-    border-radius: 16px;
-  }
+  /* ── Tables and questions ────────────────────────────────────────────────── */
 
-  .card.paper {
-    background: var(--paper);
-    color: var(--ink);
-  }
-
-  .card.dark {
-    background: var(--night);
-    color: var(--on-night);
-  }
-
-  .card.redc {
-    background: var(--redcard);
-    color: var(--on-red);
-  }
-
-  .card h2 {
-    max-inline-size: 14ch;
-    font-size: clamp(30px, 3.4vw, 48px);
-    line-height: 1;
-    letter-spacing: -0.045em;
-    text-wrap: balance;
-  }
-
-  .card.dark h2 {
-    max-inline-size: 15ch;
-  }
-
-  /* A CARD'S ONE LINE under its title. */
-  .say {
-    max-inline-size: 25em;
-    margin: 18px 0 0;
-    font-size: var(--t-site-18);
-    line-height: 1.5;
-    text-wrap: pretty;
-  }
-
-  .card.paper .say {
-    color: var(--ink2);
-  }
-
-  .card.dark .say {
-    color: var(--on-night-2);
-  }
-
-  .card.redc .say {
-    color: var(--on-red);
-  }
-
-  /* A LINK THAT LEADS ON to the rest: words and an arrow. */
-  .more {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-block-start: 22px;
-    font-weight: 500;
-    text-decoration: none;
-  }
-
-  /* 44 tall under a thumb (the layout gate's coarse-pointer target). */
-  @media (pointer: coarse) {
-    .more {
-      min-block-size: var(--tap);
-    }
-  }
-
-  .more:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
-  }
-
-  .more svg {
-    inline-size: 18px;
-    block-size: 18px;
-  }
-
-  /* A TABLE OF PLANS OR FIGURES, which scrolls inside its own box on a phone and never the page. */
   .tablebox {
     overflow-x: auto;
-    margin-block-start: 28px;
+    border-radius: var(--r-pop);
   }
 
   .ptable {
@@ -668,242 +649,65 @@
 
   .ptable th,
   .ptable td {
-    padding: 14px 10px;
-    border-block-start: 1px solid var(--rule);
+    padding: 12px 14px;
+    border-block-end: 1px solid var(--rule);
     text-align: start;
+    vertical-align: top;
+  }
+
+  .ptable tr:last-child > * {
+    border-block-end: 0;
   }
 
   .ptable th {
-    border-block-start: 0;
-    color: var(--muted);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
     font-weight: 500;
   }
 
-  .ptable td:not(:first-child),
-  .ptable th:not(:first-child) {
-    font-variant-numeric: tabular-nums;
-    text-align: end;
+  .ptable tbody th {
+    color: var(--ink-2);
   }
 
-  /* QUESTIONS PEOPLE ASK: two columns at a desk, one below 1060. */
   .faq {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 34px 56px;
-    margin-block-start: 40px;
+    gap: var(--sp-6) var(--sp-7);
   }
 
   .faq h3 {
-    margin-block-end: 8px;
-    font-size: var(--t-site-21);
-    letter-spacing: -0.03em;
+    margin: 0 0 6px;
+    color: var(--ink);
+    font-size: var(--fs-head);
+    line-height: 24px;
   }
 
   .faq p {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-site-16);
+    color: var(--ink-2);
+    font-size: var(--t-site-15);
+    line-height: 1.6;
   }
 
-  /* THE SLASH KEY, a 60px cap with the / in red, on the page or (`.on-night`) on the night ground. */
-  .keycap {
-    display: grid;
-    place-items: center;
-    inline-size: 60px;
-    block-size: 60px;
-    margin-block-end: 26px;
-    background: var(--tile);
-    border-radius: 15px;
-    box-shadow:
-      inset 0 0 0 1px var(--rule),
-      inset 0 -3px 0 var(--rule);
-    color: var(--red);
-    font: 600 28px/1 var(--head);
-  }
-
-  .keycap.on-night {
-    background: var(--night-2);
-    box-shadow:
-      inset 0 0 0 1px var(--night-rule),
-      inset 0 -3px 0 var(--night-rule);
-    /* The design's light red on the night, mixed from the red and the night's ink. */
-    color: color-mix(in srgb, var(--red) 60%, var(--on-night));
-  }
-
-  @media (max-width: 1060px) {
+  @media (max-width: 760px) {
     .faq {
       grid-template-columns: minmax(0, 1fr);
+      gap: var(--sp-5);
     }
   }
 
-  @media (max-width: 760px) {
-    .wrap {
-      padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
-    }
-
-    .card {
-      padding: 24px 20px;
-    }
-
-    .say {
-      font-size: var(--t-site-16-5);
-    }
-  }
-
-  /* ── The home's full-bleed bands ────────────────────────────── */
+  /* ── Motion every page shares ────────────────────────────────────────────── */
 
   /**
-   * A BAND IS ONE IDEA, EDGE TO EDGE, on its own ground (`--band-*` in Look B), so two neighbours never share one in
-   * either scheme. Its content sits in `.wrap`; its tiles are flat, radius 16, with no border or shadow.
-   */
-  .band[class*='band--'] {
-    padding-block: 64px;
-  }
-
-  .band--who {
-    background: var(--band-who);
-    color: var(--ink);
-  }
-
-  /* THE CHORES BAND IS THE QUIET GREY, not red (1 Nov, his rule: solid red only on Start free). */
-  .band--chores {
-    background: var(--band-yours);
-    color: var(--ink);
-    /* IN DARK ITS GREY AND THE AI BAND'S UNDER IT ARE A STEP APART, so the seam is drawn: the footer's hairline, which is
-       the night itself in light and so not seen there. */
-    border-block-end: 1px solid var(--foot-rule);
-  }
-
-  .band--tools {
-    background: var(--band-ai);
-    color: var(--on-night);
-  }
-
-  .band--slash {
-    background: var(--band-slash);
-    color: var(--ink);
-  }
-
-  .band--yours {
-    background: var(--band-yours);
-    color: var(--ink);
-  }
-
-  .band--faq {
-    background: var(--band-faq);
-    color: var(--ink);
-  }
-
-  /* A BAND'S HEADING: two lines at 1440, heavy and tight; its one line under it at 18/1.5. */
-  .band-h2 {
-    margin: 0;
-    max-inline-size: 17ch;
-    font: 600 clamp(34px, 3.8vw, 54px) / 1 var(--head);
-    letter-spacing: -0.045em;
-    text-wrap: balance;
-  }
-
-  .band-say {
-    max-inline-size: 34em;
-    margin: 16px 0 0;
-    color: var(--ink2);
-    font-size: var(--t-site-18);
-    line-height: 1.5;
-    text-wrap: pretty;
-  }
-
-  .band--tools .band-say {
-    color: var(--on-night-2);
-  }
-
-  .band--chores .band-say {
-    color: var(--ink2);
-  }
-
-  /* TWELVE COLUMNS, 16 apart; at 1059 and under, every part takes the row. A tile is as tall as what it holds, so
-     none stands half empty beside a taller neighbour; three of a kind (`.trio`) still share one height. */
-  .cols {
-    display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: 16px;
-    align-items: start;
-  }
-
-  .cols.trio {
-    align-items: stretch;
-  }
-
-  .cols > * {
-    grid-column: 1 / -1;
-    min-inline-size: 0;
-  }
-
-  @media (width >= 1060px) {
-    .cols > .c4 {
-      grid-column: span 4;
-    }
-
-    .cols > .c5 {
-      grid-column: span 5;
-    }
-
-    .cols > .c6 {
-      grid-column: span 6;
-    }
-
-    .cols > .c7 {
-      grid-column: span 7;
-    }
-
-    .cols > .c8 {
-      grid-column: span 8;
-    }
-  }
-
-  /* Three tiles of a kind sit three across down to a tablet. */
-  @media (761px <= width < 1060px) {
-    .cols.trio > .c4 {
-      grid-column: span 4;
-    }
-  }
-
-  .ftile {
-    padding: 24px;
-    border-radius: 16px;
-  }
-
-  @media (max-width: 1059px) {
-    .band[class*='band--'] {
-      padding-block: 56px;
-    }
-  }
-
-  /* A PHONE'S BANDS SIT CLOSER: six bands at 48 each way were a screen of ground. */
-  @media (max-width: 760px) {
-    .band[class*='band--'] {
-      padding-block: 40px;
-    }
-
-    .ftile {
-      padding: 20px;
-    }
-
-    .band-say {
-      font-size: var(--t-site-16);
-    }
-  }
-
-  /**
-   * A BAND RISES 8PX AS IT SCROLLS IN, AND NEVER HIDES: a transform-only rise on the scroll's own timeline,
-   * so a full-page capture, a reader that does not scroll and a crawler all see every band at full strength, and a
-   * browser without scroll timelines simply draws it in place.
+   * A TILE RISES 8PX AS IT SCROLLS IN, AND NEVER HIDES: a transform-only rise on the scroll's own timeline (no timer,
+   * no script, nothing waits on it), so a full-page capture, a reader who does not scroll and a crawler see every tile
+   * at full strength, and a browser without scroll timelines draws it in place. Nothing under reduced motion.
    */
   @media (prefers-reduced-motion: no-preference) {
     .reveal {
       animation: rise linear both;
       animation-timeline: view();
-      animation-range: entry 0% entry 35%;
+      animation-range: entry 0% entry 40%;
     }
 
     @keyframes rise {
@@ -916,12 +720,9 @@
     }
   }
 
-  /* ── Motion added in the ui pass of 1 Nov ─────────────────────────────── */
-
   /**
-   * A PAGE CHANGE IS ONE EVEN CROSS-FADE over `--d-page` (`+layout.svelte` wraps a navigation in a view transition where
-   * the browser has one), and the header holds still through it, so only the page under it changes. The new page is
-   * readable from the first frame it is drawn: nothing waits on the fade. Cut under reduced motion.
+   * A PAGE CHANGE IS ONE EVEN CROSS-FADE over `--d-page` (`+layout.svelte` wraps a navigation in a view transition
+   * where the browser has one), and the bar holds still through it. Cut under reduced motion.
    */
   ::view-transition-group(root) {
     animation-duration: var(--d-page);
@@ -943,9 +744,35 @@
   }
 
   /**
-   * EVERY DISCLOSURE OPENS BY ITS HEIGHT (the questions, the docs' sections, the changelog): the content grows to its own
-   * height over `--d-rows` and shuts over `--d-exit`. A browser without `::details-content` snaps as before. The phone's
-   * menu is left out: its panel stands over the page, so it fades and drops in instead (`+layout.svelte`).
+   * WHAT A PANE SHOWS, CHANGING IN PLACE (a tab's panel, Slash's answer to another question): it comes up over
+   * `--d-swap` with a 2px settle, as the app's swap does, and nothing beside it moves. Opacity only under reduced
+   * motion... and not even that: `a11y.css` takes the step to nothing.
+   */
+  .swap-in {
+    animation: swap-in var(--d-swap) var(--ease-out) both;
+  }
+
+  @keyframes swap-in {
+    from {
+      opacity: 0;
+      translate: 0 2px;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .swap-in {
+      animation: none;
+    }
+  }
+
+  /**
+   * EVERY DISCLOSURE OPENS BY ITS HEIGHT: the content grows to its own height over `--d-rows` and shuts over
+   * `--d-exit`. A browser without `::details-content` snaps as before. The phone's menu is left out: its panel stands
+   * over the page, so it drops in instead (`+layout.svelte`).
    */
   details:not(.menu) {
     interpolate-size: allow-keywords;
