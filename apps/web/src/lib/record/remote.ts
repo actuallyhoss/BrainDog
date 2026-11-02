@@ -612,6 +612,10 @@ export type SchemaCall = (register: string) => Promise<{ ok: boolean; value?: un
  * reader touches, where a bundled list used to cost none; a reader that has already asked answers from what it kept.
  */
 const newest = new Map<string, number>();
+/* THE NEWEST QUESTION'S OWN WAIT, by list (pages pass, 2 Nov): a reader whose older question lost to a newer one waits on
+   the newer, so it never reads the list before any answer is kept. It returned as soon as its own answer was dropped,
+   and the first read of Skills walked no list and named every project "A project". */
+const newestHeld = new Map<string, Promise<void>>();
 let questions = 0;
 export function learn(schema: SchemaCall, register: string, asked: Map<string, Promise<void>>): Promise<void> {
   let held = asked.get(register);
@@ -626,7 +630,7 @@ export function learn(schema: SchemaCall, register: string, asked: Map<string, P
     const ask = (): Promise<void> =>
       schema(register).then(
         (out) => {
-          if (newest.get(register) !== mine) return;
+          if (newest.get(register) !== mine) return newestHeld.get(register);
           const body = out.ok ? (out.value as { fields?: unknown } | null) : null;
           if (body && Array.isArray(body.fields)) relabelInto(REGISTERS, register, declOf({ ...(body as RegisterDecl), id: register }), labels());
         },
@@ -634,6 +638,7 @@ export function learn(schema: SchemaCall, register: string, asked: Map<string, P
       );
     held = listsSettled() ? ask() : heldNow().then(() => (holdsList(register) ? ask() : undefined));
     asked.set(register, held);
+    newestHeld.set(register, held);
   }
   return held;
 }

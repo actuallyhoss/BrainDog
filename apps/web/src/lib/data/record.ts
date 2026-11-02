@@ -254,6 +254,10 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
 
   async function refsFor(register: string): Promise<Said<Map<string, RefMap>>> {
     const out = new Map<string, RefMap>();
+    /* THE LIST'S OWN DECLARATION FIRST (pages pass, 2 Nov): `targetsOf` reads the fields this tab has learnt, and on a
+       first open of a list this build does not ship (an add-on's Skills) it had learnt none, so no list was walked, the
+       answer named nothing and every project in "Where it applies" was drawn as "A project". */
+    await learn(schemaOf, register, asked);
     for (const target of targetsOf(register)) {
       const map = await refMap(target);
       /* A LIST THIS PERSON MAY NOT READ IS NO NAMES, NOT NO LIST. A guest shared Kiln's tasks is refused People, which
