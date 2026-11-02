@@ -1,9 +1,10 @@
 /**
  * The alarm, as the `Scheduler` port over a Durable Object's own storage.
  *
- * ONE ALARM PER CUSTOMER, always set to the earliest pending row or not set at all. That invariant
- * is what an object per customer buys: the alternative is a cron worker fanning out across every
- * tenant on a schedule of its own, waking records that have nothing to do in order to ask them.
+ * ONE ALARM PER CUSTOMER, never later than the earliest pending row, and set to exactly it (or not set
+ * at all) by each alarm as it ends. That invariant is what an object per customer buys: the alternative
+ * is a cron worker fanning out across every tenant on a schedule of its own, waking records that have
+ * nothing to do in order to ask them. Between alarms a request only moves it earlier (`AlarmRules`).
  *
  * THIS FILE IMPORTS NOTHING FROM `cloudflare:`, and the reason is that it is the half worth testing.
  * The platform's contribution is three methods on `ctx.storage`; everything that can be wrong —
@@ -42,7 +43,30 @@ export type AlarmStore = {
  */
 export type Doorbell = () => Promise<unknown>;
 
-export function alarmScheduler(store: AlarmStore, ring?: Doorbell | undefined): Scheduler {
+/**
+ * When this object may move its alarm LATER or clear it, and not only earlier (`AlarmRules.exact`).
+ *
+ * A REQUEST ONLY EVER MOVES THE ALARM EARLIER (perf3, 2 November). Every pulse asked whether the look was due and set
+ * the alarm for now (`#lookSoon`), and then the pulse's own write tailed it back out to the earliest schedule row, an
+ * hour off (`kernel.tail`). The platform cancels an alarm that was due and is moved before it runs: on his record that
+ * was a cancelled alarm every pulse, four every fifteen seconds while agents worked, 200 between 00:00 and 02:00 UTC,
+ * and the look that was due waited for a gap between bursts long enough to slip through, up to about a minute.
+ *
+ * Only the alarm itself is exact, since it is the one that just ran what was due and knows what is next: inside it the
+ * platform reads no alarm set, so its tail sets the true next one. A request's tail that would move the alarm later or
+ * clear it leaves it as it is; the worst that costs is one alarm that wakes early, finds nothing due and sets the true
+ * next one from its own tail. An alarm already due is never moved by a request at all, earlier or not.
+ */
+export type AlarmRules = {
+  /** Whether the call comes from the alarm itself, which may move the alarm later or clear it. Absent is always. */
+  exact?: (() => boolean) | undefined;
+  /** The clock an alarm already due is read against. */
+  now?: (() => number) | undefined;
+};
+
+export function alarmScheduler(store: AlarmStore, ring?: Doorbell | undefined, rules: AlarmRules = {}): Scheduler {
+  const exact = rules.exact ?? (() => true);
+  const now = rules.now ?? Date.now;
   return {
     get: () => store.getAlarm(),
 
@@ -52,6 +76,8 @@ export function alarmScheduler(store: AlarmStore, ring?: Doorbell | undefined): 
          storage read that usually decides to do nothing. */
       const armed = await store.getAlarm();
       if (armed === atMs) return;
+      /* OUTSIDE THE ALARM, ONLY EARLIER, AND NEVER ONE ALREADY DUE (`AlarmRules`). */
+      if (!exact() && armed !== null && (armed <= atMs || armed <= now())) return;
       /* A TIME ALREADY PAST IS SET, NOT SKIPPED. A record reopened after a week has reminders whose
          time came while nothing was running, and an alarm nobody set is a schedule that never
          restarts. The platform fires a past alarm immediately, which is exactly right. */
@@ -59,6 +85,9 @@ export function alarmScheduler(store: AlarmStore, ring?: Doorbell | undefined): 
     },
 
     async clear() {
+      /* A REQUEST NEVER CLEARS IT: an alarm with nothing left to do wakes once and its own tail clears it. Cleared from
+         a request, it was the alarm a pulse had just set for the look. */
+      if (!exact()) return;
       if ((await store.getAlarm()) !== null) await store.deleteAlarm();
     },
 

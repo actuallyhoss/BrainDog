@@ -689,10 +689,13 @@ export class Record$ extends DurableObject<Env> {
    * second copy of something that may have changed by the time it is read. A lost message costs
    * latency and never a notification, because the row is still `pending` and the next wake drains
    * it — the outbox is the source of truth and the queue is a doorbell.
+   *
+   * EXACT ONLY INSIDE THE ALARM (`AlarmRules`): there it may move the alarm later or clear it, and anywhere else, a
+   * request's tail, `#soon` or `#lookSoon`, it only moves it earlier, so a pulse never cancels the alarm another set.
    */
-  #alarm: Scheduler = alarmScheduler(this.ctx.storage, () =>
-    this.env.INGRESS.send({ record: this.ctx.id.toString() }),
-  );
+  #alarm: Scheduler = alarmScheduler(this.ctx.storage, () => this.env.INGRESS.send({ record: this.ctx.id.toString() }), {
+    exact: () => this.#alarming,
+  });
 
   /**
    * The migration runs under `blockConcurrencyWhile`, which is the platform's word for "no request
@@ -1380,8 +1383,8 @@ export class Record$ extends DurableObject<Env> {
       return;
     }
     try {
-      const at = await this.#alarm.get();
-      if (at === null || at > Date.now()) await this.#alarm.set(Date.now());
+      /* SET FOR NOW ONLY WHEN IT IS NOT DUE ALREADY, which the scheduler decides outside the alarm (`AlarmRules`). */
+      await this.#alarm.set(Date.now());
     } catch (e) {
       console.error('the alarm could not be set:', e instanceof Error ? e.message : String(e));
     }
@@ -1397,10 +1400,13 @@ export class Record$ extends DurableObject<Env> {
       this.#wakeOwed ??= 'look';
       return;
     }
-    if (!(await slashDue(api))) return;
     try {
+      /* AN ALARM ALREADY DUE IS NOT ASKED FOR AGAIN, nor is the look asked about: its look asks for itself. So in a burst
+         of pulses only the first asks `slashDue`, and the rest read one alarm from memory. */
       const at = await this.#alarm.get();
-      if (at === null || at > Date.now()) await this.#alarm.set(Date.now());
+      if (at !== null && at <= Date.now()) return;
+      if (!(await slashDue(api))) return;
+      await this.#alarm.set(Date.now());
     } catch (e) {
       console.error('slash: the alarm could not be set for the look:', e instanceof Error ? e.message : String(e));
     }
