@@ -101,6 +101,7 @@ import { selfhostFacts, selfhostProbeWire, slashAnswersFor, slashDoor, slashEngi
 import { unwrap, type KeyStore } from './keys.ts';
 import { commandFor, inImage } from './how.ts';
 import { shellOf } from './shell.ts';
+import { drawnFrame, isDrawnFrame } from '@braindog/host/drawn-frame';
 import { signerFor } from './sign.ts';
 import { keysDoor, keychainDoor } from './keychain.ts';
 import { serveShape, servesShape, type ShapeDoor } from '@braindog/host/shape';
@@ -2650,6 +2651,10 @@ async function answer(
      not serve, and it is the same function the Worker calls. */
   if (/^\/+in(?:\/|$)/.test(path)) return write(res, await serveIngest(request, site.arrivals));
 
+  /* THE FRAME A DRAWN BLOCK IS DRAWN IN, WITH OR WITHOUT A BUILT SHELL: it is code under its own policy and never a file
+     of the build (`@braindog/host/drawn-frame`), so a host started with no shell, as the gates' record and `vite dev`
+     behind it are, answered "The app is not built yet" inside every drawn widget (add-ons pass 3, 2 Nov). */
+  if (shell === null && isDrawnFrame(path)) return write(res, drawnFrame(method));
   if (!/^\/+api(?:\/|$)/.test(path))
     return write(
       res,
