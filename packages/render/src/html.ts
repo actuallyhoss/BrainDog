@@ -1064,6 +1064,12 @@ function split(b: Block, o: RenderOptions): string {
   const values = rows.map((r) => signedOf(plain(inline(r.cells[1] ?? '', o))));
   const plan = splitPlan(values);
   const partOf = (i: number) => plan.parts.find((p) => p.at === i);
+  /* WHICH PART A SEGMENT, AN ARC AND A DOT DRAW, counted along the track (`data-part`), so a page that gives each part its
+     own hue (Money's) colours all three from the one count and a legend's dot never wears another part's colour. */
+  const partAttr = (i: number) => {
+    const k = plan.parts.findIndex((p) => p.at === i);
+    return k < 0 ? '' : ` data-part="${k}"`;
+  };
   const said = (r: Row) => plain(inline(r.cells[0] ?? '', o));
   /* The track is 1000 by 100 stretched to its box, so the 10 by 60 tile's stripe follows its width: about 3px apart on
      a phone's full-width track, 5px on a wide tile's. */
@@ -1077,7 +1083,7 @@ function split(b: Block, o: RenderOptions): string {
       ? `<div class="ring-dial"><svg class="ring-mark" viewBox="0 0 36 36" role="img" aria-label="${escape(donut.name)}">${late ? latePattern(late, 4, 4) : ''}<circle class="ring-track" fill="none" stroke="currentColor" stroke-opacity="0.15" stroke-width="4" cx="18" cy="18" r="16" pathLength="100"></circle>${donut.arcs
           .map(
             (a) =>
-              `<circle class="ring-arc" data-step="${a.step}"${slotAttr(rows[a.row]!)}${toneAttrs(rows[a.row]!.tone)} fill="none" stroke="currentColor" stroke-width="4"${rows[a.row]!.tone === LATE ? ` style="${lateFill('stroke', late)}"` : ''} stroke-dasharray="${a.dash}" stroke-dashoffset="${a.offset}" transform="rotate(-90 18 18)" cx="18" cy="18" r="16" pathLength="100"></circle>`,
+              `<circle class="ring-arc" data-step="${a.step}"${partAttr(a.row)}${slotAttr(rows[a.row]!)}${toneAttrs(rows[a.row]!.tone)} fill="none" stroke="currentColor" stroke-width="4"${rows[a.row]!.tone === LATE ? ` style="${lateFill('stroke', late)}"` : ''} stroke-dasharray="${a.dash}" stroke-dashoffset="${a.offset}" transform="rotate(-90 18 18)" cx="18" cy="18" r="16" pathLength="100"></circle>`,
           )
           .join('')}</svg>${donut.centre ? `<span class="ring-figure num" aria-hidden="true">${renderInline(inline(headlineFigure(donut.centre, o.home), o), o)}</span>` : ''}</div>`
       : `<svg class="split-track" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(
@@ -1085,7 +1091,7 @@ function split(b: Block, o: RenderOptions): string {
       )}">${late ? latePattern(late, 10, 60) : ''}${plan.parts
         .map(
           (p) =>
-            `<rect class="split-seg" data-step="${p.step}"${slotAttr(rows[p.at]!)}${toneAttrs(rows[p.at]!.tone)}${rows[p.at]!.tone === LATE ? ` style="${lateFill('fill', late)}"` : ''} x="${p.x}" y="0" width="${p.width}" height="100"></rect>`,
+            `<rect class="split-seg" data-step="${p.step}" data-part="${plan.parts.indexOf(p)}"${slotAttr(rows[p.at]!)}${toneAttrs(rows[p.at]!.tone)}${rows[p.at]!.tone === LATE ? ` style="${lateFill('fill', late)}"` : ''} x="${p.x}" y="0" width="${p.width}" height="100"></rect>`,
         )
         .join('')}${plan.cuts ? `<path class="split-cut" d="${plan.cuts}" vector-effect="non-scaling-stroke"></path>` : ''}</svg>`;
   const figures = splitFigures(rows.map((r) => r.cells[1]), o.home);
@@ -1096,7 +1102,7 @@ function split(b: Block, o: RenderOptions): string {
           if (!splitListed(plan, values[i]!)) return '';
           const part = partOf(i);
           const share = splitShare(plan, i, values[i]!, plain(inline(r.cells[1] ?? '', o)));
-          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''}${slotAttr(r)} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(figures[i] ?? MISSING, o), o)}</span>${share ? `<span class="split-share num">${escape(share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
+          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''}${partAttr(i)}${slotAttr(r)} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(figures[i] ?? MISSING, o), o)}</span>${share ? `<span class="split-share num">${escape(share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
         })
         .join('')}</ul>`
     : '';

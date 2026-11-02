@@ -20,6 +20,12 @@
   const values = $derived(rows.map((r) => signedOf(text(inline(r.cells[1] ?? '', opts)))));
   const figures = $derived(splitFigures(rows.map((r) => r.cells[1]), opts.home));
   const plan = $derived(splitPlan(values));
+  /* WHICH PART A SEGMENT, AN ARC AND A DOT DRAW, counted along the track (`data-part`, as `html.ts` writes it), so a page
+     that gives each part its own hue (Money's) colours all three from the one count. */
+  const partAt = (i: number): number | undefined => {
+    const k = plan.parts.findIndex((p) => p.at === i);
+    return k < 0 ? undefined : k;
+  };
   const said = (r: Row | undefined) => text(inline(r?.cells[0] ?? '', opts));
   /* A PART'S OWN COLOUR WHERE THE HOST KNOWS ITS CHIP (`opts.partLook`, Money's categories), so the ring, the bar and the
      legend wear the colour its ledger lines wear. */
@@ -73,6 +79,7 @@
           <circle
             class="ring-arc"
             data-step={a.step}
+            data-part={partAt(a.row)}
             data-slot={splitSlot(rows[a.row]?.cells[3])}
             data-intent={tone}
             fill="none"
@@ -106,7 +113,7 @@
       {/if}
       {#each plan.parts as p}
         {@const tone = rows[p.at]?.tone}
-        <rect class="split-seg" data-step={p.step} data-slot={splitSlot(rows[p.at]?.cells[3])} data-intent={tone} style={tone === 'bad' ? `fill:url(#${late}) var(--chart-late, currentColor)` : hueOf(rows[p.at]) || undefined} x={p.x} y="0" width={p.width} height="100"
+        <rect class="split-seg" data-step={p.step} data-part={partAt(p.at)} data-slot={splitSlot(rows[p.at]?.cells[3])} data-intent={tone} style={tone === 'bad' ? `fill:url(#${late}) var(--chart-late, currentColor)` : hueOf(rows[p.at]) || undefined} x={p.x} y="0" width={p.width} height="100"
         ></rect>
       {/each}
       {#if plan.cuts}<path class="split-cut" d={plan.cuts} vector-effect="non-scaling-stroke"></path>{/if}
@@ -121,7 +128,7 @@
         {#if splitListed(plan, values[i] ?? NaN)}
         {@const look = opts.partLook ? opts.partLook(said(row)) : null}
         <li class="split-item" data-intent={row.tone}>
-          {#if look}<PartChip glyph={look.glyph} slot={look.slot} letter={said(row).slice(0, 1).toLocaleUpperCase('en')} {opts} />{:else}<span class="split-dot" data-step={part?.step} data-slot={splitSlot(row.cells[3])} aria-hidden="true"></span>{/if}
+          {#if look}<PartChip glyph={look.glyph} slot={look.slot} letter={said(row).slice(0, 1).toLocaleUpperCase('en')} {opts} />{:else}<span class="split-dot" data-step={part?.step} data-part={partAt(i)} data-slot={splitSlot(row.cells[3])} aria-hidden="true"></span>{/if}
           <span class="split-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
           <span class="split-value num"><Text nodes={inline(figures[i] ?? MISSING, opts)} {opts} /></span>
           {#if share}<span class="split-share num">{share}</span>{/if}

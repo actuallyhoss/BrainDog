@@ -693,8 +693,10 @@
 /* ── a whole cut into parts: the donut ───────────────────────────────────── */
 
 /* EVERY PART ITS OWN HUE, in one fixed order, so twelve categories are twelve colours and not three and a wall of grey.
-   The ring's arcs and the legend's dots take the same order (the ring's first circle is its track), and a part kept
-   under nothing ("No category yet", a link to file them) stays the quiet grey. */
+   The ring's arcs, the bar's segments and the legend's dots read the one count along the track (`data-part`, shared
+   fix 2 Nov: Investments and gold's bar drew Fund in ink beside a teal dot, as the bar took the neutral steps and the
+   dots their place in the legend), and a part kept under nothing ("No category yet", a link to file them) stays the
+   quiet grey. */
 [data-money] .split {
   --p1: var(--cat-teal-fill);
   --p2: var(--cat-blue-fill);
@@ -706,25 +708,17 @@
   --p8: var(--cat-slate-fill);
 }
 
-[data-money] .split .ring-arc:nth-of-type(8n + 2),
-[data-money] .split .split-item:nth-child(8n + 1) > .split-dot { --part: var(--p1); }
-[data-money] .split .ring-arc:nth-of-type(8n + 3),
-[data-money] .split .split-item:nth-child(8n + 2) > .split-dot { --part: var(--p2); }
-[data-money] .split .ring-arc:nth-of-type(8n + 4),
-[data-money] .split .split-item:nth-child(8n + 3) > .split-dot { --part: var(--p3); }
-[data-money] .split .ring-arc:nth-of-type(8n + 5),
-[data-money] .split .split-item:nth-child(8n + 4) > .split-dot { --part: var(--p4); }
-[data-money] .split .ring-arc:nth-of-type(8n + 6),
-[data-money] .split .split-item:nth-child(8n + 5) > .split-dot { --part: var(--p5); }
-[data-money] .split .ring-arc:nth-of-type(8n + 7),
-[data-money] .split .split-item:nth-child(8n + 6) > .split-dot { --part: var(--p6); }
-[data-money] .split .ring-arc:nth-of-type(8n + 8),
-[data-money] .split .split-item:nth-child(8n + 7) > .split-dot { --part: var(--p7); }
-[data-money] .split .ring-arc:nth-of-type(8n + 9),
-[data-money] .split .split-item:nth-child(8n + 8) > .split-dot { --part: var(--p8); }
+[data-money] .split :is(.ring-arc, .split-seg, .split-dot):is([data-part='0'], [data-part='8'], [data-part='16'], [data-part='24']) { --part: var(--p1); }
+[data-money] .split :is(.ring-arc, .split-seg, .split-dot):is([data-part='1'], [data-part='9'], [data-part='17'], [data-part='25']) { --part: var(--p2); }
+[data-money] .split :is(.ring-arc, .split-seg, .split-dot):is([data-part='2'], [data-part='10'], [data-part='18'], [data-part='26']) { --part: var(--p3); }
+[data-money] .split :is(.ring-arc, .split-seg, .split-dot):is([data-part='3'], [data-part='11'], [data-part='19'], [data-part='27']) { --part: var(--p4); }
+[data-money] .split :is(.ring-arc, .split-seg, .split-dot):is([data-part='4'], [data-part='12'], [data-part='20'], [data-part='28']) { --part: var(--p5); }
+[data-money] .split :is(.ring-arc, .split-seg, .split-dot):is([data-part='5'], [data-part='13'], [data-part='21'], [data-part='29']) { --part: var(--p6); }
+[data-money] .split :is(.ring-arc, .split-seg, .split-dot):is([data-part='6'], [data-part='14'], [data-part='22'], [data-part='30']) { --part: var(--p7); }
+[data-money] .split :is(.ring-arc, .split-seg, .split-dot):is([data-part='7'], [data-part='15'], [data-part='23'], [data-part='31']) { --part: var(--p8); }
 
 [data-money] .split .split-item:has(> .split-label a) > .split-dot,
-[data-money] .split:has(.split-item:last-child > .split-label a) .ring-arc:last-of-type {
+[data-money] .split:has(.split-item:last-child > .split-label a) :is(.ring-arc, .split-seg):last-of-type {
   --part: var(--money-bar-quiet);
 }
 
@@ -1624,9 +1618,11 @@
 /* WHAT REPEATS' "NEXT" IS NEVER CUT (UI pass, 1 Nov): its four columns shared the row as 1fr and three 12ch tracks, so
    "Due in 11 days" and "Due in 14 days" ended in "da…" at every desk width while the description had 780px to itself.
    The day's column takes what its longest phrase needs; the description keeps the rest. Desk only: on a phone the rows
-   are cards. */
+   are cards. NOT WHERE A ROW HAS ACTIONS (shared fix, 2 Nov): Subscriptions' Other repeating payments is three columns
+   and its actions, four cells too, and this gave Mark as a subscription 12ch where its button needs 25, so the words
+   ran out of the row on the left. A table with actions keeps the tracks the renderer gave it (`rowActionsTrack`). */
 @media (width >= 900px) {
-  [data-money] .block-slot[data-source='register.recurring'] .table .tr:has(> :nth-child(4):last-child) {
+  [data-money] .block-slot[data-source='register.recurring'] .table:not(:has(.td-acts)) .tr:has(> :nth-child(4):last-child) {
     --cols: minmax(16ch, 1fr) 14ch 17ch 12ch;
   }
 }
