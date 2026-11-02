@@ -101,6 +101,11 @@
   import { SLIM_MOST, keepTell, lastLines, readTell, slimShown, type TellKept, type ToldLine } from '$lib/home/tell-line.ts';
   import TellOne from '$lib/home/TellOne.svelte';
   import NeedsFoot from '$lib/home/NeedsFoot.svelte';
+  /* LATE'S ROOM, in hand before any slot draws (`LateHold.svelte`, nojump 2 Nov): a slot whose Late code has not landed
+     draws it in its place, so the tiles under it never move when that code comes. */
+  import LateHold from '$lib/home/LateHold.svelte';
+  import { landed as tileLanded } from '$lib/home/tile-landed.ts';
+  tileLanded.hold = LateHold;
   import { sharedFrom, type SharedOut } from '$lib/home/shared-line.ts';
   import { desked as deskedOf, type Desked } from '$lib/home/desk-part.ts';
   import type WantMoreOf from '$lib/home/WantMore.svelte';
@@ -995,7 +1000,27 @@
    */
   /* AND TODAY KEPT AS A BOARD (the widgets plan of 29 October, §4): once he adds to it or arranges it, the record keeps it
      as `home` with `board: true`, and it is drawn as the board it is, not as a page laid out by hand. */
-  const keptBoard = $derived(got?.from === 'live' && declares !== null && (got.page.page as { board?: unknown }).board === true);
+  /* AND BEFORE IT IS READ, AS IT WAS LAST TIME ON THIS DEVICE, else a board (nojump, 2 Nov): a kept board read as no
+     board until its page came, so a phone drew Today's name row for a second and a half and then took it away as the
+     board came, and the whole page jumped up 56px. A kept page laid out by hand, where this device has seen one, is
+     remembered as such. */
+  const boardKey = (): string => `bd_home_board:${apiBase()}`;
+  const boardWas = ((): boolean => {
+    try {
+      return globalThis.localStorage?.getItem(boardKey()) !== '0';
+    } catch {
+      return true;
+    }
+  })();
+  const keptBoard = $derived(declares !== null && (got === null ? boardWas : got.from === 'live' && (got.page.page as { board?: unknown }).board === true));
+  $effect(() => {
+    if (declares === null || got?.from !== 'live') return;
+    try {
+      globalThis.localStorage?.setItem(boardKey(), (got.page.page as { board?: unknown }).board === true ? '1' : '0');
+    } catch {
+      /* blocked storage: the next open guesses a board again */
+    }
+  });
   const board = $derived(declares === null || keptBoard);
 
 
