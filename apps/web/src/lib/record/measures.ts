@@ -168,12 +168,17 @@ export function changeLine(m: Measure): string {
 export function tileRows(measures: readonly Measure[]): string[] {
   const shown = measures.slice(0, TILES_MOST);
   const shared = sharedNames(shown);
-  return shown.map((m) => {
+  /* ONE LINE SAID UNDER EVERY TILE IS SAID UNDER NONE (2 Nov): a project's Errors drew "Nothing reported in the 14 days
+     before" four times over, a row of noise under four figures that are plainly the first. Where every tile has nothing
+     to be weighed against, the figures stand alone; where one tile has a change, each still says its own. */
+  const lines = shown.map(changeLine);
+  const quiet = shown.length > 1 && shown.every((m, n) => lines[n] === copy.measureNothingBefore(m.keys.length, m.bucket === 'week'));
+  return shown.map((m, n) => {
     /* A TILE'S FIGURE KEEPS ITS CURRENCY AND DROPS ANY OTHER UNIT, which its name already says: "476 customers" under
        "Active customers" is a tile wrapped over two lines to say one word twice. */
     const figure = m.latest ? figureOf(m.latest.value, isCurrency(m.unit) ? m.unit : '') : '';
     const trend = m.now.some((v) => v !== null) ? ` | ${m.now.map((v) => (v === null ? '-' : String(v))).join(' ')}` : '';
-    return `${escapeCell(measureLabel(m, shared))} | ${escapeCell(figure)} | ${escapeCell(changeLine(m))}${trend}`;
+    return `${escapeCell(measureLabel(m, shared))} | ${escapeCell(figure)} | ${escapeCell(quiet ? '' : lines[n]!)}${trend}`;
   });
 }
 
