@@ -1441,6 +1441,8 @@ export type Backlink = {
   /** The register's own name, and the field's label — "Obligations · Party", not "obligations". */
   name: string;
   label: string;
+  /** The field of theirs that points here, by its id. */
+  field?: string;
   icon: IconName;
   total: number;
   /** The first few, ready to draw. The rest are behind `href`. */

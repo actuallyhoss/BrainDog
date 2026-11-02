@@ -116,6 +116,7 @@ export function linkReader(base: string, io?: Fetch, clock: () => number = Date.
         register: g.register,
         name: r.name,
         label: labelOf(f),
+        field: g.field,
         icon: iconFor(r.icon, 'rows'),
         total: g.matched,
         /* NAMED BY THIS RECORD. A pointing row's own refs are drawn from the titles that walk

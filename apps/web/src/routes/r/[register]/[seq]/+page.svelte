@@ -1836,7 +1836,7 @@
           {@const twice = incoming.filter((r) => r.name === rel.name).length > 1}
           <Tile
             icon={rel.icon}
-            title={twice ? `${rel.name} · ${copy.linkedThrough(rel.label)}` : rel.name}
+            title={rel.register === id && rel.field === 'parent' ? rowWords.steps : twice ? `${rel.name} · ${copy.linkedThrough(rel.label)}` : rel.name}
             count={rel.total}
             href={rel.total > rel.rows.length ? rel.href : undefined}
             hrefLabel={rel.total > rel.rows.length ? `${rowWords.all} ${rel.total}` : undefined}
@@ -2847,6 +2847,10 @@
     .row-head :global(.page-head .head-main) {
       flex-wrap: wrap;
       align-items: start;
+      /* NO GAP BETWEEN ITS LINES (pages polish, 2 Nov): the break before the verbs is a line of its own, so the head's 8
+         stood twice between the name and Mark done, and with the verbs' 12 the name sat about 36px over them. The verbs'
+         own 12 is the step. */
+      row-gap: 0;
     }
 
     .row-head :global(.page-head .name-row) {

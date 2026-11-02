@@ -50,6 +50,8 @@ export const rowWords = {
   /* The headings of the figures a row's page draws as tiles (`figures.ts`). */
   moneyIn: 'Money in',
   openWork: 'Open work',
+  /* A task's own steps, the tasks Part of it (pages polish, 2 Nov), where the tile said the list's name, Tasks. */
+  steps: 'Steps',
   all: 'All',
   months: (n: number): string => (n === 1 ? '1 month' : `${n} months`),
 } as const;
