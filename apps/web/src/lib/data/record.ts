@@ -13,7 +13,7 @@
 
 import { createClient, type Boot } from '@braindog/client';
 
-import { PAGE, sortRows } from '../record/api.ts';
+import { PAGE, REGISTERS, sortRows } from '../record/api.ts';
 import { readBoot, type Booted } from '../record/boot-live.ts';
 import { declOf, entryOf, learn, namesOf, orderOf, refMapOf, targetsOf, unreadRefs, whereFor, withoutUnread, type Names, type RecordRow, type RefMap } from '../record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
@@ -252,6 +252,21 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     return { ok: true, value: map };
   }
 
+  /**
+   * WHAT IS FINISHED GOES TO THE FOOT WHERE NOBODY CHOSE AN ORDER (pages pass, 2 Nov): a retired skill stood first on
+   * Skills and a superseded learning second on Learnings, over the ones in use. The rows in a state the list declares
+   * done (`done`) keep their order among themselves, after every other row. Only over a whole list, since one page of
+   * many cannot know what the next one holds; a sort somebody picked is never touched.
+   */
+  function doneLast(register: string, entries: Entry[]): Entry[] {
+    const decl = REGISTERS[register];
+    const state = decl?.state;
+    const done = new Set(decl?.done ?? []);
+    if (!state || done.size === 0) return entries;
+    const isDone = (e: Entry): boolean => typeof e.fields[state] === 'string' && done.has(e.fields[state] as string);
+    return entries.some(isDone) ? [...entries.filter((e) => !isDone(e)), ...entries.filter(isDone)] : entries;
+  }
+
   async function refsFor(register: string): Promise<Said<Map<string, RefMap>>> {
     const out = new Map<string, RefMap>();
     /* THE LIST'S OWN DECLARATION FIRST (pages pass, 2 Nov): `targetsOf` reads the fields this tab has learnt, and on a
@@ -292,6 +307,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     const names = namesOf(refs.value);
     if (a.sort && out.value.cursor === null && entries.length === out.value.matched)
       entries = sortRows(register, entries, a.sort.field, a.sort.dir, names);
+    else if (!a.sort && out.value.cursor === null && entries.length === out.value.matched) entries = doneLast(register, entries);
     return { ok: true, value: { entries, matched: out.value.matched, cursor: out.value.cursor, names } };
   }
 
