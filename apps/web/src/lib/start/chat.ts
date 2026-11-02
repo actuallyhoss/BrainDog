@@ -511,6 +511,13 @@ function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): 
   /* NO WORD OF OURS REACHES THEM (2 Nov, onboarding5: "Who else should I add to your people list?"): a question that
      says list, record, module and the like is the rules' to ask. */
   if (!fits(question, QUESTION_MOST) || raisesNew(question, w.said) || INSIDE_WORDS.test(question)) return null;
+  /* "FIRST" IS THE WHAT-FIRST TURN'S WORD AND NO OTHER'S (leftovers 7, 2 Nov: Omar was asked "Which clients should I add
+     first?" under people, read it as the what-first question and answered "Clients, invoices", so the real one was left
+     unanswered and Today drafted his clients where his invoice should have been). A model question on any other topic
+     that says first is the rules' to ask instead, and the what-first question is always the rules' own, its words and
+     its taps (an agency's Invoices among them), so there is one question about what comes first and it reads the same. */
+  if (topic === 'first') return rulesAsk('first', w);
+  if (/\bfirst\b/iu.test(question)) return rulesAsk(topic, w);
   /* NO PROJECTS OR SIDE HUSTLES ASKED OF A HOUSEHOLD (onboarding6: Marta, sorting out her home's bills, was asked "Do you
      have any specific projects or side hustles you're working on?"): the rules ask what she is saving for instead. */
   if (topic === 'work' && kindOf(w.said, w.usecase) === 'personal') return rulesAsk('work', w);
