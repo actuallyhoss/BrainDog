@@ -90,8 +90,19 @@ export async function load(event: Event): Promise<Root> {
   const frame = import('$lib/shell/AppFrame.svelte');
   /* A LOAD THAT REDIRECTS NEVER WAITS FOR IT, so a frame that failed to load then is not an unhandled refusal. */
   frame.catch(() => undefined);
+  /* TODAY'S READER'S CODE IS ASKED ONCE THE FRAME'S HAS LANDED, on the tab's first open of Today (speed6, 2 Nov), so it
+     comes in while the frame mounts and not after: Home asked for it about 110 ms into that mount on a cold phone. After
+     the frame's and not beside it, so it never takes the line from the frame's own code. `__bdToday` is `app.html`'s
+     early ask, made only for a record's front door. */
+  if (!opened && !event.url.searchParams.has('work') && (globalThis as { __bdToday?: unknown }).__bdToday) void frame.then(readerEarly, () => undefined);
   const shell = await shellOf(event);
   return { ...shell, frame: (await frame).default, light: null };
+}
+
+/** Today's reader and the code its first read takes, each asked once; Home asks the same modules and gets these. */
+function readerEarly(): void {
+  for (const ask of [() => import('$lib/page/PageView.svelte'), () => import('$lib/record/page-drawn.ts'), () => import('$lib/home/today-read.ts'), () => import('$lib/home/tile-code.ts'), () => import('$lib/home/handled.ts')])
+    void ask().catch(() => null);
 }
 
 /**
