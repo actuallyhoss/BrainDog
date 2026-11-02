@@ -56,6 +56,18 @@
   const scale = $derived(Math.max(0, ...block.rows.filter((r) => !r.hole).map(numeric).filter(Number.isFinite)));
   /* THE BARS' FIGURES ARE ONE SET (`barFigures`): all whole, or all to the same places. */
   const shown = $derived(drawnRows(block, opts).map(({ row: r }) => r));
+  /* ONE GLYPH ON EVERY ROW SAYS NOTHING A ROW DOES NOT (leftovers9): Reports' "Paid most" drew the same shop beside each
+     of ten payees under a heading that already wears it. Rows whose chips are all one glyph in one colour draw none;
+     rows that differ, as categories do, keep theirs. */
+  const oneLook = $derived.by(() => {
+    if (!opts.partLook || shown.length < 2) return false;
+    const looks = shown.map((r) => {
+      const name = text(inline(r.cells[0] ?? '', opts));
+      const l = name ? opts.partLook?.(name) : null;
+      return l ? `${l.glyph ?? ''}|${l.slot ?? ''}` : null;
+    });
+    return looks[0] !== null && looks.every((l) => l === looks[0]);
+  });
   const figures = $derived(barFigures(shown.map((r) => r.cells[1] ?? MISSING), opts.home));
   /* A BAR OF ONE COMPARES NOTHING (`barsCompare`): a single account is its name and its figure, with no track. */
   const compare = $derived(barsCompare(shown, numeric));
@@ -128,7 +140,7 @@
   {:else}
     <!-- One body, two containers. Written once so the pressable and the plain row cannot drift. -->
     {#snippet cells(row: Row, v: number, drawable: boolean, figure: string)}
-      {@const name = opts.partLook ? text(inline(row.cells[0] ?? '', opts)) : ''}
+      {@const name = opts.partLook && !oneLook ? text(inline(row.cells[0] ?? '', opts)) : ''}
       {@const look = name ? opts.partLook?.(name) : null}
       {#if look}<PartChip glyph={look.glyph} slot={look.slot} letter={name.slice(0, 1).toLocaleUpperCase('en')} {opts} />{/if}
       <span class="prop-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
