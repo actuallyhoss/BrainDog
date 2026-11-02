@@ -1296,6 +1296,7 @@ export const PREF_KEYS = [
   'boards.pages',
   'push.off',
   'agents.bypass',
+  'name.asked',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
@@ -1305,6 +1306,16 @@ export type PrefKey = (typeof PREF_KEYS)[number];
  * board. The owner's Today is the record's `page.home`, as before; a record one person uses never writes this.
  */
 export const OWN_TODAY = 'home.today';
+/**
+ * WHEN A PERSON LAST OPENED THIS RECORD, kept among their own preferences by the record alone (`boot`), never by
+ * `setPref`, so it is not in `PREF_KEYS`. The read mark (`member.seen_at`) moves only when somebody reads their bell, so
+ * People said "has not opened it" of a colleague who had joined and browsed every page (collab pass 3). Moved at most
+ * every few minutes, so a boot is not a write each time.
+ */
+export const OPENED = 'record.opened';
+/** What a person is called who owns the record and never gave a name, where a name opens a line ("The owner mentioned you"). */
+const OWNER_WORD = 'The owner';
+const OPENED_EVERY_MS = 5 * 60_000;
 /** The most a member's own Today may weigh, as JSON: sixteen widgets and their phone arrangement are a few kilobytes. */
 export const OWN_TODAY_MOST = 64_000;
 /** The most "Not now" answers to widget offers a person's `widgets.held` keeps, the oldest let go first. */
@@ -1412,6 +1423,8 @@ export type Prefs = {
    * own and nobody else's, laid over the page as it is read, so an add-on's page keeps its updates (`boardsFault`).
    */
   'boards.pages'?: Record<string, PageBoard>;
+  /** Whether this person was asked their name once on signing in (named it or skipped). Absent is not yet asked. */
+  'name.asked'?: boolean;
 };
 
 /** One page laid out as a board: its widgets by key, in order, at their sizes, less the ones taken off. */
@@ -10195,7 +10208,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         me,
         email ?? '',
       );
-      const known = sharers.flatMap((r) => (typeof r.name === 'string' && r.name.trim() !== '' ? [[r.id, r.name.trim()] as const] : []));
+      const owners = new Set(kernel.members().flatMap((m) => (m.level === 'owner' ? [m.person_id] : [])));
+      const known = sharers.flatMap((r) =>
+        typeof r.name === 'string' && r.name.trim() !== '' ? [[r.id, r.name.trim()] as const] : owners.has(r.id) ? [[r.id, OWNER_WORD] as const] : [],
+      );
       return known.length === 0 ? null : Object.fromEntries(known);
     }
     /* AND A GUEST WHO HOLDS A LIVE SHARE, ONE HELD TO ONE PROJECT INCLUDED (collab pass 2): `members` leaves a guest
@@ -10207,6 +10223,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ))
       if (typeof r.name === 'string' && r.name.trim() !== '') named[r.id] = r.name.trim();
     for (const m of kernel.members()) if (typeof m.name === 'string' && m.name.trim() !== '') named[m.person_id] = m.name.trim();
+    /* AN OWNER WHO NEVER TYPED A NAME IS SAID BY THE ROLE (collab pass 3): a self-host's `init` makes the owner with no
+       name, and everybody they shared with read "Someone you share with" for the person whose record it is. */
+    for (const m of kernel.members()) if (m.level === 'owner' && named[m.person_id] === undefined && m.suspended_at === null) named[m.person_id] = OWNER_WORD;
     return named;
   };
 
@@ -12339,6 +12358,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async boot(ctx: CallContext): Promise<Result<Boot>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
+      /* THE PERSON OPENED THE RECORD (`OPENED`): a person signed in, never a token or a link, which People reads beside
+         the read mark. Written before the read's one moment, and only when the last one is a few minutes old. */
+      if (ctx.principal.kind === 'person' && kernel.refused() === null) {
+        const was = kernel.prefsOf(ctx.principal.id)[OPENED];
+        const at = typeof was === 'string' ? Date.parse(was) : Number.NaN;
+        if (!Number.isFinite(at) || clock.now() - at > OPENED_EVERY_MS) kernel.setPref(ctx.principal.id, OPENED, new Date(clock.now()).toISOString());
+      }
       /* ONE TRANSACTION, SO ONE MOMENT. A second connection to the same file, a CLI beside a running
          self-host, could commit between the counts and the feed, and the rail said one row beside a
          feed announcing two. SQLite holds a read transaction to the snapshot of its first read. */
@@ -14394,7 +14420,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (value === 'on' && ctx.provedAt !== undefined && clock.now() - ctx.provedAt > kernel.lockAfter() * 60_000)
           return no('NEEDS_BROWSER_SESSION', 'Sign in again to let agents do everything without asking.', { at: 'proof' });
         kept = value as 'on' | 'off' | null;
-      } else if (value !== null && (key === 'look.contrast' || key === 'look.shot')) {
+      } else if (value !== null && (key === 'look.contrast' || key === 'look.shot' || key === 'name.asked')) {
         if (typeof value !== 'boolean') return no('VALUE_MALFORMED', `${key} is true or false, or null to take it away.`, { at: 'value' });
         kept = value;
       } else if (value !== null && (key === 'look.scheme' || key === 'look.size' || key === 'look.density' || key === 'look.accent')) {
@@ -16098,7 +16124,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async members(ctx: CallContext) {
       const stop = team(ctx, 'see who is here');
       if (stop) return { ok: false as const, refusal: stop };
-      return ok(kernel.members());
+      /* SEEN IS THE LATER OF THE READ MARK AND THE LAST OPEN (`OPENED`), so somebody who joined and browsed without
+         reading their bell is not said to have never opened it. */
+      return ok(
+        kernel.members().map((m) => {
+          const opened = kernel.prefsOf(m.person_id)[OPENED];
+          return typeof opened === 'string' && (m.seen_at === null || opened > m.seen_at) ? { ...m, seen_at: opened } : m;
+        }),
+      );
     },
 
     /**

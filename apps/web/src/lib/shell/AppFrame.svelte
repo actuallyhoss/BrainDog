@@ -1288,6 +1288,10 @@
    * THE DOOR SAID THIS PERSON'S ACCESS ENDED: the poll heard it (`live.ended`) or `boot` was refused
    * `at: 'access'`, and the window is the ended screen in the door's own sentence. `undefined` for everybody else.
    */
+  /* A PERSON WHO MAY ONLY ADD, ON A PAGE THAT READS THE RECORD: everything but her own settings (`AppendOnly`). */
+  const appendOnly = $derived(
+    data.refused?.at === 'level.append' && !/^\/settings(\/(?!people|sharing|notifications)[^/]*)?\/?$/u.test(here(page.url.pathname)),
+  );
   const endedSaid = $derived(live.ended !== null ? live.ended.said : data.refused?.at === 'access' ? data.refused.fix : undefined);
 
   /* OFFLINE, THE SHELL ASKS AGAIN when the browser says it is back and every twenty seconds, since a boot nobody
@@ -1574,6 +1578,10 @@
     {#await import('$lib/sharing/SeeAsBanner.svelte') then { default: SeeAsBanner }}<SeeAsBanner />{/await}
   {/if}
   <LapseBanner shell={data} />
+  <!-- YOUR NAME, ASKED ONCE of somebody the record holds none for (collab pass 3). Its own chunk: only they load it. -->
+  {#if data.me.person !== '' && !data.me.name && (data.me.prefs as Record<string, unknown> | undefined)?.['name.asked'] !== true}
+    {#await import('$lib/sharing/NameAsk.svelte') then { default: NameAsk }}<NameAsk shell={data} />{/await}
+  {/if}
   <!-- WHAT WAS SHARED WITH A GUEST, ONCE A SHARE (§3.4). Its own chunk: only somebody a share let in loads it. -->
   {#if data.me.grant !== undefined && !data.me.owner}
     {#await import('$lib/sharing/Welcome.svelte') then { default: Welcome }}<Welcome shell={data} />{/await}
@@ -1713,6 +1721,11 @@
       {#if phoneMenu}
         <!-- ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE: every place, the projects, every list and Settings. -->
         {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} lit={sideLit} working={workingOn} version={live.version} pen={sidePen} placed={listsPlaced} />{/if}
+      {:else if appendOnly}
+        <!-- SOMEBODY WHO MAY ONLY ADD IS REFUSED `boot`, and every page under it then asked the record for what she cannot
+             read (collab pass 3: Today, each project, Activity, Search, People; a 403 each). The record's sentence and
+             her one press stand in for any page but her own settings. -->
+        {#await import('$lib/sharing/AppendOnly.svelte') then { default: AppendOnly }}<AppendOnly fix={data.refused?.fix ?? ''} />{/await}
       {:else}
         {@render children()}
       {/if}
