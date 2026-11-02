@@ -233,13 +233,26 @@
     <section class="st-step" aria-labelledby="st-account">
       <h2 class="st-label" id="st-account">{words.account}</h2>
       {#if accounts.length > 1}
-        <Segmented role="group" aria-labelledby="st-account" full>
+        <!-- ON A PHONE THE ACCOUNTS ARE A LIST, one to a row (verify4 #3, 2 Nov): three names in the segmented track
+             wrapped two and one, the third alone under the others. A desk keeps the track. -->
+        <div class="st-pick-track">
+          <Segmented role="group" aria-labelledby="st-account" full>
+            {#each accounts as a (a.seq)}
+              <button type="button" class="segment" data-on={a.seq === account.seq ? '' : undefined} aria-pressed={a.seq === account.seq} onclick={() => (chosen = a.seq)}>
+                {a.name}{#if manyCurrencies && currencyName(a.currency)}{' '}<span class="st-quiet">{currencyName(a.currency)}</span>{/if}
+              </button>
+            {/each}
+          </Segmented>
+        </div>
+        <div class="st-pick-list" role="radiogroup" aria-labelledby="st-account">
           {#each accounts as a (a.seq)}
-            <button type="button" class="segment" data-on={a.seq === account.seq ? '' : undefined} aria-pressed={a.seq === account.seq} onclick={() => (chosen = a.seq)}>
-              {a.name}{#if manyCurrencies && currencyName(a.currency)}{' '}<span class="st-quiet">{currencyName(a.currency)}</span>{/if}
-            </button>
+            <label class="st-pick tap" data-on={a.seq === account.seq ? '' : undefined}>
+              <input type="radio" name="st-account" value={a.seq} checked={a.seq === account.seq} onchange={() => (chosen = a.seq)} />
+              <span class="st-pick-name">{a.name}</span>
+              {#if manyCurrencies && currencyName(a.currency)}<span class="st-quiet">{currencyName(a.currency)}</span>{/if}
+            </label>
           {/each}
-        </Segmented>
+        </div>
       {:else}
         <p class="st-one"><strong>{account.name}</strong></p>
       {/if}
@@ -350,6 +363,50 @@
 </div>
 
 <style>
+  /* THE ACCOUNT PICK: the segmented track on a desk, a list of rows on a phone (one name a row, hairlines between). */
+  .st-pick-list {
+    display: none;
+  }
+  @media (max-width: 639px) {
+    .st-pick-track {
+      display: none;
+    }
+    .st-pick-list {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--rule-strong);
+      border-radius: 12px;
+      background: var(--tile);
+      overflow: hidden;
+    }
+  }
+  .st-pick {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: 48px;
+    padding-inline: var(--sp-4);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .st-pick + .st-pick {
+    border-block-start: 1px solid var(--rule);
+  }
+  .st-pick[data-on] {
+    background: var(--chosen);
+  }
+  .st-pick input {
+    margin: 0;
+    accent-color: var(--on);
+    inline-size: 18px;
+    block-size: 18px;
+    flex: none;
+  }
+  .st-pick-name {
+    flex: 1;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
   .st-page {
     display: flex;
     flex-direction: column;
