@@ -18,7 +18,7 @@ Every page is written in a small text format called the dialect: Markdown, with 
 Who | How they reach it | What they can do
 You | The app, in a browser | Read and change anything you can see
 Slash | Press ⌘J (Ctrl+J off a Mac) | Answer questions with your figures and make the changes you ask for, with an undo
-Your agents | MCP, signed in with your yes | Read and write what you allowed, asking you first when they want to change something
+Your agents | MCP, signed in with your yes | Read and write what you allowed, and act when you tell them to. Money and keys wait for your yes unless you let them do everything
 ```
 
 ## Slash

@@ -80,7 +80,15 @@ export const slashPage = {
     title: 'Questions',
     questions: [
       { q: 'Does Slash change things on its own?', a: 'No. It changes what you ask for, and every change has an undo.' },
-      { q: 'Can it move money or delete things?', a: 'Not without you. Money, keys, sharing and deletes always wait for your yes.' },
+      /* CHECKED AGAINST THE PRODUCT (leftovers9, 2 Nov): Slash holds every change to money, keys, sharing, deletes or
+         add-ons as a card, even one asked for (`waitsFor` in `packages/mcp/src/slash-tools.ts`), and no switch lifts
+         that for Slash. Your own agents are not held the same way: one you tell to delete something does it, and with
+         "Let your agents do everything without asking" on, money goes through too (`docs/03-agents/04-scopes.md`). So the
+         answer is said of Slash, and the agents get their own half, where "always wait" read as true of them as well. */
+      {
+        q: 'Can it move money or delete things?',
+        a: 'Not without your yes. A change to money, keys, sharing or a delete comes back as a card for you to press, even when you asked for it. Your own AI tools can be allowed more, in Settings under Agents.',
+      },
       { q: 'Can I use my own AI key?', a: 'Yes, in Settings under Agents. Questions on your own key have no monthly limit.' },
       { q: 'Can I turn it off?', a: 'Yes. Set the monthly limit to zero and Slash stays quiet. Finding still works.' },
     ],
