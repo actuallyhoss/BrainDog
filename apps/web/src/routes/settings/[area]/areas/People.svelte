@@ -14,6 +14,7 @@
   import { REGISTERS } from '$lib/record/held.ts';
   import { LEVELS, type Level, type Person } from '$lib/record/schema.ts';
   import { LIST_LEVELS } from '$lib/record/may.ts';
+  import { ROLES, ROLE_ORDER } from '$lib/sharing/roles.ts';
   /* THE WRITES THIS AREA MAKES, and the one reading of what the record answered to each. */
   import { addException, dropException, moveLevel, removeAccess, suspendPerson, type Wrote } from '$lib/record/settings-write.ts';
   /* The rows of one list a grant reaches, picked with the exception and said back under it. */
@@ -63,20 +64,17 @@
 
   let peopleBusy = $state(false);
 
-  /* THE LADDER IN THE WORDS YOU WOULD USE ABOUT A COLLEAGUE. `member.level` keeps the schema's five
-     and every value written is still one of them; only what the screen prints changes. */
-  const LEVEL_SAID: Record<string, string> = {
-    owner: 'Owner',
-    decide: 'Decides',
-    write: 'Edits',
-    append: 'Adds only',
-    read: 'Reads',
-  };
-  /* THE FOUR ROLES OF A TEAM ON THE WHOLE RECORD, over the same levels: Viewer reads, Member reads and writes rows and
-     proposes, Admin also settles who is on the record, Owner keeps the rest. A list's own level keeps the words above. */
-  const ROLE_SAID: Record<string, string> = { owner: 'Owner', decide: 'Admin', write: 'Member', read: 'Viewer', append: 'Adds only' };
-  const roleSaid = (level: string | null) => (level === null ? copy.noRecordLevel : (ROLE_SAID[level] ?? level));
-  const levelSaid = (level: string | null) => (level === null ? copy.noRecordLevel : (LEVEL_SAID[level] ?? level));
+  /* THE LADDER IN THE WORDS EVERY PLACE THAT GIVES ACCESS USES (`lib/sharing/roles.ts`, collab pass 2 Nov): "Can decide",
+     "Can edit", "Can add", "Can view" and Owner, the same on the whole record and on one list, each with one line of what
+     it lets them do and one of what it does not. `member.level` keeps the schema's five; only what is printed changes. */
+  const roleSaid = (level: string | null) => (level === null ? copy.noRecordLevel : Object.hasOwn(ROLES, level) ? ROLES[level as Level].name : level);
+  const levelSaid = roleSaid;
+  const meansOf = (level: string) => (Object.hasOwn(ROLES, level) ? `${ROLES[level as Level].can} ${ROLES[level as Level].cant}` : level);
+  /* AN ADMIN INVITES TOO (`team` in the record lets `decide` in, and `teamKeeps` holds them below an owner), so the form
+     is drawn to them, offering every role but Owner. */
+  const anAdmin = $derived(!anOwner && me.level === 'decide');
+  const mayInvite = $derived(anOwner || anAdmin);
+  const inviteRoles = $derived(ROLE_ORDER.filter((l) => anOwner || l !== 'owner'));
 
   /**
    * One level change, sent as `invite({ person, levels, why })`.
@@ -642,7 +640,7 @@
               <!-- WHAT THE SELECTED ONE MEANS, said once, in a sentence, under the control that
                    sets it. Five ladder words with nothing explaining them is the schema's
                    vocabulary on the screen that decides who can change somebody's business. -->
-              <p class="means">{p.level === null ? copy.noRecordLevelMeans : (copy.levelMeans[p.level] ?? p.level)}</p>
+              <p class="means">{p.level === null ? copy.noRecordLevelMeans : meansOf(p.level)}</p>
 
               <!--
                 THE EXCEPTIONS, WHICH ARE THE MATRIX.
@@ -669,7 +667,7 @@
                            the one thing a matrix is for. The word is the comparison; the sentence
                            is what the word means. -->
                       <span class="ex-word">{levelSaid(ex.level)}</span>
-                      <span class="ex-level">{copy.levelMeans[ex.level] ?? ex.level}</span>
+                      <span class="ex-level">{ROLES[ex.level]?.can ?? ex.level}</span>
                       <!-- NOT THE DANGER TONE. Going back to their level undoes an exception, which is
                            the safe direction, and red on it said the opposite. -->
                       <Button
@@ -788,13 +786,13 @@
   NOTHING IS SAID IN ITS PLACE, because the section above it is already saying it. The record's
   own refusal is on this screen, in the record's own words, over the list this form adds to.
 -->
-{#if anOwner && teamsHeld}
+{#if mayInvite && teamsHeld}
 <Tile icon="user-plus" class="section" data-surface="tile" title={copy.inviteTitle}>
   <div class="section-body">
     <p class="hint">{copy.inviteHeld}</p>
   </div>
 </Tile>
-{:else if anOwner}
+{:else if mayInvite}
 {#snippet inviteAction()}
   <Button weight="primary" size="sm" aria-haspopup="dialog" onclick={() => (inviteOpen = true)}><Icon name="plus" size="s" />{copy.invitePerson}</Button>
 {/snippet}
@@ -832,12 +830,23 @@
         {/each}
       </Segmented>
       {#if inviteReach === 'record'}
-        <label class="ex-field">
-          <span class="ex-label">{copy.inviteLevelLabel}</span>
-          <select class="ex-select" bind:value={inviteLevel}>
-            {#each LEVELS as level}<option value={level}>{roleSaid(level)}</option>{/each}
-          </select>
-        </label>
+        <!-- THE ROLES AS CHOICES THAT SAY WHAT THEY GIVE (collab pass, 2 Nov): a select of five bare words was the whole
+             explanation an owner got before handing over his business. Each is its name, what it lets them do and what
+             it does not, and "Who can do what" lays all five side by side. -->
+        <fieldset class="roles">
+          <legend class="ex-label">{copy.inviteLevelLabel}</legend>
+          {#each inviteRoles as level (level)}
+            <label class="role" data-on={inviteLevel === level ? '' : undefined}>
+              <input type="radio" name="invite-role" value={level} bind:group={inviteLevel} />
+              <span class="role-text">
+                <span class="role-name">{ROLES[level].name}</span>
+                <span class="role-can">{ROLES[level].can}</span>
+                <span class="role-cant">{ROLES[level].cant}</span>
+              </span>
+            </label>
+          {/each}
+          <a class="roles-all" href="/settings/roles">{copy.rolesCompare}</a>
+        </fieldset>
         <!-- WHAT A WHOLE-RECORD "ADDS ONLY" LEAVES OUT, said before the link is made (`20 §1`): the record keeps an
              appender off Keys, People and any list declared for owners, and an owner who meant them to add keys would
              otherwise learn it from the colleague. -->
@@ -1480,5 +1489,65 @@
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 20px;
+  }
+
+  /* THE ROLE CHOICES: one row each, a radio, its name, and its two lines; the chosen one on the raised fill. */
+  .roles {
+    display: grid;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-inline-size: 0;
+  }
+  .role {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--sp-3);
+    align-items: start;
+    padding: var(--sp-3);
+    border-radius: var(--r-ctl);
+    background: var(--in-fill);
+    cursor: pointer;
+    transition: background-color 160ms ease, box-shadow 160ms ease;
+  }
+  .role[data-on] {
+    background: var(--tile);
+    box-shadow: inset 0 0 0 1.5px var(--ink);
+  }
+  .role input {
+    margin-block-start: 3px;
+    accent-color: var(--ink);
+  }
+  .role-text {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+  .role-name {
+    font-weight: var(--fw-semi);
+    color: var(--ink);
+  }
+  .role-can,
+  .role-cant {
+    font-size: var(--fs-meta);
+    line-height: 1.4;
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+  .role-cant {
+    color: var(--ink-3);
+  }
+  .roles-all {
+    justify-self: start;
+    font-size: var(--fs-meta);
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .role {
+      transition: none;
+    }
   }
 </style>

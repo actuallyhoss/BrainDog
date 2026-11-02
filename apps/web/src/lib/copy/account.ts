@@ -31,15 +31,15 @@ export const account = {
    * a person decides who to trust.
    */
   levelMeans: {
-    owner: 'Can change everything, and invite people',
-    decide: 'Can change items, and answer questions',
-    write: 'Can add and change items',
+    owner: 'Everything, including people, add-ons, settings and Keys',
+    decide: 'Sees and changes everything, answers what needs a decision, and invites people',
+    write: 'Sees, adds and changes what is here',
     /* `20 §1`: `append` is *"`create`, `propose` and `log` — and no read … an appender sees nothing,
        **not even what it filed**"*. "Not the rest" said the opposite — that they can read their own
        submissions — which is wrong in the PERMISSIVE direction, on the control that decides who can
        see somebody's business. */
-    append: 'Can add items, and read nothing',
-    read: 'Can read, cannot change',
+    append: 'Adds new things, and sees nothing',
+    read: 'Sees, and changes nothing',
   } as Record<string, string>,
   auditHolds: 'Every change to your BrainDog shows up here, with who made it and when.',
   export: 'Download a copy',
@@ -683,6 +683,8 @@ export const account = {
   /* Same words as `TEAMS_HELD_SAID` in the record's directory; a test holds them equal. */
   inviteHeld: 'Inviting colleagues opens soon. Nobody else can join yet.',
   inviteNoMail: 'Nothing is emailed: copy the link and send it to them yourself.',
+  /* COLLAB PASS (2 Nov): the roles side by side, from wherever access is given. */
+  rolesCompare: 'What each role can do',
   inviteLinkReady: (email: string) => `For ${email}. Shown once, so copy it now.`,
   inviteCopyLink: 'Copy link',
   inviteAddsOnlyNext: 'You add through your own agent. Make its key next.',
@@ -834,7 +836,7 @@ export const account = {
   inviteListsFold: 'Fewer choices',
   inviteListsMixed: 'Some lists',
   inviteAddsOnlyLeavesOut:
-    'Adds only on all of it leaves out Keys, People and anything kept for owners. To give one of those, pick Only some of it.',
+    'Can add on all of it leaves out Keys, People and anything kept for owners. To give one of those, pick Only some of it.',
   inviteNewLink: 'New link',
   inviteRanOut: (gives: string, on: string) => `${gives} · ran out on ${on}`,
   /* WHAT THE LINK OPENS, ONE LINE A PART (first F14): "Bills and invoices: you can add". The whole BrainDog is

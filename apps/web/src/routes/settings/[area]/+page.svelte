@@ -68,6 +68,7 @@
   import People from './areas/People.svelte';
   import Ingest from './areas/Ingest.svelte';
   import Keyboard from './areas/Keyboard.svelte';
+  import Roles from './areas/Roles.svelte';
   import Navigation from './areas/Navigation.svelte';
   import Notifications from './areas/Notifications.svelte';
   import Backups from './areas/Backups.svelte';
@@ -545,6 +546,8 @@
       {#await import('./areas/Sharing.svelte') then { default: Sharing }}
         <Sharing {shell} {area}>{#snippet here()}<People {shell} {area} />{/snippet}</Sharing>
       {/await}
+    {:else if area === 'roles'}
+      <Roles {shell} {area} />
     {:else if area === 'signing-in'}
       <SigningIn {shell} {area} />
     {:else if area === 'agents'}

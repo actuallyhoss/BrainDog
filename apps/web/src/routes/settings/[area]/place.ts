@@ -120,6 +120,8 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     icon: 'users',
     areas: [
       area('/settings/people', 'People and sharing', 'user-plus', 'Colleagues, invites, shares'),
+      /* WHAT EACH ROLE AND EACH SHARE LETS SOMEBODY DO, side by side (collab pass, 2 Nov). */
+      area('/settings/roles', 'Who can do what', 'user-check', 'Roles and shares, side by side'),
       area('/settings/billing', 'Billing', 'money', 'Plan'),
     ],
     outside: [{ label: 'Usage', href: '/usage', icon: 'observe', line: 'This month', before: 'billing' }],
