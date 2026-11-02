@@ -41,8 +41,9 @@ export type NativeKnown = {
 export function tellOptions(boot: NativeBoot, schemas: Readonly<Record<string, TellList | undefined>>, today: string, known: NativeKnown = {}): TellOptions {
   const lists: TellList[] = [];
   for (const r of boot.registers) {
-    const d = schemas[r.id];
-    if (!d) continue;
+    const raw = schemas[r.id];
+    if (!raw) continue;
+    const d = declared(raw, r.id);
     const owned: TellList = typeof r.pack === 'string' ? { ...d, pack: r.pack } : d;
     lists.push(typeof r.count === 'number' && Number.isFinite(r.count) ? { ...owned, count: r.count } : owned);
   }
@@ -59,6 +60,17 @@ export function tellOptions(boot: NativeBoot, schemas: Readonly<Record<string, T
     ...(known.titled ? { titled: known.titled } : {}),
     me: known.me ?? boot.me?.name ?? null,
   };
+}
+
+/**
+ * A declaration as the tab keeps one (`declOf` in `record/remote.ts`): its id, a name, and one of it, which the record
+ * does not require and the reader says ("an order from Nadia"). The same fallbacks, written here because `remote.ts`
+ * carries the tab's whole client with it, and a bundle for JavaScriptCore carries the reader alone.
+ */
+function declared(raw: TellList, id: string): TellList {
+  const name = typeof raw.name === 'string' && raw.name !== '' ? raw.name : id;
+  const one = typeof raw.one === 'string' && raw.one !== '' ? raw.one : name.toLowerCase().replace(/ies$/, 'y').replace(/([^s])s$/, '$1');
+  return { ...raw, id, name, one, fields: Array.isArray(raw.fields) ? raw.fields : [] };
 }
 
 /** One line read: JSON in, `Told` out, for a caller that speaks only strings (JavaScriptCore from Swift). */

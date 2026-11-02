@@ -42,6 +42,9 @@ struct Root: View {
         }
         .animation(.easeOut(duration: 0.2), value: session.signedIn)
         .tint(Palette.red)
+        #if DEBUG
+        .task { await Links.pressOnLaunch() }
+        #endif
     }
 }
 
@@ -63,6 +66,8 @@ struct Signed: View {
                         }
                         .accessibilityLabel(Words.account)
                     }
+                    /* NO GLASS CAPSULE ON A BAR BUTTON (plan 3.3): the tab bar is the only glass. */
+                    .sharedBackgroundVisibility(.hidden)
                 }
         }
         .sheet(isPresented: $account) { AccountSheet() }
@@ -112,6 +117,23 @@ enum Links {
         if let path, path.hasPrefix("/"), !path.hasPrefix("//") { today?.go(path) }
     }
 }
+
+#if DEBUG
+extension Links {
+    /// Sign in's buttons pressed from the launch line (`DebugPress`), and `go:` moving Today's screen.
+    static func pressOnLaunch() async {
+        await DebugPress.onLaunch { path, y in
+            today?.go(path)
+            if let y {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(3))
+                    today?.webView.scrollView.setContentOffset(CGPoint(x: 0, y: y), animated: false)
+                }
+            }
+        }
+    }
+}
+#endif
 
 /// The navigation bar as Look B draws it (plan 3.3): opaque `--nav`, a `--rule` hairline, no scroll-edge blur, the title
 /// in Lexend 600 at 22, and no glass on its buttons.

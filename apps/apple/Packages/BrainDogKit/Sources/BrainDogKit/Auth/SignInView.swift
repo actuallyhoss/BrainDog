@@ -17,6 +17,8 @@ public final class SignInFlow {
     public private(set) var said: String?
     /// Whether that sentence is a refusal (said in red words) or a calm note (ink-2).
     public private(set) var saidIsRefusal = false
+    /// Whether that sentence is about the passkey, so it is said under the passkey's button and not the email's.
+    public private(set) var saidOfPasskey = false
 
     @ObservationIgnored let passkey = Passkey()
 
@@ -27,6 +29,7 @@ public final class SignInFlow {
     private func say(_ text: String?, refusal: Bool = true) {
         said = text
         saidIsRefusal = refusal
+        saidOfPasskey = busy == .passkey
         if text != nil && refusal { Haptic.warning.play() }
     }
 
@@ -195,7 +198,7 @@ public struct SignInView: View {
                 .buttonStyle(.primary)
                 .disabled(flow.busy != nil && flow.busy != .sending)
 
-                said
+                if !flow.saidOfPasskey { said }
 
                 HStack(spacing: Space.s3) {
                     Hairline()
@@ -213,6 +216,8 @@ public struct SignInView: View {
                     }
                 }
                 .buttonStyle(.quietOnTile)
+
+                if flow.saidOfPasskey { said }
             }
         }
     }

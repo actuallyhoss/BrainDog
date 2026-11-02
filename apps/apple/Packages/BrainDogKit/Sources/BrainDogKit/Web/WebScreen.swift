@@ -51,7 +51,8 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate {
         controller.add(ShellBridge { [weak self] ask in self?.hear(ask) }, name: ShellBridge.name)
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        webView.allowsBackForwardNavigationGestures = false
+        /* THE WEB VIEW'S OWN SWIPE BACK UNTIL M2'S NATIVE STACKS: in native mode the web draws no back of its own. */
+        webView.allowsBackForwardNavigationGestures = kind == .ios
         #if DEBUG
         webView.isInspectable = true
         #endif

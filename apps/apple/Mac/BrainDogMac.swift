@@ -29,6 +29,9 @@ struct BrainDogMac: App {
                 if url.path == "/signin" { Task { await SignInFlow.shared.open(link: url) } }
             }
             .task { await session.refreshIfDue() }
+            #if DEBUG
+            .task { await DebugPress.onLaunch { path, _ in desk.go(path) } }
+            #endif
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1440, height: 900)

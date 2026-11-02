@@ -40,7 +40,7 @@ public struct BDButtonStyle: ButtonStyle {
                 .font(Typeface.control)
                 .foregroundStyle(ink)
                 .lineLimit(1)
-                .padding(.horizontal, weight == .bare ? 4 : 16)
+                .padding(.horizontal, weight == .bare ? 0 : 16)
                 .frame(maxWidth: full ? .infinity : nil, minHeight: 44)
                 .background(fill(down), in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))

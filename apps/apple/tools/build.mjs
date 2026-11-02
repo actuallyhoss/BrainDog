@@ -25,6 +25,11 @@ const DEVICE = 'iPhone 18 Pro';
 const [mode = 'check', ...rest] = argv.slice(2);
 const at = rest.indexOf('--server');
 const server = at >= 0 ? rest[at + 1] : null;
+/* `--press email:<address>` and the like: a Debug build presses Sign in's buttons at launch (BrainDogApp.swift). */
+const pressAt = rest.indexOf('--press');
+const press = pressAt >= 0 ? rest[pressAt + 1] : null;
+/* `--launch`: launch what was built last, again, without building. */
+const again = rest.includes('--launch');
 
 function run(cmd, args, opts = {}) {
   const out = spawnSync(cmd, args, { cwd: apple, stdio: opts.quiet ? 'pipe' : 'inherit', encoding: 'utf8', ...opts });
@@ -49,8 +54,9 @@ function booted() {
 }
 
 try {
-  generate();
+  if (!again) generate();
   if (mode === 'check') {
+    /* (generated above) */
     build('BrainDog', 'generic/platform=iOS Simulator', 'none');
     build('BrainDogMac', 'platform=macOS', 'none');
   } else if (mode === 'sim') {
@@ -61,17 +67,19 @@ try {
       on = booted();
     }
     const device = on[0];
-    build('BrainDog', `platform=iOS Simulator,id=${device.udid}`, 'local');
-    const app = join(derived, 'Build', 'Products', 'Debug-iphonesimulator', 'BrainDog.app');
-    run('xcrun', ['simctl', 'install', device.udid, app]);
+    if (!again) {
+      build('BrainDog', `platform=iOS Simulator,id=${device.udid}`, 'local');
+      run('xcrun', ['simctl', 'install', device.udid, join(derived, 'Build', 'Products', 'Debug-iphonesimulator', 'BrainDog.app')]);
+    }
     spawnSync('xcrun', ['simctl', 'terminate', device.udid, 'dog.brain.app']);
-    run('xcrun', ['simctl', 'launch', device.udid, 'dog.brain.app', ...(server ? ['-braindogServer', server] : [])]);
+    run('xcrun', ['simctl', 'launch', device.udid, 'dog.brain.app', ...(server ? ['-braindogServer', server] : []), ...(press ? ['-braindogPress', press] : [])]);
     console.log(`  launched on ${device.name}`);
   } else if (mode === 'mac') {
-    build('BrainDogMac', 'platform=macOS', 'local');
+    if (!again) build('BrainDogMac', 'platform=macOS', 'local');
     const app = join(derived, 'Build', 'Products', 'Debug', 'BrainDog.app');
     spawnSync('osascript', ['-e', 'quit app id "dog.brain.desktop"']);
-    run('open', ['-n', app, ...(server ? ['--args', '-braindogServer', server] : [])]);
+    const args = [...(server ? ['-braindogServer', server] : []), ...(press ? ['-braindogPress', press] : [])];
+    run('open', ['-n', app, ...(args.length ? ['--args', ...args] : [])]);
     console.log('  launched the Mac app');
   } else {
     throw new Error(`There is no mode called ${mode}: check, sim or mac.`);
