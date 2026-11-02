@@ -776,6 +776,9 @@ const foldOf = (v: unknown): boolean | number | undefined => (typeof v === 'bool
 const ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply', 'hue', 'picture', 'chip'] as const;
 const roleOf = (v: unknown): (typeof ROLES)[number] | undefined => ROLES.find((r) => r === v);
 
+/** The field types a declared column ends by default: counts and amounts. */
+const ENDS = new Set(['money', 'int', 'decimal', 'duration']);
+
 const columnsOf = (b: Answered) => {
   /* THE REGISTER SAYS WHICH COLUMNS ARE FIGURES, AND UNTIL NOW THIS PATH GUESSED FROM THE NAME.
      It matched `amount` or `cost`, which are the only two money fields any page currently
@@ -800,7 +803,10 @@ const columnsOf = (b: Answered) => {
       /* A card's trend column reads a `metric:` and names no field, so with no label of its own it is headed by nothing. */
       label: columnHeading(register, { field: c.field ?? '', label: str(c.label) }),
       width: c.width ?? 'minmax(12ch,1fr)',
-      align: c.align ?? 'start',
+      /* A FIGURE ENDS ITS COLUMN WHERE THE PAGE SAYS NOTHING (2 Nov): the Errors page's Events and People sat at the start
+         of their columns, so 412 and 6 did not line up by their units. Counts and amounts end, as a list's do; a date
+         keeps where the page put it, since a dated column often opens the row. */
+      align: c.align ?? (ENDS.has(fieldOf(register, c.field)?.type ?? '') ? ('end' as const) : ('start' as const)),
       truncate: fieldOf(register, c.field)?.type === 'money' ? ('never' as const) : ('end' as const),
       ...(as === undefined ? {} : { as }),
       /* A COLUMN DECLARED `named` SAYS ITS NAME ON A PHONE CARD TOO (`Column.named`). */
