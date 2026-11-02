@@ -548,6 +548,22 @@
     padding-block-start: var(--sp-2);
   }
 
+  /* CARDS ON THE BOARD SAY IT ON THEIR HEAD'S ROW, at its end (`fit.ts` `HEAD_COUNT`): they stand in no tile, so under
+     them the count had neither padding nor room, and was cut or not drawn (live verify, 2 Nov). The list's door takes
+     that place while the pointer is on the frame, so the two never sit on each other. */
+  .board-root:not([data-editing]) .board :global([data-board-key][data-more]:has(.project-cards)::after) {
+    position: absolute;
+    inset-block: 0 auto;
+    inset-inline: auto 0;
+    padding-block-start: 0;
+    line-height: 28px;
+    transition: opacity var(--d-state) var(--ease-out);
+  }
+
+  .board-root:not([data-editing]) .board :global([data-board-key][data-more]:has(.project-cards):is(:hover, :focus-within)::after) {
+    opacity: 0;
+  }
+
   .board-root:not([data-editing]) .board :global([data-board-key][data-more]:has(> .desk-part)::after) {
     position: absolute;
     inset-inline-start: var(--sp-4);

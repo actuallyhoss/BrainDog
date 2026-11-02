@@ -21,6 +21,13 @@ const SAYS_MORE = /\b(?:more|all)\b/iu;
  * of 30 October, N1). A chart is drawn whole and the frame clips it, as any picture is.
  */
 const CHART = '.series, [role="img"], svg';
+/**
+ * CARDS STAND ON THE BOARD WITH NO TILE ROUND THEM (`BlockSlot`'s `.project-cards`), so a count under them has no padding
+ * to sit in and no room the frame keeps: Projects on Maya's Today drew one card and said nothing of the other three at
+ * 1512, and "2 more" clipped at the frame's edge at 1728 (live verify, 2 Nov). Their count goes on the head's row,
+ * at its end (`Board.svelte`), and takes no room from the cards.
+ */
+const HEAD_COUNT = '.project-cards';
 
 export function fitBoard(board: HTMLElement): void {
   const frames = [...board.querySelectorAll<HTMLElement>('[data-board-key]')].filter((f) => f.dataset.lifted === undefined);
@@ -79,6 +86,7 @@ export function fitBoard(board: HTMLElement): void {
       else if (r.top > box.top + box.height / 3) feet.push({ top, bottom, el: foot });
     }
     feet.sort((a, b) => a.top - b.top);
+    const inHead = frame.querySelector(HEAD_COUNT) !== null;
     const past = (at: number) => rects.filter((r) => r.height > 0 && r.bottom > at + 1).length;
     /* WHERE THE ROWS STOP, given the feet that stay. */
     const plan = (kept: typeof feet) => {
@@ -96,7 +104,7 @@ export function fitBoard(board: HTMLElement): void {
          nothing else is there, and just above its first foot where one is (a quiet line such as "Windows PC: 1 Claude
          session, quiet"), so the two never sit on each other (recheck N3). A foot that says more already says it. */
       const says = over === Infinity && !kept.some((f) => SAYS_MORE.test(f.el.textContent ?? ''));
-      const cutAt = says && past(limit) > 0 ? limit - MORE_PX : limit;
+      const cutAt = says && !inHead && past(limit) > 0 ? limit - MORE_PX : limit;
       return { says, cutAt, shown: rects.some((r) => r.height > 0 && r.bottom <= cutAt + 1) };
     };
     let kept = feet;
@@ -123,9 +131,9 @@ export function fitBoard(board: HTMLElement): void {
     /* NEVER OVER THE ROW KEPT (Maya's Today, 1 Nov): a first row taller than the room is kept and clipped by the frame,
        and the frame's own count, laid at its foot, was then drawn on top of that row's words. Where the kept row reaches
        into the count's room, the frame says nothing more; the row's own clip says there is more. */
-    const keptOver = keepFirst && rects[first]!.bottom > Math.min(room, over) - MORE_PX;
+    const keptOver = !inHead && keepFirst && rects[first]!.bottom > Math.min(room, over) - MORE_PX;
     const left = says && !keptOver ? past(cutAt) - (keepFirst ? 1 : 0) : 0;
-    if (left > 0 && kept.length > 0) {
+    if (left > 0 && kept.length > 0 && !inHead) {
       delete frame.dataset.more;
       before.push([kept[0]!.el, `${left} more`]);
     } else if (left > 0) frame.dataset.more = `${left} more`;
