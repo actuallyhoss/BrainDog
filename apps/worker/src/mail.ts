@@ -315,7 +315,9 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
         subject: 'Your BrainDog is ready',
         parts: [
           /* "OPEN IT HERE:" WENT WITH THE BARE LINK IT POINTED AT: the letter now has a button saying the same. */
-          { say: v.record ? `${v.record} is ready.` : 'Your BrainDog is ready.' },
+          /* THE RECORD HERE IS ITS ADDRESS, NOT ITS NAME (2 Nov, a walk: Marta was mailed "marta is ready."), so it is
+             said as the address, with the one thing to do first. */
+          { say: v.record ? `Your BrainDog is ready, at the address ${v.record}. Start on Today: tell it one real thing, like a bill or somebody you met.` : 'Your BrainDog is ready. Start on Today: tell it one real thing, like a bill or somebody you met.' },
           ...link,
           ...(v.asked ? [{ say: `The name ${v.asked} was taken before the payment went through, so it was made as ${v.record || 'the next free name'}.` }] : []),
         ],
