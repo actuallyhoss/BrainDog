@@ -147,17 +147,62 @@ export const MONEY_MASK = '…';
 /**
  * Text with every amount written in it taken out ("Hide amounts"): "Paid £923.47 for clay" is "Paid
  * £… for clay", "GBP 400" is "GBP …" and "400 EUR" is "… EUR". Read by `MONEY_RE`'s own shapes and its own currency
- * check, so what is masked is what a mail's amount is read as; a number with no currency beside it stays.
+ * check, so what is masked is what a mail's amount is read as. Then the amounts written with no currency mark
+ * (`maskUnmarked`): "Budget is 12k" is "Budget is …", "240 pounds" is "… pounds", "fee 90" is "fee …". A plain number
+ * with nothing about it saying money stays.
  */
 export function maskMoneyText(text: string): string {
   if (!/\d/u.test(text)) return text;
-  return text.replace(MONEY_IN_TEXT, (whole, code: string | undefined, _a, symbol: string | undefined, _b, _c, after: string | undefined) => {
+  const marked = text.replace(MONEY_IN_TEXT, (whole, code: string | undefined, _a, symbol: string | undefined, _b, _c, after: string | undefined) => {
     const currency = code ?? after ?? SYMBOL[symbol ?? ''];
     if (currency === undefined || !isCurrencyCode(currency)) return whole;
     if (code !== undefined) return `${code} ${MONEY_MASK}`;
     if (symbol !== undefined) return `${symbol}${MONEY_MASK}`;
     return `${MONEY_MASK} ${after}`;
   });
+  return maskUnmarked(marked);
+}
+
+/*
+ * AMOUNTS WITH NO CURRENCY MARK (decided 2 Nov). A link without money still showed "Budget is 12k", "240 pounds",
+ * "2,500/month" and "Fee 90", since the pass above reads only a symbol or a code. These read an amount by what is around
+ * it instead: a size word ("12k", "1.2 million"), a currency said in words ("240 quid"), a rate ("2,500/month"), or a
+ * money word just before it ("fee 90", "salary: 45,000", "paid 240 to"). A date, a time, a version, a phone number, a
+ * percentage and a count of things ("3 tasks", "12k followers", "Invoice 1043 sent") stay: a number followed by any other
+ * word is read as a count, and only the short words an amount is said with ("a year", "for", "each") let it through.
+ */
+const AFTER_AMOUNT = new Set(
+  'a an and or but per each every to for from on by in at with the this that so plus inc incl ex excl net gross total upfront up then now last next yesterday today tomorrow already monthly weekly yearly annually hourly daily if when which we they he she i you it is was be'.split(' '),
+);
+const MONEY_WORDS = 'pounds?|quid|bucks|dollars?|euros?|pence|cents?|grand';
+const STEM = `(?<![\\w.,/:#+-])(${NUMBER})`;
+const SIZED = new RegExp(`${STEM}(?:(k|bn|mn)\\b|\\s?(thousand|million|billion|grand)\\b)`, 'giu');
+const SAID_IN_WORDS = new RegExp(`${STEM}\\s?(${MONEY_WORDS})\\b`, 'giu');
+const RATE = new RegExp(`${STEM}(?=(\\s?/\\s?|\\s(?:per|a)\\s)(?:month|mo|year|yr|annum|week|wk|day|hour|hr|night)\\b)`, 'giu');
+const AFTER_MONEY_WORD = new RegExp(
+  `\\b(invoice[sd]?|fees?|salary|salaries|rates?|budget(?:s|ed)?|prices?|priced|paid|pay|owes?|owed|owing|costs?|quote[sd]?|deposit|rent|wages?)((?:\\s*[:=~]|\\s+(?:is|was|of|at|for|to|about|around|roughly|approx|now|be|just|only)\\b){0,2}\\s*)(${NUMBER})`,
+  'giu',
+);
+
+/** Whether the text after an amount reads it as a count, a date, a time, a version or a percentage, and not money. */
+function notMoneyAfter(rest: string): boolean {
+  if (/^(?:\s?%|\s?(?:am|pm|h|hrs?|mins?|st|nd|rd|th)\b|[-/:.]\d|\w)/iu.test(rest)) return true;
+  const said = /^\s+([a-z]+)\b/iu.exec(rest)?.[1];
+  if (said === undefined || (/^[A-Z]{3}$/u.test(said) && isCurrencyCode(said))) return false;
+  const next = said.toLowerCase();
+  return !AFTER_AMOUNT.has(next) && !new RegExp(`^(?:${MONEY_WORDS})$`, 'iu').test(next);
+}
+
+function maskUnmarked(text: string): string {
+  if (!/\d/u.test(text)) return text;
+  let out = text.replace(SIZED, (whole, _n: string, _k, _w, at: number, all: string) => (notMoneyAfter(all.slice(at + whole.length)) ? whole : MONEY_MASK));
+  out = out.replace(SAID_IN_WORDS, (whole, _n: string, word: string) => `${MONEY_MASK} ${word}`);
+  /* "40/hour" is a rate and "3/day" a count; said in words it takes a bigger number, so "10 per day" stays. */
+  out = out.replace(RATE, (whole, n: string, how: string) => ((how.includes('/') ? /\d{2}|\d[., ]\d/u : /\d{3}|\d[., ]\d/u).test(n) ? MONEY_MASK : whole));
+  out = out.replace(AFTER_MONEY_WORD, (whole, word: string, gap: string, n: string, at: number, all: string) =>
+    notMoneyAfter(all.slice(at + whole.length)) ? whole : `${word}${gap}${MONEY_MASK}`,
+  );
+  return out;
 }
 
 type Token = { at: number; money: MailMoney; clean: boolean; line: string; before: string };
