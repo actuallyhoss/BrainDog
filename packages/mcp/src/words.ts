@@ -423,6 +423,9 @@ export function closest(said: string, among: readonly { id: string; name?: strin
   };
   const wanted = new Set(forms(word));
   for (const c of among) if ([c.id, c.name ?? ''].some((s) => s !== '' && forms(s).some((f) => wanted.has(f)))) return c.id;
+  /* ONE WORD OF ONE NAME: "runs" is Agent runs (`session`), and "rates" Exchange rates. Only where one name alone has it. */
+  const worded = among.filter((c) => (c.name ?? '').split(/[\s_-]+/u).some((w) => w.length >= 3 && forms(w).some((f) => wanted.has(f))));
+  if (worded.length === 1) return worded[0]!.id;
   const starts = among.filter((c) => word.length >= 3 && [c.id, c.name ?? ''].some((s) => s.toLowerCase().startsWith(word)));
   if (starts.length === 1) return starts[0]!.id;
   let best: { id: string; d: number } | null = null;

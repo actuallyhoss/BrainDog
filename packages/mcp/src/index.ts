@@ -101,6 +101,7 @@ import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
 import { ASKS, catalogue, doorTakes, keyAsk, notADoor, type Ask, type CallRow } from './act.ts';
 export { withCalls, type CallRow } from './act.ts';
 import { ANSWERED_GRAMMAR, AUTOMATION_GRAMMAR } from './automations.ts';
+import { names as scriptNames, ruleBrief, rulesBrief, scriptBrief, scriptsBrief } from './scripts.ts';
 import {
   activityBrief,
   arrivalWhole,
@@ -2538,9 +2539,69 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    */
   const byName = async (said: string, args: Args, ctx: C, turn: Turn): Promise<Done | null> => {
     const found = await named(said, ctx, turn);
+    /* A SCRIPT OR AN AUTOMATION CALLED THAT (`scriptNamed`) comes before a search's lone guess, and after a row whose
+       whole title it is: "bake-numbers" was refused, and "last_day" answered an update that happened to say "last". */
+    if (found === null || ('one' in found && !found.exact)) {
+      const script = await scriptNamed(said, ctx);
+      if (script !== null) return script;
+    }
     if (found === null) return null;
-    if ('one' in found) return run.get!({ ...args, spoken: `${found.one.register}#${String(found.one.seq)}` }, ctx, turn);
+    if ('one' in found) {
+      const got = await run.get!({ ...args, spoken: `${found.one.register}#${String(found.one.seq)}` }, ctx, turn);
+      /* A GUESS SAYS IT IS ONE: nothing is called that, and this is the one item search found for its words. */
+      if (found.exact || !got.result.ok || got.say === undefined) return got;
+      const say = got.say;
+      return { ...got, say: (look) => `Nothing is called ${clip(said, 60)}; search found this one:\n${say(look)}` };
+    }
     return { result: { ok: false, refusal: ambiguous(said, found.many, callOf('get', { ...args, spoken: found.many.handles[0]! })) } };
+  };
+
+  /**
+   * A script or an automation by its id or its whole title (`scripts.ts`), in short lines, or `null` when none is
+   * called that. Read through the record's own `scripts` and `automations`, with the caller's grant.
+   */
+  const scriptNamed = async (said: string, ctx: C): Promise<Done | null> => {
+    if (said === '' || said.length > 200 || !surface.call) return null;
+    const [scripts, automations] = await Promise.all([
+      surface.call('scripts', {}, ctx),
+      surface.automations ? surface.automations({}, ctx) : Promise.resolve(null),
+    ]);
+    const rules = automations?.ok && Array.isArray(automations.value) ? automations.value.filter(isObject) : [];
+    const script = (scripts.ok && Array.isArray(scripts.value) ? scripts.value.filter(isObject) : []).find((s) => scriptNames(s, said));
+    if (script !== undefined) {
+      const by = rules.filter((r) => isObject(r.script) && r.script.id === script.script);
+      const value = bare({ ...script, rules: by.map((r) => r.rule) });
+      return { result: { ok: true, value }, say: (look) => scriptBrief(script, by, look.now) };
+    }
+    const rule = rules.find((r) => scriptNames(r, said));
+    if (rule === undefined || !surface.automations) return null;
+    const one = await surface.automations({ rule: String(rule.rule) }, ctx);
+    if (!one.ok || !isObject(one.value)) return null;
+    const whole = one.value;
+    return { result: { ok: true, value: bare(whole) }, say: (look) => ruleBrief(whole, look.now) };
+  };
+
+  /**
+   * `list` of what is no list of rows: `scripts` and `automations` (and `rules`), a line each, from the record's own
+   * reads. `null` for any other name, which keeps its refusal.
+   */
+  const notRows = async (register: string, ctx: C): Promise<Done | null> => {
+    const asked = register.trim().toLowerCase();
+    if (asked === 'scripts' || asked === 'script') {
+      if (!surface.call) return null;
+      const got = await surface.call('scripts', {}, ctx);
+      if (!got.ok || !Array.isArray(got.value)) return got.ok ? null : { result: got };
+      const rows = got.value.filter(isObject);
+      return { result: { ok: true, value: bare(got.value) }, say: () => scriptsBrief(rows) };
+    }
+    if (asked === 'automations' || asked === 'automation' || asked === 'rules') {
+      if (!surface.automations) return null;
+      const got = await surface.automations({}, ctx);
+      if (!got.ok || !Array.isArray(got.value)) return got.ok ? null : { result: got };
+      const rows = got.value.filter(isObject);
+      return { result: { ok: true, value: bare(got.value) }, say: () => rulesBrief(rows) };
+    }
+    return null;
   };
 
   /**
@@ -2794,7 +2855,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (!figure.ok) {
         if (codeOf(figure) !== 'METRIC_UNKNOWN') return { result: figure };
         /* A LOWERCASE WORD THAT IS NO FIGURE MAY BE A NAME ("kiln"): the one thing called that answers. */
-        return (await byName(said, args, ctx, turn)) ?? { result: badSpoken(`${ROW_OR_ID} A figure is named by its id, and record_index lists them; ${said} is not one you can read.`) };
+        return (await byName(said, args, ctx, turn)) ?? { result: badSpoken(`${ROW_OR_ID} A figure, a script or an automation is named by its id: record_index lists figures, list scripts and automations the rest; ${said} is none you can read.`) };
       }
       const reading = isObject(figure.value) ? figure.value : {};
       const value = bare(figure.value);
@@ -2855,7 +2916,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         const matched = (got.value as { matched?: unknown }).matched;
         return { ok: true, value: { rows, ...(typeof matched === 'number' ? { matched } : {}), ...(cursor === undefined ? {} : { cursor }) } };
       });
-      if (!out.ok) return { result: out };
+      if (!out.ok) {
+        /* SCRIPTS AND AUTOMATIONS ARE NO LIST OF ROWS, and an agent asks for them as one (`scripts.ts`): where the record
+           holds no list of that name, they are answered from its own reads, a line each. */
+        const other = codeOf(out) === 'REGISTER_UNKNOWN' ? await notRows(register, ctx) : null;
+        return other ?? { result: out };
+      }
       const page = out.value as Page;
       const said = { ...args, ...(args.limit === undefined ? {} : { limit: page.rows.length < limit && page.cursor !== undefined ? page.rows.length : limit }) };
       return { result: out, say: (look) => cutSaid('list', args, LIST_MOST, page, (p) => listBrief(said, p, look)) };
@@ -3415,6 +3481,15 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const ruled = ruledOf(out.value);
       if (ruled !== null && 'filed' in ruled && !isEntry(out.value)) return filedOut(ruled.filed, ctx, turn);
       if (isEntry(out.value)) return wrote(out, 'Changed', ctx, turn);
+      /* EVERY SCRIPT OR EVERY AUTOMATION, A LINE EACH, as `list` says them (`scripts.ts`): the JSON was 19 and 43 KB. */
+      if ((name === 'scripts' || (name === 'automations' && sent.rule === undefined)) && Array.isArray(out.value)) {
+        const rows = out.value.filter(isObject);
+        return { result: { ok: true, value: bare(out.value) }, say: () => (name === 'scripts' ? scriptsBrief(rows) : rulesBrief(rows)) };
+      }
+      if (name === 'automations' && isObject(out.value) && typeof out.value.rule === 'string') {
+        const one = out.value;
+        return { result: { ok: true, value: bare(one) }, say: (look) => ruleBrief(one, look.now) };
+      }
       const value = bare(out.value);
       const say = isObject(value) && typeof value.say === 'string' ? value.say : null;
       return { result: { ok: true, value }, ...(say === null ? {} : { say: () => say }) };
