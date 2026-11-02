@@ -113,6 +113,33 @@
   padding-inline: 0;
 }
 
+/* ONE HAIRLINE BETWEEN A LEDGER'S ROWS, ON THE TEXT'S EDGES (leftovers9). On a phone each row drew two: the list's
+   border out to the row's wash, and under it the inset strip `blocks.css` draws in its place, so every line of the
+   Ledger had a double rule 12px wider than the head's. At 1512 the one border also ran past the text. The strip alone
+   now, at every width, starting and ending where the chip and the amount do. The border keeps its pixel, unseen, so no
+   row changes height. */
+[data-money] .list[data-kind='timeline'] > .item[data-rich] {
+  border-block-end-color: transparent;
+  background-image: linear-gradient(var(--rule), var(--rule));
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: calc(100% - 2 * var(--sp-3)) 1px;
+}
+
+[data-money] .list[data-kind='timeline'] > .item[data-rich]:last-child {
+  background-image: none;
+}
+
+/* A TABLE'S GROUP COUNT AS A QUIET FIGURE, as a tile's head says its count ("Due soon 10"), not a round chip stretched
+   to the row's height beside "Late" (leftovers9; Look B has no pills). */
+[data-money] :is(.tr-group, .table-card-group) .group-count {
+  padding-inline: 0;
+  border-radius: 0;
+  background: none;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-regular);
+}
+
 /* ── the hero ─────────────────────────────────────────────────────────────── */
 
 [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child {
