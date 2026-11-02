@@ -40,6 +40,8 @@ export type ChatAsk = {
   many?: boolean;
   /** Who a people question asks the name of ("co-founder"), so a bare name answered is said as theirs (`saidOf`). */
   role?: string;
+  /** A people question about who shares the money at home, so a tap is said back as that ("I share the money with my partner."). */
+  shares?: boolean;
   /** The one suggested, by value, where a fact points at one (the currency this device keeps). */
   suggested?: string | null;
   by: 'rules' | 'model';
@@ -371,6 +373,32 @@ const FIRST_TAPS: Readonly<Record<string, readonly string[]>> = {
   creator: ['Sponsor deals', 'Paying editors', 'Payouts', 'Uploads'],
 };
 
+/**
+ * WHO ELSE IS AROUND THEM, AS TAPS FOR THEIR KIND (onboarding8: Omar's agency was offered "New team member" and "Another
+ * client"). Each reads well said back ("I work with freelancers I hire.", "I share the money with my partner."). A team
+ * whose size they gave ("six of us", "a team of 12") is never offered "Just me" or a size: who else is asked instead.
+ */
+const PEOPLE_TAPS: Readonly<Record<string, readonly string[]>> = {
+  freelance: ['Just me', 'Other freelancers', 'An accountant', 'An agency'],
+  founder: ['My co-founder', 'A small team', 'Contractors', 'Just me'],
+  student: ['Just me', 'Classmates', 'A supervisor', 'A study group'],
+  personal: ['Just me', 'My partner', 'Family', 'Housemates'],
+  shop: ['Just me', 'A few staff', 'Suppliers', 'A business partner'],
+  creator: ['Just me', 'An editor', 'A manager', 'A designer'],
+  business: ['Just me', '2 to 5 people', 'Freelancers I hire', 'An accountant'],
+  team: ['2 to 5 people', '6 to 20 people', 'Freelancers I hire', 'Other teams'],
+  sized: ['Freelancers I hire', 'An accountant', 'Contractors', 'A business partner'],
+  any: ['Just me', 'A partner', 'A small team', 'An accountant'],
+};
+/** A team's size, said: "six of us", "a team of 12", "we're 4 people", "8 staff". */
+const TEAM_SIZE = /\b(?:(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a dozen|\d+)\s+(?:of us|people|staff|employees|designers|developers)|team of (?:two|three|four|five|six|seven|eight|nine|ten|\d+))\b/iu;
+
+function peopleTaps(w: Pick<Where, 'said' | 'usecase'>): string[] {
+  const kind = kindOf(w.said, w.usecase);
+  const key = CREATOR.test(w.said) ? 'creator' : (kind === 'business' || kind === 'team' || kind === 'shop') && TEAM_SIZE.test(w.said) ? 'sized' : (kind ?? 'any');
+  return [...(PEOPLE_TAPS[key] ?? PEOPLE_TAPS['any']!)];
+}
+
 /** The rules' question for a topic, in words that fit what kind of person they are. */
 export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
   const kind = kindOf(w.said, w.usecase);
@@ -429,11 +457,11 @@ export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
       if (pair !== null) return { topic, question: `What's your ${pair}'s name?`, choices: [], role: pair, by: 'rules' };
       const crew = crewOf(w.said);
       if (crew !== null) return { topic, question: /s$/u.test(crew) || /ies$/u.test(crew) ? `What are your ${crew}' names?` : `What's your ${crew}'s name?`, choices: [], role: crew, by: 'rules' };
-      if (kind === 'freelance') return ask('Who do you work with, besides clients?', ['Just me', 'Other freelancers', 'An accountant', 'An agency']);
-      if (kind === 'founder') return ask('Who are you building it with?', ['My co-founder', 'A small team', 'Contractors', 'Just me']);
-      if (kind === 'student') return ask('Who do you work with?', ['Just me', 'Classmates', 'A supervisor', 'A study group']);
-      if (kind === 'personal') return ask('Who shares the money with you?', ['Just me', 'My partner', 'Family', 'Housemates']);
-      return ask('Who do you work with?', ['Just me', 'A partner', 'A small team', 'Clients']);
+      if (kind === 'personal') return ask('Who shares the money with you?', peopleTaps(w), { shares: true });
+      if (kind === 'freelance') return ask('Who do you work with, besides clients?', peopleTaps(w));
+      if (kind === 'founder') return ask('Who are you building it with?', peopleTaps(w));
+      if (kind === 'shop') return ask('Who works in the shop with you?', peopleTaps(w));
+      return ask('Who do you work with?', peopleTaps(w));
     }
     case 'tools':
       return ask('Do you use AI tools? I can work with them.', ['Claude', 'ChatGPT', 'Cursor', 'None yet'], { many: true });
@@ -526,6 +554,14 @@ function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): 
   if (topic === 'currency') {
     const r = rulesAsk('currency', w);
     return r === null ? null : { ...r, question, by: 'model' };
+  }
+  /* WHO ELSE, WITH THE RULES' TAPS FOR THEIR KIND (onboarding8: the model offered an agency "New team member" and "Another
+     client"): the model's words for the question, and answers they could really tap (`peopleTaps`). Where the rules ask
+     somebody by name (a co-founder, the editors), that question stands instead. */
+  if (topic === 'people') {
+    const r = rulesAsk('people', w);
+    if (r === null || r.role !== undefined) return r;
+    return { ...r, question, by: 'model' };
   }
   /* NO TAP RE-OFFERS A NAME ALREADY SAID AS SOMETHING ELSE (`namedIn`): a client is not offered as a project. */
   const named = namedIn(w);
@@ -621,7 +657,9 @@ export function saidOf(ask: ChatAsk, answer: string): string {
   const a = plain(answer);
   if (a === '' || NO.test(a)) return '';
   if (ask.topic === 'currency' || ask.topic === 'closest' || ask.topic === 'name') return '';
-  if (ask.topic === 'what' || whole(a)) return sentence(a);
+  /* A TAP IS SAID IN A SENTENCE OF ITS OWN, even one that starts like a sentence ("My partner" is "I share the money with my partner."). */
+  const tapped = ask.choices.some((c) => c.label.toLocaleLowerCase() === a.toLocaleLowerCase());
+  if (ask.topic === 'what' || (whole(a) && !tapped)) return sentence(a);
   const low = a.charAt(0).toLowerCase() + a.slice(1);
   switch (ask.topic) {
     case 'work':
@@ -634,7 +672,12 @@ export function saidOf(ask: ChatAsk, answer: string): string {
       if (ask.role !== undefined && BARE_NAME.test(a) && !/^just me$/iu.test(a) && !/s$/u.test(ask.role)) return `My ${ask.role} is ${capital(a)}.`;
       /* THE EDITORS, BY NAME: "Kai and Rosa" is "My editors are Kai and Rosa.", which the rules keep as contractors. */
       if (ask.role !== undefined && /s$/u.test(ask.role) && NAMES.test(a)) return `My ${ask.role} are ${a.split(/\s*(?:,|\band\b|&)\s*/u).filter((x) => x !== '').map(capital).join(' and ').replace(/ and (?=.* and )/gu, ', ')}.`;
-      return /^just me$/iu.test(a) ? 'I work on my own.' : `I work with ${BARE_NAME.test(a) && /^\p{Lu}/u.test(a) ? a : low}.`;
+      {
+        /* A NAME TYPED KEEPS ITS CAPITAL ("I work with Dan."); A TAP IS WORDS IN A SENTENCE ("I work with an accountant."). */
+        const who = !tapped && BARE_NAME.test(a) && /^\p{Lu}/u.test(a) ? a : low;
+        if (ask.shares === true) return /^just me$/iu.test(a) ? 'The money is just mine.' : `I share the money with ${who}.`;
+        return /^just me$/iu.test(a) ? 'I work on my own.' : `I work with ${who}.`;
+      }
     case 'tools':
       return `I use ${a}.`;
     case 'first': {
