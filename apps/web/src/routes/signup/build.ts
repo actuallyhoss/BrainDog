@@ -12,6 +12,7 @@ import { amend, NO_AMEND, type Amend, type Reply } from '../../lib/first-run.ts'
 import { closeOver, INSTALL_ORDER } from '../../lib/shape.ts';
 import { nameOfAddress, type Draft } from '../../lib/signup.ts';
 import { placesOf, type Proposal } from '../../lib/start/propose.ts';
+import { agentsNamed, toolRows } from '../../lib/start/chat.ts';
 import { answer } from '../../lib/start/question.ts';
 import type { Accepting } from '../start/accept.ts';
 import { currencyChoices, type CurrencyEnv } from '../start/building.ts';
@@ -92,9 +93,16 @@ export async function accepting(draft: Draft, extra: Extra | null, reading: (sai
   if (one === null && modules.length === 0) return null;
   const skipped = r?.about === 'currency' && r.value === null;
   const keepsMoney = modules.some(keepsCurrency);
+  /* THE TOOLS AND AI APPS THEY NAMED, as `/start` keeps them (2 Nov, a walk: a stranger who said "Claude, Figma" opened
+     an Agents page with no agent and no Figma): the answer to the tools question is said as "I use …" (`saidOf`). */
+  const used = modules.includes('agents') ? (/\bI use ([^.]+)\./u.exec(draft.said)?.[1] ?? '') : '';
+  const have = new Set(p.rows.map((x) => `${x.register}:${String(x.fields['name'] ?? '').toLocaleLowerCase()}`));
+  const tools = used === '' ? [] : toolRows(used).filter((t) => !have.has(`${t.register}:${String(t.fields['name']).toLocaleLowerCase()}`));
+  const agents = used === '' ? [] : agentsNamed(used);
   return {
     sentence: draft.said,
-    proposal: p,
+    proposal: tools.length === 0 ? p : { ...p, rows: [...p.rows, ...tools] },
+    ...(agents.length === 0 ? {} : { agents }),
     usecase: one?.usecase ?? null,
     also: beside.map((b) => b.usecase),
     modules,

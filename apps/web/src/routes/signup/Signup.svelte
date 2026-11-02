@@ -155,7 +155,9 @@
     ackOf,
     askedLines,
     atLeast,
+    caseTitle,
     chatWords,
+    entriesSaid,
     currencyUnclear,
     firstAsk,
     namedCurrency,
@@ -165,6 +167,7 @@
     saidOf,
     TURNS_ON,
     valueOf,
+    withTodos,
     type ChatAsk,
     type ChatTurn,
   } from '$lib/start/chat.ts';
@@ -650,7 +653,8 @@
   const placed = $derived(u !== null || modules.length > 0);
 
   const parts = $derived([
-    ...cases.map((c) => casePart(c, read?.heard ?? [], chosen !== null)),
+    /* THE USE CASE IN THEIR OWN WORD (`caseTitle`), as `/start` says it: a freelancer's is Freelance, not Small business. */
+    ...cases.map((c) => casePart({ ...c, title: caseTitle(c, sentence) }, read?.heard ?? [], chosen !== null)),
     ...partsOf({
       offered,
       modules,
@@ -751,12 +755,13 @@
     const adds = text === null ? '' : saidOf(q, text);
     const value = text === null ? null : valueOf(q, text);
     const before = placeNames();
+    const rowsBefore = read?.rows ?? [];
     const s = adds === '' ? sentence : joinTurns(sentence, adds);
     const turned: ChatTurn = { ask: q, answer: text, at: Date.now(), ack: null };
     const all = [...chatTurns, turned];
     /* HER ANSWER STAYS WHERE SHE SENT IT, under its question, while BrainDog reads it; the line back is laid on it after. */
     chatTurns = all;
-    const laid: { currency?: string | null; usecase?: string | null; name?: string | null } = {};
+    const laid: { currency?: string | null; usecase?: string | null; name?: string | null; entries?: string | null } = {};
     if (q.topic === 'currency' && value !== null) {
       currencyPick = value;
       laid.currency = currencyName(value);
@@ -790,6 +795,8 @@
         if (named !== null) currencyPick = named;
       }
       await tick();
+      /* WHAT IT ADDED BY NAME (`entriesSaid`), as `/start` says it: "Added Fenwick and Acme as clients." */
+      laid.entries = q.topic === 'tools' ? null : entriesSaid(rowsBefore, read?.rows ?? []);
       chatTurns = [...chatTurns.filter((t) => t !== turned), { ...turned, ack: ackOf(q, text, before, placeNames(), all.length, laid) }];
       await atLeast(since);
     } finally {
@@ -1390,7 +1397,11 @@
       globalThis.sessionStorage?.setItem(MADE_ADDONS, JSON.stringify(tradeAddons(sentence, cat).map((u) => ({ id: u.id, title: u.title, summary: u.summary }))));
       /* AND THE WORDS WITH WHAT THEY BUILT (1 Nov): the made screen has the model read them once more, as the owner now,
          and offers what it finds beyond the build as drafts on Today (`first-drafts.ts`). Never the whole reading. */
-      globalThis.sessionStorage?.setItem(MADE_SAID, JSON.stringify(saidMade(given.sentence, given.proposal.rows)));
+      /* WITH THE FIRST TO-DOS DRAWN FROM WHAT THEY KEEP FIRST AND THE CLIENTS THEY NAMED (`withTodos`), as `/start` does. */
+      const clients = given.proposal.rows
+        .filter((r) => (r.register === 'organisations' && r.fields['kind'] === 'client') || (r.register === 'people' && r.fields['role'] === 'client'))
+        .map((r) => String(r.fields['name'] ?? ''));
+      globalThis.sessionStorage?.setItem(MADE_SAID, JSON.stringify(saidMade(withTodos(given.sentence, clients), given.proposal.rows)));
     } catch {
       /* Storage off: the end says only that it is made. */
     }
