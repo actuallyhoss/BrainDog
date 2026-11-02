@@ -10,7 +10,7 @@
  * LIGHT ON PURPOSE: Today imports this on every open, so the lists and the model's door are loaded only when a read
  * begins (`import()` below), never on Today's cold path.
  *
- * NEVER BLOCKS AND NEVER HANGS: the read has its door's twenty seconds and no more, a host with no model or a month spent
+ * NEVER BLOCKS AND NEVER HANGS: the read has twelve seconds from when it began (`FIRST_DRAFTS_MS`) and no more, a host with no model or a month spent
  * is no drafts and no word, and what the rules built stands either way.
  */
 
@@ -55,8 +55,13 @@ export type Kept = {
 };
 
 const KEY = 'braindog.first.drafts';
-/** An interrupted read older than this is let go on reload rather than asked again. */
-const STALE_MS = 60_000;
+/**
+ * HOW LONG THE READ HAS, FROM WHEN IT BEGAN, ACROSS A RELOAD (onboarding9, 2 Nov): Today said "Still reading for anything
+ * else." 14 seconds after it opened, on a read the browser gave twenty from the made screen and a reload gave twenty
+ * more. Twelve, all told, on the fast model that reads it now (`FIRST_DRAFTS_MODEL` in `@braindog/slash`); past it the
+ * read is over, with nothing said, and a reload never asks again for longer than is left.
+ */
+export const FIRST_DRAFTS_MS = 12_000;
 
 class Drafts {
   now = $state.raw<Kept | null>(null);
@@ -108,7 +113,7 @@ export function draftsFor(base: string): Kept | null {
   if (firstDrafts.now !== held) {
     firstDrafts.now = held;
     if (held.state === 'reading' && !inFlight.has(base)) {
-      if (Date.now() - held.at < STALE_MS) void read(held.begin);
+      if (Date.now() - held.at < FIRST_DRAFTS_MS - 1_000) void read(held.begin, held.at);
       else set({ ...held, state: 'none' });
     }
   }
@@ -140,24 +145,32 @@ export function beginDrafts(b: Begin): void {
   void read(b);
 }
 
-async function read(b: Begin): Promise<void> {
+async function read(b: Begin, at = Date.now()): Promise<void> {
   if (inFlight.has(b.base)) return;
   inFlight.add(b.base);
-  set({ base: b.base, state: 'reading', at: Date.now(), summary: null, drafts: [], found: 0, gone: firstDrafts.now?.base === b.base ? firstDrafts.now.gone : [], begin: b });
+  set({ base: b.base, state: 'reading', at, summary: null, drafts: [], found: 0, gone: firstDrafts.now?.base === b.base ? firstDrafts.now.gone : [], begin: b });
+  /* NEVER LEFT READING: whatever holds the read up (the door, its code still loading), it is over at the deadline. */
+  const left = Math.max(1_000, at + FIRST_DRAFTS_MS - Date.now());
+  const over = (): boolean => firstDrafts.now?.base !== b.base || firstDrafts.now.at !== at || firstDrafts.now.state !== 'reading';
+  const stop = setTimeout(() => {
+    if (!over()) set({ ...firstDrafts.now!, state: 'none' });
+  }, left + 250);
   try {
     const [{ draftOffer, draftsOf, modulesHeld, renamesOf, summaryOf }, { slashAsks }] = await Promise.all([import('./first-drafts.ts'), import('./ask.ts')]);
     const modules = modulesHeld(b.registers);
+    if (over()) return;
     if (modules.length === 0) return void set({ ...firstDrafts.now!, state: 'none' });
-    const out = await slashAsks(b.base).setup({ said: b.said, offer: draftOffer(modules), today: b.today, first: true });
-    /* MOVED ON TO ANOTHER BRAINDOG MEANWHILE: what came back is not this one's to show. */
-    if (firstDrafts.now?.base !== b.base) return;
+    const out = await slashAsks(b.base, undefined, Math.max(1_000, at + FIRST_DRAFTS_MS - Date.now())).setup({ said: b.said, offer: draftOffer(modules), today: b.today, first: true });
+    /* MOVED ON TO ANOTHER BRAINDOG MEANWHILE, OR PAST THE DEADLINE: what came back is not this one's to show. */
+    if (over() || firstDrafts.now === null) return;
     if (!out.ok) return void set({ ...firstDrafts.now, state: 'none' });
     /* AND THE LISTS BY THE PERSON'S OWN WORDS, after the entries: a rename is kept by the record's `renameList`. */
     const drafts = [...draftsOf(out.value, { modules, currency: b.currency, built: b.built, me: b.me }), ...renamesOf(out.value, { modules })];
     set({ ...firstDrafts.now, state: drafts.length > 0 ? 'ready' : 'none', summary: summaryOf(out.value), drafts, found: drafts.length, closed: false });
   } catch {
-    if (firstDrafts.now?.base === b.base) set({ ...firstDrafts.now, state: 'none' });
+    if (!over() && firstDrafts.now !== null) set({ ...firstDrafts.now, state: 'none' });
   } finally {
+    clearTimeout(stop);
     inFlight.delete(b.base);
   }
 }

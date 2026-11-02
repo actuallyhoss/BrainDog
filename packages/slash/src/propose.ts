@@ -33,7 +33,7 @@ import { no, ok, refused, type Refusal, type Result } from '@braindog/ports';
 import { compile, type Schema } from '@braindog/where';
 
 import type { Charge, Core } from './call.ts';
-import { BODIES, fenced, fill, PROMPTS, type AnsweredKind, type PromptId } from './prompts.ts';
+import { BODIES, fenced, fill, PROMPTS, type AnsweredKind, type ModelId, type PromptId } from './prompts.ts';
 import {
   checkSchema,
   citable,
@@ -1527,6 +1527,15 @@ export const readSetup = (ask: SetupAsk, inference: Inference): Promise<Result<S
   setupStep(ask, (id, _question, slots) => askedOnce(id, slots, inference));
 
 /**
+ * THE MODEL THE OWNER'S FIRST WORDS ARE READ AGAIN ON, AFTER THE BUILD (onboarding9, 2 Nov): the made screen's read for
+ * Today's "From what you wrote" (`first: true`). On `setup`'s own model, which thinks before it answers, it took 15 to 26
+ * seconds in seven walks, past the browser's twenty in some, so Today said "Still reading for anything else." long after
+ * it opened and the answer was thrown away. The conversation's fast model, its thinking off, reads the same template;
+ * the sign-up's own reading before the build is unchanged. An owner's own model (`settings().model`) still stands.
+ */
+export const FIRST_DRAFTS_MODEL: ModelId = 'gemma-4-26b-a4b';
+
+/**
  * The first run's two asks, over the ledger every other ask is held and settled in.
  *
  * ONE ASK EACH, COUNTED AS A QUESTION IS. Each holds a `read` row before its model is called, so the month's count and
@@ -1556,10 +1565,11 @@ export const setups = (core: Core, fallback: Inference): Setups => {
     inference: Inference | undefined,
     charge: Charge,
     trim?: { slot: string; lines: readonly string[] },
+    fast?: ModelId,
   ): Promise<Result<{ value: Record<string, unknown>; by: string }>> => {
     const s = core.settings();
     const template = PROMPTS[id];
-    const model = s.model ?? template.model;
+    const model = s.model ?? fast ?? template.model;
     const held = core.reserve('read', s.tier, model, charge);
     try {
       const named = naming(inference ?? fallback);
@@ -1592,7 +1602,9 @@ export const setups = (core: Core, fallback: Inference): Setups => {
     const charge = onHouse ? FIRST_WORDS : PLANNED;
     const stop = owner(ctx) ?? (onHouse ? null : spent(PLANNED));
     if (stop) return { ok: false, refusal: stop };
-    return setupStep(raw, (id, question, slots) => asked(id, question, slots, inference, charge));
+    /* THE FIRST WORDS READ AGAIN AFTER THE BUILD ARE READ ON THE FAST MODEL (`FIRST_DRAFTS_MODEL`). */
+    const fast = isRecord(raw) && raw['first'] === true ? FIRST_DRAFTS_MODEL : undefined;
+    return setupStep(raw, (id, question, slots) => asked(id, question, slots, inference, charge, undefined, id === 'setup' ? fast : undefined));
   };
 
   const proposeMapping = async (raw: MappingAsk, ctx: CallContext, inference?: Inference): Promise<Result<MappingAnswer>> => {
