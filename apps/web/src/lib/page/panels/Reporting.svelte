@@ -71,6 +71,14 @@
   let open = $state(false);
   /** Whether there is a list of readings to report to, known before the rest is read: the folded line's place is held. */
   let held = $state(false);
+  /** The panel as drawn, to find the section head it sits under. */
+  let root = $state<HTMLElement | null>(null);
+  /**
+   * THE SECTION'S OWN SHOW AND HIDE, WHERE THE SECTION FOLDS (`fold: true`, a project's "Send numbers here"). Its head
+   * said Show while this panel stood open under it on the day the project was made, and a second Hide sat in the panel:
+   * two controls for one thing, saying opposite words. The head's control is the one now, and says what this panel is.
+   */
+  let headFold = $state<HTMLDetailsElement | null>(null);
 
   const spoken = $derived(`${register}#${seq}`);
   const line = $derived(curlLine(origin, minted, copy.reportPlaceholder));
@@ -153,6 +161,23 @@
     } else cannot = 'refusal' in out ? out.refusal.fix : copy.reportUnread;
   }
 
+  /* THE HEAD'S FOLD AND THIS PANEL ARE ONE: found in the same slot, its press opens or shuts this, and this, opened or
+     shut, sets it. A key shown once keeps it open, as the panel's own button did. */
+  $effect(() => {
+    const fold = root?.closest('.block-slot')?.querySelector<HTMLDetailsElement>('details.sec-fold') ?? null;
+    headFold = fold;
+    if (!fold) return;
+    const heard = () => {
+      if (minted && !fold.open) fold.open = true;
+      else if (fold.open !== open) open = fold.open;
+    };
+    fold.addEventListener('toggle', heard);
+    return () => fold.removeEventListener('toggle', heard);
+  });
+  $effect(() => {
+    if (headFold && headFold.open !== open) headFold.open = open;
+  });
+
   async function list(client = createClient({ base: apiBase() })) {
     keysFrom(await client.reportKeys());
   }
@@ -208,12 +233,13 @@
 </script>
 
 {#if from === 'ready'}
-  <section class="report" aria-label={copy.reportHeading}>
+  <section class="report" aria-label={copy.reportHeading} bind:this={root}>
     <!-- SETUP FOLDS TO ONE LINE on a lived row (`setupFolded`), so the page's own tiles hold the first screen. The
-         button opens today's whole panel in place; a key just made keeps it open while it is shown once. -->
+         button opens today's whole panel in place; a key just made keeps it open while it is shown once. Under a section
+         that folds, the section's Show and Hide is that button (`headFold`), so it is not drawn twice. -->
     <div class="report-fold">
       <p class="report-folded">{folded}</p>
-      {#if !minted}
+      {#if !minted && !headFold}
         <Button weight="bare" aria-expanded={open} aria-controls={bodyId} onclick={() => (open = !open)}>{open ? FOLD_WORDS.hide : FOLD_WORDS.show}</Button>
       {/if}
     </div>
