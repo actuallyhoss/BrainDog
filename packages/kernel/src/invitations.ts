@@ -197,7 +197,7 @@ export function lookInvitation(sql: Sql, nowMs: number, hash: string): Result<In
 export function acceptInvitation(
   deps: InviteDeps,
   hash: string,
-  args: { person: string; email: string; name?: string },
+  args: { person: string; email: string; name?: string; operator?: true },
 ): Result<Accepted> {
   const found = lookInvitation(deps.sql, deps.nowMs, hash);
   if (!found.ok) return found as Result<never>;
@@ -210,7 +210,9 @@ export function acceptInvitation(
      address is added to whatever they hold, so a link carrying only shares binds them for a member too. */
   if (!guest && deps.sql.one('SELECT 1 AS x FROM member WHERE person_id = ? LIMIT 1', args.person))
     return no<Accepted>('ALREADY_KNOWN', 'You already have access here.', { at: 'person' });
-  const why = `Accepted invitation ${invitation.id}.`;
+  /* AN ADDRESS THE SERVER'S OPERATOR VOUCHED FOR (a self-host with no mail, `invite` in apps/selfhost) is said so on every
+     line that gives them access, since no mailbox proved it. */
+  const why = args.operator === true ? `Invited by the server's operator. Accepted invitation ${invitation.id}.` : `Accepted invitation ${invitation.id}.`;
 
   let joined: Member;
   if (guest) {

@@ -34,6 +34,8 @@ function imageCommand(words: string): string {
   const [verb = '', ...rest] = words.trim().split(/\s+/u);
   if (verb === '' || (verb === 'serve' && rest.length === 0)) return 'docker compose up -d';
   if (verb === '--help') return `docker compose exec braindog ${node} --help`;
+  /* AN OPERATOR'S INVITATION IS MADE IN THE SERVER THAT IS UP, with its key file and its settings. */
+  if (verb === 'invite') return `docker compose exec braindog ${node} ${words.trim()}`;
   /* A BACKUP INSIDE THE VOLUME, where the README takes it from with `docker compose cp`. */
   if (verb === 'backup') return `docker compose exec braindog ${node} backup ${rest[0] === '<folder>' || rest.length === 0 ? '/data/backups' : rest.join(' ')}`;
   if (verb === 'restore')

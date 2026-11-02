@@ -16164,7 +16164,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * way here is a host's `/auth/invite`, after it has signed that person in. The token is the link's own proof;
      * the address it was minted for must be the address the person signed in with.
      */
-    async acceptInvite(args: { token: string; person?: { id: string; email: string; name?: string } }): Promise<Result<unknown>> {
+    async acceptInvite(args: { token: string; person?: { id: string; email: string; name?: string; operator?: true } }): Promise<Result<unknown>> {
       if (typeof args?.token !== 'string' || !args.token) return no('REQUIRED_MISSING', 'Which invitation?', { at: 'token' });
       if (args.person === undefined) {
         const found = await kernel.lookInvitation(args.token);
@@ -16191,7 +16191,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         });
       }
       const { id, email, name } = args.person;
-      const joined = await kernel.acceptInvitation(args.token, { person: id, email, ...(name ? { name } : {}) });
+      /* AN ADDRESS THE SERVER'S OPERATOR VOUCHED FOR, on a self-host with no mail, is said so on the line that gives them access. */
+      const joined = await kernel.acceptInvitation(args.token, { person: id, email, ...(name ? { name } : {}), ...(args.person.operator === true ? { operator: true as const } : {}) });
       /* WHOEVER JOINS IS A PERSON ON THE RECORD, met by the address the host has just verified, as `setup` meets
          the one who signs up: the entry already holding that address is matched, so the same address joining again makes
          no second one, and one is made when nobody holds it, under the name they gave. Never when no list plays `meets`

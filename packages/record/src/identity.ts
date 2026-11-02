@@ -319,7 +319,7 @@ const credentialId = (x: unknown): string | null => (typeof x === 'string' && x.
 const ADDRESS = /^(?=.{3,254}$)[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** The invitation and name a mailbox proof was minted with, or `null` for a payload this code did not write. */
-const pendingInvite = (payload: string): { invite: string; name: string | null } | null => {
+const pendingInvite = (payload: string): { invite: string; name: string | null; operator?: true } | null => {
   let x: unknown = null;
   try {
     x = JSON.parse(payload);
@@ -327,7 +327,7 @@ const pendingInvite = (payload: string): { invite: string; name: string | null }
     return null;
   }
   if (!isObject(x) || typeof x.invite !== 'string' || x.invite === '') return null;
-  return { invite: x.invite, name: typeof x.name === 'string' && x.name !== '' ? x.name : null };
+  return { invite: x.invite, name: typeof x.name === 'string' && x.name !== '' ? x.name : null, ...(x.operator === true ? { operator: true as const } : {}) };
 };
 
 /**
@@ -1589,7 +1589,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
             hash,
             'invite',
             email,
-            JSON.stringify({ invite, name }),
+            JSON.stringify({ invite, name, ...(call.operator === true ? { operator: true } : {}) }),
             now + PENDING_LIFE,
             now,
           );
@@ -1620,7 +1620,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!spent) return rejected(flow, 'link');
         const held = pendingInvite(spent.payload);
         if (!held) return rejected(flow, 'shape');
-        const body: InviteProved = { email: spent.email, invite: held.invite, name: held.name };
+        const body: InviteProved = { email: spent.email, invite: held.invite, name: held.name, ...(held.operator ? { operator: true as const } : {}) };
         return { status: 200, body };
       }
 

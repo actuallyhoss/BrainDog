@@ -2291,7 +2291,7 @@ export async function start(options: {
         ? {
             invite: {
               look: (inviteToken: string) => api.acceptInvite({ token: inviteToken }) as never,
-              accept: async (inviteToken: string, person: { id: string; email: string; name?: string }) => {
+              accept: async (inviteToken: string, person: { id: string; email: string; name?: string; operator?: true }) => {
                 const out = await api.acceptInvite({ token: inviteToken, person });
                 if (!out.ok) return out;
                 const record = inviteToken.slice(0, inviteToken.indexOf('.'));

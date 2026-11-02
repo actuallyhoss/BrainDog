@@ -79,10 +79,11 @@ The server says each of these in one line when it starts. None is an error.
   When they are set, the start signs in to the mail server without sending anything and says `mail: signed in` or
   `mail: could not reach or sign in`. The domain of `BRAINDOG_MAIL_FROM` needs SPF and DKIM set up at your mail
   provider, or sign-in links land in spam.
-- Inviting people needs mail. Somebody new proves their address by opening a mail before they join, so without mail
-  an invitation can only be used by an address that already signs in here. The invite sheet says so before you press
-  and shows the link to copy. With mail on, the invitation is mailed at once, naming you and the BrainDog, and one
-  press of Join is enough. The owner also needs a passkey before anybody else can join.
+- Inviting people works best with mail. Somebody new proves their address by opening a mail before they join. With
+  mail on, the invitation is mailed at once, naming you and the BrainDog, and one press of Join is enough. Without
+  mail, the link from the invite sheet works only for an address that already signs in here, so for somebody new
+  whoever runs the server vouches for them instead (Invite without mail, below). Either way the owner needs a passkey
+  before anybody else can join.
 - Phone and browser notifications: off. They go out through BrainDog Cloud's keys, which a self-host does not have.
   Settings, Notifications says so; what is handed to somebody or mentions them waits in their bell and Needs you.
 - The iPhone and Mac apps: they sign in to BrainDog Cloud only for now. Asked to sign in here, the server answers that
@@ -108,6 +109,27 @@ It may also say:
 - `the name changed from … to …`: `BRAINDOG_ORIGIN` or the certificate moved, and passkeys made at the old name stop
   working there; each device adds one again.
 - `first time: a one-time sign-in link …`: until a passkey exists. The file is removed once the first passkey is added.
+
+### Invite without mail
+
+Invite them from People in the app first and choose what they can do. Then, on the server:
+
+```sh
+node apps/selfhost/src/main.ts invite ada@example.com
+# Docker:
+docker compose exec braindog node apps/selfhost/src/main.ts invite ada@example.com
+```
+
+It prints one link, in that terminal only, and you send it to them however you like. The link holds the proof the mail
+would have carried, so opening it and pressing Join is enough. It works once, runs out in a day, and replaces the link
+the invite sheet showed. When they join, Activity says they were invited by the server's operator.
+
+- No invitation waiting? Say what they can do here instead: `--as read`, `append`, `write`, `decide` or `owner`
+  (Can view, Can add, Can edit, Can decide, Owner).
+- More than one BrainDog in the data folder? Name it with `--record <name>`.
+- Somebody who already signs in here gets the plain link: they sign in, then open it.
+- It reads the same settings as the server (`BRAINDOG_DATA`, `BRAINDOG_ORIGIN`, the key file), so run it with the same
+  `.env`. Nothing reaches it over the network, and the link is never written to a file or a log.
 
 ### Behind a proxy
 

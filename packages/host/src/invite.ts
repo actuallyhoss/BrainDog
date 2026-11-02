@@ -49,8 +49,11 @@ export type InviteDoor = {
    * `{ slug }` OF THE RECORD JOINED, WHERE A HOST HOLDS MORE THAN ONE, and a signed-in person's session is moved
    * onto it. The Worker answers it; the self-host holds one record, so there is nowhere else a session could be,
    * and it answers what it always did.
+   *
+   * `operator` IS A PERSON WHOSE ADDRESS THE SERVER'S OPERATOR VOUCHED FOR, at a shell, on a self-host that cannot mail a
+   * proof (`invite` in apps/selfhost): the record says so on the line that gives them access.
    */
-  accept(token: string, person: { id: string; email: string; name?: string }): Promise<Result<unknown>>;
+  accept(token: string, person: { id: string; email: string; name?: string; operator?: true }): Promise<Result<unknown>>;
   /** Whether this address can already sign in here, and so must, before a link is spent for it. */
   known(email: string): Promise<boolean>;
   /**
@@ -171,18 +174,24 @@ type Door = { on: 'selfhost' | 'worker'; origin: string; ip: string; auth: Auth;
 
 /** What path 3 says on a host that cannot send mail, whose Directory therefore proves no address. */
 export const NO_MAIL =
-  "This BrainDog can't send mail yet, so it can't check that this address is yours, and you can't join with it for now. Tell whoever invited you: once it can send mail, they can send you a new link.";
+  "This BrainDog can't send mail yet, so it can't check that this address is yours, and this link alone can't let you join. Tell whoever invited you: whoever runs this BrainDog can make you a link that works.";
 
 /**
  * What the person who made an invitation is told when this host cannot mail it (selfhost lane, 2 Nov). `NO_MAIL` is the
  * joiner's sentence, and the inviter was shown "Nothing is emailed: copy the link and send it yourself", which promised a
  * link that a new address could not use: joining asks for a proof by mail, and there is no mail to send it with.
  */
-export function noMailSend(on: 'selfhost' | 'worker'): string {
+export function noMailSend(on: 'selfhost' | 'worker', email?: string): string {
   return on === 'selfhost'
-    ? "This BrainDog can't send mail, so nothing was emailed. Somebody new can join once whoever runs it sets BRAINDOG_SMTP_URL and BRAINDOG_MAIL_FROM and starts it again; until then the link works only for an address that already signs in here."
+    ? `This BrainDog can't send mail, so nothing was emailed, and the link alone works only for an address that already signs in here. To let somebody new join, whoever runs this server types ${operatorInvite(email)} on it and sends them the link it prints; or they set BRAINDOG_SMTP_URL and BRAINDOG_MAIL_FROM and start it again.`
     : "Mail isn't going out right now, so nothing was emailed. Try again in a while.";
 }
+
+/**
+ * The command the server's operator types on a self-host with no mail to let a new address join (`invite` in
+ * apps/selfhost/src/main.ts): it mints the proof the mail would have carried and prints the link in that terminal only.
+ */
+export const operatorInvite = (email?: string): string => `node apps/selfhost/src/main.ts invite ${email && email.length <= 254 && !/\s/u.test(email) ? email : '<their email>'}`;
 
 /** What a proof that is spent, run out, or minted for another invitation or address is told. */
 const PROOF_GONE = 'That link from your mail has been used, has run out, or is for another invitation. Accept again to be sent a new one.';
@@ -314,7 +323,7 @@ export async function serveInvite(
   if (body.send === true) {
     if (!live || !who) return refusal(401, { code: 'UNAUTHORIZED', fix: 'Sign in to send an invitation.', at: 'session' });
     const send = door.mail;
-    if (!send) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: noMailSend(door.on), at: 'email' });
+    if (!send) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: noMailSend(door.on, email), at: 'email' });
     const vars = { ...(found.value.record ? { record: found.value.record } : {}), ...(found.value.by ? { from: found.value.by } : {}) };
     let link = `${door.origin}/invite#${token}`;
     /* EVERY SEND IS COUNTED AGAINST THE ADDRESS (security pass, 2 Nov), a known one too: the proof flow is what keeps
@@ -322,7 +331,7 @@ export async function serveInvite(
        the link could mail somebody who already signs in here thirty times in a row. For a known address the proof
        minted is never sent and opens nothing: path 2 asks them to sign in before any proof is read. */
     const proving = await door.auth({ flow: 'invite.prove', email, invite: token });
-    if (proving.status === 404) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: noMailSend(door.on), at: 'email' });
+    if (proving.status === 404) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: noMailSend(door.on, email), at: 'email' });
     if (proving.status !== 200) return finish(proving);
     if (!(await invite.known(email))) {
       const mail = proving.mail;
@@ -436,7 +445,7 @@ async function provedThen(proof: string, token: string, email: string, door: Doo
      behind the door measured `name: null` on the member row. It is the ROW's name and not the one just typed, so a
      second invitation for somebody who has named themselves carries their name and not a stranger's. */
   const named = made.value.name ?? null;
-  const out = await invite.accept(token, { id: made.value.id, email: made.value.email, ...(named ? { name: named } : {}) });
+  const out = await invite.accept(token, { id: made.value.id, email: made.value.email, ...(named ? { name: named } : {}), ...(held.operator ? { operator: true as const } : {}) });
   if (!out.ok) return reply(httpStatus(out), out);
 
   /* THE SESSION IS A CLAIM LINK SPENT AT ONCE, in the Directory, by the same two calls a provisioned owner's first

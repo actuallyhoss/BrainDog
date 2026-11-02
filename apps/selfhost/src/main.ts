@@ -57,6 +57,7 @@ import { openSqlite, signedWebhooks, start } from './server.ts';
 import { rewrapAtStart } from './rewrap.ts';
 import { webhookPost } from './actions.ts';
 import { outboundOf } from './script.ts';
+import { operatorInvite } from './operator-invite.ts';
 import { authMail, mailedNotices, smtpCheck, smtpLine, smtpOf, smtpSender, type MailFault } from './smtp.ts';
 
 /**
@@ -934,6 +935,7 @@ function help(): void {
     ['init <name> --from <file.brainl> [--key <public key>]', 'bring an export in as the record, in an empty data folder.'],
     ['backup <folder>', 'copy every record, the directory and the key file into a new folder under <folder>.'],
     ['restore <backup folder>', 'put a backup into an empty data folder.'],
+    ['invite <their email> [--as <level>]', 'with no mail set up, print a link that lets somebody new join, here in this terminal only.'],
   ];
   say('The self-host. Each command, as you run it here:');
   for (const [words, does] of rows) say(`  ${commandFor(words).trimEnd()}\n      ${does}`);
@@ -972,7 +974,9 @@ try {
     if (!from || from.startsWith('--')) refuse(`restore needs the backup folder: ${commandFor('restore <backup folder>')}.`);
     restoreData({ data: dataDir(), from });
     say(`restored into ${dataDir()}. Start the server as usual.`);
-  } else refuse(`There is no ${command} here. It has serve, init, backup and restore; ${commandFor('--help')} says what each takes.`);
+  } else if (command === 'invite')
+    await operatorInvite(rest, { data: dataDir(), env, records: () => recordsIn(dataDir()), fileOf: (slug) => recordIn(join(dataDir(), slug)), say, refuse });
+  else refuse(`There is no ${command} here. It has serve, init, backup, restore and invite; ${commandFor('--help')} says what each takes.`);
 } catch (e) {
   refuse(e instanceof Error ? e.message : String(e));
 }

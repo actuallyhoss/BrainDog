@@ -111,7 +111,9 @@ export type AuthCall =
    * A new address accepting an invitation proves the mailbox first. The host has already looked the invitation up,
    * and `email` is the address it was made for; this mints the proof and hands it back in `mail`.
    */
-  | { flow: 'invite.prove'; email: string; invite: string; name?: string }
+  /* `operator` MARKS A PROOF THE SERVER'S OPERATOR MINTED AT A SHELL ON A SELF-HOST WITH NO MAIL (`invite` in
+     apps/selfhost), never one a request asked for: no route passes it, and the joining is logged as theirs. */
+  | { flow: 'invite.prove'; email: string; invite: string; name?: string; operator?: true }
   /** The proof coming back from the mailbox, spent once: the host makes the person only after this answers. */
   | { flow: 'invite.proved'; token: string }
   /**
@@ -275,7 +277,7 @@ export type Mail =
 export type SessionInfo = { ref: string; current: boolean; authedAt: number; activeAt: number; record: string | null; device?: string };
 
 /** What `invite.proved` answers: the proved address, the invitation the proof was minted for, and the name typed then. */
-export type InviteProved = { email: string; invite: string; name: string | null };
+export type InviteProved = { email: string; invite: string; name: string | null; operator?: true };
 
 /**
  * The answer.

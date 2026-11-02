@@ -12077,7 +12077,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const hash = await inviteHash(token);
       return hash === null ? no<InvitationRow>('UNAUTHORIZED', INVITE_GONE, { at: 'token' }) : lookInvitation(sql, clock.now(), hash);
     },
-    acceptInvitation: async (token: string, person: { person: string; email: string; name?: string }): Promise<Result<InviteAccepted>> => {
+    acceptInvitation: async (token: string, person: { person: string; email: string; name?: string; operator?: true }): Promise<Result<InviteAccepted>> => {
       const hash = await inviteHash(token);
       if (hash === null) return no<InviteAccepted>('UNAUTHORIZED', INVITE_GONE, { at: 'token' });
       return attempt(sql, transaction, () => acceptInvitation({ ...memberDeps(), recordId: () => recordIdentity(sql)?.id ?? null }, hash, person));
