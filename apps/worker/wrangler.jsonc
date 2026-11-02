@@ -792,5 +792,10 @@
      `GOOGLE_CLIENT_ID` AND `GOOGLE_CLIENT_SECRET` ARE SIGN-IN WITH GOOGLE'S TWO (`src/google.ts`): the id and the
      secret of one OAuth web client whose redirect is `https://<PUBLIC_HOST>/auth/google/callback`, each put with
      `wrangler secret put <NAME> --env <environment>`. Either unset, and the sign-in page offers no Google and both
-     routes are 404. Not under `secrets.required`, for the reason `KEK` is not. */
+     routes are 404. Not under `secrets.required`, for the reason `KEK` is not.
+
+     CONNECT GOOGLE USES THE SAME CLIENT (`src/google-connect.ts`): add `https://<PUBLIC_HOST>/api/google/callback` as a
+     second authorised redirect URI on it, and the Gmail, Calendar and Contacts read-only scopes to its consent screen.
+     Either secret unset, and Connect Google says it is not set up here. Its refresh tokens are sealed under each
+     record's connector key, so `KEK` must be bound too. */
 }
