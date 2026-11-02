@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "While a holding has no price yet, Paid in leaves it out as Worth now and Gain do, so the three figures agree, and the page says how many have no price under them. Each holding's card says its gain in money, as Gain since you bought, where it said Gain on cost, % and a bare number.",
+  "changes": "A holding with a worth and no cost, such as gold valued by a gold rate before you say what you paid, is left out of Worth now as it is of Paid in and Gain, so the three figures agree, and the page says how many have no cost yet. Net worth still counts it.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -663,6 +663,22 @@
       "sellable": true
     },
     {
+      "metric": "holdings-worth-costed",
+      "name": "Worth now of what has a cost",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "value is set, cost is set",
+      "value": {
+        "sum": "value"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
       "metric": "holdings-count",
       "name": "Holdings",
       "pack": "holdings",
@@ -731,6 +747,22 @@
       "pack": "holdings",
       "source": "register.holdings",
       "where": "value is empty",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-uncosted",
+      "name": "Holdings with a worth and no cost yet",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "value is set, cost is empty",
       "value": {
         "count": "id"
       },
@@ -1010,7 +1042,7 @@
           "span": 8,
           "cells": [
             {
-              "metric": "holdings-value",
+              "metric": "holdings-worth-costed",
               "label": "Worth now",
               "note": "{{holdings-at-cost}} of {{holdings-count}} at what they cost"
             },
@@ -1040,7 +1072,7 @@
           "span": 8,
           "cells": [
             {
-              "metric": "holdings-value",
+              "metric": "holdings-worth-costed",
               "label": "Worth now"
             },
             {
@@ -1076,6 +1108,24 @@
           "body": "{{holdings-unvalued}} holdings have no price yet, so they are left out of these.",
           "when": {
             "metric": "holdings-unvalued",
+            "gt": 1
+          }
+        },
+        {
+          "kind": "note",
+          "span": 8,
+          "body": "1 holding has no cost yet, so it is left out of these until you say what you paid.",
+          "when": {
+            "metric": "holdings-uncosted",
+            "is": 1
+          }
+        },
+        {
+          "kind": "note",
+          "span": 8,
+          "body": "{{holdings-uncosted}} holdings have no cost yet, so they are left out of these until you say what you paid.",
+          "when": {
+            "metric": "holdings-uncosted",
             "gt": 1
           }
         },

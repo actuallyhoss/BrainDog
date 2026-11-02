@@ -112,10 +112,14 @@ const bookOf = (config) => {
   return Number.isInteger(book) && book > 0 ? book : 0;
 };
 
+/* THE KEY BY THE NAME PEOPLE SEE IT UNDER (1.5.1): the label `stripe` is shown everywhere as "Stripe (read only)"
+   (`apps/web/src/lib/market/key-names.ts`), and the log said the bare label. Another label is said as it is. */
+const keyShown = (key) => (key === 'stripe' ? 'Stripe (read only)' : key);
+
 async function ask(ctx, key, path) {
   const r = await ctx.fetch(API + path, { key });
   if (r.status === 401)
-    throw new Error(`Stripe refused the key labelled "${key}" (401) at ${path}, so nothing was written. Put a working restricted key with read access to balances and payouts in the vault under that label.`);
+    throw new Error(`Stripe refused the key "${keyShown(key)}" (401) at ${path}, so nothing was written. Put a working restricted key with read access to balances and payouts in the keychain under that name.`);
   if (!r.ok) throw new Error(`Stripe answered ${r.status} at ${path}, so nothing was written this hour.`);
   return r.json();
 }
