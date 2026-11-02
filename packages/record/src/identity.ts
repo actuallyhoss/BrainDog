@@ -119,6 +119,16 @@ const APP_GRACE = 5 * MINUTE;
 /** An app's sign-in code: ten minutes, which is shorter than the link it rides with, and five wrong tries. */
 const APP_CODE_LIFE = 10 * MINUTE;
 const APP_CODE_TRIES = 5;
+/**
+ * AND TEN WRONG CODES FOR ONE PERSON, ACROSS EVERY CODE, THEN NONE FOR A DAY (sec2, 2 Nov). Anybody may ask for a link
+ * for somebody else's address with a challenge of their own (`magic.start` with `app`), so they hold the verifier and
+ * need only the six digits. Five tries a code reset with each new one: ten letters a quarter of an hour, fifty guesses,
+ * from as many addresses as they liked, since a sign-in of their own clears an address's strikes. Counted on the person
+ * the code would open (`appcode:<person>`), so no address spreads it; their link still signs them in, and a right code
+ * or a spent link clears the count.
+ */
+const APP_CODE_PERSON: Rule = { most: 9, window: DAY };
+const codeKey = (person: string): string => `appcode:${person}`;
 /** What an app session is listed as when the app sent no label of its own. */
 const APP_LABEL = 'BrainDog app';
 
@@ -746,7 +756,8 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
     sql.exec('DELETE FROM dir_session WHERE expires <= ?', now);
     sql.exec('DELETE FROM dir_app_session WHERE id_hash NOT IN (SELECT id_hash FROM dir_session)');
     sql.exec('DELETE FROM dir_app_code WHERE expires <= ?', now);
-    sql.exec('DELETE FROM dir_fail WHERE COALESCE(until, first + ?1) <= ?2', WINDOW, now);
+    /* A PERSON'S WRONG APP CODES ARE COUNTED OVER A DAY (`APP_CODE_PERSON`), so their row is not swept at fifteen minutes. */
+    sql.exec("DELETE FROM dir_fail WHERE COALESCE(until, first + CASE WHEN key LIKE 'appcode:%' THEN ?3 ELSE ?1 END) <= ?2", WINDOW, now, APP_CODE_PERSON.window);
     const record = recordOf(person.id);
     sql.exec(
       'INSERT INTO dir_session (id_hash, person, record, expires, rotated_at, authed_at) VALUES (?, ?, ?, ?, ?, ?)',
@@ -1121,6 +1132,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           const person = livePerson(link.person);
           if (!person) return 'suspended';
           sql.exec('DELETE FROM dir_fail WHERE key = ?', mailKey(person.email));
+          if (!claim) sql.exec('DELETE FROM dir_fail WHERE key = ?', codeKey(person.id));
           return open(person, presented, next, now, strike, app);
         });
         if (typeof outcome === 'string') return rejected(flow, outcome);
@@ -1154,10 +1166,23 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
             now,
           );
           if (!row) return 'link';
+          /* WHOSE IT WOULD OPEN, BEFORE THE COMPARE: a person past their wrong codes is refused as a miss, compared or not. */
+          const whose = sql.one<{ person: string }>("SELECT person FROM dir_link WHERE hash = ? AND purpose = 'magic' AND expires > ?", row.link_hash, now)?.person;
+          if (whose === undefined) {
+            sql.exec('DELETE FROM dir_app_code WHERE challenge = ?', challenge);
+            return 'link';
+          }
+          const held = sql.one<{ until: number | null }>('SELECT until FROM dir_fail WHERE key = ?', codeKey(whose));
+          if (held?.until !== null && held?.until !== undefined && Number(held.until) > now) {
+            sql.exec('DELETE FROM dir_app_code WHERE challenge = ?', challenge);
+            return 'code';
+          }
           if (!same(encoder.encode(given), encoder.encode(row.code_mac))) {
             const tries = Number(row.tries) + 1;
             if (tries >= APP_CODE_TRIES) sql.exec('DELETE FROM dir_app_code WHERE challenge = ?', challenge);
             else sql.exec('UPDATE dir_app_code SET tries = ? WHERE challenge = ?', tries, challenge);
+            const r = APP_CODE_PERSON;
+            sql.one(LOCKOUT, codeKey(whose), now, now - r.window, now + r.window, r.most);
             return 'code';
           }
           sql.exec('DELETE FROM dir_app_code WHERE challenge = ?', challenge);
@@ -1166,6 +1191,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           const person = livePerson(link.person);
           if (!person) return 'suspended';
           sql.exec('DELETE FROM dir_fail WHERE key = ?', mailKey(person.email));
+          sql.exec('DELETE FROM dir_fail WHERE key = ?', codeKey(person.id));
           return open(person, presented, next, now, strike, label);
         });
         if (typeof outcome === 'string') return rejected(flow, outcome);
