@@ -3856,6 +3856,25 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'work@1.25.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-last-worked metric.project-moved-7d metric.project-open
+      metric.tasks-after-week-yours metric.tasks-dated metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week
+      metric.tasks-due-7d metric.tasks-due-by-week metric.tasks-in-play metric.tasks-late-yours metric.tasks-later
+      metric.tasks-no-project metric.tasks-not-this-week metric.tasks-overdue metric.tasks-this-week-yours metric.tasks-today-yours
+      metric.tasks-undated-yours metric.tasks-waiting metric.tasks-week-yours metric.tasks-with-agents
+      page.roadmap page.work page.work-board
+      register.tasks register.tracks register.updates
+      rule.close_follow_ups rule.start_with_parent
+      script.close_follow_ups script.start_with_parent
+    `,
+    declares: 'e559c20bfa7b2dde',
+    history: [
+      'Work 1.25.0, pages polish of 2 November: `register.tasks` says a task\'s name as Task where it said Description -> e559c20bfa7b2dde',
+    ],
+  },
+
   'people@4.4.0': {
     holds: `
       metric.organisations-clients metric.organisations-count metric.organisations-from-card-texts metric.organisations-known

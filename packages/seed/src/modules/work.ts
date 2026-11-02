@@ -268,7 +268,9 @@ export const WORK_REGISTERS: Record<string, WorkRegister> = {
     hand: { person: 'owner', agent: 'agent', taken: 'doing' },
     pack: 'work',
     fields: [
-      { id: 'what', label: 'Description', type: 'text', required: true, search: true },
+      /* SAID AS TASK, SINCE work 1.25.0 (pages polish, 2 Nov): "Description" headed the column of task names, a word for
+         the long text under a name, and the field is the task itself. The id stays. */
+      { id: 'what', label: 'Task', type: 'text', required: true, search: true },
       /* `review` IS THE QUEUE A PERSON WORKS FROM: an agent finished its part and a person checks it before it is done.
          `backlog` IS WORK KEPT FOR LATER, not yet taken on: a team's backlog, or homework for next term. It comes first on
          the board, and a new task is To do unless somebody says Later. */
@@ -938,6 +940,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'open-tasks', is: 0 },
+        /* NO SECOND SENTENCE SAYING WHAT TO DO (pages polish, 2 Nov, tried and left): the capture line right under it is
+           the next step, and two sentences at the headline's size took four lines on a phone. */
         body: 'Nothing is open right now',
       },
       {

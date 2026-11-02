@@ -979,6 +979,8 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  * - people 4.6.0 (onboarding10, 2 Nov): `register.people` offers `staff` on `role`, said as Staff, so the people who work
  *   for a shop or a business named at sign-up are kept as its staff and not as collaborators. A value added, so a minor
  *   step.
+ * - work 1.25.0 (pages polish, 2 Nov): a task's name is said as Task, where it was Description (`register.tasks`). Words
+ *   only, but a field's label is what a list's column and a task's form say, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
@@ -986,7 +988,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   people: '4.6.0',
   'money-core': '3.38.3',
   estate: '2.8.0',
-  work: '1.24.0',
+  work: '1.25.0',
 };
 
 type Body = Record<string, unknown>;
