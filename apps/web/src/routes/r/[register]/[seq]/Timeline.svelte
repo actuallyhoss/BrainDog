@@ -34,6 +34,7 @@
     me = null,
     people = new Map(),
     onnames,
+    again = 0,
   }: {
     /** The row, as the record takes it: `obligations#1`. */
     on: string;
@@ -44,6 +45,8 @@
     people?: ReadonlyMap<string, string> | undefined;
     /** Asked when somebody other than the reader has commented, so the page reads the record's names once. */
     onnames?: (() => void) | undefined;
+    /** Moved by the page when the record changed under the row: the thread is asked again in place (collab pass 2). */
+    again?: number | undefined;
   } = $props();
 
   const uid = $props.id();
@@ -78,6 +81,16 @@
       resolving = null;
       void read(target);
     });
+  });
+
+  /* AND AGAIN WHEN THE PAGE SAYS THE RECORD MOVED, IN PLACE: what somebody else just said arrives without a reload, and
+     nothing drawn is cleared while it is asked. A reply or a resolution being typed is left as it is. */
+  let heardAgain = untrack(() => again);
+  $effect(() => {
+    const n = again;
+    if (n === heardAgain) return;
+    heardAgain = n;
+    untrack(() => void read(on));
   });
 
   /* A COLLEAGUE'S COMMENT IS SAID BY NAME, so the page is asked for the names once somebody else has spoken. */

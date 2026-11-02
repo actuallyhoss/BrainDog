@@ -332,6 +332,58 @@
     if (Number.isInteger(n) && n >= 1) untrack(() => void readRow(register, n));
   });
 
+  /**
+   * THE RECORD CHANGED UNDER THIS ROW, AND THE ROW NEVER HEARD (collab pass 2, 2 Nov). Sam marked a task done in his
+   * browser; Mira, on the same task, still read To do with Mark done offered five seconds later, and her press met "changed
+   * elsewhere". The list already asks again when the shell's poll says the record moved (`live.version`); the row now does
+   * too, in place: the row, its history and what points at it, read again and drawn over what is there, with no wait drawn
+   * and nothing cleared, and the comments under it asked again (`Timeline`'s `again`).
+   *
+   * WHAT IS BEING TYPED IS NOT TOUCHED: a change heard while a field is open is read when it closes, once. The latest
+   * re-ask is the one drawn, and an answer for a row the reader has left is dropped. A failed re-ask says nothing; the
+   * next change tries again.
+   */
+  /* WHAT A FIELD SAYS WHEN SOMEBODY ELSE SAVED IT WHILE IT WAS BEING TYPED IN (`saveEdit`). */
+  const bothWords = { theirs: 'Somebody else changed this while you typed. Save again to put yours in its place, or Cancel to keep theirs.' } as const;
+  let rowDrawnAt = untrack(() => poll.version);
+  let rowOwed = $state(false);
+  let rowAsks = 0;
+  let threadAgain = $state(0);
+  $effect(() => {
+    const now = poll.version;
+    if (now === null || now === rowDrawnAt) return;
+    rowDrawnAt = now;
+    untrack(() => {
+      if (editing !== null || saving) rowOwed = true;
+      else void rereadRow();
+    });
+  });
+  $effect(() => {
+    if (editing === null && !saving && rowOwed)
+      untrack(() => {
+        rowOwed = false;
+        void rereadRow();
+      });
+  });
+  async function rereadRow() {
+    const register = id;
+    const n = seq;
+    const key = `${register}#${n}`;
+    if (askedFor !== key || got?.from !== 'live' || reader === null || links === null) return;
+    const mine = ++rowAsks;
+    const [r, h, l] = await Promise.all([
+      reader.read(register, n),
+      sayOf().then((say) => readHistory(apiBase(), register, n, undefined, say)),
+      links.read(register, n),
+    ]);
+    if (mine !== rowAsks || askedFor !== key || editing !== null) return;
+    if (r.from === 'live' && r.entry && r.entry.seq === n) got = r;
+    if (h.from === 'live') told = h;
+    if (l.from === 'live') linked = l;
+    clock = recordNow();
+    threadAgain += 1;
+  }
+
   let writer: RowWriter | null = null;
 
   /**
@@ -492,9 +544,27 @@
     saving = true;
     problem = null;
     writer ??= rowWriter(apiBase());
-    const out = await writer.update(register, n, patch, row.version);
+    let out = await writer.update(register, n, patch, row.version);
     saving = false;
     if (askedFor !== key) return;
+    /* TWO PEOPLE ON ONE ROW (collab pass 2, 2 Nov). A conflict closed the box and threw away what was typed, though most
+       of the time the other person changed another field. So: when the field typed in still holds what it held when the
+       box opened, the change is sent again at the row's new version, and both land. When they changed this same field,
+       the box stays open over their value with the typed words in it, and says so: Save again puts yours over theirs,
+       Cancel keeps theirs. Nothing is overwritten that the person did not see. */
+    if (!out.ok && out.why === 'conflict' && out.entry) {
+      const latest = out.entry;
+      got = { from: 'live', entry: latest, names: names ?? new Map() };
+      if (JSON.stringify(latest.fields[f.id] ?? null) === JSON.stringify(before[f.id] ?? null)) {
+        saving = true;
+        out = await writer.update(register, n, patch, latest.version);
+        saving = false;
+        if (askedFor !== key) return;
+      } else {
+        problem = bothWords.theirs;
+        return;
+      }
+    }
     if (out.ok) {
       got = { from: 'live', entry: out.entry, names: names ?? new Map() };
       endEdit();
@@ -1796,7 +1866,7 @@
             <TaskEffects register={id} seq={row.seq} stateField={decl?.state ?? null} done={decl?.done ?? []} finished={decl?.done?.includes(stateValue) ?? false} description={row.fields.description ?? row.fields.notes ?? row.fields.details ?? null} />
           {/if}
           {#if live}
-            <Timeline on="{id}#{row.seq}" {history} now={clock} me={me || null} {people} onnames={askNames} />
+            <Timeline on="{id}#{row.seq}" {history} now={clock} me={me || null} {people} onnames={askNames} again={threadAgain} />
           {/if}
         </Tile>
       </aside>

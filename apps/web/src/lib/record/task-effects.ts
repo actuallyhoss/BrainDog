@@ -33,7 +33,8 @@ export function said(v: unknown): string | null {
   if (v === null || v === undefined || v === '') return 'empty';
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
   if (typeof v === 'number') return Number.isFinite(v) ? String(v) : null;
-  if (typeof v === 'string') return v.length <= 40 ? v.replace(/_/gu, ' ') : null;
+  /* AN ID IS NO WORDS (collab pass 2): a task's page said "owner empty → 01M6D38XZH5CNVAXF7DX31PSWJ" for a row handed on. */
+  if (typeof v === 'string') return /^(?:[a-z]+_)?[0-9A-HJKMNP-TV-Z]{26}$/u.test(v) ? null : v.length <= 40 ? v.replace(/_/gu, ' ') : null;
   if (typeof v === 'object' && !Array.isArray(v)) {
     const { amount, currency } = v as { amount?: unknown; currency?: unknown };
     if (typeof amount === 'number' && Number.isSafeInteger(amount) && typeof currency === 'string' && /^[A-Za-z]{3}$/u.test(currency)) return money(amount, currency.toUpperCase());
@@ -55,7 +56,10 @@ export function windowOf(task: readonly Ev[], stateField: string | null, done: r
 
 /** The changes the finisher made to other rows inside the window, net per row and field, before -> after. */
 export function doneEffects(task: { register: string; seq: number }, win: ReturnType<typeof windowOf>, recent: readonly Ev[]): Effect[] {
-  if (!win) return [];
+  /* AN AGENT'S RUN, NOT A PERSON (collab pass 2): a run is one piece of work, so what it changed while the task was open
+     is what doing the task changed. A person's hand across the same days is everything they did that week: Sam handing
+     Mira another task was said as what finishing this one changed. */
+  if (!win || win.run === null) return [];
   const mine = recent
     .filter((e) => {
       const t = at(e);

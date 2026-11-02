@@ -98,7 +98,11 @@ export function lineWhole(by: string, note: string): string | null {
  * headings with one key.
  */
 export function momentsOf(history: readonly Event[], threads: readonly Thread[]): Moment[] {
-  const events = history.map((event): Moment => ({ kind: 'event', at: event.at, event }));
+  /* A COMMENT ONCE (collab pass 2): the log carries each comment and reply as a line too, and with the thread drawn beside
+     it every comment read twice, "Sam Okafor @Mira the photos are up" over the same words in its thread. While the
+     thread is there it says them; when it is not, the log's line still does. */
+  const threaded = (e: Event): boolean => e.field === 'comment' || e.field === 'resolve' || (typeof e.field === 'string' && e.field.startsWith('reply:'));
+  const events = (threads.length > 0 ? history.filter((e) => !threaded(e)) : history).map((event): Moment => ({ kind: 'event', at: event.at, event }));
   /* A TIME THAT DOES NOT READ SORTS AS THE OLDEST, so the comparison stays consistent and the sort stable. */
   const when = (t: Thread): number => {
     const n = timeOf(t.comment.at);
