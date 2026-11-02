@@ -63,7 +63,8 @@ export type Event = {
  * rows it gained and lost: "added this to Tidewell". Without them it says how many, never the ids it holds.
  */
 export function noteOf(register: string, e: Event, names?: Names): string {
-  if (e.note) return e.note;
+  const own = ownNote(e.note);
+  if (own) return own;
   if (e.kind === 'create') return 'created';
   /* AN EDIT THAT NAMES NO FIELD: a person's Activity read "An agent edit". */
   if (!e.field) return e.kind === 'edit' ? 'changed this' : e.kind.replace(/[._]/g, ' ');
@@ -83,12 +84,23 @@ export function noteOf(register: string, e: Event, names?: Names): string {
   }
   /* A LINK IS HELD AS THE ROW'S ID, which names nothing to a reader: Home read "cycle set to cycles#01M2PAZ…" once a use
      case's examples were linked. The event does not carry the row's title, so a link is said without its value. */
+  /* AND BY ITS NAME WHERE THE ROW'S READ HANDED IT ONE: a book a rule filed the row in is "book set to Household". */
+  const linked = f?.type === 'ref' && (e.from === null || e.from === undefined || e.from === '') ? linkName(f.to, e.to, names) : null;
+  if (linked !== null) return `${name} set to ${linked}`;
   if (f?.type === 'ref' || isId(e.to) || isId(e.from)) return e.to === null || e.to === undefined || e.to === '' ? `${name} cleared` : e.from === null || e.from === undefined || e.from === '' ? `${name} set` : `${name} changed`;
   const before = display(register, e.field, e.from);
   const after = display(register, e.field, e.to);
   if (after === null) return `${name} cleared`;
   return before === null ? `${name} set to ${lineSaid(after)}` : `${name} from ${lineSaid(before)} to ${lineSaid(after)}`;
 }
+
+/**
+ * WHAT A WRITER NOTED, WITHOUT A SCRIPT'S SIGNATURE (settings3, 2 Nov): a rule's script signs every write
+ * "Written by script:book_from_account@v1.", and a line's Activity printed it after the script's own name. The line
+ * already names the script, so the signature is no note, and the change is said as any unnoted change is.
+ */
+const SIGNED = /^\s*Written by script:[a-z][a-z0-9_-]*@v\d+\.?\s*(?:·\s*)?/u;
+const ownNote = (note: string | null | undefined): string => (note ?? '').replace(SIGNED, '').trim();
 
 /** A row's id, bare or as `<list>#<id>`. */
 const ROW_ID = /^(?:[a-z][a-z0-9_]*#)?[0-9A-HJKMNP-TV-Z]{26}$/u;
@@ -401,7 +413,7 @@ export const linesOf = (register: string, events: readonly (Event & Suggested)[]
         at: e.ts,
         ...(settled === null ? {} : { settled }),
         ...(e.field ? { field: e.field, to: e.to } : {}),
-        ...(e.field && !e.note ? { from: e.from ?? null } : {}),
+        ...(e.field && !ownNote(e.note) ? { from: e.from ?? null } : {}),
       };
     })
     .reverse();
