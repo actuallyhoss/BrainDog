@@ -345,6 +345,18 @@ export function barFigures(texts: readonly string[], home?: Home, written = fals
   });
 }
 
+/**
+ * WHAT FALLS DUE, AS A SET (shared fix, 2 Nov): a list's amounts, so to the penny where any one of a currency carries
+ * pence, as the table of the same rows says them, and whole from a thousand up by the one rule for cents. Subscriptions'
+ * "Renewing in the next 30 days" read "$60" over a table saying "$59.99", as a timeline of three cells was said as totals.
+ */
+export function planFigures(texts: readonly string[], home?: Home): string[] {
+  return barFigures(texts, home, true).map((t) => {
+    const p = figureParts(t);
+    return p && Number(p.whole) >= 1000 ? wholeFigure(t) : t;
+  });
+}
+
 /** A figure's currency as its marks say it, the digits taken out: `$` and `−$` are one, `EGP ` another. */
 const markOf = (p: FigureParts): string => `${p.unit}|${p.code.trim()}`;
 

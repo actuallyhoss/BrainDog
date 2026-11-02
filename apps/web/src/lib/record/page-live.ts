@@ -1128,6 +1128,27 @@ export function soonSaid(register: string, columns: readonly { field?: unknown }
   });
 }
 
+/**
+ * A TIMELINE'S LINE WEARS THE AMBER ONLY WHEN IT IS CLOSE (shared fix, 2 Nov): a deadline under two weeks away is `warn`
+ * (`toneOf`), so Subscriptions' "Renewing in the next 30 days" drew an amber dot on every line and the dot said nothing.
+ * In a timeline, whose day is the line's first word, the amber is kept for what falls due within `URGENT_DAYS`; a late
+ * line keeps its red.
+ */
+export const URGENT_DAYS = 3;
+
+export function urgentOnly(register: string, entries: readonly Entry[], rows: { tone?: string | undefined }[], now: number): void {
+  const dated = REGISTERS[register]?.fields.find((f) => f.type === 'day' && f.deadline)?.id;
+  if (dated === undefined) return;
+  entries.forEach((e, n) => {
+    const row = rows[n];
+    const due = e.fields[dated];
+    if (!row || row.tone !== 'warn' || typeof due !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(due)) return;
+    /* FROM THE RECORD'S DAY (AH22), as `soonSaid` counts. */
+    const days = Math.round((Date.parse(`${due}T00:00:00Z`) - Date.parse(`${recordToday(now)}T00:00:00Z`)) / 86_400_000);
+    if (days > URGENT_DAYS) delete row.tone;
+  });
+}
+
 /** A close deadline's words, as a list's card says them (`RowCards.svelte`). */
 export const DUE_WORDS = {
   today: 'Due today',
@@ -2324,6 +2345,8 @@ export function blockOf(
   /* A LEDGER LINE STILL WAITING TO CLEAR SAYS SO IN THE TILE (finish F3), as the Ledger lists it apart and Budgets counts
      it: Money home's Ledger drew the pending £2,500 like any cleared line. Said at the end of the line under the name. */
   if (kind === 'timeline') pendingSaid(register, columns, entries, rows);
+  /* AND ONLY A CLOSE DAY WEARS THE AMBER in a timeline (`urgentOnly`), not every line due in the next two weeks. */
+  if (kind === 'timeline') urgentOnly(register, drawnEntries, rows, now);
   /* WHETHER AN AGENT IS ON EACH ROW, which the record works out from the row's history and its live
      runs. Narrowed here like everything else the record sends: a `working_now` that is not an array
      of booleans is left off, and the block draws no dots rather than drawing one for `"yes"`. */

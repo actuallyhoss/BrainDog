@@ -12,7 +12,7 @@
  * day for are on the same day. A blank day starts no group, and its row sits under the day above it.
  */
 
-import { barFigures, readable, zeroFigure, type Home } from './format.ts';
+import { barFigures, planFigures, readable, zeroFigure, type Home } from './format.ts';
 
 /** For each row, the day to say over it, or null where it carries on the day above it (or the timeline is not grouped). */
 export function timelineDays(rows: readonly { cells: readonly string[] }[]): (string | null)[] {
@@ -123,18 +123,17 @@ export const rowsCell = (text: string | undefined, now?: number): string =>
 
 /**
  * EVERY ROW'S THIRD CELL, AS A SET: each said by `timelineCell`, and where one amount
- * carries pence, every amount of its currency does, as a chart's figures are (`barFigures`). The Ledger read "−£2,500 …
+ * carries pence, every amount of its currency does, as a list's figures are (`barFigures`). The Ledger read "−£2,500 …
  * −£964 −£39.61", whole pounds beside pence down one column. A cell that is no figure is left as it is said.
+ * A TIMELINE OF THREE CELLS IS WHAT FALLS DUE (`planFigures`): the same, and whole from a thousand up.
  */
-export const timelineDetails = (rows: readonly { cells: readonly string[] }[], now?: number, home?: Home): string[] =>
-  barFigures(
-    rows.map((r) => timelineCell(r.cells[2], now)),
-    home,
-    /* AND A MONEY ROW KEEPS ITS PENCE WHATEVER ITS NEIGHBOURS (audit of 30 October, 20): the Ledger's one line waiting to
-       clear read "−£2,500" over Every line's "−£2,500.00", the same amount said two ways on one page because the
-       first list held no line with pence to pad it to. A ledger line is said to the penny, as `money` writes it. */
-    timelineRich(rows),
-  );
+export const timelineDetails = (rows: readonly { cells: readonly string[] }[], now?: number, home?: Home): string[] => {
+  const cells = rows.map((r) => timelineCell(r.cells[2], now));
+  /* AND A MONEY ROW KEEPS ITS PENCE WHATEVER ITS NEIGHBOURS (audit of 30 October, 20): the Ledger's one line waiting to
+     clear read "−£2,500" over Every line's "−£2,500.00", the same amount said two ways on one page because the
+     first list held no line with pence to pad it to. A ledger line is said to the penny, as `money` writes it. */
+  return timelineRich(rows) ? barFigures(cells, home, true) : planFigures(cells, home);
+};
 
 /* ---- The money row: a chip, a line under the title, and each day's net ------------------------------------------ */
 
