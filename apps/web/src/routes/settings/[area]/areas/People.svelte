@@ -580,6 +580,8 @@
               <!-- STOP IS NOT FOR YOURSELF, for the reason your own level is not: it is the press that removes your own
                    way back to this screen. Nor for the last owner, who would leave the record with nobody to let anybody
                    back in. -->
+              <!-- WHAT THEY DID HERE (collab pass, 2 Nov): Activity, held to their own lines. -->
+              <Button weight="bare" href={`/audit?by=${encodeURIComponent(p.id)}`}>{copy.theyDid}</Button>
               {#if anOwner && p.level !== 'owner' && !p.suspended}
                 <Button weight="bare" disabled={peopleBusy} aria-haspopup="dialog" onclick={() => (handing = p)}>{copy.handOverPress}</Button>
               {/if}

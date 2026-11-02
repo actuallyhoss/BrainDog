@@ -687,6 +687,7 @@ export const account = {
   rolesCompare: 'What each role can do',
   /* HANDING THE BRAINDOG OVER (collab pass, 2 Nov). */
   handOverPress: 'Make owner',
+  theyDid: 'What they did',
   handOverThis: 'this BrainDog',
   handOverTitle: (who: string, record: string) => `Hand ${record} to ${who}?`,
   handOverThey: (who: string) => `${who} becomes an owner: people, add-ons, settings, Keys, export and deleting it are theirs.`,
