@@ -3186,6 +3186,8 @@
   const emptyKind = $derived(
     result.total === 0 ? 'no-data-yet' : q || narrowed ? 'no-results' : 'cleared',
   );
+  /** Nothing in the list yet, and nothing narrowing it: the empty state's own Add is the one way to add. */
+  const bare = $derived(rows.length === 0 && emptyKind === 'no-data-yet' && q === '' && filters.length === 0);
 
   /**
    * THIS SCREEN FETCHES, AND SAYS WHAT IT DREW ONCE IT HAS.
@@ -3468,7 +3470,9 @@
             <!-- ITS NAME, CHANGED HERE (`SettingHere.svelte`): the record's `renameList`, with an Undo, no trip to Settings. -->
             {#if owner && id !== KEYS_REGISTER}<button type="button" role="menuitem" onclick={() => (renameOpen = true)}><Icon name="edit" size="s" />Rename this list</button>{/if}
           </Menu>
-          {#if adds && !arriving}
+          <!-- NOT WHILE THE LIST HOLDS NOTHING (empty states, 2 Nov): its empty state leads with its own Add (AH28), and the
+               two drew the same offer twice, a red one in the head and a second under the sentence. -->
+          {#if adds && !arriving && !bare}
             <span class="tool-add"><Button weight="primary" data-capture-open onclick={openCapture}><Icon name="plus" size="s" />{copy.captureIn(decl.one)}</Button></span>
             <!-- THE PHONE'S "+", the same add as a 44 square that opens the line as a sheet; drawn only below 640. -->
             <CapturePlus one={decl.one} onclick={() => (captureOpen = true)} />

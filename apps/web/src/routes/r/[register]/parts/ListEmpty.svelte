@@ -81,7 +81,9 @@
     {#if kind === 'no-results'}
       <Button href="/r/{register}">{copy.clearFilters}</Button>
     {:else if kind === 'no-data-yet' && adds}
-      <!-- AN EMPTY LIST LEADS WITH ITS OWN ADD (AH28), never "Connect your agent": it opens the list's add line. -->
+      <!-- AN EMPTY LIST LEADS WITH ITS OWN ADD (AH28), never "Connect your agent": it opens the list's add line. THE ONE
+           ADD (empty states, 2 Nov): the head's red Add waits until the list holds something. Quiet, since the add line
+           it opens carries the red Add. -->
       <Button href="/r/{register}?add=1">{addOne}</Button>
     {:else if kind === 'no-data-yet'}
       <NextStep />
