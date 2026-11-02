@@ -332,7 +332,26 @@
   let readWidget: string | null = null;
   let readHuman: ((answer: string | null) => void) | null = null;
 
+  /**
+   * THE NEXT READ'S ANSWER, ASKED FOR WHILE THE QUESTION IS ON SCREEN (2 Nov, the model run: each turn's read left the
+   * page some 1.7 seconds after the press, all of it the bot check, so the model's question came after the 3.5 seconds a
+   * turn waits and the rules' stood on almost every turn). Taken once by the next read; an answer is good for 300 seconds,
+   * so one older than `AHEAD_MS` is dropped and asked again.
+   */
+  const AHEAD_MS = 240_000;
+  let ahead: { at: number; answer: Promise<string | null> } | null = null;
+  function humanAhead(): void {
+    if (ahead !== null || siteKey === null || readSlot === null) return;
+    ahead = { at: Date.now(), answer: humanNow() };
+  }
   function freshHuman(): Promise<string | null> {
+    const held = ahead;
+    ahead = null;
+    if (held !== null && Date.now() - held.at < AHEAD_MS) return held.answer.then((a) => a ?? humanNow());
+    return humanNow();
+  }
+
+  function humanNow(): Promise<string | null> {
     const key = siteKey;
     const el = readSlot;
     if (key === null) return Promise.resolve('');
@@ -713,6 +732,10 @@
   let talking = $state(false);
   /** The model reads this conversation has spent; the rules read once `READS_MOST` are. */
   let modelReads = 0;
+  /* EACH QUESTION THE MODEL WILL READ THE ANSWER TO HAS ITS BOT-CHECK ANSWER ASKED FOR AS IT IS SHOWN (`humanAhead`). */
+  $effect(() => {
+    if (asking !== null && door !== null && modelReads < READS_MOST && readSlot !== null && siteKey !== null && (step === 'describe' || step === 'question')) humanAhead();
+  });
 
   const placeNames = (): string[] => parts.filter((p) => p.on).map((p) => p.name);
 
