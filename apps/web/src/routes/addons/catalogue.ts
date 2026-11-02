@@ -20,6 +20,7 @@
 import type { CatalogueEntry, CatalogueFile, CatalogueIndex, CatalogueUpdate, CatalogueVersion, Changes, KeyStatements, KnownKeys, Signature, Trust } from '@braindog/declare/catalogue';
 
 import { copy } from '../../lib/copy.ts';
+import { keyName } from '../../lib/market/key-names.ts';
 import { KENNEL_AT } from '../../lib/market/counts.ts';
 import type { PackState } from '../../lib/record/packs.ts';
 import { localKeys, readLocal, type KeySource, type KeyStore } from './known-keys.ts';
@@ -182,7 +183,11 @@ export function callSaid(call: { host: string | null; line: string; key: string 
   });
   const key = call.key ?? /(?:grant|key) "([^"]+)"/u.exec(call.line)?.[1] ?? null;
   const how = parts.join(', ');
-  const named = key && key !== 'none' ? `${key.charAt(0).toUpperCase()}${key.slice(1)}` : null;
+  /* BY THE NAME THE KEYCHAIN SHOWS IT BY (verify6, 2 Nov): Stripe's is "Stripe (read only)" there, so here it is your
+     read-only Stripe key, where it said your Stripe key. */
+  const shown = key && key !== 'none' ? keyName(key) : null;
+  const readOnly = shown ? /^(.+) \(read only\)$/u.exec(shown) : null;
+  const named = !shown ? null : readOnly ? `read-only ${readOnly[1]}` : `${shown.charAt(0).toUpperCase()}${shown.slice(1)}`;
   return `Calls ${host}${how ? ` ${how}` : ''}${named ? `${how.includes(',') ? ',' : ''} with your ${named} key` : ''}`;
 }
 
