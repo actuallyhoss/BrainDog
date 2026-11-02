@@ -34,7 +34,8 @@
     onsave: (parts: Record<string, unknown>[] | null) => Promise<string | null>;
   } = $props();
 
-  let held = $state<SplitHeld | null>(null);
+  /* `undefined` WHILE IT IS READ, `null` where the list has nothing to split by. */
+  let held = $state<SplitHeld | null | undefined>(undefined);
   $effect(() => {
     const asked = register;
     void readSplit(base, asked).then((h) => {
@@ -45,14 +46,16 @@
   const line = $derived(fields[at.of] as { amount?: number; currency?: string } | undefined);
   const minor = $derived(typeof line?.amount === 'number' ? line.amount : 0);
   const currency = $derived(typeof line?.currency === 'string' ? line.currency : '');
-  const parts = $derived(held ? partsOf(fields, at, held.by) : []);
+  /* THE PARTS ARE THE ROW'S OWN, so they are counted before the categories are read; only their names wait for them. */
+  const parts = $derived(partsOf(fields, at, held ? held.by : ''));
+  const reading = $derived(held === undefined);
   const home = $derived(homeCurrency());
   const said = (m: number): string => writeAmount({ minor: m, currency }, home, 'exact')?.text ?? '';
 
   /* THE CATEGORIES A PART MAY TAKE: those that go the line's way, and those that go either. */
   const way = $derived(held ? String(fields[held.way.field] ?? '') : '');
   const offered = $derived<Option[]>(held ? held.categories.filter((c) => c.way === null || c.way === undefined || c.way === way || held!.either.includes(c.way)) : []);
-  const nameOf = (id: string | null): string => (id === null ? words.pick : (held?.categories.find((c) => c.id === id)?.name ?? words.pick));
+  const nameOf = (id: string | null): string => (reading ? '' : id === null ? words.pick : (held?.categories.find((c) => c.id === id)?.name ?? words.pick));
 
   /* ── the editor ─────────────────────────────────────────────────────── */
   let editing = $state(false);
@@ -100,7 +103,11 @@
   }
 </script>
 
-{#if held && (parts.length > 0 || (changes && minor > 0))}
+<!-- DRAWN WITH THE ROW, NOT AFTER IT (leftovers9): the tile waited for the list's categories, about 250 ms after the row
+     was drawn, then pushed Activity down 124px (0.023 at 390, 0.025 at 1512). Whether there is a tile is the row's to say,
+     its parts or its amount, so the tile stands at once at its own height, and only its buttons and the parts' names wait
+     for the categories. -->
+{#if held !== null && (parts.length > 0 || (changes && minor > 0))}
   <Tile icon="tag" title={words.heading} meta={parts.length > 0 && !editing ? said(minor) : undefined}>
     {#if editing}
       <form class="split-form" onsubmit={save}>
@@ -148,13 +155,13 @@
       {#if fix}<p class="split-fix" role="alert">{fix}</p>{/if}
       {#if changes}
         <div class="split-actions">
-          <Button size="sm" onclick={start}>{words.change}</Button>
-          <Button size="sm" weight="bare" disabled={saving} onclick={remove}>{words.remove}</Button>
+          <Button size="sm" disabled={reading} onclick={start}>{words.change}</Button>
+          <Button size="sm" weight="bare" disabled={saving || reading} onclick={remove}>{words.remove}</Button>
         </div>
       {/if}
     {:else}
       <div class="split-actions">
-        <Button size="sm" onclick={start}>{words.start}</Button>
+        <Button size="sm" disabled={reading} onclick={start}>{words.start}</Button>
       </div>
     {/if}
   </Tile>
