@@ -624,6 +624,26 @@
   white-space: nowrap;
 }
 
+/* ON A PHONE A CARD IS A ROW OF ITS TILE (polish5, 2 Nov): each account drew as a filled, rounded box inside "Your
+   accounts", a card in a card, with 16px of tile and 16px of box eating a 358px tile. At 390 the boxes go and the
+   accounts read as the tile's own rows, hairlines between them (Look B: no tile inside a tile). */
+@media (width < 640px) {
+  [data-money] .cards-grid {
+    gap: 0;
+  }
+
+  [data-money] .cards-item,
+  [data-money] .cards-item:has(.cards-title a):hover {
+    padding-inline: 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  [data-money] .cards-item + .cards-item {
+    border-block-start: 1px solid var(--rule);
+  }
+}
+
 /* A GROUP'S NAME OVER ITS CARDS ("Bank · 10 accounts"), the quiet label every group on Money wears. */
 [data-money] .block-slot > .document:has(+ .block[data-kind='cards']) p {
   margin-block: var(--sp-2) var(--sp-1);
