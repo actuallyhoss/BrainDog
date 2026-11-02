@@ -1,10 +1,10 @@
 {
   "pack": "calendar",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "icon": "calendar",
   "title": "Calendar",
-  "summary": "Your calendar's next events, read every hour from its secret ICS link in Google Calendar or Outlook, into a list you, your widgets and your agents can read. The link stays in your keys. Nothing is written back to the calendar.",
-  "changes": "The Events page says nothing is coming up, and how to connect the calendar if it is not, in a plain note rather than the large lead, since a connected calendar can be empty too. The Next meetings widget puts what the event is first, so a narrow widget still says it.",
+  "summary": "Your calendar's events in a list you, your widgets and your agents can read: from Connect Google, every 15 minutes with invitations and your answers, or every hour from its secret ICS link in Google Calendar or Outlook. Nothing is written back to the calendar.",
+  "changes": "Invitations: with Google connected, an event you were invited to says who invited you and your answer, the Events page lists the ones you have not answered, and one you have not answered is asked about once in Needs you. Events from Google and from the ICS link are the same rows, never written twice.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -155,6 +155,87 @@
       "leads": [
         "events"
       ]
+    },
+    {
+      "id": "calendar-invites",
+      "title": "Invitations",
+      "group": "Life",
+      "for": "both",
+      "kind": "table",
+      "block": {
+        "kind": "table",
+        "source": "register.events",
+        "where": "invite is true, response is waiting, gone is not true, day after yesterday",
+        "columns": [
+          {
+            "field": "what",
+            "label": "What"
+          },
+          {
+            "field": "organiser",
+            "label": "From"
+          },
+          {
+            "field": "day",
+            "label": "Day"
+          }
+        ],
+        "order": [
+          {
+            "field": "day",
+            "dir": "asc"
+          },
+          {
+            "field": "time",
+            "dir": "asc"
+          }
+        ],
+        "limit": 6,
+        "empty": "No invitations waiting on your answer.",
+        "icon": "calendar-days",
+        "when": {
+          "metric": "events-invites",
+          "gt": 0
+        }
+      },
+      "blanks": [],
+      "sizes": [
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "tall",
+      "needs": [
+        "register.events"
+      ],
+      "example": {
+        "rows": [
+          {
+            "title": "Quarterly review",
+            "meta": "Lena Park · Thursday"
+          },
+          {
+            "title": "Studio walk-through",
+            "meta": "Omar Haddad · Friday"
+          }
+        ]
+      },
+      "says": "Invitations in your Google Calendar you have not answered yet, soonest first.",
+      "icon": "calendar-days",
+      "rows": {
+        "title": "what",
+        "meta": "organiser"
+      },
+      "words": [
+        "calendar",
+        "invitations",
+        "invites",
+        "rsvp",
+        "meetings"
+      ],
+      "leads": [
+        "events"
+      ]
     }
   ],
   "declarations": [
@@ -163,7 +244,7 @@
       "name": "Events",
       "icon": "calendar",
       "one": "event",
-      "holds": "the events coming up on your calendar, read from its ICS address",
+      "holds": "the events on your calendar, from Connect Google or its ICS address, with who invited you and your answer when Google is connected",
       "title": "what",
       "mobile": [
         "day",
@@ -228,6 +309,35 @@
           "label": "Gone from the calendar",
           "type": "bool",
           "default": false
+        },
+        {
+          "id": "invite",
+          "label": "Invitation",
+          "type": "bool",
+          "default": false,
+          "index": true
+        },
+        {
+          "id": "organiser",
+          "label": "Invited by",
+          "type": "text"
+        },
+        {
+          "id": "response",
+          "label": "Your answer",
+          "type": "enum",
+          "values": [
+            "waiting",
+            "yes",
+            "maybe",
+            "no"
+          ],
+          "index": true
+        },
+        {
+          "id": "link",
+          "label": "In Google Calendar",
+          "type": "url"
         }
       ]
     },
@@ -308,6 +418,43 @@
       "compare": "none"
     },
     {
+      "metric": "events-invites",
+      "name": "Invitations to answer",
+      "pack": "calendar",
+      "source": "register.events",
+      "where": "invite is true, response is waiting, gone is not true, day after yesterday",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "rule": "calendar_invite",
+      "name": "Ask about an invitation you have not answered",
+      "pack": "calendar",
+      "register": "events",
+      "when": "invite is true, response is waiting, gone is not true",
+      "then": [
+        {
+          "suggest": {
+            "question": "{{organiser}} invited you to {{what}} on {{day}} and you have not answered. Answer it in Google Calendar: {{link}}",
+            "options": [
+              "I answered it",
+              "Leave it"
+            ]
+          }
+        }
+      ],
+      "once_per": [
+        "entry"
+      ]
+    },
+    {
       "page": "events",
       "title": "Events",
       "pack": "calendar",
@@ -329,7 +476,7 @@
             "metric": "events-ahead",
             "lt": 1
           },
-          "body": "Nothing is on your calendar in the next sixty days. If it is not connected yet, put its secret ICS link from Google or Outlook in your keys as Calendar link, and the next events arrive within the hour."
+          "body": "Nothing is on your calendar in the next sixty days. If it is not connected yet, press Connect Google on this add-on's page, or put its secret ICS link from Google or Outlook in your keys as Calendar link."
         },
         {
           "kind": "note",
@@ -384,6 +531,52 @@
               }
             ]
           }
+        },
+        {
+          "kind": "table",
+          "heading": "Invitations to answer",
+          "icon": "mail",
+          "span": 12,
+          "when": {
+            "metric": "events-invites",
+            "gt": 0
+          },
+          "source": "register.events",
+          "where": "invite is true, response is waiting, gone is not true, day after yesterday",
+          "columns": [
+            {
+              "field": "day",
+              "label": "Day",
+              "width": "12ch"
+            },
+            {
+              "field": "time",
+              "label": "At",
+              "width": "7ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "organiser",
+              "label": "From",
+              "width": "minmax(10ch,16ch)"
+            }
+          ],
+          "order": [
+            {
+              "field": "day",
+              "dir": "asc"
+            },
+            {
+              "field": "time",
+              "dir": "asc"
+            }
+          ],
+          "limit": 20,
+          "empty": "No invitations waiting on your answer."
         },
         {
           "kind": "table",

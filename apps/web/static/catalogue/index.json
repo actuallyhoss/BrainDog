@@ -259,12 +259,47 @@
       "kind": "pack",
       "id": "calendar",
       "title": "Calendar",
-      "summary": "Your calendar's next events, read every hour from its secret ICS link in Google Calendar or Outlook, into a list you, your widgets and your agents can read. The link stays in your keys. Nothing is written back to the calendar.",
+      "summary": "Your calendar's events in a list you, your widgets and your agents can read: from Connect Google, every 15 minutes with invitations and your answers, or every hour from its secret ICS link in Google Calendar or Outlook. Nothing is written back to the calendar.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.2",
+      "latest": "2.1.0",
       "versions": [
+        {
+          "version": "2.1.0",
+          "checksum": "696283fa9a4947b54df3ee0a897aecc5f772fc269565a1857287e08c568ef5c9",
+          "bytes": 31301,
+          "published_at": "2026-11-02T22:25:16.814Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Events"
+            ],
+            "pages": [
+              "Events"
+            ],
+            "rules": [
+              "Ask about an invitation you have not answered"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "calendar.google.com",
+                "line": "CALLS OUT calendar.google.com, outlook.office365.com and outlook.live.com · every 1h · key \"Calendar link\" to the host its keychain entry opens",
+                "key": "Calendar link"
+              }
+            ],
+            "widgets": [
+              "Next meetings",
+              "Today's events",
+              "Invitations"
+            ]
+          },
+          "notes": "Invitations: with Google connected, an event you were invited to says who invited you and your answer, the Events page lists the ones you have not answered, and one you have not answered is asked about once in Needs you. Events from Google and from the ICS link are the same rows, never written twice.",
+          "preview": true
+        },
         {
           "version": "2.0.2",
           "checksum": "7d71466104390f9f3582bacb0e28919478f27d37326dbcfb1b55b045a9b787e8",
