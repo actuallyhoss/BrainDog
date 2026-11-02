@@ -182,7 +182,7 @@
   });
 
   /** What was typed for a draft's one missing field, by key. */
-  let needVals = $state<Record<string, string>>({});
+  let needVals = $state<Record<string, string | number>>({});
   /** The drafts Keep all keeps: every one that needs nothing more. */
   const ready = $derived(drafts.filter((d) => d.needs === undefined));
 

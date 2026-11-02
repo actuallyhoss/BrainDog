@@ -81,10 +81,11 @@ function decimalsOf(currency: string): number {
 const ASKABLE: Readonly<Record<string, 'day' | 'text' | 'number'>> = { day: 'day', text: 'text', int: 'number', decimal: 'number', number: 'number' };
 
 /** A draft with its one missing field filled, or the draft as it was where the value does not fit. */
-export function filled(d: FirstDraft, value: string): FirstDraft {
+export function filled(d: FirstDraft, value: string | number): FirstDraft {
   const n = d.needs;
   if (n === undefined) return d;
-  const v = value.trim();
+  /* A NUMBER FIELD'S BOUND VALUE IS A NUMBER (Svelte binds `type=number` so), never words to trim. */
+  const v = String(value ?? '').trim();
   /* AN AMOUNT IS TYPED IN UNITS AND KEPT IN THE CURRENCY'S SMALLEST ONE, in the currency the draft was made in. */
   if (n.type === 'money') {
     const units = Number(v.replace(/[,\s]/gu, ''));
