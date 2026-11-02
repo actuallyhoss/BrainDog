@@ -1097,7 +1097,9 @@ function split(b: Block, o: RenderOptions): string {
     ? numbersFold(
         'split',
         [SPLIT_PART, SPLIT_AMOUNT, SPLIT_SHARE],
-        all.map((r, i) => [said(r) || SPLIT_PART, plain(inline(r.cells[1] ?? '', o)) || SPLIT_NONE, (!r.hole && i < rows.length ? splitShare(plan, i, values[i]!, plain(inline(r.cells[1] ?? '', o))) : null) ?? SPLIT_NONE]),
+        /* THE FIGURES THE LEGEND SAYS, one way a set (colour lane, 2 Nov): the fold read "$8.25" and "$1.17" for a screen
+           reader under a legend that said "$8" and "$1". A hole is no part of the set and keeps its cell. */
+        all.map((r, i) => [said(r) || SPLIT_PART, plain(inline((i < rows.length ? figures[i] : r.cells[1]) ?? '', o)) || SPLIT_NONE, (!r.hole && i < rows.length ? splitShare(plan, i, values[i]!, plain(inline(r.cells[1] ?? '', o))) : null) ?? SPLIT_NONE]),
       )
     : '';
   return `<div class="prop split"${donut ? ' data-form="donut"' : ''}>${track}${legend}${hole}${numbers}</div>`;

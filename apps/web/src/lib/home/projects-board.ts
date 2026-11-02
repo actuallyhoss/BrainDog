@@ -23,6 +23,7 @@ import { EARNING_LANE, LANES_DEFAULT, inPlayOf, laneInLine, laneSaid, shownName,
 import { isForecast } from './card-kpi.ts';
 import { counted, names } from './phrase.ts';
 import { article } from '../copy/english.ts';
+import { exponentOf } from 'braindog-render';
 
 const DAY = 86_400_000;
 /** How many days ahead "due" reaches, and how many back a run or a task change still makes a project moving. */
@@ -502,6 +503,14 @@ function earningOf(input: BoardInput, fs: Facts[]): Earning {
       const minor = Math.round(f.p.year.minor / 12);
       lines.push({ name: f.p.name, hue: f.p.hue, minor, said: input.format(minor, f.p.year.currency), status: 'a twelfth of its year', warn: false, left: false, href: f.p.href, currency: f.p.year.currency });
     }
+  }
+  /* A MONTH'S EARNING IS A SUMMARY, SAID WHOLE (colour lane, 2 Nov, polish5's one rule a set): "$2,581.67" stood over
+     "$2,315" and "$266.67", one tile saying money two ways. Each line is rounded to the whole unit first and the total is
+     the sum of what the lines say, so the figures under it add up to it. */
+  for (const l of lines) {
+    const unit = 10 ** exponentOf(l.currency);
+    l.minor = Math.sign(l.minor) * Math.round(Math.abs(l.minor) / unit) * unit;
+    l.said = input.format(l.minor, l.currency);
   }
   if (lines.length === 0)
     return {

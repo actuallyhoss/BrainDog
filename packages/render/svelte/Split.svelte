@@ -153,7 +153,8 @@
             <tr>
               <th scope="row">{said(row) || SPLIT_PART}</th>
               <!-- AN EMPTY CELL IS READ AS "none", never a dash (P12): this table is for a screen reader. -->
-              <td class="num">{text(inline(row.cells[1] ?? '', opts)) || SPLIT_NONE}</td>
+              <!-- THE FIGURES THE LEGEND SAYS, one way a set; a hole keeps its own cell. -->
+              <td class="num">{text(inline((i < rows.length ? figures[i] : row.cells[1]) ?? '', opts)) || SPLIT_NONE}</td>
               <td class="num">{(!row.hole && i < rows.length && splitShare(plan, i, values[i] ?? NaN, text(inline(row.cells[1] ?? '', opts)))) || SPLIT_NONE}</td>
             </tr>
           {/each}
