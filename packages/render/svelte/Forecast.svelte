@@ -45,7 +45,6 @@
     FORECAST_NEXT,
     FORECAST_NO_INCOME,
     FORECAST_NONE,
-    FORECAST_NOW,
     FORECAST_NUMBERS,
     FORECAST_PAINT,
     FORECAST_RESET,
@@ -83,7 +82,6 @@
     spendRange,
     spendSaid,
     listedSteps,
-    nowPlaced,
     underNote,
     type Counted,
     type ForecastModel,
@@ -370,7 +368,9 @@
       {#if p.cross}<path class="forecast-cross-rule" {...FORECAST_PAINT.rule} d={p.cross.rule} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-today" d={p.now.rule} vector-effect="non-scaling-stroke"></path>
       {#if p.base}<path class="forecast-base" d={p.base} vector-effect="non-scaling-stroke"></path>{/if}
-      {#if p.past}<path class="forecast-past" style={p.below ? `stroke:url(#${uid}-under)` : undefined} d={p.past} vector-effect="non-scaling-stroke"></path>{/if}
+      <!-- WHAT HAPPENED KEEPS ITS GREY when the walk goes under (leftovers9): it took the split's teal, so the past and
+           the walk read as one line in the If income stopped view. -->
+      {#if p.past}<path class="forecast-past" d={p.past} vector-effect="non-scaling-stroke"></path>{/if}
       {#if p.walk}<path class="forecast-walk" style={p.below ? `stroke:url(#${uid}-under)` : undefined} {...FORECAST_PAINT.walk} d={p.walk} vector-effect="non-scaling-stroke"></path>{/if}
       {#if p.future}<path class="forecast-future" style={p.below ? `stroke:url(#${uid}-under)` : undefined} d={p.future} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-low" d={p.low} vector-effect="non-scaling-stroke"></path>
@@ -381,11 +381,8 @@
       <!-- THE DAY BEING READ, a hairline down the chart, so a thumb sees which point the readout names. -->
       {#if readout}<path class="forecast-scrub" {...FORECAST_PAINT.rule} d="M{Number(readout.at) * 1000} 0V100" vector-effect="non-scaling-stroke"></path>{/if}
     </svg>
-    <!-- TODAY'S BALANCE BESIDE TODAY'S DOT, where the line starts, hidden like the axis: the chart's name says it. -->
-    <!-- A CROSSING NEAR TODAY SETS THE TWO LABELS APART: the balance under its dot, the flag's day after its rule. -->
-    <span class="forecast-now-label num" data-near-flag={p.cross?.near ? '' : undefined} data-place={nowPlaced(p) ?? undefined} data-over={p.now.over ? '' : undefined} style="--at:{p.now.at};--y:{p.now.y}" aria-hidden="true"
-      ><span class="forecast-now-word">{FORECAST_NOW}</span><span class="forecast-now-figure">{p.now.label}</span></span
-    >
+    <!-- TODAY IS NAMED UNDER THE CHART, among the months (`ticks`, leftovers9): its words in a box on the line covered
+         the stretch they named. The rule and the dot stay; the balance is the summary's. -->
     <!-- THE VALUE AXIS, its round steps down one side, zero among them; hidden, because the chart's name says the walk.
          Where zero is off it, its end nearest zero carries a break beside the real amount, and the name says where it starts.
          The break is `FORECAST_AXIS_BREAK` written out and not drawn from a string, whose helper grew the entry script's shared runtime. -->
@@ -395,8 +392,6 @@
         >{/each}
     </ol>
     {#if p.cross}<span class="forecast-pin" data-side={p.cross.near ? 'end' : undefined} style="--at:{p.cross.at}" aria-hidden="true">{TONES.warn.glyph} {p.cross.day}</span>{/if}
-    <!-- EACH PART OF A PLAN THE LINE DROPS BY, numbered on the line and in the list under the chart (`drops`). -->
-    {#each p.drops as d (d.n)}<span class="forecast-drop num" style="--at:{d.at};--y:{d.y}" aria-hidden="true">{d.n}</span>{/each}
     <!-- THE LOWEST POINT SAID BESIDE ITS DOT, where it is not today (`lowLabel`). -->
     {#if p.lowLabel}<span
         class="forecast-low-label num"
@@ -417,7 +412,7 @@
     {/if}
   </div>
   <ol class="forecast-ticks" aria-hidden="true">
-    {#each p.ticks as t}<li class="forecast-tick" data-edge={t.edge ? '' : undefined} style="--at:{t.at}">{t.label}</li>{/each}
+    {#each p.ticks as t}<li class="forecast-tick" data-edge={t.edge ? '' : undefined} data-now={t.now ? '' : undefined} style="--at:{t.at}">{t.label}</li>{/each}
   </ol>
 {/snippet}
 
@@ -698,9 +693,10 @@
     container: forecast-plot / inline-size;
   }
 
-  /* ONE FLAT TILE, as every block is: no glass behind the readout and no shadow under it. */
+  /* ONE FLAT TILE, as every block is: no glass behind the readout and no shadow under it, AND OPAQUE (leftovers9): its
+     fill was `var(--well)`, a size and not a colour, so the readout had no fill and the line ran through its words. */
   :global(.forecast .forecast-readout) {
-    background: var(--well);
+    background: var(--tile);
     backdrop-filter: none;
     box-shadow: none;
   }
@@ -719,7 +715,10 @@
   @container forecast-plot (max-width: 600px) {
     :global(.forecast .forecast-readout),
     :global(.forecast .forecast-readout[data-flip]) {
-      inset-inline: 0;
+      /* AND OVER THE VALUE AXIS TOO (leftovers9): across the plot alone, about 240px at 390, "Harbourview, part 3 of 40" broke
+         beside its amount. The axis's figures are under it only while a thumb reads a day. */
+      inset-inline: 0 calc(-1 * var(--forecast-gutter));
+      inline-size: auto;
       grid-template-columns: 1fr auto;
       align-items: baseline;
       max-inline-size: none;

@@ -934,7 +934,7 @@ export type ForecastPlan = {
    */
   lowLabel: { at: string; y: string; figure: string; side?: 'start' | 'end'; drop?: true; foot?: true } | null;
   /** The month names under the chart; `edge` is the start's own month, set at the left edge rather than centred. */
-  ticks: { at: string; label: string; edge?: true }[];
+  ticks: { at: string; label: string; edge?: true; now?: true }[];
   /** The start and the end of the time axis, for the scrub. */
   start: string;
   span: number;
@@ -959,6 +959,8 @@ export type ForecastPlan = {
 
 /** The most parts of plans a chart numbers as drops: the soonest, so the line is never covered in numbers. */
 export const FORECAST_DROPS_MOST = 6;
+/** How near today's word a month's name may stand under the chart, as a share of its width, before it gives way. */
+const TODAY_ROOM = 0.1;
 
 /** How near either end of the chart the lowest point is, as a share, for its words to lean inward from it. */
 const LOW_EDGE = 0.15;
@@ -1294,7 +1296,10 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const end = addDays(model.today, shown.horizon);
   const span = Math.max(1, daysBetween(start, end));
   const values = [...model.past.map((p) => p.value), ...shown.days.map((p) => p.balance), ...(base?.days.filter((p) => p.day <= end).map((p) => p.balance) ?? [])];
-  const { lo, hi, levels } = axisFit(Math.min(...values), Math.max(...values), axisSays, model.axis === 'zero');
+  /* THE AXIS HOLDS ZERO, ALWAYS (leftovers9, Sam on Cash ahead: "wtf is that ui"). The walk is drawn over a wash, and a
+     wash from EGP 500k read as near nothing at its foot, with a "//" break beside the axis's last figure to say it was
+     not. An area's foot is zero or it misleads, so the axis runs to zero and no break is drawn. */
+  const { lo, hi, levels } = axisFit(Math.min(...values), Math.max(...values), axisSays, true);
   /* NOUGHT OFF THE AXIS IS SAID, never left to the eye: a line across a chart from £980k reads as near nothing unless
      the foot says it is not nought. A walk under zero throughout is cut at its top, the end nearest nought. */
   const offAxis = lo > 0 || hi < 0;
@@ -1310,7 +1315,10 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     past += `${past ? ' ' : ''}${prev !== null && daysBetween(prev, p.day) === 1 ? 'L' : 'M'}${x(p.day)} ${y(p.value)}`;
     prev = p.day;
   }
-  if (prev !== null && daysBetween(prev, model.today) === 1) past += ` L${x(model.today)} ${y(now)}`;
+  /* THE REMEMBERED LINE RUNS ON TO TODAY whatever the gap since its last day (leftovers9): it joined only from the day
+     before, so a record whose last balance was a fortnight old drew its past line, then the wash with no line over it,
+     then the walk from today. The wash bridged the gap, and now the line does. */
+  if (prev !== null && prev < model.today) past += ` L${x(model.today)} ${y(now)}`;
 
   const line = (days: Scenario['days']) =>
     days.filter((p) => p.day <= end).map((p, i) => `${i ? 'L' : 'M'}${x(p.day)} ${y(p.balance)}`).join(' ');
@@ -1365,6 +1373,13 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const c = shown.crossed;
   const said = c ? forecastUnder(shortDay(c.day, model.today)) : forecastAbove(shortDay(end, model.today));
   const nowAt = daysBetween(start, model.today) / span;
+  /* TODAY IS NAMED UNDER THE CHART, AMONG THE MONTHS (leftovers9): its words stood in a white box on the line, "Today EGP
+     720,426.10", over the very stretch they named. Now the rule runs down the chart, the dot sits on the line, and
+     "Today" is the axis's word at the rule's foot, where nothing is drawn. A month name too near it gives way; at the
+     chart's start it takes the start month's place. The balance is the summary's ("from EGP 720,426 today"). */
+  for (let i = ticks.length - 1; i >= 0; i--) if (Math.abs(Number(ticks[i]!.at) - nowAt) < TODAY_ROOM) ticks.splice(i, 1);
+  ticks.push({ at: at(nowAt), label: FORECAST_NOW, now: true, ...(nowAt < TODAY_ROOM ? { edge: true as const } : {}) });
+  ticks.sort((a, b) => Number(a.at) - Number(b.at));
   /* THE LINE AS SHARES OF THE PLOT, each stretch between two days walked in eighths, so a step that leaps a whole corner
      in one day is still found in it. */
   const shareOf = (day: string, v: number) => ({ x: daysBetween(start, day) / span, y: (hi - v) / (hi - lo) });
@@ -1403,15 +1418,11 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     .filter(Boolean)
     .join('. ');
 
-  /* THE DROPS FIRST, so a dot is never drawn under a numbered disc. */
-  const drops = shown.steps
-    .filter((s) => s.of !== undefined && s.of !== '' && s.delta < 0 && s.day > model.today && s.day <= end)
-    .slice(0, FORECAST_DROPS_MOST);
-  const marked = (incoming: boolean) =>
-    listedSteps(shown.steps)
-      .filter((s) => s.day <= end && (incoming ? s.delta > 0 : s.delta < 0) && !drops.includes(s))
-      .map((s) => `M${x(s.day)} ${y(s.balance)}h0`)
-      .join(' ');
+  /* NO NUMBERED DISCS AND NO DOT A MOVEMENT ON THE LINE (leftovers9). Discs "1" and "2" sat on the line with their key
+     out of sight under it, and a dot for every movement put a scatter along the line, some under it where two moved on
+     one day and the line drew the day's end. The line is the answer; the hover says what moved on a day, and Next
+     movements lists them. Today and the lowest point keep their dots. */
+  const drops: Scenario['steps'] = [];
   const lowAt = daysBetween(start, shown.lowest.day) / span;
   /* A NUMBERED DISC NEAR THE LOWEST POINT, not only on its day (audit of 31 October, 23): the third part of a plan fell
      the day after the lowest and its disc sat under the word "Lowest", on every look. A disc close enough across and up
@@ -1439,7 +1450,10 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     legend: !(model.headline && base === null),
     past,
     walk: drawn(shown.days.filter((p) => p.day <= known)),
-    future: drawn(shown.days.filter((p) => p.day >= known)),
+    /* THE GUESSED PART STARTS WHERE THE KNOWN PART ENDS (leftovers9): from the last day at or before `known`, so the two
+       meet whether or not a day falls on `known` itself. A known part of one day draws nothing, and the dashed line began
+       at the first day after it, a week or more past today, with a gap and a step up or down. */
+    future: drawn(shown.days.filter((p, i, all) => p.day > known || (p.day <= known && !all.slice(i + 1).some((q) => q.day <= known)))),
     area,
     below,
     now: {
@@ -1474,7 +1488,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
         day: shortDay(s.day, model.today),
         amount: forecastFigure(model, s.delta, 'read'),
       })),
-    marks: { in: marked(true), out: marked(false) },
+    marks: { in: '', out: '' },
     lowLabel,
     ticks,
     start,
@@ -1507,8 +1521,12 @@ export function readoutAt(model: ForecastModel, shown: Scenario, plan: ForecastP
     at: at(daysBetween(plan.start, day) / plan.span),
     flip: f > 0.5,
     day: shortDay(day),
-    balance: balance === null ? MISSING : forecastFigure(model, balance, 'read'),
-    moves: shown.steps.filter((s) => s.day === day).slice(0, 3).map((s) => ({ label: s.label, amount: forecastFigure(model, s.delta, 'read') })),
+    /* ROUNDED AS THE SUMMARY OVER THE CHART IS (leftovers9): "EGP 1,327,631.31" under stats that said "EGP 794,816". */
+    balance: balance === null ? MISSING : forecastFigure(model, Math.round(balance), 'read'),
+    moves: shown.steps
+      .filter((s) => s.day === day)
+      .slice(0, 3)
+      .map((s) => ({ label: s.label, amount: `${s.delta > 0 ? '+' : ''}${forecastFigure(model, Math.round(s.delta), 'read')}` })),
   };
 }
 

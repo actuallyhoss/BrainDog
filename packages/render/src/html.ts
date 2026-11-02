@@ -72,7 +72,6 @@ import {
   FORECAST_MOVE,
   FORECAST_NEXT,
   FORECAST_NONE,
-  FORECAST_NOW,
   FORECAST_NUMBERS,
   FORECAST_PAINT,
   FORECAST_WHAT,
@@ -86,7 +85,6 @@ import {
   forecastPlan,
   forecastSummary,
   listedSteps,
-  nowPlaced,
   scenario,
   underNote,
 } from './forecast.ts';
@@ -1862,9 +1860,6 @@ function forecast(b: Block, o: RenderOptions): string {
       .join('');
   /* NO SENTENCE WHERE THE PAGE'S HEADLINE SAYS IT (`legend`): the flag on the crossing stays. */
   const said = plan.legend ? `<p class="forecast-said"${plan.warn ? ' data-intent="warn"' : ''}>${plan.warn ? toneGlyph('warn') : ''}${escape(plan.said)}</p>` : '';
-  /* A CROSSING NEAR TODAY SETS THE TWO LABELS APART: today's balance under its dot, the flag's day after its rule. */
-  const placed = nowPlaced(plan);
-  const near = `${plan.cross?.near ? ' data-near-flag=""' : ''}${placed ? ` data-place="${placed}"` : ''}${plan.now.over ? ' data-over=""' : ''}`;
   /* THE END OF THE AXIS NEAREST ZERO, WHERE ZERO IS OFF IT, carries a break beside its real amount (`cut`), and the
      chart's name says where the axis starts, as `Forecast.svelte` draws it. */
   const axis = `<ol class="forecast-axis" aria-hidden="true">${plan.axis
@@ -1881,15 +1876,15 @@ function forecast(b: Block, o: RenderOptions): string {
     ? `<defs><linearGradient class="forecast-split" id="${under}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="100"><stop class="forecast-above" offset="${plan.zero}%"></stop><stop class="forecast-under" offset="${plan.zero}%"></stop></linearGradient></defs>`
     : '';
   const cutLine = under ? ` style="stroke:url(#${under})"` : '';
-  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${split}${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-today', plan.now.rule)}${path('forecast-base', plan.base)}${path('forecast-past', plan.past, cutLine)}${path('forecast-walk', plan.walk, `${painted(FORECAST_PAINT.walk)}${cutLine}`)}${path('forecast-future', plan.future, cutLine)}${path('forecast-low', plan.low)}${path('forecast-mark', plan.marks.in, ` data-dir="in"${painted(FORECAST_PAINT.mark)}`)}${path('forecast-mark', plan.marks.out, ` data-dir="out"${painted(FORECAST_PAINT.mark)}`)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg><span class="forecast-now-label num"${near} style="--at:${plan.now.at};--y:${plan.now.y}" aria-hidden="true"><span class="forecast-now-word">${escape(FORECAST_NOW)}</span><span class="forecast-now-figure">${escape(plan.now.label)}</span></span>${axis}${
+  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${split}${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-today', plan.now.rule)}${path('forecast-base', plan.base)}${path('forecast-past', plan.past)}${path('forecast-walk', plan.walk, `${painted(FORECAST_PAINT.walk)}${cutLine}`)}${path('forecast-future', plan.future, cutLine)}${path('forecast-low', plan.low)}${path('forecast-mark', plan.marks.in, ` data-dir="in"${painted(FORECAST_PAINT.mark)}`)}${path('forecast-mark', plan.marks.out, ` data-dir="out"${painted(FORECAST_PAINT.mark)}`)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg>${axis}${
     plan.cross ? `<span class="forecast-pin"${plan.cross.near ? ' data-side="end"' : ''} style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph} ${escape(plan.cross.day)}</span>` : ''
-  }${plan.drops.map((d) => `<span class="forecast-drop num" style="--at:${d.at};--y:${d.y}" aria-hidden="true">${d.n}</span>`).join('')}${
+  }${
     plan.lowLabel
       ? `<span class="forecast-low-label num"${plan.lowLabel.side ? ` data-side="${plan.lowLabel.side}"` : ''}${plan.lowLabel.drop ? ' data-drop=""' : ''}${plan.lowLabel.foot ? ' data-foot=""' : ''} style="--at:${plan.lowLabel.at};--y:${plan.lowLabel.y}" aria-hidden="true"><span class="forecast-low-word">${escape(FORECAST_LOWEST)}</span><span class="forecast-low-figure">${escape(plan.lowLabel.figure)}</span></span>`
       : ''
   }</div>`;
   const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks
-    .map((t) => `<li class="forecast-tick"${t.edge ? ' data-edge=""' : ''} style="--at:${t.at}">${escape(t.label)}</li>`)
+    .map((t) => `<li class="forecast-tick"${t.edge ? ' data-edge=""' : ''}${t.now ? ' data-now=""' : ''} style="--at:${t.at}">${escape(t.label)}</li>`)
     .join('')}</ol>`;
   /* THE ANSWER OVER THE CHART: the cash at the horizon, the lowest point and everyday spending (`forecastSummary`). */
   const summary = `<dl class="forecast-summary">${forecastSummary(model, shown)

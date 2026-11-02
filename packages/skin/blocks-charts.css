@@ -1615,9 +1615,10 @@
     color: var(--ink-2);
   }
 
+  /* THE CHART RIGHT UNDER THE ANSWERS (leftovers9): 24px, the room the crossing's flag stands in over the plot. */
   .forecast-plot {
     position: relative;
-    margin-block-start: calc(var(--sp-5) + var(--sp-2));
+    margin-block-start: var(--sp-5);
     touch-action: pan-y;
   }
 
@@ -1982,10 +1983,12 @@
   /* ── the answer over the chart and the list under it ─────────────────────
      Three figures in one row, the cash at the horizon the largest, then the line, then every movement in order: the
      mockup's "Cash on ... / Lowest / Everyday spending" over the walk and "Next movements" under it. */
+  /* THE THREE ANSWERS IN A TIGHT ROW AT THE CHART'S LEFT EDGE (leftovers9): as thirds of the tile's width each answer
+     stood a third along, Lowest 400px from Cash on, with nothing between them. Each is as wide as it says, 48px apart. */
   .forecast-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
-    gap: var(--sp-3) var(--sp-6);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3) var(--sp-7);
     margin: 0;
   }
 
@@ -2210,11 +2213,26 @@
     font-weight: 500;
   }
 
+  /* ONE LINE A FACT (leftovers9): what moved at the start, its amount at the end and never broken. At 18rem at most the
+     words "Harbourview, part 3 of 40" and "−EGP 531,765" broke into three ragged lines; the readout is as wide as its
+     longest line now, up to 24rem, and only a name longer than that wraps, under itself. */
+  .forecast-readout {
+    min-inline-size: 12rem;
+    max-inline-size: 24rem;
+    inline-size: max-content;
+  }
+
   .forecast-readout-move {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--sp-3);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--sp-4);
     color: var(--ink-2);
+  }
+
+  .forecast-readout-move > .num {
+    color: var(--ink);
+    white-space: nowrap;
+    text-align: end;
   }
 
   .forecast-ticks {
@@ -2236,6 +2254,12 @@
   /* THE START'S OWN MONTH (`data-edge`) is set at the chart's start edge, not centred on it, where half of it fell off. */
   .forecast-tick[data-edge] {
     translate: 0 0;
+  }
+
+  /* TODAY, NAMED AT THE FOOT OF ITS RULE (leftovers9), a step stronger than the months beside it. */
+  .forecast-tick[data-now] {
+    color: var(--ink-2);
+    font-weight: var(--fw-medium);
   }
 
   .forecast-knobs {
@@ -2747,7 +2771,7 @@
        the rule for any walk once, and a walk that crossed two or three month starts kept only the first. FROM FIVE,
        since a phone's plot is about 280px: five names or more leave under 56px a name, and at 390 "Jun" and "Jul" met
        (the money review). */
-    .forecast-ticks:has(> .forecast-tick:nth-child(5)) > .forecast-tick:nth-child(even) {
+    .forecast-ticks:has(> .forecast-tick:nth-child(5)) > .forecast-tick:nth-child(even):not([data-now]) {
       display: none;
     }
 
