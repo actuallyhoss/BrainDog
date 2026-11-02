@@ -65,6 +65,86 @@ public enum Words {
 
     // Settings (iOS: billing is managed on the web, App Store 3.1.1)
     public static let planManaged = "Your plan is managed at brain.dog."
+    public static let settings = "Settings"
+    public static let about = "About"
+    public static func version(_ v: String, _ build: String) -> String { "BrainDog for \(device) \(v) (\(build))" }
+    public static let billing = "Billing"
+
+    // The shell
+    public static let today = "Today"
+    public static let needsYou = "Needs you"
+    public static let activity = "Activity"
+    public static let searchTab = "Search"
+    public static let searchPrompt = "Search or go to"
+    public static let places = "Places"
+    public static let lists = "Lists"
+    public static let more = "More"
+    public static func entries(_ n: Int) -> String { n == 1 ? "1 entry" : "\(n.formatted()) entries" }
+    public static func nothingFound(_ q: String) -> String { "Nothing in your BrainDog matches \u{201C}\(q)\u{201D}." }
+    public static let nothingFoundNext = "Try fewer words, or a name as it is written."
+    public static let offlineTitle = "You're offline"
+    public static let offlinePage = "This page has not been kept on this \(device). It opens once you are back online."
+    public static let tryAgain = "Try again"
+    public static func offlineSince(_ time: String) -> String { "Offline, showing what you last saw at \(time)." }
+    public static let share = "Share"
+    public static let back = "Back"
+
+    // Account
+    public static let yourBrainDogs = "Your BrainDogs"
+    public static let opening = "Opening"
+    public static let signedInHere = "Signed in here"
+
+    // Needs you
+    public static let waitingOnYou = "Waiting on you"
+    public static let later = "Later"
+    public static func suggested(_ label: String) -> String { "Suggested: \(label)" }
+    public static func comesBack(_ day: String) -> String { "Comes back \(day)" }
+    public static let nothingNeedsYou = "Nothing needs you"
+    public static let nothingNeedsYouLine = "Questions from your agents, your rules and the people you share with wait here until you answer them."
+    public static let tellSomething = "Tell BrainDog something"
+    public static let readOnlyNeeds = "You can read these. Somebody who can decide answers them."
+    public static func answered(_ label: String) -> String { "Answered: \(label)" }
+    public static func putOff(_ day: String) -> String { "Put off until \(day)" }
+    public static let undo = "Undo"
+    public static let undone = "Put back. It waits again."
+    public static let laterTitle = "Put it off until"
+    public static let tomorrow = "Tomorrow"
+    public static let nextWeek = "Next week"
+    public static let twoWeeks = "In two weeks"
+    public static let whyItWaits = "Why it can wait"
+    public static let whyItWaitsLike = "The quote comes on Friday"
+    public static let whyMissing = "Say in a few words why it can wait first."
+    public static let putItOff = "Put it off"
+    public static let wantsReason = "This one asks why. It opens so you can say."
+    public static let changedSince = "Something changed while it was read. It is read again."
+
+    // Tell
+    public static let tell = "Tell"
+    public static let ask = "Ask"
+    public static let tellLine = "Tell BrainDog…"
+    public static let tellLike = "Paid £120 for the domain renewal yesterday"
+    public static let askLike = "What is due this week?"
+    public static let becomes = "That becomes"
+    public static let addNothingYet = "Nothing is added until you press Add."
+    public static let add = "Add"
+    public static let adding = "Adding"
+    public static let askIt = "Ask"
+    public static let tellMissing = "Type what happened first. One thing a line."
+    public static let askMissing = "Type what you want to know first."
+    public static func needs(_ what: [String]) -> String { "Needs \(and(what))" }
+    public static let notSentOffline = "Not sent: you're offline. It is kept here until you press Add again."
+    public static let nothingReady = "None of these can be added yet. Each says what it needs."
+    public static let tellUnavailable = "Tell cannot read here yet. Try again in a moment."
+    public static let done = "Done"
+    public static func addTo(_ list: String) -> String { "Add it to \(list)" }
+    public static func keptInField(_ n: Int) -> String { n == 1 ? "The line it could not place is still in the field." : "The \(n) lines it could not place are still in the field." }
+    public static let tellUndone = "Taken back. None of it was kept."
+
+    /// "a, b and c".
+    public static func and(_ items: [String]) -> String {
+        guard items.count > 1 else { return items.first ?? "" }
+        return items.dropLast().joined(separator: ", ") + " and " + items[items.count - 1]
+    }
 
     static var device: String {
         #if os(iOS)

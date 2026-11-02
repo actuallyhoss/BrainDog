@@ -87,6 +87,8 @@ public final class Session {
         cookie = nil
         keychain.delete("cookie")
         shared.removeObject(forKey: "session.refreshedAt")
+        /* WHAT THE NATIVE SCREENS KEPT GOES WITH IT (plan 3.8), and so does the web views' own copy of the record. */
+        Kept.forget()
         Task { await WebKitStore.shared.clear() }
     }
 
@@ -141,6 +143,9 @@ public final class WebKitStore {
         for c in await store.allCookies() where c.domain.hasSuffix(Server.host) {
             await store.deleteCookie(c)
         }
+        /* AND THE PAGE'S OWN KEPT COPY (IndexedDB, the service worker's), so the next person on this phone reads nothing of it. */
+        let kinds: Set<String> = [WKWebsiteDataTypeIndexedDBDatabases, WKWebsiteDataTypeServiceWorkerRegistrations, WKWebsiteDataTypeFetchCache, WKWebsiteDataTypeLocalStorage]
+        await WKWebsiteDataStore.default().removeData(ofTypes: kinds, modifiedSince: .distantPast)
     }
 
     /// Wait until the session is in the store, so a first load never goes out without it.

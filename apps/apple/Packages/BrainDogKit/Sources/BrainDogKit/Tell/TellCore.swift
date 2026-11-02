@@ -50,6 +50,23 @@ public final class TellCore {
         return fault == nil ? out?.toString() : nil
     }
 
+    /// What one press of Add sends for several lines, each given as the JSON `read` answered: `rows` for `capture`,
+    /// `shown` (each entry sent, said as its line said it, with its list) and `held` (what stayed behind and what it
+    /// needs), by the web card's own rules (`native.ts` `batchJSON`).
+    public func batch(_ tolds: [String], options: String) -> Batch? {
+        fault = nil
+        let out = api?.invokeMethod("batchJSON", withArguments: ["[\(tolds.joined(separator: ","))]", options])
+        guard fault == nil, let text = out?.toString() else { return nil }
+        return try? JSONDecoder().decode(Batch.self, from: Data(text.utf8))
+    }
+
+    /// The receipt's first sentence ("Added a project and a bill") from what `capture` made and what was sent.
+    public func added(made: String, sent: String, options: String) -> String? {
+        fault = nil
+        let out = api?.invokeMethod("addedJSON", withArguments: [made, sent, options])
+        return fault == nil ? out?.toString() : nil
+    }
+
     /// One line read and decoded: what the sheet draws as "That becomes".
     public func told(_ sentence: String, options: String) -> Told? {
         guard let text = read(sentence, options: options) else { return nil }
@@ -78,4 +95,18 @@ nonisolated public struct Told: Decodable, Sendable, Equatable {
 
     /// "That becomes": each entry's two lines, as the card reads them.
     public var becomes: [String] { rows.map { $0.detail.isEmpty ? $0.said : "\($0.said): \($0.detail)" } }
+}
+
+/// One press of Add, worked out: the entries to send, each said as its line said it, and what stays behind.
+nonisolated public struct Batch: Decodable, Sendable, Equatable {
+    public struct Shown: Decodable, Sendable, Equatable {
+        public let said: String
+        public let list: String
+        public let register: String
+    }
+    public let rows: JSONValue
+    public let shown: [Shown]
+    public let held: String
+
+    public var count: Int { rows.array?.count ?? 0 }
 }

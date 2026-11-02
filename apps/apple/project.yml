@@ -86,6 +86,9 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: dog.brain.app
             CFBundleURLSchemes: [braindog]
+        # App-Bound Domains (plan 3.2): what lets the service worker run in the web views, so the kept shell and the
+        # 7-day read copy work offline as in the PWA. `localhost` is the seed on this Mac, which only a Debug build reads.
+        WKAppBoundDomains: [app.brain.dog, brain.dog, challenges.cloudflare.com, localhost]
         # The web app's host. A Debug build may be pointed elsewhere with `-braindogServer <url>` (Server.swift).
         BrainDogServer: https://app.brain.dog
         BrainDogAppGroup: group.dog.brain

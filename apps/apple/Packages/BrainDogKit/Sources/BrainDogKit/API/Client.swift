@@ -58,6 +58,16 @@ public final class Client: Sendable {
         return try decodeValue(data)
     }
 
+    /// A read of the person's own (`GET /account/records`), answered as `T`: the account's doors are GETs, a record's are POSTs.
+    public func get<T: Decodable & Sendable>(_ path: String, as: T.Type = T.self) async throws(CallFailure) -> T {
+        var request = URLRequest(url: Server.url(path))
+        request.httpMethod = "GET"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        if let cookie = Session.shared.cookieHeader { request.setValue(cookie, forHTTPHeaderField: "cookie") }
+        let data = try await send(request, path: path)
+        return try decodeValue(data)
+    }
+
     /// The envelope's `value`, or the refusal it carried.
     private func decodeValue<T: Decodable>(_ data: Data) throws(CallFailure) -> T {
         do {
@@ -81,7 +91,11 @@ public final class Client: Sendable {
         request.setValue(Server.originText, forHTTPHeaderField: "origin")
         if let cookie = Session.shared.cookieHeader { request.setValue(cookie, forHTTPHeaderField: "cookie") }
         request.httpBody = (try? JSONEncoder().encode(body)) ?? Data("{}".utf8)
+        return try await send(request, path: path)
+    }
 
+    /// One request on the origin, its `Set-Cookie` kept, and its status read the one way every call reads it.
+    private func send(_ request: URLRequest, path: String) async throws(CallFailure) -> Data {
         let data: Data
         let response: URLResponse
         do {
@@ -91,6 +105,11 @@ public final class Client: Sendable {
         }
         guard let http = response as? HTTPURLResponse else { throw CallFailure.offline }
         Session.shared.take(response: http)
+        /* ACCESS THAT ENDED ENDS HERE TOO (plan 3.8): the host says so on any answer, and the app forgets what it kept. */
+        if http.value(forHTTPHeaderField: "x-braindog-access") == "ended" {
+            Session.shared.lost()
+            throw CallFailure.signedOut
+        }
 
         switch http.statusCode {
         case 200..<300:

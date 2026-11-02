@@ -33,6 +33,24 @@ person on the seed, on 8787, printing each sign-in letter's link and code) and `
 
 **One iOS simulator booted at a time, ever.** `build.mjs sim` refuses when more than one is.
 
+The screenshot walk: `node apps/apple/tools/shots.mjs m2` (or `m3`) relaunches the signed-in app on the booted
+simulator once per screen, light and dark, and saves each to `~/Developer/braindog/.notes/shots/apps/<milestone>/`.
+Each screen is reached by a Debug launch press (`-braindogPress go:…`, `BrainDogApp.swift`), which calls what the
+screen's own control calls; a Release build has none of it.
+
+## The iPhone app
+
+- **Tabs**: the web's first four places (`places`, from `tabsOf`), kept for the next launch, and Search or go to as the
+  search tab. Needs you is native with its count; every other tab is a native stack of web screens.
+- **Stacks**: a link pressed in a page becomes a native push (`shell.visit`, from `AppFrame.svelte`), taken from a warm
+  web view (`WebPool`). At most four live per stack; deeper screens sleep with their picture and reload on the way back.
+  A pushed screen's back and name are drawn by the app (no glass); the system's edge swipe back is kept (`SwipeBack`).
+- **Native moments**: Needs you (swipe right gives the suggested answer, left puts it off, a tap opens the card),
+  Tell (the tab bar's accessory; read on the device by `tell-core.js`, one `capture`, Undo), Search, Account (every
+  BrainDog with its role, switch, Settings, Sign out), the Settings root.
+- **Offline**: web screens use the service worker's kept copy (App-Bound Domains); a screen never kept says so with
+  Try again; Needs you shows its last read and when. Tell offline keeps the words as a draft and sends nothing.
+
 ## Generated, never by hand
 
 | File | From | Script |
