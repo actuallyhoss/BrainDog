@@ -767,14 +767,17 @@
    */
   const shape = $derived(navPrefs.shape);
 
-  /* CLEARED ON EVERY NAVIGATION, or `data-screen` is the PREVIOUS screen's answer for exactly as
+  /* CLEARED ON EVERY NEW SCREEN, or `data-screen` is the PREVIOUS screen's answer for exactly as
      long as this one takes to arrive, which is the window every browser gate measures in.
 
      AND THE SIDEBAR'S DRAWER CLOSES ON ONE, whichever of its rows started it: it belongs to the shell, which outlives
      every screen, so a row that navigated would leave it open over the new screen. */
   beforeNavigate((nav) => {
     moves += 1;
-    leaving();
+    /* A NEW SCREEN ONLY (skills pass follow-up, 2 Nov). A changed `?view=` or filter is the same screen answering, and a
+       view that reads nothing new (Tasks' Board) never said it drew again, so `data-screen` stayed off for good and
+       `calm()` held every arrival on it still. A read the change starts still takes the mark away until it lands. */
+    if (newScreen(nav.from?.url, nav.to?.url)) leaving();
     /* The dev timing hook measures the next screen from here (`timing.ts`); off, it does nothing. */
     timingOpened();
     sideOver = false;
@@ -799,6 +802,9 @@
   /* HOW MANY MOVES THIS TAB HAS MADE, so a place put back for one screen is never put back over the next one. */
   let moves = 0;
   const placeKey = (u: URL): string => u.pathname + u.search;
+  /** Whether a move opens another screen: another path, or another place at the same path (Work and Menu at `/`). */
+  const newScreen = (from: URL | undefined, to: URL | undefined): boolean =>
+    !from || !to || from.pathname !== to.pathname || placeOf(here(from.pathname), from.searchParams) !== placeOf(here(to.pathname), to.searchParams);
   const scroller = (): HTMLElement | null => document.getElementById('main');
   let fromPalette = false;
 
@@ -855,8 +861,12 @@
     /* AND WHICH PLACE IT WAS IN, for the phone's four (`tab-use.ts`). */
     const went = nav.to ? placeAt(placeOf(here(nav.to.url.pathname), nav.to.url.searchParams)) : undefined;
     if (went) noteUse(went.href);
-    /* THE RECORD FORMING (`$lib/motion`): a screen's first second draws still, so what was already there never flies in. */
-    hush();
+    /* THE RECORD FORMING (`$lib/motion`): a screen's first second draws still, so what was already there never flies in.
+       ONLY A NEW SCREEN (skills pass follow-up, 2 Nov): a changed `?view=`, `?tab=` or filter is the same screen
+       answering a press, and hushing it too stopped every Swap and arrival on a same-page switch (0 animations measured
+       on People's Recent to A to Z and the store's chips). A new path, or another place at the same path (Work and the
+       phone's Menu at `/`), is a new screen and still draws still. */
+    if (newScreen(nav.from?.url, nav.to?.url)) hush();
   });
   /* AND FIGURES COUNT AND BARS GROW when the record changes them, from one watcher on the window, fetched after the
      first draw so Today's first load does not wait for it. */
@@ -989,17 +999,121 @@
         /* THE NEW PICTURE IS THE REAL PAGE when it is quick to draw: the screen is given `DRAWN_WITHIN_MS` to say so
            (`data-screen`), so the fade does not end on a half-built page it had in hand (motion F6). */
         await waitFor(() => scroller()?.dataset.screen !== undefined, DRAWN_WITHIN_MS);
+        /* A ROW OF TABS PRESSED TO GET HERE IS ONE PICTURE ON BOTH SIDES (`pressTab` below), found on the new screen by
+           its name, so it holds still while the work under it changes. */
+        const was = tabsHeld;
+        const label = was?.getAttribute('aria-label');
+        if (was && label) {
+          const find = (): HTMLElement | undefined => [...(scroller()?.querySelectorAll<HTMLElement>('[data-tabs]') ?? [])].find((r) => r.getAttribute('aria-label') === label);
+          /* A ROW THE NEXT SCREEN DRAWS A BEAT AFTER ITS FIRST FRAME (Money's book row waits on the page's declaration) is
+             waited for a moment: the old picture already shows the press answered, so the wait is not a silence. */
+          await waitFor(() => find() !== undefined, TAB_ROW_WITHIN_MS);
+          const now = find();
+          if (now && now !== was) now.style.viewTransitionName = TAB_ROW;
+        }
       });
       crossing = moving;
       moving.ready.catch(() => undefined);
       void moving.finished
         .catch(() => undefined)
         .then(() => {
+          for (const r of document.querySelectorAll<HTMLElement>('[data-tabs]')) if (r.style.viewTransitionName === TAB_ROW) r.style.viewTransitionName = '';
+          tabsHeld = null;
           if (crossing !== moving) return;
           crossing = null;
           delete root.dataset.moving;
         });
     });
+  });
+
+  /**
+   * A TAB THAT GOES TO ANOTHER ADDRESS ANSWERS ITS PRESS AT ONCE (skills pass follow-up, 2 Nov).
+   *
+   * Money's book tabs, a section's page tabs, the Keychain's views, the automations hub, Usage's months: each tab is a
+   * link (`data-tabs` on the row, which `Segmented` gives every `nav` track), and the next page has to read before it
+   * draws. Until it did, nothing moved: the press showed nothing for about 240ms, and inside a view transition the
+   * browser holds the old picture, so the tab could not even be drawn chosen. Now, on the press itself:
+   *
+   *   - the pressed tab takes the chosen mark (`data-on` where the row uses it, `aria-current`), so the thumb slides to
+   *     it on its own steps and the old picture the browser keeps already shows it;
+   *   - what the row stands over goes quiet (`data-waiting`: 0.6 after `--d-exit`, so a page that draws at once never
+   *     dims) and the work says it is busy (`aria-busy`), until the next screen is drawn;
+   *   - the row is named for the move (`TAB_ROW`), and the same row on the next screen too, so it holds still while the
+   *     work under it cross-fades rather than fading out and back in.
+   *
+   * A NAVIGATION THAT FAILS OR IS TURNED ELSEWHERE PUTS IT ALL BACK. A press with a modifier, a link that opens
+   * elsewhere, or the tab already chosen is left alone.
+   */
+  const TAB_ROW = 'tab-row';
+  /** How long the fade waits for the pressed row to be drawn on the next screen. */
+  const TAB_ROW_WITHIN_MS = 120;
+  let tabsHeld: HTMLElement | null = null;
+  let tabPress: { href: string; undo: () => void; settle: () => void } | null = null;
+
+  function pressTab(e: MouseEvent): void {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const link = e.target instanceof Element ? e.target.closest('a[href]') : null;
+    if (!(link instanceof HTMLAnchorElement) || (link.target !== '' && link.target !== '_self') || link.hasAttribute('download')) return;
+    const main = scroller();
+    const row = link.closest<HTMLElement>('[data-tabs]');
+    if (!main || !row || !main.contains(row) || link.getAttribute('aria-current') === 'page') return;
+    const to = new URL(link.href);
+    if (to.origin !== location.origin || (to.pathname === location.pathname && to.search === location.search)) return;
+    tabPress?.undo();
+
+    const tabs = [...row.querySelectorAll<HTMLAnchorElement>('a[href]')];
+    const marks = tabs.map((a) => [a, a.getAttribute('data-on'), a.getAttribute('aria-current')] as const);
+    const onMark = marks.some(([, on]) => on !== null);
+    for (const [a] of marks) {
+      a.removeAttribute('data-on');
+      a.removeAttribute('aria-current');
+    }
+    if (onMark) link.setAttribute('data-on', '');
+    link.setAttribute('aria-current', 'page');
+
+    /* WHAT THE ROW STANDS OVER, step by step up to the work: every sibling of the row and of each box holding it. */
+    const quiet: Element[] = [];
+    for (let at: Element | null = row; at && at !== main; at = at.parentElement)
+      for (const sib of at.parentElement?.children ?? []) if (sib !== at && !sib.contains(row)) quiet.push(sib);
+    for (const q of quiet) q.setAttribute('data-waiting', '');
+    main.setAttribute('aria-busy', 'true');
+    if (typeof document.startViewTransition === 'function') {
+      row.style.viewTransitionName = TAB_ROW;
+      tabsHeld = row;
+    }
+
+    const settle = (): void => {
+      for (const q of quiet) q.removeAttribute('data-waiting');
+      main.removeAttribute('aria-busy');
+      if (tabPress?.settle === settle) tabPress = null;
+    };
+    const undo = (): void => {
+      settle();
+      for (const [a, on, current] of marks) {
+        if (on === null) a.removeAttribute('data-on');
+        else a.setAttribute('data-on', on);
+        if (current === null) a.removeAttribute('aria-current');
+        else a.setAttribute('aria-current', current);
+      }
+      if (tabsHeld === row && !document.documentElement.hasAttribute('data-moving')) {
+        row.style.viewTransitionName = '';
+        tabsHeld = null;
+      }
+    };
+    tabPress = { href: to.href, undo, settle };
+  }
+
+  $effect(() => {
+    /* CAPTURED, so the tab is marked before Kit's own click handler starts the move. */
+    addEventListener('click', pressTab, { capture: true });
+    return () => removeEventListener('click', pressTab, { capture: true });
+  });
+
+  beforeNavigate((nav) => {
+    const press = tabPress;
+    if (!press) return;
+    if (nav.to?.url.href !== press.href) return void press.undo();
+    void nav.complete.then(press.settle, press.undo);
   });
 
   /**

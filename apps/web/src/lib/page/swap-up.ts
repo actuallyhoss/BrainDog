@@ -10,8 +10,9 @@
  * typed or a column sorted: the caller keys it on the view and the chips alone (a sort already slides its rows,
  * `animate:flip`). The automations hub plays it when a tab is pressed.
  *
- * NOT HELD BY A SCREEN'S FIRST SECOND (`calm`), which the shell restarts on every navigation, a changed `?view=` or
- * `?tab=` too: the press is the change, and the caller never plays it for a first draw. Kept beside the page renderer
+ * NOT HELD BY A SCREEN'S FIRST SECOND (`calm`): the press is the change, and the caller never plays it for a first draw.
+ * (The shell restarts `calm` only for a new screen now, not for a changed `?view=` or `?tab=`, so `Swap` would play here
+ * too; this stays because it fades the new body without holding the old one.) Kept beside the page renderer
  * rather than in `$lib/motion` (the motion lane's), as the brief asks of a new primitive.
  */
 

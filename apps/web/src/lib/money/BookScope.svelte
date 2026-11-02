@@ -10,6 +10,14 @@
   can be; a refusal or a slow read draws nothing. WHICH LIST THE
   BOOKS ARE IS THE LEDGER'S TO SAY (`ledger.ts` `book`), handed by the page, never named here.
 -->
+<script module lang="ts">
+  type Book = { seq: number; name: string };
+  /* THE BOOKS LAST READ, BY RECORD AND LIST, so the next book's page draws its row with the page and the row the reader
+     just pressed is there to hold still (skills pass follow-up, 2 Nov): it was missing for a frame on every press while
+     the next page read the books again. Read again each time; this is only what is drawn until the answer lands. */
+  const kept = new Map<string, Book[]>();
+</script>
+
 <script lang="ts">
 
   import { at } from '../at.ts';
@@ -19,11 +27,12 @@
 
   let { base, book, on }: { base: string; book: SideList; on: number | null } = $props();
 
-  type Book = { seq: number; name: string };
-  let books = $state<Book[]>([]);
+  // svelte-ignore state_referenced_locally
+  let books = $state<Book[]>(kept.get(`${base} ${book.list}`) ?? []);
 
   $effect(() => {
     let gone = false;
+    const key = `${base} ${book.list}`;
     /* ASKED WITH MONEY'S OWN FIRST READ WHERE THE LEDGER WAS KNOWN BY THEN (`books.ts`), else now. */
     void (takeBooks(base, book) ?? readBooks(base, book))
       .then((got) => {
@@ -35,6 +44,7 @@
             const name = r.fields?.[book.title];
             return { seq: r.seq as number, name: typeof name === 'string' && name.trim() ? name.trim() : `Book ${r.seq}` };
           });
+        kept.set(key, books);
       })
       .catch(() => undefined);
     return () => {

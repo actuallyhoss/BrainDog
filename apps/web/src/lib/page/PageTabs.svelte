@@ -46,7 +46,7 @@
   const hereBehind = $derived(strip.more.some((t) => t.current));
 </script>
 
-<nav class="page-tabs" aria-label={strip.section}>
+<nav class="page-tabs" aria-label={strip.section} data-tabs>
   <!-- WHERE YOU ARE GLIDES from the tab you left (`litSlide`): the strip stays mounted between the pages of a section. -->
   <div class="tab-row" bind:this={row} {@attach litSlide('.tab[aria-current="page"]', { fill: 'var(--tile)' })}>
     {#each strip.shown as tab (tab.href)}
