@@ -95,15 +95,50 @@ export const ASKS: Readonly<Record<string, (args: Record<string, unknown>) => As
   },
 };
 
-/** The refusal for a call this door does not make, with the nearest it does. */
+/**
+ * The call this door makes that a name most likely meant: the same name in another case, the name with a verb an agent
+ * puts in front taken off (`listScripts` is `scripts`, `getAutomations` is `automations`), or one whose name holds it.
+ * `null` where nothing is near enough to say.
+ */
+export function nearestCall(name: string, rows: readonly CallRow[]): string | null {
+  const taken = rows.filter(doorTakes).map((r) => r.name);
+  const low = name.trim().toLowerCase();
+  if (low === '') return null;
+  const same = taken.find((n) => n.toLowerCase() === low);
+  if (same !== undefined) return same;
+  const stem = low.replace(/^(?:list|get|read|show|all|my)_?/u, '').replace(/[_\s-]+/gu, '');
+  const bare = taken.find((n) => n.toLowerCase() === stem || n.toLowerCase() === `${stem}s` || `${n.toLowerCase()}s` === stem);
+  if (bare !== undefined) return bare;
+  const holds = taken.filter((n) => stem.length >= 4 && n.toLowerCase().includes(stem));
+  return holds.length === 1 ? holds[0]! : null;
+}
+
+/** The refusal for a call this door does not make, with the nearest it does as `try`, and how to find the rest. */
 export function notADoor(name: string, rows: readonly CallRow[]): Refusal {
   if (Object.hasOwn(NEVER, name)) return { code: 'FORBIDDEN', fix: `${name} is not made through act: ${NEVER[name]}.`, at: 'call' };
   const known = rows.some((r) => r.name === name);
+  if (known) return { code: 'FORBIDDEN', fix: `${name} is not made through act; it is the app's own.`, at: 'call' };
+  const near = nearestCall(name, rows);
   return {
-    code: known ? 'FORBIDDEN' : 'ROUTE_UNKNOWN',
-    fix: known ? `${name} is not made through act; it is the app's own.` : `There is no call named ${name || '(nothing)'}. Read braindog:calls for every one.`,
+    code: 'ROUTE_UNKNOWN',
+    fix: `There is no call named ${name || '(nothing)'}${near === null ? '' : `; ${near} is`}. act {"call":"calls","args":{"q":"<a word>"}} finds the rest.`,
     at: 'call',
-  };
+    ...(near === null ? {} : { try: `act {"call":"${near}"}` }),
+  } as Refusal;
+}
+
+/**
+ * `act {call:"calls"}`: the calls this door makes whose name or line holds `q`, a line each, for a client that reads no
+ * resources and so never sees `braindog:calls`. With no `q`, every name, which is short.
+ */
+export function callsFound(rows: readonly CallRow[], q: string): string {
+  const taken = rows.filter(doorTakes);
+  const word = q.trim().toLowerCase();
+  if (word === '') return [`${String(taken.length)} calls. act {"call":"calls","args":{"q":"<a word>"}} says what each does.`, `Reads: ${taken.filter((r) => !r.writes).map((r) => r.name).join(', ')}`, `Writes: ${taken.filter((r) => r.writes).map((r) => r.name).join(', ')}`].join('\n');
+  const starts = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'u');
+  const hits = taken.filter((r) => r.name.toLowerCase().includes(word) || starts.test(r.what.toLowerCase()));
+  if (hits.length === 0) return `No call says ${q.trim()}. act {"call":"calls"} names every one.`;
+  return [...hits.slice(0, 25).map((r) => `${r.name}${r.writes ? '' : ' (read)'}: ${r.what}`), ...(hits.length > 25 ? [`and ${String(hits.length - 25)} more; a narrower word finds them.`] : [])].join('\n');
 }
 
 /** `braindog:calls`: every call this door makes, a line each, and how to make one. */

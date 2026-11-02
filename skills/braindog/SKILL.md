@@ -61,13 +61,17 @@ An audit, a plan, a design or a before and after goes on the thing it is about, 
 
 `act` makes any call the BrainDog app makes, by its name: settings and time zone, add-ons and their settings,
 automations, boards and Today, books and bills, sharing and people, Needs you, export. Read `braindog:calls` for every
-call and what it takes, then `act {call:"<name>", args:{...}}`.
+call and what it takes, or, where resources are not read, `act {call:"calls", args:{q:"<a word>"}}`, then
+`act {call:"<name>", args:{...}}`. A name it does not know is refused with the nearest call as `try`.
 
 - It runs with your own grant. What you may not do in the app you may not do here; a change your rung asks about is
   filed on Needs you, as any other.
 - What only the owner does in a browser (an add-on on or off, its settings, a declaration, taking a key out) is asked
   instead, and lands when the person says yes. Anything else refused that way is theirs: say so.
 - Take back your own write with `act {call:"undoOwn", args:{batch:"<from the receipt>"}}`.
+- Scripts and automations are no list of rows, and are read by name: `list {register:"scripts"}` or
+  `{register:"automations"}` says each on a line, and `get {spoken:"<its id or title>"}` one whole, with its last runs.
+  Your own and other agents' runs are the list `session`, Agent runs.
 - Never a key's value, in or out. A key goes in with `braindog keys put <label>`, which reads standard input.
 - A note longer than 280 characters is kept as several, in order, up to 1,400. Past that, send it as a page.
 

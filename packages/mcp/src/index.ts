@@ -98,7 +98,7 @@ import type { HANDOFF_STATES as RecordHandoffStates } from '@braindog/record';
 import { firewall } from '@braindog/record/sight';
 
 import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
-import { ASKS, catalogue, doorTakes, keyAsk, notADoor, type Ask, type CallRow } from './act.ts';
+import { ASKS, callsFound, catalogue, doorTakes, keyAsk, notADoor, type Ask, type CallRow } from './act.ts';
 export { withCalls, type CallRow } from './act.ts';
 import { ANSWERED_GRAMMAR, AUTOMATION_GRAMMAR } from './automations.ts';
 import { names as scriptNames, ruleBrief, rulesBrief, scriptBrief, scriptsBrief } from './scripts.ts';
@@ -839,7 +839,7 @@ export const TOOLS: readonly Tool[] = [
        calls as a resource, so the list pays for one tool. It took `undo`'s place, and `undo` is folded into it: its
        receipt's batch is `act undoOwn`. Destructive in the spec's sense, as `undo` was: a call may delete. Who may make
        which call is the record's to say, with the caller's own grant, so nothing here widens what an agent reaches. */
-    description: 'Any app call; braindog:calls lists them. Undo: undoOwn {batch}.',
+    description: 'Any app call; call "calls" lists them. Undo: undoOwn {batch}.',
     input: obj({ call: { type: 'string' }, args: { type: 'object' } }, ['call']),
     writes: true,
     destructive: true,
@@ -3452,6 +3452,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (!isObject(sent)) return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'args is an object: the call\'s own arguments, as braindog:calls names them.', at: 'args' } } };
       if (!surface.call || !surface.calls) return { result: unbuilt('act', 'Use the other tools, or ask the owner to do it from the app.') };
       const rows = surface.calls();
+      /* `calls` IS THIS DOOR'S OWN, the list a client that reads no resources never saw (`callsFound`). */
+      if (name === 'calls' && !rows.some((r) => r.name === 'calls')) {
+        const q = typeof sent.q === 'string' ? sent.q : '';
+        const found = callsFound(rows, q);
+        return { result: { ok: true, value: { calls: found.split('\n') } }, say: () => found };
+      }
       const row = rows.find((r) => r.name === name);
       if (row === undefined || !doorTakes(row)) return { result: { ok: false, refusal: notADoor(name, rows) } };
       /* `undoOwn` IS `undo`'s, and answered in its words. */
