@@ -1667,6 +1667,73 @@
     },
     {
       "kind": "pack",
+      "id": "gmail",
+      "title": "Gmail",
+      "summary": "Your Gmail in BrainDog: who you are in touch with, mail waiting on your reply, and bills, receipts and dates to look at. A short script in your own Google account sends the subject, sender, day, a short snippet and the link. Reads only; nothing is ever sent from your Gmail.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "21d752d9cbafdec1f6e2c5bdf2bef3d00c8ba58a5857f7142da89c42ee076795",
+          "bytes": 33617,
+          "published_at": "2026-11-02T21:08:43.487Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Mail"
+            ],
+            "pages": [
+              "Mail"
+            ],
+            "rules": [
+              "Ask about mail waiting on your reply",
+              "Ask about a mail that looks like a bill",
+              "Ask about a mail that looks like a receipt",
+              "Ask about a mail from a person with a date in it"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Mail",
+              "Waiting on your reply"
+            ],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": true
+              },
+              {
+                "id": "register.organisations",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "First version: mail in, people and organisations met from it, Last in touch kept, questions in Needs you, a Mail page and a Today widget.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "doors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "shelf": "helpers",
+      "icon": "mail"
+    },
+    {
+      "kind": "pack",
       "id": "goals",
       "title": "Goals",
       "summary": "What you are saving for: a goal for an account, a currency or a value you keep up, a target and a day, how much to put by each month, and whether you are on track.",
