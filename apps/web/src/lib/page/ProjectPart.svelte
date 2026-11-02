@@ -1030,6 +1030,24 @@
     white-space: nowrap;
   }
 
+  /* WHAT HAPPENED SAYS A DAY WITHOUT ITS WEEKDAY ("3 Sep", "12 Sep"), so its column is as wide as its widest day and no
+     wider (2 Nov): held at the 76px Dates needs for "Wed 30 Sep", it left a gap beside every line and wrapped each line
+     in the narrow column into three. One column for every row (`subgrid`), so a day with its year ("3 Sep 2025") widens
+     them all together and the lines still start on one edge. */
+  :global(.t-happened) .li-list {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 12px;
+  }
+
+  :global(.t-happened) .li {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+  }
+
+  :global(.t-happened) .li-when {
+    min-inline-size: 0;
+  }
+
   .li[data-tone='late'] .li-when,
   .li[data-tone='late'] .li-text {
     color: var(--red);
