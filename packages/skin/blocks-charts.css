@@ -1767,6 +1767,14 @@
     stroke-linecap: round;
   }
 
+  /* THE POINT THE READOUT NAMES (leftovers9), a dot as today's is and a step larger, so it reads on the line. */
+  .forecast-scrub-dot {
+    fill: none;
+    stroke: var(--chart-1);
+    stroke-width: 9px;
+    stroke-linecap: round;
+  }
+
   /* `--y` is the renderer's, inline; the 0 here only stands when a host leaves it out, and puts the words at the top. */
   .forecast-now-label {
     --y: 0;
@@ -1947,12 +1955,13 @@
   /* WORDS THAT HANG PAST THE PLOT'S FOOT (`data-foot`, `lowFoot` in `src/forecast.ts`) set the month names under them:
      under a dot at the foot, "Lowest" and its figure sat on "Nov". Two lines of 16px and the gap over them, and the disc's
      18px more where a part of a plan sits on the same day. */
+  /* ONE LINE SINCE leftovers9: the word alone, the figure being the summary's Lowest right over the chart. */
   .forecast-plot:has(.forecast-low-label[data-foot]) + .forecast-ticks {
-    margin-block-start: calc(32px + var(--sp-2));
+    margin-block-start: calc(16px + var(--sp-2));
   }
 
   .forecast-plot:has(.forecast-low-label[data-foot][data-drop]) + .forecast-ticks {
-    margin-block-start: calc(50px + var(--sp-2));
+    margin-block-start: calc(34px + var(--sp-2));
   }
 
   .forecast-low-word {
@@ -2771,7 +2780,8 @@
        the rule for any walk once, and a walk that crossed two or three month starts kept only the first. FROM FIVE,
        since a phone's plot is about 280px: five names or more leave under 56px a name, and at 390 "Jun" and "Jul" met
        (the money review). */
-    .forecast-ticks:has(> .forecast-tick:nth-child(5)) > .forecast-tick:nth-child(even):not([data-now]) {
+    /* COUNTED OVER THE MONTHS ALONE (`alt`, leftovers9), so the names kept are evenly spaced and Today stays. */
+    .forecast-ticks:has(> .forecast-tick:nth-child(5)) > .forecast-tick[data-alt] {
       display: none;
     }
 

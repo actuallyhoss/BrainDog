@@ -934,7 +934,8 @@ export type ForecastPlan = {
    */
   lowLabel: { at: string; y: string; figure: string; side?: 'start' | 'end'; drop?: true; foot?: true } | null;
   /** The month names under the chart; `edge` is the start's own month, set at the left edge rather than centred. */
-  ticks: { at: string; label: string; edge?: true; now?: true }[];
+  /** `alt` is every other month's name, counted over the months alone, which a narrow chart leaves out. */
+  ticks: { at: string; label: string; edge?: true; now?: true; alt?: true }[];
   /** The start and the end of the time axis, for the scrub. */
   start: string;
   span: number;
@@ -959,8 +960,35 @@ export type ForecastPlan = {
 
 /** The most parts of plans a chart numbers as drops: the soonest, so the line is never covered in numbers. */
 export const FORECAST_DROPS_MOST = 6;
-/** How near today's word a month's name may stand under the chart, as a share of its width, before it gives way. */
-const TODAY_ROOM = 0.1;
+/**
+ * How near today's word a month's name may stand under the chart, as a share of its width, before it gives way. At a
+ * tenth a phone's plot of 280px set "Today" and "Dec" 28px apart, centre to centre, and the two words ran into each
+ * other (leftovers9).
+ */
+const TODAY_ROOM = 0.14;
+
+/**
+ * THE MOST OF THE WIDTH THE REMEMBERED PAST TAKES, at every length (leftovers9): twelve weeks ahead drew from August,
+ * so on a phone the grey history was half the chart and the weeks ahead were squeezed into the other half. The past is
+ * context for the line, and the walk ahead is the answer, so it gets the room: twelve weeks keep about two weeks of
+ * past, a year about two months.
+ */
+const PAST_SHARE = 0.15;
+
+/**
+ * The remembered balances the chart draws from `start`: those on or after it, and where the record remembered a day
+ * before it, the balance at `start` itself, read on the straight line to the next one (or to today's), so the grey line
+ * begins at the chart's edge rather than part way in.
+ */
+function pastFrom(model: Pick<ForecastModel, 'past' | 'today'>, start: string, now: number): ForecastModel['past'] {
+  const kept = model.past.filter((p) => p.day >= start && p.day < model.today);
+  const before = model.past.filter((p) => p.day < start).at(-1);
+  if (!before || kept[0]?.day === start) return kept;
+  const next = kept[0] ?? { day: model.today, value: now };
+  const span = daysBetween(before.day, next.day);
+  const share = span > 0 ? daysBetween(before.day, start) / span : 0;
+  return [{ day: start, value: before.value + (next.value - before.value) * share }, ...kept];
+}
 
 /** How near either end of the chart the lowest point is, as a share, for its words to lean inward from it. */
 const LOW_EDGE = 0.15;
@@ -1252,8 +1280,8 @@ export function nowCrossings(points: readonly { x: number; y: number }[], dot: {
   };
 }
 
-/** The lowest point's label as a share of the plot's height on a phone: "Lowest" over its figure, two lines of 16px. */
-const LOW_TALL = 0.2;
+/** The lowest point's label as a share of the plot's height on a phone: "Lowest", one line of 16px (the figure went, leftovers9). */
+const LOW_TALL = 0.1;
 /** How much lower the label hangs where a numbered part of a plan sits on the same day: its 16px disc and a gap. */
 const LOW_DROP = 0.11;
 
@@ -1291,9 +1319,13 @@ function tickLabel(day: string, every: number): string {
  * WHERE ZERO IS OUT OF VIEW THE RULE IS THE AXIS'S OWN END NEAREST IT, the bottom of a walk that stays above and the
  * top of one that stays under, and the wash runs to it, so a drawer still has one rule to draw and one shape to fill.
  */
-export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenario | null = null): ForecastPlan {
-  const start = model.past[0]?.day ?? model.today;
-  const end = addDays(model.today, shown.horizon);
+export function forecastPlan(whole: ForecastModel, shown: Scenario, base: Scenario | null = null): ForecastPlan {
+  const end = addDays(whole.today, shown.horizon);
+  const back = Math.max(1, Math.round((shown.horizon * PAST_SHARE) / (1 - PAST_SHARE)));
+  const earliest = addDays(whole.today, -back);
+  const start = whole.past[0] ? (whole.past[0].day > earliest ? whole.past[0].day : earliest) : whole.today;
+  /* THE MODEL WITH ONLY THE PAST THE CHART HAS ROOM FOR (`PAST_SHARE`), so the axis, the wash and the line all read it. */
+  const model: ForecastModel = { ...whole, past: pastFrom(whole, start, todayBalance(whole, shown)) };
   const span = Math.max(1, daysBetween(start, end));
   const values = [...model.past.map((p) => p.value), ...shown.days.map((p) => p.balance), ...(base?.days.filter((p) => p.day <= end).map((p) => p.balance) ?? [])];
   /* THE AXIS HOLDS ZERO, ALWAYS (leftovers9, Sam on Cash ahead: "wtf is that ui"). The walk is drawn over a wash, and a
@@ -1378,8 +1410,17 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
      "Today" is the axis's word at the rule's foot, where nothing is drawn. A month name too near it gives way; at the
      chart's start it takes the start month's place. The balance is the summary's ("from EGP 720,426 today"). */
   for (let i = ticks.length - 1; i >= 0; i--) if (Math.abs(Number(ticks[i]!.at) - nowAt) < TODAY_ROOM) ticks.splice(i, 1);
+  /* THE START'S OWN MONTH IS SET FROM THE EDGE RIGHTWARD, not centred, so it reaches a share further toward Today than
+     its place says: with the past a sixth of the chart (`PAST_SHARE`), a phone read "OctToday" (leftovers9). Within twice
+     the room it gives way to Today, and the past is said by the grey line, not by a month's name. */
+  if (ticks[0]?.edge && nowAt - Number(ticks[0].at) < 2 * TODAY_ROOM) ticks.shift();
   ticks.push({ at: at(nowAt), label: FORECAST_NOW, now: true, ...(nowAt < TODAY_ROOM ? { edge: true as const } : {}) });
   ticks.sort((a, b) => Number(a.at) - Number(b.at));
+  /* EVERY OTHER MONTH, COUNTED OVER THE MONTHS ALONE (leftovers9): a phone left out every other name by its place in
+     the row, Today's included, so the months kept were uneven, "Oct Today Dec" with Nov gone and Today against Dec.
+     Counted over the months, the names a phone keeps are evenly spaced, and Today is never one left out. */
+  let nth = 0;
+  for (const t of ticks) if (!t.now) if (nth++ % 2 === 1) t.alt = true;
   /* THE LINE AS SHARES OF THE PLOT, each stretch between two days walked in eighths, so a step that leaps a whole corner
      in one day is still found in it. */
   const shareOf = (day: string, v: number) => ({ x: daysBetween(start, day) / span, y: (hi - v) / (hi - lo) });
@@ -1512,14 +1553,30 @@ export function underNote(model: ForecastModel, shown: Scenario): string {
   return n <= model.under ? forecastUnderIn(n) : '';
 }
 
-/** What the scrub reads at a fraction across the chart: the day, its balance and what moved on it. */
+/**
+ * What the scrub reads at a fraction across the chart: the day, its balance and what moved on it.
+ *
+ * IT READS THE POINT NEAREST THE CURSOR, ONE THE LINE IS DRAWN THROUGH (leftovers9): it read the day under the cursor
+ * and said nothing, a dash, over the days the record kept no balance for, between its last remembered day and today, where the line
+ * still ran. Now it snaps to the nearest remembered day, today, or a day of the walk, and the rule and its dot stand on
+ * that point, so the words always name the day the rule marks. `y` is the point's height, a share of the plot.
+ */
 export function readoutAt(model: ForecastModel, shown: Scenario, plan: ForecastPlan, fraction: number) {
   const f = Math.max(0, Math.min(1, fraction));
-  const day = addDays(plan.start, Math.round(f * plan.span));
-  const balance = day < model.today ? (model.past.find((p) => p.day === day)?.value ?? null) : (shown.days.find((p) => p.day === day)?.balance ?? null);
+  const end = addDays(plan.start, plan.span);
+  const points = [
+    ...pastFrom(model, plan.start, todayBalance(model, shown)).map((p) => ({ day: p.day, balance: p.value })),
+    ...shown.days.filter((p) => p.day >= model.today && p.day <= end),
+  ];
+  const share = (day: string) => daysBetween(plan.start, day) / plan.span;
+  const near = points.reduce<(typeof points)[number] | null>((best, p) => (best === null || Math.abs(share(p.day) - f) < Math.abs(share(best.day) - f) ? p : best), null);
+  const day = near?.day ?? addDays(plan.start, Math.round(f * plan.span));
+  const balance = near?.balance ?? null;
+  const x = share(day);
   return {
-    at: at(daysBetween(plan.start, day) / plan.span),
-    flip: f > 0.5,
+    at: at(x),
+    y: balance === null || plan.hi === plan.lo ? null : String(Math.round(((plan.hi - balance) / (plan.hi - plan.lo)) * 10_000) / 10_000),
+    flip: x > 0.5,
     day: shortDay(day),
     /* ROUNDED AS THE SUMMARY OVER THE CHART IS (leftovers9): "EGP 1,327,631.31" under stats that said "EGP 794,816". */
     balance: balance === null ? MISSING : forecastFigure(model, Math.round(balance), 'read'),

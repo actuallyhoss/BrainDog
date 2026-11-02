@@ -366,7 +366,9 @@
       {#if p.below}<path class="forecast-area" data-below="" {...FORECAST_PAINT.area} d={p.below} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-zero" d="M0 {p.zero}H1000" vector-effect="non-scaling-stroke"></path>
       {#if p.cross}<path class="forecast-cross-rule" {...FORECAST_PAINT.rule} d={p.cross.rule} vector-effect="non-scaling-stroke"></path>{/if}
-      <path class="forecast-today" d={p.now.rule} vector-effect="non-scaling-stroke"></path>
+      <!-- ONE RULE AT A TIME (leftovers9): while the cursor reads a day, today's rule steps aside, so the only line down
+           the chart is the one the readout names. -->
+      {#if !readout}<path class="forecast-today" d={p.now.rule} vector-effect="non-scaling-stroke"></path>{/if}
       {#if p.base}<path class="forecast-base" d={p.base} vector-effect="non-scaling-stroke"></path>{/if}
       <!-- WHAT HAPPENED KEEPS ITS GREY when the walk goes under (leftovers9): it took the split's teal, so the past and
            the walk read as one line in the If income stopped view. -->
@@ -380,6 +382,8 @@
       {#if p.cross}<path class="forecast-cross" d={p.cross.d} vector-effect="non-scaling-stroke"></path>{/if}
       <!-- THE DAY BEING READ, a hairline down the chart, so a thumb sees which point the readout names. -->
       {#if readout}<path class="forecast-scrub" {...FORECAST_PAINT.rule} d="M{Number(readout.at) * 1000} 0V100" vector-effect="non-scaling-stroke"></path>{/if}
+      <!-- AND A DOT ON THE POINT IT READS, the one `readoutAt` snapped to, so the balance said is the one marked. -->
+      {#if readout && readout.y !== null}<path class="forecast-scrub-dot" {...FORECAST_PAINT.now} d="M{Number(readout.at) * 1000} {Number(readout.y) * 100}h0" vector-effect="non-scaling-stroke"></path>{/if}
     </svg>
     <!-- TODAY IS NAMED UNDER THE CHART, among the months (`ticks`, leftovers9): its words in a box on the line covered
          the stretch they named. The rule and the dot stay; the balance is the summary's. -->
@@ -399,7 +403,7 @@
         data-drop={p.lowLabel.drop ? '' : undefined}
         data-foot={p.lowLabel.foot ? '' : undefined}
         style="--at:{p.lowLabel.at};--y:{p.lowLabel.y}"
-        aria-hidden="true"><span class="forecast-low-word">{FORECAST_LOWEST}</span><span class="forecast-low-figure">{p.lowLabel.figure}</span></span
+        aria-hidden="true"><span class="forecast-low-word">{FORECAST_LOWEST}</span></span
       >{/if}
     {#if readout}
       <div class="forecast-readout" style="--at:{readout.at}" data-flip={readout.flip ? '' : undefined} aria-hidden="true">
@@ -412,7 +416,7 @@
     {/if}
   </div>
   <ol class="forecast-ticks" aria-hidden="true">
-    {#each p.ticks as t}<li class="forecast-tick" data-edge={t.edge ? '' : undefined} data-now={t.now ? '' : undefined} style="--at:{t.at}">{t.label}</li>{/each}
+    {#each p.ticks as t}<li class="forecast-tick" data-edge={t.edge ? '' : undefined} data-now={t.now ? '' : undefined} data-alt={t.alt ? '' : undefined} style="--at:{t.at}">{t.label}</li>{/each}
   </ol>
 {/snippet}
 

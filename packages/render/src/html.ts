@@ -1880,11 +1880,11 @@ function forecast(b: Block, o: RenderOptions): string {
     plan.cross ? `<span class="forecast-pin"${plan.cross.near ? ' data-side="end"' : ''} style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph} ${escape(plan.cross.day)}</span>` : ''
   }${
     plan.lowLabel
-      ? `<span class="forecast-low-label num"${plan.lowLabel.side ? ` data-side="${plan.lowLabel.side}"` : ''}${plan.lowLabel.drop ? ' data-drop=""' : ''}${plan.lowLabel.foot ? ' data-foot=""' : ''} style="--at:${plan.lowLabel.at};--y:${plan.lowLabel.y}" aria-hidden="true"><span class="forecast-low-word">${escape(FORECAST_LOWEST)}</span><span class="forecast-low-figure">${escape(plan.lowLabel.figure)}</span></span>`
+      ? `<span class="forecast-low-label num"${plan.lowLabel.side ? ` data-side="${plan.lowLabel.side}"` : ''}${plan.lowLabel.drop ? ' data-drop=""' : ''}${plan.lowLabel.foot ? ' data-foot=""' : ''} style="--at:${plan.lowLabel.at};--y:${plan.lowLabel.y}" aria-hidden="true"><span class="forecast-low-word">${escape(FORECAST_LOWEST)}</span></span>`
       : ''
   }</div>`;
   const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks
-    .map((t) => `<li class="forecast-tick"${t.edge ? ' data-edge=""' : ''}${t.now ? ' data-now=""' : ''} style="--at:${t.at}">${escape(t.label)}</li>`)
+    .map((t) => `<li class="forecast-tick"${t.edge ? ' data-edge=""' : ''}${t.now ? ' data-now=""' : ''}${t.alt ? ' data-alt=""' : ''} style="--at:${t.at}">${escape(t.label)}</li>`)
     .join('')}</ol>`;
   /* THE ANSWER OVER THE CHART: the cash at the horizon, the lowest point and everyday spending (`forecastSummary`). */
   const summary = `<dl class="forecast-summary">${forecastSummary(model, shown)
