@@ -177,6 +177,9 @@
     if (asked.length > 0) return asked.slice(0, 3);
     return (b?.registers ?? []).filter((r) => r.kernel !== true && typeof r.name === 'string').map((r) => String(r.name)).slice(0, 3);
   });
+  /* ALWAYS THREE ROWS, a blank one where there is no word yet. On a phone the preview stands above the choices, and the
+     rows arriving with the record grew it 188px a beat after the first frame, pushing every choice down. */
+  const previewSlots = $derived([0, 1, 2].map((i) => previewRows[i] ?? ''));
 
   const recordBoot = async (): Promise<unknown> => {
     const [{ createClient }, { apiBase }] = await Promise.all([import('@braindog/client'), import('$lib/at.ts')]);
@@ -477,7 +480,7 @@
             </div>
             <p class="pv-said"><span class="pv-needs">{words.said(props.shell.open)}</span></p>
             <ul class="ledger ledger-lead pv-rows">
-              {#each previewRows as row, i (i)}
+              {#each previewSlots as row, i (i)}
                 <li>
                   <div class="line">
                     <span class="line-mark"><IconWell name={SPECIMEN[i % SPECIMEN.length] ?? 'doc'} size="l" /></span>
@@ -963,9 +966,25 @@
     font-weight: 500;
   }
 
+  /* ONE LINE EACH, CUT WITH AN ELLIPSIS, at every width: a phone's card lets a title wrap, and a long question wrapped
+     made the preview, and every choice under it, as tall as the record's words. */
   .pv-row {
     color: var(--ink-2);
     font-size: var(--fs-body);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     transition: font-size var(--d-state) var(--ease-out);
+  }
+
+  /* A ROW WITH NO WORD YET is a quiet bar a word's height, so the row stands as tall as a filled one. */
+  .pv-row:empty::before {
+    content: '';
+    display: inline-block;
+    inline-size: 9rem;
+    block-size: 0.7em;
+    border-radius: var(--r-xs);
+    background: var(--rule);
+    vertical-align: middle;
   }
 </style>
