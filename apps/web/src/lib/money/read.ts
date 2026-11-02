@@ -33,6 +33,11 @@ export async function declarations(base: string, lists: readonly Listed[]) {
   const ids = lists.filter((l) => l.kernel !== true).map((l) => l.id);
   const asked = new Map<string, Promise<void>>();
   await Promise.all(ids.map((id) => learn((r) => client.schema(r), id, asked).catch(() => undefined)));
+  /* A LIST STILL NOT DECLARED IS ASKED ONCE MORE, ON ITS OWN (final polish, 2 Nov). Another screen's ask of the same list,
+     made after this one (the shell's on a first open), is the one `learn` keeps, so this ask came back with nothing filled
+     and the statement import said there was no ledger on a record that holds one. */
+  const missing = ids.filter((id) => REGISTERS[id] === undefined);
+  if (missing.length > 0) await Promise.all(missing.map((id) => learn((r) => client.schema(r), id, new Map()).catch(() => undefined)));
   return ids.map((id) => REGISTERS[id]).filter((d) => d !== undefined);
 }
 
