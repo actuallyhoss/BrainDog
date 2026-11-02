@@ -37,6 +37,7 @@
   what it held and why, and the messages it held as repeats, each with "It is a second one", which files it.
 -->
 <script lang="ts">
+  import { page } from '$app/state';
   import { apiBase, at } from '$lib/at.ts';
   import { tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
@@ -296,7 +297,10 @@
 
   async function rereadPatterns() {
     const m = await import('./patterns.ts');
-    const [read, held] = await Promise.all([m.readReport(apiBase()), m.readRepeats(apiBase())]);
+    /* THE REPORT IS AN OWNER'S READ (`inboxPatterns`), so a colleague's Inbox never asks for it and draws no tile (collab
+       pass 3: a 403 on every open of it at Can decide, Can edit and Can view). */
+    const owner = (page.data as { me?: { owner?: unknown } }).me?.owner === true;
+    const [read, held] = await Promise.all([owner ? m.readReport(apiBase()) : Promise.resolve(null), m.readRepeats(apiBase())]);
     report = read;
     /* A REPEAT ALREADY ANSWERED STAYS, saying what became of it, until the screen is opened again. */
     const kept = repeats.filter((r) => seconded[r.id] !== undefined && !held.some((h) => h.id === r.id));

@@ -298,7 +298,7 @@
 
 {#if unrouted}
   <!-- A host with no sharing: People is the whole of it, and the read-only links, an owner's, are a card of their own. -->
-  {#if team}<Links />{/if}
+  {#if team && shell.me.owner}<Links />{/if}
 {:else if !team}
   {#if refused !== null}
     <Tile icon="eye" title={copy.sharingYouCanSee}><Empty kind="error" title={refused} /></Tile>
@@ -336,7 +336,8 @@
     {:else if sections.shared.length > 0}
       <ul class="bunches">{#each sections.shared as b (b.key)}{@render bunchOf(b, false)}{/each}</ul>
     {/if}
-    <Links inside bind:count={linkCount} />
+    <!-- THE LINKS ARE AN OWNER'S LIST (`shares` is ADMIN), so somebody at Can decide is never sent to ask for it (collab pass 3). -->
+    {#if shell.me.owner}<Links inside bind:count={linkCount} />{/if}
   </Tile>
 
   <!-- WAITING AND ENDED ARE DRAWN ONLY WHILE THEY HOLD SOMETHING: a tile that says "none" is a tile of nothing. -->

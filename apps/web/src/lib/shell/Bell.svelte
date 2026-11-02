@@ -136,7 +136,10 @@
 
   let SentTray = $state<typeof SentTrayView | null>(null);
   $effect(() => {
-    if (open && SentTray === null) void import('../send/SentTray.svelte').then((m) => (SentTray = m.default));
+    /* WHAT WAS SENT IS AN OWNER'S READ (`sentList`), so a colleague's bell never asks for it (collab pass 3: a 403 on every
+       open of the bell at Can edit). */
+    const owner = (page.data as { me?: { owner?: unknown } } | undefined)?.me?.owner === true;
+    if (open && owner && SentTray === null) void import('../send/SentTray.svelte').then((m) => (SentTray = m.default));
   });
 
   async function show() {

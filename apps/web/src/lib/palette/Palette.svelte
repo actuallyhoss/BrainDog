@@ -296,6 +296,8 @@
   $effect(() => {
     if (!inAsk || targetsAsked) return;
     targetsAsked = true;
+    /* WHERE TO SEND IS AN OWNER'S READ (`sendTargets`): a colleague asks Slash and is offered no machine (collab pass 3). */
+    if (shell.me?.owner !== true) return void (sendTargets = []);
     void readTargets(apiBase()).then((got) => (sendTargets = got));
   });
 
