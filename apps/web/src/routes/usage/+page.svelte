@@ -287,7 +287,7 @@
 <!-- THE MONTHS UNDER THE SENTENCE, the page's own switch, full width on a phone: on the name's row they pushed it. -->
 <!-- THE MONTH SWITCH IS THE SENTENCE ROW'S ACTION ON A DESK (plan F10), not a second row under it; a phone keeps it under
      the sentence, where the bar has no room for three months. -->
-<PageHead icon="chart-bar" title={words.usage} sentence={sentence?.text} needs={sentence?.needs} actions={wide.current ? months : undefined} below={wide.current ? undefined : months} />
+<PageHead icon="chart-bar" title={words.usage} sentence={sentence?.text} needs={sentence?.needs} heldLines={1} actions={wide.current ? months : undefined} below={wide.current ? undefined : months} />
 <div class="page">
   {#if usage.state === 'waiting' || usage.state === 'refused' || usage.state === 'offline'}
     <ReadState state={usage.state} refusal={usage.refusal} onretry={usage.reread} />

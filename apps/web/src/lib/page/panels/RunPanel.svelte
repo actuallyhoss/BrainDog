@@ -373,12 +373,15 @@
       <Instructions threads={toldViews} {mark} ontakeback={(k) => void takeBackIt(k)} onundo={(k) => void undoIt(k)} />
     </div>
   {/if}
+  <!-- THE BARS WHILE IT IS READ ARE A PART OF THEIR OWN, given back whole when the run lands: drawn in What it changed,
+       that part stayed and the parts said before it landed over it and pushed it down (0.02 to 0.03 on a cold open). -->
+  {#if from === 'reading'}
+  <div class="run-part"><Waiting rows={3} /></div>
+  {:else}
   {@render spoken(BEFORE)}
   <div class="run-part" role="group" aria-label={didSaid}>
     {#if talk.length > 0}<h3 class="run-meta run-head">{didSaid}</h3>{/if}
-    {#if from === 'reading'}
-      <Waiting rows={3} />
-    {:else if from === 'refused'}
+    {#if from === 'refused'}
       <p class="run-said" role="status">{fix}</p>
     {:else if plan && plan.steps.length === 0}
       <p class="run-said">{runWords.nothing}</p>
@@ -398,6 +401,7 @@
       </div>
     {/if}
   </div>
+  {/if}
   {@render spoken(BETWEEN)}
   {#if step}
     <div class="run-part run-step" role="group" aria-label={stepSaid.heading}>

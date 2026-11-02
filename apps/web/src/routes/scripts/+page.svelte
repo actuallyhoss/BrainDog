@@ -163,7 +163,7 @@
 {#snippet sentence()}{#each told ?? [] as p, i (i)}{#if p.tone === 'needs'}<span data-needs>{p.text}</span>{:else}{p.text}{/if}{/each}{/snippet}
 
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's. -->
-<PageHead icon="code" title={words.heading} count={live ? rows.length : undefined} sentence={told ? sentence : undefined}>
+<PageHead icon="code" title={words.heading} count={live ? rows.length : undefined} sentence={told ? sentence : undefined} heldLines={1}>
   {#snippet actions()}
     <!-- THE ONE PRIMARY: its word, and on a phone the 44px button with the plus. -->
     <Button weight="primary" href="/scripts/new" aria-label={words.newScript} data-circle><Icon name="plus" size="s" /><span class="new-word">{words.newScript}</span></Button>

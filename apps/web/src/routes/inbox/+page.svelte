@@ -793,7 +793,9 @@
 <div class="page">
   {#if !refused && (!answered || unrouted)}
     <!-- Bars before the first answer, and nothing from a host that has no inbox to read. -->
-    {#if !answered}<Waiting />{/if}
+    <!-- NOT ON A PHONE, where the head is the sentence alone and gives its held line back when the inbox has nothing to
+         say: the bars stood under it and moved up 60px. The page lands where it stays instead. -->
+    {#if !answered && !phone}<Waiting />{/if}
   {:else if !refused && INBOX.length === 0 && !tallied}
     <Waiting />
   {:else if !refused && never}
