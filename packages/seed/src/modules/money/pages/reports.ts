@@ -25,6 +25,9 @@ const MONTH_PICKER = {
 /** What every figure here leaves out and the Ledger lists, said after the line's figures (finish F55). */
 const MOVES_APART = 'Moves between your own accounts are left out.';
 
+/** A range where nothing came in: its money in read nothing, or nought. */
+const NOTHING_IN = (metric: string) => ({ any: [{ metric, empty: true }, { metric, lte: 0 }] });
+
 /** The most a block over the Ledger reads, with no month picked: the thirteen the chart of months reads. */
 const BACK = 'on after -13m, on before +1d';
 
@@ -72,20 +75,34 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       kind: 'note',
       lead: true,
       span: 12,
-      /* TWO NOTES, ONE FOR THE MONTHS AT HAND AND ONE FOR THE LONGER RANGES, SINCE money-core 3.37.0: each range says it
-         plainly when more went out than came in, and a note holds six sentences at most (`SAYS_MOST`). */
-      when: { all: [{ metric: 'out-by-month', gt: 0 }, { picked: 'months', is: ['this', 'last', ''] }] },
+      /* THREE NOTES, ONE FOR THE MONTHS AT HAND, ONE FOR NONE PICKED AND ONE FOR THE LONGER RANGES, SINCE money-core 3.37.0
+         (3.37.1 split the third out): each range says it plainly when more went out than came in, and a note holds six
+         sentences at most (`SAYS_MOST`). */
+      when: { all: [{ metric: 'out-by-month', gt: 0 }, { picked: 'months', is: ['this', 'last'] }] },
+      /* A RANGE THAT SPENT MORE THAN CAME IN SAYS BY HOW MUCH, SINCE money-core 3.37.0 (verify3, 2 Nov): "−$12,536 left" was
+         a minus to work out; it is "$12,536 more out than in" (`over-` in `figures/health.ts`). AND A RANGE WITH NOTHING IN
+         SAYS SO, SINCE money-core 3.37.1 (leftovers6, 2 Nov): "$2,586 out, $2,586 more out than in" said one amount twice;
+         with nothing in it is "$2,586 out, nothing in yet", "yet" only for the month still going. */
+      says: [
+        { when: { all: [{ picked: 'months', is: 'this' }, { metric: 'left-month', lt: 0 }, NOTHING_IN('received-month')] }, body: `This month: {{spent-by-category-month}} out, nothing in yet. ${MOVES_APART}` },
+        { when: { all: [{ picked: 'months', is: 'this' }, { metric: 'left-month', lt: 0 }] }, body: `This month: {{received-month}} in, {{spent-by-category-month}} out, {{over-month}} more out than in. ${MOVES_APART}` },
+        { when: { picked: 'months', is: 'this' }, body: `This month: {{received-month}} in, {{spent-by-category-month}} out, {{left-month}} left. ${MOVES_APART}` },
+        { when: { all: [{ metric: 'left-last', lt: 0 }, NOTHING_IN('received-last')] }, body: `Last month: {{spent-last}} out, nothing in. ${MOVES_APART}` },
+        { when: { metric: 'left-last', lt: 0 }, body: `Last month: {{received-last}} in, {{spent-last}} out, {{over-last}} more out than in. ${MOVES_APART}` },
+        { body: `Last month: {{received-last}} in, {{spent-last}} out, {{left-last}} left. ${MOVES_APART}` },
+      ],
+    },
+    {
       /* WITH NONE PICKED, FROM THE DAY THE LINES START (finish F55): "The last 13 months" stood over three months of
          lines, so the line says the first day money moved inside the thirteen (`moved-since`). AND THAT MOVES BETWEEN HIS
          OWN ACCOUNTS ARE LEFT OUT, as every figure here leaves them: the strip's "Last month 9" stood beside the Ledger's
-         "Last month 12", which lists them, and neither said why. A RANGE THAT SPENT MORE THAN CAME IN SAYS BY HOW MUCH,
-         SINCE money-core 3.37.0 (verify3, 2 Nov): "−$12,536 left" was a minus to work out; it is "$12,536 more out than
-         in" (`over-` in `figures/health.ts`). */
+         "Last month 12", which lists them, and neither said why. */
+      kind: 'note',
+      lead: true,
+      span: 12,
+      when: { all: [{ metric: 'out-by-month', gt: 0 }, { picked: 'months', is: [''] }] },
       says: [
-        { when: { all: [{ picked: 'months', is: 'this' }, { metric: 'left-month', lt: 0 }] }, body: `This month: {{received-month}} in, {{spent-by-category-month}} out, {{over-month}} more out than in. ${MOVES_APART}` },
-        { when: { picked: 'months', is: 'this' }, body: `This month: {{received-month}} in, {{spent-by-category-month}} out, {{left-month}} left. ${MOVES_APART}` },
-        { when: { all: [{ picked: 'months', is: 'last' }, { metric: 'left-last', lt: 0 }] }, body: `Last month: {{received-last}} in, {{spent-last}} out, {{over-last}} more out than in. ${MOVES_APART}` },
-        { when: { picked: 'months', is: 'last' }, body: `Last month: {{received-last}} in, {{spent-last}} out, {{left-last}} left. ${MOVES_APART}` },
+        { when: { all: [{ metric: 'left-all', lt: 0 }, NOTHING_IN('received-all')] }, body: `Since {{moved-since}}: {{spent-all}} out, nothing in. ${MOVES_APART}` },
         { when: { metric: 'left-all', lt: 0 }, body: `Since {{moved-since}}: {{received-all}} in, {{spent-all}} out, {{over-all}} more out than in. ${MOVES_APART}` },
         { body: `Since {{moved-since}}: {{received-all}} in, {{spent-all}} out, {{left-all}} left. ${MOVES_APART}` },
       ],
@@ -97,9 +114,11 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       span: 12,
       when: { all: [{ metric: 'out-by-month', gt: 0 }, { picked: 'months', is: ['three', 'year'] }] },
       says: [
+        { when: { all: [{ picked: 'months', is: 'three' }, { metric: 'left-three', lt: 0 }, NOTHING_IN('received-three')] }, body: `The last 3 months: {{spent-three}} out, nothing in. ${MOVES_APART}` },
         { when: { all: [{ picked: 'months', is: 'three' }, { metric: 'left-three', lt: 0 }] }, body: `The last 3 months: {{received-three}} in, {{spent-three}} out, {{over-three}} more out than in. ${MOVES_APART}` },
         { when: { picked: 'months', is: 'three' }, body: `The last 3 months: {{received-three}} in, {{spent-three}} out, {{left-three}} left. ${MOVES_APART}` },
-        { when: { all: [{ picked: 'months', is: 'year' }, { metric: 'left-year', lt: 0 }] }, body: `The last 12 months: {{received-year}} in, {{spent-year}} out, {{over-year}} more out than in. ${MOVES_APART}` },
+        { when: { all: [{ metric: 'left-year', lt: 0 }, NOTHING_IN('received-year')] }, body: `The last 12 months: {{spent-year}} out, nothing in. ${MOVES_APART}` },
+        { when: { metric: 'left-year', lt: 0 }, body: `The last 12 months: {{received-year}} in, {{spent-year}} out, {{over-year}} more out than in. ${MOVES_APART}` },
         { body: `The last 12 months: {{received-year}} in, {{spent-year}} out, {{left-year}} left. ${MOVES_APART}` },
       ],
     },

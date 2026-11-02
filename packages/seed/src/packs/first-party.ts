@@ -959,12 +959,15 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   in", not "−$12,536 left", over five figures added (`metric.over-month`, `metric.over-last`, `metric.over-three`,
  *   `metric.over-year`, `metric.over-all`), its line split into two notes of six sentences at most (`page.money-reports`).
  *   Ids added, so a minor step.
+ * - money-core 3.37.1 (leftovers6, 2 Nov): a Reports range with nothing in says "$2,586 out, nothing in yet", not the one
+ *   amount twice, its line now three notes of six sentences at most (`page.money-reports`). No id added or taken away,
+ *   so a patch.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.31.0',
   people: '4.4.1',
-  'money-core': '3.37.0',
+  'money-core': '3.37.1',
   estate: '2.8.0',
   work: '1.24.0',
 };
