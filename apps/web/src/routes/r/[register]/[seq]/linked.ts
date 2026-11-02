@@ -94,7 +94,9 @@ export function linkedState(
       toned = 'warn';
     }
     else if (n === 1) when = rowWords.dueTomorrow;
-    else if (n < 14) when = rowWords.dueIn(n);
+    /* AND WHENEVER THE LINE IS TONED AS DUE SOON (pages polish, 2 Nov): a step due in 14 days stood "● Open" in amber,
+       a colour with no word for it. */
+    else if (n < 14 || tone === 'warn') when = rowWords.dueIn(n);
   }
   if (own && when) return { text: `${own}, ${when.charAt(0).toLowerCase()}${when.slice(1)}`, tone: toned };
   return { text: own ?? when, tone: toned };

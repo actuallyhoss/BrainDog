@@ -616,6 +616,14 @@ export const seenWords = {
   people: (n: number): string => (n === 1 ? '1 person' : `${n} people`),
   lastInTouch: (day: string): string => `Last in touch ${day}.`,
   atPlace: (where: string): string => `at ${where}`,
+  /* WHERE THEY WERE LAST SEEN, AS A SENTENCE SAYS IT (pages polish, 2 Nov): "by mail", "in a commit to kiln-site", where
+     the page said "at Mail" and "at Commits in kiln-site", a heading read as a place. */
+  seenBy: (place: { where: string; kind: 'commit' | 'mail' | 'other' }): string => {
+    if (place.kind === 'mail') return 'by mail';
+    const repo = /^Commits in (.+)$/u.exec(place.where)?.[1];
+    if (place.kind === 'commit' && repo) return `in a commit to ${repo}`;
+    return `at ${place.where}`;
+  },
   isYou: 'This is you.',
   projects: (n: number): string => (n === 1 ? '1 project' : `${n} projects`),
   /* The list's grouped view and its disclosure. */

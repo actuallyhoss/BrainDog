@@ -1000,7 +1000,7 @@
   const lastSaid = (day: string): string => {
     const at_ = meets?.met && row ? seenOf(row.fields[meets.met]).find((x) => x.last === day) : undefined;
     const when = seenWords.lastInTouch(daySaid(day, clock));
-    return at_ ? `${when.replace(/\.$/u, '')}, ${seenWords.atPlace(at_.where)}.` : when;
+    return at_ ? `${when.replace(/\.$/u, '')}, ${seenWords.seenBy(at_)}.` : when;
   };
   const lead = $derived.by(() => {
     if (!row || (!meets && !orgRole)) return null;
@@ -1113,7 +1113,26 @@
   const rankOf = (g: Backlink): number =>
     meetsOf(REGISTERS[g.register]) ? 0 : isProjects(g.register) ? 1 : REGISTERS[g.register]?.fields.some((f) => f.type === 'money') ? 2 : 3;
   const related = $derived((orgRole ? [...incoming].sort((a, b) => rankOf(a) - rankOf(b)) : incoming).filter((g) => !projectPage || blockOf(REGISTERS[g.register]) === null));
-  const workListed = $derived(openWork !== null && openWork.parts.length === 1 && openWork.late === 0 && workList !== null && related.some((g) => g.register === workList && g.rows.length > 0));
+  /* AND WHERE THE LIST BELOW SHOWS EVERY ONE AND NONE IS LATE (pages polish, 2 Nov): a task with two steps stood "Open
+     work 2", a bar of Open and Doing and "1 open and 1 doing" over a list of the same two, each saying its own state. The
+     tile stays where the list is cut short or something is late, which the list alone does not add up. */
+  const workListed = $derived(
+    openWork !== null &&
+      openWork.late === 0 &&
+      workList !== null &&
+      related.some((g) => g.register === workList && g.rows.length > 0 && (openWork!.parts.length === 1 || (g.rows.length >= g.total && openWork!.total <= g.rows.length))),
+  );
+
+  /* WHAT THIS ROW ALREADY SAYS OF ITSELF THROUGH A LINK, its project or its client, so a line under it that names the same
+     is not said again (pages polish, 2 Nov): each step of a task on Kiln read "Doing · Kiln" under a task on Kiln. */
+  const ownLinks = $derived(
+    new Set(
+      (decl?.fields ?? [])
+        .filter((f) => f.type === 'ref' && row?.fields[f.id] !== null && row?.fields[f.id] !== undefined)
+        .map((f) => String(display(id, f.id, row?.fields[f.id], clock, names) ?? '').trim().toLowerCase())
+        .filter((v) => v !== ''),
+    ),
+  );
 
   /**
    * A RUN'S PAGE LEADS WITH ITS HANDOFF: what it is doing, where, the next step, what it already tried and its
@@ -1834,7 +1853,12 @@
                 {@const r = rel.rows[i]!}
                 {@const fields = rel.raw?.[i]}
                 {@const stood = fields ? linkedState(relDecl, fields, clock, r.tone, moneySaid) : { text: null, tone: r.tone }}
-                {@const rest = linkedCells(relDecl, rel.columns, r.cells, fields, (c) => moneyInText(c, homeCurrency())).filter((c) => !stood.text || c.trim().toLowerCase() !== stood.text.trim().toLowerCase())}
+                <!-- AND NOT ITS STATE TWICE, "Doing · Kiln" beside "Doing, due in 10 days", NOR A LINK THIS ROW SAYS ITSELF. -->
+                {@const said = stood.text?.trim().toLowerCase() ?? ''}
+                {@const rest = linkedCells(relDecl, rel.columns, r.cells, fields, (c) => moneyInText(c, homeCurrency())).filter((c) => {
+                  const w = c.trim().toLowerCase();
+                  return !(said !== '' && (w === said || said.startsWith(`${w}, `))) && !ownLinks.has(w);
+                })}
                 {@const stands = stood.text}
                 {@const tone = stood.tone}
                 <li>
@@ -2079,11 +2103,12 @@
   /* ── the fields tile ───────────────────────────────────────────────── */
 
   /* A PERSON'S NOTE LEADS THEIR PAGE as a paragraph in the body's ink, the pencil at its end, with the facts under it. */
+  /* NO MARGIN UNDER IT (pages polish, 2 Nov): the tile's own 16 between its parts is the step, and the 16 added here
+     with the pencil's 32px box stood about 40px of air between a person's note and their figure. */
   .about {
     display: flex;
     align-items: flex-start;
     gap: var(--sp-2);
-    margin-block-end: var(--sp-4);
     color: var(--ink);
     font-size: var(--fs-body);
     line-height: 1.55;
@@ -2092,6 +2117,11 @@
   .about > :global(:first-child) {
     flex: 1;
     min-inline-size: 0;
+  }
+
+  /* THE PENCIL TAKES NO HEIGHT OF ITS OWN: its 32px box sits on the note's first line, so a one-line note is a line tall. */
+  .about-pencil {
+    margin-block: calc((1.55em - 32px) / 2);
   }
 
   .self-line {
