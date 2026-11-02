@@ -1766,6 +1766,10 @@
       intent: 'good',
       undo: takeBack(entry),
     });
+    /* AND WHAT WAS ADDED IS SAID ONCE, BY NAME, WITH ITS UNDO (work2 2 Nov, 3): "Added “Motion test bill” to Bills and
+       invoices." with Undo, as a page's capture line and every other add say it. The row's chip still carries Put back;
+       the toast is for the reader whose eye has left the row, and the sheet's Add said nothing at all before. */
+    if (decl) toasts.push(copy.captureAdded(titleSaid(entry), listWord(id, decl.name)), { undo: takeBack(entry) });
     fresh = new Map(fresh).set(entry.seq, Date.now());
     added = new Set(added).add(entry.seq);
     void showRow(entry.seq);
@@ -1965,11 +1969,9 @@
     if (asked !== was) return null;
     /* THE PERSON IT IS FOR IS HELD BY NUMBER on the landed row (`orderWrite`), so its Who is their name. */
     const entry = out.entry;
+    /* AND WHAT WAS ADDED IS SAID ONCE, BY NAME (motion F12, F20, VERIFY H23), in `addLanded`; the fields it filled in
+       are each in their own cell on the row, so they are not read out. */
     addLanded(entry, mark);
-    /* AND WHAT WAS ADDED IS SAID ONCE, BY NAME (motion F12, F20, VERIFY H23): "Added “Motion test bill” to Bills and
-       invoices." The fields it filled in are each in their own cell on the row, so they are not read out here. The
-       row's chip carries Put back, so the toast offers no second Undo; ⌘Z still takes it back. */
-    if (decl) toasts.push(copy.captureAdded(titleSaid(entry), listWord(id, decl.name)), { undo: takeBack(entry), offer: false });
     return entry;
   }
 
