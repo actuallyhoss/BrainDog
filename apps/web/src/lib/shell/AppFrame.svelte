@@ -425,6 +425,11 @@
       gone = true;
     };
   });
+  /* WHAT THE SHELL ALREADY SAYS OF EACH LIST, ITS ADD-ON, taken for its facts until the declarations are read, so a list
+     whose add-on names a place (`money-core`, Money) is in that place on the first frame: a bill's page opened Money and
+     its More about a second after the page, and pushed Projects and everything under it down (0.03 to 0.06 at 1512).
+     The rest is said by the read when it lands, as before. */
+  const packFacts = $derived(new Map(data.lists.flatMap((l) => (l.pack ? [[l.id, { pack: l.pack, money: false, folk: false, projects: false, ofProjects: false }] as const] : []))));
   /** Every list is in its home: the read has answered, or this device kept where each one belongs. */
   const listsPlaced = $derived(factsSettled || Object.keys(keptFacts).length > 0);
   const sideLists = $derived<SideList[]>(
@@ -438,7 +443,7 @@
       ...(typeof r.open === 'number' ? { open: r.open } : {}),
       views: r.views,
       kernel: kernelLists.has(r.id),
-      facts: frame.facts[r.id] ?? keptFacts[r.id] ?? null,
+      facts: frame.facts[r.id] ?? keptFacts[r.id] ?? packFacts.get(r.id) ?? null,
     })),
   );
 
