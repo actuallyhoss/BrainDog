@@ -306,10 +306,14 @@ export async function serveInvite(
     if (!send) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: NO_MAIL, at: 'email' });
     const vars = { ...(found.value.record ? { record: found.value.record } : {}), ...(found.value.by ? { from: found.value.by } : {}) };
     let link = `${door.origin}/invite#${token}`;
+    /* EVERY SEND IS COUNTED AGAINST THE ADDRESS (security pass, 2 Nov), a known one too: the proof flow is what keeps
+       the count (`mailKey` in the Directory), and a known address was mailed the plain link without it, so whoever held
+       the link could mail somebody who already signs in here thirty times in a row. For a known address the proof
+       minted is never sent and opens nothing: path 2 asks them to sign in before any proof is read. */
+    const proving = await door.auth({ flow: 'invite.prove', email, invite: token });
+    if (proving.status === 404) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: NO_MAIL, at: 'email' });
+    if (proving.status !== 200) return finish(proving);
     if (!(await invite.known(email))) {
-      const proving = await door.auth({ flow: 'invite.prove', email, invite: token });
-      if (proving.status === 404) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: NO_MAIL, at: 'email' });
-      if (proving.status !== 200) return finish(proving);
       const mail = proving.mail;
       if (!mail || !('link' in mail)) return reply(503, { ok: false });
       link = proofLink(door.origin, token, mail.link);
