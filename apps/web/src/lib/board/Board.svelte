@@ -515,7 +515,16 @@
      the bar in the flow took its room out of them, so Spending's "$19,736" was cut in half under Keep. `--bar` is the bar
      as drawn, measured by `fit.ts`. */
   .board-root:not([data-editing]) .board:not([data-cols='2']) :global([data-board-key][data-board-key]:has(> [data-draft-mark])) {
-    max-block-size: calc(var(--span) * var(--row) + (var(--span) - 1) * var(--gap) + var(--bar, 0px));
+    max-block-size: calc(var(--span) * var(--row) + (var(--span) - 1) * var(--gap) + var(--bar, 0px) + var(--sp-2));
+  }
+
+  /* AND 8 BETWEEN THE WIDGET'S LAST LINE AND THE BAR'S DASHED RULE, which sat on the figures' feet (design review). */
+  .board-root:not([data-editing]) .board :global([data-board-key] > [data-draft-mark]) {
+    margin-block-start: auto;
+  }
+
+  .board-root:not([data-editing]) .board :global([data-board-key]:has(> [data-draft-mark]) > :not([data-draft-mark]):nth-last-child(2)) {
+    margin-block-end: var(--sp-2);
   }
 
   /* AND THE BAR IS IN THE FLOW, UNDER WHAT IT ASKS ABOUT (Maya's Today at 390): a phone's frame is as tall as what is drawn
