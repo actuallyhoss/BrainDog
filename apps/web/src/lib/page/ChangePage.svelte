@@ -85,8 +85,12 @@
      * page and Money's home. `null` offers no board.
      */
     board?: { on: boolean; keys: () => readonly string[] } | null;
-    /** Links the page offers first, above its own entries: a project's "Edit details" (proj F7, VERIFY H13). */
-    extra?: readonly { label: string; icon: IconName; href: string }[];
+    /**
+     * Entries the page offers first, above its own: a link (a project's "Edit details", proj F7, VERIFY H13), or a
+     * press the screen handles (Needs you's Ask a question and Select, so that home has one "⋯" and not two stacked).
+     * `checked` makes a press a checkbox item, which leaves the menu open.
+     */
+    extra?: readonly { label: string; icon: IconName; href?: string | undefined; onclick?: (() => void) | undefined; checked?: boolean | undefined }[];
     /** The page's address, which the description is about. */
     slug: string;
     /** The page's title, which names the menu for a screen reader. */
@@ -352,7 +356,11 @@
   {#snippet trigger()}
     <span class="change-more"><Icon name="more" size="s" /><span class="change-vh">{words.more(title)}</span></span>
   {/snippet}
-  {#each extra as x (x.href)}<a class="mi" role="menuitem" href={at(x.href)}><Icon name={x.icon} size="s" />{x.label}</a>{/each}
+  {#each extra as x (x.href ?? x.label)}
+    {#if x.href}<a class="mi" role="menuitem" href={at(x.href)}><Icon name={x.icon} size="s" />{x.label}</a>
+    {:else if x.checked !== undefined}<button type="button" class="mi" role="menuitemcheckbox" aria-checked={x.checked} onclick={() => x.onclick?.()}><Icon name={x.icon} size="s" />{x.label}</button>
+    {:else}<button type="button" class="mi" role="menuitem" onclick={() => { menu = false; x.onclick?.(); }}><Icon name={x.icon} size="s" />{x.label}</button>{/if}
+  {/each}
   {#if mayChange}<button type="button" class="mi" role="menuitem" onclick={() => (open = true)}><Icon name="ask" size="s" />{words.change}</button>{/if}
   {#if mayPin}
     <!-- THE PIN, NAMED BY HOW THE PAGE CAME TO LOOK AS IT DOES, which is drawn under it as a quiet line and said to a

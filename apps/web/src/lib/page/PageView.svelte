@@ -35,7 +35,7 @@
 
 <script lang="ts">
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
-  import type { Snippet } from 'svelte';
+  import type { ComponentProps, Snippet } from 'svelte';
   import { apiBase } from '../at.ts';
   import { titleOf } from '$lib/title.ts';
   /* THE KINDS ONLY A DECLARED PAGE DRAWS, with the screen that draws them rather than in the sheet every screen waits
@@ -134,7 +134,13 @@
     inside,
     waiting,
     plain = false,
+    more = [],
   }: {
+    /**
+     * A home's own entries for its "⋯", drawn first in the page's menu (`ChangePage`'s `extra`), so a home with a menu of
+     * its own (Needs you's Ask a question and Select) draws one "⋯", not its head's and the page's stacked on each other.
+     */
+    more?: ComponentProps<typeof ChangePage>['extra'];
     /**
      * A page that opens on the plain head every hand-written screen has (Decide, Automations): the name at 28 with its
      * icon and its sentence once under it, never the lead tile. The route's choice, for a page it knows by what it draws.
@@ -1332,6 +1338,7 @@
             {look}
             keys={drawnKeys}
             heads={blockHeads}
+            extra={more}
             onarrange={arranger?.entry() ? () => void arrangeHome() : null}
           />
         {/if}

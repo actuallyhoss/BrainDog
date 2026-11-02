@@ -479,7 +479,10 @@
     {#snippet actions()}
       <!-- NOT OVER A CLEARED PAGE (UI pass 1 Nov): with no line beside it the "⋯" stood alone on a row of its own above
            "Nothing needs you", offering Select with nothing to select. -->
-      {#if answerable && !(cleared && !headLine)}
+      <!-- AND ONLY OVER A CLEARED PAGE: while questions wait, the body's own "⋯" (the page's menu, Edit layout and Change
+           this page) carries Note a choice and Select first, so the head and the body no longer draw two "⋯" one over
+           the other (live verify, 2 Nov). -->
+      {#if answerable && cleared && headLine}
         <Menu label={WORDS.more} align="end">
           {#snippet trigger()}<span class="head-more"><Icon name="more" size="m" /><span class="dsr">{WORDS.more}</span></span>{/snippet}
           <!-- EACH ROW LEADS WITH ITS GLYPH, as every menu's does (VERIFY H47). -->
@@ -538,7 +541,21 @@
         style:--col-quick={board.quick ?? 'auto'}
         style:--col-handled={board.handled ?? '1 / -1'}
       >
-        <PageView slug="decide" got={drawn} mode="home" select whole {reread} opens={handled ? handledColumn : undefined} />
+        <PageView
+          slug="decide"
+          got={drawn}
+          mode="home"
+          select
+          whole
+          {reread}
+          opens={handled ? handledColumn : undefined}
+          more={answerable
+            ? [
+                { label: WORDS.ask, icon: 'ask', onclick: () => (asking = true) },
+                { label: WORDS.select, icon: 'check', checked: selecting, onclick: () => (selecting = !selecting) },
+              ]
+            : []}
+        />
       </div>
     {/if}
     {#if cleared && handled}<div class="handled-alone" id="handled"><Handled found={handled} heading={GROUP_WORDS.handled} head="strip" /></div>{/if}
@@ -605,6 +622,21 @@
 {/snippet}
 
 <style>
+  /* ON A PHONE THE PAGE'S "⋯" STANDS AT THE END OF THE SENTENCE'S ROW (look fault N), as Today's does: here the body's
+     menu is the page's only one, and on a row of its own it left a band of air between the sentence and the first
+     question (leftovers 3, live verify of 2 Nov). The sentence keeps a tap's room so no word runs under it. */
+  @media (hover: none) and (width <= 600px) {
+    .page > .body:first-child > :global(.home-page:not([data-arranging]) > .home-tools) {
+      position: absolute;
+      margin: 0;
+      inset-block-end: calc(100% + var(--sp-4));
+    }
+
+    :global(.page-head:has(+ .page > .body:first-child > .home-page:not([data-arranging]) > .home-tools :is(button, a)) .page-said) {
+      padding-inline-end: calc(var(--gutter) + var(--tap) + var(--sp-2));
+    }
+  }
+
   /* ONE COLUMN, the page's own: its blocks carry their spans, and Decide adds no column of its own beside them. */
   .page {
     display: flex;
