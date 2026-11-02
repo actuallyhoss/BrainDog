@@ -25,6 +25,7 @@
   import { erasePerson } from '$lib/record/settings-write.ts';
   /* Lane G: inviting somebody by address, with a link the owner sends and nobody mails. */
   import { inviteEmail, inviteLink, readInvites, renewInvite, withdrawInvite, type InviteReach, type Waiting } from '$lib/record/settings-write.ts';
+  import { sendInvite } from '$lib/auth.ts';
   import type { Invitation } from '@braindog/client';
   import { dateSaid, relative, since } from 'braindog-render';
   import { recordNow } from '$lib/record/boot-live.ts';
@@ -284,7 +285,7 @@
      never drawn grey for a field left empty, which read as broken; it says what is missing and goes to it. */
   let inviteWhy = $state('');
   const inviteNeeds = { email: 'Add their email so the link is bound to it.', lists: 'Give at least one list a level.' } as const;
-  let madeLink = $state<{ email: string; link: string } | null>(null);
+  let madeLink = $state<{ email: string; link: string; sent: boolean } | null>(null);
   let waitingInvites = $state<Waiting[]>([]);
 
   /** What the form would send, or `null` while it gives nothing: no address, or chosen lists with none given a level. */
@@ -379,7 +380,11 @@
       return false;
     }
     /* THE LINK IS BUILT ON THE BARE HOST, because `/invite` is the person's before it is a record's. */
-    madeLink = { email: out.value.invitation.email, link: inviteLink(bareOrigin(), out.value.token) };
+    /* AND MAILED TO THEM AT ONCE (collab pass, 2 Nov), with the proof inside it for an address new here, so they open one
+       mail and press Join. A host that cannot mail says so, and the link is there to copy either way. */
+    const sent = await sendInvite(out.value.token).catch(() => null);
+    madeLink = { email: out.value.invitation.email, link: inviteLink(bareOrigin(), out.value.token), sent: sent?.ok === true };
+    if (sent?.ok === true) toasts.push(copy.inviteEmailed(out.value.invitation.email), { intent: 'good' });
     await readInvitesNow();
     return true;
   }
@@ -800,8 +805,8 @@
   <div class="section-body">
     <!-- NO MAIL LEAVES THIS HOST, and the line says so beside the control rather than after the press: the owner sends
          the link themselves, and somebody expecting an email would wait for one that never comes. -->
-    <p class="hint">{copy.inviteHow} {copy.inviteNoMail}</p>
-    <Sheet bind:open={inviteOpen} title={copy.invitePerson} subtitle={copy.inviteHow}>
+    <p class="hint">{copy.inviteHowMail}</p>
+    <Sheet bind:open={inviteOpen} title={copy.invitePerson} subtitle={copy.inviteHowMail}>
     <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
          row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->
     <form class="code-form invite-form" onsubmit={makeInvite}>
@@ -907,12 +912,12 @@
       <!-- ONCE. The record keeps the hash and hands back the only copy of the link, so leaving this screen is
            the last of it; Done takes it off the screen deliberately rather than by navigation. -->
       <div class="invite-made">
-        <p class="hint">{copy.inviteLinkReady(madeLink.email)}</p>
+        <p class="hint">{madeLink.sent ? copy.inviteEmailed(madeLink.email) : `${copy.inviteLinkReady(madeLink.email)} ${copy.inviteNoMail}`}</p>
         <div class="field-row-controls">
           <div class="field field-lg">
             <input class="field-input" id="invite-link" type="text" readonly aria-label={copy.inviteLinkLabel} value={madeLink.link} />
           </div>
-          <Button weight="primary" onclick={copyLink}>{copy.inviteCopyLink}</Button>
+          <Button weight={madeLink.sent ? 'quiet' : 'primary'} onclick={copyLink}>{copy.inviteCopyLink}</Button>
           <Button weight="quiet" onclick={() => (madeLink = null)}>{copy.inviteDone}</Button>
         </div>
       </div>

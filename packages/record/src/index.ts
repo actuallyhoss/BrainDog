@@ -15786,11 +15786,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         /* WHAT THE LINK OPENS, SAID BEFORE ANYBODY ACCEPTS: the record's own name, what it gives on the whole record,
            and each list by its name with what it gives there. A list removed since the link was minted is left out, so
            no id reaches the page. */
-        const { email, expires_at, level, registers } = found.value;
+        const { email, expires_at, level, registers, invited_by } = found.value;
         return ok({
           email,
           expires_at,
           record: kernel.identity()?.name ?? null,
+          /* WHO INVITED THEM, by the name the record keeps for them (collab pass, 2 Nov), so the page and the mail say
+             "Sam invited you" and not only where to. `null` for a person the record holds no name for. */
+          by: ((n) => (typeof n === 'string' && n.trim() !== '' ? n.trim() : null))(sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', invited_by)?.name),
           level,
           lists: Object.entries(registers).flatMap(([id, held]) => {
             const list = kernel.register(id);

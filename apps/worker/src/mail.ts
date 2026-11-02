@@ -29,6 +29,7 @@ export type MailKind =
   | 'signup.verify'
   | 'signup.known'
   | 'invite.prove'
+  | 'invite.sent'
   | 'invite.ready'
   | 'passkey.added'
   | 'passkey.removed'
@@ -48,6 +49,7 @@ const KINDS: ReadonlySet<string> = new Set<MailKind>([
   'signup.verify',
   'signup.known',
   'invite.prove',
+  'invite.sent',
   'invite.ready',
   'passkey.added',
   'passkey.removed',
@@ -75,6 +77,7 @@ const SIGN_IN_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
   'signup.verify',
   'signup.known',
   'invite.prove',
+  'invite.sent',
   'invite.ready',
   'passkey.added',
   'passkey.removed',
@@ -84,7 +87,7 @@ const SIGN_IN_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
 ]);
 
 /** The kinds whose whole point is a link. Without one there is nothing to send, and `sendMail` says so and sends nothing. */
-const NEEDS_LINK: ReadonlySet<MailKind> = new Set<MailKind>(['signin', 'signup.verify', 'signup.known', 'invite.prove', 'invite.ready', 'email.change']);
+const NEEDS_LINK: ReadonlySet<MailKind> = new Set<MailKind>(['signin', 'signup.verify', 'signup.known', 'invite.prove', 'invite.sent', 'invite.ready', 'email.change']);
 
 /**
  * What a letter may say beyond its own words. Each is optional, and a letter leaves out the sentence a value is missing
@@ -110,6 +113,8 @@ export type MailVars = {
   say?: string | undefined;
   /** The person's own name, for a letter that greets them (`invite.ready`). */
   name?: string | undefined;
+  /** Who sent an invitation, by the name they go by (`invite.sent`). */
+  from?: string | undefined;
   /** The days a link lives, written as a whole number ("30"), for a letter that says when it ends (`invite.ready`). */
   days?: string | undefined;
 };
@@ -138,6 +143,7 @@ const WHY: Record<MailKind, string> = {
   'signup.verify': 'because somebody asked to make a BrainDog with this address',
   'signup.known': 'because somebody asked to make a BrainDog with this address',
   'invite.prove': 'because somebody accepted an invitation to a BrainDog with this address',
+  'invite.sent': 'because somebody invited this address to their BrainDog',
   'invite.ready': 'because this address was invited to make a BrainDog account',
   'passkey.added': 'because the passkeys that sign in with this address changed',
   'passkey.removed': 'because the passkeys that sign in with this address changed',
@@ -197,6 +203,16 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
           { say: v.record ? `To accept the invitation to ${v.record}, open this link. It proves this address is yours, and it works once.` : 'To accept your invitation, open this link. It proves this address is yours, and it works once.' },
           ...link,
           { say: 'If you did not accept an invitation, you can ignore this message and nothing changes.' },
+        ],
+      };
+    case 'invite.sent':
+      return {
+        subject: v.from ? `${v.from} invited you to ${v.record || 'their BrainDog'}` : `You're invited to ${v.record || 'a BrainDog'}`,
+        parts: [
+          { say: v.from ? `${v.from} invited you to ${v.record || 'their BrainDog'}, where they keep their work, projects and plans.` : `You're invited to ${v.record || 'a BrainDog'}.` },
+          { say: 'Open this link to see what you can do there and join. It works once, for this address, and ends in 24 hours.' },
+          ...link,
+          { say: 'If you did not expect this, you can ignore this message and nothing changes.' },
         ],
       };
     case 'invite.ready':
@@ -314,6 +330,7 @@ function actionOf(kind: MailKind, record: string): string {
     case 'signup.verify':
       return 'Finish making your BrainDog';
     case 'invite.prove':
+    case 'invite.sent':
       return 'Accept the invitation';
     case 'invite.ready':
       return 'Make your account';
@@ -523,6 +540,7 @@ export function letterOf(kind: MailKind, vars: MailVars = {}): Letter {
     support: flat(vars.support),
     say: flat(vars.say),
     name: flat(vars.name),
+    from: flat(vars.from),
     days: flat(vars.days),
   };
   const { subject, parts } = partsOf(kind, v);

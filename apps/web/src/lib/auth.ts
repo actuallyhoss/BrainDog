@@ -655,6 +655,8 @@ export type InviteSeen = {
   lists: { id: string; name: string; level: InviteLevel }[];
   /** What is shared with the address, in the host's own sentences ("Ada shared Pottery with you. ..."), or `null`. */
   shared: string | null;
+  /** Who invited them, by name, or `null` where the host said none. */
+  by: string | null;
 };
 
 /** The lists an invitation names, keeping only a row with an id, a name and a level this build knows. */
@@ -683,8 +685,20 @@ export async function lookInvite(token: string, io: Io = live()): Promise<Said<I
       level: levelOf(v.level),
       lists: inviteListsOf(v.lists),
       shared: typeof v.shared === 'string' && v.shared.trim() !== '' ? v.shared : null,
+      by: typeof v.by === 'string' && v.by.trim() !== '' ? v.by : null,
     },
   };
+}
+
+/**
+ * Mail the invitation to the address it is for (collab pass, 2 Nov): the host sends the link, with the proof inside it
+ * for an address new here, so the person opens one mail and presses Join. The answer is the address it went to.
+ */
+export async function sendInvite(token: string, io: Io = live()): Promise<Said<{ to: string }>> {
+  const out = await call(io, '/auth/invite', { inviteToken: token, send: true });
+  if (!out.ok) return out;
+  const v = out.value;
+  return isObj(v) && typeof v.to === 'string' ? { ok: true, value: { to: v.to } } : { ok: false, kind: 'refused', fix: null };
 }
 
 /**
@@ -715,8 +729,8 @@ export async function acceptInvite(token: string, name?: string, io: Io = live()
 }
 
 /** Accept with the proof the mail carried: the new person is made, put on the record and signed in. */
-export async function acceptProved(token: string, proof: string, io: Io = live()): Promise<Said<Accepted>> {
-  return acceptedOf(call(io, '/auth/invite', { inviteToken: token, accept: true, proof }));
+export async function acceptProved(token: string, proof: string, name?: string, io: Io = live()): Promise<Said<Accepted>> {
+  return acceptedOf(call(io, '/auth/invite', { inviteToken: token, accept: true, proof, ...(name?.trim() ? { name } : {}) }));
 }
 
 /* ── the browser half of WebAuthn ────────────────────────────────────────────────────────────────

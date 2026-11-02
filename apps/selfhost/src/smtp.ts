@@ -364,6 +364,11 @@ function missedWhat(payload: { subject?: unknown; because?: unknown }): string {
  */
 export function letterOf(kind: SignInMailKind | undefined, link: string): { subject: string; text: string } {
   const unasked = 'If you did not ask for this, you can ignore this email.';
+  if (kind === 'invite.sent')
+    return {
+      subject: "You're invited to a BrainDog",
+      text: `You were invited to join a BrainDog. Open this link to see what you can do there and join:\n\n${link}\n\nThe link works once, for this address, and ends in 24 hours. ${unasked}`,
+    };
   if (kind === 'invite.prove')
     return {
       subject: 'Confirm your email to join the record',

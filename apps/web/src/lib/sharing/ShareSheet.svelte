@@ -110,7 +110,7 @@
   let busy = $state(false);
   let problem = $state<string | null>(null);
   let confirming = $state(false);
-  let link = $state<{ email: string; href: string } | null>(null);
+  let link = $state<{ email: string; href: string; sent: boolean } | null>(null);
 
   /* ── the fold: three choices on a phone ── */
   const phone = new MediaQuery('(width < 640px)');
@@ -281,7 +281,9 @@
       const made = await ask().invite(email);
       busy = false;
       if (made.ok) {
-        link = { email, href: inviteLink(location.origin, made.value) };
+        /* MAILED TO THEM AT ONCE (collab pass, 2 Nov), the proof inside it for an address new here; the link stays to copy. */
+        const sent = await import('$lib/auth.ts').then(({ sendInvite }) => sendInvite(made.value)).catch(() => null);
+        link = { email, href: inviteLink(location.origin, made.value), sent: sent?.ok === true };
         return;
       }
       toasts.push(copy.shareLinkMissed(email), { intent: 'warn' });
@@ -337,12 +339,12 @@
     {#if link}
       <!-- THE LINK IS SHOWN ONCE: the record keeps only its hash, so closing the sheet forgets it. -->
       <div class="share-link">
-        <p class="share-said">{copy.shareLinkSaid(link.email)}</p>
+        <p class="share-said">{link.sent ? copy.inviteEmailed(link.email) : copy.shareLinkSaid(link.email)}</p>
         <label class="field-label" for="{uid}-link">{copy.shareLinkLabel}</label>
         <span class="field"><input id="{uid}-link" class="field-input" readonly value={link.href} /></span>
         <div class="share-acts">
-          <Button weight="primary" onclick={() => void put(link?.href ?? '', copy.shareLinkCopy, copy.shareLinkCopied)}><Icon name="copy" size="s" />{copy.shareLinkCopy}</Button>
-          <Button onclick={() => (open = false)}>{copy.done}</Button>
+          <Button weight={link.sent ? 'quiet' : 'primary'} onclick={() => void put(link?.href ?? '', copy.shareLinkCopy, copy.shareLinkCopied)}><Icon name="copy" size="s" />{copy.shareLinkCopy}</Button>
+          <Button weight={link.sent ? 'primary' : undefined} onclick={() => (open = false)}>{copy.done}</Button>
         </div>
       </div>
     {:else}

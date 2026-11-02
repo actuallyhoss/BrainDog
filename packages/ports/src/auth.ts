@@ -225,6 +225,9 @@ export type Mail =
   | { to: string; linkToken: string }
   | { to: string; claimToken: string }
   | { kind: 'invite.prove'; to: string; link: string }
+  /* AN INVITATION EMAILED BY WHOEVER MADE IT (collab pass, 2 Nov): the link to join, with the proof inside it for a new
+     address, so opening the mail is the proof and there is no second mail to wait for. */
+  | { kind: 'invite.sent'; to: string; link: string }
   /* A SIGN-UP'S TWO LETTERS BOTH CARRY A LINK: the proof for a new address, and a sign-in link for a known one, so the
      person who already has an account is let in rather than told so on the page. */
   | { kind: 'signup.verify' | 'signup.known'; to: string; link: string }

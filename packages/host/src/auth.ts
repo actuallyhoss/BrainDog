@@ -966,7 +966,9 @@ export type AuthDoor = {
   auth: Auth;
   ip: string;
   open?: boolean;
-  mail?: ((to: string, link: string, kind?: MailNotice) => void) | undefined;
+  /* `vars` IS WHAT A LETTER MAY SAY BESIDE ITS LINK (an invitation's record and who sent it); a host that ignores them
+     sends the letter without those sentences. */
+  mail?: ((to: string, link: string, kind?: MailNotice, vars?: { record?: string; from?: string }) => void) | undefined;
   /** The clock the operator's lockout counts by. Absent, it is the platform's own. */
   now?: (() => number) | undefined;
   operator?:

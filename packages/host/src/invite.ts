@@ -231,6 +231,8 @@ export type InviteLook = {
    * You can edit tasks in Pottery until 1 Dec." Names, never ids. `null` or absent when nothing is shared with it.
    */
   shared?: string | null;
+  /** Who made the invitation, by name, or `null`/absent for a record older than it or a person it holds no name for. */
+  by?: string | null;
 };
 
 /** What the page is told before anybody accepts: the address, when it runs out, what it opens, and who is signed in. */
@@ -241,6 +243,7 @@ export type InviteSeen = {
   level: Level | null;
   lists: { id: string; name: string; level: Level }[];
   shared: string | null;
+  by: string | null;
   signedInAs: string | null;
 };
 
@@ -258,6 +261,7 @@ function seenOf(look: InviteLook, signedInAs: string | null): InviteSeen {
     level: look.level ?? null,
     lists: look.lists ?? [],
     shared: typeof look.shared === 'string' && look.shared !== '' ? look.shared : null,
+    by: typeof look.by === 'string' && look.by !== '' ? look.by : null,
     signedInAs,
   };
 }
@@ -288,6 +292,35 @@ export async function serveInvite(
   const seen = sid === undefined ? null : await door.auth({ flow: 'session', sid });
   const live = seen !== null && seen.status === 200 ? (seen as Extract<AuthResult, { status: 200 }>) : null;
   const who = live ? (live.body as Who) : null;
+
+  /* 0. SENT BY MAIL, BY WHOEVER MADE IT (collab pass, 2 Nov). The owner copied the link and sent it himself, and the person
+     then joined, waited for a second mail proving their address, and opened that: two hops and a paste. Now the person
+     signed in who holds the link (the one the record just handed it to) asks this host to mail it to the address it is
+     for, and for an address new here the proof rides inside it, so opening the mail is the proof and Join is one press.
+     It mails the invited address and nobody else, which is what path 3a below already does for anybody holding the
+     link, so holding the link opens nothing more than it did; a session is asked for so a stranger cannot make it
+     mail at all. An address that can already sign in gets the plain link: it signs in first, as path 2 says. */
+  if (body.send === true) {
+    if (!live || !who) return refusal(401, { code: 'UNAUTHORIZED', fix: 'Sign in to send an invitation.', at: 'session' });
+    const send = door.mail;
+    if (!send) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: NO_MAIL, at: 'email' });
+    const vars = { ...(found.value.record ? { record: found.value.record } : {}), ...(found.value.by ? { from: found.value.by } : {}) };
+    let link = `${door.origin}/invite#${token}`;
+    if (!(await invite.known(email))) {
+      const proving = await door.auth({ flow: 'invite.prove', email, invite: token });
+      if (proving.status === 404) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: NO_MAIL, at: 'email' });
+      if (proving.status !== 200) return finish(proving);
+      const mail = proving.mail;
+      if (!mail || !('link' in mail)) return reply(503, { ok: false });
+      link = proofLink(door.origin, token, mail.link);
+    }
+    try {
+      send(email, link, 'invite.sent', vars);
+    } catch {
+      /* A failed send is the host's to report; the page says it was sent, and the link is still there to copy. */
+    }
+    return finish({ ...live, body: { sent: true, to: email } });
+  }
 
   if (body.accept !== true) {
     const value = seenOf(found.value, who?.email ?? null);
@@ -335,7 +368,7 @@ export async function serveInvite(
     });
 
   /* 3b. THE PROOF CAME BACK FROM THE MAILBOX, beside the invitation it was minted for. */
-  if (typeof body.proof === 'string' && body.proof !== '') return provedThen(body.proof, token, email, door, invite, finish);
+  if (typeof body.proof === 'string' && body.proof !== '') return provedThen(body.proof, token, email, door, invite, finish, body.name);
 
   /* 3a. PROVE THE MAILBOX FIRST. THE NAME IS READ HERE, because path 3 is the only one that makes a person: it is
      refused before anything is mailed, so a refused name costs the person a retry and nothing else, and a name that
@@ -366,7 +399,7 @@ export async function serveInvite(
  * is one refusal, in the same words as a proof that was spent or ran out. It is spent either way, which costs the
  * person one more mail, and a proof minted for one invitation never opens another.
  */
-async function provedThen(proof: string, token: string, email: string, door: Door, invite: InviteDoor, finish: (out: AuthResult) => Response): Promise<Response> {
+async function provedThen(proof: string, token: string, email: string, door: Door, invite: InviteDoor, finish: (out: AuthResult) => Response, typed?: unknown): Promise<Response> {
   const spent = await door.auth({ flow: 'invite.proved', token: proof });
   if (spent.status === 401) return refusal(401, { code: 'UNAUTHORIZED', fix: PROOF_GONE, at: 'proof' });
   if (spent.status !== 200) return finish(spent);
@@ -376,7 +409,9 @@ async function provedThen(proof: string, token: string, email: string, door: Doo
 
   /* THE NAME TYPED WHEN THE PROOF WAS ASKED FOR, held to the same rule again: the Directory kept it as it was sent,
      and this is the last place it is read before it is somebody's name. */
-  const asked = personName(held.name);
+  /* OR TYPED ON THE PAGE THE MAIL OPENED, where the invitation was mailed by whoever made it and no name was asked before
+     the proof (`send` above): the person names themselves there, and only a name the proof did not already carry. */
+  const asked = personName(held.name ?? typed);
   if (!asked.ok) return reply(httpStatus(asked), asked);
   const made = await invite.person(email, asked.value ?? undefined);
   if (!made.ok) return reply(httpStatus(made), made);

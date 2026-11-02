@@ -4923,8 +4923,8 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
        invitation's proof), and a sign-in link otherwise, which is what a door that hands on no kind is sending. */
     ...(env.AUTH_MAIL_FROM && env.EMAIL
       ? {
-          mail: (to: string, link: string, kind?: string) =>
-            ctx.waitUntil(signInLetter(env, isMailKind(kind) ? kind : 'signin', to, { link })),
+          mail: (to: string, link: string, kind?: string, vars?: { record?: string; from?: string }) =>
+            ctx.waitUntil(signInLetter(env, isMailKind(kind) ? kind : 'signin', to, { link, ...(vars?.record ? { record: vars.record } : {}), ...(vars?.from ? { from: vars.from } : {}) })),
         }
       : {}),
     operator: { key: env.PROVISION_KEY, provision: async (args) => provision(env, { ...args, tz: await askedZone(copy) }) },

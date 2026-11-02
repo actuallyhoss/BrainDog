@@ -44,7 +44,7 @@ test('ACCEPTING FOR A NEW ADDRESS ANSWERS WHERE THE PROOF WENT, and the proof co
 
   const who = { person: 'p_01', email: 'bo@example.com', record: 'rec_x', provedAt: 1_758_800_000_000 };
   const joining = host(() => json(200, { ok: true, value: who }));
-  const joined = await acceptProved('rec_x.tok', 'proof_43', joining.io);
+  const joined = await acceptProved('rec_x.tok', 'proof_43', undefined, joining.io);
   assert.deepEqual(joined, { ok: true, value: { kind: 'joined', who } });
   assert.deepEqual(joining.sent, [{ path: '/auth/invite', body: { inviteToken: 'rec_x.tok', accept: true, proof: 'proof_43' } }]);
 });

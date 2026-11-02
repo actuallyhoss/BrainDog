@@ -698,6 +698,13 @@ export const account = {
   invitePageTitle: 'Invitation',
   /* THE RECORD'S NAME, the fact being decided (first F14); "this BrainDog" when the host gave none. */
   inviteLanding: (record: string | null) => `You're invited to ${record ?? 'this BrainDog'}`,
+  inviteLandingBy: (by: string, record: string | null) => `${by} invited you to ${record ?? 'their BrainDog'}`,
+  inviteAs: (role: string) => `You join as ${role}`,
+  /* MAILING THE INVITATION (collab pass, 2 Nov): the host sends it, and the link stays to copy. */
+  inviteEmailIt: 'Email it to them',
+  inviteEmailing: 'Sending',
+  inviteEmailed: (email: string) => `Sent to ${email}. They open the mail and press Join.`,
+  inviteHowMail: 'One use, one address, good for 24 hours. We email it to them, or you can copy the link.',
   inviteFor: (email: string) => `This invitation is for ${email}.`,
   inviteSignedInAs: (email: string) => `You are signed in as ${email}.`,
   inviteAccept: (record: string | null) => (record ? `Join ${record}` : 'Join'),

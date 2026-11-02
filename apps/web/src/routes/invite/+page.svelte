@@ -15,6 +15,7 @@
   one ink button. The states are sign in's calm block: a glyph in a 32px well, the title, the lines under it.
 -->
 <script lang="ts">
+  import { ROLES } from '$lib/sharing/roles.ts';
   import { onMount } from 'svelte';
 
   import { acceptInvite, acceptProved, lookInvite, passkeyRegister, support, takeInvite, type InviteLevel, type InviteLink, type InviteSeen, type Said } from '$lib/auth.ts';
@@ -44,7 +45,9 @@
    * name with the proof and makes the person with it, so a box on the page the mail opens would go nowhere.
    */
   let name = $state('');
-  const asksName = $derived(seen !== null && seen.ok && !seen.value.signedInAs && !link?.proof);
+  /* AND ON THE PAGE THE MAIL OPENS TOO (collab pass, 2 Nov): an invitation mailed by whoever made it carries no name in
+     its proof, so the person names themselves here, and a name the proof already carries wins over it at the host. */
+  const asksName = $derived(seen !== null && seen.ok && !seen.value.signedInAs);
 
   /**
    * WHAT THE LINK OPENS, IN ONE LINE, BEFORE ACCEPT: "Ashgrove: Money (adds rows), Tasks (reads)". Somebody asked to
@@ -56,10 +59,13 @@
   /* A LEVEL THIS BUILD HAS NO WORDS FOR IS SAID PLAINLY, never printed as the host's own word for it. */
   const can = (level: InviteLevel): string => (Object.hasOwn(copy.inviteCan, level) ? copy.inviteCan[level] : copy.inviteCanOther);
   /* ONE LINE A PART (first F14): "Bills and invoices: you can add", the whole BrainDog first when the link gives it. */
+  /* A ROLE ON ALL OF IT IS SAID IN ITS OWN WORDS BELOW (`ROLES`), with what it lets them do and what it does not, so only
+     the lists are lines here. */
   const opens = (v: InviteSeen): string[] => [
-    ...(v.level !== null ? [copy.inviteGives(copy.inviteEverything, can(v.level))] : []),
+    ...(v.level !== null && !Object.hasOwn(ROLES, v.level) ? [copy.inviteGives(copy.inviteEverything, can(v.level))] : []),
     ...v.lists.map((l) => copy.inviteGives(l.name, can(l.level))),
   ];
+  const role = (v: InviteSeen) => (v.level !== null && Object.hasOwn(ROLES, v.level) ? ROLES[v.level as keyof typeof ROLES] : null);
   /** The BrainDog's own name, when the host said it: the title, the button and the welcome all name it. */
   const recordName = $derived(seen?.ok ? (seen.value.record ?? null) : null);
 
@@ -119,7 +125,7 @@
        no proof, and the address is the session's own. */
     const invitation = link.token;
     const proof = link.proof && seen?.ok && !seen.value.signedInAs ? link.proof : null;
-    const out = proof !== null ? await acceptProved(invitation, proof) : await acceptInvite(invitation, asksName ? name : undefined);
+    const out = proof !== null ? await acceptProved(invitation, proof, name) : await acceptInvite(invitation, asksName ? name : undefined);
     closed(true, at);
     busy = null;
     if (!out.ok) {
@@ -195,7 +201,15 @@
                drew an error card it settled `refused`, so `a11y` skipped it and nothing ever audited
                it; the moment it settled `empty` the gate looked and found no `h1` at four widths. The
                branches are exclusive, so exactly one of these is ever on the page. -->
-          <h1 class="entry-title">{copy.inviteLanding(recordName)}</h1>
+          <h1 class="entry-title">{seen.value.by ? copy.inviteLandingBy(seen.value.by, recordName) : copy.inviteLanding(recordName)}</h1>
+          {#if role(seen.value)}
+            {@const r = role(seen.value)!}
+            <div class="role-said">
+              <p class="role-name">{copy.inviteAs(r.name)}</p>
+              <p class="role-line">{r.can}</p>
+              <p class="role-line quiet">{r.cant}</p>
+            </div>
+          {/if}
           <!-- WHAT IS SHARED WITH THEM, IN THE SHARE'S OWN WORDS: "Ada shared Pottery with you. You can edit tasks in
                Pottery until 1 Dec." Beside what the link gives on the record and its lists, which a link carrying only
                shares leaves empty. -->
@@ -366,5 +380,33 @@
     .doors .field-input {
       font-size: var(--fs-body);
     }
+  }
+
+  /* WHAT THE ROLE LETS THEM DO, under the heading, on the quiet fill (collab pass, 2 Nov). */
+  .role-said {
+    display: grid;
+    gap: 2px;
+    padding: var(--sp-3) var(--sp-4);
+    border-radius: var(--r-ctl);
+    background: var(--in-fill);
+    text-align: start;
+    max-inline-size: 420px;
+    inline-size: 100%;
+  }
+  .role-said p {
+    margin: 0;
+  }
+  .role-name {
+    font-weight: var(--fw-semi);
+    color: var(--ink);
+  }
+  .role-line {
+    font-size: var(--fs-meta);
+    line-height: 1.45;
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+  .role-line.quiet {
+    color: var(--ink-3);
   }
 </style>
