@@ -37,6 +37,8 @@ export type ChatAsk = {
   choices: Choice[];
   /** Several may be chosen (tools, what to keep first): a tap adds to the answer being typed instead of sending it. */
   many?: boolean;
+  /** Who a people question asks the name of ("co-founder"), so a bare name answered is said as theirs (`saidOf`). */
+  role?: string;
   /** The one suggested, by value, where a fact points at one (the currency this device keeps). */
   suggested?: string | null;
   by: 'rules' | 'model';
@@ -120,6 +122,22 @@ export function kindOf(said: string, usecase: string | null): Kind {
 
 const MONEY_WORDS = /\b(paid|pay|pays|payment|invoice\w*|bill\w*|revenue|income|salary|wage\w*|rent|budget\w*|expense\w*|costs?|subscription\w*|money|price\w*|charge\w*|mrr|arr|sales|retainer|fees?|loan|grant)\b|[£$€¥₹₦]/iu;
 const PEOPLE_WORDS = /\b(alone|solo|by myself|just me|on my own|clients?|customers?|partner\w*|co-?founder\w*|team\w*|colleague\w*|classmates?|supervisor|cofounder|we|our|us|employees?|staff|contractors?)\b/iu;
+/**
+ * THE ONE OTHER PERSON THEY SAID THEY WORK WITH AND DID NOT NAME (2 Nov, a walk: "We're a two-person startup" settled
+ * People, so Leo was never asked who he builds with and his co-founder was never drafted). The role as it is said back
+ * ("co-founder", "business partner", "partner"), or `null` where nobody is meant or the one meant is named already.
+ */
+const PAIR_SAID = /\b(two-person|two person|two of us|co-?founders?|cofounders?|business partner|my partner|our partner)\b/iu;
+const PAIR_NAMED = /\b(?:co-?founders?|cofounders?|partner)(?:\s+is|,)?\s+\p{Lu}\p{Ll}+/u;
+export function pairOf(said: string): string | null {
+  const m = PAIR_SAID.exec(said);
+  if (m === null || PAIR_NAMED.test(said)) return null;
+  const w = m[1]!.toLowerCase();
+  return /partner/u.test(w) ? (w.startsWith('business') ? 'business partner' : 'partner') : 'co-founder';
+}
+/** A bare name typed as an answer: "Dan", "dan", "Dan Reyes". */
+const BARE_NAME = /^\p{L}[\p{L}'’-]*(?:\s\p{L}[\p{L}'’-]*)?$/u;
+const capital = (n: string): string => n.split(' ').map((x) => x.charAt(0).toUpperCase() + x.slice(1)).join(' ');
 const TOOL_WORDS = /\b(claude|chatgpt|gpt|cursor|codex|copilot|gemini|windsurf|perplexity|ai tools?|no ai|none yet)\b/iu;
 /* A thing they work on, said by name: "clients Fenwick and Acme", "an app called Tidepool", "for Fenwick". */
 /* A NAME HAS A SMALL LETTER AFTER ITS CAPITAL, so a currency code ("clients pay me in USD") is never taken for one. */
@@ -288,7 +306,8 @@ export function settled(topic: Topic, w: Where): boolean {
     case 'currency':
       return !w.money.kept || (w.money.currency !== null && !w.money.guessed);
     case 'people':
-      return PEOPLE_WORDS.test(s);
+      /* "WE'RE TWO" NAMES NOBODY: the other one is asked by name, so they can be drafted (`pairOf`). */
+      return PEOPLE_WORDS.test(s) && pairOf(s) === null;
     case 'tools':
       return TOOL_WORDS.test(s);
     case 'name':
@@ -363,12 +382,15 @@ export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
         by: 'rules',
       };
     }
-    case 'people':
+    case 'people': {
+      const pair = pairOf(w.said);
+      if (pair !== null) return { topic, question: `What's your ${pair}'s name?`, choices: [], role: pair, by: 'rules' };
       if (kind === 'freelance') return ask('Who do you work with, besides clients?', ['Just me', 'Other freelancers', 'An accountant', 'An agency']);
       if (kind === 'founder') return ask('Who are you building it with?', ['My co-founder', 'A small team', 'Contractors', 'Just me']);
       if (kind === 'student') return ask('Who do you work with?', ['Just me', 'Classmates', 'A supervisor', 'A study group']);
       if (kind === 'personal') return ask('Who shares the money with you?', ['Just me', 'My partner', 'Family', 'Housemates']);
       return ask('Who do you work with?', ['Just me', 'A partner', 'A small team', 'Clients']);
+    }
     case 'tools':
       return ask('Do you use AI tools? I can work with them.', ['Claude', 'ChatGPT', 'Cursor', 'None yet'], { many: true });
     case 'name':
@@ -434,7 +456,9 @@ const WORK_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
 /** The model's question, held to what the screen can say and to a topic not yet asked, or `null`. */
 function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): ChatAsk | null {
   if (!m) return null;
-  const topic = m.about as Topic;
+  /* A QUESTION ABOUT WHICH CURRENCY IS THE CURRENCY'S, whatever topic it came under (2 Nov, the model run: "What's the
+     currency for Tidepool's finances?" came as `money`, and the money question was then never asked). */
+  const topic = (/\bcurrenc/iu.test(m.question) ? 'currency' : m.about) as Topic;
   /* ONLY THE CONVERSATION'S OWN TOPICS (`MODEL_TOPICS`), never one asked already. A name known, a currency named, money
      already said and the tools already named are never asked again, whatever the model read. */
   if (!MODEL_TOPICS.has(topic) || asked.has(topic)) return null;
@@ -485,6 +509,12 @@ export function nextAsk(w: Where): ChatAsk | null {
   }
   /* THE LAST TURNS ARE KEPT FOR THE NAME AND WHAT FIRST (`KEPT_FOR_LAST`): when only as many are left as those still
      open, nothing else is asked, so the cap drops the tools question and never the name. */
+  /* THE ONE THEY WORK WITH IS ASKED BY NAME AT ONCE (`pairOf`), by the rules and over the model's question: "We're a
+     two-person startup" is followed by "What's your co-founder's name?", so they are drafted, and the cap never drops it. */
+  if (open.includes('people') && pairOf(w.said) !== null && room > KEPT_FOR_LAST.filter((t) => open.includes(t)).length) {
+    const r = rulesAsk('people', w);
+    if (r !== null) return r;
+  }
   const owed = KEPT_FOR_LAST.filter((t) => open.includes(t));
   const only = room <= owed.length ? owed : null;
   const m = modelAsk(w.model, w, asked);
@@ -540,7 +570,9 @@ export function saidOf(ask: ChatAsk, answer: string): string {
     case 'money':
       return sentence(a);
     case 'people':
-      return /^just me$/iu.test(a) ? 'I work on my own.' : `I work with ${low}.`;
+      /* THE ONE THEY WORK WITH, BY NAME: "Dan" is "My co-founder is Dan.", which first Today drafts in People. */
+      if (ask.role !== undefined && BARE_NAME.test(a) && !/^just me$/iu.test(a)) return `My ${ask.role} is ${capital(a)}.`;
+      return /^just me$/iu.test(a) ? 'I work on my own.' : `I work with ${BARE_NAME.test(a) && /^\p{Lu}/u.test(a) ? a : low}.`;
     case 'tools':
       return `I use ${a}.`;
     case 'first': {
