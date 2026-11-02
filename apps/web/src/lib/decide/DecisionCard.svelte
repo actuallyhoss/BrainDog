@@ -805,7 +805,7 @@
              words instead. -->
         <p class="queue-by">
           <span class="dc-sr">{cardWords.askedBy}</span>
-          <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who">{card.by.name}</span>
+          <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who" dir="auto" title={card.by.name}>{card.by.name}</span>
           {#each from as part, i (i)}<span class="dc-from" dir="auto">{part}</span>{/each}
           <span class="queue-when">{card.when}</span>
           {#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
@@ -1136,6 +1136,20 @@
     flex-wrap: wrap;
     column-gap: var(--sp-2);
     font-size: var(--fs-meta);
+  }
+
+  /* WHO ASKED WRAPS TO TWO LINES, THEN AN ELLIPSIS (leftovers 2 Nov, 4): a rule's name is a sentence ("Ask whether to keep
+     a service before it renews"), and the skin's one-line cut at 28ch stopped it at "before it …" on a 1190px card. Its
+     whole name is on the question's own page and in the title a pointer reads. The time keeps its place after it. */
+  .queue-by > .queue-who {
+    display: -webkit-box;
+    max-inline-size: min(100%, 60ch);
+    overflow: hidden;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   /* THE QUESTION, 17 AND SEMIBOLD, close under who asked it: the lead and every card alike, on a laptop and a phone. */
