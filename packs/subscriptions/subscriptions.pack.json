@@ -1,10 +1,10 @@
 {
   "pack": "subscriptions",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "icon": "refresh",
   "title": "Subscriptions",
   "summary": "Everything you pay for on a cadence, in one place: what it costs a month and a year, what renews in the next 30 days, free trials about to end, the day to cancel by, a price that went up, and what you hardly use. Built on Repeating, so Cash ahead and Coming up already count them.",
-  "changes": "The Subscriptions widget on Today says Nothing tracked yet when no subscription is marked, rather than A month £0.",
+  "changes": "Subscriptions opens on one line and the box to add one when nothing is marked yet, and What they cost shows what they cost a month and a year, leaving the counts to the lists under it that already say them.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -462,10 +462,21 @@
         },
         {
           "kind": "note",
-          "heading": "Nothing marked yet",
-          "icon": "refresh",
           "span": 12,
-          "body": "Mark the repeating payments below that are subscriptions, or add one.",
+          "body": "No subscriptions yet. Add one, or mark a repeating payment as one.",
+          "when": {
+            "metric": "subs-count",
+            "lt": 1
+          },
+          "lead": true
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a subscription",
+          "icon": "plus",
+          "span": 12,
+          "register": "recurring",
+          "where": "subscription is true",
           "when": {
             "metric": "subs-count",
             "lt": 1
@@ -531,14 +542,6 @@
             {
               "metric": "subs-year",
               "label": "A year"
-            },
-            {
-              "metric": "subs-renew-30d",
-              "label": "Renew in 30 days"
-            },
-            {
-              "metric": "subs-trials",
-              "label": "Trials ending"
             }
           ],
           "when": {
@@ -777,7 +780,11 @@
           "icon": "plus",
           "span": 12,
           "register": "recurring",
-          "where": "subscription is true"
+          "where": "subscription is true",
+          "when": {
+            "metric": "subs-count",
+            "gt": 0
+          }
         },
         {
           "kind": "table",
