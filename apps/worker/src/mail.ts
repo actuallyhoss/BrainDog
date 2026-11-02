@@ -117,6 +117,11 @@ export type MailVars = {
   from?: string | undefined;
   /** The days a link lives, written as a whole number ("30"), for a letter that says when it ends (`invite.ready`). */
   days?: string | undefined;
+  /**
+   * The six digits a BrainDog app takes instead of the link (`signin`, when the app asked for the link), for the letter
+   * opened on another device. Anything but six digits is left out, and the letter is the link alone, as it always was.
+   */
+  code?: string | undefined;
 };
 
 /** One letter: its subject, its text, and the same words as simple HTML. */
@@ -134,8 +139,11 @@ const flat = (value: string | undefined): string => (value ?? '').replace(/[\u00
 const escaped = (value: string): string =>
   value.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;').replace(/"/gu, '&quot;').replace(/'/gu, '&#39;');
 
-/** One paragraph of a letter: its words, or the link it points at. */
-type Part = { say: string } | { link: string };
+/**
+ * One paragraph of a letter: its words, the link it points at, or an app's code with the words that lead to it, which
+ * sits under the link and above the hairline, because it is the other half of what the letter is for.
+ */
+type Part = { say: string } | { link: string } | { code: string; lead: string };
 
 /** Why each mail was sent, the footer's first sentence, so a mail nobody expected still says where it came from. */
 const WHY: Record<MailKind, string> = {
@@ -169,12 +177,15 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
   const record = v.record || 'Your BrainDog';
   const link: Part[] = v.link ? [{ link: v.link }] : [];
   switch (kind) {
+    /* THE APP'S CODE, WHEN THE APP ASKED, UNDER THE LINK: the person reading this on a laptop types the six digits into
+       the app on the phone. It is one use with the link, so the words say "or". The lines around it are as they were. */
     case 'signin':
       return {
         subject: 'Sign in to BrainDog',
         parts: [
           { say: 'Here is your link to sign in to BrainDog. It works once, for the next fifteen minutes.' },
           ...link,
+          ...(/^\d{6}$/u.test(v.code) ? [{ code: v.code, lead: 'Or type this code in the BrainDog app, within ten minutes:' }] : []),
           { say: 'If you did not ask to sign in, you can ignore this message.' },
         ],
       };
@@ -435,6 +446,17 @@ const button = (label: string, href: string): string => {
  */
 const shown = (href: string): string => href.replace(/(#verify=[^&#\s]*)&said=.*$/su, '$1');
 
+/** Six digits as a person reads them aloud and types them: two threes, "123 456". */
+const spacedCode = (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`;
+
+/**
+ * An app's code under the button: the line that leads to it, and the six digits large and spaced, in the ink, so they
+ * are read whole on a phone and copied as one. `user-select: all` makes one tap take every digit.
+ */
+const codeBlock = (lead: string, code: string): string =>
+  `<p class="bd-ink2" style="margin:0 0 6px;font-family:${FONT};font-size:16px;line-height:24px;color:${L.ink2}">${h(lead)}</p>` +
+  `<p class="bd-ink" style="margin:0 0 24px;font-family:${FONT};font-size:28px;line-height:36px;font-weight:600;letter-spacing:0.12em;color:${L.ink};-webkit-user-select:all;user-select:all">${h(spacedCode(code))}</p>`;
+
 /** For a link that works once: the address itself under the button, for the client that will not follow a button. */
 const fallback = (href: string): string =>
   `<p class="bd-dim" style="margin:0 0 20px;font-family:${FONT};font-size:13px;line-height:20px;color:${L.dim}">` +
@@ -542,18 +564,23 @@ export function letterOf(kind: MailKind, vars: MailVars = {}): Letter {
     name: flat(vars.name),
     from: flat(vars.from),
     days: flat(vars.days),
+    code: flat(vars.code),
   };
   const { subject, parts } = partsOf(kind, v);
-  const line = (p: Part): string => ('say' in p ? p.say : shown(p.link));
+  const line = (p: Part): string => ('say' in p ? p.say : 'code' in p ? `${p.lead}\n\n${spacedCode(p.code)}` : shown(p.link));
   /* A BLANK LINE BETWEEN PARAGRAPHS, AS THE SIGN-IN LETTER HAS ALWAYS HAD, and the footer's lines together under them. */
   const text = [parts.map(line).join('\n\n'), textFooter(WHY[kind], v.support)].join('\n\n');
 
   const at = parts.findIndex((p) => 'link' in p);
+  /* THE HAIRLINE GOES ABOVE THE FIRST QUIET LINE AFTER THE LINK, which is the line straight after it in every letter
+     but a sign-in an app asked for, where the app's code comes first. */
+  const quiet = at === -1 ? -1 : parts.findIndex((p, i) => i > at && 'say' in p);
   const body = parts
     .map((p, i) => {
       if ('link' in p) return button(actionOf(kind, v.record), p.link) + (NEEDS_LINK.has(kind) ? fallback(shown(p.link)) : '');
+      if ('code' in p) return codeBlock(p.lead, p.code);
       if (at === -1 || i < at) return para(p.say);
-      return (i === at + 1 ? rule : '') + aside(p.say);
+      return (i === quiet ? rule : '') + aside(p.say);
     })
     .join('');
   const first = parts.find((p): p is { say: string } => 'say' in p)?.say ?? '';

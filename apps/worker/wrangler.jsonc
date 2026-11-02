@@ -581,10 +581,11 @@
            the browser (section 3.0 of the design). */
         "RP_ID": "brain.dog",
         /* THE OWNER'S APPLE DEVELOPER TEAM (ten capitals and digits, public in every app he signs), which
-           `/.well-known/apple-app-site-association` names the Mac app under so its window may use the passkeys of
-           `brain.dog` and `app.brain.dog` (`src/apple.ts`). Empty answers that file 404, and the Mac app's passkeys are
-           refused while every other way in works. */
-        "APPLE_TEAM_ID": "",
+           `/.well-known/apple-app-site-association` names both BrainDog apps under, the iPhone's (`dog.brain.app`) and
+           the Mac's (`dog.brain.desktop`), so they may use the passkeys of `brain.dog` and `app.brain.dog` and the iPhone
+           app opens the links it draws (`src/apple.ts`). Not a secret. Empty answers that file 404, and the apps'
+           passkeys and links are refused while every other way in works. */
+        "APPLE_TEAM_ID": "MG86668Z52",
         "AI_GATEWAY": "braindog",
         "AGE_RECIPIENT": "age1av0654ll7t2ghrzr7ekervs5hjc9sm0he0569z45cvu92dd43aqql9gm3t",
         "SLASH_ENDPOINT": "",

@@ -301,7 +301,7 @@ type Env = {
    * under switches passkeys off (`relyingParty`), which is a refusal an operator can read and not a broken button.
    */
   RP_ID?: string;
-  /** The owner's Apple Developer team, which `/.well-known/apple-app-site-association` names the Mac app under (`apple.ts`). */
+  /** The owner's Apple Developer team, which `/.well-known/apple-app-site-association` names both BrainDog apps under (`apple.ts`). */
   APPLE_TEAM_ID?: string;
   /**
    * The names this Worker answered as before the app moved to `PUBLIC_HOST`, comma-separated: `brain.dog`.
@@ -2651,13 +2651,19 @@ export class Directory$ extends DurableObject<Env> {
        app moves there. A name the host is not under is no passkeys at all rather
        than a ceremony every browser fails, and unset is the exact host, which is what this was. */
     const rp = host ? relyingParty(`https://${host}`, this.env.RP_ID) : null;
+    /* AND THE ORIGIN A NATIVE APP'S PASSKEY CARRIES. `ASAuthorization` on the iPhone and the Mac writes
+       `https://<relying party id>` into the client data, `https://brain.dog`, and not the page's origin, because there is
+       no page: so the BrainDog apps' assertions are accepted beside the web's. It is checked against a real assertion
+       when the app is signed with the team's identity; an unsigned simulator build has no associated domain and cannot
+       make one. A browser at `brain.dog` asserting for it is the operator's own site, the relying party itself. */
+    const passkeys = rp ? { ...rp, origins: [`https://${rp.id}`] } : null;
     this.#dir = createDirectory(
       guardedSql(this.ctx.storage),
       { now: () => Date.now() },
       mac
         ? {
             mac,
-            ...(rp ? { rp } : {}),
+            ...(passkeys ? { rp: passkeys } : {}),
             magic: Boolean(this.env.AUTH_MAIL_FROM && this.env.EMAIL),
             /* The reason a sign-in failed, for the operator's tail. A flow and a word, never who or with what. */
             log: (line) => op({ op: 'auth', flow: line.flow, ok: false, why: line.reason }, 'error'),
@@ -4981,9 +4987,10 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
       ip: request.headers.get('cf-connecting-ip') ?? '',
       ask: (call) => directory.auth(call) as unknown as Promise<AuthResult>,
     });
-  /* THE MAC APP'S WAY BACK FROM A BROWSER (`desktop-signin.ts`): an emailed link handed back as a one-time code, and the
-     code swapped in the app's window. Wherever sign-in is on, whatever Google says; off, the rows fall through to
-     `serveAuth`, which answers each as a way in this host does not offer. */
+  /* A BRAINDOG APP'S WAY BACK (`desktop-signin.ts`): an emailed link handed back as a one-time code, and the code swapped
+     in the app, `/auth/desktop` for the Mac app as it was and `/auth/app` for an app session from either app. Wherever
+     sign-in is on, whatever Google says; off, the rows fall through to `serveAuth`, which answers each as a way in this
+     host does not offer. `/auth/app/code` and `/auth/app/refresh` are Directory flows, answered by `serveAuth` below. */
   if ((env.SESSION_SECRET ?? '').length >= 32 && mode !== null && Object.hasOwn(DESKTOP_ROUTES, signupPath))
     return serveDesktop(request, signupPath as keyof typeof DESKTOP_ROUTES, {
       origin,
@@ -5024,8 +5031,17 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
        invitation's proof), and a sign-in link otherwise, which is what a door that hands on no kind is sending. */
     ...(env.AUTH_MAIL_FROM && env.EMAIL
       ? {
-          mail: (to: string, link: string, kind?: string, vars?: { record?: string; from?: string }) =>
-            ctx.waitUntil(signInLetter(env, isMailKind(kind) ? kind : 'signin', to, { link, ...(vars?.record ? { record: vars.record } : {}), ...(vars?.from ? { from: vars.from } : {}) })),
+          /* `vars.code` IS THE SIX DIGITS A BRAINDOG APP ASKED FOR beside the link (`magic.start` with `app`), printed in the
+             sign-in letter under the button and never logged; `record` and `from` are an invitation's. */
+          mail: (to: string, link: string, kind?: string, vars?: { record?: string; from?: string; code?: string }) =>
+            ctx.waitUntil(
+              signInLetter(env, isMailKind(kind) ? kind : 'signin', to, {
+                link,
+                ...(vars?.record ? { record: vars.record } : {}),
+                ...(vars?.from ? { from: vars.from } : {}),
+                ...(vars?.code ? { code: vars.code } : {}),
+              }),
+            ),
         }
       : {}),
     operator: { key: env.PROVISION_KEY, provision: async (args) => provision(env, { ...args, tz: await askedZone(copy) }) },

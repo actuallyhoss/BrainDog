@@ -37,9 +37,11 @@ import type { AuthCall, AuthResult } from '@braindog/ports';
 /** The two routes and the one method each answers, as `AUTH_ROUTES` declares them. */
 export const GOOGLE_ROUTES = { '/auth/google/start': 'GET', '/auth/google/callback': 'GET', '/auth/google/desktop': 'POST' } as const;
 
-/* THE MAC APP'S WAY BACK (docs/55-DESKTOP-APP.md). `?desktop=1&challenge=` on the start marks the flow; the callback then
+/* THE MAC APP'S WAY BACK (docs/55-DESKTOP-APP.md). `?desktop=1&challenge=` on the start marks the flow, and so does
+   `?app=mac&challenge=`, the spelling the native Mac app asks with; the callback then
    leaves the sign-in link UNSPENT and sends `braindog://auth?code=` to the app, and the app's window posts the code and its
-   PKCE verifier to `/auth/google/desktop`, which spends the link and sets the cookie there. The code is the link token
+   PKCE verifier to `/auth/google/desktop`, or to `/auth/app` for an app session, which spends the link and sets the
+   cookie there. The code is the link token
    sealed with the challenge and an expiry, so it needs no table: single use is the link's own, two minutes is the expiry,
    and a code swapped onto another challenge fails its seal. No session token is ever in a URL. */
 const CODE_LIFE_MS = 120_000;
@@ -223,7 +225,7 @@ export async function serveGoogle(request: Request, path: keyof typeof GOOGLE_RO
     const nonce = fresh();
     const next = landing(url.searchParams.get('next'));
     /* The desktop flavour needs the app's challenge and a secret to seal with; without both it fails here, not at the end. */
-    const desktop = url.searchParams.get('desktop') === '1';
+    const desktop = url.searchParams.get('desktop') === '1' || url.searchParams.get('app') === 'mac';
     const asked = url.searchParams.get('challenge') ?? '';
     if (desktop && (!CHALLENGE.test(asked) || (door.secret ?? '').length < 32)) return go(`${door.origin}/signin?google=failed`, []);
     const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
@@ -309,21 +311,26 @@ export type SwapDoor = Pick<GoogleDoor, 'origin' | 'mode' | 'ip' | 'ask' | 'secr
  * The app's window swaps its code for the session cookie: a same-site POST carrying the code and the PKCE verifier. The
  * code may come from Google's callback or from an emailed link handed back by its page (`desktop-signin.ts`); both are
  * the same sealed link, so both are spent here.
+ *
+ * `app` IS `/auth/app`: the session opened is an app session under the body's `label` (the Directory keeps it to one
+ * line of 64 characters, and "BrainDog app" when there is none), and a success answers the envelope `{ ok, value }`.
+ * Without it this is `/auth/desktop` and `/auth/google/desktop` exactly as they were: a browser's session, `{ ok }`.
  */
-export async function exchange(request: Request, door: SwapDoor, now: number): Promise<Response> {
+export async function exchange(request: Request, door: SwapDoor, now: number, app = false): Promise<Response> {
   const reply = (status: number, ok: boolean, cookies: readonly string[] = []): Response => {
     const headers = new Headers({ 'content-type': 'application/json', 'cache-control': 'no-store' });
     for (const c of cookies) headers.append('set-cookie', c);
-    return new Response(JSON.stringify({ ok }), { status, headers });
+    return new Response(JSON.stringify(app && ok ? { ok, value: {} } : { ok }), { status, headers });
   };
   if (!sameOrigin(request, door.origin) || (door.secret ?? '').length < 32) return reply(403, false);
-  const body = (await request.json().catch(() => null)) as { code?: unknown; verifier?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { code?: unknown; verifier?: unknown; label?: unknown } | null;
   if (typeof body?.code !== 'string' || typeof body.verifier !== 'string' || body.code.length > 512 || body.verifier.length > 256)
     return reply(400, false);
   const link = await openDesktopCode(door.secret as string, body.code, body.verifier, now);
   if (link === null) return reply(400, false);
   const sid = readSid(request, door.mode);
-  const out = await door.ask({ flow: 'magic.redeem', linkToken: link, ip: door.ip, ...(sid === undefined ? {} : { sid }) });
+  const label = app ? { app: typeof body.label === 'string' ? body.label : '' } : {};
+  const out = await door.ask({ flow: 'magic.redeem', linkToken: link, ip: door.ip, ...(sid === undefined ? {} : { sid }), ...label });
   if (out.status === 429) return reply(429, false);
   if (out.status !== 200 || out.session === undefined) return reply(400, false);
   return reply(200, true, [out.session === 'clear' ? clearCookie(door.mode) : sessionCookie(out.session.sid, door.mode)]);

@@ -1,6 +1,12 @@
 /**
- * The Mac app's way back from a sign-in finished in the browser: `POST /auth/desktop/handoff` and `POST /auth/desktop`
- * (`DesktopFlow` in `packages/host/src/auth.ts`, docs/55-DESKTOP-APP.md).
+ * A BrainDog app's way back from a sign-in finished somewhere else: `POST /auth/desktop/handoff` and `POST /auth/desktop`
+ * for the Mac app as it always was, and the same pair as `POST /auth/app/handoff` and `POST /auth/app` for both apps,
+ * the iPhone's and the Mac's (`DesktopFlow` in `packages/host/src/auth.ts`, docs/55-DESKTOP-APP.md).
+ *
+ * `/auth/app` OPENS AN APP SESSION. It is `/auth/desktop` with a device label (`label`, "iPhone, BrainDog app"): the
+ * session it opens is listed under that label in Settings, never rotates on read, and is renewed by the app with
+ * `/auth/app/refresh`. ON THE IPHONE THE LINK OPENS THE APP ITSELF, as a universal link (`apple.ts`), so the app reads
+ * the link and posts the handoff and the swap itself, and no browser is between them.
  *
  * AN EMAILED LINK OPENS IN THE DEFAULT BROWSER, NOT IN THE APP THAT ASKED FOR IT. So the app's window keeps a PKCE
  * verifier and sends its challenge with the link request (`app` beside `next`), and the mailed link carries it as
@@ -23,8 +29,8 @@ import { sameOrigin } from '@braindog/host/auth';
 
 import { desktopCode, exchange, type SwapDoor } from './google.ts';
 
-/** The two routes and the one method each answers, as `AUTH_ROUTES` declares them. */
-export const DESKTOP_ROUTES = { '/auth/desktop': 'POST', '/auth/desktop/handoff': 'POST' } as const;
+/** The four routes and the one method each answers, as `AUTH_ROUTES` declares them. */
+export const DESKTOP_ROUTES = { '/auth/desktop': 'POST', '/auth/desktop/handoff': 'POST', '/auth/app': 'POST', '/auth/app/handoff': 'POST' } as const;
 
 export type DesktopDoor = SwapDoor & { now?: () => number };
 
@@ -41,6 +47,7 @@ export async function serveDesktop(request: Request, path: keyof typeof DESKTOP_
   if (request.method !== want) return new Response(null, { status: 405, headers: { allow: want, 'cache-control': 'no-store' } });
   const now = (door.now ?? Date.now)();
   if (path === '/auth/desktop') return exchange(request, door, now);
+  if (path === '/auth/app') return exchange(request, door, now, true);
 
   /* THE HANDOFF: a page on this origin, a link and a challenge in the shapes they are made in, and the secret to seal with. */
   if (!sameOrigin(request, door.origin) || (door.secret ?? '').length < 32) return reply(403, { ok: false });
