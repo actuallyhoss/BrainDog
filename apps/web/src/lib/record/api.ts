@@ -130,29 +130,41 @@ export const decl = (register: string, field: string): FieldDecl | undefined =>
 
 /**
  * A COLUMN'S HEADING: the label its block gives it, or over a list's title field the word for one of its rows, as the list
- * is labelled, so a team whose tasks are Tickets reads Ticket over them. Any other column is headed by its field id, as
- * it always was.
+ * is labelled, so a team whose tasks are Tickets reads Ticket over them. Any other column is headed by its field's name
+ * (`fieldWords`).
+ *
+ * A LABEL THAT IS ONLY THE FIELD'S ID IS NO LABEL. The evaluator hands a column declared without `label:` back labelled
+ * with its field id, and this returned it as given, so Today headed a repeating line's day "next_due" (verify5, 7).
  */
 export const columnHeading = (register: string, c: { field: string; label?: string | undefined }): string => {
-  if (typeof c.label === 'string') return c.label;
+  if (typeof c.label === 'string' && c.label !== c.field) return c.label;
   const list = REGISTERS[register];
   const one = list && list.title === c.field ? list.one : undefined;
   if (typeof one === 'string' && one) return one.charAt(0).toUpperCase() + one.slice(1);
+  return fieldWords(register, c.field);
+};
+
+/**
+ * WHAT A FIELD IS CALLED ON A SCREEN, read from the list it belongs to: its declared label, else its id in words
+ * ("Next due"), never the id itself. Every place that heads or names a column by its field asks this one.
+ */
+export const fieldWords = (register: string, field: string): string => {
+  const list = REGISTERS[register];
   /* AND A FIELD THE LIST DECLARES IS SAID BY ITS LABEL, never its id: a bill's card headed its figure "amount". */
-  const f = list?.fields.find((d) => d.id === c.field);
+  const f = list?.fields.find((d) => d.id === field);
   if (f) return labelOf(f);
   /* AND NEVER THE ID ITSELF (polish-f L4): an add-on's list switched to its Table look, or read before its declaration
      arrived, headed its columns "tax_part" and "line.amount". A path through a link is said by the field it ends on, in
      the list the link points at; anything else is the id said as words, as a label is when a pack gives none. */
-  const dot = c.field.indexOf('.');
+  const dot = field.indexOf('.');
   if (dot > 0) {
-    const via = list?.fields.find((d) => d.id === c.field.slice(0, dot));
+    const via = list?.fields.find((d) => d.id === field.slice(0, dot));
     const to = via?.to === undefined ? undefined : REGISTERS[via.to];
-    const end = c.field.slice(dot + 1);
+    const end = field.slice(dot + 1);
     const there = to?.fields.find((d) => d.id === end);
     return there ? labelOf(there) : idWords(end.slice(end.lastIndexOf('.') + 1));
   }
-  return idWords(c.field);
+  return idWords(field);
 };
 
 /** A field id said as words when nothing labels it: `tax_part` is "Tax part", `paid-on` is "Paid on". */

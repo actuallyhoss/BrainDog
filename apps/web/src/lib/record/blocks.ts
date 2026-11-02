@@ -44,7 +44,7 @@ import { KINDS, KPIS_KIND, SECTION_TONES, kindSpec, showsOf, type CardRole, type
 /* WHICH FILES A CARD LEADS WITH, the renderer's list, read by `pictureCell`. */
 import { exponentOf, isPictureMime, timelineTitle } from 'braindog-render';
 import type { Column } from 'braindog-render/svelte';
-import { decl as fieldDecl, display, homeCurrency, labelOf, ROW_ID, unnamed, walkTable, type BlockResult } from './api.ts';
+import { decl as fieldDecl, display, fieldWords, homeCurrency, labelOf, ROW_ID, unnamed, walkTable, type BlockResult } from './api.ts';
 /* WHO ASKED A QUEUE'S QUESTION, in the words the card that answers it uses. */
 import { proposer } from '../page/queue-answer.ts';
 import { REGISTERS } from './held.ts';
@@ -780,7 +780,9 @@ function gaugeRows(block: BlockResult): string[] {
   const sum = total(block.matched.map((e) => e.fields[of]));
   const target = block.target;
   if (target === undefined) return [];
-  const label = block.columns[0]?.label ?? block.heading ?? '';
+  /* A LABEL THAT IS ONLY ITS FIELD'S ID IS SAID AS THE FIELD'S NAME (`fieldWords`), as a column heading is. */
+  const first = block.columns[0];
+  const label = first?.label !== undefined && first.label === first.field ? fieldWords(block.register ?? '', first.field) : (first?.label ?? block.heading ?? '');
   /* A GAUGE OVER TWO CURRENCIES IS NOT A GAUGE. Its whole output is one figure measured against one
      line, and neither of them means anything if the figure is a sum of two units. */
   if (sum.mixed.length) return [`${escapeCell(label)} | ${escapeCell(mixedFix(sum.mixed))} |  | warn`];
@@ -971,7 +973,7 @@ function cardsRows(block: BlockResult): string[] {
   const columns: readonly Column[] = block.columns;
   const roles = cardRoles(columns);
   const fields = REGISTERS[block.register ?? '']?.fields ?? [];
-  const labelOf = (c: Column) => (c.label !== c.field ? c.label : (fields.find((f) => f.id === c.field)?.label ?? c.label));
+  const labelOf = (c: Column) => (c.label !== c.field ? c.label : (fields.find((f) => f.id === c.field)?.label ?? fieldWords(block.register ?? '', c.field)));
   /* A RUN GONE QUIET IS THE EVALUATOR'S TO SAY, so it is a column of its own and not a declared one. */
   const quiet = block.quiet;
   const head = [...columns.map((c, i) => escapeCell(`${roles[i]}: ${labelOf(c)}`)), ...(quiet ? ['quiet'] : [])].join(' | ');
@@ -1736,7 +1738,7 @@ function inputsRows(block: BlockResult): string[] {
     const field = decl?.fields.find((f) => f.id === c.field);
     /* THE FIELD'S NAME, as the row page says it, where the declaration gave the column none: `price` is the schema
        talking, and it went on the screen as the input's label. */
-    const label = c.label !== c.field ? c.label : field ? labelOf(field) : c.field;
+    const label = c.label !== c.field ? c.label : field ? labelOf(field) : fieldWords(register, c.field);
     const v = entry.fields[c.field];
     const choices = type === 'enum' ? (field?.values ?? []).join(',') : '';
     const value =
