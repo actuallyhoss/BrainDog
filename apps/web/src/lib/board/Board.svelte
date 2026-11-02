@@ -511,6 +511,13 @@
     max-block-size: calc(var(--most) + var(--row) + var(--gap));
   }
 
+  /* AND ON A LAPTOP AT REST, THE BAR'S HEIGHT MORE (leftovers 4): the frame is held to the rows it was laid across, and
+     the bar in the flow took its room out of them, so Spending's "$19,736" was cut in half under Keep. `--bar` is the bar
+     as drawn, measured by `fit.ts`. */
+  .board-root:not([data-editing]) .board:not([data-cols='2']) :global([data-board-key][data-board-key]:has(> [data-draft-mark])) {
+    max-block-size: calc(var(--span) * var(--row) + (var(--span) - 1) * var(--gap) + var(--bar, 0px));
+  }
+
   /* AND THE BAR IS IN THE FLOW, UNDER WHAT IT ASKS ABOUT (Maya's Today at 390): a phone's frame is as tall as what is drawn
      in it, so a bar laid over its foot covered the widget's own figures ("Spent, 30 days $19,901" under Keep). A laptop's
      frame at rest closes up the same way (T5), and its Spending lost the same figures under Keep (live check of 2 Nov). */

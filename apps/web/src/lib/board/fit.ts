@@ -31,6 +31,15 @@ export function fitBoard(board: HTMLElement): void {
     const css = getComputedStyle(frame);
     const span = (parseInt(css.gridRowEnd, 10) || 0) - (parseInt(css.gridRowStart, 10) || 0);
     if (span > 0 && frame.style.getPropertyValue('--span') !== String(span)) frame.style.setProperty('--span', String(span));
+    /* AND A DRAFT'S KEEP BAR, AS TALL AS IT IS DRAWN (leftovers 4): on a laptop at rest the frame is held to its rows, and
+       the bar under the widget took its height out of them, so Spending's figures were cut under Keep. The frame is let
+       taller by the bar (`Board.svelte`), whatever the bar wraps to at the frame's width. */
+    const bar = frame.querySelector<HTMLElement>(':scope > [data-draft-mark]');
+    const said = bar === null ? '' : `${Math.ceil(bar.getBoundingClientRect().height)}px`;
+    if (frame.style.getPropertyValue('--bar') !== said) {
+      if (said === '') frame.style.removeProperty('--bar');
+      else frame.style.setProperty('--bar', said);
+    }
   }
   /* MEASURED WHOLE: every row put back first, in the same task, so nothing is painted between and the measure is of the
      widget as it would draw with room. */
