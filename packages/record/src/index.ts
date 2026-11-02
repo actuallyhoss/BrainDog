@@ -1325,12 +1325,14 @@ export const BYPASS_PREF = 'agents.bypass' satisfies PrefKey;
  *   - Deleting the whole BrainDog, erasing for good, putting back an old copy over it, or loading one in, stays the
  *     owner's in the app (`deleteRecord`, `erase`, `restore`, `import`).
  *   - Exporting all of BrainDog as a file, which can go to anyone, stays the owner's in the app (`export`).
- *   - Changing who the owner is stays the owner's in the app (`teamKeeps` holds an agent to what an Admin may do).
+ *   - Changing who the owner is stays the owner's in the app (`handOver`).
+ *   - Who is on the team and what they hold stays the owner's (or an Admin's) in the app: inviting somebody or changing
+ *     their level, stopping them, or taking them off (`invite`, `suspendMember`, `removeMember`, decided 2 Nov).
  *   - Paying, charging a card or changing a plan stays the owner's in the app: billing is the account's door, signed in
  *     with a browser session, and no token reaches it at all.
  *   - The switch itself is set only by the owner signed in to the app (`setPref`), so no agent turns it on for itself.
  */
-export const NEVER_BYPASS: ReadonlySet<string> = new Set(['handOver', 'setPref', 'createToken', 'createReportKey', 'ingestMint', 'deviceApprove', 'deleteRecord', 'erase', 'restore', 'import', 'export']);
+export const NEVER_BYPASS: ReadonlySet<string> = new Set(['handOver', 'invite', 'suspendMember', 'removeMember', 'setPref', 'createToken', 'createReportKey', 'ingestMint', 'deviceApprove', 'deleteRecord', 'erase', 'restore', 'import', 'export']);
 /** What a change landed without asking carries in its note, beside the reason, so the log says why nobody was asked. */
 export const BYPASS_NOTE = 'Agents act without asking';
 /** "Agents' suggestions wait apart": the owner's own switch, on unless it is `false` (`apartOn` in the kernel). */
@@ -3378,8 +3380,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /** An Admin can neither hand out the owner's rung nor touch somebody who holds it. Owners are the only ones who do. */
   const teamKeeps = (ctx: CallContext, args: { person?: string; level?: Level; registers?: Record<string, Level> }): Refusal | null => {
-    /* AN AGENT ACTING WITHOUT ASKING (`bypassOf`) MAY DO WHAT AN ADMIN MAY, and never make an owner, touch one, or change
-       the owner it acts for: changing who the owner is stays the owner's in the app. */
+    /* AN AGENT ACTING WITHOUT ASKING (`bypassOf`) NEVER REACHES HERE since team changes joined `NEVER_BYPASS` (2 Nov):
+       the wrapper never marks `invite`, `suspendMember` or `removeMember`. Kept as the second lock: even so marked, it
+       would never make an owner, touch one, or change the owner it acts for. */
     if (ctx.principal.kind === 'token' && ctx.bypass !== undefined) {
       const grants = args.level === 'owner' || Object.values(args.registers ?? {}).includes('owner');
       const holds = args.person !== undefined && (args.person === ctx.principal.person || kernel.members().some((m) => m.person_id === args.person && m.level === 'owner'));
