@@ -17,7 +17,8 @@
  * the words of its question's thread (`targetOf`), the one the app mounts under a question open or settled.
  *
  * A BODY HOLDING `@Ada` RINGS ADA'S PHONE (collab pass 2, 2 Nov; HD.383 said "no mentions or notifications yet"): the
- * text is kept as it is, and the people it names who may see the row are told, with no word of it (`ringNamed`).
+ * text is kept as it is, and the people it names who may see the row are told, with no word of it (`ringNamed`). And
+ * on a question or a decision (leftovers 4, `ringNamedOn`), held to who may see the question.
  */
 
 import type { Result } from '@braindog/ports';
@@ -67,19 +68,58 @@ export function methods(deps: RecordDeps) {
    * a guest; the kernel rings only one whose lens shows the row, never the writer, and only as their own settings allow.
    * A tap opens the row. Nothing else of the comment leaves the record.
    */
-  const ringNamed = (entry: string, list: string, body: string, comment: string, by: string): void => {
-    if (!body.includes('@')) return;
-    const row = kernel.get(entry);
-    if (row === null || typeof row.seq !== 'number') return;
+  const namedIn = (body: string, by: string): string[] => {
+    if (!body.includes('@')) return [];
     const esc = (t: string): string => t.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
     const people = sql.all<{ id: string; name: string | null }>('SELECT id, name FROM person WHERE name IS NOT NULL AND suspended_at IS NULL');
+    const out: string[] = [];
     for (const p of people) {
       const name = (p.name ?? '').trim();
       if (name === '' || p.id === by) continue;
       const first = name.split(/\s+/u)[0] ?? '';
       const named = new RegExp(`(^|[^\\p{L}\\p{N}])@(${[esc(name), esc(first)].filter((x) => x !== '').join('|')})(?![\\p{L}\\p{N}])`, 'iu');
-      if (!named.test(body)) continue;
-      kernel.tellColleague(p.id, { by, cause: `mention.${comment}.${p.id}`, open: `/r/${list}/${row.seq}`, about: entry });
+      if (named.test(body)) out.push(p.id);
+    }
+    return out;
+  };
+
+  const ringNamed = (entry: string, list: string, body: string, comment: string, by: string): void => {
+    const named = namedIn(body, by);
+    if (named.length === 0) return;
+    const row = kernel.get(entry);
+    if (row === null || typeof row.seq !== 'number') return;
+    for (const id of named) kernel.tellColleague(id, { by, cause: `mention.${comment}.${id}`, open: `/r/${list}/${row.seq}`, about: entry });
+  };
+
+  /**
+   * THE SAME RING FOR A QUESTION'S THREAD (leftovers 4, 2 Nov): before, only a comment on a row rang anybody, so `@Mira`
+   * under a question waited in her bell. A decision's words are on its question's thread (`targetOf`), so this is every
+   * comment on either. WHO MAY SEE IT IS `sightOf` ASKED AS THEM: their own context, made from what the record says
+   * they hold (`kernel.access`, the lens), as a door would make it, so a question held back from somebody never rings
+   * them. The kernel then keeps the rest: never the writer, quiet hours, their People switch, six an hour. A tap opens
+   * the question at its thread (`/decide/<id>/thread`), a path of its own so the phone says "mentioned" and not
+   * "handed". A decision no question settled has no page to open, and rings nobody.
+   */
+  const ringNamedOn = (target: string, body: string, comment: string, by: string): void => {
+    if (!target.startsWith('suggestion:')) return;
+    const named = namedIn(body, by);
+    if (named.length === 0) return;
+    const question = target.slice('suggestion:'.length);
+    for (const id of named) {
+      const held = kernel.access(id);
+      if (held === null) continue;
+      const theirs: CallContext = {
+        principal: { kind: 'person', id, level: held.level },
+        ...(held.registers === null ? {} : { registers: held.registers }),
+        ...(Object.keys(held.levels).length > 0 ? { levels: held.levels } : {}),
+        ...(held.wheres === undefined ? {} : { wheres: held.wheres }),
+        ...(held.writes === undefined ? {} : { writes: held.writes }),
+        ...(held.hides === undefined ? {} : { hides: held.hides }),
+        ...(held.nots === undefined ? {} : { nots: held.nots }),
+        ...(held.grant === undefined ? {} : { grant: held.grant }),
+      };
+      if (sightOf(theirs, target) === null) continue;
+      kernel.tellColleague(id, { by, cause: `mention.${comment}.${id}`, open: `/decide/${question}/thread` });
     }
   };
 
@@ -195,7 +235,10 @@ export function methods(deps: RecordDeps) {
         ...(args?.reply_to === undefined ? {} : { reply_to: args.reply_to }),
         actor: actorOf(ctx),
       });
-      if (written.ok && at.list !== null && typeof args?.body === 'string') ringNamed(at.target.slice('entry:'.length), at.list, args.body, written.value.id, actorOf(ctx));
+      if (written.ok && typeof args?.body === 'string') {
+        if (at.list !== null) ringNamed(at.target.slice('entry:'.length), at.list, args.body, written.value.id, actorOf(ctx));
+        else ringNamedOn(at.target, args.body, written.value.id, actorOf(ctx));
+      }
       return tail(written);
     },
 

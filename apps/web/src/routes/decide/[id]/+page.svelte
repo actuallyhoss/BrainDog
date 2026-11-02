@@ -181,6 +181,11 @@
     untrack(() => void readLive(id));
   });
 
+  /** A phone's "mentioned you" opens `#thread` (`./thread/+page.ts`): the thread is drawn after the question is read, so it is brought into view once it is there. */
+  const toThread = (el: HTMLElement): void => {
+    if (typeof location !== 'undefined' && location.hash === '#thread') requestAnimationFrame(() => el.scrollIntoView({ block: 'start' }));
+  };
+
   /**
    * THE OPEN QUESTIONS IN THE QUEUE'S ORDER, so `j` and `k` and the button after a decision go to the next
    * one rather than back to the list. Read with the question, and not again after a
@@ -1511,7 +1516,7 @@
       <!-- THE QUESTION'S COMMENTS, LAST IN THE SECOND TILE, open or settled, since what was said about it is worth as much
            after the decision as before. On the question and not on each option. A Reads colleague may comment here too. -->
       {#if from === 'live'}
-        <div class="thread">
+        <div class="thread" id="thread" {@attach toThread}>
           {#key threadRead}
             <Thread
               on="suggestion:{question.id}"

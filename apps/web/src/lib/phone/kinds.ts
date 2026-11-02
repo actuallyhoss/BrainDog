@@ -24,11 +24,12 @@ export function pushLine(kind: PushKind | null, path: string | null): string {
   if (kind === 'summary' || at.includes('/agents/summary/')) return 'Your BrainDog summary is ready';
   if (kind === 'agents') return at.includes('/decide') ? 'An agent needs your answer' : 'An agent finished what you gave it';
   if (kind === 'money') return 'Something in your money is coming due';
-  /* A COLLEAGUE'S DOING (collab pass 2): handed you a row (opens its question), named you on a row (opens the row), or
-     joined from your invitation (opens People). Told apart by where it opens, never by anything it says. */
+  /* A COLLEAGUE'S DOING (collab pass 2): handed you a row (opens its question), named you on a row (opens the row) or
+     under a question (opens its thread), or joined from your invitation (opens People). Told apart by where it opens, never by anything it says. */
   if (kind === 'people') {
+    /* A NAME UNDER A QUESTION opens its thread (`/decide/<id>/thread`), so it is told from a hand-over by that path. */
+    if (/^\/decide\/[^/]+\/thread$/u.test(at) || /^\/r\/[^/]+\/[^/]+$/u.test(at)) return 'Someone mentioned you in a comment';
     if (at.startsWith('/decide/')) return 'Someone handed you something';
-    if (/^\/r\/[^/]+\/[^/]+$/u.test(at)) return 'Someone mentioned you in a comment';
     return 'Someone you invited joined';
   }
   return 'Something in your BrainDog needs you';
