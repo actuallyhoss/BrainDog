@@ -600,7 +600,11 @@
    * tile's first row and the sentence under them at 40, in place of a 28px name over a 17px line floating on the board.
    * Not on a project's page, whose hero already holds its name and its line (`ProjectPart`).
    */
-  const tiled = $derived(led && !projectPage && !plain);
+  /* NOR ON A PAGE WITH NO PLACE OF ITS OWN (2 Nov): one no section of the rail declares (What changed, Health, a pack's
+     side page) opened on a 40px sentence in a tile of its own, a hero for a page reached from a link. It opens on the
+     plain head instead, as Agents does: the sentence once at 17 with Share beside it, then its content. */
+  const placeless = $derived(!!live && !live.page.page.nav);
+  const tiled = $derived(led && !projectPage && !plain && !placeless);
 
   /**
    * AND WHERE THE SENTENCE STAYS THE HEADER'S PLAIN LINE (`plain`, the Agents page) while the bar says the name, the
