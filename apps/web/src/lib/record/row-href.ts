@@ -46,9 +46,20 @@ export function rowPagesOf(pages: readonly PageAbout[] | null | undefined): Map<
  * The address, from what it is handed: `held` says whether the tab holds a list, `pages` is `rowPagesOf`.
  * `null` for words that are not a spoken id and for a list the tab does not hold, and the renderer draws those plain.
  */
-export function rowHrefIn(spoken: string, held: (register: string) => boolean, pages: ReadonlyMap<string, string>, byRow: ReadonlySet<string> = new Set()): string | null {
+export function rowHrefIn(
+  spoken: string,
+  held: (register: string) => boolean,
+  pages: ReadonlyMap<string, string>,
+  byRow: ReadonlySet<string> = new Set(),
+  keepsScreen: (register: string) => boolean = () => false,
+): string | null {
   const row = spokenOf(spoken);
   if (row === null || !held(row.register)) return null;
+  /* A PERSON OR AN ORGANISATION OPENS ON THEIR ROW'S SCREEN (pages polish, 2 Nov), where who they are, how they are
+     known, the money and the work with them are read, as the row's screen itself keeps them (`opensOnPage` in
+     `project.ts`). "Assigned to" on a task opened `/p/people%233`, People's thin template page, while People's own cards
+     and list opened `/r/people/3`. */
+  if (keepsScreen(row.register)) return `/r/${row.register}/${row.seq}`;
   const slug = pages.get(keyOf(row.register, row.seq)) ?? (byRow.has(row.register) ? keyOf(row.register, row.seq) : undefined);
   return slug === undefined ? `/r/${row.register}/${row.seq}` : `/p/${encodeURIComponent(slug)}`;
 }
@@ -114,7 +125,11 @@ export function chartIn(register: string, title: string, pages: ReadonlyMap<stri
 export const chartOf = (register: string, title: string): string | null => chartIn(register, title, learntLists);
 
 /** Where a spoken id opens on the record this tab is on, or `null` where it names no row of a list the tab holds. */
-export const rowHref = (spoken: string): string | null => rowHrefIn(spoken, (register) => REGISTERS[register] !== undefined, learnt, byRowLearnt);
+export const rowHref = (spoken: string): string | null =>
+  rowHrefIn(spoken, (register) => REGISTERS[register] !== undefined, learnt, byRowLearnt, (register) => keepsScreen(REGISTERS[register]));
+
+/** A list of people or of organisations, whose rows are read on their own screen and never on a template's page. */
+const keepsScreen = (decl: { meets?: unknown; org?: unknown } | undefined): boolean => decl !== undefined && (decl.meets !== undefined || decl.org !== undefined);
 
 /* ── a row with a page of its own ─────────────────────────────────────────── */
 
