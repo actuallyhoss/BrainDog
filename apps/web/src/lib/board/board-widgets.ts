@@ -71,7 +71,7 @@ export function phoneWidgets(laptop: readonly Widget[], phone: Phone | null | un
 /** The kinds whose rows are drawn one a line, so a frame cuts them to what it shows. */
 const LINES = new Set(['todo', 'timeline', 'table', 'spec', 'steps', 'link', 'feed', 'agents']);
 
-type Fits = { kind: string; rows?: readonly unknown[]; entries?: readonly unknown[]; queue?: readonly unknown[] | undefined; kpis?: readonly unknown[] | undefined; most?: number | undefined; metrics?: readonly unknown[] | undefined };
+type Fits = { kind: string; shown?: number | undefined; rows?: readonly unknown[]; entries?: readonly unknown[]; queue?: readonly unknown[] | undefined; kpis?: readonly unknown[] | undefined; most?: number | undefined; metrics?: readonly unknown[] | undefined };
 
 /**
  * A block cut to what its frame shows (§3.3): its lines, its questions, its key numbers. What it held past that stays its
@@ -84,6 +84,9 @@ export function fitted<B extends Fits>(b: B, size: WidgetSize, phone = false): B
   const n = phone && b.queue && shows > 1 ? shows - 1 : shows;
   if (b.queue && b.queue.length > n) return { ...b, queue: b.queue.slice(0, n), most: n };
   if (b.kind === 'kpis' && b.kpis && b.kpis.length > n) return { ...b, kpis: b.kpis.slice(0, n) };
-  if (LINES.has(b.kind) && b.rows && b.rows.length > n) return { ...b, rows: b.rows.slice(0, n), ...(b.entries ? { entries: b.entries.slice(0, n) } : {}) };
+  /* AND THE BLOCK SAYS IT SHOWS `n` (`shown`), so its foot says what was left out: the week's weather laid wide drew 2
+     of its 3 days on a laptop and no "1 more", since its count still said all 3 were shown (add-ons pass 3, 2 Nov). */
+  if (LINES.has(b.kind) && b.rows && b.rows.length > n)
+    return { ...b, rows: b.rows.slice(0, n), ...(b.entries ? { entries: b.entries.slice(0, n) } : {}), ...(typeof b.shown === 'number' && b.shown > n ? { shown: n } : {}) };
   return b;
 }
