@@ -1205,6 +1205,15 @@ export type FrameFloors = { ink: [number, number, number]; text: number; mark: n
  */
 export const RED_WORDS_LIGHT = '#C2362F';
 
+/*
+ * THE WELLS, CLEAN IN BOTH SCHEMES (colour lane, 2 Nov). Every dark well sat near OKLCH L 0.28, where a blue or a pink
+ * is a deep colour of its own and a yellow or a lime can only be olive-brown (#33290F, #222E12: 0.74 and 0.67 of the
+ * most colour their hue holds there, which at that depth is mud). A yellow reads as yellow only higher up, so its dark
+ * well stands at L 0.37, a deep gold (0.37 0.075 86, #513C01), and the lime's turns the few degrees toward green that
+ * keep it a leaf and not an olive (0.31 0.054 142, #20371D). Each word on them still clears 4.5:1 (the slot 6.2 and
+ * 7.5, ink 8.8 and 11.3). In light the yellow well was a cream (#FAF1D2, chroma 0.042 at hue 94); at 0.055 and hue 97 it
+ * is a pale yellow (#FAF1C7), its words at 5.0.
+ */
 const CAT_VALUES: Record<Scheme, Record<(typeof CATS)[number], [string, string]>> = {
   light: {
     blue: ['#2F5BD3', '#E8EEFC'],
@@ -1212,7 +1221,7 @@ const CAT_VALUES: Record<Scheme, Record<(typeof CATS)[number], [string, string]>
     pink: ['#B42F78', '#FBE8F2'],
     teal: ['#0C7168', '#DFF3F1'],
     sky: ['#0B6E95', '#E0F1F8'],
-    yellow: ['#7E6300', '#FAF1D2'],
+    yellow: ['#7E6300', '#FAF1C7'],
     lime: ['#437010', '#EDF5DF'],
     slate: ['#5A6475', '#EEF0F3'],
   },
@@ -1222,8 +1231,8 @@ const CAT_VALUES: Record<Scheme, Record<(typeof CATS)[number], [string, string]>
     pink: ['#F28DC4', '#3A1D30'],
     teal: ['#4FD1C5', '#12322F'],
     sky: ['#5CC8F0', '#10303D'],
-    yellow: ['#E8C34F', '#33290F'],
-    lime: ['#A6D45F', '#222E12'],
+    yellow: ['#E8C34F', '#513C01'],
+    lime: ['#A6D45F', '#20371D'],
     slate: ['#A9B3C4', '#262C38'],
   },
 };
@@ -1267,8 +1276,11 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     focus: '#101114',
     good: '#1F7A47',
     'good-tint': '#E4F3EA',
-    warn: '#9A5800',
-    'warn-tint': '#FBF0DD',
+    /* AMBER AS WORDS, NOT BROWN (colour lane, 2 Nov): #9A5800 (0.525 0.120 63) read brown in "Off target" and "renews
+       13 Nov"; #A85700 is the lightest, most coloured amber at hue 56 that still clears 4.5:1 on every ground it is drawn
+       on, its own tint included (4.55). Its tint was a beige (#FBF0DD); #FFEDD7 is a pale amber. */
+    warn: '#A85700',
+    'warn-tint': '#FFEDD7',
     /* The warn amber's own hue (OKLCH 63) lifted to 3:1 on the track, 0.642 0.144: amber, where #9A5800 drew a brown bar. */
     'warn-fill': '#C77700',
     info: '#2F5BD3',
@@ -1324,7 +1336,8 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     good: '#5FD08F',
     'good-tint': '#14301F',
     warn: '#F0A64B',
-    'warn-tint': '#36260F',
+    /* A deep amber, where #36260F (L 0.28) was brown: lifted to 0.34 0.071 64, as the yellow well is, warn on it 5.8. */
+    'warn-tint': '#512F08',
     'warn-fill': '#F0A64B',
     info: '#7AA7FF',
     'info-tint': '#18264A',
