@@ -5,7 +5,8 @@ description: Read and write the person's BrainDog record, the shared memory of t
 
 # BrainDog
 
-BrainDog is one person's record: their work, projects, money and decisions, shared by every agent they use.
+BrainDog is one person's record: their work, projects, money and decisions, shared by every agent they use, and by
+the colleagues they invite.
 
 ## Connect
 
@@ -75,6 +76,21 @@ call and what it takes, or, where resources are not read, `act {call:"calls", ar
 - Never a key's value, in or out. A key goes in with `braindog keys put <label>`, which reads standard input.
 - A note longer than 280 characters is kept as several, in order, up to 1,400. Past that, send it as a page.
 
+## When you can act without asking
+
+What you may do is your person's role and your token's scope, whichever is less. A colleague's agent sees what that
+colleague sees and never more, and a write of theirs that reads what somebody else wrote is filed as a question.
+
+The owner can turn on "Let your agents do everything without asking" in Settings > Agents. With it on, the owner's own
+agents write without asking, money and deletes too, and each change still names you and can be undone. It never
+covers: keys and their values, paying, inviting people or changing, stopping or removing them, changing the owner,
+and deleting or exporting all of BrainDog. Those are refused `NEEDS_BROWSER_SESSION`: tell the person it is theirs to
+do in the app. It never covers a colleague's agents.
+
+To bring a colleague in, write their name with @ in a comment:
+`act {call:"comment", args:{on:"tasks#3", body:"@Mira the proofs are in"}}`. A comment needs at least `propose`. They
+are told only if they can see the row or question.
+
 ## Key numbers
 
 `context` lists the key numbers you keep on the project under "Numbers", with when each was last reported. "Stale"
@@ -103,4 +119,5 @@ A refusal names the field and the fix, and its `try` is the corrected call. Neve
 - `NAME_AMBIGUOUS` at `spoken`: several things have that name. The refusal lists their handles. Say which one.
 - `TOOL_OFF`: the person turned this tool off for you in Settings > Agents. Do not look for another way. If you need it,
   ask with `propose`.
+- `NEEDS_BROWSER_SESSION`: only the person, signed in to the app, can do this. Say so, and do not look for another way.
 - `RUN_STOPPED` and `RUN_PAUSED`: see above.
