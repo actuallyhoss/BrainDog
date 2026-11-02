@@ -888,9 +888,10 @@
   }
 
   /* THE AREA'S OWN LINE: what it holds, and the way to the store and the "⋯" at its end. */
+  /* ONE ROW, THE SENTENCE WRAPPING BESIDE THE "⋯" (nojump, 2 Nov): the row wrapped, so the sentence that grew as the
+     updates were counted sent the "⋯" to a line of its own and dropped the page 35px on a phone. */
   .area-head {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
     margin-block-end: var(--tile-gap);
@@ -898,14 +899,17 @@
 
   .area-said {
     flex: 1 1 auto;
+    min-inline-size: 0;
     margin: 0;
     color: var(--ink-2);
   }
 
   .area-acts {
     display: flex;
+    flex: none;
     align-items: center;
     gap: var(--sp-2);
+    margin-inline-start: auto;
   }
 
   /* THE BOARD: the page's tiles straight on the ground, 12 apart (`--tile-gap`), as on every other screen. */
