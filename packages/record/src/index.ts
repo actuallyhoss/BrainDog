@@ -10172,7 +10172,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const others = [...herePaths.entries()].filter(([who, h]) => who !== me && h.at === path && now - h.seen <= HERE_MS);
     if (others.length === 0) return [];
     const names = namesFor(ctx) ?? {};
-    return others.flatMap(([who]) => (typeof names[who] === 'string' && names[who] !== '' ? [names[who]] : [])).sort((a, b) => a.localeCompare(b));
+    const named = others.flatMap(([who]) => (typeof names[who] === 'string' && names[who] !== '' ? [names[who]] : [])).sort((a, b) => a.localeCompare(b));
+    /* SOMEBODY WITH NO NAME IS STILL HERE (selfhost2 lane, 2 Nov): a self-host's owner is made by `init` with an address
+       and no name, so a colleague on the same page heard nobody at all. Said once as Someone, never as an address, and
+       once only, since the app keys each face by what it says. */
+    return named.length < others.length ? [...named, 'Someone'] : named;
   };
 
   const namesFor = (ctx: CallContext): Record<string, string> | null => {

@@ -460,6 +460,10 @@ export const scriptWords = (note: string): string =>
     /* The line already says which script wrote it, so "Written by the X script." is not said again. */
     .replace(/\bWritten by script:[a-z][a-z0-9_-]*@v\d+\.?\s*(?:·\s*)?/gu, '')
     .replace(/\bscript:([a-z][a-z0-9_-]*)@v\d+/gu, (_m, slug: string) => `the ${humanize(slug)} script`)
+    /* AN INVITATION BY ITS ID IS A MECHANISM TOO (selfhost2 lane, 2 Nov): the line that gives somebody access read
+       "Accepted invitation i_01M6E2J20RBD0NEFX0Y96DTAP8." */
+    .replace(/^Accepted invitation i_[0-9A-Za-z]+\.?$/u, 'Joined with an invitation.')
+    .replace(/\s*\bAccepted invitation i_[0-9A-Za-z]+\.?/gu, '')
     /* A rule's id is a mechanism: "rule.meet-payees ran." is "Meet payees ran." */
     .replace(/\brule[.:]([a-z][a-z0-9_-]*)/gu, (_m, slug: string) => humanize(slug))
     /* AND ANY OTHER NAME IN snake_case IS A MECHANISM'S: "settle_matched_line did not

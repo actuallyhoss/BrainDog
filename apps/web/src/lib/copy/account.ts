@@ -740,7 +740,7 @@ export const account = {
   inviteOptional: 'Optional',
   inviteCheckMail: 'Check your email',
   inviteMailSent: (email: string) => `We sent a link to ${email}. Open it within a day to finish.`,
-  inviteFromMail: 'You opened the link from your email. Join to finish.',
+  inviteFromMail: 'This link already shows the address is yours. Join to finish.',
   /* A key taken out of service from the Keychain screen: the bytes go, its line on the screen stays. */
   keyRevoked: (label: string) => label + ' is out of service. It stays listed, because what it opened is a fact.',
 
