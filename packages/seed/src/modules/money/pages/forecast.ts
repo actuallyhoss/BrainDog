@@ -123,14 +123,26 @@ export const MONEY_FORECAST_PAGE: SeedPage = {
       empty: 'Nothing repeats yet.',
     },
     {
-      /* WHAT IS LEFT TO PAY ON EACH PLAN, one part a plan, so the scale of the drops is read beside the line. */
+      /* WHAT IS LEFT TO PAY ON EACH PLAN, one part a plan, so the scale of the drops is read beside the line. FROM TWO
+         PLANS, SINCE money-core 3.38.0: a bar of one compares nothing (`barsCompare`), and one plan's row stood in half
+         the tile with its figure in the middle. One plan says its figure below instead. */
       kind: 'bar',
       heading: 'Left to pay, by plan',
       icon: 'chart-bar',
       span: 12,
       source: 'metric.installments-left-by-plan',
-      when: { metric: 'installments-left', gt: 0 },
+      when: { all: [{ metric: 'installments-left', gt: 0 }, { metric: 'plans-paying', gt: 1 }] },
       empty: 'Nothing is being paid in parts.',
+    },
+    {
+      /* ONE PLAN: what is left on it, as a figure, not a chart of one bar. Its name, its parts and its next part are in
+         Instalments above. */
+      kind: 'stat',
+      heading: 'Left to pay',
+      icon: 'chart-bar',
+      span: 12,
+      cells: [{ metric: 'installments-left', label: 'Every part still to come' }],
+      when: { all: [{ metric: 'installments-left', gt: 0 }, { metric: 'plans-paying', is: 1 }] },
     },
   ],
 };

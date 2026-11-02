@@ -158,11 +158,13 @@ export const MONEY_WIDGETS = {
       group: 'money',
       for: 'business',
       icon: 'hand-coins',
-      block: stat('Owed to you', 'hand-coins', [{ metric: 'owed-to-you', label: 'Owed to you' }, { metric: 'owed-by-you', label: 'You owe' }]),
+      /* THE TILE'S NAME IS NOT SAID AGAIN OVER ITS FIRST FIGURE (ui2 money, 2 Nov): "Owed to you" over "Owed to you
+         $3,200". What comes in, beside what you owe. */
+      block: stat('Owed to you', 'hand-coins', [{ metric: 'owed-to-you', label: 'Coming in' }, { metric: 'owed-by-you', label: 'You owe' }]),
       sizes: FIGURE,
       size: 'small',
       needs: { figures: ['owed-to-you'] },
-      example: { figures: [{ label: 'Owed to you', said: '¤36,000' }] },
+      example: { figures: [{ label: 'Coming in', said: '¤36,000' }] },
       words: ['invoices', 'receivables', 'clients'],
       asked: [{ match: '\\b(owe[sd]? (me|us)|owed to (me|us)|unpaid invoices?|outstanding)\\b', about: 'what is owed to you' }],
       fills: FILLS,

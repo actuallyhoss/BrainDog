@@ -211,7 +211,9 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
 const OWED_CELLS: [figure: string, label: string][] = [
   ['book-owed-to', 'Due to come in'],
   ['book-owed-by', 'Due to go out'],
-  ['book-lasts-until', 'Money lasts until'],
+  /* "RUNS OUT", SINCE money-core 3.38.0 (ui2 money, F10): "Money lasts until" over "Lasts past 2 Nov 2027" said lasts
+     twice. The question is when it runs out, and the figure answers with a day or with "Lasts past" one. */
+  ['book-lasts-until', 'Runs out'],
 ];
 
 /**

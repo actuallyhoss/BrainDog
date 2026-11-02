@@ -962,12 +962,16 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  * - money-core 3.37.1 (leftovers6, 2 Nov): a Reports range with nothing in says "$2,586 out, nothing in yet", not the one
  *   amount twice, its line now three notes of six sentences at most (`page.money-reports`). No id added or taken away,
  *   so a patch.
+ * - money-core 3.38.0 (ui2 money, 2 Nov): Forecast draws "Left to pay, by plan" from two plans and one plan as a figure,
+ *   over `metric.plans-paying` (added); a bill's figure says which way it is owed (`page.money-bill`); a book asks when
+ *   its money runs out (`page.money-book`); Reports' spending ring is six parts and everything else
+ *   (`page.money-reports`); Today's Owed to you says Coming in under its name. An id added, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.31.0',
   people: '4.4.1',
-  'money-core': '3.37.1',
+  'money-core': '3.38.0',
   estate: '2.8.0',
   work: '1.24.0',
 };

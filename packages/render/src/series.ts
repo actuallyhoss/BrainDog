@@ -366,7 +366,10 @@ function seriesScale(hi: number, lo: number, y: (v: number) => number, template:
   const marks = hi > 0 && lo > 0 ? [hi, 0, -lo] : hi > 0 ? [hi, hi / 2, 0] : [0, -lo / 2, -lo];
   /* ZERO IS 0 IN ANY CURRENCY: "EGP 0" on the rule read as an amount of nothing (the look's words check), where the
      lines above and below it already say the currency. */
-  return marks.map((v) => ({ y: at(y(v)), label: v === 0 ? '0' : amountLike(template, v, home, 'axis'), zero: v === 0 }));
+  /* NOUGHT IN THE AXIS'S OWN UNIT (ui2 money, 2 Nov): "$20k", "0", "−$30k" said one mark of three bare. A count's
+     axis still says "0"; a minus or plus on nought is never drawn. */
+  const nought = (): string => amountLike(template, 0, home, 'axis').replace(/^[+−-]\s*/u, '') || '0';
+  return marks.map((v) => ({ y: at(y(v)), label: v === 0 ? nought() : amountLike(template, v, home, 'axis'), zero: v === 0 }));
 }
 
 /** The renderer's own words, as `split.ts` keeps `SPLIT_ZERO`: it imports nothing from the app. */

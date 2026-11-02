@@ -210,6 +210,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.38.0', notes: 'Forecast says what is left on one plan as a figure, not a chart of one bar. A bill says which way it is owed, a book asks when its money runs out, and Reports draws the six largest categories and everything else.' },
     { version: '3.37.1', notes: 'Reports says a stretch with nothing in as what went out and nothing in yet, not the same amount twice.' },
     { version: '3.37.0', notes: 'Reports says a stretch that spent more than came in as how much more went out, not as a minus left over.' },
     { version: '3.36.0', notes: 'A book with no account draws no Cash ahead of nothing, and its Accounts says what adding one brings. The Ledger, Coming up, Forecast and Reports each say what will be there and how to start while they are empty, and the Ledger draws its month only once something moved.' },

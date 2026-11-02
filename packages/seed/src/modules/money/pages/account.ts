@@ -226,7 +226,9 @@ export const MONEY_BILL_PAGE: SeedPage = {
       where: 'seq is {{seq}}',
       columns: [
         { field: 'what', as: 'title' },
-        { field: 'amount', as: 'figure' },
+        /* SIGNED BY WHICH WAY IT IS OWED, SINCE money-core 3.38.0 (ui2 money, F6): an invoice owed to you read "$3,200"
+           here and "+$3,200" in Bills and invoices. */
+        { field: 'amount', as: 'figure', sign: { field: 'direction', minus: 'owed_by_me' } },
         { field: 'party', label: 'Who', as: 'fact' },
         { field: 'state', label: 'Status', as: 'fact' },
         /* THE DAY NAMED, SINCE money-core 3.34.0 (next-money, M34): as a card's `when` it was a bare "30 Jul" beside the

@@ -20,6 +20,20 @@ export const INSTALMENTS_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 
+  /* HOW MANY PLANS STILL HAVE PARTS TO PAY, SINCE money-core 3.38.0 (ui2 money, F5): Forecast draws "Left to pay, by
+     plan" as bars only from two plans; one plan was a one-bar chart, its figure stopped in the middle of the tile. */
+  'plans-paying': {
+    metric: 'plans-paying',
+    name: 'Plans still being paid',
+    source: 'register.installments',
+    where: 'state is open, direction is out',
+    value: { distinct: 'plan' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
   'installments-due-30d': {
     metric: 'installments-due-30d',
     name: 'Instalments due, 30 days',
