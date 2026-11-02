@@ -205,7 +205,7 @@
   <!-- A DIV IN THE LIST'S ROLE, never a section, which axe refuses a listitem role on (Q60 of 29 October). -->
   <div class="wk" role="listitem" aria-label={title} data-tone={t.count > 0 ? tone : undefined}>
     <header class="t-head"><IconWell name={icon} size="m" /><h3 class="t-title">{title}</h3></header>
-    <p class="wk-fig num">{t.count}<span>{t.said}</span></p>
+    <p class="wk-fig num">{t.count} <span>{t.said}</span></p>
     {#if t.lines.length > 0}
       <ul class="wk-lines">
         {#each t.lines as l, n (n)}
