@@ -1,5 +1,5 @@
 /**
- * `braindog bypass on|off`: "Let agents do everything without asking", the owner's switch in Settings > Agents
+ * `braindog bypass on|off`: "Let your agents do everything without asking", the owner's switch in Settings > Agents
  * (`agents.bypass`, `bypassOf` in `packages/record`).
  *
  * IT OPENS THE APP AT THE SWITCH, AND SETS NOTHING ITSELF. The CLI signs in with a bearer, the same kind of credential
@@ -27,10 +27,10 @@ export type BypassIo = {
 
 /** The words, one place, the same as the app's (`apps/web/src/lib/agents/bypass.ts`). */
 export const BYPASS_CLI = {
-  usage: 'braindog bypass on|off [--host <host>]: opens Settings > Agents, where you turn "Let agents do everything without asking" on or off.',
+  usage: 'braindog bypass on|off [--host <host>]: opens Settings > Agents, where you turn "Let your agents do everything without asking" on or off.',
   why: 'Only you, signed in to BrainDog, can change this, so an agent on this machine cannot turn it on for itself.',
-  on: 'Press "Let agents do everything without asking" to turn it on.',
-  off: 'Press "Let agents do everything without asking" to turn it off.',
+  on: 'Press "Let your agents do everything without asking" to turn it on.',
+  off: 'Press "Let your agents do everything without asking" to turn it off.',
 } as const;
 
 /** The address of the switch on a host as the hosts file keys it. */

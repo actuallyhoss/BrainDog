@@ -44,6 +44,7 @@ braindog keys helper <label> | Print the key alone, for Claude Code's apiKeyHelp
 braindog keys list | The keys your BrainDog holds, one line each, never a value
 braindog keys scan [<folder>] | Name every key lying in a folder's files and the command that seals them. Sends nothing unless --deposit
 braindog token create | Make a token for an agent and print it once. It reads unless --scope names propose or write. --days sets its life, --inbox gives it the inbox reach, and --name labels it. You approve the one mint in the app
+braindog bypass on, or off | Open Settings › Agents at Let your agents do everything without asking, for you to turn it on or off there. An agent on the machine cannot turn it on for itself
 ```
 
 ## Sessions, skills and tools

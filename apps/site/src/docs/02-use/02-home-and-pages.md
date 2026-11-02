@@ -12,7 +12,7 @@ Today is drawn from your starter's own first page where it has one, and from the
 
 Today keeps itself up to date. When an agent, a rule or another tab changes something, Today reads the change without a reload.
 
-A colleague who holds some of your lists and not all of BrainDog sees a Today that names their lists and opens them in one press.
+A colleague who holds some of your lists and not all of BrainDog sees a Today that names their lists and opens them in one press. The first time a colleague opens Today, one line says the role they joined with and what it lets them do.
 
 ## Arrange Today
 
@@ -95,7 +95,7 @@ Every page is written in a small text format: Markdown, with fenced blocks for t
 
 ## Share one page
 
-**Share** on a page makes a read-only link. Anybody with it can read that page as it is now, and nothing else: they cannot change anything or open any other page. You choose how long it works, and whether money goes on it with **Include money**, which starts off on a project's page. Close a link early in Settings, under People & sharing. The link is shown once, so copy it when it appears. See [Sharing](/docs/use/sharing).
+**Share** on a page makes a read-only link. Anybody with it can read that page as it is now, and nothing else: they cannot change anything or open any other page. You choose how long it works, and whether money goes on it with **Include money**, which starts off on a project's page. Close a link early in Settings, under People & sharing. The link is shown once, so copy it when it appears. A link to a project's page shows where the project stands, its work and what happened lately. See [Sharing](/docs/use/sharing).
 
 ## Moving around
 

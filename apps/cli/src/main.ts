@@ -301,7 +301,7 @@ const fullUsage = () =>
     'braindog logout [<host>] [--host <host>]',
     "  Remove this machine's token, runner token and keychain access for one host from the hosts file. Nothing is sent, and the host is not told.",
     'braindog bypass on|off [--host <host>]',
-    '  Open Settings > Agents at "Let agents do everything without asking", for you to turn it on or off there. Only you, signed in to BrainDog, can change it, so an agent on this machine cannot turn it on for itself.',
+    '  Open Settings > Agents at "Let your agents do everything without asking", for you to turn it on or off there. Only you, signed in to BrainDog, can change it, so an agent on this machine cannot turn it on for itself. Even on, keys, paying, your team, the owner and deleting or exporting all of BrainDog stay yours.',
     'braindog keys list [--project <name>] [--everywhere] [--json] [--host <host>]',
     '  The keys your BrainDog holds, one line each: what each opens, where it applies, whether it is sealed, and the day it expires. Never a value.',
     'braindog keys put <label> [--opens <what>] [--kind <kind>] [--everywhere] [--keychain <project>] [--host <host>]',
@@ -529,6 +529,7 @@ const GROUPS: [string, [string, string][]][] = [
     ['skills sync|off', "Keep this machine's skills in step with your BrainDog, after one yes"],
     ['tools scan|write', 'Record MCP servers, or show the entries to write'],
     ['token create', 'Mint a token for an agent'],
+    ['bypass on|off', 'Open the switch that lets your agents act without asking'],
     ['runner <verb>', 'Run approved jobs on this machine'],
   ]],
   ['Records', [
