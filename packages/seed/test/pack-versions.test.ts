@@ -3500,6 +3500,21 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'people@4.4.1': {
+    holds: `
+      metric.organisations-clients metric.organisations-count metric.organisations-from-card-texts metric.organisations-known
+      metric.organisations-not-clients metric.people-clients metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d
+      metric.people-in-touch-90d metric.people-not-clients metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '8fde6ca9614538af',
+    history: [
+      'People 4.4.1, empty states of 2 November: `page.people` says how many organisations once, its note under the line is the way to them -> 8fde6ca9614538af',
+    ],
+  },
+
   'portfolio@1.31.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged

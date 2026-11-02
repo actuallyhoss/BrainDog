@@ -959,7 +959,7 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.31.0',
-  people: '4.4.0',
+  people: '4.4.1',
   'money-core': '3.36.0',
   estate: '2.8.0',
   work: '1.24.0',

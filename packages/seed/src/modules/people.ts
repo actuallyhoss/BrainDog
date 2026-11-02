@@ -737,8 +737,10 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         span: 12,
         when: { metric: 'organisations-count', gt: 0 },
         /* ONE COUNT, THE LIST'S, SINCE People 4.2.1 (audit of 30 October, 23): "6 organisation(s) you work with, 0 shop(s)
-           from card texts" sat over a list that grouped one shop, since a shop given a kind is one you work with. */
-        body: 'Organisations and shops you deal with: {{organisations-count}}. [See them](/r/organisations).',
+           from card texts" sat over a list that grouped one shop, since a shop given a kind is one you work with.
+           AND NO COUNT AT ALL, SINCE People 4.4.1 (empty states, 2 Nov): the page's first line already says how many
+           ("1 organisation."), and this said it again under it. It is the way to them, said as one. */
+        body: '[See the organisations and shops you deal with](/r/organisations).',
       },
       {
         /* WHAT AGENTS DID HERE, SINCE People 3.4.0: who an agent met, merged or wrote down, one group per run,

@@ -148,6 +148,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    { version: '4.4.1', notes: 'People says how many organisations you deal with once, and the line under it is the way to them.' },
     { version: '4.4.0', notes: 'People on a new BrainDog says it holds only you so far, and who to add, rather than that it holds nothing.' },
     { version: '4.3.0', notes: 'People\'s first line counts people and organisations apart, and names your clients while there are a few: "Fenwick and Acme, 2 clients".' },
     { version: '4.2.2', notes: 'People says who may be listed twice in plainer words.' },
