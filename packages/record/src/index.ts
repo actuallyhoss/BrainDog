@@ -15571,10 +15571,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false as const, refusal: stop };
       const extra = Object.keys(args ?? {})[0];
       if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes nothing, and answers every script you can read.`, { at: extra });
+      /* AND EACH OF THEM WHOLE (sec2, 2 Nov): a contractor who reads Projects for one project was handed a Projects
+         script's hosts, key labels and "wrote 14 lines" across projects he cannot see, through MCP `get` by its title,
+         while the Scripts page holds it from anybody who does not read all of BrainDog. Read whole as `hops` asks it. */
+      const whole = (list: string): boolean => readable(ctx, list) === null && sight.whole(ctx, list) && kernel.scope(ctx, list) === undefined;
       return ok(
         listScripts(sql, clock.now()).filter((s) => {
           const lists = [...s.reads, ...s.writes];
-          return lists.length === 0 ? readsEveryList(ctx) : lists.every((list) => readable(ctx, list) === null);
+          return lists.length === 0 ? readsEveryList(ctx) : lists.every(whole);
         }),
       );
     },
@@ -17788,6 +17792,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const ctx = argv.find(isCtx);
       if (ctx !== undefined && out.ok && ctx.principal.kind === 'token') readFrom(ctx, ok({ rows: rowIdsIn(out.value).map((id) => ({ id })) }));
       return out;
+    };
+  }
+  /* A LIST NOBODY HAS NAMES ONLY THE LISTS THE CALLER MAY OPEN (sec2, 2 Nov). The kernel answers `REGISTER_UNKNOWN` with
+     every list it holds as `allowed`, and an Admin's agent asking `list {"register":"zz"}` was told the names of the
+     owner's personal lists and any list held from them, which a hidden list and a missing one must never differ by. */
+  const ownLists = (ctx: CallContext, out: unknown): unknown => {
+    const r = out as { ok?: boolean; refusal?: Refusal } | null;
+    if (r === null || typeof r !== 'object' || r.ok !== false || r.refusal?.code !== 'REGISTER_UNKNOWN' || !Array.isArray(r.refusal.allowed)) return out;
+    const allowed = r.refusal.allowed.filter((l) => typeof l !== 'string' || readable(ctx, l) === null);
+    return allowed.length === r.refusal.allowed.length ? out : { ...r, refusal: { ...r.refusal, allowed } };
+  };
+  for (const [name, method] of Object.entries(api)) {
+    if (typeof method !== 'function') continue;
+    (api as Record<string, unknown>)[name] = function (this: unknown, ...argv: unknown[]) {
+      const out = (method as (...a: unknown[]) => unknown).apply(this, argv);
+      const ctx = argv.find(isCtx) as CallContext | undefined;
+      if (ctx === undefined) return out;
+      return out instanceof Promise ? out.then((v: unknown) => ownLists(ctx, v)) : ownLists(ctx, out);
     };
   }
   /* AND WHO ACTS WITHOUT ASKING, WORKED OUT BY THE RECORD ON EVERY CALL (`bypassOf`), outermost, so every wrapper and
