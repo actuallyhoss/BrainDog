@@ -1265,9 +1265,18 @@ export function householdPeople<P extends Pick<Proposal, 'usecase' | 'also' | 'r
 
 /* ── a co-founder is a co-founder ───────────────────────────────────────── */
 
-/* The words a co-founder or business partner is named by, and the role each is kept under (People 4.5.0). */
-const PAIR: Readonly<Record<string, string>> = { 'co-founder': 'cofounder', cofounder: 'cofounder', 'business partner': 'partner', partner: 'partner' };
-const PAIR_WORDS = 'co-?founder|business partner|partner';
+/* The words a co-founder, business partner or one of the staff is named by, and the role each is kept under (People
+   4.5.0, and `staff` since 4.6.0: onboarding10, Nadia's "two part-time staff, Ellie and Tom" were kept as collaborators). */
+const PAIR: Readonly<Record<string, string>> = {
+  'co-founder': 'cofounder',
+  cofounder: 'cofounder',
+  'business partner': 'partner',
+  partner: 'partner',
+  staff: 'staff',
+  employee: 'staff',
+  'team member': 'staff',
+};
+const PAIR_WORDS = 'co-?founder|business partner|partner|staff|employee|team member';
 const pairBefore = (name: string): RegExp => new RegExp(String.raw`\b(${PAIR_WORDS})s?(?:\s+is|\s+are|,)?\s+(?:\p{Lu}\p{Ll}+\s+(?:and|&)\s+)?${name}\b`, 'iu');
 const pairAfter = (name: string): RegExp => new RegExp(String.raw`\b${name},?\s+\(?(?:my|our|is my|is our)\s+(${PAIR_WORDS})\b`, 'iu');
 
@@ -1275,7 +1284,8 @@ const pairAfter = (name: string): RegExp => new RegExp(String.raw`\b${name},?\s+
  * A CO-FOUNDER OR A BUSINESS PARTNER KEPT BY THAT WORD (onboarding9, 2 Nov: "My co-founder is Dan." was kept as "Dan,
  * collaborator", by the rules and by the model). A person the words call a co-founder or a (business) partner is kept
  * under People's role for it, where the reading kept them as a collaborator, as other or with none. A household's
- * partner is `householdPeople`'s, which runs after this.
+ * partner is `householdPeople`'s, which runs after this. AND THE STAFF THE SAME WAY (People 4.6.0): "two part-time staff,
+ * Ellie and Tom" are Ellie and Tom on the staff, whoever read them as collaborators.
  */
 export function pairPeople<P extends Pick<Proposal, 'rows'>>(p: P, sentence: string): P {
   let changed = false;

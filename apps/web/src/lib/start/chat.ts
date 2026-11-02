@@ -897,6 +897,8 @@ function kindOfEntry(r: Entry): { one: string; many: string } | null {
   /* A CO-FOUNDER OR BUSINESS PARTNER BY THAT WORD (People 4.5.0's roles): "Dan as your co-founder". */
   if (r.register === 'people' && role === 'cofounder') return { one: 'your co-founder', many: 'your co-founders' };
   if (r.register === 'people' && role === 'partner') return { one: 'your business partner', many: 'your business partners' };
+  /* THE PEOPLE WHO WORK FOR THEM (People 4.6.0's staff, onboarding10): "Ellie and Tom as your staff". */
+  if (r.register === 'people' && role === 'staff') return { one: 'one of your staff', many: 'your staff' };
   if (r.register === 'people') return { one: 'someone you work with', many: 'people you work with' };
   if (r.register === 'organisations') return { one: 'an organisation', many: 'organisations' };
   if (r.register === 'things') return { one: 'a project', many: 'projects' };

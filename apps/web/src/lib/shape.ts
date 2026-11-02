@@ -143,8 +143,9 @@ const NAME_RULES: readonly NameRule[] = [
   /* THE PEOPLE THEY PAY TO DO THE WORK, BY THE WORK (onboarding6, the creator walk: "my editors Kai and Rosa" were never
      drafted): an editor, an assistant, a designer they hire is somebody they contract. */
   { at: new RegExp(`\\b(?:${either('editor|video editor|assistant|virtual assistant|moderator|designer|developer|bookkeeper|cleaner|nanny|babysitter')})s?\\s+(?:(?:called|named|are|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'contractor', word: true },
-  /* THE PEOPLE WHO WORK THERE, NAMED (onboarding8, the shop walk: "two part-time staff, Ellie and Tom" drafted nobody). */
-  { at: new RegExp(`\\b(?:${either('staff|employee|team member')})s?,?\\s+(?:(?:called|named|are|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'collaborator' },
+  /* THE PEOPLE WHO WORK THERE, NAMED (onboarding8, the shop walk: "two part-time staff, Ellie and Tom" drafted nobody),
+     kept as staff since People 4.6.0 (onboarding10: they were collaborators, people she works with). */
+  { at: new RegExp(`\\b(?:${either('staff|employee|team member')})s?,?\\s+(?:(?:called|named|are|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'staff' },
   /* A CO-FOUNDER OR A BUSINESS PARTNER BY THAT WORD (onboarding9: Leo's co-founder Dan was kept as a collaborator),
      People's own roles since 4.5.0. */
   { at: new RegExp(`\\b(?:${either('cofounder|co-founder')})s?\\s+(?:(?:called|named|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'cofounder' },

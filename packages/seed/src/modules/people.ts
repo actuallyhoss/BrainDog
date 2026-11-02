@@ -232,7 +232,7 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
     name: 'People',
     icon: 'people',
     one: 'person',
-    holds: 'co-founders, collaborators, contractors and accountants, and what each one is for',
+    holds: 'co-founders, staff, collaborators, contractors and accountants, and what each one is for',
     title: 'name',
     mobile: ['name', 'role', 'rate'],
     pack: 'people',
@@ -277,12 +277,14 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
          (`test/lists-opened.test.ts` drives one), and a record that never used it is no longer offered it.
          `cofounder` AND `partner` SINCE People 4.5.0 (onboarding9, 2 Nov): Leo's co-founder Dan was kept as "Dan,
          collaborator", since the list had no word for him. Laid after the others, so a picker offers them last, and said
-         as Co-founder and Business partner (`labels`). */
+         as Co-founder and Business partner (`labels`).
+         `staff` SINCE People 4.6.0 (onboarding10, 2 Nov): Nadia's "two part-time staff, Ellie and Tom" were kept as
+         collaborators, people she works with, when they work for her. Laid last, said as Staff. */
       {
         id: 'role',
         type: 'enum',
-        values: ['client', 'contractor', 'accountant', 'collaborator', 'other', 'cofounder', 'partner'],
-        labels: { cofounder: 'Co-founder', partner: 'Business partner' },
+        values: ['client', 'contractor', 'accountant', 'collaborator', 'other', 'cofounder', 'partner', 'staff'],
+        labels: { cofounder: 'Co-founder', partner: 'Business partner', staff: 'Staff' },
         index: true,
       },
       { id: 'rate', type: 'money' },

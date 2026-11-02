@@ -3901,6 +3901,21 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'people@4.6.0': {
+    holds: `
+      metric.organisations-clients metric.organisations-count metric.organisations-from-card-texts metric.organisations-known
+      metric.organisations-not-clients metric.people-clients metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d
+      metric.people-in-touch-90d metric.people-not-clients metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '4ee0ab4f0f32c7ee',
+    history: [
+      'People 4.6.0, onboarding10 of 2 November: `register.people` offers `staff` on `role`, said as Staff -> 4ee0ab4f0f32c7ee',
+    ],
+  },
+
   'portfolio@1.31.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged

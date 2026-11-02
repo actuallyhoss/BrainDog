@@ -244,8 +244,8 @@ export function entryOf(row: Proposal['rows'][number]): Entry {
   return { key: `${row.register}:${title}`, title, kind: 'project', detail: row.register === 'things' ? words.project : '', amount: null, due: null };
 }
 
-/** People's roles said as People says them where the id is not a word (`labels` on `register.people`, 4.5.0). */
-const ROLE_WORD: Readonly<Record<string, string>> = { cofounder: 'Co-founder', partner: 'Business partner' };
+/** People's roles said as People says them (`labels` on `register.people`, 4.5.0 and 4.6.0). */
+const ROLE_WORD: Readonly<Record<string, string>> = { cofounder: 'Co-founder', partner: 'Business partner', staff: 'Staff' };
 
 /**
  * A use case as a part: the lists and pages it carries, the phrases that pointed at it, and its own summary. It has no

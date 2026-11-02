@@ -976,11 +976,14 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   minor step.
  * - money-core 3.38.3 (leftovers8, 2 Nov): an invoice owed to you heads its open part "Still to come in", where it said
  *   "Still to pay" as a bill you owe does (`page.money-bill`). No id added or taken away, so a patch.
+ * - people 4.6.0 (onboarding10, 2 Nov): `register.people` offers `staff` on `role`, said as Staff, so the people who work
+ *   for a shop or a business named at sign-up are kept as its staff and not as collaborators. A value added, so a minor
+ *   step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.31.0',
-  people: '4.5.0',
+  people: '4.6.0',
   'money-core': '3.38.3',
   estate: '2.8.0',
   work: '1.24.0',
