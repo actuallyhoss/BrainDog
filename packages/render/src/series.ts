@@ -275,6 +275,12 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false, ho
     const minor = cells.reduce((t, c) => t + Math.round(seriesValue(c)! * 10 ** places), 0);
     return [{ label: sr.label, value: amountLike(cells[0]!, minor / 10 ** places, home, 'read') }];
   });
+  /* A TOTAL OF ONE MONTH NAMES IT (empty states 2, polish): with one bill known, Forecast read "£20 Money out" and only
+     the line under it said which month. Where every figure added stands in one bucket, each total says it: "£20 Money
+     out in Nov 2026". */
+  const holding = body.filter((r) => r.slice(1, stated ? -1 : undefined).some((c) => (seriesValue(c) ?? 0) !== 0));
+  const lone = holding.length === 1 && every.length > 1 ? seriesBucketName((holding[0]![0] ?? '').trim()) : '';
+  if (lone) for (const t of totals) t.label = `${t.label} ${SERIES_IN(lone)}`;
 
   const sentence = buckets
     .map((b) => {
@@ -390,4 +396,6 @@ export const SERIES_DUE = 'so far, and due';
 export const SERIES_REST = (last: string): string => `Nothing is due or expected after ${last} yet.`;
 /** A bucket as a sentence names it: a month and its year as they are ("Nov 2026"), a week as the day it begins. */
 const seriesBucketName = (label: string): string => label.replace(/^Week of /u, 'the week of ');
+/** A total's one bucket, after its label: "in Nov 2026", "in the week of 20 Jul". */
+export const SERIES_IN = (bucket: string): string => `in ${bucket}`;
 export const SERIES_NUMBERS = 'The numbers';
