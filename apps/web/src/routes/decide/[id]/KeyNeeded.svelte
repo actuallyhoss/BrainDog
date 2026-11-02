@@ -22,6 +22,7 @@
   import { words as keychainWords } from '$lib/record/keychain.ts';
   import PassField from '../../keychain/PassField.svelte';
   import type { Need } from './arranged.ts';
+  import { keyHint, keyName } from '$lib/market/key-names.ts';
   import { asksOpens as asks, blankForm, keep as keepKey, ready, type KeyClient } from './key-needed.ts';
 
   let { need, at, client, onheld }: { need: Need; at: number; client?: KeyClient | undefined; onheld?: (() => unknown) | undefined } = $props();
@@ -32,6 +33,9 @@
 
   const held = $derived(need.held === 'connector');
   const asksOpens = $derived(asks(need));
+  /* SHOWN BY ITS NAME ("Stripe (read only)"), kept under its label. */
+  const name = $derived(keyName(need.label));
+  const hint = $derived(keyHint(need.label));
 
   async function keep(e: SubmitEvent) {
     e.preventDefault();
@@ -44,14 +48,14 @@
       said = out.said;
       return;
     }
-    toasts.push(copy.arrangeNeedKept(need.label), { intent: 'good' });
+    toasts.push(copy.arrangeNeedKept(name), { intent: 'good' });
     await onheld?.();
   }
 </script>
 
 <li class="need" data-held={held ? '' : undefined}>
   <div class="need-head">
-    <span class="need-label"><Icon name="key" size="s" />{need.label}</span>
+    <span class="need-label"><Icon name="key" size="s" />{name}</span>
     {#if need.held === 'connector'}
       <span class="need-state need-held"><Icon name="check" size="s" />{copy.arrangeNeedHeld}</span>
     {:else if need.held !== null}
@@ -60,7 +64,8 @@
   </div>
   {#if need.opens}<p class="need-line">{copy.arrangeNeedOpens(need.opens)}</p>{/if}
   {#if need.scheduled}<p class="need-line">{copy.arrangeNeedScheduled}</p>{/if}
-  {#if need.held === 'person'}<p class="need-line">{copy.arrangeNeedPerson(need.label)}</p>{/if}
+  {#if need.held === 'person'}<p class="need-line">{copy.arrangeNeedPerson(name)}</p>{/if}
+  {#if hint && !held}<p class="need-line">{hint}</p>{/if}
   {#if client && !held}
     <form class="need-form" onsubmit={keep}>
       {#if asksOpens}

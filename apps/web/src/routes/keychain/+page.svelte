@@ -77,6 +77,7 @@
   /* TYPES ONLY: the note's code and its component are a dynamic import (`scopeNote`), never in this screen's own chunk. */
   import type { Call, ScopeProposal } from './scope-note.ts';
   import { recordToday } from '$lib/record/zone.ts';
+  import { keyName } from '$lib/market/key-names.ts';
 
   /**
    * Whether the record has answered yet. THERE IS NO THIRD STATE: this screen drew the sample's grants and keys,
@@ -946,7 +947,7 @@
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="key" size="l" /></span>
               <span class="line-main">
-                {#if href}<a class="line-title key-name tap" href={at(href)} data-own>{k.label}</a>{:else}<span class="line-title key-name" data-own>{k.label}</span>{/if}
+                {#if href}<a class="line-title key-name tap" href={at(href)} data-own>{keyName(k.label)}</a>{:else}<span class="line-title key-name" data-own>{keyName(k.label)}</span>{/if}
                 {#if k.account}<span class="line-detail key-account" data-own>{k.account}</span>{/if}
                 <!-- WHERE IT APPLIES, THEN WHAT IT OPENS, as words in the meta line: the project's dot and name, or "All
                      projects". A saved value draws nothing; a key with no value says so with the ring and the words. -->

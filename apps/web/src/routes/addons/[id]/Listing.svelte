@@ -51,6 +51,7 @@
   import PlanSheet from '$lib/market/PlanSheet.svelte';
   import { words as planWords } from '$lib/market/plan.ts';
   import { keyPut, type KeyPut } from '$lib/market/key-put.ts';
+  import { keyName } from '$lib/market/key-names.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import PreviewPage from '$lib/market/PreviewPage.svelte';
   import { addsOf, fieldsOf, namesOf } from '$lib/market/adds.ts';
@@ -490,7 +491,7 @@
         .putKey({ label, value, ...(passphrase === '' ? {} : { passphrase }) })
         .catch(() => null);
     const out = await keyPut(send, { support, methods, passkeySignIn }, copy.writeRaced);
-    if (out.ok) toasts.push(planWords.keyAdded(label), { intent: 'good' });
+    if (out.ok) toasts.push(planWords.keyAdded(keyName(label)), { intent: 'good' });
     return out;
   }
 

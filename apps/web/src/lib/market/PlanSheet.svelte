@@ -169,9 +169,10 @@
                 {#if onkey && k.command}
                   <!-- THE KEY PUT IN HERE, as the Keychain takes one (AF3): a password field, so it is not drawn while it is
                        typed, and the terminal as the second way under it. -->
-                  <span class="plan-text">{words.keyHere(k.label)}</span>
+                  <span class="plan-text">{words.keyHere(k.name)}</span>
+                  {#if k.hint}<span class="plan-detail">{k.hint}</span>{/if}
                   <form class="plan-key-form" onsubmit={(e) => void putKey(e, k.label)} novalidate>
-                    <label class="field-label" for="plan-key-{i}">{words.keyField(k.label)}</label>
+                    <label class="field-label" for="plan-key-{i}">{words.keyField(k.name)}</label>
                     <div class="plan-key-put">
                       <div class="field"><input class="field-input" id="plan-key-{i}" type="password" autocomplete="off" spellcheck="false" bind:value={keyValues[k.label]} /></div>
                       <Button weight="primary" type="submit" disabled={putting !== '' || (keyValues[k.label] ?? '').trim() === ''}>{putting === k.label ? words.keyAdding : words.keyAdd}</Button>
@@ -190,6 +191,7 @@
                   <CodeLine text={k.command} label={k.label} words />
                 {:else}
                   <span class="plan-text">{k.line}</span>
+                  {#if k.hint}<span class="plan-detail">{k.hint}</span>{/if}
                   {#if k.command}<CodeLine text={k.command} label={k.label} words />{/if}
                   <span class="plan-detail">{onrecheck ? words.keyLooking : words.keyAgain}</span>
                 {/if}

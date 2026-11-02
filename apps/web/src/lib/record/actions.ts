@@ -26,6 +26,7 @@ import { bytes as fmtBytes, since, writeAmount } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { humanize, titleOf } from './names.ts';
+import { keyName } from '../market/key-names.ts';
 import { keptRead, wroteOutside } from '@braindog/client';
 import type { RECONNECT_STATE, ReconnectState } from './keychain.ts';
 import { often } from './actions-plain.ts';
@@ -209,7 +210,7 @@ export const words = {
   seeUsage: 'See usage',
   runs: (n: number) => (n === 1 ? '1 run this month' : `${n.toLocaleString('en-GB')} runs this month`),
   verb: { pull: 'Fetches from', call: 'Calls', poll: 'Watches' } as Record<Channel, string>,
-  key: (label: string) => `with the key "${label}"`,
+  key: (label: string) => `with the key "${keyName(label)}"`,
   /* The four states of a scheduled action, one calm sentence each. No red: paused is `warn`. */
   live: (last: string, next: string | null) => (next ? `Last ran ${last}. Next run ${next}.` : `Last ran ${last}.`),
   never: (next: string | null) => (next ? `Not run yet. First run ${next}.` : 'Not run yet.'),

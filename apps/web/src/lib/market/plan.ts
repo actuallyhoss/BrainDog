@@ -18,6 +18,7 @@
 import { doesOf } from '@braindog/kernel';
 
 import { callLine, callsOutOf, type CallOut } from '../record/actions.ts';
+import { keyHint, keyName } from './key-names.ts';
 
 type Body = Record<string, unknown>;
 
@@ -191,7 +192,7 @@ function callOf(c: Record<string, unknown>, change: Call['change'], note: string
  * A key the install would send that the keychain cannot give it yet. `command` is the line that puts it in, for a key
  * that is missing; a key that is there but cannot be opened by a run says the record's own sentence and no command.
  */
-export type KeyStep = { label: string; line: string; command: string | null };
+export type KeyStep = { label: string; name: string; hint: string | null; line: string; command: string | null };
 
 /** A label as one shell word: bare when it is only letters, digits and `._-`, else in double quotes with `"$\`` escaped. */
 export const shellWord = (label: string): string => (/^[A-Za-z0-9._-]+$/u.test(label) ? label : `"${label.replace(/["$`\\]/gu, (c) => `\\${c}`)}"`);
@@ -204,7 +205,10 @@ function keysOf(d: Body): KeyStep[] {
   return list(d.keys_missing).flatMap((k): KeyStep[] => {
     const label = text(k.label);
     if (label === '') return [];
-    return k.code === 'REQUIRED_MISSING' ? [{ label, line: words.keyMissing(label), command: keyCommand(label) }] : [{ label, line: text(k.fix) || words.keyMissing(label), command: null }];
+    /* THE KEY BY THE NAME IT IS SHOWN BY ("Stripe (read only)"), and the command by the label it is kept under. */
+    const name = keyName(label);
+    const hint = keyHint(label);
+    return k.code === 'REQUIRED_MISSING' ? [{ label, name, hint, line: words.keyMissing(name), command: keyCommand(label) }] : [{ label, name, hint, line: text(k.fix) || words.keyMissing(name), command: null }];
   });
 }
 
@@ -409,7 +413,8 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
       })),
       ...section('page-adds', words.pageAdds, pageAddRows(list(d.page_adds).filter((p) => !isMap(p.refusal)), name)),
       ...section('settings', words.settings, list(d.config).map((c) => {
-        const value = typeof c.value === 'string' || typeof c.value === 'number' || typeof c.value === 'boolean' ? String(c.value) : JSON.stringify(c.value ?? null);
+        const raw = typeof c.value === 'string' || typeof c.value === 'number' || typeof c.value === 'boolean' ? String(c.value) : JSON.stringify(c.value ?? null);
+        const value = text(c.key) === 'grant' ? keyName(raw) : raw;
         return row(name(`config.${text(c.key)}`), c.from === 'kept' || c.from === 'given' ? words.settingKept(value) : c.from === 'default' ? words.settingDefault(value) : words.settingNone);
       })),
       ...section('examples', words.examples, count(seeds.count) === 0 ? [] : [row(words.examplesLine(count(seeds.count)), seedRows.map((r) => `${name(`register.${text(r.register)}`)} ${words.examplesIn(count(r.rows))}`).join(', ') || null)]),
