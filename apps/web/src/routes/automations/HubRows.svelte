@@ -301,7 +301,7 @@
   }
 
   .said[data-dot='warn']::before {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   /* OFF IS NOT A STATE THAT NEEDS ANYTHING, so it is a ring and not a fill, in the quiet ink. */

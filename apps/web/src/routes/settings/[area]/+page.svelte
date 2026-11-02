@@ -618,7 +618,7 @@
   }
 
   .health-dot[data-bad] {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .health-look {

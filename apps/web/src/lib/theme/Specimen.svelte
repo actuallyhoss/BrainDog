@@ -209,7 +209,7 @@
   }
 
   .spec-fill[data-tone='warn'] {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .spec-fill[data-tone='danger'] {

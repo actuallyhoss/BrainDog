@@ -304,7 +304,7 @@
   }
 
   .rv-dot[data-state='waiting'] {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .rv-dot[data-state='failed'] {

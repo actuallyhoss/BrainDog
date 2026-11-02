@@ -437,7 +437,7 @@
 
   .e-stack i,
   .sw {
-    background: var(--ph);
+    background: var(--ph-fill, var(--ph));
   }
 
   .e-stack i {
@@ -783,7 +783,7 @@
   }
 
   .sp-end {
-    fill: var(--ph);
+    fill: var(--ph-fill, var(--ph));
   }
 
   .trail[data-stale] .sp-line {

@@ -1151,7 +1151,7 @@
   }
 
   .dot[data-state='waiting'] {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   /* WHO DRAFTED IT, after the state and a middle dot, in the same quiet line. */

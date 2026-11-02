@@ -60,7 +60,7 @@
   .viz [data-tone='done'] { --c: var(--chart-other); }
   .viz [data-tone='danger'] { --c: var(--chart-late); }
   .viz [data-tone='earn'] { --c: var(--good); }
-  .viz [data-tone='warn'] { --c: var(--warn); }
+  .viz [data-tone='warn'] { --c: var(--warn-fill); }
   .viz [data-tone='live'] { --c: var(--live); }
 
   /* A MARK IS DRAWN WHERE IT BELONGS AND NEVER SLID THERE. Each chart draws once at a guessed width and again at the

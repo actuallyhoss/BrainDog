@@ -168,7 +168,7 @@
   }
 
   .lanes-item[data-intent='warn'] .lanes-bar {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .lanes-item[data-intent='bad'] .lanes-bar {

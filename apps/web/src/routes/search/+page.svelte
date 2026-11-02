@@ -44,7 +44,7 @@
   import { recordNow } from '$lib/record/boot-live.ts';
   import { daySaid } from '../r/[register]/[seq]/said.ts';
   import type { Entry } from '$lib/record/schema.ts';
-  import { money, readable } from 'braindog-render';
+  import { money, readable, slotOf } from 'braindog-render';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -402,7 +402,7 @@
                 {#each t.items as p (p.href)}
                   <li>
                     <a class="place" href={at(p.href)}>
-                      <span class="place-lead" aria-hidden="true">{#if p.hue !== undefined}<span class="hue" style="--hue:{p.hue}"></span>{:else}<Icon name={t.icon} size="m" />{/if}</span>
+                      <span class="place-lead" aria-hidden="true">{#if p.hue !== undefined}<span class="hue" style:background="var(--cat-{slotOf(p.hue)}-fill)"></span>{:else}<Icon name={t.icon} size="m" />{/if}</span>
                       <span class="place-name">{p.title}</span>
                     </a>
                   </li>
@@ -627,11 +627,12 @@
     color: var(--ink-2);
   }
 
+  /* A PROJECT'S DOT IN ITS SLOT'S FILL, as Work's filters and the sidebar draw it: its own hue at the mark's lightness
+     made one project two colours (colour lane, 2 Nov). */
   .hue {
     inline-size: 8px;
     block-size: 8px;
     border-radius: var(--r-round);
-    background: oklch(var(--mark-l) var(--mark-c) var(--hue));
   }
 
   .place-name {

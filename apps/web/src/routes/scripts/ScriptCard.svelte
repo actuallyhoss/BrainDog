@@ -314,7 +314,7 @@
   }
 
   .run[data-tone='warn'] .dot {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .run-outcome,

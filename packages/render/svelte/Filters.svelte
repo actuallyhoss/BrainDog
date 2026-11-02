@@ -13,6 +13,7 @@
 -->
 <script lang="ts">
   import { FILTERS_ALL, filtersMore, filtersPlan, type Filter, type FilterPlan, type OnFilter } from '../src/filters.ts';
+  import { slotOf } from '../src/slot.ts';
 
   let {
     filters,
@@ -45,7 +46,7 @@
           <button type="button" class="filters-choice" aria-pressed={p.all} onclick={() => onfilter?.(p.field, null)}>{FILTERS_ALL}</button>
           {#each p.shown as v}
             <button type="button" class="filters-choice" aria-pressed={v.on} onclick={() => onfilter?.(p.field, v.on ? null : v.value)}
-              >{#if v.hue !== null}<span class="filters-dot" style="--hue: {v.hue}" aria-hidden="true"></span>{/if}{v.label}{#if v.count !== null}<span class="filters-count num">{v.count}</span>{/if}</button
+              >{#if v.hue !== null}<span class="filters-dot" style="--hue: {v.hue}" aria-hidden="true" data-slot={slotOf(v.hue)}></span>{/if}{v.label}{#if v.count !== null}<span class="filters-count num">{v.count}</span>{/if}</button
             >
           {/each}
           {#if p.rest.length}
@@ -58,7 +59,7 @@
           <span class="filters-choice" data-on={p.all ? '' : undefined}>{FILTERS_ALL}</span>
           {#each p.shown as v}
             <span class="filters-choice" data-on={v.on ? '' : undefined}
-              >{#if v.hue !== null}<span class="filters-dot" style="--hue: {v.hue}" aria-hidden="true"></span>{/if}{v.label}{#if v.count !== null}<span class="filters-count num">{v.count}</span>{/if}</span
+              >{#if v.hue !== null}<span class="filters-dot" style="--hue: {v.hue}" aria-hidden="true" data-slot={slotOf(v.hue)}></span>{/if}{v.label}{#if v.count !== null}<span class="filters-count num">{v.count}</span>{/if}</span
             >
           {/each}
           {#if p.rest.length}<span class="filters-more">{filtersMore(p.rest.length)}</span>{/if}

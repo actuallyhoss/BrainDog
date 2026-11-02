@@ -394,7 +394,7 @@
   }
 
   .state[data-intent='warn'] .dot {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .state[data-intent='bad'] .dot {

@@ -323,7 +323,7 @@
   }
 
   .cards-item[data-intent='warn'] .cards-ring-fill {
-    stroke: var(--warn);
+    stroke: var(--warn-fill);
   }
 
   /* LATE IS TOLD APART FROM THE WORKING RED BY A MARK, NOT ONLY ITS SHADE: the TRACK breaks, the part

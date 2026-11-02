@@ -2903,7 +2903,7 @@
 
   /* AT RISK IS AMBER, between working and late, so a plan says which bars to watch before any of them is red. */
   .roadmap-item[data-intent='warn'] .roadmap-bar {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .roadmap-item[data-intent='good'] .roadmap-bar {
@@ -3020,7 +3020,7 @@
   }
 
   .roadmap-key[data-key='warn']::before {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .roadmap-key[data-key='good']::before {

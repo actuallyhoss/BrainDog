@@ -1766,14 +1766,14 @@
 
   .live[data-state='polling'] {
     display: block;
-    background: repeating-linear-gradient(90deg, var(--warn) 0 8px, var(--rule) 8px 16px);
+    background: repeating-linear-gradient(90deg, var(--warn-fill) 0 8px, var(--rule) 8px 16px);
   }
 
   /* WARN, NOT DANGER: a dropped connection is a condition to wait out, not a loss. Solid where
      polling is dashed, so the two states differ by shape as well as by colour. */
   .live[data-state='offline'] {
     display: block;
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   /* A SURFACE WITH NO SHELL SCROLLS ITSELF. Same architecture as `.body` below — one container, one

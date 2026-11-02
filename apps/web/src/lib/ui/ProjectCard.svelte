@@ -316,11 +316,11 @@
     inline-size: 8px;
     block-size: 8px;
     border-radius: var(--r-round);
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .pc-health[data-tone='off'] .dot {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .pc-late {
@@ -466,7 +466,7 @@
     display: block;
     block-size: 100%;
     border-radius: 3px;
-    background: var(--ph);
+    background: var(--ph-fill, var(--ph));
     transition: inline-size var(--d-recompose) var(--ease-emphasis);
   }
 
@@ -556,7 +556,7 @@
     block-size: 8px;
     margin-inline: 4px;
     border-radius: var(--r-round);
-    background: var(--ph);
+    background: var(--ph-fill, var(--ph));
   }
 
   [data-arrived] {

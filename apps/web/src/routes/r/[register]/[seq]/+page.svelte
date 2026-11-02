@@ -1987,35 +1987,35 @@
   }
 
   .ref-dot[data-slot='blue'] {
-    --ph: var(--cat-blue, var(--info));
+    --ph: var(--cat-blue-fill, var(--cat-blue, var(--info)));
   }
 
   .ref-dot[data-slot='violet'] {
-    --ph: var(--cat-violet, var(--info));
+    --ph: var(--cat-violet-fill, var(--cat-violet, var(--info)));
   }
 
   .ref-dot[data-slot='pink'] {
-    --ph: var(--cat-pink, var(--ink-2));
+    --ph: var(--cat-pink-fill, var(--cat-pink, var(--ink-2)));
   }
 
   .ref-dot[data-slot='teal'] {
-    --ph: var(--cat-teal, var(--good));
+    --ph: var(--cat-teal-fill, var(--cat-teal, var(--good)));
   }
 
   .ref-dot[data-slot='sky'] {
-    --ph: var(--cat-sky, var(--info));
+    --ph: var(--cat-sky-fill, var(--cat-sky, var(--info)));
   }
 
   .ref-dot[data-slot='yellow'] {
-    --ph: var(--cat-yellow, var(--warn));
+    --ph: var(--cat-yellow-fill, var(--cat-yellow, var(--warn)));
   }
 
   .ref-dot[data-slot='lime'] {
-    --ph: var(--cat-lime, var(--good));
+    --ph: var(--cat-lime-fill, var(--cat-lime, var(--good)));
   }
 
   .ref-dot[data-slot='slate'] {
-    --ph: var(--cat-slate, var(--ink-3));
+    --ph: var(--cat-slate-fill, var(--cat-slate, var(--ink-3)));
   }
 
   /* A THUMB'S TARGET round the one line of words, which stays the height of its text. */

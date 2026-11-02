@@ -257,7 +257,7 @@
 
   .steps::after {
     inline-size: calc(100% / var(--stops) * max(var(--done) - 1, 0));
-    background: var(--ph);
+    background: var(--ph-fill, var(--ph));
   }
 
   .stop {
@@ -292,8 +292,8 @@
   }
 
   .stop[data-kind='done'] .c {
-    border-color: var(--ph);
-    background: var(--ph);
+    border-color: var(--ph-fill, var(--ph));
+    background: var(--ph-fill, var(--ph));
     color: var(--tile);
     animation: fill-in var(--d-panel) var(--ease-emphasis) both;
   }
@@ -301,7 +301,7 @@
   /* NO GLOW (SPEC 1, "Now" stop): the stop being worked on is the project's tint inside its colour's 2px ring, where a
      5px halo of the hue stood round it. */
   .stop[data-kind='now'] .c {
-    border: 2px solid var(--ph);
+    border: 2px solid var(--ph-fill, var(--ph));
     background: var(--ph-tint, var(--tile-2));
     box-shadow: none;
   }
@@ -479,11 +479,11 @@
     display: block;
     block-size: 100%;
     border-radius: 4px;
-    background: var(--ph);
+    background: var(--ph-fill, var(--ph));
   }
 
   .bar[data-before] > span {
-    background: color-mix(in oklab, var(--ph) 45%, var(--tile));
+    background: color-mix(in oklab, var(--ph-fill, var(--ph)) 45%, var(--tile));
   }
 
   .m-lines {
@@ -548,7 +548,7 @@
     max-inline-size: 24px;
     min-block-size: 1px;
     border-radius: 4px 4px 0 0;
-    background: var(--ph);
+    background: var(--ph-fill, var(--ph));
   }
 
   .col[data-partial='true'] {

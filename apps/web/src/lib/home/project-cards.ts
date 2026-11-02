@@ -119,10 +119,12 @@ export function figureOf(decl: Pick<CardDecl, 'fields'>, fields: Readonly<Record
  * A PROJECT'S COLOUR IS ITS SLOT (SPEC 1.3): the stored hue picks the nearest of the eight category slots, and `--ph` and
  * `--ph-tint` are that slot's pair, solved to 4.5:1 in light and dark. Written on the element a card, a hero or a page's
  * charts are drawn inside, so the bars, the ring, the meter and the arrow all take it. No hue is the neutral slot.
+ * `--ph-fill` is the slot as a bar or a dot (colour lane, 2 Nov): in light the yellow and lime words colours are olive, and
+ * a meter or a stack drawn in them read muddy; the fill is the same slot held at 3:1 (`cat-<slot>-fill`).
  */
 export const slotStyle = (hue: number | null | undefined): string => {
   const s = slotOf(hue);
-  return `--ph:var(--cat-${s});--ph-tint:var(--cat-${s}-tint)`;
+  return `--ph:var(--cat-${s});--ph-tint:var(--cat-${s}-tint);--ph-fill:var(--cat-${s}-fill)`;
 };
 
 /** The day a card says, short and without the year: "20 Sep". */

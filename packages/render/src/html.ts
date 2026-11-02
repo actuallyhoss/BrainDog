@@ -56,6 +56,7 @@ import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, cellIn, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitFigures, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from './split.ts';
+import { slotOf } from './slot.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_PALER, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesKeyed, linesOnly, linesPlan } from './lines.ts';
@@ -2375,7 +2376,7 @@ export function filtersHTML(filters: readonly Filter[], chosen: Readonly<Record<
   const plans = filtersPlan(filters, chosen);
   if (plans.length === 0) return '';
   const choice = (label: string, on: boolean, count: number | null, hue: number | null = null): string =>
-    `<span class="filters-choice"${on ? ' data-on=""' : ''}>${hue === null ? '' : `<span class="filters-dot" style="--hue: ${hue}" aria-hidden="true"></span>`}${escape(label)}${count === null ? '' : `<span class="filters-count num">${count}</span>`}</span>`;
+    `<span class="filters-choice"${on ? ' data-on=""' : ''}>${hue === null ? '' : `<span class="filters-dot" style="--hue: ${hue}" aria-hidden="true" data-slot="${slotOf(hue)}"></span>`}${escape(label)}${count === null ? '' : `<span class="filters-count num">${count}</span>`}</span>`;
   const groups = plans
     .map(
       (p) =>

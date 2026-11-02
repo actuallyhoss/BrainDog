@@ -554,7 +554,7 @@
     inline-size: 8px;
     block-size: 8px;
     border-radius: 50%;
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .h-health[data-tone='off'] {
@@ -655,14 +655,14 @@
   }
 
   .ck-chip[data-late] {
-    background: color-mix(in oklab, var(--red) 12%, var(--tile));
+    background: var(--red-tint);
     color: var(--red);
     font-weight: 600;
   }
 
   /* PAST TWICE ITS CADENCE: amber, never red. */
   .chip-age {
-    background: color-mix(in oklab, var(--warn) 14%, var(--tile));
+    background: var(--warn-tint);
     color: var(--warn);
     font-weight: 600;
   }
@@ -742,11 +742,11 @@
   }
 
   .s-bars rect {
-    fill: color-mix(in oklab, var(--ph) 40%, var(--tile));
+    fill: color-mix(in oklab, var(--ph-fill, var(--ph)) 40%, var(--tile));
   }
 
   .s-bars rect[data-last] {
-    fill: var(--ph);
+    fill: var(--ph-fill, var(--ph));
   }
 
   .kv {
@@ -829,8 +829,8 @@
   }
 
   .stop[data-tone='done'] .st-dot {
-    border-color: var(--ph);
-    background: var(--ph);
+    border-color: var(--ph-fill, var(--ph));
+    background: var(--ph-fill, var(--ph));
   }
 
   .stop[data-tone='doing'] .st-dot {
@@ -842,7 +842,7 @@
   }
 
   .stop[data-tone='you'] .st-dot {
-    border-color: var(--warn);
+    border-color: var(--warn-fill);
   }
 
   .st-day {
@@ -890,7 +890,7 @@
     margin-block-end: 12px;
     padding: 10px 12px;
     border-radius: 10px;
-    background: color-mix(in oklab, var(--warn) 10%, var(--tile));
+    background: var(--warn-tint);
     color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: 18px;
@@ -1437,11 +1437,11 @@
     position: absolute;
     inset-block: 0;
     border-radius: 5px;
-    background: color-mix(in oklab, var(--ph, var(--ink)) 55%, var(--tile));
+    background: color-mix(in oklab, var(--ph-fill, var(--ph, var(--ink))) 55%, var(--tile));
   }
 
   .d-seg[data-live] {
-    background: var(--ph, var(--ink));
+    background: var(--ph-fill, var(--ph, var(--ink)));
   }
 
   .nowline {
@@ -1450,7 +1450,7 @@
     inline-size: 2px;
     margin-inline-start: -1px;
     border-radius: 1px;
-    background: var(--ph, var(--ink));
+    background: var(--ph-fill, var(--ph, var(--ink)));
   }
 
   .ticks {

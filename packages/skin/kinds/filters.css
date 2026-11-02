@@ -53,7 +53,9 @@
     background: var(--tile-2);
   }
 
-  /* A PROJECT'S DOT: the row's own hue, in the mark's lightness and chroma, as the sidebar draws a project. */
+  /* A PROJECT'S DOT: its slot's fill, the colour its well, its card and the sidebar give it (colour lane, 2 Nov). The
+     row's own hue drawn as it was, at the mark's lightness and chroma, made a project at hue 30 a red dot here and pink
+     everywhere else; the hue only picks the slot (`slotOf`), and `--hue` is the fallback for a host that sends no slot. */
   .filters-dot {
     flex: none;
     inline-size: 8px;
@@ -61,6 +63,15 @@
     border-radius: 50%;
     background: oklch(var(--mark-l) var(--mark-c) var(--hue, 0));
   }
+
+  .filters-dot[data-slot='blue'] { background: var(--cat-blue-fill); }
+  .filters-dot[data-slot='violet'] { background: var(--cat-violet-fill); }
+  .filters-dot[data-slot='pink'] { background: var(--cat-pink-fill); }
+  .filters-dot[data-slot='teal'] { background: var(--cat-teal-fill); }
+  .filters-dot[data-slot='sky'] { background: var(--cat-sky-fill); }
+  .filters-dot[data-slot='yellow'] { background: var(--cat-yellow-fill); }
+  .filters-dot[data-slot='lime'] { background: var(--cat-lime-fill); }
+  .filters-dot[data-slot='slate'] { background: var(--cat-slate-fill); }
 
   .filters-choice {
     appearance: none;

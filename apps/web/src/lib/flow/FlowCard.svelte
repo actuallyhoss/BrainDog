@@ -449,7 +449,7 @@
   }
 
   .paint-dot[data-state='waiting'] {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .paint-dot[data-state='failed'] {

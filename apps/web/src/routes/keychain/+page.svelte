@@ -1506,7 +1506,7 @@
   }
 
   .state[data-warn] .dot {
-    border-color: var(--warn);
+    border-color: var(--warn-fill);
   }
 
   .key-all {
@@ -1519,8 +1519,8 @@
   }
 
   .dot[data-tone='warn'] {
-    background: var(--warn);
-    border-color: var(--warn);
+    background: var(--warn-fill);
+    border-color: var(--warn-fill);
   }
 
   /* THE COUNT AT THE ROW'S END: how often, tabular, and under it who opened it last. */

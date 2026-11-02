@@ -702,7 +702,7 @@
   }
 
   .status[data-intent='warn'] .dot {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .status[data-intent='bad'] .dot {

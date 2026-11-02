@@ -272,7 +272,7 @@
 
   .line-check[data-state='waiting'] {
     border-style: dashed;
-    border-color: var(--warn);
+    border-color: var(--warn-fill);
   }
 
   .line-check[data-state='held'] {

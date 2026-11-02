@@ -97,7 +97,7 @@
   }
 
   .dot[data-state='warn'] {
-    background: var(--warn);
+    background: var(--warn-fill);
   }
 
   .dot[data-state='good'] {
