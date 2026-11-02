@@ -797,6 +797,8 @@ function textOf(e: EventLine): string {
   }
   const pack = packText(e) ?? exportText(e) ?? accessText(e) ?? shareText(e);
   if (pack) return pack;
+  /* THE QUIET HOURS, SAID (collab pass 2): a colleague's bell read "Edit" when the owner changed them. */
+  if (e.kind === 'edit' && e.target_kind === 'record' && e.field === 'quiet') return e.to === 'off' ? 'Turned quiet hours off' : 'Changed the quiet hours';
   /* A RULE'S RUN BY THE RULE'S NAME (audit of 30 October, 7): the record notes a run "rule.weekly-review ran." */
   const ran = /^rule\.([a-z0-9][a-z0-9_-]*) ran\.?$/u.exec(e.note ?? '');
   if (ran) return `${titleOf({ id: `rule.${ran[1]!}`, kind: 'rule' })} ran`;

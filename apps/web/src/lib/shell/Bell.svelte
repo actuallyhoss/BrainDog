@@ -24,6 +24,7 @@
 -->
 <script lang="ts">
   import { tick } from 'svelte';
+  import { page } from '$app/state';
   import { apiBase, at } from '../at.ts';
   import { agoOf, bellDays, bellLines, kindOf, unreadBy, type BellLine, type Day } from './alerts.ts';
   import Icon from '../ui/Icon.svelte';
@@ -95,7 +96,10 @@
       const [{ createClient }, { newsOf }] = await Promise.all([import('@braindog/client'), import('../record/boot-live.ts')]);
       const out = await createClient({ base: apiBase() }).recentHistory({ limit: 40 });
       if (!out.ok) return;
-      before = bellLines(others(newsOf(out.value.events, frame.actor === '' ? null : frame.actor))).slice(0, BEFORE_SHOWN);
+      /* BY NAME, AS WHAT IS NEW IS (collab pass 2, 2 Nov): the names `boot` told this reader. Without them every older line
+         by a colleague said "Someone you share with" under the same person's name in the new lines above it. */
+      const said = (page.data as { names?: Record<string, string> } | undefined)?.names ?? {};
+      before = bellLines(others(newsOf(out.value.events, frame.actor === '' ? null : frame.actor, new Map(Object.entries(said))))).slice(0, BEFORE_SHOWN);
     } catch {
       /* Not read: only what is new is drawn. */
     }

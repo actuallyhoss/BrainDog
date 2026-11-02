@@ -9927,8 +9927,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const peopleModule = () =>
       kernel.register(PEOPLE) !== undefined && kernel.packStates().some((p) => p.id === PEOPLE && p.disabled_at === null && p.registers.includes(PEOPLE));
     const mayKnow = allows(ctx, 'owner') === null || (readable(ctx, PEOPLE) === null && peopleModule());
-    if (!mayKnow) return null;
-    return Object.fromEntries(kernel.members().flatMap((m) => (typeof m.name === 'string' && m.name.trim() !== '' ? [[m.person_id, m.name.trim()]] : [])));
+    /* A GUEST STILL KNOWS WHO SHARED WITH THEM (collab pass 2, 2 Nov): the invitation and its mail already said "Sam
+       shared Kiln website with you", so their bell may say Sam too. Only those people, and only their names. */
+    if (!mayKnow) {
+      const me = ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? (ctx.principal.person ?? null) : null;
+      if (me === null) return null;
+      const email = sql.one<{ email: string | null }>('SELECT email FROM person WHERE id = ?', me)?.email ?? null;
+      const sharers = sql.all<{ id: string; name: string | null }>(
+        `SELECT DISTINCT p.id, p.name FROM share s JOIN person p ON p.id = s.made_by
+          WHERE s.revoked_at IS NULL AND ((s.who_kind = 'person' AND s.who = ?) OR (s.who_kind = 'email' AND lower(s.who) = lower(?)))`,
+        me,
+        email ?? '',
+      );
+      const known = sharers.flatMap((r) => (typeof r.name === 'string' && r.name.trim() !== '' ? [[r.id, r.name.trim()] as const] : []));
+      return known.length === 0 ? null : Object.fromEntries(known);
+    }
+    /* AND A GUEST WHO HOLDS A LIVE SHARE, ONE HELD TO ONE PROJECT INCLUDED (collab pass 2): `members` leaves a guest
+       out, so the owner's bell said "Someone you share with" for Sam, whom the record names. Names only, never addresses. */
+    const named: Record<string, string> = {};
+    for (const r of sql.all<{ id: string; name: string | null }>(
+      `SELECT p.id, p.name FROM person p WHERE p.name IS NOT NULL AND p.suspended_at IS NULL AND EXISTS (SELECT 1 FROM share s WHERE s.revoked_at IS NULL
+         AND s.effect = 'allow' AND ((s.who_kind = 'person' AND s.who = p.id) OR (s.who_kind = 'email' AND lower(s.who) = lower(p.email))))`,
+    ))
+      if (typeof r.name === 'string' && r.name.trim() !== '') named[r.id] = r.name.trim();
+    for (const m of kernel.members()) if (typeof m.name === 'string' && m.name.trim() !== '') named[m.person_id] = m.name.trim();
+    return named;
   };
 
   /**
