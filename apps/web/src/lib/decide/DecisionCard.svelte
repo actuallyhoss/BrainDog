@@ -57,6 +57,7 @@
   import { groundNow, want } from './ground.svelte.ts';
   import { getContext, tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
+  import MentionPicker from '$lib/ui/MentionPicker.svelte';
   import { invalidateAll } from '$app/navigation';
   import { since } from 'braindog-render';
   import type { QueueQuestion } from '@braindog/kernel';
@@ -344,6 +345,8 @@
   let noteFix = $state('');
   let noteBusy = $state(false);
   let noteField = $state<HTMLInputElement | null>(null);
+  /* WHO AN "@" IN THE NOTE OFFERS (`MentionPicker`): the people on this record, less the reader. */
+  const mentionable = $derived([...names].filter(([id, name]) => id !== me?.person && name.trim() !== '').map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)));
 
   async function openNote() {
     note = 'open';
@@ -735,6 +738,7 @@
       <div class="qa-line">
         <span class="field field-lg qa-field">
           <input id="{uid}-note" class="field-input qa-input" type="text" autocomplete="off" enterkeyhint="send" maxlength={COMMENT_MOST} bind:value={noteBody} bind:this={noteField} />
+          <MentionPicker field={noteField} people={mentionable} />
         </span>
         <Button type="submit">{decide.noteSend}</Button>
       </div>

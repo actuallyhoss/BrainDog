@@ -22,6 +22,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import MentionPicker from '$lib/ui/MentionPicker.svelte';
   import { runOf } from '$lib/ui/face.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { agoSaid, daysOf, whenSaid } from './said.ts';
@@ -100,6 +101,12 @@
 
   const who = (by: string) => actor(by, me || null, people);
 
+  /* WHO AN "@" OFFERS: the people on this record by name, the owner and colleagues, less the reader (`MentionPicker`).
+     The page reads the names the first time a box is entered, as it does once somebody else has spoken. */
+  let newField = $state<HTMLTextAreaElement | null>(null);
+  let replyField = $state<HTMLTextAreaElement | null>(null);
+  const mentionable = $derived([...people].filter(([id, name]) => id !== me && name.trim() !== '').map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)));
+
   /** One write, then the thread again, whose new line is the answer, so a write that lands needs no toast. */
   async function send(write: () => ReturnType<typeof sayComment>): Promise<boolean> {
     if (writing) return false;
@@ -124,7 +131,7 @@
 
   /* ENTER SENDS, AND SHIFT ENTER STARTS A NEW LINE, as every composer does. */
   function onkeydown(e: KeyboardEvent) {
-    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.defaultPrevented) return;
     e.preventDefault();
     (e.currentTarget as HTMLTextAreaElement).form?.requestSubmit();
   }
@@ -174,7 +181,8 @@
 
 <form class="composer" onsubmit={add}>
   <label class="vh" for="{uid}-new">{words.composer}</label>
-  <textarea id="{uid}-new" class="composer-input" rows="1" autocomplete="off" placeholder={words.composer} bind:value={body} {onkeydown}></textarea>
+  <textarea id="{uid}-new" class="composer-input" rows="1" autocomplete="off" placeholder={words.composer} bind:value={body} bind:this={newField} onfocus={() => onnames?.()} {onkeydown}></textarea>
+  <MentionPicker field={newField} people={mentionable} />
   {#if body.trim()}
     <div class="composer-acts">
       {#if over > 0}<p class="over" role="status">{commentWords.tooLong(over)}</p>{/if}
@@ -232,7 +240,8 @@
             {#if replyingTo === c.id}
               <form class="box" onsubmit={(e) => reply(e, c.id)}>
                 <label class="vh" for="{uid}-reply">{commentWords.replyLabel(who(c.by).name)}</label>
-                <textarea id="{uid}-reply" class="composer-input" rows="1" autocomplete="off" placeholder={commentWords.replyLabel(who(c.by).name)} bind:value={replyText}></textarea>
+                <textarea id="{uid}-reply" class="composer-input" rows="1" autocomplete="off" placeholder={commentWords.replyLabel(who(c.by).name)} bind:value={replyText} bind:this={replyField} onfocus={() => onnames?.()}></textarea>
+                <MentionPicker field={replyField} people={mentionable} />
                 {#if replyOver > 0}<p class="over" role="status">{commentWords.tooLong(replyOver)}</p>{/if}
                 <div class="box-acts">
                   <Button weight="primary" size="sm" type="submit" disabled={!replyText.trim() || replyOver > 0 || writing}>{commentWords.addReply}</Button>
