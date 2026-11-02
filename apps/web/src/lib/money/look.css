@@ -277,7 +277,7 @@
 /* THE WARN AMBER ITSELF, NOT A WASH OF IT (design pass, 1 Nov): the amber mixed half with white came out tan, the one
    brown Look B rules out, on "Not named yet" on Payees and Reports. */
 [data-money] .prop-row:has(> .prop-label a) > .prop-track::after {
-  background: var(--tone-fill, var(--warn));
+  background: var(--tone-fill, var(--warn-fill));
 }
 
 /* A CURRENCY'S HEADING OVER ITS ROWS ("In EGP"), a quiet label and not a bold line. */
@@ -662,14 +662,14 @@
    The ring's arcs and the legend's dots take the same order (the ring's first circle is its track), and a part kept
    under nothing ("No category yet", a link to file them) stays the quiet grey. */
 [data-money] .split {
-  --p1: var(--cat-teal);
-  --p2: var(--cat-blue);
-  --p3: var(--cat-violet);
-  --p4: var(--cat-pink);
-  --p5: var(--cat-sky);
-  --p6: var(--cat-yellow);
-  --p7: var(--cat-lime);
-  --p8: var(--cat-slate);
+  --p1: var(--cat-teal-fill);
+  --p2: var(--cat-blue-fill);
+  --p3: var(--cat-violet-fill);
+  --p4: var(--cat-pink-fill);
+  --p5: var(--cat-sky-fill);
+  --p6: var(--cat-yellow-fill);
+  --p7: var(--cat-lime-fill);
+  --p8: var(--cat-slate-fill);
 }
 
 [data-money] .split .ring-arc:nth-of-type(8n + 2),
@@ -855,19 +855,20 @@
   grid-area: 3 / 2 / auto / -1;
 }
 
-/* A CATEGORY'S BAR IN ITS OWN COLOUR, so the chip and its bar read as one thing. */
+/* A CATEGORY'S BAR IN ITS OWN COLOUR, so the chip and its bar read as one thing. THE SLOT'S FILL, NOT ITS WORDS (polish5,
+   2 Nov): `--cat-yellow` is held dark enough to read as words, and as a bar it was olive-brown (Coffee on Budgets). */
 [data-money] .prop-row:has(> .part-chip[data-slot]) > .prop-track::after {
   background: var(--tone-fill, var(--part-hue, var(--money-bar-quiet)));
 }
 
-[data-money] .prop-row:has(> .part-chip[data-slot='blue']) { --part-hue: var(--cat-blue); }
-[data-money] .prop-row:has(> .part-chip[data-slot='violet']) { --part-hue: var(--cat-violet); }
-[data-money] .prop-row:has(> .part-chip[data-slot='pink']) { --part-hue: var(--cat-pink); }
-[data-money] .prop-row:has(> .part-chip[data-slot='teal']) { --part-hue: var(--cat-teal); }
-[data-money] .prop-row:has(> .part-chip[data-slot='sky']) { --part-hue: var(--cat-sky); }
-[data-money] .prop-row:has(> .part-chip[data-slot='yellow']) { --part-hue: var(--cat-yellow); }
-[data-money] .prop-row:has(> .part-chip[data-slot='lime']) { --part-hue: var(--cat-lime); }
-[data-money] .prop-row:has(> .part-chip[data-slot='slate']) { --part-hue: var(--cat-slate); }
+[data-money] .prop-row:has(> .part-chip[data-slot='blue']) { --part-hue: var(--cat-blue-fill); }
+[data-money] .prop-row:has(> .part-chip[data-slot='violet']) { --part-hue: var(--cat-violet-fill); }
+[data-money] .prop-row:has(> .part-chip[data-slot='pink']) { --part-hue: var(--cat-pink-fill); }
+[data-money] .prop-row:has(> .part-chip[data-slot='teal']) { --part-hue: var(--cat-teal-fill); }
+[data-money] .prop-row:has(> .part-chip[data-slot='sky']) { --part-hue: var(--cat-sky-fill); }
+[data-money] .prop-row:has(> .part-chip[data-slot='yellow']) { --part-hue: var(--cat-yellow-fill); }
+[data-money] .prop-row:has(> .part-chip[data-slot='lime']) { --part-hue: var(--cat-lime-fill); }
+[data-money] .prop-row:has(> .part-chip[data-slot='slate']) { --part-hue: var(--cat-slate-fill); }
 
 /* THE BALANCE AT HOME, quiet under a balance in another currency: "≈ EGP 427,940". */
 [data-money] .prop-row > .prop-approx {
@@ -1356,14 +1357,14 @@
   background: var(--part-hue, var(--money-bar));
 }
 
-[data-money] .progress-row:has(> .part-chip[data-slot='blue']) { --part-hue: var(--cat-blue); }
-[data-money] .progress-row:has(> .part-chip[data-slot='violet']) { --part-hue: var(--cat-violet); }
-[data-money] .progress-row:has(> .part-chip[data-slot='pink']) { --part-hue: var(--cat-pink); }
-[data-money] .progress-row:has(> .part-chip[data-slot='teal']) { --part-hue: var(--cat-teal); }
-[data-money] .progress-row:has(> .part-chip[data-slot='sky']) { --part-hue: var(--cat-sky); }
-[data-money] .progress-row:has(> .part-chip[data-slot='yellow']) { --part-hue: var(--cat-yellow); }
-[data-money] .progress-row:has(> .part-chip[data-slot='lime']) { --part-hue: var(--cat-lime); }
-[data-money] .progress-row:has(> .part-chip[data-slot='slate']) { --part-hue: var(--cat-slate); }
+[data-money] .progress-row:has(> .part-chip[data-slot='blue']) { --part-hue: var(--cat-blue-fill); }
+[data-money] .progress-row:has(> .part-chip[data-slot='violet']) { --part-hue: var(--cat-violet-fill); }
+[data-money] .progress-row:has(> .part-chip[data-slot='pink']) { --part-hue: var(--cat-pink-fill); }
+[data-money] .progress-row:has(> .part-chip[data-slot='teal']) { --part-hue: var(--cat-teal-fill); }
+[data-money] .progress-row:has(> .part-chip[data-slot='sky']) { --part-hue: var(--cat-sky-fill); }
+[data-money] .progress-row:has(> .part-chip[data-slot='yellow']) { --part-hue: var(--cat-yellow-fill); }
+[data-money] .progress-row:has(> .part-chip[data-slot='lime']) { --part-hue: var(--cat-lime-fill); }
+[data-money] .progress-row:has(> .part-chip[data-slot='slate']) { --part-hue: var(--cat-slate-fill); }
 
 /* BUDGETS ACROSS THE WHOLE PAGE ARE TWO COLUMNS on a wide screen, as the bars of a month are. */
 @media (width >= 1200px) {

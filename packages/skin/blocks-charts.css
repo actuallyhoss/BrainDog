@@ -168,35 +168,35 @@
   }
 
   :is(.split-seg, .split-dot, .ring-arc)[data-slot='blue'] {
-    --part: var(--cat-blue);
+    --part: var(--cat-blue-fill);
   }
 
   :is(.split-seg, .split-dot, .ring-arc)[data-slot='violet'] {
-    --part: var(--cat-violet);
+    --part: var(--cat-violet-fill);
   }
 
   :is(.split-seg, .split-dot, .ring-arc)[data-slot='pink'] {
-    --part: var(--cat-pink);
+    --part: var(--cat-pink-fill);
   }
 
   :is(.split-seg, .split-dot, .ring-arc)[data-slot='teal'] {
-    --part: var(--cat-teal);
+    --part: var(--cat-teal-fill);
   }
 
   :is(.split-seg, .split-dot, .ring-arc)[data-slot='sky'] {
-    --part: var(--cat-sky);
+    --part: var(--cat-sky-fill);
   }
 
   :is(.split-seg, .split-dot, .ring-arc)[data-slot='yellow'] {
-    --part: var(--cat-yellow);
+    --part: var(--cat-yellow-fill);
   }
 
   :is(.split-seg, .split-dot, .ring-arc)[data-slot='lime'] {
-    --part: var(--cat-lime);
+    --part: var(--cat-lime-fill);
   }
 
   :is(.split-seg, .split-dot, .ring-arc)[data-slot='slate'] {
-    --part: var(--cat-slate);
+    --part: var(--cat-slate-fill);
   }
 
   .split-seg[data-intent],

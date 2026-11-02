@@ -1160,6 +1160,8 @@ export const FRAME_ROLES = [
   'good-tint',
   'warn',
   'warn-tint',
+  /* Amber as a bar or a mark, not words: "Not named yet" on Payees and Reports (polish5, 2 Nov). */
+  'warn-fill',
   'info',
   'info-tint',
   'live',
@@ -1177,6 +1179,11 @@ export const FRAME_ROLES = [
   'red-tint',
   'red-tint-2',
   ...CATS.flatMap((c) => [`cat-${c}`, `cat-${c}-tint`] as const),
+  /* EACH SLOT AS A FILL (polish5, 2 Nov): a bar, a part of a donut, a budget's track. `cat-<slot>` is held at 4.5:1 as
+     words, and in light that floor leaves a yellow and a lime nowhere but olive (#7E6300, #437010 at OKLCH L 0.51), which
+     is how Coffee's budget bar read brown. A fill owes 3:1 to the tile and to the track it fills, so it may stand lighter
+     and clearer; the slots that were already clean fill in their own colour. */
+  ...CATS.map((c) => `cat-${c}-fill` as const),
 ] as const;
 
 export type FrameRole = (typeof FRAME_ROLES)[number];
@@ -1221,13 +1228,24 @@ const CAT_VALUES: Record<Scheme, Record<(typeof CATS)[number], [string, string]>
   },
 };
 
+/**
+ * A slot's fill where it is not its words' colour: light's yellow and lime at the most colour their hue holds at 3:1 on
+ * `tile-2` (OKLCH 0.636 0.130 85, a gold, and 0.622 0.167 130, a clear lime), measured 3.03 and 3.02 on the track and
+ * 3.46 and 3.44 on the tile. Every other slot, and every dark one, fills in its own colour.
+ */
+const CAT_FILLS: Record<Scheme, Partial<Record<(typeof CATS)[number], string>>> = {
+  light: { yellow: '#AF8300', lime: '#649900' },
+  dark: {},
+};
+
 const cats = (scheme: Scheme) =>
-  Object.fromEntries(
-    CATS.flatMap((c) => [
+  Object.fromEntries([
+    ...CATS.flatMap((c) => [
       [`cat-${c}`, CAT_VALUES[scheme][c][0]],
       [`cat-${c}-tint`, CAT_VALUES[scheme][c][1]],
     ]),
-  );
+    ...CATS.map((c) => [`cat-${c}-fill`, CAT_FILLS[scheme][c] ?? CAT_VALUES[scheme][c][0]]),
+  ]);
 
 /** SPEC 1.1: frame 3.1's surfaces, text and status, and the two reds as decided (0.1 item 2, 0.2). */
 export const HOUSE_FRAME: Record<Scheme, Frame> = {
@@ -1251,6 +1269,8 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     'good-tint': '#E4F3EA',
     warn: '#9A5800',
     'warn-tint': '#FBF0DD',
+    /* The warn amber's own hue (OKLCH 63) lifted to 3:1 on the track, 0.642 0.144: amber, where #9A5800 drew a brown bar. */
+    'warn-fill': '#C77700',
     info: '#2F5BD3',
     'info-tint': '#E8EEFC',
     live: '#1F8A55',
@@ -1305,6 +1325,7 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     'good-tint': '#14301F',
     warn: '#F0A64B',
     'warn-tint': '#36260F',
+    'warn-fill': '#F0A64B',
     info: '#7AA7FF',
     'info-tint': '#18264A',
     live: '#47D486',
@@ -1354,6 +1375,10 @@ export const FRAME_PAIRS: readonly FramePair[] = [
   { fg: 'red', bg: 'tile', floor: 'mark', what: 'red as a mark' },
   ...CATS.flatMap((c) =>
     (['tile', `cat-${c}-tint`] as const).map((bg) => ({ fg: `cat-${c}` as FrameRole, bg: bg as FrameRole, floor: 'text' as const, what: `the ${c} slot` })),
+  ),
+  /* A FILL ON THE TILE AND ON THE TRACK IT FILLS, at the fill floor. */
+  ...[...CATS.map((c) => `cat-${c}-fill` as const), 'warn-fill' as const].flatMap((fg) =>
+    (['tile', 'tile-2'] as const).map((bg) => ({ fg: fg as FrameRole, bg, floor: 'fill' as const, what: `${fg} as a bar` })),
   ),
   { fg: 'on-toast', bg: 'toast', floor: 'text', what: 'a toast' },
   ...(['red-fill', 'red-fill-hover', 'red-fill-press'] as const).map((bg) => ({ fg: 'on-red' as const, bg, floor: 'label' as const, what: 'the label on a red fill' })),

@@ -96,7 +96,9 @@
   }
   [data-intent='warn'] {
     --tone: var(--warn);
-    --tone-fill: var(--warn);
+    /* THE AMBER AS A FILL, NOT AS WORDS (polish5, 2 Nov): `--warn` is held dark enough to read as words, and as a dot or
+       a bar it drew brown. */
+    --tone-fill: var(--warn-fill);
   }
   [data-intent='bad'] {
     --tone: var(--red);
