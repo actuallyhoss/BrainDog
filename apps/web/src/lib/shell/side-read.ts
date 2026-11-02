@@ -171,8 +171,10 @@ export type Week = ReadonlyMap<string, { late: number; moved: boolean }>;
  * THE WEEK, ONE READ A PROJECT: late work as its card and its page count it (`latesOf`), and money in as its page's
  * Money tile reads it, this month's bucket. A read that fails says nothing.
  */
-export async function readWeek(base: string, list: string, play: readonly SideRow[], now = Date.now(), before: Week = new Map()): Promise<Week> {
-  const [lates, ins] = await Promise.all([latesOf(base, list, play.map((p) => p.seq)).catch(() => null), moneyOf(base, play, now)]);
+export async function readWeek(base: string, list: string, play: readonly SideRow[], now = Date.now(), before: Week = new Map(), money = true): Promise<Week> {
+  /* NO MONEY ASKED OF A RECORD THAT KEEPS NONE, OR OF A READER WHO SEES NONE (collab pass 3): the figure is Money's, and a
+     self-host with no Money answered each project's ask with a 404. */
+  const [lates, ins] = await Promise.all([latesOf(base, list, play.map((p) => p.seq)).catch(() => null), money ? moneyOf(base, play, now) : Promise.resolve(play.map(() => null))]);
   return new Map(
     play.map((p, i) => {
       const now = ins[i] === null || ins[i] === undefined ? undefined : ins[i].months.find((m) => m.partial);

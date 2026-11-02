@@ -227,7 +227,7 @@
              of them up behind it in the record's one thread. */
           await rested();
           if (n !== asked) return;
-          const w = await readWeek(b, got.list, play, Date.now(), untrack(() => week));
+          const w = await readWeek(b, got.list, play, Date.now(), untrack(() => week), untrack(() => lists.some((x) => x.id === 'transactions')));
           if (n !== asked) return;
           week = w;
           keepWeek(b, w);

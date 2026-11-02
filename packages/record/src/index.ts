@@ -20,7 +20,7 @@ import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import { keptRound, pagesCleanReading, ROUND_HOLDER, ROUND_KEPT, roundBegun, roundEnded, roundOf, roundPartOf, roundStep, ROUND_MS, unworded, type RoundPart } from './page-lint.ts';
 import { TICK_PAGES, UNBOUNDED, type TickBudget } from './tick-budget.ts';
 import { SIGNS_KEPT, SIGNS_MOVED_MS, SIGNS_REKEEP_MS, agentSaid, clientName, fileRecordSigns, keptNow, keptSigns, readArrivedSign, type KeptSign } from './signs.ts';
-import { appendReadRefusal } from './append-refusal.ts';
+import { APPEND_READ_AT, appendReadRefusal } from './append-refusal.ts';
 import { trialsLeft } from './script-try-cap.ts';
 import {
   handedOf,
@@ -10225,7 +10225,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     for (const m of kernel.members()) if (typeof m.name === 'string' && m.name.trim() !== '') named[m.person_id] = m.name.trim();
     /* AN OWNER WHO NEVER TYPED A NAME IS SAID BY THE ROLE (collab pass 3): a self-host's `init` makes the owner with no
        name, and everybody they shared with read "Someone you share with" for the person whose record it is. */
-    for (const m of kernel.members()) if (m.level === 'owner' && named[m.person_id] === undefined && m.suspended_at === null) named[m.person_id] = OWNER_WORD;
+    const self = ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? (ctx.principal.person ?? null) : null;
+    for (const m of kernel.members())
+      if (m.level === 'owner' && m.person_id !== self && named[m.person_id] === undefined && m.suspended_at === null) named[m.person_id] = OWNER_WORD;
     return named;
   };
 
@@ -12357,14 +12359,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     async boot(ctx: CallContext): Promise<Result<Boot>> {
       const stop = scoped(ctx, 'read');
-      if (stop) return { ok: false, refusal: stop };
       /* THE PERSON OPENED THE RECORD (`OPENED`): a person signed in, never a token or a link, which People reads beside
-         the read mark. Written before the read's one moment, and only when the last one is a few minutes old. */
-      if (ctx.principal.kind === 'person' && kernel.refused() === null) {
+         the read mark. Written before the read's one moment, and only when the last one is a few minutes old. Somebody
+         who may only add is refused `boot` and opened it all the same. */
+      if (ctx.principal.kind === 'person' && kernel.refused() === null && (stop === null || stop.at === APPEND_READ_AT)) {
         const was = kernel.prefsOf(ctx.principal.id)[OPENED];
         const at = typeof was === 'string' ? Date.parse(was) : Number.NaN;
         if (!Number.isFinite(at) || clock.now() - at > OPENED_EVERY_MS) kernel.setPref(ctx.principal.id, OPENED, new Date(clock.now()).toISOString());
       }
+      if (stop) return { ok: false, refusal: stop };
       /* ONE TRANSACTION, SO ONE MOMENT. A second connection to the same file, a CLI beside a running
          self-host, could commit between the counts and the feed, and the rail said one row beside a
          feed announcing two. SQLite holds a read transaction to the snapshot of its first read. */

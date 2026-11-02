@@ -73,8 +73,10 @@
         <span class="field ask-field">
           <input class="field-input" id="name-ask-field" type="text" autocomplete="name" maxlength="80" bind:value={typed} disabled={busy} aria-describedby={fault ? 'name-ask-fault' : undefined} />
         </span>
-        <Button weight="primary" type="submit" disabled={busy || typed.trim() === ''}>{busy ? 'Saving' : 'Save'}</Button>
-        <Button weight="quiet" onclick={() => void skip()} disabled={busy}>Skip</Button>
+        <span class="ask-presses">
+          <Button weight="primary" type="submit" disabled={busy || typed.trim() === ''}>{busy ? 'Saving' : 'Save'}</Button>
+          <Button weight="quiet" onclick={() => void skip()} disabled={busy}>Skip</Button>
+        </span>
       </form>
     {/snippet}
   </Banner>
@@ -82,13 +84,19 @@
 
 <style>
   .ask {
-    display: inline-flex;
+    display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
+    inline-size: 100%;
   }
   .ask-field {
-    min-inline-size: 14rem;
+    flex: 1 1 12rem;
+  }
+  .ask-presses {
+    display: flex;
+    flex: none;
+    gap: var(--sp-2);
   }
   .ask-fault {
     display: block;
