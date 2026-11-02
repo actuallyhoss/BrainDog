@@ -127,7 +127,7 @@ export function kindOf(said: string, usecase: string | null): Kind {
 /** Somebody who makes videos, streams or posts for a living: a creator, said as one (`caseTitle`). */
 const CREATOR = /\b(?:(?:content )?creator|streamer|streaming|youtuber|youtube channel|twitch|tiktoker|podcaster|influencer)\b/iu;
 
-const MONEY_WORDS = /\b(paid|pay|pays|payment|invoice\w*|bill\w*|revenue|income|salary|wage\w*|rent|budget\w*|expense\w*|costs?|subscription\w*|money|price\w*|charge\w*|mrr|arr|sales|retainer|fees?|loan|grant)\b|[£$€¥₹₦]/iu;
+const MONEY_WORDS = /\b(paid|pay|pays|payment|invoice\w*|bill\w*|revenue|income|salary|wage\w*|rent|budget\w*|expense\w*|costs?|subscription\w*|money|price\w*|charge\w*|mrr|arr|sales|retainers?|fees?|loan|grant|sponsors?\w*|payouts?|subs)\b|[£$€¥₹₦]/iu;
 const PEOPLE_WORDS = /\b(alone|solo|by myself|just me|on my own|clients?|customers?|partner\w*|co-?founder\w*|team\w*|colleague\w*|classmates?|supervisor|cofounder|we|our|us|employees?|staff|contractors?)\b/iu;
 /**
  * THE ONE OTHER PERSON THEY SAID THEY WORK WITH AND DID NOT NAME (2 Nov, a walk: "We're a two-person startup" settled
@@ -331,6 +331,8 @@ export function settled(topic: Topic, w: Where): boolean {
       return !w.money.kept || currencyQuiet(w);
     case 'people':
       /* "WE'RE TWO" NAMES NOBODY: the other one is asked by name, so they can be drafted (`pairOf`). */
+      /* "OUR HOUSEHOLD" NAMES NOBODY EITHER (onboarding7): who shares the money is asked until somebody is named. */
+      if (kindOf(s, w.usecase) === 'personal') return /\b(?:just me|alone|on my own|by myself)\b/iu.test(s) || /\b(?:partner|wife|husband|sister|brother|housemates?)\s+(?:is\s+)?\p{Lu}\p{Ll}/u.test(s);
       return PEOPLE_WORDS.test(s) && pairOf(s) === null && crewOf(s) === null;
     case 'tools':
       return TOOL_WORDS.test(s);
@@ -565,7 +567,10 @@ export function nextAsk(w: Where): ChatAsk | null {
   const owed = KEPT_FOR_LAST.filter((t) => open.includes(t));
   const only = room <= owed.length ? owed : null;
   const m = modelAsk(w.model, w, asked);
-  if (m !== null && (only === null || only.includes(m.topic))) return m;
+  /* WHAT FIRST IS THE LAST QUESTION, FROM THE MODEL TOO (onboarding7: Marta was asked it second, and the turns ran out
+     before anybody asked who shares the money with her). While another topic is open and there is room, it waits. */
+  const early = m !== null && m.topic === 'first' && only === null && open.some((t) => !KEPT_FOR_LAST.includes(t));
+  if (m !== null && !early && (only === null || only.includes(m.topic))) return m;
   for (const t of open) {
     if (only !== null && !only.includes(t)) continue;
     const r = rulesAsk(t, w);
