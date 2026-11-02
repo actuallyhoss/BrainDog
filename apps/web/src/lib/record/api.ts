@@ -43,7 +43,7 @@ import { hostsSaid, needsSaid, originSaid } from './tool-facts.ts';
 import { shownName } from '../shell/side.ts';
 import { largestPart, partsOf, splitAtOf, splitSaid } from './split.ts';
 /* No cycle: `names.ts` reads `held.ts` and the copy, never this file. */
-import { actor, handlesSaid, handleWords, nameWords, rowNameSaid, runByIn, type RunBy } from './names.ts';
+import { actor, AGENT_NAMES, handlesSaid, handleWords, nameWords, rowNameSaid, runByIn, type RunBy } from './names.ts';
 import type { Byline } from './byline.ts';
 
 /* THE DECLARATIONS EVERY HELPER BELOW READS, which are `held.ts`'s and not a copy: a list the record taught this tab is
@@ -321,6 +321,8 @@ export function runWho(fields: Readonly<Record<string, unknown>>): string | null
   const raw = typeof fields.client === 'string' && fields.client.trim() !== '' && !/[/\\:@]/u.test(fields.client) ? fields.client.trim() : null;
   /* AN APP'S OWN SLUG IS SAID AS ITS NAME: MCP's `clientInfo` names Claude Code
      `claude-code`, and a run's page said "claude-code, in braindog on master". */
+  /* AND A CLIENT THAT IS AN AGENT THE PRODUCT KNOWS IS ITS OWN SPELLING: "chatgpt" is ChatGPT, never "chatgpt". */
+  if (raw !== null && Object.hasOwn(AGENT_NAMES, raw.toLowerCase())) return AGENT_NAMES[raw.toLowerCase()]!;
   const app = raw !== null && /^[a-z0-9]+(?:[-_][a-z0-9]+)+$/u.test(raw) ? raw.split(/[-_]/u).map((w) => (w === 'cli' ? 'CLI' : `${w[0]!.toUpperCase()}${w.slice(1)}`)).join(' ') : raw;
   const agent = typeof fields.agent === 'string' && fields.agent !== '' && fields.agent !== 'other' ? actor(fields.agent).name : null;
   return app ?? agent;
@@ -397,6 +399,17 @@ const unitAfter = (unit: string | null | undefined): string => (unit ? `${unit =
     capitals. Said as words on screen only: the stored text is untouched (B4, the Ledger's own table). */
 const BANK_WORDS: ReadonlySet<string> = new Set(['transactions.payee', 'transactions.what', 'filing_rules.match']);
 
+/** A currency code as a person says it, plural, standing alone: `US dollars` for USD, `Euros` for EUR; `null` for a code nobody names. */
+function currencyWords(code: string): string | null {
+  try {
+    const part = new Intl.NumberFormat('en', { style: 'currency', currency: code, currencyDisplay: 'name' }).formatToParts(2).find((p) => p.type === 'currency');
+    const said = part?.value.trim() ?? '';
+    return said === '' || said.toUpperCase() === code ? null : said.charAt(0).toUpperCase() + said.slice(1);
+  } catch {
+    return null;
+  }
+}
+
 export function display(
   register: string,
   field: string,
@@ -420,8 +433,10 @@ export function display(
     return listLine(f?.type === 'list' && f.of === 'ref' ? value.map((v) => refName(f, register, v, names)) : value);
   }
   /* AN AGENT BY ITS NAME: the field holds what the agent signs with, `claude`, and a card read "claude" beside "Changed by
-     Claude". A lower-case word is said with its capital, on any list; anything else is left as it was typed. */
-  if (field === 'agent' && typeof value === 'string' && /^[a-z][a-z0-9-]*$/u.test(value)) return value.charAt(0).toUpperCase() + value.slice(1);
+     Claude". An agent the product knows is said in its own spelling (`AGENT_NAMES`): Work's With an agent read "Chatgpt"
+     (work2 2 Nov, 2). Any other lower-case word is said with its capital, on any list; anything else is left as typed. */
+  if (field === 'agent' && typeof value === 'string' && /^[a-z][a-z0-9-]*$/u.test(value))
+    return Object.hasOwn(AGENT_NAMES, value) ? AGENT_NAMES[value]! : value.charAt(0).toUpperCase() + value.slice(1);
   /* WHO WAS PAID, AND THE WORDS A FILING RULE MATCHES, IN A BANK'S CAPITALS ARE SAID AS WORDS, as the Ledger says the same
      line (`timelineTitle`, audit 2 B4): Payees' "Usual category" read FENWICK CLOUD under a bar saying Fenwick Cloud, and
      Filing rules titled each card in capitals. "As the bank wrote it" stays as the bank wrote it. */
@@ -430,6 +445,12 @@ export function display(
   if (typeof value === 'string' && field === REGISTERS[register]?.title) {
     const named = rowNameSaid(register, value);
     if (named !== value) return named;
+  }
+  /* A UNIT THAT IS A CURRENCY IS SAID IN WORDS (work2 2 Nov, 4): a key number's page read "Unit USD" over a figure
+     already in dollars; it reads "US dollars". A unit that is not a currency code is left as it was typed. */
+  if (field === 'unit' && typeof value === 'string' && /^[A-Za-z]{3}$/u.test(value.trim())) {
+    const named = currencyWords(value.trim().toUpperCase());
+    if (named !== null) return named;
   }
   /* AND THE SKILL A LEARNING BEARS ON IS SAID BY ITS NAME: How the brain changed read "Bears on: axis-qa". */
   if (register === 'learnings' && field === 'topic' && typeof value === 'string' && value.trim() !== '') return handleName(value);

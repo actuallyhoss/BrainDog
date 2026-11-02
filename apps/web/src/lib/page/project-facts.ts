@@ -15,6 +15,7 @@ import { cadenceOf, feedAgeOf } from './feed-age.ts';
 import { isForecast } from '../home/card-kpi.ts';
 import { ago, dayChip, daysBetween, endedAs, trailOf } from '../home/projects-board.ts';
 import { laneInLine } from '../shell/side.ts';
+import { AGENT_NAMES } from '../record/names.ts';
 
 /* ── what is read ──────────────────────────────────────────────────────── */
 
@@ -391,8 +392,10 @@ export function runSaid(run: Pick<FactRun, 'agent' | 'at' | 'state' | 'closedAs'
 
 const agentName = (agent: string): string => {
   const a = agent.trim().toLowerCase();
-  const known: Record<string, string> = { claude: 'Claude', codex: 'Codex', cursor: 'Cursor', gemini: 'Gemini', other: 'An agent' };
-  return known[a] ?? (agent.trim() === '' ? 'An agent' : agent.charAt(0).toUpperCase() + agent.slice(1));
+  /* EVERY AGENT THE PRODUCT KNOWS, IN ITS OWN SPELLING (`AGENT_NAMES`): this list had no ChatGPT, and said "Chatgpt". */
+  if (a === 'other') return 'An agent';
+  if (Object.hasOwn(AGENT_NAMES, a)) return AGENT_NAMES[a]!;
+  return agent.trim() === '' ? 'An agent' : agent.charAt(0).toUpperCase() + agent.slice(1);
 };
 
 /* ── the tile beside the hero, by lane ─────────────────────────────────── */
