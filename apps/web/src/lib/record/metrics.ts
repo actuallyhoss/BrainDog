@@ -889,7 +889,11 @@ export function noteOf(template: string, said: (id: string) => string | null | t
       return v === UNNAMED ? id : (v ?? '');
     })
     .replace(/(^|[^\d.,])(\d[\d,]*) ([A-Za-z]+)\(s\)/gu, (_, lead: string, n: string, word: string) => `${lead}${n} ${n === '1' ? word : manyOf(word)}`)
-    .replace(/([A-Za-z]+)\(s\)/gu, (_, word: string) => manyOf(word));
+    .replace(/([A-Za-z]+)\(s\)/gu, (_, word: string) => manyOf(word))
+    /* A SHORT ASIDE IN BRACKETS IS NEVER BROKEN (mobile pass of 2 November): Money's "Lasts until 30 Apr 2027 (179
+       days)" broke between "(179" and "days)" at 360. Its spaces are no-break ones, so the aside moves to the next line
+       whole. A link's address after `]` is no aside and is left alone. */
+    .replace(/(?<!\])\(([^()\n]{1,24})\)/gu, (aside: string) => aside.replace(/ /gu, '\u00a0'));
 }
 
 /** A `{{path}}` a lead sentence may name: a figure's id, and the page's own paths such as `steps.count` or `tasks#12.state`. */
