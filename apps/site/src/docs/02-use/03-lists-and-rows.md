@@ -18,6 +18,19 @@ On a phone the quick line sits behind the + at the top, and the list is drawn as
 
 Passwords and keys never go in a row. They go in the Keychain, and a row records what one opens.
 
+## Import your contacts
+
+To bring in the people you already know, open People and choose **Import contacts** from its ⋯ menu, or from search. People with nobody in it but you says the same under its heading.
+
+```steps
+Choose the file | A CSV from Google, Outlook, Apple or LinkedIn, or a vCard (.vcf) from your phone | On Import contacts
+Check the preview | How many people and organisations it adds, the new organisations by name, and who is already here | Before anything is added
+Press Add | New organisations are made first, then each person is linked to theirs | On the same page
+Tidy what the import left | One question for all of it: names written all small or all capitals get capitals, a new organisation gets the website its people's emails share, and new organisations can be marked as clients where you keep clients. Yes does all of it, Not now leaves it | Right after
+```
+
+Anybody already in People with the same email is skipped, and so is a second copy of the same person inside the file. An organisation you already keep is matched by its name, without Ltd, Inc or Co, and the people are linked to the one you have.
+
 ## Find rows
 
 - **Search** reads the fields the box names. For anything else, use the filters.

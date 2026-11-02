@@ -76,9 +76,28 @@ Money comes with rules that ask before they act:
 - An account whose balance was last set more than a week ago tells you, because a stale balance makes Cash now wrong.
 - A cleared payment with no category is matched to a category by the words its bank line carries, where a category names them.
 
+## Import a bank statement
+
+Most banks let you download a statement as a CSV file. **Import a statement** puts its lines into the Ledger of the account it came from. Find it in the ⋯ menu on Money, on an account's own page, or by searching for it. When you set up Money and add a bank or card account, its last step offers **Finish and import a statement**.
+
+```steps
+Pick the account | A statement goes into the account it came from. With no account yet, the page says so and offers Add an account | On Import a statement
+Drop the CSV | Or paste its lines, with the headings first | On the same page
+Check the columns | The date, description and amount columns are guessed from the headings, and you can change any of them | Under Columns
+Check the preview | New lines, in the Ledger's own money and days, with lines already in the Ledger marked and skipped | Under Preview
+Press Add | The new lines go into the Ledger | Then the account opens with them in it
+```
+
+Whether money out has a minus is read from the file itself where it can be, from a balance column or from a mix of minus and plain figures, and the page says what it read with **Not right?** beside it. Only when the file cannot settle it are you asked. Lines in another currency, or missing a date, amount or description, are left out and counted.
+
+## File what came in
+
+After an import, BrainDog offers a category for each new line by who it was paid to or from, such as Subscriptions for a streaming service or Pay for a salary: **File these lines?**, with each payee and the category beside it. Nothing is filed until you press **File**. A category you do not have yet is made when you press, and is marked new. A line no word points at is left as it is, and the page says how many: open one in the Ledger to file it by hand. In the Ledger, a line with no category shows a ? until it has one.
+
 ## Bringing money in
 
 - Type it: press **+** for a payment, or add an account on Accounts.
+- Import a bank statement as a CSV, as above.
 - Connect Stripe or Mercury from Add-ons, and balances and transactions arrive on their own. See [The inbox and doors](/docs/use/inbox-and-doors).
 - Forward card alerts or bank texts, and teach a rule to file them.
 - **Count the cash**, an add-on, writes down what is actually in a cash box or account and puts the difference from what BrainDog expected into the ledger.
