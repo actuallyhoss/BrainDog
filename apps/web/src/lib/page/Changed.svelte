@@ -44,6 +44,20 @@
     border-radius: var(--r-tile, 16px);
   }
 
+  /* NOT DRAWN WHILE A BLOCK ABOVE IT IS STILL READING (nojump, 2 Nov): the line stands at the foot of the board, so it was
+     drawn under a board that held its heading alone, then pushed down by the board's Loading and again, off a phone's
+     screen, by the board (Projects, 0.080). It keeps its place in the layout, unseen, until nothing on the page says it
+     is reading, and never longer than 5s, so a read that hangs hides it for no longer than that. */
+  :global(.page:has(.block-slot [aria-busy='true'])) > .changed {
+    visibility: hidden;
+    animation: changed-shown 0s linear 5s forwards;
+  }
+  @keyframes changed-shown {
+    to {
+      visibility: visible;
+    }
+  }
+
   .changed-said {
     display: flex;
     flex: 1;

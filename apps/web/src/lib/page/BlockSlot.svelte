@@ -1008,7 +1008,9 @@
   </div>
   {#if most !== null}<button type="button" class="block-more tap" data-queue-more onclick={(e) => void unfold(e, most)}>{words.more(every.length - most)}</button>{/if}
 {:else if board}
-  {#await import('$lib/home/ProjectsBoard.svelte') then { default: ProjectsBoard }}<ProjectsBoard list={board} entries={(block.entries ?? []) as never} />{/await}
+  <!-- WHILE THE BOARD'S CODE COMES THE SLOT SAYS IT IS STILL READING, as the board says itself once it reads (`Waiting`),
+       so what stands under it on the page (`Changed.svelte`) waits unseen rather than being drawn and pushed down. -->
+  {#await import('$lib/home/ProjectsBoard.svelte')}<span hidden aria-busy="true"></span>{:then { default: ProjectsBoard }}<ProjectsBoard list={board} entries={(block.entries ?? []) as never} />{/await}
 {:else if projectCards}
   <!-- THE CARDS ON THE BOARD, NOT IN A TILE (proj F5): the slot's fill and padding go (`:has(> .project-cards)` below),
        its heading is the lane bar, and the cards take the one grid every screen lays them in. -->
