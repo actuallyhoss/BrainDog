@@ -7,7 +7,7 @@
  * was read. A list of targets has a number and a unit and no moment, and is not one: a target was never read on a day.
  */
 
-import { dateSaid, money, exponentOf } from 'braindog-render';
+import { dateSaid, money, exponentOf, withUnit } from 'braindog-render';
 
 import type { Fields, RegisterDecl } from './schema.ts';
 
@@ -40,8 +40,7 @@ export function valueSaid(fields: Readonly<Fields>, r: Reading): string | null {
   if (CURRENCIES.has(unit)) return money(Math.round(n * 10 ** exponentOf(unit)), unit);
   const figure = `${n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('en-GB', { maximumFractionDigits: 3 })}`;
   if (unit === '') return figure;
-  if (unit === '%') return `${figure}%`;
-  return `${figure} ${Math.abs(n) === 1 && /[a-z]s$/u.test(unit) ? unit.slice(0, -1) : unit}`;
+  return withUnit(figure, Math.abs(n) === 1 && /[a-z]s$/u.test(unit) ? unit.slice(0, -1) : unit);
 }
 
 /** The reading and the day it was read, "16.4% on 28 Sep": the moment it holds, else the day the row was added. */

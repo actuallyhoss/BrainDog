@@ -10,7 +10,7 @@
  * PLAIN TYPESCRIPT, so a test can load it in Node.
  */
 
-import { WIDGETS, dayShort, moneyWhole, widgetMatches, type GalleryAnswer, type GalleryWidget, type ReadFigure, type ReadRow, type WidgetOffer, type WidgetSize } from 'braindog-render';
+import { WIDGETS, dayShort, moneyWhole, withUnit, widgetMatches, type GalleryAnswer, type GalleryWidget, type ReadFigure, type ReadRow, type WidgetOffer, type WidgetSize } from 'braindog-render';
 
 /** The sheet's own words (a unit's new words live in a module it owns, never in `copy.ts`). */
 export const sheetWords = {
@@ -114,7 +114,7 @@ export function figureSaid(f: Pick<ReadFigure, 'value' | 'unit' | 'format'>, hom
       return Math.round(n).toLocaleString('en');
     default: {
       const said = n.toLocaleString('en', { maximumFractionDigits: 1 });
-      return f.unit && f.unit !== 'count' ? `${said} ${f.unit}` : said;
+      return f.unit && f.unit !== 'count' ? withUnit(said, f.unit) : said;
     }
   }
 }

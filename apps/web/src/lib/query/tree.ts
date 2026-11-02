@@ -30,7 +30,7 @@ import {
   type Schema,
   type SentenceDeps,
 } from '@braindog/where';
-import { exponentOf } from 'braindog-render';
+import { exponentOf, withUnit } from 'braindog-render';
 import type { Filter } from '../record/schema.ts';
 
 /** How deep groups nest. At the cap the add-group control disables and shows the meter; it never refuses. */
@@ -397,7 +397,7 @@ function wordsOf(v: unknown): string {
       const places = exponentOf(o.currency);
       return `${o.currency} ${(o.amount / 10 ** places).toFixed(places)}`;
     }
-    if (typeof o.value === 'number' && typeof o.unit === 'string') return `${o.value} ${o.unit}`;
+    if (typeof o.value === 'number' && typeof o.unit === 'string') return withUnit(String(o.value), o.unit);
   }
   return String(v);
 }

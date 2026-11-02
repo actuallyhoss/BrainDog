@@ -28,6 +28,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { tick } from 'svelte';
+  import { withUnit } from 'braindog-render';
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { display, homeCurrency } from '$lib/record/api.ts';
@@ -313,7 +314,7 @@
   function said(p: Past): string {
     const shown = readings ? (p.money ? display(readings, 'amount', p.money) : display(readings, 'value', p.value)) : null;
     const figure = shown ?? p.typed;
-    return p.money || p.unit === '' ? figure : `${figure} ${p.unit}`;
+    return p.money || p.unit === '' ? figure : withUnit(figure, p.unit);
   }
 
   const swap = (p: Past) => (past = (past ?? []).map((x) => (x.seq === p.seq ? p : x)));

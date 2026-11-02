@@ -58,7 +58,7 @@ import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitFigures, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, SERIES_PALER, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
-import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesOnly, linesPlan } from './lines.ts';
+import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesKeyed, linesOnly, linesPlan } from './lines.ts';
 import { linesTrend } from './lines-trend.ts';
 import { PROGRESS_ALL_BUDGETS, PROGRESS_NONE, budgetTotal, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
@@ -1705,7 +1705,8 @@ function lines(b: Block, o: RenderOptions): string {
           : ''
       }${age ? `<span class="lines-against" data-old="">${escape(age)}</span>` : ''}</p>`
     : '';
-  const legend = `<ul class="lines-legend">${plan.lines
+  const keyed = linesKeyed(plan);
+  const legend = keyed.length === 0 ? '' : `<ul class="lines-legend">${keyed
     .map((l) => `<li class="lines-key"${l.was ? ' data-was=""' : ''} data-step="${l.step}"><span class="lines-swatch" aria-hidden="true"></span><span class="lines-name">${escape(l.label)}</span></li>`)
     .join('')}</ul>`;
   const paths =

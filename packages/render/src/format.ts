@@ -216,8 +216,19 @@ export const symbolText = (text: string, headline = false, home?: Home): string 
 const signed = (value: number, body: (n: number) => string): string =>
   `${value < 0 ? MINUS : ''}${body(Math.abs(value))}`;
 
+/**
+ * A FIGURE AND ITS UNIT, AS ONE: a percent, a per mille and a degree hug the figure ("1.8%", "21°"), and every other unit
+ * stands a space away ("25 hours"). THE ONE JOIN, SO A PERCENT IS WRITTEN ONE WAY APP-WIDE (leftovers 2 Nov, 6): the
+ * Dashboard's Churn read "1.8 %" beside Tidepool's "1.8%".
+ */
+export const withUnit = (figure: string, unit: string | null | undefined): string => {
+  const u = (unit ?? '').trim();
+  if (u === '') return figure;
+  return /^(?:%|‰|°[CF]?)$/u.test(u) ? `${figure}${u}` : `${figure} ${u}`;
+};
+
 export const quantity = (value: number, unit: string): string =>
-  `${signed(value, (n) => n.toLocaleString(NUM, { maximumFractionDigits: 3 }))}${unit ? ` ${unit}` : ''}`;
+  withUnit(signed(value, (n) => n.toLocaleString(NUM, { maximumFractionDigits: 3 })), unit);
 
 export const pct = (value: number): string =>
   `${signed(value, (n) => n.toLocaleString(NUM, { maximumFractionDigits: 1 }))}%`;

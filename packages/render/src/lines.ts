@@ -38,6 +38,18 @@ export type LinesLine = {
   end: string;
 };
 
+/**
+ * THE LINES THE LEGEND NAMES: those the chart draws, and none while fewer than two are drawn (leftovers 2 Nov, 5). The
+ * Dashboard's Sprint hours named "Previous 30 days" beside a line that had no two readings to draw, a key to nothing. A
+ * line is drawn when its path runs or holds a dot; a current line also by the dot at its last reading. One line needs no
+ * key: the heading names it.
+ */
+export function linesKeyed(plan: Pick<LinesPlan, 'lines' | 'empty'>): LinesLine[] {
+  if (plan.empty) return [];
+  const drawn = plan.lines.filter((l) => /[Lh]/u.test(l.d) || (!l.was && l.end !== ''));
+  return drawn.length < 2 ? [] : drawn;
+}
+
 export type LinesPlan = {
   /** What the first column names: `Day`. */
   axis: string;

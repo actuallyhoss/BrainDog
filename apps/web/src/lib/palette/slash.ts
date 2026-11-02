@@ -15,7 +15,7 @@
  * and the predicate is data.
  */
 
-import { exponentOf, yesno } from 'braindog-render';
+import { exponentOf, withUnit, yesno } from 'braindog-render';
 import type { Reading, SlashProposal, SlashStatus, SlashWhere } from '@braindog/client';
 import type { QueueQuestion } from '@braindog/kernel';
 
@@ -88,7 +88,7 @@ const valueWords = (v: unknown): string => {
       const places = exponentOf(o['currency']);
       return `${o['currency']} ${(o['amount'] / 10 ** places).toFixed(places)}`;
     }
-    if (typeof o['value'] === 'number' && typeof o['unit'] === 'string') return `${String(o['value'])} ${o['unit']}`;
+    if (typeof o['value'] === 'number' && typeof o['unit'] === 'string') return withUnit(String(o['value']), o['unit']);
   }
   return JSON.stringify(v) ?? String(v);
 };

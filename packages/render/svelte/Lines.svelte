@@ -14,7 +14,7 @@
 -->
 <script lang="ts">
   import { inline, text, type Block, type RenderOptions } from '../src/index.ts';
-  import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesNearest, linesOnly, linesPlan } from '../src/lines.ts';
+  import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesAge, linesKeyed, linesNearest, linesOnly, linesPlan } from '../src/lines.ts';
   import { linesTrend } from '../src/lines-trend.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -24,6 +24,8 @@
   const was = $derived(plan.lines.filter((l) => l.was));
   const current = $derived(plan.lines.filter((l) => !l.was));
   const trend = $derived(linesTrend(plan));
+  /* THE LEGEND NAMES WHAT IS DRAWN, and nothing for one line (`linesKeyed`). */
+  const keyed = $derived(linesKeyed(plan));
   /* AN OLD READING SAYS ITS AGE beside the figure it leads with (`linesAge`). */
   const age = $derived(linesAge(plan, opts.now));
 
@@ -49,11 +51,13 @@
         <span class="lines-now num">{plan.now}</span>{#if plan.change}<span class="lines-change num" data-trend={plan.trend}>{plan.change}</span><span class="lines-against">{LINES_AGAINST} {plan.against}, <span class="num">{plan.then}</span></span>{/if}{#if age}<span class="lines-against" data-old="">{age}</span>{/if}
       </p>
     {/if}
-    <ul class="lines-legend">
-      {#each plan.lines as l}
-        <li class="lines-key" data-was={l.was ? '' : undefined} data-step={l.step}><span class="lines-swatch" aria-hidden="true"></span><span class="lines-name">{l.label}</span></li>
-      {/each}
-    </ul>
+    {#if keyed.length > 0}
+      <ul class="lines-legend">
+        {#each keyed as l}
+          <li class="lines-key" data-was={l.was ? '' : undefined} data-step={l.step}><span class="lines-swatch" aria-hidden="true"></span><span class="lines-name">{l.label}</span></li>
+        {/each}
+      </ul>
+    {/if}
     {#if plan.empty}
       <p class="lines-empty">{LINES_NONE}</p>
     {:else}

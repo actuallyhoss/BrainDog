@@ -143,7 +143,7 @@ export { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_STEPS, SPLIT_ZERO, splitPl
 export { SLOT_HUES, slotOf, type Slot } from './slot.ts';
 export { BRIDGE_AMOUNT, BRIDGE_STEP, BRIDGE_UNKNOWN, bridgeOff, bridgePlan, bridgeSentence, moveOf, signedOf, type BridgeBar, type BridgeMove, type BridgePlan } from './bridge.ts';
 export { SERIES_AHEAD, SERIES_DUE, SERIES_MOST, SERIES_NET, SERIES_NONE, SERIES_NUMBERS, SERIES_PARTIAL, SERIES_POINTS, seriesNice, seriesPlan, seriesValue, type SeriesBar, type SeriesDir, type SeriesPlan, type SeriesState, type SeriesTick, type SeriesTotal } from './series.ts';
-export { LINES_AGAINST, LINES_MOST, LINES_NONE, LINES_NOTHING, LINES_NUMBERS, changeSaid, linesNearest, linesPlan, linesValue, type LinesLine, type LinesPlan } from './lines.ts';
+export { LINES_AGAINST, LINES_MOST, LINES_NONE, LINES_NOTHING, LINES_NUMBERS, changeSaid, linesKeyed, linesNearest, linesPlan, linesValue, type LinesLine, type LinesPlan } from './lines.ts';
 export {
   PROGRESS_LIMIT,
   PROGRESS_NEAR,
@@ -266,6 +266,7 @@ export {
   money,
   pct,
   quantity,
+  withUnit,
   readable,
   ref,
   relative,
