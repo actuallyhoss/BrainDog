@@ -1,6 +1,6 @@
 {
   "pack": "insurance",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "icon": "shield",
   "title": "Insurance",
   "summary": "Your life and savings policies: who the insurer is, what the premium is and where it is paid, the cover, what the fund is worth and from when, and when it matures.",
@@ -647,6 +647,10 @@
               {
                 "metric": "policies-fund-stale",
                 "is": 0
+              },
+              {
+                "metric": "policies-fund",
+                "gt": 0
               }
             ]
           },
