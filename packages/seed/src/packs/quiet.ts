@@ -460,8 +460,14 @@ export function leggedByAddons(id: string): boolean {
  * a plan that would lose anything, add a declaration, or reach outside the record is left alone. A pack whose plan
  * changes nothing is not installed, so no version moves; the pack stays at the version it holds.
  * Answers the packs put in.
+ *
+ * WITH `links` (leftovers 4, 2 Nov), EVERY ONE OF THE FIVE, AND THE LINKS THAT CAME AFTER IT: the night's relink
+ * (`updateFirstParty`'s last loop), run the moment a module or a starter goes in instead of on the next pass. A founder
+ * starts on Projects and Money and gains People after, so until that pass Money's lists had no Who (`party`): the
+ * founder's Late and Due this week and every organisation page's Money were refused for a field the list did not have,
+ * and a row written in between lost who it was with.
  */
-export async function relegFirstParty(port: Pick<QuietPort, 'held' | 'document' | 'plan' | 'install' | 'nameOf' | 'tookOff'>): Promise<string[]> {
+export async function relegFirstParty(port: Pick<QuietPort, 'held' | 'document' | 'plan' | 'install' | 'nameOf' | 'tookOff'>, o: { links?: boolean } = {}): Promise<string[]> {
   const went: string[] = [];
   const nameOf = (id: string): string => {
     const said = port.nameOf?.(id);
@@ -469,7 +475,7 @@ export async function relegFirstParty(port: Pick<QuietPort, 'held' | 'document' 
   };
   const tookOff = new Set((await port.tookOff?.()) ?? []);
   for (const id of FIRST_PARTY) {
-    if (!leggedByAddons(id)) continue;
+    if (!o.links && !leggedByAddons(id)) continue;
     const held = (await port.held()).find((p) => p.id === id && p.on && p.version !== null);
     if (!held) continue;
     const given = await port.document(id);
@@ -481,7 +487,11 @@ export async function relegFirstParty(port: Pick<QuietPort, 'held' | 'document' 
     const planned = await port.plan(doc);
     if (!planned.ok) continue;
     const diff = planned.value;
-    if (diff.changes.length === 0 || diff.adds.length > 0 || losses(diff, nameOf, tookOff).length > 0 || unready(diff) !== null) continue;
+    /* WITH `links`, AN ADD THAT READS A LINK THIS SAME PLAN LAYS BACK goes in with it, as the night's relink lets it
+       (`laidWithLink`); any other add still keeps the pack as it is. */
+    const changed = diff.changes.map((c) => c.id);
+    const adds = o.links ? diff.adds.filter((a) => !laidWithLink(id, doc, a.id, changed)) : diff.adds;
+    if (diff.changes.length === 0 || adds.length > 0 || losses(diff, nameOf, tookOff).length > 0 || unready(diff) !== null) continue;
     if ((await port.install(doc, diff.planHash)).ok) went.push(id);
   }
   return went;

@@ -3727,10 +3727,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * Cash ahead counts Certificates the moment it is in and stops naming its list once it is gone, with no question and no
    * new version. Any throw is swallowed: the install that ran this is in already.
    */
-  const legsFollow = async (ctx: CallContext): Promise<string[]> => {
+  const legsFollow = async (ctx: CallContext, o: { links?: boolean | string } = {}): Promise<string[]> => {
     try {
       const { relegFirstParty } = await import('@braindog/seed/packs/quiet');
-      const { firstPartyManifest } = await import('@braindog/seed/packs');
+      const { firstPartyManifest, FIRST_PARTY } = await import('@braindog/seed/packs');
+      /* THE LINKS ARE LAID BACK AFTER A SETUP, OR AFTER ONE OF THE FIVE WENT IN BY NAME (`links` is its id). */
+      const links = o.links === true || (typeof o.links === 'string' && (FIRST_PARTY as readonly string[]).includes(o.links));
       const { moduleDocument, dayOf } = await import('@braindog/seed/usecases/install');
       const { useCase } = await import('@braindog/seed/usecases');
       /* THE RE-PUT IS THE RECORD'S OWN, signed `system` whoever's press set it off, so a same-version one that changed
@@ -3770,7 +3772,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const body = kernel.declarations().find((d) => d.id === id)?.body as { name?: unknown; title?: unknown } | undefined;
           return typeof body?.name === 'string' ? body.name : typeof body?.title === 'string' ? body.title : null;
         },
-      });
+      }, { links });
     } catch {
       return [];
     }
@@ -15181,7 +15183,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND EVERY ADD-ON WITH A PART THAT WAITED IS PLANNED AGAIN, once (`arrange.ts` `planAgain`): a field that waited for
          what this install brought is there with no press, signed by whoever installed it. */
       if (put.ok) await waitedFor(ctx);
-      if (put.ok) await legsFollow(ctx);
+      /* A MODULE COMING IN LAYS BACK THE LINKS THE OTHERS LEFT OUT FOR IT (leftovers 4): People in after Money gives the
+         ledger and the bills their Who now, not on the night's pass. */
+      if (put.ok) await legsFollow(ctx, { links: pack.value.manifest.pack });
       return tail(put.ok && reworded.length > 0 ? { ...put, value: { ...put.value, said: reworded } } : put);
     },
 
@@ -15238,6 +15242,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const broken = kernel.refused();
       if (broken) return { ok: false, refusal: broken };
       const out = await arrangement.setup(args, actorOf(ctx));
+      /* AND THE LINKS ONE MODULE LEFT OUT FOR ANOTHER THAT CAME AFTER IT (leftovers 4): a founder's Money goes in before
+         People, so its lists had no Who until the night's pass, and the starter's Late and Due this week were refused
+         for it. Laid back here, before anything is written to them. */
+      if (out.ok) await legsFollow(ctx, { links: true });
       /* WITH PEOPLE OFF THE NAME WENT TO THE ACCOUNT, and the Directory follows where this host keeps it beside the
          record, as a rename's does (`methods/person-name.ts`). */
       if (out.ok && out.value.done.me?.includes('account') && deps.directory) {
