@@ -32,6 +32,11 @@ export const words = {
   sentence: 'Bring in the people from a contacts file. You see who will be added before anything is.',
   file: 'Your contacts file',
   drop: 'Drop a contacts file here, or choose one. A CSV or a vCard (.vcf) from your phone, Google, Outlook or LinkedIn.',
+  /* THE DROP ZONE IN TWO LINES AND A BUTTON (ui-work 2 Nov): one centred sentence in a dashed box gave nothing that read
+     as pressable, and a phone has nothing to drop. */
+  dropHere: 'Drop a contacts file here',
+  dropWhat: 'A CSV or a vCard (.vcf) from your phone, Google, Outlook or LinkedIn.',
+  choose: 'Choose a file',
   notRead: 'That file could not be read as contacts. Export a CSV or a vCard (.vcf) and try that.',
   noNames: 'No names in that file. A contacts file has a name column, or a name on each card.',
   preview: 'What it will add',

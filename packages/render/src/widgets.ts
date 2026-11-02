@@ -577,6 +577,7 @@ const SLUG = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+$/u;
 const AGENT_NAMES: Readonly<Record<string, string>> = {
   claude: 'Claude',
   'claude-code': 'Claude Code',
+  chatgpt: 'ChatGPT',
   codex: 'Codex',
   cursor: 'Cursor',
   gemini: 'Gemini',

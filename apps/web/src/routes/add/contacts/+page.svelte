@@ -229,7 +229,11 @@
         ondragleave={() => (dragging = false)}
         {ondrop}
       >
-        <span>{words.drop}</span>
+        <span class="ct-drop-words">
+          <span class="ct-drop-head">{words.dropHere}</span>
+          <span class="ct-drop-what">{words.dropWhat}</span>
+          <span class="ct-choose" aria-hidden="true">{words.choose}</span>
+        </span>
         <input class="ct-file" type="file" accept=".csv,.vcf,.vcard,.txt,text/csv,text/vcard,text/x-vcard" onchange={(e) => void pick(e.currentTarget.files?.[0])} />
       </label>
       {#if why}<p class="ct-warn" role="alert">{why}</p>{/if}
@@ -387,6 +391,47 @@
     font-size: var(--fs-body);
     text-align: center;
     cursor: pointer;
+  }
+
+  .ct-drop-words {
+    display: grid;
+    justify-items: center;
+    gap: var(--sp-1);
+  }
+
+  .ct-drop-head {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
+  .ct-drop-what {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  /* DRAWN AS THE QUIET BUTTON; THE WHOLE BOX IS THE FILE INPUT, so this is its picture, not a second control. */
+  .ct-choose {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    margin-block-start: var(--sp-2);
+    padding-inline: var(--sp-3);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+  }
+
+  /* A PHONE HAS NOTHING TO DROP: the button and what it takes. */
+  @media (pointer: coarse) {
+    .ct-drop-head {
+      display: none;
+    }
+  }
+
+  .ct-drop:hover .ct-choose {
+    background: var(--hover);
   }
 
   .ct-drop[data-over] {

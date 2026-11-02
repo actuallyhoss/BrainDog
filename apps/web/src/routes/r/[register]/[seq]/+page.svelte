@@ -1746,7 +1746,9 @@
         <!-- THE BODY: a `document` field is the dialect, drawn by the same interpreter a declared page uses, one tile
              each. The read view IS the renderer, so what you are looking at is the artefact (22 §8). -->
         {#each writtenDocuments as f (f.id)}
-          <Tile title={labelOf(f)}>
+          <!-- WITH THE HEADING WELL EVERY OTHER TILE ON THE PAGE HAS (ui-work 2 Nov): Notes on an organisation was the one
+               tile between People, Ledger, Tasks and Activity whose name stood bare. -->
+          <Tile icon="file-text" title={labelOf(f)}>
             {#snippet actions()}{#if changes && editing !== f.id}{@render pencil(f)}{/if}{/snippet}
             <article class="document-slot">
               {#if editing === f.id}
