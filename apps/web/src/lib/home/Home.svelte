@@ -48,10 +48,6 @@
   /** The reader once landed, so a later Today draws it at once and not a turn after. */
   let pageViewHad: (typeof import('$lib/page/PageView.svelte'))['default'] | null = null;
   const pageViewOf = () => (pageViewIs ??= import('$lib/page/PageView.svelte').then((m) => ((pageViewHad = m.default), m)));
-  /* ASKED AS THIS MODULE IS EVALUATED, as the comment above always said: it was asked only once Home mounted, after the
-     root layout's read had come back and the frame had drawn, so its ~90 chunks went out a whole read later than they
-     could. A chunk that fails is asked again by the mount, as before. */
-  if (typeof window !== 'undefined') void pageViewOf().catch(() => (pageViewIs = null));
 </script>
 
 <script lang="ts">

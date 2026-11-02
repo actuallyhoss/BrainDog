@@ -753,8 +753,10 @@
     <KeyViews on="keys" />
     <!-- ON A PHONE "Add a key" IS THE TOOLBAR'S CIRCLE: ink while it is the one thing to press, glass
          while a request waiting for its digits holds the screen's one primary. At a desk it is the list's own pill. -->
-    {#if acts && index.kind === 'held'}
-      <span class="add-phone">
+    <!-- AND ITS PLACE HELD, UNSEEN, WHILE THE KEYS ARE READ: drawn only once they landed, the circle widened the row
+         and pushed the buttons under the sentence, and the page dropped 32px on a phone (0.28 of its layout shift). -->
+    {#if (acts && index.kind === 'held') || from === 'reading'}
+      <span class="add-phone" style:visibility={acts && index.kind === 'held' ? undefined : 'hidden'} aria-hidden={acts && index.kind === 'held' ? undefined : 'true'}>
         <!-- INK, NEVER THE RED (live check, 1 Nov): with Unlock, an empty list's Add a key or a request's Allow once on the
              screen, the circle made two red buttons on a phone. The screen's one red is the one that needs him. -->
         <Button weight={waiting.length ? 'glass' : 'ink'} aria-label={tileWords.addKey} title={tileWords.addKey} onclick={openAdd}>

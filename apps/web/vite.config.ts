@@ -127,13 +127,7 @@ const entryGraphPlugin: Plugin = {
 function resolveDependencies(file: string, deps: string[], { hostId, hostType }: { hostId: string; hostType: 'html' | 'js' }) {
   if (hostType !== 'js') return deps;
   if (lightFrame.has(file)) return [...new Set([...deps.filter((d) => d === file || !kitEntry.has(d)), ...lightDeps])];
-  /* A LIST IN ANY OTHER CHUNK LEAVES OUT ONLY WHAT KIT'S ENTRY IMPORTS. Every route node is an entry of the bundle, so
-     the entry graph is every chunk a route reaches, and a list Home holds for the page reader (or a page for any chunk it
-     asks by `import()`) named that chunk alone: its ~90 imports were then found one level at a time, a round trip each,
-     after it arrived. Outside Kit's entry a longer list costs the entry nothing, and a chunk already in the page is not
-     asked twice. */
-  const graph = kitEntry.has(hostId) ? entryGraph : kitEntry;
-  const kept = deps.filter((d) => d === file || !graph.has(d));
+  const kept = deps.filter((d) => d === file || !entryGraph.has(d));
   if (/(?:^|\/)nodes\/0\.[\w-]+\.js$/u.test(file)) {
     layoutDeps.set(hostId, new Set(kept));
     return kept;
