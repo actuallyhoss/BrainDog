@@ -59,7 +59,11 @@ If only part of a change could be applied, Needs you says what was done and kept
 
 ## Who can answer
 
-The owner answers everything. A colleague at the Decides level can answer questions and change rows. Changes that arrange BrainDog itself, such as installing an add-on or adding a page, are the owner's to accept. See [Sharing and access](/docs/use/sharing).
+The owner answers everything. A colleague who **Can decide** can answer questions and change rows. Changes that arrange BrainDog itself, such as installing an add-on or adding a page, are the owner's to accept. See [Sharing and access](/docs/use/sharing).
+
+## Talk it over
+
+Every question has a thread under it. A colleague can comment there, and writing a name with @ brings that person in: it shows in their bell under For you, and rings their phone if they have BrainDog on it. Somebody who cannot see the question is never told about it. A comment on a decision goes to its question's thread.
 
 ## Decisions afterwards
 

@@ -66,8 +66,11 @@ Open a row (Enter, or click its title) to see all of it:
 
 - every field, each one changeable in place;
 - notes, added with **Add a note**;
+- comments, added with **Add a comment**, where writing a colleague's name with @ brings them in;
 - what points at this row from other lists, and through which field;
 - when it was added, and by whom: you, a colleague, an agent or a rule.
+
+While you have a row open, a change somebody else makes to it shows by itself, and comments arrive without a reload.
 
 Press p on a list to peek at a row without leaving the list, o to open the list a linked field points at, and y to copy a row's number (Shift+Y copies its link).
 
