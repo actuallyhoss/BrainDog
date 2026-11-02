@@ -300,8 +300,7 @@
      has room, and their border ran the whole way out; drawn as a background strip it is inset by the same padding, as the
      ledger's own rule is. */
   @media (width < 640px) {
-    .rows > .row,
-    .list > .item {
+    .rows > .row {
       border-block-end: 0;
       background-image: linear-gradient(var(--rule), var(--rule));
       background-repeat: no-repeat;
@@ -309,8 +308,7 @@
       background-size: calc(100% - 2 * var(--sp-3)) 1px;
     }
 
-    .rows > .row:last-child,
-    .list > .item:last-child {
+    .rows > .row:last-child {
       background-image: none;
     }
   }
@@ -494,6 +492,23 @@
 
   .list > .item:last-child {
     border-block-end: 0;
+  }
+
+  /* THE LIST'S HAIRLINE ON A PHONE, AFTER THE LIST'S OWN RULES (2 Nov). The inset strip `.rows` draws above was written for
+     `.list > .item` too, but it stood before `.list > .item` in this layer, so the list's own border won and every list
+     on a phone (Open on Sentry, Worth a look, Settings' index) ran its rule 12px past the text at each end. */
+  @media (width < 640px) {
+    .list > .item {
+      border-block-end: 0;
+      background-image: linear-gradient(var(--rule), var(--rule));
+      background-repeat: no-repeat;
+      background-position: center bottom;
+      background-size: calc(100% - 2 * var(--sp-3)) 1px;
+    }
+
+    .list > .item:last-child {
+      background-image: none;
+    }
   }
 
   .list[data-kind='steps'] > .item {
