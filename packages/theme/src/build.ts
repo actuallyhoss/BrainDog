@@ -1178,6 +1178,16 @@ export const FRAME_ROLES = [
   'red',
   'red-tint',
   'red-tint-2',
+  /* A CHOSEN THING AND A LINK, APART FROM THE RED (dark grey lane, 2 Nov). In light each is the accent, as it was:
+     `chosen` its first tint (a picked row, a pressed choice), `chosen-2` its second (a text selection, a chosen row
+     under the pointer), `on` its fill (a ticked box, a chosen ring, the edge of the chosen or suggested answer), `on-mark`
+     the label on it, `link` red as words. In dark they are the greys and the ink, so the accent is only the one main
+     action and red only what is late or failing: the page reads grey, not red. */
+  'chosen',
+  'chosen-2',
+  'on',
+  'on-mark',
+  'link',
   ...CATS.flatMap((c) => [`cat-${c}`, `cat-${c}-tint`] as const),
   /* EACH SLOT AS A FILL (polish5, 2 Nov): a bar, a part of a donut, a budget's track. `cat-<slot>` is held at 4.5:1 as
      words, and in light that floor leaves a yellow and a lime nowhere but olive (#7E6300, #437010 at OKLCH L 0.51), which
@@ -1298,6 +1308,12 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     red: RED_WORDS_LIGHT,
     'red-tint': '#FBEBE9',
     'red-tint-2': '#F5D9D8',
+    /* In light the chosen and the link are the accent's, the very values above (`frameOf` reads them off again). */
+    chosen: '#FBEBE9',
+    'chosen-2': '#F5D9D8',
+    on: '#CF413A',
+    'on-mark': '#FFFFFF',
+    link: RED_WORDS_LIGHT,
     ...cats('light'),
   } as Frame,
   dark: {
@@ -1317,22 +1333,28 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
        2026-11-01, THE FRAME A DEEP CRIMSON, NOT AN OXBLOOD (his word: a red dark bar, but not oxblood or brown): #2B1418
        sat at hue 9 with little colour, which at that depth reads brown. The bar is #2E0C18, hue 1 at half again the
        colour (OKLCH 0.216 0.058 1), clearly red and leaning neither to yellow nor to violet, ink at 15.5 and ink-3 at
-       6.0 on it; its chosen place #431628 holds ink-3 at 5.1. */
+       6.0 on it; its chosen place #431628 holds ink-3 at 5.1.
+       2026-11-02, GREY, NOT RED (his word: "the dashboard accents (in dark mode) are too red now ... maybe the main
+       content can be more grey-tones instead of reddish"). Every neutral, the bar and the rail with them, is the grey
+       of its own luminance with no hue (#231A1A to #1C1C1C, #2E0C18 to #181818, ink #F5EEEF to #F0F0F0), so every pair
+       above measures as it did. The rail's chosen place is a plain step up, #2C2C2C, ink-3 at 4.7. The red is the one
+       main action and what is late or failing, and a touch quieter: the fill at 0.88 of its chroma (#C2362F to
+       #BA4239, white on it 5.35), the words the same (#EA645B to #E16C63), the late well 0.27 0.04 14 (#381E20). */
     board: '#0B0B0B',
-    tile: '#231A1A',
-    'tile-2': '#322526',
-    hover: '#2D2021',
-    nav: '#2E0C18',
-    'nav-selected': '#431628',
-    rule: '#3C2D2F',
-    'rule-strong': '#4E3C3D',
+    tile: '#1C1C1C',
+    'tile-2': '#282828',
+    hover: '#232323',
+    nav: '#181818',
+    'nav-selected': '#2C2C2C',
+    rule: '#313131',
+    'rule-strong': '#404040',
     scrim: 'rgb(7 7 7 / 0.6)',
-    toast: '#3D2E2F',
-    'on-toast': '#F5EEEF',
-    ink: '#F5EEEF',
-    'ink-2': '#CCBEBF',
-    'ink-3': '#A39293',
-    focus: '#F5EEEF',
+    toast: '#323232',
+    'on-toast': '#F0F0F0',
+    ink: '#F0F0F0',
+    'ink-2': '#C1C1C1',
+    'ink-3': '#969696',
+    focus: '#F0F0F0',
     good: '#5FD08F',
     'good-tint': '#14301F',
     warn: '#F0A64B',
@@ -1342,17 +1364,25 @@ export const HOUSE_FRAME: Record<Scheme, Frame> = {
     info: '#7AA7FF',
     'info-tint': '#18264A',
     live: '#47D486',
-    'switch-off': '#7C686A',
+    'switch-off': '#6D6D6D',
     knob: '#FFFFFF',
-    'segment-on': '#403132',
-    arrived: '#352B2C',
-    'red-fill': '#C2362F',
-    'red-fill-hover': '#CF3F37',
-    'red-fill-press': '#B02F29',
+    'segment-on': '#353535',
+    arrived: '#2D2D2D',
+    'red-fill': '#BA4239',
+    'red-fill-hover': '#C64A41',
+    'red-fill-press': '#A83A32',
     'on-red': '#FFFFFF',
-    red: '#EA645B',
-    'red-tint': '#3B1E22',
-    'red-tint-2': '#55262A',
+    red: '#E16C63',
+    'red-tint': '#381E20',
+    'red-tint-2': '#462529',
+    /* A chosen thing a grey step over the tile (ink-3 on it 4.6) and a selection one more (ink-2 on it 5.8); a ticked box
+       and the chosen ring are the ink with the tile's colour on them, as a switch that is on already was; a link is
+       the ink with its underline. */
+    chosen: '#2E2E2E',
+    'chosen-2': '#404040',
+    on: '#F0F0F0',
+    'on-mark': '#1C1C1C',
+    link: '#F0F0F0',
     ...cats('dark'),
   } as Frame,
 };
@@ -1393,6 +1423,13 @@ export const FRAME_PAIRS: readonly FramePair[] = [
   ...[...CATS.map((c) => `cat-${c}-fill` as const), 'warn-fill' as const].flatMap((fg) =>
     (['tile', 'tile-2'] as const).map((bg) => ({ fg: fg as FrameRole, bg, floor: 'fill' as const, what: `${fg} as a bar` })),
   ),
+  /* THE CHOSEN AND THE LINK (dark grey lane, 2 Nov): every word on a chosen thing, a selection's words, a link on every
+     ground it is drawn on, and the ticked box against its ground and under its tick. */
+  ...(['ink', 'ink-2', 'ink-3'] as const).map((fg) => ({ fg, bg: 'chosen' as const, floor: (fg === 'ink' ? 'ink' : fg === 'ink-2' ? 'ink2' : 'ink3') as FrameFloor, what: 'words on a chosen thing' })),
+  ...(['ink', 'ink-2'] as const).map((fg) => ({ fg, bg: 'chosen-2' as const, floor: 'text' as const, what: 'text in a selection' })),
+  ...([...WORDS_ON, 'chosen'] as const).map((bg) => ({ fg: 'link' as const, bg, floor: 'text' as const, what: 'a link' })),
+  ...(['board', 'tile'] as const).map((bg) => ({ fg: 'on' as const, bg, floor: 'fill' as const, what: 'a ticked box' })),
+  { fg: 'on-mark', bg: 'on', floor: 'label', what: 'the tick on a ticked box' },
   { fg: 'on-toast', bg: 'toast', floor: 'text', what: 'a toast' },
   ...(['red-fill', 'red-fill-hover', 'red-fill-press'] as const).map((bg) => ({ fg: 'on-red' as const, bg, floor: 'label' as const, what: 'the label on a red fill' })),
   ...(['board', 'tile'] as const).map((bg) => ({ fg: 'red-fill' as const, bg, floor: 'fill' as const, what: 'a primary button' })),
@@ -1430,6 +1467,8 @@ const FRAME_GROUNDS = [
   'segment-on',
   'red-tint',
   'red-tint-2',
+  'chosen',
+  'chosen-2',
   'good-tint',
   'warn-tint',
   'info-tint',
@@ -1508,22 +1547,26 @@ export function frameOf(seed: Seed, profile: Profile, scheme: Scheme, p: Palette
      words in exactly the house ink, the one colour a reader turns the palette on for. */
   if (profile.aim?.[scheme].ink !== HOUSE_PROFILE.aim?.[scheme].ink &&contrast(rgb(p.ink), rgb(f.tile)) > contrast(rgb(f.ink), rgb(f.tile))) f.ink = p.ink;
 
-  /* 2 · THE FILL FAMILY, from the seed's own working accent where it is not the house's. */
+  /* 2 · THE FILL FAMILY, from the seed's own working accent where it is not the house's. IN DARK A TOUCH QUIETER, as
+     the house's is (dark grey lane, 2 Nov): the fill and its hover at `DARK_FILL_CHROMA` of their colour, at their own
+     lightness and hue, where the label and the grounds still clear their floors on both; a colour that would not is
+     left as the solver gave it. */
   if (!pinned) {
-    f['red-fill'] = p.action;
-    f['red-fill-hover'] = p['action-hover'];
+    const [fill, hover] = scheme === 'dark' ? quieter([p.action, p['action-hover']], p['on-action'], [f.board, f.tile]) : [p.action, p['action-hover']];
+    f['red-fill'] = fill;
+    f['red-fill-hover'] = hover;
     f['on-red'] = p['on-action'];
-    const hov = rgbToLch(rgb(p['action-hover']));
+    const hov = rgbToLch(rgb(hover));
     const labelLight = rgbToLch(rgb(p['on-action'])).L > 0.5;
     f['red-fill-press'] =
       [0.03, 0.05, 0.07]
         .map((d) => toHex(quantise({ ...hov, L: Math.min(0.98, Math.max(0.02, hov.L + (labelLight ? -d : d))) })))
-        .find((c) => contrast(rgb(c), rgb(p['on-action'])) >= 4.5) ?? p['action-hover'];
+        .find((c) => contrast(rgb(c), rgb(p['on-action'])) >= 4.5) ?? hover;
     /* As strong as the words it carries allow, each at its own floor, stepping down a percent at a time. */
     const tint = (want: number, words: [FrameRole, FrameFloor][]) => {
       const held = words.map(([w, fl]) => [f[w], frameFloor(floors, fl) ?? 4.5] as [string, number]);
       for (let a = want; a > 0.005; a -= 0.01) {
-        const t = over(p.action, f.tile, a);
+        const t = over(fill, f.tile, a);
         if (held.every(([w, fl]) => contrast(rgb(w), rgb(t)) >= fl)) return t;
       }
       return f.tile;
@@ -1572,7 +1615,39 @@ export function frameOf(seed: Seed, profile: Profile, scheme: Scheme, p: Palette
     f[role] = lift(f[role], pairs, dir);
   }
   f.focus = f.ink;
+
+  /* 4 · THE CHOSEN AND THE LINK (dark grey lane, 2 Nov). In light they are the accent's tints, fill and label and red as
+     words, read off what was just solved, so a record's colour picks its chosen rows as it always did. In dark they are
+     the frame's greys and the ink for every colour: a chosen row, a ticked box and a link say so in shape and in grey. */
+  if (scheme === 'light') {
+    f.chosen = f['red-tint'];
+    f['chosen-2'] = f['red-tint-2'];
+    f.on = f['red-fill'];
+    f['on-mark'] = f['on-red'];
+    f.link = f.red;
+  } else {
+    f.on = f.ink;
+    f['on-mark'] = f.tile;
+    f.link = f.ink;
+  }
   return f;
+}
+
+/** How much of its colour an accent's fill keeps in dark, at its own lightness and hue (dark grey lane, 2 Nov). */
+export const DARK_FILL_CHROMA = 0.88;
+
+/**
+ * An accent's fill and hover, quieter for the dark: each at `DARK_FILL_CHROMA` of its chroma, if the label on each and
+ * each against every ground a button stands on still clear 4.5 and 3. If either would not, both are kept as they were,
+ * so a fill and its hover never come from two rules.
+ */
+function quieter(fills: [string, string], label: string, grounds: string[]): [string, string] {
+  const q = fills.map((hex) => {
+    const c = rgbToLch(rgb(hex));
+    return toHex(quantise({ L: c.L, C: c.C * DARK_FILL_CHROMA, H: c.H }));
+  }) as [string, string];
+  const holds = q.every((x) => contrast(rgb(label), rgb(x)) >= 4.5 && grounds.every((g) => contrast(rgb(x), rgb(g)) >= 3));
+  return holds ? q : fills;
 }
 
 export function build(seed: Seed, profile: Profile = HOUSE_PROFILE, id = 'house'): Built {

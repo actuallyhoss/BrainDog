@@ -102,7 +102,12 @@
        Text         --ink, --ink-2, --ink-3, nothing else; --focus is the ring
        Red          --red-fill (a primary button, a count, a switch that is on, a checked box), its --red-fill-hover and
                     --red-fill-press, --on-red (any label on it, white), --red (red as words and marks: links, late,
-                    "needs you", a late dot, the selection outline), --red-tint (a chosen row), --red-tint-2 (a selection)
+                    "needs you", a late dot, the selection outline), --red-tint (a late or needs-you well),
+                    --red-tint-2 (its stronger step)
+       Chosen       --chosen (a chosen row, a pressed choice), --chosen-2 (a text selection), --on (a ticked box, a chosen
+                    ring, the chosen or suggested answer's edge) with --on-mark on it, --link (a link's words): the
+                    accent's tints, fill and red in light, the greys and the ink in dark, so dark is grey but for the one
+                    main action and what is late
        Status       --good, --warn, --info, each with its --*-tint; --live is the running dot only, never words
        Categories   --cat-blue, -violet, -pink, -teal, -sky, -yellow, -lime, -slate, each with its -tint (a project, an agent,
                     a person, a chart series)
