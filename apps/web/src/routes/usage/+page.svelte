@@ -276,6 +276,9 @@
         <a class="segment month" href={at(`/usage?month=${beside.later}`)} aria-label={words.monthIn(monthWords(beside.later))}>{monthWords(beside.later)}</a>
       {/if}
     </Segmented>
+  {:else if usage.state === 'waiting' && !wide.current}
+    <!-- ITS ROOM HELD ON A PHONE WHILE THE MONTH IS READ: the switch landed under the sentence and pushed the page down. -->
+    <div class="months-held" aria-hidden="true"></div>
   {/if}
 {/snippet}
 
@@ -534,6 +537,10 @@
       justify-self: start;
       inline-size: max-content;
     }
+  }
+
+  .months-held {
+    block-size: 48px;
   }
 
   :global(.months) .month {

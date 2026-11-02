@@ -941,7 +941,9 @@
       <!-- ASK SLASH AND HAND IT OFF, under the answers on Decide itself: Slash explains and compares them, the answer drawn
            under the card, and the send sheet hands the question on (`$lib/send`). Fetched with the first whole card. -->
       {#if drawn && !compact && phase !== 'asking'}
-        {#await import('$lib/send/DecideAsk.svelte') then { default: DecideAsk }}<DecideAsk id={question.id} title={card.question} />{/await}
+        <!-- ITS ROW HELD WHILE ITS CODE COMES (one 44px row of verbs): it landed under the answers and pushed the cards
+             under it down on a phone. -->
+        {#await import('$lib/send/DecideAsk.svelte')}<div class="da-held" aria-hidden="true"></div>{:then { default: DecideAsk }}<DecideAsk id={question.id} title={card.question} />{/await}
       {/if}
     </div>
     {#if side}
@@ -994,6 +996,17 @@
 {/if}
 
 <style>
+  /* DecideAsk's verbs' height while its code comes. */
+  .da-held {
+    block-size: var(--btn-h-sm);
+  }
+
+  @media (pointer: coarse) {
+    .da-held {
+      block-size: var(--tap);
+    }
+  }
+
   /* THE CARD IS A FORM'S COLUMN: who asked, the question, why, the choices, the buttons, at one steady step. */
   .dc {
     row-gap: var(--sp-3);

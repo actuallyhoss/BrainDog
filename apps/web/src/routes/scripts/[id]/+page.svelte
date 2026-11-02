@@ -83,7 +83,7 @@
 
 <svelte:head><title>{titleOf(held?.script.row.title ?? words.parent)}</title></svelte:head>
 
-<PageHead icon="code" title={held?.script.row.title ?? words.parent} kicker={words.parent} back="/scripts" />
+<PageHead icon="code" title={held?.script.row.title ?? words.parent} kicker={words.parent} back="/scripts" sentence="" />
 <div class="page">
   {#if mine}<ScriptCard s={mine} {named} onresumed={() => standing.reread()} />{/if}
   {#if held !== null && held.id === id && opened.value !== null && !formOpen}

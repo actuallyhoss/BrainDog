@@ -278,7 +278,7 @@
 
 <svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
-<PageHead title={words.title} kicker={words.kicker} back="/inbox" />
+<PageHead title={words.title} kicker={words.kicker} back="/inbox" sentence="" />
 
 <div class="page">
   {#if loadFix !== null}

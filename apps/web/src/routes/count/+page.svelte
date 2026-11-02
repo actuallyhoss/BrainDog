@@ -199,7 +199,7 @@
 
 <svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
-<PageHead icon="money" title={words.title} kicker="Money" back={at('/p/money', page.url.pathname)} />
+<PageHead icon="money" title={words.title} kicker="Money" back={at('/p/money', page.url.pathname)} sentence="" />
 <div class="cc-page">
   {#if !ready && installed && into === null}
     <Empty kind="no-data-yet" glyph="money" title={words.bare} body={words.bareBody}>

@@ -29,7 +29,7 @@
 
 <svelte:head><title>{titleOf(words.newHeading)}</title></svelte:head>
 
-<PageHead icon="code" title={words.newHeading} kicker={words.parent} back="/scripts" />
+<PageHead icon="code" title={words.newHeading} kicker={words.parent} back="/scripts" sentence="" />
 <div class="page">
   {#if picks.state !== 'ready'}
     <ReadState state={picks.state} refusal={picks.refusal} onretry={picks.reread} />

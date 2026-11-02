@@ -22,7 +22,7 @@
 
 <svelte:head><title>{titleOf(words.heading)}</title></svelte:head>
 
-<PageHead icon="session" title={words.heading} kicker={words.parent} back={agentsPlace((page.data as { pages?: readonly string[] }).pages)} />
+<PageHead icon="session" title={words.heading} kicker={words.parent} back={agentsPlace((page.data as { pages?: readonly string[] }).pages)} sentence="" />
 <div class="page">
   <NewKind />
 </div>
