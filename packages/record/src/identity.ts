@@ -129,6 +129,11 @@ const APP_CODE_TRIES = 5;
  */
 const APP_CODE_PERSON: Rule = { most: 9, window: DAY };
 const codeKey = (person: string): string => `appcode:${person}`;
+/**
+ * How long the sign-in sweep keeps an unlocked strike row: the longest window any limit counts over, a person's app codes
+ * (a day). Longer than any other window, so a count is never forgotten before its own rule would forget it.
+ */
+const STRIKES_KEPT = APP_CODE_PERSON.window;
 /** What an app session is listed as when the app sent no label of its own. */
 const APP_LABEL = 'BrainDog app';
 
@@ -756,8 +761,12 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
     sql.exec('DELETE FROM dir_session WHERE expires <= ?', now);
     sql.exec('DELETE FROM dir_app_session WHERE id_hash NOT IN (SELECT id_hash FROM dir_session)');
     sql.exec('DELETE FROM dir_app_code WHERE expires <= ?', now);
-    /* A PERSON'S WRONG APP CODES ARE COUNTED OVER A DAY (`APP_CODE_PERSON`), so their row is not swept at fifteen minutes. */
-    sql.exec("DELETE FROM dir_fail WHERE COALESCE(until, first + CASE WHEN key LIKE 'appcode:%' THEN ?3 ELSE ?1 END) <= ?2", WINDOW, now, APP_CODE_PERSON.window);
+    /* EACH LIMIT KEEPS ITS OWN WINDOW (sec3, 2 Nov). This deleted every unlocked row fifteen minutes after its first
+       strike, sign-in's window, so sign-up's three an hour (`SIGNUP_UNCHECKED`) and applying's ten an hour started again
+       at one whenever anybody signed in. Every statement that strikes (`LOCKOUT`, `applyStrike`, oauth's `COUNT`) already
+       starts a count again once its own window has passed, so the sweep is only tidying: it keeps a row for the longest
+       window any limit has (`STRIKES_KEPT`), and a lock to its `until`. */
+    sql.exec('DELETE FROM dir_fail WHERE COALESCE(until, first + ?1) <= ?2', STRIKES_KEPT, now);
     const record = recordOf(person.id);
     sql.exec(
       'INSERT INTO dir_session (id_hash, person, record, expires, rotated_at, authed_at) VALUES (?, ?, ?, ?, ?, ?)',
@@ -1367,6 +1376,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
             )?.n ?? 0,
           );
           sql.exec('DELETE FROM dir_session WHERE person = ? AND id_hash <> ?', person, mine);
+          sql.exec('DELETE FROM dir_app_session WHERE id_hash NOT IN (SELECT id_hash FROM dir_session)');
           return n;
         });
         return { status: 200, body: { ended }, ...(all ? { session: 'clear' as const } : carry(found)) };
@@ -1514,7 +1524,13 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
       /** The row goes and the cookie is cleared, and an id that names nothing is signed out just the same. */
       case 'logout': {
         const hash = await hashOf(call.sid);
-        if (hash !== null) sql.exec('DELETE FROM dir_session WHERE id_hash = ?1 OR (prev_hash = ?1 AND prev_until > ?2)', hash, now);
+        /* AND THE APP'S LABEL GOES WITH ITS SESSION (sec3, 2 Nov): it stayed until the next sign-in's sweep, naming a
+           device that was no longer signed in. */
+        if (hash !== null)
+          sql.transactionSync(() => {
+            sql.exec('DELETE FROM dir_session WHERE id_hash = ?1 OR (prev_hash = ?1 AND prev_until > ?2)', hash, now);
+            sql.exec('DELETE FROM dir_app_session WHERE id_hash NOT IN (SELECT id_hash FROM dir_session)');
+          });
         return { status: 200, body: {}, session: 'clear' };
       }
 
