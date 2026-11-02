@@ -359,6 +359,10 @@
           open = { at: x.at, block: x.block, under: [] };
         } else if (open) {
           const b = x.block;
+          /* NOT A SHELF THAT DOES NOT NEED HIM (leftovers 4): agents' suggestions and what he put off are queues, and a queue
+             lends the red of questions waiting, so Needs you's "Suggested by agents" wore a red well over things it says
+             are never counted as needing him. Those fold under the quiet grey. */
+          if (b.kind === 'queue' && ['governance.apart', 'governance.later'].includes(String((b as { source?: unknown }).source))) continue;
           open.under.push({ kind: b.kind, icon: b.icon, tone: b.tone, where: b.where, late: (b as WithRows).homeRows?.kind === 'late' });
         }
       }
