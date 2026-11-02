@@ -21,7 +21,7 @@ import { REGISTERS } from '../record/held.ts';
 import { singularOf } from '../voice.ts';
 import { often } from '../record/actions.ts';
 import { DAYS, EVERY, calendarWords, clockWords, inMonths } from './calendar.ts';
-import { idWords } from './chips.ts';
+import { PATH_WORDS, chipWord, idWords } from './chips.ts';
 import { learnTitles } from './plain-fail.ts';
 import { OLDER, held, type ArgFrom, type FlowGrammar, type GrammarArg, type GrammarStep } from './grammar.ts';
 
@@ -1222,7 +1222,7 @@ function laterWords(span: string): string {
 }
 
 /** `{{vars.rate}}` read aloud as `rate`. A card never shows braces; the inspector shows them as chips. */
-export const unbrace = (text: string): string => text.replace(/\{\{\s*([^}]+?)\s*\}\}/gu, (_, path: string) => path.split('.').pop() ?? path);
+export const unbrace = (text: string): string => text.replace(/\{\{\s*([^}]+?)\s*\}\}/gu, (_, path: string) => chipWord(path));
 
 const str = (v: unknown): string => (typeof v === 'string' ? unbrace(v.trim()) : typeof v === 'number' ? String(v) : '');
 
@@ -1322,7 +1322,11 @@ const refText = (path: string): string => {
   const p = path.trim();
   const said = TRIGGER_SAID[p];
   if (said !== undefined) return said;
-  if (p.includes('.')) return p.split('.').pop() ?? p;
+  /* A PATH'S LAST NAME AS A FIELD IS SAID (leftovers8): "meet from_name: mail from from_domain" put the mail's own keys
+     on screen. A field of the row by its label, anything else in words. */
+  const named = PATH_WORDS[p];
+  if (named !== undefined) return `the ${named}`;
+  if (p.includes('.')) return fieldSaid(p.split('.').pop() ?? p);
   const form = /^([a-z]+):(.+)$/u.exec(p);
   if (form === null) return fieldName(p);
   const [, kind, rest] = form as unknown as [string, string, string];

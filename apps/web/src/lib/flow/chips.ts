@@ -30,7 +30,18 @@ export type ChipGroup = { label: string; chips: Chip[] };
  * THE SAME WORD THE CARD SAYS. `unbrace` in `flow.ts` reads `{{vars.rate}}` aloud as `rate`, so the chip that put it
  * there says `rate` too; a chip that said "Rate" over a card that says "rate" is two names for one thing.
  */
-export const chipWord = (path: string): string => path.split('.').pop() ?? path;
+export const chipWord = (path: string): string => PATH_WORDS[path] ?? (path.split('.').pop() ?? path).replace(/[-_]+/gu, ' ');
+
+/**
+ * WHAT AN ARRIVAL HANDS OVER UNDER A KEY OF ITS OWN, in words (leftovers8): an email's sender came out as `from_name` and
+ * `from_domain`, on the card and on its chip.
+ */
+export const PATH_WORDS: Readonly<Record<string, string>> = {
+  'trigger.body.from': 'sender',
+  'trigger.body.from_name': "sender's name",
+  'trigger.body.from_address': "sender's address",
+  'trigger.body.from_domain': "sender's domain",
+};
 
 function groupOf(path: string): GroupKey {
   if (path.startsWith('trigger.row.')) return 'row';
