@@ -12,7 +12,7 @@
   out what it answered.
 -->
 <script lang="ts">
-  import { tick, untrack, type Snippet } from 'svelte';
+  import { flushSync, tick, untrack, type Snippet } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
@@ -176,6 +176,36 @@
      refusal; the owner's page is the blocks as handed. */
   const readerWhole = $derived(mode === 'preview' || holdsWhole((route.data as { me?: Reader } | undefined)?.me));
   const blocks = $derived(heldOut(given, readerWhole));
+  /* TODAY'S FIRST SCREEN FIRST, ON A PHONE (speed6, 2 Nov). Drawing every tile was one 170 to 240 ms task on a throttled
+     phone, and only the first two or three of them are in sight. Every tile's frame is drawn at once, in its cell, but
+     only the tiles of the board's first four rows are filled in that task. Then, before the first paint (`firstScreen`),
+     each frame still empty whose top is in sight is filled where it stands, a row at a time, until none is; the rest
+     fill in the next task, after that paint, under the fold. So what is in sight is drawn whole in the first frame, and never moves after.
+     Never while arranging, never on a wider screen, and only on the page's first draw. */
+  const FIRST_ROWS = 4;
+  const rowOfTile = untrack((): ReadonlyMap<number, number> | null => {
+    if (mode !== 'home' || placed === null || typeof window === 'undefined' || !window.matchMedia('(width < 720px)').matches) return null;
+    const rows = new Map<number, number>();
+    for (let i = 0; i < given.length; i += 1) {
+      const top = Number.parseInt(placed(i)?.area ?? '', 10);
+      if (top > FIRST_ROWS) rows.set(i, top);
+    }
+    return rows.size > 0 ? rows : null;
+  });
+  let later = $state.raw<ReadonlySet<number> | null>(rowOfTile === null ? null : new Set(rowOfTile.keys()));
+  if (rowOfTile !== null) requestAnimationFrame(() => firstScreen(rowOfTile));
+  function firstScreen(rows: ReadonlyMap<number, number>): void {
+    for (let k = 0; later !== null && k < 8; k += 1) {
+      const waiting = later;
+      const inSight = [...waiting].filter((i) => (document.getElementById(`${ids}b-${i + 1}`)?.getBoundingClientRect().top ?? Infinity) < window.innerHeight);
+      if (inSight.length === 0) break;
+      const row = Math.min(...inSight.map((i) => rows.get(i) ?? Infinity));
+      const rest = new Set([...waiting].filter((i) => rows.get(i) !== row));
+      later = rest.size > 0 ? rest : null;
+      flushSync();
+    }
+    if (later !== null) setTimeout(() => (later = null), 0);
+  }
   /* A PAGE THAT SAYS WHICH QUESTIONS ARE ITS OWN BORROWS NO OTHER: a queue of questions narrowed by `where` (the Agents
      page's "what a run asked", a project's own) is the page's place for them, and the slot over it drew the first
      question of the whole record, about a mail domain, at the head of Agents. A page with no such queue keeps the slot. */
@@ -1369,7 +1399,7 @@
 
 <!-- THE BLOCK ITSELF, inside its tile: one snippet, so a folded note and every other block draw the same part. -->
 {#snippet tile(slot: Slot, block: LiveBlock, at: number)}
-  <BlockSlot
+  {#if later === null || arranging || !later.has(slot.i)}<BlockSlot
     block={sectioned.get(at) ?? block}
     i={slot.i}
     {ids}
@@ -1387,7 +1417,7 @@
     walk={mode === 'preview' ? null : onwalk}
     slug={mode === 'home' ? page.page : null}
     widget={placed ? ((placed(slot.i)?.size ?? null) as WidgetSize | null) : null}
-  />
+  />{/if}
 {/snippet}
 
 <!-- A COLUMN'S BLOCKS, run by run. A boxed section and the blocks after it are one surface, drawn only when one of them
