@@ -80,6 +80,10 @@ export const URL_HEADER = 'x-braindog-url';
 export const ADDRESS_HEADER = 'x-braindog-address';
 export const ADDRESS_STAND_IN = 'https://address.braindog.invalid/';
 
+/** A run that made this many calls into the record's object, or was answered this many rows, writes a `script-work` line. */
+const SCRIPT_WORK_CALLS = 100;
+const SCRIPT_WORK_ROWS = 2_000;
+
 /** A provider gets ten seconds and two megabytes, as a `call` does. */
 const TIMEOUT_MS = 10_000;
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -285,6 +289,13 @@ type Turn = {
   fetches: number;
   bytes: number;
   stop: ScriptRefusal | null;
+  /**
+   * WHAT THE RUN ASKED OF THE RECORD'S OBJECT (F35, perf2): its calls into it and the rows its lists were answered. The
+   * sandbox's `cpuMs` holds the loaded Worker and not the object, so each `ctx.record.list` is the object's own CPU, out
+   * of every limit the run is held to; counted, so a run that asks a lot says so (`script-work`).
+   */
+  calls: number;
+  rows: number;
 };
 
 const utf8 = new TextEncoder();
@@ -312,9 +323,9 @@ export class ScriptRuns {
     return this.#turns.size;
   }
 
-  open(turn: Omit<Turn, 'fold' | 'cycle' | 'fetches' | 'bytes' | 'stop'>): string {
+  open(turn: Omit<Turn, 'fold' | 'cycle' | 'fetches' | 'bytes' | 'stop' | 'calls' | 'rows'>): string {
     const id = crypto.randomUUID();
-    this.#turns.set(id, { ...turn, fold: scriptFold(turn.decl.id), cycle: scriptCycle(turn.decl.id), fetches: 0, bytes: 0, stop: null });
+    this.#turns.set(id, { ...turn, fold: scriptFold(turn.decl.id), cycle: scriptCycle(turn.decl.id), fetches: 0, bytes: 0, stop: null, calls: 0, rows: 0 });
     this.#cpu.set(id, { ms: null, wake: null });
     return id;
   }
@@ -372,11 +383,14 @@ export class ScriptRuns {
       return { error: refusal.why };
     };
     const { decl } = turn;
+    turn.calls += 1;
 
     if (call.op === 'list') {
       if (!decl.reads.includes(call.register) || turn.read === undefined)
         return refuse({ code: 'FORBIDDEN', why: `${decl.id} read ${call.register}, which is not in its reads.` });
-      return { ok: await turn.read.list(call.register, call.where, call.options) };
+      const rows = await turn.read.list(call.register, call.where, call.options);
+      turn.rows += Array.isArray(rows) ? rows.length : 0;
+      return { ok: rows };
     }
     if (call.op === 'get') {
       /* THE REGISTER OF A SPOKEN ID IS THE RECORD'S TO RESOLVE, as in `runInQuickJs`: the reads that `turn.read` was
@@ -732,6 +746,9 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     ]);
     const turn = wiring.runs.close(run);
     const spent = usage(turn);
+    /* A RUN THAT ASKED THE RECORD'S OBJECT A LOT SAYS SO: that is CPU of the object's, which no limit of the run's holds. */
+    if (turn !== undefined && (turn.calls >= SCRIPT_WORK_CALLS || turn.rows >= SCRIPT_WORK_ROWS))
+      console.log(JSON.stringify({ op: 'script-work', script, calls: turn.calls, rows: turn.rows, wall_ms: spent.wall_ms }));
     /* AND THEN THE TAIL'S CPU TIME, AFTER THE WALL TIME WAS TAKEN, so the wait is never counted against the script's
        `wall_ms`. No tail, no wait: a run loaded without one has nothing to hear. */
     const cpu = wiring.exports.ScriptTail === undefined ? null : await wiring.runs.cpu(run, TAIL_MS);

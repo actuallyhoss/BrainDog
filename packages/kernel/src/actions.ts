@@ -1214,6 +1214,15 @@ export type Budget = {
   left: number;
   /** What it started at, so a pass can tell "nothing has run yet" from "there is no room left". */
   total: number;
+  /**
+   * AND WHEN THE PASS STOPS STARTING RUNS, as the clock reads it (`now`), or absent for never (F35, perf2). A run that
+   * started goes to its end, held to its own `wall_ms`; what is leased behind it once this has passed goes back for the
+   * next pass, as a run the subrequests had no room for does (`more`). A host's alarm hands it, so a script that spends
+   * its whole thirty seconds is the one run that alarm waits on, and the look and the lint after it still get their share.
+   */
+  until?: number;
+  /** The clock `until` is read on. A Worker's moves across awaits, which is where a run spends its wall time. */
+  now?: () => number;
 };
 
 /**
@@ -1316,7 +1325,9 @@ export async function runActions(
        that never runs and never says why. It runs, it spends what it spends, and the budget is
        over afterwards — which stops everything AFTER it rather than it. */
     const spentAlready = budget !== undefined && budget.left < budget.total;
-    if (budget !== undefined && spentAlready && budget.left < reserveFor(ready)) {
+    /* AND THE PASS'S TIME, once one run has gone: past `until`, the rest waits for the next pass in the same way. */
+    const late = budget?.until !== undefined && spentAlready && (budget.now ?? Date.now)() >= budget.until;
+    if (budget !== undefined && spentAlready && (late || budget.left < reserveFor(ready))) {
       /* `releaseJob` AND NOT `release`, INCLUDING FOR A CONNECTOR. `release` acks the row done,
          which is right when no host here can ever run it and wrong when the only thing missing is
          room in this invocation: that row is still due, and finishing it would skip the window it

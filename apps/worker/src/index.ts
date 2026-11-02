@@ -486,6 +486,14 @@ const ALARM_CUTS = 'braindog.alarm-cuts';
 const ALARM_STEP_MS = 5_000;
 const ALARM_STEP_PAGES = 10;
 
+/**
+ * HOW LONG THE ALARM'S ACTIONS MAY GO ON STARTING RUNS (`Budget.until`, F35 perf2). A run is held to its own `wall_ms`
+ * (at most 30 s, raced in `runScript`) and its sandbox to its `cpu_ms` (at most 1 s, the platform's `cpuMs`), but
+ * `ALARM_RUNS` of them one after another could hold one alarm for minutes, with the look, the lint and every owed wake
+ * behind it. Past this, once one run has gone, the rest wait for the next alarm, which is set for now.
+ */
+const ALARM_ACT_MS = 10_000;
+
 /** A step slower than this writes an `alarm-step` line with its time. */
 const SLOW_STEP_MS = 5_000;
 
@@ -1659,7 +1667,9 @@ export class Record$ extends DurableObject<Env> {
          ONE BUDGET FOR THIS ALARM, which is one invocation and one record. §2.3 puts it in `consume`
          instead, on the reading that one invocation drains every record; that is true of the outbox
          pump and not of this path, where the alarm is per object and each object is billed its own. */
-      const budget = invocation();
+      /* AND A SHARE OF THE ALARM'S TIME (`ALARM_ACT_MS`, F35 perf2): once one run has gone, no run starts past it, and
+         what is leased behind goes back for the next alarm (`out.more`). */
+      const budget = { ...invocation(), until: Date.now() + ALARM_ACT_MS, now: () => Date.now() };
       /* A SCRIPT ASKS THE SAME LEDGER ON THE SAME ADMISSION COUNT, so a record with one run left spends it once. */
       const script = this.#scriptRunner(api, record, openKey, (r, action, pending) => ledger.mayRun(r, action, pending), admissions);
       let out;
