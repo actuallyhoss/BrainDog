@@ -278,8 +278,23 @@
               </Tile>
             {/each}
           </div>
-          {#if pr.happened.length > 0 || pr.notes}
+          {#if pr.happened.length > 0 || pr.notes || pr.money.length > 0}
             <div class="proj-rail">
+              {#if pr.money.length > 0}
+                {@const [first, ...rest] = pr.money}
+                <!-- ITS MONEY, only on a link that carries money (leftovers 4): the owner's Money tile, its first figure
+                     large and the rest as lines, every amount said by the record. -->
+                <Tile icon="money" title={words.projectMoney}>
+                  <p class="proj-figure"><span class="proj-big num">{first!.said}</span><span class="proj-figure-label">{first!.label.toLowerCase()}</span></p>
+                  {#if rest.length > 0}
+                    <ul class="proj-rows">
+                      {#each rest as m (m.key)}
+                        <li class="proj-line proj-money"><span class="proj-said">{m.label}</span><span class="proj-amount num">{m.said}</span></li>
+                      {/each}
+                    </ul>
+                  {/if}
+                </Tile>
+              {/if}
               {#if pr.happened.length > 0}
                 <Tile icon="history" title={words.projectHappened}>
                   <ul class="proj-rows">
@@ -716,6 +731,42 @@
 
   .proj-day {
     padding-block-start: 2px;
+  }
+
+  /* ITS MONEY: the first figure at the tile's figure size with its words after it, the rest as lines, amounts right. */
+  .proj-figure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-2);
+    margin: 0;
+  }
+
+  .proj-big {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: var(--fs-figure);
+    font-weight: var(--fw-semi);
+    line-height: 26px;
+    white-space: nowrap;
+  }
+
+  .proj-figure-label {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .proj-line.proj-money {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .proj-amount {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 22px;
+    text-align: end;
+    white-space: nowrap;
   }
 
   /* ── Tables: hairlines between the rows and none round the table ──────────────────────── */

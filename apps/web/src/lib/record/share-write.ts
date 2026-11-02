@@ -98,6 +98,7 @@ export const words = {
   projectDue: (day: string) => `Due ${day}`,
   projectHappened: 'What happened',
   projectNotes: 'Notes',
+  projectMoney: 'Money',
 } as const;
 
 /** How long a link can be made for, in days, as `openShare` takes it: 1 to 90, and 30 unless said. */
@@ -327,6 +328,8 @@ export type SharedProject = {
   work: { list: string; one: string; many: string; open: SharedTask[]; more: number; done: SharedTask[] }[];
   notes: string | null;
   happened: { at: string; said: string }[];
+  /** Its money, already said, on a link that carries money; empty or absent otherwise. */
+  money: { key: 'owed' | 'in' | 'out'; label: string; said: string }[];
 };
 
 /** What the reader draws: the page, a link that does not open, or a record it could not reach. */
@@ -596,7 +599,12 @@ function projectShared(x: unknown): SharedProject | null {
   const happened = (Array.isArray(x.happened) ? x.happened : []).flatMap((h) =>
     isObject(h) && typeof h.at === 'string' && typeof h.said === 'string' && h.said.trim() !== '' ? [{ at: h.at, said: h.said }] : [],
   );
-  return { name: x.name, lane: text(x.lane), about: text(x.about), next: text(x.next), work, notes: text(x.notes), happened };
+  const money = (Array.isArray(x.money) ? x.money : []).flatMap((m): SharedProject['money'] =>
+    isObject(m) && (m.key === 'owed' || m.key === 'in' || m.key === 'out') && typeof m.label === 'string' && typeof m.said === 'string' && m.said.trim() !== ''
+      ? [{ key: m.key as 'owed' | 'in' | 'out', label: m.label, said: m.said }]
+      : [],
+  );
+  return { name: x.name, lane: text(x.lane), about: text(x.about), next: text(x.next), work, notes: text(x.notes), happened, money };
 }
 
 /** A field id said as words, for a column the owner gave no label: `due_on` is "Due on". */

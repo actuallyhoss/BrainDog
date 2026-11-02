@@ -35,7 +35,7 @@
  * never said is a host that cannot, so links ship switched off until somebody switches them on.
  */
 
-import { NOBODY, instant, isMoneyFormat, maskMoneyText, isMoneyUnit, sourceReadsWhole, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
+import { NOBODY, fill, instant, isMoneyFormat, maskMoneyText, isMoneyUnit, sourceReadsWhole, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 import { TYPED, dateSaid, formatTyped, kindSpec, splitRow, writeAmount, type TypedForm } from 'braindog-render';
 import { ok } from '@braindog/ports';
@@ -130,6 +130,12 @@ export type SharedProject = {
   work: { list: string; one: string; many: string; open: SharedTask[]; more: number; done: SharedTask[] }[];
   notes: string | null;
   happened: { at: string; said: string }[];
+  /**
+   * ITS MONEY, ON A LINK THAT CARRIES MONEY AND NEVER ON ONE THAT DOES NOT (leftovers 4, 2 Nov): the three figures the
+   * owner's Money tile reads (`project-owed`, `project-in-month`, `project-out-month`), read as nobody, each said as
+   * every screen says an amount, and only those above nought. Absent on a link without money; empty, nothing to say.
+   */
+  money?: { key: 'owed' | 'in' | 'out'; label: string; said: string }[];
 };
 
 /**
@@ -1550,7 +1556,7 @@ export function methods(deps: RecordDeps) {
    * points at the project's list (a team's Tickets point at Projects), so a use case's own work list is found without a
    * name in the code. Nobody is named: not who did a thing, not who a thing is for.
    */
-  const projectOf = (slug: string, money: boolean, lists: ReadonlyMap<string, RegisterDecl>): SharedProject | undefined => {
+  const projectOf = (slug: string, money: boolean, lists: ReadonlyMap<string, RegisterDecl>, home: string | null): SharedProject | undefined => {
     const here = kernel.pages().find((p) => p.slug === slug);
     if (here === undefined || here.about === null || typeof here.row !== 'string') return undefined;
     const register = here.about.register;
@@ -1637,7 +1643,21 @@ export function methods(deps: RecordDeps) {
     const about = decl.fields.find((f) => f.id === 'about' && f.type === 'text') ? words(row.fields.about) : null;
     const next = words(row.fields.next) ?? firstOpen;
     moved.sort((a, b) => b.at.localeCompare(a.at));
+    /* ITS MONEY, only where the link carries money: the figures the owner's Money tile reads, filled with the project's
+       name as that page fills them, read as nobody (a private row adds nothing), each currency said whole. */
+    const named = typeof row.fields[decl.title] === 'string' ? String(row.fields[decl.title]).trim() : '';
+    const moneyParts: NonNullable<SharedProject['money']> = [];
+    if (money && named !== '')
+      for (const [key, metric, label] of [['owed', 'project-owed', 'Still to come in'], ['in', 'project-in-month', 'In this month'], ['out', 'project-out-month', 'Out this month']] as const) {
+        const d = kernel.metricDecl(metric);
+        if (!d) continue;
+        const read = kernel.metric(fill(d, null, named) as typeof d, { viewer: NOBODY });
+        if (!read.ok || typeof read.value.value !== 'number' || typeof read.value.unit !== 'string' || !(read.value.value > 0)) continue;
+        const said = writeAmount({ minor: read.value.value, currency: read.value.unit }, home, 'read')?.text;
+        if (said) moneyParts.push({ key, label, said });
+      }
     return {
+      ...(money ? { money: moneyParts } : {}),
       name: titleOfRow(decl, row) ?? here.title,
       lane: laneField === undefined ? null : enumWord(decl, laneField, row.fields[laneField]) || null,
       about,
@@ -1681,7 +1701,7 @@ export function methods(deps: RecordDeps) {
       return kernel.titleOfRow(row.id) ?? undefined;
     };
     const shown = shownPage(out.value, expires_at, lists, { language: identity?.locale, zone: identity?.tz, home, now: clock.now(), figure, reads, money, moneyFigure, refSaid });
-    const found = projectOf(slug, money, lists);
+    const found = projectOf(slug, money, lists, home);
     /* ITS NOTE ONCE: where the page's own blocks already draw it, the project does not draw it again. */
     const project = found !== undefined && found.notes !== null && shown.blocks.some((b) => b.kind === 'note' && typeof b.body === 'string' && b.body.trim() !== '') ? { ...found, notes: null } : found;
     /* A PROJECT WITH SOMETHING TO SAY IS NOT AN EMPTY PAGE, whatever its blocks drew. */
