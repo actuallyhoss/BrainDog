@@ -15,7 +15,7 @@ A token made from the command line reads unless you ask for more. A machine sign
 
 ## A token is always somebody's
 
-A token carries the person who made it and can never do more than they can. What it reaches is the smaller of its scope and that person's levels, list by list, checked on every call. So a colleague who may only read the Clients list gets a token that only reads it, whatever its scope says; if you take their access away, their tokens stop with it; and if you suspend them, their agents stop too.
+A token carries the person who made it and can never do more than they can. What it reaches is the smaller of its scope and that person's levels, list by list, checked on every call. So a colleague who may only read the Clients list gets a token that only reads it, whatever its scope says; if you take their access away, their tokens stop with it; and if you suspend them, their agents stop too. The owner sees every colleague's agents in Settings › Agents, under Colleagues' agents, with when each was last used, and can revoke any of them. If you hand your BrainDog over, your own tokens drop to Can decide with you at once.
 
 A list the token cannot read stays out of its answers: a search does not reach it, and a block on a page that reads it is withheld rather than drawn.
 
@@ -23,8 +23,9 @@ A list the token cannot read stays out of its answers: a search does not reach i
 
 There is no admin scope, and there never will be one. These need somebody signed in to the app:
 
-- answering a question in Needs you, which no token reaches on its own. When you tell an agent the answer, it may pass it on with your words as `said`, while "Agents may answer when you tell them" is on in Settings › Agents. It never answers a question it asked itself, one somebody else asked, or one about a key or an amount of money;
-- inviting or removing people;
+- answering a question in Needs you, which no token reaches on its own. When you tell an agent the answer, it may pass it on with your words as `said`, while "Agents answer when you say so" is on in Settings › Agents. It never answers a question it asked itself, one somebody else asked, or one about a key or an amount of money;
+- inviting people, changing what they can do, stopping or removing them;
+- handing ownership over, or making somebody an owner;
 - making, listing and revoking tokens, report keys and door addresses;
 - installing, removing and turning off packs;
 - running an automation now, and starting a paused one again;
@@ -32,6 +33,20 @@ There is no admin scope, and there never will be one. These need somebody signed
 - listing and revoking what each key opens.
 
 A write token asks before money, keys and deletes. When you tell it to make one of those changes, it passes your words as `said` and a delete goes through; money and keys still wait for you in BrainDog.
+
+## Letting your own agents act without asking
+
+Settings › Agents has one switch for the owner: **Let your agents do everything without asking**. Off, agents ask before deletes, money, keys, add-ons and settings, and after reading things from outside. On, your own agents act without asking, money and outside reads included, and each change still names its agent and can be undone.
+
+The switch never covers:
+
+- seeing or adding a key, or making new keys;
+- inviting people, changing what they can do, stopping or removing them;
+- deleting or exporting all of BrainDog;
+- changing the owner, or handing ownership over;
+- paying.
+
+Those stay yours in the app, switch on or off. The switch covers only the owner's own agents, with a key that writes across the whole BrainDog. A colleague's agents are never covered: they ask, and never do more than their person may.
 
 An agent that wants one of these asks with `propose`, and you decide. Some fields are marked the same way: a skill's text, for one, only changes when you accept a proposal.
 

@@ -35,6 +35,16 @@ search {"q": "invoice march"}
 get {"spoken": "tasks#41", "history": true}
 ```
 
+Scripts and automations are read by name too. `get` answers one by its id or its whole title, with dashes, spaces and capitals read alike, so `bake-numbers`, `Bake numbers` and `script.bake_numbers` are the same script: what it reads and writes, its next and last run, and the rules that start it. An automation also says why it is idle and its last five runs. `list` with `scripts` or `automations` gives them a line each.
+
+```code | text
+get {"spoken": "bake-numbers"}
+list {"register": "scripts"}
+list {"register": "automations"}
+```
+
+When `get` finds nothing by that name and search turns up one row, the answer starts with "Nothing is called" so the agent knows it is a guess. A list named by one word of its name, such as `runs` for Agent runs, gets the right name back as a `try`.
+
 ## Catching up
 
 `activity` is what changed across your BrainDog lately, newest first, 20 at a time unless `limit` asks for up to 100, paged with `cursor`: each write, the row it touched and who made it. It is how one session picks up after another. `governance` is what has been proposed and not yet answered, what was decided and why, and what was predicted.
@@ -63,9 +73,10 @@ propose {"question": "Which client should we chase first?", "body_kind": "option
 
 ## Anything else the app does
 
-`act` makes any call the app makes, by its name, with the agent's own grant: settings, add-ons and their settings, automations, boards, books, sharing, Needs you, export. `braindog:calls` lists every call it makes and what each takes. The record decides who may make each one, as it does in the app, and a change the agent's rung asks about waits on Needs you. What only you do in a browser (an add-on on or off, its settings, a declaration, taking a key out of service) is asked instead, and lands when you say yes. A key's value never passes through it either way.
+`act` makes any call the app makes, by its name, with the agent's own grant: settings, add-ons and their settings, automations, boards, books, sharing, Needs you, export. `braindog:calls` lists every call it makes and what each takes. A client that reads no resources can ask `act` itself: the call `calls` with a word in `q` lists the calls whose name or line holds it. A call that is misnamed is refused with the nearest one as its `try`. The record decides who may make each one, as it does in the app, and a change the agent's rung asks about waits on Needs you. What only you do in a browser (an add-on on or off, its settings, a declaration, taking a key out of service) is asked instead, and lands when you say yes. A key's value never passes through it either way.
 
 ```code | text
+act {"call": "calls", "args": {"q": "automation"}}
 act {"call": "setZone", "args": {"tz": "Africa/Cairo"}}
 act {"call": "sameValues", "args": {"register": "datapoints", "fields": ["name", "thing", "at", "value"]}}
 ```
