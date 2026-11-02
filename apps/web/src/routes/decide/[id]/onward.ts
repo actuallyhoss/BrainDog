@@ -29,4 +29,13 @@ export const words = {
   left: (n: number): string =>
     n === 0 ? 'Nothing else waits on you.' : n === 1 ? 'One more question waits in Needs you.' : `${String(n)} more questions wait in Needs you.`,
   back: 'Back to Needs you',
+  /** Beside Next question: how many more wait, the button's own context. */
+  more: (n: number): string => (n === 1 ? '1 more question' : `${String(n)} more questions`),
+  /** The one line of a receipt: who answered it, which way and when, "You accepted this just now". */
+  result: (who: string, option: string, title: string, when: string): string =>
+    `${who} ${option === 'accept' ? 'accepted this' : option === 'reject' ? 'declined this' : `chose “${title}”`} ${when}.`,
+  /** A question closed with no answer kept: withdrawn by whoever asked, or settled somewhere else. */
+  closed: 'This question was closed without an answer here.',
+  changed: 'What changed',
+  sidebar: 'New in the sidebar:',
 };

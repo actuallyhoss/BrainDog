@@ -34,6 +34,7 @@ import { nameWords } from '../record/names.ts';
 import { acceptKey, amountSaid, declineKey, labelOf, twoWords } from '../../routes/decide/press.ts';
 import { arrangedOf, isArranging } from '../../routes/decide/[id]/arranged.ts';
 import { spoken } from './spoken.ts';
+import { askOf } from './ask.ts';
 import { recordToday } from '../record/zone.ts';
 
 /* SAID FROM HERE TOO, where every screen that draws a card already reads its words. */
@@ -511,11 +512,13 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
      said "in Projects", and the lines under the heading say only fields. The heading says it in the sentence's place. */
   const list = drawn && arranged === '' && typeof q.does === 'string' ? listSaid(saidOf(q.does)) : '';
   const cost = typeof q.cost === 'string' ? q.cost : '';
+  const asked = askOf(spoken(saidOf(q.question)));
   return {
     id: q.id,
     href: `/decide/${encodeURIComponent(q.id)}`,
-    question: spoken(saidOf(q.question)),
-    why: q.why ? spoken(saidOf(q.why)) : '',
+    /* THE QUESTION ALONE, as its page titles it, and what was written after it leads the why (`ask.ts`). */
+    question: asked.ask,
+    why: [asked.detail, q.why ? spoken(saidOf(q.why)) : ''].filter((s) => s !== '').join(' '),
     by,
     when: since(q.at, ctx.now),
     later: laterLine(q, ctx.now),

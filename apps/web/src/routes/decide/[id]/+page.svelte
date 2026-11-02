@@ -71,6 +71,7 @@
   import { proposer, queueMergeOf, queueWords, type FileAt } from '$lib/page/queue-answer.ts';
   import '$lib/decide/form.css';
   import { cardWords, putsOff, queueOf, spoken } from '$lib/decide/card.ts';
+  import { askOf } from '$lib/decide/ask.ts';
   import OptionVisual from '$lib/decide/OptionVisual.svelte';
   import { visualOf as drawingOf } from '$lib/decide/option-visual.ts';
   import { homeCurrency } from '$lib/record/api.ts';
@@ -228,6 +229,9 @@
   const whyNot = $derived(whyNotAnswering(me.level, me.lists));
 
   const question = $derived(from === 'live' ? (live?.question ?? undefined) : undefined);
+  /* THE QUESTION ALONE IS THE TITLE, and what its asker wrote after it ("Unsigned: ...") the quiet line under it
+     (`ask.ts`), as its card on Needs you says it. */
+  const headed = $derived(question ? askOf(spoken(question.title)) : { ask: '', detail: '' });
 
   /* WHAT A PAGE, A LIST, A RULE OR A LOOK WOULD PUT ON THE SCREEN, for a proposal that arranges the record. */
   const preview = $derived(from === 'live' && live?.about ? proposedOf(live.about.kind, live.about.body) : null);
@@ -341,6 +345,8 @@
 
   /** What an accepted arrangement did, and how far one got when the record stopped part way. */
   let applied = $state<string[]>([]);
+  /** The places an accept put in the sidebar, by their address, so the receipt links to them. */
+  let addedNav = $state<{ title: string; href: string }[]>([]);
   /* WHAT THE RECORD KEPT ON THE DECISION, for a reload and for anybody who did not press accept. */
   const kept = $derived(from === 'live' && live?.applied ? appliedLines(live.applied.did, live.applied.body) : []);
   let part = $state<Partial | null>(null);
@@ -827,8 +833,9 @@
     if (accepting && out.from === 'written' && had) {
       applied = appliedLines(out.applied ?? {}, accepting.body);
       await invalidateAll();
-      const added = [...sidebarNow()].filter(([href]) => !had.has(href)).map(([, title]) => title);
-      if (added.length) applied = appliedLines(out.applied ?? {}, accepting.body, added);
+      const added = [...sidebarNow()].filter(([href]) => !had.has(href));
+      addedNav = added.map(([href, title]) => ({ href, title }));
+      if (added.length) applied = appliedLines(out.applied ?? {}, accepting.body, added.map(([, title]) => title));
     } else void invalidateAll();
     /* THE WAY ON TAKES THE FOCUS, so `j` and Enter carry on to the next question. A note, when one is offered, is the
        button beside it, one step back: offered, and never in the way. */
@@ -931,6 +938,27 @@
     return key === undefined ? undefined : question?.options.find((o) => o.key === key)?.title;
   });
   const did = $derived(settled ? doesOf(about?.by, settledOption) : null);
+  /* THE RECEIPT'S ONE LINE: "You accepted this just now", by the name every screen gives them. */
+  const resultSaid = $derived.by(() => {
+    if (!settled) return '';
+    const who = whoDid(settled.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))).name;
+    const key = committed?.option ?? question?.decided?.option ?? '';
+    return onwardWords.result(who, key, settled.title, since(settled.at, now));
+  });
+  /* WHAT CHANGED, a short list: what the record says it applied, and the places it put in the sidebar as links to them.
+     A press here knows which places are new (`addedNav`); a reload reads them from the pages the add-on names. */
+  const SIDEBAR_LINE = copy.arrangeDidSidebar([]);
+  const changedLines = $derived((applied.length ? applied : kept).filter((l) => !l.startsWith(SIDEBAR_LINE) && l !== copy.arrangeDidNothing));
+  const placesAdded = $derived.by((): { title: string; href: string }[] => {
+    if (addedNav.length) return addedNav;
+    if (changedLines.length === 0) return [];
+    const names = about?.body?.names;
+    if (names === null || typeof names !== 'object') return [];
+    const nav = (page.data.nav ?? []) as { href: string; title: string }[];
+    return Object.entries(names as Record<string, unknown>)
+      .filter(([k, v]) => k.startsWith('page.') && typeof v === 'string')
+      .map(([k, v]) => ({ title: String(v), href: nav.find((n) => n.title === v)?.href ?? `/p/${k.slice(5)}` }));
+  });
   /* NOR THE OPTION'S OWN REASON THE RECORD WROTE FOR A PRESS ("Answered in one press, for the option's own reason: Mark
      an invoice as chased"), which is no words of the person's either; what the answer did is said above it (`does.ts`). */
   const ownReason = (reason: string): boolean => /^Answered in one press, for the option's own reason: /u.test(reason.trim());
@@ -1016,7 +1044,7 @@
   });
 </script>
 
-<svelte:head><title>{titleOf(question ? spoken(question.title) : undefined, copy.decide)}</title></svelte:head>
+<svelte:head><title>{titleOf(question ? headed.ask : undefined, copy.decide)}</title></svelte:head>
 
 <svelte:window {onkeydown} />
 
@@ -1036,6 +1064,22 @@
       ><Icon name="clock" size="s" /><span class="dc-later-words">{queueWords.notNow}</span></button
     >
   {/if}
+{/snippet}
+
+<!-- THE WAY ON UNDER A RECEIPT: Next question, the one red, with how many more wait as its context, and the list as a
+     quiet link. With nothing more waiting, the list is the way on. -->
+{#snippet wayOn()}
+  <div class="way-on">
+    {#if onwardTo}
+      <Button weight="primary" href="/decide/{onwardTo}" id="way-on">{copy.decideNext}</Button>
+      <span class="way-left">{onwardWords.more(waiting)}</span>
+      <a class="way-back" href={at('/decide')}>{onwardWords.back}</a>
+    {:else}
+      <Button weight="primary" href="/decide" id="way-on">{onwardWords.back}</Button>
+      <span class="way-left">{onwardWords.left(0)}</span>
+      {#if Number(page.data.inbox ?? 0) > 0}<a class="way-back" href={at('/inbox')}>{copy.decideOpenInbox}</a>{/if}
+    {/if}
+  </div>
 {/snippet}
 
 {#snippet onward()}
@@ -1069,44 +1113,55 @@
   <!-- THE QUESTION IS THE PAGE'S TITLE, and a question that gathered several says how many beside it. No sentence under
        it: how many answers there are and which is suggested is what the tile under it shows, and saying it twice was
        the trivia the reset took out. -->
-  <div class="q-head">
+  <div class="q-head" data-narrow={asking ? undefined : ''}>
     <!-- NO SENTENCE, SO NONE IS HELD: the head's empty line held while the page read and then went, moving the question up
          56px on a phone. -->
-    <PageHead icon="decide" named kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} countOf={(n) => (n === 1 ? 'change' : 'changes')} sentence="" actions={!settled && me.owner ? whoMore : undefined} />
+    <PageHead named kicker={copy.decide} back="/decide" title={headed.ask} count={joined} countOf={(n) => (n === 1 ? 'change' : 'changes')} sentence={headed.detail} actions={!settled && me.owner ? whoMore : undefined} />
   </div>
   {#snippet whoMore()}
     <Button weight="bare" size="sm" aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>
   {/snippet}
 
-  <div class="page">
+  <div class="page" data-narrow={asking ? undefined : ''}>
     <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news and the reason the options came back. -->
     {#if part && !settled}<Applied partial={part} />{/if}
     <!-- TWO TILES ON A WIDE BOARD (today F9): the answers, each option a card with its own button, and beside them why
          it is asked, what it changes and the comments. One column on a phone, the answers first. A settled question is
          its receipt in the first tile, and its comments stay beside it. -->
-    <div class="gate-grid" data-aside={aside ? '' : undefined}>
+    <div class="gate-grid" data-aside={aside && asking ? '' : undefined}>
     <Tile class="gate">
       {#if settled}
-        <!-- THE RECEIPT, WITH ITS GREEN CHECK: who, when, which option, and the reason as it was written. -->
-        <div class="settled">
+        <!-- THE RECEIPT (2 Nov, "this looks shit"): one line that says who answered it, which way and when, the reason as
+             it was written, what changed as a short list with links to the places it made, and one way on. A decision
+             is never edited, and nothing on the page offers to, so the page does not say it; Needs you keeps it under
+             Decided, which its list says. A fresh one settles in once (`data-fresh`), a reload is simply there; the toast
+             says it to a screen reader, so the receipt is not a second live region. -->
+        <div class="settled" data-fresh={committed ? '' : undefined}>
           <p class="settled-head">
-            <IconWell name="check" size="l" tone="earn" />
-            <span>
-              {copy.decidedBy}
-              {whoDid(settled.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))).name}, {since(settled.at, now)}
-            </span>
+            <span class="settled-mark" data-way={(committed?.option ?? question.decided?.option) === 'accept' ? 'good' : undefined}><Icon name={(committed?.option ?? question.decided?.option) === 'reject' ? 'close' : 'check'} size="m" /></span>
+            <span>{resultSaid}</span>
           </p>
-          <p class="settled-choice">{settled.title}</p>
-          {#if did && aboutRow}
-            <p class="settled-did">{did.lead} {#if aboutRow.href}<a class="gate-link" href={at(aboutRow.href)}>{aboutRow.title}</a>{:else}{aboutRow.title}{/if}. {did.tail}</p>
-          {/if}
           <!-- THE REASON WHEN THERE IS ONE. An answer given by its press alone is a whole answer, and a pair of quotation
                marks round nothing read as a reason that failed to load. Nor is the sentence the record wrote for a press
                (`pressedOnly`) quoted on a reloaded receipt, as though the person had written it. -->
           {#if settled.reason.trim() !== '' && !pressedOnly(settled.reason) && !ownReason(settled.reason)}<p class="settled-reason">“{settled.reason}”</p>{/if}
+          {#if did && aboutRow}
+            <p class="settled-did">{did.lead} {#if aboutRow.href}<a class="gate-link" href={at(aboutRow.href)}>{aboutRow.title}</a>{:else}{aboutRow.title}{/if}. {did.tail}</p>
+          {/if}
+          {#if changedLines.length || placesAdded.length}
+            <section class="settled-changed" aria-labelledby="changed-h">
+              <h2 class="settled-h" id="changed-h">{onwardWords.changed}</h2>
+              <ul class="settled-list">
+                {#each changedLines as line, i (i)}<li>{line}</li>{/each}
+                {#if placesAdded.length}
+                  <li>{onwardWords.sidebar} {#each placesAdded as place, i (place.href)}{i > 0 ? ', ' : ''}<a class="gate-link" href={at(place.href)}>{place.title}</a>{/each}</li>
+                {/if}
+              </ul>
+            </section>
+          {/if}
           <!-- WHAT IT WAS DECIDED ON, the question's visuals, kept beside its receipt. -->
           <VisualStrip on={question.id} />
-          <p class="settled-note">{copy.immutable}</p>
+          {#if preview?.pattern}{#await import('./PatternReads.svelte') then loaded}<loaded.default pattern={preview.pattern} resolved said={live?.about?.body.said} />{/await}{/if}
           <!-- A NOTE, OFFERED AND NEVER ASKED FOR, after a decline or an edit, which are the answers somebody later asks
                about (`press.ts` `notedAfter`). One line, kept on the question's thread below, where everybody who reads
                the question reads it. The way on keeps the focus, so `j` still goes to the next question. -->
@@ -1135,18 +1190,18 @@
               </p>
             {/if}
           {/if}
-          {#if applied.length}<div class="settled-applied"><Applied lines={applied} /></div>
-          {:else if kept.length}<div class="settled-applied"><Applied lines={kept} /></div>{/if}
-          {#if preview?.pattern}{#await import('./PatternReads.svelte') then loaded}<loaded.default pattern={preview.pattern} resolved said={live?.about?.body.said} />{/await}{/if}
-          <!-- WHERE IT WENT, and what still waits. A receipt here is always a written decision. -->
-          <p class="settled-where">{onwardWords.where} {onwardWords.left(waiting)}</p>
-          <div class="settled-next">{@render onward()}</div>
+          {@render wayOn()}
         </div>
       {:else if from === 'live' && live?.closed}
         <!-- SETTLED, AND ITS DECISION IS NOT AMONG THE ONES READ. Nothing here can answer it again, and the line says so
              without the question's handle: its title is the heading above. -->
-        <p class="cost-age">{gate.closedNow} {onwardWords.left(waiting)}</p>
-        {@render onward()}
+        <div class="settled">
+          <p class="settled-head">
+            <span class="settled-mark"><Icon name="archive" size="m" /></span>
+            <span>{onwardWords.closed}</span>
+          </p>
+          {@render wayOn()}
+        </div>
       {:else}
         <!-- WHY THE ANSWERS ARE OFF COMES FIRST, ABOVE THE OPTIONS AND NOT AFTER A PRESS AND A PARAGRAPH. It is the
              record's own refusal, said before anybody has chosen anything, and it ends by saying that reading is what
@@ -1539,7 +1594,23 @@
     display: contents;
   }
 
+  /* ONE COLUMN WIDTH FOR THE HEAD AND THE TILES, so their left edges and the ⋯ and the tile's right edge line up: the
+     answers and their side together up to 1120, a settled question's receipt and comments 720, and text in either at
+     680 at most. Past that the board is the window's, and nothing stretches across it. */
+  .q-head {
+    --q-max: 1120px;
+    --q-text: 680px;
+  }
+
+  .q-head[data-narrow],
+  .page[data-narrow] {
+    --q-max: 720px;
+  }
+
   .page {
+    --q-max: 1120px;
+    --q-text: 680px;
+    max-inline-size: calc(var(--q-max) + var(--gutter) * 2);
     container-type: inline-size;
     display: flex;
     flex-direction: column;
@@ -1831,12 +1902,6 @@
     line-height: var(--lh-body);
   }
 
-  .cost-age {
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-  }
-
   .picks {
     display: grid;
     gap: var(--sp-2);
@@ -2077,63 +2142,139 @@
     font-size: var(--fs-meta);
   }
 
-  /* ── the receipt ───────────────────────────────────────────────────────── */
+  /* ── the receipt (2 Nov) ─────────────────────────────────────────────
+     ONE LINE, THEN WHAT CHANGED, THEN THE WAY ON, at a reading measure and on one spacing step: 16 between parts. */
 
   .settled {
     display: flex;
     flex-direction: column;
-    max-inline-size: var(--measure);
+    gap: var(--sp-4);
+    max-inline-size: var(--q-text);
   }
 
+  /* WHO ANSWERED IT, WHICH WAY AND WHEN: the body's size in ink, a small mark before it in the good ink for an accept. */
   .settled-head {
     display: flex;
-    align-items: center;
-    gap: var(--sp-3);
+    align-items: baseline;
+    gap: var(--sp-2);
     margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-  }
-
-  .settled-choice {
-    margin: var(--sp-3) 0 var(--sp-1);
-    color: var(--ink);
-    font-size: var(--fs-head);
-    font-weight: var(--fw-semi);
-    line-height: var(--lh-head);
-  }
-
-  .settled-reason {
-    margin: 0;
-    color: var(--ink-2);
-  }
-
-  /* WHAT IT SET GOING, with the thing it is about one press away. */
-  .settled-did {
-    margin: 0 0 var(--sp-1);
     color: var(--ink);
     font-size: var(--fs-body);
-    max-inline-size: var(--measure);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-body);
   }
 
-  .settled-note {
-    margin: var(--sp-3) 0 0;
+  .settled-mark {
+    display: inline-flex;
+    flex: none;
+    align-self: center;
+    color: var(--ink-3);
+  }
+
+  .settled-mark[data-way='good'] {
+    color: var(--good);
+  }
+
+  .settled-reason,
+  .settled-did {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  .settled-changed {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .settled-h {
+    margin: 0;
+    color: var(--ink-3);
+    font-family: var(--font-ui);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+  }
+
+  .settled-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    overflow-wrap: anywhere;
+  }
+
+  /* A FRESH DECISION SETTLES IN ONCE: the receipt takes the answers' place with a fade and a 4px rise, over the swap's
+     160ms on the arriving curve. A reload draws it still. Reduced motion keeps only the fade, shorter. */
+  .settled[data-fresh] {
+    transition:
+      opacity var(--d-swap) var(--ease-emphasis),
+      transform var(--d-swap) var(--ease-emphasis);
+
+    @starting-style {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .settled[data-fresh] {
+      transition: opacity var(--d-enter) linear;
+
+      @starting-style {
+        opacity: 0;
+        transform: none;
+      }
+    }
+  }
+
+  /* THE WAY ON: Next question, how many more as its context, and the list as a quiet link. */
+  .way-on {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    margin-block-start: var(--sp-1);
+  }
+
+  .way-left {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
   }
 
-  .settled-applied {
-    margin-block-start: var(--sp-4);
+  .way-back {
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
   }
 
-  /* The way on, under the receipt it belongs to. */
-  .settled-next {
-    margin-block-start: var(--sp-4);
+  /* AT THE ROW'S END WHERE THE ROW HOLDS IT; on a phone it wraps under Next question, at the left edge. */
+  @media (width >= 600px) {
+    .way-back {
+      margin-inline-start: auto;
+    }
   }
 
-  .settled-where {
-    margin: var(--sp-3) 0 0;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
+  .way-back:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  @media (pointer: coarse) {
+    .way-back {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
   }
 
   /* THE WAY ON WRAPS, because on a phone the next question, the queue and the inbox do not fit one line. */
@@ -2328,6 +2469,28 @@
     .dc-option[data-checked] {
       border: 2px solid Highlight;
     }
+  }
+
+  /* ── the title (2 Nov) ─────────────────────────────────────────────────
+     THE QUESTION ALONE, at a tile figure's size (22/28) rather than a page name's 28: it is a sentence, read, not a
+     place's name. The line its asker wrote after it is quiet under it, the body's size in the second ink. */
+  .q-head :global(.page-head) {
+    max-inline-size: calc(var(--q-max) + var(--gutter) * 2);
+  }
+
+  .q-head :global(.page-head .page-name) {
+    max-inline-size: var(--q-text);
+    font-size: var(--fs-figure);
+    line-height: calc(28 / 22);
+    letter-spacing: -0.01em;
+  }
+
+  .q-head :global(.page-said) {
+    max-inline-size: calc(var(--q-text) + var(--gutter) * 2);
+    margin-block-start: var(--sp-1);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
   }
 
   /* ── the title on a phone (today F9) ──────────────────────────────────

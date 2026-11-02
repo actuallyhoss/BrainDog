@@ -71,6 +71,9 @@ export function spoken(text: string): string {
   /* A BRACKET LEFT HOLDING NOTHING goes too, the commas between what went with it, so the word before it is read
      against what follows ("changed in (a.ts, b.ts)" is "changed", not "changed in (, )"). */
   for (let was = ''; was !== t; ) [was, t] = [t, t.replace(HUNG, GONE).replace(new RegExp(`\\(\\s*(?:${GONE}[\\s,;]*)*\\)`, 'gu'), GONE)];
+  /* A WORD IS LEFT HANGING ONLY WHERE SOMETHING WAS TAKEN FROM THE END: "the catalogue it came from." took nothing, and
+     losing its "from" cut the sentence a person wrote (2 Nov, the Sentry install question). */
+  const tookEnd = new RegExp(`${GONE}[\\s.,;:!?…]*$`, 'u').test(t);
   t = t
     .replaceAll(GONE, '')
     .replace(/[(\[]\s*[)\]]/gu, '')
@@ -78,7 +81,7 @@ export function spoken(text: string): string {
     .replace(/\s+([,.;:!?…])/gu, '$1')
     .replace(/([,;:])(?=[,.;:!?])/gu, '')
     .trim();
-  while (DANGLING.test(t)) t = t.replace(DANGLING, '');
+  while (tookEnd && DANGLING.test(t)) t = t.replace(DANGLING, '');
   /* AND A STOP LEFT HANGING AT EITHER END: "Ask Jo, see tasks#8" is "Ask Jo", not "Ask Jo,". */
   return t.replace(/^[,.;:·\s]+/u, '').replace(/[,;·\s]+$/u, '').trim();
 }
