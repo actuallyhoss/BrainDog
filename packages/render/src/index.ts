@@ -92,7 +92,7 @@ export {
   type FilterValue,
   type OnFilter,
 } from './filters.ts';
-export { TIMELINE_BETWEEN, bankCode, dayThisYear, rowsCell, timelineCell, timelineDays, timelineTitle, wordSlot } from './timeline.ts';
+export { TIMELINE_BETWEEN, UNFILED_HINT, bankCode, dayThisYear, rowsCell, timelineCell, timelineDays, timelineTitle, wordSlot } from './timeline.ts';
 export {
   TABLE_CHUNK,
   TABLE_ROWS_LABEL,

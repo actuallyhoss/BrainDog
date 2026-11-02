@@ -41,6 +41,7 @@ import {
   rowsCell,
   timelineCell,
   timelineChip,
+  UNFILED_HINT,
   timelineDayHead,
   timelineDays,
   timelineDetails,
@@ -274,12 +275,12 @@ const slotArt = (name: string, o: RenderOptions): string => {
 
 /**
  * A ledger row's chip (`timelineChip`): its glyph on its category's tint where the host has art for the glyph, else the
- * title's first letter, and a `?` on a line nothing has filed. A picture beside words that already say the row, so it is
+ * title's first letter, and a `?` on a line nothing has filed, with its hint (`UNFILED_HINT`) as its title. A picture beside words that already say the row, so it is
  * hidden from a screen reader. `List.svelte` draws the same element.
  */
 function chipHtml(c: TimelineChip, o: RenderOptions): string {
   const art = c.glyph ? slotArt(c.glyph, o) : '';
-  const attrs = `${c.colour ? ` data-slot="${c.colour}"` : ''}${c.unfiled ? ' data-unfiled=""' : ''}`;
+  const attrs = `${c.colour ? ` data-slot="${c.colour}"` : ''}${c.unfiled ? ` data-unfiled="" title="${escape(UNFILED_HINT)}"` : ''}`;
   return `<span class="item-chip"${attrs} aria-hidden="true">${art || escape(c.unfiled ? '?' : c.letter)}</span>`;
 }
 

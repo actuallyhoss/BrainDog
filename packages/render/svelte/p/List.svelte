@@ -42,6 +42,7 @@
     TIMELINE_UNDER,
     timelineCell,
     timelineChip,
+    UNFILED_HINT,
     timelineDayHead,
     timelineDays,
     timelineDetails,
@@ -367,7 +368,7 @@
         {@const art = (own ?? look?.glyph) ? (void landed, glyphPath((own ?? look?.glyph)!, opts)) : null}
         {@const approx = said && opts.approx ? opts.approx((row.cells[2] ?? '').trim()) : null}
         <li class="item" data-menu-host={onmenu ? 'self' : undefined} {@attach onmenu && pointed((p) => onmenu?.(row, document.body, p))} data-rich="" data-intent={row.tone} data-arrived={row.arrived ? '' : undefined} data-row={rowId} data-focused={cursor === rowId ? '' : undefined}>
-          <span class="item-chip" data-slot={chip.colour ?? look?.slot ?? undefined} data-unfiled={chip.unfiled ? '' : undefined} aria-hidden="true"
+          <span class="item-chip" data-slot={chip.colour ?? look?.slot ?? undefined} data-unfiled={chip.unfiled ? '' : undefined} title={chip.unfiled ? UNFILED_HINT : undefined} aria-hidden="true"
             >{#if art}<svg
                 viewBox="0 0 24 24"
                 fill="none"

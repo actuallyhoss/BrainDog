@@ -73,10 +73,11 @@
   import Icon from '$lib/ui/Icon.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import { looks } from './looks.svelte.ts';
-  /* A "?" IS A LINE WITH NO CATEGORY YET (2 Nov, a walk: six imported lines drew it and nothing said what it meant). */
-  const unfiledHint = 'No category yet. Open the line to file it.';
+  /* A "?" IS A LINE WITH NO CATEGORY YET (2 Nov, a walk: six imported lines drew it and nothing said what it meant), said
+     as the Money page's Ledger tile says it (`UNFILED_HINT`). */
+  const unfiledHint = UNFILED_HINT;
   import { at } from '../at.ts';
-  import { TIMELINE_BETWEEN, timelineTitle } from 'braindog-render';
+  import { TIMELINE_BETWEEN, UNFILED_HINT, timelineTitle } from 'braindog-render';
 
   let {
     columns,

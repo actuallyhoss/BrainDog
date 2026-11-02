@@ -755,7 +755,7 @@ test('A LEDGER ROW WEARS ITS CHIP AND THE LINE UNDER ITS TITLE, money in is mark
   assert.match(items[1]!, /<span class="item-detail" data-sign="in">/u, 'money in is marked');
   assert.match(items[1]!, /<span class="item-approx num">≈ EGP 51,744<\/span>/u, 'the host restates another currency');
   assert.doesNotMatch(items[0]!, /item-approx/u, 'and not the home one');
-  assert.match(items[2]!, /^<span aria-hidden="true" class="item-chip" data-unfiled>\?<\/span>/u, 'a line nothing filed');
+  assert.match(items[2]!, /^<span aria-hidden="true" class="item-chip" data-unfiled title="No category yet\. Open the line to file it\.">\?<\/span>/u, 'a line nothing filed, with its hint');
   assert.match(items[2]!, /<span class="item-under">Bank<\/span>/u, 'no dot stands alone');
   assert.match(html, /<span class="item-day-name">Mon 26 Oct<\/span>/u);
   assert.doesNotMatch(html, /item-day-net/u, 'two currencies on one day are never one sum');

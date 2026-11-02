@@ -169,6 +169,10 @@ export function wordSlot(kept: string | undefined): TimelineChipColour | null {
   return CHIP_COLOURS[h % CHIP_COLOURS.length]!;
 }
 
+/** WHAT A "?" CHIP MEANS, said as its hint (2 Nov, a walk: imported lines drew it on the Money page's Ledger tile and
+ * nothing said what it meant). `html.ts` and `List.svelte` both put it on the chip, and the Ledger's cards say the same. */
+export const UNFILED_HINT = 'No category yet. Open the line to file it.';
+
 /** A row's chip: the glyph it names, its colour, whether nothing has filed it, and the title's first letter. `between` is a
  * move between a person's own accounts (`TIMELINE_BETWEEN`), whose amount is no money in or out and so wears no colour. */
 export type TimelineChip = { glyph: string | null; colour: TimelineChipColour | null; unfiled: boolean; letter: string; between?: true };
