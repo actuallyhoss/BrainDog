@@ -57,10 +57,10 @@ test('every icon the record names is one the site draws', () => {
   for (const icon of icons) assert.ok(Object.hasOwn(GLYPHS, icon), `${icon} is not in icons.ts`);
 });
 
-test('every question has its own id, and the desk and the chores band ask different things', () => {
+test('every question has its own id, and Today and the filing section ask different things', () => {
   const ids = [...NEEDS, ...ASKED].map((n) => n.id);
   assert.equal(new Set(ids).size, ids.length, `ids repeat: ${ids.join(', ')}`);
-  /* SITE F1: the desk's Today shows Northbound and Dana, so the chores band asks the two only a person decides. */
+  /* SITE F1: Today shows Northbound and Dana, so the filing section asks the two only a person decides. */
   assert.deepEqual(NEEDS.map((n) => n.id), ['chase', 'pay']);
   assert.deepEqual(ASKED.map((n) => n.id), ['sam', 'key']);
 });
@@ -124,8 +124,8 @@ test('the truth fixes are in', () => {
   assert.deepEqual(
     NEEDS.map((n) => [n.what, n.yes]),
     [
-      ['Northbound invoice', 'Chase it'],
-      ['Dana Reyes', 'Plan it for Friday'],
+      ['Northbound invoice 1042', 'Chase $3,200'],
+      ['Dana Reyes, Tidepool icons', 'Plan it for Friday'],
     ],
   );
   assert.ok(EVIDENCE.inv.rows.some(([label]) => label === 'Reminder drafted for your yes'));

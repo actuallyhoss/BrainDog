@@ -279,7 +279,7 @@
     margin-inline-start: auto;
     padding: 3px;
     border-radius: 8px;
-    background: var(--rule2);
+    background: var(--rule);
   }
 
   .seg {
@@ -288,7 +288,7 @@
     border: 0;
     border-radius: 6px;
     background: none;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-meta);
     font-weight: 500;
@@ -305,7 +305,7 @@
     flex: 1;
     min-inline-size: 0;
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
   }
 
@@ -316,7 +316,7 @@
     padding: 20px;
     border-radius: var(--r-tile);
     background: var(--tile);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-family: var(--font-mono);
     font-size: var(--fs-cap);
     line-height: 1.6;
@@ -370,7 +370,7 @@
     block-size: var(--well);
     border-radius: var(--r-ctl);
     background: var(--tile-2);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .tile-cell[data-headed] :global(.block-head) {

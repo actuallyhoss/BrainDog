@@ -1,9 +1,9 @@
 <!--
   The docs' section nav: the search, then every section with its pages, the open page marked.
 
-  FLAT ON THE BOARD, NO TILE (LAUNCH 103 job 7): the search field, "All sections", then each section's
-  name with its pages under it, and the page you are on on the tile's fill with a red mark at its start and in bold,
-  so it is told by more than colour.
+  FLAT ON THE BOARD, NO TILE, as the app's rail sits on its ground: the search field, "All sections", then each
+  section's name with its pages under it, and the page you are on on the tile's fill with an ink mark at its start and
+  in bold, so it is told by more than colour (red is kept for the start button).
 
   TWO DRAWINGS OF ONE LIST, and only one is ever shown. At 900px and wider it is a column beside the page that stays in
   view as the page scrolls. Below 900px it is a disclosure at the top of the page, closed, so the page's first words
@@ -79,7 +79,13 @@
   }
 
   .nav-phone[open] .nav-open :global(svg:last-child) {
-    transform: rotate(180deg);
+    rotate: 180deg;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .nav-open :global(svg:last-child) {
+      transition: rotate var(--d-state) var(--ease-out);
+    }
   }
 
   .nav-in {
@@ -101,7 +107,7 @@
     padding-inline: 10px;
     border-inline-start: 3px solid transparent;
     border-radius: 8px;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-15);
     font-weight: 500;
     line-height: 20px;
@@ -119,7 +125,7 @@
   .nav-page[aria-current='page'],
   .nav-page[aria-current='page']:hover {
     background: var(--tile);
-    border-inline-start-color: var(--red);
+    border-inline-start-color: var(--ink);
     color: var(--ink);
     font-weight: 600;
   }
@@ -140,7 +146,7 @@
   .nav-sec {
     margin: var(--sp-5) 0 var(--sp-1);
     padding-inline: 13px;
-    color: var(--muted);
+    color: var(--ink-3);
     font-size: var(--t-site-15);
     font-weight: 600;
   }
@@ -159,21 +165,24 @@
     }
 
     /* IN VIEW AS THE PAGE SCROLLS, and scrolling by itself only when the list is taller than the window. */
+    /* Under the site's bar, which stays at the top. */
     .nav-desk {
       position: sticky;
-      inset-block-start: var(--sp-5);
+      inset-block-start: calc(var(--bar-h) + var(--sp-5));
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       gap: 2px;
-      max-block-size: calc(100vh - 2 * var(--sp-5));
+      max-block-size: calc(100dvh - var(--bar-h) - 2 * var(--sp-5));
       overflow-y: auto;
     }
 
   }
 
-  /* The search sits clear of the list under it. */
+  /* The search sits clear of the list under it, and so does the room held for it before the script draws it. */
   .nav-in > :global(.search),
-  .nav-desk > :global(.search) {
+  .nav-desk > :global(.search),
+  .nav-in > :global(.search-room),
+  .nav-desk > :global(.search-room) {
     margin-block-end: var(--sp-3);
   }
 </style>

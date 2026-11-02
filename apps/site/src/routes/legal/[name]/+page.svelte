@@ -6,8 +6,9 @@
   file is in `apps/site/legal/`, it draws the text as it is written there, a document in a
   page, so its headings sit under the page's own title and a `#` title in the file is not drawn twice.
 
-  THE NIGHT HEAD, THEN ONE SHEET (Look B): the text's name and its one line in `PageHead`, then the
-  words on one flat paper tile at a 68ch reading measure, its sections headed in Lexend like every title on the site.
+  THE HEAD, THEN ONE SHEET (the redo of 2 November): the text's name and its one line in `PageHead`, then the words on
+  one of the app's tiles at a 68ch reading measure, its sections headed in Lexend like every title on the site. Only the
+  layout changed; the words are the owner's, untouched.
 
   A CONTENTS LIST AT ITS TOP (plan F26): the Terms run to ten screens at 1512 and sixteen on a phone, so each section is
   a link from the top, two columns on a desk, and a section's heading is a step smaller on a phone so it keeps to one or
@@ -78,7 +79,7 @@
 
 <style>
   .sheet-band {
-    padding-block: 56px 96px;
+    padding-block: clamp(32px, 2vw + 24px, 48px) clamp(48px, 4vw + 32px, 96px);
   }
 
   /* ONE SHEET: a legal text is read line by line, so the whole of it keeps the 68ch measure at 17/28 on one flat paper
@@ -89,8 +90,8 @@
     gap: 16px;
     max-inline-size: calc(68ch + 2 * clamp(20px, 3vw + 8px, 56px));
     padding: clamp(24px, 3vw + 8px, 56px);
-    background: var(--paper);
-    border-radius: 16px;
+    background: var(--tile);
+    border-radius: var(--r-tile);
     color: var(--ink);
   }
 
@@ -123,8 +124,8 @@
 
   .toc-title {
     margin: 0 0 10px;
-    color: var(--muted);
-    font-family: var(--ui);
+    color: var(--ink-3);
+    font-family: var(--font-ui);
     font-size: var(--t-site-15);
     font-weight: 600;
     letter-spacing: 0;
@@ -135,7 +136,7 @@
     padding-inline-start: 24px;
     columns: 2;
     column-gap: 32px;
-    color: var(--muted);
+    color: var(--ink-3);
     font-size: var(--t-site-15);
     line-height: 1.5;
   }
@@ -183,7 +184,7 @@
   .doc-p,
   .doc-ul {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-body);
     line-height: var(--lh-site-body);
     overflow-wrap: anywhere;
@@ -199,10 +200,6 @@
   }
 
   @media (width < 640px) {
-    .sheet-band {
-      padding-block: 24px 64px;
-    }
-
     /* A STEP SMALLER ON A PHONE, so a section's name keeps to one or two lines. */
     .doc-h2 {
       font-size: var(--t-site-22);

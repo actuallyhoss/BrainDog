@@ -18,6 +18,13 @@ export const agents = {
   agents: {
     title: 'Connect your AI tools in one line.',
     lead: `${APPS_AND} can read your BrainDog, suggest changes and leave notes. You approve each one once, and no key is copied anywhere.`,
+    /* The connect box's tile: the apps, each with its line, and beside it the three steps it takes. The third is
+       `connect/apps.ts`'s way in: the app opens BrainDog once to be approved, with OAuth. */
+    connect: 'Choose your app',
+    steps: {
+      title: 'How it goes',
+      items: ['Choose your app and copy its line.', 'Paste it where the app adds a connector, or run it in a terminal.', 'BrainDog opens once, and you approve it.'],
+    },
     gets: {
       title: 'What your AI tool gets',
       lines: [

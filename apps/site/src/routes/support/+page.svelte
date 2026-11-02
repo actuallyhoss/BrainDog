@@ -47,12 +47,12 @@
 
 <Seo title={s.meta.title} description={s.meta.description} path="/support" />
 {#snippet head()}
-  {#if address !== ''}<p class="write"><a class="btn ghost" href="mailto:{address}"><Icon name="mail" size="m" />{address}</a></p>{/if}
+  {#if address !== ''}<p class="write"><a class="btn lg" href="mailto:{address}"><Icon name="mail" size="m" />{address}</a></p>{/if}
 {/snippet}
 <Parts title={s.title} lede={s.lede} {parts} {head} />
 
 <style>
   .write {
-    margin: 28px 0 0;
+    margin: var(--sp-2) 0 0;
   }
 </style>

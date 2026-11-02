@@ -1,6 +1,6 @@
 <!--
-  The three plans as cards, Free first and black: the pricing page draws them under its head, and
-  the home page's plans band draws them `compact`, with the tighter top of the prototype's teaser.
+  The three plans as the app's tiles, Free first: the pricing page draws them under its head once billing is on (the
+  redo of 2 November: no black card; Free leads by its place and its figure, and its start button is the page's red).
 
   EVERY FIGURE AND EVERY WORD IS `cards.ts`'s, which reads `TABLE` (`plans.ts`) and `copy/pricing.ts`; this file only
   lays them out. Free's button is the shell's `Start`, which draws both "Start free" and "Open BrainDog" and lets
@@ -47,8 +47,8 @@
   .plans {
     display: grid;
     grid-template-columns: 1.2fr 1fr 1fr;
-    gap: 16px;
-    margin-block-start: 56px;
+    gap: var(--tile-gap);
+    margin-block-start: 0;
   }
 
   .plans.compact {
@@ -56,19 +56,14 @@
   }
 
   .plan {
-    border-radius: 24px;
-    padding: 30px;
+    border-radius: var(--r-tile);
+    padding: clamp(16px, 0.8vw + 13px, 24px);
     display: grid;
     grid-template-rows: auto auto 1fr auto;
     gap: 18px;
     align-content: start;
-    background: var(--paper);
+    background: var(--tile);
     color: var(--ink);
-  }
-
-  .plan.free {
-    background: var(--night);
-    color: var(--on-night);
   }
 
   .name {
@@ -76,43 +71,34 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    font: 600 18px/1 var(--head);
+    font: 600 18px/1 var(--font-display);
     letter-spacing: -0.02em;
   }
 
   .name em {
-    font: 500 12.5px/1 var(--ui);
+    font: 500 var(--t-site-small) / 1 var(--font-ui);
     font-style: normal;
-    color: var(--red-ink);
+    color: var(--ink-2);
     letter-spacing: 0;
-  }
-
-  /* The prototype's light red, the one that reads on the night ground in both themes. */
-  .free .name em {
-    color: var(--night-accent);
   }
 
   .price {
     margin: 0;
-    font: 600 52px/1 var(--head);
-    letter-spacing: -0.05em;
+    font: 600 var(--t-h2) / 1 var(--font-display);
+    letter-spacing: -0.03em;
   }
 
   /* A PAID CARD'S PRICE, read and not shouted: Free's $0 is the one figure at headline size. */
   .price.quiet {
-    font: 600 22px/1.2 var(--head);
+    font: 600 22px/1.2 var(--font-display);
     letter-spacing: -0.02em;
   }
 
   .price span {
-    font: 400 15px/1 var(--ui);
+    font: 400 15px/1 var(--font-ui);
     letter-spacing: 0;
-    color: var(--muted);
+    color: var(--ink-3);
     margin-inline-start: 6px;
-  }
-
-  .free .price span {
-    color: var(--on-night-2);
   }
 
   ul {
@@ -123,11 +109,7 @@
     gap: 10px;
     align-content: start;
     font-size: var(--t-site-15);
-    color: var(--ink2);
-  }
-
-  .free ul {
-    color: var(--on-night-2);
+    color: var(--ink-2);
   }
 
   li {
@@ -149,7 +131,7 @@
   }
 
   .plan > .btn.line {
-    background: var(--page);
+    --btn-fill: var(--tile-2);
   }
 
   /* In the button's place and the button's size, so the three cards end level; plain words, nothing to press. */
@@ -159,8 +141,8 @@
     align-items: center;
     justify-content: center;
     min-height: 48px;
-    font: 500 15.5px/1.2 var(--ui);
-    color: var(--muted);
+    font: 500 var(--t-site-15) / 1.2 var(--font-ui);
+    color: var(--ink-3);
   }
 
   @media (max-width: 1060px) {

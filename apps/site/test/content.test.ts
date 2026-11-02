@@ -381,41 +381,37 @@ test('the home page counts none of the product own parts at a stranger', when(NO
 });
 
 /**
- * THE HOME PAGE OPENS ON THE PRODUCT, THEN FOUR CARDS, AND IT IS DRAWN.
+ * THE HOME PAGE OPENS ON THE PRODUCT, THEN ITS SECTIONS, AND IT IS DRAWN.
  *
  * What started this check: the page was too long, all records and text. It is to be more graphical and show the value,
- * not what it does technically (at least not in the first blocks).
- * It held a band count and the drawn app in the first band. The page designed on 17 October has
- * its own shape, and this holds that shape:
+ * not what it does technically (at least not in the first blocks). Since the redo of 2 November:
  *
- *   - THE FIRST SECTION IS THE HERO, AND THE DESK IS IN IT. The live desk's sidebar (Today, Needs you, Money,
- *     Agents and a project, since 29 October) is the `data-desk` window this reads. The product was once below a band of words and counted figures,
- *     and that was the fault.
- *   - FOUR CARDS, THE FOUR VALUES: the brief, the agents, the chores and Slash, each an `article.card`. A fifth card
- *     is a feature-card grid on its way back, and fewer is a value gone quietly.
+ *   - THE FIRST SECTION IS THE HERO, AND THE APP IS IN IT: Maya's Today in the app's own window (`figure.win`,
+ *     `lib/product/Window.svelte`). The product was once below a band of words and counted figures, and that was the
+ *     fault.
+ *   - FIVE SECTIONS AFTER IT, EACH ONE IDEA ON THE ONE BOARD: the filing, the AI tools, money, what keeps it yours, and
+ *     free while in early access. No section flips to a ground of its own (`band--`).
  *   - NO PHOTOGRAPH OF IT. The screenshots this page carried looked terrible, and a screenshot is not to be dropped
  *     onto a page like that. A `<picture>` or an `<img>` coming back is that regression.
  */
-test('the home page opens on the hero with the desk, then its six bands in order, and holds no picture', when(NO_BUILD), () => {
+test('the home page opens on the hero with the app in it, then its five sections in order, and holds no picture', when(NO_BUILD), () => {
   const html = uncommented(read('index.html'));
 
   const sections = [...html.matchAll(/<section\b[^>]*>/g)];
   const first = sections[0];
   assert.ok(first, 'index.html has no section, so this check is reading a page it does not recognise');
   assert.match(first[0], /\sclass="[^"]*\bhero\b/, `the first section of index.html is not the hero: ${first[0]}`);
-  const hero = html.slice(first.index, sections[1]?.index ?? html.length);
+  const hero = html.slice(first.index, html.indexOf('id="filing"'));
   assert.match(
     hero,
-    /\sdata-desk(?:\s|>|=)/,
-    'the hero of index.html does not hold the desk and its tabs, so the page opens on words again. The product is ' +
+    /<figure class="win shot\b/,
+    'the hero of index.html does not hold the app\'s window, so the page opens on words again. The product is ' +
       'the best thing this page has.',
   );
 
-  /* SITE 2a (20 October): one product picture, then full-bleed bands that each say one new thing, and no close.
-     Money joined as the second band on 29 October (personal use as much as business). */
-  const bands = [...html.matchAll(/<section\b[^>]*\sclass="[^"]*\bband--([a-z]+)\b/g)].map((m) => m[1]);
-  assert.equal(bands.length, 7, `index.html draws ${bands.length} bands, where the page holds seven: who, money, chores, tools, slash, yours and the questions`);
-  assert.deepEqual(bands, ['who', 'money', 'chores', 'tools', 'slash', 'yours'], 'the bands are in the order the page says them');
+  const ids = [...html.matchAll(/<section\b[^>]*\sclass="section(?: [^"]*)?"[^>]*\sid="([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(ids, ['filing', 'tools', 'money', 'yours', 'free'], 'the sections are in the order the page says them');
+  assert.doesNotMatch(html, /\bband--/, 'a section flips to a ground of its own again');
 
   const pictures = [...html.matchAll(/<(?:picture|img)\b[^>]*>/g)].map((m) => m[0]);
   assert.deepEqual(pictures, [], 'index.html draws a photograph again, where the product on this page is drawn in HTML and CSS');

@@ -1,12 +1,12 @@
 <!--
-  Connect your AI tools: the door the launch is built around, rewritten in the redesign so anyone reads it: the night head with the page's name, one line and the connect box; then
-  what an AI tool gets and what it can't do, each line with its icon in a well; then the brief an AI tool starts with,
-  played in a terminal on the made-up record; then a row of plain links for developers (the MCP address is the connect
-  box's, said once there: plan F18); then the early access strip.
+  Connect your AI tools (the redo of 2 November): the door the launch is built around, on the app's board. The page's
+  name and one line, then the app's tiles: the connect box beside what an AI tool gets and what it can't do, then the
+  brief an AI tool starts with, drawn as its terminal on the made-up record, then the row of plain links for
+  developers (the MCP address is the connect box's, said once there), then the early access strip.
 
   Every word is `copy/agents.ts`'s and every connect step is `lib/connect/apps.ts`'s. With scripting off the page is
-  whole: each app's lines are in the HTML one under another, and the terminal shows every line at once. The skill an agent installs is still served at `/agents/braindog/SKILL.md`,
-  by its own route beside this page.
+  whole: each app's lines are in the HTML one under another, and the terminal shows every line. The skill an agent
+  installs is still served at `/agents/braindog/SKILL.md`, by its own route beside this page.
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
@@ -26,185 +26,203 @@
   /* One glyph a line, in the lists' order: the brief, a person, the undo; then a key, money, the clock of the trail. */
   const GETS: readonly IconName[] = ['today', 'person', 'undo'];
   const CANNOT: readonly IconName[] = ['lock', 'card', 'clock'];
-
 </script>
 
 <Seo title={site.meta.agents.title} description={site.meta.agents.description} path="/agents" ld={[crumbsOf([{ name: 'BrainDog', path: '/' }, { name: site.nav.agents, path: '/agents' }])]} />
-<PageHead title={a.title} lead={a.lead}>
-  <div class="connect">
-    <ConnectBox />
-  </div>
-</PageHead>
+<PageHead title={a.title} lead={a.lead} />
 
-<section class="wrap lists">
-  <div>
-    <h2>{a.gets.title}</h2>
-    <ul class="plain">
-      {#each a.gets.lines as item, i (item)}
-        <li><span class="ico"><Icon name={GETS[i] ?? 'check'} /></span>{item}</li>
-      {/each}
-    </ul>
-  </div>
-  <div>
-    <h2>{a.cannot.title}</h2>
-    <ul class="plain">
-      {#each a.cannot.lines as item, i (item)}
-        <li><span class="ico"><Icon name={CANNOT[i] ?? 'x'} /></span>{item}</li>
-      {/each}
-    </ul>
-  </div>
-</section>
+<section class="section" aria-label={a.title}>
+  <div class="wrap">
+    <div class="tiles">
+      <section class="tile lead connect reveal" aria-labelledby="connect-title">
+        <div class="box">
+          <h2 class="tile-head">
+            <span class="well"><Icon name="plug" /></span>
+            <span class="tile-name" id="connect-title">{a.connect}</span>
+          </h2>
+          <ConnectBox />
+        </div>
+        <div class="steps">
+          <h3 class="meta" id="steps-title">{a.steps.title}</h3>
+          <ol aria-labelledby="steps-title">
+            {#each a.steps.items as step, i (step)}
+              <li><span class="n num" aria-hidden="true">{i + 1}</span><span>{step}</span></li>
+            {/each}
+          </ol>
+        </div>
+      </section>
 
-<section class="wrap brief">
-  <div class="ftile split">
-    <div>
-      <h2 class="band-h2">{a.brief.title}</h2>
-      <p class="band-say">{a.brief.say}</p>
+      <section class="tile lead span-6 reveal" aria-labelledby="gets-title">
+        <h2 class="tile-head">
+          <span class="well"><Icon name="check" /></span>
+          <span class="tile-name" id="gets-title">{a.gets.title}</span>
+        </h2>
+        <ul class="lines">
+          {#each a.gets.lines as item, i (item)}
+            <li><span class="well l"><Icon name={GETS[i] ?? 'check'} /></span><span>{item}</span></li>
+          {/each}
+        </ul>
+      </section>
+
+      <section class="tile lead span-6 reveal" aria-labelledby="cannot-title">
+        <h2 class="tile-head">
+          <span class="well"><Icon name="lock" /></span>
+          <span class="tile-name" id="cannot-title">{a.cannot.title}</span>
+        </h2>
+        <ul class="lines">
+          {#each a.cannot.lines as item, i (item)}
+            <li><span class="well l"><Icon name={CANNOT[i] ?? 'x'} /></span><span>{item}</span></li>
+          {/each}
+        </ul>
+      </section>
+
+      <section class="tile lead brief reveal" aria-labelledby="brief-title">
+        <div class="words">
+          <h2 class="h2" id="brief-title">{a.brief.title}</h2>
+          <p class="lede">{a.brief.say}</p>
+        </div>
+        <Term lines={TERM} />
+      </section>
+
+      <section class="tile lead dev reveal" aria-labelledby="dev-title">
+        <h2 class="tile-head">
+          <span class="well"><Icon name="code" /></span>
+          <span class="tile-name" id="dev-title">{a.dev.title}</span>
+        </h2>
+        <ul>
+          {#each a.dev.links as link (link.href)}
+            <li><a class="onward" href={link.href}>{link.label}<Icon name="arrow-right" size="s" /></a></li>
+          {/each}
+        </ul>
+      </section>
     </div>
-    <Term lines={TERM} />
   </div>
-</section>
-
-<section class="wrap dev" aria-labelledby="dev-title">
-  <h2 id="dev-title">{a.dev.title}</h2>
-  <ul>
-    {#each a.dev.links as link (link.href)}
-      <li><a href={link.href}>{link.label}<Icon name="arrow-right" size="s" /></a></li>
-    {/each}
-  </ul>
 </section>
 
 <EarlyStrip />
 
 <style>
-  .connect {
-    max-inline-size: 820px;
-    margin-block-start: 40px;
-  }
-
-  .lists {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 56px;
-    padding-block-start: 96px;
-  }
-
-  .lists h2,
-  .dev h2 {
-    margin: 0 0 20px;
-    font-size: var(--t-site-28);
-    line-height: 1.1;
-    letter-spacing: -0.035em;
-  }
-
-  .plain {
-    display: grid;
-    gap: 16px;
+  ul {
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .plain li {
-    display: grid;
-    grid-template-columns: 32px minmax(0, 1fr);
-    gap: 12px;
-    align-items: center;
-    color: var(--ink2);
-    font-size: var(--t-site-17);
-    line-height: 1.5;
+  /* EACH LINE WITH ITS GLYPH, a hairline between them, as the app lists a tile's rows. */
+  .lines li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    padding-block: var(--sp-3);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 1.45;
   }
 
-  /* AN 18PX ICON IN A 32PX WELL, as the app's tile heads draw theirs. */
-  .ico {
-    display: grid;
-    place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
-    border-radius: 8px;
-    background: var(--paper);
-    color: var(--ink2);
+  .lines li:first-child {
+    padding-block-start: 0;
   }
 
-  .ico :global(.icon) {
-    inline-size: 18px;
-    block-size: 18px;
+  .lines li + li {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .lines li > span:last-child {
+    padding-block-start: 5px;
+    text-wrap: pretty;
   }
 
   .brief {
-    padding-block-start: 96px;
+    gap: var(--sp-5);
   }
 
-  .split {
+  .words {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 48px;
-    align-items: center;
-    background: var(--paper);
-  }
-
-  .dev {
-    padding-block: 96px;
+    align-content: start;
+    gap: var(--sp-3);
   }
 
   .dev ul {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 12px 32px;
-    margin: 0;
+    gap: 4px var(--sp-6);
+  }
+
+  .dev .onward {
+    font-size: var(--t-site-15);
+  }
+
+  ol {
+    display: grid;
+    gap: var(--sp-3);
+    margin: var(--sp-3) 0 0;
     padding: 0;
     list-style: none;
-    font-size: var(--t-site-16);
   }
 
-
-  .dev a {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-block-size: 32px;
+  /* THE THREE STEPS, numbered in a well each, the way the app numbers a sequence. */
+  .steps li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
     color: var(--ink);
+    font-size: var(--t-site-15);
+    line-height: 1.5;
+  }
+
+  .n {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: var(--well);
+    block-size: var(--well);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink-2);
+    font-size: var(--t-site-small);
     font-weight: 600;
-    text-decoration: none;
   }
 
-  .dev a:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
+  .steps li > span:last-child {
+    padding-block-start: 3px;
   }
 
-  @media (pointer: coarse) {
-    .dev a {
-      min-block-size: var(--tap);
+  .connect {
+    gap: var(--sp-6);
+  }
+
+  .box {
+    display: grid;
+    gap: var(--sp-4);
+    min-inline-size: 0;
+  }
+
+  @media (width >= 900px) {
+    /* THE CONNECT BOX AND ITS STEPS SIDE BY SIDE, the steps under a hairline of their own. */
+    .connect {
+      display: grid;
+      grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+      gap: var(--sp-7);
+      align-items: start;
     }
-  }
 
-  @media (max-width: 1060px) {
-    .split {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 32px;
+    .steps {
+      padding-inline-start: var(--sp-6);
+      border-inline-start: 1px solid var(--rule);
     }
 
-    .lists {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 48px;
-    }
-  }
-
-  @media (max-width: 760px) {
-    .lists,
     .brief {
-      padding-block-start: 64px;
+      display: grid;
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      gap: var(--sp-7);
+      align-items: center;
     }
+  }
 
-    .dev {
-      padding-block: 64px;
-    }
-
-    .dev ul {
-      flex-direction: column;
-      align-items: flex-start;
+  @media (width < 900px) {
+    .steps {
+      padding-block-start: var(--sp-4);
+      border-block-start: 1px solid var(--rule);
     }
   }
 </style>

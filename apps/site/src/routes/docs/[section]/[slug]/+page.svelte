@@ -1,10 +1,10 @@
 <!--
-  One docs page: a slim night strip with where the page sits and its title, then the section nav, the page drawn by the
+  One docs page: a slim head with where the page sits and its title, then the section nav, the page drawn by the
   product's renderer, and the list of its parts.
 
-  THE LOOK IS LOOK B'S (LAUNCH 103 job 7): the strip carries on from the header's night, then the board.
-  The page is one sheet of --paper read at 68ch (`Body`); the nav and "On this page" are flat on the board with no tile
-  round them, and stay in view as the page scrolls. From 900px the nav and the page; below 900px the nav is a closed
+  THE LOOK IS THE APP'S (the redo of 2 November): everything on the board, the page one of the app's tiles read at 68ch
+  (`Body`); the nav and "On this page" are flat on the board with no tile round them, and stay in view under the bar
+  as the page scrolls. From 900px the nav and the page; below 900px the nav is a closed
   disclosure at the top and the list of parts is not drawn, because on a phone the page itself is the list; there the
   part in view is named in one line that stays at the top as the page scrolls (plan F24), and on a desk the list marks
   the part in view. A code
@@ -42,29 +42,28 @@
   const repo: string | null = LAUNCH.repo ? SOURCE : null;
   const edit = $derived(repo === null ? null : `${repo}/edit/master/${DOCS_DIR}${doc.file}`);
 
-  /* THE PART IN VIEW: the last `##` heading whose top has passed the top of the window, by its anchor. */
+  /**
+   * THE PART IN VIEW: the last `##` heading whose top has passed the line under the site's bar, by its anchor. NO
+   * SCROLL LISTENER: an observer wakes only when a heading crosses into or out of the window under the bar, and the
+   * headings are read then, so scrolling the page costs nothing between crossings.
+   */
   let inView = $state<string | null>(null);
   $effect(() => {
     const heads = doc.headings;
     if (heads.length === 0) return void (inView = null);
-    let frame = 0;
-    const spy = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        let at: string | null = null;
-        for (const h of heads) {
-          const el = document.getElementById(h.id);
-          if (el && el.getBoundingClientRect().top <= 72) at = h.id;
-        }
-        inView = at;
-      });
+    const els = heads.map((h) => document.getElementById(h.id)).filter((el): el is HTMLElement => el !== null);
+    const bar = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) || 64;
+    const line = bar + 8;
+    const read = (): void => {
+      let at: string | null = null;
+      for (const el of els) if (el.getBoundingClientRect().top <= line) at = el.id;
+      inView = at;
     };
-    spy();
-    addEventListener('scroll', spy, { passive: true });
-    return () => {
-      cancelAnimationFrame(frame);
-      removeEventListener('scroll', spy);
-    };
+    read();
+    if (typeof IntersectionObserver !== 'function') return;
+    const io = new IntersectionObserver(read, { rootMargin: `-${line}px 0px 0px 0px`, threshold: [0, 1] });
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
   });
   const inViewText = $derived(inView === null ? null : plainOf(doc.headings.find((h) => h.id === inView)?.text ?? ''));
 </script>
@@ -74,7 +73,7 @@
   <link rel="alternate" type="text/markdown" href={`${doc.path}.md`} />
 </svelte:head>
 <!-- A header and not a named section: the article below is the region its title names, so a second would repeat it. -->
-<header class="night strip">
+<header class="strip">
   <div class="wrap strip-in">
     <p class="doc-where">
       <a class="doc-crumb" href="/docs">{w.nav.home}</a>
@@ -134,11 +133,11 @@
 </div>
 
 <style>
-  /* THE NIGHT STRIP: slim, carrying on from the header's night, with where the page sits and its title. */
+  /* THE HEAD: slim, on the board, with where the page sits and its title. */
   .strip-in {
     display: grid;
-    gap: 14px;
-    padding-block: 28px 44px;
+    gap: var(--sp-3);
+    padding-block: clamp(28px, 2vw + 16px, 48px) 0;
   }
 
   .doc-where {
@@ -147,12 +146,12 @@
     align-items: center;
     gap: 6px;
     margin: 0;
-    color: var(--on-night-2);
-    font-size: var(--t-site-15);
+    color: var(--ink-3);
+    font-size: var(--t-site-small);
   }
 
   .doc-crumb {
-    color: var(--on-night-2);
+    color: var(--ink-2);
     text-decoration: none;
   }
 
@@ -166,25 +165,24 @@
   }
 
   .doc-crumb:hover {
-    color: var(--on-night);
+    color: var(--ink);
     text-decoration: underline;
     text-underline-offset: 3px;
   }
 
   .doc-title {
-    max-inline-size: 22ch;
+    max-inline-size: 24ch;
     margin: 0;
-    font-size: clamp(2.1rem, 3.8vw, 3.2rem);
-    line-height: 1.02;
-    letter-spacing: -0.045em;
+    color: var(--ink);
+    font-size: clamp(30px, 1.2vw + 24px, 40px);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
     text-wrap: balance;
   }
 
-  /* THE BOARD under the strip, flat and full width, down to the footer with no gap above it. */
+  /* THE PAGE under the head, on the same board, down to the footer. */
   .board {
-    padding-block: var(--sp-6) 72px;
-    margin-block-end: 0;
-    background: var(--board);
+    padding-block: var(--sp-6) clamp(48px, 4vw + 32px, 96px);
   }
 
   /* ONE COLUMN ON A PHONE, the nav's disclosure over the page. */
@@ -217,15 +215,10 @@
     gap: 4px;
     min-block-size: var(--tap);
     padding: 18px 22px;
-    background: var(--paper);
-    border-radius: 16px;
+    background: var(--tile);
+    border-radius: var(--r-tile);
     color: var(--ink);
     text-decoration: none;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  .pager-link:hover {
-    background: var(--tile);
   }
 
   .pager-link:hover .pager-title {
@@ -237,7 +230,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--muted);
+    color: var(--ink-3);
     font-size: var(--t-site-15);
   }
 
@@ -250,8 +243,8 @@
   .contents-title {
     margin: 0 0 var(--sp-2);
     padding-inline: 10px;
-    color: var(--muted);
-    font-family: var(--ui);
+    color: var(--ink-3);
+    font-family: var(--font-ui);
     font-size: var(--t-site-15);
     font-weight: 600;
   }
@@ -270,7 +263,7 @@
     min-block-size: 36px;
     padding: 6px 10px;
     border-radius: 8px;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-site-15);
     line-height: 20px;
     text-decoration: none;
@@ -282,16 +275,19 @@
     color: var(--ink);
   }
 
+  /* THE PART IN VIEW: bold and in ink, with the tile's fill, so it is told by more than colour. */
+
   .contents-link[aria-current] {
+    background: var(--tile);
     color: var(--ink);
     font-weight: 600;
   }
 
-  /* THE PART IN VIEW ON A PHONE: one line on the board's ground, held at the window's top once the header has scrolled
-     away, cut with an ellipsis. Fixed, so its arrival moves nothing under it. */
+  /* THE PART IN VIEW ON A PHONE: one line on the board's ground, held under the site's bar, cut with an ellipsis.
+     Fixed, so its arrival moves nothing under it. */
   .in-view {
     position: fixed;
-    inset-block-start: 0;
+    inset-block-start: var(--bar-h);
     inset-inline: 0;
     z-index: 2;
     display: block;
@@ -348,18 +344,14 @@
 
     .contents {
       position: sticky;
-      inset-block-start: var(--sp-5);
+      inset-block-start: calc(var(--bar-h) + var(--sp-5));
       display: block;
     }
   }
 
   @media (max-width: 760px) {
-    .strip-in {
-      padding-block: 20px 32px;
-    }
-
     .board {
-      padding-block: var(--sp-4) 48px;
+      padding-block: var(--sp-5) 48px;
     }
   }
 </style>

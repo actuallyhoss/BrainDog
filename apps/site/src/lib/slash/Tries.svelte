@@ -50,41 +50,49 @@
 
 <style>
   .tries {
-    padding: 8px;
     display: grid;
     align-content: start;
     gap: 2px;
   }
   .lab {
     margin: 0;
-    padding: 10px 10px 6px;
-    font: 500 12px/1 var(--ui);
-    color: var(--muted);
+    padding: 0 10px 6px;
+    font: 500 var(--t-site-13) / 1 var(--font-ui);
+    color: var(--ink-3);
   }
   button {
-    all: unset;
+    /* NOT `all: unset`, which would take the a11y layer's focus ring with it. */
+    appearance: none;
+    margin: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 10px;
-    border-radius: 9px;
-    font-size: var(--t-site-small);
+    border-radius: var(--r-ctl);
+    font-size: var(--t-site-15);
     line-height: 1.35;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
-  button:hover,
   button[aria-pressed='true'] {
-    background: var(--soft);
+    background: var(--tile-2);
     color: var(--ink);
   }
-  button:focus-visible {
-    outline: 2px solid var(--red);
-    outline-offset: -2px;
+  /* Hover only where there is one: a tap would leave a second question looking chosen. */
+  @media (hover: hover) {
+    button:hover {
+      background: var(--tile-2);
+      color: var(--ink);
+    }
   }
   .g {
     display: inline-flex;
-    color: var(--muted);
+    color: var(--ink-3);
   }
   .k {
     display: inline-grid;
@@ -93,11 +101,10 @@
     height: 19px;
     padding: 0 5px;
     margin-inline-start: auto;
-    border-radius: 5px;
-    background: var(--soft);
-    box-shadow: inset 0 0 0 1px var(--rule);
-    font: 500 11px/1 var(--mono);
-    color: var(--ink2);
+    border-radius: var(--r-xs);
+    background: var(--tile);
+    font: 500 11px/1 var(--font-mono);
+    color: var(--ink-2);
     visibility: hidden;
   }
   button[aria-pressed='true'] .k {

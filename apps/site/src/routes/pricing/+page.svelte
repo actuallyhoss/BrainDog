@@ -2,15 +2,15 @@
   import Seo from '$lib/site/Seo.svelte';
   import { application, faqOf } from '$lib/site/seo.ts';
   /**
-   * Pricing. WHILE BILLING IS OFF it is the early access page (20 October, `copy/pricing.ts` `early`): the night
-   * head, Free on the night with its $0 and what it holds, one line that paid plans come later and nothing made now is
-   * lost (plan F20), and the questions people ask: this page's three and the home page's, which moved here (plan F12),
-   * and no close. No paid plan's price is drawn.
+   * Pricing (the redo of 2 November). WHILE BILLING IS OFF it is the early access page (20 October, `copy/pricing.ts`
+   * `early`): the page's head, then one row of the app's tiles, Free with its $0, what it holds and the start button
+   * (the page's one red) with the one line that paid plans come later and nothing made now is lost, and beside it the
+   * questions people ask: this page's three and the home page's. No paid plan's price is drawn.
    *
-   * THE DAY `LAUNCH.billing` IS ON it is the plans page again: the three plans with Free first and black (§35), what
-   * each plan holds, extra use and the questions people ask. Every figure is `TABLE`'s (`plans.ts`, held to
-   * `PLAN_TABLE` by `plans.test.ts`) and every sentence is `copy/pricing.ts`'s; `lib/pricing/cards.ts` puts the one
-   * into the other, so this page types neither.
+   * THE DAY `LAUNCH.billing` IS ON it is the plans page again: the three plans with Free first, what each plan holds,
+   * extra use and the questions people ask. Every figure is `TABLE`'s (`plans.ts`, held to `PLAN_TABLE` by
+   * `plans.test.ts`) and every sentence is `copy/pricing.ts`'s; `lib/pricing/cards.ts` puts the one into the other, so
+   * this page types neither.
    *
    * NO JAVASCRIPT IS NEEDED TO READ ANY OF IT: the cards, the tables and the answers are finished HTML.
    */
@@ -23,6 +23,7 @@
   import Questions from '$lib/home/Questions.svelte';
   import EarlyStrip from '$lib/site/EarlyStrip.svelte';
   import PageHead from '$lib/site/PageHead.svelte';
+  import Icon from '$lib/Icon.svelte';
   import Start from '$lib/site/Start.svelte';
 
   const p = site.pricing;
@@ -36,25 +37,30 @@
 {#if !LAUNCH.billing}
   <PageHead title={e.title} lead={e.lede} />
 
-  <section class="wrap early">
-    <article class="plan">
-      <p class="pname">{e.plan.name} <b class="num">{e.plan.price}</b></p>
-      <ul>
-        {#each e.plan.lines(TABLE.free) as line (line)}<li>{line}</li>{/each}
-      </ul>
-      <div class="go"><Start /></div>
-    </article>
-    <p class="later">{e.later.say}</p>
+  <section class="section">
+    <div class="wrap">
+      <div class="tiles">
+        <article class="tile lead span-5 plan reveal" aria-labelledby="plan-free">
+          <p class="pname" id="plan-free">{e.plan.name}</p>
+          <p class="figure big num">{e.plan.price}</p>
+          <ul>
+            {#each e.plan.lines(TABLE.free) as line (line)}<li><Icon name="check" size="m" /><span>{line}</span></li>{/each}
+          </ul>
+          <div class="go"><Start size="lg" /></div>
+          <p class="later">{e.later.say}</p>
+        </article>
+        <div class="span-7 reveal" id="questions"><Questions questions={asked} title={e.faq.title} /></div>
+      </div>
+    </div>
   </section>
-  <div id="questions"><Questions questions={asked} title={e.faq.title} /></div>
 {:else}
 <PageHead title={p.title} lead={p.sub} />
 
-<section class="wrap">
+<section class="section wrap">
   <Plans />
 
   <div class="sec" id="holds">
-    <h2>{p.holds.title}</h2>
+    <h2 class="h2">{p.holds.title}</h2>
     <p class="say">{p.holds.say}</p>
     <div class="tablebox">
       <table class="ptable">
@@ -77,7 +83,7 @@
   </div>
 
   <div class="sec" id="extra">
-    <h2>{p.extra.title}</h2>
+    <h2 class="h2">{p.extra.title}</h2>
     <!-- EXTRA USE IS SOLD THE DAY `LAUNCH.extra` IS ON, with billing: until then the section says it is coming soon. -->
     <p class="say">{#if LAUNCH.billing}{p.extra.say}{/if}{#if !(LAUNCH.billing && LAUNCH.extra)}{LAUNCH.billing ? ' ' : ''}{p.extra.soon}{/if}</p>
     <div class="tablebox">
@@ -95,7 +101,7 @@
   </div>
 
   <div class="sec" id="questions">
-    <h2>{p.faq.title}</h2>
+    <h2 class="h2">{p.faq.title}</h2>
     <div class="faq">
       {#each faq as item (item.q)}
         <div><h3>{item.q}</h3><p>{item.a}</p></div>
@@ -108,93 +114,76 @@
 {/if}
 
 <style>
-  /* The skin's own .sec is a group heading with a hairline under it; this one is a plain section. */
-  .sec {
-    display: block;
-    padding-block: 120px 0;
-    border-block-end: 0;
-  }
+  /* ── Early access: the one plan ─────────────────────────────────────── */
 
-  /* THE QUESTIONS' BAND FOLLOWS ON THE SAME GROUND, so its own padding is the space between them. */
-  .early {
-    padding-block: 64px 0;
-  }
-
-
-  /* THE ONE PLAN, on the night: its name and $0, what it holds, and the start button. */
   .plan {
-    max-inline-size: 640px;
-    padding: 32px;
-    border-radius: 16px;
-    background: var(--night);
-    color: var(--on-night);
+    gap: var(--sp-3);
   }
 
   .pname {
     margin: 0;
-    font: 600 28px/1.1 var(--head);
-    letter-spacing: -0.035em;
-  }
-
-  .pname b {
-    margin-inline-start: 8px;
-    color: var(--on-night-2);
+    color: var(--ink-2);
+    font-size: var(--t-site-15);
     font-weight: 600;
   }
 
   .plan ul {
     display: grid;
-    gap: 12px;
-    margin: 24px 0 0;
+    gap: 10px;
+    margin: var(--sp-2) 0 0;
     padding: 0;
     list-style: none;
-    font-size: var(--t-site-17);
+    color: var(--ink);
+    font-size: var(--t-site-15);
   }
 
-  .plan li::before {
-    content: '';
-    display: inline-block;
-    inline-size: 6px;
-    block-size: 6px;
-    margin-inline-end: 12px;
-    border-radius: 50%;
-    background: var(--on-night-2);
-    vertical-align: middle;
+  .plan li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
 
-  .plan .go {
-    margin-block-start: 32px;
+  .plan li :global(svg) {
+    color: var(--good);
   }
 
-  /* WHAT COMES LATER, one plain line under the plan. */
+  .go {
+    margin-block-start: var(--sp-3);
+  }
+
+  /* WHAT COMES LATER, one plain line under the button. */
   .later {
-    margin: 20px 0 0;
-    color: var(--ink2);
-    font-size: var(--t-site-17);
+    margin: var(--sp-2) 0 0;
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
+    color: var(--ink-2);
+    font-size: var(--t-site-small);
     line-height: 1.55;
   }
 
-
-  @media (max-width: 760px) {
-    .plan {
-      padding: 24px 20px;
-    }
-
-    .plan .go :global(.btn) {
+  @media (max-width: 640px) {
+    .go,
+    .go :global(.btn) {
       inline-size: 100%;
     }
+  }
 
-    .early {
-      padding-block: 40px 0;
-    }
+  /* ── Billing on: the plans page ─────────────────────────────────────── */
 
+  .sec {
+    display: block;
+    padding-block: clamp(48px, 4vw + 32px, 96px) 0;
   }
 
   .sec .say {
-    margin: 16px 0 0;
-    font-size: var(--t-site-19);
-    color: var(--ink2);
-    max-width: 30em;
+    margin: var(--sp-3) 0 var(--sp-5);
+    max-inline-size: 60ch;
+    color: var(--ink-2);
+    font-size: var(--t-lead);
+  }
+
+  .sec .tablebox {
+    background: var(--tile);
   }
 
   .vh {
@@ -204,11 +193,5 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  @media (max-width: 760px) {
-    .sec {
-      padding-block-start: 96px;
-    }
   }
 </style>

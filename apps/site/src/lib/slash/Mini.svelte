@@ -1,6 +1,6 @@
 <!--
-  One of Slash's answers drawn small beside its words on the Slash page, the prototype's `.mini` (site.html ~:379-381,
-  ~:1296-1299): the question in a bar with its "/", and the answer under it. Nothing types in: the page is for reading,
+  One of Slash's answers drawn small beside its words on the Slash page: the app's palette with the question in its bar
+  and the answer under it. Nothing types in: the page is for reading,
   so the answer is there from the start, and a Make draft is still added or left with one press.
 -->
 <script lang="ts">
@@ -19,28 +19,31 @@
 </div>
 
 <style>
+  /* THE APP'S PALETTE, drawn small: an opaque layer with the 1px edge the design system gives what floats. */
   .mini {
-    background: var(--paper);
-    border-radius: 22px;
-    padding: 14px;
     display: grid;
     gap: 10px;
-    min-width: 0;
+    min-inline-size: 0;
+    padding: 12px;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-tile);
+    background: var(--tile);
     color: var(--ink);
   }
+
   .mini-in {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: var(--tile);
+    padding: 10px 12px;
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
     font-size: var(--t-site-15);
-    /* A PLAIN HAIRLINE, as the home band's bar (plan F17): red is kept for the one ask. */
-    box-shadow: inset 0 0 0 1px var(--rule);
   }
+
+  /* The bar's "/" in the third ink: red is kept for the page's one ask. */
   .sl {
-    color: var(--red);
-    font: 600 16px/1 var(--head);
+    color: var(--ink-3);
+    font: 600 16px/1 var(--font-display);
   }
 </style>
