@@ -37,9 +37,14 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { argv } from 'node:process';
+import { realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, resolve as resolvePath, sep } from 'node:path';
+import { argv, env } from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { keysDoor } from '../../apps/selfhost/src/keychain.ts';
+import { openKeyStore, recordKeys } from '../../apps/selfhost/src/keys.ts';
 import { start } from '../../apps/selfhost/src/server.ts';
 import { startCloud } from '../../apps/worker/test/cloud-serve.ts';
 import { httpStatus } from '../../packages/host/src/index.ts';
@@ -51,6 +56,9 @@ import { budget } from './lib.mjs';
    draws it here as a variant; until then it is handed on from this door, so a gate and the look reach both records
    through one module, and the runner reads `lived.mjs` as the library it is rather than a gate nobody registered. */
 export { buildLived, openLived } from './lived.mjs';
+/* THE OUTSIDE WORLD A RECORD'S SCRIPTS ASK, stubbed (`outside.mjs`), handed on from here for the same reason: a walk that
+   starts a record with `keys` and `outside` reaches the stub and its keys through this one door. */
+export { KEYS as STUB_KEYS, SENTRY_ORG, startOutside } from './outside.mjs';
 
 /**
  * The app's own catalogue folder, the one the build ships beside the shell: every add-on as it was last published, read
@@ -287,6 +295,48 @@ async function asModules(api) {
   }
 }
 
+
+/**
+ * The key file a record's key store may be opened on: a scratch file, never the real vault.
+ *
+ * A SCRATCH FILE IS ONE UNDER THE MACHINE'S TEMPORARY FOLDER, the folder named, as it is on disk, under `tmpdir()` or
+ * `/tmp`, and never the file `BRAINDOG_KEK_FILE` names, which is the operator's own. Anything else throws before a byte
+ * is read or written, so a gate or a walk that names the wrong path is stopped rather than handed a person's keys. A
+ * file that is not there yet is minted, `0600`, by `openKeyStore`, as `init` mints one.
+ */
+export function scratchKeyFile(file) {
+  if (typeof file !== 'string' || file === '') throw new Error('a record key store needs a scratch file named');
+  const at = resolvePath(file);
+  const real = (dir) => {
+    try {
+      return realpathSync(dir);
+    } catch {
+      return null;
+    }
+  };
+  const folder = real(dirname(at));
+  if (folder === null) throw new Error(`${dirname(at)} is not a folder, so no key store was opened there`);
+  const scratch = [tmpdir(), '/tmp', '/private/tmp'].map(real).filter((r) => r !== null);
+  const under = scratch.some((root) => folder === root || folder.startsWith(root + sep));
+  const vault = env.BRAINDOG_KEK_FILE === undefined ? null : resolvePath(env.BRAINDOG_KEK_FILE);
+  if (!under || at === vault)
+    throw new Error(`${at} is not a scratch file under the temporary folder, so it was not opened: a record started here never holds the real vault`);
+  return at;
+}
+
+/**
+ * Where a script's request goes when the record is given `outside`: the stub's base, then the host it asked, then its
+ * path, so the stub (`outside.mjs`) answers as that service. Nothing leaves the machine.
+ */
+const toOutside = (outside) => async (url, init) =>
+  fetch(`${outside}/${url.host}${url.pathname}${url.search}`, { method: init.method, headers: init.headers, ...(init.body === undefined ? {} : { body: init.body }), redirect: 'manual' });
+
+/** Every host a script asks is a public address to the pin, since `toOutside` sends it to the stub whatever it is. */
+const PUBLIC = async () => [{ address: '93.184.215.14', family: 4 }];
+
+/** The owner as the keychain's own door reads them: a person, the owner, in no chat. `p_self` is `IDENTITY`'s owner. */
+const OWNER_CTX = { principal: { kind: 'person', id: 'p_self', level: 'owner' } };
+
 /**
  * Start one. `{ base, now, ask, setPref, close, server, variants }`, where `base` is `http://127.0.0.1:<port>`, `now` its
  * clock and `ask` and `setPref` its own doors with the gate's key (`recordAt`).
@@ -304,23 +354,32 @@ async function asModules(api) {
  * `open` IS FOR THE COMMAND LINE: `vite dev` proxies `/api` to it directly and cannot add a bearer, so that
  * record is the open self-host it always was, at the origin the dev server serves the app from.
  *
+ * `keys` OPENS A KEY STORE ON A SCRATCH FILE AND PUTS STUB KEYS IN IT: `{ file, put: [{ label, opens, value }] }`. The file
+ * is held to `scratchKeyFile` (never the real vault), the record is made with its three wrapped keys as `init` makes them,
+ * and each key goes in through the keychain's own deposit door as the owner, so a script opens it exactly as on a real
+ * self-host. `outside` IS A STUB'S BASE (`outside.mjs`): outbound is turned on and every request a script sends goes
+ * there and nowhere else, its host kept in the path, and the belt runs each second. The handle then has `again()`, which
+ * makes every script due now and runs one pass, since the record's clock stands still and an hourly script would
+ * otherwise run once.
+ *
  * `variant` MAKES THIS RECORD ONE OF `VARIANTS`, and `variants: true` starts every one of them beside this record and
  * hands their bases back as `variants[name]`. ONE `close()` GIVES ALL OF THEM BACK, which is why they come from this
  * call and not from a second one in the gate: `test/handles.test.mjs` holds every gate to closing what it opened in the
  * `finally` of the `try` it opened it in, and four records under one handle are one close.
  */
-export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false, runs = false, catalogue = false } = {}) {
+export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false, runs = false, catalogue = false, keys, outside } = {}) {
   if (variant !== undefined && !VARIANTS.some((v) => v.name === variant)) throw new Error(`there is no record variant called ${variant}`);
   /* THE CLOUD IS ANOTHER HOST, NOT THIS ONE WITH SOMETHING ADDED, so none of what follows is asked of it. */
   if (variant === 'cloud') return startCloudRecord();
   const key = open ? undefined : randomBytes(32).toString('base64url');
+  const store = keys === undefined ? undefined : await openKeyStore(scratchKeyFile(keys.file));
   const running = await start({
     file: ':memory:',
     directory: ':memory:',
     port,
     host: '127.0.0.1',
     now: NOW,
-    pollMs: catalogue ? 1_000 : 0,
+    pollMs: catalogue || outside !== undefined ? 1_000 : 0,
     sessionKey: new Uint8Array(randomBytes(32)),
     /* NO PUBLIC KENNEL. Left to the environment, the record read `https://app.brain.dog/api/kennel/v1/` for every catalogue
        index and preview, so a screen waited on another host for up to five seconds a file: `/packs/browse` asks for a
@@ -333,6 +392,9 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
        folder is on this disk, so nothing waits on the network. No gate asks for it: their sweeps measure the seed as it
        ships, and a gate's `/packs/browse` stays the empty store it has always measured. */
     ...(catalogue ? { catalogue: CATALOGUE } : {}),
+    ...(store === undefined ? {} : { keys: store }),
+    /* THE STUB AND NOTHING ELSE. `openKey` is left to the host, so the key a script sends is the one this store opens. */
+    ...(outside === undefined ? {} : { actions: { send: toOutside(outside), resolve: PUBLIC } }),
     ...(key === undefined ? {} : { token: key }),
     ...(origin === undefined ? {} : { origin }),
   });
@@ -345,7 +407,7 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
      drops a rejection, so the caller sees why the record did not start and not why it did not stop; `close()` as
      `start` writes it never rejects, and a throw inside its `server.close` callback is uncaught rather than dropped. */
   try {
-    const named = running.api.kernel.createRecord(IDENTITY);
+    const named = running.api.kernel.createRecord(store === undefined ? IDENTITY : { ...IDENTITY, keys: await recordKeys(store, IDENTITY.id) });
     if (!named.ok) throw new Error(`the gate's record could not be named: ${named.refusal?.fix ?? 'no reason given'}`);
     /* WITH THE CATALOGUE, BRAINDOG'S MODULES GO IN FIRST AS THE PACKS A PERSON'S RECORD HOLDS THEM AS (`asModules`), so
        an add-on that needs Money finds it: the seed alone writes Money's lists as the record's own, and the store
@@ -388,6 +450,15 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
     if (runs) await plantRuns(running.api.kernel);
     if (variant === 'busy') await decideRenewals(running.api.kernel);
     if (variant === 'connected') await connect(running.server.address().port, key);
+    /* THE STUB KEYS, LAST, so the Keychain the seed or a module holds is there to take them. Through the door the Keys
+       screen deposits through, as the owner, sealed under this store. */
+    if (store !== undefined) {
+      const door = keysDoor(running.api, store, new Set(['http://127.0.0.1']));
+      for (const k of keys.put ?? []) {
+        const put = await door.keys.put({ ctx: OWNER_CTX, hints: {}, body: { label: k.label, opens: k.opens, value: k.value, ...(k.kind === undefined ? {} : { kind: k.kind }) } });
+        if (!put.ok) throw new Error(`the gate's record could not keep the stub key ${k.label}: ${put.refusal?.fix ?? 'no reason given'}`);
+      }
+    }
   } catch (e) {
     await running.close().catch(() => {});
     throw e;
@@ -422,6 +493,32 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
       await stop();
     },
     server: running.server,
+    ...(outside === undefined
+      ? {}
+      : {
+          /* EVERY SCRIPT DUE AT THE RECORD'S NOW, AND ONE PASS. The clock stands at `NOW`, so a script that ran once is
+             next due an hour after a moment that never comes. */
+          again: async () => {
+            running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script'", new Date(NOW - 1_000).toISOString());
+            /* AND PASSES UNTIL NO RUN IS LEFT WAITING: a pass leases a few, and the seed's own scripts queue a couple of
+               hundred runs the first time, so one pass would leave an add-on's run behind them. */
+            const waiting = () => running.sql.one("SELECT count(*) AS n FROM outbox WHERE kind = 'script.run' AND state IN ('pending', 'leased')")?.n ?? 0;
+            for (let i = 0; i < 400; i++) {
+              await running.poll();
+              if (waiting() === 0) break;
+            }
+            /* AND WHAT EACH SCRIPT SAID, from its newest run's event, so a walk can print it. */
+            return running.sql
+              .all("SELECT target, note, to_v FROM event WHERE target LIKE 'declaration:script.%' AND rowid IN (SELECT max(rowid) FROM event WHERE target LIKE 'declaration:script.%' GROUP BY target)")
+              .map((e) => {
+                let said = {};
+                try {
+                  said = JSON.parse(e.to_v ?? '{}') ?? {};
+                } catch {}
+                return { script: String(e.target).replace('declaration:script.', ''), outcome: said.outcome ?? e.note, log: said.log ?? null };
+              });
+          },
+        }),
   };
 }
 
