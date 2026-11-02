@@ -197,19 +197,28 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         case .drag:
             /* AS A TITLE BAR DOES: the press that started it is the event AppKit is handling now, or the move just after. */
             guard let window = webView.window, let event = NSApp.currentEvent, [.leftMouseDown, .leftMouseDragged].contains(event.type) else { return }
+            /* A DOUBLE PRESS IS TOLD BY ITS CLICK COUNT, as a title bar tells it: the page never sees its `dblclick`. */
+            if event.type == .leftMouseDown, event.clickCount >= 2 { return titleBarDoubleClick(window) }
             window.performDrag(with: event)
         case .titleBarDoubleClick:
             guard let window = webView.window else { return }
-            switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
-            case "Minimize": window.miniaturize(nil)
-            case "None": break
-            default: window.zoom(nil)
-            }
+            titleBarDoubleClick(window)
         #endif
         default:
             onAsk?(ask)
         }
     }
+
+    #if os(macOS)
+    /// What a double press on a title bar does, as the person set it in System Settings: zoom, minimise or nothing.
+    private func titleBarDoubleClick(_ window: NSWindow) {
+        switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+        case "Minimize": window.miniaturize(nil)
+        case "None": break
+        default: window.zoom(nil)
+        }
+    }
+    #endif
 
     #if os(iOS)
     @objc private func pulled(_ control: UIRefreshControl) {

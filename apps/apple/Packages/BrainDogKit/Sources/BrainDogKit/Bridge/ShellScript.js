@@ -80,16 +80,17 @@
     const pressable =
       'a,button,input,textarea,select,label,summary,details,[role=button],[role=link],[role=tab],[role=menuitem],[role=switch],[role=checkbox],[role=combobox],[role=slider],[contenteditable=""],[contenteditable=true],[tabindex]:not([tabindex="-1"]),[draggable=true]';
     const empty = (e) => e.button === 0 && e.clientY >= 0 && e.clientY < BAR && !(e.target && e.target.closest && e.target.closest(pressable));
+    // EVERY PRESS GOES TO NATIVE, the second of a double one too: AppKit's drag takes the press's mouse-up, so the page
+    // never sees a `dblclick` there, and native tells a double press by the event's own click count.
     addEventListener(
       'mousedown',
       (e) => {
-        if (!empty(e) || e.detail > 1) return;
+        if (!empty(e)) return;
         e.preventDefault();
         post('drag');
       },
       true,
     );
-    addEventListener('dblclick', (e) => empty(e) && post('zoom'), true);
   }
   // Any link that leaves BrainDog opens outside, whatever the page did with it.
   addEventListener(
