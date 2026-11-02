@@ -6178,7 +6178,7 @@
         "id": "braindog",
         "name": "BrainDog"
       },
-      "unlisted": true,
+      "shelf": "helpers",
       "icon": "triangle-alert"
     },
     {
