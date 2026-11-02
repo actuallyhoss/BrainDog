@@ -49,6 +49,9 @@ export const words = {
   sentence: 'A CSV from your bank. Lines already in the Ledger are skipped.',
   account: 'Account',
   noAccounts: 'No open account yet.',
+  /* THE WAY ON FROM NO ACCOUNT (2 Nov, a new person's first CSV met "No open account yet." and nothing to press). */
+  noAccountsWhy: 'A statement goes into the account it came from. Add that account on Money, then come back with the file.',
+  addAccount: 'Add an account',
   noLedger: 'There is no ledger to import into yet.',
   file: 'Statement',
   drop: 'Drop a CSV here, or choose one',

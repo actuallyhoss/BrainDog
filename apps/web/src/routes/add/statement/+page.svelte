@@ -158,7 +158,9 @@
   {#if loader.state === 'waiting' || loader.state === 'refused' || loader.state === 'offline'}
     <ReadState state={loader.state} refusal={loader.refusal} onretry={loader.reread} />
   {:else if !account}
-    <Empty kind="no-data-yet" glyph="money" title={words.noAccounts} />
+    <Empty kind="no-data-yet" glyph="money" title={words.noAccounts} body={words.noAccountsWhy}>
+      {#snippet actions()}<Button weight="primary" href={home}>{words.addAccount}</Button>{/snippet}
+    </Empty>
   {:else if result}
     <div class="st-done" role="status">
       <h2>{result.added === 0 && result.filled > 0 ? words.filled(result.filled) : words.added(result.added, result.account)}</h2>
