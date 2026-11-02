@@ -42,10 +42,38 @@ export function between(a: Shape, b: Shape, t: number): string {
   return `${b.pre}${said}${b.post}`;
 }
 
-/* A STRONG EASE-OUT, A QUARTIC (leftovers9, Sam: "the animation of the numbers moving too slowly is shit, make it faster
-   and smoother"). Over 420ms on a cubic, a figure crawled through its last digits for the second half of the count; now
-   it covers nine tenths of the way in the first third of `--form-count`, 300ms, and settles. */
-const easeOut = (t: number): number => 1 - (1 - t) ** 4;
+/* A STRONG EASE-OUT, cubic-bezier(0.22, 1, 0.36, 1) (leftovers9, Sam: "the animation of the numbers moving too slowly
+   is shit, make it faster and smoother"). Over 420ms on a cubic, a figure crawled through its last digits for the second
+   half of the count; now it covers about nine tenths of the way in the first third of `--form-count`, 300ms, and
+   settles without a step. The curve's x is solved for each frame's share of the time (Newton's method, then halving
+   where it stalls), and its y is how far along the figure is. */
+const BEZIER = [0.22, 1, 0.36, 1] as const;
+const axis = (p1: number, p2: number) => (u: number): number => 3 * (1 - u) ** 2 * u * p1 + 3 * (1 - u) * u ** 2 * p2 + u ** 3;
+const slope = (p1: number, p2: number) => (u: number): number => 3 * (1 - u) ** 2 * p1 + 6 * (1 - u) * u * (p2 - p1) + 3 * u ** 2 * (1 - p2);
+const bx = axis(BEZIER[0], BEZIER[2]);
+const by = axis(BEZIER[1], BEZIER[3]);
+const dx = slope(BEZIER[0], BEZIER[2]);
+export const easeOut = (t: number): number => {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  let u = t;
+  for (let i = 0; i < 8; i++) {
+    const err = bx(u) - t;
+    if (Math.abs(err) < 1e-5) return by(u);
+    const d = dx(u);
+    if (Math.abs(d) < 1e-6) break;
+    u -= err / d;
+  }
+  let lo = 0;
+  let hi = 1;
+  u = t;
+  for (let i = 0; i < 30; i++) {
+    if (bx(u) < t) lo = u;
+    else hi = u;
+    u = (lo + hi) / 2;
+  }
+  return by(u);
+};
 
 const running = new WeakMap<Text, number>();
 /** Whether a text is still counting: what it says now is a figure on its way, not the one it will stay at. */
