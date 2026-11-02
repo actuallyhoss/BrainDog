@@ -287,6 +287,11 @@ export type Act = { said: string; href: string } | null;
 export type HeroFacts = { headline: string; lede: string | null; red: Act; soft: Act };
 
 const lateOf = (tasks: readonly FactTask[], today: string): FactTask[] => tasks.filter((t) => !t.done && t.by !== null && t.by < today).sort((a, b) => a.by!.localeCompare(b.by!));
+/** The day a task falls due as the hero says it: today and tomorrow in words, as the task's own page says them, else "Sat 7 Nov". */
+const dueDay = (by: string, today: string): string => {
+  const n = daysBetween(today, by);
+  return n === 0 ? 'today' : n === 1 ? 'tomorrow' : dayChip(by);
+};
 const dueOf = (tasks: readonly FactTask[], today: string, days = 7): FactTask[] =>
   tasks.filter((t) => !t.done && t.by !== null && t.by >= today && daysBetween(today, t.by) <= days).sort((a, b) => a.by!.localeCompare(b.by!));
 
@@ -328,7 +333,7 @@ export function heroFactsOf(f: FactsIn, numbers: Numbers): HeroFacts {
   }
   if (numbers.banner && numbers.newest) facts.push(`No numbers have come from ${f.name} since ${daySaid(numbers.newest, f.today)}.`);
   if (f.lane === 'parked' && f.since) facts.push(`${f.name} has been ${laneInLine(f.laneWord ?? 'parked')} since ${f.since}.`);
-  if (due.length > 0) facts.push(due.length === 1 ? `${quoted(due[0]!.title)} is due ${dayChip(due[0]!.by!)}.` : `${due.length} tasks fall due this week, the first ${dayChip(due[0]!.by!)}.`);
+  if (due.length > 0) facts.push(due.length === 1 ? `${quoted(due[0]!.title)} is due ${dueDay(due[0]!.by!, f.today)}.` : `${due.length} tasks fall due this week, the first ${dueDay(due[0]!.by!, f.today)}.`);
   const run = f.runs[0];
   if (run) facts.push(`${runSaid(run, f.now)}.`);
   if (f.about !== '' && fold(f.about) !== fold(f.next)) facts.push(/[.!?]$/u.test(f.about) ? f.about : `${f.about}.`);
