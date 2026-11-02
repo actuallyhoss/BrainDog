@@ -1164,29 +1164,17 @@
       grid-column: auto;
     }
 
-    .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]):last-child,
-    .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]):has(~ .shape-part[data-empty]):not(:has(~ .shape-part:not([data-empty]))) {
+    /* THE TWO COLUMNS END LEVEL, THE SLACK SHARED (leftovers 2 Nov): only the last tile of the shorter column grew, so
+       Agents stood over a 330px band on Kiln, and once it kept its own height the column ended 270px short of What
+       happened, a hole in the board. Every tile of a column grows now, by the same share: in the longer column there is
+       nothing to share and each is as tall as what it holds; in the shorter, each gets a little room at its foot (Agents
+       between its runs and the box to tell them), so no one tile holds a band and no hole stands under the column. */
+    .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]) {
       flex-grow: 1;
     }
 
-    .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]):last-child > :global(:last-child),
-    .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]):has(~ .shape-part[data-empty]):not(:has(~ .shape-part:not([data-empty]))) > :global(:last-child) {
+    .shape-row[data-cols] .shape-col > .shape-part:not([data-empty]) > :global(:last-child) {
       flex-grow: 1;
-    }
-
-    /* AGENTS IS AS TALL AS ITS RUNS (skills pass 2 Nov), as Dates and Numbers are: grown to end level with the work's
-       column it stood over a 330px empty band at 1512 on Kiln, two runs and then nothing down to the box to tell them.
-       A column ending short of its neighbour is the board's background; a hole inside a tile reads as something
-       missing. */
-    /* AND DATES AND NUMBERS IN THE COLUMNS TOO (ui-work 2 Nov): Northbound's one date stood in a 400px tile at 1280,
-       grown to end level with Tasks, Runs on and What happened; the rule above held them only outside the columns. */
-    .shape-row[data-cols] .shape-col > .shape-part:is([data-shape='agents-here'], [data-shape='dates'], [data-shape='numbers']):not([data-empty]),
-    .shape-row[data-cols] .shape-col > .shape-part:is([data-shape='agents-here'], [data-shape='dates'], [data-shape='numbers']):not([data-empty]):has(~ .shape-part[data-empty]):not(:has(~ .shape-part:not([data-empty]))) {
-      flex-grow: 0;
-    }
-
-    .shape-row[data-cols] .shape-col > .shape-part:is([data-shape='dates'], [data-shape='numbers']):not([data-empty]) > :global(:last-child) {
-      flex-grow: 0;
     }
   }
 
@@ -1422,7 +1410,9 @@
 
   .r-more {
     display: block;
+    inline-size: fit-content;
     margin: var(--sp-2) 0 0;
+    text-align: start;
     padding: 0;
     border: 0;
     background: none;
