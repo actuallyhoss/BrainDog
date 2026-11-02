@@ -15,31 +15,31 @@ public typealias PlatformColor = NSColor
 public enum Palette {
     /// `--board`: #F3F4F6 light, #0B0B0B dark.
     public static let board = Color("board", bundle: .module)
-    /// `--tile`: #FFFFFF light, #231A1A dark.
+    /// `--tile`: #FFFFFF light, #1C1C1C dark.
     public static let tile = Color("tile", bundle: .module)
-    /// `--tile-2`: #EEF0F3 light, #322526 dark.
+    /// `--tile-2`: #EEF0F3 light, #282828 dark.
     public static let tile2 = Color("tile-2", bundle: .module)
-    /// `--hover`: #F4F5F7 light, #2D2021 dark.
+    /// `--hover`: #F4F5F7 light, #232323 dark.
     public static let hover = Color("hover", bundle: .module)
-    /// `--nav`: #FFFFFF light, #2E0C18 dark.
+    /// `--nav`: #FFFFFF light, #181818 dark.
     public static let nav = Color("nav", bundle: .module)
-    /// `--nav-selected`: #F0F1F4 light, #431628 dark.
+    /// `--nav-selected`: #F0F1F4 light, #2C2C2C dark.
     public static let navSelected = Color("nav-selected", bundle: .module)
-    /// `--rule`: #E3E5E9 light, #3C2D2F dark.
+    /// `--rule`: #E3E5E9 light, #313131 dark.
     public static let rule = Color("rule", bundle: .module)
-    /// `--rule-strong`: #D5D9DF light, #4E3C3D dark.
+    /// `--rule-strong`: #D5D9DF light, #404040 dark.
     public static let ruleStrong = Color("rule-strong", bundle: .module)
-    /// `--toast`: #1B1E24 light, #3D2E2F dark.
+    /// `--toast`: #1B1E24 light, #323232 dark.
     public static let toast = Color("toast", bundle: .module)
-    /// `--on-toast`: #F3F4F6 light, #F5EEEF dark.
+    /// `--on-toast`: #F3F4F6 light, #F0F0F0 dark.
     public static let onToast = Color("on-toast", bundle: .module)
-    /// `--ink`: #101114 light, #F5EEEF dark.
+    /// `--ink`: #101114 light, #F0F0F0 dark.
     public static let ink = Color("ink", bundle: .module)
-    /// `--ink-2`: #3B4048 light, #CCBEBF dark.
+    /// `--ink-2`: #3B4048 light, #C1C1C1 dark.
     public static let ink2 = Color("ink-2", bundle: .module)
-    /// `--ink-3`: #5F6670 light, #A39293 dark.
+    /// `--ink-3`: #5F6670 light, #969696 dark.
     public static let ink3 = Color("ink-3", bundle: .module)
-    /// `--focus`: #101114 light, #F5EEEF dark.
+    /// `--focus`: #101114 light, #F0F0F0 dark.
     public static let focus = Color("focus", bundle: .module)
     /// `--good`: #1F7A47 light, #5FD08F dark.
     public static let good = Color("good", bundle: .module)
@@ -57,28 +57,38 @@ public enum Palette {
     public static let infoTint = Color("info-tint", bundle: .module)
     /// `--live`: #1F8A55 light, #47D486 dark.
     public static let live = Color("live", bundle: .module)
-    /// `--switch-off`: #8A919C light, #7C686A dark.
+    /// `--switch-off`: #8A919C light, #6D6D6D dark.
     public static let switchOff = Color("switch-off", bundle: .module)
     /// `--knob`: #FFFFFF light, #FFFFFF dark.
     public static let knob = Color("knob", bundle: .module)
-    /// `--segment-on`: #FFFFFF light, #403132 dark.
+    /// `--segment-on`: #FFFFFF light, #353535 dark.
     public static let segmentOn = Color("segment-on", bundle: .module)
-    /// `--arrived`: #EEEFEF light, #352B2C dark.
+    /// `--arrived`: #EEEFEF light, #2E2E2E dark.
     public static let arrived = Color("arrived", bundle: .module)
-    /// `--red-fill`: #CF413A light, #C2362F dark.
+    /// `--red-fill`: #CF413A light, #BA4239 dark.
     public static let redFill = Color("red-fill", bundle: .module)
-    /// `--red-fill-hover`: #B3322C light, #CF3F37 dark.
+    /// `--red-fill-hover`: #B3322C light, #C64A41 dark.
     public static let redFillHover = Color("red-fill-hover", bundle: .module)
-    /// `--red-fill-press`: #A12A25 light, #B02F29 dark.
+    /// `--red-fill-press`: #A12A25 light, #A83A32 dark.
     public static let redFillPress = Color("red-fill-press", bundle: .module)
     /// `--on-red`: #FFFFFF light, #FFFFFF dark.
     public static let onRed = Color("on-red", bundle: .module)
-    /// `--red`: #C2362F light, #EA645B dark.
+    /// `--red`: #C2362F light, #E16C63 dark.
     public static let red = Color("red", bundle: .module)
-    /// `--red-tint`: #FBEBE9 light, #3B1E22 dark.
+    /// `--red-tint`: #FBEBE9 light, #381E20 dark.
     public static let redTint = Color("red-tint", bundle: .module)
-    /// `--red-tint-2`: #F5D9D8 light, #55262A dark.
+    /// `--red-tint-2`: #F5D9D8 light, #462529 dark.
     public static let redTint2 = Color("red-tint-2", bundle: .module)
+    /// `--chosen`: #FBEBE9 light, #2E2E2E dark.
+    public static let chosen = Color("chosen", bundle: .module)
+    /// `--chosen-2`: #F5D9D8 light, #404040 dark.
+    public static let chosen2 = Color("chosen-2", bundle: .module)
+    /// `--on`: #CF413A light, #F0F0F0 dark.
+    public static let on = Color("on", bundle: .module)
+    /// `--on-mark`: #FFFFFF light, #1C1C1C dark.
+    public static let onMark = Color("on-mark", bundle: .module)
+    /// `--link`: #C2362F light, #F0F0F0 dark.
+    public static let link = Color("link", bundle: .module)
     /// `--cat-blue`: #2F5BD3 light, #7AA7FF dark.
     public static let catBlue = Color("cat-blue", bundle: .module)
     /// `--cat-blue-tint`: #E8EEFC light, #1A2747 dark.
@@ -171,6 +181,11 @@ public enum PlatformPalette {
     public static var red: PlatformColor { named("red") }
     public static var redTint: PlatformColor { named("red-tint") }
     public static var redTint2: PlatformColor { named("red-tint-2") }
+    public static var chosen: PlatformColor { named("chosen") }
+    public static var chosen2: PlatformColor { named("chosen-2") }
+    public static var on: PlatformColor { named("on") }
+    public static var onMark: PlatformColor { named("on-mark") }
+    public static var link: PlatformColor { named("link") }
     public static var catBlue: PlatformColor { named("cat-blue") }
     public static var catBlueTint: PlatformColor { named("cat-blue-tint") }
     public static var catViolet: PlatformColor { named("cat-violet") }
