@@ -21,7 +21,7 @@
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import NotFound from '$lib/ui/NotFound.svelte';
-  import { onMount } from 'svelte';
+  import { untrack } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import type { CatalogueIndex, Shelf } from '@braindog/declare/catalogue';
@@ -175,8 +175,17 @@
      it is the whole record's: "This isn't shared with you", and nothing asked (collab pass 4). */
   const part = $derived(!!(page.data as { me?: unknown }).me && !may(page.data as unknown as Shell, 'read'));
 
-  onMount(() => {
-    if (part) return;
+  /* READ ONCE THE SHELL SAYS THE WHOLE RECORD IS THEIRS (verify5, 2 Nov): asked once on mount, a cold open met the shell
+     before `boot` had said so, took the owner for somebody held to part of the record and never read the store, so a
+     typed or reloaded Add-ons listed the starters alone. An effect starts the reads the first time `part` is false. */
+  let reading = false;
+  $effect(() => {
+    if (part || reading) return;
+    reading = true;
+    untrack(start);
+  });
+
+  function start(): void {
     readStore();
     void readCounts(fetch).then((got) => (counts = got));
     void read(async () => {
@@ -198,7 +207,7 @@
       ]);
       return true;
     });
-  });
+  }
   $effect(() => drew('ready'));
 </script>
 
