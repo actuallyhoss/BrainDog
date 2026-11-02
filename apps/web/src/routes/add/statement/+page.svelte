@@ -18,8 +18,9 @@
   import Money from '$lib/ui/Money.svelte';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import { BYTES_MOST, type Export } from '$lib/start/export.ts';
-  import { balancesOf, freshOf, guessRoles, linesOf, readStatement, rolesMissing, fieldsOf, ROLES, words, type Held, type Roles, type Sign } from '$lib/money/statement.ts';
+  import { balancesOf, freshOf, guessRoles, linesOf, readStatement, rolesMissing, fieldsOf, ROLES, signSaid, words, type Held, type Roles, type Sign } from '$lib/money/statement.ts';
   import { addLines, fillBalances, heldFor, loadStatement, type Added, type Into, type Loaded } from '$lib/money/statement-live.ts';
+  import { fileLines, filingWords, loadCategories, suggestCategory, type Offered } from '$lib/money/filing.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -60,6 +61,12 @@
   let roles = $state<Roles>({ day: null, what: null, amount: null, out: null, in: null, balance: null });
   let sign = $state<Sign>('minus-out');
   const two = $derived(roles.out !== null || roles.in !== null);
+  /* THE FILE'S OWN SIGNS ANSWER THE QUESTION WHERE THEY CAN (`signSaid`); asked only where they do not, or on "Not right?". */
+  const said = $derived(exp ? signSaid(exp, roles) : null);
+  let askSign = $state(false);
+  $effect(() => {
+    if (said !== null && !askSign) sign = said;
+  });
 
   function take(name: string, text: string): void {
     const got = readStatement(name, text);
@@ -71,6 +78,7 @@
     exp = got;
     roles = guessRoles(got, locale);
     sign = 'minus-out';
+    askSign = false;
     result = null;
   }
 
@@ -146,6 +154,33 @@
     adding = null;
     result = { ...out, account: account.name, filled };
     heldKey = '';
+    /* THE LINES JUST ADDED, EACH OFFERED A CATEGORY BY ITS PAYEE (`filing.ts`), filed only on the one press. */
+    offered = null;
+    filed = null;
+    const cats = await loadCategories(base, l.ledger);
+    if (cats === null) return;
+    const lines = split.fresh;
+    const offers: Offered[] = [];
+    let unfiled = 0;
+    lines.forEach((line, i) => {
+      const seq = out.seqs?.[i] ?? null;
+      if (seq === null) return;
+      const c = suggestCategory(line.what, line.way, cats);
+      if (c === null) unfiled++;
+      else offers.push({ seq, what: line.what, category: c });
+    });
+    offered = { offers, unfiled };
+  }
+
+  let offered = $state.raw<{ offers: Offered[]; unfiled: number } | null>(null);
+  let filing = $state(false);
+  let filed = $state<number | null>(null);
+  async function fileAll(): Promise<void> {
+    const l = loader.value;
+    if (!l || !offered || filing) return;
+    filing = true;
+    filed = await fileLines(base, l.ledger, offered.offers);
+    filing = false;
   }
 
   const sample = (column: string | null): string => (column && exp ? (exp.entries.find((e) => (e[column] ?? '').trim() !== '')?.[column] ?? '') : '');
@@ -166,8 +201,25 @@
       <h2>{result.added === 0 && result.filled > 0 ? words.filled(result.filled) : words.added(result.added, result.account)}</h2>
       {#if result.added > 0 && result.filled > 0}<p class="st-quiet">{words.filled(result.filled)}</p>{/if}
       {#if result.missed > 0}<p class="st-warn">{words.missed(result.missed)} {result.why}</p>{/if}
+      {#if offered && offered.offers.length > 0}
+        <section class="st-file" aria-labelledby="st-file-h">
+          {#if filed === null}
+            <h3 class="st-label" id="st-file-h">{filingWords.title(offered.offers.length)}</h3>
+            <p class="st-quiet">{filingWords.sentence}</p>
+            <ul class="st-file-list">
+              {#each offered.offers as o (o.seq)}<li><span>{o.what}</span><span class="st-quiet">{o.category.name}</span></li>{/each}
+            </ul>
+            <Button weight="primary" onclick={fileAll} disabled={filing}>{filing ? filingWords.filing : filingWords.file(offered.offers.length)}</Button>
+          {:else}
+            <h3 class="st-label" id="st-file-h">{filingWords.filed(filed)}</h3>
+          {/if}
+          {#if offered.unfiled > 0}<p class="st-quiet">{filingWords.left(offered.unfiled)}</p>{/if}
+        </section>
+      {:else if offered && offered.unfiled > 0}
+        <p class="st-quiet">{filingWords.left(offered.unfiled)}</p>
+      {/if}
       <div class="st-actions">
-        <Button weight="primary" onclick={again}>{words.again}</Button>
+        <Button weight={offered && offered.offers.length > 0 && filed === null ? 'quiet' : 'primary'} onclick={again}>{words.again}</Button>
         <Button href={home}>Back to Money</Button>
       </div>
     </div>
@@ -229,7 +281,9 @@
             </label>
           {/each}
         </div>
-        {#if !two}
+        {#if !two && said !== null && !askSign}
+          <p class="st-quiet st-sign-read">{words.signRead[said]} <Button weight="quiet" size="sm" onclick={() => (askSign = true)}>{words.signChange}</Button></p>
+        {:else if !two}
           <span class="st-label" id="st-sign">{words.sign}</span>
           <Segmented role="group" aria-labelledby="st-sign">
             {#each ['minus-out', 'plus-out'] as const as s (s)}
@@ -319,6 +373,26 @@
     font-weight: 500;
   }
 
+  .st-file {
+    display: grid;
+    gap: var(--space-2, 8px);
+    justify-items: start;
+    margin-block: var(--space-3, 12px);
+  }
+  .st-file-list {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    inline-size: 100%;
+    max-inline-size: 480px;
+  }
+  .st-file-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
   .st-quiet {
     color: var(--ink-3);
     font-size: var(--fs-meta);

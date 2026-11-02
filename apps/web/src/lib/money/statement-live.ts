@@ -99,26 +99,30 @@ export async function fillBalances(base: string, list: string, fills: readonly {
 }
 
 /** What the write came to: how many went in, how many the record refused, and its first sentence why. */
-export type Added = { added: number; missed: number; why: string };
+export type Added = { added: number; missed: number; why: string; seqs?: (number | null)[] };
 
-/** Write each line, a few at a time, saying how far it has got. */
+/** Write each line, a few at a time, saying how far it has got. `seqs` is each row's number as written, in order. */
 export async function addLines(base: string, list: string, rows: readonly Record<string, unknown>[], progress: (done: number) => void): Promise<Added> {
   const client = createClient({ base });
-  const queue = [...rows];
+  const queue = rows.map((fields, i) => ({ fields, i }));
+  const seqs: (number | null)[] = rows.map(() => null);
   let done = 0;
   let missed = 0;
   let why = '';
   const worker = async (): Promise<void> => {
-    for (let fields = queue.shift(); fields !== undefined; fields = queue.shift()) {
-      const out = await client.create({ register: list, fields }).catch(() => null);
+    for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+      const out = await client.create({ register: list, fields: next.fields }).catch(() => null);
       if (!out?.ok) {
         missed++;
         const fix = (out as { refusal?: { fix?: string } } | null)?.refusal?.fix;
         if (why === '' && fix) why = fix;
+      } else {
+        const seq = (out.value as { seq?: unknown } | null)?.seq;
+        seqs[next.i] = typeof seq === 'number' ? seq : null;
       }
       progress(++done);
     }
   };
   await Promise.all(Array.from({ length: AT_ONCE }, worker));
-  return { added: rows.length - missed, missed, why };
+  return { added: rows.length - missed, missed, why, seqs };
 }

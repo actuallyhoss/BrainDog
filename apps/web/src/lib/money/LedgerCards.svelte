@@ -73,6 +73,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import { looks } from './looks.svelte.ts';
+  /* A "?" IS A LINE WITH NO CATEGORY YET (2 Nov, a walk: six imported lines drew it and nothing said what it meant). */
+  const unfiledHint = 'No category yet. Open the line to file it.';
   import { at } from '../at.ts';
   import { TIMELINE_BETWEEN, timelineTitle } from 'braindog-render';
 
@@ -148,11 +150,11 @@
           <li in:lineIn out:dismiss animate:flip={springy()}>
             <svelte:element this={l.href ? 'a' : 'div'} class="lc-line" href={l.href ? at(l.href) : undefined} data-intent={l.tone} data-chipless={chipped ? undefined : ''}>
               {#if chipped}
-                <span class="item-chip lc-chip" data-slot={look?.slot ?? undefined} data-unfiled={look ? undefined : ''} aria-hidden="true"
+                <span class="item-chip lc-chip" data-slot={look?.slot ?? undefined} data-unfiled={look ? undefined : ''} title={look ? undefined : unfiledHint} aria-hidden="true"
                   >{#if look}<Icon name={look.glyph as IconName} size="s" />{:else}?{/if}</span
                 >
               {/if}
-              <span class="lc-title">{l.title || l.category || '—'}</span>
+              <span class="lc-title">{l.title || l.category || '—'}{#if chipped && !look}<span class="sr-only">, {unfiledHint}</span>{/if}</span>
               <span class="lc-amount num" data-sign={l.inflow ? 'in' : undefined}>{l.amount}</span>
               {#if l.under}<span class="lc-under">{l.under}</span>{/if}
               {#if l.after}<span class="lc-after num"><span class="sr-only">{afterLabel} </span>{l.after}</span>{/if}

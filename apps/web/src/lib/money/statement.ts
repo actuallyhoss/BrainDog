@@ -41,6 +41,38 @@ export type Line = { at: number; day: string; what: string; amount: number; curr
 export type Held = { day: string; what: string; amount: number; currency: string; way: 'in' | 'out'; also?: string[]; balance?: number | null; seq?: number };
 
 /** The file read as lines, and what was left out: lines in another currency, and lines with no day, amount or words. */
+/**
+ * HOW THE FILE ITSELF SAYS MONEY OUT, where it says it, so the question is not asked (2 Nov, a walk: "Money out is shown:
+ * With a minus / As a plain figure" was asked of a file whose minus signs already settled it). A running balance says it
+ * outright: the way most lines move it. Without one, a column with both minus and plain figures is a bank's, and a
+ * minus is money out. `null` where the file does not say (no minus anywhere, or a balance that agrees with neither way).
+ */
+export function signSaid(exp: Export, roles: Roles): Sign | null {
+  if (roles.amount === null) return null;
+  const cell = (e: Record<string, string>, c: string): number | null => numberOf((e[c] ?? '').trim());
+  const amounts = exp.entries.map((e) => cell(e, roles.amount!));
+  if (roles.balance !== null) {
+    const balances = exp.entries.map((e) => cell(e, roles.balance!));
+    let minus = 0;
+    let plus = 0;
+    for (let i = 1; i < exp.entries.length; i++) {
+      const a = amounts[i];
+      const b0 = balances[i - 1];
+      const b1 = balances[i];
+      if (a == null || b0 == null || b1 == null || a === 0) continue;
+      const move = b1 - b0;
+      const back = b0 - b1;
+      /* EITHER ORDER: newest first or oldest first, the line's own move is its amount one way or the other. */
+      const near = (x: number, y: number): boolean => Math.abs(x - y) < 0.005;
+      if (near(move, a) || near(back, -a)) minus++;
+      else if (near(move, -a) || near(back, a)) plus++;
+    }
+    if (minus + plus >= 2 && minus !== plus) return minus > plus ? 'minus-out' : 'plus-out';
+  }
+  const signed = amounts.filter((n): n is number => n !== null && n !== 0);
+  return signed.some((n) => n < 0) && signed.some((n) => n > 0) ? 'minus-out' : null;
+}
+
 export type Read = { lines: Line[]; other: number; unread: number };
 
 /** Kept here, so the screen owns its words. Plain, sentence case. */
@@ -67,6 +99,9 @@ export const words = {
   twoColumns: 'Money out and money in are separate columns',
   sign: 'Money out is shown',
   signs: { 'minus-out': 'With a minus', 'plus-out': 'As a plain figure' } as Record<Sign, string>,
+  /** Said instead of the question, where the file's own signs settle it (`signSaid`). */
+  signRead: { 'minus-out': 'Money out has a minus in this file.', 'plus-out': 'Money out is a plain figure in this file.' } as Record<Sign, string>,
+  signChange: 'Not right?',
   preview: 'Preview',
   checking: 'Checking the Ledger…',
   already: 'Already in the Ledger',
