@@ -130,9 +130,10 @@
     min-inline-size: 0;
   }
 
+  /* WHO DREW IT IS META, in the quiet ink (colour lane, 2 Nov): in red it read as a warning over a draft. */
   .slot-who {
     margin: 0;
-    color: var(--red);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
   }

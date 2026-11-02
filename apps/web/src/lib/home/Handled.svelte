@@ -275,7 +275,8 @@
     border: 0;
     border-radius: var(--r-ctl);
     background: none;
-    color: var(--red);
+    /* INK, NOT RED (colour lane, 2 Nov): Undo is a quiet control, not something late or failing. */
+    color: var(--ink);
     font: inherit;
     font-size: var(--fs-meta);
     font-weight: 500;

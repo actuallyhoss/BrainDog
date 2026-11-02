@@ -182,7 +182,9 @@
     outline-offset: -2px;
   }
 
-  /* SEND, THE ONE RED FILL ON THE TILE, white words, a fill change on press and nothing that moves. */
+  /* SEND IS INK, NOT RED (colour lane, 2 Nov): the box sits on a project's page under its hero's one red button ("Open the
+     next task") and on Agents beside a draft's Keep, and a second red fill made two main actions on one screen. Ink fill,
+     tile words, as the ink weight of a button draws a strong choice whose screen spent its red elsewhere. */
   .ins-send {
     display: inline-flex;
     align-items: center;
@@ -192,8 +194,8 @@
     padding: 0 var(--sp-4);
     border: 0;
     border-radius: var(--r-ctl);
-    background: var(--red-fill);
-    color: var(--on-red);
+    background: var(--ink);
+    color: var(--tile);
     font: inherit;
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
@@ -207,7 +209,7 @@
   }
 
   .ins-send:active {
-    background: var(--red-fill-press, var(--red-fill-hover));
+    background: color-mix(in oklab, var(--ink) 78%, var(--tile));
   }
 
   .ins-send[aria-busy='true'] {
@@ -221,7 +223,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .ins-send:hover:not(:active) {
-      background: var(--red-fill-hover);
+      background: color-mix(in oklab, var(--ink) 86%, var(--tile));
     }
   }
 
