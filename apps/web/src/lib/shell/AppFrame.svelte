@@ -33,6 +33,7 @@
 -->
 <script lang="ts">
   import { BASE, apiBase, at, here, slugOf } from '$lib/at.ts';
+  import { nameAskDue } from '$lib/sharing/name-ask.ts';
   import { appPath, inIosApp, isApp, macNotifications, notify, onShell, setBadge, shellPlaces, shellTitle, shellVisit, windowFocused } from '$lib/shell.ts';
   import { handoffAlert, instructionAlert, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
   /* THE STYLESHEETS AND `applyInset()` ARE THE ROOT LAYOUT'S (`routes/+layout.svelte`), in the order they always had,
@@ -1584,8 +1585,10 @@
   {/if}
   <LapseBanner shell={data} />
   <!-- YOUR NAME, ASKED ONCE of somebody the record holds none for (collab pass 3). Its own chunk: only they load it. -->
-  {#if data.me.person !== '' && !data.me.name && (data.me.prefs as Record<string, unknown> | undefined)?.['name.asked'] !== true}
-    {#await import('$lib/sharing/NameAsk.svelte') then { default: NameAsk }}<NameAsk shell={data} />{/await}
+  <!-- ITS ROOM IS HELD WHILE ITS CODE COMES (nojump, 2 Nov), and only where it will draw (`name-ask.ts`): it came a beat
+       after the page, 150px tall on a phone, and pushed the whole screen down. -->
+  {#if nameAskDue(data, apiBase())}
+    {#await import('$lib/sharing/NameAsk.svelte')}<div class="banner-room" aria-hidden="true"></div>{:then { default: NameAsk }}<NameAsk shell={data} />{/await}
   {/if}
   <!-- WHAT WAS SHARED WITH A GUEST, ONCE A SHARE (§3.4). Its own chunk: only somebody a share let in loads it. -->
   {#if data.me.grant !== undefined && !data.me.owner}
@@ -1803,6 +1806,16 @@
 <div class="sr-only" role="status" aria-live="polite"></div>
 
 <style>
+  /* THE NAME ASK'S ROOM while its code comes: its banner's height, one line on a desk, stacked on a phone. */
+  .banner-room {
+    block-size: 64px;
+    margin: var(--inset) var(--gutter) 0;
+  }
+  @media (width < 640px) {
+    .banner-room {
+      block-size: 150px;
+    }
+  }
   /* 127x41 ON EVERY ROUTE, and it is the first target a keyboard user reaches. It sat four pixels
      under `13 §7`'s floor for the life of the build, on the control whose entire audience is people
      who cannot use a pointer — and the layout gate could not see it, because the scan was scoped to

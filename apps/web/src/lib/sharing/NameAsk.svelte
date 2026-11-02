@@ -16,23 +16,16 @@
   import { wrote } from '$lib/record/settings-write.ts';
   import Banner from '$lib/ui/Banner.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import { nameAskDue, nameAskKey } from './name-ask.ts';
 
   let { shell }: { shell: Shell } = $props();
 
-  const key = $derived(`bd_name_asked:${apiBase()}`);
-  const skippedHere = (k: string): boolean => {
-    try {
-      return localStorage.getItem(k) === '1';
-    } catch {
-      return false;
-    }
-  };
+  const key = $derived(nameAskKey(apiBase()));
   let done = $state(false);
   let typed = $state('');
   let busy = $state(false);
   let fault = $state('');
-  const asked = $derived((shell.me.prefs as Record<string, unknown> | undefined)?.['name.asked'] === true);
-  const shown = $derived(!done && !shell.refused && !shell.stale && shell.me.person !== '' && !shell.me.name && !asked && !skippedHere(key));
+  const shown = $derived(!done && nameAskDue(shell, apiBase()));
 
   async function save(e: SubmitEvent): Promise<void> {
     e.preventDefault();
