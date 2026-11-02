@@ -366,22 +366,31 @@
 
   .said {
     overflow-wrap: anywhere;
+    text-wrap: pretty;
+  }
+
+  /* A SENTENCE WITH CHIPS IN IT KEEPS ONE LINE HEIGHT (ui2-settings, 2 Nov): the chips stood as boxes taller than the
+     line, so in an "If so" card at 1512 every line holding one grew and the words wrapped round them in steps. The
+     line is opened to hold a chip, and the chip is drawn inline so it sits in the line as a word does. */
+  .said:has(.ref) {
+    line-height: 26px;
   }
 
   /* A VALUE THE STEP READS IS A CHIP IN THE SENTENCE, in the UI face and the meta size: `rate` and `what` are names a
      person picked, not identifiers to copy, so not `--font-mono`. The tile's inner fill,
      a pill, and no border. */
   .ref {
-    display: inline-block;
+    display: inline;
+    white-space: nowrap;
     margin-inline: 2px;
-    padding: 0 var(--sp-2);
+    padding: 3px var(--sp-2);
     background: var(--tile-2);
     border-radius: var(--r-ctl);
     color: var(--ink-2);
     font-family: var(--font-ui);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 22px;
+    line-height: inherit;
     vertical-align: baseline;
   }
 
