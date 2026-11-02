@@ -1116,7 +1116,7 @@
   <div class="q-head" data-narrow={asking ? undefined : ''}>
     <!-- NO SENTENCE, SO NONE IS HELD: the head's empty line held while the page read and then went, moving the question up
          56px on a phone. -->
-    <PageHead named kicker={copy.decide} back="/decide" title={headed.ask} count={joined} countOf={(n) => (n === 1 ? 'change' : 'changes')} sentence={headed.detail} actions={!settled && me.owner ? whoMore : undefined} />
+    <PageHead named kicker={copy.decide} back="/decide" title={headed.ask} count={joined} countOf={(n) => (n === 1 ? 'change' : 'changes')} sentence={headed.detail} actions={asking && me.owner ? whoMore : undefined} />
   </div>
   {#snippet whoMore()}
     <Button weight="bare" size="sm" aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>
