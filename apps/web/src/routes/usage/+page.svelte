@@ -728,6 +728,27 @@
     column-gap: var(--sp-4);
   }
 
+  /* THE FIGURE'S COLUMN IS AS WIDE AS ITS LONGEST FIGURE, the same on every row: at 4.5rem "101 runs · under a minute"
+     ran back under the bar's end (live verify, 2 Nov). The rows share one grid, so the bars still start and end level. */
+  @media (width >= 640px) {
+    .use-bars {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.6fr) max-content;
+      column-gap: var(--sp-4);
+    }
+
+    .use-bars > li,
+    .use-bars .use-bar-row {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+    }
+
+    .use-bar-row .use-counts {
+      white-space: nowrap;
+    }
+  }
+
   .use-bar-row .use-counts {
     justify-content: flex-end;
     text-align: end;
