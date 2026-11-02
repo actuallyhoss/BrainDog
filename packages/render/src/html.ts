@@ -54,7 +54,7 @@ import {
   type TimelineChip,
 } from './timeline.ts';
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
-import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, cellIn, tableCellBody } from './table.ts';
+import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, cellIn, tableCellBody, tracksOf } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
 import { SPLIT_AMOUNT, SPLIT_NONE, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitFigures, splitListed, splitPlan, splitSentence, splitShare, splitSlot } from './split.ts';
 import { slotOf } from './slot.ts';
@@ -996,7 +996,7 @@ function table(b: Block, o: RenderOptions): string {
     })
     .join('');
   const label = b.heading ?? TABLE_ROWS_LABEL;
-  const tracks = columns.map((c) => c.width).join(' ');
+  const tracks = tracksOf(columns);
   return (
     `<div class="table-region" role="group" tabindex="0" aria-label="${escape(label)}">` +
     `<div class="table" role="grid" aria-rowcount="${lines.length + 1}" aria-colcount="${columns.length}" style="--cols:${tracks}" tabindex="-1">` +

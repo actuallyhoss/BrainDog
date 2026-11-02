@@ -33,7 +33,7 @@
   import { slotOf } from '../../src/slot.ts';
   import { glyphPath } from '../../src/inline.ts';
   import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type CardCell, type Cell, type Column, type TableRow } from '../types.ts';
-  import { glyphColumn, intrinsicRows, sameRows, cellIn, tableCellBody, TABLE_CHUNK, TABLE_ROWS_LABEL } from '../../src/table.ts';
+  import { glyphColumn, intrinsicRows, sameRows, cellIn, tableCellBody, tracksOf, TABLE_CHUNK, TABLE_ROWS_LABEL } from '../../src/table.ts';
   import { MISSING } from '../../src/format.ts';
   import { rowGroup, tableLines } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
@@ -175,7 +175,7 @@
      where the column sits. */
   const scoped = $derived(new Set((scope?.columns ?? []).map((i) => columns[i]?.field).filter((f): f is string => f !== undefined)));
 
-  const tracks = $derived(columns.map((c) => c.width).join(' ') + (acts ? ` ${rowActionsTrack(rowActions)}` : ''));
+  const tracks = $derived(tracksOf(columns, acts ? rowActionsTrack(rowActions) : undefined));
   /* One function for the groups AND the step they are counted in, because `aria-rowindex` is
      `group * step + i` and the two disagreeing is a table that announces a different row than the
      one on screen. It is also where `chunk={0}` stops being an endless loop during render. */

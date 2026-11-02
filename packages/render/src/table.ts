@@ -71,6 +71,17 @@ export type Column = {
    * the page's evaluator places the column the way a phone card does: text first, a figure after.
    */
   as?: CardRole | 'chip' | undefined;
+  /**
+   * A COLUMN THAT GIVES UP ITS ROOM FIRST when the row is too wide for its space, from `most` down to `least` (widgets-
+   * empty, 2 Nov): the Ledger's Category, so Payee and Account stay whole at 1280. Its track is what the row leaves it
+   * (`tracksOf`), and `width` is kept for a host that draws no such track. Absent, the column is sized by `width` alone.
+   */
+  gives?: { least: string; most: string } | undefined;
+  /**
+   * How wide a column whose `width` is a share (`fr`) is let grow before a column that gives way loses any room. Only
+   * read where some column `gives`; a share with no `room` leaves every track as declared.
+   */
+  room?: string | undefined;
 };
 
 export type TableRow = {
@@ -121,6 +132,38 @@ export function sameRows(a: readonly TableRow[], b: readonly TableRow[]): boolea
 }
 
 export const TABLE_ROWS_LABEL = 'Rows';
+
+/** A track that is one length, so it can be added up: `12ch`, `32px`, a `calc(...)`. */
+const LENGTH = /^(?:\d+(?:\.\d+)?(?:ch|px|rem|em)|calc\(.*\))$/u;
+/** The most of `minmax(least, most)` where the most is a length. */
+const MOST = /^minmax\(\s*[^,]+,\s*(\d+(?:\.\d+)?(?:ch|px|rem|em))\s*\)$/u;
+
+/**
+ * THE TABLE'S `--cols`, one track a column and the row's actions after (`extra`), spelled once for both drawers.
+ *
+ * A COLUMN THAT GIVES (`gives`) TAKES WHAT THE ROW LEAVES IT: `clamp(least, (100% - every other column at its most) / n,
+ * most)`, where a share counts at its `room`. A table is as wide as its columns or its space (`.table` in `blocks.css`),
+ * so at a width where the rest fit it keeps its most, and below that it is cut before any other column is. Every other
+ * track is a length or a `minmax` with a length at its top, else the tracks are drawn as declared.
+ */
+export function tracksOf(columns: readonly Column[], extra?: string): string {
+  const plain = columns.map((c) => c.width).join(' ') + (extra ? ` ${extra}` : '');
+  const giving = columns.filter((c) => c.gives !== undefined);
+  if (giving.length === 0) return plain;
+  const others: string[] = [];
+  for (const c of columns) {
+    if (c.gives) continue;
+    const most = c.room ?? (LENGTH.test(c.width) ? c.width : MOST.exec(c.width)?.[1]);
+    if (most === undefined) return plain;
+    others.push(most);
+  }
+  if (extra) {
+    if (!LENGTH.test(extra)) return plain;
+    others.push(extra);
+  }
+  const left = `calc((100% - (${others.join(' + ')})) / ${giving.length})`;
+  return columns.map((c) => (c.gives ? `clamp(${c.gives.least}, ${left}, ${c.gives.most})` : c.width)).join(' ') + (extra ? ` ${extra}` : '');
+}
 
 /**
  * How many rows share one `content-visibility` box.

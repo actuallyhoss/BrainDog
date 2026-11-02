@@ -753,7 +753,31 @@ export function tableOf(r: RegisterDecl): (Column & { or?: string | readonly str
       ...(ors.length === 0 ? {} : { or: ors.length === 1 ? ors[0]! : ors }),
     });
   }
-  return cols;
+  return shrunkFirst(cols, r);
+}
+
+/** How wide the lead is let grow before a column that gives way first loses any room: "Grangemoor Events, Stand Deposit". */
+const LEAD_ROOM = '28ch';
+/** The least a column that gives way first keeps: a word and its cut. */
+const GIVES_FLOOR = '8ch';
+
+/**
+ * A DECLARED TABLE GIVES UP ROOM IN AN ORDER (widgets-empty, 2 Nov): a link after the first (the Ledger's Category) and
+ * a text column after the lead are cut first, then the lead, so at 1280 the Ledger keeps Payee and Account whole and
+ * Category is the one that is cut. A table is as wide as its columns (`.table` is `max-content`), so no column shrank
+ * and a row too wide scrolled. Such a column now `gives` (`render/src/table.ts` `tracksOf`): it takes what the row
+ * leaves it once every other column has its most and the lead its `LEAD_ROOM`, at most its own most (16ch for a link)
+ * and at least 8ch. Two that give way share what is left.
+ */
+function shrunkFirst<C extends Column>(cols: C[], r: RegisterDecl): C[] {
+  const type = (c: Column) => r.fields.find((f) => f.id === c.field)?.type;
+  const firstLink = cols.findIndex((c) => type(c) === 'ref');
+  const lead = cols.findIndex((c) => c.width.startsWith('minmax(22ch'));
+  if (lead < 0) return cols;
+  const most = (c: Column): string => /(\d+(?:\.\d+)?ch)\s*\)$/u.exec(c.width)?.[1] ?? '16ch';
+  const gives = (c: Column, n: number): boolean => n !== lead && ((type(c) === 'ref' && n !== firstLink) || (type(c) === 'text' && n > lead));
+  if (!cols.some(gives)) return cols;
+  return cols.map((c, n) => (n === lead ? { ...c, room: LEAD_ROOM } : gives(c, n) ? { ...c, gives: { least: GIVES_FLOOR, most: most(c) } } : c));
 }
 
 /**

@@ -102,6 +102,7 @@ export {
   glyphColumn,
   intrinsicRows,
   tableCellBody,
+  tracksOf,
   type Column,
   type TableCellBody,
   type TableRow,
