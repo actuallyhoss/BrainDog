@@ -7,6 +7,7 @@
   it: both carry this switch, both are titled Keychain, and the rail lights the Keychain on either.
 -->
 <script lang="ts">
+  import { page } from '$app/state';
   import { at } from '$lib/at.ts';
   import { KEYS_REGISTER } from '$lib/record/keychain.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
@@ -16,15 +17,19 @@
     { key: 'keys', label: 'Keys', href: '/keychain' },
     { key: 'table', label: 'List', href: `/r/${KEYS_REGISTER}` },
   ] as const;
+
+  /* THE LIST VIEW ONLY WHERE THE RECORD HOLDS THE LIST (empty states, 2 Nov): the Keys list comes with the Agents add-on,
+     and a new BrainDog's List opened "No list called". With no list there is one view, so no switch is drawn. */
+  const listed = $derived(((page.data as { lists?: readonly { id: string }[] }).lists ?? []).some((l) => l.id === KEYS_REGISTER));
 </script>
 
-<div class="key-views">
+{#if listed}<div class="key-views">
   <Segmented tag="nav" aria-label="How the Keychain is shown">
     {#each views as v (v.key)}
       <a class="segment" href={at(v.href)} data-on={on === v.key ? '' : undefined} aria-current={on === v.key ? 'page' : undefined}>{v.label}</a>
     {/each}
   </Segmented>
-</div>
+</div>{/if}
 
 <style>
   .key-views {
