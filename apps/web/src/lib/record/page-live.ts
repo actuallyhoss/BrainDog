@@ -972,7 +972,10 @@ export function tileOf(
    * empty register a few lines from its own `held === 0`. The figure itself stays: a total of
    * nothing is zero, and it is the verdict on it that was invented.
    */
-  const unsaid = !empty && r.rows === 0 && decl !== undefined && overUnsaidField(decl);
+  /* AND THE RECORD'S OWN WORD FOR IT FIRST (`reading.unsaid`), so it never waits on this tab having the list's schema:
+     a phone read Today before the transactions schema had come, could not compile the figure's `tax_part is set`, and
+     drew "Set aside this year £0" where the laptop left it out and led with "Due £26,520" (add-ons pass 3, 2 Nov). */
+  const unsaid = !empty && r.rows === 0 && ((r as { unsaid?: unknown }).unsaid === true || (decl !== undefined && overUnsaidField(decl)));
   /* A FLOOR OF NOUGHT MARKS ONLY ITS MISS (`markOf`): "Oldest balance 3 Sep" and "To pay on the card £1,240" drew a tick. */
   const met = empty || unsaid ? null : markOf(decl, r.met);
   /* NO DOOR OVER NO ROWS, AND NONE FOR A FIGURE THAT READS NO LIST: `hrefFor` answers `null` there, where it used to

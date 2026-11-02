@@ -1532,8 +1532,11 @@ export const NO_ROW_SAID = copy.nothingMatched;
  * would have replaced it. `held` is absent on a reading a caller built by hand, and the fallback to
  * `rows` there is the old ambiguous zero, which withholds the verdict rather than inventing one.
  */
-export function unsaidFigure(decl: MetricDecl | undefined, r: { rows: number; held?: number }): boolean {
-  if (decl === undefined || (r.held ?? r.rows) === 0) return false;
+export function unsaidFigure(decl: MetricDecl | undefined, r: { rows: number; held?: number; unsaid?: unknown }): boolean {
+  if ((r.held ?? r.rows) === 0) return false;
+  /* THE RECORD'S OWN WORD FIRST, as `page-live.ts` reads it, so the answer does not hang on a schema this tab has yet. */
+  if (r.rows === 0 && r.unsaid === true) return true;
+  if (decl === undefined) return false;
   return r.rows === 0 && overUnsaidField(decl);
 }
 
