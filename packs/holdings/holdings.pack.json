@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "3.7.0",
+  "version": "3.7.1",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "Investments and gold reads like the rest of Money: what you hold leads across the page, the gold rate pairs with where it sits, everything you hold is one list with what each is worth at the end, a buy names its holding first, and the date prices are from is a line, not a tile.",
+  "changes": "The gold rate and where it sits stand side by side as two halves at a desk's width, as the page meant them to, with the line about an old gold rate above the pair.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -1162,9 +1162,28 @@
           }
         },
         {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "body": "The gold rate is from {{gold-rate-on}}, {{bad:over a week ago}}.",
+          "when": {
+            "all": [
+              {
+                "metric": "gold-held",
+                "gt": 0
+              },
+              {
+                "metric": "gold-rates-old",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
           "kind": "table",
           "heading": "Gold rate",
           "icon": "vault",
+          "span": 6,
           "body": "A karat with no rate of its own follows the newest rate there is.",
           "source": "register.gold_rates",
           "where": "live is true",
@@ -1198,27 +1217,10 @@
           "empty": "No gold rate yet. Set one under Gold rates, below."
         },
         {
-          "kind": "note",
-          "tone": "warn",
-          "span": 12,
-          "body": "The gold rate is from {{gold-rate-on}}, {{bad:over a week ago}}.",
-          "when": {
-            "all": [
-              {
-                "metric": "gold-held",
-                "gt": 0
-              },
-              {
-                "metric": "gold-rates-old",
-                "gt": 0
-              }
-            ]
-          }
-        },
-        {
           "kind": "split",
           "heading": "Where it sits",
           "icon": "chart-pie",
+          "span": 6,
           "source": "metric.holdings-by-kind",
           "when": {
             "metric": "holdings-count",

@@ -2111,8 +2111,60 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "3.7.0",
+      "latest": "3.7.1",
       "versions": [
+        {
+          "version": "3.7.1",
+          "checksum": "9e46b491f0f7fc229ba1552c81186f9cc6c54061762e7a91998b3a9612d54925",
+          "bytes": 63050,
+          "published_at": "2026-11-02T21:15:09.540Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "latest.currency-api.pages.dev",
+                "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
+                "key": null
+              }
+            ],
+            "widgets": [
+              "Gold price"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.fx",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "The gold rate and where it sits stand side by side as two halves at a desk's width, as the page meant them to, with the line about an old gold rate above the pair.",
+          "preview": true
+        },
         {
           "version": "3.7.0",
           "checksum": "36912cc3a81d81a876d5fbd67f43b9cf8dfc43573e2a33a1607cbcecbc665e62",
