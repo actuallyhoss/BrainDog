@@ -517,6 +517,8 @@ export function shareFault(s: unknown): { at: string; fix: string } | null {
 
 const isGated = (l: CatalogList): boolean => l.ownerOnly === true || l.kernel === true || l.personal === true || l.role === 'keys' || l.role === 'meets';
 const hasMoney = (l: CatalogList): boolean => l.fields.some((f) => !f.retired && f.type === 'money');
+/** Whether a target is "every list with money" (`{ lists: { has: 'money' } }`), as the templates' deny of money says it. */
+const isMoneyDeny = (t: Target): boolean => 'lists' in t && !Array.isArray(t.lists) && 'has' in t.lists && t.lists.has === 'money';
 const scopeField = (l: CatalogList): CatalogField | undefined => l.fields.find((f) => f.scope !== undefined && !f.retired);
 
 /** The `where` package's schema for one list, so a condition compiles as a filter would. */
@@ -723,6 +725,15 @@ function lensOrThrow(sources: LensSources, catalog: Catalog, nowMs: number, tz: 
     if (base) for (const c of LEVEL_CAPS[base.level]) allows[c].push(base.cond);
     const hidden = new Set<string>();
     for (const s of live) {
+      /* "NO MONEY" ON THE PROJECTS LIST HIDES ITS AMOUNTS, AND NEVER THE PROJECT (collab pass, 2 Nov). The projects list
+         carries a money field or two (earned in a year), so the Contractor and Assistant templates' deny of every list
+         with money took the project row itself away: a contractor shared Kiln could edit Kiln's tasks and was told "No
+         page called kiln-website", and an Assistant on everything but money had no projects at all. A deny of money
+         lists is read on that list as its money fields hidden, which is what "No money" says. */
+      if (s.effect === 'deny' && l.role === 'projects' && isMoneyDeny(s.what)) {
+        for (const f of l.fields) if (!f.retired && f.type === 'money') hidden.add(f.id);
+        continue;
+      }
       const cover = coverOf(s.what, l, me);
       if (cover.cond === false) continue;
       let cond: Expr = cover.cond;

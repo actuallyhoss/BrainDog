@@ -6582,6 +6582,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return read.ok && whollyWithheld(read.value.blocks as never);
   };
 
+  /**
+   * A MONEY PAGE FOR SOMEBODY WHO READS NO MONEY (collab pass, 2 Nov): a page that reads lists holding amounts, of which
+   * this caller reads none. A contractor shared Kiln with "No money" had Money in her rail, because Coming up reads Tasks
+   * for one line besides its bills, and it opened onto "Nothing of yours is at /money". A page of one row is left to
+   * `seesPage`, which asks the row.
+   */
+  const moneyWithheld = (ctx: CallContext, page: { registers: readonly string[]; about: unknown }): boolean => {
+    if (page.about !== null) return false;
+    const lists = kernel.registers();
+    const money = page.registers.filter((id) => (lists.get(id)?.fields ?? []).some((f) => (f as { type?: string; retired?: boolean }).type === 'money' && (f as { retired?: boolean }).retired !== true));
+    return money.length > 0 && money.every((id) => readable(ctx, id) !== null);
+  };
+
   /** The pages a caller may open, as `pages` lists them. */
   const visiblePages = (ctx: CallContext) =>
     kernel
@@ -7449,13 +7462,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        a rowset carries every field value of the rows it names. The whole question is held back, as a plan's rows
        are above, rather than the rowset drawn with the one row missing. A row the rowset adds names no `at` and is
        not an existing row this caller could already be denied. */
+    /* A ROWSET THAT ALSO PUTS PEOPLE IN WHAT IT ADDS (`join`, an organisation's people by their rows) names those rows,
+       and is held from a reader who cannot read the People list, whatever list it adds to. */
+    if (row.body_kind === 'rowset' && body?.join !== undefined && body.join !== null) {
+      const people = kernel.meetsList()?.register ?? PEOPLE;
+      if (readable(ctx, people) !== null) return true;
+    }
     if (row.body_kind === 'rowset' && typeof named === 'string' && named !== '' && readable(ctx, named) === null) {
       const rule = kernel.scope(ctx, named);
       if (rule !== undefined) {
         const rows = Array.isArray(body?.rows) ? (body.rows as { at?: unknown }[]) : [];
         const ids: string[] = [];
         for (const r of rows) {
-          if (typeof r.at !== 'string') continue;
+          /* A ROW IT ADDS IS HELD BACK TOO, from a reader held to some rows (collab pass, 2 Nov). It was let through as
+             "not an existing row", so a contractor shared one project read "Add Kiln? Ana Ruiz and Mira Chen have an
+             address at kiln.test", an organisation of nobody's project and two People rows she cannot read, on her
+             Today, in `context` and in the bell. Nothing says a new row falls inside her rule, so the question is not hers. */
+          if (typeof r.at !== 'string') return true;
           const seq = Number(r.at.slice(r.at.lastIndexOf('#') + 1));
           const one = Number.isInteger(seq) ? kernel.get({ register: named, seq }, { includeDeleted: true }) : null;
           if (one === null) return true;
@@ -10120,7 +10143,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        Projects and Tasks had Money in her rail, because its page reads Tasks for one line, and it opened onto nothing.
        Asked only of a page with a place in the rail and no row behind it, and only of somebody held from some list. */
     const everyList = readsEveryList(ctx) && allows(ctx, 'read') === null;
-    const opens = every.filter((page) => seesPage(ctx, page) && (everyList || page.nav === null || page.about !== null || !drawnWithheld(ctx, page.slug)));
+    const opens = every.filter(
+      (page) => seesPage(ctx, page) && (everyList || page.nav === null || page.about !== null || (!moneyWithheld(ctx, page) && !drawnWithheld(ctx, page.slug))),
+    );
     /* HOME FOLLOWS THE VOICE, as the use case's own page (`homePageOf` in `@braindog/seed`, `home-<use case>`), and only
        a page this caller may open: a member held to one list is never handed a slug she would be refused. */
     const speaker = speakingNow(kernel);
