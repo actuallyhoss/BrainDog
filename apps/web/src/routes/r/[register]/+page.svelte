@@ -1042,16 +1042,20 @@
     /* THE HEAD'S TOTAL IS `boot`'s COUNT, AND `boot` IS KEPT FOR THE TAB, so a row an agent added would be drawn under a
        head still counting one fewer. Unfiltered, the answer's size moving is the register's size moving, which is the
        arithmetic `addLanded` already does by one. Filtered, it says nothing about the rows outside the filter. */
+    /* AN ADD TAKEN BACK STAYS OUT (`unAdd`): a recheck asked before its archive landed still carries it, and drew it
+       back under a head that no longer counted it. */
+    const entries = answer.value.entries.filter((e) => !takenBack.has(e.seq));
+    const answered = Math.max(0, answer.value.matched - (answer.value.entries.length - entries.length));
     if (booted && chips.length === 0 && text === '') {
-      const by = answer.value.matched - matched;
+      const by = answered - matched;
       if (by !== 0) booted = { ...booted, registers: booted.registers.map((r) => (r.id === register ? { ...r, count: r.count + by } : r)) };
     }
     const had = new Set(pages.flat().map((e) => e.seq));
-    arrive(answer.value.entries.filter((e) => !had.has(e.seq) && !fresh.has(e.seq)).map((e) => `${register}#${e.seq}`));
-    pages = [answer.value.entries];
+    arrive(entries.filter((e) => !had.has(e.seq) && !fresh.has(e.seq)).map((e) => `${register}#${e.seq}`));
+    pages = [entries];
     named = answer.value.names;
     cursor = answer.value.cursor;
-    matched = answer.value.matched;
+    matched = answered;
     counted = facets.counts;
     uncounted = facets.withheld;
     fromCopy = false;
@@ -1792,6 +1796,9 @@
    * is not a row to look at again, so it goes now, the head and the list's count go back by one, and the toast says
    * so with an Undo that brings it back. A refusal puts the row back where it was.
    */
+  /** The rows an add's Undo took off this list, kept out of any answer asked before the record had them archived. */
+  const takenBack = new Set<number>();
+
   async function unAdd(entry: Entry) {
     const list = id;
     const seq = entry.seq;
@@ -1817,9 +1824,11 @@
       matched = Math.max(0, matched + by);
       if (booted) booted = { ...booted, registers: booted.registers.map((r) => (r.id === list ? { ...r, count: Math.max(0, r.count + by) } : r)) };
     };
+    takenBack.add(seq);
     drop(entry, -1);
     const out = await writes().archive(list, seq, version);
     if (!out.ok) {
+      takenBack.delete(seq);
       drop(entry, 1);
       toasts.push(out.fix ?? copy.writeNotReached, { intent: 'warn' });
       return;
@@ -1834,6 +1843,7 @@
       undo: async () => {
         const back = await writes().restore(list, seq, archived.version);
         if (alongGone && along) void writes().restore(along.register, along.seq, alongGone.version);
+        if (back.ok) takenBack.delete(seq);
         if (back.ok) drop(back.entry, 1);
         else toasts.push(back.fix ?? copy.writeNotReached, { intent: 'warn' });
       },
