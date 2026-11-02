@@ -13,6 +13,9 @@
   const text = (x, most = 512) => (typeof x === 'string' ? x.slice(0, most) : '');
   const subs = { slash: new Set(), search: new Set(), goto: new Set(), saved: new Set(), unsaved: new Set(), refresh: new Set() };
   let readied = false;
+  // THE IPHONE'S PERMISSION ASK ANSWERS (M4): native emits `pushAnswer` with 'yes' or 'no', and the page's `askPush` reads
+  // it. Unanswered in a minute, it answers nothing, which the page reads as "said nothing". The Mac answers nothing at once.
+  const asking = [];
   const shell = {
     kind: '__KIND__',
     inset: __INSET__,
@@ -35,7 +38,14 @@
     share: (what) => post('share', { url: text(what && what.url, 2048), title: text(what && what.title, 200) }),
     tell: (prefill) => post('tell', { prefill: text(prefill, 2000) }),
     ask: (prefill) => post('ask', { prefill: text(prefill, 2000) }),
-    pushAsk: () => post('pushAsk'),
+    pushAsk: () => {
+      post('pushAsk');
+      if ('__KIND__' !== 'ios') return undefined;
+      return new Promise((resolve) => {
+        asking.push(resolve);
+        setTimeout(() => resolve(undefined), 60000);
+      });
+    },
     signedOut: () => post('signedOut'),
     title: (name, sub) => post('title', { name: text(name, 200), sub: typeof sub === 'string' ? text(sub, 200) : null }),
     places: (tabs) => {
@@ -48,6 +58,10 @@
     visit: (path, opts) => post('visit', { path: text(path), mode: text(opts && opts.mode, 16) || 'push' }),
     // Called by the app (a menu, a key, a pull, a deep link); the web never calls it.
     emit(event, arg) {
+      if (event === 'pushAnswer') {
+        asking.splice(0).forEach((resolve) => resolve(arg === 'yes'));
+        return;
+      }
       (subs[event] || []).forEach((fn) => {
         try {
           fn(arg);

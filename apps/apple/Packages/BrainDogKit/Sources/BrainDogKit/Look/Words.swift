@@ -169,6 +169,36 @@ public enum Words {
         return items.dropLast().joined(separator: ", ") + " and " + items[items.count - 1]
     }
 
+    // Push (M4)
+    public static let pushAccept = "Accept"
+    public static func pushSuggested(_ answer: String) -> String { "Suggested: \(answer)" }
+    public static let pushOtherBrainDog = "That question is in another BrainDog. Open BrainDog to answer it there."
+    public static let pushAlreadyAnswered = "That question was already answered or put off."
+    public static let pushOpenToAnswer = "This one needs a few words. Open BrainDog to answer it."
+    public static let pushLaterWhy = "Put off from a notification"
+
+    // On this iPhone (Settings root, M4 and M5)
+    public static let onThisPhone = "On this \(device)"
+    public static let notifications = "Notifications"
+    public static let notificationsOn = "On. BrainDog rings this \(device) for what you chose in Notifications."
+    public static let notificationsOff = "Off. Turn them on to hear when something needs you."
+    public static let notificationsDenied = "Off in the \(device)'s Settings, under Notifications."
+    public static let turnOn = "Turn on"
+    public static let saysWhat = "Say what it is about"
+    public static let saysWhatLine = "Read the question on this \(device) and show its words. Off, a notification says only what kind of thing it is."
+    public static let faceLock = "Lock with Face ID"
+    public static let faceLockLine = "Ask for Face ID when BrainDog opens, and after five minutes away."
+    public static let faceLockUnavailable = "This \(device) has no Face ID or passcode set up."
+    public static let unlock = "Unlock"
+    public static let locked = "BrainDog is locked"
+    public static let unlockReason = "Unlock BrainDog"
+
+    // Widgets (M5)
+    public static let dueNext = "Due next"
+    public static let nothingDue = "Nothing due on Today."
+    public static let todayNumber = "Today number"
+    public static let pickNumber = "Pick a number in the widget's settings."
+
     static var device: String {
         #if os(iOS)
         return "iPhone"

@@ -74,6 +74,8 @@ struct AccountSheet: View {
                     Button(Words.signOut) {
                         Task {
                             dismiss()
+                            /* THIS PHONE STOPS BEING RUNG ON THIS BRAINDOG FIRST, while the session can still say so (M4). */
+                            await Push.unregister(record: app.boot?.record?.slug)
                             await Session.shared.signOut()
                         }
                     }

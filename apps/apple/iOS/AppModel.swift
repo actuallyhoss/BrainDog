@@ -107,10 +107,20 @@ final class AppModel {
     struct Outside: Identifiable { let id = UUID(); let url: URL }
 
     private init() {
-        let kept = (UserDefaults.standard.data(forKey: "shell.places")).flatMap { try? JSONDecoder().decode([Place].self, from: $0) }
-        places = kept ?? [Place.today, Place.needs]
+        /* THE TABS SETTLE BETWEEN USES (M23): a new set of places the web named while he was here waits for the next cold
+           start, or a return after half an hour away, so a tab never moves under his thumb. */
+        let next = (UserDefaults.standard.data(forKey: Self.nextPlacesKey)).flatMap { try? JSONDecoder().decode([Place].self, from: $0) }
+        let kept = (UserDefaults.standard.data(forKey: Self.placesKey)).flatMap { try? JSONDecoder().decode([Place].self, from: $0) }
+        places = next ?? kept ?? [Place.today, Place.needs]
+        if let next {
+            if let data = try? JSONEncoder().encode(next) { UserDefaults.standard.set(data, forKey: Self.placesKey) }
+            UserDefaults.standard.removeObject(forKey: Self.nextPlacesKey)
+        }
         needs.onOpen = { [weak self] path in self?.push(path, on: self?.stack(Place.needs.href)) }
-        needs.onCount = { [weak self] n in self?.badge = n }
+        needs.onCount = { [weak self] n in
+            self?.badge = n
+            if n > 0 { Task { await self?.considerAskingPush() } }
+        }
         tell.onAsk = { [weak self] q in
             self?.tellOpen = false
             self?.open("/slash?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")
@@ -122,8 +132,16 @@ final class AppModel {
         build()
     }
 
-    /// The Needs you count on the tab: from the queue once it has been read, else from `boot`, else the page's own.
-    var badge = 0
+    /// The Needs you count on the tab: from the queue once it has been read, else from `boot`, else the page's own. The
+    /// app icon's badge is the same count (M4).
+    var badge = 0 {
+        didSet { if badge != oldValue, Session.shared.signedIn { Push.badge(badge) } }
+    }
+
+    static let placesKey = "shell.places"
+    static let nextPlacesKey = "shell.places.next"
+    /// This phone's token from Apple, once given, registered on each BrainDog this session opens.
+    @ObservationIgnored private var token: Data?
 
     // MARK: stacks
 
@@ -150,11 +168,11 @@ final class AppModel {
 
     /// Hear what a screen asks of the app.
     func bind(_ screen: WebScreen, in stack: Stack) {
-        screen.onAsk = { [weak self, weak stack] ask in self?.heard(ask, in: stack) }
+        screen.onAsk = { [weak self, weak stack, weak screen] ask in self?.heard(ask, in: stack, from: screen) }
         screen.onFile = { [weak self] file in self?.sharing = Sharing(items: [file]) }
     }
 
-    private func heard(_ ask: ShellAsk, in stack: Stack?) {
+    private func heard(_ ask: ShellAsk, in stack: Stack?, from screen: WebScreen?) {
         switch ask {
         case .visit(let path, _):
             visit(path, from: stack)
@@ -170,8 +188,14 @@ final class AppModel {
             badge = n
         case .open(let url):
             outside = Outside(url: url)
-        case .pushAsk, .notify, .ready, .haptic, .signedOut, .title, .drag, .titleBarDoubleClick:
-            /* Push is M4's; a notification from the page would ring twice beside the record's push; the rest the screen answered. */
+        case .pushAsk:
+            /* THE WEB'S NOTIFICATIONS SETTING ASKS THE PHONE (`askPush`): the system's own ask, and the answer said back. */
+            Task {
+                let given = await askPush()
+                screen?.emit("pushAnswer", given ? "yes" : "no")
+            }
+        case .notify, .ready, .haptic, .signedOut, .title, .drag, .titleBarDoubleClick:
+            /* A notification from the page would ring twice beside the record's push; the rest the screen answered. */
             break
         }
     }
@@ -185,10 +209,29 @@ final class AppModel {
             four = Array(four.prefix(3))
             four.insert(Place.needs, at: min(1, four.count))
         }
-        guard four != places else { return }
+        guard four != places else {
+            UserDefaults.standard.removeObject(forKey: Self.nextPlacesKey)
+            return
+        }
+        /* THE FIRST SET IS TAKEN AT ONCE (nothing to move from); ANY LATER CHANGE WAITS for `settlePlaces`. */
+        if UserDefaults.standard.data(forKey: Self.placesKey) == nil {
+            apply(four)
+        } else if let data = try? JSONEncoder().encode(four) {
+            UserDefaults.standard.set(data, forKey: Self.nextPlacesKey)
+        }
+    }
+
+    private func apply(_ four: [Place]) {
         places = four
-        if let data = try? JSONEncoder().encode(four) { UserDefaults.standard.set(data, forKey: "shell.places") }
+        if let data = try? JSONEncoder().encode(four) { UserDefaults.standard.set(data, forKey: Self.placesKey) }
+        UserDefaults.standard.removeObject(forKey: Self.nextPlacesKey)
         build()
+    }
+
+    /// Back after half an hour away: the places the web named meanwhile are taken now, before he has touched anything.
+    func settlePlaces() {
+        guard let next = (UserDefaults.standard.data(forKey: Self.nextPlacesKey)).flatMap({ try? JSONDecoder().decode([Place].self, from: $0) }) else { return }
+        apply(next)
     }
 
     // MARK: addresses
@@ -281,10 +324,15 @@ final class AppModel {
         bootRaw = raw
         Kept.save(boot, as: "boot")
         if !needs.known { badge = boot.counts?.decide ?? 0 }
+        /* SPOTLIGHT KNOWS HIS PAGES AND LISTS BY NAME (M5), and Apple's token is handed to this BrainDog too (M4). */
+        Spotlight.index(boot)
+        await registerPush()
         if boot.level.adds, let schemas = try? await Calls.schemas() {
             tell.learn(boot: raw, schemas: schemas)
             /* KEPT FOR THE SHARE SHEET AND SIRI, which read lines with no wait for the record. */
             TellModel.keep(boot: raw, schemas: schemas)
+            /* THEN WHAT TODAY'S TELL KNOWS BY READING THE LISTS (M23): people, accounts, organisations, titled entries. */
+            await tell.learnKnown(boot: raw, schemas: schemas)
         }
     }
 
@@ -316,8 +364,14 @@ final class AppModel {
         boot = nil
         bootRaw = nil
         badge = 0
-        UserDefaults.standard.removeObject(forKey: "shell.places")
+        UserDefaults.standard.removeObject(forKey: Self.placesKey)
+        UserDefaults.standard.removeObject(forKey: Self.nextPlacesKey)
         UserDefaults.standard.removeObject(forKey: "tell.draft")
+        Spotlight.forget()
+        tell.forgetKnown()
+        Handoff.advertise(path: nil, title: nil)
+        Push.badge(0)
+        Push.registered = [:]
         places = [Place.today, Place.needs]
         build()
         /* AND THE HOME SCREEN: the widgets draw "Sign in" now, not the last person's questions. */
@@ -344,5 +398,62 @@ final class AppModel {
     func rescale() {
         for stack in stacks.values { for screen in stack.screens { screen.rescale() } }
         for screen in search.screens { screen.rescale() }
+    }
+
+    // MARK: push (M4)
+
+    /// The system's ask, then Apple's token: true when given. Asked by the web's Notifications setting, the native
+    /// Settings row, and once by itself the first time Needs you holds something.
+    func askPush() async -> Bool {
+        let given: Bool
+        switch await Push.status() {
+        case .authorized, .provisional, .ephemeral: given = true
+        case .denied: given = false
+        default: given = await Push.ask()
+        }
+        if given { UIApplication.shared.registerForRemoteNotifications() }
+        return given
+    }
+
+    /// The first time something waits on him: the ask, once, never again whatever he answered.
+    func considerAskingPush() async {
+        guard !UserDefaults.standard.bool(forKey: "push.asked"), await Push.status() == .notDetermined else { return }
+        UserDefaults.standard.set(true, forKey: "push.asked")
+        _ = await askPush()
+    }
+
+    /// Already allowed: Apple is asked for the token at each launch (it can change), and it is handed to this BrainDog.
+    private func registerPush() async {
+        switch await Push.status() {
+        case .authorized, .provisional, .ephemeral:
+            if let token { await Push.register(token: token, record: boot?.record?.slug) } else { UIApplication.shared.registerForRemoteNotifications() }
+        default:
+            break
+        }
+    }
+
+    func took(token: Data) async {
+        self.token = token
+        await Push.register(token: token, record: boot?.record?.slug)
+    }
+
+    /// A notification (or a page handed over) opens what it is about: in the BrainDog it came from, switched to first
+    /// when that is another one he can open, then in the tab that owns the path.
+    func opened(push info: [AnyHashable: Any]) async {
+        guard Session.shared.signedIn else { return }
+        if let record = info["record"] as? String, !record.isEmpty, let here = boot?.record?.slug, record != here {
+            guard (try? await Calls.open(record)) != nil else { return }
+            await reopened()
+        }
+        if let path = info["open"] as? String, path.hasPrefix("/") { open(path) } else { select(Place.needs.href, toRoot: true) }
+    }
+
+    // MARK: Handoff (M5)
+
+    /// The page in front, for Handoff: the top of the selected tab, by its address and its name.
+    var inFront: (path: String, title: String?)? {
+        guard let stack = current else { return nil }
+        if let top = stack.top { return (top.here, top.title) }
+        return (stack.place.href, stack.place.label)
     }
 }

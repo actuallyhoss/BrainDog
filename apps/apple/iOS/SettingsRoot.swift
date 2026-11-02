@@ -1,5 +1,6 @@
 import BrainDogKit
 import SwiftUI
+import UserNotifications
 
 /// Settings' root, natively (plan 3.4): the web's own areas in the web's own groups, each a press that pushes the web's
 /// area here, and what only the app says (its version, where the plan is managed). Keyboard is left off a phone, as the
@@ -77,6 +78,8 @@ struct SettingsRoot: View {
                     }
                 }
 
+                PhoneTile()
+
                 Tile(Words.about) {
                     VStack(alignment: .leading, spacing: Space.s2) {
                         Text(Words.version(version, build)).font(Typeface.body).foregroundStyle(Palette.ink)
@@ -94,4 +97,62 @@ struct SettingsRoot: View {
 
     private var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0" }
     private var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1" }
+}
+
+/// What only this phone holds (plan 3.4's native rows): whether BrainDog may ring it, whether a notification says what
+/// it is about, and Lock with Face ID. What rings it is chosen in the web's Notifications above, for every device at once.
+struct PhoneTile: View {
+    @State private var app = AppModel.shared
+    @State private var lock = Lock.shared
+    @State private var status: UNAuthorizationStatus = .notDetermined
+    @State private var says = Push.saysWhat
+    @State private var lockSaid: String?
+
+    var body: some View {
+        Tile(Words.onThisPhone) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center, spacing: Space.s3) {
+                    Row(Words.notifications, detail: line, glyph: .bell)
+                    if status == .notDetermined {
+                        Button(Words.turnOn) {
+                            Haptic.press.play()
+                            Task {
+                                _ = await app.askPush()
+                                status = await Push.status()
+                            }
+                        }
+                        .buttonStyle(BDButtonStyle(.quiet, onTile: true, full: false))
+                    }
+                }
+                Hairline()
+                toggle(Words.saysWhat, line: Words.saysWhatLine, glyph: .eye, isOn: Binding(get: { says }, set: { says = $0; Push.saysWhat = $0 }))
+                Hairline()
+                toggle(Words.faceLock, line: lockSaid ?? Words.faceLockLine, glyph: .lock, isOn: Binding(get: { lock.on }, set: { wanted in
+                    Task {
+                        let done = await lock.turn(wanted)
+                        lockSaid = done ? nil : (Lock.possible ? nil : Words.faceLockUnavailable)
+                        if !done { Haptic.warning.play() } else { Haptic.select.play() }
+                    }
+                }))
+            }
+        }
+        .task { status = await Push.status() }
+    }
+
+    private var line: String {
+        switch status {
+        case .authorized, .provisional, .ephemeral: Words.notificationsOn
+        case .denied: Words.notificationsDenied
+        default: Words.notificationsOff
+        }
+    }
+
+    private func toggle(_ title: String, line: String, glyph: Glyph, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            Row(title, detail: line, glyph: glyph)
+        }
+        .toggleStyle(.switch)
+        .tint(Palette.on)
+        .padding(.vertical, Space.s1)
+    }
 }

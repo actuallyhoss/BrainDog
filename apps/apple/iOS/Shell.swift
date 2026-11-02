@@ -46,7 +46,19 @@ struct Shell: View {
         #if DEBUG
         .fullScreenCover(item: $app.gallery) { GalleryView(gallery: $0) }
         #endif
-        .task { await app.load() }
+        .task {
+            await app.load()
+            QuickActions.runLaunched()
+        }
+        /* HANDOFF: the page in front, made current whenever the tab, the stack or the page's name changes (M5). */
+        .onChange(of: handoffKey, initial: true) { _, _ in
+            let front = app.inFront
+            Handoff.advertise(path: front.flatMap { $0.path.hasPrefix("/") ? $0.path : nil }, title: front?.title)
+        }
+    }
+
+    private var handoffKey: String {
+        "\(app.selected)|\(app.current?.path.count ?? 0)|\(app.current?.top?.title ?? "")"
     }
 }
 

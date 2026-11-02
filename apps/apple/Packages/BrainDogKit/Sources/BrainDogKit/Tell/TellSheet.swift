@@ -56,6 +56,11 @@ public final class TellModel {
 
     @ObservationIgnored private var options: String?
     @ObservationIgnored private var names: [String: String] = [:]
+    /// What Today's Tell knows by having read the lists (`native.ts` `NativeKnown`), as JSON: people, accounts,
+    /// organisations and every list's entries by name (M23). `{}` until `learnKnown` has read them.
+    @ObservationIgnored private var known = Kept.load("tell.known", as: JSONValue.self)?.text ?? "{}"
+    /// The `boot` and declarations the options were last built from, so `learnKnown` can build them again.
+    @ObservationIgnored private var learnt: (boot: String, schemas: String)?
     /// Each list's first file field, where an attachment goes (`shared.svelte.ts` `photoField`).
     @ObservationIgnored private var fileFields: [String: String] = [:]
     /// Whether the words are kept as the app's draft. The share sheet and Siri start from their own words and keep none.
@@ -79,7 +84,8 @@ public final class TellModel {
             "index": ["currency": currency.map(JSONValue.string) ?? .null],
             "me": ["name": boot["me"]?["name"] ?? .null],
         ]
-        options = core.options(boot: native.text, schemas: schemas.text, today: Said.iso(Date()))
+        learnt = (native.text, schemas.text)
+        options = core.options(boot: native.text, schemas: schemas.text, today: Said.iso(Date()), known: known)
         for list in boot["registers"]?.array ?? [] {
             if let id = list["id"]?.string, let name = list["name"]?.string { names[id] = name }
         }
@@ -92,6 +98,69 @@ public final class TellModel {
     }
 
     public var ready: Bool { options != nil && core.loaded }
+
+    /// Learn what Today's Tell learns by reading the lists (`Home.svelte` `tellOptions`): every held list's entries by
+    /// name (`titled`), the people, the accounts a payment is booked from, and the organisations a person is from. So
+    /// "Paid Halden 300" links the Halden he already keeps, here as on Today. At most 24 lists of at most 2,000 entries
+    /// each are read, names only (`list` with `short`); kept for the share sheet and Siri.
+    public func learnKnown(boot: JSONValue, schemas: JSONValue) async {
+        guard case .object(let decls) = schemas else { return }
+        let held = (boot["registers"]?.array ?? []).compactMap { r -> String? in
+            guard let id = r["id"]?.string, decls[id] != nil, let n = r["count"]?.number, n > 0, n <= 2000 else { return nil }
+            return id
+        }
+        var titled: [String: JSONValue] = [:]
+        await withTaskGroup(of: (String, [JSONValue]).self) { group in
+            for id in held.prefix(24) {
+                let title = decls[id]?["title"]?.string
+                group.addTask { (id, await Self.names(in: id, title: title)) }
+            }
+            for await (id, names) in group { titled[id] = .array(names) }
+        }
+        func refs(_ decl: JSONValue?) -> [JSONValue] { decl?["fields"]?.array?.filter { $0["type"]?.string == "ref" } ?? [] }
+        /* THE ACCOUNTS A PAYMENT IS BOOKED FROM: a required ref field that names an account, in any list (`into`). */
+        var accounts: [JSONValue] = []
+        for (_, decl) in decls {
+            for f in refs(decl) where f["required"] == .bool(true) {
+                let words = "\(f["id"]?.string ?? "") \(f["label"]?.string ?? "")"
+                if words.range(of: "account", options: .caseInsensitive) != nil, let to = f["to"]?.string { accounts += titled[to]?.array ?? [] }
+            }
+        }
+        let orgsList = refs(decls["people"]).first { $0["id"]?.string == "org" }?["to"]?.string
+        var out: [String: JSONValue] = ["titled": .object(titled), "accounts": .array(accounts)]
+        if let people = titled["people"] { out["people"] = people }
+        if let orgsList, let orgs = titled[orgsList] { out["orgs"] = orgs }
+        let value = JSONValue.object(out)
+        Kept.save(value, as: "tell.known")
+        known = value.text
+        if let learnt { options = core.options(boot: learnt.boot, schemas: learnt.schemas, today: Said.iso(Date()), known: known) }
+        reread()
+    }
+
+    /// Signed out: nothing of the last person's names stays.
+    public func forgetKnown() {
+        known = "{}"
+        learnt = nil
+        options = nil
+    }
+
+    /// One list's entries as `{ seq, name }`, by the field its declaration names them with.
+    nonisolated private static func names(in register: String, title: String?) async -> [JSONValue] {
+        var out: [JSONValue] = []
+        var cursor: String?
+        repeat {
+            var args: [String: JSONValue] = ["register": .string(register), "limit": .number(500), "short": .bool(true)]
+            if let cursor { args["cursor"] = .string(cursor) }
+            guard let raw = try? await Client.shared.call("list", args, as: JSONValue.self) else { break }
+            for row in raw["rows"]?.array ?? [] {
+                guard let seq = row["seq"]?.number else { continue }
+                let name = title.flatMap { row["fields"]?[$0]?.string } ?? row["title"]?.string
+                if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty { out.append(["seq": .number(seq), "name": .string(name)]) }
+            }
+            cursor = raw["cursor"]?.string
+        } while cursor != nil && out.count < 2000
+        return out
+    }
 
     /// Learn from what the app kept last (`boot` and the declarations, in the App Group), so the share sheet and Siri can
     /// read lines at once; then from the record, which keeps the copy fresh. Signed out or offline, the kept copy stands.

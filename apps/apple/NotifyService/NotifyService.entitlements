@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The notification service extension (M4), like the widgets (M5), reads the app's session from the shared Keychain group and what the app kept (the glance, the
+  lists' declarations) from the App Group. The simulator embeds these without a profile; a device build needs the team's.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.dog.brain</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)dog.brain.shared</string>
+	</array>
+</dict>
+</plist>

@@ -94,6 +94,19 @@ targets:
         BrainDogServer: https://app.brain.dog
         BrainDogAppGroup: group.dog.brain
         BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
+        # Handoff of the page open now, between this app, the Mac app and Safari; and Spotlight's pages and lists (M5).
+        NSUserActivityTypes: [dog.brain.page, com.apple.corespotlightitem]
+        # The Home Screen's press-and-hold (M5): Tell, Needs you, Search. Handled in `iOS/Doors.swift`.
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: dog.brain.tell
+            UIApplicationShortcutItemTitle: Tell BrainDog
+            UIApplicationShortcutItemIconSymbolName: plus.bubble
+          - UIApplicationShortcutItemType: dog.brain.needs
+            UIApplicationShortcutItemTitle: Needs you
+            UIApplicationShortcutItemIconSymbolName: tray
+          - UIApplicationShortcutItemType: dog.brain.search
+            UIApplicationShortcutItemTitle: Search
+            UIApplicationShortcutItemIconSymbolName: magnifyingglass
 
   # ── Mac ───────────────────────────────────────────────────────────────────────────────────────────────────────────
   BrainDogMac:
@@ -139,6 +152,8 @@ targets:
         BrainDogServer: https://app.brain.dog
         BrainDogAppGroup: $(TeamIdentifierPrefix)dog.brain
         BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
+        # Handoff of the page open now, with the iPhone app (M5).
+        NSUserActivityTypes: [dog.brain.page]
         # The menu bar extra and the Dock badge keep the count while the window is closed; the app stays open then.
         NSSupportsAutomaticTermination: false
 
@@ -146,7 +161,8 @@ targets:
   WidgetsiOS:
     type: app-extension
     platform: iOS
-    sources: [Widgets]
+    # `Shared/Open.swift` too: the Control Center's Tell runs the app's own Open Tell intent.
+    sources: [Widgets, Shared/Open.swift]
     dependencies:
       - package: BrainDogKit
       - sdk: WidgetKit.framework
@@ -173,7 +189,7 @@ targets:
   WidgetsMac:
     type: app-extension
     platform: macOS
-    sources: [Widgets]
+    sources: [Widgets, Shared/Open.swift]
     dependencies:
       - package: BrainDogKit
       - sdk: WidgetKit.framework
@@ -284,12 +300,17 @@ targets:
         PRODUCT_NAME: BrainDogNotify
         TARGETED_DEVICE_FAMILY: "1,2"
         SKIP_INSTALL: YES
+        # It reads the question with the app's session (the Keychain group) and what the app kept (the App Group).
+        CODE_SIGN_ENTITLEMENTS: NotifyService/NotifyService.entitlements
     info:
       path: NotifyService/Info.plist
       properties:
         CFBundleDisplayName: BrainDog
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        BrainDogServer: https://app.brain.dog
+        BrainDogAppGroup: group.dog.brain
+        BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
         NSExtension:
           NSExtensionPointIdentifier: com.apple.usernotifications.service
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService

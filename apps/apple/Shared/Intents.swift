@@ -2,14 +2,6 @@ import AppIntents
 import BrainDogKit
 import Foundation
 
-/// What an intent asks the app it runs in to show: Tell with words in it, or a place. Each app sets these at launch
-/// (iPhone: `AppModel`; Mac: `MacModel`); until then nothing happens.
-@MainActor
-enum AppDoor {
-    static var tell: (String) -> Void = { _ in }
-    static var open: (String) -> Void = { _ in }
-}
-
 /// "Tell BrainDog" (plan 3.10): Siri asks what, and the words are read on the device by the web's own reader and added
 /// as Tell adds them, in one `capture`. What the reader cannot place by itself, or an entry that needs more, is not
 /// guessed at: BrainDog opens in Tell with the words in it, to finish there.
@@ -57,25 +49,6 @@ struct TellBrainDogIntent: AppIntent {
         try await continueInForeground(IntentDialog(stringLiteral: Words.openToFinish), alwaysConfirm: false)
         #endif
         AppDoor.tell(words)
-    }
-}
-
-/// Opens BrainDog in Tell, with words in it when there are some.
-struct OpenTellIntent: AppIntent {
-    static let title: LocalizedStringResource = "Open Tell"
-    static let description = IntentDescription("Open BrainDog ready to tell it something.")
-    static let openAppWhenRun = true
-
-    @Parameter(title: "Words", default: "")
-    var words: String
-
-    init() {}
-    init(words: String) { self.words = words }
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        AppDoor.tell(words)
-        return .result()
     }
 }
 

@@ -1,4 +1,5 @@
 import BrainDogKit
+import CoreSpotlight
 import SwiftUI
 
 /// BrainDog for iPhone (plan 3.3). Native Sign in; then the tab bar of his places with a native stack per tab around
@@ -6,6 +7,10 @@ import SwiftUI
 @main
 struct BrainDogApp: App {
     @Environment(\.scenePhase) private var phase
+    /// Push, its Accept and Later, and the Home Screen's press-and-hold come through the delegate (`Doors.swift`).
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @State private var lock = Lock.shared
+    @State private var awayAt: Date?
 
     init() {
         Typeface.register()
@@ -22,11 +27,19 @@ struct BrainDogApp: App {
                 .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                     if let url = activity.webpageURL { Task { await Links.open(url) } }
                 }
+                /* HANDOFF FROM THE MAC APP, and a Spotlight result (M5). */
+                .onContinueUserActivity(Handoff.type) { activity in Task { await Handoff.continued(activity) } }
+                .onContinueUserActivity(CSSearchableItemActionType) { activity in Spotlight.continued(activity) }
+                .overlay {
+                    if lock.covered { LockCover().transition(.opacity) }
+                }
                 .onReceive(NotificationCenter.default.publisher(for: UIContentSizeCategory.didChangeNotification)) { _ in
                     AppModel.shared.rescale()
                 }
         }
         .onChange(of: phase) { was, now in
+            /* LOCKED OR NOT, THE SWITCHER'S PICTURE IS THE COVER while Face ID lock is on (M5). */
+            if now == .active { lock.cameBack() } else { lock.wentAway() }
             guard Session.shared.signedIn else { return }
             switch now {
             case .active:
@@ -35,10 +48,14 @@ struct BrainDogApp: App {
                     await Session.shared.refreshIfDue()
                     if was == .background { await AppModel.shared.needs.read() }
                 }
+                /* BACK AFTER HALF AN HOUR: the tabs take any change the web named meanwhile (M23's settle rule). */
+                if let awayAt, Date().timeIntervalSince(awayAt) >= 30 * 60 { AppModel.shared.settlePlaces() }
+                awayAt = nil
             case .inactive where was == .active:
                 /* THE LAUNCH PICTURE: Today as it is now, laid over Today at the next cold start until it has drawn. */
                 Task { await AppModel.shared.keepLaunchPicture() }
             case .background:
+                awayAt = awayAt ?? Date()
                 /* AND THE WIDGETS GET WHAT IS TRUE NOW, as the app goes (plan 3.10). */
                 Task { await GlanceStore.refresh() }
             default:
