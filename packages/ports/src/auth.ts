@@ -58,9 +58,18 @@ export type AuthCall =
   | { flow: 'passkey.register.options'; sid: string }
   | { flow: 'passkey.register'; sid: string; credential: RegistrationJSON; label?: string }
   | { flow: 'passkey.assert.options'; ip: string }
-  | { flow: 'passkey.assert'; credential: AssertionJSON; ip: string; sid?: string }
-  | { flow: 'magic.start'; email: string; ip: string }
-  | { flow: 'magic.redeem'; linkToken: string; ip: string; sid?: string }
+  /**
+   * `app` IS THE DEVICE LABEL OF A NATIVE APP SIGNING IN ("iPhone, BrainDog app"): with it the session opened is an app
+   * session (`AppSessions` below), listed by that label and renewed by `app.refresh` rather than on read.
+   */
+  | { flow: 'passkey.assert'; credential: AssertionJSON; ip: string; sid?: string; app?: string }
+  /**
+   * `app` IS THE APP'S PKCE CHALLENGE (S256, 43 characters), when a BrainDog app asked for the link: the link carries it
+   * as `?app=`, and the Directory mints a six-digit code bound to it and to the link, mailed beside the link as `appCode`.
+   */
+  | { flow: 'magic.start'; email: string; ip: string; app?: string }
+  /** `app` as on `passkey.assert`: a link a BrainDog app spends (`/auth/app`) opens an app session with this label. */
+  | { flow: 'magic.redeem'; linkToken: string; ip: string; sid?: string; app?: string }
   | { flow: 'magic.redeem'; claimToken: string; ip: string; sid?: string }
   /** Whose account a sign-in or claim link opens, asked before the press and spending nothing. */
   | { flow: 'magic.whose'; linkToken: string; ip: string }
@@ -77,6 +86,22 @@ export type AuthCall =
   | { flow: 'sessions'; sid: string }
   /** End this person's other sessions (`keep: 'this'`), or all of them, this one included (`keep: 'none'`). */
   | { flow: 'logout.all'; sid: string; keep: 'this' | 'none' }
+  /**
+   * End ONE of this person's sessions, named by the `ref` `sessions` listed it under. Ending this one is signing out,
+   * and the cookie is cleared with it.
+   */
+  | { flow: 'session.end'; sid: string; ref: string }
+  /**
+   * An app session renews itself: a new id by compare-and-set, the old one good for five more minutes, the expiry
+   * renewed as a rotation renews it. A browser's session is refused, because it rotates itself on read.
+   */
+  | { flow: 'app.refresh'; sid: string }
+  /**
+   * The six digits a sign-in letter carries for the app that asked for it, typed in that app: `verifier` is the PKCE
+   * verifier whose S256 is the challenge the code was minted for, and `label` names the device. The code and the link it
+   * came with are one use between them.
+   */
+  | { flow: 'app.code'; code: string; verifier: string; label?: string; ip: string; sid?: string }
   /**
    * Lock the keychain in this browser: the session's last proof is put behind the longest keychain window, so the next
    * keychain act asks for a sign-in again. The session stays signed in for everything else.
@@ -222,7 +247,10 @@ export type AssertionOptions = {
  * person that their way in changed, so a change they did not make is one they hear about.
  */
 export type Mail =
-  | { to: string; linkToken: string }
+  /* `appCode` IS THE SIX DIGITS A BRAINDOG APP TAKES INSTEAD OF THE LINK, there only when the app asked for the link
+     (`magic.start` with `app`). It is printed in the letter and nowhere else, and it opens nothing without the verifier
+     that stayed in the app. */
+  | { to: string; linkToken: string; appCode?: string }
   | { to: string; claimToken: string }
   | { kind: 'invite.prove'; to: string; link: string }
   /* AN INVITATION EMAILED BY WHOEVER MADE IT (collab pass, 2 Nov): the link to join, with the proof inside it for a new
@@ -240,8 +268,11 @@ export type Mail =
  * MAC cannot be presented as a cookie, and twelve characters of one cannot be looked up as it. It changes when the
  * session rotates. `activeAt` is when it last rotated, which a session does on its first use after a day, so it is
  * the last day it was used; `authedAt` is its last proof. `record` is the record it opens on, `null` for none.
+ *
+ * `device` IS AN APP SESSION'S LABEL ("iPhone, BrainDog app"), absent for a browser's. An app session is renewed by the
+ * app once a day (`app.refresh`), so its `activeAt` is still the last day it was used.
  */
-export type SessionInfo = { ref: string; current: boolean; authedAt: number; activeAt: number; record: string | null };
+export type SessionInfo = { ref: string; current: boolean; authedAt: number; activeAt: number; record: string | null; device?: string };
 
 /** What `invite.proved` answers: the proved address, the invitation the proof was minted for, and the name typed then. */
 export type InviteProved = { email: string; invite: string; name: string | null };
@@ -293,6 +324,12 @@ export type AuthBodies = {
   'logout.all': { ended: number };
   /** The keychain is locked in this browser: `locked` is always true, and the session is otherwise as it was. */
   'keychain.lock': { locked: true };
+  /** How many sessions ended: one, or none when the `ref` named none of this person's (the answer is then a 422). */
+  'session.end': { ended: number };
+  /** The new id rides in the cookie, never in the body. */
+  'app.refresh': Record<string, never>;
+  /** Signed in: the cookie is the answer, as `/auth/app` sets it. */
+  'app.code': Record<string, never>;
   'invite.prove': Record<string, never>;
   'invite.proved': InviteProved;
   'signup.start': Record<string, never>;

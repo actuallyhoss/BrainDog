@@ -222,15 +222,20 @@ export function cbor(bytes: Uint8Array): Verdict<Cbor> {
 
 /* ── client data ──────────────────────────────────────────────────────── */
 
-export type Expect = { origin: string; rpId: string; challenge?: string | undefined };
+/**
+ * `origin` IS ONE ORIGIN OR THE LIST OF THEM a ceremony may come from: the page's own, and on the Worker the one a
+ * native app's assertion carries (`https://<relying party id>`, see `AuthConfig.rp` in `identity.ts`).
+ */
+export type Expect = { origin: string | readonly string[]; rpId: string; challenge?: string | undefined };
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
 /**
  * `clientDataJSON`: what the browser says it was asked to do, and where.
  *
- * THE ORIGIN IS COMPARED EXACTLY, as a string. `https://studio.example` is not `https://studio.example/`, not
- * `http://studio.example` and not a subdomain; the browser writes it, so a mismatch is somebody else's page.
+ * THE ORIGIN IS COMPARED EXACTLY, as a string, against each origin the host listed. `https://studio.example` is not
+ * `https://studio.example/`, not `http://studio.example` and not a subdomain; the browser writes it, so a mismatch is
+ * somebody else's page.
  *
  * AND NEVER FROM INSIDE A FRAME ON ANOTHER SITE. Anything but an absent or `false` `crossOrigin` is refused as
  * `origin`, because the page that asked is then not the page the origin names.
@@ -240,7 +245,7 @@ const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'obj
  */
 export function clientData(
   json: Uint8Array,
-  expect: { type: 'webauthn.create' | 'webauthn.get'; origin: string; challenge?: string | undefined },
+  expect: { type: 'webauthn.create' | 'webauthn.get'; origin: string | readonly string[]; challenge?: string | undefined },
 ): Verdict<{ challenge: string }> {
   const text = utf8(json);
   let c: unknown = null;
@@ -253,7 +258,8 @@ export function clientData(
     return fail('shape');
   if (c.type !== expect.type) return fail('type');
   if (expect.challenge !== undefined && c.challenge !== expect.challenge) return fail('challenge');
-  if (c.origin !== expect.origin) return fail('origin');
+  const origins: readonly string[] = typeof expect.origin === 'string' ? [expect.origin] : expect.origin;
+  if (!origins.includes(c.origin)) return fail('origin');
   if (c.crossOrigin !== undefined && c.crossOrigin !== false) return fail('origin');
   return pass({ challenge: c.challenge });
 }

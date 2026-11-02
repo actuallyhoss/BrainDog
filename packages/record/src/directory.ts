@@ -233,6 +233,36 @@ CREATE TABLE IF NOT EXISTS dir_link (
   expires INTEGER NOT NULL
 );
 
+-- AN APP SESSION: a dir_session row a BrainDog app holds (the iPhone and Mac apps), by the id_hash the session has
+-- now, with the device label it is listed under in Settings ("iPhone, BrainDog app"). Such a session never rotates on
+-- read, because the webview, a widget and an extension share one id and a rotation would race between them; the app
+-- renews it itself (identity.ts, app.refresh), which moves this row to the new hash in the same transaction.
+--
+-- A NEW TABLE AND NOT A COLUMN ON dir_session, for the reason dir_inbound gives below: created on the next open,
+-- DIRECTORY_VERSION unmoved, so an older Worker still opens this Directory and reads every app session as a browser's.
+-- No foreign key: a row whose session went is swept where dead sessions are (identity.ts, open). Left out of every copy
+-- with dir_session.
+CREATE TABLE IF NOT EXISTS dir_app_session (
+  id_hash TEXT PRIMARY KEY,                 -- dir_session.id_hash, the session's id as it is now
+  label   TEXT NOT NULL,                    -- one line, at most 64 characters
+  made_at INTEGER NOT NULL                  -- epoch ms
+);
+
+-- THE SIX DIGITS A SIGN-IN LETTER CARRIES FOR THE APP THAT ASKED FOR IT, for a link opened on another device. Bound to
+-- the app's PKCE challenge (in clear: it is a hash, it rides in the link's query, and it opens nothing without the
+-- verifier) and to the link it was mailed with, ten minutes, five wrong tries. Only a MAC of the code is kept, under
+-- the Directory's key with the challenge inside it, so the table opens nothing. Spending the link deletes the row, and
+-- spending the code deletes the link: the two are one use between them. Same doctrine as above: a new table, created
+-- on the next open, and left out of every copy with dir_link.
+CREATE TABLE IF NOT EXISTS dir_app_code (
+  challenge TEXT PRIMARY KEY,               -- the app's S256 challenge, base64url, 43 characters
+  code_mac  TEXT NOT NULL,                  -- HMAC of 'a:' + challenge + '.' + code
+  link_hash TEXT NOT NULL,                  -- dir_link.hash of the link it was mailed with
+  tries     INTEGER NOT NULL DEFAULT 0,     -- wrong codes typed; the fifth deletes the row
+  expires   INTEGER NOT NULL                -- epoch ms
+);
+CREATE INDEX IF NOT EXISTS dir_app_code_link ON dir_app_code(link_hash);
+
 -- A WebAuthn challenge, five minutes, for one ceremony and (on registration) one person. In a table
 -- rather than in memory, because a Durable Object evicted mid-ceremony forgets its memory.
 CREATE TABLE IF NOT EXISTS dir_challenge (
@@ -917,15 +947,15 @@ export const CARRIED = [
 ] as const;
 
 /**
- * The tables a copy leaves out: sessions, sign-in links, WebAuthn challenges, the lockout's strikes, the mailboxes
- * not yet proved, and the sign-up codes.
+ * The tables a copy leaves out: sessions and the app labels beside them, sign-in links and the app codes beside them,
+ * WebAuthn challenges, the lockout's strikes, the mailboxes not yet proved, and the sign-up codes.
  *
  * CREDENTIALS THAT EXPIRE IN MINUTES TO DAYS. A restore that revived them would sign back in people who had signed out,
  * and a copy kept thirty nights would hold a session for longer than the session itself lives. Named, and not merely
  * absent from `CARRIED`, so a table added to `SCHEMA` later has to be put in one list or the other: the test reads
  * `sqlite_master` and fails for a table in neither.
  */
-export const LEFT_OUT = ['dir_session', 'dir_link', 'dir_challenge', 'dir_fail', 'dir_pending', 'dir_invite', 'dir_invite_mailed', 'dir_left'] as const;
+export const LEFT_OUT = ['dir_session', 'dir_app_session', 'dir_link', 'dir_app_code', 'dir_challenge', 'dir_fail', 'dir_pending', 'dir_invite', 'dir_invite_mailed', 'dir_left'] as const;
 
 type Carried = (typeof CARRIED)[number];
 

@@ -10,7 +10,9 @@
  *   In       JSON. A POST needs `content-type: application/json` and `sameOrigin`, except the two
  *            operator routes, which take `Authorization: Bearer <PROVISION_KEY>` instead. The fields are
  *            the `AuthCall`'s: `{ serverKey }`, `{ credential, label? }`, `{ credential }`, `{ email }`,
- *            `{ linkToken }` or `{ claimToken }`, `{ id }`, `{ id, label }`, `{ keep }`; provision takes `{ slug, email, name? }`.
+ *            `{ linkToken }` or `{ claimToken }`, `{ id }`, `{ id, label }`, `{ keep }`, `{ ref }`, `{ code, verifier,
+ *            label? }`; a passkey assertion may carry `app`, the device label of a native app; provision takes
+ *            `{ slug, email, name? }`.
  *   200      `{ ok: true, value }`, the value being `AuthBodies[flow]`; `/auth/methods` answers `MethodsBody`.
  *   202      `/auth/invite` alone: `{ ok: true, value: { proving: true, to } }`, a new address mailed its proof.
  *            A host that sends no mail answers that path 501 `NOT_IN_THIS_BUILD` instead (`invite.ts`).
@@ -28,7 +30,8 @@
  *            A fragment never reaches a server, a log or a link pre-fetcher, and a press is what spends it.
  *            `/auth/magic/start` also reads `next`, the one field that is the host's and not the call's: a
  *            path of the app on this origin (`appNext`) goes in the link as `?next=<path>`, before the fragment;
- *            and `app`, the Mac app's PKCE challenge, goes in as `?app=` so the page hands the link back to it.
+ *            and `app`, a BrainDog app's PKCE challenge (the iPhone's or the Mac's), goes in as `?app=` so the page,
+ *            or the iPhone app the link opens, hands the link back to it, with six digits beside it in the letter.
  *
  * STANDARD `Request`, `Response` AND WEBCRYPTO, like the rest of this package, so the Worker and the
  * self-host run this file unchanged. Neither adds a sign-in route, and neither answers one differently.
@@ -438,19 +441,22 @@ export type GoogleFlow = 'google.start' | 'google.callback' | 'google.desktop';
 const GOOGLE: ReadonlySet<string> = new Set<GoogleFlow>(['google.start', 'google.callback', 'google.desktop']);
 
 /**
- * The Mac app's way back from a sign-in finished in the browser, which are routes and never Directory flows.
+ * A BrainDog app's way back from a sign-in finished in a browser or a mail app, which are routes and never Directory
+ * flows: the Mac app's `desktop` pair as it always was, and the same pair as `app` for both apps.
  *
- * AN EMAILED LINK OPENS IN THE DEFAULT BROWSER, not in the app that asked for it. The app sends its PKCE challenge with
- * `magic.start` (`app` beside `next`), the link carries it (`?app=`), and the page the link opens hands the unspent link
- * to `desktop.handoff`, which seals it to that challenge as a one-time code for `braindog://auth?code=`. The app's
- * window then posts the code and its verifier to `desktop`, which spends the link and sets the cookie there. The
- * Worker answers both (`apps/worker/src/desktop-signin.ts`); a self-host has no Mac app to hand back to.
+ * AN EMAILED LINK OPENS IN THE DEFAULT BROWSER, not in the app that asked for it, unless it is the iPhone app's own
+ * universal link. The app sends its PKCE challenge with `magic.start` (`app` beside `next`), the link carries it
+ * (`?app=`), and whatever opens the link (the page in a browser, or the iPhone app) hands the unspent link to
+ * `app.handoff` (`desktop.handoff`), which seals it to that challenge as a one-time code (for the Mac,
+ * `braindog://auth?code=`). The app then posts the code and its verifier to `app` (`desktop`), which spends the link
+ * and sets the cookie there; `app` opens an app session under the device label the app sends. The Worker answers all
+ * four (`apps/worker/src/desktop-signin.ts`); a self-host has no app to hand back to.
  */
-export type DesktopFlow = 'desktop' | 'desktop.handoff';
+export type DesktopFlow = 'desktop' | 'desktop.handoff' | 'app' | 'app.handoff';
 
-const DESKTOP: ReadonlySet<string> = new Set<DesktopFlow>(['desktop', 'desktop.handoff']);
+const DESKTOP: ReadonlySet<string> = new Set<DesktopFlow>(['desktop', 'desktop.handoff', 'app', 'app.handoff']);
 
-/** A PKCE S256 challenge, as the Mac app sends one: 43 characters of base64url, and nothing else is carried. */
+/** A PKCE S256 challenge, as a BrainDog app sends one: 43 characters of base64url, and nothing else is carried. */
 const APP_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 
 
@@ -498,6 +504,12 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/logout', method: 'POST', flow: 'logout', on: 'both', needs: 'nothing', what: 'End this session and clear the cookie.' },
   { path: '/auth/sessions', method: 'GET', flow: 'sessions', on: 'both', needs: 'session', what: 'Every live session you have, this one marked, each by a short reference and never by its id.' },
   { path: '/auth/logout/all', method: 'POST', flow: 'logout.all', on: 'both', needs: 'session', what: 'End your other sessions, `{ keep: "this" }`, or every one of them, `{ keep: "none" }`.' },
+  /* ONE SESSION, BY THE `ref` THE LIST GAVE IT: an app on a lost phone ended from a laptop, without signing out the rest.
+     Ending this one is signing out, and the cookie is cleared. Both hosts, so the self-host's Settings can do the same. */
+  { path: '/auth/session/end', method: 'POST', flow: 'session.end', on: 'both', needs: 'session', what: 'End one of your sessions, `{ ref }`, as the list names it. Ending this one signs you out here.' },
+  /* AN APP SESSION RENEWING ITSELF, which a browser's does on read. Both hosts, because a passkey asserted with `app`
+     opens an app session on either, and one that could not renew would end ninety days after its sign-in. */
+  { path: '/auth/app/refresh', method: 'POST', flow: 'app.refresh', on: 'both', needs: 'session', what: 'A BrainDog app renews its session, `{}`: a new cookie, and the old one good for five more minutes. A browser is refused.' },
   /* LOCK NOW, for the keychain (`12 §6.3`): the session's proof is put behind the keychain's longest window, so the next
      keychain act asks for a sign-in again and nothing else changes. A POST, as everything that changes a session is. */
   { path: '/auth/keychain/lock', method: 'POST', flow: 'keychain.lock', on: 'both', needs: 'session', what: 'Lock the keychain in this browser: its next use asks you to sign in again, and nothing else changes.' },
@@ -510,6 +522,13 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/google/desktop', method: 'POST', flow: 'google.desktop', on: 'worker', needs: 'nothing', what: 'The Mac app swaps the one-time code from `braindog://auth` and its PKCE verifier for the session cookie. `?desktop=1&challenge=` on the start asks for that flavour.' },
   { path: '/auth/desktop', method: 'POST', flow: 'desktop', on: 'worker', needs: 'nothing', what: 'The Mac app swaps a one-time code from `braindog://auth` and its PKCE verifier for the session cookie.' },
   { path: '/auth/desktop/handoff', method: 'POST', flow: 'desktop.handoff', on: 'worker', needs: 'nothing', what: 'A sign-in link the Mac app asked for, opened in a browser: sealed to the app\'s challenge as a one-time code, and not spent. `{ linkToken, challenge }`.' },
+  /* THE SAME PAIR FOR BOTH APPS, opening an app session under the device label the app sends (`label`, "iPhone, BrainDog
+     app"). `/auth/desktop` and its handoff stay as they were, for the Mac app already installed. */
+  { path: '/auth/app', method: 'POST', flow: 'app', on: 'worker', needs: 'nothing', what: 'A BrainDog app swaps a one-time code and its PKCE verifier for an app session cookie. `{ code, verifier, label? }`.' },
+  { path: '/auth/app/handoff', method: 'POST', flow: 'app.handoff', on: 'worker', needs: 'nothing', what: 'A sign-in link a BrainDog app asked for, sealed to the app\'s challenge as a one-time code, and not spent. `{ linkToken, challenge }`.' },
+  /* THE SIX DIGITS IN THE LETTER, for a link opened on another device: typed in the app, spent with the verifier. Worker
+     only, because only the Worker's letter carries them. */
+  { path: '/auth/app/code', method: 'POST', flow: 'app.code', on: 'worker', needs: 'nothing', what: 'A BrainDog app signs in with the six digits its sign-in letter carried. `{ code, verifier, label? }`.' },
   { path: '/auth/claim/mint', method: 'POST', flow: 'claim.mint', on: 'worker', needs: 'operator', what: 'A new 24-hour claim link for somebody already provisioned.' },
   { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A BrainDog, its Directory rows and a 24-hour claim link, handed to the operator.' },
   { path: '/auth/suspend', method: 'POST', flow: 'suspend', on: 'worker', needs: 'operator', what: 'Stop somebody signing in, `{ email }`, ending every session they hold, or let them in again, `{ email, suspended: false }`.' },
@@ -966,9 +985,10 @@ export type AuthDoor = {
   auth: Auth;
   ip: string;
   open?: boolean;
-  /* `vars` IS WHAT A LETTER MAY SAY BESIDE ITS LINK (an invitation's record and who sent it); a host that ignores them
-     sends the letter without those sentences. */
-  mail?: ((to: string, link: string, kind?: MailNotice, vars?: { record?: string; from?: string }) => void) | undefined;
+  /* `vars` IS WHAT A LETTER MAY SAY BESIDE ITS LINK (an invitation's record and who sent it, and `code`, the six digits a
+     BrainDog app takes instead of the link on a sign-in letter the app asked for); a host that ignores them sends the
+     letter without those sentences. */
+  mail?: ((to: string, link: string, kind?: MailNotice, vars?: { record?: string; from?: string; code?: string }) => void) | undefined;
   /** The clock the operator's lockout counts by. Absent, it is the platform's own. */
   now?: (() => number) | undefined;
   operator?:
@@ -1084,7 +1104,21 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
     case 'logout':
     case 'sessions':
     case 'keychain.lock':
+    case 'app.refresh':
       return { flow, sid: sid ?? '' };
+    case 'session.end':
+      return { flow, sid: sid ?? '', ref: text(body.ref) };
+    /* THE VERIFIER GOES TO THE DIRECTORY, which takes its S256 itself, so the challenge a code is looked up by is always
+       one somebody holding the verifier made. */
+    case 'app.code':
+      return {
+        flow,
+        code: text(body.code),
+        verifier: text(body.verifier),
+        ...(typeof body.label === 'string' ? { label: body.label } : {}),
+        ip,
+        ...presented,
+      };
     /* ANYTHING BUT `none` KEEPS THIS SESSION, as the Directory reads it too: a page that sent no `keep`, or a word
        this build does not know, never signs out the browser it was pressed in. */
     case 'logout.all':
@@ -1101,10 +1135,12 @@ function callOf(flow: AuthFlow, body: Record<string, unknown>, sid: string | und
     /* A CHALLENGE IS COUNTED AGAINST THE ADDRESS ASKING FOR IT (`chal:<ip>`), so the address goes with it. */
     case 'passkey.assert.options':
       return { flow, ip };
+    /* `app` IS A NATIVE APP'S DEVICE LABEL: the session it opens is an app session, listed under it. */
     case 'passkey.assert':
-      return { flow, credential: body.credential as AssertionJSON, ip, ...presented };
+      return { flow, credential: body.credential as AssertionJSON, ip, ...presented, ...(typeof body.app === 'string' ? { app: body.app } : {}) };
+    /* `app` IS A BRAINDOG APP'S PKCE CHALLENGE here, the same field `linkOf` reads for the link's `?app=`. */
     case 'magic.start':
-      return { flow, email: text(body.email), ip };
+      return { flow, email: text(body.email), ip, ...(typeof body.app === 'string' && APP_CHALLENGE.test(body.app) ? { app: body.app } : {}) };
     case 'magic.redeem':
       return typeof body.claimToken === 'string'
         ? { flow, claimToken: body.claimToken, ip, ...presented }
@@ -1233,7 +1269,7 @@ export async function serveAuth(request: Request, door: AuthDoor): Promise<Respo
   if (out.status === 200 && out.mail && door.mail) {
     const mail = out.mail;
     try {
-      if (!('kind' in mail)) door.mail(mail.to, linkOf(door.origin, mail, body.next, body.app));
+      if (!('kind' in mail)) door.mail(mail.to, linkOf(door.origin, mail, body.next, body.app), undefined, 'appCode' in mail && mail.appCode !== undefined ? { code: mail.appCode } : undefined);
       else if (mail.kind !== 'invite.prove') door.mail(mail.to, '', mail.kind);
     } catch {
       /* A failed send is the host's to report; the answer is the same either way. */

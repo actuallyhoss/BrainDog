@@ -7,7 +7,8 @@
  *
  * NOTHING THAT OPENS ANYTHING IS STORED. A session id, a link token, a challenge and a mailbox proof are 32 random
  * bytes that live in a browser, a mailbox or a ceremony; the tables hold HMAC-SHA-256 of each under the host's key,
- * with a prefix per kind (`s:`, `l:`, `c:`, `p:`) so a value minted as one can never be looked up as another.
+ * with a prefix per kind (`s:`, `l:`, `c:`, `p:`, and `a:` for an app's six-digit code with its challenge) so a value
+ * minted as one can never be looked up as another.
  * Changing the key is the fleet-wide lever `12 §8` names: every session and every link stops matching at once, and
  * no row is walked.
  *
@@ -44,7 +45,7 @@ type InviteProved = AuthBodies['invite.proved'];
  * What `log` is told: a `Why` from the verifier, or one of the Directory's own. Never an address, never a token.
  * `stale` is a session whose last proof is too old for the flow it asked for, which is not a failed sign-in.
  */
-export type Reason = Why | 'session' | 'unknown' | 'key' | 'link' | 'suspended' | 'locked' | 'reserve' | 'full' | 'stale';
+export type Reason = Why | 'session' | 'unknown' | 'key' | 'link' | 'code' | 'suspended' | 'locked' | 'reserve' | 'full' | 'stale';
 
 /**
  * What a host hands the Directory to switch sign-in on.
@@ -54,7 +55,9 @@ export type Reason = Why | 'session' | 'unknown' | 'key' | 'link' | 'suspended' 
  * it, so the host may zero its own buffer straight after.
  *
  * `rp` ABSENT MEANS NO PASSKEYS: the host decides, because only it knows whether its origin is one a browser
- * will run WebAuthn on. `magic` says the host can deliver mail. `key` is the self-host's server key, absent on
+ * will run WebAuthn on. `rp.origins` are the other origins a ceremony may come from besides `rp.origin`: on the Worker,
+ * `https://<rp.id>`, which is the origin a native app's passkey (`ASAuthorization` on the iPhone and the Mac) writes
+ * into its client data. Absent, `rp.origin` alone, which is the self-host. `magic` says the host can deliver mail. `key` is the self-host's server key, absent on
  * the Worker. `log` receives the reason for every refusal, and nothing that identifies anyone.
  *
  * `admits` IS THE RECORD'S OWN ANSWER to whether a person is on it, asked before a session is moved there. The
@@ -64,7 +67,7 @@ export type Reason = Why | 'session' | 'unknown' | 'key' | 'link' | 'suspended' 
  */
 export type AuthConfig = {
   mac: Uint8Array;
-  rp?: { id: string; origin: string };
+  rp?: { id: string; origin: string; origins?: readonly string[] };
   magic: boolean;
   key?: { serverKey: string };
   log?: (line: { flow: Flow; reason: Reason }) => void;
@@ -107,6 +110,17 @@ const CLAIM_LIFE = DAY;
 const PENDING_LIFE = DAY;
 /** The most sessions `sessions` lists for one person, newest first. Each sign-in makes one, and a list is read on a phone. */
 const SESSIONS_READ = 100;
+/**
+ * FIVE MINUTES FOR THE ID AN APP'S OWN REFRESH REPLACED, not a rotation's one. The webview, a widget, the notification
+ * extension and an intent each read the id from the shared Keychain when they start, so one already running holds the
+ * old id until its next read; five minutes covers a request that was in flight and an extension that woke just before.
+ */
+const APP_GRACE = 5 * MINUTE;
+/** An app's sign-in code: ten minutes, which is shorter than the link it rides with, and five wrong tries. */
+const APP_CODE_LIFE = 10 * MINUTE;
+const APP_CODE_TRIES = 5;
+/** What an app session is listed as when the app sent no label of its own. */
+const APP_LABEL = 'BrainDog app';
 
 /** How many strikes a lockout key takes, and over how long; the lock lasts the same length again. */
 export type Rule = { most: number; window: number };
@@ -128,6 +142,21 @@ export const SIGNUP_UNCHECKED: Rule = { most: 3, window: 60 * MINUTE };
 
 /** Every value this file mints is 32 random bytes in base64url, which is 43 characters and nothing else. */
 const MINTED = /^[A-Za-z0-9_-]{43}$/;
+/** A PKCE S256 challenge has the same shape: SHA-256 in base64url. */
+const CHALLENGE = MINTED;
+/** A PKCE verifier, as RFC 7636 spells one: 43 to 128 of its unreserved characters. */
+const VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
+
+/**
+ * Six digits, every one of the million equally likely: a 32-bit draw is redrawn when it falls in the last, short run
+ * past the largest multiple of a million, so no code is likelier than another.
+ */
+const sixDigits = (): string => {
+  const draw = new Uint32Array(1);
+  do crypto.getRandomValues(draw);
+  while (draw[0]! >= 4_294_000_000);
+  return String(draw[0]! % 1_000_000).padStart(6, '0');
+};
 
 /**
  * The lockout: reserve before compare, sticky, capped, forgetting, and cleared by a success. `49 §5.5`, amended
@@ -180,11 +209,13 @@ const mailKey = (address: string): string => `email:${mailCanon(address)}`;
 /**
  * A live session: by its id, or by the id it had until a rotation less than a minute ago, only for a person who is
  * not suspended, and only while its last proof is younger than `PROOF_LIFE` (`?3` is now minus that). `is_current`
- * says which of the two ids matched, because only the current id may rotate.
+ * says which of the two ids matched, because only the current id may rotate. `app` is an app session's device label,
+ * `null` for a browser's: the row in `dir_app_session` is always under the session's current id.
  */
 const LIVE = `SELECT s.id_hash AS id_hash, s.person AS person, s.record AS record, s.rotated_at AS rotated_at,
-       s.authed_at AS authed_at, p.email AS email, s.id_hash = ?1 AS is_current
+       s.authed_at AS authed_at, p.email AS email, s.id_hash = ?1 AS is_current, a.label AS app
   FROM dir_session s JOIN dir_person p ON p.id = s.person AND p.suspended_at IS NULL
+  LEFT JOIN dir_app_session a ON a.id_hash = s.id_hash
  WHERE (s.id_hash = ?1 OR (s.prev_hash = ?1 AND s.prev_until > ?2)) AND s.expires > ?2 AND s.authed_at > ?3`;
 
 /**
@@ -224,6 +255,7 @@ export function signInForgotten(sql: Sql, person: string, email: string): { pass
   const passkeys = count('dir_passkey');
   const sessions = count('dir_session');
   sql.exec('DELETE FROM dir_passkey WHERE person = ?', person);
+  sql.exec('DELETE FROM dir_app_session WHERE id_hash IN (SELECT id_hash FROM dir_session WHERE person = ?)', person);
   sql.exec('DELETE FROM dir_session WHERE person = ?', person);
   sql.exec('DELETE FROM dir_link WHERE person = ?', person);
   sql.exec('DELETE FROM dir_challenge WHERE person = ?', person);
@@ -254,7 +286,7 @@ export type DirectoryAuth = <C extends AuthCall | SessionAsk | SignupCall | Acco
   call: C,
 ) => Promise<AuthResult<DirectoryBodies[C['flow']]>>;
 
-type Row = { id_hash: string; person: string; record: string | null; rotated_at: number; authed_at: number; email: string; is_current: number };
+type Row = { id_hash: string; person: string; record: string | null; rotated_at: number; authed_at: number; email: string; is_current: number; app: string | null };
 type Found = { row: Row; rotated: { sid: string } | null };
 type Minted = { sid: string; hash: string };
 type Person = { id: string; email: string };
@@ -463,6 +495,15 @@ export function passkeyName(x: unknown): string | null {
 }
 
 /**
+ * An app session's device label as it is kept: `passkeyName`'s rule (one line, 64 code points, cut between whole
+ * characters), and `APP_LABEL` when the app sent nothing that leaves a word.
+ *
+ * THE APP'S WORDS AND NOT A CLAIM. A label says what the person will read in Settings; nothing decides anything on it,
+ * so it is kept as sent, as a passkey's name is.
+ */
+export const appLabel = (x: unknown): string => passkeyName(x) ?? APP_LABEL;
+
+/**
  * Names a host gives to anybody who asks, where a passkey made for the name, or for one under it, would answer at
  * sites its operator does not own: `workers.dev`, `pages.dev`, `github.io` and the hosts like them.
  */
@@ -523,7 +564,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
   /* A BLANK SERVER KEY OPENS NOTHING: its digest is the digest of a missing one. */
   const wanted: Promise<ArrayBuffer> | null = config?.key && config.key.serverKey.trim() !== '' ? crypto.subtle.digest('SHA-256', encoder.encode(config.key.serverKey)) : null;
 
-  const hmac = async (kind: 's:' | 'l:' | 'c:' | 'p:', value: string): Promise<string> => {
+  const hmac = async (kind: 's:' | 'l:' | 'c:' | 'p:' | 'a:', value: string): Promise<string> => {
     const tag = new Uint8Array(await crypto.subtle.sign('HMAC', await macKey!, encoder.encode(kind + value)));
     let out = '';
     for (const b of tag) out += b.toString(16).padStart(2, '0');
@@ -540,6 +581,10 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
 
   /** The MAC of a presented session id, or `null` when what was presented cannot be one. */
   const hashOf = async (sid: unknown): Promise<string | null> => (typeof sid === 'string' && MINTED.test(sid) ? hmac('s:', sid) : null);
+
+  /** The S256 challenge of a PKCE verifier, as the app made it: SHA-256 of its text, in base64url. `null` for no verifier. */
+  const challengeOf = async (verifier: unknown): Promise<string | null> =>
+    typeof verifier === 'string' && VERIFIER.test(verifier) ? b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(verifier)))) : null;
 
   const say = (flow: Flow, reason: Reason): void => {
     try {
@@ -617,6 +662,11 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
    * rotation due; the first moves the row and the second changes nothing, answers with the row it read, and its
    * cookie is still good for a minute as the previous id. `authed_at` is never touched: rotation is not a proof,
    * and the new expiry is never past `PROOF_LIFE` from it, so the row goes when the proof runs out.
+   *
+   * AN APP SESSION NEVER ROTATES HERE. Its one id is shared by the app's webview, its widgets, its notification
+   * extension and its intents, each reading it from the Keychain, and a rotation on read would hand the new id to
+   * whichever of them asked first and leave the rest on an id that dies a minute later. The app renews it itself, once
+   * a day, with `app.refresh`, so its expiry moves only then.
    */
   const current = async (sid: unknown, now: number): Promise<Found | null> => {
     const hash = await hashOf(sid);
@@ -627,7 +677,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
       sql.exec('DELETE FROM dir_session WHERE id_hash = ?', hash);
       return null;
     }
-    if (!row.is_current || now - Number(row.rotated_at) <= ROTATE_AFTER) return { row, rotated: null };
+    if (!row.is_current || row.app !== null || now - Number(row.rotated_at) <= ROTATE_AFTER) return { row, rotated: null };
     const next = await minted();
     const moved = sql.one(
       `UPDATE dir_session SET id_hash = ?1, prev_hash = id_hash, prev_until = ?2, rotated_at = ?3, expires = MIN(?4, authed_at + ?7)
@@ -683,13 +733,19 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
    * `LOCKOUT` for why). In the same transaction as the session, so a signed-in address and a cleared count are
    * one fact rather than two writes that can disagree.
    *
-   * AND THE DEAD ROWS GO WITH IT: expired sessions and lockout keys whose window has passed. Sign-in is the one
-   * write every host makes regularly and nobody makes a thousand times a second.
+   * AND THE DEAD ROWS GO WITH IT: expired sessions and lockout keys whose window has passed, the app labels whose
+   * session has gone by any road (a sign-out, a passkey removed, a suspension, an expiry), and app codes past their
+   * ten minutes. Sign-in is the one write every host makes regularly and nobody makes a thousand times a second.
+   *
+   * `app` MAKES IT AN APP SESSION, listed under that label and exempt from rotation on read (`current`); `null` is a
+   * browser's, as every session was.
    */
-  const open = (person: Person, presented: string | null, next: Minted, now: number, strike: string): Who => {
+  const open = (person: Person, presented: string | null, next: Minted, now: number, strike: string, app: string | null = null): Who => {
     if (presented !== null) sql.exec('DELETE FROM dir_session WHERE id_hash = ?1 OR (prev_hash = ?1 AND prev_until > ?2)', presented, now);
     sql.exec('DELETE FROM dir_fail WHERE key = ?', strike);
     sql.exec('DELETE FROM dir_session WHERE expires <= ?', now);
+    sql.exec('DELETE FROM dir_app_session WHERE id_hash NOT IN (SELECT id_hash FROM dir_session)');
+    sql.exec('DELETE FROM dir_app_code WHERE expires <= ?', now);
     sql.exec('DELETE FROM dir_fail WHERE COALESCE(until, first + ?1) <= ?2', WINDOW, now);
     const record = recordOf(person.id);
     sql.exec(
@@ -701,6 +757,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
       now,
       now,
     );
+    if (app !== null) sql.exec('INSERT INTO dir_app_session (id_hash, label, made_at) VALUES (?, ?, ?)', next.hash, app, now);
     return { person: person.id, email: person.email, record, provedAt: now };
   };
 
@@ -752,6 +809,8 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
     /* THE CLOCK IS READ ONCE, so every row one call writes shares an instant however long its awaits take. */
     const now = clock.now();
     const rp = config.rp;
+    /* EVERY ORIGIN A CEREMONY MAY COME FROM: the host's page, and those the host added (`AuthConfig.rp`). */
+    const origins: readonly string[] = rp ? [...new Set([rp.origin, ...(rp.origins ?? [])])] : [];
 
     switch (call.flow) {
       case 'methods': {
@@ -877,10 +936,10 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!cred) return rejected(flow, 'shape', keep);
         /* The challenge the browser carried is found and consumed first, so a response is good once whatever
            happens to it after. */
-        const pre = clientData(cred.clientDataJSON, { type: 'webauthn.create', origin: rp.origin });
+        const pre = clientData(cred.clientDataJSON, { type: 'webauthn.create', origin: origins });
         if (!pre.ok) return rejected(flow, pre.why, keep);
         if (!consume(await hmac('c:', pre.value.challenge), 'register', person, now)) return rejected(flow, 'challenge', keep);
-        const v = await registration(cred, { origin: rp.origin, rpId: rp.id, challenge: pre.value.challenge });
+        const v = await registration(cred, { origin: origins, rpId: rp.id, challenge: pre.value.challenge });
         if (!v.ok) return rejected(flow, v.why, keep);
         /* The id the browser reported must be the id the authenticator attested, or this is two responses spliced. */
         if (v.value.id !== cred.id) return rejected(flow, 'shape', keep);
@@ -923,15 +982,17 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         return { status: 200, body };
       }
 
+      /** `app` makes the session an app session under that label (`open`), for a passkey a native app asserted. */
       case 'passkey.assert': {
         if (!rp) return off();
         const [presented, next] = await Promise.all([hashOf(call.sid), minted()]);
+        const app = call.app === undefined ? null : appLabel(call.app);
         const strike = `ip:${text(call.ip)}`;
         const stop = reserve(flow, strike, now);
         if (stop) return stop;
         const cred = asserted(call.credential);
         if (!cred) return rejected(flow, 'shape');
-        const pre = clientData(cred.clientDataJSON, { type: 'webauthn.get', origin: rp.origin });
+        const pre = clientData(cred.clientDataJSON, { type: 'webauthn.get', origin: origins });
         if (!pre.ok) return rejected(flow, pre.why);
         if (!consume(await hmac('c:', pre.value.challenge), 'assert', null, now)) return rejected(flow, 'challenge');
         const held = sql.one<{ person: string; jwk: string; alg: number; sign_count: number }>(
@@ -940,7 +1001,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         );
         if (!held) return rejected(flow, 'unknown');
         const v = await assertion(cred, {
-          origin: rp.origin,
+          origin: origins,
           rpId: rp.id,
           challenge: pre.value.challenge,
           jwk: JSON.parse(held.jwk) as PublicJwk,
@@ -962,7 +1023,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
             cred.id,
             held.sign_count,
           );
-          return moved ? open(person, presented, next, now, strike) : 'count';
+          return moved ? open(person, presented, next, now, strike, app) : 'count';
         });
         if (typeof outcome === 'string') return rejected(flow, outcome);
         return { status: 200, body: outcome, session: { sid: next.sid } };
@@ -978,12 +1039,21 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
        * AND SO DOES A MAILBOX THAT HAS HAD ITS FILL. The `email:` key is reserved only once a person is found, so a
        * 429 from it would be a 429 only a known address could earn, and that is the account oracle again. A full
        * count is the same 200 with no mail; the links already sent still work, and spending one clears the count.
+       *
+       * A BRAINDOG APP'S LINK CARRIES A CODE TOO. With `app`, the app's PKCE challenge, six digits are minted beside the
+       * link, bound to the challenge and to the link (`dir_app_code`), and mailed with it as `appCode`, for a letter
+       * opened on a device other than the one the app is on: the person types the six digits in the app, and only the
+       * app holding the verifier can spend them (`app.code`). ONE ROW PER CHALLENGE: asking again from the same window
+       * replaces the code, and the earlier link still works alone. The code and its MAC are made before the address is
+       * looked up, as the link's are, so a known address takes no longer to answer than an unknown one.
        */
       case 'magic.start': {
         if (!config.magic) return off();
         const email = text(call.email).trim();
         const linkToken = fresh();
-        const hash = await hmac('l:', linkToken);
+        const challenge = typeof call.app === 'string' && CHALLENGE.test(call.app) ? call.app : null;
+        const appCode = challenge === null ? null : sixDigits();
+        const [hash, codeMac] = await Promise.all([hmac('l:', linkToken), appCode === null ? null : hmac('a:', `${challenge}.${appCode}`)]);
         const stop = reserve(flow, `mint:${text(call.ip)}`, now);
         if (stop) return stop;
         const person = email.includes('@')
@@ -998,8 +1068,19 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         sql.transactionSync(() => {
           sql.exec('DELETE FROM dir_link WHERE expires <= ?', now);
           sql.exec('INSERT INTO dir_link (hash, person, purpose, expires) VALUES (?, ?, ?, ?)', hash, person.id, 'magic', now + MAGIC_LIFE);
+          if (challenge !== null && codeMac !== null) {
+            sql.exec('DELETE FROM dir_app_code WHERE expires <= ?', now);
+            sql.exec(
+              `INSERT INTO dir_app_code (challenge, code_mac, link_hash, tries, expires) VALUES (?, ?, ?, 0, ?)
+               ON CONFLICT (challenge) DO UPDATE SET code_mac = excluded.code_mac, link_hash = excluded.link_hash, tries = 0, expires = excluded.expires`,
+              challenge,
+              codeMac,
+              hash,
+              now + APP_CODE_LIFE,
+            );
+          }
         });
-        return { status: 200, body: {}, mail: { to: person.email, linkToken } };
+        return { status: 200, body: {}, mail: { to: person.email, linkToken, ...(appCode === null ? {} : { appCode }) } };
       }
 
       /**
@@ -1011,9 +1092,13 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
        *
        * ONLY THE ASKING ADDRESS IS STRUCK, NEVER THE MAILBOX. A link already sent is always worth spending, and
        * spending it clears the mailbox's count of mails sent (`LOCKOUT`), so the person it reached can ask again.
+       *
+       * AND ITS APP CODE GOES WITH IT, so the link and the six digits mailed beside it are one use between them. `app`
+       * (a sign-in link only, spent by a BrainDog app through `/auth/app`) opens an app session under that label.
        */
       case 'magic.redeem': {
         const claim = 'claimToken' in call;
+        const app = 'linkToken' in call && call.app !== undefined ? appLabel(call.app) : null;
         const token = 'claimToken' in call ? call.claimToken : call.linkToken;
         const [presented, next, hash] = await Promise.all([
           hashOf(call.sid),
@@ -1032,13 +1117,59 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
             now,
           );
           if (!link) return 'link';
+          sql.exec('DELETE FROM dir_app_code WHERE link_hash = ?', hash);
           const person = livePerson(link.person);
           if (!person) return 'suspended';
           sql.exec('DELETE FROM dir_fail WHERE key = ?', mailKey(person.email));
-          return open(person, presented, next, now, strike);
+          return open(person, presented, next, now, strike, app);
         });
         if (typeof outcome === 'string') return rejected(flow, outcome);
         return { status: 200, body: outcome, session: { sid: next.sid } };
+      }
+
+      /**
+       * The six digits a sign-in letter carried for a BrainDog app, typed in that app (`/auth/app/code`).
+       *
+       * THREE THINGS MUST AGREE: the verifier, whose S256 is the challenge the code was minted for, so only the app that
+       * asked can spend it; the code, compared as a MAC in constant time; and the link it was mailed with, still unspent,
+       * which goes in the same transaction, so the link and the code are one use between them.
+       *
+       * STRUCK TWICE OVER. The asking address pays a strike before anything is compared, as every sign-in does
+       * (`reserve`), and each wrong code is counted on its row: the fifth wrong one deletes it, so a million codes are
+       * never five guesses from a lucky one. Every miss is the one 401, whatever it missed on.
+       */
+      case 'app.code': {
+        const typed = text(call.code).replace(/[\s-]/g, '');
+        const [presented, next, challenge] = await Promise.all([hashOf(call.sid), minted(), challengeOf(call.verifier)]);
+        const given = challenge !== null && /^\d{6}$/.test(typed) ? await hmac('a:', `${challenge}.${typed}`) : null;
+        const strike = `ip:${text(call.ip)}`;
+        const stop = reserve(flow, strike, now);
+        if (stop) return stop;
+        if (challenge === null || given === null) return rejected(flow, 'shape');
+        const label = appLabel(call.label);
+        const outcome = sql.transactionSync((): Who | Reason => {
+          const row = sql.one<{ code_mac: string; link_hash: string; tries: number }>(
+            'SELECT code_mac, link_hash, tries FROM dir_app_code WHERE challenge = ? AND expires > ?',
+            challenge,
+            now,
+          );
+          if (!row) return 'link';
+          if (!same(encoder.encode(given), encoder.encode(row.code_mac))) {
+            const tries = Number(row.tries) + 1;
+            if (tries >= APP_CODE_TRIES) sql.exec('DELETE FROM dir_app_code WHERE challenge = ?', challenge);
+            else sql.exec('UPDATE dir_app_code SET tries = ? WHERE challenge = ?', tries, challenge);
+            return 'code';
+          }
+          sql.exec('DELETE FROM dir_app_code WHERE challenge = ?', challenge);
+          const link = sql.one<{ person: string }>("DELETE FROM dir_link WHERE hash = ? AND purpose = 'magic' AND expires > ? RETURNING person", row.link_hash, now);
+          if (!link) return 'link';
+          const person = livePerson(link.person);
+          if (!person) return 'suspended';
+          sql.exec('DELETE FROM dir_fail WHERE key = ?', mailKey(person.email));
+          return open(person, presented, next, now, strike, label);
+        });
+        if (typeof outcome === 'string') return rejected(flow, outcome);
+        return { status: 200, body: {}, session: { sid: next.sid } };
       }
 
       /**
@@ -1155,6 +1286,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
        *
        * NO ROW'S MAC LEAVES WHOLE. `ref` is its first twelve hex, enough for a person to tell two sessions apart
        * and useless as a cookie: a MAC is never looked up as an id, and twelve characters of one match nothing.
+       * An app session carries its device label as `device`.
        */
       case 'sessions': {
         const found = await current(call.sid, now);
@@ -1162,10 +1294,11 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         const mine = await hashNow(found);
         const body = {
           sessions: sql
-            .all<{ id_hash: string; record: string | null; authed_at: number; rotated_at: number }>(
-              `SELECT id_hash, record, authed_at, rotated_at FROM dir_session
-                WHERE person = ? AND expires > ? AND authed_at > ?
-                ORDER BY rotated_at DESC, id_hash LIMIT ?`,
+            .all<{ id_hash: string; record: string | null; authed_at: number; rotated_at: number; device: string | null }>(
+              `SELECT s.id_hash AS id_hash, s.record AS record, s.authed_at AS authed_at, s.rotated_at AS rotated_at, a.label AS device
+                 FROM dir_session s LEFT JOIN dir_app_session a ON a.id_hash = s.id_hash
+                WHERE s.person = ? AND s.expires > ? AND s.authed_at > ?
+                ORDER BY s.rotated_at DESC, s.id_hash LIMIT ?`,
               found.row.person,
               now,
               now - PROOF_LIFE,
@@ -1178,6 +1311,7 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
                 authedAt: Number(s.authed_at),
                 activeAt: Number(s.rotated_at),
                 record: s.record,
+                ...(s.device === null ? {} : { device: s.device }),
               }),
             ),
         };
@@ -1210,6 +1344,92 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
           return n;
         });
         return { status: 200, body: { ended }, ...(all ? { session: 'clear' as const } : carry(found)) };
+      }
+
+      /**
+       * End one of this person's sessions, by the `ref` `sessions` listed it under (Settings, the iPhone's End).
+       *
+       * BY THE ID IT HAS NOW OR THE ONE IT HAD BEFORE ITS LAST ROTATION, because a `ref` is read off a list that may be
+       * a day old and a rotation in between changes it; a row keeps its previous id until its next rotation, so the list
+       * the person is looking at still names it. Only the person's own rows are asked, so a `ref` of somebody else's
+       * session ends nothing and says nothing about it. NONE FOUND IS A 422 and not a quiet `0`, so the page reads the
+       * list again rather than say something was ended that is still signed in.
+       *
+       * THIS SESSION TOO, AND THEN IT IS A SIGN-OUT: the row goes and the cookie is cleared on the same answer, so the
+       * app that ended its own session holds nothing that still names one.
+       */
+      case 'session.end': {
+        const found = await current(call.sid, now);
+        if (!found) return rejected(flow, 'session', { session: 'clear' });
+        const ref = text(call.ref).trim().toLowerCase();
+        const gone: AuthResult = {
+          status: 422,
+          refusal: { code: 'OUT_OF_BOUNDS', fix: 'That session is not signed in any more, or it changed since the list was read. Read the list again.', at: 'ref' },
+          ...carry(found),
+        };
+        if (!/^[0-9a-f]{12}$/.test(ref)) return gone;
+        const mine = await hashNow(found);
+        const person = found.row.person;
+        const ended = sql.transactionSync((): string[] => {
+          const rows = sql
+            .all<{ id_hash: string }>(
+              'SELECT id_hash FROM dir_session WHERE person = ?1 AND (substr(id_hash, 1, 12) = ?2 OR substr(prev_hash, 1, 12) = ?2)',
+              person,
+              ref,
+            )
+            .map((r) => r.id_hash);
+          for (const hash of rows) {
+            sql.exec('DELETE FROM dir_app_session WHERE id_hash = ?', hash);
+            sql.exec('DELETE FROM dir_session WHERE id_hash = ?', hash);
+          }
+          return rows;
+        });
+        if (ended.length === 0) return gone;
+        return { status: 200, body: { ended: ended.length }, ...(ended.includes(mine) ? { session: 'clear' as const } : carry(found)) };
+      }
+
+      /**
+       * An app session renewed by the app, once a day (`/auth/app/refresh`): what a rotation on read does for a browser.
+       *
+       * A COMPARE-AND-SET ON `rotated_at`, as a rotation is, and the label moves to the new id in the same transaction.
+       * The old id stays good for `APP_GRACE`, five minutes, for the extensions still holding it; the expiry is renewed
+       * as a rotation renews it, `LIFE` from now and never past `PROOF_LIFE` from the last proof.
+       *
+       * FROM THE PREVIOUS ID TOO, WHILE IT IS STILL GOOD. A refresh whose answer was lost on the way leaves the app
+       * holding the id it sent; refusing that one would sign the app out five minutes later. The row moves on from
+       * the id it now has, and the one before that is gone. Two refreshes of one row at once move it once, and the
+       * second is a 503 the app tries again.
+       *
+       * A BROWSER'S SESSION IS REFUSED, because it rotates itself on read; a rotation that falls due here still rides
+       * on the refusal.
+       */
+      case 'app.refresh': {
+        const [found, next] = await Promise.all([current(call.sid, now), minted()]);
+        if (!found) return rejected(flow, 'session', { session: 'clear' });
+        if (found.row.app === null)
+          return {
+            status: 403,
+            refusal: { code: 'FORBIDDEN', fix: 'Only the BrainDog app renews its session this way. A browser renews its own as it is used.', at: 'session' },
+            ...carry(found),
+          };
+        const moved = sql.transactionSync((): boolean => {
+          const row = sql.one(
+            `UPDATE dir_session SET id_hash = ?1, prev_hash = id_hash, prev_until = ?2, rotated_at = ?3, expires = MIN(?4, authed_at + ?7)
+              WHERE id_hash = ?5 AND rotated_at = ?6 RETURNING id_hash`,
+            next.hash,
+            now + APP_GRACE,
+            now,
+            now + LIFE,
+            found.row.id_hash,
+            found.row.rotated_at,
+            PROOF_LIFE,
+          );
+          if (!row) return false;
+          sql.exec('UPDATE dir_app_session SET id_hash = ? WHERE id_hash = ?', next.hash, found.row.id_hash);
+          return true;
+        });
+        if (!moved) return { status: 503 };
+        return { status: 200, body: {}, session: { sid: next.sid } };
       }
 
       /**
