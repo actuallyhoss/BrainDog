@@ -261,6 +261,13 @@ const ownWordsPlugin: Plugin = {
  * still names it among the layout's modulepreloads and it arrives in the same wave as before. `svelte:element` is one of
  * them because it imports `transitions.js`; left in the shared chunk it would pull this chunk back into the entry.
  *
+ * AND THE KEYED LISTS AND AN ELEMENT'S ATTRIBUTES (speed5, 2 Nov): `{#each}` and `set_attribute`, `class`, `style` with
+ * `clsx` under them are on every screen and in nothing Kit's client or `root.svelte` runs, and they were 3.4 KB brotli of
+ * the entry, which read 33,854 against its 33,864 line on any build whose hashes happened to brotli worse. Out, the entry
+ * is 30,492 and the first load the same 307.0 KB. Tried and left in: `custom-element` (the app entry grew by more than it
+ * saved), `snippet`, `legacy-client`, `hydratable`, the `select` and `window` bindings and attachments, each of which the
+ * entry calls and so pulled the whole chunk back into it.
+ *
  * THREE THINGS MAKE IT HOLD. The modules are marked free of side effects (their top level declares and nothing more), or
  * the barrel would keep a bare import of this chunk to run them in order. The group takes only these modules, not what
  * they import, since that is the runtime itself. And taking only them needs `preserveEntrySignatures` looser than Kit's
@@ -268,7 +275,7 @@ const ownWordsPlugin: Plugin = {
  * only; the server build is untouched.
  */
 const ROUTE_RUNTIME =
-  /[\\/]svelte[\\/]src[\\/]internal[\\/]client[\\/](?:loop|dom[\\/]elements[\\/](?:transitions|actions|bindings[\\/](?:input|size|universal))|dom[\\/]blocks[\\/](?:svelte-element|await|svelte-head|key))\.js$/u;
+  /[\\/]svelte[\\/]src[\\/]internal[\\/](?:client[\\/](?:loop|dom[\\/]elements[\\/](?:transitions|actions|attributes|class|style|bindings[\\/](?:input|size|universal))|dom[\\/]blocks[\\/](?:svelte-element|await|svelte-head|key|each))|shared[\\/]attributes)\.js$|[\\/]clsx[\\/]dist[\\/]clsx\.mjs$/u;
 const routeRuntimePlugin: Plugin = {
   name: 'braindog:route-runtime',
   apply: 'build',
