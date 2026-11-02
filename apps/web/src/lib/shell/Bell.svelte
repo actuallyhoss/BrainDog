@@ -45,6 +45,7 @@
 
   const words = {
     title: 'Notifications',
+    forYou: 'For you',
     named: (n: number) => (n === 0 ? 'Notifications' : `Notifications, ${n.toLocaleString('en')} new`),
     none: 'Nothing new',
     noneWhy: 'What agents and people change on your record shows up here.',
@@ -112,7 +113,10 @@
   const told = $derived<(BellLine & { old?: true })[]>([...news, ...seenBefore]);
   /* READ ONCE EACH TIME IT OPENS, so "5m" is the time when he looked. */
   let now = $state(Date.now());
-  const days = $derived(bellDays(told, new Date(now)));
+  /* WHAT IS YOURS, FIRST AND ONCE: kept out of the days below so it is not said twice. */
+  /* ONE LINE A THING: what is new and what was read before can both carry it, said by two names for one person. */
+  const forYou = $derived(told.filter((l, i) => l.you !== undefined && told.findIndex((o) => o.you !== undefined && o.href === l.href && o.at === l.at) === i).slice(0, 8));
+  const days = $derived(bellDays(told.filter((l) => l.you === undefined), new Date(now)));
 
   let open = $state(false);
   /** On the page, which is longer than open: from the opening to the end of its close. */
@@ -238,6 +242,25 @@
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div class="bell-body" data-bell-body={uid} onclick={onClick}>
     {#if SentTray}<SentTray />{/if}
+    {#if forYou.length > 0}
+      <!-- FOR YOU LEADS (collab pass, 2 Nov): a row somebody gave you, a comment that names you. -->
+      <section class="bell-day" aria-labelledby="{uid}-you">
+        <div class="bell-day-row"><h3 class="bell-day-head" id="{uid}-you">{words.forYou}</h3></div>
+        <ul class="bell-lines">
+          {#each forYou as l, i (i)}
+            {@const isNew = l.old !== true && unread(l)}
+            <li>
+              <a class="bell-row" data-bell-item data-unread={isNew ? '' : undefined} data-you="" href={at(l.href)}>
+                <span class="bell-new" aria-hidden="true"></span>
+                <span class="bell-kind" aria-hidden="true"><Icon name={l.you === 'mentioned' ? 'ask' : 'user-check'} size="m" /></span>
+                <span class="bell-said" dir="auto">{#if isNew}<span class="sr-only">{words.unread}</span>{/if}{l.text}</span>
+                <time class="bell-ago num" datetime={l.at}>{agoOf(l.at, now)}</time>
+              </a>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
     {#if nowLines.length > 0}
       <section class="bell-day" aria-labelledby="{uid}-now">
         <div class="bell-day-row"><h3 class="bell-day-head" id="{uid}-now">{words.now}</h3></div>
@@ -277,7 +300,7 @@
         </ul>
       </section>
     {:else}
-      {#if nowLines.length === 0}
+      {#if nowLines.length === 0 && forYou.length === 0}
       <div class="bell-none">
         <span class="bell-none-mark" aria-hidden="true"><Icon name="bell" size="m" /></span>
         <p class="bell-none-said">{words.none}</p>

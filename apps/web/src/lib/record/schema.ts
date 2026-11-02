@@ -783,7 +783,8 @@ export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'heat
 export { REDUCES } from '@braindog/kernel/constants';
 
 /** `asked`: the line is a question put to the reader, which Needs you holds and the bell does not. */
-export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info'; asked?: true };
+/* `you` (collab pass, 2 Nov): the line is about the reader, a row given them or a comment naming them (`EventLine.you`). */
+export type NewsItem = { at: string; by: string; text: string; href: string; tone?: 'good' | 'warn' | 'bad' | 'info'; asked?: true; you?: 'assigned' | 'mentioned' };
 
 /**
  * The person ladder, closed at five: `read ⊂ append ⊂ write ⊂ decide ⊂ owner` (`20 §1`).

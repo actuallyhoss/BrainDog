@@ -52,10 +52,10 @@ function plain(line: string, year: number): string {
 type Tone = 'good' | 'warn' | 'bad' | 'info';
 
 /** One line of the bell: what happened, where it goes, how many times, when it last did (`at`) and how it went. */
-export type BellLine = { text: string; href: string; n: number; at: string; tone?: Tone | undefined };
+export type BellLine = { text: string; href: string; n: number; at: string; tone?: Tone | undefined; you?: 'assigned' | 'mentioned' | undefined };
 
 /** WHAT HAPPENED, EACH LINE ONCE: the same line twice is one, with how many times it happened, at its newest time. */
-export function bellLines<N extends { text: string; href: string; asked?: true | undefined; at?: string; tone?: Tone | undefined }>(news: readonly N[]): BellLine[] {
+export function bellLines<N extends { text: string; href: string; asked?: true | undefined; at?: string; tone?: Tone | undefined; you?: 'assigned' | 'mentioned' | undefined }>(news: readonly N[]): BellLine[] {
   const out: BellLine[] = [];
   for (const item of happened(news)) {
     const text = bellSaid(item.text);
@@ -67,7 +67,7 @@ export function bellLines<N extends { text: string; href: string; asked?: true |
     if (same) {
       same.n += 1;
       if (Date.parse(at) > Date.parse(same.at)) same.at = at;
-    } else out.push({ text, href: item.href, n: 1, at, ...(item.tone ? { tone: item.tone } : {}) });
+    } else out.push({ text, href: item.href, n: 1, at, ...(item.tone ? { tone: item.tone } : {}), ...(item.you ? { you: item.you } : {}) });
   }
   return out;
 }

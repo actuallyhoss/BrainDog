@@ -24,6 +24,10 @@ export const data = {
   /** Who did it and what to, in a `feed` block on a live record: "You", "Someone", "installed the Team board use case". */
   /** The making of a BrainDog, its owner, add-ons and the person it is for, as one line of the feed. */
   feedMade: 'Your BrainDog was made',
+  /* WHAT IS THE READER'S (collab pass, 2 Nov): a row given them, a comment naming them. */
+  feedGaveYou: (by: string, title: string) => `${by} gave you ${title}`,
+  feedMentionedYou: (by: string, title: string | null, note: string) =>
+    `${by} mentioned you${title ? ` on ${title}` : ''}: ${note.length > 90 ? `${note.slice(0, 89)}…` : note}`,
   /** A decision in the feed, with the reason it was given when there is one. */
   feedDecided: (title: string, reason: string | null) => (reason ? `Decided: ${title}${/[.?!]$/u.test(title) ? '' : '.'} ${reason}` : `Decided: ${title}`),
   /**

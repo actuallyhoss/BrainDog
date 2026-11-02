@@ -47,7 +47,7 @@ import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import { NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
-import { PUSH_KINDS, SAID_MOST, mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
+import { PUSH_KINDS, SAID_MOST, mayOf, openInstructions, shareMeOf, type Instr, type Profile, type Stop } from '@braindog/kernel';
 import { OWN_RUN, nameMid, personNamed, stopLine, toldOf, toldTo, type Told } from './methods/instructions.ts';
 import { saysOf } from './methods/agent-profile.ts';
 import type { Grant, InvitationRow } from '@braindog/kernel';
@@ -1752,6 +1752,12 @@ export type EventLine = Omit<LogLine, 'rowid'> & {
   made?: true;
   /** What the thing is called: a row's title, or a question. */
   title: string | null;
+  /**
+   * WHETHER THIS LINE IS ABOUT THE READER (collab pass, 2 Nov): `assigned` when somebody else put a row on one of the
+   * reader's own People rows (the rows their sign-in address names, as a share's `$me` does), `mentioned` when somebody
+   * else's comment names them with an @. So the bell can lead with what is theirs. Left out on every other line.
+   */
+  you?: 'assigned' | 'mentioned';
   /**
    * On the one line a pass of BrainDog's own update is said as (kind `update`): its sentence and counts, with
    * every line it wrote under it as `steps`, newest first, each still undone on its own.
@@ -9857,6 +9863,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { ...news, events: lines(news.events) };
   };
 
+  /**
+   * WHICH LINES ARE ABOUT THE READER (collab pass, 2 Nov): a row put on one of their own People rows by somebody else, or a
+   * comment by somebody else naming them with an @ (their first name or their whole name). Their People rows are the ones
+   * their sign-in address names (`shareMeOf`, a share's `$me`). Asked once a page; a reader with no person is nobody.
+   */
+  const youOf = (ctx: CallContext): ((line: EventLine) => 'assigned' | 'mentioned' | null) => {
+    const p = ctx.principal;
+    const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
+    if (person === null) return () => null;
+    const rows = new Set(shareMeOf(sql, person, kernel.meetsList()?.register ?? null));
+    const name = (sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', person)?.name ?? '').trim();
+    const esc = (t: string): string => t.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+    const first = name.split(/\s+/u)[0] ?? '';
+    const at = name === '' ? null : new RegExp(`(^|[^\\p{L}\\p{N}])@(${[esc(name), esc(first)].filter((x) => x !== '').join('|')})(?![\\p{L}\\p{N}])`, 'iu');
+    return (line) => {
+      if (line.actor === person) return null;
+      if (line.target_kind === 'entry' && (line.kind === 'edit' || line.kind === 'update') && typeof line.to === 'string' && rows.has(line.to)) return 'assigned';
+      if (line.kind === 'note' && at !== null && typeof line.note === 'string' && (line.field === 'comment' || String(line.field ?? '').startsWith('reply:')) && at.test(line.note))
+        return 'mentioned';
+      return null;
+    };
+  };
+
   const newsFor = (ctx: CallContext, cursor?: number, everything = false): WhatsNew => {
     const reader = readerOf(ctx);
     const muted = mutesOf(ctx);
@@ -9866,7 +9895,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const events = lines.slice(0, NEWS);
     /* WHAT THE MAKING WROTE IS SAID SO (PK1), read once for the page. */
     const spans = madeSpans(kernel);
-    const marked = (line: Walked): Walked => (spans.length > 0 && madeLine(spans, line) ? { ...line, made: true } : line);
+    const yours = youOf(ctx);
+    const marked = (line: Walked): Walked => {
+      const made = spans.length > 0 && madeLine(spans, line) ? { ...line, made: true as const } : line;
+      const you = yours(made);
+      return you === null ? made : { ...made, you };
+    };
     return {
       /* AND WHO SUGGESTED, DRAFTED AND SETTLED, read once for the page (`settling.ts`). */
       events: withSettling(sql, events).map((line) => shown(ctx, marked(line))),
@@ -17085,7 +17119,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       let below: Cursor | null = null;
       if (lines.length > limit) below = last ? pointAt(ctx, last) : null;
       else if (next !== null) below = holdsRowids(ctx) ? next : await cursors.seal(next);
-      return ok({ events: withSettling(sql, events).map((line) => shown(ctx, line)), cursor: below, byWho: byWhoOf(events, readerOf(ctx)) });
+      const yours = youOf(ctx);
+      return ok({
+        events: withSettling(sql, events).map((line) => ((you) => shown(ctx, you === null ? line : { ...line, you }))(yours(line))),
+        cursor: below,
+        byWho: byWhoOf(events, readerOf(ctx)),
+      });
     },
 
     /**
