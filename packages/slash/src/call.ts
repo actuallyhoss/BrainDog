@@ -503,6 +503,7 @@ const KINDS: Readonly<Record<PromptId, CallKind>> = {
   mapping: 'read',
   chat: 'read',
   turn: 'read',
+  drafts: 'read',
 };
 
 /** A throw the host marked as a ceiling saying no before anything was sent: true of every candidate after it too. */

@@ -128,13 +128,17 @@ export function madeSteps(lists: readonly KeptList[], arrivesBy?: ArrivesBy): Ma
 /** Where sign-up leaves the words and what they built, in the tab the made screen opens in. */
 export const MADE_SAID = 'braindog.made.said';
 
-/** What the made screen is handed: the words as kept, and the entries the build wrote from them. */
-export type SaidMade = { said: string; built: { register: string; fields: Record<string, unknown> }[] };
+/**
+ * What the made screen is handed: the words as kept, the entries the build wrote from them, and the use case it was made
+ * as, by id, so the read after the build is told the kind in one line (onboarding11).
+ */
+export type SaidMade = { said: string; built: { register: string; fields: Record<string, unknown> }[]; kind?: string | null };
 
 /** The words and what they built, as kept: at most 2,000 characters and twenty entries, as the first run reads them. */
-export const saidMade = (said: string, rows: readonly { register: string; fields: Record<string, unknown> }[]): SaidMade => ({
+export const saidMade = (said: string, rows: readonly { register: string; fields: Record<string, unknown> }[], kind: string | null = null): SaidMade => ({
   said: said.trim().slice(0, 2000),
   built: rows.slice(0, 20).map((r) => ({ register: r.register, fields: r.fields })),
+  ...(kind !== null && kind !== '' ? { kind: kind.slice(0, 64) } : {}),
 });
 
 /** The words handed over, read back off what was kept, or `null` when it is not that. */
@@ -142,14 +146,14 @@ export function saidMadeOf(raw: string | null): SaidMade | null {
   try {
     const v = JSON.parse(raw ?? 'null') as unknown;
     if (typeof v !== 'object' || v === null) return null;
-    const { said, built } = v as { said?: unknown; built?: unknown };
+    const { said, built, kind } = v as { said?: unknown; built?: unknown; kind?: unknown };
     if (typeof said !== 'string' || said.trim() === '' || !Array.isArray(built)) return null;
     const rows = built.flatMap((r): SaidMade['built'] =>
       typeof r === 'object' && r !== null && typeof (r as { register?: unknown }).register === 'string' && typeof (r as { fields?: unknown }).fields === 'object' && (r as { fields?: unknown }).fields !== null
         ? [{ register: (r as { register: string }).register, fields: (r as { fields: Record<string, unknown> }).fields }]
         : [],
     );
-    return saidMade(said, rows);
+    return saidMade(said, rows, typeof kind === 'string' ? kind : null);
   } catch {
     return null;
   }

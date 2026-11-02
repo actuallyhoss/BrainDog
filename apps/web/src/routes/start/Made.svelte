@@ -104,6 +104,7 @@
           base,
           said: s.said,
           built: s.built,
+          kind: s.kind ?? null,
           registers: [...new Set([...declared, ...held, ...installed])],
           /* AND THE ONE SIGN-UP SAID, where the record keeps none of its own (AP9). */
           currency: boot.currency ?? boot.record?.currency ?? currencyGuessed(base),

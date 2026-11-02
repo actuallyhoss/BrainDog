@@ -25,6 +25,8 @@ export type Begin = {
   said: string;
   /** What the build already wrote from the same words, never offered again. */
   built: { register: string; fields: Record<string, unknown> }[];
+  /** The use case it was made as, by id, told to the model in words (`kindSaid`). */
+  kind?: string | null;
   /** The lists this BrainDog holds, by id. */
   registers: string[];
   currency: string | null;
@@ -156,11 +158,17 @@ async function read(b: Begin, at = Date.now()): Promise<void> {
     if (!over()) set({ ...firstDrafts.now!, state: 'none' });
   }, left + 250);
   try {
-    const [{ draftOffer, draftsOf, modulesHeld, renamesOf, summaryOf }, { slashAsks }] = await Promise.all([import('./first-drafts.ts'), import('./ask.ts')]);
+    const [{ draftOffer, draftsOf, kindSaid, modulesHeld, renamesOf, summaryOf }, { slashAsks }] = await Promise.all([import('./first-drafts.ts'), import('./ask.ts')]);
     const modules = modulesHeld(b.registers);
     if (over()) return;
     if (modules.length === 0) return void set({ ...firstDrafts.now!, state: 'none' });
-    const out = await slashAsks(b.base, undefined, Math.max(1_000, at + FIRST_DRAFTS_MS - Date.now())).setup({ said: b.said, offer: draftOffer(modules), today: b.today, first: true });
+    const out = await slashAsks(b.base, undefined, Math.max(1_000, at + FIRST_DRAFTS_MS - Date.now())).setup({
+      said: b.said,
+      offer: draftOffer(modules),
+      today: b.today,
+      first: true,
+      ...(b.kind ? { kind: kindSaid(b.kind) } : {}),
+    });
     /* MOVED ON TO ANOTHER BRAINDOG MEANWHILE, OR PAST THE DEADLINE: what came back is not this one's to show. */
     if (over() || firstDrafts.now === null) return;
     if (!out.ok) return void set({ ...firstDrafts.now, state: 'none' });

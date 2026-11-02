@@ -1044,6 +1044,11 @@ export type SetupAsk = {
    * at and the next question, in about fifty tokens on a fast model. The whole reading (`setup`) is asked without it.
    */
   quick?: boolean;
+  /**
+   * WHAT THE BRAINDOG WAS MADE AS, IN WORDS ("Personal", "Shop"), for the read after the build (`first`, the `drafts`
+   * template): one line in place of every use case, so a household is still read as one.
+   */
+  kind?: string;
 };
 
 /** The setup the model proposed, every id one it was offered and every phrase one the person typed. */
@@ -1295,6 +1300,7 @@ export const setupAskOf = (raw: unknown): SetupAsk => {
     ...(r['first'] === true ? { first: true } : {}),
     ...(asked === '' ? {} : { asked }),
     ...(r['quick'] === true ? { quick: true } : {}),
+    ...(typeof r['kind'] === 'string' && r['kind'].trim() !== '' ? { kind: oneLine(r['kind'], 80) } : {}),
   };
 };
 
@@ -1443,7 +1449,7 @@ const listLines = (lists: readonly MappingList[]): string =>
   lists.map((l) => `${l.id} (${l.name}): ${l.fields.map((f) => `${f.id}:${f.type}${f.values && f.values.length > 0 ? `[${f.values.join('/')}]` : ''}`).join(' · ')}`).join('\n');
 
 /** One model call for a first-run template, answering the checked object and the name it ran under, or the refusal. */
-type Asking = (id: 'setup' | 'turn', question: string, slots: Record<string, string>) => Promise<Result<{ value: Record<string, unknown>; by: string }>>;
+type Asking = (id: 'setup' | 'turn' | 'drafts', question: string, slots: Record<string, string>) => Promise<Result<{ value: Record<string, unknown>; by: string }>>;
 
 /**
  * THE STORE-FREE STEP FROM A SENTENCE TO A READING, which both doors take: the ask as the browser or the host handed it,
@@ -1469,6 +1475,20 @@ const setupStep = async (raw: SetupAsk, asking: Asking): Promise<Result<SetupAns
       '%KNOWN%': fenced('known', knownLines(said)),
     });
     return out.ok ? ok(turnOf(out.value.value, { ...ask, said }, out.value.by)) : out;
+  }
+  /* THE READ AFTER THE BUILD (`first`) IS THE SHORT ONE (`drafts`): the entries, the lists' names and a sentence, read
+     against the lists this BrainDog keeps and the kind it was made as. Nothing else of a reading is asked. */
+  if (ask.first === true) {
+    const out = await asking('drafts', firstBytes(said, ASK_BYTES), {
+      '%MODULES%': moduleLines(ask.offer),
+      '%KIND%': ask.kind === undefined ? 'not said' : JSON.stringify(ask.kind),
+      '%TODAY%': ask.today === '' ? 'not said' : ask.today,
+      '%SAID%': fenced('said', said),
+    });
+    if (!out.ok) return out;
+    const v = out.value.value;
+    const reading = { name: null, usecase: null, also: [], modules: [], currency: null, heard: [], draft: null, ask: null, summary: v['summary'], names: v['names'], rows: v['rows'] };
+    return ok(setupOf(reading, { ...ask, said }, out.value.by));
   }
   const out = await asking('setup', firstBytes(said, ASK_BYTES), {
     '%USECASES%': caseLines(ask.offer),
@@ -1559,7 +1579,7 @@ export const setups = (core: Core, fallback: Inference): Setups => {
 
   /** Hold, ask, settle: the one path both asks take, answering the checked object or the refusal the ledger kept. */
   const asked = async (
-    id: 'setup' | 'mapping' | 'turn',
+    id: 'setup' | 'mapping' | 'turn' | 'drafts',
     question: string,
     slots: Record<string, string>,
     inference: Inference | undefined,

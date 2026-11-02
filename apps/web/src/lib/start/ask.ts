@@ -53,7 +53,7 @@ export type SetupOffer = {
 /** `first`: the owner's sign-up words, read once after the build on the house, never one of the month's asks. */
 /** `asked`: the conversation's questions so far, one a line as `about: question` (`lib/start/chat.ts` `askedLines`). */
 /** `quick`: one turn of the conversation, read short and fast (`turn`), never the whole reading. */
-export type SetupAsked = { said: string; offer: SetupOffer; today: string; first?: boolean; asked?: string; quick?: boolean };
+export type SetupAsked = { said: string; offer: SetupOffer; today: string; first?: boolean; asked?: string; quick?: boolean; kind?: string };
 export type MappingAsked = {
   file: string;
   columns: string[];

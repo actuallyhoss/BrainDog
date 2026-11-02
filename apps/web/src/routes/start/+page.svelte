@@ -1045,7 +1045,7 @@
         const crew = asked.proposal.rows.filter((r) => r.register === 'people' && r.fields['role'] === 'contractor').map((r) => String(r.fields['name'] ?? ''));
         const todos = [...todo, ...todosOf(chatTurns, clients, todo, crew)].slice(0, 3);
         const forDrafts = chatTurns.length > 0 ? draftsSaid(chatTurns, todos) : sentence;
-        madeSaid = forDrafts.trim() === '' ? null : saidMade(forDrafts, asked.proposal.rows);
+        madeSaid = forDrafts.trim() === '' ? null : saidMade(forDrafts, asked.proposal.rows, asked.proposal.usecase);
         made = true;
         globalThis.scrollTo?.({ top: 0 });
         return;

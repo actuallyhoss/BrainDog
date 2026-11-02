@@ -84,7 +84,7 @@ export type ModelRate = { in: number; out: number };
  * an automation's question, `setup` and `mapping` are the first run's two asks, and the other five of the eight have no
  * caller here yet.
  */
-export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' | 'mapping' | 'chat' | 'turn';
+export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' | 'mapping' | 'chat' | 'turn' | 'drafts';
 
 export type PromptTemplate = {
   /** The purpose the host's route is asked for; every template in `PROMPTS` says one (`SlashPurpose` below). */
