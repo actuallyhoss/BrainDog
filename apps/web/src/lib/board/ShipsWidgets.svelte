@@ -7,19 +7,20 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
 
-  let { pack, name, on = true }: { pack: string; name: string; on?: boolean } = $props();
+  let { pack, name, on = true, onread }: { pack: string; name: string; on?: boolean; /** Told once the widgets are read, landed or not, so a page can hold what is under the line. */ onread?: () => void } = $props();
 
   let titles = $state<string[]>([]);
 
   $effect(() => {
     const id = pack;
-    if (!on) return;
+    if (!on) return void onread?.();
     void import('@braindog/client')
       .then(async ({ createClient }) => {
         const out = await createClient({ base: apiBase() }).call<{ widgets?: { title?: unknown }[] }>('widgetGallery', { addon: id });
         titles = out.ok && Array.isArray(out.value.widgets) ? out.value.widgets.flatMap((w) => (typeof w.title === 'string' ? [w.title] : [])) : [];
       })
-      .catch(() => (titles = []));
+      .catch(() => (titles = []))
+      .finally(() => onread?.());
   });
 
   const and = (xs: readonly string[]): string => (xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);

@@ -204,6 +204,11 @@
     holds = undefined;
     if (chosen.first.ok) {
       show(chosen.first.value);
+      heldRead = false;
+      waitedLong = false;
+      setTimeout(() => {
+        if (id === want) waitedLong = true;
+      }, 2500);
       from = 'ready';
       void readHeld(chosen.source, want);
       void readHolds(chosen.first.value, want);
@@ -304,8 +309,17 @@
     }
   }
 
+  /* WHETHER THE PAGE MAY BE DRAWN: the store's listing and whether it is on are read with its settings, so its lead does
+     not grow under the head (its line, its version, Open and Uninstall) and push every tile down by a phone's screen
+     a moment after it is drawn (0.15 at 390, 0.04 at 1512). At most 2.5 s after its settings land. */
+  let heldRead = $state(false);
+  let widgetsRead = $state(false);
+  let waitedLong = $state(false);
+  const drawable = $derived(heldRead && indexes !== null);
   async function readHeld(s: Source, want: string) {
-    const got = await s.packs();
+    const got = await s.packs().finally(() => {
+      if (id === want) heldRead = true;
+    });
     if (got.ok && id === want) {
       installed = got.value.find((p) => p.id === want) ?? null;
       feed = ratesFeedOf(got.value);
@@ -606,7 +620,7 @@
       {#snippet actions()}<Button href="/settings/addons">{copy.packs}</Button>{/snippet}
     </Empty>
   </div>
-{:else if from === 'ready' && settings}
+{:else if from === 'ready' && settings && (drawable || waitedLong)}
   <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/settings/addons" title={name} sentence="">
     {#snippet actions()}
       {#if newer && updateAt}<Button weight="primary" size="sm" href={updateAt}>{market.about.updateTo(newer)}</Button>{/if}
@@ -633,7 +647,9 @@
    <div class="tiles">
     <!-- THE LEAD TILE, AS THE STORE'S PAGE DRAWS IT: what it is for, then its version and whether it is on. The head's
          switch says the state to a screen reader, and this line says it in words, so off is never colour alone. -->
-    <div class="lead-cell">
+    <!-- WHILE THE WIDGETS IT SHIPS AND WHEN EACH SETTING TAKES HOLD ARE READ, what follows the lead waits out of sight: the
+         widgets' line grew the lead and the settings' lines grew the form, and each pushed the tiles under them down. -->
+    <div class="lead-cell" aria-busy={widgetsRead && holds !== undefined ? undefined : 'true'}>
      <Tile lead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} title={copy.useCaseFor} aria-label={copy.useCaseFor}>
       {#if blurb}<p class="summary">{blurb}</p>{/if}
       <p class="about">
@@ -660,7 +676,7 @@
           {#if !core}<Button size="sm" weight="bare" disabled={removing} onclick={() => void uninstall()}>{copy.uninstall}</Button>{/if}
         </div>
       {/if}
-      <ShipsWidgets pack={id} {name} on={!installed?.disabled_at} />
+      <ShipsWidgets pack={id} {name} on={!installed?.disabled_at} onread={() => (widgetsRead = true)} />
      </Tile>
     </div>
 
@@ -959,6 +975,17 @@
 {/if}
 
 <style>
+  .lead-cell[aria-busy='true'] ~ :global(*) {
+    visibility: hidden;
+    animation: lead-shown 0s linear 2.5s forwards;
+  }
+
+  @keyframes lead-shown {
+    to {
+      visibility: visible;
+    }
+  }
+
   .adds-part {
     padding: var(--sp-3) var(--sp-3) var(--sp-1);
     color: var(--ink-3);

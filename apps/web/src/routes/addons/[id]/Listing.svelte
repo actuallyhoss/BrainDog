@@ -181,6 +181,9 @@
     return trust.kind === 'known' ? 'good' : 'info';
   });
   let preview = $state.raw<PreviewRead>({ state: 'none' });
+  /* WHETHER WHAT IT ADDS HAS BEEN READ, landed or not: until then the tiles after it wait out of sight, since its rows
+     grew it from "Reading the plan" and pushed Its pages, Versions and Details down (0.10 at 1512, 0.16 at 390). */
+  let planRead = $state(false);
   /** A preview the version says it has and that is still being read, so its tile holds its room. */
   const previewComing = $derived(!u && preview.state === 'none' && !refused && listing?.source === 'kennel' && !!latest?.preview);
 
@@ -298,7 +301,8 @@
     trust = null;
     refused = null;
     preview = { state: 'none' };
-    if (!l || !v) return;
+    planRead = false;
+    if (!l || !v) return void (planRead = true);
     const still = () => fileKey === k;
     void (async () => {
       const cat = await import('@braindog/declare/catalogue');
@@ -312,6 +316,7 @@
         const parsed = safeParse(got.text);
         file = { doc: l.kind === 'pack' && parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null, text: got.text };
         reach = v.reach;
+        planRead = true;
         const t = await trustForEntry(keys, e, v.version, got.signature, kennel?.keys);
         if (!still()) return;
         trust = t;
@@ -335,7 +340,11 @@
       file = { doc, text: null };
       const held = await cat.readPackFile(doc, { kind: 'local' });
       if (held.ok && still()) reach = cat.reachOf(held.value);
-    })();
+    })()
+      .catch(() => undefined)
+      .finally(() => {
+        if (fileKey === k) planRead = true;
+      });
   }
 
   /* A STORE THAT DID NOT ANSWER IS NOT AN ADD-ON THAT IS GONE: it says so, with Try again. */
@@ -748,7 +757,7 @@
 
       <!-- WHAT IT ADDS, BEFORE ANYTHING CHANGES (the site's board): each kind beside its glyph and its count, and what each
            is called; then every host it calls, or that it calls none. Read from the file, never written for the page. -->
-      <div class="adds-cell">
+      <div class="adds-cell" aria-busy={planRead ? undefined : 'true'}>
         <!-- NO COUNT OVER NOTHING: "What it adds 0" over the hosts it calls read as a mistake. -->
         <Tile icon="plus" title={words.adds} count={addsTotal || undefined}>
           {#if addsTotal === 0}<p class="quiet">{words.addsNothing}</p>{/if}
@@ -947,6 +956,18 @@
 
     .tiles:has(.calls-cell) .versions-cell {
       grid-row: span 2;
+    }
+  }
+
+  /* WHILE WHAT IT ADDS IS READ, what comes after it is held out of sight, at most 2.5 s (`planRead`). */
+  .adds-cell[aria-busy='true'] ~ :global(*) {
+    visibility: hidden;
+    animation: plan-shown 0s linear 2.5s forwards;
+  }
+
+  @keyframes plan-shown {
+    to {
+      visibility: visible;
     }
   }
 
