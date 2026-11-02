@@ -48,6 +48,7 @@
 </script>
 
 <script lang="ts">
+  import { page } from '$app/state';
   import { apiBase, at } from '../at.ts';
   import type { Snippet } from 'svelte';
   import { dateSaid, leadingCode, symbolFigure } from 'braindog-render';
@@ -124,6 +125,10 @@
   $effect(() => {
     const asked = register;
     if (REGISTERS[asked]) return;
+    /* NOT A LIST THE RECORD DOES NOT HOLD (leftovers 4): `/r/<no such list>` on a phone asked the record for its
+       declaration and logged the refusal as an error, under the page that already says there is no such list. */
+    const held = (page.data as { index?: { registers?: { id: string }[] } }).index?.registers;
+    if (held && !held.some((r) => r.id === asked)) return;
     void Promise.all([import('@braindog/client'), import('$lib/record/remote.ts')])
       .then(([{ createClient }, remote]) => remote.learn((id) => createClient({ base: apiBase() }).schema(id), asked, new Map()))
       .then(() => {
