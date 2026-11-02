@@ -817,9 +817,26 @@ export function usageFromLedger(said: AccountUsage, month: string, through?: str
       add(into, p);
       projects.set(key, into);
     }
+    /* A RULE AND THE SCRIPT IT RUNS ARE ONE ROW (verify3, 2 Nov): the ledger meters `rule:payment-matches` and the
+       script it calls apart, and both are said "Find what a payment paid", so By action named it twice with two counts.
+       One row per name in a record's scope: the times it ran are the rule's or the script's, whichever counted more
+       (each run of the rule is a run of its script, so adding them would count one happening twice), and what the two
+       cost, requests, bytes and time, is added. */
+    const one = new Map<string, Named>();
     for (const a of r.actions) {
       const global = isGlobal(a.scope);
-      const named: Named = { name: prefix + nameOf(names, a.action), faint: global, runs: a.runs, requests: a.requests, bytes: a.bytes, failures: a.failures, ms: a.ms };
+      const name = prefix + nameOf(names, a.action);
+      const same = one.get(`${a.scope ?? ''}\u0000${name}`);
+      if (same) {
+        same.runs = Math.max(same.runs, a.runs);
+        same.failures = Math.max(same.failures, a.failures);
+        same.requests += a.requests;
+        same.bytes += a.bytes;
+        same.ms = (same.ms ?? 0) + (a.ms ?? 0);
+        continue;
+      }
+      const named: Named = { name, faint: global, runs: a.runs, requests: a.requests, bytes: a.bytes, failures: a.failures, ms: a.ms };
+      one.set(`${a.scope ?? ''}\u0000${name}`, named);
       actions.push(named);
       /* ONE RECORD'S PROJECT IS NOT ANOTHER'S, so a group is keyed by record and scope and named with the record's prefix;
          every record's global actions share Everywhere. */
