@@ -669,8 +669,9 @@ export type CallContext = {
    *
    * SET ONLY BY `instructionsMine`, AFTER `wordOf` HAS SAID HIS SWITCH IS ON AND `wordFault` THAT THE QUESTION NEITHER
    * GRANTS A KEY NOR SETS AN AMOUNT, and for one `decide` and nothing else. `decide` lets it accept what installs (an
-   * add-on, an arrangement, an automation), which is what he asked for; `admin` and `keychain` refuse it everywhere else,
-   * so his word never erases, deletes the record, shares a key or touches billing.
+   * add-on, an arrangement, an automation), which is what he asked for. `admin` admits it as it admits his agents while
+   * his switch is on (2 Nov), and `ownerKeeps` and `keychain` refuse it, so his word never hands the record over,
+   * erases, deletes the record, reads a key or touches billing.
    */
   onWord?: string | undefined;
 
@@ -8199,7 +8200,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * What no word reaches, of what a write or a question would do, or `null` when his word may do it all: a key (a list
    * of keys, or an automation that calls out with one), and an amount of money set on what is already there. Adding an
    * entry with an amount is filing it, as the kernel's own line on the floor says (`kindsOfProposal`'s money `add`).
-   * Erasing, deleting the record and billing are no write or question an agent reaches: `admin` refuses `onWord`.
+   * Erasing, deleting the record, handing it over and billing are no write or question an agent reaches: `ownerKeeps`
+   * refuses `onWord` and `word` there.
    */
   const beyondWord = (kinds: readonly { floor: string | null; verb: string }[], body?: unknown): string | null => {
     if (kinds.some((k) => k.floor === 'keys') || callsWithKey(body))

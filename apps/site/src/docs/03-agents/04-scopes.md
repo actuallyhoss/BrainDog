@@ -36,19 +36,19 @@ A write token asks before money, keys and deletes. When you tell it to make one 
 
 ## Letting your own agents act without asking
 
-Settings › Agents has one switch for the owner: **Let your agents do everything without asking**. Off, agents ask before deletes, money, keys, add-ons and settings, and after reading things from outside. On, your own agents act without asking, money and outside reads included, and each change still names its agent and can be undone.
+Settings › Agents has one switch for the owner: **Let your agents do everything without asking**. Off, agents ask before deletes, money, keys, add-ons and settings, and after reading things from outside. On, your own agents do anything you can do here without asking: money, settings, add-ons, your team, sharing, making keys, imports and exports. Each change still names its agent and can be undone.
 
-The switch never covers:
+The switch never covers three things:
 
-- seeing or adding a key, or making new tokens, report keys or door addresses;
-- inviting people, changing what they can do, stopping or removing them;
-- deleting, exporting or importing all of BrainDog, putting a copy back, or erasing a person;
-- changing the owner, or handing ownership over;
-- the switch itself, and paying.
+- giving this BrainDog to someone else;
+- deleting the whole BrainDog, or erasing a person for good;
+- reading a key's value. A key is only ever added with `braindog keys put`, and an agent's export leaves the keys' sealed bytes out.
 
-Those stay yours in the app, switch on or off. The switch covers only the owner's own agents, with a key that writes across the whole BrainDog. A colleague's agents are never covered: they ask, and never do more than their person may.
+An agent also never makes an owner, changes one, or changes the owner it acts for, and paying stays in Billing. The switch covers only the owner's own agents, with a key that writes across the whole BrainDog. A colleague's agents are never covered: they ask, and never do more than their person may. An agent may turn the switch off, never on.
 
-An agent that wants one of these asks with `propose`, and you decide. Some fields are marked the same way: a skill's text, for one, only changes when you accept a proposal.
+With the switch off, **Agents answer when you say so** lets an agent do the same things when you tell it to: it sends your words as `said` with the call, and they are kept beside what it did.
+
+Otherwise an agent that wants one of these asks with `propose`, and you decide. Some fields are marked the same way: a skill's text, for one, only changes when you accept a proposal.
 
 ## One operation at a time
 
