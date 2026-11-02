@@ -72,7 +72,7 @@
   import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
   import { KEYS_REGISTER } from '$lib/record/keys-register.ts';
-  import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
+  import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, rowsAsLists, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
   import { MENU, WORK, arrange, flatNav, isHere, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { byUse, keptUses, noteUse } from '$lib/shell/tab-use.ts';
@@ -512,7 +512,8 @@
         .filter((p) => p !== projectsPlace)
         .flatMap((p) => {
           const own = rail.things.find(([section]) => section === p.label)?.[1] ?? [];
-          return own.length > 0 ? [[p.key, own.map((e) => ({ href: e.href, label: e.title, icon: 'doc' }))] as const] : [];
+          /* ONE ROW A LIST, NOT A ROW A TRIP (`rowsAsLists`): Money's trips and plans each had a row of their own. */
+          return own.length > 0 ? [[p.key, rowsAsLists(own, rail.views[p.key] ?? [], sideLists)] as const] : [];
         }),
     ),
   );

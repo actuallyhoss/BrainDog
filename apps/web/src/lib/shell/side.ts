@@ -388,7 +388,11 @@ export function sideModel(o: {
         const row = { ...r };
         seen.set(at, row);
         out.push(row);
-      } else if (r.href !== kept.href) kept.near = [...(kept.near ?? []), r.href];
+      } else {
+        /* AND THE ADDRESSES THE ROW LEFT OUT ANSWERED FOR, so Trips stands for each trip's page too (`rowsAsLists`). */
+        const more = [...(r.href !== kept.href ? [r.href] : []), ...(r.near ?? [])].filter((h) => h !== kept.href && !(kept.near ?? []).includes(h));
+        if (more.length > 0) kept.near = [...(kept.near ?? []), ...more];
+      }
     }
     return out;
   };
@@ -612,4 +616,31 @@ export function moneyLead(views: readonly { href: string }[] | undefined, own: s
     .filter((v) => v.href !== own)
     .slice(0, MONEY_LEAD_MOST)
     .map((v) => v.href);
+}
+
+/**
+ * A PLACE'S PAGES ABOUT ONE ROW AS ONE ROW FOR THEIR LIST (his call, 2 Nov): each trip and each plan had a row of its own
+ * under Money, thirty and more on a full record, where a project's page sits under Projects for a reason Money's do not
+ * have. Each list's pages are now one row, its page where the place has one of that name (Trips) and else its list
+ * (Plans), which answers for every one of them, so a trip's page still lights Trips and its crumb still reads Money.
+ * A page whose list is not said keeps its own row.
+ */
+export function rowsAsLists(
+  rows: readonly { href: string; title: string; register?: string | undefined }[],
+  views: readonly { href: string; title: string }[],
+  lists: readonly { id: string; name: string; icon?: string | undefined }[],
+): SideLink[] {
+  const out: SideLink[] = [];
+  const byList = new Map<string, string[]>();
+  for (const r of rows) {
+    if (typeof r.register !== 'string' || r.register === '') out.push({ href: r.href, label: r.title, icon: 'doc' });
+    else byList.set(r.register, [...(byList.get(r.register) ?? []), r.href]);
+  }
+  for (const [id, hrefs] of byList) {
+    const list = lists.find((l) => l.id === id);
+    const name = list?.name ?? id;
+    const page = views.find((v) => word(v.title) === word(name));
+    out.push({ href: page?.href ?? `/r/${id}`, label: page?.title ?? name, icon: list?.icon ?? 'doc', near: hrefs });
+  }
+  return out;
 }
