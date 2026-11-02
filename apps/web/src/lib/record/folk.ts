@@ -475,7 +475,8 @@ const KEY_LABELS: Readonly<Record<string, string>> = {
   github: 'GitHub',
   bank: 'Bank texts call it',
   folder: 'Folder',
-  git: 'Git',
+  /* WHO THEY COMMIT AS (pages polish, 2 Nov): "Git jokonkwo" under "GitHub jokonkwo" named a tool, not what it says. */
+  git: 'Commits as',
   gitlab: 'GitLab',
   slack: 'Slack',
   discord: 'Discord',

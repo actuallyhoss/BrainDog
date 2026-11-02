@@ -150,7 +150,7 @@ test('WHAT SOMEBODY IS KNOWN BY IS SAID BY KIND, each once, a repository by its 
     [
       { label: 'Email', value: 'jo@okonkwo.example' },
       { label: 'GitHub', value: 'jokonkwo' },
-      { label: 'Git', value: 'jokonkwo' },
+      { label: 'Commits as', value: 'jokonkwo' },
     ],
   );
   assert.deepEqual(
