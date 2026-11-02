@@ -1,5 +1,6 @@
 <!--
-  Settings > Sessions: every browser this person is signed in on, this one first, and the one press that ends the rest.
+  Settings > Sessions: every browser and BrainDog app this person is signed in on, this one first, a press on each of
+  the others that ends that one, and the one press that ends the rest.
   Under them, what this browser keeps of the record to draw at once and read offline (`lib/data/local.ts`), its size,
   and the one press that forgets it.
 -->
@@ -8,7 +9,7 @@
   import { dismiss, lineIn } from '$lib/motion';
   import { settle } from '$lib/ui/motion.ts';
   import { copy } from '$lib/copy.ts';
-  import { sessions, signOutEverywhere, type SessionInfo } from '$lib/auth.ts';
+  import { endSession, sessions, signOutEverywhere, type SessionInfo } from '$lib/auth.ts';
   import { since } from 'braindog-render';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -78,6 +79,38 @@
 
   const when = (ms: number): string => since(new Date(ms).toISOString());
 
+  /* ── one session at a time ──
+     A BRAINDOG APP NAMES ITS OWN SESSION ("iPhone, BrainDog app"), so a row says the device where the host has one, and
+     a browser stays "This browser" or "Another browser", which is all a browser's session can say about itself. The
+     words are this area's, as the kept-copy words below are. */
+  const oneWords = {
+    end: 'Sign out',
+    endName: (name: string) => `Sign out ${name}`,
+    ended: (name: string) => `${name} is signed out.`,
+    stale: 'That one had already ended or changed since the list was read, so the list is read again.',
+  } as const;
+  const nameOf = (r: SessionInfo): string => r.device ?? (r.current ? copy.sessionThis : copy.sessionOther);
+  let endingRef = $state<string | null>(null);
+
+  async function endOne(r: SessionInfo) {
+    if (endingRef !== null) return;
+    endingRef = r.ref;
+    said = null;
+    const at = opened();
+    const out = await endSession(r.ref);
+    closed(true, at);
+    endingRef = null;
+    if (out.ok) said = oneWords.ended(r.device ?? copy.sessionOther);
+    else if (out.kind === 'refused') said = oneWords.stale;
+    else {
+      toasts.push(copy.sessionsFailed, { intent: 'warn' });
+      return;
+    }
+    /* THE LIST AS THE HOST HAS IT NOW, whichever way the press went: what ended is gone, and a row that rotated is back
+       under the reference it has now. */
+    await list();
+  }
+
   /* ── what this browser keeps ── */
   const keptWords = {
     title: 'Kept on this device',
@@ -120,11 +153,24 @@
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="monitor" size="l" tone={r.current ? 'ink' : undefined} /></span>
               <span class="line-main">
-                <span class="line-title session-title">{r.current ? copy.sessionThis : copy.sessionOther}</span>
+                <span class="line-title session-title">{nameOf(r)}</span>
                 <span class="line-detail session-detail">{copy.sessionWhen(when(r.authedAt), when(r.activeAt))}</span>
               </span>
               <span class="line-amount"></span>
-              <span class="line-when"></span>
+              <!-- EVERY ROW BUT THIS ONE ENDS ON ITS OWN, as a passkey is removed on its own row. This one is signed out
+                   from the account menu. -->
+              <span class="line-when">
+                {#if !r.current}
+                  <Button
+                    weight="bare"
+                    tone="bad"
+                    aria-label={oneWords.endName(nameOf(r))}
+                    aria-busy={endingRef === r.ref}
+                    disabled={endingRef !== null || ending}
+                    onclick={() => endOne(r)}>{oneWords.end}</Button
+                  >
+                {/if}
+              </span>
             </div>
           </li>
         {/each}

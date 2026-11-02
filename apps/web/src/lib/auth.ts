@@ -555,8 +555,11 @@ export async function signOutAndLeave(to: string, go: (href: string) => void = (
   return out;
 }
 
-/** One live session, as Settings lists it. `ref` tells two apart and opens neither; `record` is `null` for none. */
-export type SessionInfo = { ref: string; current: boolean; authedAt: number; activeAt: number; record: string | null };
+/**
+ * One live session, as Settings lists it. `ref` tells two apart and opens neither; `record` is `null` for none.
+ * `device` is a BrainDog app's label for its own session ("iPhone, BrainDog app"), and `null` for a browser's.
+ */
+export type SessionInfo = { ref: string; current: boolean; authedAt: number; activeAt: number; record: string | null; device: string | null };
 
 function sessionOf(v: unknown): SessionInfo | null {
   if (!isObj(v) || typeof v.ref !== 'string') return null;
@@ -566,7 +569,21 @@ function sessionOf(v: unknown): SessionInfo | null {
     authedAt: typeof v.authedAt === 'number' ? v.authedAt : 0,
     activeAt: typeof v.activeAt === 'number' ? v.activeAt : 0,
     record: typeof v.record === 'string' ? v.record : null,
+    device: typeof v.device === 'string' && v.device.trim() !== '' ? v.device : null,
   };
+}
+
+/**
+ * End one session, by the `ref` the list named it under, and answer how many ended.
+ *
+ * A REFUSAL IS A LIST GONE STALE: the session ended elsewhere, or rotated since the list was read, so the screen reads
+ * the list again rather than say it ended. The screen offers this for the others only; signing out here is its own press.
+ */
+export async function endSession(ref: string, io: Io = live()): Promise<Said<number>> {
+  const out = await call(io, '/auth/session/end', { ref });
+  if (!out.ok) return out;
+  const ended = isObj(out.value) && typeof out.value.ended === 'number' ? out.value.ended : null;
+  return ended === null ? { ok: false, kind: 'refused', fix: null } : { ok: true, value: ended };
 }
 
 /** Every live session the person signed in has, this one marked `current`. */
