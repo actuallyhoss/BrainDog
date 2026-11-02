@@ -46,6 +46,18 @@ export async function readVersionPreview(fetcher: Fetcher, kind: EntryKind, id: 
 }
 
 /**
+ * A BLOCK OF FIGURES THE RECORD LEFT UNDRAWN FOR HAVING NOTHING TO COUNT IS DRAWN WITH ITS FIGURES IN A PREVIEW. A live
+ * page leaves such a block out (`drawn: false`, `why: 'empty'`), but a preview draws every block to show the page's
+ * shape, and this one drew "Nothing matched." under "Where the goals stand" in a page that says it is an example. Its
+ * readings came with it, so its tiles are drawn as read, each figure at nought, and never a sentence about a search.
+ */
+function shown<T extends { drawn?: unknown; why?: unknown; readings?: unknown }>(b: T): T {
+  if (b.drawn !== false || b.why !== 'empty' || !Array.isArray(b.readings) || b.readings.length === 0) return b;
+  const { drawn: _drawn, why: _why, ...rest } = b;
+  return rest as T;
+}
+
+/**
  * One page of a preview as `PageView` draws it: the page's own title, and each block through `blockOf`.
  *
  * THE ADD-ON'S OWN LISTS ARE LENT FOR THE DRAWING (`lists`, its file's list declarations) and taken back after it
@@ -62,7 +74,7 @@ export function openedOf(answer: PageAnswer, now: number, lists: readonly Record
     lent.push(id);
   }
   try {
-    const blocks = (answer.blocks as unknown as Parameters<typeof blockOf>[0][]).map((b) => blockOf(b, new Map(), now));
+    const blocks = (answer.blocks as unknown as Parameters<typeof blockOf>[0][]).map((b) => blockOf(shown(b), new Map(), now));
     return { from: 'live', now, page: { page: { page: answer.page, title: answer.title }, blocks } };
   } finally {
     for (const id of lent) delete REGISTERS[id];
