@@ -42,7 +42,10 @@ export function between(a: Shape, b: Shape, t: number): string {
   return `${b.pre}${said}${b.post}`;
 }
 
-const easeOut = (t: number): number => 1 - (1 - t) ** 3;
+/* A STRONG EASE-OUT, A QUARTIC (leftovers9, Sam: "the animation of the numbers moving too slowly is shit, make it faster
+   and smoother"). Over 420ms on a cubic, a figure crawled through its last digits for the second half of the count; now
+   it covers nine tenths of the way in the first third of `--form-count`, 300ms, and settles. */
+const easeOut = (t: number): number => 1 - (1 - t) ** 4;
 
 const running = new WeakMap<Text, number>();
 /** Whether a text is still counting: what it says now is a figure on its way, not the one it will stay at. */
@@ -61,7 +64,7 @@ export function countText(text: Text, from: string, to: string): boolean {
   const [a, b] = pair;
   const prior = running.get(text);
   if (prior !== undefined) cancelAnimationFrame(prior);
-  const long = ms('--form-count', 420);
+  const long = ms('--form-count', 300);
   if (long <= 0) return false;
   const start = performance.now();
   const step = (at: number) => {

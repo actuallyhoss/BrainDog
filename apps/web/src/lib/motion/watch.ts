@@ -44,7 +44,7 @@ function grow(el: HTMLElement | SVGElement, axis: 'x' | 'y', from: number): void
   const scale = axis === 'x' ? `scaleX(${from})` : `scaleY(${from})`;
   if (el instanceof SVGElement) el.style.transformBox = 'fill-box';
   el.style.transformOrigin = origin;
-  play(el as HTMLElement, { transform: [scale, 'none'] }, { duration: ms('--form-count', 420) });
+  play(el as HTMLElement, { transform: [scale, 'none'] }, { duration: ms('--form-count', 300) });
 }
 
 /** Starts the watcher on `root` (the document's body by default); the function it returns stops it. */

@@ -417,7 +417,8 @@
     --form-in: 320ms;
     --form-out: 180ms;
     --form-settle: 380ms;
-    --form-count: 420ms;
+    /* 300ms, NOT 420 (leftovers9): a figure counting to its value read as slow beside the press that changed it. */
+    --form-count: 300ms;
     --form-gap: 40ms;
     /* A RESTRAINED SPRING: most of the way in the first third, 2.8% past, and back by the end. Never a bounce. */
     --ease-spring: linear(0, 0.05 4%, 0.168 8%, 0.316 12%, 0.467 16%, 0.606 20%, 0.752 25%, 0.862 30%, 0.949 36%, 0.999 42%, 1.022 48%, 1.028 55%, 1.024 62%, 1.016 70%, 1.007 80%, 1.002 90%, 1);
