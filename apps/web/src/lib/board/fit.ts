@@ -33,21 +33,27 @@ export function fitBoard(board: HTMLElement): void {
   const frames = [...board.querySelectorAll<HTMLElement>('[data-board-key]')].filter((f) => f.dataset.lifted === undefined);
   /* EACH FRAME'S ROWS AS LAID (T5): a laptop's frame at rest is as tall as what it draws, the rows it was laid across at
      most, and the packer may lay a frame across more rows than its size (`filled` in `pack.ts`). Read from its own
-     grid-area, written before anything is measured. */
-  for (const frame of frames) {
+     grid-area, written before anything is measured.
+     AND A DRAFT'S KEEP BAR, AS TALL AS IT IS DRAWN (leftovers 4): on a laptop at rest the frame is held to its rows, and
+     the bar under the widget took its height out of them, so Spending's figures were cut under Keep. The frame is let
+     taller by the bar (`Board.svelte`), whatever the bar wraps to at the frame's width.
+     EVERY FRAME READ, THEN EVERY FRAME WRITTEN (speed5): read between writes, each frame's bar laid the board out again,
+     once a widget, and on a cold phone this was the hottest function of the open. A span or a bar changes a frame's
+     height and never a width, so no bar read here depends on what another frame is about to be told. */
+  const laid = frames.map((frame) => {
     const css = getComputedStyle(frame);
     const span = (parseInt(css.gridRowEnd, 10) || 0) - (parseInt(css.gridRowStart, 10) || 0);
-    if (span > 0 && frame.style.getPropertyValue('--span') !== String(span)) frame.style.setProperty('--span', String(span));
-    /* AND A DRAFT'S KEEP BAR, AS TALL AS IT IS DRAWN (leftovers 4): on a laptop at rest the frame is held to its rows, and
-       the bar under the widget took its height out of them, so Spending's figures were cut under Keep. The frame is let
-       taller by the bar (`Board.svelte`), whatever the bar wraps to at the frame's width. */
     const bar = frame.querySelector<HTMLElement>(':scope > [data-draft-mark]');
-    const said = bar === null ? '' : `${Math.ceil(bar.getBoundingClientRect().height)}px`;
+    return { span, said: bar === null ? '' : `${Math.ceil(bar.getBoundingClientRect().height)}px` };
+  });
+  frames.forEach((frame, i) => {
+    const { span, said } = laid[i]!;
+    if (span > 0 && frame.style.getPropertyValue('--span') !== String(span)) frame.style.setProperty('--span', String(span));
     if (frame.style.getPropertyValue('--bar') !== said) {
       if (said === '') frame.style.removeProperty('--bar');
       else frame.style.setProperty('--bar', said);
     }
-  }
+  });
   /* MEASURED WHOLE: every row put back first, in the same task, so nothing is painted between and the measure is of the
      widget as it would draw with room. */
   for (const frame of frames) {
@@ -182,8 +188,10 @@ function closeUp(board: HTMLElement, frames: readonly HTMLElement[]): void {
     lowest = Math.max(lowest, bottom);
     if (up > 0) moves.push([l.f, up]);
   }
-  for (const [f, up] of moves) f.style.translate = `0 ${-up}px`;
+  /* THE BOARD'S FOOT READ BEFORE ANY TILE MOVES: a move is a transform and leaves it where it was, and read after the
+     writes it made the browser work out the page's style again for one number. */
   const slack = Math.round(board.getBoundingClientRect().bottom - lowest);
+  for (const [f, up] of moves) f.style.translate = `0 ${-up}px`;
   if (moves.length > 0 && slack > 0) board.style.marginBlockEnd = `${-slack}px`;
 }
 

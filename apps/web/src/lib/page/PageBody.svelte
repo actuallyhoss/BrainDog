@@ -494,15 +494,26 @@
       const px = Math.round(w);
       if (px !== workWidth) workWidth = px;
     };
-    const s = getComputedStyle(el);
-    /* UNTRACKED, or the width this writes would be one this effect reads, and every measure would set the watch up again. */
-    untrack(() => take(el.clientWidth - (Number.parseFloat(s.paddingInlineStart) || 0) - (Number.parseFloat(s.paddingInlineEnd) || 0)));
+    /* THE FIRST WIDTH IS THE RESIZEOBSERVER'S FIRST ANSWER, TAKEN AT ONCE (speed5): it comes after the browser's own
+       layout of the frame and before its paint, so the page is still measured before it is first seen, and nothing makes
+       the browser lay the page out in the middle of mounting it, which reading `clientWidth` here did (45 ms on a cold
+       phone's Today). Every later answer waits a frame, as before (`frameResizeObserver`). UNTRACKED, or the width this
+       writes would be one this effect reads, and every measure would set the watch up again. */
     const watch = frameResizeObserver((seen) => {
       const box = seen.at(-1)?.contentRect;
       if (box) take(box.width);
     });
-    watch.observe(el);
-    return () => watch.disconnect();
+    const first = new ResizeObserver((seen) => {
+      first.disconnect();
+      const box = seen.at(-1)?.contentRect;
+      if (box) untrack(() => take(box.width));
+      watch.observe(el);
+    });
+    first.observe(el);
+    return () => {
+      first.disconnect();
+      watch.disconnect();
+    };
   });
   const twoUp = $derived(workWidth !== null && workWidth >= PAIR_FROM && mode !== 'preview' && (!layout || !railShown));
   /* AND ONE COLUMN IN THE ROOM OF A WINDOW UNDER 900 (`layout.ts` `ONE_UNDER`), beside a docked panel or the rail as much
