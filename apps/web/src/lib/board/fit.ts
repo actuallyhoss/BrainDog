@@ -57,10 +57,15 @@ export function fitBoard(board: HTMLElement): void {
   /* MEASURED WHOLE: every row put back first, in the same task, so nothing is painted between and the measure is of the
      widget as it would draw with room. */
   for (const frame of frames) {
+    if (frame.dataset.grown !== undefined) {
+      frame.style.maxBlockSize = '';
+      delete frame.dataset.grown;
+    }
     for (const row of frame.querySelectorAll<HTMLElement>('[data-cut]')) delete row.dataset.cut;
     for (const foot of frame.querySelectorAll<HTMLElement>('[data-more-before]')) delete foot.dataset.moreBefore;
   }
   const marks: [HTMLElement, number][] = [];
+  const grows: [HTMLElement, number][] = [];
   const before: [HTMLElement, string][] = [];
   const recounts: [HTMLElement, number][] = [];
   for (const frame of frames) {
@@ -128,7 +133,29 @@ export function fitBoard(board: HTMLElement): void {
        its first line taller than the room under the title. The first row stays and the frame clips what runs past it. */
     const first = rects.findIndex((r) => r.height > 0);
     const keepFirst = first >= 0 && !p.shown;
-    const cutOf = (i: number): boolean => !(keepFirst && i === first) && rects[i]!.height > 0 && rects[i]!.bottom > cutAt + 1;
+    /* A ROW'S NEIGHBOURS ON ITS LINE GO WITH IT (2 Nov, 1280): Projects' cards stand two to a line, and the first card was
+       kept while the one beside it, as tall and on the same line, was cut, so half the line stood empty beside "3 more". */
+    const line = keepFirst ? rects.map((r, i) => (r.height > 0 && Math.abs(r.top - rects[first]!.top) < 1 ? i : -1)).filter((i) => i >= 0) : [];
+    /* AND THE FRAME LETS THAT LINE AND ITS FOOT IN, at rest (2 Nov, 1280): Arrivals at one row kept its first line, two
+       lines tall at that width, and the frame cut "All activity" off at its foot; Projects' cards were cut square at their
+       foot. The frame is let as tall as the kept line, its feet and the tile's own padding, and no taller; the rows under
+       it still go. */
+    if (keepFirst && board.dataset.cols !== '2' && !board.closest('[data-editing]')) {
+      const block = frame.querySelector<HTMLElement>(':scope > .block') ?? frame;
+      const b = block.getBoundingClientRect();
+      const lineEnd = Math.max(...line.map((i) => rects[i]!.bottom));
+      const natural = Math.max(...rects.filter((r) => r.height > 0).map((r) => r.bottom), ...kept.map((f) => f.bottom));
+      const tail = Math.max(0, b.top + block.scrollHeight - natural);
+      let end = lineEnd;
+      if (kept.length > 0 && !inHead) {
+        const top = kept[0]!.top;
+        const above = rects.filter((r) => r.height > 0 && r.bottom <= top + 1).reduce((m, r) => Math.max(m, r.bottom), -Infinity);
+        end += (Number.isFinite(above) ? Math.max(0, top - above) : 8) + (kept.at(-1)!.bottom - top);
+      }
+      const need = Math.ceil(end - box.top + tail);
+      if (need > box.height + 1) grows.push([frame, need]);
+    }
+    const cutOf = (i: number): boolean => !line.includes(i) && rects[i]!.height > 0 && rects[i]!.bottom > cutAt + 1;
     rows.forEach((row, i) => marks.push([row, cutOf(i) ? 1 : 0]));
     /* A FOOT THAT COUNTS WHAT IT LEAVES OUT COUNTS WHAT THE FRAME CUT TOO (live check of 30 October, 5): Needs you held 4,
        drew two, had its second cut by the frame, and said "2 more" over one question where the phone said "3 more". */
@@ -138,12 +165,16 @@ export function fitBoard(board: HTMLElement): void {
        and the frame's own count, laid at its foot, was then drawn on top of that row's words. Where the kept row reaches
        into the count's room, the frame says nothing more; the row's own clip says there is more. */
     const keptOver = !inHead && keepFirst && rects[first]!.bottom > Math.min(room, over) - MORE_PX;
-    const left = says && !keptOver ? past(cutAt) - (keepFirst ? 1 : 0) : 0;
+    const left = says && !keptOver ? past(cutAt) - line.filter((i) => rects[i]!.bottom > cutAt + 1).length : 0;
     if (left > 0 && kept.length > 0 && !inHead) {
       delete frame.dataset.more;
       before.push([kept[0]!.el, `${left} more`]);
     } else if (left > 0) frame.dataset.more = `${left} more`;
     else delete frame.dataset.more;
+  }
+  for (const [frame, need] of grows) {
+    frame.style.maxBlockSize = `${need}px`;
+    frame.dataset.grown = '';
   }
   for (const [row, cut] of marks) if (cut) row.dataset.cut = '';
   for (const [foot, said] of before) foot.dataset.moreBefore = said;
