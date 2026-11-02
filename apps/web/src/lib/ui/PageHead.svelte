@@ -61,6 +61,7 @@
   import { copy } from '../copy.ts';
   import { openPalette } from '../palette/open.svelte.ts';
   import Bell from '../shell/Bell.svelte';
+  import HereFaces from '$lib/shell/HereFaces.svelte';
   import { barTitled, frame, narrow } from '../shell/frame.svelte.ts';
   import Brand from '../shell/Brand.svelte';
   import YouMenu from '../shell/YouMenu.svelte';
@@ -307,6 +308,7 @@
         <Icon name="search" size="l" />
       </button>
     {/if}
+    <HereFaces />
     <Bell phone />
     <YouMenu phone />
   </span>

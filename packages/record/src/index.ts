@@ -2246,6 +2246,13 @@ export type Version = {
    * log's). Only when asked, so `version`'s own keys are as `33 §4` names them.
    */
   moved?: string[] | null;
+  /**
+   * WHO ELSE IS ON THE PAGE THE CALLER SAID (`at`, collab pass 2, 2 Nov): the names of the other people whose tabs asked
+   * this poll from the same page in the last half minute, and only names this caller may already be told (`namesFor`).
+   * Absent when nothing was asked or nobody else is there. Kept in the record's memory and nowhere else: no row, no line
+   * of the log, gone when the object sleeps.
+   */
+  here?: string[];
 };
 
 /**
@@ -9923,6 +9930,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * PEOPLE IS THE FIRST-PARTY MODULE, NOT A LIST WITH THAT ID. A shared use case on a record without the module could
    * declare its own `people` and invite somebody to it, so the list must be owned by the `people` pack and that pack on.
    */
+  /**
+   * WHO ELSE IS ON THIS PAGE (collab pass 2, 2 Nov), heard on the poll every open tab already sends (`version`, every
+   * 1.5 to 6 s while it is looked at): the page it is on rides with it as `at`, an app path, and this keeps the newest
+   * page each person was on and when. Nothing is written: a Map in this object's memory, cut to `HERE_MOST` people, gone
+   * when the object sleeps, which is when nobody is looking anyway. A tab that is hidden asks nothing, so it leaves the
+   * page within `HERE_MS`.
+   *
+   * ONLY PEOPLE, ONLY OTHERS, ONLY NAMES THE CALLER MAY ALREADY BE TOLD (`namesFor`): an agent's token is never "here",
+   * a guest who may not know the team's names hears nobody but who shared with them, and a person the record has no
+   * name for is left out rather than said as an id.
+   */
+  const HERE_MS = 30_000;
+  const HERE_MOST = 200;
+  const herePaths = new Map<string, { at: string; seen: number }>();
+  const hereFor = (ctx: CallContext, at: unknown): string[] | undefined => {
+    if (ctx.principal.kind !== 'person' || typeof at !== 'string') return undefined;
+    const path = at.split(/[?#]/u)[0] ?? '';
+    if (!/^\/[\w\-/.%]{0,200}$/u.test(path)) return undefined;
+    const now = clock.now();
+    const me = ctx.principal.id;
+    herePaths.delete(me);
+    herePaths.set(me, { at: path, seen: now });
+    if (herePaths.size > HERE_MOST) for (const key of [...herePaths.keys()].slice(0, herePaths.size - HERE_MOST)) herePaths.delete(key);
+    const others = [...herePaths.entries()].filter(([who, h]) => who !== me && h.at === path && now - h.seen <= HERE_MS);
+    if (others.length === 0) return [];
+    const names = namesFor(ctx) ?? {};
+    return others.flatMap(([who]) => (typeof names[who] === 'string' && names[who] !== '' ? [names[who]] : [])).sort((a, b) => a.localeCompare(b));
+  };
+
   const namesFor = (ctx: CallContext): Record<string, string> | null => {
     const peopleModule = () =>
       kernel.register(PEOPLE) !== undefined && kernel.packStates().some((p) => p.id === PEOPLE && p.disabled_at === null && p.registers.includes(PEOPLE));
@@ -17454,15 +17490,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /** What this record is at, and what is reading it. `33 §4`, line 356. */
-    async version(ctx: CallContext, args?: { since?: unknown }): Promise<Result<Version>> {
+    async version(ctx: CallContext, args?: { since?: unknown; at?: unknown }): Promise<Result<Version>> {
       /* `scoped`, AS `boot` ASKS: whoever may open the app may poll it. A colleague held to named lists, a guest among
          them, holds nothing record-wide, and `guard` refused the poll that tells their tab the grant moved. */
       const stop = scoped(ctx, 'read');
       const since = args?.since;
+      const here = stop ? undefined : hereFor(ctx, args?.at);
       return stop
         ? { ok: false, refusal: stop }
         : ok({
             ...(since === undefined || since === null ? {} : { moved: movedSince(ctx, since) }),
+            ...(here === undefined || here.length === 0 ? {} : { here }),
             version: versionFor(ctx),
             format: FORMAT_VERSION,
             kernel: KERNEL_MIGRATION,

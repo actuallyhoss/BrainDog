@@ -691,6 +691,8 @@ export type Version = {
    * say; absent when nothing was asked, or from an older host. The tab keeps what it read over the rest (`keptOr`).
    */
   moved?: string[] | null;
+  /** The names of the other people on the page this tab said it is on (`at`), within the last half minute. Absent when none. */
+  here?: string[];
 };
 
 /** `listDevices` and `revokeDevice`: one device grant, by its handle and never its poll id. See `DeviceRow` in `@braindog/kernel`. */
@@ -2630,13 +2632,14 @@ export function createClient(options: ClientOptions) {
       const out = await call<Boot>('boot');
       return out.ok ? { ...out, value: bootFilled(out.value) } : out;
     },
-    version: async () => {
+    /* `at`, THE PAGE THE TAB IS ON (an app path), so the record can say who else is on it (`Version.here`). */
+    version: async (at?: string) => {
       const asked = Date.now();
       const heard = `${base} ${options.token ?? ''}`;
       /* WHAT MOVED SINCE THE VERSION THIS TAB HEARD LAST is asked with it, while reads are kept, so a move over other lists
          drops nothing kept over these (`keepOver`). */
       const since = KEEPING ? HEARD.get(heard) : undefined;
-      const out = await call<Version>('version', since === undefined ? {} : { since });
+      const out = await call<Version>('version', { ...(since === undefined ? {} : { since }), ...(typeof at === 'string' && at !== '' ? { at } : {}) });
       if (out.ok && typeof out.value.version === 'number') {
         const moved = out.value.moved;
         if (since !== undefined && HEARD.get(heard) === since && Array.isArray(moved) && out.value.version !== since) keepOver(heard, since, out.value.version, moved);

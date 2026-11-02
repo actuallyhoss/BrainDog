@@ -38,10 +38,15 @@ import { forgetSignedOut } from '../record/signed-out.ts';
  * copy (`offline.ts`), and `null` when everything drawn came from the record. `Pull.svelte` says it as "Offline, showing what you last saw at
  * 14:02".
  */
-export const live = $state<{ state: LiveState; version: number | null; from: number | null; ended: { said: string } | null }>({
+export const live = $state<{ state: LiveState; version: number | null; from: number | null; ended: { said: string } | null; here: readonly string[]; hereAt: string }>({
   state: 'open',
   version: null,
   from: null,
+  /* WHO ELSE IS ON THIS PAGE, by name, as the record heard it on this poll (`Version.here`, collab pass 2): the head bar's
+     small faces. Empty when nobody is, or the host is older. */
+  here: [],
+  /* AND THE PAGE IT WAS HEARD FOR, so a tab that has moved on draws nobody until the next poll says who is on the new one. */
+  hereAt: '',
   /* THE DOOR SAID THIS PERSON'S ACCESS ENDED, in its own sentence with the owner's name: the layout
      draws the ended screen over everything, and the copies are already gone. */
   ended: null,
@@ -175,7 +180,9 @@ function asker(base: string): () => Promise<number> {
   let client: Promise<ReturnType<typeof createClient>> | null = null;
   return async () => {
     client ??= import('@braindog/client').then(({ createClient }) => createClient({ base }));
-    const out = await (await client).version();
+    /* THE PAGE THIS TAB IS ON RIDES WITH THE POLL, an app path and nothing else, so the record can say who else is on it. */
+    const asked = typeof location === 'undefined' ? undefined : location.pathname;
+    const out = await (await client).version(asked);
     if (!out.ok) {
       /* A SESSION THAT ENDED TAKES THE READ COPY WITH IT. The worker deletes it on any 401 it sees, and this covers a
          page the worker does not control yet (the first visit, before it claims the tab). */
@@ -205,6 +212,11 @@ function asker(base: string): () => Promise<number> {
       known = epoch;
       void reboot().catch(() => undefined);
     }
+    /* WHO ELSE IS HERE, replaced only when it changed, so the faces do not redraw on every poll. */
+    const here = Array.isArray(out.value.here) ? out.value.here.filter((n): n is string => typeof n === 'string' && n !== '').slice(0, 8) : [];
+    const at = asked ?? '';
+    if (here.join('\n') !== live.here.join('\n')) live.here = here;
+    if (at !== live.hereAt) live.hereAt = at;
     return out.value.version;
   };
 }

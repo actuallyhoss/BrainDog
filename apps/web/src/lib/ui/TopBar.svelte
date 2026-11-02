@@ -19,6 +19,7 @@
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import Bell from '../shell/Bell.svelte';
+  import HereFaces from '$lib/shell/HereFaces.svelte';
   import { frame } from '../shell/frame.svelte.ts';
   import type { Crumb } from '../shell/side.ts';
   import YouMenu from '../shell/YouMenu.svelte';
@@ -66,6 +67,7 @@
   {/if}
 
   <span class="bar-end" data-alone={searching ? '' : undefined}>
+    <HereFaces />
     <Bell />
     <YouMenu />
   </span>
