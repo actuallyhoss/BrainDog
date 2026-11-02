@@ -468,6 +468,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   agents: [
     {
+      version: '1.33.0',
+      notes: "A skill's page says when to use it at the size of the rest of the page, and shows the skill's text even while it has only one version.",
+    },
+    {
       version: '1.32.0',
       notes: 'Agents no longer needs Projects. Without Projects, a learning, skill, key or tool applies everywhere, and once Projects is on it can say which project.',
     },

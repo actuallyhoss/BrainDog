@@ -620,18 +620,25 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
     icon: 'skill',
     requires: ['register.skills', 'register.learnings'],
     blocks: [
-      /* THE TRIGGER IS THE PAGE'S LINE, SINCE 1.4.0: the sentence that makes a session reach for the skill. */
-      { kind: 'note', lead: true, span: 12, body: '{{trigger}}' },
+      /* THE TRIGGER IS THE PAGE'S LINE, SINCE 1.4.0: the sentence that makes a session reach for the skill.
+         AT THE BODY SIZE, UNDER ITS OWN HEADING, SINCE 1.33.0 (pages pass, 2 Nov): as the page's lead it was drawn at the
+         hero size in a tile of its own, two lines of 34px for one sentence of prose ("At the end of a run, to leave the
+         next step..."), so the page shouted the trigger and showed nothing of the skill. */
+      { kind: 'note', key: 'trigger', heading: 'When to use it', icon: 'info', span: 12, body: '{{trigger}}' },
+      /* ITS TEXT, SINCE 1.33.0 HEADED SO: the newest version against the one before, and a skill with one version drawn
+         whole (`historyTable` in `apps/web/src/lib/record/api.ts`), where "Versions" said "One version so far." and the
+         skill's own text was on no screen. */
       {
         kind: 'diff',
-        heading: 'Versions',
+        key: 'versions',
+        heading: 'Its text',
         icon: 'history',
         span: 12,
         source: 'register.skills',
         row: '{{spoken}}',
         field: 'body',
         versions: 5,
-        empty: 'One version so far.',
+        empty: 'No text yet.',
       },
       /* THE LEARNINGS THIS VERSION TOOK IN, each a card that opens its row. `id is {{because}}` and not a note:
          `because` holds row ids, which `fill` writes into a sentence as `id is A or B`, so the cards are the lessons
@@ -873,8 +880,11 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      the timeline, where a block of cards said the same six over it. No list, field or figure goes.
      1.32.0 REQUIRES NOTHING, SO IT IS MINOR (onboarding7, 2 Nov): `project` on the four lists is a link to Projects and
      no longer a need, so a household answering the AI tools question gets Agents and no Projects. On a record that
-     holds Projects the document is as 1.31.0's; on one that does not, the field goes with what reads it (`LINKS`). */
-  manifest: { id: 'agents', version: '1.32.0', requires: [] },
+     holds Projects the document is as 1.31.0's; on one that does not, the field goes with what reads it (`LINKS`).
+     1.33.0 IS WORDS AND A HEADING, SO IT IS MINOR (pages pass, 2 Nov): a skill's page says its trigger under When to use
+     it at the body size, where it was the page's hero line, and its versions block is headed Its text. No list, field
+     or figure goes. */
+  manifest: { id: 'agents', version: '1.33.0', requires: [] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

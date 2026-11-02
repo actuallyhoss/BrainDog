@@ -2162,11 +2162,15 @@ export function feedTable(
  * version has nothing to compare with and draws no line. `total` is every version the row has held.
  */
 export function historyTable(history: readonly { text: string }[], total: number): Pick<BlockResult, 'rows' | 'shown' | 'total'> {
+  /* A TEXT WITH ONE VERSION IS DRAWN WHOLE, as what that version put in (pages pass, 2 Nov): a skill's page said "One
+     version so far." and never showed the skill, so the one place to read it was its row's raw field. Two or more are
+     the newest against the one before, as ever. */
+  const [newest, before] = history;
   return {
     rows:
-      history.length > 1
-        ? diffRows(history[1]!.text, history[0]!.text).map((line, i) => ({ key: String(i), cells: [line], href: undefined, tone: undefined }))
-        : [],
+      newest === undefined
+        ? []
+        : diffRows(before?.text ?? '', newest.text).map((line, i) => ({ key: String(i), cells: [line], href: undefined, tone: undefined })),
     shown: history.length,
     total,
   };

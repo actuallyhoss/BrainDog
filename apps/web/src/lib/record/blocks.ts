@@ -1540,6 +1540,11 @@ function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSp
         ? /* THE LOG'S ROWS ARE WRITTEN BY THE READER (`agentsTable`, `feedTable`) in the kind's own cells, so they go
              through as they are. Without this a live `agents` block drew its `empty:` over five things an agent did. */
           block.rows.map((r) => r.cells.map((c) => escapeCell(c ?? '')).join(' | '))
+      : block.kind === 'diff' && block.source
+        ? /* A TEXT'S VERSIONS ARE WRITTEN BY THE READER TOO (`historyTable`), one marked line a row (pages pass, 2 Nov).
+             Without this a skill's page drew its `empty:` over every version it held, the newest against the one before
+             included, because no branch here wrote a `diff`'s rows. */
+          block.rows.map((r) => escapeCell(r.cells[0] ?? ''))
       : block.kind === 'chips'
         ? chipsRows(block)
       : block.kind === 'gauge'
