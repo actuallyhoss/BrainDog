@@ -4,7 +4,7 @@ The Sentry add-on reads what is breaking in your apps from Sentry every hour and
 
 ## What it adds
 
-- **Sentry projects**, a list of the projects in your Sentry organization, each linked to a project of yours. A new Sentry project is linked to the project whose name it starts with, so `crumb-bot`, `bake-health` and `crumb-site` all go to Crumb.gg. Change a link on the row and it stays as you set it.
+- **Sentry projects**, a list of the projects in your Sentry organization, each linked to a project of yours. A new Sentry project is linked to the project whose name its words are, with the part it names taken off, so `crumb-bot`, `bake-health` and `crumb-site` all go to Crumb.gg and `marlow-site` to Marlow & Co ("& Co", "Ltd" and the like do not count). One that only looks like a project of yours is not linked: it waits on the Errors page under Looks like one of yours for you to pick. Change a link on the row and it stays as you set it.
 - **Sentry issues**, every open issue: what broke, where, how many times, how many people it hit, when it was last seen and a link to it on Sentry. An issue Sentry no longer lists as open is marked closed, never deleted.
 - **Four numbers a project** in Numbers: Open errors, New errors in a day, Error events in a day and People hit in a day. They chart like any other feed, and a number is written when it moves and at least once a day.
 - An **Errors** page with what is worth a look, every open issue and your Sentry projects; an **Errors** tile on each linked project's page; and two widgets for Today, Errors and Errors worth a look.

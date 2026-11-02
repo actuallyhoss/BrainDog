@@ -4,8 +4,9 @@ What is breaking in your apps, read from Sentry every hour. Reads only: nothing 
 
 - **Sentry projects**: each project in your Sentry organization, the project of yours it belongs to, and its open
   errors, new ones in a day, error events in a day and people hit in a day. A new Sentry project is linked to the
-  project of yours whose name it starts with (`crumb-bot`, `bake-health` and `crumb-site` go to Crumb.gg). Change the link
-  on the row and it stays yours.
+  project of yours whose name its words are, its part (`-site`, `-bot`, `-health`, `-api`, `-web`) taken off and "& Co",
+  "Ltd" and punctuation ignored: `crumb-bot` goes to Crumb.gg, `marlow-site` to Marlow & Co. One that only looks alike
+  is suggested on the Errors page, never linked. Change the link on the row and it stays yours.
 - **Sentry issues**: every open issue, with how often it happened, how many people it hit, when it was last seen and a
   link to it on Sentry. Agents read it like any list, so "what's breaking in Bake" is a list of `sentry_issues` where
   the project is Crumb.gg.

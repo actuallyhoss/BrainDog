@@ -11,11 +11,13 @@
  * One row an open issue in Sentry issues, found again by Sentry's issue id, so an issue is never written twice; an issue
  * that is no longer open in Sentry is marked closed here, never deleted. And four numbers a project of yours in Numbers,
  * so they chart like any other feed: Open errors, New errors in a day, Error events in a day and People hit in a day. A
- * number is written when it moves, and at least once a day when it does not.
+ * number is written when it moves, and at least once a day when it does not. A Sentry project not linked to one of
+ * yours has its own four, named after it on Sentry ("Open errors · billing-worker").
  *
- * WHICH PROJECT A SENTRY PROJECT BELONGS TO. A new Sentry project is linked to the project of yours whose name it
- * starts with: crumb-bot, bake-health and crumb-site go to Crumb.gg, marsh-bot to Marsh.gg. Only a single clear match is
- * linked; anything else is left for you to pick on the row. A link you change or clear is yours and is never redone.
+ * WHICH PROJECT A SENTRY PROJECT BELONGS TO. A new Sentry project is linked to the project of yours whose name its
+ * words are, with the part it names taken off: crumb-bot, bake-health and crumb-site go to Crumb.gg, marsh-bot to
+ * Marsh.gg, marlow-site to Marlow & Co. Only a single sure match is linked; one that only looks alike is put on the
+ * row as Looks like for you to pick. A link you change or clear is yours and is never redone.
  *
  * WHEN IT SPEAKS UP. An issue that is new and high priority, has come back after being resolved, or is escalating
  * gets `alarm` set, once each time it turns that way. The add-on's rules ring the bell for it (inside your quiet hours
@@ -49,23 +51,69 @@ export function stemOf(name) {
   return bare.replace(/[^a-z0-9]+/gu, '');
 }
 
+/* WORDS A COMPANY'S NAME CARRIES THAT SAY NOTHING ABOUT WHICH ONE IT IS: "Marlow & Co" is Marlow. */
+const NAME_NOISE = new Set(['co', 'ltd', 'limited', 'inc', 'llc', 'llp', 'plc', 'gmbh', 'corp', 'the', 'and']);
+/* WHAT A SENTRY PROJECT'S SLUG ENDS IN TO SAY WHICH PART OF A PROJECT IT IS: `marlow-site` is Marlow's site. */
+const SLUG_PARTS = new Set(['site', 'bot', 'health', 'api', 'web', 'www', 'server', 'worker', 'app']);
+
+/** A project's name as words: lower case, its web ending, "& Co", "Ltd" and punctuation gone. "Marlow & Co" is `["marlow"]`. */
+export function nameWords(name) {
+  const lower = String(name ?? '').toLowerCase().trim().replace(/\.(gg|com|io|app|dev|net|org|co|ai|xyz|so|me)$/u, '');
+  const words = lower.replace(/&/gu, ' and ').split(/[^a-z0-9]+/u).filter((w) => w !== '');
+  const kept = words.filter((w) => !NAME_NOISE.has(w));
+  return kept.length > 0 ? kept : words;
+}
+
+/** A slug as words, with the part it names taken off the end: `marlow-site` is `["marlow"]`, `kiln-type` `["kiln", "type"]`. */
+export function slugWords(slug) {
+  const words = String(slug ?? '').toLowerCase().split(/[^a-z0-9]+/u).filter((w) => w !== '');
+  while (words.length > 1 && SLUG_PARTS.has(words[words.length - 1])) words.pop();
+  return words;
+}
+
 /**
- * The project of yours a Sentry project's slug points at, or `null`. The slug's first word (`bake` of `crumb-bot`) or
- * the whole slug run together must be a project's stem, or start with one at least three letters long, and exactly one
- * project may match. Pure, so the rule can be read without the record around it.
+ * Which project of yours a Sentry project's slug points at: `{ link, maybe }`, each a project's id or `null`.
+ *
+ * SURE, AND LINKED, when the slug's words (its part taken off) are the name's words, or begin with them: `crumb-bot` is
+ * Crumb.gg, `marlow-site` is Marlow & Co, `kiln-type` is Kiln. Exactly one project may be that sure, or the longest
+ * name when one is longer than the rest (`bake` and `bakery`).
+ * UNSURE, AND ONLY SUGGESTED, when the two share a first word or a word of four letters or more but neither is the
+ * other (`marlow-site` and "Marlow Studio"); the add-on puts it on the row as Looks like and leaves the link to you.
+ * Pure, so the rule can be read without the record around it.
  */
-export function suggestFor(slug, things) {
-  const head = stemOf(String(slug).split(/[-_.]/u)[0]);
+export function matchFor(slug, things) {
+  const s = slugWords(slug);
   const whole = stemOf(slug);
-  const hits = things.filter((t) => {
-    const stem = stemOf(t.fields.name);
-    if (stem.length < 3) return false;
-    return head === stem || whole === stem || whole.startsWith(stem);
-  });
-  /* THE LONGEST STEM WINS A TIE BETWEEN A PROJECT AND ONE WHOSE NAME IT STARTS (`bake` and `bakery`), else nothing. */
-  if (hits.length === 1) return hits[0].id;
-  const best = hits.map((t) => [t, stemOf(t.fields.name).length]).sort((a, b) => b[1] - a[1]);
-  return best.length > 1 && best[0][1] > best[1][1] ? best[0][0].id : null;
+  if (s.length === 0) return { link: null, maybe: null };
+  const sure = [];
+  const unsure = [];
+  for (const t of things) {
+    const w = nameWords(t.fields.name);
+    const joined = w.join('');
+    if (joined.length < 3) continue;
+    let starts = false;
+    for (let k = 1; k <= s.length && !starts; k++) starts = s.slice(0, k).join('') === joined;
+    if (starts || whole === joined || whole === stemOf(t.fields.name)) {
+      sure.push([t, joined.length]);
+      continue;
+    }
+    const shared = w.filter((x) => s.includes(x) && (x.length >= 4 || x === s[0]));
+    if (w[0] === s[0] || shared.length > 0) unsure.push([t, shared.length + (w[0] === s[0] ? 1 : 0)]);
+  }
+  const one = (hits) => {
+    if (hits.length === 1) return hits[0][0].id;
+    const best = [...hits].sort((a, b) => b[1] - a[1]);
+    return best.length > 1 && best[0][1] > best[1][1] ? best[0][0].id : null;
+  };
+  const link = one(sure);
+  if (link) return { link, maybe: null };
+  /* SEVERAL EQUALLY SURE IS NOT SURE: the first of them is only suggested when nothing else is. */
+  return { link: null, maybe: sure.length > 0 ? null : one(unsure) };
+}
+
+/** The project of yours a Sentry project's slug points at, or `null`: `matchFor`'s sure link alone. */
+export function suggestFor(slug, things) {
+  return matchFor(slug, things).link;
 }
 
 /**
@@ -196,14 +244,22 @@ export default async function run(ctx) {
     const slug = String(p.slug ?? p.name ?? id);
     const row = heldBySlug.get(id) ?? held.find((r) => r.fields.slug === slug);
     let thing = row ? (row.fields.thing ?? null) : null;
-    let suggested = row ? (row.fields.suggested ?? null) : null;
-    if (!row) {
-      suggested = suggestFor(slug, things);
-      thing = suggested;
+    let maybe = row ? (row.fields.maybe ?? null) : null;
+    /* MATCHED ONCE: a new row, or one an older version could not link that nobody has touched since (no link, nothing the
+       add-on linked, never matched by words). After that the link is the person's, set, changed or cleared. */
+    const fresh = !row || (row.fields.matched == null && row.fields.thing == null && row.fields.suggested == null);
+    let match = null;
+    if (fresh) {
+      match = matchFor(slug, things);
+      thing = match.link;
+      maybe = match.maybe;
     }
+    /* A LOOKS LIKE GOES ONCE A PROJECT IS PICKED, or when the project it named is gone. */
+    if (thing || (maybe && !nameOf.has(maybe))) maybe = null;
     linked.set(slug, thing);
-    seen.push({ id, slug, name: String(p.name ?? slug), platform: p.platform ? String(p.platform) : null, row, thing, suggested });
+    seen.push({ id, slug, name: String(p.name ?? slug).trim() || slug, platform: p.platform ? String(p.platform) : null, row, thing, maybe, match });
   }
+  const shownOf = new Map(seen.map((p) => [p.slug, p.name]));
 
   /* LINKED FIRST, then the rest, fifteen at most. */
   const asked = [...seen].sort((a, b) => (a.thing ? 0 : 1) - (b.thing ? 0 : 1)).slice(0, MOST_PROJECTS);
@@ -241,6 +297,9 @@ export default async function run(ctx) {
       platform: p.platform,
       link: siteOf.has(p.slug) ? `${siteOf.get(p.slug)}/projects/${p.slug}/` : (p.row?.fields.link ?? null),
       gone: false,
+      maybe: p.maybe,
+      matched: 'words',
+      ...(p.match && p.row ? { thing: p.thing, ...(p.thing ? { suggested: p.thing } : {}) } : {}),
       ...(c ? { unresolved: c.unresolved, new_24h: c.fresh, events_24h: c.events, users_24h: c.users, checked: ctx.now() } : {}),
     };
     if (!p.row) {
@@ -286,7 +345,7 @@ export default async function run(ctx) {
       issue_id: id,
       project: project.slug,
       thing,
-      project_name: thing ? nameOf.get(thing) || project.slug : project.slug,
+      project_name: (thing ? nameOf.get(thing) : '') || shownOf.get(project.slug) || project.slug,
       culprit: issue.culprit ? String(issue.culprit).slice(0, 300) : null,
       level: issue.level ? String(issue.level) : null,
       substatus: issue.substatus ? String(issue.substatus) : null,
@@ -331,12 +390,27 @@ export default async function run(ctx) {
     const c = counts.get(p.slug);
     const thing = linked.get(p.slug) ?? null;
     const at = thing ?? `slug:${p.slug}`;
-    const s = sums.get(at) ?? { thing, slug: thing ? null : p.slug, unresolved: 0, fresh: 0, events: null, users: null };
+    const s = sums.get(at) ?? { thing, shown: thing ? null : shownOf.get(p.slug) || p.slug, unresolved: 0, fresh: 0, events: null, users: null };
     s.unresolved += c.unresolved;
     s.fresh += c.fresh;
     if (c.events !== null) s.events = (s.events ?? 0) + c.events;
     if (c.users !== null) s.users = (s.users ?? 0) + c.users;
     sums.set(at, s);
+  }
+  /* NUMBERS 1.0 NAMED "Open errors, marlow-site" for an unlinked project take the name and the project it has now, so a
+     chart draws one line for it and not an old one beside the new for two weeks. */
+  let renamed = 0;
+  {
+    const older = await every(ctx, 'datapoints', { all: [{ field: 'tags', has: 'sentry' }, { any: MEASURES.map((m) => ({ field: 'name', starts: `${m.name}, ` })) }, { field: 'at', gte: new Date(nowMs - 15 * DAY_MS).toISOString() }] });
+    for (const r of older) {
+      const at = String(r.fields.name).indexOf(', ');
+      const measure = MEASURES.find((m) => m.name === String(r.fields.name).slice(0, at));
+      const slug = String(r.fields.name).slice(at + 2);
+      if (!measure || !shownOf.has(slug) || r.fields.thing) continue;
+      const thing = linked.get(slug) ?? null;
+      ctx.update(spoken('datapoints', r), thing ? { name: measure.name, thing } : { name: `${measure.name} · ${shownOf.get(slug)}` }, r.version);
+      renamed++;
+    }
   }
   const recent = await every(ctx, 'datapoints', { all: [{ field: 'tags', has: 'sentry' }, { field: 'at', gte: new Date(nowMs - 2 * DAY_MS).toISOString() }] });
   const latest = new Map();
@@ -350,7 +424,7 @@ export default async function run(ctx) {
     for (const m of MEASURES) {
       const value = s[m.key];
       if (value === null || value === undefined) continue;
-      const name = s.thing ? m.name : `${m.name}, ${s.slug}`;
+      const name = s.thing ? m.name : `${m.name} · ${s.shown}`;
       const had = latest.get(`${name}|${s.thing ?? ''}`);
       if (had && had.fields.value === value && nowMs - Date.parse(had.fields.at) < RESAY_MS) continue;
       ctx.write('datapoints', { name, value, unit: m.unit, ...(s.thing ? { thing: s.thing } : {}), at: ctx.now(), source: 'polled', tags: ['sentry', m.tag] });
@@ -360,7 +434,7 @@ export default async function run(ctx) {
 
   const total = [...counts.values()].reduce((n, c) => n + c.unresolved, 0);
   ctx.log(
-    `Read ${asked.length} of ${seen.length} Sentry projects: ${total} open issues${rang > 0 ? `, ${rang} newly worth a look` : ''}${closed > 0 ? `, ${closed} no longer open` : ''}. Wrote ${wrote} rows and ${said} numbers.`,
+    `Read ${asked.length} of ${seen.length} Sentry projects: ${total} open issues${rang > 0 ? `, ${rang} newly worth a look` : ''}${closed > 0 ? `, ${closed} no longer open` : ''}. Wrote ${wrote} rows and ${said} numbers${renamed > 0 ? `, and renamed ${renamed} older ones` : ''}.`,
   );
   return { projects: seen.length, asked: asked.length, open: total, alarms: rang, closed, numbers: said };
 }
