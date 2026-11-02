@@ -589,6 +589,44 @@
     font-weight: 600;
   }
 
+  /* UNDER A THUMB EACH LINE IS A 44 ROW (mobile pass, 2 Nov). The brief's lines were links 18 tall, 24 apart, so a thumb
+     meant for Tuesday's task opened Wednesday's. The whole row is the target, day and all, and the words stay one line.
+     The earning lines and a project's name in the list grow the same way, inside their own rows. */
+  @media (pointer: coarse) {
+    .wk-lines {
+      gap: 0;
+    }
+
+    .wk-lines li {
+      position: relative;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+
+    .wk-lines a::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+    }
+
+    .kv li {
+      position: relative;
+      align-items: center;
+      min-block-size: var(--tap);
+      padding-block: var(--sp-1);
+    }
+
+    .kv-k::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+    }
+
+    .r-name {
+      min-block-size: var(--tap);
+    }
+  }
+
   /* ON A PHONE A TILE IS ITS FIGURE AND ITS FIRST LINE, the day over the words in two lines at most; the figure says how
      many, so "and N more" is left to the desk. */
   @media (width < 640px) {
