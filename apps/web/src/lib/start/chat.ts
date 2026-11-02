@@ -533,15 +533,15 @@ function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): 
     const v = c.trim();
     if (fits(v, CHOICE_MOST) && !named.has(v.toLowerCase()) && !INSIDE_WORDS.test(v) && !choices.some((x) => x.value === v)) choices.push(tap(v));
   }
-  /* WHERE THAT LEFT FEWER THAN TWO: plain examples for their work, the rules' own taps for what first, or none. */
+  /* WHERE THAT LEFT FEWER THAN TWO: plain examples for their work, or none (what first is the rules' own, above). */
   if (choices.length < 2 && m.choices.length > 0) {
     const kind = kindOf(w.said, w.usecase) ?? '';
     /* A QUESTION ABOUT WHICH PROJECTS IS ANSWERED WITH PLAIN EXAMPLES OF WORK, whatever topic it came under. */
     const work = topic === 'work' || /\bprojects?\b/iu.test(question);
-    const instead = work ? (WORK_EXAMPLES[kind] ?? ['A few projects', 'One big project']) : topic === 'first' ? (rulesAsk('first', w)?.choices.map((c) => c.label) ?? []) : [];
+    const instead = work ? (WORK_EXAMPLES[kind] ?? ['A few projects', 'One big project']) : [];
     choices.splice(0, choices.length, ...instead.filter((x) => !named.has(x.toLowerCase())).map((x) => tap(x)));
   }
-  return { topic, question, choices: choices.slice(0, 4), many: topic === 'tools' || topic === 'first', by: 'model' };
+  return { topic, question, choices: choices.slice(0, 4), many: topic === 'tools', by: 'model' };
 }
 
 /**
