@@ -54,7 +54,7 @@
   import { dateSaid, leadingCode, symbolFigure } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { valueSaid } from '$lib/voice.ts';
-  import { dirOf, display, identityFor, labelOf, toneOf } from '$lib/record/api.ts';
+  import { dirOf, display, identityFor, labelOf, orsOf, tableOf, toneOf } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { agentKey, agentName, handFor } from '$lib/record/hand.ts';
   import { scopeFieldOf, scopeOf, type Scope } from '$lib/record/scope-move.ts';
@@ -235,6 +235,23 @@
   /* The tick's accessible name. `copy.ts` holds every sentence (`50 §3`) and this is one. */
   const selectedLabel = copy.selected;
 
+  /**
+   * THE CARD LEADS WITH WHAT THE LIST'S TABLE LEADS WITH, WHERE IT DECLARES ONE (leftovers8): the Ledger's table opens on
+   * who the money went to, and its card on a phone led with the description, which an import fills with the category.
+   * The table's first column of words, read as the table reads it: its field, else each `or` in turn. A list that
+   * declares no table leads with its card's first field, as before.
+   */
+  const lead = $derived.by(() => {
+    if (!decl || !Array.isArray(decl.table)) return null;
+    return tableOf(decl).find((c) => c.field === decl.title || decl.fields.find((f) => f.id === c.field)?.type === 'text') ?? null;
+  });
+  const titleField = $derived(lead?.field ?? decl?.mobile[0] ?? '');
+  const titleOf = (e: Entry): string | null => {
+    let said = display(register, titleField, e.fields[titleField], now, names);
+    for (const or of lead ? orsOf(lead) : []) if (said === null) said = display(register, or, e.fields[or], now, names);
+    return said;
+  };
+
   /* A FIGURE IS A QUANTITY, and the first of the card's two fields that is one ends the title's line. */
   const FIGURES = new Set(['money', 'int', 'decimal']);
   const figure = $derived(decl?.mobile.slice(1).find((f) => FIGURES.has(decl.fields.find((d) => d.id === f)?.type ?? '')));
@@ -351,7 +368,7 @@
 {#if decl}
   <ul class="cards" data-faced={faced ? '' : undefined}>
     {#each steady as e (e.seq)}
-      {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]], now, names)}
+      {@const title = titleOf(e)}
       {@const line = lineOf(e)}
       {@const holder = holderOf(e)}
       <!-- A CARD ADDED OR TAKEN AWAY ARRIVES AND LEAVES WITH THE LIST'S MOTION (motion F7.1), and the cards beside it
@@ -362,7 +379,7 @@
                what the row is before anything about it. ONE THING LEADS IT, the project's mark or, on a
                list of people, the person's face, in a slot every card keeps when any card in the list has
                one, so the titles share an edge. The tone and the mark both led it once, two dots before a word. -->
-          <span class="card-title" dir={dirOf(register, decl.mobile[0])} data-whole={figure ? undefined : ''} data-slot={slotted ? '' : undefined} data-own={title === null ? undefined : ''}>
+          <span class="card-title" dir={dirOf(register, titleField)} data-whole={figure ? undefined : ''} data-slot={slotted ? '' : undefined} data-own={title === null ? undefined : ''}>
             {#if faced}
               <!-- `aria-hidden` inside `Face`, because the name it is drawn from is the title beside it. -->
               <span class="card-face"><Face name={title ?? ''} kind="person" size="s" /></span>

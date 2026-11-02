@@ -725,12 +725,16 @@ export function tableOf(r: RegisterDecl): (Column & { or?: string | readonly str
     });
     const lead = !led && (f.type === 'text' || f.id === r.title);
     if (lead) led = true;
+    /* A LINK KEEPS ITS NAME WHOLE BEFORE THE LEAD TAKES THE REST, AND THE LATER ONE GIVES WAY FIRST (leftovers8): at 1280
+       the Ledger cut "Studio current acc…" at a link's 16ch with room to spare in Payee. The first link may grow to 24ch
+       from 16ch, a later one shrinks to 10ch before the first goes under 16ch, and Amount keeps its 15ch at the end. */
+    const linked = f.type === 'ref' ? (cols.some((c) => r.fields.find((x) => x.id === c.field)?.type === 'ref') ? 'minmax(10ch, 16ch)' : 'minmax(16ch, 24ch)') : null;
     cols.push({
       field: f.id,
       label: typeof column.label === 'string' && column.label.trim() !== '' ? column.label : labelOf(f),
       /* A DAY THAT OPENS THE ROW STARTS AT THE ROW'S EDGE, as the words do, and is as wide as "30 Aug 2025": ended in its
          15ch it hung in a gutter of its own. */
-      width: lead ? 'minmax(24ch, 3fr)' : cols.length === 0 && f.type === 'day' ? '12ch' : (WIDTH[f.type] ?? WIDTH.text!),
+      width: lead ? 'minmax(24ch, 3fr)' : cols.length === 0 && f.type === 'day' ? '12ch' : (linked ?? WIDTH[f.type] ?? WIDTH.text!),
       align: END.has(f.type) && !(cols.length === 0 && f.type === 'day') ? 'end' : 'start',
       truncate: f.type === 'money' ? 'never' : 'end',
       ...(ors.length === 0 ? {} : { or: ors.length === 1 ? ors[0]! : ors }),
