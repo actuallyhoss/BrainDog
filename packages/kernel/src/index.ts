@@ -350,7 +350,7 @@ import {
 } from './instruction.ts';
 import { profileById, profileFor as profileMatching, readProfiles, setProfile as writeProfile, type Profile, type ProfileRow, type ProfileWho } from './agent-profile.ts';
 import { agentsDataSteps } from './migrations/0042_agents.ts';
-import { ASKED_KEY, agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
+import { ASKED_KEY, agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, ownerIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, undoStaged as stageUndo, type UndoApplied, type UndoDeclared, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
 import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
 import { foldPlan as planFold, isFold as foldMade, type FoldDeps, type FoldPlan } from './undo-fold.ts';
@@ -5394,7 +5394,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         ) as Json;
         sql.exec('UPDATE event SET rowid = (SELECT MAX(rowid) + 1 FROM event), to_v = ? WHERE id = ?', written(shape), made.id);
         const changed = touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null));
-        handedNotice(decl, entry, changed, w.actor);
+        handedNotice(decl, entry, changed, w.actor, writerPerson(w));
         const folded = w.batch ?? made.batch ?? made.id;
         return ok({ ...rules(entry, register, w, folded, { op: 'update', changed }), batch: folded });
       }
@@ -5511,7 +5511,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const changed = touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null));
       if (paired && decl.pairs && !changed.includes(decl.pairs.mark) && paired.fields[decl.pairs.mark] !== current.fields[decl.pairs.mark])
         changed.push(decl.pairs.mark);
-      if (!deleting) handedNotice(decl, paired ?? entry, changed, w.actor);
+      if (!deleting) handedNotice(decl, paired ?? entry, changed, w.actor, writerPerson(w));
       /* THE ANSWER CARRIES ITS BATCH, so a receipt's Undo can ask the record to put back this write and all it caused. */
       return ok({ ...rules(paired ?? entry, register, w, batch, { op: first === 'delete' ? 'delete' : 'update', changed }), batch });
     });
@@ -5529,8 +5529,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * `checkBody` REFUSES A CHOICE OF ONE ("A choice is between at least two options."), so a second option rides
    * beside "Seen" rather than the done-means' single button: "Put back" is the done-means' own name for undoing a
    * hand, so it is a real second option and not a formality invented to pass the gate.
+   *
+   * NOT TO THE PERSON BEHIND THE WRITE, nor to the record's owner when no other person is behind it (2 Nov fix pass).
+   * `by` is the writer's person (`writerPerson`): a member is themself, and an agent is the person whose key it runs
+   * under. Measured on his record: an agent working for him set 63 tasks' owner to him, and each opened "Someone handed
+   * you" for him to tap Seen on. Nobody handed him anything: he made the change, through his agent. A write with no
+   * person behind it (a rule, an import, Slash, the system) giving a row to the record's owner is the record's own
+   * doing for him, and it applies quietly too. Another member, or another member's agent, handing him a row still tells him.
    */
-  function handedNotice(decl: RegisterDecl, entry: Entry, changed: readonly string[], actor: string): void {
+  function handedNotice(decl: RegisterDecl, entry: Entry, changed: readonly string[], actor: string, by: string | undefined): void {
     const field = decl.hand?.person;
     if (!field || !changed.includes(field)) return;
     const to = entry.fields[field];
@@ -5544,7 +5551,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       "SELECT m.person_id AS id FROM member m JOIN person p ON p.id = m.person_id WHERE p.email = ? AND p.suspended_at IS NULL LIMIT 1",
       email,
     );
-    if (!member || member.id === actor) return;
+    if (!member || member.id === actor || member.id === by) return;
+    if (by === undefined && ownerIn(sql, member.id)) return;
     const name = sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', actor)?.name?.trim();
     const title = entry.fields[decl.title];
     const filed = openSuggestion(governDeps(), actor, {
