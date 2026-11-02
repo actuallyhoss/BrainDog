@@ -1010,7 +1010,7 @@
 {:else if board}
   <!-- WHILE THE BOARD'S CODE COMES THE SLOT SAYS IT IS STILL READING, as the board says itself once it reads (`Waiting`),
        so what stands under it on the page (`Changed.svelte`) waits unseen rather than being drawn and pushed down. -->
-  {#await import('$lib/home/ProjectsBoard.svelte')}<span hidden aria-busy="true"></span>{:then { default: ProjectsBoard }}<ProjectsBoard list={board} entries={(block.entries ?? []) as never} />{/await}
+  {#await import('$lib/home/ProjectsBoard.svelte')}<span hidden aria-busy="true" data-board-reading></span>{:then { default: ProjectsBoard }}<ProjectsBoard list={board} entries={(block.entries ?? []) as never} />{/await}
 {:else if projectCards}
   <!-- THE CARDS ON THE BOARD, NOT IN A TILE (proj F5): the slot's fill and padding go (`:has(> .project-cards)` below),
        its heading is the lane bar, and the cards take the one grid every screen lays them in. -->
@@ -1186,7 +1186,11 @@
      filled (Agents on a phone, each of Working now, Up next and Recent runs). They keep their place in the layout but
      are not drawn until every panel above them has answered, and never longer than 2.5s, so a read that hangs hides
      nothing for good. */
-  :global(.block-slot:has(> [data-seen-none][aria-busy='true']) ~ .block-slot) {
+  /* AND SO DOES THE PROJECTS BOARD WHILE IT READS (jumps, 2 Nov): its bars stand 235px and the board lands about 1050px
+     on a desk, so on Portfolio "Waiting on you" was drawn under the bars and pushed off screen (CLS 0.085). The board's
+     height turns on what each project holds, so no count can hold it; what is under it waits unseen instead. */
+  :global(.block-slot:has(> [data-seen-none][aria-busy='true']) ~ .block-slot),
+  :global(.block-slot:has([data-board-reading]) ~ .block-slot) {
     visibility: hidden;
     animation: slot-shown 0s linear 2.5s forwards;
   }

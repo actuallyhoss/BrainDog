@@ -10,6 +10,7 @@
 -->
 <script lang="ts">
   import { createClient } from '@braindog/client';
+  import type { TransitionConfig } from 'svelte/transition';
 
   import { apiBase } from '$lib/at.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -28,6 +29,10 @@
   let fault = $state('');
   let field = $state<HTMLInputElement | null>(null);
   const shown = $derived(!done && nameAskDue(shell, apiBase()));
+  /* IT FOLDS AWAY ONLY ONCE IT IS ANSWERED OR SKIPPED. Taken away while still asking, it is this copy being handed on: on
+     a phone the frame's copy goes when the page's head draws the banners under its bar, and with the fold both stood at
+     once and the page slid up 162px a beat after it arrived (jumps, 2 Nov: CLS 0.17 on Numbers and Marlow & Co). */
+  const leave = (node: Element): TransitionConfig => (shown ? { duration: 0 } : dismiss(node));
 
   async function save(e: SubmitEvent): Promise<void> {
     e.preventDefault();
@@ -66,8 +71,9 @@
 
 {#if shown}
   <!-- ANSWERED OR SKIPPED, IT LETS GO AND THE PAGE UNDER IT RISES INTO ITS ROOM (motion pass 2 Nov), rather than the page
-       jumping up by the banner's height. `global`, because the frame's own if takes it away in the same moment. -->
-  <div out:dismiss|global>
+       jumping up by the banner's height. `global`, because the frame's own if takes it away in the same moment. Not when
+       it is still asking (`leave`): then another copy already stands in its place. -->
+  <div out:leave|global>
   <!-- THE WORDS ARE THE BANNER'S LINE AND THE FORM ITS ACTIONS, since the line is a paragraph and a form may not sit in one. -->
   <Banner tone="note" icon="user-check">
     <label for="name-ask-field">What should people here call you?</label>

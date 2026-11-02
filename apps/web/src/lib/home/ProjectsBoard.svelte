@@ -196,7 +196,8 @@
     {/if}
   </div>
 {:else if !failed}
-  <Waiting rows={4} />
+  <!-- `data-board-reading`: what stands under the board on the page waits unseen until it lands (`BlockSlot.svelte`). -->
+  <div class="b-reading" data-board-reading><Waiting rows={4} /></div>
 {/if}
 
 <ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.href} send={menuRow?.key ?? null} />
@@ -218,6 +219,10 @@
 {/snippet}
 
 <style>
+  .b-reading {
+    display: contents;
+  }
+
   .projects-board {
     display: grid;
     gap: var(--inset, 12px);
