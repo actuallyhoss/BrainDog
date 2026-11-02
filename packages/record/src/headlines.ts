@@ -406,6 +406,11 @@ const namesOf = (page: HeadlinePage): string[] => [...(page.items ?? []).map((i)
 
 /** A hole as a line writes it: `{{id}}`, the id a figure was handed by. The same form a lead note's template has. */
 const HOLE = /\{\{\s*([^{}\s]+)\s*\}\}/gu;
+/** A currency code typed just before a hole: `USD {{over-all}}`. */
+let currencies: ReadonlySet<string> | undefined;
+/** The currency codes the runtime knows, so "NYC {{figure}}" keeps its word. */
+const CURRENCIES = (): ReadonlySet<string> => (currencies ??= new Set(typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('currency') : ['USD', 'EUR', 'GBP']));
+const CODED_HOLE = /\b([A-Z]{3})\s+(\{\{\s*([^{}\s]+)\s*\}\})/gu;
 
 /**
  * Every hole a page's line may hold, with what fills it: each figure's id for its value, and `<id>.change` for how far
@@ -427,7 +432,14 @@ export function handedHoles(page: HeadlinePage): Map<string, string> {
 export function filledHeadline(line: string, page: HeadlinePage, now: Today = Date.now()): string | null {
   const handed = handedHoles(page);
   let missing = false;
-  const filled = line.replace(HOLE, (_, id: string) => {
+  /* A CURRENCY CODE THE MODEL TYPED BEFORE A FIGURE THAT SAYS ITS OWN MONEY GOES (verify4, 2 Nov): Reports read "USD
+     $12,536 more out than in: USD $45,862 in" where the figure's "$" already said it. Kept where the figure starts with
+     a digit, where the code is the only mark of its money. */
+  const coded = line.replace(CODED_HOLE, (all: string, code: string, hole: string, id: string) => {
+    const value = handed.get(id);
+    return value !== undefined && CURRENCIES().has(code) && (/^[^\p{L}\p{N}\s]/u.test(value) || value.startsWith(code)) ? hole : all;
+  });
+  const filled = coded.replace(HOLE, (_, id: string) => {
     const value = handed.get(id);
     if (value === undefined) missing = true;
     return value ?? '';
