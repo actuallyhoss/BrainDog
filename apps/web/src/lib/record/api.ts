@@ -703,6 +703,39 @@ export const numberColumn = (): Column => ({ field: 'seq', label: nameWords.numb
 const FIELD_COLUMNS = 9;
 
 /**
+ * THE COLUMNS A LIST DECLARES ITS TABLE OPENS ON (`table:`, `42 §4.4`), in its order, or none where it declares none.
+ *
+ * WHAT THE LIST SAYS WINS OVER WHAT THIS WORKS OUT. The Ledger's title is its description, which an import fills with
+ * the category's name, so the worked-out columns read the category twice and never said who the money went to. A
+ * column over a field this reader is not shown, or the list no longer holds, is left out, and so is an `or` over one.
+ * The first text column leads, taking the share of the row the title takes where the columns are worked out.
+ */
+export function tableOf(r: RegisterDecl): (Column & { or?: string })[] {
+  if (!Array.isArray(r.table)) return [];
+  const live = (id: unknown) => (typeof id === 'string' ? r.fields.find((f) => f.id === id && f.retired !== true) : undefined);
+  const cols: (Column & { or?: string })[] = [];
+  let led = false;
+  for (const said of r.table) {
+    const column = typeof said === 'string' ? { field: said } : said;
+    const f = live(column?.field);
+    if (!f || cols.length >= FIELD_COLUMNS || cols.some((c) => c.field === f.id)) continue;
+    const or = live(column.or);
+    const lead = !led && (f.type === 'text' || f.id === r.title);
+    if (lead) led = true;
+    cols.push({
+      field: f.id,
+      label: typeof column.label === 'string' && column.label.trim() !== '' ? column.label : labelOf(f),
+      width: lead ? 'minmax(24ch, 3fr)' : (WIDTH[f.type] ?? WIDTH.text!),
+      /* A DAY THAT OPENS THE ROW STARTS AT THE ROW'S EDGE, as the words do: ended, it hung in a gutter of its own. */
+      align: END.has(f.type) && !(cols.length === 0 && f.type === 'day') ? 'end' : 'start',
+      truncate: f.type === 'money' ? 'never' : 'end',
+      ...(or && or.id !== f.id ? { or: or.id } : {}),
+    });
+  }
+  return cols;
+}
+
+/**
  * The columns a list opens on, and with `number` set, the row's number after them, which is how Display offers it.
  */
 export function columnsFor(register: string, declared?: RegisterDecl, number = false): Column[] {
@@ -710,6 +743,8 @@ export function columnsFor(register: string, declared?: RegisterDecl, number = f
      `REGISTERS`, and without its own declaration here it drew rows with no cells in them. */
   const r = REGISTERS[register] ?? declared;
   if (!r) return [];
+  const table = tableOf(r);
+  if (table.length > 0) return number ? [...table, numberColumn()] : table;
   const wanted = new Set<string>([r.title, ...r.mobile, ...(r.state ? [r.state] : [])]);
   for (const f of r.fields) if (f.deadline) wanted.add(f.id);
   /**

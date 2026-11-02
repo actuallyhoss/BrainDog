@@ -23,6 +23,11 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
      own three in place of any other count), and a payment's card without its amount is a list nobody can read, so the
      account it moved through is one tap away on the row rather than on the card. */
   mobile: ['what', 'amount', 'on'],
+  /* THE TABLE A LEDGER IS READ BY, SINCE money-core 3.38.1: the day, who it was with, the account, what it was for and
+     the amount. Worked out from the title and the card, it opened on Description, which an import fills with the
+     category's name, so the category was read twice and the payee not at all. Who it was with is the name a person
+     gave, else the words the bank wrote. */
+  table: ['on', { field: 'payee', or: 'counterparty_text', label: 'Payee' }, 'account', 'category', 'amount'],
   state: 'state',
   done: ['cleared', 'void'],
   pack: 'money-core',

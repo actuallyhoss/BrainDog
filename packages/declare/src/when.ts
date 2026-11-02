@@ -118,6 +118,21 @@ function sifted(kind: DeclKind, body: Body, at: string, decide: Decide, out: Wai
          field it names (work-pack-file-90). `mobile` keeps it, as the seed's own modules do, since the short view of a
          field that is not there draws nothing and the kernel does not refuse it. */
       if (isBody(body.hand)) body.hand = Object.fromEntries(Object.entries(body.hand).filter(([k, v]) => k === 'taken' || !lost.has(String(v))));
+      /* AND A COLUMN OF `table` OVER IT, which the kernel refuses as it refuses a role's part: the column waits with its
+         field, a column's `or` over it goes and the column stays, and a table left with no column goes, so the list
+         opens on the columns the app works out. */
+      if (Array.isArray(body.table)) {
+        const columns = body.table.flatMap((c): unknown[] => {
+          if (typeof c === 'string') return lost.has(c) ? [] : [c];
+          if (!isBody(c)) return [c];
+          if (lost.has(String(c.field))) return [];
+          if (c.or === undefined || !lost.has(String(c.or))) return [c];
+          const { or: _gone, ...rest } = c;
+          return [rest];
+        });
+        if (columns.length === 0) delete body.table;
+        else body.table = columns;
+      }
     }
     for (const key of ['pairs', ...Object.keys(ROLES)]) {
       const part = body[key];

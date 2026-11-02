@@ -106,7 +106,12 @@ export function linkReader(base: string, io?: Fetch, clock: () => number = Date.
       const rows = (g.rows as RecordRow[]).map((row) => entryOf(g.register, row, refs));
       /* The pointing field is dropped from the columns: every row in this list has the same value
          for it, which is the row you are already looking at. */
-      const columns = columnsFor(g.register).filter((c) => c.field !== g.field).slice(0, 3);
+      const all = columnsFor(g.register).filter((c) => c.field !== g.field);
+      /* AND AN AMOUNT STAYS AMONG THE THREE: a list that declares its table puts its figure last (the Ledger's Date,
+         Payee, Account, Category, Amount), and the first three of it drew a payment with no sum. */
+      const figure = all.find((c) => c.truncate === 'never');
+      const first = all.slice(0, 3);
+      const columns = figure === undefined || first.includes(figure) ? first : [...first.slice(0, 2), figure];
       groups.push({
         register: g.register,
         name: r.name,

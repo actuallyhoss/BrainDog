@@ -4534,6 +4534,8 @@ function createFault(
  *             a row holds them, and a person's edit is not narrowed (the write path in `index.ts`).
  *   `kept_by` `automations`, the one value: its rows are written by the record's own automations, never typed one by one,
  *             so the record offers it no page of its own (`emergent.ts` in `packages/record`). It refuses no write.
+ *   `table`   the columns the list opens on, in order: a field, or `{ field, or?, label? }` (`tableFault` below). Read by the
+ *             app's list table; left out, the app derives them from the title, the card and the state.
  *   `same`    `{ fields, within?, fold, keep? }`: what makes two of its rows the same thing, its text `fields` folded by
  *             `fold` (`text` or `exact`) within one value of `within`, its scope or a link; `keep` is which of two is
  *             kept, `oldest` unless it says `latest` or `sealed` (`sameFault` below, `entities.ts`'s `rowKeys`).
@@ -4551,6 +4553,7 @@ const REGISTER_KEYS = [
   'register', 'name', 'one', 'pack', 'series', 'fields', 'search', 'title', 'mobile', 'identity',
   'id', 'state', 'done', 'finished', 'icon', 'holds', 'seq_prefix', 'scopes', 'steps', 'rates', 'meets', 'org', 'pairs',
   'order',
+  'table',
   'delete',
   'owner_only',
   'personal',
@@ -4597,6 +4600,48 @@ const HAND_PARTS = ['person', 'agent', 'taken'] as const;
 
 /** The parts of `AGENT_ROLES` only a personal list may play: one person's profiles, and what carries between his machines. */
 const PERSONAL_ROLES = ['profiles', 'carry'] as const;
+
+/** The most columns a list's `table:` names: the nine fields a list opens on at most when the app derives them. */
+const TABLE_MOST = 9;
+/** The parts of one column of a list's `table:` written as an object. */
+const TABLE_PARTS = ['field', 'or', 'label'] as const;
+/** The most characters a column's own heading takes. */
+const TABLE_LABEL_MOST = 40;
+
+/**
+ * Why a list's `table:` would draw a column it cannot fill, or `null` when it can be read.
+ *
+ * EVERY COLUMN IS A LIVE FIELD OF THE LIST, its `or` too, each named once, because a column over a field the list does
+ * not hold is a column of blanks on every row, and nothing would say why.
+ */
+function tableFault(id: string, fields: readonly { id?: unknown; retired?: unknown }[], table: unknown): Refusal | null {
+  const live = fields.filter((f) => f.retired !== true).map((f) => String(f.id));
+  const shape = `as [on, { field: payee, or: counterparty_text, label: Payee }, amount]: one to ${TABLE_MOST} of ${id}'s fields, in the order they are drawn`;
+  if (!Array.isArray(table) || table.length === 0 || table.length > TABLE_MOST)
+    return bad('DECLARATION_INVALID', `${id}'s table names the columns it opens on. Say it ${shape}.`, 'table', live);
+  const seen = new Set<string>();
+  for (const [i, raw] of table.entries()) {
+    const at = `table[${i}]`;
+    const column: Record<string, unknown> | null = typeof raw === 'string' ? { field: raw } : isPart(raw) ? raw : null;
+    if (column === null || Object.keys(column).some((k) => !(TABLE_PARTS as readonly string[]).includes(k)))
+      return bad('DECLARATION_INVALID', `${id}'s ${at} is a field, or { field, or?, label? }. Say it ${shape}.`, at, TABLE_PARTS);
+    for (const part of ['field', 'or'] as const) {
+      const name = column[part];
+      if (part === 'or' && name === undefined) continue;
+      if (typeof name !== 'string' || !live.includes(name))
+        return bad('FIELD_UNKNOWN', `${id}'s ${at} draws ${JSON.stringify(name ?? null)}, and ${id} has no such field to draw.`, part === 'or' ? `${at}.or` : at, live);
+    }
+    const field = String(column.field);
+    if (column.or === field)
+      return bad('DECLARATION_INVALID', `${id}'s ${at} reads ${field} where ${field} holds nothing. Name another field in or, or take it off.`, `${at}.or`, live);
+    if (seen.has(field)) return bad('DECLARATION_INVALID', `${id}'s table draws ${field} twice.`, at, live);
+    seen.add(field);
+    const label = column.label;
+    if (label !== undefined && (typeof label !== 'string' || label.trim() === '' || label.length > TABLE_LABEL_MOST))
+      return bad('DECLARATION_INVALID', `${id}'s ${at} is headed by words of 1 to ${TABLE_LABEL_MOST} characters. ${JSON.stringify(label)} is not.`, `${at}.label`);
+  }
+  return null;
+}
 
 /** The parts of a list's `same:`, the two ways it compares a text (`identity-keys.ts`'s `sameFold`), and which row stays. */
 const SAME_PARTS = ['fields', 'within', 'fold', 'keep'] as const;
@@ -6061,6 +6106,14 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
         'order',
         sorts.map((f) => String(f.id)),
       );
+  }
+
+  /* A LIST'S OWN TABLE: the columns it opens on, in order, where the app derived them from the title, the card and the
+     state. Each is a live field of this list, or `{ field, or?, label? }`: `or` the field read where the first holds
+     nothing, `label` the column's heading. Left out, the app derives them as before. */
+  if (decl.body.table !== undefined) {
+    const fault = tableFault(id, fields as { id?: unknown; retired?: unknown }[], decl.body.table);
+    if (fault) return fault;
   }
 
   /* `delete:` TAKES THE ONE VALUE THE WRITE PATH KEEPS (`referenced.ts`). Any other would install a promise about

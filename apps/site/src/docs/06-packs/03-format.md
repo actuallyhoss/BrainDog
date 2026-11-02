@@ -74,6 +74,22 @@ The top of the file says what the pack is. Its keys are the ones listed below; a
 
 A `register` declaration is a list. Its `fields` each have an `id` and a `type`, such as `text`, `enum`, `day`, `money` or `int`, and may be `required` or carry a `default`. `title` names the field a row is called by. Ids are stable for ever: a field is retired, never renamed, and a new one added in its place. A list with example rows declares `tags` as a list of text, because that is where each example is marked. [The kinds](/docs/packs/kinds) has an example of each declaration.
 
+### The table a list opens on
+
+`table` is optional. It names the columns the list's table opens on, in the order they are drawn, one to nine of them. Each is a field of the list, or an object with three keys:
+
+- `field`: the field the column draws.
+- `or`: another field, read where `field` holds nothing.
+- `label`: the column's heading, up to 40 characters, in place of the field's own label.
+
+```json
+"table": ["on", { "field": "payee", "or": "counterparty_text", "label": "Payee" }, "account", "category", "amount"]
+```
+
+That is the Ledger's: the date, who the money went to or came from (the bank's words where nobody gave a name), the account, the category and the amount. Every field named has to be a field of the list, or the install is refused with the field it could not find. A column over a field that waits for another list (`when`) waits with it.
+
+Leave `table` out and the list opens on columns worked out for it: the `title`, the `mobile` fields, the `state` and a deadline. A pack written before `table` existed keeps those. Either way a person can hide a column from Display, and that choice is theirs alone.
+
 ## Pages
 
 A `page` declaration is a [declared page](/docs/dialect/pages), in the same keys the page dialect uses. `requires` names the lists it reads, and a page cannot appear in a record that lacks them. Every block with a `source` says what it shows when it is empty.

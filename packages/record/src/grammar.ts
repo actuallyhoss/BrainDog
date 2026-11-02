@@ -230,6 +230,7 @@ const REGISTER = {
     holds: 'one line saying what the list holds',
     seq_prefix: "# or a capital letter and up to three capitals or digits: the start of a row's spoken id, such as P for P12. D, SG and S are BrainDog's own",
     mobile: 'the few fields the phone view keeps, such as [what, amount, due]',
+    table: 'the columns its table opens on, in order, 1 to 9: a field, or {field, or?, label?} where or is the field read when the first holds nothing, such as [on, {field: payee, or: counterparty_text, label: Payee}, amount]. Left out, the table is worked out from the title, mobile and state',
     delete: 'refuse_while_referenced: a row another row points at is not deleted',
     owner_only: 'true: somebody who may add to all of this BrainDog does not add here unless the list is named to them',
     personal: 'true: only the owner reads or changes it. No grant, share, link, child key or See as reaches it, even one that names it',
