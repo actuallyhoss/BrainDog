@@ -87,6 +87,8 @@
   import About from './About.svelte';
   import { foundListing, newerThan } from './found.ts';
   import Connect from './Connect.svelte';
+  import GoogleConnect from '$lib/google/GoogleConnect.svelte';
+  import type { GoogleStatus } from '$lib/google/google.ts';
   import { recipesIn, type Recipe } from './connect.ts';
 
   /** The pack id the record holds it under, when the address names it otherwise (`founder` for `usecase-founder`). */
@@ -239,6 +241,9 @@
   /* A DOOR'S CONNECT RECIPE, read from the same file (`connect.ts`), so an add-on that takes things in from somewhere
      else says how to set that up on its own page. */
   let recipes = $state<Recipe[]>([]);
+  /* CONNECT GOOGLE, on the two add-ons it fills (`$lib/google`): with Google connected, Gmail's paste steps give way to it. */
+  const googleFor = $derived(id === 'gmail' ? 'gmail' : id === 'calendar' ? 'calendar' : null);
+  let google = $state<GoogleStatus | null>(null);
   async function readHolds(s: PackConfig, want: string) {
     const firstParty = firstPartyModules().some((m) => m.id === want);
     const declarations = await declarationsOf(want, s.version, firstParty).catch(() => null);
@@ -688,8 +693,13 @@
     </div>
 
     <div class="wide-cell stack">
+    {#if googleFor && installed}
+      <GoogleConnect place={googleFor} onstatus={(s) => (google = s)} />
+    {/if}
     {#each recipes as recipe (recipe.ingest)}
-      <Connect {recipe} />
+      {#if !(googleFor === 'gmail' && google?.connected && !google.broken)}
+        <Connect {recipe} quiet={googleFor !== null && google?.on === true} />
+      {/if}
     {/each}
     {#if entries.length}
       <Tile icon="settings" class="section" data-surface="tile" title={words.settings}>

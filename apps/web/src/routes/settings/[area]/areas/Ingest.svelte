@@ -28,6 +28,7 @@
   const UNSIGNED_HELP = 'https://brain.dog/docs/use/inbox-and-doors#when-mail-arrives-unsigned';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
+  import GoogleConnect from '$lib/google/GoogleConnect.svelte';
   import PasteBank from '$lib/tell/PasteBank.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { doorState, doorsLine, doorWords } from '../../billing.ts';
@@ -357,6 +358,8 @@
   either: `mintsHere === false` is true of every reader, and only after that does it matter
   who is asking.
 -->
+<!-- CONNECT GOOGLE: one Google account, read only, filling Gmail, Calendar and People (`$lib/google`). -->
+<GoogleConnect place="settings" />
 <Tile icon="mail" class="section" data-surface="tile" title={mailWords.title}>
   <div class="section-body">
     <p class="hint">{mailWords.how}</p>

@@ -19,7 +19,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { filled, readerZone, type Recipe } from './connect.ts';
 
-  let { recipe }: { recipe: Recipe } = $props();
+  /* `quiet`: the page offers Connect Google as its main way in, so this press is not a second primary. */
+  let { recipe, quiet = false }: { recipe: Recipe; quiet?: boolean } = $props();
 
   const call = () => callerAt(apiBase());
   let door = $state<Door | null>(null);
@@ -99,7 +100,7 @@
     {:else}
       {#if door?.held}<p class="hint">An address is in use. Make a new one only to set the script up again.</p>{/if}
       <div class="row-actions">
-        <Button weight={door?.held ? 'quiet' : 'primary'} disabled={busy} onclick={press}>
+        <Button weight={door?.held || quiet ? 'quiet' : 'primary'} disabled={busy} onclick={press}>
           {busy ? copy.doorsMinting : door?.held ? copy.doorsRemint : copy.doorsMint}
         </Button>
       </div>
