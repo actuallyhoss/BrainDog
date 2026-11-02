@@ -9,12 +9,13 @@
  * the app lives at `app.brain.dog`, so both answer it: this Worker on its own name, and the site forwarding it
  * (`run_worker_first` in `apps/site/wrangler.jsonc`).
  *
- * A UNIVERSAL LINK OPENS THE IPHONE APP, AND ONLY FOR WHAT IT DRAWS: a question to decide, a page, a list, an
+ * A UNIVERSAL LINK OPENS THE APP, AND ONLY FOR WHAT IT DRAWS: a question to decide, a page, a list, an
  * invitation, each with or without the record's name in front (`/<slug>/...`, `apps/web/src/lib/at.ts`), and the sign-in
  * link only when it carries a BrainDog app's challenge (`?app=`), which is the link the app asked for. The host's own
  * doors are excluded FIRST, because Apple takes the first component that matches and `*` crosses a `/`: `/api/*` and
- * `/auth/*` and the rest are never an app's to open, under a slug or not. The Mac app takes no universal links; its
- * links come back by `braindog://`.
+ * `/auth/*` and the rest are never an app's to open, under a slug or not. The Mac app takes the same addresses (apps
+ * mac6, 3 November): a question, a page or a list clicked in Mail or a chat opens in its window, and its sign-in link
+ * comes back to it as the iPhone's does; `braindog://` stays for what the app itself opens (widgets, Siri).
  *
  * THE TEAM IS THE OWNER'S APPLE DEVELOPER TEAM, `APPLE_TEAM_ID`, ten capitals and digits and no secret (every signed app
  * carries it). Unset, the file is a 404 and the apps' passkeys and links are refused as they were; every other way in
@@ -60,10 +61,10 @@ const COMPONENTS: readonly Component[] = [
   { '/': '/signin', '?': { app: '*' }, comment: 'A sign-in link a BrainDog app asked for: the app hands it back to itself.' },
 ];
 
-/** The file's body for a team: both apps' passkeys, and the iPhone app's links. */
+/** The file's body for a team: both apps' passkeys, and both apps' links. */
 export function association(team: string): object {
   return {
-    applinks: { details: [{ appIDs: [`${team}.${IOS_APP}`], components: COMPONENTS }] },
+    applinks: { details: [{ appIDs: [`${team}.${IOS_APP}`, `${team}.${MAC_APP}`], components: COMPONENTS }] },
     webcredentials: { apps: [`${team}.${IOS_APP}`, `${team}.${MAC_APP}`] },
   };
 }
