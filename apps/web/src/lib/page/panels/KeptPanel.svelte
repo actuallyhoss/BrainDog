@@ -35,7 +35,7 @@
 
 {#if !read || rows.length === 0}
   <!-- NOTHING ANSWERED, NOT THE OWNER, OR NOT READ YET: the tile is left out whole (`BlockSlot.svelte`'s rule). -->
-  <span data-seen-none hidden></span>
+  <span data-seen-none hidden aria-busy={!read ? 'true' : undefined}></span>
 {:else}
   <ul class="kept">
     {#each rows as r (r.agent)}

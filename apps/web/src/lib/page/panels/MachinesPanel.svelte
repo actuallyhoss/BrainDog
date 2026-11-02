@@ -49,7 +49,7 @@
 
 {#if !read || machines.lines.length === 0}
   <!-- NOTHING TO NAME, OR NOT READ YET: the tile is left out whole (`BlockSlot.svelte`'s rule for a panel that drew nothing). -->
-  <span data-seen-none hidden></span>
+  <span data-seen-none hidden aria-busy={!read ? 'true' : undefined}></span>
 {:else}
   <div class="machines">
     <!-- ONE CELL A MACHINE, ON ONE GRID: its name, its counts and its profiles each on a row the cells share, so names,

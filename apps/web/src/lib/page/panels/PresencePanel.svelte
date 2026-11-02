@@ -216,7 +216,7 @@
 {#if line}
   {#if !read}
     <!-- NOT READ YET: nothing but the mark that it is reading, rather than a line that may be wrong a moment later. -->
-    <span class="at-work-busy" aria-busy="true"></span>
+    <span class="at-work-busy" data-seen-none hidden aria-busy="true"></span>
   {:else if drawn === 0}
     <p class="at-work-none">{words.none}</p>
     <!-- THE AGENTS HE NAMED THAT HAVE NOT CALLED YET, each with Connect (`NamedAgents.svelte`), for the owner. -->
@@ -266,7 +266,7 @@
 {:else if drawn === 0}
   <!-- NOTHING OPEN, OR NOT READ YET: the tile is left out whole, heading and all (`BlockSlot.svelte`'s rule for a panel
        that drew nothing). -->
-  <span data-seen-none hidden></span>
+  <span data-seen-none hidden aria-busy={!read ? 'true' : undefined}></span>
 {:else}
   <Presence
     rows={views}

@@ -9,7 +9,12 @@
  * PURE: no rune, no `$lib`, types only from the components.
  */
 
+import type LateHold from './LateHold.svelte';
 import type LateNow from './LateNow.svelte';
 import type WorkingNow from './WorkingNow.svelte';
 
-export const landed: { late?: typeof LateNow; working?: typeof WorkingNow } = {};
+/**
+ * `hold` is Late's room while its code is on its way (`LateHold.svelte`, nojump 2 Nov): Today's page puts it here as it
+ * loads, so it is in hand before any slot draws, and a slow `late` never moves the tiles under it.
+ */
+export const landed: { late?: typeof LateNow; working?: typeof WorkingNow; hold?: typeof LateHold } = {};

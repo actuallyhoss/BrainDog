@@ -909,7 +909,11 @@
   <div class="desk-part" data-desk={desk.kind}>
     {#if desk.kind === 'late'}
       <!-- AT ONCE WHERE ITS CODE HAS LANDED (`tile-landed.ts`), so it draws with the page and moves nothing under it. -->
-      {#await landed.late ?? import('$lib/home/LateNow.svelte').then((m) => m.default) then LateNow}
+      <!-- AND WHILE IT IS ON ITS WAY, ITS ROOM (`LateHold`, which Today puts in hand as it loads): the same tile and lines
+           with nothing to press, so code that misses the reader's wait moves nothing under it (nojump, 2 Nov). -->
+      {#await landed.late ?? import('$lib/home/LateNow.svelte').then((m) => m.default)}
+        {#if landed.hold}{@const LateHold = landed.hold}<LateHold lines={desk.lines} heading={desk.heading} more={desk.more} most={phone.current ? Math.min(3, desk.most) : desk.most} writes={(list) => may(route.data as unknown as Shell, 'write', list)} />{/if}
+      {:then LateNow}
         <LateNow lines={desk.lines} heading={desk.heading} more={desk.more} most={phone.current ? Math.min(3, desk.most) : desk.most} writes={(list) => may(route.data as unknown as Shell, 'write', list)} onfinished={() => void writes?.reread()} />
       {/await}
     {:else if desk.kind === 'working'}
@@ -1118,7 +1122,7 @@
        the entry chunk. -->
   <!-- WHILE ITS CODE ARRIVES THE SLOT SAYS IT IS STILL READING (`aria-busy`), so nobody, a look included, takes the
        empty tile for the panel. -->
-  {#await import('./panels/index.ts').then((m) => m.PANEL_LOADERS[hosted]())}<span hidden aria-busy="true"></span>{:then { default: Hosted }}<Hosted owner={owns} />{/await}
+  {#await import('./panels/index.ts').then((m) => m.PANEL_LOADERS[hosted]())}<span data-seen-none hidden aria-busy="true"></span>{:then { default: Hosted }}<Hosted owner={owns} />{/await}
 {/if}
 
 <!--
@@ -1174,6 +1178,20 @@
   /* A `panel: seen` SECTION WHOSE PANEL DREW NOTHING is left out whole, tile and heading. */
   :global(.block-slot:has(> [data-seen-none])) {
     display: none;
+  }
+  /* A PANEL STILL READING HOLDS WHAT COMES AFTER IT OUT OF SIGHT (nojump, 2 Nov). Its slot is left out while it reads
+     (above), and then it either stays out or fills; the blocks after it were drawn meanwhile and jumped down when it
+     filled (Agents on a phone, each of Working now, Up next and Recent runs). They keep their place in the layout but
+     are not drawn until every panel above them has answered, and never longer than 2.5s, so a read that hangs hides
+     nothing for good. */
+  :global(.block-slot:has(> [data-seen-none][aria-busy='true']) ~ .block-slot) {
+    visibility: hidden;
+    animation: slot-shown 0s linear 2.5s forwards;
+  }
+  @keyframes -global-slot-shown {
+    to {
+      visibility: visible;
+    }
   }
   /* THE TILE'S HEADING ROW (`ui/Tile.svelte`'s): the well, the name at `--fs-body` 600, and the source as the
      meta at the right, one well high, with the tile's 16 under it. No rule under it: the name is what says a block

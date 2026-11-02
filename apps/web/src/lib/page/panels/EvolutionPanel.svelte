@@ -105,7 +105,7 @@
 
 {#if !read || refused}
   <!-- NOT READ YET, OR NOT A READER OF THE LEARNINGS: the tile is left out whole (`BlockSlot.svelte`'s rule). -->
-  <span data-seen-none hidden></span>
+  <span data-seen-none hidden aria-busy={!read ? 'true' : undefined}></span>
 {:else if weeks.length === 0}
   <p class="evo-empty">{words.empty}</p>
 {:else}
