@@ -16,8 +16,8 @@
  * ONE THREAD FOR A QUESTION AND THE DECISION THAT SETTLED IT. A decision named by its number reads, takes and resolves
  * the words of its question's thread (`targetOf`), the one the app mounts under a question open or settled.
  *
- * NOTHING IS SENT TO ANYBODY (HD.383, "no mentions or notifications yet"). A body holding `@ada` is kept as the text
- * it is; no name in it is looked up and nothing is queued, so a comment is read by whoever opens the thing.
+ * A BODY HOLDING `@Ada` RINGS ADA'S PHONE (collab pass 2, 2 Nov; HD.383 said "no mentions or notifications yet"): the
+ * text is kept as it is, and the people it names who may see the row are told, with no word of it (`ringNamed`).
  */
 
 import type { Result } from '@braindog/ports';
@@ -59,6 +59,29 @@ export function methods(deps: RecordDeps) {
    */
   const actorOf = (ctx: CallContext): string =>
     ctx.principal.kind === 'token' ? `agent:${ctx.session?.agent ?? 'other'}` : ctx.principal.id;
+
+  /**
+   * THE PEOPLE A COMMENT ON A ROW NAMES WITH AN @, TOLD ON THEIR PHONES (collab pass 2, 2 Nov). The bell already marks such
+   * a line `mentioned` for its reader (`youOf` in `index.ts`); this is the ring that goes with it, by the same match: `@`
+   * then a person's whole name or first name, as the record names them. Anybody signed in here may be named, a member or
+   * a guest; the kernel rings only one whose lens shows the row, never the writer, and only as their own settings allow.
+   * A tap opens the row. Nothing else of the comment leaves the record.
+   */
+  const ringNamed = (entry: string, list: string, body: string, comment: string, by: string): void => {
+    if (!body.includes('@')) return;
+    const row = kernel.get(entry);
+    if (row === null || typeof row.seq !== 'number') return;
+    const esc = (t: string): string => t.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+    const people = sql.all<{ id: string; name: string | null }>('SELECT id, name FROM person WHERE name IS NOT NULL AND suspended_at IS NULL');
+    for (const p of people) {
+      const name = (p.name ?? '').trim();
+      if (name === '' || p.id === by) continue;
+      const first = name.split(/\s+/u)[0] ?? '';
+      const named = new RegExp(`(^|[^\\p{L}\\p{N}])@(${[esc(name), esc(first)].filter((x) => x !== '').join('|')})(?![\\p{L}\\p{N}])`, 'iu');
+      if (!named.test(body)) continue;
+      kernel.tellColleague(p.id, { by, cause: `mention.${comment}.${p.id}`, open: `/r/${list}/${row.seq}`, about: entry });
+    }
+  };
 
   /**
    * The question a decision settled, by its number, or `null` for a decision the log pairs with none.
@@ -166,14 +189,14 @@ export function methods(deps: RecordDeps) {
       /* A REPLY UNDER A WORD KEPT ON THE DECISION goes beside it, so the reply reads under it in the one thread. */
       const older = args?.reply_to === undefined ? null : olderOf(at.target);
       const parent = older !== null && typeof args.reply_to === 'string' ? kernel.commentOf(args.reply_to.trim()) : null;
-      return tail(
-        kernel.writeComment({
-          target: parent !== null && parent.target === older ? older : at.target,
-          body: args?.body,
-          ...(args?.reply_to === undefined ? {} : { reply_to: args.reply_to }),
-          actor: actorOf(ctx),
-        }),
-      );
+      const written = kernel.writeComment({
+        target: parent !== null && parent.target === older ? older : at.target,
+        body: args?.body,
+        ...(args?.reply_to === undefined ? {} : { reply_to: args.reply_to }),
+        actor: actorOf(ctx),
+      });
+      if (written.ok && at.list !== null && typeof args?.body === 'string') ringNamed(at.target.slice('entry:'.length), at.list, args.body, written.value.id, actorOf(ctx));
+      return tail(written);
     },
 
     /**

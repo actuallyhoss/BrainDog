@@ -30,9 +30,10 @@ export type PushTarget = { id: string; endpoint: string; open?: string; kind?: P
  * WHAT A PUSH IS ABOUT, AS ONE WORD FROM A CLOSED LIST, so the phone can say which kind of thing it is and a person can
  * turn each kind off (`push.off`, their own preference). Never a word anybody wrote: `needs` is something waiting on
  * him in Needs you, `agents` an agent asking or finishing, `money` a money list's notice (a bill or instalment due),
- * `summary` the morning and evening summary.
+ * `summary` the morning and evening summary, `people` a colleague who handed you something, named you in a comment, or
+ * joined from your invitation (collab pass 2, 2 Nov).
  */
-export const PUSH_KINDS = ['needs', 'agents', 'money', 'summary'] as const;
+export const PUSH_KINDS = ['needs', 'agents', 'money', 'summary', 'people'] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 
 /** The person's own preference that names the kinds they turned off on every phone (`setPref`). */
@@ -103,6 +104,24 @@ export function ownersPushSubs(sql: Sql, kind?: PushKind): string[] {
        WHERE 1 = 1 ${off}
        ORDER BY s.id`,
       ...(kind === undefined ? [] : [kind]),
+    )
+    .map((r) => r.id);
+}
+
+/**
+ * ONE PERSON'S SUBSCRIPTIONS, for a push about them and nobody else (collab pass 2, 2 Nov): a row handed to them, a comment
+ * naming them, somebody joining from their invitation. Owner or not, since what it is about is theirs. Never a suspended
+ * person's, and never for a kind they turned off (`push.off`), as `ownersPushSubs` holds an owner's.
+ */
+export function personPushSubs(sql: Sql, person: string, kind: PushKind): string[] {
+  return sql
+    .all<{ id: string }>(
+      `SELECT s.id FROM push_sub s JOIN person p ON p.id = s.person_id AND p.suspended_at IS NULL
+        WHERE s.person_id = ?
+          AND NOT EXISTS (SELECT 1 FROM pref f, json_each(f.value) j WHERE f.person_id = s.person_id AND f.key = '${PUSH_OFF}' AND j.value = ?)
+        ORDER BY s.id`,
+      person,
+      kind,
     )
     .map((r) => r.id);
 }

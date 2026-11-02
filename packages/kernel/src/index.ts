@@ -107,7 +107,7 @@ import {
 import { ack, enqueue, lease, retryDead, unlease, type Ack, type AckDeps, type OutboxKind } from './outbox.ts';
 import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
-import { leasedPushTarget, ownersPushSubs, pushKindOf, pushOpenOf, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
+import { leasedPushTarget, ownersPushSubs, personPushSubs, pushKindOf, pushOpenOf, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type AccessLens, type Held, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
 import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, groupKept, meOf, saysMe, sharesFor as heldSharesOf, LensCache, newListGrants, putGroup, putShare, retireGroup, revokeShare, setGroupMember, shareKept, sharesKept, sharesWaiting, type GroupKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
 import { activeAt, shareReach, type Cap as LensCapOf, type Catalog } from './lens.ts';
@@ -591,7 +591,7 @@ export { OUTBOX_KINDS, backoffMs, retryDead, summary } from './outbox.ts';
 export type { Ack, OutboxKind, OutboxRow } from './outbox.ts';
 export { ERASED, subjectsOf } from './erase.ts';
 export type { EraseReport, EraseRequest } from './erase.ts';
-export { PUSH_KINDS, PUSH_OFF, PUSH_OPEN, ownersPushSubs, pushKindOf, pushOpenOf } from './push.ts';
+export { PUSH_KINDS, PUSH_OFF, PUSH_OPEN, ownersPushSubs, personPushSubs, pushKindOf, pushOpenOf } from './push.ts';
 export type { PushJob, PushKind, PushSettled, PushTarget } from './push.ts';
 export type { QuietWindow } from './digest.ts';
 export { SCHEDULE_KINDS, drainSchedule, retryFailed, retryHandler } from './schedule.ts';
@@ -5538,7 +5538,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (!member || member.id === actor) return;
     const name = sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', actor)?.name?.trim();
     const title = entry.fields[decl.title];
-    openSuggestion(governDeps(), actor, {
+    const filed = openSuggestion(governDeps(), actor, {
       question: `${name && name !== '' ? name : 'Someone'} handed you ${typeof title === 'string' && title !== '' ? title : 'a row'}`,
       body_kind: 'options',
       body: {
@@ -5549,6 +5549,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         to: member.id,
       },
     });
+    /* AND THEIR PHONE, if they turned one on (collab pass 2): a tap opens the question, in Decide. */
+    if (filed.ok) tellColleague(member.id, { by: actor, cause: `handed.${filed.value.id}`, open: `/decide/${filed.value.id}`, about: entry.id });
   }
 
   /**
@@ -8864,6 +8866,52 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   };
 
   /** The sentence a step that reaches past a maker's rows is refused in. */
+  /**
+   * TELLING ONE COLLEAGUE'S PHONE ABOUT SOMETHING THAT IS THEIRS (collab pass 2, 2 Nov): a row handed to them, a comment
+   * that names them, somebody joining from their invitation. Before this only an owner's phones ever rang, so a member
+   * heard about work given to them when they next opened the app.
+   *
+   * THE SAME RULES AN OWNER'S PUSH KEEPS: their own `push.off` (kind `people`), the record's quiet hours, once per cause,
+   * and the payload `{ sub: { id }, cause, open, kind }` and nothing else, so no words reach the outbox. And more:
+   *   - never the person who did it, and never somebody who cannot reach the record any more (`access`);
+   *   - with `about`, never somebody whose lens does not show that row, so a push never opens on "not there";
+   *   - at most `PERSON_PUSH_HOUR` an hour to one person, counted over their own subscriptions' rows, so a busy
+   *     afternoon of comments is a few rings and the rest wait in the bell.
+   * It tells and nothing more, and a push that cannot be queued never fails the write it is about.
+   */
+  const PERSON_PUSH_HOUR = 6;
+  function tellColleague(person: string | null | undefined, said: { by: string; cause: string; open: string; about?: string }): void {
+    try {
+      if (typeof person !== 'string' || person === '' || person === said.by) return;
+      const open = pushOpenOf(said.open);
+      if (open === null) return;
+      const held = access(sql, person, null, accessLens());
+      if (held === null) return;
+      if (said.about !== undefined && held.level !== 'owner') {
+        const row = byId(said.about);
+        if (!row) return;
+        const m: Maker = { name: '', held, ctx: { principal: { kind: 'person', id: person }, ...(held.wheres ? { wheres: held.wheres } : {}), ...(held.writes ? { writes: held.writes } : {}) } };
+        if (!makerSees(m, row)) return;
+      }
+      const d = digestDeps();
+      if (d.quiet !== undefined && inQuietHours(clock.now(), d.tz, d.quiet)) return;
+      if ((sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'notify.push' AND json_extract(payload, '$.cause') = ?", said.cause)?.n ?? 0) > 0) return;
+      const subs = personPushSubs(sql, person, 'people');
+      if (subs.length === 0) return;
+      const lately =
+        sql.one<{ n: number }>(
+          `SELECT count(DISTINCT json_extract(o.payload, '$.cause')) AS n FROM outbox o JOIN push_sub s ON s.id = json_extract(o.payload, '$.sub.id')
+            WHERE o.kind = 'notify.push' AND s.person_id = ? AND o.created > ? AND json_extract(o.payload, '$.test') IS NOT 1`,
+          person,
+          instant(clock.now() - 3_600_000),
+        )?.n ?? 0;
+      if (lately >= PERSON_PUSH_HOUR) return;
+      for (const id of subs) enqueue(sql, mint, clock.now(), 'notify.push', { sub: { id }, cause: said.cause, open, kind: 'people' });
+    } catch {
+      /* A RING IS NEVER WORTH THE WRITE. */
+    }
+  }
+
   const boundSaid = (m: Maker): string => `${m.name} turned this on, so it reads and writes only what ${m.name} can, and does not reach past those rows.`;
 
   /**
@@ -12136,6 +12184,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * a run included.
      * The caller's `version` and `opId` are not carried, because they describe no row meet writes.
      */
+    /**
+     * Ring one colleague's phones about something that is theirs (`tellColleague`): a comment naming them, somebody
+     * joining from their invitation. Content-free, held by their own settings and the record's quiet hours. Never fails.
+     */
+    tellColleague: (person: string, said: { by: string; cause: string; open: string; about?: string }): void => tellColleague(person, said),
+
     meet: (args: MeetArgs, w: WriteContext, o: { viewer?: string | null | undefined } = {}): Result<Met> => {
       const barred = schemaRefusal(state);
       if (barred) return barred;

@@ -15847,8 +15847,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          record this is, which joining does not change. They are met as themselves at their own keyboard, so the address
          is believed. A meeting that will not land leaves them a member all the same. NOR BY A SHARED INBOX'S ADDRESS
          (`office@`), which no person can hold (`markOwnRow`): `meet` reads it as an organisation's and would write one. */
+      /* SIGNED BY THE RECORD AND NOT BY THEM (collab pass 2, 2 Nov): they did not write their People row or ask "Add Kiln?",
+         joining did. Signed by the joiner, their own Activity said "You created Mira Chen" and Needs you said "You" under
+         a question they never asked. Still believed as typed (a person's principal): the host has just verified the address. */
       if (joined.ok && kernel.meetsList() !== null && !isOrganisationAddress(email))
-        kernel.meet({ ...(name ? { name } : {}), email, where: 'accepted an invitation' }, { actor: id, principal: { kind: 'person' } }, { viewer: null });
+        kernel.meet({ ...(name ? { name } : {}), email, where: 'accepted an invitation' }, { actor: 'system', principal: { kind: 'person' } }, { viewer: null });
+      /* AND WHOEVER INVITED THEM HEARS IT ON THEIR PHONE (collab pass 2), as their own settings allow: a tap opens People. */
+      if (joined.ok) {
+        const inv = sql.one<{ id: string; invited_by: string | null }>('SELECT id, invited_by FROM invitation WHERE accepted_by = ? ORDER BY accepted_at DESC LIMIT 1', id);
+        const people = kernel.meetsList()?.register ?? null;
+        if (inv && people !== null) kernel.tellColleague(inv.invited_by ?? '', { by: id, cause: `joined.${inv.id}`, open: `/r/${people}` });
+      }
       return tail(joined);
     },
 
