@@ -2143,8 +2143,8 @@ export type Context = {
   /** What his settings let this agent do, as one sentence (§3.2, section 3); `null` for a caller who is no agent. */
   may?: string | null;
   /**
-   * What an agent acting for a colleague can reach, in one line (`acts-for.ts`): "You act for Sam:
-   * Kiln, view; amounts hidden." `null` for a person, and for an owner's agent, which reaches everything.
+   * What an agent acting for a colleague can reach, in one line (`acts-for.ts`): "You act for Sam and
+   * can view Kiln. Amounts are hidden from you." `null` for a person, and for an owner's agent, which reaches everything.
    */
   reach?: string | null;
   /** His brief for this kind of agent (§3.2, section 4), from Settings › Agents. */

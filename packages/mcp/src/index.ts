@@ -4015,9 +4015,10 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const look = await lookOf(ctx, turn, { people: true, runs: [result.conflict.actor] });
       const current = isObject(result.conflict.current) ? result.conflict.current : null;
       const register = current && typeof current.spoken === 'string' ? registerOf(current.spoken, sent) : undefined;
-      const stale = staleOf(result.conflict, look, callOf(name, { ...sent, version: result.conflict.version }));
+      const version = typeof sent.version === 'number' ? sent.version : undefined;
+      const stale = staleOf(result.conflict, look, callOf(name, { ...sent, version: result.conflict.version }), version);
       const fitted = fittedJson(stale);
-      return { result, text: capped(full || walled ? JSON.stringify(fitted) : conflictBrief(result.conflict, register, look)), structured: fitted };
+      return { result, text: capped(full || walled ? JSON.stringify(fitted) : conflictBrief(result.conflict, register, look, version)), structured: fitted };
     }
     const value = result.ok ? result.value : undefined;
     /* THE LOOK'S OWN READS, a `boot` for the people and one of the runs, are made only for an answer said in words. */
@@ -4718,10 +4719,13 @@ function taught(refusal: Refusal, call: string | undefined): Refusal {
  * "RE-APPLY YOUR CHANGE" AND NOT "SEND IT AGAIN". The `try` is the same change sent at the version that holds now,
  * which is right for a patch that says only what this agent meant to change, and the sentence says to look first.
  */
-function staleOf(conflict: { version: number; current: unknown; actor: string }, look: Look, call: string): Record<string, unknown> {
+function staleOf(conflict: { version: number; current: unknown; actor: string }, look: Look, call: string, sent?: number): Record<string, unknown> {
+  const ahead = sent !== undefined && sent > conflict.version;
   return {
     code: 'VERSION_STALE',
-    fix: `${look.actor(conflict.actor)} changed it after you read it. current is how it stands at version ${String(conflict.version)}: re-apply your change to it and send that version.`,
+    fix: ahead
+      ? `You sent version ${String(sent)}, but it is only at version ${String(conflict.version)}; nobody changed it. current is how it stands: apply your change to it and send that version.`
+      : `${look.actor(conflict.actor)} changed it after you read it. current is how it stands at version ${String(conflict.version)}: re-apply your change to it and send that version.`,
     version: conflict.version,
     actor: conflict.actor,
     current: conflict.current,

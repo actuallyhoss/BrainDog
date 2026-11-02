@@ -216,8 +216,8 @@ export type ContextFacts = {
   who: CardParts | null;
   may: MayFact | string | null;
   /**
-   * What an agent acting for a colleague can reach, in one line (`acts-for.ts`): "You act for Sam: Kiln, view; amounts
-   * hidden." Said beside May and never cut, so it knows why a list is not there. `null` or absent for an owner's agent.
+   * What an agent acting for a colleague can reach, in one line (`acts-for.ts`): "You act for Sam and can view Kiln.
+   * Amounts are hidden from you." Said beside May and never cut, so it knows why a list is not there. `null` or absent for an owner's agent.
    */
   reach?: string | null | undefined;
   rules: readonly RuleFact[];

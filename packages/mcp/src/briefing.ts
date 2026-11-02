@@ -264,8 +264,8 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
   /* ── what follows the card ─────────────────────────────────────────────── */
 
   const lines: string[] = [];
-  /* WHAT AN AGENT ACTING FOR A COLLEAGUE REACHES, one line the record said ("You act for Sam: Kiln, view; amounts
-     hidden"), first after the card, so a list it expected and does not see is not taken for an empty one. A plan says
+  /* WHAT AN AGENT ACTING FOR A COLLEAGUE REACHES, one line the record said ("You act for Sam and can view Kiln.
+     Amounts are hidden from you."), first after the card, so a list it expected and does not see is not taken for an empty one. A plan says
      it itself, as its Reach line. */
   const reach = text(c.reach);
   if (reach !== null && text(c.plan) === null) lines.push(reach);

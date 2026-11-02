@@ -903,13 +903,27 @@ export function refusalBrief(refusal: Record<string, unknown>): string {
   return lines.join('\n');
 }
 
-/** A write that arrived second: who wrote first, the row as it stands, and the version to send with the change again. */
-export function conflictBrief(conflict: { version: number; actor: string; current: unknown }, register: string | undefined, look: Look): string {
+/**
+ * A write that arrived second: who wrote first, the row as it stands, and the version to send with the change again.
+ *
+ * A VERSION AHEAD OF THE ROW IS NOT A WRITE THAT CAME SECOND (MCP check of 2 November): sent 3 to a row at 1 said
+ * "BrainDog changed it after you read it", which nobody did. `sent` is the version the call sent, so that case says
+ * what happened: the version sent is one the row never reached.
+ */
+export function conflictBrief(conflict: { version: number; actor: string; current: unknown }, register: string | undefined, look: Look, sent?: number): string {
   const current = isObject(conflict.current) ? (conflict.current as Shaped) : null;
-  const lines = [`Not saved, VERSION_STALE: ${inLine(look.actor(conflict.actor))} changed it after you read it, and it is at version ${String(conflict.version)} now.`];
+  const lines = [`Not saved, VERSION_STALE: ${staleSaid(conflict, look, sent, inLine)}`];
   if (current && typeof current.spoken === 'string' && register !== undefined) lines.push(`Now: ${rowLine(current, register, look)}`);
   lines.push(`Re-apply your change to it as it is now and send version ${String(conflict.version)}.`);
   return lines.join('\n');
+}
+
+/** Why a version was refused, in one sentence: ahead of the row, or behind a change somebody made. */
+export function staleSaid(conflict: { version: number; actor: string }, look: Look, sent: number | undefined, name: (s: string) => string = (s) => s): string {
+  const now = String(conflict.version);
+  if (sent !== undefined && sent > conflict.version)
+    return `you sent version ${String(sent)}, but it is only at version ${now}, so nobody changed it after you read it: the version you sent is ahead of it.`;
+  return `${name(look.actor(conflict.actor))} changed it after you read it, and it is at version ${now} now.`;
 }
 
 /* ── what a write says it did ──────────────────────────────────────────── */
