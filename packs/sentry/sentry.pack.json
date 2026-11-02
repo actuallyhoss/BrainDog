@@ -1,10 +1,10 @@
 {
   "pack": "sentry",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "icon": "triangle-alert",
   "title": "Sentry",
   "summary": "What is breaking in your apps, from Sentry every hour: open issues, new ones, error events and people hit, on each project's page and on Today. An issue that is new and serious, comes back or spikes rings the bell. Reads only; nothing is sent to Sentry.",
-  "changes": "The mail an alarm sends says what happened in its subject, \"Crumb.gg: Failed to send follow-up is back (121 people)\", gives the reason with its numbers (people hit so far and events in the last day), and opens the issue in BrainDog, with a quiet link to it on Sentry. Issues keep a new What happened field for that line.",
+  "changes": "The Errors page opens on one short line: how many issues are open on Sentry and how many are worth a look, or that nothing is open.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "uses": [
@@ -731,6 +731,64 @@
             "lt": 1
           },
           "body": "Nothing has come from Sentry yet. If it is not connected, make a token in Sentry (Settings, Developer Settings, Custom Integrations, Create New Integration, Internal Integration, with Read on Project, Issue & Event and Organization), put it in your keys as Sentry token, and set your organization. Your projects arrive within the hour. [Set it up](/addons/sentry?set=org)"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{sentry-open}} issue(s) open on Sentry, {{sentry-worth-a-look}} worth a look.",
+          "when": {
+            "all": [
+              {
+                "metric": "sentry-projects-held",
+                "gt": 0
+              },
+              {
+                "metric": "sentry-worth-a-look",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{sentry-open}} issue(s) open on Sentry, none worth a look.",
+          "when": {
+            "all": [
+              {
+                "metric": "sentry-projects-held",
+                "gt": 0
+              },
+              {
+                "metric": "sentry-open",
+                "gt": 0
+              },
+              {
+                "metric": "sentry-worth-a-look",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "Nothing is open on Sentry.",
+          "when": {
+            "all": [
+              {
+                "metric": "sentry-projects-held",
+                "gt": 0
+              },
+              {
+                "metric": "sentry-open",
+                "lt": 1
+              }
+            ]
+          }
         },
         {
           "kind": "stat",
