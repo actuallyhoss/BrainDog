@@ -43,6 +43,9 @@ struct Shell: View {
         .fullScreenCover(item: $app.outside) { outside in
             Browser(url: outside.url).ignoresSafeArea()
         }
+        #if DEBUG
+        .fullScreenCover(item: $app.gallery) { GalleryView(gallery: $0) }
+        #endif
         .task { await app.load() }
     }
 }

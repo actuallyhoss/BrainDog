@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- A Mac extension runs only sandboxed. The App Group and the Keychain group join it in M5, with the team's profile. -->
+<!--
+  A Mac extension runs only sandboxed. Signed with the team's profile (Release) it joins the app's App Group and Keychain
+  group, which is how it reads the session and the glance; signed to run locally it has neither and says "Sign in to
+  BrainDog", since macOS kills a locally signed process that claims them.
+-->
 <plist version="1.0">
 <dict>
 	<key>com.apple.security.app-sandbox</key>

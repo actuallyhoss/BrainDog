@@ -55,6 +55,14 @@ const WALKS = {
     ['tell-receipt', 'go:tell:New project: winter market|Call Nadia tomorrow;;tellAdd', 12],
     ['answered', 'go:tab:/decide;;answer', 10],
   ],
+  /* M5: the widgets and the share sheet are drawn by their own views in a Debug gallery over the app (`Gallery.swift`),
+     since nobody can add a widget to a simulator's Home Screen or press Share in another app without a finger. */
+  m5: [
+    ['widgets', 'go:widgets', 9],
+    ['share-link', 'go:share:Read before the launch|https://www.example.com/spring-launch-checklist', 9],
+    ['share-photo', 'go:share:Paid £34 for lunch with Nadia today|photo', 9],
+    ['tell-widget-opens', 'go:tab:/;;tellLink', 10],
+  ],
 };
 
 const walk = WALKS[milestone];

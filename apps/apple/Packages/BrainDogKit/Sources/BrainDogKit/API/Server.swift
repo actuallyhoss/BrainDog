@@ -10,7 +10,17 @@ public enum Server {
     public static let origin: URL = {
         #if DEBUG
         if let asked = UserDefaults.standard.string(forKey: "braindogServer"), let url = URL(string: asked), url.scheme != nil, url.host != nil {
+            /* AND SAID TO THE EXTENSIONS, which get no launch line: a widget or the share sheet of a Debug build talks to
+               the host the app was pointed at (the seed), through the App Group's defaults. */
+            if let group = appGroup { UserDefaults(suiteName: group)?.set(asked, forKey: "debug.server") }
             return url
+        }
+        if let group = appGroup, let shared = UserDefaults(suiteName: group) {
+            if !isExtension {
+                shared.removeObject(forKey: "debug.server")
+            } else if let asked = shared.string(forKey: "debug.server"), let url = URL(string: asked), url.scheme != nil, url.host != nil {
+                return url
+            }
         }
         #endif
         let named = Bundle.main.object(forInfoDictionaryKey: "BrainDogServer") as? String
@@ -34,6 +44,9 @@ public enum Server {
     public static func url(_ path: String) -> URL {
         URL(string: originText + (path.hasPrefix("/") ? path : "/" + path)) ?? origin
     }
+
+    /// True in a widget, share or notification extension, false in an app.
+    public static var isExtension: Bool { Bundle.main.bundleURL.pathExtension == "appex" }
 
     /// The App Group every target shares the session's facts and the glance snapshot through.
     public static var appGroup: String? {

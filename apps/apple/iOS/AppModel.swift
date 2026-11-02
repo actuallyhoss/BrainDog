@@ -98,6 +98,10 @@ final class AppModel {
     var outside: Outside?
     /// An address that arrived before sign-in finished, opened once it has.
     @ObservationIgnored var waiting: String?
+    #if DEBUG
+    /// The widgets and the share sheet drawn in the app, for the screenshot walk (`Gallery.swift`).
+    var gallery: Gallery?
+    #endif
 
     struct Sharing: Identifiable { let id = UUID(); let items: [Any] }
     struct Outside: Identifiable { let id = UUID(); let url: URL }
@@ -166,7 +170,7 @@ final class AppModel {
             badge = n
         case .open(let url):
             outside = Outside(url: url)
-        case .pushAsk, .notify, .ready, .haptic, .signedOut, .title:
+        case .pushAsk, .notify, .ready, .haptic, .signedOut, .title, .drag, .titleBarDoubleClick:
             /* Push is M4's; a notification from the page would ring twice beside the record's push; the rest the screen answered. */
             break
         }
@@ -258,6 +262,8 @@ final class AppModel {
                 await self.took(boot: boot, raw: raw)
             }
         }
+        /* THE WIDGETS DRAW WHAT THE APP JUST READ (plan 3.10), once `boot` has named the record and its currency. */
+        await GlanceStore.refresh()
         if let path = waiting {
             waiting = nil
             open(path)
@@ -275,13 +281,20 @@ final class AppModel {
         bootRaw = raw
         Kept.save(boot, as: "boot")
         if !needs.known { badge = boot.counts?.decide ?? 0 }
-        if boot.level.adds, let schemas = try? await Calls.schemas() { tell.learn(boot: raw, schemas: schemas) }
+        if boot.level.adds, let schemas = try? await Calls.schemas() {
+            tell.learn(boot: raw, schemas: schemas)
+            /* KEPT FOR THE SHARE SHEET AND SIRI, which read lines with no wait for the record. */
+            TellModel.keep(boot: raw, schemas: schemas)
+        }
     }
 
     /// Every screen reads again (after Tell added, after an answer), as a pull would.
     func refreshAll() {
         for stack in stacks.values { for screen in stack.screens { screen.emit("refresh") } }
-        Task { await needs.read() }
+        Task {
+            await needs.read()
+            await GlanceStore.refresh()
+        }
     }
 
     /// Another BrainDog opened on this session: every screen and every read starts again on it.
@@ -307,6 +320,8 @@ final class AppModel {
         UserDefaults.standard.removeObject(forKey: "tell.draft")
         places = [Place.today, Place.needs]
         build()
+        /* AND THE HOME SCREEN: the widgets draw "Sign in" now, not the last person's questions. */
+        GlanceStore.redraw()
     }
 
     // MARK: Tell

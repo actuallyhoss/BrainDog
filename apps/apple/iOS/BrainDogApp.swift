@@ -10,6 +10,9 @@ struct BrainDogApp: App {
     init() {
         Typeface.register()
         Bars.dress()
+        /* WHAT SIRI AND SHORTCUTS OPEN (`Shared/Intents.swift`): Tell with words in it, or a place. */
+        AppDoor.tell = { words in AppModel.shared.openTell(prefill: words) }
+        AppDoor.open = { path in AppModel.shared.open(path) }
     }
 
     var body: some Scene {
@@ -35,6 +38,9 @@ struct BrainDogApp: App {
             case .inactive where was == .active:
                 /* THE LAUNCH PICTURE: Today as it is now, laid over Today at the next cold start until it has drawn. */
                 Task { await AppModel.shared.keepLaunchPicture() }
+            case .background:
+                /* AND THE WIDGETS GET WHAT IS TRUE NOW, as the app goes (plan 3.10). */
+                Task { await GlanceStore.refresh() }
             default:
                 break
             }
@@ -73,6 +79,13 @@ enum Links {
     static func open(_ url: URL) async {
         if url.scheme == "https", url.path == "/signin" {
             await SignInFlow.shared.open(link: url)
+            return
+        }
+        /* `braindog://tell` (the Tell widget, a Home Screen action): Tell, with `?text=` in it when given. */
+        if url.scheme == "braindog", url.host == "tell" {
+            guard Session.shared.signedIn else { return }
+            let text = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "text" })?.value ?? ""
+            AppModel.shared.openTell(prefill: text)
             return
         }
         /* `braindog://open?path=/money` and a universal link to a page (`/decide/SG4`, `/p/money`, `/r/tasks/3`,
@@ -122,6 +135,11 @@ extension Links {
             _ = try? await app.current?.top?.webView.evaluateJavaScript("document.querySelector('\(css)')?.scrollIntoView({block: 'center'})")
         case "end": _ = try? await app.current?.top?.webView.evaluateJavaScript("window.scrollTo(0, document.documentElement.scrollHeight)")
         case "account": app.accountOpen = true
+        case "widgets": app.gallery = .widgets
+        case "tellLink": await Links.open(GlanceLink.tell)
+        case let p where p.hasPrefix("share:"):
+            /* The share sheet's own view over the app, with what a share would bring (`share:<words>|<photo>`). */
+            app.gallery = .share(String(p.dropFirst(6)))
         case "settings": app.current?.path.append(.settings)
         case "tellAdd": await app.tell.press()
         case "pop": _ = app.current?.path.popLast()

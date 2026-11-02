@@ -94,6 +94,21 @@ public final class Client: Sendable {
         return try await send(request, path: path)
     }
 
+    /// A file sent to the record's files (`PUT /api/files`, as a file field sends one): its bytes as they are, answered
+    /// with the file as a row holds it. The answer is the file itself, not the `{ ok, value }` envelope.
+    public func put(file data: Data, type: String) async throws(CallFailure) -> SentFile {
+        var request = URLRequest(url: Server.url("/api/files"))
+        request.httpMethod = "PUT"
+        request.setValue(type, forHTTPHeaderField: "content-type")
+        request.setValue(Server.originText, forHTTPHeaderField: "origin")
+        if let cookie = Session.shared.cookieHeader { request.setValue(cookie, forHTTPHeaderField: "cookie") }
+        request.httpBody = data
+        let answer = try await send(request, path: "/api/files")
+        if let sent = try? JSONDecoder().decode(SentFile.self, from: answer) { return sent }
+        if let wrapped = try? JSONDecoder().decode(Envelope<SentFile>.self, from: answer), let sent = wrapped.value { return sent }
+        throw CallFailure.failed(status: 200)
+    }
+
     /// One request on the origin, its `Set-Cookie` kept, and its status read the one way every call reads it.
     private func send(_ request: URLRequest, path: String) async throws(CallFailure) -> Data {
         let data: Data
@@ -195,3 +210,10 @@ nonisolated extension JSONValue: ExpressibleByStringLiteral, ExpressibleByDictio
 
 /// An empty answer, `{}`, which most sign-in routes give.
 nonisolated public struct Nothing: Decodable, Sendable {}
+
+/// A file as the record keeps it (`PUT /api/files`): its hash, type and size. A row's file field holds it with a name.
+nonisolated public struct SentFile: Codable, Sendable, Equatable {
+    public let sha256: String
+    public let mime: String
+    public let bytes: Int
+}

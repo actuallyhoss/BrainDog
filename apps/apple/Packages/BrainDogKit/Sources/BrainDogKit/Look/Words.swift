@@ -139,6 +139,29 @@ public enum Words {
     public static func addTo(_ list: String) -> String { "Add it to \(list)" }
     public static func keptInField(_ n: Int) -> String { n == 1 ? "The line it could not place is still in the field." : "The \(n) lines it could not place are still in the field." }
     public static let tellUndone = "Taken back. None of it was kept."
+    public static let tellTitle = "Tell BrainDog"
+    public static func attachmentGoes(_ kind: String) -> String { "The \(kind) goes with the first entry whose list keeps a file." }
+    public static func takeOff(_ kind: String) -> String { "Take the \(kind) off" }
+    public static func fileNotKept(_ kind: String) -> String { "The \(kind) was not kept: none of these lists keeps a file." }
+    public static func fileTooBig(_ kind: String) -> String { "The \(kind) was not kept: it is over 2 MB." }
+    public static func fileNotSent(_ kind: String) -> String { "The \(kind) was not kept: it could not be sent." }
+    public static let shareSignIn = "Open BrainDog and sign in first. Then share to it again."
+
+    // Outside the app: widgets, Siri and Shortcuts, the menu bar
+    public static func waitCount(_ n: Int) -> String { n == 1 ? "1 waits on you" : "\(n) wait on you" }
+    public static let nothingWaits = "Nothing waits on you."
+    public static let keyNumbers = "Key numbers"
+    public static let noKeyNumbers = "No key numbers on Today yet."
+    public static let signInToSee = "Sign in to BrainDog to see this."
+    public static func readAt(_ time: String) -> String { "At \(time)" }
+    public static func whatNeedsMe(_ n: Int, first: String?) -> String {
+        guard n > 0 else { return "Nothing needs you. You're up to date." }
+        let count = n == 1 ? "One thing needs you" : "\(n) things need you"
+        return first.map { "\(count). First: \($0)" } ?? "\(count)."
+    }
+    public static let tellAsk = "What do you want to tell BrainDog?"
+    public static let openToFinish = "BrainDog could not add that by itself. It is open in Tell to finish."
+    public static let openBrainDog = "Open BrainDog"
 
     /// "a, b and c".
     public static func and(_ items: [String]) -> String {

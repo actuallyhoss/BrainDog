@@ -34,10 +34,12 @@ public final class TellModel {
     public var mode: Mode = .tell
     public var text = "" {
         didSet {
-            UserDefaults.standard.set(text, forKey: Self.draftKey)
+            if keepsDraft { UserDefaults.standard.set(text, forKey: Self.draftKey) }
             if text != oldValue { reread() }
         }
     }
+    /// A file that came with the words (the share sheet's photo or PDF): sent with the first entry whose list keeps a file.
+    public var attachment: Attachment?
     public private(set) var lines: [Line] = []
     /// A line whose words fit nowhere, placed by a press on one of its offers.
     public private(set) var chosen: [Int: Told.Row] = [:]
@@ -54,14 +56,19 @@ public final class TellModel {
 
     @ObservationIgnored private var options: String?
     @ObservationIgnored private var names: [String: String] = [:]
+    /// Each list's first file field, where an attachment goes (`shared.svelte.ts` `photoField`).
+    @ObservationIgnored private var fileFields: [String: String] = [:]
+    /// Whether the words are kept as the app's draft. The share sheet and Siri start from their own words and keep none.
+    @ObservationIgnored private let keepsDraft: Bool
 
     /// A list's name as the person named it.
     public func listName(_ register: String) -> String { names[register] ?? register }
     @ObservationIgnored private let core = TellCore.shared
     private static let draftKey = "tell.draft"
 
-    public init() {
-        text = UserDefaults.standard.string(forKey: Self.draftKey) ?? ""
+    public init(keepsDraft: Bool = true) {
+        self.keepsDraft = keepsDraft
+        text = keepsDraft ? (UserDefaults.standard.string(forKey: Self.draftKey) ?? "") : ""
     }
 
     /// What lines are read against, from `boot` and the lists' declarations, as Today assembles them (`native.ts`).
@@ -76,10 +83,32 @@ public final class TellModel {
         for list in boot["registers"]?.array ?? [] {
             if let id = list["id"]?.string, let name = list["name"]?.string { names[id] = name }
         }
+        if case .object(let lists) = schemas {
+            for (id, decl) in lists {
+                if let field = decl["fields"]?.array?.first(where: { $0["type"]?.string == "file" })?["id"]?.string { fileFields[id] = field }
+            }
+        }
         reread()
     }
 
     public var ready: Bool { options != nil && core.loaded }
+
+    /// Learn from what the app kept last (`boot` and the declarations, in the App Group), so the share sheet and Siri can
+    /// read lines at once; then from the record, which keeps the copy fresh. Signed out or offline, the kept copy stands.
+    public func learnKeptThenFresh() async {
+        if let boot = Kept.load("tell.boot", as: JSONValue.self), let schemas = Kept.load("tell.schemas", as: JSONValue.self) {
+            learn(boot: boot, schemas: schemas)
+        }
+        guard Session.shared.signedIn, let (_, raw) = try? await Calls.boot(), let schemas = try? await Calls.schemas() else { return }
+        Self.keep(boot: raw, schemas: schemas)
+        learn(boot: raw, schemas: schemas)
+    }
+
+    /// Keep what lines are read against, for the extensions and the next cold start.
+    public static func keep(boot: JSONValue, schemas: JSONValue) {
+        Kept.save(boot, as: "tell.boot")
+        Kept.save(schemas, as: "tell.schemas")
+    }
 
     private func reread() {
         guard mode == .tell, let options else { lines = []; return }
@@ -135,16 +164,18 @@ public final class TellModel {
         say(nil)
         defer { sending = false }
         do {
-            let made = try await Calls.capture(batch.rows)
+            let (rows, fileSaid) = try await withAttachment(batch.rows)
+            let made = try await Calls.capture(rows)
             let madeJSON = (try? JSONEncoder().encode(made.made.map { ["register": $0.register] })).map { String(decoding: $0, as: UTF8.self) } ?? "[]"
             let first = core.added(made: madeJSON, sent: batch.rows.text, options: options) ?? Words.add
-            let sentence = [first, batch.held].filter { !$0.isEmpty }.joined(separator: ". ")
+            let sentence = [first, batch.held, fileSaid ?? ""].filter { !$0.isEmpty }.map { $0.hasSuffix(".") ? String($0.dropLast()) : $0 }.joined(separator: ". ")
             Haptic.success.play()
             /* A LINE THAT WENT NOWHERE STAYS IN THE FIELD, never dropped quietly: it is still what was typed, waiting for a
                list or for words that place it. */
             let left = lines.filter { $0.told.rows.isEmpty && chosen[$0.id] == nil }.map(\.sentence)
             receipt = Receipt(said: sentence.hasSuffix(".") ? sentence : sentence + ".", batch: made.batch, kept: left.count)
             chosen = [:]
+            attachment = nil
             text = left.joined(separator: "\n")
             if left.isEmpty { lines = [] }
             onChanged?()
@@ -153,6 +184,30 @@ public final class TellModel {
         } catch {
             say(Words.failure(error))
         }
+    }
+
+    /// The rows with the attachment sent and set in the first one whose list keeps a file, and what to say when none
+    /// does or it could not be sent: the entries are added all the same, as the web's share does.
+    private func withAttachment(_ rows: JSONValue) async throws(CallFailure) -> (JSONValue, String?) {
+        guard let attachment, var list = rows.array else { return (rows, nil) }
+        guard let at = list.firstIndex(where: { fileFields[$0["register"]?.string ?? ""] != nil }),
+              let register = list[at]["register"]?.string, let field = fileFields[register],
+              case .object(var row) = list[at], case .object(var fields)? = row["fields"] else {
+            return (rows, Words.fileNotKept(attachment.kind))
+        }
+        guard let data = attachment.fitted() else { return (rows, Words.fileTooBig(attachment.kind)) }
+        let sent: SentFile
+        do {
+            sent = try await Client.shared.put(file: data.bytes, type: data.type)
+        } catch .offline {
+            throw .offline
+        } catch {
+            return (rows, Words.fileNotSent(attachment.kind))
+        }
+        fields[field] = ["sha256": .string(sent.sha256), "mime": .string(sent.mime), "bytes": .number(Double(sent.bytes)), "name": .string(data.name)]
+        row["fields"] = .object(fields)
+        list[at] = .object(row)
+        return (.array(list), nil)
     }
 
     /// The receipt's Undo: the whole batch taken back.
@@ -201,20 +256,36 @@ public struct TellSheet: View {
     @Bindable var model: TellModel
     @FocusState private var typing: Bool
     @Environment(\.dismiss) private var dismiss
+    /// Whether Ask is offered beside Tell: not in the share sheet, whose words only ever become entries.
+    let asks: Bool
+    /// What Done does where there is no sheet to dismiss (the share extension, a Mac window).
+    let done: (() -> Void)?
 
-    public init(model: TellModel) { self.model = model }
+    public init(model: TellModel, asks: Bool = true, done: (() -> Void)? = nil) {
+        self.model = model
+        self.asks = asks
+        self.done = done
+    }
 
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s4) {
                 HStack(spacing: Space.s3) {
-                    Segmented([(TellModel.Mode.tell, Words.tell), (.ask, Words.ask)], chosen: $model.mode)
-                        .frame(maxWidth: 220)
+                    if asks {
+                        Segmented([(TellModel.Mode.tell, Words.tell), (.ask, Words.ask)], chosen: $model.mode)
+                            .frame(maxWidth: 220)
+                    } else {
+                        Text(Words.tellTitle).font(Typeface.heading).foregroundStyle(Palette.ink)
+                    }
                     Spacer(minLength: 0)
-                    Button(Words.done) { dismiss() }.buttonStyle(.bare)
+                    Button(Words.done) { if let done { done() } else { dismiss() } }.buttonStyle(.bare)
                 }
 
                 field
+
+                if let attachment = model.attachment {
+                    attachmentView(attachment)
+                }
 
                 if let receipt = model.receipt {
                     receiptView(receipt)
@@ -250,7 +321,8 @@ public struct TellSheet: View {
         .scrollDismissesKeyboard(.interactively)
         .background(Palette.tile)
         .onChange(of: model.mode) { _, _ in model.opened(mode: model.mode) }
-        .onAppear { typing = model.receipt == nil }
+        /* THE KEYBOARD COMES UP FOR AN EMPTY FIELD; words that arrived with it (a share, Siri) are read first. */
+        .onAppear { typing = model.receipt == nil && model.text.isEmpty }
         .animation(.easeOut(duration: 0.18), value: model.lines)
         .animation(.easeOut(duration: 0.18), value: model.receipt)
     }
@@ -266,6 +338,33 @@ public struct TellSheet: View {
             .frame(minHeight: 96, alignment: .topLeading)
             .background(Palette.tile2, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
             .accessibilityLabel(model.mode == .ask ? Words.ask : Words.tell)
+    }
+
+    private func attachmentView(_ attachment: Attachment) -> some View {
+        HStack(spacing: Space.s3) {
+            if let picture = attachment.picture {
+                picture.resizable().scaledToFill().frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                    .accessibilityHidden(true)
+            } else {
+                IconWell(.doc, size: .card)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(attachment.name).font(Typeface.bodyMedium).foregroundStyle(Palette.ink).lineLimit(1).truncationMode(.middle)
+                Text(Words.attachmentGoes(attachment.kind)).font(Typeface.meta).foregroundStyle(Palette.ink3).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button {
+                Haptic.select.play()
+                model.attachment = nil
+            } label: {
+                Glyph.close.image.resizable().scaledToFit().frame(width: 16, height: 16).foregroundStyle(Palette.ink3)
+                    .frame(width: Space.tap, height: Space.tap)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Words.takeOff(attachment.kind))
+        }
+        .accessibilityElement(children: .contain)
     }
 
     private var becomes: some View {

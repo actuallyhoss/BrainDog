@@ -16,6 +16,10 @@ nonisolated public enum ShellAsk: Sendable, Equatable {
     case title(name: String, sub: String?)
     case places(JSONValue)
     case visit(path: String, mode: String)
+    /// The Mac: a press on the empty part of the bar, which moves the window as a title bar does.
+    case drag
+    /// The Mac: a double press there, which does what the person set for a title bar (zoom, minimise or nothing).
+    case titleBarDoubleClick
 }
 
 /// The kind of shell a web view is in, which the web reads as `kind` and decides its frame by.
@@ -88,6 +92,10 @@ public final class ShellBridge: NSObject, WKScriptMessageHandler {
                let value = try? JSONDecoder().decode(JSONValue.self, from: data) { hear(.places(value)) }
         case "visit":
             hear(.visit(path: text("path"), mode: text("mode")))
+        case "drag":
+            hear(.drag)
+        case "zoom":
+            hear(.titleBarDoubleClick)
         default:
             break
         }

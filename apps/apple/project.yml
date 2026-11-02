@@ -43,6 +43,7 @@ targets:
     platform: iOS
     sources:
       - path: iOS
+      - path: Shared
       - path: Assets.xcassets
       - path: BrainDog.icon
         buildPhase: resources
@@ -100,6 +101,7 @@ targets:
     platform: macOS
     sources:
       - path: Mac
+      - path: Shared
       - path: Assets.xcassets
       - path: BrainDog.icon
         buildPhase: resources
@@ -136,9 +138,11 @@ targets:
             CFBundleURLSchemes: [braindog]
         BrainDogServer: https://app.brain.dog
         BrainDogAppGroup: $(TeamIdentifierPrefix)dog.brain
-        BrainDogKeychainGroup: ""
+        BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
+        # The menu bar extra and the Dock badge keep the count while the window is closed; the app stays open then.
+        NSSupportsAutomaticTermination: false
 
-  # ── Extensions (empty in M0; filled in M4 and M5) ─────────────────────────────────────────────────────────────────
+  # ── Extensions (the widgets and share in M5; the notification service in M4) ─────────────────────────────────────────────────────────────────
   WidgetsiOS:
     type: app-extension
     platform: iOS
@@ -153,12 +157,16 @@ targets:
         PRODUCT_NAME: BrainDogWidgets
         TARGETED_DEVICE_FAMILY: "1,2"
         SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: Widgets/Widgets-iOS.entitlements
     info:
       path: Widgets/Info-iOS.plist
       properties:
         CFBundleDisplayName: BrainDog
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        BrainDogServer: https://app.brain.dog
+        BrainDogAppGroup: group.dog.brain
+        BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
@@ -175,14 +183,21 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dog.brain.desktop.widgets
         PRODUCT_NAME: BrainDogWidgets
         SKIP_INSTALL: YES
-        CODE_SIGN_ENTITLEMENTS: Widgets/Widgets-Mac.entitlements
         ENABLE_HARDENED_RUNTIME: YES
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: Widgets/Widgets-Mac.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Widgets/Widgets-Mac.release.entitlements
     info:
       path: Widgets/Info-Mac.plist
       properties:
         CFBundleDisplayName: BrainDog
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        BrainDogServer: https://app.brain.dog
+        BrainDogAppGroup: $(TeamIdentifierPrefix)dog.brain
+        BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
@@ -198,20 +213,27 @@ targets:
         PRODUCT_NAME: BrainDogShare
         TARGETED_DEVICE_FAMILY: "1,2"
         SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: Share/Share-iOS.entitlements
     info:
       path: Share/Info-iOS.plist
       properties:
         CFBundleDisplayName: BrainDog
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        BrainDogServer: https://app.brain.dog
+        BrainDogAppGroup: group.dog.brain
+        BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareController
           NSExtensionAttributes:
+            # Text, one link, or one photo or file (a PDF, a receipt): what Tell can take with its words.
             NSExtensionActivationRule:
               NSExtensionActivationSupportsText: true
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
               NSExtensionActivationSupportsImageWithMaxCount: 1
+              NSExtensionActivationSupportsFileWithMaxCount: 1
+              NSExtensionActivationSupportsAttachmentsWithMaxCount: 2
 
   ShareMac:
     type: app-extension
@@ -224,14 +246,21 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dog.brain.desktop.share
         PRODUCT_NAME: BrainDogShare
         SKIP_INSTALL: YES
-        CODE_SIGN_ENTITLEMENTS: Share/Share-Mac.entitlements
         ENABLE_HARDENED_RUNTIME: YES
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: Share/Share-Mac.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Share/Share-Mac.release.entitlements
     info:
       path: Share/Info-Mac.plist
       properties:
         CFBundleDisplayName: BrainDog
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        BrainDogServer: https://app.brain.dog
+        BrainDogAppGroup: $(TeamIdentifierPrefix)dog.brain
+        BrainDogKeychainGroup: $(AppIdentifierPrefix)dog.brain.shared
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareController
@@ -240,6 +269,8 @@ targets:
               NSExtensionActivationSupportsText: true
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
               NSExtensionActivationSupportsImageWithMaxCount: 1
+              NSExtensionActivationSupportsFileWithMaxCount: 1
+              NSExtensionActivationSupportsAttachmentsWithMaxCount: 2
 
   NotifyService:
     type: app-extension
