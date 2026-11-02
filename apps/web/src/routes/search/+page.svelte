@@ -696,6 +696,9 @@
   /* THE BEST MATCH, one 56px line. */
   .best {
     min-block-size: 56px;
+    /* AND ITS WELL ON THE SAME EDGE AS EVERY LIST'S BELOW IT (leftovers 4): a list's rows stand out by their padding so
+       the wash under the pointer reaches the tile's edge, and the best match, not in one, stood 12 further in. */
+    margin-inline: calc(-1 * var(--sp-3));
   }
 
   /* A LATE ROW'S DUE CELL, in red as its list says it. */
