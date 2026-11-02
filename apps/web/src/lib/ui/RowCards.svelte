@@ -297,8 +297,14 @@
     const chip = place !== undefined && (decl?.mobile.includes(scoped ?? '') === true || text === undefined);
     /* THE PROJECT'S NAME, where nothing else fills the detail and the project is not already the chip. */
     const thing = !chip && text === undefined ? (markFor(e)?.name ?? null) : null;
-    return { tone, word, also, date, detail: chip ? undefined : text, place: chip ? (place ?? null) : undefined, chip, thing };
+    /* AND WHO IT IS FOR, AFTER WHERE IT APPLIES (leftovers 2 Nov, 12): the field that travels with the scope (a task's
+       Client beside its Project, `qualifies`) is said on the card as the laptop's list says it in the next column. */
+    const forWhom = qualified && (chip || thing !== null || text !== undefined) ? saidOf(e, qualified) || null : null;
+    return { tone, word, also, date, detail: chip ? undefined : text, place: chip ? (place ?? null) : undefined, chip, thing, forWhom };
   };
+
+  /* THE FIELD THAT TRAVELS WITH THE SCOPE (`qualifies`), said after it on the second line. */
+  const qualified = $derived(scoped ? decl?.fields.find((f) => f.qualifies === scoped && f.type === 'ref')?.id : undefined);
 
   /* ONE LEADING SLOT, KEPT ON EVERY CARD when any card has a face or a word: the face in it on the first line, the
      dot on the second, and the words of both lines start at one x. */
@@ -392,6 +398,7 @@
             {:else if line.thing}
               {#if line.word || line.date}<span aria-hidden="true">{' · '}</span>{/if}<span dir="auto">{line.thing}</span>
             {/if}
+            {#if line.forWhom}<span aria-hidden="true">{' · '}</span><span class="card-for" dir="auto">{line.forWhom}</span>{/if}
           </span>
           <!-- THE END OF LINE TWO: the holder's face after a hand, then a selected row's tick. The face had
                a third grid row of its own, which made a handed row a card of three lines. -->
@@ -603,6 +610,16 @@
 
     .card:has(.card-end) .card-b {
       grid-column: 1;
+    }
+
+    /* WHO A ROW IS FOR NEVER CUTS: where the line has no room for it, it goes under, whole. */
+    .card-b:has(.card-for) {
+      white-space: normal;
+      text-overflow: clip;
+    }
+
+    .card-for {
+      white-space: nowrap;
     }
 
     .card-holder {
