@@ -1447,9 +1447,11 @@
 /* A BOOK'S PAGE AND AN ACCOUNT'S HAVE NO SENTENCE ABOVE THEIR FILTERS, so the book tabs (Everything, Household,
    Tidepool LLC) or the account's chips rise into the head's row beside Show the data, Share and More, as the Ledger's
    search does, rather than under a row that held the three buttons and nothing else. */
-/* A DESK ONLY: on a phone the filters keep their own row and their gutter. */
+/* A DESK ONLY: on a phone the filters keep their own row and their gutter. AND ONLY A STRIP THAT DRAWS SOMETHING
+   (leftovers 4): a book whose tabs drew nothing left an empty strip that still rose 42px, and the page's first tile
+   covered Add a movement, Show the data, Share and More. */
 @media (width >= 900px) {
-  .hosted[data-money] > .page-head[data-titled]:has(.name-unseen):not(:has(.page-said)):not(:has(~ .head-below)) ~ .page-filters {
+  .hosted[data-money] > .page-head[data-titled]:has(.name-unseen):not(:has(.page-said)):not(:has(~ .head-below)) ~ .page-filters:has(> *) {
     margin-block-start: -54px;
     padding-inline-end: 180px;
     pointer-events: none;
@@ -1457,7 +1459,7 @@
 
   /* ROOM FOR THE BUTTONS THE HEAD HOLDS, AND NO MORE: Share and More take 140px, Show the data 120 beside them. At a flat
      320 Payees' "25 more" fell onto a line of its own under five chips that had room for it. */
-  .hosted[data-money] > .page-head[data-titled]:has(.name-unseen):not(:has(.page-said)):not(:has(~ .head-below)):has(.head-actions > a.btn) ~ .page-filters {
+  .hosted[data-money] > .page-head[data-titled]:has(.name-unseen):not(:has(.page-said)):not(:has(~ .head-below)):has(.head-actions > a.btn) ~ .page-filters:has(> *) {
     padding-inline-end: 300px;
   }
 
