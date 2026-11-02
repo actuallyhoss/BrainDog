@@ -25,7 +25,7 @@
   import { erasePerson } from '$lib/record/settings-write.ts';
   /* Lane G: inviting somebody by address, with a link the owner sends and nobody mails. */
   import { inviteEmail, inviteLink, readInvites, renewInvite, withdrawInvite, type InviteReach, type Waiting } from '$lib/record/settings-write.ts';
-  import { sendInvite } from '$lib/auth.ts';
+  import { methods, sendInvite } from '$lib/auth.ts';
   import type { Invitation } from '@braindog/client';
   import { dateSaid, relative, since } from 'braindog-render';
   import { recordNow } from '$lib/record/boot-live.ts';
@@ -49,6 +49,16 @@
      an owner's control asks the same question (`settings-state.svelte.ts`). The names below are the
      ones this markup reads. */
   const s = settingsState(() => shell);
+
+  /* A SELF-HOST WITH NO MAIL SAYS SO BEFORE THE PRESS (selfhost lane, 2 Nov): the sheet promised "We email it to them" on
+     a server that sends nothing, and a new address cannot join without the proof a mail carries. Asked only of a self-host;
+     the Cloud always mails. */
+  let mailOff = $state(false);
+  $effect(() => {
+    if (shell.host !== 'self-host') return;
+    void methods().then((m) => (mailOff = m.ok && m.value.magic !== true)).catch(() => {});
+  });
+  const inviteHow = $derived(mailOff ? copy.inviteHowNoMail : copy.inviteHowMail);
   const me = $derived(shell.me);
   const anOwner = $derived(s.anOwner);
   /* TEAMS HELD: the Cloud says so in `/account/billing` (`teams_held`), and the invite form gives way to the sentence. */
@@ -844,8 +854,8 @@
   <div class="section-body">
     <!-- NO MAIL LEAVES THIS HOST, and the line says so beside the control rather than after the press: the owner sends
          the link themselves, and somebody expecting an email would wait for one that never comes. -->
-    <p class="hint">{copy.inviteHowMail}</p>
-    <Sheet bind:open={inviteOpen} title={copy.invitePerson} subtitle={copy.inviteHowMail}>
+    <p class="hint">{inviteHow}</p>
+    <Sheet bind:open={inviteOpen} title={copy.invitePerson} subtitle={inviteHow}>
     <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
          row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->
     <form class="code-form invite-form" onsubmit={makeInvite}>

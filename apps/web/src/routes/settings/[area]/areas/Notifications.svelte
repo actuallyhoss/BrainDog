@@ -283,7 +283,8 @@
       </div>
     </Tile>
   {:else if props.shell.host === 'self-host'}
-    <Tile>
+    <!-- Laid flat inside the push wrapper as `PushToggle`'s own tile is, so the wrapper is drawn once. -->
+    <Tile class="section" data-surface="tile">
       <StateRow icon="phone" title={words.selfPush} line={words.selfPushLine} />
     </Tile>
   {:else}

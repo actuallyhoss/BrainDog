@@ -180,7 +180,7 @@ export const NO_MAIL =
  */
 export function noMailSend(on: 'selfhost' | 'worker'): string {
   return on === 'selfhost'
-    ? "This BrainDog can't send mail, so nothing was emailed, and somebody new can't join until it can: whoever runs it sets BRAINDOG_SMTP_URL and BRAINDOG_MAIL_FROM and starts it again. Until then the link works only for an address that already signs in here."
+    ? "This BrainDog can't send mail, so nothing was emailed. Somebody new can join once whoever runs it sets BRAINDOG_SMTP_URL and BRAINDOG_MAIL_FROM and starts it again; until then the link works only for an address that already signs in here."
     : "Mail isn't going out right now, so nothing was emailed. Try again in a while.";
 }
 

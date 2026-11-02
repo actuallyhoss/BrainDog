@@ -718,6 +718,7 @@ export const account = {
   inviteEmailing: 'Sending',
   inviteEmailed: (email: string) => `Sent to ${email}. They open the mail and press Join.`,
   inviteHowMail: 'One use, one address, good for 24 hours. We email it to them, or you can copy the link.',
+  inviteHowNoMail: "One use, one address, good for 24 hours. This BrainDog can't send mail yet, so somebody new can't join until whoever runs it sets mail up. The link works now for an address that already signs in here.",
   inviteFor: (email: string) => `This invitation is for ${email}.`,
   inviteSignedInAs: (email: string) => `You are signed in as ${email}.`,
   inviteAccept: (record: string | null) => (record ? `Join ${record}` : 'Join'),
