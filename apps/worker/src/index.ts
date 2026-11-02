@@ -1304,7 +1304,15 @@ export class Record$ extends DurableObject<Env> {
       });
       /* CONNECT GOOGLE, every 15 minutes while a Google account is connected (`google-connect.ts`): its own step, so a
          slow Google holds only itself, and the alarm is kept no later than the next sync below. */
-      await this.#step(api, 'google', () => this.#googleSync(api), undefined);
+      await this.#step(
+        api,
+        'google',
+        () =>
+          this.#googleSync(api).catch((e: unknown) => {
+            console.error('google:', e instanceof Error ? e.message : String(e));
+          }),
+        undefined,
+      );
       /* WHAT THIS ALARM DREW AND WHAT IT LEFT FOR THE NEXT, when it drew anything: the clock cannot say (`countedShare`). */
       if (lookShare.used() + lintShare.used() + lookShare.kept() > 0)
         op({
@@ -1384,7 +1392,7 @@ export class Record$ extends DurableObject<Env> {
         const held = new Map<string, { seq: number; version: number; fields: Record<string, unknown> }>();
         let cursor: string | null = null;
         for (let i = 0; i < 20; i++) {
-          const page = await api.list({ register: 'events', where: `day after ${fromDay}`, limit: 200, cursor }, sys);
+          const page = await api.list({ register: 'events', where: { all: [{ field: 'day', gte: fromDay }] }, limit: 200, cursor }, sys);
           if (!page.ok) break;
           for (const r of page.value.rows) if (r.seq !== null && typeof r.fields.key === 'string') held.set(r.fields.key, { seq: r.seq, version: r.version, fields: r.fields });
           cursor = page.value.cursor;
@@ -1393,10 +1401,10 @@ export class Record$ extends DurableObject<Env> {
         return held;
       },
       addEvent: async (fields) => {
-        await api.create({ register: 'events', fields: fields as never, said: 'From Google Calendar' }, sys);
+        await api.create({ register: 'events', fields: fields as never }, sys);
       },
       changeEvent: async (seq, version, patch) => {
-        await api.update({ register: 'events', seq, version, patch: patch as never, said: 'From Google Calendar' }, sys);
+        await api.update({ register: 'events', seq, version, patch: patch as never }, sys);
       },
       meet: async (said) => {
         await api.meet({ ...said, source: 'Google Contacts' }, sys);
