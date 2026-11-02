@@ -26,6 +26,18 @@ subject, who it is from or to, the day, a snippet of at most 160 characters and 
 - A **Mail** page, and two Today widgets: **Mail** (need a reply, unread) and **Waiting on your reply**. Both stay off
   the board until the first mail arrives; until then the Connect tile on the add-on page is where to start.
 
+## Connect Google (the simpler way, since 2 Nov)
+
+BrainDog can read Gmail itself once Google is connected: **Connect Google** on this add-on's page, or in Settings, What
+comes in. It is Google's own sign-in, read only (`gmail.readonly`, `calendar.readonly`, `contacts.readonly`,
+`userinfo.email`), and BrainDog keeps Google's refresh token sealed on its server, never in a row, a note or an answer.
+Every 15 minutes it reads what changed (Gmail's history, from a two-week start) and posts each mail through this
+add-on's own door, `gmail_in`, as the very lines the script below posts. So the list, the page, the questions, the Today
+widgets and the people met are the same whichever way the mail came, and a mail is never written twice. With Google
+connected, this add-on's page says Connected in place of the paste steps, and the script can be stopped.
+
+The script stays for anybody who would rather not connect Google, and keeps working beside it.
+
 ## Why a script in your own Google account
 
 Reading Gmail from a server needs a Google Cloud app, and an app that reads mail needs Google's restricted-scope review

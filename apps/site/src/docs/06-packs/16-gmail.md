@@ -11,7 +11,17 @@ The Gmail add-on brings your mail into BrainDog: who you are in touch with, mail
 - **Mail older than two weeks** that still waits on your reply stays, with its question, until you reply or answer it.
 - A **Mail** page, and two widgets for Today, Mail and Waiting on your reply. They stay off Today until your first mail arrives.
 
-## Connect it
+## Connect Google
+
+The simplest way in: open Add-ons, Gmail (or Settings, What comes in) and press **Connect Google**. Google asks you to
+let BrainDog read your mail, calendar and contacts; say yes and you come back to BrainDog. From then on BrainDog reads
+every 15 minutes: mail into this add-on, events and invitations into the Calendar add-on, and your Google contacts into
+People. It only reads. **Disconnect** on the same tile stops it and takes the access back at Google; what came in stays.
+
+With Google connected you do not need the script below. If you set it up before, you can stop it, or leave it: both
+write the same mail, never twice.
+
+## Or connect it with a script
 
 The sender is a short script in your own Google account, so no Google Cloud app or review is needed.
 
