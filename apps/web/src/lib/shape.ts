@@ -139,7 +139,10 @@ const NAME_RULES: readonly NameRule[] = [
   { at: new RegExp(`\\b(?:${either('bill|invoice|charge')})(?:s|ed|ing)?\\s+${LIST}`, 'gu'), register: 'people', role: 'client' },
   { at: new RegExp(`\\b(?:${either('contractor')})s?\\s+(?:(?:called|named)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'contractor' },
   { at: new RegExp(`\\b(?:${either('accountant')})s?\\s+(?:(?:called|named)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'accountant' },
-  { at: new RegExp(`\\b(?:${either('partner|cofounder|co-founder|collaborator')})s?\\s+(?:(?:called|named)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'collaborator' },
+  /* THE PEOPLE THEY PAY TO DO THE WORK, BY THE WORK (onboarding6, the creator walk: "my editors Kai and Rosa" were never
+     drafted): an editor, an assistant, a designer they hire is somebody they contract. */
+  { at: new RegExp(`\\b(?:${either('editor|video editor|assistant|virtual assistant|moderator|designer|developer|bookkeeper|cleaner|nanny|babysitter')})s?\\s+(?:(?:called|named|are|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'contractor' },
+  { at: new RegExp(`\\b(?:${either('partner|cofounder|co-founder|collaborator')})s?\\s+(?:(?:called|named|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'collaborator' },
   { at: new RegExp(`\\b(?:${either('run|runs|running|own|owns|build|builds|building|make|makes|making|started|founded')}|working on)\\s+${LIST}`, 'gu'), register: 'things' },
   { at: new RegExp(`\\b(?:called|named)\\s+${LIST}`, 'gu'), register: 'things' },
 ];

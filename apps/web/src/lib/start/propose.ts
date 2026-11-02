@@ -1215,7 +1215,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     const org = clientCompany({ register: r.register, fields: r.fields }, modules);
     if (org !== null) rows[i] = { register: org.register, fields: org.fields };
   }
-  return businessNotProject({
+  return householdPeople(businessNotProject({
     ...out,
     currency,
     ...(typed === null && there === null && currency !== null ? { currencyBy: 'device' as const } : {}),
@@ -1223,7 +1223,43 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     title: titleOf(said, name.name, rows),
     places: placesOf(out),
     by: 'rules',
+  }), sentence);
+}
+
+/* ── a household's people are family, not people you work with ─────────── */
+
+/* THE WORDS A HOUSEHOLD NAMES ITS PEOPLE BY, and the role each is kept under: Personal's own values (`extends`), never the
+   studio's. */
+const KIN: Readonly<Record<string, string>> = {
+  partner: 'family', wife: 'family', husband: 'family', spouse: 'family', girlfriend: 'family', boyfriend: 'family', fiance: 'family', fiancee: 'family',
+  mum: 'family', mom: 'family', mother: 'family', dad: 'family', father: 'family', son: 'family', daughter: 'family', sister: 'family', brother: 'family',
+  friend: 'friend', landlord: 'landlord', landlady: 'landlord', housemate: 'other', flatmate: 'other', roommate: 'other',
+};
+const KIN_WORDS = Object.keys(KIN).join('|');
+const kinBefore = (name: string): RegExp => new RegExp(String.raw`\b(?:my|our)\s+(${KIN_WORDS})(?:\s+is|,)?\s+${name}\b`, 'iu');
+const kinAfter = (name: string): RegExp => new RegExp(String.raw`\b${name},?\s+\(?(?:my|our)\s+(${KIN_WORDS})\b`, 'iu');
+const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+
+/**
+ * A HOUSEHOLD'S PEOPLE IN ITS OWN WORDS (2 Nov, onboarding5: Marta's "my partner Sam" was kept as a collaborator and said
+ * back as "someone you work with"). Where the setup is a household (the personal use case on its own), a person the words
+ * name as "my partner", "my sister", "our landlord" is kept under Personal's role for it (family, friend, landlord), with
+ * the word they used as the note ("Partner"), which the tile and the line back say. Anyone else is left as read.
+ */
+export function householdPeople<P extends Pick<Proposal, 'usecase' | 'also' | 'rows'>>(p: P, sentence: string): P {
+  if (p.usecase === null || !HOUSEHOLD.has(p.usecase) || !p.also.every((a) => HOUSEHOLD.has(a))) return p;
+  let changed = false;
+  const rows = p.rows.map((r) => {
+    const name = typeof r.fields.name === 'string' ? r.fields.name.trim() : '';
+    if (r.register !== PEOPLE || name === '') return r;
+    const m = kinBefore(escape(name)).exec(sentence) ?? kinAfter(escape(name)).exec(sentence);
+    const word = m?.[1]?.toLowerCase().replace(/é/gu, 'e');
+    const role = word === undefined ? undefined : KIN[word];
+    if (role === undefined || word === undefined) return r;
+    changed = true;
+    return { ...r, fields: { ...r.fields, role, note: word.charAt(0).toUpperCase() + word.slice(1) } };
   });
+  return changed ? { ...p, rows } : p;
 }
 
 /* ── a client is somebody, never a project ──────────────────────────────── */
@@ -1412,7 +1448,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
     /* THE RULES' NAMES COME WITH THE RULES' LINES, so "freelance as a designer" still reads Clients where it stands in. */
     ...(Object.keys(names).length > 0 ? { names } : said.length === 0 && rules.names ? { names: rules.names } : {}),
   };
-  return businessNotProject({
+  return householdPeople(businessNotProject({
     ...out,
     currency,
     ...(!typed && ruled === null && currency !== null ? { currencyBy: 'device' as const } : {}),
@@ -1422,7 +1458,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
     by: reply.by === '' || reply.by === 'rules' ? 'model' : reply.by,
     summary: summary === '' ? null : summary,
     draft: u === null && reply.draft !== null && reply.draft.trim() !== '' ? reply.draft.trim() : null,
-  });
+  }), sentence);
 }
 
 /**

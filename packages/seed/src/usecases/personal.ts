@@ -3,8 +3,8 @@
  * for the love of it, and the goals and habits they keep.
  *
  * IT BUILDS ON MONEY, NOT BESIDE IT. Money's accounts and bills are the same lists a business keeps, spoken in a
- * person's words through labels ("Bills", not "Money"). Money points its bills at projects, so Projects comes with it,
- * and People comes when the person names someone (`needs`, since 2.6.0). Projects is where a passion project lives, its states relabelled Active, Ongoing, On hold and Finished. The people in
+ * person's words through labels ("Bills", not "Money"). Projects comes when a project is said, not with Money, and
+ * People comes with it, since its roles are laid on People's list (`needs`, since 2.11.0). Projects is where a passion project lives, its states relabelled Active, Ongoing, On hold and Finished. The people in
  * a life are People's list with Personal's own roles laid on it (`extends` below): family, friend, landlord,
  * tradesperson and adviser.
  *
@@ -166,8 +166,13 @@ export const PERSONAL = {
      2.9.1 (audit 31 Oct h, AH21): the Log is called Progress and Put by is called Money saved, so a new person reads
      what each holds. Words only, so a patch step; 2.9.0 is published.
      2.10.0 (audit 31 Oct l, AL13): Goals' line leaves out a count of nought, "1 goal on the go" and never "1 goal and 0
-     habits", by one line for each case. Blocks added and nothing taken away, so a minor step; 2.9.1 is published. */
-  version: '2.10.0',
+     habits", by one line for each case. Blocks added and nothing taken away, so a minor step; 2.9.1 is published.
+     2.11.0 (onboarding6, 2 Nov): a household stands on Money and People, not Projects. Projects came with every Personal record because
+     this pack's Project steps point at it, so a household that said bills, rent and a holiday was made a Projects part
+     it never asked for. `needs` is People and Money now; Projects comes when a project is said, and until then the install cuts
+     Project steps' link to it (`fitted`). Nothing is declared, taken away or reworded, so a record on 2.10.0 keeps all
+     it holds; the file it shares changes (`needs`, People and Money), so a version beside 2.10.0, which is published. */
+  version: '2.11.0',
   title: 'Personal',
   summary: 'Your money, bills, savings and goals.',
   author: 'BrainDog',
@@ -182,10 +187,14 @@ export const PERSONAL = {
     'diet', 'reading more', 'family',
   ],
   modules: ['portfolio', 'people', 'money-core'],
-  /* WHAT A PERSON CANNOT STAND WITHOUT, SINCE 2.6.0: their money, and the Projects its bills point at, which this pack's
-     own Project steps point at too (`project_steps.thing`), so it is said here and not left to the install to close
-     over. People comes when a name is said. */
-  needs: ['portfolio', 'money-core'],
+  /* WHAT A PERSON CANNOT STAND WITHOUT, SINCE 2.11.0: their money, and the people in their life. Projects was here from
+     2.6.0 because Money's bills and this pack's Project steps point at it (`project_steps.thing`), and a household was
+     handed a Projects part for it; those links are cut at install where Projects is not held (`fitted`), and Projects
+     comes when a project is said. PEOPLE IS STOOD ON, because this pack lays its roles (family, friend, landlord) on
+     People's list (`extends`), and that is cut too where People is not held when this pack goes in: Marta's partner,
+     written as family in the same press, was refused "role has no value family". Every sign-up asks a name, which keeps
+     People anyway, so a household is shown nothing new. */
+  needs: ['people', 'money-core'],
   voice: {
     home: 'Day to day',
     right_now: 'This month',

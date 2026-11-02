@@ -74,6 +74,9 @@ export const BUSINESS = {
     'business', 'small business', 'my business', 'studio', 'agency', 'freelance', 'freelancer', 'freelancing',
     'consultancy', 'consulting', 'clients', 'client', 'customers', 'invoice', 'invoices', 'invoicing', 'domains',
     'hosting', 'subscriptions', 'contractors', 'accountant', 'vat', 'bookkeeping', 'retainer', 'foundry',
+    /* A CREATOR'S WORK IS A SMALL BUSINESS (onboarding6: "I'm a streamer and YouTuber" paid by sponsors and paying two
+       editors was read by the rules as a household's Personal, on "money"). Signals only, outside the pack. */
+    'streamer', 'youtuber', 'content creator', 'creator', 'sponsors', 'sponsorships', 'brand deals',
   ],
   modules: [],
   /* THE HOUSE VOICE BUT FOR HOME'S LINES ABOUT MONEY: the house words are written for every kind of person, and a

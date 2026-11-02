@@ -1325,11 +1325,14 @@ const moduleLines = (offer: SetupOffer): string =>
 const partLines = (offer: SetupOffer): string =>
   offer.modules.map((m) => `${m.id} (${m.name})${m.lists.length > 0 ? `: ${m.lists.map((l) => l.name).join(', ')}` : ''}`).join('\n');
 
-/** What a turn may ask about next, in the order the rules ask: each with the words the model is told it means. */
+/**
+ * What a turn may ask about next, in the order the rules ask: each with the words the model is told it means. NO CURRENCY
+ * SINCE 2 NOV (onboarding6): the model asked it first in all four walks; the device's currency is taken and said on the
+ * summary with a Change beside it, and the rules ask only where the words leave it open (`chat.ts` `currencyQuiet`).
+ */
 const TURN_TOPICS: readonly (readonly [SetupAbout, string])[] = [
   ['work', 'work: the projects, clients or products they work on'],
   ['money', 'money: what comes in and what goes out'],
-  ['currency', 'currency: which currency their money is in, once money has come up and they named none'],
   ['people', 'people: who they work with'],
   ['tools', 'tools: the AI assistants they use, such as Claude, ChatGPT or Cursor, never design or office software'],
   ['first', 'first: what to keep track of first'],

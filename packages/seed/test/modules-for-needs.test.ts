@@ -73,7 +73,7 @@ test('A USE CASE STANDS ON ITS NEEDS, and on all of its modules when it says non
   /* FOUNDER 2.7.0 AND PERSONAL 2.6.0 SAY THEIR NEEDS, Projects and Money; a built-in that says none
      installs what it did before this. */
   assert.deepEqual(useCase('founder')!.needs, ['portfolio', 'money-core']);
-  assert.deepEqual(useCase('personal')!.needs, ['portfolio', 'money-core']);
+  assert.deepEqual(useCase('personal')!.needs, ['people', 'money-core']);
   for (const u of USE_CASES) {
     const first: readonly string[] = MODULE_ORDER;
     const stands = u.needs ?? u.modules;

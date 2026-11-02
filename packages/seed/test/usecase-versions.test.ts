@@ -1310,6 +1310,34 @@ const DECLARED: Record<string, Version> = {
     declares: '802797948d753d43',
     history: ['`page.goals` says its line one way for each case, so a count of nought is left out and a first goal reads "1 goal on the go" (audit 31 Oct l, AL13); blocks added, no id added or taken away -> 802797948d753d43'],
   },
+  'personal@2.11.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson
+      hands.metric.budgets-set.money-core metric.goal-log-held metric.goals-active metric.goals-held
+      metric.habits-active metric.logged-by-goal metric.logged-this-week-by-goal metric.put-by-by-goal
+      metric.put-by-held metric.saved-toward-goals metric.savings-active metric.savings-held metric.steps-done
+      metric.steps-left page.goals page.home-personal page.my-project register.goal_log register.goals
+      register.project_steps register.put_by register.savings_goals setting.holds_obligations setting.holds_people
+      setting.holds_things setting.label_accounts setting.label_books setting.label_categories setting.label_goal_log
+      setting.label_goals setting.label_installments setting.label_obligations setting.label_people
+      setting.label_people__role__accountant setting.label_people__role__client setting.label_people__role__collaborator
+      setting.label_people__role__contractor setting.label_project_steps setting.label_put_by setting.label_recurring
+      setting.label_savings_goals setting.label_things setting.label_things__lane__building
+      setting.label_things__lane__earning setting.label_things__lane__parked setting.label_things__lane__retired
+      setting.label_things__revenue setting.label_transactions setting.lk_10103af7 setting.lk_1d01726f
+      setting.lk_303a3cce setting.lk_4f9bf906 setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a
+      setting.lk_f625eca1 setting.one_accounts setting.one_books setting.one_categories setting.one_goal_log
+      setting.one_goals setting.one_installments setting.one_obligations setting.one_people setting.one_project_steps
+      setting.one_put_by setting.one_recurring setting.one_savings_goals setting.one_things setting.one_transactions
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue
+      setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '802797948d753d43',
+    history: ['`register.project_steps` keeps its link to Projects only where Projects is held: `needs` is People and Money, so a household is not handed Projects (onboarding6); nothing declared moves, no id added or taken away -> 802797948d753d43'],
+  },
   'founder@1.15.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard

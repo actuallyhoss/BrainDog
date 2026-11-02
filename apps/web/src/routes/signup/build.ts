@@ -6,7 +6,7 @@
  * calling this, rather than by a copy of it that can drift: a copy once sent a currency the page never did, and so hid
  * that the page made every record with none.
  */
-import type { UseCase } from '@braindog/seed/usecases';
+import { standsOn, type UseCase } from '@braindog/seed/usecases';
 import { moduleName } from '@braindog/seed/usecases/names';
 import { amend, NO_AMEND, type Amend, type Reply } from '../../lib/first-run.ts';
 import { closeOver, INSTALL_ORDER } from '../../lib/shape.ts';
@@ -73,7 +73,9 @@ export function replyOf(draft: Draft, extra: Extra | null): Reply | null {
 export function picked(p: Pick<Proposal, 'usecase' | 'also' | 'modules'> | null, usecase: string | null): { one: UseCase | null; beside: UseCase[]; modules: string[] } {
   const one = caseOf(usecase ?? p?.usecase ?? null);
   const beside = p && one && one.usecase === p.usecase ? p.also.flatMap((id) => caseOf(id) ?? []) : [];
-  const asked = new Set([...(p?.modules ?? []), ...[one, ...beside].flatMap((c) => c?.modules ?? [])]);
+  /* WHAT EACH USE CASE STANDS ON (`standsOn`, its `needs`), as the record installs it, and not all it may grow into: a
+     household is Money and its own lists, and was shown Projects "needed by Personal" (onboarding6). */
+  const asked = new Set([...(p?.modules ?? []), ...[one, ...beside].flatMap((c) => (c ? standsOn(c) : []))]);
   return { one, beside, modules: [...new Set([...INSTALL_ORDER, ...asked])].filter((id) => asked.has(id)) };
 }
 

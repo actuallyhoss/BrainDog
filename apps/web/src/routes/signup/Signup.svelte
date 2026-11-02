@@ -65,7 +65,7 @@
 <script lang="ts">
   import { onDestroy, onMount, tick } from 'svelte';
   import { createClient } from '@braindog/client';
-  import { USE_CASES } from '@braindog/seed/usecases';
+  import { standsOn, USE_CASES } from '@braindog/seed/usecases';
   import { dayOf } from '@braindog/seed/usecases/install';
   import { moduleName } from '@braindog/seed/usecases/names';
   import { apiBase, at, BASE } from '$lib/at.ts';
@@ -73,7 +73,7 @@
   import { copy } from '$lib/copy.ts';
   import { amendKept, keepAmend, litIn, NO_AMEND, firstRun, type Amend, type Reply } from '$lib/first-run.ts';
   import * as pref from '$lib/pref.ts';
-  import { INSTALL_ORDER } from '$lib/shape.ts';
+  import { INSTALL_ORDER, LEANS_ON } from '$lib/shape.ts';
   import {
     allWritten,
     arrivalOf,
@@ -653,7 +653,14 @@
   const modules = $derived(choice.modules);
   /** Every part on offer, in install order, then any the words or a use case brought beyond them. */
   const offered = $derived([...new Set([...INSTALL_ORDER, ...modules])]);
-  const heldBy = (id: string): string | null => cases.find((c) => c.modules.includes(id))?.title ?? null;
+  /**
+   * WHO A PART IS MADE FOR, where it was not asked for: a use case that stands on it, or a part kept that leans on it
+   * (Agents keeps its work in Projects), as `/start` says it. A part only leaned on is said as such on the tile, and is
+   * not said as added in the line back (`placeNames`): a household that said ChatGPT was told "That adds Projects".
+   */
+  const heldBy = (id: string): string | null =>
+    cases.find((c) => standsOn(c).includes(id))?.title ?? modules.filter((m) => m !== id && (LEANS_ON[m] ?? []).includes(id)).map((m) => moduleName(m))[0] ?? null;
+  const leanedOnly = (p: { id: string; why: readonly string[] }): boolean => p.why.length === 0 && !cases.some((c) => standsOn(c).includes(p.id)) && modules.some((m) => m !== p.id && (LEANS_ON[m] ?? []).includes(p.id));
 
   /* THE CURRENCY IS THE ONE TYPED OR THE ONE ANSWERED, never guessed (`oneQuestion` asks it where an amount has none). */
   const money = $derived(modules.find(keepsCurrency) ?? null);
@@ -737,7 +744,7 @@
     if (asking !== null && door !== null && modelReads < READS_MOST && readSlot !== null && siteKey !== null && (step === 'describe' || step === 'question')) humanAhead();
   });
 
-  const placeNames = (): string[] => parts.filter((p) => p.on).map((p) => p.name);
+  const placeNames = (): string[] => parts.filter((p) => p.on && !leanedOnly(p)).map((p) => p.name);
 
   /** What the next question is chosen from (`nextAsk`). */
   function where() {
@@ -811,7 +818,9 @@
         /* THE PART THE QUESTION WAS ABOUT COMES ON with any answer that is not a no (`TURNS_ON`). */
         /* AND "DEADLINES" OR "TASKS" KEPT FIRST KEEPS WORK, where the first to-dos wait (`firstTurnsOn`), as on `/start`. */
         const part = TURNS_ON[q.topic] ?? (q.topic === 'first' && text !== null ? (firstTurnsOn(text) ?? undefined) : undefined);
-        if (part !== undefined && !(q.topic === 'people' && /^just me$/iu.test(text ?? '')) && !modules.includes(part)) {
+        /* KEPT ON EVEN WHERE THE READING HAS IT NOW (onboarding6, the creator walk: "ChatGPT, Descript" was answered "That
+           adds Agents", and a later reading that left Agents out took it away, because it was on when answered). */
+        if (part !== undefined && !(q.topic === 'people' && /^just me$/iu.test(text ?? ''))) {
           amends = { ...amends, on: [...new Set([...(amends.on ?? []), part])], off: (amends.off ?? []).filter((x) => x !== part) };
         }
       }

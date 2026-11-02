@@ -84,6 +84,8 @@ export const chatWords = {
   nameAgain: "I didn't catch a name there. What's your first name?",
   /** The business use case as a freelancer hears it (`caseTitle`). */
   freelance: 'Freelance',
+  /** The business use case as a streamer, YouTuber or other creator hears it (`caseTitle`). */
+  creator: 'Creator',
   /** The founder use case as founders who are more than one hear it (`caseTitle`). */
   startup: 'Startup',
   /** The end, before the summary. */
@@ -121,6 +123,9 @@ export function kindOf(said: string, usecase: string | null): Kind {
   if (usecase === 'personal' || /\b(household|our home|family budget|my partner|my salary|personal (?:money|finances?))\b/u.test(s)) return 'personal';
   return null;
 }
+
+/** Somebody who makes videos, streams or posts for a living: a creator, said as one (`caseTitle`). */
+const CREATOR = /\b(?:(?:content )?creator|streamer|streaming|youtuber|youtube channel|twitch|tiktoker|podcaster|influencer)\b/iu;
 
 const MONEY_WORDS = /\b(paid|pay|pays|payment|invoice\w*|bill\w*|revenue|income|salary|wage\w*|rent|budget\w*|expense\w*|costs?|subscription\w*|money|price\w*|charge\w*|mrr|arr|sales|retainer|fees?|loan|grant)\b|[£$€¥₹₦]/iu;
 const PEOPLE_WORDS = /\b(alone|solo|by myself|just me|on my own|clients?|customers?|partner\w*|co-?founder\w*|team\w*|colleague\w*|classmates?|supervisor|cofounder|we|our|us|employees?|staff|contractors?)\b/iu;
@@ -306,7 +311,7 @@ export function settled(topic: Topic, w: Where): boolean {
     case 'money':
       return MONEY_WORDS.test(s);
     case 'currency':
-      return !w.money.kept || (w.money.currency !== null && !w.money.guessed);
+      return !w.money.kept || currencyQuiet(w);
     case 'people':
       /* "WE'RE TWO" NAMES NOBODY: the other one is asked by name, so they can be drafted (`pairOf`). */
       return PEOPLE_WORDS.test(s) && pairOf(s) === null;
@@ -319,6 +324,20 @@ export function settled(topic: Topic, w: Where): boolean {
     default:
       return false;
   }
+}
+
+/**
+ * THE CURRENCY IS A QUIET CONFIRM, NOT A QUESTION (2 Nov, onboarding5: the model asked the currency first in all four
+ * walks, and twice for Leo). The device's currency is taken as theirs and said on the summary with a Change beside it, so
+ * it is asked only where their words leave it open: two currencies named, a word that could be several, or one named
+ * that is not the device's ("sponsors pay me in euros" on a phone in New York). And where nothing gives one at all.
+ */
+function currencyQuiet(w: Where): boolean {
+  if (currencyUnclear(w.said, w.env)) return false;
+  const device = w.env?.zone ? currencyChoices('', w.env, 1).suggested : null;
+  const named = namedCurrency(w.said, w.env);
+  if (named !== null && device !== null && named !== device) return false;
+  return w.money.currency !== null || device !== null;
 }
 
 /** What each kind of person is offered to keep first: words the first to-dos are drawn from (`todosOf`). */
@@ -469,6 +488,9 @@ function modelAsk(m: ModelAsk | null | undefined, w: Where, asked: Set<Topic>): 
   /* NO WORD OF OURS REACHES THEM (2 Nov, onboarding5: "Who else should I add to your people list?"): a question that
      says list, record, module and the like is the rules' to ask. */
   if (!fits(question, QUESTION_MOST) || raisesNew(question, w.said) || INSIDE_WORDS.test(question)) return null;
+  /* NO PROJECTS OR SIDE HUSTLES ASKED OF A HOUSEHOLD (onboarding6: Marta, sorting out her home's bills, was asked "Do you
+     have any specific projects or side hustles you're working on?"): the rules ask what she is saving for instead. */
+  if (topic === 'work' && kindOf(w.said, w.usecase) === 'personal') return rulesAsk('work', w);
   /* A CURRENCY IS A CODE THIS DEVICE KNOWS: the model's words, the rules' taps. */
   if (topic === 'currency') {
     const r = rulesAsk('currency', w);
@@ -715,10 +737,23 @@ export function ackOf(
 /** One entry the reading holds, as `entriesSaid` reads it. */
 type Entry = { register: string; fields: Record<string, unknown> };
 
+/** A household's roles (Personal's own), as one of them is said where no word of theirs is kept. */
+const HOME_ROLES: ReadonlyMap<string, string> = new Map([
+  ['family', 'family'],
+  ['friend', 'a friend'],
+  ['landlord', 'your landlord'],
+  ['tradesperson', 'someone who works on your home'],
+  ['adviser', 'an adviser'],
+]);
+
 /** What kind of thing an entry is, in the words the line back says it in, or `null` for one it does not say. */
 function kindOfEntry(r: Entry): { one: string; many: string } | null {
   const role = String(r.fields['role'] ?? r.fields['kind'] ?? '');
   if ((r.register === 'people' || r.register === 'organisations') && role === 'client') return { one: 'a client', many: 'clients' };
+  /* A HOUSEHOLD'S PEOPLE IN ITS WORDS (2 Nov, onboarding5: Marta's partner was "someone you work with"): "Sam as your
+     partner", by the word they used (`householdPeople`), and family, a friend or a landlord by the role. */
+  const note = String(r.fields['note'] ?? '').trim().toLowerCase();
+  if (r.register === 'people' && HOME_ROLES.has(role)) return { one: note !== '' && note.length <= 20 ? `your ${note}` : (HOME_ROLES.get(role) ?? 'family'), many: role === 'family' ? 'family' : 'people in your life' };
   if (r.register === 'people') return { one: 'someone you work with', many: 'people you work with' };
   if (r.register === 'organisations') return { one: 'an organisation', many: 'organisations' };
   if (r.register === 'things') return { one: 'a project', many: 'projects' };
@@ -836,6 +871,9 @@ export function atLeast(since: number, ms = TYPING_MS): Promise<void> {
  */
 export function caseTitle(u: { usecase: string; title: string }, said: string): string {
   if (u.usecase === 'business' && kindOf(said, null) === 'freelance') return chatWords.freelance;
+  /* A STREAMER OR A YOUTUBER IS NO SMALL BUSINESS TO THEMSELVES (onboarding6, the creator walk: "I'm a streamer and
+     YouTuber" was told "That adds Small business"). The same starter, said as Creator. */
+  if (u.usecase === 'business' && CREATOR.test(said)) return chatWords.creator;
   /* A FOUNDER WHO SAYS "WE" IS NO SOLO FOUNDER (2 Nov, a walk: "We're a two-person startup" was told "That adds Solo
      founder"). The same starter, said as Startup. */
   if (u.usecase === 'founder' && /\b(?:we|we're|we’re|our|us|co-?founders?|two-person|team)\b/iu.test(said)) return chatWords.startup;

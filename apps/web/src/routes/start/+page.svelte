@@ -46,7 +46,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
-  import { USE_CASES } from '@braindog/seed/usecases';
+  import { standsOn, USE_CASES } from '@braindog/seed/usecases';
   import { dayOf } from '@braindog/seed/usecases/install';
   import { moduleName } from '@braindog/seed/usecases/names';
   import { apiBase, at } from '$lib/at.ts';
@@ -689,7 +689,7 @@
    */
   function heldBy(id: string): string | null {
     for (const b of brought) if (b.mapping?.module === id) return b.file.file;
-    for (const c of cases) if (c.modules.includes(id)) return c.title;
+    for (const c of cases) if (standsOn(c).includes(id)) return c.title;
     for (const m of kept) if (m !== id && (LEANS_ON[m] ?? []).includes(id)) return moduleName(m);
     return null;
   }
