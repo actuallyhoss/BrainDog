@@ -90,6 +90,10 @@
     stale: 'That one had already ended or changed since the list was read, so the list is read again.',
   } as const;
   const nameOf = (r: SessionInfo): string => r.device ?? (r.current ? copy.sessionThis : copy.sessionOther);
+  /* AND WEARS THE DEVICE'S GLYPH: the phone for the iPhone app, the laptop for the Mac app, the screen for a browser. The
+     label is the app's own ("iPhone, BrainDog app", `Session.deviceLabel`), so its first word says which. */
+  const glyphOf = (r: SessionInfo): 'smartphone' | 'laptop' | 'monitor' =>
+    r.device === undefined || r.device === null ? 'monitor' : /^(iPhone|iPad)\b/u.test(r.device) ? 'smartphone' : /^Mac\b/u.test(r.device) ? 'laptop' : 'monitor';
   let endingRef = $state<string | null>(null);
 
   async function endOne(r: SessionInfo) {
@@ -151,7 +155,7 @@
         {#each ordered as r (r.ref)}
           <li class="session" data-current={r.current ? '' : undefined} in:lineIn out:dismiss animate:flip={settle()}>
             <div class="line line-tall">
-              <span class="line-mark"><IconWell name="monitor" size="l" tone={r.current ? 'ink' : undefined} /></span>
+              <span class="line-mark"><IconWell name={glyphOf(r)} size="l" tone={r.current ? 'ink' : undefined} /></span>
               <span class="line-main">
                 <span class="line-title session-title">{nameOf(r)}</span>
                 <span class="line-detail session-detail">{copy.sessionWhen(when(r.authedAt), when(r.activeAt))}</span>

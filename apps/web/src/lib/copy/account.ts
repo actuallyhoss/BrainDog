@@ -786,8 +786,9 @@ export const account = {
   lapsedFix: 'Read-only until billing resumes. Export is available.',
   lapseDeletes: (day: string) => `It is deleted on ${day} unless it is paid.`,
 
-  /* SESSIONS: every browser this person is signed in on, this one first. A session has no device name, so a row
-     says when it was proved and when it was last used, which is what tells a stranger's session from your own. */
+  /* SESSIONS: every browser and BrainDog app this person is signed in on, this one first. A BrainDog app names its device
+     ("iPhone, BrainDog app") and a browser cannot, so every row also says when it was proved and when it was last used,
+     which is what tells a stranger's session from your own. */
   sessions: 'Where you are signed in',
   sessionsHow: 'Signing the others out ends them at once.',
   sessionThis: 'This browser',
