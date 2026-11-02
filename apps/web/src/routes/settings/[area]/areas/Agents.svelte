@@ -951,6 +951,9 @@
 <!-- SLASH, IN ITS PANEL: its one line while no model is connected, what a model has when one is, the two switch rows,
      its model and its two depths, with Claude on the owner's Mac while a runner there is live. Never "host": the person
      did not set one up. -->
+<!-- AN OWNER'S ONLY (collab pass 3): its reads are an owner's, and the panel was mounted for a colleague too, who was
+     answered a 403 for each of them on opening this page. -->
+{#if anOwner}
 <Sheet bind:open={slashOpen} title={words.slash} caret={false}>
   <div class="flat slash-panel" data-part="slash">
     <SlashAsks owner={anOwner} bare />
@@ -960,6 +963,7 @@
     <SlashBrain owner={anOwner} mac={rows.some((c) => c.live && c.machine?.reach === 'runner')} />
   </div>
 </Sheet>
+{/if}
 
 <style>
   /* THE CONNECTED TILE'S ROWS: the face or the 32px well, the name over what is known about it, what it can
