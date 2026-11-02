@@ -198,6 +198,14 @@ export const accountPage = (declared: (figure: string) => boolean): SeedPage => 
   };
 };
 
+/** A bill's open part, as its Still to pay (or Still to come in) table draws it. */
+const BILL_PARTS_COLUMNS = [
+  { field: 'due', label: 'Due', width: '13ch' },
+  { field: 'amount', label: 'Amount', width: '15ch', align: 'end' as const },
+  { field: 'paid_so_far', label: 'Paid so far', width: '15ch', align: 'end' as const },
+  { field: 'state', label: 'Status', width: '11ch' },
+];
+
 /** The page Money ships: an account's page over the figures Money declares. */
 export const MONEY_ACCOUNT_PAGE: SeedPage = accountPage((figure) => figure in MONEY_METRICS);
 
@@ -246,13 +254,21 @@ export const MONEY_BILL_PAGE: SeedPage = {
       icon: 'calendar-clock',
       span: 12,
       source: 'register.obligations',
-      where: 'seq is {{seq}}, state is open or part',
-      columns: [
-        { field: 'due', label: 'Due', width: '13ch' },
-        { field: 'amount', label: 'Amount', width: '15ch', align: 'end' },
-        { field: 'paid_so_far', label: 'Paid so far', width: '15ch', align: 'end' },
-        { field: 'state', label: 'Status', width: '11ch' },
-      ],
+      /* WHAT YOU OWE ONLY, SINCE money-core 3.38.3: an invoice owed to you headed its parts "Still to pay", which is
+         somebody else's job. It has the block after this one. */
+      where: 'seq is {{seq}}, state is open or part, direction is owed by me',
+      columns: BILL_PARTS_COLUMNS,
+      limit: 1,
+    },
+    {
+      /* WHAT IS STILL TO COME IN, SINCE money-core 3.38.3: the same part on an invoice owed to you, in its own words. */
+      kind: 'table',
+      heading: 'Still to come in',
+      icon: 'calendar-clock',
+      span: 12,
+      source: 'register.obligations',
+      where: 'seq is {{seq}}, state is open or part, direction is owed to me',
+      columns: BILL_PARTS_COLUMNS,
       limit: 1,
     },
     {

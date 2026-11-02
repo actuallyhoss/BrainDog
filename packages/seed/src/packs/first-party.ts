@@ -974,12 +974,14 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  * - people 4.5.0 (onboarding9, 2 Nov): `register.people` offers `cofounder` and `partner` on `role`, said as Co-founder
  *   and Business partner, so a co-founder named at sign-up is kept as one and not as a collaborator. Values added, so a
  *   minor step.
+ * - money-core 3.38.3 (leftovers8, 2 Nov): an invoice owed to you heads its open part "Still to come in", where it said
+ *   "Still to pay" as a bill you owe does (`page.money-bill`). No id added or taken away, so a patch.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.31.0',
   people: '4.5.0',
-  'money-core': '3.38.2',
+  'money-core': '3.38.3',
   estate: '2.8.0',
   work: '1.24.0',
 };
