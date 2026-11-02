@@ -72,7 +72,7 @@
   import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
   import { KEYS_REGISTER } from '$lib/record/keys-register.ts';
-  import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, rowsAsLists, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
+  import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, litOfUp, rowsAsLists, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
   import { MENU, WORK, arrange, flatNav, isHere, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { byUse, keptUses, noteUse } from '$lib/shell/tab-use.ts';
@@ -657,7 +657,7 @@
   const crumb = $derived(crumbOf(spot, model, lit, frame.title || null, frame.heading || null, frame.up));
   /* A PAGE ABOUT A ROW LIGHTS THE ROW ITS LIST SITS UNDER (F33): an account's page opened Money with Accounts lit, as its
      crumb says, where it lit nothing and Money stayed shut. */
-  const sideLit = $derived(lit ?? (frame.up?.href ? litOf(frame.up.href, model) : null));
+  const sideLit = $derived(lit ?? (frame.up?.href ? litOfUp(frame.up.href, model) : null));
   $effect.pre(() => {
     frame.here = crumb.at(-1)?.label ?? '';
   });

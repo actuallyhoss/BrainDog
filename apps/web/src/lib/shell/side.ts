@@ -173,6 +173,8 @@ export type SideLink = {
   count?: number | undefined;
   /** Other addresses the row answers for, where it stands for a row of the same name (Money's Accounts page for its list). */
   near?: string[] | undefined;
+  /** The list whose pages about a row this row stands for (`rowsAsLists`), so a page past the ones the boot sent lights it. */
+  of?: string | undefined;
 };
 
 /**
@@ -392,6 +394,8 @@ export function sideModel(o: {
         /* AND THE ADDRESSES THE ROW LEFT OUT ANSWERED FOR, so Trips stands for each trip's page too (`rowsAsLists`). */
         const more = [...(r.href !== kept.href ? [r.href] : []), ...(r.near ?? [])].filter((h) => h !== kept.href && !(kept.near ?? []).includes(h));
         if (more.length > 0) kept.near = [...(kept.near ?? []), ...more];
+        /* AND THE LIST IT STANDS FOR (`of`), so a page past the boot's first five still finds it (`litOfUp`). */
+        if (r.of !== undefined && kept.of === undefined) kept.of = r.of;
       }
     }
     return out;
@@ -640,7 +644,19 @@ export function rowsAsLists(
     const list = lists.find((l) => l.id === id);
     const name = list?.name ?? id;
     const page = views.find((v) => word(v.title) === word(name));
-    out.push({ href: page?.href ?? `/r/${id}`, label: page?.title ?? name, icon: list?.icon ?? 'doc', near: hrefs });
+    out.push({ href: page?.href ?? `/r/${id}`, label: page?.title ?? name, icon: list?.icon ?? 'doc', near: hrefs, of: id });
   }
   return out;
+}
+
+/**
+ * THE ROW A PAGE ABOUT A ROW LIGHTS, from the way back its head says (`frame.up`, `/r/<list>`): the place's row that
+ * stands for that list's pages (`rowsAsLists`, `of`) before any other row answering to the list. The record's boot sends
+ * only the first five pages of each kind, so a sixth trip (Kyoto) was in no row's `near`, and its way back lit Trips
+ * under More lists rather than Money's Trips (add-ons pass 3, 2 Nov).
+ */
+export function litOfUp(up: string, m: SideModel): string | null {
+  const id = /^\/r\/([^/?#]+)$/u.exec(up)?.[1];
+  const kid = id === undefined ? undefined : m.places.flatMap((p) => p.kids as readonly { href: string; of?: string | undefined }[]).find((k) => k.of === id);
+  return kid?.href ?? litOf(up, m);
 }
