@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  BrainDog for Mac's update feed (Sparkle 2), read by the app at https://brain.dog/mac/appcast.xml (apps/apple/Mac/Updates.swift).
+  Empty until the first signed and notarised release: the release script adds one <item> per version, each with its dmg on
+  download.brain.dog, its sparkle:edSignature from the update key, and its minimum macOS.
+-->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>BrainDog for Mac</title>
+    <link>https://brain.dog/mac/appcast.xml</link>
+    <description>New versions of BrainDog for Mac.</description>
+    <language>en</language>
+  </channel>
+</rss>

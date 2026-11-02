@@ -25,3 +25,9 @@
 # one for a week and refreshes it in the background for a month after, rather than asking on every visit.
 /fonts/*
   Cache-Control: public, max-age=604800, stale-while-revalidate=2592000
+
+# The Mac app's update feed (`mac/appcast.xml`, Sparkle) is read by every copy once a day: kept five minutes, so a release
+# reaches them the same day and the feed is never stale for long.
+/mac/*
+  Cache-Control: public, max-age=300
+  Content-Type: application/xml; charset=utf-8
