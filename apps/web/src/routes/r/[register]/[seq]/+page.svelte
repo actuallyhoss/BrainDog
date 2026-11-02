@@ -133,6 +133,7 @@
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { reachWords } from '../reach.ts';
   import { OWN_TYPES } from '$lib/ui/own.ts';
+  import { typingHints } from '$lib/ui/typing-hints.ts';
   import { knownOf, lastDayOf, meetsOf, orgNameSaid, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../folk.ts';
 
   const id = $derived(page.params.register ?? '');
@@ -1412,7 +1413,7 @@
           {#if f.to}<span class="edit-unit">{listName(f.to)}</span>{/if}
         </div>
       {:else}
-        <div class="field"><input class="field-input" type="text" aria-label={labelOf(f)} bind:value={draft} /></div>
+        <div class="field"><input class="field-input" type="text" {...typingHints(f)} aria-label={labelOf(f)} bind:value={draft} /></div>
       {/if}
       <div class="edit-actions">
         <Button type="submit" weight="primary" disabled={saving}>{saving ? copy.writeMarkSaving : copy.editSave}</Button>

@@ -38,6 +38,7 @@
   import Segmented from './Segmented.svelte';
   import { fileOf, isFile } from '../record/field-draft.ts';
   import { recordToday } from '../record/zone.ts';
+  import { typingHints } from './typing-hints.ts';
 
   /**
    * `problems` IS BOUND OUT rather than pulled in.
@@ -529,7 +530,7 @@
         <!-- A FILE IS CHOSEN, NEVER TYPED: the picker sends the bytes and the draft holds what came back. -->
         <FileField id={id(f)} label={labelOf(f)} bind:value={typed[f.id]} />
       {:else}
-        <div class="field"><input class="field-input" id={id(f)} type="text" required={f.required} bind:value={typed[f.id]} aria-describedby={describedBy} aria-invalid={invalid ? 'true' : undefined} /></div>
+        <div class="field"><input class="field-input" id={id(f)} type="text" {...typingHints(f)} required={f.required} bind:value={typed[f.id]} aria-describedby={describedBy} aria-invalid={invalid ? 'true' : undefined} /></div>
       {/if}
         {/snippet}
       </Field>
