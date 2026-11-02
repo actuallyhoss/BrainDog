@@ -68,6 +68,8 @@
       {/each}
     </ol>
   {/if}
+  <!-- WHERE WHAT IT KNOWS STOPS, when the empty months to come were left off (`rest`). -->
+  {#if plan.rest}<p class="series-rest">{plan.rest}</p>{/if}
   {#if plan.buckets.length}
     <!-- THE BARS' NUMBERS, for a screen reader: a table nobody sees, since a fold headed "The numbers" under every chart
          read as a stray caption. -->

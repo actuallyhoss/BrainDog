@@ -80,6 +80,11 @@ export type SeriesPlan = {
   totals: SeriesTotal[];
   /** The chart's accessible name. */
   sentence: string;
+  /**
+   * Where what the chart knows stops, in words, when the months still to come after it held nothing and were left off
+   * ("Nothing is due or expected after Nov 2026 yet."), else ''.
+   */
+  rest: string;
 };
 
 /** The day a week begins on and its month, inside a bucket's label: `20 Jul` of `Week of 20 Jul`. */
@@ -104,8 +109,26 @@ const stateOf = (cell: string | undefined): SeriesState => {
  * `net` is the fence's `net` form.
  */
 export function seriesPlan(rows: readonly (readonly string[])[], net = false, home?: string | null): SeriesPlan {
-  const [head = [], ...body] = rows;
+  const [head = [], ...every] = rows;
   const stated = head.length > 1 && head[head.length - 1]!.trim().toLowerCase() === 'state';
+  /* WHAT IS NOT KNOWN YET IS NOT DRAWN AS NOUGHT (empty states, 2 Nov): a record with one bill drew the month it falls in
+     and then three months "expected" at £0, three claims of nothing coming or going. The months still to come at the
+     end of the chart with nothing in them or out are left off, and the chart says plainly where what it knows stops
+     (`rest`). A month to come between two that hold something stays: there it is a nought the walk worked out. */
+  let known = every.length;
+  while (
+    known > 0 &&
+    stated &&
+    stateOf(every[known - 1]![head.length - 1]) === 'ahead' &&
+    every[known - 1]!.slice(1, head.length - 1).every((c) => {
+      const v = seriesValue(c);
+      return v === null || v === 0;
+    })
+  )
+    known--;
+  /* ALL OF THEM TO COME AND EMPTY IS A CHART OF NOTHING, said as it always was (`empty`), so nothing is cut. */
+  const body = known === 0 ? every : every.slice(0, known);
+  const rest = known > 0 && known < every.length ? SERIES_REST(seriesBucketName((every[known - 1]![0] ?? '').trim())) : '';
   const named = head.slice(1, stated ? -1 : undefined).slice(0, SERIES_MOST);
   const steps = { in: 0, out: 0 };
   const series = named.map((cell) => {
@@ -276,6 +299,7 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false, ho
     drawn: span > 0 && (sums.filter((x) => !x.gap).length >= SERIES_POINTS || mixed),
     totals,
     sentence,
+    rest,
   };
 }
 
@@ -362,4 +386,8 @@ export const SERIES_PARTIAL = 'so far';
 export const SERIES_AHEAD = 'expected';
 /** The current bucket when it counts money due later in it beside what was paid so far. */
 export const SERIES_DUE = 'so far, and due';
+/** Under a chart whose empty months to come were left off: where what it knows stops. */
+export const SERIES_REST = (last: string): string => `Nothing is due or expected after ${last} yet.`;
+/** A bucket as a sentence names it: a month and its year as they are ("Nov 2026"), a week as the day it begins. */
+const seriesBucketName = (label: string): string => label.replace(/^Week of /u, 'the week of ');
 export const SERIES_NUMBERS = 'The numbers';

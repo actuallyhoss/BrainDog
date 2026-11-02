@@ -18,7 +18,7 @@
 <script lang="ts">
   import { inline, magnitudeOfCell, text, trendOf, SPARKLINE_POINT, TREND, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { barFigures } from '../../src/format.ts';
-  import { drawnRows, gaugeFigure } from '../../src/html.ts';
+  import { barsCompare, drawnRows, gaugeFigure } from '../../src/html.ts';
   import Text from '../Text.svelte';
   import Trend from '../Trend.svelte';
   import Split from '../Split.svelte';
@@ -57,6 +57,8 @@
   /* THE BARS' FIGURES ARE ONE SET (`barFigures`): all whole, or all to the same places. */
   const shown = $derived(drawnRows(block, opts).map(({ row: r }) => r));
   const figures = $derived(barFigures(shown.map((r) => r.cells[1] ?? MISSING), opts.home));
+  /* A BAR OF ONE COMPARES NOTHING (`barsCompare`): a single account is its name and its figure, with no track. */
+  const compare = $derived(barsCompare(shown, numeric));
   const gauge = $derived.by(() => {
     const r = block.rows[0];
     if (!r) return 0;
@@ -141,7 +143,7 @@
     {/snippet}
     {#each shown as row, i}
       {@const v = numeric(row)}
-      {@const drawable = Number.isFinite(v) && v >= 0 && !row.hole && scale > 0}
+      {@const drawable = compare && Number.isFinite(v) && v >= 0 && !row.hole && scale > 0}
       <!-- A HOLE ROW IS A CONTROL ONLY WHERE THE HOST CAN ACT ON IT. It was a `<button>` with no
            handler on either side of the parity boundary: a real tab stop, styled as a control, on
            the one row of the chart whose whole purpose is to be the way to fix the chart. Two

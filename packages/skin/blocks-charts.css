@@ -986,6 +986,13 @@
     font-size: var(--fs-meta);
   }
 
+  /* WHERE WHAT THE CHART KNOWS STOPS, under it, when its empty months to come were left off: a quiet line of meta. */
+  .series-rest {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
   /* `progress`: a track a row, filled toward its target. The label and the figure on one line, the track under them,
      then what is left and the note. The fill is ink until the row carries an intent: a goal reached, a budget close to or
      past its limit. Past a limit the track is the spending, a hairline marks the limit, and the part after it is the

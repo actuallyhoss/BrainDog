@@ -537,6 +537,20 @@ const OWN_GRID = new Set(['cards', 'heat', 'gallery', 'board']);
  * written, since a chip with no word is a rebus whatever the author asked (05 §7.4). A chip, a figure cell and a bar whose
  * figure holds a path that names nothing (`UNNAMED`) are left out, kept noughts or not. Every other block draws every row.
  */
+/**
+ * Whether a `bar` block's rows are drawn with bars: while two of them or more could have one (a number, not below
+ * nought, not a hole). A single bar is always the whole track, a share of itself, so one row is its words and figure.
+ */
+export function barsCompare(rows: readonly Row[], numeric: (r: Row) => number): boolean {
+  let n = 0;
+  for (const r of rows) {
+    const v = numeric(r);
+    if (!r.hole && Number.isFinite(v) && v >= 0) n++;
+    if (n >= 2) return true;
+  }
+  return false;
+}
+
 export function drawnRows(b: Block, o: RenderOptions): { row: Row; at: number }[] {
   const all = b.rows.map((row, at) => ({ row, at }));
   const keep = keepsNought(b, o);
@@ -710,13 +724,16 @@ function proportional(b: Block, o: RenderOptions): string {
   const listed = drawnRows(b, o);
   /* THE BARS' FIGURES ARE ONE SET (`barFigures`): all whole, or all to the same places. */
   const figures = barFigures(listed.map(({ row: r }) => r.cells[1] ?? MISSING), o.home);
+  /* A BAR OF ONE COMPARES NOTHING (empty states, 2 Nov): Money's Accounts with one account drew a track the whole width
+     of the tile, a share of 100% of itself. Bars are drawn while two rows or more have one (`barsCompare`). */
+  const compare = barsCompare(listed.map(({ row }) => row), numeric);
   const body = listed
     .map(({ row: r }, i) => {
       const v = numeric(r);
       /* A NEGATIVE VALUE LOSES ITS BAR, like a value that is not a number. The scale has one
          side, so the only bar it could draw for a credit is a bar of length zero, and a bar at zero
          claims the value IS zero. The number is still printed, with its sign. */
-      const drawable = Number.isFinite(v) && v >= 0 && !r.hole && scale > 0;
+      const drawable = compare && Number.isFinite(v) && v >= 0 && !r.hole && scale > 0;
       const track = drawable ? `<span class="prop-track" style="--magnitude:${magnitude(v / scale)}"></span>` : '';
       const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${drawn(figures[i] ?? MISSING)}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
       return r.hole
@@ -1822,7 +1839,9 @@ function series(b: Block, o: RenderOptions): string {
         )
         .join('')}</tbody></table></div>`
     : '';
-  return `<div class="prop series" style="--cells:${plan.buckets.length}">${legend}${chart}${numbers}</div>`;
+  /* WHERE WHAT IT KNOWS STOPS, when the empty months to come were left off (`rest`). */
+  const rest = plan.rest ? `<p class="series-rest">${escape(plan.rest)}</p>` : '';
+  return `<div class="prop series" style="--cells:${plan.buckets.length}">${legend}${chart}${rest}${numbers}</div>`;
 }
 
 /**
