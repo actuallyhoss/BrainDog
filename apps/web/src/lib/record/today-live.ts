@@ -446,11 +446,13 @@ export function forecastOf(blocks: readonly unknown[], today: string, weeks = 13
     }
     values.push(lowest);
   }
-  let low: Forecast['low'] = { value: opening, day: null };
+  /* THE LOWEST FROM WHERE THE LINE STARTS (polish5, 2 Nov): today after today's movements, as the line's first point and
+     Cash ahead's Today say it, so an invoice walked in today never leaves a low under the line's start unsaid. */
+  let low: Forecast['low'] = { value: values[0]!, day: null };
   let crossed: string | null = null;
   for (const s of steps) {
     if (s.day > last) break;
-    if (s.balance < low.value) low = { value: s.balance, day: s.day };
+    if (s.day > today && s.balance < low.value) low = { value: s.balance, day: s.day };
     if (crossed === null && s.balance < 0) crossed = s.day;
   }
   return { currency: fit.currency as string, values, weeks, low, crossed };

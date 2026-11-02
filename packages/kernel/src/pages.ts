@@ -4150,16 +4150,18 @@ function aheadOf(
   const at = (n: number): string => new Date(Date.parse(`${today}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
   const trend: number[] = [];
   let balance = walk.from;
-  let low = { day: today, value: walk.from };
+  /* THE LOWEST IS READ OFF THE LINE IT IS SAID UNDER (polish5, 2 Nov): the balance at the end of each day, today's after
+     today's movements, as the line starts and as Cash ahead's chart says Today and Lowest. Counted from the opening, an
+     invoice walked in today left "Lowest" lower than any point the tile's line drew. */
+  let low: { day: string; value: number } | null = null;
   let i = 0;
   for (let n = 0; n <= days; n++) {
     const day = at(n);
-    while (i < walk.steps.length && walk.steps[i]!.day <= day) {
-      balance = walk.steps[i++]!.balance;
-      if (balance < low.value) low = { day, value: balance };
-    }
+    while (i < walk.steps.length && walk.steps[i]!.day <= day) balance = walk.steps[i++]!.balance;
+    if (low === null || balance < low.value) low = { day, value: balance };
     trend.push(balance);
   }
+  if (low === null) low = { day: today, value: walk.from };
   return { trend, ahead: { from: today, currency: walk.currency, low } };
 }
 

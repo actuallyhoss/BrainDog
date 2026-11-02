@@ -214,6 +214,16 @@ export type Scenario = {
   lowest: { day: string; balance: number };
 };
 
+/**
+ * TODAY AS THE CHART SAYS IT: the balance at the end of today, after today's movements, which is the walk's first day.
+ *
+ * ONE TODAY FOR THE LINE, ITS DOT AND ITS LOWEST (polish5, 2 Nov). The dot and "Today $41,380" read the opening, before
+ * today's movements, while the line started and the lowest was counted after them: an overdue invoice walked today put
+ * "Lowest $44,580 today" beside "Today $41,380", and a second dot under the line's start. The opening is still what
+ * the accounts hold now, and the table of movements says it; the chart says the day as it ends.
+ */
+export const todayBalance = (model: Pick<ForecastModel, 'opening'>, shown: Pick<Scenario, 'days'>): number => shown.days[0]?.balance ?? model.opening;
+
 /** A whole number written in a cell, at least `least`, or `null`. */
 const whole = (cell: string | undefined, least = Number.MIN_SAFE_INTEGER): number | null => {
   const n = cell === undefined || cell.trim() === '' ? NaN : Number(cell.trim());
@@ -973,8 +983,9 @@ export type SummaryCell = { key: 'end' | 'low' | 'everyday'; label: string; figu
  * walk on screen, so a knob that moves the line moves these with it, and a drawer with no knobs says the host's walk.
  */
 export function forecastSummary(model: ForecastModel, shown: Scenario): SummaryCell[] {
-  const last = shown.days.at(-1) ?? { day: model.today, balance: model.opening };
-  const change = cents(last.balance - model.opening);
+  const now = todayBalance(model, shown);
+  const last = shown.days.at(-1) ?? { day: model.today, balance: now };
+  const change = cents(last.balance - now);
   /* THE ANSWER IN WHOLE UNITS, as Cash now is said over it: a walk that averages everyday spending lands on piastres,
      and "EGP 756,443.02" beside "from EGP 729,312 today" read as two kinds of figure. The list under the chart keeps
      each movement to the cent. */
@@ -987,7 +998,7 @@ export function forecastSummary(model: ForecastModel, shown: Scenario): SummaryC
       key: 'end',
       label: forecastCashOn(shortDay(last.day, model.today)),
       figure: read(last.balance),
-      note: [forecastFromToday(read(model.opening)), changed].filter(Boolean).join(', '),
+      note: [forecastFromToday(read(now)), changed].filter(Boolean).join(', '),
       ...(change !== 0 ? { dir: change > 0 ? ('in' as const) : ('out' as const) } : {}),
       ...(Math.round(last.balance) < 0 ? { below: true as const } : {}),
     },
@@ -1288,13 +1299,14 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const x = (day: string) => at((daysBetween(start, day) / span) * 1000);
   const y = (v: number) => at(((hi - v) / (hi - lo)) * 100);
 
+  const now = todayBalance(model, shown);
   let past = '';
   let prev: string | null = null;
   for (const p of model.past) {
     past += `${past ? ' ' : ''}${prev !== null && daysBetween(prev, p.day) === 1 ? 'L' : 'M'}${x(p.day)} ${y(p.value)}`;
     prev = p.day;
   }
-  if (prev !== null && daysBetween(prev, model.today) === 1) past += ` L${x(model.today)} ${y(model.opening)}`;
+  if (prev !== null && daysBetween(prev, model.today) === 1) past += ` L${x(model.today)} ${y(now)}`;
 
   const line = (days: Scenario['days']) =>
     days.filter((p) => p.day <= end).map((p, i) => `${i ? 'L' : 'M'}${x(p.day)} ${y(p.balance)}`).join(' ');
@@ -1353,17 +1365,17 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
      in one day is still found in it. */
   const shareOf = (day: string, v: number) => ({ x: daysBetween(start, day) / span, y: (hi - v) / (hi - lo) });
   const traced: { x: number; y: number }[] = [];
-  for (const run of [model.past.map((p) => shareOf(p.day, p.value)), [shareOf(model.today, model.opening), ...shown.days.filter((p) => p.day <= end).map((p) => shareOf(p.day, p.balance))]])
+  for (const run of [model.past.map((p) => shareOf(p.day, p.value)), [shareOf(model.today, now), ...shown.days.filter((p) => p.day <= end).map((p) => shareOf(p.day, p.balance))]])
     run.forEach((p, i) => {
       const before = run[i - 1];
       if (before) for (let k = 1; k < 8; k++) traced.push({ x: before.x + ((p.x - before.x) * k) / 8, y: before.y + ((p.y - before.y) * k) / 8 });
       traced.push(p);
     });
   const nearFlag = c !== null && Math.abs(daysBetween(start, c.day) / span - nowAt) <= FLAG_NEAR;
-  const placed = nowPlace(traced, shareOf(model.today, model.opening), nearFlag);
+  const placed = nowPlace(traced, shareOf(model.today, now), nearFlag);
   /* AND WHETHER THE LINE RUNS THROUGH IT ALL THE SAME, or the corner hangs past the plot: then the words stand on the tile's
      own colour, so the line passes behind them and never through them (A23). */
-  const nowOver = nowCrossings(traced, shareOf(model.today, model.opening))(placed) !== 0;
+  const nowOver = nowCrossings(traced, shareOf(model.today, now))(placed) !== 0;
   /* STANDING OFF THE DOT is the start side's words, moved left along the plot. */
   const place: NowPlace = placed === 'start-far' ? 'start' : placed;
   const figure = (v: number) => forecastFigure(model, v);
@@ -1378,7 +1390,8 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   }));
   const foot = !offAxis ? '' : lo > 0 ? forecastAxisFrom(forecastFigure(model, lo, 'read')) : forecastAxisTo(forecastFigure(model, hi, 'read'));
   const sentence = [
-    `${model.label || FORECAST_BALANCE} ${figure(model.opening)} ${FORECAST_TODAY}`,
+    /* SAID AS THE DOT SAYS IT: the opening's name ("Cash now") is what the accounts hold before today's movements. */
+    `${FORECAST_NOW} ${figure(now)}`,
     model.past.length ? forecastRecorded(shortDay(model.past[0]!.day, model.today), figure(model.past[0]!.value)) : '',
     said,
     forecastLowest(figure(shown.lowest.balance), shortDay(shown.lowest.day, model.today)),
@@ -1426,10 +1439,10 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     area,
     below,
     now: {
-      d: `M${x(model.today)} ${y(model.opening)}h0`,
+      d: `M${x(model.today)} ${y(now)}h0`,
       at: at(placed === 'start-far' ? nowAt - NOW_SHIFT : nowAt),
-      y: String(Math.round(Number(y(model.opening)) * 100) / 10_000),
-      label: forecastFigure(model, model.opening, 'read'),
+      y: String(Math.round(Number(y(now)) * 100) / 10_000),
+      label: forecastFigure(model, now, 'read'),
       place,
       ...(nowOver ? { over: true as const } : {}),
       /* TODAY IS A HAIRLINE DOWN THE WHOLE CHART as well as a dot, named "Today" with the balance under the word, so the
