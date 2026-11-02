@@ -991,15 +991,16 @@
   }
 
   /* IN THE DARK THE MARKS GO ONE STEP QUIETER (plan F4): the slot's tint and colour read louder than the place glyphs
-     beside them, so each leans toward the nav's surface and the quiet ink. */
+     beside them, so each leans toward the quiet ink, and the well toward the board's neutral black. Leaned toward the
+     crimson nav, a yellow or a lime well took its red and read brown (colour lane, 2 Nov). */
   :global(:root[data-theme='dark']) .s-pm:not(:empty) {
-    background: color-mix(in oklab, var(--ph-tint) 55%, var(--nav));
+    background: color-mix(in oklab, var(--ph-tint) 80%, var(--board));
     color: color-mix(in oklab, var(--ph) 70%, var(--ink-3));
   }
 
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme='light'])) .s-pm:not(:empty) {
-      background: color-mix(in oklab, var(--ph-tint) 55%, var(--nav));
+      background: color-mix(in oklab, var(--ph-tint) 80%, var(--board));
       color: color-mix(in oklab, var(--ph) 70%, var(--ink-3));
     }
   }
