@@ -85,6 +85,11 @@
   const scoped = (i: number): boolean => opts.scope?.columns.includes(i) ?? false;
 
   const label = (i: number): string => L.labels[i] ?? '';
+  /** The word said before a card's day: its column's label, unless the day already says it. */
+  const whenWord = (cell: string): string => {
+    const l = label(L.when);
+    return l && !cell.trim().toLocaleLowerCase('en').startsWith(l.toLocaleLowerCase('en')) ? l : '';
+  };
   /** The word before a project in a card's meta line. */
   const CARDS_ON = 'on';
   const said = (r: Row, i: number): string => (i < 0 ? '' : text(inline(r.cells[i] ?? '', opts)));
@@ -397,7 +402,8 @@
           {:else if opts.partLook && L.name >= 0 && r.cells[L.name]}{@const look = opts.partLook(said(r, L.name))}{#if look}<PartChip glyph={look.glyph} slot={look.slot} letter={said(r, L.name).slice(0, 1).toLocaleUpperCase('en')} {opts} />{/if}{/if}
           {#if L.name >= 0}{@const te = boxOf(r, L.name)}<h3 class="cards-title">{#if te}{@render box(r, n, L.name, te, EMPTY_NAME)}{:else if r.cells[L.name]}<Text nodes={nodes(r, L.name)} {opts} />{:else}{MISSING}{/if}</h3>{/if}
           {#if r.tone}<span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span>{/if}
-          {#if L.when >= 0 && r.cells[L.when]}<span class="cards-when"><Text nodes={nodes(r, L.when)} {opts} /></span>{/if}
+          <!-- A DAY SAYS WHAT DAY IT IS (2 Nov): a labelled day reads "Last confirmed 2 Nov", "Renews 3 Dec", not a bare "2 Nov". -->
+          {#if L.when >= 0 && r.cells[L.when]}<span class="cards-when">{#if whenWord(r.cells[L.when] ?? '')}{whenWord(r.cells[L.when] ?? '')}&nbsp;{/if}<Text nodes={nodes(r, L.when)} {opts} /></span>{/if}
         </div>
         <!-- The reply is the line under the head, and an empty one draws nothing, as in `toHTML`; one typed on in place is
              a box even while empty, since the box is where the line is written. -->
