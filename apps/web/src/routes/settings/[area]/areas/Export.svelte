@@ -34,9 +34,18 @@
    * exported". The layout's `boot`, so arriving asks nothing; a host older than the field draws no line.
    */
   let facts = $state<CopyFacts | null>(null);
+  /* WHILE IT IS READ the tile waits out of sight (`settings.css` `data-hold`): the line landed at the tile's top and
+     pushed its rows down. `boot` is kept for the tab, so this is a moment. */
+  let factsRead = $state(false);
   const lastExport = $derived(facts ? exportLine(facts, Date.now()) : null);
   $effect(() => {
-    untrack(() => void readBoot(apiBase()).then((b) => (facts = b.from === 'live' ? copiesOf(b.boot) : null)));
+    untrack(
+      () =>
+        void readBoot(apiBase())
+          .then((b) => (facts = b.from === 'live' ? copiesOf(b.boot) : null))
+          .catch(() => undefined)
+          .finally(() => (factsRead = true)),
+    );
   });
 
   /** A record hands the browser a `.brainl` file, and a host that refuses says why in its own words. */
@@ -136,6 +145,7 @@
   <Button href="/addons/share">{copy.shareSetup}</Button>
 {/snippet}
 
+{#if !factsRead}<span data-hold hidden></span>{/if}
 <Tile icon="download" class="section" data-surface="tile" title={copy.yourData}>
   <div class="section-body">
     <!-- THE WHOLE CONTENT OF THIS SCREEN WAS TWO DEAD BUTTONS, on the page that carries the

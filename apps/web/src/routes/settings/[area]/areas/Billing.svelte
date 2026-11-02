@@ -83,23 +83,30 @@
    */
   let questions = $state<number | null>(null);
   let tools = $state<number | null>(null);
+  /** The two counts still out, so the plan's tile is held until its bars are all there. */
+  let countsOut = $state(0);
   $effect(() => {
     if (!hosted || !anOwner || !billed?.limits) return;
     untrack(() => {
       const c = createClient({ base: apiBase(page.url) });
-      if (page.data.slash === true)
+      if (page.data.slash === true) {
+        countsOut += 1;
         void c
           .slashStatus()
           .then((s) => {
             if (s.ok) questions = metered(s.value) ? s.value.asks.used : null;
           })
-          .catch(() => undefined);
+          .catch(() => undefined)
+          .finally(() => (countsOut -= 1));
+      }
+      countsOut += 1;
       void c
         .listTokens()
         .then((out) => {
           if (out.ok) tools = toolsConnected(out.value as Parameters<typeof toolsConnected>[0], Date.now());
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => (countsOut -= 1));
     });
   });
   /* THE LEDGER'S COUNT OF QUESTIONS WHERE SLASH'S OWN COULD NOT BE READ. */
@@ -231,6 +238,9 @@
     <p class="hint">{copy.planManaged}</p>
   </Tile>
 {:else}
+<!-- WHILE THE BILL, THIS MONTH AND ITS COUNTS ARE READ the tiles wait out of sight (`settings.css`): the plan's tile
+     landed over the bill and pushed it down, and the bill's own rows grew it after. -->
+{#if hosted && (bill.state === 'waiting' || usage.state === 'waiting' || countsOut > 0)}<span data-hold hidden></span>{/if}
 {#if limits.bars.length > 0}
   <Tile icon="money" title={tileWords.planTitle} meta={resets ? tileWords.monthMeta(month.day, month.of, resets) : undefined} lead>
     {#if figure}<p class="figure num">{figure}</p>{/if}

@@ -388,3 +388,18 @@
 ::view-transition-new(settings-chooser):only-child {
   animation: page-in calc(var(--d-page) - var(--d-exit)) var(--ease-out) var(--d-exit) both;
 }
+
+/* A TILE STILL BEING READ HOLDS WHAT COMES AFTER IT OUT OF SIGHT (`<span data-hold hidden>` where the tile will stand), so
+   the tiles under it do not draw and then move when it lands. Hidden boxes that move are no shift, and nothing seen
+   moves. At most 2.5 s, so a read that hangs hides nothing for good. Only what is after the hold waits; the head and
+   the tiles over it are drawn at once. */
+.settings-place .body > [data-hold] ~ * {
+  visibility: hidden;
+  animation: settings-held 0s linear 2.5s forwards;
+}
+
+@keyframes settings-held {
+  to {
+    visibility: visible;
+  }
+}

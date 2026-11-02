@@ -270,6 +270,9 @@
 -->
 <!-- A LIST TILE, WITH NO CHART (a pure list is the one tile that holds no figure). Drawn only where the record
      declares a door and an owner is reading; the section below says the rest. -->
+<!-- UNTIL THE DOORS AND THE ARRIVALS ARE READ the tiles wait out of sight (`settings.css`): the doors' tile landed over
+     Sources and pushed every tile down 164px, and the arrivals' rows grew Sources after it. -->
+{#if (anOwner && doors.state === 'waiting') || !waysRead}<span data-hold hidden></span>{/if}
 {#if anOwner && doorList.length > 0}
   <Tile icon="plug" title={doorWords.title} count={doorList.length}>
     <ul class="doors">

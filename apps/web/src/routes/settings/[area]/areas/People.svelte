@@ -542,6 +542,8 @@
 -->
 <!-- NOTHING WHILE IT IS READ: an empty tile under its title read as nobody at all. -->
 {#if peopleFrom === 'reading'}
+  <!-- AND WHAT FOLLOWS WAITS OUT OF SIGHT (`settings.css`): the tile landed over Sharing's and pushed them down 116px. -->
+  <span data-hold hidden></span>
 {:else if peopleFrom === 'refused' || peopleFrom === 'unrouted'}
   <Tile icon="user-check" class="section" data-surface="tile" title={copy.whoCanSee}>
     <div class="section-body">

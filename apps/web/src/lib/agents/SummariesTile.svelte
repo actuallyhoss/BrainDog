@@ -14,6 +14,9 @@
   import { offerHref, summariesOf, summaryHref, summaryWords as words, type Summary } from './summary.ts';
 
   let summaries = $state.raw<Summary[] | null>(null);
+  /* WHILE IT IS READ, what follows waits out of sight where a page holds it (Settings' `data-hold`), so the tile does not
+     land over Quiet hours and push it down. */
+  let reading = $state(true);
 
   onMount(() => {
     void createClient({ base: apiBase() })
@@ -22,10 +25,12 @@
         const a = out as { ok?: unknown } | null;
         summaries = a?.ok === true ? summariesOf(out) : null;
       })
-      .catch(() => (summaries = null));
+      .catch(() => (summaries = null))
+      .finally(() => (reading = false));
   });
 </script>
 
+{#if reading}<span data-hold hidden></span>{/if}
 {#if summaries !== null}
   <Tile icon="history" title={words.all}>
     {#if summaries.length === 0}
