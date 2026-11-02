@@ -170,8 +170,8 @@
   /** Words of the usual length for the line under the title, set unseen while it is on its way so it holds their room. */
   const HELD_LIKE = '6 keys. 3 have no value yet.';
   /* A RECORD THE SHELL SAYS HOLDS NO KEYS HOLDS NO LINE FOR A SENTENCE (nojump, 2 Nov): it says nothing once read, and the
-     held line gave its 32px back then, lifting the page on a phone. */
-  const noKeys = $derived(((page.data as { index?: { registers?: { id: string; count: number }[] } } | undefined)?.index?.registers ?? []).find((r) => r.id === 'credentials')?.count === 0);
+     held line gave its 32px back then, lifting the page on a phone. The shell lists a list only once it holds a row. */
+  const noKeys = $derived(((page.data as { index?: { registers?: { id: string; count: number }[] } } | undefined)?.index?.registers ?? []).every((r) => r.id !== 'credentials' || r.count === 0));
   const sentence = $derived(
     from === 'live'
       ? sentenceOf({ keys, listed: index.kind === 'held', counts, asking: waiting.length, seesMachines: devices.kind === 'held', retired })
