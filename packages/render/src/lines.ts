@@ -115,7 +115,12 @@ const lastOf = (values: (number | null)[]): number => {
  * The lines, the lead and every printed figure, from the header row and the body rows as text.
  */
 export function linesPlan(rows: readonly (readonly string[])[], home?: string | null): LinesPlan {
-  const [head = [], ...body] = rows;
+  const [head = [], ...whole] = rows;
+  /* THE CHART STARTS AT ITS FIRST READING (ui-work 2 Nov). "By project, this year" asked for a year of weeks, and a
+     measure first read in October drew as a cliff in the last twentieth of the plot, its ends' figures on the line. The
+     empty weeks before the first reading are not drawn; the first tick says where it starts. */
+  const firstRead = whole.findIndex((r) => r.slice(1, LINES_MOST + 1).some((c) => linesValue(c ?? '') !== null));
+  const body = firstRead > 0 && whole.length - firstRead >= 2 ? whole.slice(firstRead) : whole;
   const steps = { now: 0, was: 0 };
   const named = head.slice(1, LINES_MOST + 1).map((cell) => {
     const m = /^was:\s*(.*)$/iu.exec(cell.trim());

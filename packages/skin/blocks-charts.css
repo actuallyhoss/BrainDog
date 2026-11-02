@@ -1557,9 +1557,13 @@
       margin-inline-end: var(--sp-2);
     }
 
+    /* AT THE PLOT'S START, ON THE TILE'S COLOUR (ui-work 2 Nov): at its end they stood on the newest point, which is
+       where a line that rose ends, "412 users" over its own dot. A line passing the start goes behind the figure. */
     .lines-top,
     .lines-bottom {
-      inset-inline: auto 0;
+      inset-inline: 0 auto;
+      padding-inline: 0 var(--sp-1);
+      background: var(--tile);
     }
 
     /* AND THE READOUT STAYS INSIDE THE PLOT. Its 11rem is most of a phone's plot, so beside the rule it ran off one edge
