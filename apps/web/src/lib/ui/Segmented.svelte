@@ -10,7 +10,8 @@
     </Segmented>
 
   Everything else it is given (`role`, `aria-*`, `id`, `class`) lands on the track. `tag` is for a track that is a
-  `nav` of links, or an `ol` where the segments are steps in order, each in an `li`.
+  `nav` of links, or an `ol` where the segments are steps in order, each in an `li`. A `nav` track is marked `data-tabs`,
+  so the shell draws a pressed link chosen at once, before the page it goes to has read (`AppFrame.svelte` `pressTab`).
 
   THE THUMB IS THE TRACK'S `::before` (`controls.css`), placed by `--x`, `--y`, `--w` and `--h`, which are READ FROM
   THE CHOSEN SEGMENT'S BOX and never worked out from a count: labels are different widths, and a word goes away below
@@ -214,6 +215,7 @@
   bind:this={track}
   class={['segmented', cls]}
   data-slides=""
+  data-tabs={tag === 'nav' ? '' : undefined}
   data-many={many ? '' : undefined}
   data-full={full ? '' : undefined}
   data-scroll={full && scroll && tag === 'nav' ? '' : undefined}

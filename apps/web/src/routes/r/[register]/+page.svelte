@@ -102,6 +102,7 @@
     writeDefault,
     type Keep,
     type ListDefault,
+    type Reading,
     type Receipt,
     type View,
   } from './parts/list.ts';
@@ -568,6 +569,8 @@
   let named = $state<Names | null>(null);
   /* The answer this page set belongs to. A cursor from a different question is not a cursor. */
   let asked = $state('');
+  /** The question `matched` and `pages` answer, set as each answer lands: behind `question` while a new one is out. */
+  let readFor = $state('');
   /** A question is out, the first page or the next one. `aria-busy` reads it. */
   let busy = $state(false);
   /** A next page is out. `more()` asks once however often the sentinel comes into view. */
@@ -718,6 +721,7 @@
       named = remembered.names;
       cursor = null;
       matched = remembered.matched;
+      readFor = said;
       counted = remembered.counted;
       uncounted = remembered.uncounted;
       fromCopy = true;
@@ -739,6 +743,7 @@
           named = namesOf(got.value);
           cursor = null;
           matched = got.value.matched;
+          readFor = said;
           fromCopy = true;
           painted('list', 'copy');
           return true;
@@ -762,6 +767,7 @@
           named = names;
           cursor = null;
           matched = found.matched;
+          readFor = said;
           fromCopy = true;
           searchedHere = true;
           foundRoom = true;
@@ -827,6 +833,7 @@
       named = answer.value.names;
       cursor = answer.value.cursor;
       matched = answer.value.matched;
+      readFor = said;
       counted = facets.counts;
       uncounted = facets.withheld;
       fromCopy = false;
@@ -1480,9 +1487,16 @@
     }
     return best && now - Date.parse(`${best.day}T12:00:00Z`) > 30 * 86_400_000 ? best : null;
   });
-  const reading = $derived(
-    readingOf(decl, standing, now, { whole, filtered: narrowed || q !== '', matched: Math.max(0, result.matched - notCounted), total: Math.max(0, result.total - notCounted), besides: youListed, quiet: quietest }),
-  );
+  /* NOT UNTIL THE NEW ROWS LAND (skills pass follow-up, 2 Nov): a slice pressed made the list filtered at once while the
+     count in hand was still the old answer's, so the head said "27 of 27 match." for a frame before "1 of 27 matches.".
+     While a new question is out the sentence already drawn stays, on this list only. */
+  let readingWas: { list: string; said: Reading | null } | null = null;
+  const reading = $derived.by((): Reading | null => {
+    if (readFor !== question) return readingWas?.list === id ? readingWas.said : null;
+    const said = readingOf(decl, standing, now, { whole, filtered: narrowed || q !== '', matched: Math.max(0, result.matched - notCounted), total: Math.max(0, result.total - notCounted), besides: youListed, quiet: quietest });
+    readingWas = { list: id, said };
+    return said;
+  });
 
   /** A row's title as the list says it, for the summary tile's largest rows. */
   const titleSaid = (e: Entry): string => (decl ? display(id, decl.title, e.fields[decl.title], now, result.names ?? undefined) : null) ?? copy.thisRow;

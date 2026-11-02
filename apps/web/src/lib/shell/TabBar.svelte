@@ -143,6 +143,14 @@
     color: var(--ink);
   }
 
+  /* THE WHOLE 64 FOR THE WORD ON THE NARROWEST PHONES (skills pass follow-up, 2 Nov): with 4 of padding a side "Needs
+     you" was cut to "Needs y…" at 320. The target is the tab's full box either way. */
+  @media (width < 360px) {
+    .tab {
+      padding-inline: 0;
+    }
+  }
+
   /* FIVE TABS ON A 320px PHONE ARE 64px EACH, so a long section name ends in an ellipsis rather than pushing its neighbours. */
   .tab-name {
     max-inline-size: 100%;

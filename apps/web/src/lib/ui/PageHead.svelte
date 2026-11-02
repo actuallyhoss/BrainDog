@@ -290,7 +290,7 @@
   {:else}
     <span class="bar-mark"><Brand bare size={22} /></span>
   {/if}
-  <div class="bar-lead">
+  <div class="bar-lead" data-greets={shortGreeting(where) !== null ? '' : undefined}>
     <!-- WHERE YOU ARE, the same words the desk's crumb ends on, and over it the page's name once it has scrolled away. -->
     <p class="bar-where" dir="auto" bind:this={whereEl}>{whereShown}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
     <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
@@ -854,18 +854,32 @@
       text-decoration: none;
     }
 
+    /* A NAME TOO LONG FOR ONE LINE TAKES TWO (skills pass follow-up, 2 Nov): "Defaults for new agents" was cut to
+       "Defaults for new ag…" at 390, and on a phone the bar is the only place the page's name is drawn. Two lines at 17
+       on a 1.2 line are 41 of the bar's 56; past two it is cut, which no page name in the app reaches. */
     .bar-where,
     .bar-title {
+      display: -webkit-box;
       margin: 0;
       overflow: hidden;
       color: var(--ink);
       font-family: var(--font-display);
       font-size: var(--fs-head);
       font-weight: var(--fw-semi);
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1.2;
+      text-wrap: balance;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
       /* Showing waits for the other to go; going does not wait. */
       transition: opacity var(--swap-out) var(--ease-out) var(--swap-out);
+    }
+
+    /* TODAY'S GREETING STAYS ON ONE LINE: it has a shorter form of its own it changes to when it does not fit. */
+    .bar-lead[data-greets] > :is(.bar-where, .bar-title) {
+      display: block;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .bar-title {

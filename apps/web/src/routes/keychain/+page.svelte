@@ -1599,10 +1599,16 @@
     cursor: pointer;
   }
 
-  .mi:hover,
   .mi:focus-visible {
     background: var(--hover);
   }
+
+  @media (hover: hover) and (pointer: fine) {
+    .mi:hover {
+      background: var(--hover);
+    }
+  }
+
 
   /* A SENTENCE IN A MENU, not a row: nothing happens when it is pressed. Where the key came from, wrapped, never cut. */
   .mi-note {

@@ -611,8 +611,10 @@
     text-decoration: none;
   }
 
-  .health-look:hover {
-    text-decoration: underline;
+  @media (hover: hover) and (pointer: fine) {
+    .health-look:hover {
+      text-decoration: underline;
+    }
   }
 
   /* TRY AGAIN AND DETAILS: rectangles in a row under the sentence, wrapping on a phone. */

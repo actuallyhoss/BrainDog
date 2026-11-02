@@ -309,6 +309,8 @@
     margin: auto;
     padding: 0;
     overflow: auto;
+    /* A LONG ASK SCROLLS INSIDE ITSELF and never hands the scroll to the page behind it (skills pass follow-up, 2 Nov). */
+    overscroll-behavior: contain;
     background: var(--tile);
     border: 0;
     border-radius: var(--r-tile);

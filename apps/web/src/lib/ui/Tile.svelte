@@ -195,14 +195,16 @@
     margin-inline-start: auto;
   }
 
+  /* A META LINE THAT DOES NOT FIT WRAPS, never cut (skills pass follow-up, 2 Nov): Activity's "5 by agents · 2 by you ·
+     177 by rules · 13 by Br…" ended in an ellipsis with no way to the rest. The head already wraps, so a long one goes
+     under the title. */
   .tile-meta {
     min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    overflow-wrap: break-word;
+    text-wrap: pretty;
   }
 
   /* ONE LINK, "All 17": 13/500 in the second ink, its arrow after it. */

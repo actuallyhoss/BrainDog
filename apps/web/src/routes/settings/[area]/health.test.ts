@@ -100,7 +100,7 @@ test('THE WORST THING ONLY: a fault before a red check, before a missed night, b
   assert.deepEqual(needs(all), ['BrainDog could not check for people who are here twice.']);
   assert.equal(leadFault([MAIL, PAIRS])?.cause, 'outbox#infer.resolve');
   assert.equal(leadFault([]), null);
-  assert.equal(text(healthSaid('missing', MONTH, { faults: [], signs: signs('red', 'red'), signsAt: '/p/health' })), 'One check needs a look. Look');
+  assert.equal(text(healthSaid('missing', MONTH, { faults: [], signs: signs('red', 'red'), signsAt: '/p/health' })), 'One check needs a look. Open Health');
   assert.equal(text(healthSaid('missing', { ...MONTH, near: { key: 'runs', share: 0.914 } }, { faults: [] })), 'No copy last night.');
   assert.equal(text(healthSaid('in', { ...MONTH, near: { key: 'runs', share: 0.914 } }, { faults: [] })), 'Runs are at 91%, 2 days to go.');
   assert.equal(text(healthSaid('in', { ...MONTH, near: { key: 'bytes', share: 1 } })), 'Fetched data is used up until 1 October.');
@@ -122,7 +122,7 @@ test('A RED CHECK IS NAMED BY ITS OWN SENTENCE, with no count of the rest, and o
     { sign: 'copies', state: 'red', said: 'Last night’s copy did not run.' },
     { sign: 'runs', state: 'red', said: 'A run stopped.' },
   ];
-  assert.equal(text(healthSaid(null, null, { signs: named, signsAt: '/p/health' })), 'Last night’s copy did not run. Look');
+  assert.equal(text(healthSaid(null, null, { signs: named, signsAt: '/p/health' })), 'Last night’s copy did not run. Open Health');
   assert.deepEqual(needs(healthSaid(null, null, { signs: named })), ['Last night’s copy did not run.']);
   const backup: Sign = { sign: 'questions', state: 'red', said: 'Something went wrong, not a choice for you: The backup on 3 Sep did not run.' };
   const said = healthSaid(null, null, { signs: [backup], signsAt: '/p/health', backupsAt: '/settings/backups' });
@@ -133,7 +133,7 @@ test('A RED CHECK IS NAMED BY ITS OWN SENTENCE, with no count of the rest, and o
   /* AJ3: a failure headed by its own words says them, not the follow-on, and opens its question. */
   const headed: Sign = { sign: 'questions', state: 'red', name: 'The backup on 3 Sep did not run', said: 'It waits on you in Needs you, with “Run it now” suggested.', to: '/decide/q1' };
   const lead = healthSaid(null, null, { signs: [headed], signsAt: '/p/health', backupsAt: '/settings/backups' });
-  assert.equal(text(lead), 'The backup on 3 Sep did not run. Look');
+  assert.equal(text(lead), 'The backup on 3 Sep did not run. Open it in Needs you');
   assert.deepEqual(links(lead), ['/decide/q1']);
   assert.equal(plainSign('Something went wrong, not a choice for you: The mail did not send.'), 'The mail did not send.');
   assert.ok(aboutCopies('The backup on 3 Sep did not run') && !aboutCopies('The mail did not send'));
