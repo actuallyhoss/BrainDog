@@ -14,6 +14,7 @@ import { copy } from '../../../../lib/copy.ts';
 import { seqWidth } from '../../../../lib/record/api.ts';
 import { wayField } from '../../../../lib/record/money-way.ts';
 import { declaredValue } from '../../../../lib/record/where.ts';
+import { recordToday } from '../../../../lib/record/zone.ts';
 import { isMoney, type Entry, type FieldDecl, type Filter, type RegisterDecl } from '../../../../lib/record/schema.ts';
 import { orgFieldOf, orgRoleOf } from '../folk.ts';
 import { presenceOf } from '@braindog/kernel';
@@ -553,8 +554,12 @@ export function isLate(decl: RegisterDecl | undefined, e: Entry, now: number): b
   return (Date.parse(`${due}T12:00:00Z`) - now) / DAY_MS < 0;
 }
 
-/** Calendar days from the record's instant to a day, as a card counts them. */
-const daysTo = (iso: string, now: number): number => Math.floor(Date.parse(`${iso}T00:00:00Z`) / DAY_MS) - Math.floor(now / DAY_MS);
+/**
+ * Calendar days from the record's day to a day, as a card counts them: FROM THE RECORD'S DAY, NOT GREENWICH'S (AH22, as
+ * `RowCards` and `soonSaid` already count). Counted in UTC days, Maya's Tasks said "the next due today" at 21:00 in New
+ * York over a task Work called due tomorrow, and its board "Due in 2 days" where the task's own page said 3.
+ */
+const daysTo = (iso: string, now: number): number => Math.round((Date.parse(`${iso}T00:00:00Z`) - Date.parse(`${recordToday(now)}T00:00:00Z`)) / DAY_MS);
 
 /** A day inside a sentence: "today", "tomorrow", "in 3 days", or the date itself past two weeks. */
 export function dayWord(iso: string, now: number): string {
