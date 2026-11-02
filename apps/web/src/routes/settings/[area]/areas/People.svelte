@@ -299,7 +299,9 @@
      never drawn grey for a field left empty, which read as broken; it says what is missing and goes to it. */
   let inviteWhy = $state('');
   const inviteNeeds = { email: 'Add their email so the link is bound to it.', lists: 'Give at least one list a level.' } as const;
-  let madeLink = $state<{ email: string; link: string; sent: boolean } | null>(null);
+  /* `unsent` IS THE HOST'S OWN SENTENCE WHEN IT COULD NOT MAIL (a self-host with no mail set up says why, and who can still
+     use the link), and null when it said nothing, which keeps the old copy-it-yourself line. */
+  let madeLink = $state<{ email: string; link: string; sent: boolean; unsent: string | null } | null>(null);
   let waitingInvites = $state<Waiting[]>([]);
 
   /** What the form would send, or `null` while it gives nothing: no address, or chosen lists with none given a level. */
@@ -383,6 +385,11 @@
   /* THE INVITATION'S FORM IS A SHEET (G20): the page leads with who is in, and "Invite a person" is the tile's action. */
   let inviteOpen = $state(false);
 
+  /** The host's sentence for an invitation it did not mail, when it gave one. */
+  function unsentOf(sent: Awaited<ReturnType<typeof sendInvite>> | null): string | null {
+    return sent && !sent.ok && sent.kind === 'refused' && sent.fix ? sent.fix : null;
+  }
+
   async function mint(make: () => ReturnType<typeof inviteEmail>): Promise<boolean> {
     inviting = true;
     const at = opened();
@@ -397,7 +404,7 @@
     /* AND MAILED TO THEM AT ONCE (collab pass, 2 Nov), with the proof inside it for an address new here, so they open one
        mail and press Join. A host that cannot mail says so, and the link is there to copy either way. */
     const sent = await sendInvite(out.value.token).catch(() => null);
-    madeLink = { email: out.value.invitation.email, link: inviteLink(bareOrigin(), out.value.token), sent: sent?.ok === true };
+    madeLink = { email: out.value.invitation.email, link: inviteLink(bareOrigin(), out.value.token), sent: sent?.ok === true, unsent: unsentOf(sent) };
     if (sent?.ok === true) toasts.push(copy.inviteEmailed(out.value.invitation.email), { intent: 'good' });
     await readInvitesNow();
     return true;
@@ -944,7 +951,7 @@
       <!-- ONCE. The record keeps the hash and hands back the only copy of the link, so leaving this screen is
            the last of it; Done takes it off the screen deliberately rather than by navigation. -->
       <div class="invite-made">
-        <p class="hint">{madeLink.sent ? copy.inviteEmailed(madeLink.email) : `${copy.inviteLinkReady(madeLink.email)} ${copy.inviteNoMail}`}</p>
+        <p class="hint">{madeLink.sent ? copy.inviteEmailed(madeLink.email) : `${copy.inviteLinkReady(madeLink.email)} ${madeLink.unsent ?? copy.inviteNoMail}`}</p>
         <div class="field-row-controls">
           <div class="field field-lg">
             <input class="field-input" id="invite-link" type="text" readonly aria-label={copy.inviteLinkLabel} value={madeLink.link} />

@@ -362,13 +362,20 @@ function missedWhat(payload: { subject?: unknown; because?: unknown }): string {
  * `link` IS EMPTY FOR A NOTICE, which opens nothing: it tells a person their way in changed, so a change they did not
  * make is one they hear about.
  */
-export function letterOf(kind: SignInMailKind | undefined, link: string): { subject: string; text: string } {
+export function letterOf(kind: SignInMailKind | undefined, link: string, vars: LetterVars = {}): { subject: string; text: string } {
   const unasked = 'If you did not ask for this, you can ignore this email.';
-  if (kind === 'invite.sent')
+  /* THE INVITER AND THE BRAINDOG BY NAME, as the Cloud's letter says them (collab pass, 2 Nov); the host hands both over
+     when it knows them, and a letter without them reads as it did. */
+  if (kind === 'invite.sent') {
+    const from = oneLine(vars.from);
+    const record = oneLine(vars.record);
+    const who = from ? `${from} invited you` : 'You were invited';
+    const where = record ? `their BrainDog, ${record}` : 'a BrainDog';
     return {
-      subject: "You're invited to a BrainDog",
-      text: `You were invited to join a BrainDog. Open this link to see what you can do there and join:\n\n${link}\n\nThe link works once, for this address, and ends in 24 hours. ${unasked}`,
+      subject: from ? `${from} invited you to ${record ? record : 'their BrainDog'}` : "You're invited to a BrainDog",
+      text: `${who} to join ${where}. Open this link to see what you can do there and join:\n\n${link}\n\nThe link works once, for this address, and ends in 24 hours. ${unasked}`,
     };
+  }
   if (kind === 'invite.prove')
     return {
       subject: 'Confirm your email to join the record',
@@ -467,9 +474,15 @@ export function withoutAddresses(error: string): string {
  * AND RAISED ON HEALTH (`fault`, PK4): it was the server log alone, where neither the person waiting for the link nor the
  * owner looked. The next mail that goes out clears it.
  */
-export function authMail(send: SendLetter, say: (line: string) => void, fault?: MailFault): (to: string, link: string, kind?: SignInMailKind) => void {
-  return (to, link, kind) => {
-    const letter = letterOf(kind, link);
+/** What a letter may name besides its link: the BrainDog and who sent it (`AuthDoor['mail']`'s `vars`). */
+export type LetterVars = { record?: string | undefined; from?: string | undefined };
+
+/** A name as one short line, so a name with a line break cannot write a second line into the letter or its subject. */
+const oneLine = (v: string | undefined): string => (v ?? '').replace(/[\r\n\t]+/gu, ' ').trim().slice(0, 120);
+
+export function authMail(send: SendLetter, say: (line: string) => void, fault?: MailFault): (to: string, link: string, kind?: SignInMailKind, vars?: LetterVars) => void {
+  return (to, link, kind, vars) => {
+    const letter = letterOf(kind, link, vars);
     void send({ to, ...letter }).then(
       () => fault && tellRecord(fault.sent),
       (e: unknown) => {

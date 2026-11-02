@@ -1213,6 +1213,19 @@ function answered(out: AuthResult, mode: CookieMode): Response {
 }
 
 /**
+ * What a self-host says when asked a sign-in route only BrainDog Cloud has, in plain words and with the way in it does
+ * have. The apps (`/auth/app*`, `/auth/desktop*`) do not sign in to a self-host yet; sign-up, Google and the operator's
+ * routes are the Cloud's own.
+ */
+function cloudOnly(flow: string, origin: string): string {
+  if (DESKTOP.has(flow) || flow === 'app.code')
+    return `The BrainDog apps for iPhone and Mac sign in to BrainDog Cloud only, not yet to a BrainDog you run yourself. Open ${origin} in a browser and sign in there.`;
+  if (GOOGLE.has(flow)) return `Signing in with Google is a BrainDog Cloud way in. Here, sign in at ${origin}/signin with a passkey or a sign-in link.`;
+  if (SIGNUP.has(flow)) return 'A BrainDog you run yourself has no sign-up. Ask whoever runs it for an invitation.';
+  return 'That route is for whoever runs BrainDog Cloud, and a BrainDog you run yourself does not have it.';
+}
+
+/**
  * Answer one `/auth/*` request.
  *
  * THE ORDER IS THE ARGUMENT. The route and its method first, so a path that is not a route says so and
@@ -1224,7 +1237,14 @@ export async function serveAuth(request: Request, door: AuthDoor): Promise<Respo
   const path = new URL(request.url).pathname.replace(/\/+$/, '');
   const route = AUTH_ROUTES.find((r) => r.path === path && (r.on === 'both' || r.on === door.on));
   /* The path is not repeated back. A link pasted into the path rather than the fragment would be a token. */
-  if (!route) return refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'There is no sign-in route at that address.' });
+  if (!route) {
+    /* A CLOUD ROUTE ASKED OF A SELF-HOST says so (selfhost lane, 2 Nov). The iPhone and Mac apps asked `/auth/app` here and
+       were told "There is no sign-in route at that address.", which reads as a typo in the address rather than as the
+       apps not reaching a server somebody runs themselves yet. */
+    const cloud = door.on === 'selfhost' ? AUTH_ROUTES.find((r) => r.path === path && r.on === 'worker') : undefined;
+    if (cloud) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: cloudOnly(cloud.flow, door.origin) });
+    return refusal(404, { code: 'ROUTE_UNKNOWN', fix: 'There is no sign-in route at that address.' });
+  }
   if (request.method !== route.method)
     return refusal(405, { code: 'ROUTE_UNKNOWN', fix: `${route.path} takes a ${route.method}.` }, [['allow', route.method]]);
 

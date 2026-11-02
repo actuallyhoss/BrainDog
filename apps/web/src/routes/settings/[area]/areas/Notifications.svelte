@@ -44,6 +44,10 @@
     /* WHAT THE APP'S OWN ASK SAYS WHEN IT ANSWERS (`askPush`). */
     pushGiven: 'This device is told when something interrupts you.',
     pushRefused: 'Notifications are off for BrainDog. Turn them on in the device’s Settings, under Notifications.',
+    /* A SELF-HOST RINGS NO PHONE AND NO BROWSER (selfhost lane, 2 Nov): push goes out through BrainDog Cloud's keys, so this
+       area drew nothing at all there and a colleague waited for a ring that never came. Said once, with where news lands. */
+    selfPush: 'No phone or browser notifications here',
+    selfPushLine: 'This BrainDog runs on its own server, which can’t ring phones or browsers. Anything handed to you or mentioning you waits in the bell and in Needs you.',
   } as const;
 
   /**
@@ -277,6 +281,10 @@
         {/if}
         <p class="said" role="status">{nativeLine}</p>
       </div>
+    </Tile>
+  {:else if props.shell.host === 'self-host'}
+    <Tile>
+      <StateRow icon="phone" title={words.selfPush} line={words.selfPushLine} />
     </Tile>
   {:else}
     <div class="push-switch"><PushToggle host={props.shell.host} onchange={turned} /></div>

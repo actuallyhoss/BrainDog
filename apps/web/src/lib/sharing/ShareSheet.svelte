@@ -111,7 +111,7 @@
   let busy = $state(false);
   let problem = $state<string | null>(null);
   let confirming = $state(false);
-  let link = $state<{ email: string; href: string; sent: boolean } | null>(null);
+  let link = $state<{ email: string; href: string; sent: boolean; unsent: string | null } | null>(null);
 
   /* ── the fold: three choices on a phone ── */
   const phone = new MediaQuery('(width < 640px)');
@@ -284,7 +284,9 @@
       if (made.ok) {
         /* MAILED TO THEM AT ONCE (collab pass, 2 Nov), the proof inside it for an address new here; the link stays to copy. */
         const sent = await import('$lib/auth.ts').then(({ sendInvite }) => sendInvite(made.value)).catch(() => null);
-        link = { email, href: inviteLink(location.origin, made.value), sent: sent?.ok === true };
+        /* NOT MAILED, the host's own sentence says why when it gave one (a self-host with no mail set up). */
+        const unsent = sent && !sent.ok && sent.kind === 'refused' && sent.fix ? sent.fix : null;
+        link = { email, href: inviteLink(location.origin, made.value), sent: sent?.ok === true, unsent };
         return;
       }
       toasts.push(copy.shareLinkMissed(email), { intent: 'warn' });
@@ -340,7 +342,7 @@
     {#if link}
       <!-- THE LINK IS SHOWN ONCE: the record keeps only its hash, so closing the sheet forgets it. -->
       <div class="share-link">
-        <p class="share-said">{link.sent ? copy.inviteEmailed(link.email) : copy.shareLinkSaid(link.email)}</p>
+        <p class="share-said">{link.sent ? copy.inviteEmailed(link.email) : link.unsent ? `${copy.shareLinkSaid(link.email)} ${link.unsent}` : copy.shareLinkSaid(link.email)}</p>
         <label class="field-label" for="{uid}-link">{copy.shareLinkLabel}</label>
         <span class="field"><input id="{uid}-link" class="field-input" readonly value={link.href} /></span>
         <div class="share-acts">

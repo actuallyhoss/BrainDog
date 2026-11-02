@@ -171,7 +171,18 @@ type Door = { on: 'selfhost' | 'worker'; origin: string; ip: string; auth: Auth;
 
 /** What path 3 says on a host that cannot send mail, whose Directory therefore proves no address. */
 export const NO_MAIL =
-  'This BrainDog cannot send mail, so a new address cannot be proved here. Ask the owner to invite an address that can already sign in.';
+  "This BrainDog can't send mail yet, so it can't check that this address is yours, and you can't join with it for now. Tell whoever invited you: once it can send mail, they can send you a new link.";
+
+/**
+ * What the person who made an invitation is told when this host cannot mail it (selfhost lane, 2 Nov). `NO_MAIL` is the
+ * joiner's sentence, and the inviter was shown "Nothing is emailed: copy the link and send it yourself", which promised a
+ * link that a new address could not use: joining asks for a proof by mail, and there is no mail to send it with.
+ */
+export function noMailSend(on: 'selfhost' | 'worker'): string {
+  return on === 'selfhost'
+    ? "This BrainDog can't send mail, so nothing was emailed, and somebody new can't join until it can: whoever runs it sets BRAINDOG_SMTP_URL and BRAINDOG_MAIL_FROM and starts it again. Until then the link works only for an address that already signs in here."
+    : "Mail isn't going out right now, so nothing was emailed. Try again in a while.";
+}
 
 /** What a proof that is spent, run out, or minted for another invitation or address is told. */
 const PROOF_GONE = 'That link from your mail has been used, has run out, or is for another invitation. Accept again to be sent a new one.';
@@ -303,7 +314,7 @@ export async function serveInvite(
   if (body.send === true) {
     if (!live || !who) return refusal(401, { code: 'UNAUTHORIZED', fix: 'Sign in to send an invitation.', at: 'session' });
     const send = door.mail;
-    if (!send) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: NO_MAIL, at: 'email' });
+    if (!send) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: noMailSend(door.on), at: 'email' });
     const vars = { ...(found.value.record ? { record: found.value.record } : {}), ...(found.value.by ? { from: found.value.by } : {}) };
     let link = `${door.origin}/invite#${token}`;
     /* EVERY SEND IS COUNTED AGAINST THE ADDRESS (security pass, 2 Nov), a known one too: the proof flow is what keeps
@@ -311,7 +322,7 @@ export async function serveInvite(
        the link could mail somebody who already signs in here thirty times in a row. For a known address the proof
        minted is never sent and opens nothing: path 2 asks them to sign in before any proof is read. */
     const proving = await door.auth({ flow: 'invite.prove', email, invite: token });
-    if (proving.status === 404) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: NO_MAIL, at: 'email' });
+    if (proving.status === 404) return refusal(501, { code: 'NOT_IN_THIS_BUILD', fix: noMailSend(door.on), at: 'email' });
     if (proving.status !== 200) return finish(proving);
     if (!(await invite.known(email))) {
       const mail = proving.mail;

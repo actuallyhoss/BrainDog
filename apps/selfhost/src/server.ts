@@ -1316,7 +1316,7 @@ export async function start(options: {
    * `MailNotice`, because `packages/ports` is not this lane's to widen, so this field takes the two kinds beside it and
    * hands them to `serveAccount`'s `email.mail`; a narrower caller (`door.mail`, `AuthDoor['mail']`) still fits it.
    */
-  mail?: ((to: string, link: string, kind?: MailNotice | 'email.change' | 'email.changed') => void) | undefined;
+  mail?: ((to: string, link: string, kind?: MailNotice | 'email.change' | 'email.changed', vars?: { record?: string; from?: string }) => void) | undefined;
 } & (
     | {
         /**
