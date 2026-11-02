@@ -55,10 +55,22 @@ export function meant(options: readonly RefOption[], typed: string): RefOption |
   return found.length === 1 ? found[0]! : null;
 }
 
+/**
+ * WHETHER A LINK'S BOX OFFERS PEOPLE TOO (`RefPick`'s `people`): a link to organisations that says who a thing is for, a
+ * task's Client. Read off the field, its id or its label, so a list a pack adds with a Client of its own offers them too;
+ * an organisation a person is with ("Organisation") and who a payment was with stay companies.
+ */
+export const peopleMayBe = (f: { id: string; to?: string | undefined; label?: string | undefined }): boolean =>
+  f.to === 'organisations' && (f.id === 'client' || /\bclients?\b/iu.test(f.label ?? ''));
+
 export const pickWords = {
   none: 'None',
   nothing: (list: string) => `Nothing in ${list} yet.`,
   noMatch: (typed: string) => `Nothing called “${typed.trim()}”.`,
   more: (n: number) => `${String(n)} more. Type to narrow.`,
   search: (list: string) => `Search ${list}`,
+  searchWithPeople: (list: string) => `Search ${list} and people`,
+  /* A PERSON OFFERED IN A CLIENT BOX, told from a company beside it. */
+  person: 'Person',
+  personFailed: (name: string) => `${name} could not be made a client. Try again, or add them to Organisations first.`,
 };

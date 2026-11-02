@@ -36,6 +36,7 @@
   import JsonBox from '$lib/ui/JsonBox.svelte';
   import FileField from '$lib/ui/FileField.svelte';
   import RefPick from '$lib/ui/RefPick.svelte';
+  import { peopleMayBe } from '$lib/ui/ref-pick.ts';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import Face from '$lib/ui/Face.svelte';
   import { ofPeople } from '$lib/ui/RowCards.svelte';
@@ -420,7 +421,7 @@
               if (!e.defaultPrevented) cellKeys(e, true);
             }}
           >
-            <RefPick to={f.to} label={labelOf(f)} autofocus fixed bind:value={editValue} onpick={() => commitEdit()} />
+            <RefPick to={f.to} people={peopleMayBe(f)} label={labelOf(f)} autofocus fixed bind:value={editValue} onpick={() => commitEdit()} />
           </span>
         {:else if f && isFile(f)}
           <!-- A FILE IS CHOSEN, NEVER TYPED: the picker sends the bytes and the draft holds what came back,

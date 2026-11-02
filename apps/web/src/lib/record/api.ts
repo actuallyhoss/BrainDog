@@ -519,7 +519,8 @@ export function display(
 /** The name of the row one link of `f` points at, by the record's names where a screen has them. */
 function refName(f: FieldDecl, register: string, value: unknown, names?: Names): string {
   if (names) {
-    const known = names.get(`${f.to}#${value}`);
+    /* AND WHAT THIS TAB HAS LEARNT SINCE THE SCREEN READ ITS NAMES: a client made from a person a moment ago. */
+    const known = names.get(`${f.to}#${value}`) ?? (f.to ? TITLES.get(f.to)?.get(Number(value)) || undefined : undefined);
     return known ? (f.to && REGISTERS[f.to]?.identity ? shownName(known) : known) : unnamed(f.to ?? register, String(value), f.label);
   }
   /* AND WITHOUT `names`, THE NAMES THIS TAB HAS LEARNT (`held.ts` `TITLES`). This read the sample's rows, so a

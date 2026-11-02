@@ -10,8 +10,10 @@
 -->
 <script lang="ts">
   import Icon from './Icon.svelte';
+  import { apiBase } from '../at.ts';
+  import { toasts } from './toast.svelte.ts';
   import { iconFor } from '../record/api.ts';
-  import { REGISTERS, refOptions } from '../record/held.ts';
+  import { REGISTERS, TITLES, refOptions } from '../record/held.ts';
   import { listName } from '../record/names.ts';
   import { matching, meant, pickWords as words, seqOf, SHOWN, type RefOption } from './ref-pick.ts';
 
@@ -25,6 +27,7 @@
     invalid = false,
     autofocus = false,
     fixed = false,
+    people = false,
     onpick,
   }: {
     /** The list the link points at. */
@@ -43,6 +46,13 @@
      * clips anything that hangs out of a cell, and its table is a containing block a `position: fixed` list lands in.
      */
     fixed?: boolean | undefined;
+    /**
+     * PEOPLE MAY BE PICKED TOO, for a link to organisations that names who a thing is for: a task's Client (leftovers 2
+     * Nov, 11). A client who is a person, a freelancer's or a shop's, is kept in People, and a Client box offered only
+     * companies. A person picked is filed as the organisation they are with; one with none is given one in their own
+     * name (a client), and they are put with it, so the link still points at the one list it names.
+     */
+    people?: boolean | undefined;
     /**
      * A row pressed or chosen with Enter, after the value holds it. A row page and a grid cell save on it, so the list
      * never stands between a pick and Save. A name typed and left is not a pick: it only fills the box.
@@ -94,7 +104,52 @@
     if (!typing) query = picked?.label ?? '';
   });
 
-  const found = $derived(matching(options, typing ? query : ''));
+  /* THE PEOPLE A CLIENT MAY BE (`people`): read once, when the box is first opened. Each is offered under a value of its
+     own below nought, so it is never taken for an organisation's number. */
+  type Folk = { seq: number; id: string; name: string; org: string | null };
+  let folk = $state<Folk[] | null>(null);
+  async function readFolk() {
+    if (!people || folk !== null || !REGISTERS.people) return;
+    folk = [];
+    try {
+      const { createClient } = await import('@braindog/client');
+      const out = await createClient({ base: apiBase() }).list({ register: 'people', limit: 500, fields: ['name', 'org', 'self'] });
+      if (!out.ok) return;
+      folk = (out.value.rows as { id: string; seq: number; fields?: Record<string, unknown> }[]).flatMap((r) =>
+        typeof r.fields?.name === 'string' && r.fields.name.trim() !== '' && r.fields.self !== true
+          ? [{ seq: r.seq, id: r.id, name: r.fields.name, org: typeof r.fields.org === 'string' && r.fields.org !== '' ? r.fields.org : null }]
+          : [],
+      );
+    } catch {
+      /* No people offered: the box still offers every organisation. */
+    }
+  }
+  const asOptions = $derived<RefOption[]>((folk ?? []).filter((p) => !options.some((o) => o.label.trim().toLowerCase() === p.name.trim().toLowerCase())).map((p) => ({ value: -p.seq, label: p.name })));
+  const everyone = $derived(people ? [...options, ...asOptions] : options);
+  /* A PERSON PICKED IS FILED AS THEIR ORGANISATION, or one made in their name. `null` where that could not be written. */
+  async function orgOf(person: Folk): Promise<RefOption | null> {
+    try {
+      const { createClient } = await import('@braindog/client');
+      const client = createClient({ base: apiBase() });
+      if (person.org !== null) {
+        const orgs = await client.list({ register: 'organisations', limit: 500, fields: ['name'] });
+        const row = orgs.ok ? (orgs.value.rows as { id: string; seq: number; fields?: Record<string, unknown> }[]).find((r) => r.id === person.org) : undefined;
+        if (row) return { value: row.seq, label: typeof row.fields?.name === 'string' ? row.fields.name : person.name };
+      }
+      const made = await client.create({ register: 'organisations', fields: { name: person.name, kind: 'client' } });
+      if (!made.ok) return null;
+      const org = made.value as { id: string; seq: number };
+      await client.update({ register: 'people', seq: person.seq, patch: { org: org.id } });
+      person.org = org.id;
+      /* THE NEW ROW IS NAMED IN THIS TAB, so the box and the list draw it by name at once. */
+      TITLES.set('organisations', new Map([...(TITLES.get('organisations') ?? []), [org.seq, person.name]]));
+      return { value: org.seq, label: person.name };
+    } catch {
+      return null;
+    }
+  }
+
+  const found = $derived(matching(everyone, typing ? query : ''));
   const shown = $derived(found.slice(0, SHOWN));
   /* "None" leads while the list is browsed, for a link that may be empty and holds a row now. */
   const offerNone = $derived(!required && !typing && held !== null);
@@ -104,6 +159,7 @@
   const reveal = () => void Promise.resolve().then(() => ul?.querySelector(`#${CSS.escape(optionId(active))}`)?.scrollIntoView({ block: 'nearest' }));
 
   function show() {
+    void readFolk();
     open = true;
     const at = rows.findIndex((o) => o !== null && o.value === held);
     active = at < 0 ? 0 : at;
@@ -113,6 +169,25 @@
   }
 
   function pick(o: RefOption | null, chosen = false) {
+    if (o !== null && o.value < 0) {
+      const person = (folk ?? []).find((p) => p.seq === -o.value);
+      typing = false;
+      query = o.label;
+      open = false;
+      if (person)
+        void orgOf(person).then((org) => {
+          /* NOT FILED, SAID SO: the box goes back to what it held, and the toast says what to do. */
+          if (org === null) {
+            query = picked?.label ?? '';
+            toasts.push(words.personFailed(person.name), { intent: 'bad' });
+            return;
+          }
+          value = String(org.value);
+          query = org.label;
+          if (chosen) onpick?.(value);
+        });
+      return;
+    }
     value = o === null ? '' : String(o.value);
     typing = false;
     query = o?.label ?? '';
@@ -127,7 +202,7 @@
       return;
     }
     if (query.trim() === '' && !required) return pick(null);
-    const o = meant(options, query);
+    const o = meant(everyone, query);
     if (o) return pick(o);
     typing = false;
     query = picked?.label ?? '';
@@ -190,7 +265,7 @@
       aria-activedescendant={open && rows.length > 0 ? optionId(active) : undefined}
       aria-describedby={describedBy}
       aria-invalid={invalid ? 'true' : undefined}
-      placeholder={words.search(list)}
+      placeholder={people && REGISTERS.people ? words.searchWithPeople(list) : words.search(list)}
       {autofocus}
       {required}
       bind:value={query}
@@ -230,8 +305,9 @@
           {#if o === null}
             <span class="pick-name">{words.none}</span>
           {:else}
-            <span class="pick-row-icon" aria-hidden="true"><Icon name={icon} size="s" /></span>
-            <span class="pick-name">{o.label}</span>
+            <span class="pick-row-icon" aria-hidden="true"><Icon name={o.value < 0 ? 'people' : icon} size="s" /></span>
+            <span class="pick-name" dir="auto">{o.label}</span>
+            {#if o.value < 0}<span class="pick-kind">{words.person}</span>{/if}
             {#if o.value === held}<span class="pick-on" aria-hidden="true"><Icon name="check" size="s" /></span>{/if}
           {/if}
         </li>
@@ -309,6 +385,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .pick-kind {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .pick-on {

@@ -73,6 +73,7 @@
   import QuantityBox from '$lib/ui/QuantityBox.svelte';
   import JsonBox from '$lib/ui/JsonBox.svelte';
   import RefPick from '$lib/ui/RefPick.svelte';
+  import { peopleMayBe } from '$lib/ui/ref-pick.ts';
   import { ownsRecord, type Me } from '../../../settings/levels.ts';
   import { namedLines, readHistory, readNames, type Say, type SettledWords, type Told } from '$lib/record/history-live.ts';
   import { rowReader, type Docs, type Got, type RowReader } from '$lib/record/row-live.ts';
@@ -1404,7 +1405,7 @@
         </div>
       {:else if f.type === 'ref' && f.to}
         <!-- A PRESSED ROW IS SAVED AT ONCE, so the open list never stands over Save. -->
-        <RefPick to={f.to} label={labelOf(f)} bind:value={draft} onpick={() => void saveEdit(f)} />
+        <RefPick to={f.to} people={peopleMayBe(f)} label={labelOf(f)} bind:value={draft} onpick={() => void saveEdit(f)} />
       {:else if f.type === 'ref'}
         <div class="field">
           <input class="field-input num" type="text" inputmode="numeric" aria-label={labelOf(f)} bind:value={draft} />

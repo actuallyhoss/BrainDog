@@ -33,6 +33,7 @@
   import { errorFor, loose, type Refused } from './field.ts';
   import FileField from './FileField.svelte';
   import RefPick from './RefPick.svelte';
+  import { peopleMayBe } from './ref-pick.ts';
   import Icon from './Icon.svelte';
   import Segmented from './Segmented.svelte';
   import { fileOf, isFile } from '../record/field-draft.ts';
@@ -483,7 +484,7 @@
           {/each}
         </select>
       {:else if f.type === 'ref' && f.to}
-        <RefPick to={f.to} label={labelOf(f)} id={id(f)} required={f.required} {describedBy} {invalid} bind:value={typed[f.id]} />
+        <RefPick to={f.to} people={peopleMayBe(f)} label={labelOf(f)} id={id(f)} required={f.required} {describedBy} {invalid} bind:value={typed[f.id]} />
       {:else if f.type === 'money'}
         <!-- The currency is printed rather than typed, and it is THE ONE THE AMOUNT WILL BE WRITTEN
              IN: the code of the account its link names, else the field's declared currency, else its rows', else the
