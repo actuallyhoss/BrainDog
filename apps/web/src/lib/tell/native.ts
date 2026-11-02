@@ -13,6 +13,7 @@
  * passes as `known`, and leaves out where it has not asked.
  */
 
+import { addedSaid, heldSaid, readyAt, readyRows } from '../home/first-today.ts';
 import { tellRead, type Known, type TellList, type TellOptions, type Told } from './read.ts';
 
 /** What of `boot` the reader needs: the lists this person holds, with their counts and add-ons, the money, who they are. */
@@ -82,6 +83,54 @@ export function readJSON(sentence: string, optionsJSON: string): string {
 /** `tellOptions` over JSON, the same way. */
 export function optionsJSON(bootJSON: string, schemasJSON: string, today: string, knownJSON = '{}'): string {
   return JSON.stringify(tellOptions(JSON.parse(bootJSON) as NativeBoot, JSON.parse(schemasJSON) as Record<string, TellList>, today, JSON.parse(knownJSON) as NativeKnown));
+}
+
+/* ── one press of Add, over every line typed ─────────────────────────────────────────────────────────────── */
+
+/** A field's `{ $row: n }` moved on by `by`, so a line's pointers still name its own entries once lines are joined. */
+function shifted(v: unknown, by: number): unknown {
+  if (Array.isArray(v)) return v.map((x) => shifted(x, by));
+  if (v === null || typeof v !== 'object') return v;
+  const o = v as Record<string, unknown>;
+  if (Object.keys(o).length === 1 && typeof o.$row === 'number') return { $row: o.$row + by };
+  return Object.fromEntries(Object.entries(o).map(([k, x]) => [k, shifted(x, by)]));
+}
+
+/**
+ * WHAT ONE PRESS OF ADD SENDS, FOR SEVERAL LINES AT ONCE: each line's ready entries (`readyRows`, the card's own rule),
+ * joined into one `capture` so one Undo takes them all back, with each line's `$row` pointers moved on past the lines
+ * before it. `shown` is each entry sent, said as its line said it, with the list it lands in; `held` is what stayed
+ * behind and what it needs (`heldSaid`), the receipt's second sentence.
+ */
+export function batchJSON(toldsJSON: string, optionsJSON: string): string {
+  const tolds = JSON.parse(toldsJSON) as Told[];
+  const options = JSON.parse(optionsJSON) as TellOptions;
+  const nameOf = (register: string): string => options.lists.find((l) => l.id === register)?.name ?? register;
+  const rows: { register: string; fields: Record<string, unknown> }[] = [];
+  const shown: { said: string; list: string; register: string }[] = [];
+  const held: string[] = [];
+  for (const told of tolds) {
+    const by = rows.length;
+    for (const r of readyRows(told.rows)) rows.push({ register: r.register, fields: shifted(r.fields, by) as Record<string, unknown> });
+    for (const i of readyAt(told.rows)) {
+      const row = told.rows[i];
+      if (row) shown.push({ said: row.said, list: row.where?.name ?? nameOf(row.register), register: row.register });
+    }
+    const left = heldSaid(told.rows);
+    if (left !== '') held.push(left);
+  }
+  return JSON.stringify({ rows, shown, held: held.join(' ') });
+}
+
+/** The receipt's first sentence, "Added a project and a bill", from what `capture` made and the fields each was sent with. */
+export function addedJSON(madeJSON: string, sentJSON: string, optionsJSON: string): string {
+  const made = JSON.parse(madeJSON) as { register: string }[];
+  const sent = JSON.parse(sentJSON) as { fields?: Record<string, unknown> }[];
+  const options = JSON.parse(optionsJSON) as TellOptions;
+  return addedSaid(
+    made.map((m, i) => ({ register: m.register, fields: sent[i]?.fields })),
+    options.lists,
+  );
 }
 
 export { tellRead };
