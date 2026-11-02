@@ -99,10 +99,10 @@
   /** Whether its row, and what was said beside it, have been read, landed or not. */
   let rowRead = $state(false);
   let partsRead = $state(false);
-  const settled = $derived(from !== 'reading' && rowRead && (held === null || partsRead));
   /* THE RUN'S OWN ROW AND WHAT WAS READ BESIDE IT, which the conversation is said from (`run-talk.ts`). */
   let held = $state.raw<RunRow | null>(null);
   let parts = $state.raw<RunParts>({});
+  const settled = $derived(from !== 'reading' && rowRead && (held === null || partsRead));
   let beside = false;
   const talk = $derived(held ? runTalk(held, parts) : []);
   /* WHERE THE RUN IS NOW, in the record's six words (`presence-words.ts`), read off its row as it lands: a run that
