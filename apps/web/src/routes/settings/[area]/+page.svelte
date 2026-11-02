@@ -324,8 +324,6 @@
   let engine = $state<Engine | null>(null);
   let signs = $state<Sign[] | null>(null);
   let asked = false;
-  /* WHETHER THE HEALTH READS HAVE ANSWERED, so the index waits for its head (below). */
-  let healthIn = $state(false);
 
   /* ONLY THE OWNER READS FAULTS (`faults` refuses anyone else), so nobody else is asked for them or offered Details. */
   const owns = $derived(!shell.refused && may(shell, 'owner'));
@@ -369,7 +367,6 @@
     }
     engine = eng && typeof eng === 'object' && 'health' in eng ? (eng as Engine) : null;
     signs = Array.isArray(vital?.signs) ? vital.signs : null;
-    healthIn = true;
   }
 
   $effect(() => {
@@ -473,6 +470,47 @@
   {/if}
 {/snippet}
 
+<!-- THE INDEX'S SENTENCE IN ONE PLACE (leftovers9, second pass): the lead sentence and the health line share one cell,
+     so the line is as tall as the taller of the two and the tiles under it never move when the health reads answer. The
+     lead stays in the cell unseen once the health line is said, holding its room. A fault's Try again and Details are
+     words at the end of its line, as the health line's Look is, where they were a row of buttons under it that landed
+     late and pushed the index down 40 to 48px (0.027 at 390). What they open, the refusal and the list, comes after a
+     press, which is no shift. -->
+{#snippet indexSaid()}
+  <span class="said-stack">
+    <span class="said-lead" data-gone={health ? '' : undefined} aria-hidden={health ? 'true' : undefined}>{words.lead(shell.refused ? '' : shell.index.name)}</span>
+    {#if health}
+      <span class="said-health"
+        >{@render healthLine()}{#if fault}{#if retries(fault.cause)}{' '}<button type="button" class="health-look said-act tap" disabled={retrying !== null} aria-busy={retrying === fault.cause} onclick={() => void retry(fault.cause)}>{faultWords.retry}</button>{/if}{#if owns}{retries(fault.cause) ? ' · ' : ' '}<button type="button" class="health-look said-act tap" aria-expanded={details} aria-controls="fault-details" onclick={() => (details = !details)}>{details ? faultWords.hide : faultWords.details}</button>{/if}{/if}</span
+      >
+    {/if}
+  </span>
+{/snippet}
+
+<!-- WHAT A PRESS ON THE INDEX'S FAULT OPENS: the record's refusal, and the owner's list. -->
+{#snippet indexFault()}
+  <p class="fault-fix" role="status">{retryFix}</p>
+  {#if fault && owns && details}
+    <div id="fault-details" class="fault-details">
+      <Tile title={faultWords.details} count={faults?.length ?? 0}>
+        <ul class="faults">
+          {#each faults ?? [] as f (f.cause)}
+            <li>
+              <p class="fault-said">{f.said}</p>
+              {#if f.why}<p class="fault-why">{f.why}</p>{/if}
+              <p class="fault-when">{faultWords.failed(f.count, dayOf(f.since))}</p>
+              {#if f.error}<p class="fault-error">{f.error}</p>{/if}
+              {#if f.cause !== fault.cause && retries(f.cause)}
+                <Button size="sm" disabled={retrying !== null} aria-busy={retrying === f.cause} onclick={() => void retry(f.cause)}>{faultWords.retry}</Button>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </Tile>
+    </div>
+  {/if}
+{/snippet}
+
 <!-- NO SEND TO SLASH ON SETTINGS: the red sign's sentence links to Health, where it is read, and Slash is asked from the
      top bar. A split button under the title read as a setting. -->
 
@@ -528,8 +566,8 @@
     <PageHead
       icon="settings"
       title={copy.settings}
-      sentence={health ? healthLine : words.lead(shell.refused ? '' : shell.index.name)}
-      below={fault ? faultTools : undefined}
+      sentence={indexSaid}
+      below={fault && (details || retryFix !== '') ? indexFault : undefined}
       actions={indexTools}
     />
   </div>
@@ -538,12 +576,7 @@
 {#if !known}
   <!-- THE INDEX, DRAWN BY THE ONE READER: Home's body mode, with no head of its own under this one. Where the record
        cannot draw it, the chooser's list is the index, so nobody is left on a page of nothing. -->
-  <!-- THE INDEX WAITS OUT OF SIGHT FOR ITS HEAD (leftovers9): a fault's Try again and Details land under the sentence, and
-       the health line takes the lead sentence's place in more or fewer lines, once the record answers. Drawn first, the
-       tiles moved 40 to 48px down when that landed (0.027 at 390 on a record with an open fault, 0.025 on live). Hidden
-       boxes that move are no shift. At most 2.5 s, as `settings.css` holds an area's tiles, so a read that hangs hides
-       nothing for good. -->
-  <div class="settings-index" data-held={!healthIn && !shell.refused ? '' : undefined}>
+  <div class="settings-index">
     <!-- IN THE IPHONE APP THE INDEX IS THE CHOOSER'S LIST, in the order the record's index gives (`groups`), since the
          drawn index's Billing row is a link and the app shows the plan as a line (`SettingsIndex`). -->
     {#if indexDown || !owner || inIosApp}
@@ -736,15 +769,32 @@
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  .settings-index[data-held] {
-    visibility: hidden;
-    animation: index-held 0s linear 2.5s forwards;
+  /* THE LEAD AND THE HEALTH LINE IN ONE CELL, the cell as tall as the taller (`indexSaid`). */
+  .said-stack {
+    display: grid;
   }
 
-  @keyframes index-held {
-    to {
-      visibility: visible;
-    }
+  .said-stack > * {
+    grid-area: 1 / 1;
+  }
+
+  .said-lead[data-gone] {
+    visibility: hidden;
+  }
+
+  /* TRY AGAIN AND DETAILS AS WORDS, the health line's Look in a button. */
+  .said-act {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .said-act:disabled {
+    color: var(--ink-3);
+    cursor: default;
   }
 
   /* THE INDEX'S DIVIDERS START AT THE TEXT (agents F28), past the row's well, where the link list's own padding puts the
