@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "Brings its Gold price widget for Today, which was BrainDog’s own until now, and its gold rates say they restate the night’s net worth in grams of 24k gold, which BrainDog worked out by their names until now.",
+  "changes": "While a holding has no price yet, Paid in leaves it out as Worth now and Gain do, so the three figures agree, and the page says how many have no price under them. Each holding's card says its gain in money, as Gain since you bought, where it said Gain on cost, % and a bare number.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -726,6 +726,22 @@
       "compare": "none"
     },
     {
+      "metric": "holdings-unvalued",
+      "name": "Holdings with no worth yet",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "value is empty",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
       "metric": "holdings-priced-on",
       "name": "Oldest price",
       "pack": "holdings",
@@ -762,7 +778,7 @@
       "name": "Paid in",
       "pack": "holdings",
       "source": "register.holdings",
-      "where": "cost is set",
+      "where": "cost is set, value is set",
       "value": {
         "sum": "cost"
       },
@@ -1046,6 +1062,24 @@
           }
         },
         {
+          "kind": "note",
+          "span": 8,
+          "body": "1 holding has no price yet, so it is left out of these.",
+          "when": {
+            "metric": "holdings-unvalued",
+            "is": 1
+          }
+        },
+        {
+          "kind": "note",
+          "span": 8,
+          "body": "{{holdings-unvalued}} holdings have no price yet, so they are left out of these.",
+          "when": {
+            "metric": "holdings-unvalued",
+            "gt": 1
+          }
+        },
+        {
           "kind": "table",
           "heading": "Gold rate",
           "icon": "vault",
@@ -1182,8 +1216,8 @@
               "as": "fact"
             },
             {
-              "field": "gain_pct",
-              "label": "Gain on cost, %",
+              "field": "gain",
+              "label": "Gain since you bought",
               "as": "fact"
             }
           ],
@@ -1338,7 +1372,7 @@
             },
             {
               "field": "gain_pct",
-              "label": "Gain on cost, %",
+              "label": "Gain, %",
               "as": "fact"
             }
           ],
