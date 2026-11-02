@@ -127,6 +127,15 @@ export function draftOffer(modules: readonly string[]): SetupOffer {
   };
 }
 
+/**
+ * THE KIND A BRAINDOG WAS MADE AS, IN WORDS, for the read after the build (`drafts` in `@braindog/slash`): the use
+ * case's own name, and for a household what that means, so its words are never read as a business's.
+ */
+export function kindSaid(usecase: string): string {
+  const name = moduleName(usecase);
+  return usecase === 'personal' || usecase === 'usecase-personal' ? `${name}, a household or one person's own money` : name;
+}
+
 /* COMPARED AS NAMES (`nameEnd`), so a draft of "Kettle & Co." is the "Kettle & Co" the build already wrote. */
 const plain = (s: unknown): string => (typeof s === 'string' ? nameEnd(s).toLowerCase() : '');
 
@@ -297,12 +306,14 @@ const INVOICE_DAYS = 30;
 
 /** The to-dos a creator's "sponsor deals, paying editors" draws (`todosFor`): "Log this month's sponsor deals", "Pay Kai and Rosa". */
 const SPONSOR_TODO = /^log this month's sponsor deals\.?$/iu;
+/** The to-do a household's "bills" kept first draws (`todosFor`): "Write down this month's bills". */
+const BILLS_TODO = /^write down this month's bills\.?$/iu;
 const PAY_TODO = /^pay (.+?)\.?$/iu;
 
 /**
  * A FIRST TO-DO THAT IS MONEY, IN MONEY: what it is called there, which way it goes, and the line under it. The invoice
  * (`INVOICE_TODO`), and since onboarding7 a creator's sponsor deals (money in) and the editors they pay (money out),
- * which drew nothing on a Today with Money and no Tasks.
+ * which drew nothing on a Today with Money and no Tasks; since onboarding11 a household's bills (money out).
  */
 function moneyTodo(said: string): { title: string; direction: 'owed_to_me' | 'owed_by_me' } | null {
   const s = said.trim();
@@ -312,6 +323,9 @@ function moneyTodo(said: string): { title: string; direction: 'owed_to_me' | 'ow
     return { title: client === '' ? "This month's invoices" : `Invoice to ${client}`, direction: 'owed_to_me' };
   }
   if (SPONSOR_TODO.test(s)) return { title: "This month's sponsor deals", direction: 'owed_to_me' };
+  /* A HOUSEHOLD'S BILLS, MONEY OUT (onboarding11: Marta kept "Bills" first, was drawn "Write down this month's bills",
+     and her Today, with Money and no Tasks, offered nothing; Tell reads that line as nothing without a Tasks list). */
+  if (BILLS_TODO.test(s)) return { title: "This month's bills", direction: 'owed_by_me' };
   const pay = PAY_TODO.exec(s);
   if (pay !== null) return { title: `Pay ${pay[1]!.trim()}`, direction: 'owed_by_me' };
   return null;
