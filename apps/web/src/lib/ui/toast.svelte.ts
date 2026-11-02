@@ -41,6 +41,8 @@
 
 import { untrack } from 'svelte';
 
+import { keysSaid } from '../record/names.ts';
+
 export type Toast = {
   id: number;
   /** Past tense, the thing named by its name in quotes, never an id: "Archived “Invoice 2026-041: brand system”." */
@@ -90,7 +92,9 @@ class Toasts {
          toast that offers an Undo takes the place of the one before that offered one: the newest is what ⌘Z undoes. */
       const offers = (t: Pick<Toast, 'undo' | 'offer'>): boolean => t.undo !== undefined && t.offer !== false;
       if (offers({ undo: opts.undo, offer: opts.offer })) for (const was of this.items.filter(offers)) this.dismiss(was.id);
-      const next = [...this.items, { id, text, undo: opts.undo, intent: opts.intent, life: opts.life, offer: opts.offer }];
+      /* NO KEY IN A TOAST (leftovers 2 Nov, 3): a refusal or a run's note handed on as it came said "rule.…" and
+         "script.…"; each is said by its name (`keysSaid`). */
+      const next = [...this.items, { id, text: keysSaid(text), undo: opts.undo, intent: opts.intent, life: opts.life, offer: opts.offer }];
 
       /* THE OLDEST GOES THROUGH `dismiss` RATHER THAN JUST OFF THE END OF THE ARRAY, so that its
          countdown goes with it. A timer left armed on a toast nobody can see expires up to ten seconds

@@ -45,6 +45,10 @@ export const nameWords = {
   number: 'Number',
   /* A RULE FROM HIS OLD NOTES, numbered by the import and never named. */
   importedRule: 'One of your imported rules',
+  /* A RUN THAT STOPPED AT THE DAY'S CEILING, and one whose script is paused (`keysSaid`). */
+  dayCeiling: (rule: string, script: string, n: number) =>
+    `“${rule}” stopped: “${script}” already ran ${n} times today, the most in a day. It runs again tomorrow.`,
+  scriptPaused: (rule: string, script: string) => `“${rule}” stopped: “${script}” is paused. Switch it back on in Automations.`,
 } as const;
 
 /**
@@ -85,6 +89,30 @@ export function humanize(id: string): string {
     .replace(/[-_.\s]+/gu, ' ')
     .trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * A SENTENCE THE RECORD WROTE WITH ITS KEYS IN IT, IN WORDS (leftovers 2 Nov, 3): a run that stopped notes why as
+ * "rule.payment-matches-again starts script.match_payment at step 1, and rules have started script.match_payment 100
+ * times today, the most a day. …", and the bell said it as "Rule.payment-matches-again starts script…". Two shapes the
+ * record writes often are said whole; anything else keeps its sentence with each key said by its name, a rule's and a
+ * script's as the product names them and a list by its own name. Only for drawing: the record's note is untouched.
+ */
+export function keysSaid(text: string): string {
+  if (!/\b(?:rule|script|register)\.[a-z]/u.test(text)) return text;
+  const rule = (id: string): string => shipped(id) ?? humanize(id);
+  const script = (id: string): string => (Object.hasOwn(SCRIPT_NAMES, id) ? SCRIPT_NAMES[id]! : humanize(id));
+  /* THE DAY'S CEILING: the rule, the script, and the most it may start. */
+  const most = /^rule\.([a-z0-9][a-z0-9_-]*) starts script\.([a-z0-9_]+) at step \d+, and rules have started script\.[a-z0-9_]+ (\d+) times today, the most a day\b/u.exec(text);
+  if (most) return nameWords.dayCeiling(rule(most[1]!), script(most[2]!), Number(most[3]));
+  /* A SCRIPT THAT IS PAUSED. */
+  const paused = /^rule\.([a-z0-9][a-z0-9_-]*) starts script\.([a-z0-9_]+) at step \d+, and script\.[a-z0-9_]+ is paused\b/u.exec(text);
+  if (paused) return nameWords.scriptPaused(rule(paused[1]!), script(paused[2]!));
+  const out = text
+    .replace(/\brule\.([a-z0-9][a-z0-9_-]*)(?:'s)?/gu, (all, id: string) => `“${rule(id)}”${all.endsWith("'s") ? "'s" : ''}`)
+    .replace(/\bscript\.([a-z0-9_]+)/gu, (_, id: string) => `“${script(id)}”`)
+    .replace(/\bregister\.([a-z][a-z0-9_-]*)/gu, (_, id: string) => listName(id));
+  return out.charAt(0).toUpperCase() + out.slice(1);
 }
 
 /** The lists whose rows are named by the handle an agent types them as: a tool (`fenwick`) and a skill (`review-pr`). */

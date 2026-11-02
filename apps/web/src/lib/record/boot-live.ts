@@ -37,7 +37,7 @@ import { dropCopy } from './boot-copy.ts';
 import { forgetWith } from './forget-read.ts';
 import type { Answer, SwitcherRow } from './switcher.ts';
 import { declaredOf, noteOf } from './history-live.ts';
-import { listName, titleOf } from './names.ts';
+import { keysSaid, listName, titleOf } from './names.ts';
 import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
 import { levelsFrom, type HeldLevel } from './may.ts';
 import type { IconName } from '../ui/icons.ts';
@@ -786,7 +786,7 @@ function textOf(e: EventLine): string {
   if (e.kind === 'setup') return setupText(e);
   if (e.register !== null) {
     if (e.kind === 'create' && e.title) return `Added ${e.title}`;
-    const what = noteOf(e.register, e);
+    const what = keysSaid(noteOf(e.register, e));
     return e.title ? `${e.title}: ${what}` : sentence(what);
   }
   if (e.kind === 'suggest' && e.title) return `Asked: ${asPartOf(e.title)}`;
@@ -802,7 +802,8 @@ function textOf(e: EventLine): string {
   /* A RULE'S RUN BY THE RULE'S NAME (audit of 30 October, 7): the record notes a run "rule.weekly-review ran." */
   const ran = /^rule\.([a-z0-9][a-z0-9_-]*) ran\.?$/u.exec(e.note ?? '');
   if (ran) return `${titleOf({ id: `rule.${ran[1]!}`, kind: 'rule' })} ran`;
-  return sentence(e.note ?? e.kind.replace(/[._]/gu, ' '));
+  /* A RUN'S NOTE IN WORDS (leftovers 2 Nov, 3): "rule.payment-matches-again starts script.match_payment…" reached the bell. */
+  return sentence(e.note ? keysSaid(e.note) : e.kind.replace(/[._]/gu, ' '));
 }
 
 /** A record setting itself up is one line (`api.ts` `setupSaid`). */
