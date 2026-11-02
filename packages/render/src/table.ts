@@ -82,6 +82,12 @@ export type Column = {
    * read where some column `gives`; a share with no `room` leaves every track as declared.
    */
   room?: string | undefined;
+  /**
+   * A PHONE CARD SAYS THIS COLUMN'S NAME before its value, as it does a bare count's (`cardCells`): for a value that
+   * reads as a second name beside the title, so "shop-tallow" over "Tallow" reads "Looks like Tallow" (final polish,
+   * 2 Nov). The grid heads every column already, so a table ignores it.
+   */
+  named?: boolean | undefined;
 };
 
 export type TableRow = {

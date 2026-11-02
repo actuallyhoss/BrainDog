@@ -1,6 +1,6 @@
 {
   "pack": "sentry",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "icon": "triangle-alert",
   "title": "Sentry",
   "summary": "What is breaking in your apps, from Sentry every hour: open issues, new ones, error events and people hit, on each project's page and on Today. An issue that is new and serious, comes back or spikes rings the bell. Reads only; nothing is sent to Sentry.",
@@ -778,7 +778,8 @@
             {
               "field": "maybe",
               "label": "Looks like",
-              "width": "minmax(10ch,14ch)"
+              "width": "minmax(10ch,14ch)",
+              "named": true
             }
           ],
           "order": [

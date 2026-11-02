@@ -117,7 +117,7 @@ export function cardCells(row: TableRow, columns: readonly Column[], plan: CardP
   const mark = at(plan.mark);
   /* A SECOND FIGURE NAMES BOTH: "Was £34" and "Now £39", where the card said "£34" over "£39" (B11). */
   const twoFigures = mark !== null && isFigure(mark.value) && rest.some((c) => isFigure(c.value));
-  const named = (c: CardCell): CardCell => (isCount(c.value) || (twoFigures && isFigure(c.value)) ? { ...c, named: true } : c);
+  const named = (c: CardCell): CardCell => (c.column.named === true || isCount(c.value) || (twoFigures && isFigure(c.value)) ? { ...c, named: true } : c);
   const said = rest.map(named);
   return {
     title: at(plan.title),

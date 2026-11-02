@@ -6376,8 +6376,60 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.1.1",
       "versions": [
+        {
+          "version": "1.1.1",
+          "checksum": "5b04f06ac08b147f0cf5e745db866ea0059032f779d6ecd47baae724a3e1813b",
+          "bytes": 47110,
+          "published_at": "2026-11-02T16:20:33.352Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Sentry projects",
+              "Sentry issues"
+            ],
+            "pages": [
+              "Errors"
+            ],
+            "rules": [
+              "Ring the bell for an issue worth a look",
+              "Ask about an issue that hit many people"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "us.sentry.io",
+                "line": "CALLS OUT us.sentry.io, de.sentry.io and sentry.io · every 1h · key \"Sentry token\" to the host its keychain entry opens",
+                "key": "Sentry token"
+              }
+            ],
+            "widgets": [
+              "Errors",
+              "Errors worth a look"
+            ],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": true
+              },
+              {
+                "id": "page.project",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "A Sentry project is linked by its words, so marlow-site goes to Marlow & Co as crumb-bot goes to Crumb.gg, and one that only looks alike is suggested on the Errors page for you to pick, never linked for you. A link you changed is left alone. A project that is not linked is named as it is on Sentry, after a middle dot like the rest (Open errors · billing-worker), and its older numbers follow it. The Errors page's three figures sit in one even row.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "17bde2c6b311f9cdc4971078aa068cfe4b3a85b6591018e601598cff09d51e25",
