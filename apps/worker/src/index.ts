@@ -4793,8 +4793,12 @@ async function connectDoor(request: Request, env: Env, id: string, ctx: CallCont
   if (path === '/api/google/connect') {
     const status = (await object.google$(ctx, { op: 'status' })).status;
     const next = new URL(request.url).searchParams.get('next') ?? '/settings/ingest';
-    const back = (said: ConnectSaid): Response =>
-      new Response(null, { status: 302, headers: { location: `${origin}${slug === null ? '' : `/${slug}`}${next.startsWith('/') && !next.startsWith('//') ? next : '/settings/ingest'}${next.includes('?') ? '&' : '?'}google=${said}`, 'cache-control': 'no-store' } });
+    const page = next.startsWith('/') && !next.startsWith('//') ? next : '/settings/ingest';
+    const under = slug === null ? '' : `/${slug}`;
+    const back = (said: ConnectSaid): Response => {
+      const to = `${origin}${under}${page}${page.includes('?') ? '&' : '?'}google=${said}`;
+      return new Response(null, { status: 302, headers: { location: to, 'cache-control': 'no-store' } });
+    };
     if (!status.on) return back('off');
     if (!status.owner) return back('failed');
     return startConnect(request, { origin, clientId: (env.GOOGLE_CLIENT_ID ?? '').trim(), slug, email: status.email });
