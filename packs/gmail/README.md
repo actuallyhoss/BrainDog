@@ -23,6 +23,10 @@ subject, who it is from or to, the day, a snippet of at most 160 characters and 
   question until you answer it or reply. The 1.1.0 script in Google keeps looking at up to 60 such mails after they
   leave its 14 days, so a late reply or read still reaches BrainDog. The 1.0.0 script keeps working as it was; it just
   does not see a reply made after two weeks, so answer the question instead.
+- **The hourly script runs** (1.1.1): 1.1.0's script asked its list for something a script's list does not take, so
+  every run was refused before it read a mail, and nobody was met and nothing reached Needs you. An hour with no new
+  mail now does nothing. People and organisations are matched as the record matches them (an address in any case,
+  Gmail's dots and +tags, a known organisation's subdomains), so meeting somebody already there never stops the run.
 - A **Mail** page, and two Today widgets: **Mail** (need a reply, unread) and **Waiting on your reply**. Both stay off
   the board until the first mail arrives; until then the Connect tile on the add-on page is where to start.
 

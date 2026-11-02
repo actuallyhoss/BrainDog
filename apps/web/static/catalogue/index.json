@@ -1743,8 +1743,55 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.1.1",
       "versions": [
+        {
+          "version": "1.1.1",
+          "checksum": "b17ed02b5549e2c9e06a68f08757e8d5649742cbb647fe7944ac21f6c432f0b2",
+          "bytes": 53105,
+          "published_at": "2026-11-02T23:16:47.807Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Mail"
+            ],
+            "pages": [
+              "Mail"
+            ],
+            "rules": [
+              "Ask about mail waiting on your reply",
+              "Ask about a mail that looks like a bill",
+              "Ask about a mail that looks like a receipt",
+              "Ask about a mail from a person with a date in it",
+              "Take a mail you replied to off Waiting on your reply",
+              "Take a mail that needs no reply off Waiting on your reply",
+              "Clear a mail you said is not a bill",
+              "Clear a mail you said is not a receipt"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Mail",
+              "Waiting on your reply"
+            ],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": true
+              },
+              {
+                "id": "register.organisations",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "The hourly script that meets the people you mail now runs: 1.1.0 was refused on every run, so no mail was looked at, nobody was met and no question reached Needs you. An hour with no new mail does nothing.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "63e2cabdcd28f3e61bfcd53888867cbabf161a04947b01bbd4fbd4d45c66c264",
