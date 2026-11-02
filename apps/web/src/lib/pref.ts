@@ -277,11 +277,17 @@ export function write(change: Pref & Sync): Pref & Sync {
   const next = { ...read(), ...change };
   for (const [key, value] of Object.entries(next)) if (value === undefined) delete (next as Record<string, unknown>)[key];
 
-  if (typeof document !== 'undefined')
+  if (typeof document !== 'undefined') {
     /* `SameSite=Lax` AND NO `Secure`, deliberately: this is read by the page's own shell and never
        sent anywhere that matters, and a `Secure` cookie is silently dropped on `http://localhost`,
        which is where a self-host is first opened. */
-    document.cookie = `${NAME}=${encodeURIComponent(JSON.stringify(next))}; path=/; max-age=${YEAR}; samesite=lax`;
+    /* ON brain.dog THE COOKIE IS THE WHOLE DOMAIN'S (2 Nov), so the site at brain.dog wears the scheme the person set
+       in the app. The host-only copy an older build wrote is taken away first, so the shell never reads two. */
+    const host = typeof location === 'undefined' ? '' : location.hostname;
+    const shared = host === 'brain.dog' || host.endsWith('.brain.dog');
+    if (shared) document.cookie = `${NAME}=; path=/; max-age=0; samesite=lax`;
+    document.cookie = `${NAME}=${encodeURIComponent(JSON.stringify(next))}; path=/; max-age=${YEAR}; samesite=lax${shared ? '; domain=.brain.dog' : ''}`;
+  }
 
   /* NO EVENT ANY MORE. The shell once listened for every write to redraw its shape; it reads the shape from
      `nav-prefs.svelte.ts` now, whose field changes when the shape is set, so there is nobody left to tell. */

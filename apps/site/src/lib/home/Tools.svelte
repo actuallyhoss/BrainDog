@@ -48,7 +48,7 @@
     </div>
 
     <div class="tiles">
-      <section class="tile span-5 reveal" aria-labelledby="brief-title">
+      <section class="tile span-5 reveal desk-only" aria-labelledby="brief-title">
         <h3 class="tile-head">
           <span class="well"><AgentMark id="claude" size={16} /></span>
           <span class="tile-title" id="brief-title">{t.brief}</span>
@@ -60,7 +60,7 @@
         </div>
       </section>
 
-      <section class="tile span-7 reveal" aria-labelledby="notes-title">
+      <section class="tile span-7 reveal desk-only" aria-labelledby="notes-title">
         <h3 class="tile-head">
           <span class="well"><Icon name="message" /></span>
           <span class="tile-title" id="notes-title">{t.notes}</span>
@@ -289,6 +289,14 @@
     }
 
     .bar {
+      display: none;
+    }
+  }
+
+  /* ON A PHONE THE BRIEF AND THE NOTES STEP ASIDE (2 Nov): the home page ran 8,237px at 390 once every section showed
+     the real product; Slash and the connect box carry the point there, and a desk shows all four. */
+  @media (width < 700px) {
+    .desk-only {
       display: none;
     }
   }
