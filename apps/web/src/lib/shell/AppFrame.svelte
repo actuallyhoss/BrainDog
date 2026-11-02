@@ -433,6 +433,14 @@
     return () => mq.removeEventListener('change', set);
   });
 
+  /* THE BANNERS, HANDED TO THE PAGE'S HEAD for a phone to draw under its bar (`frame.banners`, collab pass 2). */
+  $effect(() => {
+    frame.banners = shellBanners;
+    return () => {
+      frame.banners = null;
+    };
+  });
+
   /* AND WHETHER THE SIDEBAR CAN STAND BESIDE THE WORK: from 1,280 up. Narrower it slides in from the left over the page. */
   let deskWide = $state(typeof matchMedia === 'function' && matchMedia('(width >= 1280px)').matches);
   $effect(() => {
@@ -1498,6 +1506,22 @@
   }
 </script>
 
+<!-- THE SHELL'S BANNERS, as one snippet the page's head can draw on a phone (`frame.banners`, collab pass 2). -->
+{#snippet shellBanners()}
+  <!-- SEEING AS SOMEBODY (§3.3): the banner is its own chunk, since only an owner or an Admin trying it loads it. -->
+  {#if seeingAs() !== null}
+    {#await import('$lib/sharing/SeeAsBanner.svelte') then { default: SeeAsBanner }}<SeeAsBanner />{/await}
+  {/if}
+  <LapseBanner shell={data} />
+  <!-- WHAT WAS SHARED WITH A GUEST, ONCE A SHARE (§3.4). Its own chunk: only somebody a share let in loads it. -->
+  {#if data.me.grant !== undefined && !data.me.owner}
+    {#await import('$lib/sharing/Welcome.svelte') then { default: Welcome }}<Welcome shell={data} />{/await}
+  {:else if !data.me.owner && data.me.lists === null && data.me.level !== 'owner' && page.route.id === '/'}
+    <!-- AND WHAT A ROLE LETS A NEW COLLEAGUE DO, once a role on this device (collab pass, 2 Nov). Its own chunk too. -->
+    {#await import('$lib/sharing/RoleWelcome.svelte') then { default: RoleWelcome }}<RoleWelcome shell={data} />{/await}
+  {/if}
+{/snippet}
+
 <svelte:window {onkeydown} onkeydowncapture={ontyped} />
 <svelte:document onpointerover={(e) => readAhead(e, 60)} ontouchstart={(e) => readAhead(e, 0)} onfocusin={(e) => readAhead(e, 0)} />
 
@@ -1621,18 +1645,8 @@
         <!-- OFFLINE, CALMLY, as one line over what the local copy drew: what it shows, and that nothing saves until back. -->
         <p class="offline-line" role="status">{offlineWords.lastSaw} {offlineWords.cannotSave}</p>
       {/if}
-      <!-- SEEING AS SOMEBODY (§3.3): the banner is its own chunk, since only an owner or an Admin trying it loads it. -->
-      {#if seeingAs() !== null}
-        {#await import('$lib/sharing/SeeAsBanner.svelte') then { default: SeeAsBanner }}<SeeAsBanner />{/await}
-      {/if}
-      <LapseBanner shell={data} />
-      <!-- WHAT WAS SHARED WITH A GUEST, ONCE A SHARE (§3.4). Its own chunk: only somebody a share let in loads it. -->
-      {#if data.me.grant !== undefined && !data.me.owner}
-        {#await import('$lib/sharing/Welcome.svelte') then { default: Welcome }}<Welcome shell={data} />{/await}
-      {:else if !data.me.owner && data.me.lists === null && data.me.level !== 'owner' && page.route.id === '/'}
-        <!-- AND WHAT A ROLE LETS A NEW COLLEAGUE DO, once a role on this device (collab pass, 2 Nov). Its own chunk too. -->
-        {#await import('$lib/sharing/RoleWelcome.svelte') then { default: RoleWelcome }}<RoleWelcome shell={data} />{/await}
-      {/if}
+      <!-- THE BANNERS, here on a desk and under the page's own bar on a phone (`frame.banners`, collab pass 2). -->
+      {#if !(narrow && frame.heads > 0)}{@render shellBanners()}{/if}
       {#if phoneMenu}
         <!-- ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE: every place, the projects, every list and Settings. -->
         {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} lit={sideLit} working={workingOn} version={live.version} pen={sidePen} placed={listsPlaced} />{/if}

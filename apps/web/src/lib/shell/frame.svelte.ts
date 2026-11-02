@@ -4,6 +4,7 @@
  * own name (`PageHead.svelte`), and the sidebar says what each list declares once it has read it (`SideBar.svelte`).
  */
 import { MediaQuery } from 'svelte/reactivity';
+import type { Snippet } from 'svelte';
 import type { Cursor } from '@braindog/client';
 import type { NewsItem } from '../record/schema.ts';
 import type { SwitcherRow } from '../record/switcher.ts';
@@ -48,6 +49,14 @@ export const frame = $state({
   crumbed: false,
   /** What each list declares about where it belongs, by id, as the sidebar learnt it. */
   facts: {} as Readonly<Record<string, ListFacts>>,
+  /**
+   * THE SHELL'S BANNERS (seeing as somebody, a lapse, a guest's welcome, a new colleague's role line), handed to the page's
+   * head so a phone draws them UNDER its bar and not over it (collab pass 2, 2 Nov): drawn by the shell above the page,
+   * they sat above the bar the page itself draws, and the bar was pushed half a screen down.
+   */
+  banners: null as Snippet | null,
+  /** How many page heads are drawn now: with one on a phone, it draws the banners and the shell does not. */
+  heads: 0,
 });
 
 /** Below 900px a page's head draws the phone's bar, which says where you are at its start. */

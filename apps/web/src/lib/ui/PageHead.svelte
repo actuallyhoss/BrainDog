@@ -69,7 +69,7 @@
   import { page } from '$app/state';
   import type { Noun } from '$lib/define.svelte.ts';
   import type { IconName } from './icons.ts';
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
 
   let {
     title,
@@ -237,6 +237,11 @@
 
   /* ON A DESK WITH THE CRUMB IN THE BAR, the head draws no way back of its own. */
   const crumbed = $derived(frame.crumbed && !narrow.current);
+  /* A HEAD IS DRAWN, so on a phone the banners are this head's to draw under its bar and not the shell's (collab pass 2). */
+  $effect(() => {
+    untrack(() => (frame.heads += 1));
+    return () => untrack(() => (frame.heads -= 1));
+  });
   /* WHERE YOU ARE, IN THE PHONE'S BAR: the shell's lit row, else this page's name. */
   const where = $derived(frame.here || title);
 
@@ -306,6 +311,9 @@
     <YouMenu phone />
   </span>
 </div>
+<!-- THE SHELL'S BANNERS, UNDER THE BAR ON A PHONE (collab pass 2, 2 Nov): drawn by the shell over the page, they sat above
+     this bar and pushed it half a screen down. On a desk the shell draws them over the work, as before. -->
+{#if narrow.current && frame.banners}<div class="head-banners">{@render frame.banners()}</div>{/if}
 {#if crumb && !headless && !tiled && !crumbed && !titled}
   <!-- Over the name and scrolling with the page: the row that stays is the name's. -->
   {#if back}
