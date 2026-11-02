@@ -220,7 +220,7 @@ const CORE_ROUTES: readonly Route[] = [
   /* THE WHOLE FIRST RUN AS ONE CALL. The browser ran it as a script of a dozen calls, so a closed tab left a
      record part made. ADMIN as `installPack` is: it installs add-ons, and only the owner in a browser may. */
   { name: 'setup', group: 'ADMIN', writes: true, what: 'Make this BrainDog from what its owner accepted, in one call: the add-ons in order, then their name, their words, the settings and what they asked to start with. It answers what was done and what was not, and asked with again it writes only what is missing.' },
-  { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved, with the calls-out lines it asks for. A browser session only.' },
+  { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved, with the calls-out lines it asks for. In the app, or by your agents while they act without asking.' },
   { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
   { name: 'disablePack', group: 'ADMIN', writes: true, what: 'Turn a pack off. It stays listed, its rows stay, and what leans on it is named first.' },
   { name: 'enablePack', group: 'ADMIN', writes: true, what: 'Turn a pack back on, over the rows it kept.' },

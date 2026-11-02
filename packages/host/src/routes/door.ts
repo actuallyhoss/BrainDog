@@ -18,6 +18,6 @@ export const ROUTES: readonly Route[] = [
     takes: {} },
   { name: 'doorSigns', group: 'READ+', writes: false, what: 'How many sessions connected, were given the tools and made a call, over the last 7 days unless days says otherwise. It changes nothing.',
     takes: { days: 'integer' } },
-  { name: 'doorHealth', group: 'ADMIN', writes: false, what: 'Every app, machine and key that can act on this BrainDog, the build each runs and when it last used a tool, and whether the agent door is working. A browser session only.',
+  { name: 'doorHealth', group: 'ADMIN', writes: false, what: 'Every app, machine and key that can act on this BrainDog, the build each runs and when it last used a tool, and whether the agent door is working. In the app, or by your agents while they act without asking.',
     takes: {} },
 ];

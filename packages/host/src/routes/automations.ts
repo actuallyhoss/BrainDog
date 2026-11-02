@@ -23,6 +23,6 @@ export const ROUTES: readonly Route[] = [
   { name: 'todayReminders', group: 'READ+', writes: false, what: 'The reminder lines automations have put on Today in the last two days, newest first, held to the lists the caller reads.' },
   { name: 'automationVersions', group: 'READ+', writes: false, what: 'One automation\'s versions, newest first, each with its body, when it was installed and by whom.',
     takes: { rule: 'text' } },
-  { name: 'setAutomation', group: 'ADMIN', writes: true, what: 'Switch one automation on or off, as a new version landed at once. A browser session only.' },
-  { name: 'retryRun', group: 'ADMIN', writes: true, what: 'Start a finished run again, under the automation as installed now, with the same trigger. A browser session only.' },
+  { name: 'setAutomation', group: 'ADMIN', writes: true, what: 'Switch one automation on or off, as a new version landed at once. In the app, or by your agents while they act without asking.' },
+  { name: 'retryRun', group: 'ADMIN', writes: true, what: 'Start a finished run again, under the automation as installed now, with the same trigger. In the app, or by your agents while they act without asking.' },
 ];
