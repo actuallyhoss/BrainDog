@@ -1050,10 +1050,14 @@ export function forecastNext(model: ForecastModel, shown: Scenario, plan: Pick<F
   for (const s of listed) if (n < plan.drops.length && s.of !== undefined && s.of !== '' && s.delta < 0 && s.day > model.today) numbered.set(s, ++n);
   const kept = listed.filter((s, i) => i < most || numbered.has(s));
   const said = forecastEveryday(model, shown);
+  /* ONE WAY FOR THE LIST (polish5's rule for a set of exact amounts): every line to the penny where any line has pence,
+     every line whole where none does. "−$45" over "−$208.25" read as two kinds of figure in one column. */
+  const figures = kept.map((s) => forecastFigure(model, s.delta));
+  const pence = figures.some((f) => !WHOLE_PENCE.test(f));
   return {
     rows: [
       ...(said ? [{ everyday: true as const, said }] : []),
-      ...kept.map((s) => ({ n: numbered.get(s) ?? null, dir: s.delta > 0 ? ('in' as const) : ('out' as const), day: shortDay(s.day, model.today), label: s.label, amount: `${s.delta > 0 ? '+' : ''}${forecastFigure(model, s.delta).replace(WHOLE_PENCE, '')}` })),
+      ...kept.map((s, i) => ({ n: numbered.get(s) ?? null, dir: s.delta > 0 ? ('in' as const) : ('out' as const), day: shortDay(s.day, model.today), label: s.label, amount: `${s.delta > 0 ? '+' : ''}${pence ? figures[i]! : figures[i]!.replace(WHOLE_PENCE, '')}` })),
     ],
     more: listed.length - kept.length,
   };

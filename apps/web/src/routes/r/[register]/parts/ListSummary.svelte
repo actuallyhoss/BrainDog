@@ -30,7 +30,7 @@
   £119,124", "In £49,670") at 20, one 6px stacked bar (late, open, part paid, paid) and the late line under it.
 -->
 <script lang="ts">
-  import { dayShort } from 'braindog-render';
+  import { dayShort, exponentOf } from 'braindog-render';
   import { labelOf } from '$lib/record/api.ts';
   import { wayOfValue } from '$lib/record/money-way.ts';
   import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
@@ -88,7 +88,12 @@
   /* The list says which way its amounts go, so the tile is a side per way and never their sum. */
   const sided = $derived(figured?.by !== undefined);
   const whole = $derived(fig !== null && wholeMoney(decl, entries).has(fig.field.id));
-  const said = (f: Figured, n: number): string => figureSaid(f, n, whole);
+  /* A TILE OF TOTALS SAYS THEM WHOLE (polish5's rule for a set of totals): "Money in $51,892.48" over the Ledger read
+     against "Received $8,581" on its page. Where any sum on the tile is a thousand or more, every figure on it is whole;
+     under that the column's own rule holds. */
+  const unit = $derived(fig?.currency ? 10 ** exponentOf(fig.currency) : 1);
+  const big = $derived.by(() => fig?.currency != null && Math.max(Math.abs(fig.total), ...sides.map((x) => Math.abs(x.total ?? 0))) >= 1000 * unit);
+  const said = (f: Figured, n: number): string => (big ? figureSaid(f, Math.round(n / unit) * unit, true) : figureSaid(f, n, whole));
   /** A field's name in the plural ("writes", "hours"), by its last letter: not "status", not "process". */
   const plural = (what: string): boolean => /[^su]s$/u.test(what) && !what.includes(' ');
 
