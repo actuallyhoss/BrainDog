@@ -20,7 +20,7 @@
  * is an argument rather than a read of `Date.now()`, so a test can say what day it is.
  */
 
-import { day, relative, since } from 'braindog-render';
+import { day, relative, since, spoken } from 'braindog-render';
 import type { QueueQuestion } from '@braindog/kernel';
 import { createClient } from '@braindog/client';
 import { everyGovernance, governancePage, type Governor, type Read } from '../../lib/record/governance.ts';
@@ -30,6 +30,7 @@ import type { PageBlock } from '../../lib/record/schema.ts';
 import { emptyHidden, says } from '../../lib/page/home.ts';
 import { alikeOf } from '../../lib/page/alike.ts';
 import { copy } from '../../lib/copy.ts';
+import { askOf } from '../../lib/decide/ask.ts';
 import { ageDays, WORDS as LEAD } from './lead.ts';
 import { words } from './words.ts';
 import { othersLine, WORDS as DECIDER_WORDS, type Decided } from './[id]/decider.ts';
@@ -493,6 +494,8 @@ export function decidedOf(b: Answered, now: number): LiveBlock {
     if (field === 'at') return typeof v === 'string' ? since(v, now) : '';
     if (field === 'answer_label') return typeof v === 'string' && v !== '' ? moneyInText(v) : answerWord(f.answer);
     if (field === 'answer') return answerWord(v);
+    /* THE QUESTION ALONE, as its page and its card title it (`ask.ts`). */
+    if (field === 'question') return typeof v === 'string' ? askOf(spoken(moneyInText(v))).ask : '';
     return typeof v === 'string' ? moneyInText(v) : v === null || v === undefined ? '' : String(v);
   };
   const rows = got.flatMap((r) => {
@@ -507,7 +510,8 @@ export function decidedOf(b: Answered, now: number): LiveBlock {
 }
 
 /* `accept` and `reject` are what a question with no options of its own was answered with. */
-const answerWord = (v: unknown): string => (v === 'accept' ? copy.acceptIt : v === 'reject' ? copy.rejectIt : typeof v === 'string' ? v : '');
+/* SAID AS THE QUESTION'S OWN PAGE SAYS IT ("You accepted this", "You declined this"), and never the record's Reject. */
+const answerWord = (v: unknown): string => (v === 'accept' ? words.accepted : v === 'reject' ? words.declined : typeof v === 'string' ? v : '');
 
 /**
  * ONE ANSWERED BLOCK AS THE PAGE DRAWS IT. What was put off is a queue like the open one, and is read as one; what was

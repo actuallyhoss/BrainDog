@@ -11,6 +11,9 @@
  */
 
 export const words = {
+  /** A decided question's answer in the Decided list, as its page says it. */
+  accepted: 'Accepted',
+  declined: 'Declined',
   /* ── the page ── */
 
   /** The page's calm line, lifted into the head while nothing waits. */
