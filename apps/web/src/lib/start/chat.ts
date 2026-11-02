@@ -754,6 +754,8 @@ function kindOfEntry(r: Entry): { one: string; many: string } | null {
      partner", by the word they used (`householdPeople`), and family, a friend or a landlord by the role. */
   const note = String(r.fields['note'] ?? '').trim().toLowerCase();
   if (r.register === 'people' && HOME_ROLES.has(role)) return { one: note !== '' && note.length <= 20 ? `your ${note}` : (HOME_ROLES.get(role) ?? 'family'), many: role === 'family' ? 'family' : 'people in your life' };
+  /* AND SOMEBODY PAID FOR THE WORK, BY THE WORK ("Kai and Rosa as your editors"), where the words named it. */
+  if (r.register === 'people' && role === 'contractor' && note !== '' && note.length <= 20) return { one: `your ${note}`, many: `your ${note}s` };
   if (r.register === 'people') return { one: 'someone you work with', many: 'people you work with' };
   if (r.register === 'organisations') return { one: 'an organisation', many: 'organisations' };
   if (r.register === 'things') return { one: 'a project', many: 'projects' };

@@ -131,7 +131,8 @@ const either = (words: string): string => words.split('|').map((w) => `[${w.char
 /** The list a project a sentence names is filed in, Projects', which every other list leans on (`propose.ts` reads the record's name from it). */
 export const PROJECTS: Row['register'] = 'things';
 
-type NameRule = { at: RegExp; register: 'things' | 'people'; role?: string };
+/** `word`: the work they are paid for is kept as the person's note ("Editor"), so the tile and the line back say it. */
+type NameRule = { at: RegExp; register: 'things' | 'people'; role?: string; word?: true };
 
 /* In order: a rule that takes a name keeps it from the rules after it. */
 const NAME_RULES: readonly NameRule[] = [
@@ -141,11 +142,17 @@ const NAME_RULES: readonly NameRule[] = [
   { at: new RegExp(`\\b(?:${either('accountant')})s?\\s+(?:(?:called|named)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'accountant' },
   /* THE PEOPLE THEY PAY TO DO THE WORK, BY THE WORK (onboarding6, the creator walk: "my editors Kai and Rosa" were never
      drafted): an editor, an assistant, a designer they hire is somebody they contract. */
-  { at: new RegExp(`\\b(?:${either('editor|video editor|assistant|virtual assistant|moderator|designer|developer|bookkeeper|cleaner|nanny|babysitter')})s?\\s+(?:(?:called|named|are|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'contractor' },
+  { at: new RegExp(`\\b(?:${either('editor|video editor|assistant|virtual assistant|moderator|designer|developer|bookkeeper|cleaner|nanny|babysitter')})s?\\s+(?:(?:called|named|are|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'contractor', word: true },
   { at: new RegExp(`\\b(?:${either('partner|cofounder|co-founder|collaborator')})s?\\s+(?:(?:called|named|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'collaborator' },
   { at: new RegExp(`\\b(?:${either('run|runs|running|own|owns|build|builds|building|make|makes|making|started|founded')}|working on)\\s+${LIST}`, 'gu'), register: 'things' },
   { at: new RegExp(`\\b(?:called|named)\\s+${LIST}`, 'gu'), register: 'things' },
 ];
+
+/** The work word a rule matched on, as a note: "editors Kai and Rosa" is "Editor". */
+const workWord = (matched: string): string => {
+  const w = (/^\s*([\p{L} ]+?)s?\s+(?:called|named|are|is\s+)?\p{Lu}/u.exec(matched)?.[1] ?? '').trim().replace(/\s+(?:called|named|are|is)$/u, '');
+  return w === '' ? '' : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+};
 
 const NOT_A_NAME = new Set(['i', 'we', 'my', 'our', 'the', 'a', 'an', 'and', 'but', 'so']);
 const CODES = new Set(Intl.supportedValuesOf('currency'));
@@ -259,7 +266,7 @@ export function shape(sentence: string, today: string = recordToday(), offers: r
           rule.register === 'things'
             ? /* `building` is the one status a named, current project can be given without asking. */
               { register: 'things', fields: { name, lane: 'building' }, missing: [] }
-            : { register: 'people', fields: { name, ...(rule.role ? { role: rule.role } : {}) }, missing: [] },
+            : { register: 'people', fields: { name, ...(rule.role ? { role: rule.role } : {}), ...(rule.word ? { note: workWord(m[0]) } : {}) }, missing: [] },
         );
       }
     }

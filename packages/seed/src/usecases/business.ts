@@ -62,8 +62,10 @@ export const BUSINESS = {
      1.7.0 is live. Still unreleased (commit 63423720 holds 1.7.0), it takes batch 88's block with no version of its
      own: Home draws Gone quiet, what stopped reporting, straight under What you have (founder-home-quiet-88), a sixth
      tile on a page held to six. A block added, nothing taken away.
-     1.7.2: the card's summary is one short line. Words only, so a patch step. */
-  version: '1.7.2',
+     1.7.2: the card's summary is one short line. Words only, so a patch step.
+     1.7.3 (onboarding6): a streamer, a YouTuber or a creator paid by sponsors is heard as a small business (`signals`).
+     Signals only, nothing a record holds, so a patch step; 1.7.2 is published. */
+  version: '1.7.3',
   title: 'Small business',
   summary: 'Money in and out, clients and subscriptions.',
   author: 'BrainDog',

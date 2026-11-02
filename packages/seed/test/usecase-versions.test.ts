@@ -2426,6 +2426,14 @@ const DECLARED: Record<string, Version> = {
   },
   /** SHOP IS NEW (use case 6 of the vision): its first entry, Orders, Products and the Orders page. Unreleased, so the
       Orders section, an order's total and the month's count fold into it rather than a 1.0.1. */
+  'business@1.7.3': {
+    holds: `
+      page.home-business setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with
+      setting.voice_nothing_due
+    `,
+    declares: 'b4eb9cf32455cdd4',
+    history: ['A streamer or a creator paid by sponsors is heard as a small business, so `page.home-business` is what they open on; signals only, no id added or taken away -> b4eb9cf32455cdd4'],
+  },
   'shop@1.0.0': {
     holds: `
       metric.orders-30d metric.orders-due-7d metric.orders-owed page.orders register.orders register.products setting.label_orders

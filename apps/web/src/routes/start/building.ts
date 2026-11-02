@@ -228,7 +228,7 @@ export function entryOf(row: Proposal['rows'][number]): Entry {
   }
   if (row.register === PEOPLE) {
     /* A HOUSEHOLD'S PERSON IS SAID BY THE WORD THEY USED ("Sam, partner"), kept as the note (`householdPeople`). */
-    const own = f.role === 'family' || f.role === 'friend' || f.role === 'landlord' || f.role === 'other' ? (typeof f.note === 'string' && f.note.length <= 20 ? f.note : '') : '';
+    const own = f.role === 'family' || f.role === 'friend' || f.role === 'landlord' || f.role === 'other' || f.role === 'contractor' ? (typeof f.note === 'string' && f.note.length <= 20 ? f.note : '') : '';
     const role = own !== '' ? own : typeof f.role === 'string' ? capital(f.role) : '';
     return { key: `${row.register}:${title}`, title, kind: 'person', detail: role, amount: null, due: null };
   }
