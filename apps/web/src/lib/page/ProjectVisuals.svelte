@@ -483,7 +483,7 @@
   }
 
   .bar[data-before] > span {
-    background: color-mix(in oklab, var(--ph-fill, var(--ph)) 45%, var(--tile));
+    background: var(--ph-2, color-mix(in oklab, var(--ph-fill, var(--ph)) 45%, var(--tile)));
   }
 
   .m-lines {
@@ -551,8 +551,10 @@
     background: var(--ph-fill, var(--ph));
   }
 
+  /* A MONTH ONLY PARTLY KEPT IS THE PROJECT'S SECOND TONE (domains lane, 2 Nov): at 45% opacity it took the tile's colour
+     through it, an olive bar under a gold project in the dark and a slate one under a blue. */
   .col[data-partial='true'] {
-    opacity: 0.45;
+    background: var(--ph-2, color-mix(in oklab, var(--ph-fill, var(--ph)) 45%, var(--tile)));
   }
 
   .mval {

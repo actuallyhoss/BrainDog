@@ -127,6 +127,35 @@
     --chart-track: var(--tile-2);
     --chart-other: var(--cat-slate);
     --chart-late: var(--red);
+  }
+
+  /* A PROJECT'S SECOND AND THIRD TONES, `--ph-2` AND `--ph-3` (domains lane, 2 Nov; dataviz and better-colors), on any
+     element that carries a project's slot (`slotStyle` writes `--ph-fill` inline), so they are worked out from that slot.
+     They were its colour mixed into the tile, which in the dark mixed a gold or a lime toward the warm black and drew
+     brown and olive, and a blue toward slate. In the light they step from the slot's fill toward its own tint in OKLCH,
+     so the hue holds and a yellow stays a yellow, the third still 2:1 on white (`validate_palette.js --ordinal`); in the dark they step down in lightness at the fill's own hue and
+     chroma, so they stay as coloured as the first tone and never meet the tile. A project's page draws its second and
+     third chart series in them, and its bars and segments of what has passed. */
+  [style*='--ph-fill'] {
+    --ph-2: color-mix(in oklch, var(--ph-fill) 78%, var(--ph-tint));
+    --ph-3: color-mix(in oklch, var(--ph-fill) 56%, var(--ph-tint));
+  }
+
+  @supports (color: oklch(from red l c h)) {
+    html[data-scheme='dark'] [style*='--ph-fill'] {
+      --ph-2: oklch(from var(--ph-fill) calc(l * 0.84) c h);
+      --ph-3: oklch(from var(--ph-fill) calc(l * 0.7) calc(c * 0.92) h);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      html:not([data-scheme='light']) [style*='--ph-fill'] {
+        --ph-2: oklch(from var(--ph-fill) calc(l * 0.84) c h);
+        --ph-3: oklch(from var(--ph-fill) calc(l * 0.7) calc(c * 0.92) h);
+      }
+    }
+  }
+
+  :root {
 
     /* A tile's padding: 20, 24 on the lead tile (`--tile-pad-lead`), 16 below 640px (frame 3.3). */
     --tile-pad: 20px;

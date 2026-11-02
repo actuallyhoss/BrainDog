@@ -742,7 +742,7 @@
   }
 
   .s-bars rect {
-    fill: color-mix(in oklab, var(--ph-fill, var(--ph)) 40%, var(--tile));
+    fill: var(--ph-2, color-mix(in oklab, var(--ph-fill, var(--ph)) 40%, var(--tile)));
   }
 
   .s-bars rect[data-last] {
@@ -1437,7 +1437,7 @@
     position: absolute;
     inset-block: 0;
     border-radius: 5px;
-    background: color-mix(in oklab, var(--ph-fill, var(--ph, var(--ink))) 55%, var(--tile));
+    background: var(--ph-2, color-mix(in oklab, var(--ph-fill, var(--ph, var(--ink))) 55%, var(--tile)));
   }
 
   .d-seg[data-live] {

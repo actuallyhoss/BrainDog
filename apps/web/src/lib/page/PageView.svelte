@@ -373,7 +373,7 @@
     const d = REGISTERS[about.register];
     const hue = d ? projectHue(d as Parameters<typeof projectHue>[0], shapeRow) : null;
     const more = moreSaid(laidFrom);
-    return `${slotStyle(hue)};--chart-1:var(--ph);--chart-2:color-mix(in oklab, var(--ph) 55%, var(--tile));--chart-3:color-mix(in oklab, var(--ph) 28%, var(--tile))${more ? `;--more-said:${JSON.stringify(more)}` : ''}`;
+    return `${slotStyle(hue)};--chart-1:var(--ph-fill, var(--ph));--chart-2:var(--ph-2);--chart-3:var(--ph-3)${more ? `;--more-said:${JSON.stringify(more)}` : ''}`;
   });
   /* WHAT THE PAGE IS ABOUT, SHARED WITH PEOPLE: a project's page shares the project, everything
      that names it; a page about any other row shares that row. */
