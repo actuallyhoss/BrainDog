@@ -554,7 +554,7 @@
   }
 
   .bcard[data-picked] {
-    box-shadow: 0 0 0 2px var(--red-fill);
+    box-shadow: 0 0 0 2px var(--on);
   }
 
   /* THE CARET'S RING ONLY WHILE THE KEYBOARD IS ON THE BOARD. At rest it sat round the first card, which nobody chose,

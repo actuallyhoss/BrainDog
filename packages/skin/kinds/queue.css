@@ -261,8 +261,8 @@
   /* THE ONE BEING ANSWERED (`QueueAnswer.svelte`'s `data-on`) is the accent's tint with an accent edge: chosen, in the
      colour that means chosen. */
   .queue-options:has(.queue-because) > .queue-option:has(> .queue-act[data-on]) {
-    background: var(--red-tint);
-    box-shadow: inset 0 0 0 1px var(--red-fill);
+    background: var(--chosen);
+    box-shadow: inset 0 0 0 1px var(--on);
   }
 
   .queue-options:has(.queue-because) .queue-visual {
@@ -359,13 +359,13 @@
      reads it). A marked answer on a card the other button cannot undo tomorrow reads as an endorsement, so there its
      button is drawn as every other answer is, and its word goes with the mark, for the eye and a screen reader alike. */
   .queue-card:not(:has(.queue-cost[data-cost='undo'])) .queue-options:not(:has(.queue-because)) .queue-option[data-recommended] > .queue-act:not([data-on]) {
-    background: var(--red-tint);
-    color: var(--red);
+    background: var(--chosen);
+    color: var(--link);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .queue-card:not(:has(.queue-cost[data-cost='undo'])) .queue-options:not(:has(.queue-because)) .queue-option[data-recommended] > .queue-act:not([data-on]):hover {
-      background: var(--red-tint-2);
+      background: var(--chosen-2);
     }
   }
 
@@ -491,21 +491,21 @@
     border: 1.5px solid var(--switch-off);
     border-radius: 4px;
     background: transparent;
-    color: var(--on-red);
+    color: var(--on-mark);
     font-size: var(--fs-cap);
     cursor: pointer;
   }
 
   .queue-select[aria-checked='true'] {
-    background: var(--red-fill);
-    border-color: var(--red-fill);
+    background: var(--on);
+    border-color: var(--on);
   }
 
   /* A CHOSEN QUESTION IS THE RAISED SURFACE the cursor band uses, and nothing louder: the box says it in shape. */
   .queue-card[data-selected]:not([data-focused]) {
     border-radius: var(--r-ctl);
-    background: var(--red-tint);
-    box-shadow: 0 0 0 var(--sp-2) var(--red-tint);
+    background: var(--chosen);
+    box-shadow: 0 0 0 var(--sp-2) var(--chosen);
   }
 
   .queue-more,

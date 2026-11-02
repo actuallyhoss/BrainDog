@@ -762,7 +762,7 @@
   }
 
   .kind[aria-pressed='true'] {
-    background: var(--red-tint);
+    background: var(--chosen);
   }
 
   @media (hover: hover) and (pointer: fine) {

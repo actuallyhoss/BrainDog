@@ -200,7 +200,7 @@
     margin-inline: 3px;
     border: 1.5px solid var(--ink-2);
     border-radius: var(--r-xs);
-    color: var(--on-red);
+    color: var(--on-mark);
   }
 
   .mi-box :global(svg) {
@@ -209,8 +209,8 @@
   }
 
   .mi-box[data-on] {
-    background: var(--red-fill);
-    border-color: var(--red-fill);
+    background: var(--on);
+    border-color: var(--on);
   }
 
   /* THE MENU IS A KEYBOARD CHEAT SHEET ON A DEVICE WITH NO KEYBOARD: under a thumb the key caps go. */

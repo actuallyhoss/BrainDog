@@ -1090,7 +1090,7 @@
     background: none;
     border: 1.5px solid var(--ink-2);
     border-radius: var(--r-xs);
-    color: var(--on-red);
+    color: var(--on-mark);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -1110,8 +1110,8 @@
   }
 
   .pick[data-on] {
-    background: var(--red-fill);
-    border-color: var(--red-fill);
+    background: var(--on);
+    border-color: var(--on);
   }
 
   .pick-some {

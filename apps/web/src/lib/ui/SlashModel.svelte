@@ -297,7 +297,7 @@
 
   /* THE PICKED KEY IS THE "ON" SURFACE, AND HOVER ONLY WHERE THERE IS ONE: a phone keeps `:hover` on the last row tapped. */
   .key[aria-pressed='true'] {
-    background: var(--red-tint);
+    background: var(--chosen);
   }
 
   @media (hover: hover) and (pointer: fine) {

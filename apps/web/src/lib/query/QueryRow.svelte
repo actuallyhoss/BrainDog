@@ -218,7 +218,7 @@
   }
 
   .q-pick[data-on] {
-    background: var(--red-tint);
+    background: var(--chosen);
     color: var(--ink);
   }
 

@@ -1397,7 +1397,7 @@
 
   /* THE CHOICES ARE `Button`'S QUIET PILLS, as every other choice on the screen is; the chosen one on the selected fill. */
   .chips :global(.btn[aria-pressed='true']) {
-    background: var(--red-tint);
+    background: var(--chosen);
     color: var(--ink);
     font-weight: 600;
   }

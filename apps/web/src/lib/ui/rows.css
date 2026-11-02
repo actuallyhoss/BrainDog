@@ -68,7 +68,7 @@
      row are the wash. A washed row's hairline and the one under it step aside, so the fill is one clean shape. */
   .line:is([aria-selected='true'], [data-selected]),
   .ledger > li:is([aria-selected='true'], [data-selected]) > .line {
-    background: var(--row-selected, var(--red-tint));
+    background: var(--row-selected, var(--chosen));
   }
 
   .line[data-cursor],

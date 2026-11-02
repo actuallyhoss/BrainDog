@@ -100,8 +100,9 @@
   }
 
   .list[data-form='path'] > .item[data-mark='done'] > .item-marker {
-    background: var(--red-fill);
-    border-color: var(--red-fill);
+    background: var(--on);
+    border-color: var(--on);
+    color: var(--on-mark);
     font-variant-emoji: text;
   }
 

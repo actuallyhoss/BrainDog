@@ -2212,7 +2212,7 @@
 
   /* THE SUGGESTED ONE WEARS THE ACCENT'S EDGE, as well as its word, so the row is read from it. */
   .dc-option[data-suggested]:not([data-bare], [data-checked]) {
-    border-color: var(--red-fill);
+    border-color: var(--on);
   }
 
   /* AN OPTION THAT IS ONLY ITS NAME IS ONLY ITS BUTTON: no card round it, the button the cell's width and a thumb's

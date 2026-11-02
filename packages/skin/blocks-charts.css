@@ -2367,13 +2367,13 @@
   }
 
   .forecast-chip[aria-checked='true'] .switch-track {
-    background: var(--red-fill);
-    border-color: var(--red-fill);
+    background: var(--on);
+    border-color: var(--on);
   }
 
   .forecast-chip[aria-checked='true'] .switch-track::after {
     translate: 16px 0;
-    background: var(--on-red);
+    background: var(--on-mark);
   }
 
   .forecast-chip[aria-checked='true']:dir(rtl) .switch-track::after {

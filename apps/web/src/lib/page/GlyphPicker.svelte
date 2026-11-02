@@ -174,8 +174,8 @@
   }
 
   .glyph[data-on] {
-    background: var(--red-tint);
-    color: var(--red);
+    background: var(--chosen);
+    color: var(--link);
   }
 
   .glyph:focus-visible {

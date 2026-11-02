@@ -992,14 +992,16 @@
 
   /* IN THE DARK THE MARKS GO ONE STEP QUIETER (plan F4): the slot's tint and colour read louder than the place glyphs
      beside them, so each leans toward the quiet ink, and the well toward the board's neutral black. Leaned toward the
-     crimson nav, a yellow or a lime well took its red and read brown (colour lane, 2 Nov). */
-  :global(:root[data-theme='dark']) .s-pm:not(:empty) {
+     crimson nav, a yellow or a lime well took its red and read brown (colour lane, 2 Nov). ON THE SCHEME THE PERSON
+     CHOSE (dark grey lane, 2 Nov): this read `data-theme`, which only ever says high contrast, so a dark pick on a light
+     device kept the loud wells and a light pick on a dark device took the dark ones. */
+  :global(html[data-scheme='dark']) .s-pm:not(:empty) {
     background: color-mix(in oklab, var(--ph-tint) 80%, var(--board));
     color: color-mix(in oklab, var(--ph) 70%, var(--ink-3));
   }
 
   @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme='light'])) .s-pm:not(:empty) {
+    :global(html:not([data-scheme])) .s-pm:not(:empty) {
       background: color-mix(in oklab, var(--ph-tint) 80%, var(--board));
       color: color-mix(in oklab, var(--ph) 70%, var(--ink-3));
     }

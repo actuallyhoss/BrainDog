@@ -537,7 +537,7 @@
     block-size: 16px;
     border: 1.5px solid var(--ink-2);
     border-radius: var(--r-xs);
-    color: var(--on-red);
+    color: var(--on-mark);
   }
 
   .filter-box :global(svg) {
@@ -546,8 +546,8 @@
   }
 
   .filter-value[data-on] .filter-box {
-    background: var(--red-fill);
-    border-color: var(--red-fill);
+    background: var(--on);
+    border-color: var(--on);
   }
 
   @media (width < 640px) {

@@ -78,8 +78,8 @@
 /* THE ONE CHOSEN: the accent's edge and its first tint, and its ring filled. A shape as well as a shade. */
 .dc-choice[aria-checked='true'],
 .dc-choice[aria-checked='true']:hover {
-  background: var(--red-tint);
-  border-color: var(--red-fill);
+  background: var(--chosen);
+  border-color: var(--on);
 }
 
 .dc-choice:disabled {
@@ -114,8 +114,8 @@
 }
 
 .dc-choice[aria-checked='true'] .dc-ring {
-  border-color: var(--red-fill);
-  background: var(--red-fill);
+  border-color: var(--on);
+  background: var(--on);
 }
 
 .dc-choice[aria-checked='true'] .dc-ring::after {
@@ -123,7 +123,7 @@
   inline-size: 6px;
   block-size: 6px;
   border-radius: var(--r-round);
-  background: var(--on-red);
+  background: var(--on-mark);
 }
 
 /* WHAT IT DOES RUNS UNDER "SUGGESTED" TOO. The words are laid on the choice's own grid rather than in a column of their
@@ -253,13 +253,13 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
 .dc-choice[data-checked],
 .dc-choice[data-checked]:hover {
-  background: var(--red-tint);
-  border-color: var(--red-fill);
+  background: var(--chosen);
+  border-color: var(--on);
 }
 
 .dc-choice[data-checked] .dc-ring {
-  border-color: var(--red-fill);
-  background: var(--red-fill);
+  border-color: var(--on);
+  background: var(--on);
 }
 
 .dc-choice[data-checked] .dc-ring::after {
@@ -267,7 +267,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   inline-size: 6px;
   block-size: 6px;
   border-radius: var(--r-round);
-  background: var(--on-red);
+  background: var(--on-mark);
 }
 
 .dc-choice:has(> .dc-choice-main > .dc-choice-hit:disabled) {
@@ -303,12 +303,12 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 }
 
 .queue-option[data-recommended] > .dc-choice[data-press] {
-  border-color: var(--red-fill);
+  border-color: var(--on);
 }
 
 .dc-choice[data-press]:active {
-  background: var(--red-tint);
-  border-color: var(--red-fill);
+  background: var(--chosen);
+  border-color: var(--on);
 }
 
 /* SAID TO A SCREEN READER WITH THE NAME, where the eye reads it at the end of the line. */
@@ -451,8 +451,8 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
 /* The answer the record's one line is for, while it is open: the chosen tint and the accent's edge. */
 .dc-btn[data-on] {
-  background: var(--red-tint);
-  box-shadow: inset 0 0 0 1px var(--red-fill);
+  background: var(--chosen);
+  box-shadow: inset 0 0 0 1px var(--on);
   color: var(--ink);
 }
 
@@ -563,7 +563,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 }
 
 .dc-choices[data-across] > .queue-option[data-recommended] > .dc-choice {
-  border-color: var(--red-fill);
+  border-color: var(--on);
 }
 
 @media (width < 600px) {

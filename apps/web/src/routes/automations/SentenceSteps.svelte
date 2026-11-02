@@ -147,7 +147,7 @@
 
   /* WHERE A DROP WOULD LAND is a line in the red, and the step in hand is quieter. */
   li[data-over] {
-    box-shadow: 0 -2px 0 0 var(--red-fill);
+    box-shadow: 0 -2px 0 0 var(--on);
   }
 
   li[data-drag] {

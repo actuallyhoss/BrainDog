@@ -476,7 +476,7 @@
     }
 
     .card-line[data-picked] {
-      background: var(--red-tint);
+      background: var(--chosen);
     }
 
     .picked-tick {

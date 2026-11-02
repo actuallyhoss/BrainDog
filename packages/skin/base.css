@@ -68,12 +68,13 @@
     margin: 0;
   }
 
-  /* A LINK IS RED WITH A QUIET UNDERLINE (SPEC 0.1 item 1: links stay red). `--red` is red as words, held at 4.5:1 on
-     every ground it is drawn on (the theme's check T); the underline carries the affordance at 40% and firms up under
-     the pointer, so a link is never told from a late date by colour alone. */
+  /* A LINK IS RED WITH A QUIET UNDERLINE (SPEC 0.1 item 1: links stay red). `--link` is red as words in light and the
+     ink in dark (dark grey lane, 2 Nov: in dark red is only what is late or failing), held at 4.5:1 on every ground it
+     is drawn on (the theme's check T); the underline carries the affordance at 40% and firms up under the pointer, so a
+     link is never told from a late date by colour alone. */
   a {
-    color: var(--red);
-    text-decoration-color: color-mix(in srgb, var(--red) 40%, transparent);
+    color: var(--link);
+    text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
   }
@@ -158,6 +159,6 @@
   }
 
   ::selection {
-    background: var(--red-tint-2);
+    background: var(--chosen-2);
   }
 }

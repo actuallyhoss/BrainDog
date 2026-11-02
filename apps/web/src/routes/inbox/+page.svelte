@@ -1633,8 +1633,8 @@
   }
 
   .arrival:has(.pick[data-on]) {
-    --row-wash: var(--red-tint);
-    background: var(--red-tint);
+    --row-wash: var(--chosen);
+    background: var(--chosen);
   }
 
   @media (hover: hover) and (pointer: fine) {

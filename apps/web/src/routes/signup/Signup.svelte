@@ -2183,7 +2183,7 @@
   }
 
   .opt[aria-checked='true'] {
-    background: var(--red-tint);
+    background: var(--chosen);
   }
 
   .opt-name {

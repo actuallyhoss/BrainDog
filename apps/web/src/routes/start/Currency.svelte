@@ -147,7 +147,7 @@
   /* THE ONE PRESSED IS ON: the selected fill with its check, never the ink of the screen's one primary. */
   .currency-choices :global(.btn[aria-pressed='true']),
   .currency-matches :global(.btn[aria-pressed='true']) {
-    background: var(--red-tint);
+    background: var(--chosen);
     font-weight: 600;
   }
 

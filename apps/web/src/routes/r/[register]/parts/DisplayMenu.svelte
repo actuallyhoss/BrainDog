@@ -298,15 +298,15 @@
     flex: none;
     border: 1px solid var(--switch-off);
     border-radius: var(--r-xs);
-    color: var(--on-red);
+    color: var(--on-mark);
     font-size: var(--fs-cap);
     line-height: 1;
   }
 
   .filter-value[data-on] .filter-box {
-    background: var(--red-fill);
-    border-color: var(--red-fill);
-    color: var(--on-red);
+    background: var(--on);
+    border-color: var(--on);
+    color: var(--on-mark);
   }
 
   .locked {
