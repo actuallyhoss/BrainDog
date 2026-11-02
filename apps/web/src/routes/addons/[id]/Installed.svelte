@@ -607,7 +607,7 @@
     </Empty>
   </div>
 {:else if from === 'ready' && settings}
-  <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/settings/addons" title={name}>
+  <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/settings/addons" title={name} sentence="">
     {#snippet actions()}
       {#if newer && updateAt}<Button weight="primary" size="sm" href={updateAt}>{market.about.updateTo(newer)}</Button>{/if}
       {#if installed && !core}

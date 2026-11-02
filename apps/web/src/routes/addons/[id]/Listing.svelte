@@ -181,6 +181,8 @@
     return trust.kind === 'known' ? 'good' : 'info';
   });
   let preview = $state.raw<PreviewRead>({ state: 'none' });
+  /** A preview the version says it has and that is still being read, so its tile holds its room. */
+  const previewComing = $derived(!u && preview.state === 'none' && !refused && listing?.source === 'kennel' && !!latest?.preview);
 
   const adds = $derived(file ? addsOf(file.doc ?? (file.text ? safeParse(file.text) : null)) : null);
   const names = $derived(file ? namesOf(file.doc ?? (file.text ? safeParse(file.text) : null)) : new Map<string, string>());
@@ -642,7 +644,9 @@
 
 <!-- THE WAY BACK IS THE HEAD'S: a kicker at 1440 and the back link in the phone's bar, on the gutter like every detail
      page's, where a bare button above the lead sat off it. -->
-<PageHead icon={glyph} kicker={copy.packs} back="/addons" title={listing?.title ?? copy.packs} />
+<!-- `sentence=""`: the page says nothing under its name, so no line is held for one and given back when it settles,
+     which pulled every tile up by its height (verify6, 2 Nov). -->
+<PageHead icon={glyph} kicker={copy.packs} back="/addons" title={listing?.title ?? copy.packs} sentence="" />
 
 <!-- ONE VERSION ON THE VERSIONS TILE: the newest, and each earlier one under the fold. -->
 {#snippet versionRow(v: CatalogueVersion)}
@@ -770,7 +774,9 @@
       <!-- ITS PAGES, DRAWN: the use case's rail and Home, or an add-on's pages through the real renderer, each on a well of
            the ground's colour inside the tile. A listing with no drawing has no tile for one: what it adds already names
            its pages. A drawing that could not be read says so. -->
-      {#if u || preview.state === 'ready' || preview.state === 'refused'}
+      <!-- ITS ROOM HELD WHILE THE PREVIEW IS READ (verify6, 2 Nov): a version that says it has one had the tile land over
+           Versions and Details once read, and pushed them down by its height (0.10 to 0.15 of the screen at 1512). -->
+      {#if u || preview.state === 'ready' || preview.state === 'refused' || previewComing}
         <div class="wide-cell">
           <!-- AN EXAMPLE, SAID SO (AM9): the drawing holds the add-on's own made-up rows, and "Studio rent £1,650" under
                Its pages read as his own rent, on a record whose rent is EGP 12,000. -->
@@ -780,6 +786,8 @@
               <Preview preview={previewOf(u)} large />
             {:else if preview.state === 'ready' && preview.preview.pages.length > 0}
               <PreviewPage preview={preview.preview} large lists={declared.filter((d) => typeof d.register === 'string')} />
+            {:else if previewComing}
+              <div class="preview-held" aria-hidden="true"></div>
             {:else}
               <p class="quiet">{preview.state === 'refused' ? preview.fix : words.noPreview}</p>
             {/if}
@@ -940,6 +948,11 @@
     .tiles:has(.calls-cell) .versions-cell {
       grid-row: span 2;
     }
+  }
+
+  /* About the height a drawn preview takes under its line, so Versions and Details stay where they land. */
+  .preview-held {
+    min-block-size: 300px;
   }
 
   /* WHAT IT DOES, FIRST AND LARGEST: the lead sentence at 16/24 in ink. */
