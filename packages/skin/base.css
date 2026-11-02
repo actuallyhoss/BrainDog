@@ -19,6 +19,17 @@
     box-sizing: border-box;
   }
 
+  /* A NAME SOMEBODY WROTE KEEPS ITS OWN DIRECTION AND THE PAGE'S SIDE (leftovers 2 Nov, 9). A title, a chip or a row's
+     name is marked `dir="auto"`, which isolates it so an Arabic name never reorders the words and figures around it;
+     but a box marked so lines its words up on its own start, and "دار الياسمين" stood at the far right of the rail and
+     of a project's head, a tile's width from its own mark. A name in a box lines up as the page does. A paragraph, a
+     field and a document someone writes in keep their own side. */
+  :where([dir='auto']):not(p, blockquote, pre, li, dd, input, textarea, select, [contenteditable]) {
+    /* Chromium and Safari know the value by its older name. */
+    text-align: -webkit-match-parent;
+    text-align: match-parent;
+  }
+
   html {
     /* 2.4.11: keyboard focus must not land under the sticky header. Paid once, here. */
     scroll-padding-block-start: calc(var(--sticky) + var(--sp-2));
