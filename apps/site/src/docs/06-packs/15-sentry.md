@@ -16,8 +16,11 @@ An issue that is new and high priority, comes back after it was resolved, or is 
 ## Connect it
 
 1. In Sentry, open Settings, then Developer Settings, then Custom Integrations, and press Create New Integration. Choose Internal Integration and call it BrainDog. Under Permissions, set Project to Read, Issue & Event to Read and Organization to Read. Save, and copy the token shown on the integration's page.
+
 2. Put the token in your keys as Sentry token. From a terminal, `braindog keys put "Sentry token" --opens us.sentry.io` reads it from standard input; or paste it where Install asks for it.
+
 3. Install Sentry from Add-ons and set Organization to the part of your Sentry address before `.sentry.io`. Leave Region at `us.sentry.io` unless your organization is kept in the EU.
+
 4. Within the hour, open Errors and check each Sentry project points at the right project of yours.
 
 If you cannot make an integration, a Personal Token works too: User Settings, then Personal Tokens, with the scopes `org:read`, `project:read` and `event:read`. An Organization Token does not work, because it can only make releases.

@@ -7,7 +7,9 @@ A list, a page or an automation you made on your own BrainDog can go to anybody 
 Open Add-ons and press Share this setup. At the top, choose An add-on from what you made. The page lists what you made yourself: your own lists, pages, figures and automations, and nothing an installed add-on brought.
 
 1. Tick what goes in. What a ticked thing needs comes along by itself: the list a page shows, the figure a stat names, the script an automation runs. Each one is said under What it would add, with why it came.
+
 2. Give the add-on a name under What the add-on is called.
+
 3. Press Download the add-on. The file is saved as `<id>.pack.json`, and nothing has been sent anywhere.
 
 Then check it and publish it from the command line, as [Publishing and review](/docs/packs/publishing) says.

@@ -14,9 +14,13 @@ The Gmail add-on brings your mail into BrainDog: who you are in touch with, mail
 The sender is a short script in your own Google account, so no Google Cloud app or review is needed.
 
 1. Install the add-on, open Add-ons, Gmail, and press **Make the address**.
+
 2. Open script.google.com and press **New project**.
+
 3. In **Project Settings**, tick **Show "appsscript.json" manifest file in editor**.
-4. Paste the first box into `appsscript.json` and the second into `Code.gs`, and save.
+
+4. Paste the first box on the add-on's page into `appsscript.json` and the second into `Code.gs`, and save.
+
 5. Run `start`, and allow it to read your mail.
 
 Mail arrives within a minute. To stop it, run `stop` in the same project, or delete the project.
