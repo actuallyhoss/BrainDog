@@ -142,8 +142,25 @@ export function pairOf(said: string): string | null {
   const w = m[1]!.toLowerCase();
   return /partner/u.test(w) ? (w.startsWith('business') ? 'business partner' : 'partner') : 'co-founder';
 }
+/**
+ * THE PEOPLE THEY PAY TO DO THE WORK AND DID NOT NAME (onboarding7, the creator walk: "I pay two video editors" was asked
+ * "Which sponsors do you work with?"): the work word, plural where they said more than one ("editors"), or `null` where
+ * none is said or one is named already ("my editors Kai and Rosa"). Asked by name as a co-founder is (`pairOf`), so they
+ * are drafted. A word that is what they are themselves ("I'm a freelance designer") is no crew: it follows a number, a
+ * my or our, or a pay or hire.
+ */
+const CREW_SAID = /\b(?:pay|paying|hire|hired|hiring|employ|with|my|our|two|three|four|five|a couple of|a few|some)\s+(?:\p{L}+\s+)?(editors?|assistants?|moderators?|designers?|developers?|bookkeepers?|cleaners?|nann(?:y|ies))\b/iu;
+const CREW_NAMED = /\b(?:editors?|assistants?|moderators?|designers?|developers?|bookkeepers?|cleaners?|nann(?:y|ies))(?:\s+(?:are|is|called|named)|,)?\s+\p{Lu}\p{Ll}+/u;
+export function crewOf(said: string): string | null {
+  const m = CREW_SAID.exec(said);
+  if (m === null || CREW_NAMED.test(said)) return null;
+  return m[1]!.toLowerCase();
+}
+
 /** A bare name typed as an answer: "Dan", "dan", "Dan Reyes". */
 const BARE_NAME = /^\p{L}[\p{L}'’-]*(?:\s\p{L}[\p{L}'’-]*)?$/u;
+/** Names typed as an answer: "Kai and Rosa", "kai, rosa". */
+const NAMES = /^\p{L}[\p{L}'’-]*(?:\s*(?:,|\band\b|&)\s*\p{L}[\p{L}'’-]*)+$/u;
 const capital = (n: string): string => n.split(' ').map((x) => x.charAt(0).toUpperCase() + x.slice(1)).join(' ');
 const TOOL_WORDS = /\b(claude|chatgpt|gpt|cursor|codex|copilot|gemini|windsurf|perplexity|ai tools?|no ai|none yet)\b/iu;
 /* A thing they work on, said by name: "clients Fenwick and Acme", "an app called Tidepool", "for Fenwick". */
@@ -314,7 +331,7 @@ export function settled(topic: Topic, w: Where): boolean {
       return !w.money.kept || currencyQuiet(w);
     case 'people':
       /* "WE'RE TWO" NAMES NOBODY: the other one is asked by name, so they can be drafted (`pairOf`). */
-      return PEOPLE_WORDS.test(s) && pairOf(s) === null;
+      return PEOPLE_WORDS.test(s) && pairOf(s) === null && crewOf(s) === null;
     case 'tools':
       return TOOL_WORDS.test(s);
     case 'name':
@@ -348,6 +365,7 @@ const FIRST_TAPS: Readonly<Record<string, readonly string[]>> = {
   personal: ['Bills', 'Savings', 'Subscriptions', 'Rent'],
   student: ['Deadlines', 'Courses', 'Money', 'Projects'],
   shop: ['Orders', 'Stock', 'Sales', 'Suppliers'],
+  creator: ['Sponsor deals', 'Paying editors', 'Payouts', 'Uploads'],
 };
 
 /** The rules' question for a topic, in words that fit what kind of person they are. */
@@ -406,6 +424,8 @@ export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
     case 'people': {
       const pair = pairOf(w.said);
       if (pair !== null) return { topic, question: `What's your ${pair}'s name?`, choices: [], role: pair, by: 'rules' };
+      const crew = crewOf(w.said);
+      if (crew !== null) return { topic, question: /s$/u.test(crew) || /ies$/u.test(crew) ? `What are your ${crew}' names?` : `What's your ${crew}'s name?`, choices: [], role: crew, by: 'rules' };
       if (kind === 'freelance') return ask('Who do you work with, besides clients?', ['Just me', 'Other freelancers', 'An accountant', 'An agency']);
       if (kind === 'founder') return ask('Who are you building it with?', ['My co-founder', 'A small team', 'Contractors', 'Just me']);
       if (kind === 'student') return ask('Who do you work with?', ['Just me', 'Classmates', 'A supervisor', 'A study group']);
@@ -420,7 +440,8 @@ export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
       /* WHAT THIS KIND OF PERSON KEEPS FIRST, in their words (2 Nov, a walk: a freelancer who invoices every month was
          offered "Projects, People, Money, Agents", and a household "Savings goals" beside "Goals"). Where no kind is
          read, the places the build will make, never Agents or Today, and never one inside another. */
-      const own = FIRST_TAPS[kind ?? ''];
+      /* A CREATOR KEEPS THEIR DEALS AND WHO THEY PAY (onboarding7): sponsor deals first, as Jules said. */
+      const own = CREATOR.test(w.said) ? FIRST_TAPS['creator'] : FIRST_TAPS[kind ?? ''];
       if (own) return ask('What should I keep track of first?', [...own], { many: true });
       const ps = w.places.filter((p) => fits(p, CHOICE_MOST) && !/^(?:agents|today)$/iu.test(p));
       const choices = ps.filter((p) => !ps.some((o) => o !== p && o.toLocaleLowerCase().endsWith(` ${p.toLocaleLowerCase()}`))).slice(0, 4);
@@ -537,7 +558,7 @@ export function nextAsk(w: Where): ChatAsk | null {
      open, nothing else is asked, so the cap drops the tools question and never the name. */
   /* THE ONE THEY WORK WITH IS ASKED BY NAME AT ONCE (`pairOf`), by the rules and over the model's question: "We're a
      two-person startup" is followed by "What's your co-founder's name?", so they are drafted, and the cap never drops it. */
-  if (open.includes('people') && pairOf(w.said) !== null && room > KEPT_FOR_LAST.filter((t) => open.includes(t)).length) {
+  if (open.includes('people') && (pairOf(w.said) !== null || crewOf(w.said) !== null) && room > KEPT_FOR_LAST.filter((t) => open.includes(t)).length) {
     const r = rulesAsk('people', w);
     if (r !== null) return r;
   }
@@ -597,7 +618,9 @@ export function saidOf(ask: ChatAsk, answer: string): string {
       return sentence(a);
     case 'people':
       /* THE ONE THEY WORK WITH, BY NAME: "Dan" is "My co-founder is Dan.", which first Today drafts in People. */
-      if (ask.role !== undefined && BARE_NAME.test(a) && !/^just me$/iu.test(a)) return `My ${ask.role} is ${capital(a)}.`;
+      if (ask.role !== undefined && BARE_NAME.test(a) && !/^just me$/iu.test(a) && !/s$/u.test(ask.role)) return `My ${ask.role} is ${capital(a)}.`;
+      /* THE EDITORS, BY NAME: "Kai and Rosa" is "My editors are Kai and Rosa.", which the rules keep as contractors. */
+      if (ask.role !== undefined && /s$/u.test(ask.role) && NAMES.test(a)) return `My ${ask.role} are ${a.split(/\s*(?:,|\band\b|&)\s*/u).filter((x) => x !== '').map(capital).join(' and ').replace(/ and (?=.* and )/gu, ', ')}.`;
       return /^just me$/iu.test(a) ? 'I work on my own.' : `I work with ${BARE_NAME.test(a) && /^\p{Lu}/u.test(a) ? a : low}.`;
     case 'tools':
       return `I use ${a}.`;
@@ -955,8 +978,8 @@ function firstOf(turns: readonly ChatTurn[]): string {
  * on the clients they named, one to three in all: "Send Fenwick's invoice", "Set up deadlines for Acme". Offered on
  * Today, never written unasked.
  */
-export function todosOf(turns: readonly ChatTurn[], clients: readonly string[], have: readonly string[] = []): string[] {
-  return todosFor(firstOf(turns), clients, have);
+export function todosOf(turns: readonly ChatTurn[], clients: readonly string[], have: readonly string[] = [], crew: readonly string[] = []): string[] {
+  return todosFor(firstOf(turns), clients, have, crew);
 }
 
 /**
@@ -965,13 +988,18 @@ export function todosOf(turns: readonly ChatTurn[], clients: readonly string[], 
  * link builds, but its "First I want to keep track of …" (`saidOf`) is in the words. The words with the to-dos said after
  * them, for the drafts read again on Today, as `draftsSaid` gives `/start`'s.
  */
-export function withTodos(said: string, clients: readonly string[]): string {
+export function withTodos(said: string, clients: readonly string[], crew: readonly string[] = []): string {
   const first = /\bFirst I want to keep track of ([^.]+)\./u.exec(said)?.[1] ?? '';
-  const todos = first === '' ? [] : todosFor(first, clients);
+  const todos = first === '' ? [] : todosFor(first, clients, [], crew);
   return [said.trim(), ...todos.map((t) => `${t}.`)].filter((x) => x !== '').join(' ');
 }
 
-function todosFor(firstSaid: string, clients: readonly string[], have: readonly string[] = []): string[] {
+/**
+ * `crew` IS WHO THEY PAY TO DO THE WORK, BY NAME (onboarding7, the creator walk: "Sponsor deals, paying editors" kept
+ * first drew no to-do at all): the editors, assistants and the like the reading kept as contractors. "Paying editors"
+ * is "Pay Kai and Rosa", and sponsor deals are this month's to log.
+ */
+function todosFor(firstSaid: string, clients: readonly string[], have: readonly string[] = [], crew: readonly string[] = []): string[] {
   const first = firstSaid.toLowerCase();
   const c = clients.filter((x) => x.trim() !== '');
   const one = c[0] ?? null;
@@ -987,6 +1015,10 @@ function todosFor(firstSaid: string, clients: readonly string[], have: readonly 
   if (/\bdeadlines?|\bdue dates?|\bschedule/u.test(first)) add(two ? `Set up deadlines for ${two}` : "Write down this month's deadlines");
   if (/\bprojects?\b/u.test(first)) add(one ? `List the work for ${one}` : 'List the projects on now');
   if (/\bclients?\b|\bcustomers?\b/u.test(first) && one) add(`Add a contact at ${one}`);
+  if (/\bsponsors?(?:hips?)?\b|\bbrand deals?\b/u.test(first)) add("Log this month's sponsor deals");
+  const paid = /\bpay(?:ing|ments? to)?\s+(?:my\s+|the\s+|our\s+)?(editors?|assistants?|moderators?|designers?|developers?|freelancers?|contractors?|team|staff)\b/u.exec(first);
+  const crewNamed = crew.filter((x) => x.trim() !== '');
+  if (paid) add(crewNamed.length > 0 ? `Pay ${and(crewNamed.slice(0, 3))}` : `Pay the ${paid[1]}`);
   return out.slice(0, 3);
 }
 

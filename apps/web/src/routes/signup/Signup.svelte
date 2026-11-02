@@ -1435,7 +1435,9 @@
       const clients = given.proposal.rows
         .filter((r) => (r.register === 'organisations' && r.fields['kind'] === 'client') || (r.register === 'people' && r.fields['role'] === 'client'))
         .map((r) => String(r.fields['name'] ?? ''));
-      globalThis.sessionStorage?.setItem(MADE_SAID, JSON.stringify(saidMade(withTodos(given.sentence, clients), given.proposal.rows)));
+      /* AND WHO THEY PAY FOR THE WORK, so "paying editors" first is "Pay Kai and Rosa" (onboarding7). */
+      const crew = given.proposal.rows.filter((r) => r.register === 'people' && r.fields['role'] === 'contractor').map((r) => String(r.fields['name'] ?? ''));
+      globalThis.sessionStorage?.setItem(MADE_SAID, JSON.stringify(saidMade(withTodos(given.sentence, clients, crew), given.proposal.rows)));
     } catch {
       /* Storage off: the end says only that it is made. */
     }

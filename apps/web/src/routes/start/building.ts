@@ -289,6 +289,28 @@ function phrasesFor(name: string | readonly string[], heard: readonly Said[]): s
   return out;
 }
 
+/** Words for where money comes from, which People heard is not about anybody kept there. */
+const MONEY_WORDS = /\b(?:sponsors?(?:hips?)?|brand deals?|ads?|adsense|subs|subscribers|payouts?|revenue|income|sales|invoices?|salary|royalt(?:y|ies)|donations?|tips?|merch)\b/iu;
+
+/**
+ * A PART'S PHRASES WITH THE ONE IT IS SAID TO COME FROM FIRST (onboarding7, the creator walk: People said "from: YouTube
+ * ads and a few sponsors" over Kai and Rosa, the editors). A phrase naming somebody or something the part holds comes
+ * first; for People, a phrase about where money comes from comes last. Otherwise the order they were heard in.
+ */
+function saidFirst(id: string, why: readonly string[], entries: readonly Entry[]): string[] {
+  const names = entries.map((e) => e.title.toLocaleLowerCase()).filter((t) => t.length > 1);
+  const named = (lower: string, n: string): boolean => {
+    const at = lower.indexOf(n);
+    return at >= 0 && !/\p{L}/u.test(lower.charAt(at - 1)) && !/\p{L}/u.test(lower.charAt(at + n.length));
+  };
+  const score = (phrase: string): number => {
+    const lower = phrase.toLocaleLowerCase();
+    if (names.some((n) => named(lower, n))) return 0;
+    return id === 'people' && MONEY_WORDS.test(phrase) ? 2 : 1;
+  };
+  return why.map((w, i) => ({ w, i, s: score(w) })).sort((a, b) => a.s - b.s || a.i - b.i).map((x) => x.w);
+}
+
 /** Where a part's first phrase stands among everything heard, for the order the build is drawn in. */
 function heardAt(why: readonly string[], heard: readonly Said[]): { heardAt?: number } {
   const at = why.length === 0 ? -1 : heard.findIndex((h) => h.phrase === why[0]);
@@ -326,7 +348,9 @@ export function partsOf(p: PartsIn): Part[] {
     const state: PartState = !on ? 'off' : id === p.waiting ? 'waiting' : held !== null ? 'held' : why.length > 0 ? 'heard' : p.byHand.has(id) ? 'hand' : 'heard';
     const entries = on ? p.rows.flatMap((r) => (moduleOfList(r.register)?.id === id ? [entryOf(r)] : [])) : [];
     const lists = (info?.registers ?? []).map((r) => info?.titles[r] ?? r);
-    return { id, name, icon: partIcon(id), on, state, held, why, ...heardAt(why, p.heard), entries, lists, blurb: info?.blurb ?? '' };
+    /* THE PHRASE A PART SAYS IT CAME FROM names what it holds, where one does (`saidFirst`); it is still drawn where
+       its first phrase was heard. */
+    return { id, name, icon: partIcon(id), on, state, held, why: saidFirst(id, why, entries), ...heardAt(why, p.heard), entries, lists, blurb: info?.blurb ?? '' };
   });
 }
 
