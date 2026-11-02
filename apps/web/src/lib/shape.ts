@@ -145,7 +145,11 @@ const NAME_RULES: readonly NameRule[] = [
   { at: new RegExp(`\\b(?:${either('editor|video editor|assistant|virtual assistant|moderator|designer|developer|bookkeeper|cleaner|nanny|babysitter')})s?\\s+(?:(?:called|named|are|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'contractor', word: true },
   /* THE PEOPLE WHO WORK THERE, NAMED (onboarding8, the shop walk: "two part-time staff, Ellie and Tom" drafted nobody). */
   { at: new RegExp(`\\b(?:${either('staff|employee|team member')})s?,?\\s+(?:(?:called|named|are|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'collaborator' },
-  { at: new RegExp(`\\b(?:${either('partner|cofounder|co-founder|collaborator')})s?\\s+(?:(?:called|named|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'collaborator' },
+  /* A CO-FOUNDER OR A BUSINESS PARTNER BY THAT WORD (onboarding9: Leo's co-founder Dan was kept as a collaborator),
+     People's own roles since 4.5.0. */
+  { at: new RegExp(`\\b(?:${either('cofounder|co-founder')})s?\\s+(?:(?:called|named|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'cofounder' },
+  { at: new RegExp(`\\b(?:${either('business partner|partner')})s?\\s+(?:(?:called|named|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'partner' },
+  { at: new RegExp(`\\b(?:${either('collaborator')})s?\\s+(?:(?:called|named|is)\\s+)?${LIST}`, 'gu'), register: 'people', role: 'collaborator' },
   { at: new RegExp(`\\b(?:${either('run|runs|running|own|owns|build|builds|building|make|makes|making|started|founded')}|working on)\\s+${LIST}`, 'gu'), register: 'things' },
   { at: new RegExp(`\\b(?:called|named)\\s+${LIST}`, 'gu'), register: 'things' },
 ];

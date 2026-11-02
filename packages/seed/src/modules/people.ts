@@ -232,7 +232,7 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
     name: 'People',
     icon: 'people',
     one: 'person',
-    holds: 'collaborators, contractors and accountants, and what each one is for',
+    holds: 'co-founders, collaborators, contractors and accountants, and what each one is for',
     title: 'name',
     mobile: ['name', 'role', 'rate'],
     pack: 'people',
@@ -274,8 +274,17 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
          NO `registrar`, AND THERE WAS ONE until People 2.0.0: a role only a studio that holds domains has, shipped to every
          record, and the Personal use case had to relabel it Agency before a household could read it. A record whose rows
          hold it keeps it as its own word when it updates, because the plan lays back a value a row was written under
-         (`test/lists-opened.test.ts` drives one), and a record that never used it is no longer offered it. */
-      { id: 'role', type: 'enum', values: ['client', 'contractor', 'accountant', 'collaborator', 'other'], index: true },
+         (`test/lists-opened.test.ts` drives one), and a record that never used it is no longer offered it.
+         `cofounder` AND `partner` SINCE People 4.5.0 (onboarding9, 2 Nov): Leo's co-founder Dan was kept as "Dan,
+         collaborator", since the list had no word for him. Laid after the others, so a picker offers them last, and said
+         as Co-founder and Business partner (`labels`). */
+      {
+        id: 'role',
+        type: 'enum',
+        values: ['client', 'contractor', 'accountant', 'collaborator', 'other', 'cofounder', 'partner'],
+        labels: { cofounder: 'Co-founder', partner: 'Business partner' },
+        index: true,
+      },
       { id: 'rate', type: 'money' },
       /* Unique, because an email is how a person met twice is known to be one person. KEPT SINCE People 3.0.0 for every
          reader that already asks it; `keys` below holds it again with every other address. */

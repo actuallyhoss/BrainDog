@@ -229,7 +229,7 @@ export function entryOf(row: Proposal['rows'][number]): Entry {
   if (row.register === PEOPLE) {
     /* A HOUSEHOLD'S PERSON IS SAID BY THE WORD THEY USED ("Sam, partner"), kept as the note (`householdPeople`). */
     const own = f.role === 'family' || f.role === 'friend' || f.role === 'landlord' || f.role === 'other' || f.role === 'contractor' ? (typeof f.note === 'string' && f.note.length <= 20 ? f.note : '') : '';
-    const role = own !== '' ? own : typeof f.role === 'string' ? capital(f.role) : '';
+    const role = own !== '' ? own : typeof f.role === 'string' ? (ROLE_WORD[f.role] ?? capital(f.role)) : '';
     return { key: `${row.register}:${title}`, title, kind: 'person', detail: role, amount: null, due: null };
   }
   /* AN ORGANISATION IS SOMEBODY THEY WORK WITH, never a project (1 Nov: clients the model wrote as organisations stood
@@ -243,6 +243,9 @@ export function entryOf(row: Proposal['rows'][number]): Entry {
   if (row.register === 'tasks') return { key: `${row.register}:${title}`, title, kind: 'project', detail: words.task, amount: null, due: null };
   return { key: `${row.register}:${title}`, title, kind: 'project', detail: row.register === 'things' ? words.project : '', amount: null, due: null };
 }
+
+/** People's roles said as People says them where the id is not a word (`labels` on `register.people`, 4.5.0). */
+const ROLE_WORD: Readonly<Record<string, string>> = { cofounder: 'Co-founder', partner: 'Business partner' };
 
 /**
  * A use case as a part: the lists and pages it carries, the phrases that pointed at it, and its own summary. It has no

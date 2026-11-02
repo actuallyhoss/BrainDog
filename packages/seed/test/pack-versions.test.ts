@@ -3824,6 +3824,21 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'people@4.5.0': {
+    holds: `
+      metric.organisations-clients metric.organisations-count metric.organisations-from-card-texts metric.organisations-known
+      metric.organisations-not-clients metric.people-clients metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d
+      metric.people-in-touch-90d metric.people-not-clients metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '1f00311e183ad608',
+    history: [
+      'People 4.5.0, onboarding9 of 2 November: `register.people` offers `cofounder` and `partner` on `role`, said as Co-founder and Business partner -> 1f00311e183ad608',
+    ],
+  },
+
   'portfolio@1.31.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged

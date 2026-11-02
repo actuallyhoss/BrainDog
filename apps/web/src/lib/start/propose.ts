@@ -1216,7 +1216,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     const org = clientCompany({ register: r.register, fields: r.fields }, modules);
     if (org !== null) rows[i] = { register: org.register, fields: org.fields };
   }
-  return householdPeople(businessNotProject({
+  return householdPeople(pairPeople(businessNotProject({
     ...out,
     currency,
     ...(typed === null && there === null && currency !== null ? { currencyBy: 'device' as const } : {}),
@@ -1224,7 +1224,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     title: titleOf(said, name.name, rows),
     places: placesOf(out),
     by: 'rules',
-  }), sentence);
+  }), sentence), sentence);
 }
 
 /* ── a household's people are family, not people you work with ─────────── */
@@ -1259,6 +1259,35 @@ export function householdPeople<P extends Pick<Proposal, 'usecase' | 'also' | 'r
     if (role === undefined || word === undefined) return r;
     changed = true;
     return { ...r, fields: { ...r.fields, role, note: word.charAt(0).toUpperCase() + word.slice(1) } };
+  });
+  return changed ? { ...p, rows } : p;
+}
+
+/* ── a co-founder is a co-founder ───────────────────────────────────────── */
+
+/* The words a co-founder or business partner is named by, and the role each is kept under (People 4.5.0). */
+const PAIR: Readonly<Record<string, string>> = { 'co-founder': 'cofounder', cofounder: 'cofounder', 'business partner': 'partner', partner: 'partner' };
+const PAIR_WORDS = 'co-?founder|business partner|partner';
+const pairBefore = (name: string): RegExp => new RegExp(String.raw`\b(${PAIR_WORDS})s?(?:\s+is|\s+are|,)?\s+(?:\p{Lu}\p{Ll}+\s+(?:and|&)\s+)?${name}\b`, 'iu');
+const pairAfter = (name: string): RegExp => new RegExp(String.raw`\b${name},?\s+\(?(?:my|our|is my|is our)\s+(${PAIR_WORDS})\b`, 'iu');
+
+/**
+ * A CO-FOUNDER OR A BUSINESS PARTNER KEPT BY THAT WORD (onboarding9, 2 Nov: "My co-founder is Dan." was kept as "Dan,
+ * collaborator", by the rules and by the model). A person the words call a co-founder or a (business) partner is kept
+ * under People's role for it, where the reading kept them as a collaborator, as other or with none. A household's
+ * partner is `householdPeople`'s, which runs after this.
+ */
+export function pairPeople<P extends Pick<Proposal, 'rows'>>(p: P, sentence: string): P {
+  let changed = false;
+  const rows = p.rows.map((r) => {
+    const name = typeof r.fields.name === 'string' ? r.fields.name.trim() : '';
+    const was = r.fields.role;
+    if (r.register !== PEOPLE || name === '' || (was !== undefined && was !== null && was !== 'collaborator' && was !== 'other')) return r;
+    const m = pairBefore(escape(name)).exec(sentence) ?? pairAfter(escape(name)).exec(sentence);
+    const role = m?.[1] === undefined ? undefined : PAIR[m[1].toLowerCase()];
+    if (role === undefined) return r;
+    changed = true;
+    return { ...r, fields: { ...r.fields, role } };
   });
   return changed ? { ...p, rows } : p;
 }
@@ -1456,7 +1485,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
     /* THE RULES' NAMES COME WITH THE RULES' LINES, so "freelance as a designer" still reads Clients where it stands in. */
     ...(Object.keys(names).length > 0 ? { names } : said.length === 0 && rules.names ? { names: rules.names } : {}),
   };
-  return householdPeople(businessNotProject({
+  return householdPeople(pairPeople(businessNotProject({
     ...out,
     currency,
     ...(!typed && ruled === null && currency !== null ? { currencyBy: 'device' as const } : {}),
@@ -1466,7 +1495,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
     by: reply.by === '' || reply.by === 'rules' ? 'model' : reply.by,
     summary: summary === '' ? null : summary,
     draft: u === null && reply.draft !== null && reply.draft.trim() !== '' ? reply.draft.trim() : null,
-  }), sentence);
+  }), sentence), sentence);
 }
 
 /**

@@ -971,11 +971,14 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   opened on Description, an import's copy of the category. No id added or taken away, so a patch.
  * - money-core 3.38.2 (verify5, 2 Nov): Reports' spending ring is the six largest categories and everything else, where
  *   it drew five, as `limit` counts the rest among its parts (`page.money-reports`). No id added or taken away, so a patch.
+ * - people 4.5.0 (onboarding9, 2 Nov): `register.people` offers `cofounder` and `partner` on `role`, said as Co-founder
+ *   and Business partner, so a co-founder named at sign-up is kept as one and not as a collaborator. Values added, so a
+ *   minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.31.0',
-  people: '4.4.1',
+  people: '4.5.0',
   'money-core': '3.38.2',
   estate: '2.8.0',
   work: '1.24.0',
