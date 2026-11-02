@@ -1,4 +1,22 @@
-# BrainDog for Mac
+# BrainDog for Windows and Linux, later
+
+**This is not the Mac app.** BrainDog for Mac is the native SwiftUI app in `apps/apple` (target `BrainDogMac`, the same
+bundle id `dog.brain.desktop`), which replaced this shell before anything here was published (apps plan of 2 November,
+`loop/plans/apps-2026-11-02/PLAN.md` section 1, and M6). Nobody has this build: `/download` stayed held, and the
+updater key below has signed nothing anyone installed.
+
+This folder is kept as the shell for **Windows and Linux**, which are not in v1 (plan section 9). When they are built,
+Tauri 2's Windows (WebView2) and Linux (WebKitGTK) targets start from here, with the same bridge contract as the native
+apps (`window.__BRAINDOG_SHELL__`, `apps/web/src/lib/shell.ts`). Until then:
+
+- **Do not publish it, and do not run `release.mjs --publish`.** A Mac dmg from here would compete with the native app
+  for the same bundle id; the native app's updates come from Sparkle (`apps/apple/Mac/Updates.swift`), not from
+  `brain.dog/desktop/latest.json`.
+- Everything below describes the shell as it stood on 24 October, on the Mac, where it was built and checked. The
+  Mac-only parts (Entitlements, notarising, the dmg) are history; the bridge, the menus, the offline page and the sign-in
+  handoff are what a Windows or Linux build would carry over.
+
+## What the shell did (on the Mac, 24 October)
 
 A thin Tauri 2 window around `https://app.brain.dog` (plan: `docs/55-DESKTOP-APP.md`). The web app is the product; this
 shell only adds what a tab cannot do:
@@ -79,8 +97,10 @@ password). Export the real values in the shell that runs `cargo tauri build`; th
   A publish that stopped after its build (an upload that failed, or the dmg not answering yet) is finished with
   `--upload-only`, which builds nothing and sends what `apps/desktop/dist` holds, even when that version is live.
 
-## Not done yet
+## Before a Windows or Linux build
 
-- **The signing sitting** (E49): the Apple Developer Program and a Developer ID Application certificate on this Mac.
-- **Deep link in dev.** macOS registers `braindog://` only for a built, installed app, not `cargo tauri dev`.
-- Compiled and bundled on 24 October (an unsigned dmg); not yet opened and walked against a record.
+- Targets: `x86_64-pc-windows-msvc` (WebView2, an MSI or NSIS installer, Authenticode signing) and Linux (WebKitGTK,
+  AppImage and deb). Neither has been built.
+- A Windows or Linux updater key of their own, or this one; this pair has signed nothing anyone installed.
+- `MAC_APP` in `apps/worker/src/apple.ts` names the native Mac app; nothing here needs Apple's association file.
+- **Deep link in dev.** An OS registers `braindog://` only for a built, installed app, not `cargo tauri dev`.
