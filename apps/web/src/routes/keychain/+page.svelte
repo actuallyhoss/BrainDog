@@ -169,6 +169,7 @@
    */
   /** Words of the usual length for the line under the title, set unseen while it is on its way so it holds their room. */
   const HELD_LIKE = '6 keys. 3 have no value yet.';
+  let asksRead = $state(false);
   /* A RECORD THE SHELL SAYS HOLDS NO KEYS HOLDS NO LINE FOR A SENTENCE (nojump, 2 Nov): it says nothing once read, and the
      held line gave its 32px back then, lifting the page on a phone. The shell lists a list only once it holds a row. */
   const noKeys = $derived(((page.data as { index?: { registers?: { id: string; count: number }[] } } | undefined)?.index?.registers ?? []).every((r) => r.id !== 'credentials' || r.count === 0));
@@ -770,8 +771,10 @@
   {/snippet}
 </PageHead>
 
-<div class="page">
-  {#if acts}<AskTile {client} refresh={accessTick} focus={askFocus} paused={locked} {acts} />{/if}
+<!-- WHAT IS UNDER THE ASKS WAITS UNSEEN FOR THEIR FIRST READ (nojump, 2 Nov): a machine's ask landed over the keys a beat
+     after the page and pushed them down 188px on a phone. Never longer than 2.5s. -->
+<div class="page" data-asking={acts && !asksRead ? '' : undefined}>
+  {#if acts}<AskTile {client} refresh={accessTick} focus={askFocus} paused={locked} {acts} onread={() => (asksRead = true)} />{/if}
   {#if waiting.length}
     <!--
       THE REQUEST LEADS, AND ONLY WHILE THERE IS ONE: it is time-boxed, so it is the one tile that is about now. Amber and
@@ -1902,6 +1905,15 @@
 
     :global(.page-head .head-main:has(.add-phone) > .head-actions) {
       margin-inline-start: auto;
+    }
+  }
+  .page[data-asking] > :global(*) {
+    visibility: hidden;
+    animation: asks-wait 0s linear 2.5s forwards;
+  }
+  @keyframes asks-wait {
+    to {
+      visibility: visible;
     }
   }
 </style>

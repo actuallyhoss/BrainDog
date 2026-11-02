@@ -21,6 +21,7 @@
     focus = null,
     paused = false,
     acts = true,
+    onread,
   }: {
     client: ReturnType<typeof createClient> | null;
     /** Bumped by the page when its own data changes. */
@@ -30,6 +31,8 @@
     /** The screen is locked: the record would refuse the read, so none is made. */
     paused?: boolean;
     acts?: boolean;
+    /** Its first read is back, asks or none: the page shows what it held out of sight under it (nojump, 2 Nov). */
+    onread?: (() => void) | undefined;
   } = $props();
 
   let list = $state.raw<KeyAsk[]>([]);
@@ -39,12 +42,14 @@
   const pointed = $derived(focusOf(list, focus, now));
 
   async function load() {
+    if (paused) onread?.();
     if (!client || paused) return;
     const out = await client.keyAsks({ recent: focus !== null }).catch(() => null);
     if (out && out.ok) {
       list = out.value.asks as KeyAsk[];
       now = Date.now();
     }
+    onread?.();
   }
 
   onMount(() => {
