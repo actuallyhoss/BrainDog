@@ -458,6 +458,22 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     when: 'account is set, book is empty',
     steps: [{ script: { id: 'book_from_account', as: 'filing', input: {} } }],
   })),
+  /**
+   * AND WHAT AN ACCOUNT ALREADY HOLDS FOLLOWS IT INTO A BOOK, SINCE money-core 3.35.0 (leftovers 2 Nov, 2). Putting an
+   * account in a book wrote only the account, so its Ledger entries, bills, repeating lines and instalments stayed in
+   * no book until the night's count asked about them, and the book's page said "$0 this month" over a month the account
+   * had spent in. An account written with a book starts the same script handed the account, which files everything on
+   * it that is in no book, as one change with one Undo, as a new filing rule files back (`rule-files-back`). A thing
+   * that names its own book keeps it. The night's question is still asked of anything left over.
+   */
+  {
+    rule: 'account-files-book',
+    name: "File what an account holds in its book",
+    pack: 'money-core',
+    on: { written: { register: 'accounts', op: ['create', 'update'], fields: ['book'] } },
+    when: 'book is set',
+    steps: [{ script: { id: 'book_from_account', as: 'filing', input: {} } }],
+  },
   BOOK_FROM_ACCOUNT_SCRIPT,
   /**
    * A PLAN IS A ROW OF ITS OWN, AND EACH PART SAYS WHAT IS LEFT AFTER IT: an instalment made, or

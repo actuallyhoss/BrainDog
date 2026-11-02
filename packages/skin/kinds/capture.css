@@ -23,8 +23,51 @@
      words, and the region keeps its name, since a reference to a hidden heading still reads its text. While the page is
      being arranged the bar comes back, because it is what a block is moved by. The page's styles are not in a layer,
      so only an important declaration here outranks them, as a section's bar is hidden (`section.css`). */
+  /* AND IT IS A QUIET TILE LIKE THE REST (leftovers 2 Nov, 1): its heading row, the block's own well and the field
+     beside it saying the heading, where it was a grey bar alone in a white tile ("Add an account" on Accounts and on a
+     book). The well is the bar's; the bar's name is kept for a screen reader, out of sight, since the field says it. */
+  .block-slot:not([data-arranging]):has(> .block[data-kind='capture'] .capture[data-bare]) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--sp-1);
+  }
+
   .block-slot:not([data-arranging]):has(> .block[data-kind='capture'] .capture[data-bare]) > .block-bar {
-    display: none !important;
+    min-block-size: var(--well);
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  .block-slot:not([data-arranging]):has(> .block[data-kind='capture'] .capture[data-bare]) > .block-bar > :not(.well) {
+    position: absolute !important;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .block-slot:not([data-arranging]):has(> .block[data-kind='capture'] .capture[data-bare]) > .block {
+    min-inline-size: 0;
+    margin: 0;
+  }
+
+  .capture[data-bare] .capture-field {
+    min-block-size: var(--well);
+    padding-inline: var(--sp-2) var(--sp-1);
+    background: transparent;
+  }
+
+  .capture[data-bare] .capture-field:focus-within {
+    background: var(--tile-2);
+  }
+
+  .capture[data-bare] .capture-input::placeholder {
+    color: var(--ink-2);
+    font-weight: var(--fw-medium);
+    opacity: 1;
   }
 
   .capture-field {

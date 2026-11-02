@@ -207,6 +207,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.35.0', notes: 'Putting an account in a book takes what it already holds with it, so a book counts the money the account spent before. A book says This month only while money came in or went out, and its accounts and Add an account each take the whole row.' },
     {
       version: '3.34.0',
       notes: 'Money opens on what is late both ways, an invoice owed to you as well as a bill, and says what needs a look straight under your cash rather than at the foot of the page. Coming up is one table in four stretches, late first, with what repeats each month at the foot. Accounts shows one card an account with its balance. An account shows its balance once while the lines match the bank, with the box for today\'s balance under it. Budgets lists the budgets you set, with Set another for the rest. Forecast shows one row a plan. Reports keeps how long your money lasts and what you kept, in red below nought. Payees can give a name to what the bank writes, such as Google Workspace for GOOGLE *WORKSPACE, and every line takes it. Filing rules has Add a rule at the top. A book opens on its Cash ahead, and a plan says what is paid once.',

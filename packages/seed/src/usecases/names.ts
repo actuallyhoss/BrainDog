@@ -59,6 +59,7 @@ export const RULE_NAMES: Readonly<Record<string, string>> = {
   /* THE OTHERS THE PRODUCT SHIPS, each the name its declaration gives it, so a screen that could not read the record's
      titles (Activity's fallback, a row's history) still says a sentence and never "Meet payees" or "Entry takes book". */
   'account-closed': "Ask where a closed account's money goes",
+  'account-files-book': 'File what an account holds in its book',
   'account-moved': 'Move what a closed account holds',
   'bill-moves-line': 'Ask to move a repeating line on when its bill is paid',
   'bill-takes-book': "File a bill or an invoice in its account's book",

@@ -101,6 +101,23 @@ export default async function run(ctx) {
     typeof input.row === 'string' && /^[a-z_]+#\d+$/.test(input.row) ? input.row : typeof input.register === 'string' && Number.isSafeInteger(input.seq) ? `${input.register}#${input.seq}` : null;
   if (handed) {
     const list = handed.split('#')[0];
+    /* AN ACCOUNT PUT IN A BOOK (`account-files-book`): everything on it that is in no book and still stands takes the book. */
+    if (list === 'accounts') {
+      const account = await ctx.record.get(handed);
+      const book = account ? account.fields.book : null;
+      if (!account || !held(book)) {
+        ctx.log('The account is in no book, so nothing was filed.');
+        return null;
+      }
+      const found = [];
+      for (const each of LISTS)
+        found.push(...(await every(each, { all: [{ field: 'account', is: account.id }, { field: 'book', empty: true }] })).filter((r) => STANDS[each](r.fields.state)));
+      const writes = bookFromAccount(found, { [account.id]: book }).slice(0, 1000);
+      for (const w of writes) ctx.update(w.id, w.fields, w.version);
+      const name = String(account.fields.name ?? '').trim() || 'The account';
+      ctx.log(writes.length === 0 ? `${name} holds nothing in no book.` : `${writes.length} ${writes.length === 1 ? 'thing' : 'things'} on ${name} ${writes.length === 1 ? 'is' : 'are'} in ${await nameOf(book)} now, the book it was put in.`);
+      return writes.length === 0 ? null : { filed: writes.length };
+    }
     if (!LISTS.includes(list)) {
       ctx.log('The script was handed something that holds no account, so nothing was filed in a book.');
       return null;

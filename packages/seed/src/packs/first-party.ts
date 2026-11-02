@@ -941,12 +941,16 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  * - people 4.3.0 (client-link, 2 Nov): People's line counts people and organisations apart and names the clients while
  *   there are three or fewer (`page.people`), over four figures added (`metric.organisations-clients`,
  *   `metric.organisations-not-clients`, `metric.people-clients`, `metric.people-not-clients`). Ids added, so a minor step.
+ * - money-core 3.35.0 (leftovers3, 2 Nov): an account put in a book takes what it already holds with it
+ *   (`rule.account-files-book`, handing `script.book_from_account` the account), a book's This month is drawn only while
+ *   something came in or went out (`page.money-book`), and its Accounts and Add an account each take the whole row. A
+ *   rule added, no id taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.30.2',
   people: '4.3.0',
-  'money-core': '3.34.0',
+  'money-core': '3.35.0',
   estate: '2.7.0',
   work: '1.23.0',
 };

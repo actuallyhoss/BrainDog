@@ -22,6 +22,9 @@ import { BOOK_LEGS, DUE_30D, MOVED_COLUMNS } from './shared.ts';
  * true, because a book's few accounts are the page's subject and Cash now by account is a figure of the whole record.
  * SINCE money-core 3.4.0 the month ahead and what moved are folded under the accounts, as Money's are.
  *
+ * SINCE money-core 3.35.0 This month is drawn only while something came in or went out, and Accounts and Add an account
+ * each take the whole row.
+ *
  * SINCE money-core 3.17.0 a book whose money never goes under in the year reads one line that it lasts (`lastsNote`),
  * and a record holding categories marked against how the Ledger books them says how many (`againstNotes`).
  *
@@ -82,17 +85,23 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
         { metric: 'book-out-month:{{name}}', label: 'Out this month' },
         { metric: 'book-net-month:{{name}}', label: 'Net' },
       ],
-      when: { metric: 'book-net-month:{{name}}', empty: false },
+      /* ONLY WHILE SOMETHING CAME IN OR WENT OUT, SINCE money-core 3.35.0 (leftovers 2 Nov, 2): `book-net-month` over no
+         entries reads nought in the book's own currency, which is an amount, so a book with a currency and a quiet month
+         said "$0, $0, $0", and one whose lines were filed in no book said the same under a month of spending. */
+      when: { any: [{ metric: 'book-in-month:{{name}}', gt: 0 }, { metric: 'book-out-month:{{name}}', gt: 0 }] },
     },
     ...owedRow(declared),
     /* NO "LASTS THE YEAR ON WHAT IS DUE." TILE UNDER THE CHART, SINCE money-core 3.34.0 (next-money, M33): Cash ahead's
        own summary says how far it stays above nought, so the tile said it a second time. */
     ...monthsChart(declared),
     {
+      /* THE WHOLE ROW, SINCE money-core 3.35.0 (leftovers 2 Nov, 1), with Add an account the quiet line under it: at eight
+         twelfths beside a capture of four, the capture was laid on a row of its own under the chart, a field alone in a
+         tile far from the accounts it adds to. */
       kind: 'cards',
       heading: 'Accounts',
       icon: 'landmark',
-      span: 8,
+      span: 12,
       source: 'register.accounts',
       where: 'book is {{name}}, state is not closed',
       columns: [
@@ -112,7 +121,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       kind: 'capture',
       heading: 'Add an account',
       icon: 'plus',
-      span: 4,
+      span: 12,
       register: 'accounts',
       where: 'book is {{spoken}}',
     },
