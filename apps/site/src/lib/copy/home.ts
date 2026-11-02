@@ -87,7 +87,7 @@ export const home = {
     say: 'Filing, naming and sorting just happen, each with a reason and an undo. You only see what needs a person.',
     waits: 'Waits for you',
     done: 'Done on its own',
-    floor: 'Money, keys, sharing and deletes wait for your yes. Only you can let your own agents skip that, and keys and people stay yours even then.',
+    floor: 'Money, keys, sharing and deletes wait for your yes. Only you can let your own agents skip that, and handing it over, deleting it and reading a key stay yours even then.',
     /* The figures beside the two headings, and the line the drawing says once nothing waits. */
     today: (n: number) => `${n} today`,
     empty: 'Nothing needs you. Everything else is handled.',

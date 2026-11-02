@@ -46,7 +46,7 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'agents-leave-a-note', said: "leaves a note when it's done", where: 'tools.say', state: 'true' },
   { id: 'chores-reason-undo', said: 'each with a reason and an undo', where: 'chores.say', state: 'true' },
   { id: 'floor-waits', said: 'Money, keys, sharing and deletes wait for your yes.', where: 'chores.floor', state: 'true' },
-  { id: 'floor-switch', said: 'Only you can let your own agents skip that, and keys and people stay yours even then.', where: 'chores.floor', state: 'true' },
+  { id: 'floor-switch', said: 'Only you can let your own agents skip that, and handing it over, deleting it and reading a key stay yours even then.', where: 'chores.floor', state: 'true' },
   { id: 'together-invite-mail', said: 'Invite someone by email and pick what they can do in plain words.', where: 'together.say', state: 'true' },
   { id: 'together-make-owner', said: 'When you step back, Make owner hands it over.', where: 'together.roles.say', state: 'true' },
   { id: 'together-mention', said: 'Type @ in a comment and pick a name.', where: 'together.mention.say', state: 'true' },

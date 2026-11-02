@@ -36,7 +36,7 @@ braindog addon install ./reading-list/reading-list.pack.json
 braindog addon install reading-list --from https://example.com/catalogue/
 ```
 
-Each files a proposal for the owner rather than installing, and prints where to answer it in Needs you. An agent with a key installs the same way, so no agent can add lists or pages to a record without its owner saying yes.
+Each files a proposal for the owner rather than installing, and prints where to answer it in Needs you. An agent with a key installs the same way, so no agent adds lists or pages to a record without its owner saying yes, unless the owner has turned on **Let your agents do everything without asking** for their own agents.
 
 A record holds the version it installed to that file's checksum, and a catalogue that later served different bytes under the same version would be refused.
 

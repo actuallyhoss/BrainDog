@@ -8,12 +8,12 @@ The last of `braindog`: automations and scripts, your BrainDog as one file you c
 Command | What it does
 braindog automations list | Say every automation you can read, what starts it and how its runs went
 braindog automations show <id> | One automation, with its last ten runs step by step
-braindog automations run <id> | Start one now. A person in the app only, so a token is told so
-braindog automations cancel <run> | Stop a run that has not finished. A person in the app only
-braindog scripts resume <id> | Start a script paused by three refused runs in a row. A person in the app only
+braindog automations run <id> | Start one now. You in the app, or your own agents while Let your agents do everything without asking is on
+braindog automations cancel <run> | Stop a run that has not finished. You in the app, or your own agents while Let your agents do everything without asking is on
+braindog scripts resume <id> | Start a script paused by three refused runs in a row. You in the app, or your own agents while Let your agents do everything without asking is on
 ```
 
-An agent that wants an automation run asks with `propose`, and you press Run now in the app.
+Otherwise an agent that wants an automation run asks with `propose`, and you press Run now in the app.
 
 ## Your BrainDog as a file
 

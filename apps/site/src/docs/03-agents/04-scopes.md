@@ -60,7 +60,7 @@ A few of those can be started from the command line: `braindog export`, `braindo
 Status | Code | What it means
 403 | FORBIDDEN | Outside what this token may reach. The sentence says what it lacks
 403 | LEVEL_REQUIRED | The list is in reach, but the level on it is too low for this
-403 | NEEDS_BROWSER_SESSION | Only a person signed in to the app can do this
+403 | NEEDS_BROWSER_SESSION | Only a person signed in to the app can do this, unless the owner lets their own agents do everything without asking
 401 | UNAUTHORIZED | The token is wrong, ended or revoked
 ```
 
