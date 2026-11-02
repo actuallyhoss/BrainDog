@@ -13,9 +13,33 @@
  */
 
 const ROW = 4;
+/**
+ * NEIGHBOURS THAT ALMOST LINE UP DO LINE UP (empty states 2, polish): with one account and one bill, Accounts stood 8px
+ * taller than Due soon beside it, from the account's 36px well against the bill's 28px day, which reads as a slip and
+ * not as a board of cards. Tiles that start on one row and end within this much of each other end level, the shorter
+ * one as tall as the taller. Further apart, each keeps its own height, as above.
+ */
+const LEVEL = 16;
 
 /** The rows a tile spans for its height and the gap under it. PURE, for its test. */
 export const rowsFor = (height: number, gap: number, row = ROW): number => Math.max(1, Math.ceil((height + gap) / row));
+
+/**
+ * The tiles that start on one row, side by side, and end within `LEVEL` of each other: each such set, read from where
+ * the grid drew them. A tile alone on its row, or one far taller than its neighbour, is in none.
+ */
+function rowsOf(tiles: readonly HTMLElement[], heights: ReadonlyMap<HTMLElement, number>): HTMLElement[][] {
+  const by = new Map<number, HTMLElement[]>();
+  for (const t of tiles) {
+    const top = Math.round(t.getBoundingClientRect().top);
+    by.set(top, [...(by.get(top) ?? []), t]);
+  }
+  return [...by.values()].filter((row) => {
+    if (row.length < 2) return false;
+    const hs = row.map((t) => heights.get(t)!);
+    return Math.max(...hs) - Math.min(...hs) <= LEVEL;
+  });
+}
 
 /** An attachment for Money's page host: packs `.page`'s tiles while it has more than one column. */
 export function masonry(host: HTMLElement): () => void {
@@ -40,7 +64,10 @@ export function masonry(host: HTMLElement): () => void {
     if (columns < 2 || arranging) {
       if (p.hasAttribute('data-packed')) {
         p.removeAttribute('data-packed');
-        for (const t of tiles(p)) t.style.removeProperty('--money-rows');
+        for (const t of tiles(p)) {
+          t.style.removeProperty('--money-rows');
+          t.style.removeProperty('min-block-size');
+        }
       }
       return;
     }
@@ -49,16 +76,29 @@ export function masonry(host: HTMLElement): () => void {
       p.style.setProperty('--money-gap', `${gap}px`);
       p.setAttribute('data-packed', '');
     }
-    for (const t of tiles(p)) {
+    const all = tiles(p);
+    /* EACH TILE'S OWN HEIGHT, measured with no levelling on it (put back below in the same task, so nothing is painted
+       between and the size the observer last saw is the size it sees again). */
+    for (const t of all) t.style.removeProperty('min-block-size');
+    const heights = new Map<HTMLElement, number>();
+    for (const t of all) {
       if (!watched.has(t)) {
         watched.add(t);
         sized.observe(t);
       }
       const h = t.getBoundingClientRect().height;
+      heights.set(t, h);
       /* A tile that draws nothing takes one row of four pixels and no gap. */
       const rows = h === 0 ? 1 : rowsFor(h, gap);
       const was = t.style.getPropertyValue('--money-rows');
       if (was !== String(rows)) t.style.setProperty('--money-rows', String(rows));
+    }
+    for (const row of rowsOf(all.filter((t) => (heights.get(t) ?? 0) > 0), heights)) {
+      const most = Math.max(...row.map((t) => heights.get(t)!));
+      for (const t of row) {
+        t.style.setProperty('--money-rows', String(rowsFor(most, gap)));
+        if (heights.get(t)! < most) t.style.setProperty('min-block-size', `${most}px`);
+      }
     }
   }
 
@@ -80,7 +120,10 @@ export function masonry(host: HTMLElement): () => void {
     if (page) {
       page.removeAttribute('data-packed');
       page.style.removeProperty('--money-gap');
-      for (const t of tiles(page)) t.style.removeProperty('--money-rows');
+      for (const t of tiles(page)) {
+        t.style.removeProperty('--money-rows');
+        t.style.removeProperty('min-block-size');
+      }
     }
   };
 }
