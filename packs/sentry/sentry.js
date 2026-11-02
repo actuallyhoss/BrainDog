@@ -20,9 +20,11 @@
  * row as Looks like for you to pick. A link you change or clear is yours and is never redone.
  *
  * WHEN IT SPEAKS UP. An issue that is new and high priority, has come back after being resolved, or is escalating
- * gets `alarm` set, once each time it turns that way. The add-on's rules ring the bell for it (inside your quiet hours
- * nothing sounds) and, when it has hit at least as many people as the setting says, put it in Needs you with a link
- * to the issue. An issue that calms down clears its alarm, and if it turns again later it is a new alarm.
+ * gets `alarm` set, once a burst. The add-on's rules ring the bell for it once it has hit at least one person (inside
+ * your quiet hours nothing sounds) and, when it has hit at least as many people as the setting says, put it in Needs
+ * you with a link to the issue. The alarm stays the same one while the issue keeps happening, whatever Sentry calls it
+ * from hour to hour, so a burst rings once. It clears when the issue has been quiet for a day or is resolved, and only
+ * then can a later turn be a new alarm. Coming back after being resolved is always a new one.
  *
  * NOTHING IS EVER WRITTEN TO SENTRY. Every request is a read.
  */
@@ -35,6 +37,8 @@ const ISSUES_EACH = 50;
 const DAY_MS = 86_400_000;
 /* A NUMBER THAT HAS NOT MOVED IS STILL WRITTEN ONCE THIS LONG HAS PASSED, so a chart has a point every day. */
 const RESAY_MS = 20 * 3_600_000;
+/* AN ISSUE WITH NO EVENT FOR THIS LONG HAS GONE QUIET: its burst is over, and the next turn is a new alarm. */
+const QUIET_MS = DAY_MS;
 
 /* THE FOUR NUMBERS, each with the tag a page finds it by. */
 export const MEASURES = [
@@ -358,12 +362,28 @@ export default async function run(ctx) {
     const kind = alarmKind(issue);
     const users = whole(issue.userCount);
     const thing = linked.get(project.slug) ?? null;
-    /* A NEW ALARM EACH TIME IT TURNS: the count goes up when the kind is set and was not, so the rules' once-per key is new. */
+    /* ONE ALARM A BURST (1.2.2). The rules ring once per alarm, so the alarm is what a burst is. It was made again each
+       time Sentry's word for the issue moved, and an issue that went escalating, then ongoing, then escalating again in
+       the same afternoon rang each time (10 bells in a day on one record). Now an alarm, once set, stays the same one
+       while the issue keeps happening, and clears only when the issue has gone a day with no event or is resolved (the
+       row closed below). A new alarm (the count goes up, so the rules' once-per key is new) needs a turn after that, or
+       a regression, which means somebody resolved it and it came back. */
     const was = row ? String(row.fields.alarm ?? '') : '';
     const turns = row ? whole(row.fields.turns) : 0;
     const wasKind = was.split('-')[0];
-    const alarm = kind === '' ? '' : wasKind === kind ? was : `${kind}-${turns + 1}`;
+    const lastMs = Date.parse(String(issue.lastSeen ?? ''));
+    const quiet = Number.isFinite(lastMs) && nowMs - lastMs >= QUIET_MS;
+    /* STILL IN THE BURST AN OLDER VERSION CLEARED: open here, seen within the quiet time, and alarmed before. That
+       version cleared an alarm the hour Sentry's word moved off it, so the same turn is taken up again, never a new one. */
+    const heldSeen = row ? Date.parse(String(row.fields.last_seen ?? '')) : NaN;
+    const ongoing = !!row && row.fields.open !== false && turns > 0 && Number.isFinite(heldSeen) && nowMs - heldSeen < QUIET_MS;
+    let alarm = '';
+    if (quiet) alarm = '';
+    else if (was !== '') alarm = kind === 'regressed' && wasKind !== 'regressed' ? `${kind}-${turns + 1}` : was;
+    else if (kind !== '') alarm = ongoing ? `${kind}-${turns}` : `${kind}-${turns + 1}`;
     if (alarm !== '' && alarm !== was) rang++;
+    /* WHAT THE ALARM SAYS IS WHAT IT WAS SET FOR, with today's numbers. */
+    const said = alarm === '' ? '' : alarm.split('-')[0];
     const fields = {
       what: String(issue.title ?? issue.metadata?.title ?? 'An error').slice(0, 160),
       short_id: issue.shortId ? String(issue.shortId) : null,
@@ -383,9 +403,9 @@ export default async function run(ctx) {
       link: linkOf(issue),
       open: true,
       alarm: alarm === '' ? null : alarm,
-      turns: alarm !== '' && alarm !== was ? turns + 1 : turns,
-      why: alarm === '' ? null : whyOf(kind, users, eventsInDay(issue)),
-      news: alarm === '' ? null : newsOf(kind, users),
+      turns: alarm === '' ? turns : Math.max(turns, Number(alarm.split('-')[1]) || turns),
+      why: alarm === '' || !WHY[said] ? null : whyOf(said, users, eventsInDay(issue)),
+      news: alarm === '' || !NEWS[said] ? null : newsOf(said, users),
       wide: alarm !== '' && users >= many,
     };
     if (!row) {

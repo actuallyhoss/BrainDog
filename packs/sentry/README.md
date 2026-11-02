@@ -13,8 +13,10 @@ What is breaking in your apps, read from Sentry every hour. Reads only: nothing 
 - **Numbers**: Open errors, New errors in a day, Error events in a day and People hit in a day for each of your
   projects, tagged `sentry`, so they chart like any other feed.
 - **Errors** page, an **Errors** tile on each linked project's page, and two Today widgets.
-- An issue that is new and high priority, comes back after being resolved, or is escalating rings the bell (held in
-  your quiet hours). One that has hit at least as many people as the setting says also waits in Needs you.
+- An issue that is new and high priority, comes back after being resolved, or is escalating rings the bell once it has
+  hit at least one person (held in your quiet hours). It rings once a burst: not again for the same issue until it has
+  gone a day with no event or was resolved and came back. One that has hit at least as many people as the setting says
+  also waits in Needs you.
 
 ## Connect it
 
