@@ -238,6 +238,14 @@ detail is fetched by an authenticated client. A push payload passes through a th
 service, and this record holds money and credentials; putting an amount in a push notification is
 a leak with a friendly UI on it.
 
+**Push to a colleague (2 Nov).** `notify.push` rings the owner's subscriptions; a colleague's own phones are rung by
+`kernel.tellColleague` (`personPushSubs`), kind `people`, when a row is handed to them, when a comment @mentions them
+on a row, a question or a decision, and, for the inviter, when somebody joins from their invitation. The payload is
+the same content-free shape, `{ sub, cause, open, kind }`, and the phone says only "Someone handed you something",
+"Someone mentioned you in a comment" or "Someone you invited joined". It never rings the person who did it, nor anybody
+who cannot see the row or question, once per cause, inside the record's quiet hours, at most six an hour per person,
+and each person turns the kind off in Settings > Notifications. [20-COLLABORATION](20-COLLABORATION.md) §7 has the rest.
+
 ---
 
 ## 4 · The notification contract
