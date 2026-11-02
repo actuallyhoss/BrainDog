@@ -45,6 +45,8 @@ export function between(a: Shape, b: Shape, t: number): string {
 const easeOut = (t: number): number => 1 - (1 - t) ** 3;
 
 const running = new WeakMap<Text, number>();
+/** Whether a text is still counting: what it says now is a figure on its way, not the one it will stay at. */
+export const counting = (text: Node): boolean => running.has(text as Text);
 /** What this module last wrote into each text, so its own writes are not taken for the record's. */
 export const wrote = new WeakMap<Text, string>();
 

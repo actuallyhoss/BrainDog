@@ -24,6 +24,7 @@
   import { WIDGETS_PARAM } from './sheet-address.ts';
   import { todayOffer } from './offer.svelte.ts';
   import { fitBoard } from './fit.ts';
+  import { counting } from '$lib/motion/count.ts';
   import { calm, ms, play, still as lessMotion } from '$lib/motion';
 
   /* THE SHEET AND THE SUGGESTION ARE FETCHED WHEN ASKED FOR, not with Today: the catalogue, its previews and the
@@ -146,7 +147,13 @@
     };
     const sized = new ResizeObserver(fit);
     sized.observe(node);
-    const changed = new MutationObserver(fit);
+    /* NOT FOR A FIGURE ON ITS WAY (speed6, 2 Nov): a count writes its text every frame for about 400 ms, and each write
+       fitted the board again, two layouts of the whole page a frame on a cold phone. Its last write, the figure it stays
+       at, still fits it. */
+    const changed = new MutationObserver((said) => {
+      if (said.every((m) => m.type === 'characterData' && counting(m.target))) return;
+      fit();
+    });
     changed.observe(node, { childList: true, subtree: true, characterData: true });
     fit();
     return () => {
