@@ -782,7 +782,7 @@
     box-sizing: border-box;
     flex: none;
     block-size: calc(56px + var(--shell-inset, 0px));
-    padding: var(--shell-inset, 0px) var(--sp-3) 0 var(--sp-3);
+    padding: var(--shell-inset, 0px) var(--sp-3) 0 max(var(--sp-3), var(--shell-lead, 0px));
     border-block-end: 1px solid var(--rule);
   }
 
@@ -829,6 +829,16 @@
     gap: var(--sp-2);
     padding-inline: var(--sp-2) 0;
     margin-block: var(--sp-4) var(--sp-1);
+  }
+
+  /* UNDER A THUMB THE HEAD IS AS TALL AS ITS TARGETS (mobile pass of 2 November): "Projects" and its + are 44 high by
+     `.tap`'s box in a 28px row, so both reached 4px into the first project's row on Menu. The row is now 44 and the
+     rows start under it, with the gap above the head taken in by the same amount so the list barely moves. */
+  @media (width < 900px) {
+    .s-head {
+      min-block-size: var(--tap);
+      margin-block: var(--sp-3) 0;
+    }
   }
 
   .s-title {
@@ -1232,6 +1242,12 @@
     block-size: calc(56px + var(--shell-inset, 0px));
     padding-block-start: var(--shell-inset, 0px);
     border-block-end: 1px solid var(--rule);
+  }
+
+  /* IN THE MAC APP THE RAIL'S HEAD IS WHERE THE TRAFFIC LIGHTS STAND (`--shell-lead`), so the mark gives them its place;
+     the bar after it takes the rest of their room (`AppFrame.svelte`). */
+  :global(:root[data-shell='mac']) .s-rhead > :global(*) {
+    visibility: hidden;
   }
 
   .s-rlist {
