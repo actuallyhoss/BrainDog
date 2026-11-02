@@ -610,6 +610,60 @@
     pointer-events: none;
   }
 
+  /* AND WHERE THE WIDGET NAMES ITS LIST, THE COUNT IS A LINK THERE (`fit.ts` `moreLinks`), drawn where the words were and
+     as they were, so nothing moves: the words give way to it. A pointer darkens it; a key gets the one ring (`a11y.css`). */
+  .board :global([data-board-key][data-more][data-more-link]::after),
+  .board :global([data-board-key] [data-more-before][data-more-link]::before) {
+    content: none;
+  }
+
+  .board :global(a[data-fit-more]) {
+    position: absolute;
+    inset-inline-start: 20px;
+    inset-block-end: var(--sp-3, 12px);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 20px;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: color var(--d-state) var(--ease-out);
+  }
+
+  .board :global(a[data-fit-more]:hover) {
+    color: var(--ink);
+  }
+
+  .board-root:not([data-editing]) .board :global([data-board-key] > a[data-fit-more]) {
+    position: static;
+    order: 1;
+    flex: none;
+    align-self: flex-start;
+    padding-block-start: var(--sp-2);
+  }
+
+  .board-root:not([data-editing]) .board :global([data-board-key]:has(.project-cards) > a[data-fit-more]) {
+    position: absolute;
+    inset-block: 0 auto;
+    inset-inline: auto 0;
+    padding-block-start: 0;
+    line-height: 28px;
+  }
+
+  .board-root:not([data-editing]) .board :global([data-board-key]:has(.project-cards):is(:hover, :focus-within) > a[data-fit-more]:not(:focus-visible)) {
+    opacity: 0;
+  }
+
+  .board-root:not([data-editing]) .board :global([data-board-key]:has(> .desk-part) > a[data-fit-more]) {
+    position: absolute;
+    inset-inline-start: var(--sp-4);
+    padding-block-start: 0;
+  }
+
+  .board :global([data-board-key] [data-more-before] > a[data-fit-more]) {
+    inset-inline-start: 0;
+    inset-block-end: 100%;
+  }
+
   /* AND WHERE THE WIDGET HAS A QUIET FOOT, the count sits just above it, in the room `fit.ts` kept for it. */
   .board :global([data-board-key] [data-more-before]) {
     position: relative;

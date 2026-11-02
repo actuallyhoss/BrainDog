@@ -15,6 +15,14 @@ const ROWS = '.ln, .qa, .run, li, tr, .cards-item, .feed-row, [data-row]';
 const FOOT = '.late-more, .block-more, .block-slice, .queue-more, .p-more, [data-needs-foot], .signs-line, .t-more, .more, .r-more, [data-draft-mark], .l-foot, .tile-link';
 /** A foot that is the widget's own "N more" or "All …" link, which already says there is more. */
 const SAYS_MORE = /\b(?:more|all)\b/iu;
+/** The "N more" link this file draws (`moreLinks`), whose words are never read back as the widget's own. */
+const OWN_LINK = 'a[data-fit-more]';
+/** What a foot says in its own words, less the link this file put in it. */
+const saidBy = (el: HTMLElement): string => {
+  const link = el.querySelector(OWN_LINK);
+  const all = el.textContent ?? '';
+  return link ? all.replace(link.textContent ?? '', '') : all;
+};
 /**
  * A CHART'S OWN PARTS ARE NOT ROWS: its bars, scale, ticks and legend are list items and its numbers a table, and read as
  * rows they were hidden one by one and counted, a weekly chart drawn as its title and "36 more" (the validator's recheck
@@ -114,7 +122,7 @@ export function fitBoard(board: HTMLElement): void {
       /* A WIDGET THAT HAS NO "N MORE" OF ITS OWN SAYS HOW MANY IT LEFT OUT, under what it shows: at the frame's foot where
          nothing else is there, and just above its first foot where one is (a quiet line such as "Windows PC: 1 Claude
          session, quiet"), so the two never sit on each other (recheck N3). A foot that says more already says it. */
-      const says = over === Infinity && !kept.some((f) => SAYS_MORE.test(f.el.textContent ?? ''));
+      const says = over === Infinity && !kept.some((f) => SAYS_MORE.test(saidBy(f.el)));
       const cutAt = says && !inHead && past(limit) > 0 ? limit - MORE_PX : limit;
       return { says, cutAt, shown: rects.some((r) => r.height > 0 && r.bottom <= cutAt + 1) };
     };
@@ -122,7 +130,7 @@ export function fitBoard(board: HTMLElement): void {
     let p = plan(kept);
     /* A QUIET FOOT GIVES WAY BEFORE THE LAST ROW DOES: where the rows, the count and the quiet lines cannot all fit, the
        quiet lines go and one row at least stays (a one-row Working now). */
-    const quiet = feet.filter((f) => !SAYS_MORE.test(f.el.textContent ?? ''));
+    const quiet = feet.filter((f) => !SAYS_MORE.test(saidBy(f.el)));
     if (!p.shown && rects.some((r) => r.height > 0) && quiet.length > 0) {
       kept = feet.filter((f) => !quiet.includes(f));
       p = plan(kept);
@@ -179,6 +187,7 @@ export function fitBoard(board: HTMLElement): void {
   for (const [row, cut] of marks) if (cut) row.dataset.cut = '';
   for (const [foot, said] of before) foot.dataset.moreBefore = said;
   for (const [foot, cut] of recounts) recount(foot, cut);
+  moreLinks(frames);
   closeUp(board, frames);
 }
 
@@ -226,13 +235,64 @@ function closeUp(board: HTMLElement, frames: readonly HTMLElement[]): void {
   if (moves.length > 0 && slack > 0) board.style.marginBlockEnd = `${-slack}px`;
 }
 
+/** Where a widget's whole list is: its head's link to its source, or its own door ("All agents", "All numbers"). */
+const DOOR = 'a.block-source[href], a.tile-link[href], a.kb-all[href]';
+
+/**
+ * THE "N MORE" A FRAME WRITES IS A LINK TO THE WHOLE LIST (work2 2 Nov, 7): "1 more" under Your work this week and "3 more"
+ * on Projects were words drawn by the stylesheet, so the one line that said there was more led nowhere. Where the widget
+ * names its list (its head's source link, or its own door), the count is drawn as a link there, in the same place and
+ * the same size as the words it replaces (`Board.svelte`), so nothing moves; where it names none, the words stay.
+ * Written only where something changed, so the board's watch of its own content does not fit it again for nothing.
+ */
+function moreLinks(frames: readonly HTMLElement[]): void {
+  for (const frame of frames) {
+    const door = frame.querySelector<HTMLAnchorElement>(DOOR)?.getAttribute('href') ?? null;
+    /* AT THE FRAME'S FOOT, a child of the frame, where its words were. */
+    const own = frame.querySelector<HTMLAnchorElement>(`:scope > ${OWN_LINK}`);
+    const said = frame.dataset.more;
+    if (said !== undefined && door !== null) {
+      linkTo(frame, own, said, door, 'end');
+      if (frame.dataset.moreLink === undefined) frame.dataset.moreLink = '';
+    } else {
+      own?.remove();
+      if (frame.dataset.moreLink !== undefined) delete frame.dataset.moreLink;
+    }
+    /* AND OVER A QUIET FOOT, inside it, where its words were; never inside a foot that is a link itself. */
+    for (const foot of frame.querySelectorAll<HTMLElement>('[data-more-before], [data-more-link]:not([data-board-key])')) {
+      const inner = foot.querySelector<HTMLAnchorElement>(`:scope > ${OWN_LINK}`);
+      const before = foot.dataset.moreBefore;
+      if (before !== undefined && door !== null && foot.tagName !== 'A' && foot.querySelector('a:not([data-fit-more])') === null) {
+        linkTo(foot, inner, before, door, 'start');
+        if (foot.dataset.moreLink === undefined) foot.dataset.moreLink = '';
+      } else {
+        inner?.remove();
+        if (foot.dataset.moreLink !== undefined) delete foot.dataset.moreLink;
+      }
+    }
+  }
+}
+
+function linkTo(host: HTMLElement, link: HTMLAnchorElement | null, said: string, href: string, at: 'start' | 'end'): void {
+  let a = link;
+  if (a === null) {
+    a = document.createElement('a');
+    a.dataset.fitMore = '';
+    a.className = 'fit-more';
+    if (at === 'start') host.prepend(a);
+    else host.append(a);
+  }
+  if (a.getAttribute('href') !== href) a.setAttribute('href', href);
+  if (a.textContent !== said) a.textContent = said;
+}
+
 /** A foot's "N more" at its start, the number it says it leaves out. */
 const MORE_COUNT = /^\s*\d[\d,]*\s+more\b/u;
 
 /** The first of a foot's own words that holds a figure, which is where its "N more" is written. */
 function countNode(foot: HTMLElement): Text | null {
   const walk = document.createTreeWalker(foot, NodeFilter.SHOW_TEXT);
-  for (let n = walk.nextNode(); n; n = walk.nextNode()) if (/\d/u.test(n.nodeValue ?? '')) return n as Text;
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) if (/\d/u.test(n.nodeValue ?? '') && !n.parentElement?.closest(OWN_LINK)) return n as Text;
   return null;
 }
 const ownText = (foot: HTMLElement): string => countNode(foot)?.data ?? '';
