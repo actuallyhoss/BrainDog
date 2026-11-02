@@ -324,6 +324,8 @@
   let engine = $state<Engine | null>(null);
   let signs = $state<Sign[] | null>(null);
   let asked = false;
+  /* WHETHER THE HEALTH READS HAVE ANSWERED, so the index waits for its head (below). */
+  let healthIn = $state(false);
 
   /* ONLY THE OWNER READS FAULTS (`faults` refuses anyone else), so nobody else is asked for them or offered Details. */
   const owns = $derived(!shell.refused && may(shell, 'owner'));
@@ -367,6 +369,7 @@
     }
     engine = eng && typeof eng === 'object' && 'health' in eng ? (eng as Engine) : null;
     signs = Array.isArray(vital?.signs) ? vital.signs : null;
+    healthIn = true;
   }
 
   $effect(() => {
@@ -535,7 +538,12 @@
 {#if !known}
   <!-- THE INDEX, DRAWN BY THE ONE READER: Home's body mode, with no head of its own under this one. Where the record
        cannot draw it, the chooser's list is the index, so nobody is left on a page of nothing. -->
-  <div class="settings-index">
+  <!-- THE INDEX WAITS OUT OF SIGHT FOR ITS HEAD (leftovers9): a fault's Try again and Details land under the sentence, and
+       the health line takes the lead sentence's place in more or fewer lines, once the record answers. Drawn first, the
+       tiles moved 40 to 48px down when that landed (0.027 at 390 on a record with an open fault, 0.025 on live). Hidden
+       boxes that move are no shift. At most 2.5 s, as `settings.css` holds an area's tiles, so a read that hangs hides
+       nothing for good. -->
+  <div class="settings-index" data-held={!healthIn && !shell.refused ? '' : undefined}>
     <!-- IN THE IPHONE APP THE INDEX IS THE CHOOSER'S LIST, in the order the record's index gives (`groups`), since the
          drawn index's Billing row is a link and the app shows the plan as a line (`SettingsIndex`). -->
     {#if indexDown || !owner || inIosApp}
@@ -726,6 +734,17 @@
     min-inline-size: 0;
     max-inline-size: var(--page-max);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
+  }
+
+  .settings-index[data-held] {
+    visibility: hidden;
+    animation: index-held 0s linear 2.5s forwards;
+  }
+
+  @keyframes index-held {
+    to {
+      visibility: visible;
+    }
   }
 
   /* THE INDEX'S DIVIDERS START AT THE TEXT (agents F28), past the row's well, where the link list's own padding puts the
