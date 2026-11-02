@@ -21,7 +21,7 @@ import { shareSentenceOf, type Share, type ShareCaps, type ShareHide, type Share
 
 import { copy } from '../copy.ts';
 import { deletesOf, rowsOf, rungOf, templateOf, type Fills, type Offers } from './templates.ts';
-import { recordToday } from '../record/zone.ts';
+import { recordMidnight, recordToday } from '../record/zone.ts';
 
 const DAY_MS = 86_400_000;
 /** How long a share with somebody not on the record lasts unless somebody says otherwise (§6, default 2). */
@@ -180,7 +180,12 @@ export function whoOf(w: With): Share['who'] {
 /** When it ends, as an instant: a picked day lasts to its end. */
 export function untilAt(u: Until, now: number): string | undefined {
   if (u.kind === 'none') return undefined;
-  if (u.kind === 'day') return `${u.day}T23:59:59.000Z`;
+  /* THE END OF THAT DAY ON THE RECORD'S CLOCK (collab pass 2), as every day on the screen is the record's: read as UTC, a
+     share "until 2 Dec" on a record in New York stopped at seven in the evening of the 2nd. */
+  if (u.kind === 'day') {
+    const after = Date.parse(`${u.day}T12:00:00Z`) + DAY_MS;
+    return Number.isFinite(after) ? new Date(recordMidnight(after) - 1000).toISOString() : `${u.day}T23:59:59.000Z`;
+  }
   const days = u.kind === 'day1' ? 1 : u.kind === 'week' ? 7 : 30;
   return new Date(now + days * DAY_MS).toISOString();
 }

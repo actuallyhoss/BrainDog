@@ -70,7 +70,7 @@
   import { asksConfirm, sheetApi, type Got, type Group, type Here, type Preview } from './sheet-api.ts';
   import { chipsFor } from './templates.ts';
   import { SHARED_EVENT } from './sharing.ts';
-  import { recordToday } from '../record/zone.ts';
+  import DayBox from '../ui/DayBox.svelte';
 
   let {
     open = $bindable(false),
@@ -532,14 +532,14 @@
             </Segmented>
             {#if s.until.kind === 'day'}
               <label class="field-label share-day-label" for="{uid}-day">{copy.shareUntilDay}</label>
-              <span class="field share-day">
-                <input
+              <!-- THE RECORD'S WORDS FOR A DAY ("2 Dec 2026"), typed where it is drawn (`DayBox`), and never the browser's own
+                   control, which said "02/12/2026" or "12/02/2026" by the machine's language (collab pass 2). A day that
+                   does not read, or is not after today in the record's zone, keeps Share from sending (`canSend`). -->
+              <span class="share-day">
+                <DayBox
                   id="{uid}-day"
-                  class="field-input"
-                  type="date"
-                  min={recordToday(now + 86_400_000)}
-                  value={s.until.day}
-                  oninput={(e) => (s = { ...s, until: { kind: 'day', day: e.currentTarget.value } })}
+                  label={copy.shareUntilDay}
+                  bind:value={() => (s.until.kind === 'day' ? s.until.day : ''), (v) => (s = { ...s, until: { kind: 'day', day: v ?? '' } })}
                 />
               </span>
             {/if}
@@ -758,6 +758,20 @@
 
   .share-day-label {
     margin: 0;
+  }
+
+  /* THE DAY BOX, ITS LINE'S WIDTH: 16px and 44 tall under a thumb, as every box in the sheet is. */
+  .share-day {
+    display: flex;
+    min-inline-size: 0;
+  }
+
+  @media (width < 900px) {
+    .share-day :global(.day) {
+      min-block-size: var(--tap);
+      max-block-size: var(--tap);
+      font-size: 16px;
+    }
   }
 
   /* THE FIVE LENGTHS ON ONE LINE, at 390 and in the drawer: each takes what its words need, with a little less room
