@@ -2,7 +2,7 @@
  * THE FIRST RUN AS A CONVERSATION (1 Nov, the owner: "i need the who are you to be a conversation with questions. not
  * just a field"). BrainDog says hello and asks "What do you do?", then asks the follow-ups that matter for building this
  * person's BrainDog, one at a time, chosen from what they said: what they work on, the money side, which currency, who
- * they work with, which AI tools they use, and what to keep track of first. A topic the answers already settled is
+ * they work with, their name, which AI tools they use, and what to keep track of first. A topic the answers already settled is
  * skipped. Usually three to five questions; never more than `ASKS_MOST`; every one skippable; "That's enough" ends it.
  *
  * EVERY ANSWER IS ONE MORE SENTENCE OF WHAT WAS SAID (`saidOf`), joined to the rest (`joinTurns`), so the reading, the
@@ -258,8 +258,15 @@ export type Where = {
   model?: ModelAsk | null;
 };
 
-/** The order the rules ask in, after "What do you do?". */
-export const ORDER: readonly Topic[] = ['closest', 'work', 'money', 'currency', 'people', 'tools', 'name', 'first'];
+/**
+ * The order the rules ask in, after "What do you do?". THE NAME BEFORE THE TOOLS (2 Nov, a walk: an agency owner's six
+ * questions ran out on the tools and he was never asked his name, so his BrainDog took the email's). The tools are learned
+ * later; a name is how every screen after this one speaks to them.
+ */
+export const ORDER: readonly Topic[] = ['closest', 'work', 'money', 'currency', 'people', 'name', 'tools', 'first'];
+
+/** The questions the last turns are kept for, in this order: who they are, then what to keep first. */
+const KEPT_FOR_LAST: readonly Topic[] = ['name', 'first'];
 
 const QUESTION_MOST = 120;
 const CHOICE_MOST = 24;
@@ -476,10 +483,14 @@ export function nextAsk(w: Where): ChatAsk | null {
     const c = rulesAsk('currency', w);
     if (c !== null && c.choices.length > 1) return c;
   }
+  /* THE LAST TURNS ARE KEPT FOR THE NAME AND WHAT FIRST (`KEPT_FOR_LAST`): when only as many are left as those still
+     open, nothing else is asked, so the cap drops the tools question and never the name. */
+  const owed = KEPT_FOR_LAST.filter((t) => open.includes(t));
+  const only = room <= owed.length ? owed : null;
   const m = modelAsk(w.model, w, asked);
-  if (m !== null && (room > 1 || m.topic === 'first')) return m;
+  if (m !== null && (only === null || only.includes(m.topic))) return m;
   for (const t of open) {
-    if (room === 1 && t !== 'first' && open.includes('first')) continue;
+    if (only !== null && !only.includes(t)) continue;
     const r = rulesAsk(t, w);
     if (r !== null) return r;
   }
