@@ -1512,6 +1512,9 @@
     margin-block-start: -54px;
     padding-inline-end: 180px;
     pointer-events: none;
+    /* AS TALL AS THE HEAD IT RISES INTO (leftovers9): one row of chips is 40px and the head's buttons 52, so Payees'
+       Share stood on the edge of the first tile with no gap under it. */
+    min-block-size: 54px;
   }
 
   /* ROOM FOR THE BUTTONS THE HEAD HOLDS, AND NO MORE: Share and More take 140px, Show the data 120 beside them. At a flat
