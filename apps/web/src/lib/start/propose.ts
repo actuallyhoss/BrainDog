@@ -1200,6 +1200,15 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     heard: typed === null ? sayCurrency(lines, modules, currency) : lines,
     ...(Object.keys(names).length === 0 ? {} : { names }),
   };
+  /* THE CLIENTS NAMED IN A LIST ARE CLIENTS (`clientsNamed`), where the reading kept none of them and People is kept. */
+  if (read.declined === null && listById(PEOPLE, modules)) {
+    const have = new Set(rows.map((r) => String(r.fields['name'] ?? r.fields['what'] ?? '').trim().toLocaleLowerCase()));
+    for (const n of clientsNamed(said)) {
+      if (have.has(n.toLocaleLowerCase()) || n.toLocaleLowerCase() === (name.name ?? '').toLocaleLowerCase()) continue;
+      have.add(n.toLocaleLowerCase());
+      rows.push({ register: PEOPLE, fields: { name: n, role: 'client' } });
+    }
+  }
   /* A CLIENT BY ONE NAME IS A COMPANY (`clientCompany`), kept in organisations, where no other entry points at it. */
   for (const [i, r] of rows.entries()) {
     if (rows.some((x) => x.party === i)) continue;
@@ -1218,6 +1227,32 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
 }
 
 /* ── a client is somebody, never a project ──────────────────────────────── */
+
+/* ONE NAME: a capital and a small letter, then more words that start with a capital ("Kettle & Co", "Blue Fern"). */
+const CLIENT_NAME = String.raw`\p{Lu}\p{Ll}[\p{L}\p{N}'’-]*(?:\s+(?:&\s+)?\p{Lu}[\p{L}\p{N}'’.-]*)*`;
+const CLIENT_LIST = `${CLIENT_NAME}(?:(?:\\s*,\\s*(?:and\\s+)?|\\s+and\\s+|\\s+&\\s+)${CLIENT_NAME})*`;
+/* "three clients, Fenwick, Brightside and Acme", "clients like Fenwick and Acme", "my clients are Fenwick and Acme". */
+const AFTER_CLIENTS = new RegExp(String.raw`\b(?:clients?|customers?)\b(?:\s+(?:are|is|include|including|like|called|named|such as))?\s*[,:]?\s+(${CLIENT_LIST})`, 'gu');
+/* "a checkout redesign for Fenwick", "a brand refresh for Kettle & Co": work done for somebody named. */
+const WORK_FOR = new RegExp(String.raw`\b(?:redesign|rebuild|refresh|website|site|app|campaign|brand(?:ing)?|audit|logo|shoot|project|retainer|work)\s+for\s+(${CLIENT_NAME})`, 'gu');
+/* Words with a capital that name no client: the days and months, and "I". */
+const NOT_CLIENT = /^(?:i|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december)$/iu;
+
+/**
+ * THE CLIENTS A SENTENCE NAMES (2 Nov, a walk with no model: "I work with three clients, Fenwick, Brightside and Acme"
+ * made a People page that said "Just you so far"): a list after "clients", and the names work is done for ("a website
+ * rebuild for Northwind"). Each as typed, none twice, at most six.
+ */
+export function clientsNamed(said: string): string[] {
+  const out: string[] = [];
+  const add = (n: string) => {
+    const v = n.trim().replace(/[.’']+$/u, '');
+    if (v !== '' && !NOT_CLIENT.test(v) && [...v].length <= 40 && !out.some((x) => x.toLocaleLowerCase() === v.toLocaleLowerCase())) out.push(v);
+  };
+  for (const m of said.matchAll(AFTER_CLIENTS)) for (const n of (m[1] ?? '').split(/\s*,\s*(?:and\s+)?|\s+and\s+/u)) add(n);
+  for (const m of said.matchAll(WORK_FOR)) add(m[1] ?? '');
+  return out.slice(0, 6);
+}
 
 /** Whether the words call this name a client: "clients Fenwick and Acme", "Acme, a client", "for my client Fenwick". */
 function calledClient(name: string, sentence: string): boolean {

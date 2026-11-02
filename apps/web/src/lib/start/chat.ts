@@ -80,6 +80,8 @@ export const chatWords = {
   nameAgain: "I didn't catch a name there. What's your first name?",
   /** The business use case as a freelancer hears it (`caseTitle`). */
   freelance: 'Freelance',
+  /** The founder use case as founders who are more than one hear it (`caseTitle`). */
+  startup: 'Startup',
   /** The end, before the summary. */
   done: "That's enough to start. Here is what I'll make. Take out anything you don't want.",
   doneShort: 'Here is what I will make. Take out anything you do not want.',
@@ -111,7 +113,7 @@ export function kindOf(said: string, usecase: string | null): Kind {
   if (usecase === 'shop' || /\b(shop|store|etsy|orders|sell)\b/u.test(s)) return 'shop';
   if (usecase === 'team' || /\b(our team|my team|the team)\b/u.test(s)) return 'team';
   if (usecase === 'business' || /\b(business|agency|studio|company)\b/u.test(s)) return 'business';
-  if (usecase === 'personal') return 'personal';
+  if (usecase === 'personal' || /\b(household|our home|family budget|my partner|my salary|personal (?:money|finances?))\b/u.test(s)) return 'personal';
   return null;
 }
 
@@ -193,6 +195,27 @@ export function currencyUnclear(said: string, env: CurrencyEnv | null): boolean 
   return codes.length + named.length >= 2 || (codes.length === 0 && named.length === 1 && namedCurrency(said, env) === null);
 }
 
+/**
+ * THE CURRENCY AN ANSWER NAMES IN WORDS (2 Nov, a walk: "US Dollar" and "Euro" typed to "I'll keep money in British
+ * Pound. Is that right?" were thanked and dropped, and the record was made in pounds): its English name ("US Dollar",
+ * "euros"), else an everyday word ("dollars", "quid"), the one of its codes the question offered first. `null` for none.
+ */
+export function codeNamed(answer: string, offered: readonly string[] = []): string | null {
+  const a = answer.trim().toLocaleLowerCase().replace(/[.!]+$/u, '');
+  if (a === '') return null;
+  const list = (Intl as { supportedValuesOf?: (key: 'currency') => string[] }).supportedValuesOf;
+  const all = typeof list === 'function' ? list('currency') : [];
+  const bare = (x: string): string => x.toLocaleLowerCase().replace(/s$/u, '');
+  for (const code of all) {
+    const n = displayName(code).toLocaleLowerCase();
+    if (n !== code.toLocaleLowerCase() && (bare(n) === bare(a) || bare(a).endsWith(` ${bare(n)}`))) return code;
+  }
+  const words = wordsSaid(a);
+  if (words.length !== 1) return null;
+  const codes = words[0]!.codes;
+  return codes.find((c) => offered.includes(c)) ?? codes[0] ?? null;
+}
+
 /** The codes the words point at, in the order said, and the device's beside them: what the currency question offers. */
 function codesOffered(said: string, env: CurrencyEnv | null): string[] {
   const device = env?.zone ? currencyChoices('', env, 1).suggested : null;
@@ -204,6 +227,9 @@ function codesOffered(said: string, env: CurrencyEnv | null): string[] {
   }
   return out.filter((c) => knownCode(c));
 }
+
+/** The currencies offered after the ones the words and the device point at. */
+const COMMON = ['USD', 'EUR', 'GBP'] as const;
 
 /** Whether the build keeps money: a part that keeps a currency is on. */
 export type Money = { kept: boolean; currency: string | null; guessed: boolean };
@@ -266,6 +292,16 @@ export function settled(topic: Topic, w: Where): boolean {
   }
 }
 
+/** What each kind of person is offered to keep first: words the first to-dos are drawn from (`todosOf`). */
+const FIRST_TAPS: Readonly<Record<string, readonly string[]>> = {
+  freelance: ['Invoices', 'Clients', 'Deadlines', 'Projects'],
+  business: ['Clients', 'Invoices', 'Projects', 'Deadlines'],
+  founder: ['The launch', 'Customers', 'Spending', 'Tasks'],
+  personal: ['Bills', 'Savings', 'Subscriptions', 'Rent'],
+  student: ['Deadlines', 'Courses', 'Money', 'Projects'],
+  shop: ['Orders', 'Stock', 'Sales', 'Suppliers'],
+};
+
 /** The rules' question for a topic, in words that fit what kind of person they are. */
 export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
   const kind = kindOf(w.said, w.usecase);
@@ -286,19 +322,24 @@ export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
       if (kind === 'founder') return ask('What are you building, and what is on this month?', ['Our first launch', 'Finding customers', 'Raising money', 'Hiring']);
       if (kind === 'student') return ask('Which courses or side projects are you on right now?', ['My courses', 'A side project', 'A thesis', 'Job hunting']);
       if (kind === 'shop') return ask('What do you sell?', ['Things I make', 'Products I stock', 'Digital things']);
+      /* NOT "WHAT ARE YOU WORKING ON" TO SOMEBODY SORTING OUT HOME MONEY (2 Nov, a walk: a household was offered "Day-to-day
+         running"). */
+      if (kind === 'personal') return ask('What are you saving for or sorting out right now?', ['Saving for a holiday', 'Paying off a card', 'Moving home', 'Sorting out bills']);
       return ask('What are you working on right now?', ['A few projects', 'One big project', 'Day-to-day running']);
     case 'money':
       if (kind === 'freelance') return ask('How do you get paid, and what goes out each month?', ['Invoices to clients', 'A monthly retainer', 'Bills and subscriptions', 'Not now']);
       if (kind === 'founder') return ask('Is money coming in yet, and what goes out?', ['Customer subscriptions', 'Not yet', 'Investor money', 'Hosting and tools']);
       if (kind === 'student') return ask('Any money to keep an eye on?', ['Rent and bills', 'A part-time job', 'A loan or grant', 'Not really']);
       if (kind === 'shop') return ask('What money comes in and goes out?', ['Sales', 'Supplier bills', 'Shipping costs', 'Not now']);
+      if (kind === 'personal') return ask('What comes in and goes out each month?', ['My salary', 'Rent or mortgage', 'Bills and subscriptions', 'Not now']);
       return ask('What money comes in and goes out?', ['Invoices I send', 'Bills I pay', 'Subscriptions', 'Not now']);
     case 'currency': {
       const c = w.env ? currencyChoices(w.said, w.env, 3) : null;
       const nameOf = (code: string): string => c?.choices.find((x) => x.code === code)?.name ?? displayName(code);
       /* WHAT THEIR WORDS NAMED FIRST, every one of them, then what this device points at. */
       const said = codesOffered(w.said, w.env);
-      const codes = [...new Set([...said, ...(c?.choices ?? []).map((x) => x.code)])];
+      /* AND THE THREE MOST PEOPLE KEEP, so a person whose money is not the device's taps theirs instead of typing it. */
+      const codes = [...new Set([...said, ...(c?.choices ?? []).map((x) => x.code), ...COMMON])];
       const choices = codes.map((code) => tap(fits(nameOf(code), CHOICE_MOST) ? nameOf(code) : code, code));
       const unclear = currencyUnclear(w.said, w.env);
       const guess = unclear ? null : (w.money.currency ?? c?.suggested ?? null);
@@ -318,13 +359,20 @@ export function rulesAsk(topic: Topic, w: Where): ChatAsk | null {
       if (kind === 'freelance') return ask('Who do you work with, besides clients?', ['Just me', 'Other freelancers', 'An accountant', 'An agency']);
       if (kind === 'founder') return ask('Who are you building it with?', ['My co-founder', 'A small team', 'Contractors', 'Just me']);
       if (kind === 'student') return ask('Who do you work with?', ['Just me', 'Classmates', 'A supervisor', 'A study group']);
+      if (kind === 'personal') return ask('Who shares the money with you?', ['Just me', 'My partner', 'Family', 'Housemates']);
       return ask('Who do you work with?', ['Just me', 'A partner', 'A small team', 'Clients']);
     case 'tools':
       return ask('Do you use AI tools? I can work with them.', ['Claude', 'ChatGPT', 'Cursor', 'None yet'], { many: true });
     case 'name':
       return { topic, question: 'And what should I call you?', choices: [], by: 'rules' };
     case 'first': {
-      const choices = w.places.filter((p) => fits(p, CHOICE_MOST)).slice(0, 4);
+      /* WHAT THIS KIND OF PERSON KEEPS FIRST, in their words (2 Nov, a walk: a freelancer who invoices every month was
+         offered "Projects, People, Money, Agents", and a household "Savings goals" beside "Goals"). Where no kind is
+         read, the places the build will make, never Agents or Today, and never one inside another. */
+      const own = FIRST_TAPS[kind ?? ''];
+      if (own) return ask('What should I keep track of first?', [...own], { many: true });
+      const ps = w.places.filter((p) => fits(p, CHOICE_MOST) && !/^(?:agents|today)$/iu.test(p));
+      const choices = ps.filter((p) => !ps.some((o) => o !== p && o.toLocaleLowerCase().endsWith(` ${p.toLocaleLowerCase()}`))).slice(0, 4);
       return choices.length < 2 ? null : ask('What should I keep track of first?', choices, { many: true });
     }
     default:
@@ -475,7 +523,8 @@ export function saidOf(ask: ChatAsk, answer: string): string {
   const low = a.charAt(0).toLowerCase() + a.slice(1);
   switch (ask.topic) {
     case 'work':
-      return `I'm working on ${low}.`;
+      /* "Saving for a holiday" is a sentence already; "A redesign" is what they work on. */
+      return /^\p{L}+ing\b/u.test(a) ? sentence(a) : `I'm working on ${low}.`;
     case 'money':
       return sentence(a);
     case 'people':
@@ -503,7 +552,7 @@ export function valueOf(ask: ChatAsk, answer: string): string | null {
   const c = ask.choices.find((x) => x.value.toLocaleLowerCase() === low || x.label.toLocaleLowerCase() === low);
   if (ask.topic === 'currency') {
     if (/^(?:yes|yep|yeah|right|correct|that's right|ok|okay)\b/iu.test(a)) return ask.suggested ?? null;
-    const code = (c?.value ?? (codesIn(a.toUpperCase())[0] ?? a)).toUpperCase();
+    const code = (c?.value ?? codesIn(a.toUpperCase())[0] ?? codeNamed(a, ask.choices.map((x) => x.value)) ?? a).toUpperCase();
     return knownCode(code) ? code : null;
   }
   if (ask.topic === 'closest') return c?.value ?? USE_CASES.find((u) => u.title.toLocaleLowerCase() === low)?.usecase ?? null;
@@ -735,7 +784,11 @@ export function atLeast(since: number, ms = TYPING_MS): Promise<void> {
  * so the use case is the business one, said as Freelance. Every other use case is its own title.
  */
 export function caseTitle(u: { usecase: string; title: string }, said: string): string {
-  return u.usecase === 'business' && kindOf(said, null) === 'freelance' ? chatWords.freelance : u.title;
+  if (u.usecase === 'business' && kindOf(said, null) === 'freelance') return chatWords.freelance;
+  /* A FOUNDER WHO SAYS "WE" IS NO SOLO FOUNDER (2 Nov, a walk: "We're a two-person startup" was told "That adds Solo
+     founder"). The same starter, said as Startup. */
+  if (u.usecase === 'founder' && /\b(?:we|we're|we’re|our|us|co-?founders?|two-person|team)\b/iu.test(said)) return chatWords.startup;
+  return u.title;
 }
 
 /* ── the tools they named ──────────────────────────────────────────────── */
@@ -812,7 +865,23 @@ function firstOf(turns: readonly ChatTurn[]): string {
  * Today, never written unasked.
  */
 export function todosOf(turns: readonly ChatTurn[], clients: readonly string[], have: readonly string[] = []): string[] {
-  const first = firstOf(turns).toLowerCase();
+  return todosFor(firstOf(turns), clients, have);
+}
+
+/**
+ * THE SAME FIRST TO-DOS FROM THE SENTENCE A SIGN-UP KEPT (2 Nov, a walk: a stranger who named three clients and
+ * "invoices, deadlines" first opened a Today with nothing of hers): the conversation is gone by the time the letter's
+ * link builds, but its "First I want to keep track of …" (`saidOf`) is in the words. The words with the to-dos said after
+ * them, for the drafts read again on Today, as `draftsSaid` gives `/start`'s.
+ */
+export function withTodos(said: string, clients: readonly string[]): string {
+  const first = /\bFirst I want to keep track of ([^.]+)\./u.exec(said)?.[1] ?? '';
+  const todos = first === '' ? [] : todosFor(first, clients);
+  return [said.trim(), ...todos.map((t) => `${t}.`)].filter((x) => x !== '').join(' ');
+}
+
+function todosFor(firstSaid: string, clients: readonly string[], have: readonly string[] = []): string[] {
+  const first = firstSaid.toLowerCase();
   const c = clients.filter((x) => x.trim() !== '');
   const one = c[0] ?? null;
   const two = c[1] ?? one;
