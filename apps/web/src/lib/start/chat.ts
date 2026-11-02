@@ -76,6 +76,8 @@ export const chatWords = {
   currencyIs: (name: string) => `Money will be kept in ${name}.`,
   caseIs: (title: string) => `I'll set it up as ${title}.`,
   callYou: (name: string) => `Nice to meet you, ${name}.`,
+  /** Asked once more where an answer to the name question held no name BrainDog could be sure of (`nameIn`). */
+  nameAgain: "I didn't catch a name there. What's your first name?",
   /** The business use case as a freelancer hears it (`caseTitle`). */
   freelance: 'Freelance',
   /** The end, before the summary. */
@@ -505,8 +507,62 @@ export function valueOf(ask: ChatAsk, answer: string): string | null {
     return knownCode(code) ? code : null;
   }
   if (ask.topic === 'closest') return c?.value ?? USE_CASES.find((u) => u.title.toLocaleLowerCase() === low)?.usecase ?? null;
-  if (ask.topic === 'name') return fits(a, 60) ? a.replace(/^(?:call me|i'm|i am|it's|its)\s+/iu, '') : null;
+  if (ask.topic === 'name') return nameIn(a);
   return null;
+}
+
+/* ── a name, from how people say it ─────────────────────────────────────── */
+
+/* A greeting before it and a courtesy after it say nothing of the name: "Hi, I'm Layla", "Layla here, thanks". */
+const GREETING = /^(?:hi|hello|hey|hiya|heya|yo|oh|well|sure|ok|okay)\b[\s,.!-]*/iu;
+const COURTESY = /[\s,.!-]+(?:here|thanks|thank you|thx|please|cheers|is fine|works|is good|will do|is great)$/iu;
+/* The ways a name is introduced, taken off before it. */
+const NAME_LEAD =
+  /^(?:(?:you\s+can|you\s+could|just|please|people|everyone|everybody|friends|they\s+all|most\s+people)\s+)?(?:call\s+me|calls\s+me|call\s+me\s+just|i\s+go\s+by|go\s+with|my\s+name\s+is|my\s+name['’]s|name['’]s|the\s+name['’]s|i['’]?m|i\s+am|it['’]?s|its|it\s+is|this\s+is|just)\s+(?:just\s+)?/iu;
+/* Where the name stops: a clause after it ("I'm Layla, I run a studio", "Call me Sam and I design"). */
+const NAME_END = /\s*(?:[,;:!?()]|\.(?:\s|$)|\s[-–—]\s|\s(?:and|but|from|by|in|at|i|i['’]m|who|because|as|or|though|although)\s)/iu;
+const HONORIFIC = /^(?:dr|mr|mrs|ms|mx|miss|prof|sir|dame)\.?\s+/iu;
+/* One word of a name: letters in any script, with the marks, apostrophes and hyphens names carry ("O'Brien", "Jean-Luc"). */
+const NAME_WORD = /^\p{L}[\p{L}\p{M}'’-]*$/u;
+/* Words that are never a name, so a sentence is never taken for one ("My partner Sam and I…" is no name). */
+const NOT_NAME = new Set(
+  (
+    'i me my mine we us our you your he she they them their it its the a an and or but so if is am are was were be been ' +
+    'being do does did have has had not no yes yeah yep nope sure ok okay fine good great thanks thank please hi hello hey ' +
+    'call called name names named just only also too here there this that these those what who which when where why how ' +
+    'with without for from to of in on at by as about into over under up out off work working works job jobs run running ' +
+    'partner partners wife husband team client clients business company studio shop freelance freelancer student founder ' +
+    'designer developer anything nothing none whatever someone somebody anyone nobody skip pass later dunno idk rather ' +
+    'prefer say tell know want like would could should will can may might must every each all some any many more most'
+  ).split(' '),
+);
+/** No name wanted, said plainly: asked once is enough. */
+export const NO_NAME = /^(?:no|nope|skip|pass|rather not|i['’]?d rather not|prefer not(?: to say)?|i['’]?d prefer not to(?: say)?|no thanks|none|not telling|n\/a|-)$/iu;
+
+/**
+ * THE NAME AN ANSWER TO "WHAT SHOULD I CALL YOU?" GIVES, or `null` where BrainDog cannot be sure of one (2 Nov: "My
+ * partner Sam and I run a studio" was taken whole, and the record was called "My's BrainDog"). Read from the ways people
+ * say it: "Layla", "Layla Hassan", "I'm Layla", "Call me Layla", "my name is Layla", "Hi, it's Layla, thanks", at most
+ * three words, each a word a name can be, none a word of a sentence. A name typed all in small letters is given its
+ * capitals ("layla hassan" is Layla Hassan); one typed with capitals is kept as typed ("McKenzie", "de Silva").
+ */
+export function nameIn(answer: string): string | null {
+  let a = plain(answer).replace(/[“”"]/gu, '');
+  if (a === '' || NO_NAME.test(a)) return null;
+  for (let i = 0; i < 3; i += 1) {
+    const was = a;
+    a = a.replace(GREETING, '').replace(COURTESY, '').replace(NAME_LEAD, '').replace(HONORIFIC, '').trim();
+    if (a === was) break;
+  }
+  const end = NAME_END.exec(a);
+  if (end !== null) a = a.slice(0, end.index);
+  a = a.replace(/[.!,;:]+$/u, '').trim();
+  const words = a.split(/\s+/u).filter((w) => w !== '');
+  if (words.length === 0 || words.length > 3) return null;
+  if (!words.every((w) => NAME_WORD.test(w) && !NOT_NAME.has(w.toLocaleLowerCase().replace(/['’]s$/u, '')))) return null;
+  if ([...words.join(' ')].length > 40) return null;
+  const small = a === a.toLocaleLowerCase() && a !== a.toLocaleUpperCase();
+  return small ? words.map((w) => w.replace(/(^|[-'’])(\p{L})/gu, (_, p: string, c: string) => p + c.toLocaleUpperCase())).join(' ') : words.join(' ');
 }
 
 /* ── the model's view of the conversation ──────────────────────────────── */
@@ -546,6 +602,8 @@ export function ackOf(
   if (laid.currency) return chatWords.currencyIs(laid.currency);
   if (laid.usecase) return chatWords.caseIs(laid.usecase);
   if (laid.name) return chatWords.callYou(laid.name);
+  /* NO NAME HEARD IS NOT "GOT IT": the question asked again says so (`nameAgain`), or nothing does. */
+  if (ask.topic === 'name') return null;
   const came = after.filter((p) => !before.includes(p));
   /* WHAT THE ANSWER ADDED BY NAME COMES FIRST (1 Nov, a live run answered "Clients Fenwick and Acme" with "Good to know"):
      "Added Fenwick and Acme as clients.", and the places it turned on after it. */
@@ -606,23 +664,49 @@ export function withName(p: Proposal, name: string | null): Proposal {
 
 /* ── the part of what was said a thing came from ──────────────────────── */
 
+const DIGIT = /\p{Nd}/u;
+/* A figure is grouped or parted, by locale, with a comma or full stop ("2,400.50", "2.400,50"), which `stopAt` keeps
+   inside it; an apostrophe or an Arabic separator ("2'400", "٢٬٤٠٠"), which is never a stop; or a space ("2 400", also
+   no-break and narrow no-break), which `wordsOf` keeps inside it. (2 Nov: "£2,400" was said as "from: I invoice Fenwick £2".) */
+
+/** Whether the character at `k` ends a clause: a stop or comma, never one between two digits ("£2,400", "1.5", "2.400,50"). */
+function stopAt(s: string, k: number): boolean {
+  const c = s.charAt(k);
+  if (!/[.!?;,\n]/u.test(c)) return false;
+  return !((c === ',' || c === '.') && DIGIT.test(s.charAt(k - 1)) && DIGIT.test(s.charAt(k + 1)));
+}
+
+/**
+ * THE WORDS OF A STRETCH OF WHAT WAS SAID, a figure grouped with spaces kept as one ("2 400", "1 250 000,50"), so a cut
+ * at a word never cuts inside a number.
+ */
+function wordsOf(s: string): string[] {
+  const out: string[] = [];
+  for (const w of s.trim().split(/\s+/u)) {
+    if (w === '') continue;
+    const last = out.at(-1);
+    if (last !== undefined && /\p{Nd}$/u.test(last) && /^\p{Nd}{3}(?!\p{Nd})/u.test(w) && /(?:^|[^\p{Nd}])\p{Nd}{1,3}$|\s\p{Nd}{3}$/u.test(last)) out[out.length - 1] = `${last} ${w}`;
+    else out.push(w);
+  }
+  return out;
+}
+
 /**
  * THE CLAUSE A PHRASE SITS IN, for "from" under a part ("from: a freelance designer in Cairo"): the words around the
- * phrase up to the nearest stop or comma, at most `most` characters, cut at a word.
+ * phrase up to the nearest stop or comma, never one inside a figure, at most `most` characters, cut at a word.
  */
 export function clauseOf(said: string, phrase: string, most = 48): string {
   const i = said.toLocaleLowerCase().indexOf(phrase.toLocaleLowerCase());
   if (i < 0) return phrase;
-  const stops = /[.!?;,\n]/u;
   let a = i;
-  while (a > 0 && !stops.test(said.charAt(a - 1))) a -= 1;
+  while (a > 0 && !stopAt(said, a - 1)) a -= 1;
   let b = i + phrase.length;
-  while (b < said.length && !stops.test(said.charAt(b))) b += 1;
+  while (b < said.length && !stopAt(said, b)) b += 1;
   const clause = said.slice(a, b).trim().replace(/^(?:and|but|so)\s+/iu, '');
   if (clause.length <= most) return clause;
   /* A LONG CLAUSE IS SAID AROUND THE PHRASE, a few whole words either side, with "…" where it was cut. */
-  const before = said.slice(a, i).trim().split(/\s+/u).filter((x) => x !== '');
-  const after = said.slice(i + phrase.length, b).trim().split(/\s+/u).filter((x) => x !== '');
+  const before = wordsOf(said.slice(a, i));
+  const after = wordsOf(said.slice(i + phrase.length, b));
   let l = Math.min(3, before.length);
   let r = Math.min(4, after.length);
   const text = (): string => [...before.slice(before.length - l), said.slice(i, i + phrase.length), ...after.slice(0, r)].join(' ');

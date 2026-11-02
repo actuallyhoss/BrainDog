@@ -150,6 +150,7 @@
     TURNS_ON,
     valueOf,
     withName,
+    NO_NAME,
     within,
     type ChatAsk,
     type ChatTurn,
@@ -535,7 +536,10 @@
     } finally {
       thinking = false;
     }
-    const next = nextAsk(where());
+    /* A NAME BRAINDOG COULD NOT BE SURE OF IS ASKED FOR ONCE MORE, plainly (`nameIn`), never made into "<word>'s BrainDog";
+       a plain no, or a second answer it still cannot read, leaves the name unasked. */
+    const nameAgain = q.topic === 'name' && text !== null && value === null && !NO_NAME.test(text.trim().replace(/[.!]+$/u, '')) && all.filter((t) => t.ask.topic === 'name').length === 1;
+    const next = nameAgain ? { topic: 'name' as const, question: chatWords.nameAgain, choices: [], by: 'rules' as const } : nextAsk(where());
     lateAsk = null;
     if (next === null) finishTalk();
     else asking = next;
