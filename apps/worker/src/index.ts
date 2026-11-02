@@ -27,6 +27,11 @@ import { accessHeaders, clearCookie, cookieMode, mirrorEverywhere, readSid, rena
 import type { AccountCall, SignupCall } from '@braindog/ports';
 /* GOOGLE: its two routes are answered in `signIn()` before `serveAuth`, as sign-up's are. */
 import { GOOGLE_ROUTES, googleOn, serveGoogle } from './google.ts';
+/* CONNECT GOOGLE: one Google account per record, read only, synced on the record's alarm (`google-connect.ts`). */
+import {
+  BROKEN_GONE, CONNECTION_KEY, accessOf, callbackSlug, connectOn, finishConnect, openToken, revokeToken, sealToken, servesConnect, startConnect, statusOf, swapCode, syncOnce,
+  CONNECT_ROUTES, SYNC_EVERY_MS, type ConnectSaid, type Connection, type Status as GoogleStatus, type Writer as GoogleWriter,
+} from './google-connect.ts';
 import { DESKTOP_ROUTES, serveDesktop } from './desktop-signin.ts';
 import { appleAssociation } from './apple.ts';
 /* CLOSING AN ACCOUNT: the door is the host package's, and `account()` hands it this Worker's halves. */
@@ -1297,6 +1302,9 @@ export class Record$ extends DurableObject<Env> {
           console.error('signs:', e instanceof Error ? e.message : String(e));
         }
       });
+      /* CONNECT GOOGLE, every 15 minutes while a Google account is connected (`google-connect.ts`): its own step, so a
+         slow Google holds only itself, and the alarm is kept no later than the next sync below. */
+      await this.#step(api, 'google', () => this.#googleSync(api), undefined);
       /* WHAT THIS ALARM DREW AND WHAT IT LEFT FOR THE NEXT, when it drew anything: the clock cannot say (`countedShare`). */
       if (lookShare.used() + lintShare.used() + lookShare.kept() > 0)
         op({
@@ -1322,6 +1330,172 @@ export class Record$ extends DurableObject<Env> {
        question. Neither jobs `#act` released nor questions left in the outbox are schedule rows, so nothing else here
        would set it back. */
     if (more || asked || modelled || looked || linted) await this.#alarm.set(Date.now());
+    await this.#googleArm();
+  }
+
+  /* ── Connect Google (`google-connect.ts`) ───────────────────────────────── */
+
+  async #googleRead(): Promise<Connection | null> {
+    try {
+      const kept = await this.ctx.storage.get<Connection>(CONNECTION_KEY);
+      return kept && kept.v === 1 ? kept : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** The alarm set no later than the next Google sync, when one is due and the record is connected and not broken. */
+  async #googleArm(): Promise<void> {
+    const conn = await this.#googleRead();
+    if (conn === null || conn.broken !== undefined) return;
+    try {
+      const at = await this.#alarm.get();
+      if (at === null || at > conn.due) await this.#alarm.set(Math.max(conn.due, Date.now()));
+    } catch (e) {
+      console.error('google: the alarm could not be set:', e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /** The record's key store and its connector key, or `null` when this host cannot seal or open for it. */
+  async #googleKeys(api: RecordApi) {
+    const store = await keyStoreOf(this.env.KEK).catch(() => null);
+    const wrapping = api.kernel.connectorWrapping();
+    const record = api.kernel.identity()?.id;
+    return store && wrapping && record ? { store, wrapping, record } : null;
+  }
+
+  /** What the sync writes through: the add-ons' own door and lists, as the system. */
+  #googleWriter(api: RecordApi): GoogleWriter {
+    const sys: CallContext = { principal: { kind: 'system', id: 'google' } };
+    const events = api.kernel.register('events');
+    const hasField = (id: string): boolean => events?.fields.some((f) => f.id === id) === true;
+    return {
+      zone: api.kernel.identity()?.tz ?? 'UTC',
+      mail: api.kernel.register('gmail_mail') !== undefined,
+      events: hasField('key'),
+      invites: hasField('response') && hasField('organiser'),
+      arrive: async (body) => {
+        const bytes = new TextEncoder().encode(body);
+        const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
+        const out = await api.arrive({ channel: 'webhook', headers: { 'content-type': 'text/plain; charset=utf-8' }, body, sha256, verified: true, ingest: 'gmail_in' });
+        return out.ok;
+      },
+      heldEvents: async (fromDay) => {
+        const held = new Map<string, { seq: number; version: number; fields: Record<string, unknown> }>();
+        let cursor: string | null = null;
+        for (let i = 0; i < 20; i++) {
+          const page = await api.list({ register: 'events', where: `day after ${fromDay}`, limit: 200, cursor }, sys);
+          if (!page.ok) break;
+          for (const r of page.value.rows) if (r.seq !== null && typeof r.fields.key === 'string') held.set(r.fields.key, { seq: r.seq, version: r.version, fields: r.fields });
+          cursor = page.value.cursor;
+          if (cursor === null) break;
+        }
+        return held;
+      },
+      addEvent: async (fields) => {
+        await api.create({ register: 'events', fields: fields as never, said: 'From Google Calendar' }, sys);
+      },
+      changeEvent: async (seq, version, patch) => {
+        await api.update({ register: 'events', seq, version, patch: patch as never, said: 'From Google Calendar' }, sys);
+      },
+      meet: async (said) => {
+        await api.meet({ ...said, source: 'Google Contacts' }, sys);
+      },
+    };
+  }
+
+  /** One sync, when one is due: the refresh token opened for it and dropped after, and the connection kept. */
+  async #googleSync(api: RecordApi, force = false): Promise<void> {
+    const conn = await this.#googleRead();
+    if (conn === null || conn.broken !== undefined) return;
+    const now = Date.now();
+    if (!force && conn.due > now) return;
+    if (!connectOn(this.env)) return;
+    const keys = await this.#googleKeys(api);
+    if (keys === null) {
+      conn.last = { at: now, said: 'This BrainDog cannot open its Google key on this host.', ok: false };
+      conn.due = now + SYNC_EVERY_MS;
+      await this.ctx.storage.put(CONNECTION_KEY, conn);
+      return;
+    }
+    const client = { id: (this.env.GOOGLE_CLIENT_ID ?? '').trim(), secret: (this.env.GOOGLE_CLIENT_SECRET ?? '').trim() };
+    const send = (input: string, init?: RequestInit): Promise<Response> => fetch(input, init);
+    const refresh = await openToken(keys.store, keys.record, keys.wrapping, conn.token);
+    const access = refresh === null ? 'failed' : await accessOf(client, refresh, send);
+    if (access === 'gone') {
+      conn.broken = BROKEN_GONE;
+      conn.last = { at: now, said: 'Google stopped answering for this account.', ok: false };
+    } else if (access === 'failed') {
+      conn.last = { at: now, said: refresh === null ? 'The Google key did not open on this host.' : 'Google did not answer; it is tried again in 15 minutes.', ok: false };
+      conn.due = now + SYNC_EVERY_MS;
+    } else {
+      await syncOnce(conn, access, this.#googleWriter(api), send, now);
+      op({ op: 'google', rec: recOf(api), ok: conn.last?.ok ?? false });
+    }
+    await this.ctx.storage.put(CONNECTION_KEY, conn);
+  }
+
+  /**
+   * Connect Google, for the `/api/google*` doors (`google-connect.ts`): what the app is told, a code swapped at Google and
+   * sealed, a disconnect, a sync now. AN RPC AND NEVER A ROUTE, and only an owner, signed in and not seeing as somebody
+   * else, changes anything; the refresh token is never in an answer.
+   */
+  async google$(
+    ctx: CallContext,
+    call: { op: 'status' } | { op: 'keep'; code: string; verifier: string; redirect: string } | { op: 'disconnect' } | { op: 'sync' },
+  ): Promise<{ status: GoogleStatus; said?: ConnectSaid }> {
+    const api = await this.#record();
+    const owner = ctx.principal.kind === 'person' && ctx.principal.level === 'owner' && ctx.preview === undefined;
+    const w = this.#googleWriter(api);
+    const facts = { on: connectOn(this.env), mail: w.mail, events: w.events, owner };
+    const answer = async (said?: ConnectSaid) => ({ status: statusOf(await this.#googleRead(), facts), ...(said ? { said } : {}) });
+    if (call.op === 'status') return answer();
+    if (!owner) return answer('failed');
+    if (!connectOn(this.env)) return answer('off');
+    const client = { id: (this.env.GOOGLE_CLIENT_ID ?? '').trim(), secret: (this.env.GOOGLE_CLIENT_SECRET ?? '').trim() };
+    const send = (input: string, init?: RequestInit): Promise<Response> => fetch(input, init);
+
+    if (call.op === 'keep') {
+      const keys = await this.#googleKeys(api);
+      if (keys === null) return answer('failed');
+      const swapped = await swapCode(client, call.code, call.verifier, call.redirect, send);
+      if (typeof swapped === 'string') return answer(swapped);
+      const token = await sealToken(keys.store, keys.record, keys.wrapping, swapped.refresh);
+      if (token === null) {
+        await revokeToken(swapped.refresh, send);
+        return answer('failed');
+      }
+      /* ONE GOOGLE ACCOUNT A RECORD: a second connect replaces the first, which is revoked at Google. */
+      const was = await this.#googleRead();
+      if (was !== null) {
+        const old = await openToken(keys.store, keys.record, keys.wrapping, was.token);
+        if (old !== null) await revokeToken(old, send);
+      }
+      const now = Date.now();
+      await this.ctx.storage.put(CONNECTION_KEY, { v: 1, email: swapped.email, scopes: swapped.scopes, token, since: now, due: now } satisfies Connection);
+      await this.#soon();
+      return answer('connected');
+    }
+
+    if (call.op === 'disconnect') {
+      const was = await this.#googleRead();
+      if (was !== null) {
+        const keys = await this.#googleKeys(api);
+        const token = keys === null ? null : await openToken(keys.store, keys.record, keys.wrapping, was.token);
+        if (token !== null) await revokeToken(token, send);
+        await this.ctx.storage.delete(CONNECTION_KEY);
+      }
+      return answer();
+    }
+
+    /* SYNC NOW: due at once, and the alarm asked for now, so the press is answered at once and the sync runs there. */
+    const conn = await this.#googleRead();
+    if (conn !== null && conn.broken === undefined) {
+      conn.due = Date.now();
+      await this.ctx.storage.put(CONNECTION_KEY, conn);
+      await this.#soon();
+    }
+    return answer();
   }
 
   /** Whether this object's doors are still to be told (`DOORS_DUE`), read from storage once an object's life. */
@@ -4056,6 +4230,11 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
 
     const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
 
+    /* CONNECT GOOGLE'S WAY BACK IS ONE ADDRESS AT THE ROOT, the one registered at Google, so the record it is for is the
+       one its start was made under, read from the start's own cookie (`google-connect.ts`). */
+    const connectAsked = servesConnect(url.pathname);
+    if (connectAsked === '/api/google/callback' && slug === null) slug = callbackSlug(request);
+
     /* WHICH DOOR, in `session.ts`'s order and nowhere else: a link, a bearer, the session cookie, or none. A cookie that
        names no session is a 401 that clears it. */
     const door = await doorOf(request, {
@@ -4114,6 +4293,9 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
     if (door.door === 'session' && opensShare(request.method, url.pathname))
       return withCookie(await openShare(inward(request, door.ctx), env, door.record, door.ctx), door.cookie);
 
+    /* CONNECT GOOGLE IS A BROWSER SESSION'S, like the keys: the record answers who may, and never with the token. */
+    if (door.door === 'session' && connectAsked !== null) return withCookie(await connectDoor(request, env, door.record, door.ctx, connectAsked, slug), door.cookie);
+
     /* A PERSON, on the record their session names, and a rotation rides back on the record's answer. The
        record authorises exactly as it does for a bearer: every check is inside `createRecordApi`. */
     if (door.door === 'session')
@@ -4136,6 +4318,8 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
 
     /* AND WHAT IS LEFT AT `/api/keys/*` IS A BEARER OR NOTHING, which is the one thing those doors do not take. */
     if (keysAsked) return noSession();
+    /* NOR CONNECT GOOGLE: an agent never connects, disconnects or reads the connection. */
+    if (connectAsked !== null) return json({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Connect Google from the app, signed in.', at: 'principal' } }, 403);
 
     /* NOR SLASH'S ASK, FOR THE SAME REASON AND BECAUSE THE DOOR CANNOT SAY IT HERE. `serveSlash` refuses any
        `authorization` header, but `inward()` below deletes that header, so on this host the door never saw one and
@@ -4582,6 +4766,38 @@ function appKeys(request: Request, env: Env, id: string, ctx: CallContext): Prom
     record: id,
     keys: isBound(env.KEK) ? keyHalf(env) : undefined,
   });
+}
+
+/**
+ * `/api/google*`: Connect Google, for the browser session `doorOf` has already resolved (`google-connect.ts`).
+ *
+ * THE RECORD IS THE SESSION'S, and the record's object answers who may: an owner, signed in, not seeing as somebody else.
+ * A page load (`connect`, `callback`) answers with a redirect; the rest with JSON the app reads. The refresh token is
+ * swapped, sealed and kept inside the record's object and is in no answer here.
+ */
+async function connectDoor(request: Request, env: Env, id: string, ctx: CallContext, path: keyof typeof CONNECT_ROUTES, slug: string | null): Promise<Response> {
+  const want = CONNECT_ROUTES[path];
+  if (request.method !== want && !(want === 'GET' && request.method === 'HEAD'))
+    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `${path} takes a ${want}.` } }, 405, [['allow', want]]);
+  const origin = `https://${env.PUBLIC_HOST ?? ''}`;
+  const object = env.RECORD.get(env.RECORD.idFromName(id));
+  if (path === '/api/google') return json({ ok: true, value: (await object.google$(ctx, { op: 'status' })).status }, 200);
+  if (path === '/api/google/connect') {
+    const status = (await object.google$(ctx, { op: 'status' })).status;
+    const next = new URL(request.url).searchParams.get('next') ?? '/settings/ingest';
+    const back = (said: ConnectSaid): Response =>
+      new Response(null, { status: 302, headers: { location: `${origin}${slug === null ? '' : `/${slug}`}${next.startsWith('/') && !next.startsWith('//') ? next : '/settings/ingest'}${next.includes('?') ? '&' : '?'}google=${said}`, 'cache-control': 'no-store' } });
+    if (!status.on) return back('off');
+    if (!status.owner) return back('failed');
+    return startConnect(request, { origin, clientId: (env.GOOGLE_CLIENT_ID ?? '').trim(), slug, email: status.email });
+  }
+  if (path === '/api/google/callback')
+    return finishConnect(request, {
+      origin,
+      keep: async (code, verifier, redirect) => (await object.google$(ctx, { op: 'keep', code, verifier, redirect })).said ?? 'failed',
+    });
+  const out = await object.google$(ctx, { op: path === '/api/google/disconnect' ? 'disconnect' : 'sync' });
+  return json(out.said === undefined ? { ok: true, value: out.status } : { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only the owner, signed in, can change the Google connection.' } }, out.said === undefined ? 200 : 403);
 }
 
 /**

@@ -12564,6 +12564,19 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return sql.one<{ kek_id: string | null }>('SELECT kek_id FROM vault_key WHERE kek_id IS NOT NULL ORDER BY purpose LIMIT 1')?.kek_id ?? null;
     },
 
+    /**
+     * The connector key as the record keeps it, wrapped, for a host that seals a scheduled connection's own credential
+     * under it (`apps/worker/src/google-connect.ts`). Read only, and `null` for a record that has none or whose connector
+     * key is not wrapped by a root key. The record never opens it; only the host, which holds the root key, can.
+     */
+    connectorWrapping(): { wrapped: Uint8Array; nonce: Uint8Array; kek_id: string } | null {
+      const row = sql.one<{ wrapped: Uint8Array; nonce: Uint8Array; wrapped_by: string; kek_id: string | null }>(
+        "SELECT wrapped, nonce, wrapped_by, kek_id FROM vault_key WHERE purpose = 'connector'",
+      );
+      if (!row || row.wrapped_by !== 'kek' || !row.kek_id) return null;
+      return { wrapped: row.wrapped, nonce: row.nonce, kek_id: row.kek_id };
+    },
+
     export(opts: { sections?: readonly Section[]; redactGrants?: boolean; actor?: string } = {}) {
       const refused = schemaRefusal(state);
       if (refused) return Promise.resolve(refused as Result<string[]>);
