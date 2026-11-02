@@ -508,9 +508,12 @@
   <!-- EACH AREA UNDER ITS OWN GLYPH (agents F28): the sun for Appearance, the bell for Notifications. -->
   {#if agentParam !== undefined}
     <!-- ONE AGENT'S PAGE (G14): its name, under Agents, and Back goes to the list. -->
-    <PageHead icon={known.icon} kicker={label ?? known.label} back="/settings/agents" title={agentHead.name || nameOfSlug(agentParam, KIND_NAMES)} />
+    <PageHead icon={known.icon} kicker={label ?? known.label} back="/settings/agents" title={agentHead.name || nameOfSlug(agentParam, KIND_NAMES)} sentence="" />
   {:else}
-    <PageHead icon={known.icon} kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} below={fault ? faultTools : undefined} />
+    <!-- AN AREA SAYS NO SENTENCE UNLESS ITS HEALTH DOES (`SAID_ON`), so its head holds no line for one on its way: the held
+         line stood 52px over the area until the screen settled and then gave the room back (a 0.03 to 0.1 shift on
+         every area's cold open, verify4). -->
+    <PageHead icon={known.icon} kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : SAID_ON.has(area) ? undefined : ''} below={fault ? faultTools : undefined} />
   {/if}
 {:else}
   <!-- THE INDEX OPENS ON A LEAD TILE, as a declared page does: its name and Arrange ride over the top of the tile and the
