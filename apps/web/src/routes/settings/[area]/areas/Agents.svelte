@@ -375,6 +375,10 @@
     more: 'Keys, permissions and Slash',
     trust: 'Permissions',
     trustLine: 'What each agent does without asking you',
+    theirs: "Colleagues' agents",
+    theirsLead: 'Each does at most what its person may do here. Letting agents act without asking covers only yours.',
+    theirsLine: (n: number, used: string | null) => `${n === 1 ? '1 key' : `${n} keys`}${used ? `, last used ${used}` : ', not used yet'}`,
+    theirsManage: 'See or revoke them',
     slashLine: 'Its model and what it reads',
     /* WHAT EACH LEVEL MEANS, in one line under the list: it was three lines, one a level. */
     levels: { write: 'makes changes; money, keys and deletes still wait', propose: 'asks you first', read: 'changes nothing' } as Record<string, string>,
@@ -438,6 +442,21 @@
 
   /** The reader, by their person id, so a key they made says so and never "made by" their own name. */
   const me = $derived((shell.me as { person?: string | null }).person ?? null);
+  /* COLLEAGUES' KEYS, BY PERSON (collab pass, 2 Nov): the live keys a person other than the reader made, counted, with the
+     newest use. `person_name` rides on `listTokens`'s rows (`madeByOther`). */
+  const colleagueKeys = $derived.by(() => {
+    const by = new Map<string, { who: string; n: number; used: string | null }>();
+    for (const t of held.value?.tokens ?? []) {
+      const who = madeByOther({ token: t } as never, me);
+      if (who === null) continue;
+      const used = (t as { last_used_at?: string | null }).last_used_at ?? null;
+      const was = by.get(who) ?? { who, n: 0, used: null };
+      was.n += 1;
+      if (used !== null && (was.used === null || used > was.used)) was.used = used;
+      by.set(who, was);
+    }
+    return [...by.values()];
+  });
   const lineOf = (c: Connection, parts: ReturnType<typeof partsOf>): string => appLineOf(c, parts, me);
 
   /* HOW MANY ARE AT WORK NOW, which is the tile's meta only when some are: "all at work now" when every connection that
@@ -743,6 +762,21 @@
           </div>
         {/if}
       {/if}
+    </Tile>
+  {/if}
+
+  <!-- COLLEAGUES' AGENTS, ONE LINE A PERSON (collab pass, 2 Nov): whose agents can reach this BrainDog, how many keys each
+       made, and when one was last used, so the owner sees them beside his own and knows the switch below is not theirs.
+       Each acts at most as its person may; revoking one is in Connections. -->
+  {#if anOwner && colleagueKeys.length > 0}
+    <Tile icon="users" title={words.theirs} count={colleagueKeys.length} data-wide data-part="colleague-agents">
+      <p class="theirs-lead">{words.theirsLead}</p>
+      <ul class="theirs">
+        {#each colleagueKeys as k (k.who)}
+          <li><span class="theirs-who">{k.who}</span><span class="theirs-said">{words.theirsLine(k.n, k.used ? since(k.used, Date.now()) : null)}</span></li>
+        {/each}
+      </ul>
+      <div class="theirs-do"><Button weight="quiet" size="sm" onclick={() => (connOpen = true)}>{words.theirsManage}</Button></div>
     </Tile>
   {/if}
 
@@ -1469,5 +1503,38 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: 18px;
+  }
+
+  .theirs-lead {
+    margin: 0 0 var(--sp-3);
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+  .theirs {
+    list-style: none;
+    margin: 0 0 var(--sp-2);
+    padding: 0;
+  }
+  .theirs li {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--sp-1) var(--sp-3);
+    padding-block: var(--sp-2);
+    border-block-end: 1px solid var(--rule);
+  }
+  .theirs li:last-child {
+    border-block-end: 0;
+  }
+  .theirs-do {
+    display: flex;
+    justify-content: flex-start;
+  }
+  .theirs-who {
+    color: var(--ink);
+  }
+  .theirs-said {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 </style>

@@ -14,13 +14,14 @@
 export const BYPASS_PREF = 'agents.bypass' as const;
 
 export const bypassWords = {
-  title: 'Let agents do everything without asking',
+  /* "YOUR" (collab pass, 2 Nov): the switch covers the owner's own agents and never a colleague's (`bypassOf`). */
+  title: 'Let your agents do everything without asking',
   /* ONE LINE EACH (G15): it was two paragraphs under the switch. What the "on" line folded away (installs, automations,
      bank texts and imports) is the same lift; what still needs him waits behind "What still needs you". */
   on: 'Agents act without asking, money and outside reads too. Each change names its agent and can be undone.',
   off: 'Agents ask before deletes, money, keys, add-ons and settings, and after reading things from outside.',
   more: 'What still needs you',
-  still: 'Still only you, here: seeing or adding a key, making new keys, deleting or exporting all of BrainDog, changing the owner, and paying.',
+  still: "Still only you, here: seeing or adding a key, making new keys, deleting or exporting all of BrainDog, changing the owner, and paying. Your colleagues' agents are never covered: they ask, and never do more than their person may.",
 } as const;
 
 /** Whether the switch is on, from the person's prefs as `boot` answered them. Only `on` is on. */
