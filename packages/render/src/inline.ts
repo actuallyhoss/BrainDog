@@ -175,6 +175,9 @@ export const drawnLink = (href: string | null, opts: Pick<InlineOptions, 'links'
  * a number alone), and stays the author's text, marked. Two currencies are never added here: the host writes them apart.
  */
 function writtenAmount(form: string, said: string): string | null {
+  /* `{{day:<path>}}` OVER A DAY FIGURE THE HOST ALREADY SAID ("15 Jan", "1 Mar 2028") is that day as said: the page drew
+     the figure's own id in its place, "Next payout certificates-next-payout.", because the said day is no ISO day. */
+  if ((form === 'day' || form === 'date') && /\d/u.test(said) && /\p{L}/u.test(said)) return said.trim();
   if (form !== 'money') return null;
   const t = said.trim();
   if (!/\d/u.test(t) || /^[-−+]?[\d,.\s]+$/u.test(t)) return null;
@@ -206,9 +209,11 @@ function braced(body: string, opts: InlineOptions): Inline {
       if (arg === UNNAMED) return { type: 'path', path: raw, resolved: null, named: false };
       if (arg === null || arg === undefined)
         return { type: 'path', path: raw, resolved: null };
-      const text = formatTyped(form as TypedForm, arg, opts.now, opts.zone) ?? (isPath ? writtenAmount(form, arg) : null);
+      const typed = formatTyped(form as TypedForm, arg, opts.now, opts.zone);
+      const text = typed ?? (isPath ? writtenAmount(form, arg) : null);
       if (text === null) return { type: 'unresolved', text: raw };
-      const link = form === 'date' ? ('day' as const) : form === 'ref' ? ('row' as const) : undefined;
+      /* A DAY THE HOST SAID IN WORDS IS NO ADDRESS, so only a day this form read itself links. */
+      const link = typed === null ? undefined : form === 'date' ? ('day' as const) : form === 'ref' ? ('row' as const) : undefined;
       return { type: 'typed', form: form as TypedForm, arg, text, ...(link ? { link } : {}) };
     }
   }
