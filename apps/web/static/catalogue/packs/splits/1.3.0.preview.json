@@ -1,0 +1,503 @@
+{
+  "format": 1,
+  "made_at": "2026-11-02T21:04:31.571Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "You are owed {{splits-to-me}} and you owe {{splits-to-them}}, across {{splits-people-open}} people.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "splits-to-me"
+              },
+              {
+                "gt": 0,
+                "metric": "splits-to-them"
+              }
+            ]
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "You are owed {{splits-to-me}}.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "splits-to-me"
+              },
+              {
+                "lte": 0,
+                "metric": "splits-to-them"
+              }
+            ]
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "You owe {{splits-to-them}}.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "lte": 0,
+                "metric": "splits-to-me"
+              },
+              {
+                "gt": 0,
+                "metric": "splits-to-them"
+              }
+            ]
+          },
+          "key": "k08lez9h-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Everyone is square.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "splits-held"
+              },
+              {
+                "lt": 1,
+                "metric": "splits-people-open"
+              }
+            ]
+          },
+          "key": "k08lez9h-4",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "body": "Nothing shared yet. Add a shared cost below, or write a name in Shared with on a Ledger line.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "splits-held"
+          },
+          "key": "k08lez9h-5",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "You are owed",
+              "metric": "splits-to-me"
+            },
+            {
+              "label": "You owe",
+              "metric": "splits-to-them"
+            },
+            {
+              "label": "Open splits",
+              "metric": "splits-open"
+            },
+            {
+              "label": "Shared this month",
+              "metric": "splits-shared-month"
+            }
+          ],
+          "heading": "Where it stands",
+          "icon": "split",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "splits-held"
+          },
+          "key": "k0jacd2u",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Open splits",
+              "metric": "splits-open",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 3,
+                "unit": null,
+                "rows": 3,
+                "refusals": [],
+                "held": 3,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Shared this month",
+              "metric": "splits-shared-month",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 3,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "splits-to-me": {
+              "name": "Comes back to you",
+              "source": "register.split_people",
+              "where": "way is to_me",
+              "value": {
+                "sum": "stands"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "splits-to-them": {
+              "name": "Goes back from you",
+              "source": "register.split_people",
+              "where": "way is to_them",
+              "value": {
+                "sum": "stands"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "splits-open": {
+              "name": "Open splits",
+              "source": "register.splits",
+              "where": "state is open",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "splits-shared-month": {
+              "name": "Shared costs this month",
+              "source": "register.splits",
+              "where": "kind is cost, on at least bom",
+              "value": {
+                "sum": "amount"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Name",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "stands",
+              "label": "Stands at",
+              "sign": {
+                "field": "way",
+                "minus": "to_them"
+              },
+              "width": "14ch"
+            },
+            {
+              "field": "way",
+              "label": "Which way",
+              "width": "minmax(16ch,20ch)"
+            },
+            {
+              "align": "end",
+              "field": "open",
+              "label": "Open",
+              "width": "8ch"
+            },
+            {
+              "field": "since",
+              "label": "Since",
+              "width": "13ch"
+            }
+          ],
+          "empty": "Everyone is square.",
+          "heading": "Each person",
+          "icon": "users",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "since"
+            }
+          ],
+          "source": "register.split_people",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "splits-people-open"
+          },
+          "where": "way is to_me or to_them",
+          "key": "k1fld6l8",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add a shared cost",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "splits",
+          "span": 12,
+          "key": "k12cxcw9",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "columns": [
+            {
+              "field": "on"
+            },
+            {
+              "field": "what"
+            },
+            {
+              "field": "part",
+              "sign": {
+                "field": "way",
+                "minus": "to_them"
+              }
+            },
+            {
+              "field": "with"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "empty": "Nothing open.",
+          "heading": "Open",
+          "icon": "rows",
+          "kind": "timeline",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.splits",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "splits-open"
+          },
+          "where": "state is open",
+          "key": "k19mkvg4",
+          "rows": [
+            {
+              "id": "01M6F17YAK0JTHYEQNKGJJYJWC",
+              "register": "splits",
+              "seq": 1,
+              "fields": {
+                "what": "Dinner out",
+                "on": "2026-10-30",
+                "with": "Sam",
+                "kind": "cost",
+                "paid_by": "me",
+                "amount": {
+                  "amount": 8400,
+                  "currency": "USD"
+                },
+                "my_share": 50,
+                "state": "open"
+              },
+              "state": "open",
+              "version": 1,
+              "created_at": "2026-11-02T21:04:31.571Z",
+              "updated_at": "2026-11-02T21:04:31.571Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6F17YAK0JTHYEQNKWEF9CM8",
+              "register": "splits",
+              "seq": 2,
+              "fields": {
+                "what": "Train tickets",
+                "on": "2026-10-23",
+                "with": "Ana",
+                "kind": "cost",
+                "paid_by": "them",
+                "amount": {
+                  "amount": 6200,
+                  "currency": "USD"
+                },
+                "my_share": 50,
+                "state": "open"
+              },
+              "state": "open",
+              "version": 1,
+              "created_at": "2026-11-02T21:04:31.571Z",
+              "updated_at": "2026-11-02T21:04:31.571Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6F17YAK0JTHYEQNM2XK808B",
+              "register": "splits",
+              "seq": 3,
+              "fields": {
+                "what": "Groceries",
+                "on": "2026-10-21",
+                "with": "Sam",
+                "kind": "cost",
+                "paid_by": "me",
+                "amount": {
+                  "amount": 4600,
+                  "currency": "USD"
+                },
+                "my_share": 50,
+                "state": "open"
+              },
+              "state": "open",
+              "version": 1,
+              "created_at": "2026-11-02T21:04:31.571Z",
+              "updated_at": "2026-11-02T21:04:31.571Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 3,
+          "refusals": []
+        },
+        {
+          "fold": true,
+          "heading": "Settled",
+          "icon": "archive",
+          "kind": "section",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "splits-held"
+          },
+          "key": "k14j0vi5",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "on"
+            },
+            {
+              "field": "what"
+            },
+            {
+              "field": "amount"
+            },
+            {
+              "field": "with"
+            }
+          ],
+          "empty": "Nothing settled yet.",
+          "heading": "Settled splits",
+          "icon": "archive",
+          "kind": "timeline",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.splits",
+          "span": 12,
+          "where": "state is settled",
+          "key": "k11q2qy6",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "split",
+      "nav": {
+        "order": 65,
+        "section": "Money"
+      },
+      "pack": "splits",
+      "page": "splits",
+      "requires": [
+        "register.splits",
+        "register.split_people"
+      ],
+      "title": "Splits",
+      "read_at": "2026-11-02T21:04:31.571Z",
+      "zone": "UTC",
+      "look": {
+        "look": "splits",
+        "basis": "r01zt0cw",
+        "by": "rule",
+        "hide": [
+          "k14j0vi5",
+          "k11q2qy6"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

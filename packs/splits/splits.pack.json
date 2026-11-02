@@ -1,10 +1,10 @@
 {
   "pack": "splits",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "icon": "split",
   "title": "Splits",
   "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their splits close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
-  "changes": "The Splits widget on Today says Nothing split yet when nothing is shared, rather than leaving the board.",
+  "changes": "Splits reads like the Ledger: each open and settled split is a line with what it was, who it was with and the whole cost under it, and what comes back to you or goes to them at the end, with its sign. With nothing shared yet the page opens on one line and the box to add a cost.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -543,14 +543,13 @@
         },
         {
           "kind": "note",
-          "heading": "Nothing shared yet",
-          "icon": "split",
           "span": 12,
-          "body": "Add a shared cost below, or write a name in Shared with on a Ledger line.",
+          "body": "Nothing shared yet. Add a shared cost below, or write a name in Shared with on a Ledger line.",
           "when": {
             "metric": "splits-held",
             "lt": 1
-          }
+          },
+          "lead": true
         },
         {
           "kind": "stat",
@@ -597,7 +596,11 @@
               "field": "stands",
               "label": "Stands at",
               "width": "14ch",
-              "align": "end"
+              "align": "end",
+              "sign": {
+                "field": "way",
+                "minus": "to_them"
+              }
             },
             {
               "field": "way",
@@ -637,7 +640,7 @@
           "register": "splits"
         },
         {
-          "kind": "table",
+          "kind": "timeline",
           "heading": "Open",
           "icon": "rows",
           "span": 12,
@@ -645,36 +648,23 @@
           "where": "state is open",
           "columns": [
             {
-              "field": "on",
-              "label": "Date",
-              "width": "13ch"
+              "field": "on"
             },
             {
-              "field": "what",
-              "label": "What",
-              "width": "minmax(16ch,1fr)"
-            },
-            {
-              "field": "with",
-              "label": "With",
-              "width": "minmax(10ch,16ch)"
-            },
-            {
-              "field": "amount",
-              "label": "Amount",
-              "width": "13ch",
-              "align": "end"
+              "field": "what"
             },
             {
               "field": "part",
-              "label": "To settle",
-              "width": "13ch",
-              "align": "end"
+              "sign": {
+                "field": "way",
+                "minus": "to_them"
+              }
             },
             {
-              "field": "way",
-              "label": "Which way",
-              "width": "minmax(14ch,18ch)"
+              "field": "with"
+            },
+            {
+              "field": "amount"
             }
           ],
           "order": [
@@ -702,7 +692,7 @@
           }
         },
         {
-          "kind": "table",
+          "kind": "timeline",
           "heading": "Settled splits",
           "icon": "archive",
           "span": 12,
@@ -710,25 +700,16 @@
           "where": "state is settled",
           "columns": [
             {
-              "field": "on",
-              "label": "Date",
-              "width": "13ch"
+              "field": "on"
             },
             {
-              "field": "what",
-              "label": "What",
-              "width": "minmax(16ch,1fr)"
+              "field": "what"
             },
             {
-              "field": "with",
-              "label": "With",
-              "width": "minmax(10ch,16ch)"
+              "field": "amount"
             },
             {
-              "field": "amount",
-              "label": "Amount",
-              "width": "13ch",
-              "align": "end"
+              "field": "with"
             }
           ],
           "order": [
@@ -794,7 +775,7 @@
           "where": "with is {{name}}"
         },
         {
-          "kind": "table",
+          "kind": "timeline",
           "heading": "Open with them",
           "icon": "rows",
           "span": 12,
@@ -802,36 +783,20 @@
           "where": "state is open, with is {{name}}",
           "columns": [
             {
-              "field": "on",
-              "label": "Date",
-              "width": "13ch"
+              "field": "on"
             },
             {
-              "field": "what",
-              "label": "What",
-              "width": "minmax(16ch,1fr)"
-            },
-            {
-              "field": "kind",
-              "label": "Type",
-              "width": "14ch"
-            },
-            {
-              "field": "amount",
-              "label": "Amount",
-              "width": "13ch",
-              "align": "end"
+              "field": "what"
             },
             {
               "field": "part",
-              "label": "To settle",
-              "width": "13ch",
-              "align": "end"
+              "sign": {
+                "field": "way",
+                "minus": "to_them"
+              }
             },
             {
-              "field": "way",
-              "label": "Which way",
-              "width": "minmax(14ch,18ch)"
+              "field": "amount"
             }
           ],
           "order": [
@@ -844,7 +809,7 @@
           "empty": "Nothing open: you are square."
         },
         {
-          "kind": "table",
+          "kind": "timeline",
           "heading": "Settled with them",
           "icon": "archive",
           "span": 12,
@@ -852,20 +817,13 @@
           "where": "state is settled, with is {{name}}",
           "columns": [
             {
-              "field": "on",
-              "label": "Date",
-              "width": "13ch"
+              "field": "on"
             },
             {
-              "field": "what",
-              "label": "What",
-              "width": "minmax(16ch,1fr)"
+              "field": "what"
             },
             {
-              "field": "amount",
-              "label": "Amount",
-              "width": "13ch",
-              "align": "end"
+              "field": "amount"
             }
           ],
           "order": [
