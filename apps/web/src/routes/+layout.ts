@@ -82,6 +82,11 @@ type Event = Pick<LoadEvent, 'url' | 'fetch'> & Partial<Pick<LoadEvent, 'depends
  */
 export async function load(event: Event): Promise<Root> {
   if (light(here(event.url.pathname))) return lightLoad(apiBase(event.url));
+  /* AN INVITATION PAGE OPENED WITH NO LINK IN IT ASKS THE RECORD NOTHING (settings3, 2 Nov): its token is the fragment,
+     so with none there is nothing to look at, and the shell it asked for came back 401 twice to a stranger, two
+     console errors over a page that only says to open the link. `app.html` skips its early asks for it too. The
+     fragment is the address's own (`location`), since a load is never handed one. */
+  if (here(event.url.pathname) === '/invite' && typeof location !== 'undefined' && location.hash === '') return lightLoad(apiBase(event.url));
   const frame = import('$lib/shell/AppFrame.svelte');
   /* A LOAD THAT REDIRECTS NEVER WAITS FOR IT, so a frame that failed to load then is not an unhandled refusal. */
   frame.catch(() => undefined);
