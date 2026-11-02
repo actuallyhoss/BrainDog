@@ -400,6 +400,14 @@
     border-block-start: 1px solid var(--rule);
   }
 
+  /* A FIGURE AFTER THE LEAD THAT IS A DOOR gives back the margin and the corners `a.cell` borrows for its wash: its rule
+     and its neighbour's are the edges, so two linked figures overlapped by 24px and the rule between them started off
+     the middle on a rounded corner (sentry2, 2 Nov). Under the edge rules below, which still reach the tile's sides. */
+  .block[data-kind='stat'][data-form='lead'] > .grid > :where(a.cell:not(:first-child)) {
+    margin: 0;
+    border-radius: 0;
+  }
+
   .block[data-kind='stat'][data-form='lead'] > .grid > .cell:nth-child(2) {
     margin-inline-start: calc(-1 * var(--tile-pad));
     padding-inline-start: var(--tile-pad);
@@ -581,6 +589,13 @@
       padding-inline: 0;
       padding-block: var(--sp-3);
       border-inline-start: 0;
+    }
+
+    /* AND THE LAST OF THEM TOO, which the edge rule above reached past (it is one step more particular), so its hairline
+       ran 16px further right than the row's above it. */
+    .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child):last-child {
+      margin-inline-end: 0;
+      padding-inline-end: 0;
     }
 
     .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child:has(> :is(.cell-trend, .cell-trend-ahead)) {
