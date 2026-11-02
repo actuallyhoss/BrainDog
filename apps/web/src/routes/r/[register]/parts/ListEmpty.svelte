@@ -59,6 +59,20 @@
   /* WHAT THE LIST IS FOR, UNDER "NOTHING IN IT YET" (next-money, M41): Exchange rates said "Nothing in Exchange rates
      yet." and nothing of what a rate does. Its own `holds:`, as a sentence. */
   const heldSaid = $derived(typeof decl.holds === 'string' && decl.holds.trim() !== '' ? `It holds ${decl.holds.trim().replace(/\.$/u, '')}.` : undefined);
+  /* SKILLS AND TOOLS SAY WHAT ONE IS AND HOW ONE ARRIVES (work2 2 Nov, 5): "Nothing in Skills yet." over "It holds what a
+     session can do here, the moment to reach for it, and its text, versioned" named the list twice and said nothing a
+     person could act on. These two fill mostly from agents, so the line says that, and that Add is there too. */
+  const OWN: Readonly<Record<string, { title: string; body: string }>> = {
+    skills: {
+      title: 'No skills yet.',
+      body: 'A skill is a way of working your agents follow, like how you review a pull request or write release notes. Agents save the ones they use, or you can add one.',
+    },
+    tools: {
+      title: 'No tools yet.',
+      body: 'Tools are the apps, command lines and servers your agents use, with how each one starts and the keys it needs. Agents add them as they connect, or you can add one.',
+    },
+  };
+  const own = $derived(Object.hasOwn(OWN, register) ? OWN[register] : undefined);
   /* "Add a bill or invoice": the list's own word for one entry. */
   const addOne = $derived(`Add ${/^[aeiou]/iu.test(decl.one ?? '') ? 'an' : 'a'} ${(decl.one ?? 'entry').toLowerCase()}`);
 </script>
@@ -70,9 +84,9 @@
     ? `${size} in ${decl.name}, none matching:`
     : kind === 'cleared'
       ? 'Nothing outstanding.'
-      : `Nothing in ${decl.name} yet.`}
+      : (own?.title ?? `Nothing in ${decl.name} yet.`)}
   query={kind === 'no-results' ? [q, saidPlainly(register, whereOf(filters))].filter(Boolean).join(' · ') : undefined}
-  body={kind === 'no-results' && q ? copy.searchesOnly(searched) : kind === 'no-data-yet' ? heldSaid : undefined}
+  body={kind === 'no-results' && q ? copy.searchesOnly(searched) : kind === 'no-data-yet' ? (own?.body ?? heldSaid) : undefined}
 >
   {#snippet actions()}
     <!-- NO "Add the first row" AND NO EXAMPLE ROW. The capture line sits directly above and the New button beside the
