@@ -86,6 +86,8 @@
   import { readHostCatalogue, readShippedCatalogue } from '../catalogue.ts';
   import About from './About.svelte';
   import { foundListing, newerThan } from './found.ts';
+  import Connect from './Connect.svelte';
+  import { recipesIn, type Recipe } from './connect.ts';
 
   /** The pack id the record holds it under, when the address names it otherwise (`founder` for `usecase-founder`). */
   let { packId = null }: { packId?: string | null } = $props();
@@ -202,6 +204,7 @@
     installed = null;
     turnSaid = '';
     holds = undefined;
+    recipes = [];
     if (chosen.first.ok) {
       show(chosen.first.value);
       heldRead = false;
@@ -233,10 +236,14 @@
   let holds = $state<Record<string, TakesHold> | null | undefined>(undefined);
   /* THE FIGURE EACH LIMIT HOLDS, from the same file (`targetsIn`), so its box says what it does. */
   let targets = $state<Record<string, string>>({});
+  /* A DOOR'S CONNECT RECIPE, read from the same file (`connect.ts`), so an add-on that takes things in from somewhere
+     else says how to set that up on its own page. */
+  let recipes = $state<Recipe[]>([]);
   async function readHolds(s: PackConfig, want: string) {
     const firstParty = firstPartyModules().some((m) => m.id === want);
     const declarations = await declarationsOf(want, s.version, firstParty).catch(() => null);
     if (id !== want) return;
+    recipes = recipesIn(declarations);
     holds = declarations === null ? null : answersIn(declarations, Object.keys(s.config));
     targets = declarations === null ? {} : targetsIn(declarations, Object.keys(s.config));
   }
@@ -681,6 +688,9 @@
     </div>
 
     <div class="wide-cell stack">
+    {#each recipes as recipe (recipe.ingest)}
+      <Connect {recipe} />
+    {/each}
     {#if entries.length}
       <Tile icon="settings" class="section" data-surface="tile" title={words.settings}>
         <div class="section-body">
