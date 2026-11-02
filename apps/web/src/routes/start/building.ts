@@ -93,6 +93,9 @@ export const words = {
   task: 'To do',
   /** Projects made with nothing in it yet, which the side of the screen shows from the first project on. */
   projectsWait: 'on the side once you add a project',
+  /** The phone's sheet of the whole build, opened from the strip at the top of the talk (`FormingStrip`). */
+  formingTitle: 'Your BrainDog',
+  formingSub: 'Forming as we talk',
   /** Which way a bill's money goes, in the words Money's own list says it (`direction` on its bills). */
   moneyIn: 'Money in',
   moneyOut: 'Money out',

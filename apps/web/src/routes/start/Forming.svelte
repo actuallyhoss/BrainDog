@@ -38,6 +38,7 @@
     title = null,
     ghost = false,
     settled = false,
+    bare = false,
     busy = false,
     pages = null,
     locale,
@@ -56,6 +57,8 @@
     ghost?: boolean;
     /** The talk is over (sign-up's keep step): it no longer says it is forming. */
     settled?: boolean;
+    /** In the phone's sheet (`FormingStrip`), whose head already says its name: the rows on the sheet, no tile round them. */
+    bare?: boolean;
     busy?: boolean;
     /** How many pages it will draw, said once at the foot, or `null`. */
     pages?: number | null;
@@ -138,7 +141,15 @@
   }
 </script>
 
-<Tile icon="home" title={title ?? words.title} meta={ghost || settled ? undefined : words.forming} data-build {@attach settleOn(title)}>
+{#if bare}
+  <div class="bare">{@render body()}</div>
+{:else}
+  <Tile icon="home" title={title ?? words.title} meta={ghost || settled ? undefined : words.forming} data-build {@attach settleOn(title)}>
+    {@render body()}
+  </Tile>
+{/if}
+
+{#snippet body()}
   <ol class="rows">
     <li class="row" data-forming="today">
       <span class="well"><Icon name="sun" size="m" /></span>
@@ -201,9 +212,14 @@
     </p>
   {/if}
   {#if pages !== null && pages > 0}<p class="pages" in:arrive={{ rise: 4, from: 1, delay: 160 }}>{words.pages(pages)}</p>{/if}
-</Tile>
+{/snippet}
 
 <style>
+  .bare {
+    display: grid;
+    min-inline-size: 0;
+  }
+
   .rows {
     display: grid;
     margin: 0;

@@ -128,6 +128,8 @@
   import { arrive } from '$lib/motion';
   import Chat from './Chat.svelte';
   import Forming from './Forming.svelte';
+  import FormingStrip from './FormingStrip.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
   import {
     ackOf,
     agentsNamed,
@@ -379,6 +381,8 @@
   let asking = $state.raw<ChatAsk | null>(firstAsk());
   /** The talk is over: the summary and Make it mine stand where the field was. */
   let talkDone = $state(false);
+  /** The whole build as a sheet, opened from the phone's strip at the top of the talk. */
+  let formingOpen = $state(false);
   /** A name answered in the conversation, laid over every reading (`withName`). */
   let nameAnswer = $state<string | null>(null);
   /**
@@ -1078,6 +1082,9 @@
    * its first project (`holdsProjects`), so it is not said as made; its tile on the build says what it waits for.
    */
   const holdsProject = $derived((proposal?.rows ?? []).some((r) => r.register === 'things'));
+  /** The build as the tile, the phone's strip and its sheet draw it: Projects says it waits until it holds a project. */
+  const buildParts = $derived(steps.map((p) => (p.id === 'portfolio' && !holdsProject ? { ...p, waits: words.projectsWait } : p)));
+  const buildGhost = $derived(proposal === null && brought.length === 0);
   /* AND THE USE CASE IS WHAT IT IS SET UP AS, said on its own line: its page is Today, never a place on the side called
      Freelance or Small business. */
   const madeParts = $derived(onParts.filter((p) => !p.id.startsWith('usecase-') && (p.id !== 'portfolio' || holdsProject)));
@@ -1228,6 +1235,10 @@
         <!-- ── THE CONVERSATION ──────────────────────────────────────────── -->
         <section class="talk" aria-labelledby="who-h" data-dragging={dragging ? '' : undefined}>
           {#if dragging}<p class="drop" aria-hidden="true">{firstRun.exportDrop}</p>{/if}
+          <!-- ON A PHONE, THE BUILD HELD AT THE TOP OF THE TALK while it lasts, opening whole as a sheet. -->
+          {#if !talkDone}
+            <FormingStrip parts={buildParts} ghost={buildGhost} title={proposal?.title ?? null} open={formingOpen} onopen={() => (formingOpen = true)} />
+          {/if}
           <Chat
             turns={chatTurns}
             current={asking}
@@ -1248,11 +1259,11 @@
         <!-- ── THE BUILD ─────────────────────────────────────────────────── -->
         <div class="build">
           <Forming
-            parts={steps.map((p) => (p.id === 'portfolio' && !holdsProject ? { ...p, waits: words.projectsWait } : p))}
+            parts={buildParts}
             left={proposal ? offParts.map((p) => ({ id: p.id, name: p.name })) : []}
             said={sentence}
             title={proposal?.title ?? null}
-            ghost={proposal === null && brought.length === 0}
+            ghost={buildGhost}
             settled={talkDone}
             {busy}
             {locale}
@@ -1283,6 +1294,24 @@
           {/if}
         </div>
       </div>
+
+      <!-- THE WHOLE BUILD, FROM THE PHONE'S STRIP: the tile's rows on the sheet, a part taken out or put back here too. -->
+      <Sheet bind:open={formingOpen} title={proposal?.title ?? words.formingTitle} subtitle={talkDone ? undefined : words.formingSub} caret={false}>
+        <Forming
+          bare
+          parts={buildParts}
+          left={proposal ? offParts.map((p) => ({ id: p.id, name: p.name })) : []}
+          said={sentence}
+          title={proposal?.title ?? null}
+          ghost={buildGhost}
+          settled={talkDone}
+          {busy}
+          {locale}
+          pages={proposal ? pageCount || null : null}
+          onremove={leaveOut}
+          onrestore={flip}
+        />
+      </Sheet>
     {/if}
   </div>
 </Frame>
@@ -1435,6 +1464,14 @@
   }
 
   /* A FILE HELD OVER THE SCREEN: the conversation says where it goes, in the ink, over a quiet wash. */
+  /* ON A PHONE NOTHING FOCUSED SITS UNDER THE STRIP HELD AT THE TOP OF THE TALK (2.4.11): a control scrolled to by its
+     focus stops a strip's height below the top. */
+  @media (width < 900px) {
+    .talk :global(:is(button, a, textarea, input, [tabindex])) {
+      scroll-margin-block-start: calc(var(--tap, 44px) + var(--sp-5));
+    }
+  }
+
   .talk[data-dragging] {
     position: relative;
   }
