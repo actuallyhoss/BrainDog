@@ -9545,6 +9545,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   });
 
   async function tail(scheduler: Scheduler): Promise<void> {
+    /* WHAT THE TAIL READ, while nothing has awaited since: then the doorbell's question below is already answered. */
+    let read: ReturnType<typeof pendingWork> | null = null;
     try {
       const armed = await scheduler.get();
       /* READ AFTER THE AWAIT, not before it. Reading the minimum first and then awaiting meant two
@@ -9555,11 +9557,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const work = pendingWork(sql, opts.delivers);
       if (work.nextDueMs === null) {
         if (armed !== null) await scheduler.clear();
+        else read = work;
       } else if (armed !== work.nextDueMs) await scheduler.set(work.nextDueMs);
+      else read = work;
     } finally {
       /* And the doorbell asks again too: a job queued while this tail was parked is a job the ring
-         is about. */
-      if (pendingWork(sql, opts.delivers).outboxPending) await scheduler.wake();
+         is about. A tail that set nothing was never parked after its read, so that read still holds. */
+      if ((read ?? pendingWork(sql, opts.delivers)).outboxPending) await scheduler.wake();
     }
   }
 
