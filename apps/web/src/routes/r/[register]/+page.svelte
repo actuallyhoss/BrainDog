@@ -1783,7 +1783,63 @@
    * `Archived` and its own `Put back`, and says so in a toast, so a row added by mistake is one press from gone and
    * one more from here again. Before this, the only way to take back a typed row was to find Archive in its menu.
    */
-  const takeBack = (entry: Entry) => () => void archiveOnRecord([entry.seq], `“${nameOf(entry.seq)}”`, madeFor.get(entry.seq));
+  const takeBack = (entry: Entry) => () => void unAdd(entry);
+
+  /**
+   * AN ADD TAKEN BACK LEAVES THE LIST AT ONCE, AND ITS COUNTS WITH IT (leftovers 7, 2 Nov). It went through the row's
+   * own Archive, which keeps an archived row on screen wearing Put back for the length of an Undo, so the head read
+   * "14 of 13": the row was still drawn and counted while the record's count had dropped. A row nobody meant to add
+   * is not a row to look at again, so it goes now, the head and the list's count go back by one, and the toast says
+   * so with an Undo that brings it back. A refusal puts the row back where it was.
+   */
+  async function unAdd(entry: Entry) {
+    const list = id;
+    const seq = entry.seq;
+    const named = `“${nameOf(seq)}”`;
+    const version = rowAt(seq)?.version ?? entry.version;
+    const along = madeFor.get(seq);
+    const drop = (row: Entry, by: 1 | -1) => {
+      if (list !== id) return;
+      if (by < 0) {
+        if (!pages.some((p) => p.some((e) => e.seq === row.seq))) return;
+        pages = pages.map((p) => p.filter((e) => e.seq !== row.seq));
+        const kept = new Map(held);
+        kept.delete(row.seq);
+        held = kept;
+        clearReceipt(row.seq);
+        const a = new Set(added);
+        a.delete(row.seq);
+        added = a;
+      } else {
+        if (pages.some((p) => p.some((e) => e.seq === row.seq))) return;
+        pages = [[row, ...(pages[0] ?? [])], ...pages.slice(1)];
+      }
+      matched = Math.max(0, matched + by);
+      if (booted) booted = { ...booted, registers: booted.registers.map((r) => (r.id === list ? { ...r, count: Math.max(0, r.count + by) } : r)) };
+    };
+    drop(entry, -1);
+    const out = await writes().archive(list, seq, version);
+    if (!out.ok) {
+      drop(entry, 1);
+      toasts.push(out.fix ?? copy.writeNotReached, { intent: 'warn' });
+      return;
+    }
+    let alongGone: Entry | null = null;
+    if (along) {
+      const gone = await writes().archiveAlone(along.register, along.seq);
+      if (gone?.ok) alongGone = gone.entry;
+    }
+    const archived = out.entry;
+    toasts.push(copy.writeArchived(named), {
+      undo: async () => {
+        const back = await writes().restore(list, seq, archived.version);
+        if (alongGone && along) void writes().restore(along.register, along.seq, alongGone.version);
+        if (back.ok) drop(back.entry, 1);
+        else toasts.push(back.fix ?? copy.writeNotReached, { intent: 'warn' });
+      },
+      life: UNDO_MS,
+    });
+  }
   /* THE PERSON AN ORDER MADE GOES AND COMES BACK WITH IT (RN5): "20 candles for Salma by Friday" makes Salma in the
      same write as the order, and its Undo and Put back take her too, unless something else now links to her (RO9). By
      the order's number, for this tab's life. */
