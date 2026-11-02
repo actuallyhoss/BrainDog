@@ -1221,7 +1221,9 @@
 
   <!-- THE LINE THE PAGE OPENS ON, drawn once: in the header's row, or handed to the body to sit under its sentence. -->
   {#snippet lineInHead()}
-    {#if headLine}<HeadCapture block={headLine.block} oncapture={(register, text, inherited) => void writes.captureLine(register, text, inherited)} />{/if}
+    {#if headLine && (tiled || !wide.current)}<HeadCapture block={headLine.block} oncapture={(register, text, inherited) => void writes.captureLine(register, text, inherited)} />{/if}
+    <!-- UNDER "JUST YOU SO FAR", the one way to bring everybody in at once. -->
+    {#if peopleEmpty}<p class="people-import">Have a contacts file from your phone, Google or Outlook? <a href={at('/add/contacts')}>Import contacts</a></p>{/if}
   {/snippet}
 
   <!-- THE DECLARED HEAD'S LINE UNDER THE NAME: the state with its mark and its words (never colour alone), a way back
@@ -1295,9 +1297,6 @@
         {/await}
       {/if}
     {/snippet}
-    {#if peopleEmpty}
-      <p class="people-import">Have a contacts file from your phone, Google or Outlook? <a href={at('/add/contacts')}>Import contacts</a></p>
-    {/if}
     <div class="body-wrap" data-project={projectPage ? '' : undefined} style={projectStyle}>
     {#snippet laidOut(blocks: LiveBlock[], placed: ((i: number) => { key: string; area: string; size: string } | null) | null, inside: import('svelte').Snippet<[number]> | null)}
       <PageBody
@@ -1313,7 +1312,7 @@
         leadHead={tiled && !placed ? leadRow : null}
         leadEnd={besideLead && !buttonsTaken && !placed ? pageButtons : null}
         captured={placed ? -1 : (headLine?.at ?? -1)}
-        under={headLine && (tiled || !wide.current) && !shapeWaits && !placed ? lineInHead : null}
+        under={((headLine && (tiled || !wide.current)) || peopleEmpty) && !shapeWaits && !placed ? lineInHead : null}
         strip={strip && led && !shapeWaits && !placed ? narrow : null}
         host={hosting && !shapeWaits ? host : null}
         pick={hosting ? picked : null}
@@ -1461,7 +1460,6 @@
   /* PEOPLE WITH NOBODY BUT YOU: the one line that says where a contacts file goes, a plain link in ink. */
   .people-import {
     margin: 0;
-    padding-inline: var(--gutter);
     color: var(--ink-2);
     font-size: var(--fs-body);
   }

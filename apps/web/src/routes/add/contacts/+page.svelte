@@ -259,7 +259,8 @@
               {#each plan.people.slice(0, SHOWN) as c, i (i)}
                 <tr>
                   <td class="ct-name">{c.name}</td>
-                  <td>{c.org}{#if c.org && orgNew.has(c.orgKey)}<span class="ct-tag">{words.newOrg}</span>{/if}</td>
+                  <!-- AN ORGANISATION KEPT ALREADY IS SAID BY THE NAME IT IS KEPT AS ("Fenwick", where the file says "Fenwick Ltd"). -->
+                  <td>{plan.heldOrgs.get(c.orgKey)?.name ?? c.org}{#if c.org && orgNew.has(c.orgKey)}<span class="ct-tag">{words.newOrg}</span>{/if}</td>
                   <td class="ct-wrap">{c.emails.join(', ')}</td>
                   <td class="ct-nowrap">{c.phones.join(', ')}</td>
                 </tr>

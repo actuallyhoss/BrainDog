@@ -59,7 +59,7 @@ export const words = {
   tidyLeft: 'Left as it is. You can change any of them on their page.',
   capitals: (names: readonly string[]) => `Write ${listed(names)} with capitals`,
   websites: (n: number) => (n === 1 ? 'Give 1 new organisation its website, from their emails' : `Give ${n} new organisations their websites, from their emails`),
-  clients: (names: readonly string[]) => `Mark ${listed(names)} as clients, like the ones you have`,
+  clients: (names: readonly string[]) => `Mark ${listed(names)} as ${names.length === 1 ? 'a client' : 'clients'}, like the ones you have`,
 };
 
 /** "A", "A and B", "A, B and C", "A, B and 3 more". */
