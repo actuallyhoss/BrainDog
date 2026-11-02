@@ -18,6 +18,9 @@
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
+  import { may } from '$lib/record/may.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import NotFound from '$lib/ui/NotFound.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
@@ -168,7 +171,12 @@
     });
   }
 
+  /* SOMEBODY HELD TO PART OF THE RECORD (a contractor on one project) reaches this only by typing it, and every read of
+     it is the whole record's: "This isn't shared with you", and nothing asked (collab pass 4). */
+  const part = $derived(!!(page.data as { me?: unknown }).me && !may(page.data as unknown as Shell, 'read'));
+
   onMount(() => {
+    if (part) return;
     readStore();
     void readCounts(fetch).then((got) => (counts = got));
     void read(async () => {
@@ -194,7 +202,7 @@
   $effect(() => drew('ready'));
 </script>
 
-<svelte:head><title>{titleOf(copy.packs)}</title></svelte:head>
+<svelte:head><title>{titleOf(part ? copy.notShared.title : copy.packs)}</title></svelte:head>
 
 <!-- ON A PHONE THE TWO WAYS ON SIT UNDER THE SENTENCE (1 Nov): beside it they squeezed "Each shows its plan before
      anything changes." into five lines of two words. -->
@@ -203,6 +211,10 @@
   <!-- ANYBODY SIGNED IN MAY PUBLISH ONE: the form makes it from what they built, and it waits for review. -->
   <Button size="sm" weight="bare" href={addonHref}>{words.publish}</Button>
 {/snippet}
+{#if part}
+  <PageHead title={copy.notShared.title} headless />
+  <NotFound title={copy.notShared.title} body={copy.notShared.body} />
+{:else}
 <PageHead icon="packs" title={copy.packs} sentence={store.sentence} actions={phone.current ? undefined : ways}>
   {#snippet below()}{#if phone.current}<div class="ways">{@render ways()}</div>{/if}{/snippet}
 </PageHead>
@@ -316,6 +328,7 @@
   </div>
   </Swap>
 </div>
+{/if}
 
 <style>
   .page {

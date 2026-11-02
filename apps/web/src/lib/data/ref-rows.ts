@@ -20,6 +20,7 @@ import { wrote, type Client } from '@braindog/client';
 
 import type { RecordRow } from '../record/remote.ts';
 import { keptToken, versionKept } from './local-tab.ts';
+import { heldNow, listsSettled, readsList } from '../record/lists-held.ts';
 import { forgetRowsWith } from './rows-forget.ts';
 
 /** How long a walk is drawn from without asking again, whatever the log says. */
@@ -44,7 +45,11 @@ const walksNow = (): Map<string, Kept> => {
  * EACH LONG TEXT CUT TO ITS FIRST LINE (`short`): a walk names rows, adds up their money and marks the finished ones, and
  * never draws a note, and on his record the projects' notes were 457 KB of a 466 KB walk. A row's own screen reads it whole.
  */
-export async function walkSaid(client: Pick<Client, 'list'>, register: string): Promise<Walked> {
+export async function walkSaid(client: Pick<Client, 'list'>, register: string, base?: string): Promise<Walked> {
+  /* A LIST THE READER'S `boot` LEFT OUT IS NOT ASKED (`lists-held.ts`): the record would refuse it, and the ref it names
+     is drawn unnamed either way. */
+  if (!listsSettled()) await heldNow(base);
+  if (!readsList(register, base)) return { ok: false, refusal: { code: 'FORBIDDEN', fix: 'This list is not shared with you.' } };
   const rows: RecordRow[] = [];
   let cursor: string | null = null;
   do {
@@ -87,7 +92,7 @@ export async function rowsSaid(client: Pick<Client, 'list'>, base: string, regis
   const now = Date.now();
   const was = walks.get(at);
   if (was !== undefined && was.token === token && now >= was.at && now - was.at < ROWS_KEPT_MS) return was.walked;
-  const walked = walkSaid(client, register);
+  const walked = walkSaid(client, register, base);
   const entry: Kept = { token, at: now, walked };
   walks.set(at, entry);
   const drop = () => {

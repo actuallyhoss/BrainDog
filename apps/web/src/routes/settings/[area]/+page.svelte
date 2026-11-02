@@ -352,7 +352,9 @@
     const client = recordClient();
     const [copies, usage, eng, vital] = await Promise.all([
       hosted ? readSnapshots(apiBase()).catch(() => null) : null,
-      hosted ? readUsage((url, init) => fetch(url, init), now, '', apiBase(page.url), undefined, homeCurrency()).catch(() => null) : null,
+      /* THE MONTH'S USE, FOR SOMEBODY WHO READS THE WHOLE RECORD (collab pass 4): past the ledger it reads the record's
+         `actions`, which a contractor held to one project was refused on every open of Settings. */
+      hosted && may(shell, 'read') ? readUsage((url, init) => fetch(url, init), now, '', apiBase(page.url), undefined, homeCurrency()).catch(() => null) : null,
       valueOf(() => client.engineHealth()),
       valueOf(() => client.call<{ signs: Sign[] }>('signs')),
       owns ? readFaults() : null,

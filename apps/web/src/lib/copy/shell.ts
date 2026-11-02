@@ -349,6 +349,12 @@ export const shell = {
    */
   noPageCalled: (name: string) => `No page called ${name}`,
   /**
+   * AN ADDRESS SOMEBODY HELD TO PART OF THE RECORD TYPED, THAT IS NOT IN THEIR PART (collab pass 4): a project nobody
+   * shared with them, or a screen of the whole record such as Add-ons. Said the same whether it exists or not, so the
+   * words give nothing away, and never as the raw refusal.
+   */
+  notShared: { title: "This isn't shared with you", body: 'Ask whoever shared this BrainDog with you if you need it.' },
+  /**
    * A place with nothing in it yet, said as its own list where its first step names it: "No trips yet." from its box
    * "Add a trip" (design pass 1 Nov, M29), the box under it being the way to add the first. Otherwise by its name and how
    * it fills (audit 11-01 AP8): "Nothing in People yet. What you add or mention lands here." Never a bare "Nothing here yet".

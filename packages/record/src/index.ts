@@ -10232,6 +10232,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * THE PERSON OPENED THE RECORD (`OPENED`): a person signed in, never a token or a link, which People reads beside the
+   * read mark, written only when the last one is a few minutes old. `boot` writes it, and `whoami` for somebody who may
+   * only add, which the app asks her in place of `boot`.
+   */
+  const markOpened = (ctx: CallContext): void => {
+    if (ctx.principal.kind !== 'person' || kernel.refused() !== null) return;
+    const was = kernel.prefsOf(ctx.principal.id)[OPENED];
+    const at = typeof was === 'string' ? Date.parse(was) : Number.NaN;
+    if (!Number.isFinite(at) || clock.now() - at > OPENED_EVERY_MS) kernel.setPref(ctx.principal.id, OPENED, new Date(clock.now()).toISOString());
+  };
+
+  /**
+   * Whether the caller is a person or a key at "Adds only" on the whole record, still let in to add: `whoami` answers them,
+   * since what it says is who they are, and no read of the record does.
+   */
+  const addsOnly = (ctx: CallContext): boolean => {
+    const p = ctx.principal;
+    return (p.kind === 'person' || p.kind === 'token') && p.level === 'append' && guard(ctx, 'append') === null;
+  };
+
+  /**
    * The level this caller holds on each list, for `boot`'s `me.levels`: a grant naming the list, else the record-wide
    * level, and no key for a list outside their ceiling or an owner's list a record-wide appender does not reach.
    *
@@ -12362,11 +12383,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* THE PERSON OPENED THE RECORD (`OPENED`): a person signed in, never a token or a link, which People reads beside
          the read mark. Written before the read's one moment, and only when the last one is a few minutes old. Somebody
          who may only add is refused `boot` and opened it all the same. */
-      if (ctx.principal.kind === 'person' && kernel.refused() === null && (stop === null || stop.at === APPEND_READ_AT)) {
-        const was = kernel.prefsOf(ctx.principal.id)[OPENED];
-        const at = typeof was === 'string' ? Date.parse(was) : Number.NaN;
-        if (!Number.isFinite(at) || clock.now() - at > OPENED_EVERY_MS) kernel.setPref(ctx.principal.id, OPENED, new Date(clock.now()).toISOString());
-      }
+      if (stop === null || stop.at === APPEND_READ_AT) markOpened(ctx);
       if (stop) return { ok: false, refusal: stop };
       /* ONE TRANSACTION, SO ONE MOMENT. A second connection to the same file, a CLI beside a running
          self-host, could commit between the counts and the feed, and the rail said one row beside a
@@ -14216,7 +14233,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     async whoami(ctx: CallContext) {
       const stop = guard(ctx, 'read');
-      if (stop) return { ok: false as const, refusal: stop };
+      /* AND SOMEBODY WHO MAY ONLY ADD IS ANSWERED TOO (collab pass 4): every read of the record is refused her, and this
+         was as well, so the app learnt what she may do from a 403 on every page. What is said here is about her and her
+         grant, never about the record. */
+      if (stop && !addsOnly(ctx)) return { ok: false as const, refusal: stop };
+      /* AND SHE OPENED THE RECORD, which `boot` wrote down before the app asked her this in its place. */
+      if (stop) markOpened(ctx);
 
       const p = ctx.principal;
       const may = NEEDS.filter((need) => allows(ctx, need) === null);

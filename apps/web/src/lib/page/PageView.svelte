@@ -419,7 +419,9 @@
   });
   /* AN UNBOXED ACTIONS SECTION IS COUNTED TOO, for the one case that asks: it is left out when the shape took what it heads. */
   const asking = (bs: readonly LiveBlock[]) => bs.map((b) => (b.kind === 'section' && (b as { panel?: unknown }).panel === 'actions' ? ({ ...b, box: true } as LiveBlock) : b));
-  const asks = $derived(spoken !== null && asksActions(asking(live?.page.blocks ?? [])));
+  /* AND ONLY OF SOMEBODY WHO READS THE WHOLE RECORD, as `actions` asks (collab pass 4): a contractor held to one project
+     was refused it on its page, and the section that waits on it is shut for him as for a page with none. */
+  const asks = $derived(spoken !== null && (!(route.data as Partial<Shell>).me || may(route.data as unknown as Shell, 'read')) && asksActions(asking(live?.page.blocks ?? [])));
   let tally = $state.raw<{ of: string; rows: ActionRow[] | null } | null>(null);
   $effect(() => {
     const of = asks ? spoken : null;
@@ -672,7 +674,9 @@
         ? railed?.title
         : got.from === 'refused'
           ? ((shell?.nav ?? []).find((n) => n.id === slug)?.title ?? copy.errorPage.broken.title)
-          : copy.noPageCalled(slug),
+          : shell?.me && !may(shell, 'read')
+            ? copy.notShared.title
+            : copy.noPageCalled(slug),
   );
 
   /* ── the reader's mark ─────────────────────────────────────────────────────
@@ -1110,6 +1114,7 @@
   </div>
 {:else if !live}
   {@const pages = (got.from === 'missing' ? got.held : []).map((h) => ({ title: heldTitle(h), href: `/p/${h.address}`, address: h.address }))}
+  {@const part = !!shell?.me && !may(shell, 'read')}
   <div class="said">
     <!-- A URL NAMING SOMETHING THIS RECORD DOES NOT HAVE IS A REFUSAL, and the record already has the sentence for it.
          Nothing failed, so there is no request id to quote (`50 §13 D11`), and no filter ran, so "nothing matched" is
@@ -1118,9 +1123,12 @@
          the whole index in one sentence was thirty-eight addresses, none of them a thing to press. -->
     <!-- AND ONE SCREEN FOR EVERY ADDRESS THAT LEADS NOWHERE (`NotFound`): the same head, words and two ways on as a
          mistyped address and a number that names nothing, so a page not here is not a second design. -->
-    {#if mode === 'page'}<PageHead title={copy.noPageCalled(slug)} headless />{/if}
+    <!-- AND FOR SOMEBODY HELD TO PART OF THE RECORD, "This isn't shared with you" (collab pass 4): a contractor typing
+         another project's address was told it did not exist, which is not his to know either way. -->
+    {#if mode === 'page'}<PageHead title={part ? copy.notShared.title : copy.noPageCalled(slug)} headless />{/if}
     {#await Promise.all([import('$lib/ui/NotFound.svelte'), import('$lib/record/nearest.ts')]) then [{ default: NotFound }, { nearest }]}
-      <NotFound title={copy.noPageCalled(slug)} body={pages.length === 0 ? copy.theseExist('Pages', []) : undefined} near={nearest(slug, pages)} />
+      {#if part}<NotFound title={copy.notShared.title} body={copy.notShared.body} />
+      {:else}<NotFound title={copy.noPageCalled(slug)} body={pages.length === 0 ? copy.theseExist('Pages', []) : undefined} near={nearest(slug, pages)} />{/if}
     {/await}
   </div>
 {:else if mode === 'page'}

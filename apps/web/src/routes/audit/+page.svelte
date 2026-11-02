@@ -20,6 +20,8 @@
   import { handlesSaid, listName as declaredName, ruleNameSaid } from '$lib/record/names.ts';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
+  import { may } from '$lib/record/may.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
   import Button from '$lib/ui/Button.svelte';
   import { day as fmtDay } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
@@ -303,6 +305,9 @@
   let byWho = $state.raw<WhoPart[] | null>(null);
   $effect(() => {
     if (!route.data.live) return;
+    /* NOT OF SOMEBODY HELD TO A FEW LISTS (collab pass 4): the figure reads the whole log, and a contractor on one project
+       was told 404 for it on every open. */
+    if (!may(route.data as unknown as Shell, 'read')) return;
     untrack(() => {
       void import('@braindog/client')
         .then(({ createClient }) => createClient({ base: apiBase() }).metric('activity-by-who'))

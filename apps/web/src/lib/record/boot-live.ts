@@ -40,6 +40,7 @@ import { declaredOf, noteOf } from './history-live.ts';
 import { keysSaid, listName, titleOf } from './names.ts';
 import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
 import { levelsFrom, type HeldLevel } from './may.ts';
+import { expectLists, forgetLists, holdLists } from './lists-held.ts';
 import type { IconName } from '../ui/icons.ts';
 import { agentKindOf, hueFor, type AgentKind } from '../ui/face.ts';
 /* THE HOLDING PEN, AS THE RECORD SENDS IT (`boot`'s `pen`), held to the shape the settings screen draws. */
@@ -321,6 +322,36 @@ function earlyBoot(url: string): Promise<Response> | null {
   return held.at as Promise<Response>;
 }
 
+/**
+ * WHAT THIS DEVICE WAS TOLD THE LAST TIME A PERSON AT "ADDS ONLY" OPENED THE RECORD AT `base`, or `null` (collab pass 4).
+ *
+ * The root layout keeps the boot address under `bd_add_only` and the refusal under `bd_add_only_said` once `boot` refused
+ * her (`+layout.ts`). From then on `app.html` asks `whoami` and not `boot`, and so does `readBoot`: `whoami` answers her,
+ * so what she may do is asked without a 403 on every page, and a `boot` is asked only once she may read.
+ */
+function addOnlyAt(base: string): Said | null {
+  try {
+    if (typeof location === 'undefined' || localStorage.getItem('bd_add_only') !== new URL(`${base}/api/boot`, location.href).href) return null;
+    const kept = JSON.parse(localStorage.getItem('bd_add_only_said') ?? 'null') as Partial<Said> | null;
+    return kept && typeof kept.code === 'string' && typeof kept.fix === 'string' && kept.at === APPEND_AT ? saidOf(kept as Said) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether `whoami` at `base` says the caller still may only add: asked early by `app.html` where it was, else now. */
+async function stillAddsOnly(base: string): Promise<boolean> {
+  const url = `${base}/api/whoami`;
+  const held = (globalThis as { __bdWho?: { url?: unknown; at?: unknown } }).__bdWho;
+  const early = held && held.url === url && held.at instanceof Promise ? (held.at as Promise<Response>) : null;
+  if (early) (globalThis as { __bdWho?: unknown }).__bdWho = undefined;
+  const io = early ? (((input: string | URL | Request, init?: RequestInit) => (String(input) === url ? early : globalThis.fetch(input, init))) as Fetch) : undefined;
+  const said = await createClient({ base, ...(io ? { fetch: io } : {}) })
+    .whoami()
+    .catch(() => null);
+  return said?.ok === true && (said.value as { level?: unknown } | null)?.level === 'append';
+}
+
 /** The record whose every list's declaration was asked beside `boot` and handed to the client (`firstOpen`). */
 let everyAt: string | null = null;
 
@@ -367,18 +398,30 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
     }
   }
   kept ??= (async (): Promise<Booted> => {
+    /* A WALK ASKED FROM HERE WAITS FOR WHAT THIS `boot` SAYS THE READER HOLDS (`lists-held.ts`). Not for a test's fetch. */
+    if (!io) expectLists(base);
     /* THE EARLY ANSWER, WHEN IT WAS ASKED AT THIS ADDRESS, is the one `boot` read; anything else goes to the network. */
     const early = io ? null : earlyBoot(`${base}/api/boot`);
     const first: Fetch | undefined = early
       ? (((input: string | URL | Request, init?: RequestInit) =>
           String(input) === `${base}/api/boot` && (init?.method ?? 'GET') === 'GET' ? early : globalThis.fetch(input, init)) as Fetch)
       : io;
+    /* SOMEBODY THIS DEVICE KNOWS MAY ONLY ADD IS ASKED `whoami`, which answers her, and `boot` only once it says she reads. */
+    const addOnly = early || io ? null : addOnlyAt(base);
+    if (addOnly && (await stillAddsOnly(base))) {
+      holdLists(base, null);
+      kept = null;
+      refusal = addOnly;
+      return { from: 'refused', ...addOnly };
+    }
     const client = createClient({ base, ...(first ? { fetch: first } : {}) });
     const out = await client.boot();
     refusal = null;
     if (out.ok) {
       /* THE RECORD'S CLOCK, set the moment its answer lands (`recordNow`). */
       learnNow(out.value.now);
+      /* AND THE LISTS THE READER HOLDS, so a walk or a declaration of a list they do not is never asked (`lists-held.ts`). */
+      if (!io) holdLists(base, levelsFrom((out.value.me as Record<string, unknown> | undefined)?.levels));
       /* THE PAGES' TITLES ARE KEPT WHERE A SCREEN LOOKS A PAGE UP BY SLUG (`held.ts`), which was the sample's copy alone. */
       learnPages(out.value.pages ?? []);
       /* AND WHERE THE RECORD NAMED NO CURRENCY, WHAT ITS MONEY IS IN, asked before the shell is built so the first
@@ -397,6 +440,7 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
        A refusal kept nothing then either; now it is every such answer. */
     kept = null;
     refusal = saidOf(said);
+    if (!io) holdLists(base, null);
     return { from: 'refused', ...refusal };
   })();
   return kept;
@@ -597,6 +641,7 @@ export function forget(): void {
   forgetShell();
   forgetSchemas();
   forgetRows();
+  forgetLists();
   forgetKept();
   forgetToday();
 }

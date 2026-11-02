@@ -49,12 +49,13 @@ export const SKILLS_MOST = 1_000;
 const SESSION = (sessionDeclaration().body as unknown as { id: string }).id;
 
 /** Which check a fixed address's reader makes before it does any work. */
-type Asks = 'record' | 'any' | 'every' | 'runs' | 'inbox';
+type Asks = 'self' | 'record' | 'any' | 'every' | 'runs' | 'inbox';
 
 /**
  * Every address with no parameter, in the order the agent door lists them, each beside what its reader asks.
  *
- * - `record`: `guard(ctx, 'read')`. `whoami`, `actions`, `arrangement` and its grammars, and `version`, which the door
+ * - `self`: `whoami`, `guard(ctx, 'read')`, or a person or key at "Adds only" on the whole record who may add.
+ * - `record`: `guard(ctx, 'read')`. `actions`, `arrangement` and its grammars, and `version`, which the door
  *   asks before it answers the two grammars it keeps as its own text.
  * - `any`: `scoped(ctx, 'read')`, a read that filters its own answer. `boot`, `context`, `digestToday`, `governance`,
  *   `automations`, `briefing`, `widgetGallery` (`widgets`), `exceptions`, `stale`, `learnings`, and `previewPage`, which draws `handoffs`. The four
@@ -64,7 +65,7 @@ type Asks = 'record' | 'any' | 'every' | 'runs' | 'inbox';
  * - `inbox`: `inbox` and `inboxPatterns`.
  */
 const FIXED: readonly (readonly [string, Asks])[] = [
-  ['whoami', 'record'],
+  ['whoami', 'self'],
   ['boot', 'any'],
   ['context', 'any'],
   ['understand', 'every'],
@@ -116,7 +117,10 @@ export function methods(deps: RecordDeps) {
   const asker = (ctx: CallContext): ((asks: Asks) => boolean) => {
     const said = new Map<Asks, boolean>();
     const ask = (asks: Asks): boolean =>
-      asks === 'record'
+      asks === 'self'
+        ? guard(ctx, 'read') === null ||
+          ((ctx.principal.kind === 'person' || ctx.principal.kind === 'token') && ctx.principal.level === 'append' && guard(ctx, 'append') === null)
+        : asks === 'record'
         ? guard(ctx, 'read') === null
         : asks === 'every'
           ? deps.readsEveryList?.(ctx) === true && deps.understood !== undefined

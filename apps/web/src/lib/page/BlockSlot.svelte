@@ -1103,7 +1103,8 @@
 {:else if (panel === 'actions' || panel === 'reporting' || panel === 'run') && param && writes && !arranging}
   <!-- BY THE ROW, `things#1`, and not by its title: the record resolves each action's project to its row. -->
   <!-- LOADED BY `import()` AS SEEN AND JOB ARE: both are a row's page's and never Today's, which draws no row. -->
-  {#if panel === 'actions'}{#await import('./panels/Actions.svelte') then { default: Actions }}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />{/await}
+  <!-- ACTIONS ONLY FOR SOMEBODY WHO READS THE WHOLE RECORD, as `actions` asks: a contractor on one project was refused it. -->
+  {#if panel === 'actions'}{#if may(route.data as unknown as Shell, 'read')}{#await import('./panels/Actions.svelte') then { default: Actions }}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />{/await}{/if}
   {:else if panel === 'run'}
     <!-- A RUN'S PAGE, drawn for one row of the list of runs: what it did and its way back, by its handle (`S42`). -->
     {#if param.register === 'session'}{#await import('./panels/RunPanel.svelte') then { default: RunPanel }}<RunPanel run={`S${param.seq}`} title={param.title} onchanged={writes.reread} />{/await}{/if}

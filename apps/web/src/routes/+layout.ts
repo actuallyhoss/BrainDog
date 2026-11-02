@@ -165,8 +165,14 @@ async function shellOf({ url, fetch, depends }: Event): Promise<FrameData> {
   if (typeof location !== 'undefined')
     try {
       const u = new URL(`${api}/api/boot`, location.href).href;
-      if (booted.from === 'refused' && booted.at === 'level.append') localStorage.setItem('bd_add_only', u);
-      else if (booted.from === 'live' && localStorage.getItem('bd_add_only') === u) localStorage.removeItem('bd_add_only');
+      if (booted.from === 'refused' && booted.at === 'level.append') {
+        localStorage.setItem('bd_add_only', u);
+        /* AND WHAT SHE WAS TOLD, so the next open draws it from `whoami` and asks no `boot` (`addOnlyAt`, collab pass 4). */
+        localStorage.setItem('bd_add_only_said', JSON.stringify({ code: booted.code, fix: booted.fix, at: booted.at }));
+      } else if (booted.from === 'live' && localStorage.getItem('bd_add_only') === u) {
+        localStorage.removeItem('bd_add_only');
+        localStorage.removeItem('bd_add_only_said');
+      }
     } catch {
       /* blocked storage: the early asks go on as before */
     }

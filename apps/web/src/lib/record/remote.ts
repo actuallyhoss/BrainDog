@@ -30,6 +30,7 @@ import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { declaredValue, schemaOf } from './where.ts';
 import { labels, relabelInto } from '../voice.ts';
 import { survivorsOf } from './names.ts';
+import { heldNow, holdsList, listsSettled } from './lists-held.ts';
 
 /** One register's rows, by the ULID the record stores a ref as, and back again. */
 export type RefMap = {
@@ -614,17 +615,24 @@ const newest = new Map<string, number>();
 let questions = 0;
 export function learn(schema: SchemaCall, register: string, asked: Map<string, Promise<void>>): Promise<void> {
   let held = asked.get(register);
+  /* A LIST THE READER HOLDS NOTHING ON IS NOT ASKED ABOUT (`lists-held.ts`, collab pass 4): its declaration is refused
+     them, and nothing of it is drawn. Not kept in `asked`, so a reader whose access is raised asks it on the next read.
+     Asked at once where `boot` has said, as before, so the lists a screen learns in one turn still go as one read; where
+     it is still out, once it lands. */
+  if (!held && listsSettled() && !holdsList(register)) return Promise.resolve();
   if (!held) {
     const mine = ++questions;
     newest.set(register, mine);
-    held = schema(register).then(
-      (out) => {
-        if (newest.get(register) !== mine) return;
-        const body = out.ok ? (out.value as { fields?: unknown } | null) : null;
-        if (body && Array.isArray(body.fields)) relabelInto(REGISTERS, register, declOf({ ...(body as RegisterDecl), id: register }), labels());
-      },
-      () => undefined,
-    );
+    const ask = (): Promise<void> =>
+      schema(register).then(
+        (out) => {
+          if (newest.get(register) !== mine) return;
+          const body = out.ok ? (out.value as { fields?: unknown } | null) : null;
+          if (body && Array.isArray(body.fields)) relabelInto(REGISTERS, register, declOf({ ...(body as RegisterDecl), id: register }), labels());
+        },
+        () => undefined,
+      );
+    held = listsSettled() ? ask() : heldNow().then(() => (holdsList(register) ? ask() : undefined));
     asked.set(register, held);
   }
   return held;
