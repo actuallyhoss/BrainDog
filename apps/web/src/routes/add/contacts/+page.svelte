@@ -247,6 +247,10 @@
       {#if !plan}
         <p class="ct-quiet">Checking who is here already.</p>
       {:else}
+        <!-- A COLUMN NOBODY SHOWN HAS A VALUE IN IS NOT DRAWN: an empty Phone took a quarter of a phone's width and broke
+             every address in two. -->
+        {@const shown = [...plan.people.slice(0, SHOWN), ...plan.skipped.slice(0, Math.max(0, SHOWN - plan.people.length))]}
+        {@const has = { org: shown.some((c) => c.org !== ''), email: shown.some((c) => c.emails.length > 0), phone: shown.some((c) => c.phones.length > 0) }}
         <p class="ct-sum" aria-live="polite">
           <strong>{words.people(plan.people.length)}{#if plan.orgs.length > 0}, {words.orgs(plan.orgs.length)}{/if}</strong>{#if plan.skipped.length > 0}<span class="ct-quiet"
               >{` · ${words.skipped(plan.skipped.length)}`}</span
@@ -257,24 +261,24 @@
         <div class="ct-table-wrap">
           <table class="ct-table">
             <thead>
-              <tr><th scope="col">{words.columns.name}</th><th scope="col">{words.columns.org}</th><th scope="col">{words.columns.email}</th><th scope="col">{words.columns.phone}</th></tr>
+              <tr><th scope="col">{words.columns.name}</th>{#if has.org}<th scope="col">{words.columns.org}</th>{/if}{#if has.email}<th scope="col">{words.columns.email}</th>{/if}{#if has.phone}<th scope="col">{words.columns.phone}</th>{/if}</tr>
             </thead>
             <tbody>
               {#each plan.people.slice(0, SHOWN) as c, i (i)}
                 <tr>
                   <td class="ct-name">{c.name}</td>
                   <!-- AN ORGANISATION KEPT ALREADY IS SAID BY THE NAME IT IS KEPT AS ("Fenwick", where the file says "Fenwick Ltd"). -->
-                  <td>{plan.heldOrgs.get(c.orgKey)?.name ?? c.org}{#if c.org && orgNew.has(c.orgKey)}<span class="ct-tag">{words.newOrg}</span>{/if}</td>
-                  <td class="ct-wrap">{c.emails.join(', ')}</td>
-                  <td class="ct-nowrap">{c.phones.join(', ')}</td>
+                  {#if has.org}<td>{plan.heldOrgs.get(c.orgKey)?.name ?? c.org}{#if c.org && orgNew.has(c.orgKey)}<span class="ct-tag">{words.newOrg}</span>{/if}</td>{/if}
+                  {#if has.email}<td class="ct-wrap">{c.emails.join(', ')}</td>{/if}
+                  {#if has.phone}<td class="ct-nowrap">{c.phones.join(', ')}</td>{/if}
                 </tr>
               {/each}
               {#each plan.skipped.slice(0, Math.max(0, SHOWN - plan.people.length)) as c, i ('s' + i)}
                 <tr data-already="">
                   <td class="ct-name">{c.name}<span class="ct-tag">{words.already}</span></td>
-                  <td>{c.org}</td>
-                  <td class="ct-wrap">{c.emails.join(', ')}</td>
-                  <td class="ct-nowrap">{c.phones.join(', ')}</td>
+                  {#if has.org}<td>{c.org}</td>{/if}
+                  {#if has.email}<td class="ct-wrap">{c.emails.join(', ')}</td>{/if}
+                  {#if has.phone}<td class="ct-nowrap">{c.phones.join(', ')}</td>{/if}
                 </tr>
               {/each}
             </tbody>
@@ -499,6 +503,49 @@
   .ct-nowrap {
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* ON A PHONE EACH PERSON IS ONE ROW OF LINES: the name, then their organisation, address and number under it in the
+     quiet ink, so an address is never broken across a narrow column. The headings stay for a screen reader. */
+  @media (width < 600px) {
+    .ct-table thead {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .ct-table tr {
+      display: grid;
+      gap: 2px;
+      padding: var(--sp-2) var(--sp-3);
+      border-block-end: 1px solid var(--rule);
+    }
+
+    .ct-table tbody tr:last-child {
+      border-block-end: 0;
+    }
+
+    .ct-table td {
+      display: block;
+      padding: 0;
+      border: 0;
+    }
+
+    .ct-table td:not(.ct-name) {
+      color: var(--ink-3);
+      font-size: var(--fs-meta);
+    }
+
+    .ct-table td:empty {
+      display: none;
+    }
+
+    .ct-wrap {
+      overflow-wrap: break-word;
+    }
   }
 
   .ct-tag {
