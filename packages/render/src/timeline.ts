@@ -57,8 +57,21 @@ export const timelineCell = (text: string | undefined, now?: number): string =>
  * "GRANGEMOOR EVENTS, STAND DEPOSIT" as "Grangemoor Events, Stand Deposit". A cell that carries markup (a link, a hole)
  * is the author's, and is left as written.
  */
-export const timelineTitle = (text: string | undefined): string =>
-  text === undefined ? '' : (bankCode(text) ?? (/[[\]{}()`*_<>]/u.test(text) ? text : readable(bankLine(text))));
+export const timelineTitle = (text: string | undefined): string => {
+  if (text === undefined) return '';
+  const line = merchantStar(text);
+  return bankCode(line) ?? (/[[\]{}()`*_<>]/u.test(line) ? line : readable(bankLine(line)));
+};
+
+/**
+ * A CARD PROCESSOR'S STAR IS A SPACE (domains lane, 2 Nov): "GOOGLE *WORKSPACE" and "SQ *BLUE BOTTLE" are a bank line in
+ * capitals with the processor's mark between its words, and the star read as markup, so the Ledger printed the line
+ * as the bank wrote it. Only a line with no small letters, a star between two words of capitals; anything else is kept.
+ */
+function merchantStar(text: string): string {
+  if (/\p{Ll}/u.test(text)) return text;
+  return text.replace(/(?<=[A-Z0-9&'.])\s?\*\s?(?=[A-Z0-9])/gu, ' ');
+}
 
 /**
  * A BANK'S CODE IS NEVER PRINTED AS A NAME (Q15 of 29 October). A transfer the bank names only by the end of the account

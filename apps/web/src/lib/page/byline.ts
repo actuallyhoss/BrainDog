@@ -88,7 +88,11 @@ export function changedLine(lines: Iterable<Byline>, now: number = Date.now()): 
       : one.by === 'rule'
         ? bylineWords.byRules
         : one.by === 'slash' || (one.by === 'agent' && names.size === 1)
-          ? bylineWords.by(one.name)
+          ? /* AN APP WITH NO NAME OF ITS OWN IS "another app" (domains lane, 2 Nov): its kind's word, "Other", read
+               "1 change on this page by Other this week". */
+            /^other(?: apps?)?$/iu.test(one.name.trim())
+            ? bylineWords.byAnotherApp
+            : bylineWords.by(one.name)
           : bylineWords.madeForYou;
   return { count: week.length, text: bylineWords.changes(week.length, by) };
 }
@@ -104,6 +108,7 @@ export const bylineWords = {
   changes: (n: number, by: string) => `${n} ${n === 1 ? 'change' : 'changes'} on this page ${by} this week`,
   byRules: 'by your rules',
   by: (name: string) => `by ${name}`,
+  byAnotherApp: 'by another app',
   madeForYou: 'made for you',
   /** The line's one action, which opens the list in the panel. */
   review: 'Review',

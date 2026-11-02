@@ -52,7 +52,7 @@
     type Project,
     type Thread,
   } from '$lib/record/instruct.ts';
-  import { machinesOf } from './machines.ts';
+  import { UNNAMED, machinesOf } from './machines.ts';
   import NamedAgents from '$lib/agents/NamedAgents.svelte';
 
   let {
@@ -81,6 +81,7 @@
     quiet: 'Quiet',
     /* WHERE THEY RUN, said as a sentence (1 Nov): "On MacBook Pro" stood alone under the runs and read as a stray label. */
     on: (said: string) => `Running on ${said}`,
+    unnamed: 'a machine with no name',
   } as const;
 
   const io = control(apiBase());
@@ -155,7 +156,9 @@
     if (!line) return null;
     const drawnRuns = [...open.shown, ...open.idle];
     const m = machinesOf(drawnRuns.filter(isAtWork), drawnRuns.filter((r) => !isAtWork(r)), NO_PLACES);
-    const on = m.lines.map((l) => `${l.name}${l.seats.length > 0 ? `, as ${l.seats.join(', ')}` : ''}`);
+    /* A MACHINE WITH NO NAME IS SAID MID-SENTENCE IN LOWER CASE (domains lane, 2 Nov): "Running on A machine not named". */
+    const named = (name: string) => (name === UNNAMED ? words.unnamed : name);
+    const on = m.lines.map((l) => `${named(l.name)}${l.seats.length > 0 ? `, as ${l.seats.join(', ')}` : ''}`);
     return on.length === 0 ? null : words.on(on.join(' and '));
   });
   const quietRows = $derived(
