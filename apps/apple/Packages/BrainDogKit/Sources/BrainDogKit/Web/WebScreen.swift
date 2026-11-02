@@ -60,7 +60,7 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         config.limitsNavigationsToAppBoundDomains = !Server.isLocal
         #endif
         let controller = WKUserContentController()
-        controller.addUserScript(ShellBridge.script(kind: kind, inset: kind == .mac ? 78 : 0, textScale: Self.textScale))
+        controller.addUserScript(ShellBridge.script(kind: kind, inset: kind == .mac ? MacBar.room : 0, textScale: Self.textScale))
         config.userContentController = controller
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
@@ -193,6 +193,19 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
             Session.shared.lost()
         case .open(let url):
             openOutside(url)
+        #if os(macOS)
+        case .drag:
+            /* AS A TITLE BAR DOES: the press that started it is the event AppKit is handling now, or the move just after. */
+            guard let window = webView.window, let event = NSApp.currentEvent, [.leftMouseDown, .leftMouseDragged].contains(event.type) else { return }
+            window.performDrag(with: event)
+        case .titleBarDoubleClick:
+            guard let window = webView.window else { return }
+            switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+            case "Minimize": window.miniaturize(nil)
+            case "None": break
+            default: window.zoom(nil)
+            }
+        #endif
         default:
             onAsk?(ask)
         }
@@ -339,6 +352,17 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         webView.pageZoom = Self.textScale
     }
     #endif
+}
+
+/// The Mac window's bar, which the web draws and the traffic lights stand in (plan M6): 56 tall, the lights `lead` from
+/// the window's edge and centred on it, and `room` left for them at the start of the row (`--shell-lead` in the web).
+///
+/// THE ROOM IS MEASURED, NOT GUESSED. macOS 26 draws the lights 14 wide on a 23 pitch, 60 for the three, so 16 + 60 and
+/// 12 to the web's first mark is 88. The web's own default for a shell that says nothing is 78, the Tauri app's lights.
+public enum MacBar {
+    public static let height: CGFloat = 56
+    public static let lead: CGFloat = 16
+    public static let room = 88
 }
 
 #if os(iOS)

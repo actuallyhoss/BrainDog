@@ -1,55 +1,204 @@
 import BrainDogKit
 import SwiftUI
 
-/// BrainDog for Mac (plan 3.4, M6). In M1: one window with native Sign in, then the web desk in native mode, with the
-/// title bar hidden and the traffic lights over the web's top bar (inset 78). Menus, the menu bar and the ⌥Space panel
-/// arrive in M6.
+/// BrainDog for Mac (plan 3.4, M6), in the Tauri shell's place: one native window with native Sign in, then the web desk
+/// in native mode (its own rail and bar, the traffic lights in the bar's row, the bar's empty part moving the window);
+/// the menus and their keys; a Settings window; Tell in a small window of its own; the count in the menu bar and on the
+/// Dock. Widgets, the share extension and Siri come from the shared targets (M5).
 @main
 struct BrainDogMac: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var session = Session.shared
-    @State private var desk = WebScreen(kind: .mac, path: "/")
+    @State private var model = MacModel.shared
 
     init() {
         Typeface.register()
     }
 
     var body: some Scene {
-        WindowGroup("BrainDog") {
-            ZStack {
-                if session.signedIn {
-                    WebView(desk).ignoresSafeArea()
-                } else {
-                    SignInView().frame(minWidth: 480, minHeight: 560)
-                }
-            }
-            .frame(minWidth: 900, minHeight: 600)
-            .background(Palette.board)
-            .animation(.easeOut(duration: 0.2), value: session.signedIn)
-            .onOpenURL { url in
-                if url.path == "/signin" { Task { await SignInFlow.shared.open(link: url) } }
-            }
-            .task { await session.refreshIfDue() }
-            #if DEBUG
-            .task { await DebugPress.onLaunch { path, _ in desk.go(path) } }
-            #endif
+        Window("BrainDog", id: "main") {
+            MainWindow()
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1440, height: 900)
-        .commands {
-            CommandGroup(after: .toolbar) {
-                Button("Reload") { desk.reload() }.keyboardShortcut("r")
+        .commands { Menus(model: model, session: session) }
+
+        Window(Words.tellTitle, id: "tell") {
+            TellWindow()
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.top)
+
+        Settings {
+            SettingsView()
+        }
+
+        #if DEBUG
+        /* The menu bar's panel in a window of its own, for the screenshot walk (`--press go:menubar`). */
+        Window("Menu bar", id: "menubar-shot") {
+            MenuBarPanel()
+        }
+        .windowResizability(.contentSize)
+        #endif
+
+        MenuBarExtra(isInserted: Binding(get: { model.inMenuBar && session.signedIn }, set: { model.inMenuBar = $0 })) {
+            MenuBarPanel()
+        } label: {
+            MenuBarLabel(count: model.count)
+        }
+        .menuBarExtraStyle(.window)
+    }
+}
+
+/// The app stays open with its window closed while the menu bar holds the count; the Dock's icon opens the window again.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        /* `-braindogAppearance light|dark`: the screenshot walk draws both without changing this Mac's own setting. */
+        switch UserDefaults.standard.string(forKey: "braindogAppearance") {
+        case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        default: break
+        }
+        #endif
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        !MacModel.shared.inMenuBar
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows { MacModel.shared.openWindow?("main") }
+        return true
+    }
+}
+
+/// The window: Sign in, or the desk, with the chrome put on the window it is in.
+struct MainWindow: View {
+    @State private var session = Session.shared
+    @State private var model = MacModel.shared
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+    @State private var chrome = WindowChrome()
+
+    var body: some View {
+        ZStack {
+            if session.signedIn {
+                WebView(model.desk).ignoresSafeArea()
+            } else {
+                SignInView().frame(minWidth: 480, minHeight: 560)
             }
-            CommandMenu("Go") {
-                Button("Today") { desk.go("/") }.keyboardShortcut("1")
-                Button("Needs you") { desk.go("/decide") }.keyboardShortcut("2")
-                Button("Search or go to…") { desk.emit("search") }.keyboardShortcut("k")
-                Button("Ask") { desk.emit("slash") }.keyboardShortcut("j")
-            }
-            CommandGroup(after: .appInfo) {
-                if session.signedIn {
-                    Button(Words.signOut) { Task { await session.signOut() } }
+        }
+        .frame(minWidth: 900, minHeight: 600)
+        .background(Palette.board)
+        .background(WindowReader { chrome.take($0) })
+        .animation(.easeOut(duration: 0.2), value: session.signedIn)
+        .onAppear {
+            model.openWindow = { id in openWindow(id: id) }
+            model.openSettings = { openSettings() }
+            model.start()
+        }
+        .onChange(of: session.signedIn) { _, now in
+            if now { Task { await model.read() } } else { model.forget() }
+        }
+        .onOpenURL { url in Links.open(url) }
+        .task { await session.refreshIfDue() }
+        #if DEBUG
+        .task { await DebugPress.onLaunch { path, _ in Links.debug(path) } }
+        #endif
+    }
+}
+
+/// Where a `braindog://` address or a link to the app goes on the Mac.
+@MainActor
+enum Links {
+    static func open(_ url: URL) {
+        let model = MacModel.shared
+        if url.path == "/signin" {
+            Task { await SignInFlow.shared.open(link: url) }
+            return
+        }
+        if url.scheme == "braindog", url.host == "tell" {
+            let text = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "text" })?.value ?? ""
+            model.openTell(prefill: text)
+            return
+        }
+        let path: String? = url.scheme == "braindog"
+            ? URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "path" })?.value
+            : url.path + (url.query.map { "?\($0)" } ?? "")
+        guard let path, path.hasPrefix("/"), !path.hasPrefix("//"), !path.hasPrefix("/api/"), !path.hasPrefix("/auth/") else { return }
+        model.go(path)
+    }
+
+    #if DEBUG
+    /// A Debug launch press's `go:` (`tools/build.mjs mac --press go:…`): an address, or `tell:<words>`, `settings`,
+    /// `menubar` (the panel's own view in a window), each step three seconds after the last when joined by `;;`.
+    static func debug(_ steps: String) {
+        Task { @MainActor in
+            for (i, step) in steps.components(separatedBy: ";;").enumerated() {
+                if i > 0 { try? await Task.sleep(for: .seconds(3)) }
+                let model = MacModel.shared
+                switch step {
+                case let s where s.hasPrefix("tell:"): model.openTell(prefill: String(s.dropFirst(5)).replacingOccurrences(of: "|", with: "\n"))
+                case "settings": model.openSettings?()
+                case "menubar": model.openWindow?("menubar-shot")
+                case "search": model.desk.emit("search")
+                case let s where s.hasPrefix("shot:"): await Shots.window(String(s.dropFirst(5)))
+                case let s where s.hasPrefix("panel:"):
+                    Shots.view(MenuBarPanel().environment(\.font, Typeface.body), name: String(s.dropFirst(6)))
+                case let s where s.hasPrefix("window:"):
+                    let parts = s.dropFirst(7).split(separator: "=", maxSplits: 1).map(String.init)
+                    if parts.count == 2 { Shots.other(titled: parts[0], name: parts[1]) }
+                case let s where s.hasPrefix("size:"):
+                    let wh = s.dropFirst(5).split(separator: "x").compactMap { Double($0) }
+                    if wh.count == 2, let w = model.desk.webView.window { w.setFrame(NSRect(x: w.frame.minX, y: w.frame.minY, width: wh[0], height: wh[1]), display: true); w.center() }
+                default: model.go(step)
                 }
             }
+        }
+    }
+    #endif
+}
+
+/// The menus (plan M6, Menus): the app's, Edit and Window as the system makes them, View, Go and Help.
+struct Menus: Commands {
+    let model: MacModel
+    let session: Session
+
+    var body: some Commands {
+        CommandGroup(after: .appSettings) {
+            Toggle("Open at Login", isOn: Binding(get: { model.opensAtLogin }, set: { model.setOpensAtLogin($0) }))
+            if session.signedIn {
+                Divider()
+                Button(Words.signOut) { Task { await session.signOut() } }
+            }
+        }
+        CommandGroup(replacing: .newItem) {
+            Button("\(Words.tellTitle)…") { model.openTell() }
+                .keyboardShortcut("t")
+                .disabled(!session.signedIn)
+        }
+        CommandGroup(replacing: .toolbar) {
+            Button("Reload") { model.desk.reload() }.keyboardShortcut("r")
+            Divider()
+            Button("Actual Size") { model.zoom = 1 }.keyboardShortcut("0")
+            Button("Zoom In") { model.zoomIn() }.keyboardShortcut("=")
+            Button("Zoom Out") { model.zoomOut() }.keyboardShortcut("-")
+            Divider()
+        }
+        CommandMenu("Go") {
+            Button(Words.back) { model.back() }.keyboardShortcut("[")
+            Button("Forward") { model.forward() }.keyboardShortcut("]")
+            Divider()
+            Button(Words.today) { model.go("/") }.keyboardShortcut("1")
+            Button(Words.needsYou) { model.go("/decide") }.keyboardShortcut("2")
+            Divider()
+            Button("Search or Go To…") { model.front(); model.desk.emit("search") }.keyboardShortcut("k")
+            Button("Ask…") { model.front(); model.desk.emit("slash") }.keyboardShortcut("j")
+        }
+        CommandGroup(replacing: .help) {
+            Button("BrainDog Help") { NSWorkspace.shared.open(URL(string: "https://brain.dog/docs")!) }
+            Button("Contact Support") { NSWorkspace.shared.open(URL(string: "https://brain.dog/support")!) }
         }
     }
 }

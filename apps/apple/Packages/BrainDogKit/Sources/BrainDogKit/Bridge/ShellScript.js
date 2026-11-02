@@ -58,6 +58,25 @@
     },
   };
   Object.defineProperty(window, '__BRAINDOG_SHELL__', { value: Object.freeze(shell), writable: false, configurable: false });
+  // THE MAC: THE BAR'S EMPTY PART IS THE TITLE BAR. The traffic lights stand in the web's own 56px bar (`--shell-lead`),
+  // so a press on that row where nothing is pressable moves the window, and a double press zooms it, as a title bar does.
+  // Anything a person can press, type in or drag keeps the press. Not a member of the shell: the page never calls it.
+  if (shell.kind === 'mac') {
+    const BAR = 56;
+    const pressable =
+      'a,button,input,textarea,select,label,summary,details,[role=button],[role=link],[role=tab],[role=menuitem],[role=switch],[role=checkbox],[role=combobox],[role=slider],[contenteditable=""],[contenteditable=true],[tabindex]:not([tabindex="-1"]),[draggable=true]';
+    const empty = (e) => e.button === 0 && e.clientY >= 0 && e.clientY < BAR && !(e.target && e.target.closest && e.target.closest(pressable));
+    addEventListener(
+      'mousedown',
+      (e) => {
+        if (!empty(e) || e.detail > 1) return;
+        e.preventDefault();
+        post('drag');
+      },
+      true,
+    );
+    addEventListener('dblclick', (e) => empty(e) && post('zoom'), true);
+  }
   // Any link that leaves BrainDog opens outside, whatever the page did with it.
   addEventListener(
     'click',

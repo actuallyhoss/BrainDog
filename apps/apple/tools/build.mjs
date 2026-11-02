@@ -28,6 +28,9 @@ const server = at >= 0 ? rest[at + 1] : null;
 /* `--press email:<address>` and the like: a Debug build presses Sign in's buttons at launch (BrainDogApp.swift). */
 const pressAt = rest.indexOf('--press');
 const press = pressAt >= 0 ? rest[pressAt + 1] : null;
+/* `--appearance light|dark`: the Mac app draws in that, whatever this Mac is set to (Debug only). */
+const lookAt = rest.indexOf('--appearance');
+const appearance = lookAt >= 0 ? rest[lookAt + 1] : null;
 /* `--launch`: launch what was built last, again, without building. */
 const again = rest.includes('--launch');
 
@@ -77,8 +80,11 @@ try {
   } else if (mode === 'mac') {
     if (!again) build('BrainDogMac', 'platform=macOS', 'local');
     const app = join(derived, 'Build', 'Products', 'Debug', 'BrainDog.app');
-    spawnSync('osascript', ['-e', 'quit app id "dog.brain.desktop"']);
-    const args = [...(server ? ['-braindogServer', server] : []), ...(press ? ['-braindogPress', press] : [])];
+    /* ONLY THE APP THIS WORKTREE BUILT, by its path: another BrainDog for Mac running on this Mac (a lane's, his own) is left be. */
+    const ours = spawnSync('pgrep', ['-f', join(app, 'Contents', 'MacOS', 'BrainDog')], { encoding: 'utf8' }).stdout.split('\n').filter(Boolean);
+    for (const pid of ours) spawnSync('kill', [pid]);
+    if (ours.length > 0) spawnSync('sleep', ['1']);
+    const args = [...(server ? ['-braindogServer', server] : []), ...(press ? ['-braindogPress', press] : []), ...(appearance ? ['-braindogAppearance', appearance] : [])];
     run('open', ['-n', app, ...(args.length ? ['--args', ...args] : [])]);
     console.log('  launched the Mac app');
   } else {

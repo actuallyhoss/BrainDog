@@ -180,7 +180,23 @@ struct Keychain: Sendable {
         return [group, nil]
     }
 
+    #if os(macOS) && DEBUG
+    /* A MAC BUILD SIGNED TO RUN LOCALLY IS A NEW APP TO THE KEYCHAIN EACH TIME IT IS BUILT (its signature is its hash), so
+       the login keychain asks the person at the screen to let it read its own item again, and the launch waits on that
+       prompt. Such a build (no team, so no Keychain group) keeps the session in a file in its own sandbox container,
+       readable by it alone; a build signed by the team always uses the Keychain. Debug only. */
+    private func local(_ account: String) -> URL? {
+        guard let task = SecTaskCreateFromSelf(nil), SecTaskCopyValueForEntitlement(task, "keychain-access-groups" as CFString, nil) == nil else { return nil }
+        let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("DebugKeychain", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        return folder.appendingPathComponent("\(service).\(account)")
+    }
+    #endif
+
     func read(_ account: String) -> String? {
+        #if os(macOS) && DEBUG
+        if let file = local(account) { return try? String(contentsOf: file, encoding: .utf8) }
+        #endif
         for group in groups {
             var q = query(account, group: group)
             q[kSecReturnData as String] = true
@@ -194,6 +210,13 @@ struct Keychain: Sendable {
     }
 
     func write(_ account: String, _ value: String) {
+        #if os(macOS) && DEBUG
+        if let file = local(account) {
+            try? Data(value.utf8).write(to: file, options: .atomic)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+            return
+        }
+        #endif
         let data = Data(value.utf8)
         for group in groups {
             let q = query(account, group: group)
@@ -211,6 +234,12 @@ struct Keychain: Sendable {
     }
 
     func delete(_ account: String) {
+        #if os(macOS) && DEBUG
+        if let file = local(account) {
+            try? FileManager.default.removeItem(at: file)
+            return
+        }
+        #endif
         for group in groups { SecItemDelete(query(account, group: group) as CFDictionary) }
     }
 }

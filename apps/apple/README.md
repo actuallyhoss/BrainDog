@@ -8,8 +8,9 @@ plan is `loop/plans/apps-2026-11-02/PLAN.md`; what each milestone did is beside 
 |---|---|---|
 | `BrainDog` | `dog.brain.app` | the iPhone (and iPad) app |
 | `BrainDogMac` | `dog.brain.desktop` | the Mac app (the id the Tauri shell held, kept) |
-| `WidgetsiOS`, `WidgetsMac` | `….widgets` | WidgetKit (M5) |
-| `ShareiOS`, `ShareMac` | `….share` | the share extension (M5) |
+| `WidgetsiOS`, `WidgetsMac` | `….widgets` | WidgetKit: Needs you, Key numbers, Tell (M5) |
+| `ShareiOS`, `ShareMac` | `….share` | the share extension: words, a link, a photo or a PDF into Tell (M5) |
+| `Shared/` | | App Intents and App Shortcuts, compiled into both apps: Tell BrainDog, What needs me, Open Needs you |
 | `NotifyService` | `dog.brain.app.notify` | the notification service extension (M4) |
 | `Packages/BrainDogKit` | | everything they share: client, session, sign-in, the bridge, the web screen, Look B, Tell |
 
@@ -33,7 +34,7 @@ person on the seed, on 8787, printing each sign-in letter's link and code) and `
 
 **One iOS simulator booted at a time, ever.** `build.mjs sim` refuses when more than one is.
 
-The screenshot walk: `node apps/apple/tools/shots.mjs m2` (or `m3`) relaunches the signed-in app on the booted
+The screenshot walk: `node apps/apple/tools/shots.mjs m2` (or `m3`, `m5`) relaunches the signed-in app on the booted
 simulator once per screen, light and dark, and saves each to `~/Developer/braindog/.notes/shots/apps/<milestone>/`.
 Each screen is reached by a Debug launch press (`-braindogPress go:…`, `BrainDogApp.swift`), which calls what the
 screen's own control calls; a Release build has none of it.
@@ -50,6 +51,41 @@ screen's own control calls; a Release build has none of it.
   BrainDog with its role, switch, Settings, Sign out), the Settings root.
 - **Offline**: web screens use the service worker's kept copy (App-Bound Domains); a screen never kept says so with
   Try again; Needs you shows its last read and when. Tell offline keeps the words as a draft and sends nothing.
+
+## Outside the app (M5)
+
+- **The glance**: one `previewPage` over Needs you's queue and the Home figures (`figures.home`, Today's key numbers),
+  writing nothing (`Glance/Glance.swift`). The app reads it at launch, after Tell or an answer, and going to the
+  background, keeps it in the App Group and asks the widgets to draw again; each widget also reads it itself every 15
+  minutes with the session from the shared Keychain group.
+- **Widgets**: Needs you (small, medium, Lock Screen circular and rectangular), Key numbers (small, medium), Tell
+  (small, Lock Screen circular). Plain: the tile, a Lexend figure, red only for the count and a figure under its target.
+  `braindog://open?path=` and `braindog://tell` are what they open.
+- **Siri and Shortcuts** (`Shared/Intents.swift`): "Tell BrainDog" reads the words with the same `tell-core.js` and adds
+  what is placed whole in one `capture`; anything it cannot place opens the app in Tell with the words in it. "What
+  needs me" says the count and the first question.
+- **Share**: the share sheet's Tell, with the shared words and the first photo or file; the file goes into the first
+  file field of the list the first entry goes to (`PUT /api/files`), and the receipt says when no list keeps one.
+- A Debug build draws the widgets and the share sheet over the app for the walk (`go:widgets`, `go:share:…`,
+  `iOS/Gallery.swift`): nobody can add a widget or press Share on a simulator without a finger.
+
+## The Mac app (M6)
+
+- **One window**, no title bar of its own: the traffic lights stand in the web's 56px bar, centred on it, 16 from the
+  edge, and the web leaves them 88 (`MacBar`, `Mac/WindowChrome.swift`). A press on the bar's empty part moves the
+  window and a double press zooms it (`ShellScript.js`, as a title bar does). Size and place are remembered.
+- **Menus**: BrainDog (Settings…, Open at Login, Sign out), File (Tell BrainDog… ⌘T), Edit, View (Reload ⌘R, Actual
+  Size ⌘0, Zoom In ⌘=, Zoom Out ⌘−, full screen), Go (Back ⌘[, Forward ⌘], Today ⌘1, Needs you ⌘2, Search or Go To ⌘K,
+  Ask ⌘J), Window, Help.
+- **Settings window** (⌘,): open at login (`SMAppService`), the menu bar, text size; who is signed in, Sign out.
+- **Menu bar**: the Needs you glyph and the count; its panel lists the first three questions, Tell and Open BrainDog.
+  **Dock badge**: the count. The app stays open with its window closed while the menu bar holds the count.
+- **Tell window**: the same composer as the iPhone's Tell sheet. Page notifications show while the app runs; exports go
+  to Downloads.
+- Screenshots: `node apps/apple/tools/mac-shots.mjs` once signed in (`build.mjs mac --press email:…`, then `code:…`); the
+  app draws its own pictures (`Mac/Shots.swift`), since a shell may not record the screen.
+- A Mac build signed to run locally keeps its session in a file in its own sandbox container, because the login keychain
+  asks the person at the screen again after every rebuild (`Session.swift`, Debug only).
 
 ## Generated, never by hand
 
