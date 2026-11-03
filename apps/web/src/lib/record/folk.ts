@@ -441,6 +441,32 @@ function placeOf(said: string): { where: string; kind: Seen['kind']; about: stri
   return words ? { where: words.charAt(0).toUpperCase() + words.slice(1), kind: 'other', about: null } : null;
 }
 
+/* A MONTH AND A YEAR, OR A YEAR, AT THE END OF AN IMPORT'S LINE: ", Oct 2026" of "Arrived in Roomy creator outreach
+   mail, Oct 2026". And the verb an import starts its line with, which "Met" says already. */
+const WHEN_AT_END = /,?\s*((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{4}|\d{4})\s*$/iu;
+const ARRIVED = /^(?:arrived|came|met|found|added|joined)\s+(?:in|via|from|through|at|by|on)\s+/iu;
+
+/**
+ * WHERE THEY WERE FIRST MET, as one small fact: "Met Oct 2026 · Roomy creator outreach mail", "Met 29 Oct · by mail",
+ * "Met at Onboarding". The oldest place `seenOf` read (its list is newest first, undated last), its when from the line's
+ * own end or its day, and no day at all when it is the day the head already says they were last in touch.
+ */
+export function metSaid(places: readonly Seen[], day: (iso: string) => string, lastDay: string | null = null): string | null {
+  const first = places.at(-1);
+  if (!first) return null;
+  let where = first.where.replace(ARRIVED, '');
+  let when: string | null = null;
+  const end = WHEN_AT_END.exec(where);
+  if (end && end.index > 0) {
+    when = end[1]!;
+    where = where.slice(0, end.index).trim();
+  } else if (first.last !== null && first.last !== lastDay) when = day(first.last);
+  if (where === '') return when ? seenWords.metHow(when) : null;
+  where = where.charAt(0).toUpperCase() + where.slice(1);
+  if (first.kind !== 'other') return when ? seenWords.metWhen(when, seenWords.seenBy({ ...first, where })) : seenWords.metHow(seenWords.seenBy({ ...first, where }));
+  return when ? seenWords.metWhen(when, where) : seenWords.metHow(seenWords.seenBy({ ...first, where }));
+}
+
 /**
  * THE `met` LINES AS PLACES, newest first: each place once, with how many times and the last day. A line that is not
  * dated still counts, with no day.
@@ -616,6 +642,14 @@ export const seenWords = {
   more: (n: number): string => `${n} more`,
   people: (n: number): string => (n === 1 ? '1 person' : `${n} people`),
   lastInTouch: (day: string): string => `Last in touch ${day}.`,
+  /* THE HEAD'S SMALL FACTS (3 Nov, Sam): "Last in touch 2 Nov" and "Met Oct 2026 · Roomy creator outreach mail", each
+     on its own, where the head glued them into "Last in touch 2 Nov, at Arrived in Roomy creator outreach mail, Oct 2026." */
+  inTouch: (day: string): string => `Last in touch ${day}`,
+  metWhen: (when: string, where: string): string => `Met ${when} · ${where}`,
+  metHow: (how: string): string => `Met ${how}`,
+  askAbout: (name: string): string => `Ask about ${name}`,
+  askShort: 'Ask',
+  askIn: (name: string): string => `Ask Slash about ${name}`,
   atPlace: (where: string): string => `at ${where}`,
   /* WHERE THEY WERE LAST SEEN, AS A SENTENCE SAYS IT (pages polish, 2 Nov): "by mail", "in a commit to kiln-site", where
      the page said "at Mail" and "at Commits in kiln-site", a heading read as a place. */

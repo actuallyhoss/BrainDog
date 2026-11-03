@@ -113,7 +113,8 @@
   import { handFor } from '$lib/record/hand.ts';
   import type { Backlink } from '$lib/record/api.ts';
   import { listName, personWords, rowNameSaid } from '$lib/record/names.ts';
-  import { movable, scopeFieldOf } from '$lib/record/scope-move.ts';
+  import { movable, scopeFieldOf, scopeOf, type Scope } from '$lib/record/scope-move.ts';
+  import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import ScopeMove from './ScopeMove.svelte';
   import Timeline from './Timeline.svelte';
   import NoteText from './NoteText.svelte';
@@ -136,7 +137,7 @@
   import { reachWords } from '../reach.ts';
   import { OWN_TYPES } from '$lib/ui/own.ts';
   import { typingHints } from '$lib/ui/typing-hints.ts';
-  import { knownOf, lastDayOf, meetsOf, orgNameSaid, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../folk.ts';
+  import { knownOf, lastDayOf, meetsOf, metSaid, orgNameSaid, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../folk.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -998,11 +999,23 @@
    * THE LINE UNDER THE NAME. A person: "Contractor at Brightwell, on Kiln and Portage. Last in touch 2 Sep." An
    * organisation: "Client · 24 people, on Kiln and Portage." Each part only when the row has it.
    */
-  const lastSaid = (day: string): string => {
-    const at_ = meets?.met && row ? seenOf(row.fields[meets.met]).find((x) => x.last === day) : undefined;
-    const when = seenWords.lastInTouch(daySaid(day, clock));
-    return at_ ? `${when.replace(/\.$/u, '')}, ${seenWords.seenBy(at_)}.` : when;
-  };
+  /**
+   * EACH PROJECT ITS OWN CHIP, EACH OPENING ITS PAGE (3 Nov, Sam): a person's or an organisation's projects were one chip,
+   * "Sketchpad, Roomy", that opened nothing, and the sentence beside it named them again. A list whose rows name several
+   * projects cannot move a row in one press (`movable`), so its chip was only ever words; these are links.
+   */
+  const projectChips = $derived.by((): { key: string; scope: Scope; href: string }[] | null => {
+    const f = scopeFieldOf(id);
+    if (!row || !f?.to || movable(f) || !(meets || orgRole)) return null;
+    const v = row.fields[f.id];
+    return (Array.isArray(v) ? v : []).flatMap((x) => {
+      const one = scopeOf(id, { [f.id]: [x] }, names);
+      const named = namedRef(f.to, x);
+      return one && named?.href ? [{ key: one.spoken, scope: one, href: named.href }] : [];
+    });
+  });
+  /* "ASK ABOUT DANA" (3 Nov, Sam): Slash opened with the person in it, by their spoken row. */
+  const askAbout = $derived(meets && row && !self && row.seq !== null ? { href: `/slash?with=${encodeURIComponent(`${id}#${row.seq}`)}`, name: String(row.fields[decl?.title ?? ''] ?? '').trim().split(/\s+/u)[0] || decl?.one || '' } : null);
   const lead = $derived.by(() => {
     if (!row || (!meets && !orgRole)) return null;
     /* THE CHIP BEFORE THE SENTENCE ALREADY NAMES THE PROJECTS (3 Nov): "• Ferment & Co, Tidepool  Accountant, on Ferment
@@ -1019,9 +1032,11 @@
       return {
         parts: whoParts({ role: roleSaid, org, projects }),
         named: projects.length > 0 || chipSays(meets.projects),
-        /* WHEN, AND ABOUT WHAT (1 Nov, L21): "Last in touch 29 Oct, at Onboarding." where the newest place they were seen
-           is that day's. Yourself, never: "Last in touch" over your own name said nothing, so your page says it is you. */
-        last: self ? seenWords.isYou : day ? lastSaid(day) : null,
+        /* WHEN, AS A SMALL FACT OF ITS OWN (3 Nov, Sam): "Last in touch 2 Nov", and where they were first met as another,
+           "Met Oct 2026 · Roomy creator outreach mail", where the two were one garbled sentence. Yourself, never: "Last in
+           touch" over your own name said nothing, so your page says it is you. */
+        last: self ? seenWords.isYou : null,
+        facts: self ? [] : [day ? seenWords.inTouch(daySaid(day, clock)) : null, metSaid(seen, (d) => daySaid(d, clock), day)].filter((x): x is string => x !== null),
         /* THE FIELDS THE SENTENCE SAYS, so the facts do not say them a second time under it. */
         said: [roleSaid?.trim() || (role && row.fields[role] === 'other') ? role : null, org ? meets.org : null, day ? meets.in_touch : null].filter((x): x is string => Boolean(x)),
       };
@@ -1036,6 +1051,7 @@
       parts: whoParts({ role: said, org: null, projects }),
       named: projects.length > 0 || chipped,
       last: null,
+      facts: [] as string[],
       said: [kind?.trim() && orgRole?.kind ? orgRole.kind : null].filter((x): x is string => Boolean(x)),
     };
   });
@@ -1285,6 +1301,12 @@
       sender.openHere();
       return;
     }
+    /* ON A PERSON'S PAGE `s` ASKS ABOUT THEM, the press that stands where Send to stands on any other row. */
+    if (e.key === 's' && askAbout) {
+      e.preventDefault();
+      void goto(at(askAbout.href));
+      return;
+    }
     if (e.key === 'y' || e.key === 'Y') {
       e.preventDefault();
       void (e.key === 'y' ? clipboard.putSpoken(id, row.seq) : clipboard.putLink(id, row.seq));
@@ -1339,7 +1361,7 @@
   {#snippet sentenceLine()}{#each sentence as piece, i (i)}{#if piece.kind === 'state'}<span class="lead-word">{stateSaid(decl, stateValue)}</span>{:else if piece.kind === 'late'}<span class="said-late" data-tone={piece.tone} data-needs={piece.tone === 'bad' ? '' : undefined}>{piece.text}</span>{:else}{piece.text}{/if}{/each}{/snippet}
 
   <!-- WHO A PERSON IS, OR WHAT AN ORGANISATION IS, in place of the sentence a row of any other list leads with. -->
-  {#snippet whoLine()}{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link tap" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}{/snippet}
+  {#snippet whoLine()}{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link tap" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}{#if lead?.facts && lead.facts.length > 0}<span class="who-facts">{#each lead.facts as fact (fact)}<span class="who-fact">{fact}</span>{/each}</span>{/if}{/snippet}
 
   <!-- A VALUE AS THE PAGE SAYS IT, in its line of the fields tile. -->
   {#snippet shown(f: FieldDecl, value: unknown)}
@@ -1503,9 +1525,11 @@
   <!-- THE HEAD'S META LINE: where the row applies, then the sentence, then who holds it. The chip and "Hand to" stood in
        the head's row beside the primary, five controls at 1440 and "Mark do…" off the edge at 390; now the row keeps its
        primary and its "…", and what is true of the row is said under its name. -->
-  {#snippet headLine()}<span class="head-scope"
+  {#snippet headLine()}{#if projectChips && projectChips.length > 0}<span class="head-scope head-projects"
+      >{#each projectChips as p (p.key)}<a class="head-project" href={at(p.href)}><ScopeChip scope={p.scope} size="s" /></a>{/each}</span
+    >{:else if !projectChips}<span class="head-scope"
       ><ScopeMove register={id} {row} {names} live={changes} size="s" title={String(row.fields[decl.title] ?? '')} onmoved={() => void rowMoved(id, seq)} /></span
-    >{#if !archived && (lead?.parts || lead?.last)}{@render whoLine()}{:else}{@render sentenceLine()}{/if}{#if id === KEYS_REGISTER && !archived && !keyHeld(row.fields) && !(typeof row.fields.where === 'string' && row.fields.where.trim() !== '')}{' '}<a class="who-link tap" href={at(`/keychain?reconnect=${encodeURIComponent(String(row.fields.label ?? ''))}`)}>Add it</a>{/if}{#if live && !archived}{' '}<HandSheet
+    >{/if}{#if !archived && (lead?.parts || lead?.last || (lead?.facts && lead.facts.length > 0))}{@render whoLine()}{:else}{@render sentenceLine()}{/if}{#if id === KEYS_REGISTER && !archived && !keyHeld(row.fields) && !(typeof row.fields.where === 'string' && row.fields.where.trim() !== '')}{' '}<a class="who-link tap" href={at(`/keychain?reconnect=${encodeURIComponent(String(row.fields.label ?? ''))}`)}>Add it</a>{/if}{#if live && !archived}{' '}<HandSheet
         register={id}
         {row}
         {decl}
@@ -1545,8 +1569,15 @@
       {#if changes && archived}
         <Button weight="primary" disabled={saving} data-head-primary onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
       {/if}
+      <!-- ASK ABOUT A PERSON, in Slash with them in it (3 Nov, Sam): the one thing a person's page is opened to send, so it
+           stands where Send to stands on any other row, and `s` presses it. -->
+      {#if askAbout && !archived}
+        <Button href={askAbout.href} aria-label={seenWords.askIn(askAbout.name)} data-ask-about
+          ><Icon name="slash" size="s" /><span class="ask-full">{seenWords.askAbout(askAbout.name)}</span><span class="ask-short" aria-hidden="true">{seenWords.askShort}</span></Button
+        >
+      {/if}
       <!-- SEND TO…: Slash or an agent, the last one in one press and the rest from its arrow (s). -->
-      {#if live && !archived && row.seq !== null}
+      {#if live && !archived && row.seq !== null && !askAbout}
         <SendButton
           bind:this={sender}
           kind={id}
@@ -1816,8 +1847,9 @@
           </Tile>
         {/each}
 
-        <!-- WHERE A PERSON WAS SEEN: each place once, newest first, with how often and when, in a person's words. -->
-        {#if seen.length > 0}
+        <!-- WHERE A PERSON WAS SEEN: each place once, newest first, with how often and when, in a person's words. ONE PLACE,
+             ONCE, WITH NOTHING ABOUT IT is the head's "Met" fact already (3 Nov), so it is not a card as well. -->
+        {#if seen.length > 1 || (seen.length === 1 && (seen[0]!.times > 1 || seen[0]!.about.length > 0 || !meets || self))}
           <Tile icon="link" title={seenWords.seenIn}>
             <ul class="items" aria-label={seenWords.seenIn}>
               {#each seen as place (place.where)}
@@ -2873,6 +2905,65 @@
     display: inline-flex;
     margin-inline-end: var(--sp-2);
     vertical-align: middle;
+  }
+
+  /* A PERSON'S OR AN ORGANISATION'S PROJECTS, ONE CHIP EACH, each a link to its page (3 Nov). */
+  .head-projects {
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+  }
+
+  .head-project {
+    display: inline-flex;
+    border-radius: var(--r-pill, 999px);
+    color: inherit;
+    text-decoration: none;
+    transition: opacity var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .head-project:hover {
+      opacity: 0.8;
+    }
+  }
+
+  .head-project:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* THE SMALL FACTS AFTER WHO THEY ARE: "Last in touch 2 Nov · Met Oct 2026 · Roomy creator outreach mail", in the meta
+     size and ink, each kept whole on a line. */
+  .who-facts {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0 var(--sp-3);
+    margin-inline-start: var(--sp-2);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: 400;
+    line-height: var(--lead-meta, 18px);
+    letter-spacing: 0;
+    vertical-align: baseline;
+  }
+
+  .who-fact {
+    white-space: nowrap;
+  }
+
+  /* "ASK ABOUT DANA" AT A DESK, "ASK" ON A PHONE, the slash glyph before it either way. */
+  .ask-short {
+    display: none;
+  }
+
+  @media (width < 640px) {
+    .ask-full {
+      display: none;
+    }
+
+    .ask-short {
+      display: inline;
+    }
   }
 
   /* ── the phone ─────────────────────────────────────────────────────── */
