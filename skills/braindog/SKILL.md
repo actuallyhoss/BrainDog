@@ -29,6 +29,13 @@ Call `context` first. It names your run and your project. It leads with anything
 step, your rules, who else is working here and your lane. The server's instructions carry the rules you keep.
 
 Meet everyone you work with or are told about with `meet`, and give their email or handle when you have one.
+What you know about them goes in their fields, not their note: `meet` takes `fields`, as
+`{"legal_name": "Callum Doran", "discord": "codeize", "nationality": "Irish", "terms": "10% of Otters.gg gross, monthly"}`,
+and `update` takes the same. People has a field for a legal name, the name they go by, what they are to the owner
+(`relation`), their roles ("CPO at Quartz"), nationality, country, city, time zone, birthday, languages, phones, each
+platform's handle (`discord`, `discord_id`, `github`, `x`, `instagram`, `linkedin`, `telegram`, `whatsapp`), the deal
+(`terms`) and the paperwork still open. The note is for what no field holds. To move facts already in people's notes
+into their fields, run `act {call: "automationRun", args: {rule: "people-fields"}}`: it asks the owner once a person.
 
 ## What the person told you
 

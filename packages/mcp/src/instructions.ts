@@ -20,7 +20,9 @@
  *
  * AND ONE LINE SAYS WHOM TO MEET, because the record understands the people and organisations in the work only as well
  * as agents tell it about them: everyone worked with or told about, with an address or handle, since a
- * name alone is only noted. The opening's list of what a record holds paid for it.
+ * name alone is only noted. The opening's list of what a record holds paid for it. AND WHERE WHAT IS KNOWN ABOUT THEM
+ * GOES (People 4.7.0, 3 Nov): a legal name, a handle, a nationality or a deal is a field of the person, so the line says
+ * so, and `create` and `update` refuse a note that holds one (`person-facts.ts`).
  *
  * SENT ONCE A CONNECTION: in `initialize`, or in `server/discover` for a client of the stateless revision, and no longer
  * with every `tools/list`, which carried the whole text a second time in every session that asked for both.
@@ -34,7 +36,7 @@ export const INSTRUCTIONS = [
   '2. Suggest, and let the person decide in BrainDog: ask with propose; act when they tell you, passing their words as said.',
   '3. Write short and plain, for a phone: say names, never ids, and one line where one will do.',
   'Reads answer in short lines; format "full" gives JSON.',
-  'Meet everyone you work with or hear of, with an email or handle.',
+  'Meet everyone you work with or hear of, with an email or handle; facts about them go in their fields, never the note.',
   'A credential never goes in a row, note or call: pipe it to braindog keys put <label> --opens <what>.',
   'After a fix, a surprise or a dead end a later session would repeat, create a learning: topic is the skill it bears on, by name; because says how it went wrong.',
   'A refusal names the field and fix; its try is the corrected call. Never resend one unchanged.',

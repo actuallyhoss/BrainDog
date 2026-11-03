@@ -144,6 +144,7 @@ import {
 } from './brief.ts';
 import { briefed, handlesIn } from './briefing.ts';
 import { actorWords, agentOf, bare, callOf, clip, closest, counted, cursorIn, cursorOut, dayInWords, grouped, moneyIn, runnerOf } from './words.ts';
+import { createTry, keepsFacts, noteRefusal, updateTry } from './person-facts.ts';
 
 type Answer<T = unknown> = Promise<Result<T>>;
 type Args = Record<string, unknown>;
@@ -804,6 +805,7 @@ export const TOOLS: readonly Tool[] = [
         domain: str('Like kiln.example.'),
         role: { type: 'string' },
         where: { type: 'string' },
+        fields: { type: 'object', description: 'Facts as fields, not note: legal_name, discord, nationality...' },
       },
       ['where'],
     ),
@@ -3286,6 +3288,14 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      */
     create: async (args, ctx, turn) => {
       const register = String(args.register);
+      /* A PERSON'S FACTS IN THEIR FIELDS, NOT THEIR NOTE (`person-facts.ts`). */
+      if (isObject(args.fields) && args.fields.note !== undefined) {
+        if (!decls.has(register)) await learnPrefix(register, ctx);
+        if (keepsFacts(decls.get(register)?.fields)) {
+          const stop = noteRefusal(args.fields.note, {}, 'fields.note', (f) => createTry(args, f));
+          if (stop) return { result: { ok: false, refusal: stop } };
+        }
+      }
       const made = await surface.create(
         {
           register,
@@ -3318,6 +3328,15 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
             } as Refusal,
           },
         };
+      }
+      if (isObject(args.patch) && args.patch.note !== undefined) {
+        if (!decls.has(at.value.register)) await learnPrefix(at.value.register, ctx);
+        if (keepsFacts(decls.get(at.value.register)?.fields)) {
+          const now = await surface.get(at.value as never, ctx);
+          const held = now.ok && isEntry(now.value) ? (now.value.fields as Args) : {};
+          const stop = noteRefusal(args.patch.note, { ...held, ...args.patch, note: undefined }, 'patch.note', (f) => updateTry(args, f));
+          if (stop) return { result: { ok: false, refusal: stop } };
+        }
       }
       const changed = await surface.update(
         {
@@ -3415,7 +3434,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      */
     meet: async (args, ctx, turn) => {
       if (!surface.meet) return { result: unbuilt('meet', 'If there is a people register, add the person there with create.') };
-      const out = await surface.meet(args, ctx);
+      /* `fields`, SINCE People 4.7.0: what is known about who they are (legal_name, discord, nationality, terms...),
+         written to the row `meet` lands on, through `update` and its ladder. The record's own `meet` never sees it. */
+      const { fields: facts, ...meeting } = args;
+      if (facts !== undefined && !isObject(facts))
+        return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'fields is an object of the person\'s fields, as {"legal_name":"Callum Doran","discord":"codeize"}.', at: 'fields' } as Refusal } };
+      const out = await surface.meet(meeting, ctx);
       if (!out.ok || !isObject(out.value)) return { result: out };
       turn.batch = batchIn(out.value);
       const raw = bare(out.value) as Record<string, unknown>;
@@ -3469,8 +3493,18 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           on = c.ok && isObject(c.value) && isObject(c.value.project) && typeof c.value.project.name === 'string' ? c.value.project.name : null;
         }
       }
+      /* THE FIELDS, ONTO THE ROW MET. A mention made no row, so they wait for the person to be made. */
+      let kept: Record<string, unknown> | null = null;
+      if (isObject(facts) && Object.keys(facts).length > 0 && spoken !== null && !mention) {
+        const at = await locate(spoken, ctx);
+        if (at.ok) {
+          const wroteFacts = await surface.update({ ...at.value, patch: facts as Args }, ctx);
+          kept = wroteFacts.ok ? { fields: Object.keys(facts) } : { fields_refused: 'refusal' in wroteFacts ? wroteFacts.refusal : wroteFacts };
+        }
+      }
       const how = matchedHow(raw, args);
       const value: Record<string, unknown> = {
+        ...(kept ?? {}),
         ...(spoken === null ? {} : { person: spoken }),
         ...(words ? { name: words } : {}),
         created: raw.created === true,
