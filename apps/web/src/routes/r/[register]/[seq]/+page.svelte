@@ -1611,6 +1611,9 @@
         <!-- WHAT IT HOLDS TO LOOK AT: the audits, plans and designs hung on it, each a still or a quiet card until pressed. -->
         {#if live && row.seq !== null}<VisualStrip on="{id}#{row.seq}" tile />{/if}
 
+        <!-- THE FILES PUT ON IT FOR CONTEXT: PDFs, pages saved from Claude, pictures, notes. Loaded with the row, not the app. -->
+        {#if live && row.seq !== null}{#await import('$lib/attach/Attachments.svelte') then { default: Attachments }}<Attachments on="{id}#{row.seq}" tile />{/await}{/if}
+
         <!-- A RUN READS AS ITS HANDOFF, led by its face, what it is doing and where it is, then what the next
              session needs: the next step, what was already tried, newest first, and the notes it left. The one place
              `live` is used on this page, in the face's ring. -->

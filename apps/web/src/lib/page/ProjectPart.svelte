@@ -211,6 +211,8 @@
       {#await import('../send/SendStrip.svelte') then { default: SendStrip }}<SendStrip ref="{hold.register}#{hold.seq}" kind={hold.register} label={hold.name} />{/await}
       <!-- THE PROJECT'S VISUALS, its audits, plans and designs, under the hero: nothing when it holds none. -->
       <VisualStrip on="{hold.register}#{hold.seq}" tile />
+      <!-- THE FILES PUT ON THE PROJECT FOR CONTEXT, with a place to drop more. -->
+      {#await import('../attach/Attachments.svelte') then { default: Attachments }}<Attachments on="{hold.register}#{hold.seq}" tile />{/await}
     {/if}
     {#if !hold.shape && hold.holds}
       <!-- A PROJECT THIS TAB HAS DRAWN WAITS IN ITS OWN SHAPE, the picture the page's read drew, never a list's bars. -->
