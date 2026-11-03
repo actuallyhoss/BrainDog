@@ -59,20 +59,20 @@ export const pricing = {
         price: '$0',
         lines: (f: Figures) => [
           'Every feature',
-          `${grouped(f.agents)} agents connected, such as Claude Code, Cursor and ChatGPT`,
+          `${grouped(f.agents)} connected agents`,
           `${grouped(f.credits)} questions a month to Slash, the built-in assistant`,
-          `Rules and automations that run on their own, ${grouped(f.allowance.runs)} times a month`,
+          `${grouped(f.allowance.runs)} automation runs a month`,
           'Invite the people you work with',
           'Export everything, any time',
         ],
       },
       /* ONE LINE FOR WHAT COMES LATER (plan F20): a tile naming Cloud and Cloud Plus with two "Coming soon" rows said
          nothing a reader could act on. Still his N2 words: both named, coming soon, priced at launch. */
-      later: { say: 'Paid plans for more agents, more questions and your team come later, priced at launch. Nothing you set up now is lost.' },
+      later: { say: 'Paid plans for more agents, more questions and your team come later. Nothing you set up now is lost.' },
       faq: {
         title: 'Questions people ask',
         questions: [
-          { q: 'What counts as an agent?', a: 'Each app or machine you connect. Claude Code on your laptop is one, Cursor is another, ChatGPT is a third.' },
+          { q: 'What counts as an agent?', a: 'Each app or machine you connect. The coding agent on your laptop is one, the chat app on your phone is another.' },
           { q: 'What is a Slash question?', a: 'One question or one change to the built-in assistant, however much work it takes. The briefing, filing and your rules never spend one.' },
           { q: 'Can I take my data out?', a: 'Yes, all of it, as one file, whenever you like.' },
         ],
@@ -145,7 +145,7 @@ export const pricing = {
       questions: [
         // `ASK_CAP_*` and `BACKGROUND_ASKS_MONTH` in `packages/slash/src/types.ts`: the brief and filing spend no question.
         // An agent key per app (`agents` in `PLAN_TABLE`).
-        { q: 'What counts as an agent?', a: 'Each app or machine you connect. Claude Code on your laptop is one, Cursor is another, ChatGPT is a third.' },
+        { q: 'What counts as an agent?', a: 'Each app or machine you connect. The coding agent on your laptop is one, the chat app on your phone is another.' },
         { q: 'What is a Slash question?', a: 'One question or one change to the built-in assistant, however much work it takes. The briefing, filing and your rules never spend one.' },
         // Export is the CLI's and Settings' one file, on every plan.
         { q: 'Can I take my data out?', a: 'Yes, all of it, as one file, on every plan.' },

@@ -41,7 +41,7 @@ export const DESK = {
     tossed: 'Thrown away.',
     undo: 'Undo',
   },
-  agents: { connected: 'Connected', working: 'Working now', terminal: 'A terminal, with Claude working on Tidepool' },
+  agents: { connected: 'Connected', working: 'Working now', terminal: 'A terminal: the briefing for Tidepool, a key put away, and a check of this machine' },
 } as const;
 
 export type Tab = keyof typeof DESK.tabs;

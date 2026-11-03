@@ -20,7 +20,7 @@ export const packs = {
        words.ts`). "Pack" stays the word in the docs, where the file format is. */
     title: 'Add-ons',
     /* What an add-on is rests on `packages/declare/src/catalogue.ts`: `reachOf` counts the lists, pages, rules and hosts. */
-    lede: 'Connect the services your projects run on, and your agents see them too: Stripe and Mercury balances, Sentry errors, Calendar and more. Each add-on shows what it adds before anything changes.',
+    lede: 'Connect the services your projects run on, and your agents see them too. Each add-on shows what it adds before anything changes.',
 
     search: 'Search add-ons',
     searchHint: 'Rent, invoices, Stripe',
@@ -78,9 +78,8 @@ export const packs = {
     make: {
       title: 'Build your own.',
       say:
-        'When BrainDog does not do something you want, ask your agent. It looks here first, and if nothing fits it writes ' +
-        'an add-on, checks it against your BrainDog and asks you before anything is installed. You can share it, or send it ' +
-        'in for review. Nothing from outside is listed until a person has looked at it.',
+        'Missing something? Ask your agent. It looks here first, and if nothing fits it writes an add-on, checks it ' +
+        'and asks you before installing. Nothing from outside is listed until a person has looked at it.',
       agent: 'Build one with your agent',
       agentHref: '/docs/packs/with-your-agent',
       first: 'Write one yourself',

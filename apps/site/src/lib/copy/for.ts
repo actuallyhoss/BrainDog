@@ -42,9 +42,8 @@ export const forPages = {
         said: 'What is due, what is left to spend, and am I still on track?',
         /* Inbox is docs/07 §4; Needs you (once Decide, `apps/web/src/routes/decide/`) is where every proposal waits. */
         sub:
-          'Keep your bills, budgets, subscriptions, savings and habits in one record, with your net worth and ' +
-          'any gold you hold counted in. Import a bank statement and each line is filed, then your choices file the ' +
-          'next one. Anything that would move money waits for your answer in Needs you.',
+          'Bills, budgets, subscriptions and savings in one record, with your net worth counted in. Import a bank ' +
+          'statement and each line is filed. Anything that would move money waits for your yes.',
         rows: [
           {
             head: 'Bills file themselves',
@@ -55,7 +54,7 @@ export const forPages = {
           {
             head: 'Budgets that say where you stand',
             /* The budget form of `progress`, `KINDS` in `packages/render/src/kinds.ts`. */
-            said: 'Each budget shows what is spent and what is left, by the week, the month or the year, so an expensive week shows early.',
+            said: 'Each budget shows what is spent and what is left, so an expensive week shows early.',
             draw: { page: 'home', at: 2 },
           },
           {
@@ -77,8 +76,8 @@ export const forPages = {
         said: 'Three modules, a deadline most weeks, and I keep losing track.',
         /* Automations are `apps/web/src/routes/automations/` and their reminders docs/09; Slash is docs/11. */
         sub:
-          'Keep deadlines, coursework and reading in one record. Automations remind you before things are ' +
-          'due, and Slash answers from your own notes and lists.',
+          'Deadlines, coursework and reading in one record. Automations remind you before things are due, and ' +
+          'Slash answers from your own notes.',
         rows: [
           {
             head: 'Every deadline on one line',
@@ -112,13 +111,13 @@ export const forPages = {
         /* Money's own rule `invoice-late` (`packages/seed/src/modules/money/rules.ts`) puts a late invoice to you;
            the floor in `packages/kernel/src/change-kind.ts` holds anything that moves money for a yes. */
         sub:
-          'BrainDog keeps each project\'s next step, decisions and money in one place your agents read before they start. ' +
-          'Late invoices are put to you to chase, receipts are filed, and anything that moves money waits for your yes.',
+          'Each project\'s next step, decisions and money in one place your agents read first. Late invoices come to ' +
+          'you to chase, and anything that moves money waits for your yes.',
         rows: [
           {
             head: 'Your agents, where you can see them',
             /* The app's Agents page: who is working now, and what each did (`apps/web/src/lib/record/PresencePanel.svelte`). */
-            said: 'See which agent is on which project right now, and what each one did today, without asking any of them.',
+            said: 'Which agent is on which project right now, and what each one did today.',
             draw: { page: 'agents', at: 0 },
           },
           {
@@ -130,7 +129,7 @@ export const forPages = {
           {
             head: 'Money in and out, month by month',
             /* The net form of `series`, `KINDS` in `packages/render/src/kinds.ts`. */
-            said: 'See what came in and what went out each month, without keeping a spreadsheet up to date.',
+            said: 'What came in and what went out each month, with no spreadsheet to keep.',
             draw: { page: 'home', at: 2 },
           },
         ],
@@ -140,15 +139,14 @@ export const forPages = {
         nav: 'For teams and agencies',
         title: 'For teams and agencies · BrainDog',
         description:
-          'Invite your team by email, each with a role in plain words. Their agents get exactly their access, and every change says who made it.',
+          'Invite your team by email, each with a role. Their agents get the same access, and every change says who made it.',
         tag: 'For teams and agencies',
         said: "Five of us, a dozen clients, and everyone's agents working at once.",
         /* THE DOCS' WORDS (`docs/02-use/09-sharing.md`): a second person joins with their own sign-in, at a role or on the
            parts they are given; an agent sees what its person sees. Cloud Plus is not named while billing is off. */
         sub:
-          'Give each client a project and invite your team by email, each with a role in plain words. Their agents get ' +
-          'their access and no more, every change says who made it, person or agent, and a client can get a read-only ' +
-          'link to their own project.',
+          'Give each client a project and invite your team by email. Their agents get their access and no more, and ' +
+          'every change says who made it, person or agent. A client can get a read-only link to their project.',
         rows: [
           {
             head: "Who's working on what, agents included",
@@ -181,8 +179,8 @@ export const forPages = {
         said: 'I am starting something new, and there is no template for it.',
         /* First run, `apps/web/src/routes/start/`: Slash proposes the lists and pages, and you accept them. */
         sub:
-          'Tell it what you are starting in a short chat. It sets up the areas, the path and the budget as you ' +
-          'answer, and you change whatever you like after that.',
+          'Say what you are starting in a short chat. It sets up the areas, the path and the budget, and you change ' +
+          'what you like after.',
         rows: [
           {
             head: 'A path, one step at a time',

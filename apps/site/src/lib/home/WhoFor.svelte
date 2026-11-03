@@ -5,7 +5,7 @@
   that starts caught up, blue for what waits on you, each in its well. The words are `copy/home.ts`; the names in the
   drawings are Maya's (`demo/maya.ts`).
 
-  The first step draws the makers it connects, the second the briefing in a terminal, the third the first of Maya's
+  The first step draws the makers it connects, the second `braindog context` in a terminal window (`lib/site/TermWindow.svelte`), the third the first of Maya's
   questions as Needs you draws it, with its two answers (drawn, not pressable: the desk above is where they work).
 
   ON A PHONE, THREE SHORT TILES: each is its icon, the step's title and its way on under it. The cards and their
@@ -16,6 +16,7 @@
   import Icon from '$lib/Icon.svelte';
   import { home } from '$lib/copy/home.ts';
   import { NEEDS } from '$lib/demo/maya.ts';
+  import TermWindow from '$lib/site/TermWindow.svelte';
 
   const w = home.who;
   const ask = NEEDS[0]!;
@@ -42,9 +43,7 @@
         <span class="fwell"><Icon name="terminal" /></span>
         <h3>{w.build.title}</h3>
         <p class="say">{w.build.say}</p>
-        <div class="draw term" aria-hidden="true">
-          {#each w.build.lines as line, i}<p class:first={i === 0}>{line}</p>{/each}
-        </div>
+        <div class="draw"><TermWindow title={w.build.term.title} label={w.build.term.label} lines={w.build.term.lines} /></div>
         <a class="onward" href={w.build.href}>{w.build.link}<Icon name="arrow-right" size="s" /></a>
       </article>
 
@@ -159,22 +158,6 @@
     color: var(--ink);
     font: 600 28px/1 var(--head);
     letter-spacing: -0.024em;
-  }
-
-  /* THE TERMINAL IS A DRAWING OF ONE, so it keeps the night's ground inside the plain tile. */
-  .term {
-    display: grid;
-    gap: 4px;
-    padding: 10px 12px;
-    background: var(--night);
-    border-radius: 12px;
-    font: 400 13px/1.45 var(--mono);
-    color: var(--on-night-2);
-  }
-
-  .term .first {
-    color: var(--night-accent);
-    font-weight: 500;
   }
 
   /* ONE QUESTION AS NEEDS YOU DRAWS IT: the ask, then its two answers as the app's small buttons, drawn only. */

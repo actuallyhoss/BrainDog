@@ -7,24 +7,23 @@
  * The connect steps themselves are data in `lib/connect/apps.ts`, beside the box that draws them, so the home page and
  * this page say the same lines. The made-up names are the demo record's (`lib/demo/maya.ts`).
  */
-import { APPS_AND } from '../agents.ts';
 import { DOCS } from '../links.ts';
 
 export const agents = {
   agents: {
     title: 'Connect your agents in one line.',
-    lead: `${APPS_AND} connect to one address. You approve each once in BrainDog and no key is copied anywhere. From then on, every session starts caught up.`,
+    lead: 'Every agent connects to one address. You approve each once, and no key is copied anywhere. From then on, every session starts caught up.',
     /* THE BRIEFING FIRST (3 November story, S5): the terminal explains it faster than the list, so it leads. */
     brief: {
       title: 'Every session starts with a briefing.',
-      say: "Before you type a word, Claude Code shows where the project stands, the next step the last session left and what's waiting on you. When it stops, it leaves a handoff for whichever agent comes next.",
+      say: "Before you type a word, your agent sees where the project stands, the next step and what's waiting on you. When it stops, it leaves a handoff for the next one. The command line prints the same briefing for you.",
     },
     gets: {
       title: 'What every session starts with',
       lines: [
-        'Where each project stands, and the one next step the last session left.',
-        "Who else is working right now, and where, so two agents don't trip over each other.",
-        'The lessons earlier sessions wrote down, and the skills that apply here.',
+        'Where each project stands, and the next step the last session left.',
+        "Who else is working right now, so two agents don't collide.",
+        'The lessons earlier sessions wrote down.',
         "What's waiting on you, and the keys it may use, by name only.",
       ],
     },
@@ -38,7 +37,7 @@ export const agents = {
       lines: [
         "It asks first. A new agent's changes arrive as questions, each with what would happen and why.",
         'It earns one kind at a time. Keep ten changes of a kind and it may make that kind alone. One undo, or an email it just read, puts it back to asking.',
-        'Some things always ask. Deletes, money, keys and sharing never climb. Reading a key, giving BrainDog away and deleting it stay yours even if you let your own agents do everything.',
+        'Some things always ask: deletes, money, keys and sharing. Reading a key, giving BrainDog away and deleting it stay yours even if you let your own agents do everything.',
         "It can't hide what it did. Every change carries its name, and you can undo it.",
       ],
     },
@@ -47,7 +46,7 @@ export const agents = {
        other agent at its next call to BrainDog. The drawn rows are Maya's `TODAY.working`. */
     watch: {
       title: 'Watch them, and stop them',
-      say: 'The Agents page in BrainDog shows every agent working now, on which project, since when. Tell one something, pause it, redirect it or stop it. Claude Code hears it at its next step; other agents at their next call to BrainDog.',
+      say: 'The Agents page shows every agent working now, on which project, since when. Tell one something, pause it, redirect it or stop it. It hears you at its next step.',
       head: 'Working now',
       pause: 'Pause',
       resume: 'Resume',

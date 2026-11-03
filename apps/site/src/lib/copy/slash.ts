@@ -17,7 +17,6 @@
  * IT IS NOT SPREAD INTO `copy.ts`: the Slash page and the drawing import it directly.
  */
 
-import { APPS_AND } from '../agents.ts';
 import { TABLE } from '../plans.ts';
 
 const FREE = TABLE.free.credits;
@@ -26,8 +25,8 @@ export const slashPage = {
   head: {
     title: 'Ask BrainDog in plain words.',
     lead:
-      "Slash is the assistant built into BrainDog. Press ⌘J on any page and ask what you owe, who hasn't paid or how a " +
-      'project is doing. It answers from your own numbers, shows what it read, and makes the changes you ask for with an undo.',
+      "Slash is the assistant inside BrainDog. Press ⌘J and ask what you owe, who hasn't paid or how a project is " +
+      'doing. It answers from your own numbers and makes the changes you ask for, with an undo.',
   },
   /** The label a screen reader hears on each list of examples. */
   examples: 'Try typing',
@@ -37,37 +36,34 @@ export const slashPage = {
     title: 'Ask',
     body: [
       "Ask the way you'd ask someone who knows your business. Slash reads your projects, money, people " +
-        'and notes, and answers in a few lines with your numbers. Follow up and it carries on.',
-      'Every figure opens what it came from, and under the answer you see what Slash read. When nothing in ' +
-        'BrainDog answers, it says so instead of guessing.',
+        'and notes, and answers in a few lines.',
+      'Every figure opens what it came from. When nothing in BrainDog answers, it says so instead of guessing.',
     ],
   },
   find: {
     title: 'Find',
     body: [
-      "Press / and type a few letters, and everything that matches shows up at once: people, projects, invoices, notes, pages and your agents' work.",
+      "Press / and type a few letters. People, projects, invoices, notes and your agents' work show up at once.",
       'It also jumps to any page and runs actions. Finding is free and never spends a question.',
     ],
   },
   make: {
     title: 'Make',
     body: [
-      'Ask for a change, a page, a list or a rule, and Slash makes it from what is already there. You see what ' +
-        'changed and where.',
+      'Ask for a change, a page, a list or a rule, and Slash makes it. You see what changed and where.',
       'Everything it makes carries its name and an undo. Money, keys, sharing and deletes come back to you as a question first.',
     ],
   },
   tally: {
     title: 'How questions are counted',
     say:
-      'Each question or change counts as one question, however much reading it takes. Finding things, the briefing and the work ' +
-      `Slash does in the background cost nothing. Free includes ${FREE} Slash questions a month, or no limit with your ` +
-      'own AI key.',
+      'Each question or change counts once, however much reading it takes. Finding, the briefing and background work ' +
+      `cost nothing. Free includes ${FREE} Slash questions a month, or no limit with your own AI key.`,
     after: "When the month's questions run out, Slash says when they come back. Everything else keeps working.",
   },
   agents: {
     title: 'Slash and your agents',
-    say: `Slash lives inside BrainDog. Your agents live in ${APPS_AND}. Both read the same BrainDog.`,
+    say: 'Slash lives inside BrainDog. Your agents live in the apps you already use. Both read the same BrainDog.',
     head: ['Slash', 'Your agents'],
     lines: [
       ['Where', 'In BrainDog. Press ⌘J', 'In the apps you connect'],
@@ -87,7 +83,7 @@ export const slashPage = {
          answer is said of Slash, and the agents get their own half, where "always wait" read as true of them as well. */
       {
         q: 'Can it move money or delete things?',
-        a: 'Not without your yes. A change to money, keys, sharing or a delete comes back as a card for you to press, even when you asked for it. Your own agents can be allowed more, in Settings under Agents.',
+        a: 'Not without your yes. A change to money, keys, sharing or a delete comes back as a card to press, even when you asked for it. Your own agents can be allowed more in Settings.',
       },
       { q: 'Can I use my own AI key?', a: 'Yes, in Settings under Agents. Questions on your own key have no monthly limit.' },
       { q: 'Can I turn it off?', a: 'Yes. Set the monthly limit to zero and Slash stays quiet. Finding still works.' },

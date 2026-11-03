@@ -53,7 +53,7 @@ export const trust = {
       description: 'Where to get help with BrainDog, and what to put in a report so it can be answered the first time.',
     },
     title: 'Support',
-    lede: 'Write to us and a person answers. A few details help us answer the first time.',
+    lede: 'Write to us and a person answers.',
     mail: {
       title: 'Write to us',
       body: 'Send a question, a fault or a request about your BrainDog to the support address.',
@@ -63,7 +63,7 @@ export const trust = {
     /* Shown only when `LAUNCH.repo`: while the repository is private these addresses answer 404. */
     github: {
       title: 'On GitHub',
-      body: 'Report a fault as an issue, or ask a question in Discussions, where the answer stays findable for the next person.',
+      body: 'Report a fault as an issue, or ask in Discussions so the answer helps the next person too.',
       issues: 'Open an issue',
       discussions: 'Ask in Discussions',
     },
@@ -85,7 +85,7 @@ export const trust = {
       description: 'How BrainDog keeps your projects, money and keys safe: a database of your own, sealed keys, sealed nightly copies, no password, and agents that ask first.',
     },
     title: 'Security',
-    lede: "How your projects, money and keys are kept safe, from other people and from an agent's mistake, and how to tell us about a weakness.",
+    lede: "How your projects, money and keys stay safe from other people and from an agent's mistakes.",
     kept: {
       title: 'How your BrainDog is kept',
       /* One tile each on /security: a short name, the glyph its well draws, and the fact as it has always been worded. */
@@ -94,19 +94,19 @@ export const trust = {
         {
           title: 'Its own database',
           glyph: 'server',
-          text: "Your BrainDog is its own database, apart from every other customer's, so nobody else's search can reach yours.",
+          text: "Your BrainDog is its own database, apart from everyone else's. No other customer's search can reach it.",
         },
         // docs/16-DECISIONS.md ADR-062; apps/worker/src/vault.ts and keys.ts (the host seals, the record stores).
         {
           title: 'Sealed keys',
           glyph: 'key',
-          text: "Keys to the services you connect are sealed before they're stored. BrainDog never holds one in the clear.",
+          text: "Keys are sealed before they're stored. BrainDog never holds one in the clear.",
         },
         // apps/worker/src/seal.ts and nightly.ts (age to one recipient whose identity is kept outside Cloudflare).
         {
           title: 'Sealed nightly copies',
           glyph: 'lock',
-          text: 'Every night a copy is sealed to a key kept outside Cloudflare, so the stored copy alone opens nothing.',
+          text: 'Every night a copy is sealed to a key kept elsewhere, so the copy alone opens nothing.',
         },
         // apps/web/src/lib/copy/account.ts `signInLede` and apps/worker/src/google.ts (email, Google or a passkey; no password).
         {
@@ -121,13 +121,13 @@ export const trust = {
         {
           title: 'What an agent can do',
           glyph: 'agent',
-          text: 'An agent can read, suggest and write, and starts out asking before every change to your work. It earns the right to act alone one kind of change at a time, and loses it on an undo. Reading a key, handing BrainDog over or deleting it needs you, signed in, even when you let your own agents do everything else.',
+          text: 'A new agent asks before every change to your work. It earns the right to act alone one kind of change at a time, and loses it on an undo. Reading a key, handing BrainDog over or deleting it always needs you, signed in.',
         },
         // apps/web/src/routes/settings/[area]/areas/Export.svelte; docs/12-SECURITY.md §8 (the export).
         {
           title: 'Export any time',
           glyph: 'download',
-          text: 'Export everything as one file from Settings, whenever you like.',
+          text: 'Export everything as one file from Settings.',
         },
       ],
     },

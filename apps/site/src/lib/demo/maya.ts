@@ -12,6 +12,7 @@
  */
 import { CODEX_LISTED, listed } from '../agents.ts';
 import type { IconName } from '../icons.ts';
+import type { TermLine } from '../site/term.ts';
 
 /** A dollar figure in cents as the page says it: `$8,420`, `$64.20`, or with `pence` always, `$3,200.00`. */
 export function usd(cents: number, opts: { pence?: boolean } = {}): string {
@@ -397,22 +398,21 @@ export const NOTES: { agent: AgentId; text: string; meta: string }[] = [
   { agent: 'codex' as const, text: 'Upgraded the Stripe library. Nothing else changed.', meta: 'Codex · Monday' },
 ].filter((n) => listed(n.agent));
 
-/** The agent tab's terminal, line by line. An empty line is a gap; `tone` picks the line's colour. */
-export const TERM: { tone: 'dim' | 'bold' | 'good' | 'white' | ''; text: string }[] = [
-  { tone: 'dim', text: '~/code/tidepool' },
-  { tone: 'white', text: '$ claude' },
-  { tone: '', text: '' },
-  { tone: 'bold', text: '  braindog · context' },
-  { tone: '', text: '  Tidepool, building. Next: ship webhook retries.' },
-  { tone: '', text: "  Waiting on Maya: Dana's invoice, due Friday." },
-  { tone: '', text: "  Cursor, yesterday: onboarding copy waits on Dana's icons." },
-  { tone: '', text: '' },
-  { tone: 'white', text: '● Picking up the webhook retries. Reading the failed jobs first.' },
-  { tone: 'dim', text: '  3 files changed · 18 tests pass' },
-  { tone: '', text: '' },
-  { tone: 'bold', text: '  braindog · log' },
-  { tone: 'good', text: '  Shipped webhook retries. Left a note on Tidepool.' },
-];
+/** The /agents page's terminal, line by line: real commands of the command line and their short answers on Maya's record. */
+export const TERM: TermLine[] = [
+  { kind: 'cmd', text: 'braindog context' },
+  { kind: 'head', text: 'Tidepool · building' },
+  { kind: 'out', text: 'Next: ship webhook retries' },
+  { kind: 'out', text: "Waiting on Maya: Dana's invoice, due Friday" },
+  { kind: 'dim', text: "Another agent, yesterday: onboarding copy waits on Dana's icons" },
+  { kind: 'gap', text: '' },
+  { kind: 'cmd', text: 'pbpaste | braindog keys put stripe --opens "Stripe payouts"' },
+  { kind: 'ok', text: 'deposited stripe on maya.brain.dog · version 1' },
+  { kind: 'gap', text: '' },
+  { kind: 'cmd', text: 'braindog doctor' },
+  { kind: 'out', text: 'braindog doctor read 2 profiles, and changed nothing.' },
+  { kind: 'ok', text: 'Nothing to fix.' },
+]
 
 /** A button under an answer. `tint` is the one that does the thing; `quiet` keeps or leaves it. */
 export type Action = { label: string; tone: 'tint' | 'quiet' };

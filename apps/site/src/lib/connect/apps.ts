@@ -58,7 +58,7 @@ const EVERY_APP: readonly ConnectApp[] = [
   {
     id: 'chatgpt',
     name: 'ChatGPT',
-    ways: [{ where: 'Connector address', code: MCP, hint: 'In Settings, under Apps, turn on developer mode and create an app with this address.' }],
+    ways: [{ where: 'Connector address', code: MCP, hint: 'In Settings, under Apps, turn on developer mode and create an app with this address. Paid plans only.' }],
   },
   {
     id: 'codex',

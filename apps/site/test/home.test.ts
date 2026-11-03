@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { home } from '../src/lib/copy/home.ts';
-import { APP_NAMES, APPS_AND, CODEX_LISTED } from '../src/lib/agents.ts';
+import { APP_NAMES, CODEX_LISTED } from '../src/lib/agents.ts';
 import { BUILD, missing, when } from './built.ts';
 
 const NO_BUILD = missing(['index.html'], 'the home page checks read the built page');
@@ -37,7 +37,7 @@ test('home.ts holds the words of the site story at the key paths the ledger read
   assert.equal(home.hero.title, 'Stop re-explaining your work.');
   assert.equal(
     home.hero.sub,
-    `BrainDog keeps where your projects stand, what you decided and who owes you in one place. ${APPS_AND} read it first, so each picks up where the last one stopped, and they ask before touching money, keys or deletes.`,
+    'One record of your projects, decisions and money. Your agents read it first, so each picks up where the last one stopped. They ask before touching money, keys or deletes.',
   );
   assert.equal(home.hero.secondary, 'Connect your agents');
   assert.equal(home.hero.works, 'Works with');
@@ -48,28 +48,28 @@ test('home.ts holds the words of the site story at the key paths the ledger read
   assert.equal(home.who.title, 'How it works');
   assert.deepEqual(
     [home.who.small.title, home.who.build.title, home.who.life.title],
-    ['Connect the agents you already use', 'Each session starts caught up', 'You answer what needs you'],
+    ['Connect your agents', 'Each session starts caught up', 'You answer what needs you'],
   );
   assert.deepEqual([home.who.small.href, home.who.build.href, home.who.life.href], ['/agents', '/agents', '/docs/use/decide']);
   assert.equal(home.chores.title, "Agents ask until they've earned your trust.");
   assert.equal(
     home.chores.say,
-    "A new agent asks before every change to your work. Once you've kept ten of its changes of one kind, BrainDog offers to let it make that kind on its own, and only that kind. One undo puts it back to asking.",
+    'A new agent asks before every change to your work. Keep ten of its changes of one kind, and BrainDog offers to let it make that kind alone. One undo puts it back to asking.',
   );
   assert.equal(
     home.chores.floor,
-    'Deletes, money, keys and sharing ask every time. You can let your own agents skip that; reading a key, giving BrainDog away and deleting it stay yours either way.',
+    'Deletes, money, keys and sharing ask every time. You can let your own agents skip that, but reading a key, giving BrainDog away and deleting it stay yours.',
   );
   assert.equal(home.tools.title, 'Nothing gets explained twice.');
   assert.equal(
     home.tools.say,
-    "Every agent reads the same page: each project's next step, the decisions and why, the dead ends already tried, the lessons learned and the keys it may use, by name. What Claude learns on Monday, Cursor knows on Tuesday.",
+    'Every agent reads the same page: the next step, what was decided and why, the dead ends, and the keys it may use. What one agent learns on Monday, the next one knows on Tuesday.',
   );
   assert.equal(home.slash.title, 'Or just ask BrainDog.');
   assert.equal(home.yours.title, 'It stays yours.');
   assert.deepEqual(home.yours.points.map((p) => p.text), [
     'Every change carries a name, person or agent, and an undo.',
-    'See which agents are working now, and pause, redirect or stop one from any browser.',
+    'See which agents are working, and pause or stop one from any browser.',
     'Agents use your keys without ever seeing them.',
   ]);
   assert.equal(home.free.title, 'Free while in early access.');
@@ -120,7 +120,7 @@ test('the hero is section.hero with the headline and the .sub sentence', when(NO
   const hero = html.match(/<section\b[^>]*class="[^"]*\bhero\b[^"]*"[^>]*>[\s\S]*?<\/section>/);
   assert.ok(hero, 'section.hero');
   assert.match(hero[0], /id="hero-title"/);
-  assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*BrainDog keeps where your projects stand/);
+  assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*One record of your projects/);
 });
 
 test('the six bands and the ask, in order, and no close after them', when(NO_BUILD), () => {

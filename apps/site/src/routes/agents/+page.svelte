@@ -18,7 +18,8 @@
   import { site } from '$lib/copy.ts';
   import { TERM, TODAY } from '$lib/demo/maya.ts';
   import AgentMark from '$lib/AgentMark.svelte';
-  import Term from '$lib/desk/Term.svelte';
+  import TermWindow from '$lib/site/TermWindow.svelte';
+  import { DESK } from '$lib/desk/words.ts';
   import type { IconName } from '$lib/icons.ts';
   import Icon from '$lib/Icon.svelte';
   import EarlyStrip from '$lib/site/EarlyStrip.svelte';
@@ -56,7 +57,7 @@
       <h2 class="band-h2">{a.brief.title}</h2>
       <p class="band-say">{a.brief.say}</p>
     </div>
-    <Term lines={TERM} />
+    <TermWindow title="zsh: ~/code/tidepool" label={DESK.agents.terminal} lines={TERM} play />
   </div>
 </section>
 

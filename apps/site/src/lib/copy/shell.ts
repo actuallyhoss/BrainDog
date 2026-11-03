@@ -2,7 +2,6 @@
  * The words every page shares: the product's name, each page's search result, the header, the footer (which
  * carries the slogan) and the 404. Which pages the header, the footer and the 404 list is `nav.ts`'s.
  */
-import { APPS_AND } from '../agents.ts';
 import { LAUNCH } from '../launch.ts';
 
 export const shell = {
@@ -12,13 +11,12 @@ export const shell = {
   meta: {
     home: {
       title: 'BrainDog · Every AI agent starts where the last one stopped',
-      description: `${APPS_AND} read where your projects stand before they start, leave a handoff when they stop, and ask before touching money or keys.`,
+      description: 'One record of your projects, decisions and money. Your agents read it before they start, leave a handoff when they stop, and ask before touching money or keys.',
     },
     slash: {
       title: 'Slash, the assistant built into BrainDog',
       description:
-        'Press ⌘J on any page and ask in plain words. Slash answers from your own numbers, shows what it read, and ' +
-        'makes the changes you ask for with an undo.',
+        'Press ⌘J and ask in plain words. Slash answers from your own numbers, shows what it read, and makes changes with an undo.',
     },
     pricing: {
       title: 'Pricing: free in early access · BrainDog',
@@ -28,10 +26,9 @@ export const shell = {
           'month. Paid plans come later, priced at launch.',
     },
     agents: {
-      title: `Connect ${APPS_AND} · BrainDog`,
+      title: 'Connect your agents · BrainDog',
       description:
-        'One address and one approval per agent. From then on every session starts with where things stand and ends ' +
-        'with a handoff for the next one.',
+        'One address and one approval per agent. Every session then starts with where things stand and ends with a handoff.',
     },
     notFound: {
       title: 'Page not found · BrainDog',
