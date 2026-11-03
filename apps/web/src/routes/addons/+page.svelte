@@ -59,6 +59,8 @@
   import { cardsIn } from './cards-in.ts';
   import { asksWords } from '$lib/market/asks.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { CORE_PACK } from '@braindog/declare';
+  import { heldMine, madeWords, waitingOf, type AddonLine, type OpenRow } from '$lib/market/made-here.ts';
 
   const store = words.store;
 
@@ -70,6 +72,10 @@
   /** The record's vital signs and its open questions, for what the store suggests; `null` until read, or refused. */
   let signs = $state.raw<SignRead[] | null>(null);
   let questions = $state.raw<string[] | null>(null);
+  /** What this record holds as the record says it (`addons {installed: true}`), for Made by you; `null` until read. */
+  let mine = $state.raw<AddonLine[] | null>(null);
+  /** The open questions whole, for an add-on an agent made that waits on Decide. */
+  let openRows = $state.raw<OpenRow[]>([]);
 
   let query = $state(page.url.searchParams.get('q') ?? '');
   /** The chip picked: the starters, one shelf, or everything. */
@@ -85,6 +91,15 @@
   /* A CHIP A NEW SEARCH EMPTIED LETS GO, so the page never says nothing matches because of a chip no longer drawn. */
   const chip = $derived(picked !== null && chips.some((c) => c.id === picked) ? picked : null);
   const total = $derived(chips.reduce((n, c) => n + c.count, 0));
+  /* MADE BY YOU, FIRST: what the person or their agents made here, then what came from a link, each found by the words
+     typed as the store's own cards are. BrainDog's own parts the seed holds are never theirs. */
+  const OURS = new Set<string>([CORE_PACK, ...MODULES, ...firstPartyModules().map((m) => m.id)]);
+  const held = $derived.by(() => {
+    const q = query.trim().toLowerCase();
+    const found = (mine ?? []).filter((l) => q === '' || `${l.title} ${l.summary}`.toLowerCase().includes(q));
+    return chip === null ? heldMine(found, OURS) : { made: [], linked: [] };
+  });
+  const waiting = $derived(chip === null && query.trim() === '' ? waitingOf(openRows, new Set((mine ?? []).map((l) => l.id))) : []);
 
   /** Four to a shelf until Show all, a search or a chip. */
   const FOLDED_AT = 4;
@@ -215,10 +230,14 @@
        landed, and "Suggested for you" led on the laptop and was missing on the phone. */
     await Promise.allSettled([
       client
+        .call<{ addons?: unknown }>('addons', { installed: true, limit: 30 })
+        .then((out) => (mine = out.ok && Array.isArray(out.value?.addons) ? (out.value.addons as AddonLine[]) : null)),
+      client
         .call<{ signs?: unknown }>('signs')
         .then((out) => (signs = out.ok && Array.isArray(out.value?.signs) ? (out.value.signs as SignRead[]) : null)),
       client.governance({ register: 'suggestion', status: 'open', limit: 50 }).then((out) => {
         const rows = out.ok && Array.isArray(out.value) ? (out.value as { question?: unknown }[]) : [];
+        openRows = rows as OpenRow[];
         questions = rows.flatMap((r) => (typeof r.question === 'string' ? [r.question] : []));
       }),
     ]);
@@ -242,6 +261,8 @@
      anything changes." into five lines of two words. -->
 {#snippet ways()}
   <Button size="sm" href={INSTALLED_AT}>{words.yours}</Button>
+  <!-- FROM GITHUB OR A FILE, beside the store: the same plan sheet every install reads, opened on Your add-ons. -->
+  <Button size="sm" href={`${INSTALLED_AT}?from`}>{madeWords.fromLink}</Button>
   <!-- ANYBODY SIGNED IN MAY PUBLISH ONE: the form makes it from what they built, and it waits for review. -->
   <Button size="sm" weight="bare" href={addonHref}>{words.publish}</Button>
 {/snippet}
@@ -291,6 +312,31 @@
   {#if settled}
   <Swap key={chip}>
   <div class="shelves">
+  {#if held.made.length + waiting.length > 0}
+    <section class="part" aria-labelledby="store-mine">
+      <h2 class="part-h" id="store-mine">{madeWords.shelf}<span class="part-note">{madeWords.shelfNote}</span></h2>
+      <ul class="cards">
+        {#each waiting as w (w.question)}
+          <StoreCard title={w.title} line={madeWords.waitingLine} href={`/decide/${encodeURIComponent(w.question)}`} icon="ask" hue={SHELF_SLOTS.starters} cue={madeWords.decide} badge={{ text: madeWords.waiting, tone: 'warn' }} />
+        {/each}
+        {#each held.made as l (l.id)}
+          <StoreCard title={l.title} line={l.summary} href={`/addons/${encodeURIComponent(l.id)}`} icon="code" hue={SHELF_SLOTS.starters} cue={madeWords.open} held badge={{ text: madeWords.card(l.here?.version ?? null), tone: 'info' }} />
+        {/each}
+      </ul>
+    </section>
+  {/if}
+
+  {#if held.linked.length > 0}
+    <section class="part" aria-labelledby="store-linked">
+      <h2 class="part-h" id="store-linked">{madeWords.linked}<span class="part-note">{madeWords.linkedNote}</span></h2>
+      <ul class="cards">
+        {#each held.linked as l (l.id)}
+          <StoreCard title={l.title} line={l.summary} href={`/addons/${encodeURIComponent(l.id)}`} icon="link" hue={SHELF_SLOTS.starters} cue={madeWords.open} held badge={{ text: madeWords.cardLinked(l.here?.version ?? null), tone: 'warn' }} />
+        {/each}
+      </ul>
+    </section>
+  {/if}
+
   {#if suggested.length > 0}
     <section class="part" aria-labelledby="store-suggested">
       <h2 class="part-h" id="store-suggested">{store.suggested}<span class="part-note">{store.suggestedNote}</span></h2>
@@ -321,7 +367,7 @@
     </section>
   {/if}
 
-  {#if total === 0}
+  {#if total === 0 && held.made.length + held.linked.length === 0}
     <Empty kind="no-results" title={words.nothingFound} body={words.nothingFoundBody} />
   {/if}
 
@@ -430,6 +476,7 @@
 
   .ways {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--sp-2);
   }
 
@@ -502,6 +549,7 @@
 
   .part-h {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     gap: var(--sp-2);
     margin: 0;

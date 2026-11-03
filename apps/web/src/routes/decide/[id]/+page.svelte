@@ -44,6 +44,8 @@
   import Changes from './Changes.svelte';
   import Proposed from './Proposed.svelte';
   import Arranged from './Arranged.svelte';
+  import MadeFor from './MadeFor.svelte';
+  import { agentName, gitOfBody } from '$lib/market/made-here.ts';
   import Applied from './Applied.svelte';
   import { heard } from '$lib/voice.svelte.ts';
   import {
@@ -1134,6 +1136,10 @@
                 <div class="does-parts">
                   {#if story && !settled}
                     <section class="changed" aria-label={story.lead}>
+                      <!-- AN ADD-ON AN AGENT MADE, its file in the question: who made it, unreviewed, and its scripts whole. -->
+                      {#if about?.kind === 'pack' && ((typeof about.body?.doc === 'object' && about.body.doc !== null) || gitOfBody(about.body) !== null)}
+                        <MadeFor doc={about.body?.doc} by={agentName(askerSaid || nameWords.agent)} git={gitOfBody(about.body)} />
+                      {/if}
                       <Arranged arranged={story} />
                     </section>
                   {/if}

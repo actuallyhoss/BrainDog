@@ -26,6 +26,7 @@
     held = false,
     why = null,
     note = null,
+    badge = null,
   }: {
     title: string;
     line: string;
@@ -44,6 +45,8 @@
     why?: string | null;
     /** A short second line under the summary, such as what a starter turns on. */
     note?: string | null;
+    /** Where it came from, as a small label in place of who made it: "Made here", "Not reviewed". */
+    badge?: { text: string; tone: 'good' | 'warn' | 'info' | null } | null;
   } = $props();
 </script>
 
@@ -53,7 +56,9 @@
   {#if note}<p class="sc-note">{note}</p>{/if}
   {#if why}<p class="sc-why"><Icon name="info" size="s" /><span>{why}</span></p>{/if}
   <div class="sc-foot">
-    {#if ours}
+    {#if badge}
+      <span class="pill-badge" data-tone={badge.tone ?? undefined}>{badge.text}</span>
+    {:else if ours}
       <span class="sc-by">{words.store.byBrainDog}</span>
     {:else if by}
       <span class="sc-by">{by}</span>
@@ -159,8 +164,8 @@
     margin-inline-start: auto;
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-3);
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    background: var(--soft-fill, var(--tile-2));
+    border-radius: var(--r-pill, 999px);
     color: var(--ink);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
@@ -258,6 +263,13 @@
 
     .sc-by {
       display: none;
+    }
+
+    /* WHERE IT CAME FROM STAYS ON A PHONE, under the line on the text's edge: it is the one thing a made-here card says. */
+    .sc-foot > .pill-badge {
+      grid-column: 1;
+      justify-self: start;
+      margin-inline-start: calc(32px + var(--sp-3));
     }
 
     .sc-cue {
