@@ -329,10 +329,13 @@ public struct TellSheet: View {
     let asks: Bool
     /// What Done does where there is no sheet to dismiss (the share extension, a Mac window).
     let done: (() -> Void)?
+    /// What sits at the head in place of the title when Ask is not offered: the share sheet's Attach | Tell.
+    let lead: AnyView?
 
-    public init(model: TellModel, asks: Bool = true, done: (() -> Void)? = nil) {
+    public init(model: TellModel, asks: Bool = true, lead: AnyView? = nil, done: (() -> Void)? = nil) {
         self.model = model
         self.asks = asks
+        self.lead = lead
         self.done = done
     }
 
@@ -343,6 +346,8 @@ public struct TellSheet: View {
                     if asks {
                         Segmented([(TellModel.Mode.tell, Words.tell), (.ask, Words.ask)], chosen: $model.mode)
                             .frame(maxWidth: 220)
+                    } else if let lead {
+                        lead
                     } else {
                         Text(Words.tellTitle).font(Typeface.heading).foregroundStyle(Palette.ink)
                     }

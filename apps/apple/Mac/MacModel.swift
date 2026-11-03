@@ -22,6 +22,9 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
 
     var count: Int { glance?.waiting ?? 0 }
 
+    /// A file the page opened to be looked at (an attached PDF), in Quick Look over the window.
+    var previewing: URL?
+
     /// One place in the app: the Go menu's and the quick panel's Search's.
     struct Place: Identifiable, Hashable {
         let href: String
@@ -88,6 +91,7 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
         }
         desk.onAsk = { [weak self] ask in self?.heard(ask) }
         desk.onFile = { [weak self] file in self?.keep(file) }
+        desk.onPreview = { [weak self] file in self?.previewing = file }
         UNUserNotificationCenter.current().delegate = self
         AppDoor.tell = { [weak self] words in self?.openTell(prefill: words) }
         AppDoor.open = { [weak self] path in self?.go(path) }

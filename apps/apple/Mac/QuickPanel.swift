@@ -56,6 +56,17 @@ final class QuickPanel: NSObject, NSWindowDelegate {
         model.closed()
     }
 
+    /// Files dropped on the panel: it shows "Attach to…" in place of Tell and Search until it closes.
+    func attach(_ files: [AttachModel.File]) {
+        if let attaching = model.attaching, attaching.receipt == nil {
+            files.forEach(attaching.add)
+            return
+        }
+        let next = AttachModel(files: files)
+        next.onChanged = { MacModel.shared.desk.emit("refresh") }
+        model.attaching = next
+    }
+
     private func make() -> Panel {
         let panel = Panel(contentRect: NSRect(x: 0, y: 0, width: QuickModel.width, height: 120),
                           styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView], backing: .buffered, defer: true)
@@ -130,6 +141,8 @@ final class QuickModel {
         didSet { if query != oldValue { find() } }
     }
     private(set) var hits: [Hit] = []
+    /// Files dropped on the panel, on their way to a project or a task; the panel draws "Attach to…" while it is set.
+    var attaching: AttachModel?
     private(set) var searching = false
     /// The result Enter opens, moved by the arrow keys.
     var selected = 0
@@ -171,6 +184,7 @@ final class QuickModel {
 
     func closed() {
         finding?.cancel()
+        attaching = nil
         /* A RECEIPT IS FOR THE PRESS IT ANSWERED: the next open starts clean, with any words not yet added still there. */
         tell.opened(mode: .tell)
         query = ""
@@ -238,8 +252,37 @@ struct QuickPanelView: View {
     @Bindable var model: QuickModel
     @State private var hotKey = HotKey.shared
     @FocusState private var typing: Bool
+    @State private var over = false
 
     var body: some View {
+        Group {
+            if let attaching = model.attaching {
+                AttachView(model: attaching, opens: { target in
+                    QuickPanel.shared.close()
+                    MacModel.shared.go(target.path)
+                }, done: { QuickPanel.shared.close() })
+                .frame(width: QuickModel.width)
+                .frame(maxHeight: 560)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous).strokeBorder(Palette.rule.opacity(0.7), lineWidth: 0.5).accessibilityHidden(true))
+                .clipShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
+            } else {
+                panelBody
+            }
+        }
+        .overlay { if over { DropRing().clipShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous)) } }
+        /* A FILE DROPPED ON THE PANEL IS ATTACHED: drag from Finder, press the shortcut while holding it, and let go here. */
+        .onDrop(of: [.fileURL], isTargeted: $over) { providers in
+            Task {
+                let files = await AttachModel.files(from: providers)
+                if !files.isEmpty { QuickPanel.shared.attach(files) }
+            }
+            return true
+        }
+    }
+
+    private var panelBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: Space.s3) {
                 IconWell(model.mode == .tell ? .slash : .search, size: .l)

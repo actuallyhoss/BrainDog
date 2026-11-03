@@ -78,12 +78,36 @@ struct MenuBarPanel: View {
 struct TellWindow: View {
     @State private var model = MacModel.shared
     @Environment(\.dismiss) private var dismiss
+    /// Files dropped on the window, on their way to a project or a task in a sheet over it.
+    @State private var attaching: AttachModel?
+    @State private var over = false
 
     var body: some View {
         TellSheet(model: model.tell, done: { dismiss() })
             .frame(width: 520)
             .frame(minHeight: 320)
             .background(Palette.tile)
+            /* A FILE DROPPED ON TELL IS ATTACHED, not read as words: "Attach to…" in a sheet, a project or a task picked there. */
+            .overlay { if over { DropRing() } }
+            .onDrop(of: [.fileURL], isTargeted: $over) { providers in
+                Task {
+                    let files = await AttachModel.files(from: providers)
+                    guard !files.isEmpty else { return }
+                    if let attaching, attaching.receipt == nil {
+                        files.forEach(attaching.add)
+                    } else {
+                        let next = AttachModel(files: files)
+                        next.onChanged = { model.desk.emit("refresh") }
+                        attaching = next
+                    }
+                }
+                return true
+            }
+            .sheet(item: $attaching) { attach in
+                AttachView(model: attach, opens: { target in attaching = nil; model.go(target.path) }, done: { attaching = nil })
+                    .frame(width: 480, height: 560)
+                    .background(Palette.tile)
+            }
             .onAppear {
                 model.tell.onAsk = { q in
                     dismiss()
@@ -92,5 +116,22 @@ struct TellWindow: View {
                 }
                 model.tell.onChanged = { model.desk.emit("refresh"); Task { await model.read() } }
             }
+    }
+}
+
+/// Where a drop will land: the window's edge drawn in ink, with what letting go does.
+struct DropRing: View {
+    var body: some View {
+        ZStack {
+            Palette.tile.opacity(0.92)
+            VStack(spacing: Space.s3) {
+                IconWell(.download, size: .xl)
+                Text(Words.attachDrop).font(Typeface.bodyMedium).foregroundStyle(Palette.ink).multilineTextAlignment(.center)
+            }
+            .padding(Space.s5)
+        }
+        .overlay(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous).strokeBorder(Palette.ink, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])).padding(Space.s2))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
