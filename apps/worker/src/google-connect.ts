@@ -415,6 +415,39 @@ function kindOf(subject: string, snippet: string, address: string): string {
   return 'none';
 }
 
+/*
+ * A CALENDAR'S OWN MAIL: an invitation, its update, an answer to one or a cancelling. Google's come from the organiser
+ * with Google Calendar as the `Sender`, an invitation carries a text/calendar part, and the subject says which. The
+ * Calendar add-on asks about the event, so the Gmail add-on never asks about the mail (`gmail.event= yes`).
+ */
+const INVITE_SUBJECT =
+  /^(?:(?:updated |new )?invitation(?: with note)?|accepted|declined|tentatively accepted|tentative|maybe|cancel+ed(?: event)?|event cancel+ed|updated event|new event|proposed new time)\s*(?:\([^)]*\))?\s*:/i;
+const CALENDAR_SENDER = /^calendar-(?:notification|server)@google\.com$/i;
+
+/** Whether a mail is a calendar's, by its subject, its sender or `Sender`, or its type. */
+export function isInvite(subject: string, from: string, sender: string, type: string): boolean {
+  return INVITE_SUBJECT.test(subject.trim()) || CALENDAR_SENDER.test(from) || CALENDAR_SENDER.test(sender) || /\btext\/calendar\b/i.test(type);
+}
+
+/** An event's title or a mail's subject as the two compare: lower case, words only, a reply's or forward's prefix gone. */
+export const titleWords = (s: string): string =>
+  s
+    .replace(/^\s*(?:(?:re|fwd?|fw|aw|sv)\s*:\s*)+/iu, '')
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+/**
+ * Whether a mail's subject names an event the calendar already holds: one title of two words or more, whole, in it.
+ * "Re: Weekly Team Sync agenda" is about Weekly Team Sync; "Lunch?" is about no event called Lunch.
+ */
+export function aboutEvent(subject: string, titles: readonly string[]): boolean {
+  const said = ` ${titleWords(subject)} `;
+  return titles.some((t) => t.includes(' ') && t.length >= 6 && said.includes(` ${t} `));
+}
+
 function parseAddress(raw: string): { name: string; address: string } {
   const s = raw.trim();
   const m = /^\s*"?([^"<]*?)"?\s*<([^>]+)>/.exec(s);
@@ -441,6 +474,10 @@ type Mail = {
   to: string[];
   /** Whether he wrote in the thread after this one came in. */
   answered: boolean;
+  /** For one that came in: whether he is on its To (one of his own addresses), only on Cc or Bcc, or it cannot be said. */
+  toMe: 'to' | 'cc' | 'unknown';
+  /** A calendar's mail (`isInvite`), or one about an event the calendar holds (`aboutEvent`). */
+  event: boolean;
   subject: string;
   snippet: string;
   at: number;
@@ -466,6 +503,8 @@ export function mailBody(m: Mail, zone: string): string {
     `gmail.unread= ${m.unread ? 'yes' : 'no'}`,
     `gmail.reply= ${m.reply ? 'yes' : 'no'}`,
     `gmail.person= ${m.person ? 'yes' : 'no'}`,
+    `gmail.to_me= ${m.toMe}`,
+    `gmail.event= ${m.event ? 'yes' : 'no'}`,
     `gmail.kind= ${m.kind}`,
     `gmail.link= ${m.link}`,
     `gmail.snippet= ${m.snippet}`,
@@ -474,12 +513,17 @@ export function mailBody(m: Mail, zone: string): string {
   ].join('\n');
 }
 
-const HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date', 'List-Unsubscribe', 'List-Id', 'Precedence', 'Auto-Submitted'];
+const HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date', 'List-Unsubscribe', 'List-Id', 'Precedence', 'Auto-Submitted', 'Sender', 'Content-Type'];
 
 /** Every address in a header that may list several (`"Lovelace, Ada" <ada@x.com>, bob@y.com`), lower case. */
 const addressesIn = (text: string): string[] => [...new Set([...text.matchAll(/[^\s<>()[\]"',;:]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/giu)].map((m) => m[0].toLowerCase()))];
 
-async function readMail(get: Get, id: string, me: string): Promise<Mail | null> {
+/** The keys of every address that is his: the one connected and Gmail's send-as list, as the record keys them. */
+function ownKeys(conn: Connection): Set<string> {
+  return new Set([conn.email, ...(conn.own?.list ?? [])].map((a) => keyOf('email', a)).filter((k): k is string => k !== null));
+}
+
+async function readMail(get: Get, id: string, me: string, mine: ReadonlySet<string> = new Set()): Promise<Mail | null> {
   const q = new URLSearchParams({ format: 'metadata' });
   for (const h of HEADERS) q.append('metadataHeaders', h);
   const m = await get(`${GMAIL}/messages/${encodeURIComponent(id)}?${q}`);
@@ -506,9 +550,14 @@ async function readMail(get: Get, id: string, me: string): Promise<Mail | null> 
     labels.some((l) => /^CATEGORY_(PROMOTIONS|SOCIAL|FORUMS)$/.test(l)) ||
     looksLikeNewsletter(`${subject} ${snippet}`, other.address);
   const thread = str(m.threadId);
+  const event = !out && isInvite(subject, from.address, parseAddress(h['sender'] ?? '').address, h['content-type'] ?? '');
+  /* ON TO, OR ONLY COPIED: one of his own addresses on To is a mail to him; Cc, Bcc or a list he is on is not. */
+  const own = new Set([...mine, keyOf('email', me)].filter((k): k is string => k !== null));
+  const toMe = out ? 'unknown' : addressesIn(h['to'] ?? '').some((a) => own.has(keyOf('email', a) ?? '')) ? 'to' : 'cc';
   const unread = !out && labels.includes('UNREAD') && labels.includes('INBOX');
-  const replied = !out && !bulk && labels.includes('INBOX') && (await answered(get, thread, id, me));
-  const reply = !out && !bulk && labels.includes('INBOX') && !replied;
+  /* AN INVITATION IS ANSWERED IN THE CALENDAR, never waiting on a reply in Gmail. */
+  const replied = !out && !bulk && !event && labels.includes('INBOX') && (await answered(get, thread, id, me));
+  const reply = !out && !bulk && !event && labels.includes('INBOX') && !replied;
   return {
     id,
     thread,
@@ -517,13 +566,15 @@ async function readMail(get: Get, id: string, me: string): Promise<Mail | null> 
     address: other.address,
     to: out ? addressesIn(`${h['to'] ?? ''}, ${h['cc'] ?? ''}`).filter((a) => a !== me) : [],
     answered: replied,
+    toMe,
+    event,
     subject,
     snippet,
     at: Number(m.internalDate) || Date.now(),
     unread,
     reply,
     person: !bulk,
-    kind: out ? 'none' : newsletter ? 'list' : kindOf(subject, snippet, other.address),
+    kind: out || event ? 'none' : newsletter ? 'list' : kindOf(subject, snippet, other.address),
     link: `https://mail.google.com/mail/?authuser=${encodeURIComponent(me)}#all/${thread}`,
   };
 }
@@ -778,13 +829,29 @@ async function gmailPass(get: Get, conn: Connection, w: Writer, now: number): Pr
   const queue = [...want];
   const later = queue.slice(MAIL_MOST);
   const handed = new Set(st.whole ?? []);
+  const mine = ownKeys(conn);
+  /* THE EVENTS THE CALENDAR HOLDS, read once a pass and only for a mail that may be about one, so a mail about an event
+     already there is never asked about as a date. */
+  let titles: string[] | null = null;
+  const eventTitles = async (): Promise<string[]> => {
+    if (titles !== null) return titles;
+    titles = [];
+    if (!w.events) return titles;
+    try {
+      const held = await w.heldEvents(wallIn(now - BEHIND_DAYS * 86_400_000, w.zone).day);
+      titles = [...new Set([...held.values()].map((e) => titleWords(str(e.fields.what))).filter((t) => t.includes(' ')))].slice(0, 500);
+    } catch {
+      titles = [];
+    }
+    return titles;
+  };
   let told = 0;
   let read = 0;
   const since = now - LOOK_BACK_DAYS * 86_400_000;
   for (const id of queue.slice(0, MAIL_MOST)) {
     let mail: Mail | null;
     try {
-      mail = await readMail(get, id, me);
+      mail = await readMail(get, id, me, mine);
     } catch (e) {
       /* GONE FROM GMAIL FOR GOOD: nothing more to say about it. */
       if (e instanceof Fault && (e.status === 404 || e.status === 400)) {
@@ -794,6 +861,7 @@ async function gmailPass(get: Get, conn: Connection, w: Writer, now: number): Pr
       throw e;
     }
     if (mail === null) continue;
+    if (!mail.out && mail.person && !mail.event && mail.kind === 'date' && aboutEvent(mail.subject, await eventTitles())) mail.event = true;
     /* OLDER THAN THE WINDOW AND NOT ONE STILL WAITING: left alone, as the Apps Script leaves it. */
     if (mail.at < since && !Object.hasOwn(open, id)) continue;
     if (mail.at >= since) conn.touch = touchMail(conn.touch ?? {}, mail, wallIn(mail.at, w.zone).day);
