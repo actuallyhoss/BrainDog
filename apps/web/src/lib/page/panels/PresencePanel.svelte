@@ -54,6 +54,8 @@
   } from '$lib/record/instruct.ts';
   import { UNNAMED, machinesOf } from './machines.ts';
   import NamedAgents from '$lib/agents/NamedAgents.svelte';
+  import RunSkeleton from '$lib/agents/RunSkeleton.svelte';
+  import { keepCount, lastCount } from '$lib/agents/last-size.ts';
 
   let {
     owner = false,
@@ -171,6 +173,13 @@
     }),
   );
   const views = $derived(line ? [] : scopedLeads(rows, { run, project }).map(viewOf));
+  /* THE TILE'S SIZE, KEPT FOR ITS NEXT OPEN (3 Nov): the lines it drew, so its skeleton stands at that size while it
+     reads, where the whole tile came in late and pushed Recent runs down. Only the Agents page's own tile. */
+  const SIZE = 'at-work';
+  const lastSize = $derived(line ? lastCount(SIZE) : null);
+  $effect(() => {
+    if (line && read) keepCount(SIZE, Math.max(1, shownViews.length + (idleViews.length > 0 ? 1 : 0) + quietRows.length));
+  });
   const drawn = $derived(line ? open.shown.length + open.idle.length + open.quiet.length : views.length);
 
   $effect(() => oncount?.(line ? open.shown.length : views.length));
@@ -218,8 +227,9 @@
 
 {#if line}
   {#if !read}
-    <!-- NOT READ YET: nothing but the mark that it is reading, rather than a line that may be wrong a moment later. -->
-    <span class="at-work-busy" data-seen-none hidden aria-busy="true"></span>
+    <!-- NOT READ YET: rows shaped like the ones it drew last time, at that count, or where it has never been seen here,
+         nothing but the mark that it is reading, rather than a line that may be wrong a moment later. -->
+    {#if lastSize !== null && lastSize > 0}<RunSkeleton count={lastSize} />{:else}<span class="at-work-busy" data-seen-none hidden aria-busy="true"></span>{/if}
   {:else if drawn === 0}
     <p class="at-work-none">{words.none}</p>
     <!-- THE AGENTS HE NAMED THAT HAVE NOT CALLED YET, each with Connect (`NamedAgents.svelte`), for the owner. -->

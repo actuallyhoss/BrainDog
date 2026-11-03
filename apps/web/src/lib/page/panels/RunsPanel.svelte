@@ -31,6 +31,8 @@
   import { agentKindOf } from '$lib/ui/face.ts';
   import { kindIcon, type RunLine } from '../../../routes/automations/hub.ts';
   import { listen } from '../listen.svelte.ts';
+  import RunSkeleton from '$lib/agents/RunSkeleton.svelte';
+  import { keepCount, lastCount } from '$lib/agents/last-size.ts';
 
   /** How many rows are drawn before the rest are one press away. */
   const SHOWN = 8;
@@ -87,6 +89,12 @@
     }, []),
   );
   const shown = $derived(all ? folded : folded.slice(0, SHOWN));
+  /* ITS SIZE, KEPT FOR THE NEXT OPEN (3 Nov): the rows and the doors' line, so the skeleton stands where they will. */
+  const SIZE = 'recent-runs';
+  const lastSize = lastCount(SIZE);
+  $effect(() => {
+    if (drew !== null) keepCount(SIZE, drew ? Math.min(folded.length, SHOWN) + 1 : 0);
+  });
 
   /** How a line ended, from its sentence where it carries no word of its own: "Refused" of "Refused 2h ago." */
   const firstWord = (said: string): string => said.split(/\s/u)[0]?.replace(/[.,]$/u, '') ?? said;
@@ -98,7 +106,10 @@
 
 <ItemMenu label={menuLine?.name ?? ''} bind:at={point} href={menuLine?.path} />
 
-{#if drew !== true}
+{#if drew === null && lastSize !== null && lastSize > 0}
+  <!-- NOT READ YET, AND IT DREW ROWS LAST TIME: those rows' shape, at that count, while it reads. -->
+  <RunSkeleton count={lastSize} />
+{:else if drew !== true}
   <!-- NOT READ YET, OR NOTHING HAS RUN: the tile is left out whole (`BlockSlot.svelte`'s rule for a panel that drew
        nothing), and says it is still reading while it is. -->
   <span data-seen-none hidden aria-busy={drew === null ? 'true' : undefined}></span>

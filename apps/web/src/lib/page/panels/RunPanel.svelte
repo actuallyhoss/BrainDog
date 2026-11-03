@@ -38,7 +38,8 @@
   import { undoApply, undoPlan, type UndoPlan } from '$lib/record/undo-write.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
-  import Waiting from '$lib/ui/Waiting.svelte';
+  import RunSkeleton from '$lib/agents/RunSkeleton.svelte';
+  import { keepCount, lastCount } from '$lib/agents/last-size.ts';
   import { runLines, runWords } from './run-lines.ts';
   import { readRunParts, runTalk, talkWords, type RunParts, type RunRow, type TalkKey } from './run-talk.ts';
   import { PRESENCE_WORDS, presenceSaid } from '$lib/ui/presence-words.ts';
@@ -61,6 +62,8 @@
   } = $props();
 
   let from = $state<'reading' | 'ready' | 'refused'>('reading');
+  /* THE PARTS IT DREW, KEPT FOR THE RUN'S NEXT OPEN (3 Nov): its skeleton stands at that many label and value rows. */
+  let box = $state<HTMLElement | null>(null);
   let plan = $state.raw<UndoPlan | null>(null);
   let fix = $state('');
   let confirming = $state(false);
@@ -103,6 +106,11 @@
   let held = $state.raw<RunRow | null>(null);
   let parts = $state.raw<RunParts>({});
   const settled = $derived(from !== 'reading' && rowRead && (held === null || partsRead));
+  $effect(() => {
+    if (!settled || !box) return;
+    const handle = run;
+    void Promise.resolve().then(() => box && keepCount(`run:${handle}`, box.querySelectorAll(':scope > .run-part').length));
+  });
   let beside = false;
   /* WHAT IT SAID IT IS DOING IS NOT SAID A THIRD TIME (pages pass, 2 Nov): the run's page is titled by it, and its live
      row says it again under the agent's name, so the part under its own heading repeated the title word for word. It
@@ -385,12 +393,12 @@
   {/each}
 {/snippet}
 
-<section class="run" aria-label={runWords.heading} aria-busy={!settled}>
+<section class="run" aria-label={runWords.heading} aria-busy={!settled} bind:this={box}>
   <!-- THE BARS WHILE ANY OF ITS THREE READS IS OUT, A PART OF THEIR OWN, given back whole when they have all landed: drawn
        in What it changed, that part stayed while its row, its plan and what was said beside it landed over it one by
        one and pushed it down (0.02 to 0.03 on a cold open). -->
   {#if !settled}
-  <div class="run-part"><Waiting rows={3} /></div>
+  <div class="run-part"><RunSkeleton kind="pairs" count={lastCount(`run:${run}`) ?? 3} /></div>
   {:else}
   <!-- AN OPEN RUN SAYS WHERE IT IS ON ITS LIVE ROW, from the record's clock, so the word is not said twice. -->
   {#if now && !(meRow && toldIt)}<p class="run-now">{now}</p>{/if}
