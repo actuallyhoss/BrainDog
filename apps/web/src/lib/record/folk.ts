@@ -491,7 +491,7 @@ export function seenOf(lines: unknown): Seen[] {
 /* ── what a person or an organisation is known by ───────────────────────── */
 
 /** One way somebody is known: "Email" and the address, "GitHub" and the login. */
-export type Known = { label: string; value: string };
+export type Known = { label: string; value: string; kind?: string };
 
 /* THE KINDS OF KEY `packages/kernel/src/identity-keys.ts` WRITES (`kind:value`), as a person says each. A remote is a
    repository by its name and a folder by its own, never the host or the path; a key of a kind nobody named here is said
@@ -526,7 +526,7 @@ export function keySaid(key: string): Known | null {
   const value = kind === 'remote' || kind === 'folder' ? repoOf(raw) : Object.hasOwn(KEY_LABELS, kind) ? raw : plain(raw, IDS);
   if (!value) return null;
   const label = Object.hasOwn(KEY_LABELS, kind) ? KEY_LABELS[kind]! : kind ? kind.charAt(0).toUpperCase() + kind.slice(1) : seenWords.handle;
-  return { label, value };
+  return kind ? { label, value, kind } : { label, value };
 }
 
 /**
@@ -546,12 +546,12 @@ export function knownOf(
     seen.add(id);
     out.push(k);
   };
-  const one = (part: string | undefined, label: string) => {
+  const oneOf = (part: string | undefined, label: string, kind: string) => {
     const v = part ? fields[part] : null;
-    if (typeof v === 'string' && v.trim() !== '') add({ label, value: v.trim() });
+    if (typeof v === 'string' && v.trim() !== '') add({ label, value: v.trim(), kind });
   };
-  one(parts.email, KEY_LABELS.email!);
-  one(parts.domain, KEY_LABELS.domain!);
+  oneOf(parts.email, KEY_LABELS.email!, 'email');
+  oneOf(parts.domain, KEY_LABELS.domain!, 'domain');
   for (const part of [parts.keys, parts.handles]) if (part) for (const k of textsOf(fields[part])) add(keySaid(k));
   if (parts.aliases) for (const a of textsOf(fields[parts.aliases])) add({ label: seenWords.aliases, value: a.trim() });
   return out;
@@ -698,3 +698,69 @@ export const seenWords = {
   knownBy: 'Known by',
   yours: 'Your identities',
 } as const;
+
+/* ── where a person is found, as chips ──────────────────────────────────── */
+
+/**
+ * THE PLATFORMS A PERSON IS FOUND ON, BY THE FIELD THAT HOLDS EACH (People 4.7.0, 3 Nov): a chip with the platform's
+ * mark that opens their page there. The same kinds read off a key or a handle (`discord:668...`, `github:jokonkwo`), so
+ * a person `meet` wrote before those fields existed opens the same way.
+ */
+export const PLATFORM_FIELDS: Readonly<Record<string, string>> = {
+  discord: 'discord',
+  discord_id: 'discord',
+  github: 'github',
+  x: 'x',
+  instagram: 'instagram',
+  linkedin: 'linkedin',
+  telegram: 'telegram',
+  whatsapp: 'whatsapp',
+};
+
+/** One chip: the words, where it opens (nowhere for a handle no address can be made from), and its platform. */
+export type FoundChip = { text: string; href?: string; platform?: string };
+
+const login = (v: string): string => v.trim().replace(/^@/u, '').replace(/^https?:\/\/[^/]+\/(?:in\/)?/iu, '').replace(/\/+$/u, '');
+
+/**
+ * A handle as a chip, by the platform it is on, or `null` for a value with nothing in it. `discordId` makes a Discord
+ * name open the person's profile, which only the id can address.
+ */
+export function foundChip(platform: string, value: unknown, discordId: string | null = null): FoundChip | null {
+  const v = typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : '';
+  if (v === '') return null;
+  const at = (href: string): FoundChip => ({ text: v, href, platform });
+  switch (platform) {
+    case 'discord':
+      if (/^\d{15,21}$/u.test(v)) return at(`https://discord.com/users/${v}`);
+      return discordId ? { text: `@${login(v)}`, href: `https://discord.com/users/${discordId}`, platform } : { text: `@${login(v)}`, platform };
+    case 'github':
+      return { ...at(`https://github.com/${encodeURIComponent(login(v))}`), text: login(v) };
+    case 'x':
+    case 'twitter':
+      return { text: `@${login(v)}`, href: `https://x.com/${encodeURIComponent(login(v))}`, platform: 'x' };
+    case 'instagram':
+      return { text: `@${login(v)}`, href: `https://instagram.com/${encodeURIComponent(login(v))}`, platform };
+    case 'telegram':
+      return { text: `@${login(v)}`, href: `https://t.me/${encodeURIComponent(login(v))}`, platform };
+    case 'linkedin':
+      return { text: login(v), href: /^https?:\/\//iu.test(v) ? v : `https://www.linkedin.com/in/${encodeURIComponent(login(v))}`, platform };
+    case 'whatsapp':
+      return at(`https://wa.me/${v.replace(/[^\d]/gu, '')}`);
+    case 'phone':
+      return { text: v, href: `tel:${v.replace(/[^\d+]/gu, '')}` };
+    case 'email':
+      return { text: v, href: `mailto:${v}` };
+    default:
+      return null;
+  }
+}
+
+/**
+ * A ROLE AS SAID, "CPO at Quartz", split at its last " at ", so the page can open Quartz where the record holds a project
+ * or an organisation of that name. A role with no " at " is all title.
+ */
+export function roleParts(said: string): { title: string; at: string | null } {
+  const i = said.toLowerCase().lastIndexOf(' at ');
+  return i > 0 ? { title: said.slice(0, i).trim(), at: said.slice(i + 4).trim() || null } : { title: said.trim(), at: null };
+}

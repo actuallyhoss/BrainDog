@@ -139,7 +139,8 @@
   import { reachWords } from '../reach.ts';
   import { OWN_TYPES } from '$lib/ui/own.ts';
   import { typingHints } from '$lib/ui/typing-hints.ts';
-  import { knownOf, lastDayOf, meetsOf, metSaid, orgNameSaid, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../folk.ts';
+  import { foundChip, knownOf, lastDayOf, meetsOf, metSaid, orgNameSaid, orgRoleOf, orgSaid, PLATFORM_FIELDS, roleFieldOf, roleParts, seenOf, seenWords, timesSaid, whoParts, type FoundChip, type Known, type Named } from '../folk.ts';
+  import { PLATFORM_MARKS, type Platform } from '$lib/ui/platform-marks.ts';
 
   const id = $derived(page.params.register ?? '');
   const seq = $derived(Number(page.params.seq));
@@ -958,7 +959,9 @@
    */
   const LEAD_FACTS = 6;
   let factsOpen = $state(false);
-  const folds = $derived(facts.length > LEAD_FACTS + 2);
+  /* A PERSON'S FACTS ARE WHO THEY ARE (People 4.7.0): never folded behind More details, since each is a field somebody
+     filled in on purpose, and an empty one is not drawn at all. */
+  const folds = $derived(!meetsOf(decl) && facts.length > LEAD_FACTS + 2);
   const factsShown = $derived(!folds || factsOpen ? facts : facts.filter((f, i) => i < LEAD_FACTS || editing === f.id));
   const factsHidden = $derived(folds ? facts.length - LEAD_FACTS : 0);
   const foldIn = (node: Element, more: boolean) => (more ? rowIn(node) : { duration: 0 });
@@ -1091,6 +1094,9 @@
       const part = Object.entries(knownParts).find(([, v]) => v === field.id)?.[0];
       const lines = (part ? knownOf(row.fields, { [part]: field.id }) : []).filter((k) => {
         const key = `${k.label}:${k.value.toLowerCase()}`;
+        /* A KEY A PLATFORM'S OWN FIELD ALREADY SAYS (`discord:668...` beside Discord id) is said once, by the field. */
+        if (meets && k.kind && Object.entries(PLATFORM_FIELDS).some(([fid, pl]) => pl === (k.kind === 'twitter' ? 'x' : k.kind) && String(row.fields[fid] ?? '').trim().replace(/^@/u, '').toLowerCase() === k.value.replace(/^@/u, '').toLowerCase()))
+          return false;
         if (said.has(key)) return false;
         said.add(key);
         return true;
@@ -1130,9 +1136,65 @@
     const v = f ? row.fields[f.id] : null;
     return f && typeof v === 'string' && v.trim() !== '' && editing !== f.id ? { field: f.id, text: v } : null;
   });
+  /* THE SHORT LINE ABOUT THEM (People 4.7.0's `about`), said over their note, where the note was all there was. */
+  const aboutLine = $derived.by(() => {
+    if (!meets || !row || !decl) return null;
+    const f = decl.fields.find((x) => x.id === 'about' && !x.retired && x.type === 'text');
+    const v = f ? row.fields[f.id] : null;
+    return f && typeof v === 'string' && v.trim() !== '' && editing !== f.id ? { field: f, text: v.trim() } : null;
+  });
+  /** The record's projects and organisations by name, so a role "CPO at Quartz" opens Quartz. */
+  const placeByName = $derived.by(() => {
+    const out = new Map<string, string>();
+    for (const list of ['organisations', 'things']) {
+      const held = [
+        ...(names ? [...names.entries()].filter(([k]) => k.startsWith(`${list}#`)) : []),
+        ...[...(TITLES.get(list)?.entries() ?? [])].map(([n, v]) => [`${list}#${n}`, v] as const),
+      ];
+      for (const [k, v] of held) if (typeof v === 'string' && v.trim() !== '' && !out.has(v.trim().toLowerCase())) out.set(v.trim().toLowerCase(), rowHref(k) ?? `/r/${k.replace('#', '/')}`);
+    }
+    return out;
+  });
+  /** A Discord id the row holds, which a Discord name opens by. */
+  const discordId = $derived.by(() => {
+    const v = row?.fields.discord_id;
+    if (typeof v === 'string' && /^\d{15,21}$/u.test(v.trim())) return v.trim();
+    for (const list of [row?.fields.handles, row?.fields.keys]) for (const h of Array.isArray(list) ? list : []) {
+      const m = /^discord:(\d{15,21})$/iu.exec(String(h));
+      if (m) return m[1]!;
+    }
+    return null;
+  });
+  /**
+   * A PERSON'S FACT AS CHIPS, where chips say it better than words (People 4.7.0, 3 Nov): a handle with its platform's
+   * mark that opens their page there, a phone that calls, and each role, "CPO at Quartz", opening Quartz where the
+   * record holds it. `null` for every other fact, which is drawn as before.
+   */
+  const personChips = (f: FieldDecl, value: unknown): FoundChip[] | null => {
+    if (!meets) return null;
+    const platform = PLATFORM_FIELDS[f.id];
+    if (platform) {
+      const c = foundChip(platform, value, f.id === 'discord' ? discordId : null);
+      return c ? [c] : null;
+    }
+    if (!Array.isArray(value) || value.length === 0) return null;
+    if (f.id === 'phones') return value.map((v) => foundChip('phone', v)).filter((c): c is FoundChip => c !== null);
+    if (f.id === 'titles')
+      return value.map((v) => {
+        const said = String(v);
+        const place = roleParts(said).at;
+        /* A NAME THE TAB HAS NOT MET YET IS LOOKED FOR, so the chip still opens where Quartz is. */
+        const href = place ? (placeByName.get(place.toLowerCase()) ?? `/search?q=${encodeURIComponent(place)}`) : undefined;
+        return href ? { text: said, href } : { text: said };
+      });
+    return null;
+  };
+  /** A line of what they are known by as a chip, by its kind, or `null` for a kind nothing opens. */
+  const knownChip = (k: Known): FoundChip | null => (k.kind ? foundChip(k.kind === 'twitter' ? 'x' : k.kind, k.value, discordId) : null);
   const evidence = $derived(
     new Set(
       [
+        aboutLine?.field.id,
         ...knownFields.map((f) => f.id),
         ...saidAbove.map((f) => f.id),
         meets?.met ?? orgRole?.met,
@@ -1379,8 +1441,19 @@
   {#snippet whoLine()}{#each lead?.parts ?? [] as part, i (i)}{#if part.href}<a class="who-link tap" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}{#if lead?.parts && lead.last}{' '}{/if}{lead?.last ?? ''}{#if lead?.facts && lead.facts.length > 0}<span class="who-facts">{#each lead.facts as fact (fact)}<span class="who-fact">{fact}</span>{/each}</span>{/if}{/snippet}
 
   <!-- A VALUE AS THE PAGE SAYS IT, in its line of the fields tile. -->
+  {#snippet foundChips(list: FoundChip[])}<span class="found">{#each list as c, i (i)}{#if c.href}<a
+          class="found-chip tap"
+          href={c.href.startsWith('/') ? at(c.href) : c.href}
+          target={c.href.startsWith('http') ? '_blank' : undefined}
+          rel={c.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+          >{@render platformMark(c.platform)}<span dir="auto">{c.text}</span></a
+        >{:else}<span class="found-chip">{@render platformMark(c.platform)}<span dir="auto">{c.text}</span></span>{/if}{/each}</span
+    >{/snippet}
+  {#snippet platformMark(platform: string | undefined)}{#if platform && Object.hasOwn(PLATFORM_MARKS, platform)}<svg class="found-mark" viewBox="0 0 24 24" aria-hidden="true"><path d={PLATFORM_MARKS[platform as Platform]} /></svg>{/if}{/snippet}
   {#snippet shown(f: FieldDecl, value: unknown)}
-    {#if f.type === 'money'}
+    {#if personChips(f, value)}
+      {@render foundChips(personChips(f, value)!)}
+    {:else if f.type === 'money'}
       <!-- AT THE FACT'S OWN WEIGHT: the amount the page leads with is the large one, and a second never competes. -->
       <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} />
     {:else if f.id === decl.state}
@@ -1703,6 +1776,12 @@
                  said here, beside the face their row wears in every list. -->
             <p class="self-line"><Face name={String(row.fields[decl.title] ?? '')} kind="person" you={owner} size="m" /><span>{personWords.self}</span></p>
           {/if}
+          {#if aboutLine}
+            <div class="about about-line">
+              <p>{aboutLine.text}</p>
+              {#if changes && editable(aboutLine.field, id)}<div class="about-pencil">{@render pencil(aboutLine.field)}</div>{/if}
+            </div>
+          {/if}
           {#if about}
             <div class="about">
               <NoteText text={about.text} />
@@ -1739,9 +1818,10 @@
                   {@render fact(g.field)}
                 {:else}
                   {#each g.lines as k, i (i)}
+                    {@const chip = knownChip(k)}
                     <div class="fact">
                       <dt class="fact-label">{k.label}</dt>
-                      <dd class="fact-value" dir="auto" data-own>{k.value}</dd>
+                      {#if chip}<dd class="fact-value">{@render foundChips([chip])}</dd>{:else}<dd class="fact-value" dir="auto" data-own>{k.value}</dd>{/if}
                       {#if i === 0 && changes && editable(g.field, id)}<dd class="fact-pencil">{@render pencil(g.field)}</dd>{/if}
                     </div>
                   {/each}
@@ -2166,6 +2246,43 @@
   /* A PERSON'S NOTE LEADS THEIR PAGE as a paragraph in the body's ink, the pencil at its end, with the facts under it. */
   /* NO MARGIN UNDER IT (pages polish, 2 Nov): the tile's own 16 between its parts is the step, and the 16 added here
      with the pencil's 32px box stood about 40px of air between a person's note and their figure. */
+  /* A PERSON'S HANDLES, PHONES AND ROLES AS CHIPS (People 4.7.0): the platform's mark, then the handle as written. */
+  .found {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .found-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: 28px;
+    padding-inline: 10px;
+    border-radius: 999px;
+    background: var(--soft-fill);
+    color: var(--ink);
+    font: inherit;
+    text-decoration: none;
+    max-inline-size: 100%;
+  }
+  .found-chip > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  a.found-chip:hover {
+    background: var(--hover);
+  }
+  .found-mark {
+    inline-size: 14px;
+    block-size: 14px;
+    flex: none;
+    fill: currentColor;
+  }
+  .about-line p {
+    margin: 0;
+    font-weight: 500;
+  }
   .about {
     display: flex;
     align-items: flex-start;
