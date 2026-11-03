@@ -445,6 +445,17 @@
   .hd-line + .hd-line {
     margin-block-start: var(--sp-2);
   }
+  /* A DAY'S SECOND LINE HAS NO DATE BESIDE IT, so it takes its words' height and not the date's 40: two items on one day
+     stood 48 apart, as far as two days (rhythm pass, 3 Nov). The step over it is the row stack's, a hair under a day's. */
+  .hd-line + .hd-line {
+    min-block-size: 0;
+    margin-block-start: var(--sp-1);
+    padding-block: var(--sp-1);
+  }
+  /* AND A DAY IS ITS LINES: 8 of air each side of one, 16 between days, as a two-line row (`--row-h-2`) is spaced. */
+  .hd {
+    padding-block: var(--sp-2);
+  }
 
   /* THE DATE AS A STACK, NOT A BOX (ops look, 3 Nov): the weekday small and capped over the day's number, on the tile
      itself, so a list of days reads as dates rather than as a column of grey buttons. Today keeps its ring. */
