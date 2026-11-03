@@ -3330,7 +3330,7 @@
   <!-- LOADING. The answer is a round trip away, and a placeholder list would be rows that are not
        there, so it is bars with no words in them, after 300ms (`Waiting.svelte`). `aria-busy` says
        the region is on its way, and `data-screen` stays off until it has arrived. -->
-  <div aria-busy="true"><Waiting head rows={8} /></div>
+  <div aria-busy="true"><Waiting head shape="list" rows={8} /></div>
 {:else if !decl}
   {@const have = offered(booted?.registers ?? [])}
   <div class="page">

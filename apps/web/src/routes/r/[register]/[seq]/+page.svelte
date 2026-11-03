@@ -1411,7 +1411,7 @@
 
 {#if waiting}
   <!-- Bars until the row has been read. -->
-  <Waiting head rows={6} />
+  <Waiting head shape="row" rows={6} />
 {:else if got?.from === 'refused'}
   <div class="page">
     <Empty kind="error" heading title={got.fix}>
