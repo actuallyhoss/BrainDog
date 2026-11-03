@@ -18,7 +18,7 @@
 
 const SET = {
   /* icons:app. Written by `scripts/icons.mjs` from the app's glyphs. Change the app, then run the script. */
-  today: '<circle cx="12" cy="12" r="4"/><path d="M12 2.75v1.5M12 19.75v1.5M2.75 12h1.5M19.75 12h1.5M5.46 5.46l1.06 1.06M17.48 17.48l1.06 1.06M5.46 18.54l1.06-1.06M17.48 6.52l1.06-1.06"/>',
+  today: '<rect x="3.75" y="5.25" width="16.5" height="15" rx="3.5"/><path d="M3.75 10h16.5M8 3.25v3.5M16 3.25v3.5"/><path d="M10.75 13.75h2.5v2.5h-2.5zM11.5 15h1"/>',
   work: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M8.25 12.25l2.5 2.5 5-5.5"/>',
   projects: '<rect x="3.75" y="3.75" width="9.5" height="7" rx="2"/><rect x="15.25" y="3.75" width="5" height="7" rx="2"/><rect x="3.75" y="12.75" width="5" height="7.5" rx="2"/><rect x="10.75" y="12.75" width="9.5" height="7.5" rx="2"/>',
   money: '<path d="M18.5 7.25V5.9a1.4 1.4 0 0 0-1.75-1.36L6 7.25"/><rect x="3.75" y="7.25" width="16.5" height="12.5" rx="3"/><path d="M20.25 11.5h-3.5a2 2 0 0 0 0 4h3.5"/>',
@@ -114,7 +114,7 @@ const LUCIDE = {
 
 export const GLYPHS = {
   ...SET,
-  sun: SET.today,
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.75v1.5M12 19.75v1.5M2.75 12h1.5M19.75 12h1.5M5.46 5.46l1.06 1.06M17.48 17.48l1.06 1.06M5.46 18.54l1.06-1.06M17.48 6.52l1.06-1.06"/>',
   menu: MENU,
   ...LUCIDE,
   /* The names the site used before the set, each drawn as the set draws its idea. */

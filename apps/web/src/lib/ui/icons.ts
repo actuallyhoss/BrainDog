@@ -21,7 +21,7 @@
  *
  * ONE ENTRY PER LINE, `name: '<markup>'`, and never a reference to another entry: `glyphs.test.ts`
  * in `braindog-render` reads the names off this file as text, and a name spelled any other way is one
- * it does not see. That is why `sun` repeats `today`'s markup instead of pointing at it.
+ * it does not see. That is why `today` repeats `calendar`'s markup instead of pointing at it.
  *
  * A DECLARATION MAY NAME MORE THAN THESE. `braindog-render/glyphs` holds 251, Lucide's, and a page an
  * agent declares with `icon: rocket` draws one of them; see `IconName` at the foot of this file.
@@ -34,8 +34,10 @@ import { CORE, loadSet, type CoreGlyph, type SetGlyph } from 'braindog-render/gl
 import { GLYPH_NAMES, type AppGlyph } from 'braindog-render/glyphs/names';
 
 export const PATHS = {
-  /* The places, in the rail's order. `today` is the sun of the day's start; `work` a checked task. */
-  today: '<circle cx="12" cy="12" r="4"/><path d="M12 2.75v1.5M12 19.75v1.5M2.75 12h1.5M19.75 12h1.5M5.46 5.46l1.06 1.06M17.48 17.48l1.06 1.06M5.46 18.54l1.06-1.06M17.48 6.52l1.06-1.06"/>',
+  /* The places, in the rail's order. `today` is `calendar` with today's day filled in: the sun it was read as
+     the light theme's switch, which `sun` is. The day is a 2.5 square with a stroke through it, so it fills solid at
+     1.5 and 1.75 without a `fill` the shapes list does not carry. `work` is a checked task. */
+  today: '<rect x="3.75" y="5.25" width="16.5" height="15" rx="3.5"/><path d="M3.75 10h16.5M8 3.25v3.5M16 3.25v3.5"/><path d="M10.75 13.75h2.5v2.5h-2.5zM11.5 15h1"/>',
   work: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M8.25 12.25l2.5 2.5 5-5.5"/>',
   projects: '<rect x="3.75" y="3.75" width="9.5" height="7" rx="2"/><rect x="15.25" y="3.75" width="5" height="7" rx="2"/><rect x="3.75" y="12.75" width="5" height="7.5" rx="2"/><rect x="10.75" y="12.75" width="9.5" height="7.5" rx="2"/>',
   money: '<path d="M18.5 7.25V5.9a1.4 1.4 0 0 0-1.75-1.36L6 7.25"/><rect x="3.75" y="7.25" width="16.5" height="12.5" rx="3"/><path d="M20.25 11.5h-3.5a2 2 0 0 0 0 4h3.5"/>',
@@ -81,7 +83,7 @@ export const PATHS = {
   edit: '<path d="M4.75 19.25h3.5L18.5 9a2.47 2.47 0 0 0-3.5-3.5L4.75 15.75z"/><path d="M13.5 7l3.5 3.5"/>',
   archive: '<rect x="3.25" y="4.25" width="17.5" height="4.5" rx="2"/><path d="M5 8.75v8.5a2.5 2.5 0 0 0 2.5 2.5h9a2.5 2.5 0 0 0 2.5-2.5v-8.5"/><path d="M10 12.75h4"/>',
 
-  /* The theme. `sun` is `today`'s shape, as the icon set says. */
+  /* The theme. `sun` is the light theme's alone; Today is a calendar so the two are never confused. */
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.75v1.5M12 19.75v1.5M2.75 12h1.5M19.75 12h1.5M5.46 5.46l1.06 1.06M17.48 17.48l1.06 1.06M5.46 18.54l1.06-1.06M17.48 6.52l1.06-1.06"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/>',
   monitor: '<rect x="2.75" y="4.25" width="18.5" height="12.5" rx="2.5"/><path d="M8.5 20.25h7M12 16.75v3.5"/>',
