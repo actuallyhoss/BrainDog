@@ -3846,7 +3846,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--tile-gap);
-    padding: var(--sp-4) var(--gutter) var(--page-bottom);
+    padding: var(--page-top) var(--gutter) var(--page-bottom);
   }
 
   /* THE LIST'S TILE: its toolbar, the capture line and the rows, a step apart rather than a section apart, so they
@@ -4067,7 +4067,7 @@
     /* THE PHONE'S BOARD: one column on the phone's gutter, the head's and the banner's edge (it stood 4px outside them
        at 12), and the list's tile a step tighter inside. */
     .page {
-      padding: var(--sp-4) var(--gutter) var(--page-bottom);
+      padding: var(--page-top) var(--gutter) var(--page-bottom);
     }
 
     .page :global(.list-tile) {

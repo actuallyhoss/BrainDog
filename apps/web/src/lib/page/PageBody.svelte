@@ -1689,6 +1689,9 @@
     padding: var(--slot-pad);
     background: var(--tile);
     border-radius: var(--r-tile);
+    /* ITS EDGE AND LIFT, AS EVERY TILE HAS (rhythm pass, 3 Nov): a block's tile had the fill alone, so in dark it stood
+       flatter than the `Tile` cards beside it. */
+    box-shadow: var(--card);
     /* `#b-4` must not scroll underneath the sticky header. Paid once, per anchor. */
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
@@ -1704,6 +1707,7 @@
     padding: var(--slot-pad);
     background: var(--tile);
     border-radius: var(--r-tile);
+    box-shadow: var(--card);
   }
 
   .area[data-area='rail'] .box {
@@ -1780,6 +1784,7 @@
     padding: var(--tile-pad-lead);
     background: var(--tile);
     border-radius: var(--r-tile);
+    box-shadow: var(--card);
   }
 
   .block-slot[data-lead]:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(.block p) {
@@ -1951,6 +1956,7 @@
   .block-slot:not([data-arranging]):has(:global(.block[data-kind='note'] p > a + a)) {
     padding-block: 0;
     background: transparent;
+    box-shadow: none;
   }
 
   .block-slot :global(.block[data-kind='note'] p:has(> a + a):not(:has(> :not(a)))) {

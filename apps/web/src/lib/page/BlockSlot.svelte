@@ -1488,6 +1488,7 @@
   :global(.block-slot.block-slot:has(> .shape-row)) {
     padding: 0;
     background: none;
+    box-shadow: none;
   }
 
   :global(.block-slot.block-slot:has(> .shape-row[data-empty])) {
@@ -1497,6 +1498,7 @@
   :global(.block-slot.block-slot:has(> .desk-part)) {
     padding: 0;
     background: none;
+    box-shadow: none;
     container-type: inline-size;
   }
 
@@ -1516,6 +1518,7 @@
   :global(.block-slot.block-slot:is(:has(> .project-cards), :has(> .project-lanes), :has(> .projects-board))) {
     padding: 0;
     background: none;
+    box-shadow: none;
     container-type: inline-size;
   }
 

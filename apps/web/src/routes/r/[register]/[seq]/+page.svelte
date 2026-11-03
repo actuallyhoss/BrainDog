@@ -1917,7 +1917,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--tile-gap);
-    padding: var(--sp-4) var(--gutter) var(--page-bottom);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* ── the board ─────────────────────────────────────────────────────── */
@@ -2868,7 +2868,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-4) var(--gutter) var(--page-bottom);
+      padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
     }
 
     /* THE NAME ON ITS OWN ROW, THREE LINES AT MOST, the "…" at its end and level with its first line. */
