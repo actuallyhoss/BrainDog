@@ -3107,26 +3107,38 @@
 
   /* A CARD OF ONE FIGURE IS A STAT TILE: its words small over the figure, the figure at the tile figure's 22/600. Laid as
      a row, "Coming in" at the left and "$4,160" at the right edge read as a ledger line under "Owed to you". */
-  .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:only-child) {
+  .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:only-child),
+  .body[data-board] :global([data-board-key][data-size='small'] .block[data-kind='stat'] .grid > .cell:first-child) {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: var(--sp-1);
   }
 
-  .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:only-child .cell-label) {
+  .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:only-child .cell-label),
+  .body[data-board] :global([data-board-key][data-size='small'] .block[data-kind='stat'] .grid > .cell:first-child .cell-label) {
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
   }
 
-  .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:only-child .cell-figure) {
+  .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:only-child .cell-figure),
+  .body[data-board] :global([data-board-key][data-size='small'] .block[data-kind='stat'] .grid > .cell:first-child .cell-figure) {
     justify-self: start;
     font-size: var(--fs-figure);
     font-weight: var(--fw-semi);
     line-height: 26px;
     letter-spacing: -0.02em;
     text-align: start;
+  }
+
+  /* EVERY QUESTION IN NEEDS YOU AT A ROW TITLE'S SIZE AT A DESK: a plain question stood at the card heading's 17/600
+     under a money question's 15, so one card read as two kinds of thing. Decide keeps its 17, where a card is alone. */
+  @media (width >= 900px) {
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-main > .queue-question) {
+      font-size: var(--fs-row);
+      line-height: var(--lead-row, 20px);
+    }
   }
 
   /* A PROJECT'S NUMBER IS SAID ONCE: with Numbers on the board, "412 Beta users" and "25 Sprint hours" stood in both
