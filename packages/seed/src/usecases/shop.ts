@@ -60,8 +60,11 @@ export const SHOP = {
      1.4.1: the card's summary is one short line. Words only, so a patch step.
      1.5.0 (audit 31 Oct h, AH4): Products has a page of its own, on the rail from the first minute beside Orders, opening
      on a box to add a product. The first screen promised Products, and `/p/products` said there was no such page. A
-     page added and nothing taken away, so a minor step; 1.4.1 is published. */
-  version: '1.5.0',
+     page added and nothing taken away, so a minor step; 1.4.1 is published.
+     1.6.0 (no briefs, 3 Nov): Products no longer opens on how many products there are and how many run low, which its table
+     shows with how many are left. Orders keeps its line, since it names who still owes and what is late. A block
+     taken away and none added, so a minor step; 1.5.0 is published. */
+  version: '1.6.0',
   title: 'Shop',
   summary: 'Your orders, products and what is paid.',
   author: 'BrainDog',
@@ -258,7 +261,6 @@ export const SHOP = {
         icon: 'doc',
         requires: ['register.products'],
         blocks: [
-          { kind: 'note', lead: true, span: 12, body: '{{products-held}} product(s), {{products-low}} running low' },
           { kind: 'capture', heading: 'Add a product', icon: 'plus', span: 12, register: 'products' },
           {
             kind: 'table',

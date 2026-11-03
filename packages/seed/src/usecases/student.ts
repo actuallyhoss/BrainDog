@@ -32,8 +32,10 @@ export const STUDENT = {
      "your streak starts here": BrainDog keeps no game score (his rule: no gamification). Words only, so a patch step.
      1.7.0 (audit 31 Oct h, AH4): Studies is on the rail from the first minute (its place, after Work), and opens on two
      boxes, one to add a piece of work and one to add a course, where a new student found it inside More lists saying
-     "Nothing here yet". Blocks added and nothing taken away, so a minor step; 1.6.2 is published. */
-  version: '1.7.0',
+     "Nothing here yet". Blocks added and nothing taken away, so a minor step; 1.6.2 is published.
+     1.8.0 (no briefs, 3 Nov): Home and Studies no longer open on a line counting work to hand in and courses, which the lists
+     and the board under them show. Two blocks taken away and none added, so a minor step; 1.7.0 is published. */
+  version: '1.8.0',
   title: 'Student',
   summary: 'Your courses, assignments and grades.',
   author: 'BrainDog',
@@ -195,14 +197,6 @@ export const STUDENT = {
         requires: ['register.assignments', 'register.study_sessions'],
         blocks: [
           {
-            /* THE PAGE'S ONE LINE, SINCE 1.5.0: how much is left to hand in, and how much of it this week. A clause whose
-               figure is nought is left out, so a new record reads no line and starts at the box under it. */
-            kind: 'note',
-            lead: true,
-            span: 12,
-            body: '{{homework-open}} piece(s) of work to hand in, {{homework-due-7d}} due this week',
-          },
-          {
             /* THE HEADING IS THE PROMPT (`render/src/capture.ts`), and a piece of work added here is To do with no day
                until the student gives it one. */
             kind: 'capture',
@@ -282,13 +276,6 @@ export const STUDENT = {
         icon: 'board',
         requires: ['register.assignments', 'register.courses', 'register.study_sessions'],
         blocks: [
-          {
-            /* THE PAGE'S ONE LINE, SINCE 1.5.0. */
-            kind: 'note',
-            lead: true,
-            span: 12,
-            body: '{{homework-open}} piece(s) of work to hand in, {{courses-held}} course(s)',
-          },
           /* TWO BOXES, SINCE 1.7.0 (AH4): a piece of work and a course, each added where the page opens. */
           { kind: 'capture', heading: 'Add a piece of work', icon: 'plus', span: 12, register: 'assignments' },
           { kind: 'capture', heading: 'Add a course', icon: 'graduation-cap', span: 12, register: 'courses', when: { metric: 'courses-held', lt: 1 } },

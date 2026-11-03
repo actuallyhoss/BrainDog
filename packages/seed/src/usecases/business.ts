@@ -64,8 +64,10 @@ export const BUSINESS = {
      tile on a page held to six. A block added, nothing taken away.
      1.7.2: the card's summary is one short line. Words only, so a patch step.
      1.7.3 (onboarding6): a streamer, a YouTuber or a creator paid by sponsors is heard as a small business (`signals`).
-     Signals only, nothing a record holds, so a patch step; 1.7.2 is published. */
-  version: '1.7.3',
+     Signals only, nothing a record holds, so a patch step; 1.7.2 is published.
+     1.8.0 (no briefs, 3 Nov): Today no longer opens on how many questions need your call, which Needs your call under it lists.
+     A block taken away and none added, so a minor step; 1.7.3 is published. */
+  version: '1.8.0',
   title: 'Small business',
   summary: 'Money in and out, clients and subscriptions.',
   author: 'BrainDog',
@@ -104,8 +106,6 @@ export const BUSINESS = {
         icon: 'home',
         requires: ['register.session'],
         blocks: [
-          /* THE PAGE'S ONE LINE, SINCE 1.4.0, said from the one figure every record has whatever it installs. */
-          { kind: 'note', lead: true, span: 12, body: '{{questions-open}} question(s) need your call' },
           { kind: 'stat', lead: true, heading: 'What you have', icon: 'wallet', span: 12, source: 'figures.home' },
           {
             /* WHAT STOPPED REPORTING, STRAIGHT UNDER WHAT THERE IS, INSIDE 1.7.1 (batch 88): the table a founder's Home

@@ -171,8 +171,11 @@ export const PERSONAL = {
      this pack's Project steps point at it, so a household that said bills, rent and a holiday was made a Projects part
      it never asked for. `needs` is People and Money now; Projects comes when a project is said, and until then the install cuts
      Project steps' link to it (`fitted`). Nothing is declared, taken away or reworded, so a record on 2.10.0 keeps all
-     it holds; the file it shares changes (`needs`, People and Money), so a version beside 2.10.0, which is published. */
-  version: '2.11.1',
+     it holds; the file it shares changes (`needs`, People and Money), so a version beside 2.10.0, which is published.
+     2.12.0 (no briefs, 3 Nov): Goals no longer opens on a line counting goals and habits, which its lists show. Home's line of
+     what is in the accounts and what moves in thirty days stays, as no tile on Home says it. Three blocks taken away
+     and none added, so a minor step; 2.11.1 is published. */
+  version: '2.12.0',
   title: 'Personal',
   summary: 'Your money, bills, savings and goals.',
   author: 'BrainDog',
@@ -607,30 +610,6 @@ export const PERSONAL = {
         icon: 'star',
         requires: ['register.savings_goals', 'register.goals', 'register.goal_log', 'register.put_by'],
         blocks: [
-          /* THE PAGE'S ONE LINE, SINCE 2.2.0: what is put by, and how many goals and habits are on the go. SAID THREE WAYS
-             SINCE 2.10.0 (audit 31 Oct l, AL13), exactly one of them drawn: a first goal read "1 goal and 0 habits on the
-             go", since a clause of nought goes only between commas and "and" joins the two counts in one clause. */
-          {
-            kind: 'note',
-            lead: true,
-            span: 12,
-            when: { all: [{ metric: 'goals-active', gte: 1 }, { metric: 'habits-active', gte: 1 }] },
-            body: '{{saved-toward-goals}} saved so far, {{goals-active}} goal(s) and {{habits-active}} habit(s) on the go',
-          },
-          {
-            kind: 'note',
-            lead: true,
-            span: 12,
-            when: { metric: 'habits-active', lt: 1 },
-            body: '{{saved-toward-goals}} saved so far, {{goals-active}} goal(s) on the go',
-          },
-          {
-            kind: 'note',
-            lead: true,
-            span: 12,
-            when: { all: [{ metric: 'goals-active', lt: 1 }, { metric: 'habits-active', gte: 1 }] },
-            body: '{{saved-toward-goals}} saved so far, {{habits-active}} habit(s) on the go',
-          },
           /* A BOX TO ADD A GOAL OR A HABIT, SINCE 2.9.0 (AH4), and one to name a saving until one is named, as Home has. */
           { kind: 'capture', heading: 'Add a goal or a habit', icon: 'plus', span: 12, register: 'goals' },
           {

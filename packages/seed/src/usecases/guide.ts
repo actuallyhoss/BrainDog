@@ -56,8 +56,10 @@ export const GUIDE = {
      1.6.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name of
      the Steps list"), not by its id ("Label: steps"), and every list's name is declared before any
      singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step.
-     1.7.1: the card's summary is one short line. Words only, so a patch step. */
-  version: '1.7.1',
+     1.7.1: the card's summary is one short line. Words only, so a patch step.
+     1.8.0 (no briefs, 3 Nov): Your project and the Guide no longer open on a line counting milestones, steps and choices, which
+     the path and the lists under it show. Two blocks taken away and none added, so a minor step; 1.7.1 is published. */
+  version: '1.8.0',
   title: 'New project guide',
   summary: 'Milestones and next steps for a new project.',
   author: 'BrainDog',
@@ -294,13 +296,6 @@ export const GUIDE = {
         requires: ['register.milestones', 'register.steps', 'register.choices', 'register.resources'],
         blocks: [
           {
-            /* THE PAGE'S ONE LINE, SINCE 1.5.0: how far along the way the project is, and what is left to do and decide. */
-            kind: 'note',
-            lead: true,
-            span: 12,
-            body: '{{guide-milestones-reached}} of {{guide-milestones}} milestone(s) reached, {{guide-steps-open}} step(s) to take, {{guide-choices-open}} choice(s) to make',
-          },
-          {
             /* THE MILESTONES AS A PATH, top to bottom in their order: the ones passed are done, the first not passed is
                next, and the rest are later. The record marks them from `passed`, so the path and the status agree. THE
                WHOLE WIDTH SINCE 1.5.0, as every tile on this page is, so none leaves a half row when it is not drawn. */
@@ -395,14 +390,6 @@ export const GUIDE = {
         icon: 'star',
         requires: ['register.milestones', 'register.steps', 'register.choices', 'register.resources'],
         blocks: [
-          {
-            /* THE PAGE'S ONE LINE, SINCE 1.5.0, where a tile of four figures stood: two of them, the steps to take and the
-               choices to make, are the lists under it, so the line says how far along the way it is and how fast it moves. */
-            kind: 'note',
-            lead: true,
-            span: 12,
-            body: '{{guide-milestones-reached}} of {{guide-milestones}} milestone(s) reached, {{guide-steps-done-7d}} step(s) done this week',
-          },
           {
             kind: 'table',
             heading: '{{config:voice_right_now}}',

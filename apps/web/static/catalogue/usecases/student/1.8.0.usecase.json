@@ -1,0 +1,679 @@
+{
+  "usecase": "student",
+  "version": "1.8.0",
+  "title": "Student",
+  "summary": "Your courses, assignments and grades.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "individual",
+  "tone": "plain and encouraging",
+  "signals": [
+    "student",
+    "students",
+    "study",
+    "studies",
+    "studying",
+    "homework",
+    "exam",
+    "exams",
+    "revision",
+    "revising",
+    "course",
+    "courses",
+    "coursework",
+    "class",
+    "classes",
+    "lecture",
+    "lectures",
+    "assignment",
+    "assignments",
+    "essay",
+    "essays",
+    "thesis",
+    "dissertation",
+    "degree",
+    "university",
+    "uni",
+    "college",
+    "school",
+    "semester",
+    "grades",
+    "phd",
+    "masters",
+    "undergraduate",
+    "a levels",
+    "gcse",
+    "gcses",
+    "teacher",
+    "teachers",
+    "tutor"
+  ],
+  "modules": [],
+  "voice": {
+    "home": "Today",
+    "right_now": "This week",
+    "needs_you": "Coming up",
+    "nothing_needs_you": "Nothing is due",
+    "since_away": "Since you last looked",
+    "lists": "My things",
+    "coming_up": "Due soon",
+    "overdue": "Late",
+    "nothing_now": "Nothing is due right now.",
+    "nothing_due": "Nothing is due in the next two weeks. A good time to get ahead.",
+    "fills_with": "What is due, what you are working on and how each piece of work went show up here as you add your courses.",
+    "record_empty": "Nothing here yet",
+    "no_questions": "Nothing to decide",
+    "inbox_clear": "Nothing new has come in",
+    "new_row": "Add",
+    "add_first": "Add the first one",
+    "pen_waits": "When there is a way to fit this to how you study, it waits here until you keep it or say no."
+  },
+  "labels": {
+    "courses": "Courses",
+    "courses:one": "course",
+    "assignments": "Assignments",
+    "assignments:one": "assignment",
+    "study_sessions": "Study sessions",
+    "study_sessions:one": "study session"
+  },
+  "pack": {
+    "pack": "usecase-student",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "register": "courses",
+        "name": "Courses",
+        "one": "course",
+        "icon": "doc",
+        "holds": "the courses you are taking, the term each runs in and who teaches it",
+        "title": "name",
+        "mobile": [
+          "name",
+          "term",
+          "teacher"
+        ],
+        "fields": [
+          {
+            "id": "name",
+            "label": "Course",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "term",
+            "label": "Term",
+            "type": "text",
+            "index": true
+          },
+          {
+            "id": "teacher",
+            "label": "Teacher",
+            "type": "text"
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "assignments",
+        "name": "Assignments",
+        "one": "assignment",
+        "icon": "task",
+        "holds": "every piece of work with its course, its due date and how it went",
+        "title": "what",
+        "mobile": [
+          "what",
+          "due",
+          "state"
+        ],
+        "state": "state",
+        "done": [
+          "handed_in",
+          "marked"
+        ],
+        "fields": [
+          {
+            "id": "what",
+            "label": "Assignment",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "state",
+            "label": "Status",
+            "type": "enum",
+            "values": [
+              "to_do",
+              "doing",
+              "handed_in",
+              "marked"
+            ],
+            "labels": {
+              "to_do": "To do",
+              "doing": "Doing",
+              "handed_in": "Handed in",
+              "marked": "Marked"
+            },
+            "default": "to_do",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "course",
+            "label": "Course",
+            "type": "ref",
+            "to": "courses",
+            "index": true,
+            "qualifies": "what"
+          },
+          {
+            "id": "due",
+            "label": "Due",
+            "type": "day",
+            "index": true,
+            "deadline": true,
+            "remind": [
+              "-2d",
+              "0d"
+            ]
+          },
+          {
+            "id": "grade",
+            "label": "Grade",
+            "type": "text"
+          },
+          {
+            "id": "mark",
+            "label": "Mark",
+            "type": "decimal",
+            "min": 0,
+            "max": 100
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "study_sessions",
+        "name": "Study sessions",
+        "one": "study session",
+        "icon": "calendar",
+        "holds": "the time you set aside to study, what for and how long",
+        "title": "what",
+        "mobile": [
+          "what",
+          "on",
+          "minutes"
+        ],
+        "fields": [
+          {
+            "id": "what",
+            "label": "Session",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "course",
+            "label": "Course",
+            "type": "ref",
+            "to": "courses",
+            "index": true,
+            "qualifies": "what"
+          },
+          {
+            "id": "on",
+            "label": "Day",
+            "type": "day",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "minutes",
+            "label": "Minutes",
+            "type": "int"
+          },
+          {
+            "id": "done",
+            "label": "Done",
+            "type": "bool",
+            "index": true
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "course_reads",
+        "name": "Reading list",
+        "one": "reading",
+        "icon": "doc",
+        "holds": "books, articles and papers to read, for a course or for yourself",
+        "title": "name",
+        "mobile": [
+          "name",
+          "state"
+        ],
+        "fields": [
+          {
+            "id": "name",
+            "label": "Title",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "by",
+            "label": "By",
+            "type": "text"
+          },
+          {
+            "id": "course",
+            "label": "Course",
+            "type": "ref",
+            "to": "courses",
+            "index": true
+          },
+          {
+            "id": "state",
+            "label": "Status",
+            "type": "enum",
+            "values": [
+              "queued",
+              "reading",
+              "finished"
+            ],
+            "labels": {
+              "queued": "Queued",
+              "reading": "Reading",
+              "finished": "Finished"
+            },
+            "default": "queued",
+            "index": true
+          },
+          {
+            "id": "thoughts",
+            "label": "A line on it",
+            "type": "text"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "metric": "homework-open",
+        "name": "Work to hand in",
+        "source": "register.assignments",
+        "where": "state is not handed_in or marked",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "homework-due-7d",
+        "name": "Due this week",
+        "source": "register.assignments",
+        "where": "state is not handed_in or marked, due before +8d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "homework-later",
+        "name": "Due after this week",
+        "source": "register.assignments",
+        "where": "state is not handed_in or marked, due after +7d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "study-held",
+        "name": "Study sessions",
+        "source": "register.study_sessions",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "study-done-12w",
+        "name": "Study done in twelve weeks",
+        "source": "register.study_sessions",
+        "where": "done is true, on after -84d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "courses-held",
+        "name": "Courses",
+        "source": "register.courses",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "page": "home-student",
+        "title": "Today",
+        "icon": "home",
+        "requires": [
+          "register.assignments",
+          "register.study_sessions"
+        ],
+        "blocks": [
+          {
+            "kind": "capture",
+            "heading": "Add homework",
+            "icon": "plus",
+            "span": 12,
+            "register": "assignments"
+          },
+          {
+            "kind": "timeline",
+            "heading": "Due this week",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "deadlines",
+            "horizon": 7,
+            "where": "list is assignments",
+            "columns": [
+              {
+                "field": "day"
+              },
+              {
+                "field": "title"
+              }
+            ],
+            "limit": 8,
+            "when": {
+              "metric": "homework-due-7d",
+              "gt": 0
+            },
+            "empty": "{{config:voice_nothing_needs_you}}"
+          },
+          {
+            "kind": "calendar",
+            "heading": "{{config:voice_right_now}}",
+            "icon": "calendar",
+            "span": 12,
+            "source": "register.study_sessions",
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "on"
+              }
+            ],
+            "back": 0,
+            "ahead": 0,
+            "when": {
+              "metric": "study-held",
+              "gt": 0
+            },
+            "empty": "No study time planned this week."
+          },
+          {
+            "kind": "heat",
+            "heading": "Study done",
+            "icon": "activity",
+            "span": 12,
+            "source": "register.study_sessions",
+            "where": "done is true, on after -84d",
+            "columns": [
+              {
+                "field": "on"
+              },
+              {
+                "field": "minutes"
+              }
+            ],
+            "when": {
+              "metric": "study-done-12w",
+              "gt": 0
+            },
+            "empty": "No study done yet. Tick a session done and it shows here."
+          },
+          {
+            "kind": "table",
+            "heading": "{{config:voice_needs_you}}",
+            "icon": "calendar-range",
+            "span": 12,
+            "source": "register.assignments",
+            "where": "state is not handed_in or marked, due after +7d",
+            "when": {
+              "metric": "homework-later",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "what",
+                "label": "Assignment",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "course",
+                "label": "Course",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "due",
+                "label": "Due",
+                "width": "14ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "due",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "Nothing due after this week yet."
+          }
+        ]
+      },
+      {
+        "page": "studies",
+        "title": "Studies",
+        "nav": {
+          "section": "Studies",
+          "order": 10,
+          "place": 20
+        },
+        "icon": "board",
+        "requires": [
+          "register.assignments",
+          "register.courses",
+          "register.study_sessions"
+        ],
+        "blocks": [
+          {
+            "kind": "capture",
+            "heading": "Add a piece of work",
+            "icon": "plus",
+            "span": 12,
+            "register": "assignments"
+          },
+          {
+            "kind": "capture",
+            "heading": "Add a course",
+            "icon": "graduation-cap",
+            "span": 12,
+            "register": "courses",
+            "when": {
+              "metric": "courses-held",
+              "lt": 1
+            }
+          },
+          {
+            "kind": "board",
+            "heading": "By status",
+            "icon": "board",
+            "span": 12,
+            "source": "register.assignments",
+            "columns": [
+              {
+                "field": "state"
+              },
+              {
+                "field": "what"
+              },
+              {
+                "field": "due"
+              }
+            ],
+            "empty": "No assignments yet."
+          },
+          {
+            "kind": "table",
+            "heading": "Study sessions",
+            "icon": "clock",
+            "span": 12,
+            "when": {
+              "metric": "study-held",
+              "gt": 0
+            },
+            "source": "register.study_sessions",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Session",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "course",
+                "label": "Course",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "minutes",
+                "label": "Minutes",
+                "width": "10ch",
+                "align": "end"
+              },
+              {
+                "field": "on",
+                "label": "Day",
+                "width": "14ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "on",
+                "dir": "desc"
+              }
+            ],
+            "limit": 20,
+            "empty": "No study sessions yet."
+          },
+          {
+            "kind": "table",
+            "heading": "Courses",
+            "icon": "graduation-cap",
+            "span": 12,
+            "source": "register.courses",
+            "columns": [
+              {
+                "field": "name",
+                "label": "Course",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "term",
+                "label": "Term",
+                "width": "16ch"
+              },
+              {
+                "field": "teacher",
+                "label": "Teacher",
+                "width": "minmax(10ch,20ch)"
+              }
+            ],
+            "empty": "No courses yet."
+          }
+        ]
+      }
+    ]
+  },
+  "skills": [
+    {
+      "name": "study-planner",
+      "trigger": "when an assignment is added or its due date moves, to plan the days before it"
+    }
+  ],
+  "nav": [],
+  "links": [],
+  "over": {}
+}

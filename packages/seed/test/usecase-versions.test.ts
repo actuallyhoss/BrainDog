@@ -1366,6 +1366,35 @@ const DECLARED: Record<string, Version> = {
     declares: '90f2f87ea4c23171',
     history: ["`page.home-personal`'s Bring your money in says Find a plugin for your bank, where it said add-on -> 90f2f87ea4c23171"],
   },
+  'personal@2.12.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson
+      hands.metric.budgets-set.money-core metric.goal-log-held metric.goals-active metric.goals-held
+      metric.habits-active metric.logged-by-goal metric.logged-this-week-by-goal metric.put-by-by-goal
+      metric.put-by-held metric.saved-toward-goals metric.savings-active metric.savings-held metric.steps-done
+      metric.steps-left page.goals page.home-personal page.my-project register.goal_log register.goals
+      register.project_steps register.put_by register.savings_goals setting.holds_obligations setting.holds_people
+      setting.holds_things setting.label_accounts setting.label_books setting.label_categories
+      setting.label_goal_log setting.label_goals setting.label_installments setting.label_obligations
+      setting.label_people setting.label_people__role__accountant setting.label_people__role__client
+      setting.label_people__role__collaborator setting.label_people__role__contractor setting.label_project_steps
+      setting.label_put_by setting.label_recurring setting.label_savings_goals setting.label_things
+      setting.label_things__lane__building setting.label_things__lane__earning setting.label_things__lane__parked
+      setting.label_things__lane__retired setting.label_things__revenue setting.label_transactions
+      setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906 setting.lk_666e92eb
+      setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1 setting.one_accounts setting.one_books
+      setting.one_categories setting.one_goal_log setting.one_goals setting.one_installments
+      setting.one_obligations setting.one_people setting.one_project_steps setting.one_put_by
+      setting.one_recurring setting.one_savings_goals setting.one_things setting.one_transactions
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue
+      setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'd0f54b766a364c2a',
+    history: ["`page.goals` no longer opens on a line counting goals and habits (no briefs, 3 Nov); three blocks taken away, no id added or taken away -> d0f54b766a364c2a"],
+  },
   'founder@1.15.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard
@@ -1990,6 +2019,29 @@ const DECLARED: Record<string, Version> = {
     declares: 'c9d5eb8bd0af5a15',
     history: ["`page.home-founder`'s Bring your numbers in says Plugins that read a live number for you, where it said add-on -> c9d5eb8bd0af5a15"],
   },
+  'founder@3.10.0': {
+    holds: `
+      adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
+      adds.page.relation.6 adds.page.someone.7 extends.register.datapoints.about_service
+      extends.register.datapoints.organisation hands.register.datapoints.portfolio
+      hands.register.organisations.people metric.datapoints-30d metric.datapoints-7d metric.datapoints-age
+      metric.datapoints-held metric.datapoints-reported metric.due-this-week metric.lapsing-30d metric.late-money
+      metric.organisations-held metric.project-numbers-7d metric.projects-earning-silent metric.service-numbers
+      page.dashboard page.home-founder page.project setting.label_accounts setting.label_books
+      setting.label_categories setting.label_installments setting.label_obligations setting.label_people
+      setting.label_recurring setting.label_services setting.label_tasks setting.label_things setting.label_tracks
+      setting.label_transactions setting.label_updates setting.one_accounts setting.one_books
+      setting.one_categories setting.one_installments setting.one_obligations setting.one_people
+      setting.one_recurring setting.one_services setting.one_tasks setting.one_things setting.one_tracks
+      setting.one_transactions setting.one_updates setting.shared_version setting.speaks setting.voice_coming_up
+      setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists
+      setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now
+      setting.voice_nothing_waiting setting.voice_overdue setting.voice_pen_waits setting.voice_right_now
+      setting.voice_since_away setting.voice_working_now
+    `,
+    declares: 'dabcb595c49a7730',
+    history: ["`page.dashboard` no longer opens on how many numbers came in thirty days, and `page.home-founder` no longer counts the agents at work (no briefs, 3 Nov); two blocks taken away, no id added or taken away -> dabcb595c49a7730"],
+  },
   'founder@3.7.1': {
     holds: `
       adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
@@ -2484,6 +2536,14 @@ const DECLARED: Record<string, Version> = {
     declares: 'b4eb9cf32455cdd4',
     history: ['A streamer or a creator paid by sponsors is heard as a small business, so `page.home-business` is what they open on; signals only, no id added or taken away -> b4eb9cf32455cdd4'],
   },
+  'business@1.8.0': {
+    holds: `
+      page.home-business setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with
+      setting.voice_nothing_due
+    `,
+    declares: '2a2cf1d91e7de6ed',
+    history: ["`page.home-business` no longer opens on how many questions need your call, which Needs your call lists (no briefs, 3 Nov); a block taken away, no id added or taken away -> 2a2cf1d91e7de6ed"],
+  },
   'shop@1.0.0': {
     holds: `
       metric.orders-30d metric.orders-due-7d metric.orders-owed page.orders register.orders register.products setting.label_orders
@@ -2570,6 +2630,17 @@ const DECLARED: Record<string, Version> = {
     declares: '828ad70641a0adce',
     history: ['`page.products` is added with `metric.products-held` and `metric.products-low` (audit 31 Oct h, AH4): Products has a page and a place on the rail from the first minute, opening on a box to add one; three ids added and none taken away -> 828ad70641a0adce'],
   },
+  'shop@1.6.0': {
+    holds: `
+      metric.orders-30d metric.orders-due-7d metric.orders-late metric.orders-owed metric.orders-owed-named
+      metric.orders-owed-other metric.products-held metric.products-low page.orders page.products register.orders
+      register.products setting.label_orders setting.label_people setting.label_products setting.one_orders
+      setting.one_people setting.one_products setting.shared_version setting.speaks setting.voice_coming_up
+      setting.voice_fills_with setting.voice_nothing_due
+    `,
+    declares: '6ca58a22141bf3d4',
+    history: ["Products no longer opens on a count of products and how many run low (no briefs, 3 Nov); a block taken away, no id added or taken away -> 6ca58a22141bf3d4"],
+  },
   'guide@1.7.0': {
     holds: `
       metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached metric.guide-milestones metric.guide-milestones-reached metric.guide-milestones-underway metric.guide-resources metric.guide-steps-agents metric.guide-steps-blocked metric.guide-steps-done metric.guide-steps-done-7d metric.guide-steps-done-by-week metric.guide-steps-open metric.milestone-choices metric.milestone-resources metric.milestone-steps page.guide page.home-guide page.milestone register.choices register.milestones register.resources register.steps rule.guide_milestone_open rule.guide_milestone_passed setting.label_choices setting.label_milestones setting.label_resources setting.label_steps setting.one_choices setting.one_milestones setting.one_resources setting.one_steps setting.shared_version setting.speaks setting.start_next_milestone setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_lists setting.voice_needs_you setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits setting.voice_record_empty setting.voice_right_now setting.voice_since_away
@@ -2584,6 +2655,25 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '8719fe1699ace09b',
     history: ["The card's summary is one short line, a word outside the pack; `page.home-guide` and every other declaration are 1.7.0's word for word -> 8719fe1699ace09b"],
+  },
+  'guide@1.8.0': {
+    holds: `
+      metric.guide-choices-made metric.guide-choices-open metric.guide-idea-left metric.guide-idea-reached
+      metric.guide-milestones metric.guide-milestones-reached metric.guide-milestones-underway
+      metric.guide-resources metric.guide-steps-agents metric.guide-steps-blocked metric.guide-steps-done
+      metric.guide-steps-done-7d metric.guide-steps-done-by-week metric.guide-steps-open metric.milestone-choices
+      metric.milestone-resources metric.milestone-steps page.guide page.home-guide page.milestone register.choices
+      register.milestones register.resources register.steps rule.guide_milestone_open rule.guide_milestone_passed
+      setting.label_choices setting.label_milestones setting.label_resources setting.label_steps
+      setting.one_choices setting.one_milestones setting.one_resources setting.one_steps setting.shared_version
+      setting.speaks setting.start_next_milestone setting.voice_add_first setting.voice_coming_up
+      setting.voice_fills_with setting.voice_home setting.voice_lists setting.voice_needs_you
+      setting.voice_new_row setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you
+      setting.voice_nothing_now setting.voice_overdue setting.voice_pen_waits setting.voice_record_empty
+      setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '65ca41a6f13bae20',
+    history: ["`page.home-guide` and the Guide no longer open on a line counting milestones, steps and choices (no briefs, 3 Nov); two blocks taken away, no id added or taken away -> 65ca41a6f13bae20"],
   },
   'student@1.6.0': {
     holds: `
@@ -2621,6 +2711,21 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'c6e495cbc76c73cc',
     history: ['`page.studies` takes its place on the rail and opens on boxes to add a piece of work and a course (audit 31 Oct h, AH4); no id added or taken away -> c6e495cbc76c73cc'],
+  },
+  'student@1.8.0': {
+    holds: `
+      metric.courses-held metric.homework-due-7d metric.homework-later metric.homework-open metric.study-done-12w
+      metric.study-held page.home-student page.studies register.assignments register.course_reads register.courses
+      register.study_sessions setting.label_assignments setting.label_course_reads setting.label_courses
+      setting.label_study_sessions setting.one_assignments setting.one_course_reads setting.one_courses
+      setting.one_study_sessions setting.shared_version setting.speaks setting.voice_add_first
+      setting.voice_coming_up setting.voice_fills_with setting.voice_home setting.voice_inbox_clear
+      setting.voice_lists setting.voice_needs_you setting.voice_new_row setting.voice_no_questions
+      setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue
+      setting.voice_pen_waits setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: 'd7345d7187706f5d',
+    history: ["`page.home-student` and the Studies page no longer open on a line counting work and courses (no briefs, 3 Nov); two blocks taken away, no id added or taken away -> d7345d7187706f5d"],
   },
   'team@2.29.0': {
     holds: `
@@ -2763,6 +2868,27 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '74ac808ecb502c71',
     history: ['`page.cycles` draws its own glyph, where it drew the three lines the phone bar\'s Menu draws (audit 31 Oct o, AO14); the look only, no id added or taken away -> 74ac808ecb502c71'],
+  },
+  'team@2.31.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles rule.cycle_day_each_morning
+      rule.ticket_done_ticks_plan rule.ticket_reopened_unticks_plan script.cycle_day script.plan_follows_ticket
+      setting.holds_people setting.holds_tasks setting.label_cycle_days setting.label_cycle_plan
+      setting.label_cycles setting.label_people setting.label_people__role__collaborator setting.label_tasks
+      setting.label_tasks__state__backlog setting.label_tasks__state__doing setting.label_tasks__state__open
+      setting.label_tasks__state__review setting.label_things setting.label_tracks setting.label_updates
+      setting.one_cycle_days setting.one_cycle_plan setting.one_cycles setting.one_people setting.one_tasks
+      setting.one_things setting.one_tracks setting.one_updates setting.shared_version setting.speaks
+      setting.voice_add_first setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '34ceb0044973d7e5',
+    history: ["Team's Home, Sprints and Agent work no longer open on a line counting tickets (no briefs, 3 Nov); three blocks taken away, no id added or taken away -> 34ceb0044973d7e5"],
   },
 };
 

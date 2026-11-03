@@ -23,6 +23,7 @@ const SUMMARY = 'Its card says what it is for in one short line. Nothing in your
 
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
   personal: [
+    { version: '2.12.0', notes: 'Goals no longer opens on a line counting your goals and habits, since the lists under it show them. Nothing you hold changes.' },
     { version: '2.11.1', notes: 'Bring your money in says plugin, as the app now calls them. Nothing you hold changes.' },
     { version: '2.10.0', notes: 'Goals says only the counts you have: "1 goal on the go", not "and 0 habits". Nothing you hold changes.' },
     { version: '2.9.1', notes: 'The Log is called Progress and Put by is called Money saved. Nothing you hold changes.' },
@@ -36,6 +37,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '2.3.1', notes: NAMED('Ledger') },
   ],
   student: [
+    { version: '1.8.0', notes: 'Home and Studies no longer open on a line counting your work and courses, since the lists under them show them. Nothing you hold changes.' },
     { version: '1.7.0', notes: 'Studies is in your sidebar from the start, and opens on boxes to add a piece of work and a course. Nothing you hold changes.' },
     { version: '1.6.2', notes: 'Home calls your study by day Study done. It counts no streak. Nothing you hold changes.' },
     { version: '1.6.1', notes: SUMMARY },
@@ -43,6 +45,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.5.1', notes: NAMED('Courses') },
   ],
   founder: [
+    { version: '3.10.0', notes: 'The Dashboard no longer opens on how many numbers came in, and Home no longer counts the agents at work over the list of them. Nothing you hold changes.' },
     { version: '3.9.3', notes: 'Bring your numbers in says plugins, as the app now calls them. Nothing you hold changes.' },
     { version: '3.9.2', notes: 'The Dashboard says where a project sends its numbers in a plain sentence: to its own address, shown on its page.' },
     { version: '3.9.1', notes: 'The Dashboard comes after Agents in your sidebar, so nothing already there moves. When the sidebar is full, it is under More.' },
@@ -94,6 +97,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   team: [
+    { version: '2.31.0', notes: 'Team, Sprints and Agent work no longer open on a line counting tickets, since the lists under them show them. Nothing you hold changes.' },
     { version: '2.30.5', notes: 'Sprints has its own icon, so it no longer looks like Menu on a phone. Nothing you hold changes.' },
     { version: '2.30.4', notes: 'Teammates is called People, as your sidebar and Today say it. Nothing you hold changes.' },
     { version: '2.30.3', notes: 'Open each morning is called Sprint days. Nothing you hold changes.' },
@@ -137,11 +141,13 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   guide: [
+    { version: '1.8.0', notes: 'Your project and the Guide no longer open on a line counting milestones, steps and choices, since the path and lists under it show them. Nothing you hold changes.' },
     { version: '1.7.1', notes: SUMMARY },
     { version: '1.7.0', notes: 'Starting a project is part of the New project guide now: a step can say why it is worth doing.' },
     { version: '1.6.1', notes: NAMED('Steps') },
   ],
   shop: [
+    { version: '1.6.0', notes: 'Products no longer opens on a count of your products, since the table shows each one and how many are left. Nothing you hold changes.' },
     { version: '1.5.0', notes: 'Products has a page of its own in your sidebar, beside Orders, with a box to add a product. Nothing you hold changes.' },
     { version: '1.4.1', notes: SUMMARY },
     { version: '1.4.0', notes: 'The Orders page opens on a box to add an order, so a new shop has something to press on its first tab.' },
@@ -157,6 +163,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.0.0', notes: 'The first version: Orders and Products, and an Orders page that says the month\'s orders, what ships this week and who still owes you.' },
   ],
   business: [
+    { version: '1.8.0', notes: 'Today no longer opens on how many questions need your call, since the list of them is on the page. Nothing you hold changes.' },
     { version: '1.7.2', notes: SUMMARY },
     { version: '1.7.1', notes: 'Home is called Today on the page too, as it already was in the menu. It says what stopped reporting: Gone quiet lists what this record was taking and no longer is, with the day each was last seen.' },
     {

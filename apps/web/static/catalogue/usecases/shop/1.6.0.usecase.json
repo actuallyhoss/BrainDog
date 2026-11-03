@@ -1,0 +1,579 @@
+{
+  "usecase": "shop",
+  "version": "1.6.0",
+  "title": "Shop",
+  "summary": "Your orders, products and what is paid.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "individual",
+  "tone": "plain, the house voice",
+  "signals": [
+    "shop",
+    "store",
+    "sell",
+    "selling",
+    "orders",
+    "products",
+    "stock",
+    "handmade",
+    "market stall",
+    "stall",
+    "my shop",
+    "online shop"
+  ],
+  "modules": [
+    "people"
+  ],
+  "voice": {
+    "coming_up": "Due soon",
+    "nothing_due": "No order is due in the next two weeks.",
+    "fills_with": "The orders due this week and the money still to come in show up here as you add your orders."
+  },
+  "labels": {
+    "orders": "Orders",
+    "orders:one": "order",
+    "products": "Products",
+    "products:one": "product"
+  },
+  "pack": {
+    "pack": "usecase-shop",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "register": "orders",
+        "name": "Orders",
+        "one": "order",
+        "icon": "task",
+        "holds": "every order with who it is for, what and how many, the day it is due, what it comes to and what was paid",
+        "title": "what",
+        "mobile": [
+          "what",
+          "who",
+          "due"
+        ],
+        "state": "state",
+        "done": [
+          "paid"
+        ],
+        "fields": [
+          {
+            "id": "who",
+            "label": "Who",
+            "type": "ref",
+            "to": "people",
+            "index": true,
+            "qualifies": "what"
+          },
+          {
+            "id": "what",
+            "label": "What",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "how_many",
+            "label": "How many",
+            "type": "int"
+          },
+          {
+            "id": "due",
+            "label": "Due",
+            "type": "day",
+            "index": true,
+            "deadline": true,
+            "remind": [
+              "-1d",
+              "0d"
+            ]
+          },
+          {
+            "id": "total",
+            "label": "Total",
+            "type": "money"
+          },
+          {
+            "id": "paid",
+            "label": "Paid",
+            "type": "money"
+          },
+          {
+            "id": "state",
+            "label": "Status",
+            "type": "enum",
+            "values": [
+              "new",
+              "ready",
+              "sent",
+              "paid"
+            ],
+            "labels": {
+              "new": "New",
+              "ready": "Ready",
+              "sent": "Sent",
+              "paid": "Paid"
+            },
+            "default": "new",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "products",
+        "name": "Products",
+        "one": "product",
+        "icon": "doc",
+        "holds": "the things you sell, their price and how many are left",
+        "title": "name",
+        "mobile": [
+          "name",
+          "price",
+          "left"
+        ],
+        "fields": [
+          {
+            "id": "name",
+            "label": "Product",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "price",
+            "label": "Price",
+            "type": "money"
+          },
+          {
+            "id": "left",
+            "label": "How many left",
+            "type": "int"
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "metric": "orders-30d",
+        "name": "Orders in the last 30 days",
+        "source": "register.orders",
+        "where": "created_at after -30d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "orders-due-7d",
+        "name": "Orders due this week",
+        "source": "register.orders",
+        "where": "state is new or ready, due after -1d, due before +8d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "orders-late",
+        "name": "Orders late",
+        "source": "register.orders",
+        "where": "state is new or ready, due before today",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "orders-owed",
+        "name": "Orders not paid in full",
+        "source": "register.orders",
+        "where": "state is not paid, total is set",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "products-held",
+        "name": "Products",
+        "source": "register.products",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "products-low",
+        "name": "Products with three or fewer left",
+        "source": "register.products",
+        "where": "left at most 3",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "orders-owed-named",
+        "name": "Orders nothing was paid on, with a name and a day",
+        "source": "register.orders",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none",
+        "where": {
+          "all": [
+            {
+              "field": "state",
+              "not": "paid"
+            },
+            {
+              "field": "total",
+              "present": true
+            },
+            {
+              "field": "paid",
+              "empty": true
+            },
+            {
+              "field": "who",
+              "present": true
+            },
+            {
+              "field": "due",
+              "present": true
+            }
+          ]
+        }
+      },
+      {
+        "metric": "orders-owed-other",
+        "name": "Other orders not paid in full",
+        "source": "register.orders",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none",
+        "where": {
+          "all": [
+            {
+              "field": "state",
+              "not": "paid"
+            },
+            {
+              "field": "total",
+              "present": true
+            },
+            {
+              "any": [
+                {
+                  "field": "paid",
+                  "present": true
+                },
+                {
+                  "field": "who",
+                  "empty": true
+                },
+                {
+                  "field": "due",
+                  "empty": true
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "page": "orders",
+        "title": "Orders",
+        "nav": {
+          "section": "Orders",
+          "order": 10,
+          "place": 20
+        },
+        "icon": "board",
+        "requires": [
+          "register.orders"
+        ],
+        "blocks": [
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "body": "{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, {{orders-late}} late, {{orders-owed-other}} not paid in full, and {{orders-owed-named.first_who}} still owes {{orders-owed-named.first_total}}, with {{orders-owed-named.more}} more order(s) not paid at all"
+          },
+          {
+            "kind": "capture",
+            "heading": "Add an order",
+            "icon": "plus",
+            "span": 12,
+            "register": "orders"
+          },
+          {
+            "kind": "table",
+            "heading": "Late",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "register.orders",
+            "where": "state is new or ready, due before today",
+            "when": {
+              "metric": "orders-late",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "what",
+                "label": "Order",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "who",
+                "label": "Who",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "how_many",
+                "label": "How many",
+                "width": "10ch",
+                "align": "end"
+              },
+              {
+                "field": "due",
+                "label": "Due",
+                "width": "14ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "due",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "No order is late."
+          },
+          {
+            "kind": "table",
+            "heading": "Due this week",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "register.orders",
+            "where": "state is new or ready, due after -1d, due before +8d",
+            "when": {
+              "metric": "orders-due-7d",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "what",
+                "label": "Order",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "who",
+                "label": "Who",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "how_many",
+                "label": "How many",
+                "width": "10ch",
+                "align": "end"
+              },
+              {
+                "field": "due",
+                "label": "Due",
+                "width": "14ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "due",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "No order is due this week."
+          },
+          {
+            "kind": "table",
+            "heading": "Still to come in",
+            "icon": "wallet",
+            "span": 12,
+            "source": "register.orders",
+            "where": "state is not paid, total is set",
+            "when": {
+              "metric": "orders-owed",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "who",
+                "label": "Who",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "what",
+                "label": "Order",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "total",
+                "label": "Total",
+                "width": "14ch",
+                "align": "end"
+              },
+              {
+                "field": "paid",
+                "label": "Paid",
+                "width": "14ch",
+                "align": "end"
+              },
+              {
+                "field": "due",
+                "label": "Due",
+                "width": "14ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "due",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "Every order is paid in full."
+          }
+        ]
+      },
+      {
+        "page": "products",
+        "title": "Products",
+        "nav": {
+          "section": "Products",
+          "order": 10,
+          "place": 25
+        },
+        "icon": "doc",
+        "requires": [
+          "register.products"
+        ],
+        "blocks": [
+          {
+            "kind": "capture",
+            "heading": "Add a product",
+            "icon": "plus",
+            "span": 12,
+            "register": "products"
+          },
+          {
+            "kind": "table",
+            "heading": "Products",
+            "icon": "doc",
+            "span": 12,
+            "source": "register.products",
+            "when": {
+              "metric": "products-held",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "name",
+                "label": "Product",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "price",
+                "label": "Price",
+                "width": "14ch",
+                "align": "end"
+              },
+              {
+                "field": "left",
+                "label": "How many left",
+                "width": "14ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "name",
+                "dir": "asc"
+              }
+            ],
+            "limit": 50,
+            "empty": "No products yet."
+          }
+        ]
+      }
+    ]
+  },
+  "skills": [],
+  "nav": [],
+  "links": [],
+  "over": {}
+}

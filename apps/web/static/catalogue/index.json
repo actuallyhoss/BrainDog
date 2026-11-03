@@ -9832,8 +9832,26 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.7.3",
+      "latest": "1.8.0",
       "versions": [
+        {
+          "version": "1.8.0",
+          "checksum": "b0866b8be841280d07fcc8d2e8ef722b72a931a5425ee7e5b6902cdaccb15cb6",
+          "bytes": 4447,
+          "published_at": "2026-11-03T21:07:32.700Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.7.3",
           "checksum": "0b2e1a00ccb16431b2a83187669d51056f640bae46ca3e2f2276f36d80f26824",
@@ -9941,8 +9959,37 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "founder",
-      "latest": "3.9.3",
+      "latest": "3.10.0",
       "versions": [
+        {
+          "version": "3.10.0",
+          "checksum": "1b3cbe23b2de7cecb7d764adea7b1e71895c953e619aaef8c02869805e52dde3",
+          "bytes": 45490,
+          "published_at": "2026-11-03T21:07:32.700Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core",
+              "estate",
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Founder overview",
+              "Dashboard",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "datapoint-reporter",
+              "poll-setup"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "3.9.3",
           "checksum": "ee7df48e0cd5b13aa44c20571bc925a18c6d5076cba0ae17606a248d948246b5",
@@ -10502,8 +10549,40 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "starter",
-      "latest": "1.7.1",
+      "latest": "1.8.0",
       "versions": [
+        {
+          "version": "1.8.0",
+          "checksum": "753187316e7abb9ef0040b4c9b97d16b1d7fada13ed8bec2d5637507f4ab60e6",
+          "bytes": 37316,
+          "published_at": "2026-11-03T21:07:32.700Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Milestones",
+              "Choices",
+              "Resources",
+              "Steps"
+            ],
+            "pages": [
+              "Your project",
+              "Guide",
+              "{{what}}"
+            ],
+            "rules": [
+              "Mark a milestone passed on the path once it is reached",
+              "Take a milestone off the path as passed when it is moved back"
+            ],
+            "examples": 0,
+            "skills": [
+              "project-coach",
+              "step-taker",
+              "choice-recorder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.7.1",
           "checksum": "67f41891afdbfe0d64467a6b7130e4932f18fdb77656af3286cde7f25d79c316",
@@ -10784,8 +10863,40 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "2.11.1",
+      "latest": "2.12.0",
       "versions": [
+        {
+          "version": "2.12.0",
+          "checksum": "5a85104f30d28d240888a4a58601b0108c5b7c60da56eabfe22e3d3b7278e31b",
+          "bytes": 32354,
+          "published_at": "2026-11-03T21:07:32.700Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core"
+            ],
+            "lists": [
+              "Savings goals",
+              "Goals",
+              "Progress",
+              "Money saved",
+              "Project steps"
+            ],
+            "pages": [
+              "Day to day",
+              "Goals",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "bill-reminder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.11.1",
           "checksum": "5f245de5ff96560b79dcee362be0895feaf193f5be4125a7892da93b06105f98",
@@ -11308,8 +11419,32 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.5.0",
+      "latest": "1.6.0",
       "versions": [
+        {
+          "version": "1.6.0",
+          "checksum": "49fdf3075df52a9033eb8bb0571e215677396e3a2df857c29ddef8b2f20dab2b",
+          "bytes": 14113,
+          "published_at": "2026-11-03T21:07:32.700Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Orders",
+              "Products"
+            ],
+            "pages": [
+              "Orders",
+              "Products"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.5.0",
           "checksum": "bc88f09347b70b35aed8010706f99a38f01b0d6f865731e96bd373f87653d65d",
@@ -11462,8 +11597,34 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.7.0",
+      "latest": "1.8.0",
       "versions": [
+        {
+          "version": "1.8.0",
+          "checksum": "76d479b757791a1e31519f25ef1e7c0d62ed03e1c1a5f3e6dec1088d5540329e",
+          "bytes": 16660,
+          "published_at": "2026-11-03T21:07:32.700Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Study sessions",
+              "Reading list"
+            ],
+            "pages": [
+              "Today",
+              "Studies"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "study-planner"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "1.7.0",
           "checksum": "74a6b579914a7906bedcb6fe99f62d1f45e4573e332ce98971887e17d120cfdc",
@@ -11715,8 +11876,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "2.30.5",
+      "latest": "2.31.0",
       "versions": [
+        {
+          "version": "2.31.0",
+          "checksum": "690eb492cd350de24dd4971dc04be8c935da7606b5f49920c43031c90469110e",
+          "bytes": 37110,
+          "published_at": "2026-11-03T21:07:32.700Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Sprints",
+              "Sprint plan",
+              "Sprint days"
+            ],
+            "pages": [
+              "Team",
+              "Sprints",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [
+              "ticket_done_ticks_plan",
+              "ticket_reopened_unticks_plan",
+              "cycle_day_each_morning"
+            ],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.30.5",
           "checksum": "e04c14ec3353ffb6f4b9109466fc35f687dfbb98004ea66fec20a1a725763eba",

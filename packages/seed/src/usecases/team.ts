@@ -270,8 +270,10 @@ export const TEAM = {
      list was Teammates and sat apart under More lists; a team keeps clients and people it met there too. The setting
      stays. Words only, so a patch step; 2.30.3 is published.
      2.30.5 (audit 31 Oct o, AO14): Sprints draws its own glyph, where it drew Menu's three lines on the phone bar. The
-     look only, so a patch step; 2.30.4 is published. */
-  version: '2.30.5',
+     look only, so a patch step; 2.30.4 is published.
+     2.31.0 (no briefs, 3 Nov): Team, Sprints and Agent work no longer open on a line counting tickets, which the lists and
+     boards under them show. Three blocks taken away and none added, so a minor step; 2.30.5 is published. */
+  version: '2.31.0',
   title: 'Team board',
   summary: 'Tickets, sprints and the agents on them.',
   author: 'BrainDog',
@@ -423,13 +425,6 @@ export const TEAM = {
         icon: 'home',
         requires: ['register.tasks', 'register.cycle_plan', 'register.cycle_days'],
         blocks: [
-          {
-            /* THE PAGE'S ONE LINE, SINCE 2.10.0: how much is open, what is stuck and what the agents suggest. */
-            kind: 'note',
-            lead: true,
-            span: 12,
-            body: '{{open-tasks}} open ticket(s), {{tickets-blocked}} blocked, {{questions-open}} suggestion(s) from agents',
-          },
           {
             /* WHAT STOPPED REPORTING, STRAIGHT UNDER THE LINE, INSIDE 2.21.0 (batch 88): the table a founder's Home draws
                since 2.6.0 and the browser draws on the Today it builds, word for word, over the record's own read of
@@ -583,13 +578,6 @@ export const TEAM = {
         icon: 'refresh',
         requires: ['register.tasks', 'register.cycles', 'register.cycle_plan'],
         blocks: [
-          {
-            /* THE PAGE'S ONE LINE, SINCE 2.10.0. */
-            kind: 'note',
-            lead: true,
-            span: 12,
-            body: '{{tickets-planned}} ticket(s) planned into sprints, {{tickets-blocked}} blocked',
-          },
           /* A BOX TO ADD A CYCLE, SINCE 2.30.0 (AH4). */
           { kind: 'capture', heading: 'Add a sprint', icon: 'plus', span: 12, register: 'cycles' },
           {
@@ -655,13 +643,6 @@ export const TEAM = {
         icon: 'session',
         requires: ['register.tasks'],
         blocks: [
-          {
-            /* THE PAGE'S ONE LINE, SINCE 2.10.0. */
-            kind: 'note',
-            lead: true,
-            span: 12,
-            body: '{{tickets-taken}} ticket(s) with an agent, {{tickets-done-by-agents}} finished by agents',
-          },
           {
             /* THE RUNS THE RECORD KNOWS ARE GOING (2.6.0), each with the agent's face and what it says it is doing, read
                from `sessions.live` as Home's own runs are. This page listed the `session` list by hand, and drew an

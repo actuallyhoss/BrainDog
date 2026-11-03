@@ -1,0 +1,1449 @@
+{
+  "usecase": "guide",
+  "version": "1.8.0",
+  "title": "New project guide",
+  "summary": "Milestones and next steps for a new project.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "starter",
+  "tone": "patient, one step at a time",
+  "signals": [
+    "new project",
+    "a new project",
+    "start a",
+    "starting a",
+    "start something",
+    "starting something",
+    "something new",
+    "get started",
+    "getting started",
+    "where to begin",
+    "where to start",
+    "don't know where",
+    "from scratch",
+    "first time",
+    "beginner",
+    "guide",
+    "step by step",
+    "checklist",
+    "milestones",
+    "an idea",
+    "my idea",
+    "podcast",
+    "youtube channel",
+    "newsletter",
+    "blog",
+    "book",
+    "novel",
+    "album",
+    "band",
+    "charity",
+    "event",
+    "community",
+    "course of my own",
+    "passion project"
+  ],
+  "modules": [],
+  "voice": {
+    "home": "Your project",
+    "right_now": "Where you are",
+    "needs_you": "Waiting on you",
+    "nothing_needs_you": "Nothing is waiting on you",
+    "since_away": "What you have done so far",
+    "lists": "Your notes",
+    "coming_up": "Next steps",
+    "overdue": "Running late",
+    "nothing_now": "Nothing is waiting on you. Take the next step when you are ready.",
+    "nothing_due": "No step has a day in the next two weeks.",
+    "fills_with": "Your milestones, the next step and what you have done so far show up here as your project takes shape.",
+    "record_empty": "Your project starts here",
+    "no_questions": "Nothing to decide yet",
+    "new_row": "Add",
+    "add_first": "Write the first one",
+    "pen_waits": "When there is a way to help this project along, it waits here until you keep it or say no."
+  },
+  "labels": {
+    "milestones": "Milestones",
+    "steps": "Steps",
+    "choices": "Choices",
+    "resources": "Resources"
+  },
+  "pack": {
+    "pack": "usecase-guide",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "register": "milestones",
+        "name": "Milestones",
+        "one": "milestone",
+        "icon": "star",
+        "holds": "the points your project passes on the way, from an idea to something people use",
+        "title": "what",
+        "steps": {
+          "of": "after",
+          "done": "passed",
+          "order": "order"
+        },
+        "mobile": [
+          "what",
+          "stage",
+          "state"
+        ],
+        "state": "state",
+        "done": [
+          "reached"
+        ],
+        "finished": "reached_on",
+        "fields": [
+          {
+            "id": "what",
+            "label": "Milestone",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "stage",
+            "label": "Stage",
+            "type": "enum",
+            "values": [
+              "idea",
+              "plan",
+              "build",
+              "launch",
+              "grow"
+            ],
+            "labels": {
+              "idea": "Idea",
+              "plan": "Plan",
+              "build": "Build",
+              "launch": "Launch",
+              "grow": "Grow"
+            },
+            "index": true
+          },
+          {
+            "id": "state",
+            "label": "Status",
+            "type": "enum",
+            "values": [
+              "not_started",
+              "underway",
+              "reached"
+            ],
+            "labels": {
+              "not_started": "Not started",
+              "underway": "Underway",
+              "reached": "Reached"
+            },
+            "default": "not_started",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "order",
+            "label": "Order",
+            "type": "int",
+            "index": true
+          },
+          {
+            "id": "target",
+            "label": "Aim for",
+            "type": "day",
+            "index": true
+          },
+          {
+            "id": "reached_on",
+            "label": "Reached on",
+            "type": "day",
+            "index": true
+          },
+          {
+            "id": "passed",
+            "label": "Passed",
+            "type": "bool",
+            "default": false,
+            "index": true
+          },
+          {
+            "id": "after",
+            "label": "Comes after",
+            "type": "ref",
+            "to": "milestones",
+            "index": true
+          },
+          {
+            "id": "why",
+            "label": "Why it matters",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "choices",
+        "name": "Choices",
+        "one": "choice",
+        "icon": "decide",
+        "holds": "the questions your project has to answer, the options for each, what you picked and why",
+        "title": "question",
+        "mobile": [
+          "question",
+          "state",
+          "picked"
+        ],
+        "state": "state",
+        "done": [
+          "made"
+        ],
+        "finished": "made_on",
+        "fields": [
+          {
+            "id": "question",
+            "label": "Question",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "state",
+            "label": "Status",
+            "type": "enum",
+            "values": [
+              "open",
+              "made"
+            ],
+            "labels": {
+              "open": "To make",
+              "made": "Made"
+            },
+            "default": "open",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "options",
+            "label": "Options",
+            "type": "document"
+          },
+          {
+            "id": "picked",
+            "label": "Picked",
+            "type": "text"
+          },
+          {
+            "id": "why",
+            "label": "Why",
+            "type": "document"
+          },
+          {
+            "id": "milestone",
+            "label": "Milestone",
+            "type": "ref",
+            "to": "milestones",
+            "index": true
+          },
+          {
+            "id": "made_on",
+            "label": "Made on",
+            "type": "day",
+            "index": true
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "resources",
+        "name": "Resources",
+        "one": "resource",
+        "icon": "link",
+        "holds": "the guides, tools, people and examples that help, and the milestone each one helps with",
+        "title": "name",
+        "mobile": [
+          "name",
+          "kind",
+          "milestone"
+        ],
+        "fields": [
+          {
+            "id": "name",
+            "label": "Resource",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "kind",
+            "label": "Kind",
+            "type": "enum",
+            "values": [
+              "guide",
+              "tool",
+              "person",
+              "example",
+              "other"
+            ],
+            "labels": {
+              "guide": "Guide",
+              "tool": "Tool",
+              "person": "Person",
+              "example": "Example",
+              "other": "Other"
+            },
+            "index": true
+          },
+          {
+            "id": "link",
+            "label": "Link",
+            "type": "url"
+          },
+          {
+            "id": "milestone",
+            "label": "Milestone",
+            "type": "ref",
+            "to": "milestones",
+            "index": true
+          },
+          {
+            "id": "note",
+            "label": "Notes",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "register": "steps",
+        "name": "Steps",
+        "one": "step",
+        "icon": "task",
+        "holds": "the small things to do next, each towards a milestone, in the order to do them, and who took each one",
+        "title": "what",
+        "mobile": [
+          "what",
+          "milestone",
+          "state"
+        ],
+        "state": "state",
+        "done": [
+          "done",
+          "skipped"
+        ],
+        "finished": "done_on",
+        "fields": [
+          {
+            "id": "what",
+            "label": "Step",
+            "type": "text",
+            "required": true,
+            "search": true
+          },
+          {
+            "id": "state",
+            "label": "Status",
+            "type": "enum",
+            "values": [
+              "to_do",
+              "doing",
+              "blocked",
+              "done",
+              "skipped"
+            ],
+            "labels": {
+              "to_do": "To do",
+              "doing": "Doing",
+              "blocked": "Blocked",
+              "done": "Done",
+              "skipped": "Skipped"
+            },
+            "default": "to_do",
+            "required": true,
+            "index": true
+          },
+          {
+            "id": "milestone",
+            "label": "Milestone",
+            "type": "ref",
+            "to": "milestones",
+            "index": true
+          },
+          {
+            "id": "order",
+            "label": "Order",
+            "type": "int",
+            "index": true
+          },
+          {
+            "id": "why",
+            "label": "Why",
+            "type": "text"
+          },
+          {
+            "id": "by",
+            "label": "By",
+            "type": "day",
+            "index": true,
+            "deadline": true,
+            "remind": [
+              "0d"
+            ]
+          },
+          {
+            "id": "waiting_on",
+            "label": "Waiting on",
+            "type": "text"
+          },
+          {
+            "id": "agent",
+            "label": "Taken by",
+            "type": "text",
+            "index": true
+          },
+          {
+            "id": "done_on",
+            "label": "Done on",
+            "type": "day",
+            "index": true
+          },
+          {
+            "id": "how",
+            "label": "How",
+            "type": "document"
+          },
+          {
+            "id": "tags",
+            "type": "list",
+            "of": "text"
+          }
+        ]
+      },
+      {
+        "metric": "guide-milestones",
+        "name": "Milestones",
+        "source": "register.milestones",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-milestones-reached",
+        "name": "Milestones reached",
+        "source": "register.milestones",
+        "where": "state is reached",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-steps-open",
+        "name": "Steps to take",
+        "source": "register.steps",
+        "where": "state is to_do or doing",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-steps-blocked",
+        "name": "Steps blocked",
+        "source": "register.steps",
+        "where": "state is blocked",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-steps-agents",
+        "name": "Steps an agent has taken",
+        "source": "register.steps",
+        "where": "agent is set, state is not done or skipped",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-steps-done",
+        "name": "Steps done",
+        "source": "register.steps",
+        "where": "state is done",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-steps-done-7d",
+        "name": "Steps done in 7 days",
+        "source": "register.steps",
+        "where": "state is done, done_on after -8d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-choices-open",
+        "name": "Choices to make",
+        "source": "register.choices",
+        "where": "state is open",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-choices-made",
+        "name": "Choices made",
+        "source": "register.choices",
+        "where": "state is made",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-idea-left",
+        "name": "Idea milestones still to reach",
+        "source": "register.milestones",
+        "where": "stage is idea, state is not reached",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-idea-reached",
+        "name": "Idea milestones reached",
+        "source": "register.milestones",
+        "where": "stage is idea, state is reached",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-milestones-underway",
+        "name": "Milestones underway",
+        "source": "register.milestones",
+        "where": "state is underway",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-resources",
+        "name": "What helps",
+        "source": "register.resources",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "milestone-steps",
+        "name": "Steps of a milestone",
+        "source": "register.steps",
+        "where": "milestone is {{it}}",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "milestone-choices",
+        "name": "Choices on a milestone",
+        "source": "register.choices",
+        "where": "milestone is {{it}}",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "milestone-resources",
+        "name": "What helps with a milestone",
+        "source": "register.resources",
+        "where": "milestone is {{it}}",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "guide-steps-done-by-week",
+        "name": "Steps done, by week",
+        "source": "register.steps",
+        "where": "state is done, done_on after -63d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none",
+        "group_by": "done_on",
+        "bucket": "week"
+      },
+      {
+        "rule": "guide_milestone_passed",
+        "name": "Mark a milestone passed on the path once it is reached",
+        "on": {
+          "written": {
+            "register": "milestones",
+            "op": [
+              "create",
+              "update"
+            ],
+            "fields": [
+              "state"
+            ]
+          }
+        },
+        "when": "state is reached",
+        "steps": [
+          {
+            "set": {
+              "field": "passed",
+              "to": "true"
+            }
+          }
+        ]
+      },
+      {
+        "rule": "guide_milestone_open",
+        "name": "Take a milestone off the path as passed when it is moved back",
+        "on": {
+          "written": {
+            "register": "milestones",
+            "op": [
+              "update"
+            ],
+            "fields": [
+              "state"
+            ]
+          }
+        },
+        "when": "state is not reached",
+        "steps": [
+          {
+            "set": {
+              "field": "passed",
+              "to": "false"
+            }
+          }
+        ]
+      },
+      {
+        "page": "home-guide",
+        "title": "Your project",
+        "icon": "home",
+        "requires": [
+          "register.milestones",
+          "register.steps",
+          "register.choices",
+          "register.resources"
+        ],
+        "blocks": [
+          {
+            "kind": "steps",
+            "heading": "{{config:voice_right_now}}",
+            "icon": "milestone",
+            "span": 12,
+            "source": "register.milestones",
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "stage"
+              }
+            ],
+            "order": [
+              {
+                "field": "order",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "No milestones yet. Add the first point your project should reach."
+          },
+          {
+            "kind": "queue",
+            "heading": "A decision waiting",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "where": "list is choices or milestones",
+            "tiles": true,
+            "limit": 1,
+            "when": {
+              "metric": "questions-open",
+              "gt": 0
+            },
+            "empty": "No decision is waiting on you."
+          },
+          {
+            "kind": "todo",
+            "heading": "Next three steps",
+            "icon": "list-todo",
+            "span": 12,
+            "when": {
+              "metric": "guide-steps-open",
+              "gt": 0
+            },
+            "source": "register.steps",
+            "where": "state is to_do or doing",
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "by"
+              }
+            ],
+            "order": [
+              {
+                "field": "order",
+                "dir": "asc"
+              }
+            ],
+            "limit": 3,
+            "empty": "No step is waiting. Add the next small thing to do."
+          },
+          {
+            "kind": "table",
+            "heading": "Blocked",
+            "icon": "octagon-alert",
+            "span": 12,
+            "when": {
+              "metric": "guide-steps-blocked",
+              "gt": 0
+            },
+            "source": "register.steps",
+            "where": "state is blocked",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Step",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "waiting_on",
+                "label": "Waiting on",
+                "width": "minmax(12ch,24ch)"
+              }
+            ],
+            "limit": 5,
+            "empty": "Nothing is blocked."
+          },
+          {
+            "kind": "table",
+            "heading": "{{config:voice_needs_you}}",
+            "icon": "scale",
+            "span": 12,
+            "source": "register.choices",
+            "where": "state is open",
+            "when": {
+              "metric": "guide-choices-open",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "question",
+                "label": "Question",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "milestone",
+                "label": "Milestone",
+                "width": "minmax(10ch,20ch)"
+              }
+            ],
+            "limit": 5,
+            "empty": "{{config:voice_nothing_needs_you}}"
+          },
+          {
+            "kind": "table",
+            "heading": "Resources",
+            "icon": "book-open",
+            "span": 12,
+            "when": {
+              "metric": "guide-resources",
+              "gt": 0
+            },
+            "source": "register.resources",
+            "columns": [
+              {
+                "field": "name",
+                "label": "Resource",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "kind",
+                "label": "Kind",
+                "width": "10ch"
+              },
+              {
+                "field": "link",
+                "label": "Link",
+                "width": "minmax(12ch,24ch)"
+              }
+            ],
+            "limit": 5,
+            "empty": "Nothing saved yet. Keep the guides and tools that help here."
+          }
+        ]
+      },
+      {
+        "page": "guide",
+        "title": "Guide",
+        "nav": {
+          "section": "Guide",
+          "order": 10
+        },
+        "icon": "star",
+        "requires": [
+          "register.milestones",
+          "register.steps",
+          "register.choices",
+          "register.resources"
+        ],
+        "blocks": [
+          {
+            "kind": "table",
+            "heading": "{{config:voice_right_now}}",
+            "icon": "flag",
+            "span": 12,
+            "source": "register.milestones",
+            "where": "state is underway",
+            "when": {
+              "metric": "guide-milestones-underway",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "what",
+                "label": "Milestone",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "stage",
+                "label": "Stage",
+                "width": "10ch"
+              },
+              {
+                "field": "target",
+                "label": "Aim for",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "order",
+                "dir": "asc"
+              }
+            ],
+            "limit": 3,
+            "empty": "No milestone is underway. Mark the next one Underway below."
+          },
+          {
+            "kind": "steps",
+            "heading": "Your next steps",
+            "icon": "list-todo",
+            "span": 12,
+            "when": {
+              "metric": "guide-steps-open",
+              "gt": 0
+            },
+            "source": "register.steps",
+            "where": "state is to_do or doing",
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "by"
+              },
+              {
+                "field": "milestone"
+              }
+            ],
+            "order": [
+              {
+                "field": "order",
+                "dir": "asc"
+              }
+            ],
+            "limit": 5,
+            "empty": "No step is waiting. Add the next small thing to do."
+          },
+          {
+            "kind": "table",
+            "heading": "Blocked",
+            "icon": "octagon-alert",
+            "span": 12,
+            "when": {
+              "metric": "guide-steps-blocked",
+              "gt": 0
+            },
+            "source": "register.steps",
+            "where": "state is blocked",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Step",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "waiting_on",
+                "label": "Waiting on",
+                "width": "minmax(12ch,24ch)"
+              },
+              {
+                "field": "milestone",
+                "label": "Milestone",
+                "width": "minmax(10ch,22ch)"
+              },
+              {
+                "field": "changed",
+                "label": "Changed by",
+                "width": "16ch"
+              }
+            ],
+            "empty": "Nothing is blocked."
+          },
+          {
+            "kind": "table",
+            "heading": "Choices to make",
+            "icon": "scale",
+            "span": 12,
+            "source": "register.choices",
+            "where": "state is open",
+            "when": {
+              "metric": "guide-choices-open",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "question",
+                "label": "Question",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "milestone",
+                "label": "Milestone",
+                "width": "minmax(10ch,22ch)"
+              }
+            ],
+            "empty": "No choice is waiting on you."
+          },
+          {
+            "kind": "progress",
+            "heading": "How far each milestone is",
+            "icon": "gauge",
+            "span": 12,
+            "source": "register.steps",
+            "columns": [
+              {
+                "field": "milestone"
+              },
+              {
+                "field": "state"
+              }
+            ],
+            "order": [
+              {
+                "field": "order",
+                "dir": "asc"
+              }
+            ],
+            "limit": 6,
+            "empty": "Give a milestone its steps and how far it is shows here."
+          },
+          {
+            "kind": "section",
+            "heading": "Everything so far",
+            "icon": "history",
+            "span": 12,
+            "fold": true
+          },
+          {
+            "kind": "series",
+            "heading": "Steps done, by week",
+            "icon": "chart-column",
+            "span": 12,
+            "when": {
+              "metric": "guide-steps-done",
+              "gt": 0
+            },
+            "series": [
+              {
+                "metric": "guide-steps-done-by-week",
+                "label": "Done"
+              }
+            ],
+            "back": 8,
+            "ahead": 0,
+            "empty": "No step was done in these weeks."
+          },
+          {
+            "kind": "table",
+            "heading": "Milestones",
+            "icon": "milestone",
+            "span": 12,
+            "source": "register.milestones",
+            "when": {
+              "metric": "guide-milestones",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "what",
+                "label": "Milestone",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "stage",
+                "label": "Stage",
+                "width": "10ch"
+              },
+              {
+                "field": "state",
+                "label": "Status",
+                "width": "14ch"
+              },
+              {
+                "field": "target",
+                "label": "Aim for",
+                "width": "15ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "order",
+                "dir": "asc"
+              }
+            ],
+            "empty": "No milestones yet."
+          },
+          {
+            "kind": "table",
+            "heading": "What helps",
+            "icon": "book-open",
+            "span": 12,
+            "source": "register.resources",
+            "when": {
+              "metric": "guide-resources",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "name",
+                "label": "Resource",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "kind",
+                "label": "Kind",
+                "width": "10ch"
+              },
+              {
+                "field": "milestone",
+                "label": "Milestone",
+                "width": "minmax(10ch,22ch)"
+              },
+              {
+                "field": "link",
+                "label": "Link",
+                "width": "minmax(12ch,24ch)"
+              }
+            ],
+            "empty": "Nothing saved yet. Keep the guides and tools that help here."
+          },
+          {
+            "kind": "table",
+            "heading": "Taken by agents",
+            "icon": "bot",
+            "span": 12,
+            "when": {
+              "metric": "guide-steps-agents",
+              "gt": 0
+            },
+            "source": "register.steps",
+            "where": "agent is set, state is not done or skipped",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Step",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "agent",
+                "label": "Taken by",
+                "width": "12ch"
+              },
+              {
+                "field": "state",
+                "label": "Status",
+                "width": "12ch"
+              },
+              {
+                "field": "changed",
+                "label": "Changed by",
+                "width": "16ch"
+              }
+            ],
+            "empty": "No agent has taken a step."
+          },
+          {
+            "kind": "table",
+            "heading": "Choices made",
+            "icon": "circle-check",
+            "span": 12,
+            "when": {
+              "metric": "guide-choices-made",
+              "gt": 0
+            },
+            "source": "register.choices",
+            "where": "state is made",
+            "columns": [
+              {
+                "field": "question",
+                "label": "Question",
+                "width": "minmax(16ch,1fr)"
+              },
+              {
+                "field": "picked",
+                "label": "Picked",
+                "width": "minmax(10ch,20ch)"
+              },
+              {
+                "field": "why",
+                "label": "Why",
+                "width": "minmax(14ch,1fr)"
+              },
+              {
+                "field": "changed",
+                "label": "Changed by",
+                "width": "16ch"
+              }
+            ],
+            "order": [
+              {
+                "field": "made_on",
+                "dir": "desc"
+              }
+            ],
+            "limit": 8,
+            "empty": "No choice has been made yet."
+          },
+          {
+            "kind": "table",
+            "heading": "Done lately",
+            "icon": "check",
+            "span": 12,
+            "when": {
+              "metric": "guide-steps-done",
+              "gt": 0
+            },
+            "source": "register.steps",
+            "where": "state is done",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Step",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "milestone",
+                "label": "Milestone",
+                "width": "minmax(10ch,22ch)"
+              },
+              {
+                "field": "done_on",
+                "label": "Done on",
+                "width": "13ch",
+                "align": "end"
+              },
+              {
+                "field": "changed",
+                "label": "Changed by",
+                "width": "16ch"
+              }
+            ],
+            "order": [
+              {
+                "field": "done_on",
+                "dir": "desc"
+              }
+            ],
+            "limit": 8,
+            "empty": "No step is done yet."
+          }
+        ]
+      },
+      {
+        "page": "milestone",
+        "title": "{{what}}",
+        "for": {
+          "register": "milestones",
+          "where": "state is underway"
+        },
+        "nav": {
+          "section": "Guide",
+          "order": 20
+        },
+        "icon": "star",
+        "requires": [
+          "register.milestones",
+          "register.steps",
+          "register.choices",
+          "register.resources"
+        ],
+        "blocks": [
+          {
+            "kind": "progress",
+            "heading": "Progress",
+            "icon": "gauge",
+            "span": 12,
+            "source": "register.steps",
+            "where": "milestone is {{what}}",
+            "columns": [
+              {
+                "field": "milestone"
+              },
+              {
+                "field": "state"
+              }
+            ],
+            "empty": "This milestone has no steps yet. Add the first and its progress shows here."
+          },
+          {
+            "kind": "steps",
+            "heading": "Steps",
+            "icon": "list-todo",
+            "span": 12,
+            "source": "register.steps",
+            "where": "milestone is {{what}}",
+            "when": {
+              "metric": "milestone-steps:{{what}}",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "by"
+              },
+              {
+                "field": "state"
+              }
+            ],
+            "order": [
+              {
+                "field": "order",
+                "dir": "asc"
+              }
+            ],
+            "limit": 12,
+            "empty": "This milestone has no steps yet. Add the first small thing to do."
+          },
+          {
+            "kind": "table",
+            "heading": "Choices",
+            "icon": "scale",
+            "span": 12,
+            "source": "register.choices",
+            "where": "milestone is {{what}}",
+            "when": {
+              "metric": "milestone-choices:{{what}}",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "question",
+                "label": "Question",
+                "width": "minmax(16ch,1fr)"
+              },
+              {
+                "field": "state",
+                "label": "Status",
+                "width": "10ch"
+              },
+              {
+                "field": "picked",
+                "label": "Picked",
+                "width": "minmax(10ch,20ch)"
+              },
+              {
+                "field": "changed",
+                "label": "Changed by",
+                "width": "16ch"
+              }
+            ],
+            "empty": "No choice to make on this milestone."
+          },
+          {
+            "kind": "table",
+            "heading": "What helps",
+            "icon": "book-open",
+            "span": 12,
+            "source": "register.resources",
+            "where": "milestone is {{what}}",
+            "when": {
+              "metric": "milestone-resources:{{what}}",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "name",
+                "label": "Resource",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "kind",
+                "label": "Kind",
+                "width": "10ch"
+              },
+              {
+                "field": "link",
+                "label": "Link",
+                "width": "minmax(12ch,24ch)"
+              },
+              {
+                "field": "changed",
+                "label": "Changed by",
+                "width": "16ch"
+              }
+            ],
+            "empty": "Nothing saved for this milestone yet."
+          }
+        ]
+      }
+    ]
+  },
+  "skills": [
+    {
+      "name": "project-coach",
+      "trigger": "when a milestone is reached or a step has sat still for a week, to suggest the next small step"
+    },
+    {
+      "name": "step-taker",
+      "trigger": "when a step is one an agent can do, to take it, say so in Taken by, and mark it done or blocked with what it waits on"
+    },
+    {
+      "name": "choice-recorder",
+      "trigger": "when a choice is made in conversation, to record what was picked and why, and add anything that helped as a resource"
+    }
+  ],
+  "nav": [],
+  "links": [],
+  "over": {}
+}

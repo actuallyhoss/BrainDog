@@ -517,8 +517,11 @@ export const FOUNDER = {
      had and the Dashboard waits under More. Its place only, so a patch step; 3.9.0 is published.
      3.9.2 (audit 1 Nov, AP32): Set up a numbers feed and Fix the numbers feed say "Each project sends its numbers to its
      own address, shown on its page.", where they said its page "has the key", with no full stop. Words only, so a patch
-     step; 3.9.1 is published. */
-  version: '3.9.3',
+     step; 3.9.1 is published.
+     3.10.0 (no briefs, 3 Nov): the Dashboard no longer opens on how many numbers came in thirty days, which its charts draw, and
+     Home no longer counts the agents at work over Agents at work. The lines for an empty Dashboard and Home's line
+     about cash and how long it lasts stay. Two blocks taken away and none added, so a minor step; 3.9.3 is published. */
+  version: '3.10.0',
   title: 'Solo founder',
   summary: 'Your companies, their revenue and metrics.',
   author: 'BrainDog',
@@ -668,19 +671,10 @@ export const FOUNDER = {
             limit: 6,
           },
           {
-            /* HOW MANY AGENTS WORK NOW, SAID IN WORDS, SINCE 2.4.0, from the record's own count (`runs-working`): the runs
-               heard from in the last fifteen minutes, the number the rail and the Agents page say. The plural and the
-               verb agree with it ("1 agent is working now"). Drawn only while one is, so a quiet record says nothing. */
-            kind: 'note',
-            lead: true,
-            span: 12,
-            when: { metric: 'runs-working', gt: 0 },
-            body: '{{runs-working}} agent(s) are working now.',
-          },
-          {
             /* WHICH AGENTS, FOLDED SHUT, SINCE 2.6.0 (batch 88). Gone quiet is a seventh tile on a page that stood at six
                (`test/calm-pages.test.ts`), and this is the one that gave way: the line above already says how many are
-               at work, and the rail and the Agents page say which. Gone with its table while no agent works. */
+               at work, and the rail and the Agents page say which. THE LINE IS GONE SINCE 3.10.0: it only counted
+               what the rail and the Agents page count. Gone with its table while no agent works. */
             kind: 'section',
             heading: 'Agents at work',
             icon: 'session',
@@ -729,15 +723,6 @@ export const FOUNDER = {
         /* AND PROJECTS, SINCE 3.9.0: the first project is named on this page before any number comes. */
         requires: ['register.datapoints', 'register.organisations', 'register.things'],
         blocks: [
-          /* THE OPENING SENTENCE, SAID FROM THE NUMBERS OF THE LAST THIRTY DAYS (`datapoints-30d`, which leaves the
-             example out). Both are held to the one figure, so exactly one of them draws. */
-          {
-            kind: 'note',
-            lead: true,
-            span: 12,
-            when: { metric: 'datapoints-30d', gte: 1 },
-            body: 'Your projects reported {{datapoints-30d}} number(s) in the last thirty days.',
-          },
           /* BEFORE ANY PROJECT, SINCE 3.9.0 (AH18): what comes here and the box that starts it, never a feed to fix. The
              project named here is on the go at once (`lane is building`), as Personal's Home box makes one. */
           {
