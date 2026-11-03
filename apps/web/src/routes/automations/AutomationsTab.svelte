@@ -392,6 +392,6 @@
     margin-block-start: auto;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 </style>

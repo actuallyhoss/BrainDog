@@ -89,7 +89,7 @@
     font-size: var(--fs-head);
     font-weight: 600;
     letter-spacing: -0.01em;
-    line-height: 22px;
+    line-height: var(--lead-head);
   }
 
   /* CLASS NAMES OF ITS OWN, because `.rows`, `.row` and `.glyph` are `blocks.css`'s and `.line` is
@@ -101,7 +101,7 @@
      line up under the group's title and the rounded wash still has somewhere to be. */
   .area-rows {
     display: grid;
-    gap: 2px;
+    gap: var(--sp-0);
     margin: 0 calc(-1 * var(--sp-1));
     padding: 0;
     list-style: none;
@@ -139,7 +139,7 @@
 
   .words {
     display: grid;
-    gap: 2px;
+    gap: var(--row-stack);
     min-inline-size: 0;
   }
 
@@ -150,7 +150,7 @@
     overflow: hidden;
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -200,7 +200,7 @@
   }
 
   /* BESIDE AN OPEN AREA THE LIST IS QUIET: 200 wide, each group's title at the meta step in the quiet ink with no rule
-     under it, and each row 32 tall with a 24px well and its name at 13, so the area beside it is what the eye lands on. */
+     under it, and each row the rail's 36 with a 24px well and its name at 12.5, so the area beside it is what the eye lands on. */
   @media (width >= 900px) {
     .index[data-beside] {
       gap: var(--sp-4);
@@ -214,13 +214,13 @@
       font-size: var(--fs-meta);
       font-weight: var(--fw-medium);
       letter-spacing: 0;
-      line-height: 18px;
+      line-height: var(--lead-meta);
     }
 
     .index[data-beside] .area-row {
       grid-template-columns: 24px minmax(0, 1fr);
       column-gap: var(--sp-2);
-      min-block-size: 34px;
+      min-block-size: var(--rail-item-h);
       border-radius: var(--r-ctl);
     }
 
@@ -239,12 +239,12 @@
 
     .index[data-beside] .name {
       font-size: var(--fs-meta);
-      line-height: 18px;
+      line-height: var(--lead-meta);
     }
   }
 
   /* ON A PHONE THE INDEX IS THE PAGE: a 32px well, the name at the phone's body size and its line under it,
-     then the chevron, in a row 60 tall, with a hairline between rows under the words and none around them. The line
+     then the chevron, in a row 56 tall (`--row-h-2`), with a hairline between rows under the words and none around them. The line
      keeps to one line with an ellipsis as its guard; the registry keeps each line short enough that the guard is not
      what a reader sees. */
   @media (width < 900px) {
@@ -269,7 +269,8 @@
     .area-row {
       grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
       column-gap: var(--sp-3);
-      min-block-size: 60px;
+      min-block-size: var(--row-h-2);
+      padding-block: var(--row-pad-y);
       color: var(--ink);
     }
 
@@ -280,14 +281,18 @@
 
     .name {
       font-size: var(--fs-body);
-      line-height: 22px;
+      line-height: var(--lead-ui);
+    }
+
+    .words {
+      gap: var(--row-stack);
     }
 
     .area-line {
       display: block;
       overflow: hidden;
       font-size: var(--fs-meta);
-      line-height: 18px;
+      line-height: var(--lead-meta);
       text-overflow: ellipsis;
       white-space: nowrap;
     }

@@ -259,7 +259,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .from-row {
@@ -316,7 +316,7 @@
     color: var(--ink);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     resize: vertical;
   }
 

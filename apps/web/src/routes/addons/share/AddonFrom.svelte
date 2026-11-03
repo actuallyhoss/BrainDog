@@ -437,7 +437,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* A TICK IS THE WHOLE LINE, 44 tall, so the box and its name are one target. */
@@ -448,7 +448,7 @@
     min-block-size: var(--tap);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .pair {
@@ -472,7 +472,7 @@
     list-style: none;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .lines li {

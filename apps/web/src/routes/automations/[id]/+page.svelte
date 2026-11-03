@@ -1149,14 +1149,14 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .trigger-said {
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
   }
 
@@ -1382,7 +1382,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .run {
@@ -1415,7 +1415,7 @@
   .run-say {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1528,7 +1528,7 @@
     color: var(--ink-2);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

@@ -157,7 +157,7 @@
     gap: var(--sp-2);
     align-items: start;
     font-size: var(--fs-meta);
-    line-height: 1.45;
+    line-height: var(--lead-meta);
     color: var(--ink-2);
     text-wrap: pretty;
   }

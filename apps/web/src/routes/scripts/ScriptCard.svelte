@@ -180,7 +180,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .card-do {

@@ -86,7 +86,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .log {
@@ -103,7 +103,7 @@
     gap: 2px;
     padding-block: var(--sp-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .log-row + .log-row {
@@ -152,7 +152,7 @@
   .notes {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .facts {
@@ -162,7 +162,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .facts dt {

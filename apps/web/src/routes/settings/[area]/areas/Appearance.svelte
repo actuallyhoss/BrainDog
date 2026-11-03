@@ -539,16 +539,15 @@
 
 <style>
   /* THE FOLDS: one quiet line each, opened by a press, so the five settings are what the area shows. */
-  .more {
-    margin-block-start: var(--sp-2);
-  }
-
+  /* A FOLD'S LINE IS A CONTROL'S HEIGHT (36), the words in its middle; it takes no margin of its own, so the column's gap
+     alone sets it off from the choice above, and two folds stand as far apart as a fold from the choices. */
   .more > summary {
     cursor: pointer;
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 600;
-    padding-block: var(--sp-2);
+    line-height: var(--lead-meta);
+    padding-block: calc((var(--ctl-h) - var(--lead-meta)) / 2);
   }
 
   /* UNDER A THUMB A FOLD'S LINE IS A 44px TARGET (`--tap`), its words still one line in the middle of it. */
@@ -577,7 +576,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   /* ONE COLUMN ON A PHONE, THE PREVIEW FIRST: a person sees what they are changing before the choices that change it.
@@ -646,12 +645,15 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
+    line-height: var(--lead-ui);
   }
 
+  /* THE LINE UNDER A CHOICE'S NAME HANGS 4 UNDER IT, half the choice's gap, so name and line read as one label. */
   .choice-line {
-    margin-block-start: calc(var(--sp-1) * -1);
+    margin-block-start: calc(var(--sp-1) - var(--sp-2));
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* A CHOICE ON A PHONE IS THE COLUMN'S WIDTH, so a full segmented control shares it evenly. The density's
@@ -789,6 +791,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* UNDER A THUMB THE BUTTON IS 44 SQUARE AND THE COLOUR STAYS 32 (P39): the colour, its ring
@@ -878,7 +881,7 @@
     max-inline-size: var(--measure);
     color: var(--red);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   /* ── the preview ── */
@@ -888,6 +891,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
+    line-height: var(--lead-meta);
   }
 
   /* THE BOARD WITH ONE TILE ON IT: flat, opaque, no border and no shadow. Every colour here is a role the

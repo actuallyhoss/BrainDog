@@ -180,7 +180,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   .danger {
@@ -199,13 +199,13 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .danger-why {
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* THE LINE UNDER THE FIELD: what to type in the quiet ink, and the wrong name in red with its glyph. Held at one line,

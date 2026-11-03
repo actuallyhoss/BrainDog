@@ -153,7 +153,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .links-lead {
@@ -207,7 +207,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
   }
 
@@ -219,7 +219,7 @@
   .link-when {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .link :global(.btn) {

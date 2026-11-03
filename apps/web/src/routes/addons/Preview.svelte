@@ -59,7 +59,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .mini-rail,

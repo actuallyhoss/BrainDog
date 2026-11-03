@@ -172,7 +172,7 @@
     padding-inline-start: calc(var(--well) + var(--sp-3));
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   @media (width < 520px) {

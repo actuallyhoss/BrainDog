@@ -148,7 +148,7 @@
     border-radius: 8px;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
     min-inline-size: 0;
   }
 
@@ -192,7 +192,7 @@
     padding-inline-start: calc(var(--icon-s) + var(--sp-3));
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* AN ENTRY THE SENTENCE FILLED, under its place and in line with its name. */
@@ -224,6 +224,6 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 </style>

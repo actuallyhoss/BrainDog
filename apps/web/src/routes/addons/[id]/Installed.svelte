@@ -1111,7 +1111,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .about:empty,
@@ -1194,7 +1194,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .rates-why {
@@ -1202,7 +1202,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
     text-wrap: pretty;
   }
 
@@ -1229,14 +1229,14 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: var(--lead-head);
   }
 
   .rate-note {
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .rate-line {
@@ -1268,13 +1268,13 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .setting[data-kind='switch'] .setting-label {
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .setting-control {
@@ -1336,7 +1336,7 @@
   .setting-why {
     margin: 0;
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .setting-note {

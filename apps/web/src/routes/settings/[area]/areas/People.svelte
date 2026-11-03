@@ -1505,7 +1505,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   /* THE SHARED PILLS FROM `controls.css`, with the two things `Appearance.svelte` explains beside the
@@ -1547,7 +1547,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .danger :global(.btn) {
@@ -1561,7 +1561,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* THE ROLE CHOICES: one row each, a radio, its name, and its two lines; the chosen one on the raised fill. */
@@ -1604,7 +1604,7 @@
   .role-can,
   .role-cant {
     font-size: var(--fs-meta);
-    line-height: 1.4;
+    line-height: var(--lead-meta);
     color: var(--ink-2);
     text-wrap: pretty;
   }

@@ -106,7 +106,7 @@
   /* THE WHOLE SENTENCE, wrapped at 390 rather than cut, at body size. */
   .gone-line {
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
     white-space: normal;
   }
 

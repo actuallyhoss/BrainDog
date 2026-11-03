@@ -352,7 +352,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
     text-wrap: pretty;
   }
@@ -402,7 +402,7 @@
   }
   .role-line {
     font-size: var(--fs-meta);
-    line-height: 1.45;
+    line-height: var(--lead-meta);
     color: var(--ink-2);
     text-wrap: pretty;
   }

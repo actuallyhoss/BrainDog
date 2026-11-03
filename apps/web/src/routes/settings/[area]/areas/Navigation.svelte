@@ -370,13 +370,13 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .pen-fold-line {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .pen-fold-go {
@@ -393,7 +393,7 @@
     max-inline-size: 75ch;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   /* WHERE THE AREA'S CHOICES ARE KEPT, once, as the line under every area that keeps its own is drawn. */

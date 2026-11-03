@@ -1969,7 +1969,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: var(--lead-head);
   }
 
   .lines,
@@ -2094,7 +2094,7 @@
     min-inline-size: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 
@@ -2108,7 +2108,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: var(--lead-head);
   }
 
   /* THE ZONE AND THE CURRENCY (1 Nov): one quiet line under the name, with Change on its end; opened, the two pickers. */
@@ -2316,7 +2316,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: var(--lead-head);
   }
 
   .next-list {

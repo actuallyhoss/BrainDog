@@ -873,7 +873,7 @@
     padding-inline: var(--sp-1);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .part-of-h {
@@ -924,7 +924,7 @@
   .addon-holds {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /**

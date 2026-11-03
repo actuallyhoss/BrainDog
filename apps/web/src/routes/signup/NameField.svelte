@@ -107,7 +107,7 @@
     margin: var(--sp-2) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 
@@ -142,7 +142,7 @@
     color: var(--ink-2);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 

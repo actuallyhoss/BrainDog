@@ -595,7 +595,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   /* THE DOORS TILE'S ROWS: a 32px well, the door and the list it writes to, and its state as a 6px dot and a word,
@@ -675,13 +675,13 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .door-detail {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .door-state {
@@ -721,7 +721,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   @media (width < 900px) {

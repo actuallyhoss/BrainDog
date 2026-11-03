@@ -236,7 +236,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .fact {
@@ -285,7 +285,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     text-wrap: pretty;
   }
 
@@ -342,14 +342,14 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     overflow-wrap: break-word;
   }
 
   .ask-line {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .ask-left {
@@ -359,7 +359,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* ON A PHONE, ONE BUTTON TO A LINE AND THE WHOLE WIDTH. */

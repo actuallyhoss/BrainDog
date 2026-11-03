@@ -1029,14 +1029,14 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
   }
 
   .who-detail {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* WHAT IT WOULD BE ALLOWED TO DO, where two words do not say all of it: the sentence the decision is made from, so
@@ -1182,7 +1182,7 @@
     color: var(--ink-2);
     text-wrap: pretty;
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .agent-may {
@@ -1250,7 +1250,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     text-wrap: pretty;
   }
 
@@ -1288,7 +1288,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* ON A PHONE THE TWO WORDS AND REVOKE GO UNDER THE NAME, starting where the name starts. Beside the name, Revoke took
@@ -1356,7 +1356,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   .plan dt {
@@ -1526,7 +1526,7 @@
     margin-block-start: var(--sp-3);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .theirs-lead {

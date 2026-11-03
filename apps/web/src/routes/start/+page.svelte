@@ -1460,7 +1460,7 @@
     pointer-events: none;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     opacity: 0;
     transition: opacity 120ms var(--ease-out);
   }
@@ -1531,7 +1531,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* CHANGE IS A WORD IN THE LINK INK, not another pill: the line says what was chosen, and this opens the rest. Ink and
@@ -1635,12 +1635,12 @@
 
   .made-note .again-h {
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .made-note .again-why {
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .again.alone {
@@ -1660,7 +1660,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: var(--lead-head);
   }
 
   .again-why {
