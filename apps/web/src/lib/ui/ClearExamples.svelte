@@ -5,10 +5,22 @@
   new record it is quiet; once rows of the owner's own sit beside the examples (after an import) it says they are in the
   way. Pressing asks once more with the count, because clearing deletes rows. On the sample, or for anyone but the owner,
   nothing is drawn.
+
+  ITS ROOM IS KEPT (finish 3 Nov): it is drawn after its own read, and drawn then it pushed Today down. Its height is
+  kept per record, page and width (`shape.ts`, 0 when it said nothing), and while the read is out a card of that height
+  stands where it will be (`SkeletonCard`), or nothing where it said nothing last time. Home holds the same room while
+  this code comes (`examplesRoom`).
 -->
+<script lang="ts" module>
+  /** The name its room is kept under on its page (`shape.ts`). */
+  export const EXAMPLES_CARD = 'clear-examples';
+</script>
+
 <script lang="ts">
   import { apiBase } from '../at.ts';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
+  import SkeletonCard from './SkeletonCard.svelte';
+  import { cardShape, keepCard, shapeKey } from './shape.ts';
   import { page } from '$app/state';
   import { invalidateAll } from '$app/navigation';
   import { createClient } from '@braindog/client';
@@ -22,9 +34,26 @@
   let asking = $state(false);
   let busy = $state(false);
   const offer = $derived(offerOf(read));
+  /* THE ROOM IT TOOK LAST TIME HERE, held while its read is out. */
+  const key = shapeKey();
+  const kept = untrack(() => cardShape(key, EXAMPLES_CARD));
+  let mine = $state(false);
+  /* WHAT IT SAID IS KEPT AS ITS HEIGHT: nothing said is 0, so the next open holds no room. */
+  $effect(() => {
+    if (read !== null && !offer) keepCard(key, EXAMPLES_CARD, { h: 0 });
+  });
+  function measure(el: HTMLElement): () => void {
+    const seen = new ResizeObserver(() => {
+      const h = Math.round(el.offsetHeight);
+      if (h > 0) keepCard(key, EXAMPLES_CARD, { h, kind: 'lines', rows: 1 });
+    });
+    seen.observe(el);
+    return () => seen.disconnect();
+  }
 
   onMount(() => {
     if (!page.data.live || !page.data.me?.owner) return;
+    mine = true;
     client = createClient({ base: apiBase() }) as unknown as ExamplesClient;
     void readExamples(client).then((e) => (read = e));
   });
@@ -59,7 +88,7 @@
 </script>
 
 {#if offer}
-  <Tile class="section" data-surface="tile" title={offer.title}>
+  <div class="examples-box" {@attach measure}><Tile class="section" data-surface="tile" title={offer.title}>
     <div class="section-body">
       <div class="examples" data-loud={offer.loud ? '' : undefined}>
         <p class="examples-said">{offer.body}</p>
@@ -73,10 +102,18 @@
         </div>
       </div>
     </div>
-  </Tile>
+  </Tile></div>
+{:else if mine && read === null && kept !== null && kept.h > 0}
+  <div class="examples-room surface-card" style:block-size={`${kept.h}px`} aria-busy="true"><SkeletonCard fill kind="lines" rows={1} /></div>
 {/if}
 
 <style>
+  .examples-room {
+    box-sizing: border-box;
+    padding: var(--tile-pad);
+    overflow: clip;
+  }
+
   .examples {
     display: grid;
     grid-template-columns: minmax(0, var(--measure)) auto;
