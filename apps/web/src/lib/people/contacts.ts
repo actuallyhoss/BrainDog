@@ -45,7 +45,7 @@ export const words = {
   skipped: (n: number) => (n === 1 ? '1 already here, skipped' : `${n} already here, skipped`),
   unnamed: (n: number) => (n === 1 ? '1 with no name, left out' : `${n} with no name, left out`),
   already: 'Already here',
-  newOrg: 'new',
+  newOrg: 'New',
   more: (n: number) => `And ${n} more.`,
   add: (people: number, orgs: number) => (orgs === 0 ? `Add ${words.people(people)}` : `Add ${words.people(people)} and ${words.orgs(orgs)}`),
   adding: (done: number, of: number) => `Adding ${done} of ${of}`,

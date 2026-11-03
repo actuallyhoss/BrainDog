@@ -15,7 +15,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { walkRows } from '$lib/data/ref-rows.ts';
   import { BYTES_MOST } from '$lib/start/export.ts';
-  import { listed, personFields, planOf, readContacts, tidyOf, words, type Contact, type HeldOrg, type HeldPerson, type Tidy, type Wrote } from '$lib/people/contacts.ts';
+  import { personFields, planOf, readContacts, tidyOf, words, type Contact, type HeldOrg, type HeldPerson, type Tidy, type Wrote } from '$lib/people/contacts.ts';
   import { arrive } from '$lib/motion/index.ts';
   import Button from '$lib/ui/Button.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -258,7 +258,8 @@
               >{` · ${words.skipped(plan.skipped.length)}`}</span
             >{/if}{#if unnamed > 0}<span class="ct-quiet">{` · ${words.unnamed(unnamed)}`}</span>{/if}
         </p>
-        {#if plan.orgs.length > 0}<p class="ct-quiet">New organisations: {listed(plan.orgs.map((o) => o.name))}.</p>{/if}
+        <!-- THE NEW ORGANISATIONS ARE MARKED IN THE TABLE (3 Nov): "New organisations: Lumen Studio." over a table whose
+             rows already say "Lumen Studio  new" said it twice. -->
         {#if heldFailed}<p class="ct-warn">People could not be read, so nobody is marked as already here.</p>{/if}
         <div class="ct-table-wrap">
           <table class="ct-table">
@@ -270,14 +271,14 @@
                 <tr>
                   <td class="ct-name">{c.name}</td>
                   <!-- AN ORGANISATION KEPT ALREADY IS SAID BY THE NAME IT IS KEPT AS ("Fenwick", where the file says "Fenwick Ltd"). -->
-                  {#if has.org}<td>{plan.heldOrgs.get(c.orgKey)?.name ?? c.org}{#if c.org && orgNew.has(c.orgKey)}<span class="ct-tag">{words.newOrg}</span>{/if}</td>{/if}
+                  {#if has.org}<td>{plan.heldOrgs.get(c.orgKey)?.name ?? c.org}{#if c.org && orgNew.has(c.orgKey)}<span class="ct-tag pill-badge" data-tone="info">{words.newOrg}</span>{/if}</td>{/if}
                   {#if has.email}<td class="ct-wrap">{c.emails.join(', ')}</td>{/if}
                   {#if has.phone}<td class="ct-nowrap">{c.phones.join(', ')}</td>{/if}
                 </tr>
               {/each}
               {#each plan.skipped.slice(0, Math.max(0, SHOWN - plan.people.length)) as c, i ('s' + i)}
                 <tr data-already="">
-                  <td class="ct-name">{c.name}<span class="ct-tag">{words.already}</span></td>
+                  <td class="ct-name">{c.name}<span class="ct-tag pill-badge">{words.already}</span></td>
                   {#if has.org}<td>{c.org}</td>{/if}
                   {#if has.email}<td class="ct-wrap">{c.emails.join(', ')}</td>{/if}
                   {#if has.phone}<td class="ct-nowrap">{c.phones.join(', ')}</td>{/if}
@@ -305,8 +306,8 @@
   .ct-page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    gap: var(--section-gap, var(--sp-6));
+    padding: var(--page-top, var(--sp-5)) var(--gutter) var(--page-bottom, var(--sp-8));
     max-inline-size: var(--page-max);
   }
 
@@ -338,6 +339,7 @@
     padding: var(--tile-pad);
     border-radius: var(--r-tile);
     background: var(--tile);
+    box-shadow: var(--card, none);
   }
 
   .ct-tidy ul {
@@ -389,8 +391,8 @@
     place-items: center;
     min-block-size: 120px;
     padding: var(--sp-5);
-    border: 1px dashed var(--rule);
-    border-radius: var(--r-ctl);
+    border: 1px dashed var(--rule-strong);
+    border-radius: var(--r-tile);
     background: var(--tile);
     color: var(--ink-2);
     font-size: var(--fs-body);
@@ -420,9 +422,9 @@
     align-items: center;
     min-block-size: var(--ctl-h);
     margin-block-start: var(--sp-2);
-    padding-inline: var(--sp-3);
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
+    padding-inline: var(--ctl-pad, var(--sp-4));
+    border-radius: var(--r-pill, 999px);
+    background: var(--g-on, var(--tile-2));
     color: var(--ink);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
@@ -436,7 +438,7 @@
   }
 
   .ct-drop:hover .ct-choose {
-    background: var(--hover);
+    background: var(--row-wash-press, var(--hover));
   }
 
   .ct-drop[data-over] {
@@ -456,11 +458,13 @@
     cursor: pointer;
   }
 
-  /* ON A TILE, NOT IN A BOX (Look B: no border round a tile). */
+  /* ON A CARD (ops 3 Nov): the tile's edge and shadow, padded so the rows' words sit on the card's text edge. */
   .ct-table-wrap {
     overflow-x: auto;
+    padding: var(--sp-2) var(--card-list-pad, var(--sp-2));
     border-radius: var(--r-tile);
     background: var(--tile);
+    box-shadow: var(--card, none);
   }
 
   .ct-table {
@@ -469,24 +473,24 @@
     font-size: var(--fs-body);
   }
 
+  /* ONE HAIRLINE, UNDER THE CAPS HEAD; the rows are told apart by air (ops tables, 3 Nov). */
   .ct-table th {
     padding: var(--sp-2) var(--sp-3);
-    border-block-end: 1px solid var(--rule);
+    box-shadow: inset 0 -1px 0 var(--sep, var(--rule));
     color: var(--ink-3);
-    font-size: var(--fs-meta);
+    font-size: var(--fs-caps, 11px);
     font-weight: 500;
+    line-height: var(--lead-caps, 16px);
+    letter-spacing: var(--track-caps, 0.025em);
     text-align: start;
+    text-transform: uppercase;
   }
 
   .ct-table td {
+    block-size: var(--table-row-h, 44px);
     padding: var(--sp-2) var(--sp-3);
-    border-block-end: 1px solid var(--rule);
     color: var(--ink);
-    vertical-align: baseline;
-  }
-
-  .ct-table tr:last-child td {
-    border-block-end: 0;
+    vertical-align: middle;
   }
 
   .ct-table tr[data-already] td {
@@ -520,17 +524,13 @@
 
     .ct-table tr {
       display: grid;
-      gap: 2px;
+      gap: var(--row-stack, 2px);
       padding: var(--sp-2) var(--sp-3);
-      border-block-end: 1px solid var(--rule);
-    }
-
-    .ct-table tbody tr:last-child {
-      border-block-end: 0;
     }
 
     .ct-table td {
       display: block;
+      block-size: auto;
       padding: 0;
       border: 0;
     }
@@ -551,8 +551,7 @@
 
   .ct-tag {
     margin-inline-start: var(--sp-2);
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
+    vertical-align: 1px;
   }
 
   .ct-actions {
