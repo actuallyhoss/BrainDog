@@ -9,7 +9,7 @@
 import { shell } from './copy/shell.ts';
 import { cases } from './copy/cases.ts';
 import { forPages } from './copy/for.ts';
-import { DOCS, PACKS, SECURITY, SUPPORT } from './links.ts';
+import { ADDONS, DOCS, SECURITY, SUPPORT } from './links.ts';
 import { HELD, LAUNCH, held } from './launch.ts';
 
 export type Place = {
@@ -45,7 +45,7 @@ const person = (id: keyof typeof forPages.person.who): Place => ({
 export const PLACES: readonly Place[] = [
   place('/slash', 'slash', true),
   place('/agents', 'agents', true),
-  place(PACKS, 'packs', false),
+  place(ADDONS, 'packs', false),
   place('/pricing', 'pricing', true),
   place(SECURITY, 'security', true),
   person('founder'),

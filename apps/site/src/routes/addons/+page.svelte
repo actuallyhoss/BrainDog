@@ -1,26 +1,23 @@
 <!--
-  `/packs`: the add-on store as a stranger sees it. Every public listing as a card, a search, and the categories as one
+  `/addons`: the add-on store as a stranger sees it. Every public listing as a card, a search, and the categories as one
   segmented control.
 
   THE SITE'S DESIGN: the night head with the search in its slot, then the store on the board's ground with
-  the categories over the cards, then a night band that says anybody can make one and points at the docs, and the
+  the categories over the cards, then a night band that says your agent can build one and points at the docs, and the
   early access strip. Two neighbours never share a ground in either scheme.
 
   EVERY CARD IS IN THE HTML. The load hands the page every public card at build time, so the page reads whole with
   scripting off; the search and the control narrow what is drawn once the script runs, and nothing is fetched to do it.
 
-  A CARD SAYS WHAT A STRANGER WEIGHS: its name, one line, what it brings, who made it and how many hold it when the
-  Kennel counted ten or more. "Made by BrainDog" is drawn only where the catalogue says BrainDog published it.
-
-  THE WHOLE CARD IS THE TARGET, through its title's link stretched over it, so a screen reader hears the title as the
-  link's name rather than every word on the card.
+  THE CARDS ARE `lib/packs/Cards.svelte`, shared with an author's page.
 -->
 <script lang="ts">
   import Seo from '$lib/site/Seo.svelte';
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
-  import { PACKS } from '$lib/links.ts';
+  import { ADDONS } from '$lib/links.ts';
   import { packs } from '$lib/copy/packs.ts';
+  import Cards from '$lib/packs/Cards.svelte';
   import { filtersOf, matches, type Category } from '$lib/packs/catalogue.ts';
   import EarlyStrip from '$lib/site/EarlyStrip.svelte';
   import PageHead from '$lib/site/PageHead.svelte';
@@ -44,7 +41,7 @@
   }
 </script>
 
-<Seo title={w.meta.title} description={w.meta.description} path="/packs" />
+<Seo title={w.meta.title} description={w.meta.description} path={ADDONS} />
 <PageHead title={w.title} lead={w.lede}>
   {#if data.cards.length > 0}
     <div class="head-search" role="search">
@@ -87,27 +84,7 @@
           <button type="button" class="btn line" onclick={showAll}>{w.showAll}</button>
         </div>
       {:else}
-        <ul class="cards">
-          {#each shown as card (card.slug)}
-            <li class="addon">
-              <div class="card-top">
-                <span class="icon-well"><Icon name={card.glyph} size="m" /></span>
-                <span class="kind">{w.kind[card.kind]}</span>
-              </div>
-              <h2 class="name"><a class="card-link" href="{PACKS}/{card.slug}">{card.title}</a></h2>
-              <p class="summary">{card.summary}</p>
-              <p class="brings">{card.adds.length ? card.adds.join(' · ') : w.worksOn}</p>
-              <p class="foot">
-                {#if card.ours}
-                  <span class="maker"><Mark height={13} tone="inherit" />{w.ours}</span>
-                {:else}
-                  <span class="maker">{w.by(card.publisher)}</span>
-                {/if}
-                {#if card.installs !== null}<span class="num">{w.installs(card.installs)}</span>{/if}
-              </p>
-            </li>
-          {/each}
-        </ul>
+        <Cards cards={shown} />
       {/if}
     {/if}
   </div>
@@ -119,13 +96,18 @@
       <h2 id="make-title" class="band-h2">{m.title}</h2>
       <p class="band-say">{m.say}</p>
       <p class="make-go">
-        <a class="btn ghost" href={m.firstHref}>{m.first}<Icon name="arrow" size="m" /></a>
+        <a class="btn ghost" href={m.agentHref}>{m.agent}<Icon name="arrow" size="m" /></a>
+        <a class="more" href={m.firstHref}>{m.first}<Icon name="arrow" size="m" /></a>
         <a class="more" href={m.publishHref}>{m.publish}<Icon name="arrow" size="m" /></a>
       </p>
     </div>
     <figure class="c6 term">
       <figcaption class="term-hd">{m.terminal}</figcaption>
-      <pre class="term-body"><code>{#each m.steps as step, i (step)}{#if i > 0}{'\n'}{/if}<span class="prompt" aria-hidden="true">$ </span>{step}{/each}</code></pre>
+      <p class="ask"><Icon name="message" size="m" /><span>{m.ask}</span></p>
+      <p class="term-hd steps-hd">{m.stepsSaid}</p>
+      <ol class="term-body">
+        {#each m.steps as step (step)}<li><code>{step}</code></li>{/each}
+      </ol>
     </figure>
   </div>
 </section>
@@ -286,150 +268,10 @@
     background: var(--tile);
   }
 
-  /* THREE ACROSS AT A DESK, two on a tablet, one on a phone; each card as tall as its row. */
-  .cards {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* A CARD: flat, radius 16, no edge and no shadow. */
-  .addon {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-inline-size: 0;
-    padding: 24px;
-    border-radius: 16px;
-    background: var(--tile);
-    color: var(--ink);
-    transition: box-shadow var(--d-state) var(--ease-out);
-  }
-
-  .card-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-block-end: 6px;
-  }
-
-  /* THE ICON WELL: 40, the board's fill, radius 10, in the second ink. */
-  .icon-well {
-    display: inline-grid;
-    flex: none;
-    place-items: center;
-    inline-size: 40px;
-    block-size: 40px;
-    border-radius: 10px;
-    background: var(--board);
-    color: var(--ink2);
-  }
-
-  .kind {
-    color: var(--muted);
-    font-size: var(--t-site-13);
-    font-weight: 500;
-  }
-
-  .name {
-    margin: 0;
-    font-size: var(--t-site-21);
-    line-height: 1.2;
-    letter-spacing: -0.021em;
-    overflow-wrap: anywhere;
-  }
-
-  .card-link {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  /* THE TITLE'S LINK COVERS THE CARD, so a press anywhere on it opens the add-on. */
-  .card-link::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 16px;
-  }
-
-  .card-link:focus-visible {
-    /* focus-ok: the ring is drawn on `::before`, round the whole card the link covers. */
-    outline: none;
-  }
-
-  .card-link:focus-visible::before {
-    outline: 2px solid var(--ink);
-    outline-offset: 2px;
-  }
-
-  .summary {
-    display: -webkit-box;
-    margin: 0;
-    overflow: hidden;
-    color: var(--ink2);
-    font-size: var(--t-site-15);
-    line-height: 1.5;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-  }
-
-  .brings {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-site-14);
-    font-weight: 500;
-  }
-
-  .foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px 16px;
-    margin: 0;
-    margin-block-start: auto;
-    padding-block-start: 14px;
-    border-block-start: 1px solid var(--rule);
-    color: var(--muted);
-    font-size: var(--t-site-14);
-  }
-
-  .maker {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-  }
-
   @media (hover: hover) and (pointer: fine) {
     .seg[aria-pressed='false']:hover {
       background: var(--soft);
       color: var(--ink);
-    }
-
-    .addon:hover {
-      box-shadow: inset 0 0 0 1px var(--rule);
-    }
-
-    .addon:hover .icon-well {
-      color: var(--ink);
-    }
-  }
-
-  @media (width >= 700px) {
-    .cards {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (width >= 1060px) {
-    .cards {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 
@@ -477,17 +319,46 @@
     font-weight: 500;
   }
 
-  /* A LONG COMMAND SCROLLS INSIDE THE TILE, never the page. */
+  /* WHAT A PERSON SAYS, as a message: the band's own words in the body face. */
+  .ask {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    padding: 14px 16px;
+    border-radius: var(--r-field);
+    background: color-mix(in oklab, var(--on-night) 8%, transparent);
+    color: var(--on-night);
+    font-size: var(--t-site-15);
+    line-height: 1.5;
+  }
+
+  .ask :global(svg) {
+    flex: none;
+    margin-block-start: 2px;
+    color: var(--on-night-2);
+  }
+
+  .steps-hd {
+    margin-block: 20px 8px;
+  }
+
+  /* THE AGENT'S CALLS, numbered, in the mono face. A long one scrolls inside the tile, never the page. */
   .term-body {
     margin: 0;
+    padding-inline-start: 22px;
     overflow-x: auto;
     color: var(--on-night);
     font: 400 var(--t-site-14) / 2 var(--font-mono);
   }
 
-  .prompt {
+  .term-body li::marker {
     color: var(--on-night-2);
-    user-select: none;
+  }
+
+  .term-body code {
+    font: inherit;
+    white-space: nowrap;
   }
 
   /* ── A phone ───────────────────────────────────────────────────────────── */
@@ -507,10 +378,6 @@
 
     .seg {
       min-block-size: var(--tap);
-    }
-
-    .addon {
-      padding: 20px;
     }
 
     .no-match {

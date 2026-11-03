@@ -1,15 +1,16 @@
 <!--
-  `/packs/<id>`: one add-on, as a stranger weighs it before adding it.
+  `/addons/<id>`: one add-on, as a stranger weighs it before adding it.
 
-  THE SITE'S DESIGN: the night head holds the way back, the add-on's name and its one line, who made it and
-  how many hold it, and "Add to your BrainDog" as the page's one red. Under it, on the board's ground, the drawing of
-  what it adds beside three tiles: what it brings by name, who made it, and its versions.
+  THE SITE'S DESIGN: the night head holds the way back, the add-on's name and its one line, who made it (a link to all
+  of theirs), how far it was checked and how many hold it, and "Add to BrainDog" as the page's one red. Under it, on the
+  board's ground, first what it asks for of yours, because that is the decision, then the drawing of what it adds
+  beside three tiles: what it brings by name, who made it, and its versions.
 
   THE DRAWING IS THE PRODUCT'S. A version the catalogue made a preview for is drawn page by page from that preview's
   answers, and one with none is drawn as what it adds, both through `lib/app/Page.svelte` and the renderer the app
   uses. So a list here has the columns the added page has, and nothing on this page is a picture somebody made.
 
-  ADDING GOES TO THE APP (`app.brain.dog/packs/browse/<id>`), which shows the plan and asks before it writes, so the link
+  ADDING GOES TO THE APP (`app.brain.dog/addons/<id>`), which shows the plan and asks before it writes, so the link
   carries `rel="external"`: the prerender crawler must not follow it into the app.
 
   BELOW 1060PX THE TILES STACK with the drawing first, because the drawing is what the reader came to see.
@@ -22,7 +23,7 @@
   import Page from '$lib/app/Page.svelte';
   import type { Span } from '$lib/examples/types.ts';
   import { LAUNCH } from '$lib/launch.ts';
-  import { PACKS } from '$lib/links.ts';
+  import { ADDONS } from '$lib/links.ts';
   import { packs } from '$lib/copy/packs.ts';
   import PageHead from '$lib/site/PageHead.svelte';
   import type { PageProps } from './$types';
@@ -46,18 +47,19 @@
   const wide = (src: string): Span[] => parse(src, { page: true }).map((_, at) => ({ at, cols: 12 }));
 </script>
 
-<Seo title={d.title(card.title)} description={card.summary} path="/packs/{card.slug}" />
+<Seo title={d.title(card.title)} description={card.summary} path="{ADDONS}/{card.slug}" />
 {#snippet back()}
-  <a class="back" href={PACKS}><Icon name="back" size="m" />{d.back}</a>
+  <a class="back" href={ADDONS}><Icon name="back" size="m" />{d.back}</a>
 {/snippet}
 
 <PageHead title={card.title} lead={card.summary} before={back}>
   <p class="meta-row">
     <span class="tag">{w.kind[card.kind]}</span>
     {#if card.ours}
-      <span class="maker"><Mark height={14} tone="inherit" />{w.ours}</span>
+      <a class="maker" href="{ADDONS}/by/{card.who}"><Mark height={14} tone="inherit" />{w.ours}</a>
     {:else}
-      <span class="maker">{w.by(card.publisher)}</span>
+      <a class="maker" href="{ADDONS}/by/{card.who}">{w.by(card.publisher)}</a>
+      <span class="tag">{w.trust[card.trust]}</span>
     {/if}
     {#if card.installs !== null}<span class="num">{w.installs(card.installs)}</span>{/if}
   </p>
@@ -69,6 +71,20 @@
 
 <section class="board" aria-labelledby="drawing-title">
   <div class="wrap layout">
+    <section class="tile asks" aria-labelledby="asks-title">
+      <div class="asks-head">
+        <h2 class="tile-h" id="asks-title">{d.asks}</h2>
+        <p class="note">{d.asksNote}</p>
+      </div>
+      {#if data.asks.length}
+        <ul class="ask-lines">
+          {#each data.asks as line (line)}<li><Icon name="check" size="s" /><span>{line}</span></li>{/each}
+        </ul>
+      {:else}
+        <p class="plain">{d.asksNothing}</p>
+      {/if}
+    </section>
+
     <div class="drawing">
       <div class="drawing-head">
         <h2 class="drawing-title" id="drawing-title">{data.pages ? d.preview : d.adds}</h2>
@@ -136,11 +152,13 @@
             <dt>{d.publisher}</dt>
             <dd class="maker">{#if card.ours}<Mark height={14} tone="inherit" />{/if}{card.publisher}</dd>
           </div>
+          <div class="fact"><dt>{d.trust}</dt><dd>{w.trust[card.trust]}</dd></div>
           {#if data.licence !== ''}
             <div class="fact"><dt>{d.licence}</dt><dd>{data.licence}</dd></div>
           {/if}
           <div class="fact"><dt>{d.latest}</dt><dd class="num">{card.version}</dd></div>
         </dl>
+        <a class="more-by" href="{ADDONS}/by/{card.who}">{d.moreBy(card.publisher)}<Icon name="arrow" size="s" /></a>
       </section>
 
       <section class="tile" aria-labelledby="versions-title">
@@ -212,6 +230,18 @@
     gap: 7px;
   }
 
+  a.maker {
+    min-block-size: var(--tap);
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+    text-underline-offset: 3px;
+  }
+
+  a.maker:hover {
+    color: var(--on-night);
+  }
+
   .install {
     display: flex;
     flex-wrap: wrap;
@@ -271,11 +301,62 @@
     line-height: 1.5;
   }
 
-  /* A TILE: flat, radius 16, no edge and no shadow. */
+  /* A TILE: the site's solid card (`.tile` in `app.css`), its padding and gap set here. */
   .tile {
     gap: 16px;
     padding: 24px;
-    border-radius: 16px;
+    border-radius: var(--r-tile);
+  }
+
+  /* ── What it asks for of yours: the decision, across the whole board ─────── */
+
+  .asks {
+    display: grid;
+  }
+
+  .asks-head {
+    display: grid;
+    gap: 6px;
+  }
+
+  .ask-lines {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ask-lines li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--ink);
+    font-size: var(--t-site-15);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .ask-lines :global(svg) {
+    flex: none;
+    margin-block-start: 3px;
+    color: var(--ink2);
+  }
+
+  .more-by {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: var(--tap);
+    color: var(--ink);
+    font-size: var(--t-site-15);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .more-by:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   .sheet {
@@ -464,6 +545,16 @@
   @media (width >= 1060px) {
     .layout {
       grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    }
+
+    .asks {
+      grid-column: 1 / -1;
+    }
+
+    /* TWO COLUMNS OF LINES when there are enough to fill them, so the decision stays one short read. */
+    .ask-lines {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 32px;
     }
   }
 

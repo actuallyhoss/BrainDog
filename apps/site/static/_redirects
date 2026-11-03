@@ -6,3 +6,6 @@
 # the ones the app (its update feed) and /download name, so they never change when the files move
 # (tools/desktop/release.mjs --publish uploads them).
 /desktop/* https://download.brain.dog/:splat 302
+# The add-on store was /packs until 3 November. An old link or a shared listing lands on the same add-on at /addons.
+/packs /addons 301
+/packs/* /addons/:splat 301
