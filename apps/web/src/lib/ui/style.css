@@ -168,8 +168,8 @@
       --soft-fill: color-mix(in oklab, var(--ink) 8%, transparent);
       --soft-fill-hover: color-mix(in oklab, var(--ink) 13%, transparent);
       --ambient:
-        radial-gradient(60rem 40rem at 50% -12%, color-mix(in oklab, var(--red-fill) 9%, transparent), transparent 70%),
-        radial-gradient(40rem 30rem at 12% 106%, color-mix(in oklab, var(--info) 6%, transparent), transparent 70%),
+        radial-gradient(60rem 40rem at 50% -12%, color-mix(in oklab, var(--info) 8%, transparent), transparent 70%),
+        radial-gradient(40rem 30rem at 12% 106%, color-mix(in oklab, var(--cat-sky) 5%, transparent), transparent 70%),
         radial-gradient(35rem 28rem at 92% 78%, color-mix(in oklab, var(--cat-violet) 5%, transparent), transparent 70%),
         var(--board);
     }
@@ -204,8 +204,8 @@
     --soft-fill: color-mix(in oklab, var(--ink) 8%, transparent);
     --soft-fill-hover: color-mix(in oklab, var(--ink) 13%, transparent);
     --ambient:
-      radial-gradient(60rem 40rem at 50% -12%, color-mix(in oklab, var(--red-fill) 9%, transparent), transparent 70%),
-      radial-gradient(40rem 30rem at 12% 106%, color-mix(in oklab, var(--info) 6%, transparent), transparent 70%),
+      radial-gradient(60rem 40rem at 50% -12%, color-mix(in oklab, var(--info) 8%, transparent), transparent 70%),
+      radial-gradient(40rem 30rem at 12% 106%, color-mix(in oklab, var(--cat-sky) 5%, transparent), transparent 70%),
       radial-gradient(35rem 28rem at 92% 78%, color-mix(in oklab, var(--cat-violet) 5%, transparent), transparent 70%),
       var(--board);
   }

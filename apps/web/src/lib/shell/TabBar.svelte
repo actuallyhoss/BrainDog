@@ -89,7 +89,8 @@
     box-sizing: border-box;
     block-size: var(--tab-h);
     padding: 4px;
-    background: var(--glass-chrome);
+    /* THE READ-ON FILM, not the sidebar's chrome film: rows pass under this bar, and their words must not show through. */
+    background: var(--glass-regular);
     -webkit-backdrop-filter: var(--glass-filter);
     backdrop-filter: var(--glass-filter);
     box-shadow: var(--glass-edge), var(--elev-popover);
