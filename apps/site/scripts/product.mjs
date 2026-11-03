@@ -148,7 +148,7 @@ for (const path of CARD_PATHS) {
       .og-card .brand .mark { inline-size: auto; block-size: 56px; }
       .og-card .brand .wordmark { font-size: 48px; }
       .og-card .og-words { display: grid; gap: 24px; }
-      .og-card .og-title { max-inline-size: 20ch; margin: 0; font-size: 80px; line-height: 1.02; letter-spacing: -0.05em; }
+      .og-card .og-title { max-inline-size: 20ch; margin: 0; font-size: 80px; line-height: 1.02; letter-spacing: -0.028em; }
       .og-card .og-sub {
         max-inline-size: 46ch; margin: 0; font-size: 26px; line-height: 1.4;
       }
