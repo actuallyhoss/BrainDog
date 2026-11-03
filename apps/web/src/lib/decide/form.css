@@ -5,8 +5,9 @@
  *
  * THE CHOICES ARE A VERTICAL LIST OF FULL-WIDTH RECTANGLES, each its name and one line of what it does, a ring at its
  * start that fills when it is the one chosen, and "Suggested" in the accent's words beside the one an agent suggests.
- * Then the buttons: Decide (or Accept) filled with the accent, the rest quiet or words only. Rectangles at the control
- * radius, never pills; a band that warns is said in the button's own words, never a chip.
+ * Then the buttons: Decide (or Accept) filled with the accent, the rest quiet or words only. The choices are boxes at the
+ * field radius and the buttons are capsules (the ops style, 3 Nov); a band that warns is said in the button's own words,
+ * never a chip.
  *
  * WHERE ONE PRESS DECIDES (`[data-press]`, the card's two or three answers that can be undone) the rectangle is the
  * button: no ring, no Decide under it, and the suggested one wears the accent's edge.
@@ -16,6 +17,14 @@
  * elements (the keys and the queue gate find a choice by `.queue-act`), and an unlayered rule wins over a layered one
  * whatever its weight, so here they are drawn as choices and nowhere else is touched.
  */
+
+/* THE SOFT FILL OF A QUIET ANSWER (ops 4.6, neutral): the ink at 6% on the card and 10% under the pointer, so it reads
+   on the tile in light and dark without a second grey. */
+.dc-btn {
+  --dc-soft: color-mix(in srgb, var(--ink) 6%, transparent);
+  --dc-soft-hover: color-mix(in srgb, var(--ink) 10%, transparent);
+  --dc-soft-off: color-mix(in srgb, var(--ink) 4%, transparent);
+}
 
 /* ── the choices ──────────────────────────────────────────────────────────── */
 
@@ -48,7 +57,7 @@
   margin: 0;
   padding: var(--sp-3) 14px;
   border: 1px solid var(--rule);
-  border-radius: var(--r-ctl);
+  border-radius: var(--r-field, 12px);
   background: var(--tile);
   box-shadow: none;
   color: var(--ink);
@@ -70,7 +79,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .dc-choice:hover:not(:disabled, [aria-disabled='true']) {
-    background: var(--tile-2);
+    background: var(--tile) linear-gradient(var(--row-wash), var(--row-wash));
     border-color: var(--rule-strong);
   }
 }
@@ -276,7 +285,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
 @media (hover: hover) and (pointer: fine) {
   div.dc-choice:has(> .dc-choice-main > .dc-choice-hit:not(:disabled)):hover:not([data-checked]) {
-    background: var(--tile-2);
+    background: var(--tile) linear-gradient(var(--row-wash), var(--row-wash));
     border-color: var(--rule-strong);
   }
 }
@@ -361,10 +370,10 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   box-sizing: border-box;
   min-block-size: var(--btn-h);
   margin: 0;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 0;
-  border-radius: var(--r-ctl);
-  background: var(--tile-2);
+  border-radius: var(--r-pill, 999px);
+  background: var(--dc-soft);
   box-shadow: none;
   color: var(--ink);
   font: inherit;
@@ -377,7 +386,13 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   cursor: pointer;
   transition:
     background var(--d-state) var(--ease-out),
-    color var(--d-state) var(--ease-out);
+    color var(--d-state) var(--ease-out),
+    scale var(--d-press, 70ms) cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* THE OPS PRESS: an answer gives a little under the finger, 0.97, and comes back. */
+.dc-btn:active:not(:disabled, [aria-disabled='true']) {
+  scale: 0.97;
 }
 
 .dc-btn::before {
@@ -386,6 +401,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
 .dc-btn[data-weight='primary'] {
   background: var(--red-fill);
+  box-shadow: var(--shadow-raised, none);
   color: var(--on-red);
 }
 
@@ -407,20 +423,38 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   margin-inline-start: var(--sp-2);
 }
 
+/* THE NUMBER KEY IS THE OPS KEY CHIP: a soft fill of the button's own ink and no outline, small and quiet, so "1"
+   reads as a key to press and not as a second label. */
+:is(.dc-btn, .dc-choice) .queue-key {
+  min-inline-size: 18px;
+  block-size: 18px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 5px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  color: inherit;
+  font-size: 11px;
+  font-weight: var(--fw-medium);
+  line-height: 18px;
+  opacity: 0.8;
+}
+
 /* A NUMBER KEY ON THE FILLED BUTTON is in the button's own ink: the skin's dim cap vanished into the accent. */
 .dc-btn[data-weight='primary'] .queue-key {
-  border-color: color-mix(in srgb, var(--on-red) 45%, transparent);
+  background: color-mix(in srgb, var(--on-red) 22%, transparent);
   color: var(--on-red);
+  opacity: 1;
 }
 
 .dc-btn[data-weight='ink'] .queue-key {
-  border-color: color-mix(in srgb, var(--tile) 45%, transparent);
+  background: color-mix(in srgb, var(--tile) 22%, transparent);
   color: var(--tile);
+  opacity: 1;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .dc-btn:hover:not(:disabled, [aria-disabled='true']) {
-    background: var(--hover);
+    background: var(--dc-soft-hover);
   }
 
   .dc-btn[data-weight='primary']:hover:not(:disabled, [aria-disabled='true']) {
@@ -432,7 +466,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   }
 
   .dc-btn[data-weight='bare']:hover:not(:disabled, [aria-disabled='true']) {
-    background: var(--hover);
+    background: var(--row-wash, var(--hover));
     color: var(--ink);
   }
 }
@@ -440,7 +474,8 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 /* NOTHING CHOSEN YET, OR A READER WHO MAY NOT: the fill goes with the label, so it never reads as live. */
 .dc-btn:disabled,
 .dc-btn[aria-disabled='true'] {
-  background: var(--tile-2);
+  background: var(--dc-soft-off);
+  box-shadow: none;
   color: var(--ink-3);
   cursor: not-allowed;
 }

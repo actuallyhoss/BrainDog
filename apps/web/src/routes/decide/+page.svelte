@@ -851,10 +851,13 @@
     gap: var(--tile-gap);
   }
 
+  /* EACH QUESTION IS AN OPS CARD (2.7.2): solid tile, its 1px edge and the two-layer card shadow (none in dark). */
   .body :global(.block-slot > .queue > .qa) {
     padding: var(--tile-pad);
+    border: 1px solid var(--card-edge, transparent);
     background: var(--tile);
     border-radius: var(--r-tile);
+    box-shadow: var(--shadow-card, none);
   }
 
   /* THE TILE IS THE EDGE NOW: no hairline over a question and no band of air under the lead. */
@@ -940,12 +943,13 @@
     justify-content: center;
     align-items: center;
     inline-size: 100%;
-    min-block-size: var(--tap);
+    min-block-size: var(--ctl-page, var(--btn-h));
     margin-block-start: var(--tile-gap);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     /* A QUIET BUTTON ON THE BOARD IS THE TILE'S COLOUR (2 Nov): bare, "2 more" floated alone in the middle of the
-       column's foot and did not read as something to press. */
+       column's foot and did not read as something to press. A capsule now, with the card's edge. */
     background: var(--tile);
+    box-shadow: inset 0 0 0 0.5px var(--g-line, var(--rule));
     color: var(--ink-2);
     font-size: var(--fs-body);
     font-weight: 500;
@@ -955,22 +959,27 @@
 
   @media (hover: hover) and (pointer: fine) {
     .body :global(.block-slot[data-key^='decide-'] > .block-more:hover) {
-      background: var(--hover);
+      background: var(--tile) linear-gradient(var(--row-wash), var(--row-wash));
       color: var(--ink);
     }
   }
 
   /* WHAT WAS PUT OFF AND WHAT WAS DECIDED ARE PLAIN DISCLOSURE LINES (today F12), not tiles that say only a heading and
      Show: the name at 15/600 with a quiet well, and the fold's word at the end of the line. */
+  /* THE OPS FOLD ROW (4.17): a 40px line on the text edge, no card round it. Only its Show is pressed, so the line
+     itself takes no wash. */
   .body :global(.block-slot:has(> .block[data-kind='section'])) {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    min-block-size: var(--tap);
-    padding: 0;
+    min-block-size: 40px;
+    padding: 0 var(--title-inset, 12px);
     background: none;
-    border-radius: 0;
+    border: 0;
+    border-radius: 10px;
+    box-shadow: none;
   }
+
 
   .body :global(.block-slot:has(> .block[data-kind='section']) > .block-bar) {
     margin: 0;
@@ -986,26 +995,29 @@
   }
 
   .body :global(.block-slot:has(> .block[data-kind='section']) .sec-toggle) {
+    border-radius: var(--r-pill, 999px);
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   /* THE "⋯" IN THE HEAD: a quiet square, a tap wide under a thumb. */
+  /* THE "⋯" IN THE HEAD IS A GLASS CIRCLE (ops 4.1), the page tier: 36px, the control fill with its blur and hairline. */
   .head-more {
     display: inline-grid;
     place-items: center;
-    inline-size: var(--btn-h);
-    block-size: var(--btn-h);
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    inline-size: var(--ctl-page, var(--btn-h));
+    block-size: var(--ctl-page, var(--btn-h));
+    background: var(--g-fill, var(--tile-2));
+    backdrop-filter: var(--g-bf, none);
+    border-radius: var(--r-pill, 999px);
+    box-shadow: inset 0 0 0 0.5px var(--g-line, transparent);
     color: var(--ink-2);
     transition: background var(--d-state) var(--ease-out);
   }
-
   @media (hover: hover) and (pointer: fine) {
     :global(.menu-trigger):hover > .head-more {
-      background: var(--hover);
+      background: var(--g-fill-hover, var(--hover));
       color: var(--ink);
     }
   }

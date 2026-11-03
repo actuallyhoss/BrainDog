@@ -1234,12 +1234,14 @@
     min-block-size: var(--ctl-h);
     max-inline-size: 100%;
     padding-inline-start: var(--sp-4);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
   }
 
+  /* A GLASS CAPSULE IN THE CONTROL LINE (ops 4.1): the control fill, its blur and its 0.5px edge, no border. */
   .file-into[data-where='bar'] {
-    background: var(--tile);
-    border: 1px solid var(--rule-strong);
+    background: var(--g-fill, var(--tile));
+    backdrop-filter: var(--g-bf, none);
+    box-shadow: inset 0 0 0 0.5px var(--g-line, var(--rule-strong));
   }
 
 
@@ -1249,6 +1251,8 @@
   :global(.head[data-under] .series) {
     background: transparent;
     border-color: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
   }
 
   .file-label {
@@ -1261,7 +1265,7 @@
     min-block-size: var(--ctl-h);
     max-inline-size: 24ch;
     background-color: transparent;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
@@ -1281,7 +1285,7 @@
 
   .file-into[data-where='row'] .file-select {
     background-color: var(--tile-2);
-    border-radius: var(--r-pop);
+    border-radius: var(--r-field, 12px);
   }
 
   /* `Select` IS A PHONE'S AND A THUMB'S, for the reason `selecting` gives. */
@@ -1290,13 +1294,16 @@
   }
 
   /* THE "⋯" IN A PHONE'S HEAD: a quiet square, a tap wide. Its name is said to a screen reader and not drawn. */
+  /* A GLASS CIRCLE NOW (ops 4.1), drawn at the page tier and a tap wide under the thumb. */
   .head-more {
     display: inline-grid;
     place-items: center;
     inline-size: var(--tap);
     block-size: var(--tap);
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    background: var(--g-fill, var(--tile-2));
+    backdrop-filter: var(--g-bf, none);
+    border-radius: var(--r-pill, 999px);
+    box-shadow: inset 0 0 0 0.5px var(--g-line, transparent);
     color: var(--ink-2);
   }
 
@@ -1353,7 +1360,7 @@
   }
 
   .way + .way {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
   }
 
   .way-main {
@@ -1447,7 +1454,7 @@
   }
 
   .did-line + .did-line {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
   }
 
   .did-head {
@@ -1622,20 +1629,25 @@
 
   /* ONE GRID FOR AN OPEN ROW AND A SHUT ONE (today F14): the check, the words, and the time at the end of the third
      column always, so every row's time and hairline end at the same place. */
+  /* AN ARRIVAL IS AN OPS INBOX ROW (4.15): the row wash, rounded 10, and no hairline between two rows. */
   .arrival {
-    --row-wash: var(--hover);
     position: relative;
     display: grid;
     grid-template-columns: 28px minmax(0, 1fr) 72px;
     align-items: center;
     padding-inline: var(--sp-3);
-    border-radius: var(--r-pop);
+    margin-block: 1px;
+    border-radius: 10px;
     scroll-margin-block: var(--sp-7);
     transition: background var(--d-state) var(--ease-out);
   }
 
   .arrival[data-cursor] {
-    background: var(--hover);
+    background: var(--row-wash);
+  }
+
+  .arrival > .line::after {
+    display: none;
   }
 
   .arrival:has(.pick[data-on]) {
@@ -1645,7 +1657,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .arrival:hover {
-      background: var(--hover);
+      background: var(--row-wash);
     }
 
     /* The hairlines either side of a washed row step aside, as the shared rows' do. */
@@ -1795,9 +1807,12 @@
     max-inline-size: 100%;
     margin-inline: auto;
     padding: 6px 6px 6px var(--sp-4);
-    background: var(--tile);
-    border-radius: var(--r-tile);
-    border: 1px solid var(--rule-strong);
+    /* FLOATING CHROME, SO GLASS (ops 4.12's toast surface): the regular material, its edge and the popover shadow. */
+    background: var(--glass-regular, var(--tile));
+    backdrop-filter: var(--glass-filter, none);
+    border-radius: var(--r-chrome, var(--r-tile));
+    border: 0;
+    box-shadow: var(--glass-edge, none), var(--elev-popover, none);
   }
 
 
