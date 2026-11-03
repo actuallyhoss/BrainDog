@@ -38,7 +38,7 @@ struct MenuBarPanel: View {
                 VStack(spacing: 0) {
                     ForEach(Array(questions.prefix(3).enumerated()), id: \.element.id) { i, q in
                         Button { model.go(q.path) } label: {
-                            Text(q.question).font(Typeface.body).foregroundStyle(Palette.ink).lineLimit(2)
+                            Text(q.question).font(Typeface.body).foregroundStyle(Palette.ink).lineLimit(2).leading(.body)
                                 .multilineTextAlignment(.leading)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.vertical, Space.s2)

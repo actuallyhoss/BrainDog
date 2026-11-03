@@ -3,26 +3,34 @@ import SwiftUI
 /// The one surface for a group, a card: `--tile` on the board at radius 16, lifted by the card shadow in light and
 /// edged by a 1px rule in dark (`card()`). A heading row is a neutral 28 circle with an 18 glyph, the title at 15/600,
 /// an optional count in ink-3, and one thing at the far end.
+///
+/// A TILE OF ROWS (`rows: true`) leaves no orphan gap: its foot is 16 less the last row's own 10, so the last row's well
+/// sits 16 from the card's foot as the heading does from its top, and the heading stands 2 above the first row, whose own
+/// 10 makes the 12 a card's heading keeps from its content (`--card-head-gap`).
 public struct Tile<Content: View, Trailing: View>: View {
     let title: String?
     let glyph: Glyph?
     let count: Int?
-    let padding: CGFloat
+    let insets: EdgeInsets
+    let gap: CGFloat
     let content: Content
     let trailing: Trailing
 
-    public init(_ title: String? = nil, glyph: Glyph? = nil, count: Int? = nil, padding: CGFloat = Space.s4,
+    public init(_ title: String? = nil, glyph: Glyph? = nil, count: Int? = nil, padding: CGFloat = Space.s4, rows: Bool = false,
                 @ViewBuilder content: () -> Content, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
         self.title = title
         self.glyph = glyph
         self.count = count
-        self.padding = padding
+        self.insets = rows
+            ? EdgeInsets(top: Space.tilePad, leading: Space.tilePad, bottom: Space.tilePad - Space.rowY, trailing: Space.tilePad)
+            : EdgeInsets(top: padding, leading: padding, bottom: padding, trailing: padding)
+        self.gap = rows ? Space.s3 - Space.rowY : Space.s3
         self.content = content()
         self.trailing = trailing()
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
+        VStack(alignment: .leading, spacing: gap) {
             if let title {
                 HStack(spacing: Space.s2) {
                     if let glyph { IconWell(glyph, size: .m) }
@@ -36,7 +44,7 @@ public struct Tile<Content: View, Trailing: View>: View {
             }
             content
         }
-        .padding(padding)
+        .padding(insets)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
     }

@@ -280,12 +280,12 @@
 <style>
   .acct-share {
     display: grid;
-    gap: 10px;
+    gap: var(--sp-3);
   }
   /* EACH QUESTION STANDS APART FROM THE ONE ABOVE IT, "With" and "They can" as the Share sheet sets them, not run on
      under the sentence; and the choice keeps its own width. */
   .acct-share > :global(.field-label) {
-    margin-block-start: 8px;
+    margin-block-start: var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
@@ -331,7 +331,7 @@
     cursor: pointer;
   }
   .acct-stop {
-    margin-inline-start: 6px;
+    margin-inline-start: var(--sp-2);
     text-decoration: underline;
     font: inherit;
   }
@@ -345,35 +345,36 @@
   .acct-offer {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--gap-glyph);
     width: 100%;
-    min-height: 40px;
+    min-height: var(--row-h);
     border: 0;
     background: none;
     color: var(--ink);
     text-align: start;
     cursor: pointer;
-    border-radius: 8px;
-    padding: 4px 8px;
+    border-radius: var(--r-ctl);
+    padding: var(--sp-1) var(--sp-2);
   }
   .acct-offer:hover {
     background: var(--hover, color-mix(in oklab, var(--ink) 6%, transparent));
   }
   /* IN THE PAGE'S COLUMN, level with the filters and tiles under it, not out at the edge of the screen. */
   .acct-holders {
-    margin: 4px var(--gutter, 16px) 0;
+    margin: var(--sp-1) var(--gutter, 16px) 0;
     justify-self: start;
     inline-size: fit-content;
     max-inline-size: calc(100% - 2 * var(--gutter, 16px));
-    padding: 6px 12px;
+    padding: var(--sp-1) var(--sp-3);
     border-radius: var(--r-ctl, 8px);
     background: var(--tile-2, color-mix(in oklab, var(--ink) 4%, transparent));
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--sp-1) var(--sp-2);
     align-items: baseline;
     color: var(--ink-2);
     font-size: 0.875em;
+    line-height: var(--lead-ui);
   }
   .acct-holders-head {
     color: var(--ink-3);
@@ -381,6 +382,6 @@
   .acct-holder {
     display: inline-flex;
     align-items: baseline;
-    gap: 6px;
+    gap: var(--sp-1);
   }
 </style>

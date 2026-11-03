@@ -102,7 +102,7 @@
     flex-direction: column;
     gap: var(--tile-gap);
     min-inline-size: 0;
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   .tab-body {

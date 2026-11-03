@@ -115,6 +115,7 @@
     gap: var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .q-items {
@@ -172,6 +173,7 @@
     gap: var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .q-meter meter {

@@ -960,7 +960,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* ONE COLUMN UNTIL THERE IS ROOM FOR TWO: the tiles over the stream, side by side where they fit. */
@@ -969,14 +969,20 @@
     grid-template-areas: 'side' 'feed';
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    gap: var(--sp-5);
+    gap: var(--tile-gap);
+  }
+
+  /* WITHOUT THE SIDE TILES (a phone lays them inside the stream) THE EMPTY ROW GOES, and its gap with it: the stream
+     stood 28 under the head where every page's first tile stands 16 (cleanup, 3 Nov). */
+  .board:not(:has(> .side)) {
+    grid-template-areas: 'feed';
   }
 
   .side {
     grid-area: side;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-    gap: var(--inset);
+    gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
@@ -986,17 +992,17 @@
     grid-area: feed;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--tile-gap);
     min-inline-size: 0;
     container-type: inline-size;
   }
 
-  /* AT 1440 THE TILES ARE A 320 COLUMN AT THE STREAM'S RIGHT, 12 apart like any two tiles. */
+  /* AT 1440 THE TILES ARE A 320 COLUMN AT THE STREAM'S RIGHT, a tile's gap apart like any two tiles. */
   @container (width >= 860px) {
     .board {
       grid-template-areas: 'feed side';
       grid-template-columns: minmax(0, 1fr) 320px;
-      gap: var(--sp-6);
+      gap: var(--tile-gap);
     }
 
     .side {
@@ -1017,13 +1023,14 @@
     margin-block-start: auto;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .foot {
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* A TILE'S FOOT SITS UNDER ITS READING, a step closer than the tile's own gap. */
@@ -1069,6 +1076,7 @@
     color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     cursor: pointer;
   }
 
@@ -1124,7 +1132,7 @@
   .seg-menu {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-1);
     box-sizing: border-box;
     max-inline-size: 22ch;
   }
@@ -1282,7 +1290,7 @@
   .line-detail {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-2);
     min-inline-size: 0;
   }
 
@@ -1324,6 +1332,7 @@
   .line-when time {
     font-family: var(--font-ui);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1334,7 +1343,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     font-variant-numeric: tabular-nums;
   }
 

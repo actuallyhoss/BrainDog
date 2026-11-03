@@ -66,6 +66,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 400;
+    line-height: var(--lead-meta, 18px);
   }
 
   .cell .glyph {
@@ -611,6 +612,17 @@
     .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child > :is(.cell-trend, .cell-trend-ahead) {
       inline-size: 100%;
       margin-block-start: var(--sp-3);
+    }
+
+    /* NO ORPHAN GAP AT A STACK'S ENDS (rhythm, 3 Nov): the 12 a row keeps either side of its hairline is space between
+       rows, so the first keeps none above it and the last none below; the tile's own padding is the edge. */
+    .block[data-kind='stat'] .grid > .cell:first-child {
+      padding-block-start: 0;
+    }
+
+    .block[data-kind='stat'] .grid > .cell:last-child,
+    .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child):last-child {
+      padding-block-end: 0;
     }
   }
 }

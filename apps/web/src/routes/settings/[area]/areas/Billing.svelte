@@ -419,7 +419,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .reading[data-needs] {
@@ -432,7 +432,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   .bills {
@@ -478,12 +478,13 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .bill-plan {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -492,7 +493,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* PAST DUE AND LAPSED ARE THE TWO STATES THAT NEED THE PERSON, and red is the house's word for what needs him.
@@ -556,6 +557,7 @@
   .invoice-state {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .invoice-state[data-state='open'],
@@ -567,6 +569,7 @@
     display: flex;
     gap: var(--sp-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .invoice-links a {

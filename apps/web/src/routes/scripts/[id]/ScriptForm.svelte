@@ -363,6 +363,7 @@
     padding: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
 
@@ -378,6 +379,7 @@
     margin-block-start: var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .help {
@@ -385,6 +387,7 @@
     margin-block-start: calc(var(--sp-1) - var(--sp-2));
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .help.wrong {
@@ -512,6 +515,7 @@
     color: var(--ink-2);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

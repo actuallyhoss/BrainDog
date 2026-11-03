@@ -60,14 +60,79 @@
     --ctl-page: 36px;
     --ctl-panel: 28px;
     --table-row-h: 44px;
+    --row-h: 44px;
+    --row-h-2: 56px;
     --title-inset: 12px;
-    --toolbar-gap: 6px;
+    --toolbar-gap: 8px;
     --window-inset: 12px;
     --tile-gap: 16px;
     --rail: 220px;
     /* THE PHONE BAR FLOATS: 60 tall, 8 over the home indicator. */
     --tab-h: 60px;
     --tabbar: calc(var(--tab-h) + 8px + env(safe-area-inset-bottom));
+
+    /* THE RHYTHM (3 Nov, "revise all spacing, line spacing, padding ... ALL"): the rules are
+       `loop/plans/spacing-2026-11-03/RHYTHM.md`. Space is a multiple of 4; 2 only inside a control. */
+    --sp-0: 2px;
+    /* Line boxes per size, in px, so a line sits on the 2px sub-grid. `--lh-*` stay ratios for running text. */
+    --lead-caps: 16px;
+    --lead-cap: 16px;
+    --lead-meta: 18px;
+    --lead-ctl: 20px;
+    --lead-ui: calc(var(--fs-body) + 6px);
+    --lead-row: 20px;
+    --lead-head: 22px;
+    --lead-figure: 26px;
+    --lead-page: 32px;
+    --lead-hero: 34px;
+    --lh-head: 1.3;
+    --lh-figure: 1.18;
+    --lh-tight: 1.25;
+    --track-caps: 0.025em;
+    --track-head: -0.01em;
+    --track-body: 0.005em;
+    /* The type pairs as one shorthand each: `font: var(--t-row)`. */
+    --t-caps: var(--fw-medium) var(--fs-caps) / var(--lead-caps) var(--font-ui);
+    --t-cap: var(--fw-regular) var(--fs-cap) / var(--lead-cap) var(--font-ui);
+    --t-meta: var(--fw-regular) var(--fs-meta) / var(--lead-meta) var(--font-ui);
+    --t-ctl: var(--fw-medium) var(--fs-ctl) / var(--lead-ctl) var(--font-ui);
+    --t-body: var(--fw-regular) var(--fs-body) / var(--lh-body) var(--font-ui);
+    --t-ui: var(--fw-regular) var(--fs-body) / var(--lead-ui) var(--font-ui);
+    --t-row: var(--fw-regular) var(--fs-row) / var(--lead-row) var(--font-ui);
+    --t-head: var(--fw-semi) var(--fs-head) / var(--lead-head) var(--font-display);
+    --t-figure: var(--fw-semi) var(--fs-figure) / var(--lead-figure) var(--font-display);
+    --t-page: var(--fw-semi) var(--fs-page) / var(--lead-page) var(--font-display);
+    --t-hero: var(--fw-semi) var(--fs-hero) / var(--lead-hero) var(--font-display);
+
+    /* Controls. */
+    --field-h: 36px;
+    --menu-row-h: 32px;
+    --badge-h: 20px;
+    --ctl-pad: 16px;
+    --ctl-pad-sm: 12px;
+    --gap-glyph: 8px;
+    /* A card's heading glyph: bare, 18, in the quiet ink. */
+    --head-glyph: 18px;
+
+    /* Rows. */
+    --row-pad-y: 8px;
+    --row-pad-x: var(--title-inset);
+    --row-gap: 12px;
+    --row-stack: 2px;
+
+    /* Cards, sections and the page: desk values here, tablet and phone below. */
+    --tile-pad: 20px;
+    --tile-pad-lead: 24px;
+    --card-list-pad: calc(var(--tile-pad) - var(--title-inset));
+    --card-head-gap: 12px;
+    --divider-space: 12px;
+    --gutter: 32px;
+    --page-top: 24px;
+    --page-head-gap: 24px;
+    --section-gap: 48px;
+    --section-head-gap: 16px;
+    --page-bottom: 64px;
+    --title-gap: 16px;
 
     /* MOTION: the ops springs, beside the house's eases. */
     --spring-press: linear(0, 0.158, 0.438, 0.683, 0.852, 0.949, 0.995, 1.013, 1.015, 1.012, 1.008, 1);
@@ -86,6 +151,7 @@
     --focus-ring: color-mix(in oklab, var(--focus) 70%, transparent);
 
     --card-edge: color-mix(in oklab, var(--tile) 80%, transparent);
+    --card: inset 0 0 0 1px var(--card-edge), var(--shadow-card);
     --shadow-card:
       inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px color-mix(in oklab, var(--sh) 4%, transparent),
       0 12px 30px -12px color-mix(in oklab, var(--sh) 14%, transparent);
@@ -148,6 +214,7 @@
       --menu-row-fill: color-mix(in oklab, var(--ink) 8%, transparent);
       --card-edge: color-mix(in oklab, var(--ink) 8%, transparent);
       --shadow-card: none;
+      --card: inset 0 0 0 1px var(--card-edge);
       --shadow-card-hover: none;
       --shadow-raised: 0 1px 1px rgb(0 0 0 / 0.3), 0 2px 4px rgb(0 0 0 / 0.24), 0 6px 12px rgb(0 0 0 / 0.28);
       --elev-chrome: 0 6px 18px -8px rgb(0 0 0 / 0.42);
@@ -185,6 +252,7 @@
     --menu-row-fill: color-mix(in oklab, var(--ink) 8%, transparent);
     --card-edge: color-mix(in oklab, var(--ink) 8%, transparent);
     --shadow-card: none;
+    --card: inset 0 0 0 1px var(--card-edge);
     --shadow-card-hover: none;
     --shadow-raised: 0 1px 1px rgb(0 0 0 / 0.3), 0 2px 4px rgb(0 0 0 / 0.24), 0 6px 12px rgb(0 0 0 / 0.28);
     --elev-chrome: 0 6px 18px -8px rgb(0 0 0 / 0.42);
@@ -241,10 +309,36 @@
      (`.tap`, a11y.css). The skin's own coarse block made them 44 and 40 drawn; this one comes later and wins. */
   @media (pointer: coarse) {
     :root {
+      --field-h: var(--tap);
       --ctl-h: 36px;
       --btn-h: 36px;
       --btn-h-sm: 28px;
     }
+  }
+
+  /* THE RHYTHM BY WIDTH: tablet 640 to 1199, phone under 640, and a wider gutter from 1600. */
+  @media (width < 1200px) {
+    :root {
+      --gutter: 24px;
+      --section-gap: 40px;
+      --page-bottom: 48px;
+    }
+  }
+  @media (width < 640px) {
+    :root {
+      --tile-pad: 16px;
+      --tile-pad-lead: 16px;
+      --tile-gap: 12px;
+      --gutter: 16px;
+      --page-top: 12px;
+      --page-head-gap: 16px;
+      --section-gap: 32px;
+      --section-head-gap: 12px;
+      --page-bottom: 24px;
+    }
+  }
+  @media (width >= 1600px) {
+    :root { --gutter: 40px; }
   }
 
   html[data-text='sm'] { --fs-body: 13px; }
@@ -273,10 +367,12 @@
   }
 
   /* A CARD: the one surface for content. Solid, a 1px edge in its own colour, the soft two-layer shadow in light. */
+  /* THE EDGE IS DRAWN, NOT A BORDER (rhythm, 3 Nov): a 1px border moved a tile's content a pixel in from every other
+     card's on the board. `--card` is the edge and the shadow as one name, for any surface that is a card. */
   .surface-card,
   .tile {
-    border: 1px solid var(--card-edge);
-    box-shadow: var(--shadow-card);
+    border: 0;
+    box-shadow: var(--card);
   }
   .surface-card {
     background: var(--tile);
@@ -291,8 +387,7 @@
     transition: box-shadow 150ms var(--ease-standard), border-color 150ms var(--ease-standard);
   }
   .surface-card.is-link:hover {
-    box-shadow: var(--shadow-card-hover);
-    border-color: var(--rule-strong);
+    box-shadow: inset 0 0 0 1px var(--rule-strong), var(--shadow-card-hover);
   }
 
   /* GLASS: a floating surface people read on (menus, tooltips, toasts). Never content. */
@@ -335,7 +430,7 @@
   }
   .gctl.cap {
     inline-size: auto;
-    padding-inline: 14px;
+    padding-inline: var(--ctl-pad);
   }
   .gctl.sm {
     inline-size: var(--ctl-panel);
@@ -344,7 +439,7 @@
   }
   .gctl.sm.cap {
     inline-size: auto;
-    padding-inline: 12px;
+    padding-inline: var(--ctl-pad-sm);
   }
   .gctl:hover {
     background-color: var(--g-fill-hover);
@@ -399,8 +494,8 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    block-size: 22px;
-    padding-inline: 8px;
+    block-size: var(--badge-h);
+    padding-inline: var(--sp-2);
     border-radius: var(--r-pill);
     background: var(--soft-fill);
     color: var(--ink-2);
@@ -417,7 +512,8 @@
   .caps-label {
     font-size: var(--fs-caps);
     font-weight: var(--fw-medium);
-    letter-spacing: 0.025em;
+    line-height: var(--lead-caps);
+    letter-spacing: var(--track-caps);
     text-transform: uppercase;
     color: var(--ink-3);
   }
@@ -430,7 +526,7 @@
     align-items: center;
     gap: 8px;
     inline-size: 100%;
-    min-block-size: 32px;
+    min-block-size: var(--menu-row-h);
     padding: 0 10px;
     border: 0;
     border-radius: var(--r-menu-row);
@@ -458,11 +554,10 @@
   .group-list {
     display: flex;
     flex-direction: column;
-    padding-block: 3px;
+    padding-block: var(--sp-1);
     border-radius: var(--r-tile);
     background: var(--tile);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--card-edge);
+    box-shadow: var(--card);
   }
   .group-list > * + * {
     box-shadow: inset 0 0.5px 0 var(--sep);
@@ -553,10 +648,10 @@
   .field:has(> .field-input[type='search']),
   .field:has(> input[type='search']) {
     border-radius: var(--r-pill);
-    padding-inline: 14px;
+    padding-inline: var(--ctl-pad);
   }
   .field-input.head-search {
-    padding-inline: 14px;
+    padding-inline: var(--ctl-pad);
     border-radius: var(--r-pill);
     background: var(--g-fill);
     -webkit-backdrop-filter: var(--g-bf);

@@ -1047,7 +1047,7 @@
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* FOUR TABS WRAP RATHER THAN PUSH THE PAGE SIDEWAYS on a 320px screen, where their words do not fit one row. The
@@ -1149,14 +1149,14 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .trigger-said {
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
   }
 
@@ -1174,6 +1174,7 @@
     margin: 0 0 var(--sp-3);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WHAT IS WRONG WITH THE WHOLE OF IT, UNDER THE TRIGGER: red words after the glyph, on the
@@ -1186,6 +1187,7 @@
     padding-inline: calc(var(--sp-3) + var(--well-l) + var(--sp-3)) var(--sp-3);
     color: var(--red);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
 
@@ -1203,6 +1205,7 @@
     gap: var(--sp-1);
     margin: 0;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .calls :global(.calls-h) {
@@ -1231,6 +1234,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1382,7 +1386,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .run {
@@ -1415,7 +1419,7 @@
   .run-say {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1441,6 +1445,7 @@
   .version-tag {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
 
@@ -1470,6 +1475,7 @@
     padding: 0;
     list-style: none;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .diff-line {
@@ -1528,7 +1534,7 @@
     color: var(--ink-2);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

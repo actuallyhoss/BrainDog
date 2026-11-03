@@ -1018,6 +1018,7 @@
     padding: var(--sp-3) var(--sp-3) var(--sp-1);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: var(--fw-medium);
   }
 
@@ -1029,7 +1030,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
     min-inline-size: 0;
   }
 
@@ -1111,7 +1112,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .about:empty,
@@ -1136,6 +1137,7 @@
   .head-switch-word {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: var(--fw-medium);
   }
 
@@ -1163,6 +1165,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WHAT WAITS IS READ AS A SENTENCE, at body size, under the version: the count and the list it waits for are the words. */
@@ -1194,7 +1197,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .rates-why {
@@ -1202,7 +1205,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
     text-wrap: pretty;
   }
 
@@ -1229,14 +1232,14 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: var(--lead-head);
   }
 
   .rate-note {
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .rate-line {
@@ -1268,13 +1271,13 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .setting[data-kind='switch'] .setting-label {
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .setting-control {
@@ -1312,6 +1315,7 @@
     color: var(--ink-3);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* A SELECT OR A DATE IS A FIELD: the `--tile-2` well, no border, the `--r-pop` corner, 40 tall and 44 under a thumb. The
@@ -1336,7 +1340,7 @@
   .setting-why {
     margin: 0;
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .setting-note {
@@ -1377,6 +1381,7 @@
   .added-meta {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     white-space: nowrap;
   }
 

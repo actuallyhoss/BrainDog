@@ -1029,14 +1029,14 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
   }
 
   .who-detail {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* WHAT IT WOULD BE ALLOWED TO DO, where two words do not say all of it: the sentence the decision is made from, so
@@ -1054,6 +1054,7 @@
   .who-scope {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
     white-space: nowrap;
   }
@@ -1098,11 +1099,15 @@
   }
 
   /* DEFAULTS IS NOT AN AGENT: it stands under them across the tile, a hairline above it. */
+  /* THE TILE'S 16 GAP IS TAKEN BACK over the hairline, so the rule has the rows' own 12 on each side of it, as the rules
+     between the agents above it do: it stood 28 under the last agent and 12 over Defaults. */
   .agents-default {
+    margin-block-start: calc(-1 * var(--sp-4));
     border-block-start: 1px solid var(--rule);
   }
 
   .agents-default:first-child {
+    margin-block-start: 0;
     border-block-start: 0;
   }
 
@@ -1182,7 +1187,7 @@
     color: var(--ink-2);
     text-wrap: pretty;
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .agent-may {
@@ -1250,7 +1255,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     text-wrap: pretty;
   }
 
@@ -1288,7 +1293,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* ON A PHONE THE TWO WORDS AND REVOKE GO UNDER THE NAME, starting where the name starts. Beside the name, Revoke took
@@ -1327,6 +1332,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WHO IS WAITING, one line each, over the six boxes. */
@@ -1356,7 +1362,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   .plan dt {
@@ -1399,6 +1405,7 @@
   .plan-detail {
     color: var(--ink-3);
     font-size: var(--fs-cap);
+    line-height: var(--lead-cap);
   }
 
   /* THE FACTS UNDER A NAME WRAP AS WHOLE ITEMS, with space between them and no separator to lead a line. */
@@ -1421,6 +1428,7 @@
     margin: 0;
     color: var(--tone, var(--ink-2));
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
@@ -1526,7 +1534,7 @@
     margin-block-start: var(--sp-3);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .theirs-lead {
@@ -1560,5 +1568,6 @@
   .theirs-said {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 </style>

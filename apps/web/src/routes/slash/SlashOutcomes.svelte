@@ -44,7 +44,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lh-body);
     font-variant-numeric: tabular-nums;
   }
 

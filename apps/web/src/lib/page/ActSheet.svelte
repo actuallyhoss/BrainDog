@@ -98,24 +98,24 @@
 <style>
   .act-sheet {
     display: grid;
-    gap: 12px;
+    gap: var(--sp-3);
   }
   .act-said,
   .act-look {
     margin: 0;
     font-size: var(--fs-body);
-    line-height: 1.5;
+    line-height: var(--lh-body);
     color: var(--ink);
   }
   .act-look {
-    padding-inline-start: 20px;
+    padding-inline-start: var(--sp-5);
     display: grid;
-    gap: 4px;
+    gap: var(--sp-1);
   }
   /* THE VALUE ON A FLAT FIELD, in the mono face and broken anywhere, so a long key is read whole on a phone. */
   .act-value {
     display: block;
-    padding: 12px;
+    padding: var(--sp-3);
     border-radius: var(--r-field, var(--r-ctl));
     background: var(--tile-2);
     font-family: var(--font-mono);
@@ -126,7 +126,7 @@
   .act-foot {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--toolbar-gap);
     justify-content: flex-end;
   }
 </style>

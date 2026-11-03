@@ -69,7 +69,7 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* 40 TALL AND 44 UNDER A THUMB, on the `--tile-2` fill with no border, at the control's 8px corner, so a field and the
@@ -79,7 +79,8 @@
     align-items: center;
     gap: var(--sp-2);
     box-sizing: border-box;
-    min-block-size: 40px;
+    /* 36 UNDER A MOUSE, THE BUTTONS' HEIGHT, AND 44 UNDER A THUMB (rhythm, 3 Nov: it was 40, between the two). */
+    min-block-size: var(--field-h);
     padding: 0 var(--sp-3);
     /* THE OPS FIELD (3 Nov): the tile's own fill, a 1px edge, radius 12. */
     background: var(--tile);
@@ -129,7 +130,7 @@
   /* UNDER A MOUSE THE INPUT IS THE FIELD'S 40, and under a thumb the field is 44 and so is the input. */
   @media (pointer: fine) {
     .field:not(.field-lg) .field-input {
-      min-block-size: 40px;
+      min-block-size: var(--field-h);
     }
   }
 
@@ -140,7 +141,7 @@
   }
 
   .field-lg {
-    min-block-size: var(--tap);
+    min-block-size: var(--field-h);
     padding-inline: var(--sp-4);
     gap: var(--sp-3);
   }
@@ -156,8 +157,8 @@
     flex: 1;
     align-self: stretch;
     /* AND THE INPUT HOLDS THE FLOOR ITSELF, not only its wrapper: `13 §7` counts the target, not its container, and
-       under a thumb `--ctl-h` is the 44 the rule asks for. */
-    min-block-size: var(--ctl-h);
+       under a thumb `--field-h` is the 44 the rule asks for. */
+    min-block-size: var(--field-h);
     min-inline-size: 0;
     border: 0;
     background: none;
@@ -224,6 +225,7 @@
     color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
+    line-height: var(--lead-ctl);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -573,7 +575,7 @@
    */
   :where(select:not([multiple], [size])) {
     appearance: none;
-    min-block-size: max(40px, var(--ctl-h));
+    min-block-size: var(--field-h);
     padding-inline-start: var(--sp-3);
     background-color: var(--tile-2);
     border: 0;
@@ -604,7 +606,7 @@
      `--sp-3` of padding here would set its value a step further in than every text field beside it. */
   :where(input:is([type='date'], [type='time'], [type='datetime-local'], [type='month'], [type='week']):not(.field-input)) {
     appearance: none;
-    min-block-size: max(40px, var(--ctl-h));
+    min-block-size: var(--field-h);
     padding-inline: var(--sp-3);
     background-color: var(--tile-2);
     border: 0;

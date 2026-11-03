@@ -287,6 +287,7 @@
   .qb-label {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
 
@@ -313,6 +314,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* A MISREAD LEAVES THE LAST GOOD ROWS WHERE THEY ARE, greyed, so what still applies is visible under the line. */
@@ -342,6 +344,7 @@
     margin: var(--sp-1) 0 0;
     color: var(--red);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* THE COUNT AND DONE STAY AT THE FOOT, pinned to the bottom of whatever scrolls the builder, so the answer to the
@@ -362,6 +365,7 @@
   .qb-count {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .qb-count[data-counting] {

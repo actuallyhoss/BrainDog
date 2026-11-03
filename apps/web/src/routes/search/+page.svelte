@@ -537,8 +537,8 @@
     container-type: inline-size;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    gap: var(--page-head-gap, 24px);
+    padding: var(--page-head-gap, 24px) var(--gutter) var(--page-bottom, 64px);
   }
 
   /* THE FIELD IS `controls.css`'s, with the ink ring on the wrapper while the input inside it has focus, drawn here at
@@ -565,10 +565,8 @@
     margin: 0;
     padding-inline: var(--title-inset, 12px);
     color: var(--ink-3);
-    font-size: var(--fs-caps, 11px);
-    font-weight: var(--fw-medium);
-    letter-spacing: 0.025em;
-    line-height: 16px;
+    font: var(--t-caps, 500 11px / 16px var(--font-ui));
+    letter-spacing: var(--track-caps, 0.025em);
     text-transform: uppercase;
   }
 
@@ -615,8 +613,8 @@
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: var(--sp-3);
-    min-block-size: 36px;
+    column-gap: var(--row-gap, 12px);
+    min-block-size: var(--ctl-h, 36px);
     padding-inline: var(--sp-2);
     border-radius: var(--r-ctl);
     color: var(--ink);
@@ -653,7 +651,7 @@
   .place-name {
     overflow: hidden;
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui, 20px);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -663,6 +661,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
     font-variant-numeric: tabular-nums;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -704,7 +703,7 @@
     padding-inline: var(--title-inset, 12px);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
   /* THE LETTERS THE QUERY MATCHED, at 600 in the title's own ink. */
@@ -714,7 +713,9 @@
 
   /* THE BEST MATCH, one 56px line. */
   .best {
-    min-block-size: 56px;
+    min-block-size: var(--row-h-2, 56px);
+    /* THE SAME 12 FROM WELL TO WORDS AS THE LISTS' ROWS BELOW (it was 16, so its title started 4px further in). */
+    column-gap: var(--row-gap, 12px);
     /* AND ITS WELL ON THE SAME EDGE AS EVERY LIST'S BELOW IT (leftovers 4): a list's rows stand out by their padding so
        the wash under the pointer reaches the tile's edge, and the best match, not in one, stood 12 further in. */
     margin-inline: calc(-1 * var(--sp-3));

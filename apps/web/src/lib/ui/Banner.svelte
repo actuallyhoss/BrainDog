@@ -45,8 +45,11 @@
     gap: var(--sp-2) var(--sp-4);
     box-sizing: border-box;
     min-block-size: 48px;
-    margin: var(--inset) var(--gutter) 0;
-    padding: 10px 10px 10px var(--sp-4);
+    /* THE PAGE'S TOP STEP OVER IT (cleanup, 3 Nov), and the same step under it, which is the head's or the page's own
+       top padding: 12 on a phone, 24 wider, so a banner stands where the page's first line would. */
+    margin: var(--page-top) var(--gutter) 0;
+    /* 12 round the controls and 16 before the words (rhythm, 3 Nov: it was 10, off the grid). */
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
     border-radius: var(--r-tile);
     color: var(--ink);
   }
@@ -80,7 +83,7 @@
     min-inline-size: 0;
     margin: 0;
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lead-ui);
   }
 
   /* THE GLYPH SITS ON THE FIRST LINE'S MIDDLE: a box one line tall, the icon centred in it. */
@@ -88,7 +91,7 @@
     display: flex;
     flex: none;
     align-items: center;
-    block-size: 22px;
+    block-size: var(--lead-ui);
     color: var(--banner-glyph);
   }
 

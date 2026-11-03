@@ -288,7 +288,7 @@
     overflow: hidden;
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -297,7 +297,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -322,7 +322,7 @@
   .card-holds {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* THE ONE WRITTEN LINE under the chart and its rows. */
@@ -330,7 +330,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* A PAGE OPENED FROM ITS ROW FILLS A PHONE'S SCREEN, clear of the top and bottom insets, and is a wide sheet from
@@ -383,7 +383,7 @@
     overflow-wrap: anywhere;
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: var(--lead-head);
   }
 
   .opened-close {

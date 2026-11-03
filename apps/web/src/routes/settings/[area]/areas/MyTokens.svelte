@@ -191,6 +191,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     max-inline-size: var(--measure);
   }
 
@@ -215,12 +216,14 @@
     min-inline-size: 0;
     overflow-wrap: anywhere;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .mine-said {
     margin: 0;
     min-block-size: 1lh;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .mine-said[data-intent='bad'] {
@@ -277,6 +280,7 @@
     column-gap: var(--sp-3);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* REVOKE KEEPS A THUMB'S TARGET: the button's own height is `--ctl-h`, 44px with a coarse pointer, and the column

@@ -452,7 +452,22 @@
      at most, set at the name's edge under the face, and what they were met in as one quiet run of words after it, where
      a note ran to six lines and "Met in" stood a column away from its value. The whole note is on their page. */
   .cards-item:has(> .cards-head > .cards-face) {
-    gap: var(--sp-1);
+    gap: var(--row-stack, 2px);
+  }
+
+  /* ON THE RHYTHM'S LINE BOXES (cleanup, 3 Nov): the name 14/20, who they are and where they were met 12.5/18, each
+     2 under the line above. The face is 28 and the name's line 20, so who they are comes 4 back up into the head's
+     box to stand 2 under the name and not 6. */
+  .cards-item:has(> .cards-head > .cards-face) .cards-title {
+    line-height: var(--lead-ui, 20px);
+  }
+
+  .cards-item:has(> .cards-head > .cards-face) :is(.cards-reply, .cards-fact, .cards-fact dt, .cards-fact dd, .cards-when) {
+    line-height: var(--lead-meta, 18px);
+  }
+
+  .cards-item:has(> .cards-head > .cards-face) > .cards-head + * {
+    margin-block-start: calc(var(--lead-ui, 20px) / 2 - 14px);
   }
 
   .cards-item:has(> .cards-head > .cards-face) > :is(.cards-reply, .cards-facts) {

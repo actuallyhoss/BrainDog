@@ -142,6 +142,9 @@
     gap: var(--sp-2) var(--sp-3);
     min-inline-size: 0;
     min-block-size: var(--well);
+    /* THE ONE CARD HEAD (rhythm, 3 Nov): a 28 row (a panel control's height) with its 14/20 name centred, and 12 to
+       what it names; the tile's 16 between its other parts less 4. */
+    margin-block-end: calc(var(--card-head-gap) - var(--sp-4));
   }
 
   /* A HEADING WITH NOTHING BESIDE IT KEEPS ITS NAME BY ITS WELL: in a narrow tile (two to a row on a phone) "Quiet
@@ -149,8 +152,8 @@
   /* THE HEADING'S GLYPH IS BARE (ops style, 3 Nov): 18px of quiet ink beside the name, no well behind it, so a card's
      head is its name and nothing boxed. A project's well keeps its slot colour as the glyph's ink. */
   .tile-head > :global(.well) {
-    inline-size: 18px;
-    block-size: 18px;
+    inline-size: var(--head-glyph);
+    block-size: var(--head-glyph);
     border-radius: 0;
     background: none;
     color: var(--ink-3);
@@ -184,7 +187,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: 22px;
+    line-height: var(--lead-ui);
   }
 
   .tile-name {
@@ -198,6 +201,7 @@
     flex: none;
     color: var(--ink-3);
     font-weight: var(--fw-medium);
+    line-height: var(--lead-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -221,6 +225,7 @@
     min-inline-size: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-variant-numeric: tabular-nums;
     overflow-wrap: break-word;
     text-wrap: pretty;

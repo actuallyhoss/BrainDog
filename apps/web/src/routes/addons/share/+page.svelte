@@ -482,7 +482,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* THE TWO KINDS OF FILE TAKE THEIR WORDS' WIDTH, never a grey band across the page (agents F27). */
@@ -504,7 +504,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* ONE COLUMN, EVERY FIELD THE SAME WIDTH: the page runs the whole window and the fields keep the reading measure
@@ -571,7 +571,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* A PICK IS A ROW: the box, then its words, 44 tall so the whole row is the target. */
@@ -583,7 +583,7 @@
     min-block-size: var(--tap);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* THE WORDS SIT BESIDE THE BOX, never under it, and a pick has air above it and the disclosure below. */
@@ -638,7 +638,7 @@
   .pick-detail {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* WHAT CHANGES, ONE LINE EACH, a hairline between two. */
@@ -650,7 +650,7 @@
     list-style: none;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .changes li {
@@ -685,9 +685,4 @@
     margin-block-start: var(--sp-5);
   }
 
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-  }
 </style>

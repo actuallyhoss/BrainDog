@@ -497,6 +497,7 @@
     cursor: pointer;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 600;
     padding-block: var(--sp-2);
   }
@@ -521,6 +522,7 @@
   .code-label {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* A FORWARDING ADDRESS HAS NO SPACES IN IT, and one long word must not push the page sideways:
@@ -539,6 +541,7 @@
     border-radius: var(--r-pop);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* THE STEPS: a number in a fixed track, then the step. No box around a step or the list;
@@ -588,6 +591,7 @@
     margin: 0;
     color: var(--tone, var(--ink-2));
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .hint {
@@ -595,7 +599,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   /* THE DOORS TILE'S ROWS: a 32px well, the door and the list it writes to, and its state as a 6px dot and a word,
@@ -641,6 +645,7 @@
   .feed-said {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .doors {
@@ -675,13 +680,13 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .door-detail {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .door-state {
@@ -690,6 +695,7 @@
     gap: 6px;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
     white-space: nowrap;
   }
@@ -721,7 +727,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   @media (width < 900px) {

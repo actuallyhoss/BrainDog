@@ -38,8 +38,13 @@
    on one screen. The one class more is what lets Money's head be a head. */
 .hosted[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) {
   gap: var(--sp-1);
-  padding: var(--sp-2) 0 var(--sp-1);
+  /* NO STEP OF ITS OWN OVER IT: the page's top step already stands over the sentence, which stood 8 lower than every
+     other page's first line (cleanup, 3 Nov). */
+  padding: 0 0 var(--sp-1);
   background: none;
+  /* NOR THE CARD'S EDGE: the lead tile wears one since the rhythm pass, and with the fill gone it drew an empty outline
+     round Money's sentence (cleanup, 3 Nov). */
+  box-shadow: none;
 }
 
 .hosted[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p {
@@ -488,10 +493,10 @@
 
 /* ── the board packs its tiles by their heights (`masonry.ts`) ───────────── */
 
-/* EACH TILE AS TALL AS WHAT IT HOLDS, the next in its column starting under it: rows four pixels high, no gap between
+/* EACH TILE AS TALL AS WHAT IT HOLDS, the next in its column starting under it: rows a pixel high, no gap between
    them, and each tile spanning its own height and the gap under it. Set only while the page has two columns or more. */
 [data-money] .page[data-packed] {
-  grid-auto-rows: 4px;
+  grid-auto-rows: 1px;
   row-gap: 0;
 }
 
@@ -2134,4 +2139,249 @@
 
 [data-money] .cards-item .cards-when {
   font-size: var(--fs-cap);
+}
+
+/* ── THE RHYTHM (spacing pass, 3 Nov; `loop/plans/spacing-2026-11-03/RHYTHM.md`) ─────────────────────────────────────
+   Last in the sheet so it wins a tie. Every space a multiple of four, every line its size's line box (`--lead-*`), a
+   rule inside a card with the same air above and below it, rows told apart by air and not by hairlines, and a card's
+   text as far from its bottom edge as its heading is from its top. */
+
+/* THE CASH: the label at a control label's line box, the note at a meta line's, the glance strip's caption at the caps
+   label's 11/16 and its figure 4 under it. The rule over the strip has 12 above and 12 below (`--divider-space`): the
+   cash's link fill reaches 8 past its words, so its foot is the space plus those 8. */
+[data-money] .block[data-form='lead'] .cell:first-child .cell-label,
+[data-money] .block[data-kind='stat'] .cell .cell-label {
+  line-height: var(--lead-ctl);
+}
+
+[data-money] .block[data-form='lead'] .cell:first-child .cell-note,
+[data-money] .block[data-form='lead'] .trend-days {
+  line-height: var(--lead-meta);
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:first-child {
+  padding-block-end: calc(var(--divider-space) + var(--sp-2));
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) {
+  padding-block: var(--divider-space) 0;
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:nth-child(n + 3)::after {
+  inset-block: var(--divider-space) 0;
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-label {
+  font: var(--t-caps);
+  letter-spacing: var(--track-caps);
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-figure {
+  margin-block-start: var(--sp-1);
+  line-height: var(--lead-head);
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-note {
+  line-height: var(--lead-meta);
+}
+
+[data-money] .block[data-kind='stat']:not([data-form='lead']) .cell-figure {
+  line-height: var(--lead-page);
+}
+
+@container stat (inline-size < 480px) {
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) {
+    padding-block: var(--divider-space);
+  }
+
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:last-child {
+    padding-block-end: 0;
+  }
+
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-figure {
+    line-height: var(--lead-row);
+  }
+}
+
+/* WHAT IS DUE, BY DAY: a one-line row is a row's height (44, was 52), its words on the UI line box, and a new day starts
+   8 lower in air instead of under a hairline. */
+[data-money] .list[data-kind='timeline'] > .item:not([data-rich]) {
+  min-block-size: var(--row-h);
+  line-height: var(--lead-ui);
+}
+
+[data-money] .list[data-kind='timeline'] > .item:not([data-rich]) > * {
+  line-height: var(--lead-ui);
+}
+
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) > .item-day {
+  min-block-size: var(--row-h);
+  line-height: var(--lead-cap);
+}
+
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) > :is(.item-day, .item-day + .item) {
+  border-block-start-width: 0;
+}
+
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) > :is(.item-day:not(:first-child), .item-day:not(:first-child) + .item) {
+  margin-block-start: var(--sp-2);
+}
+
+/* THE LEDGER: no hairline between lines (rows by air); a line is title 15/20 over meta 12.5/18, 2 apart, 8 above and
+   below, so 56 (`--row-h-2`). A day's head is a caption 12/16 with 16 of air over it and 4 under, the first one flush. */
+[data-money] .list[data-kind='timeline'] > .item[data-rich],
+[data-money] .list[data-kind='timeline']:not([data-days]) > .item:not([data-rich]) {
+  background-image: none;
+}
+
+[data-money] .list[data-kind='timeline'] > .item[data-rich] {
+  row-gap: var(--row-stack);
+  grid-template-rows: var(--lead-row) var(--lead-meta);
+  padding-block: var(--row-pad-y);
+}
+
+[data-money] .list[data-kind='timeline'] > .item[data-rich] > :is(.item-title, .item-detail) {
+  line-height: var(--lead-row);
+}
+
+[data-money] .list[data-kind='timeline'] > .item[data-rich] > :is(.item-meta, .item-under) {
+  line-height: var(--lead-meta);
+}
+
+[data-money] .list:has(> .item[data-rich]) > .item-day {
+  min-block-size: 0;
+  padding-block: var(--sp-4) var(--sp-1);
+  line-height: var(--lead-cap);
+}
+
+[data-money] .list:has(> .item[data-rich]) > .item-day:first-child {
+  padding-block-start: 0;
+}
+
+/* NO RULE UNDER THE LEDGER'S HEAD, and its head as far from its first line as every other tile's. */
+[data-money] .block-slot:has(> .block[data-kind='timeline'] > .list > .item[data-rich]) > .block-bar {
+  border-block-end: 0;
+  margin-block-end: var(--sp-2);
+}
+
+/* BARS: a row is 8 above and below (was 10), its name and amount on the row's 20 line (was 22.5), 8 to its bar. */
+[data-money] .prop > .prop-row {
+  padding-block: var(--row-pad-y);
+  row-gap: var(--sp-2);
+}
+
+[data-money] .prop-row > :is(.prop-label, .prop-value) {
+  line-height: var(--lead-row);
+}
+
+[data-money] .prop-row > :is(.prop-note, .prop-approx) {
+  line-height: var(--lead-meta);
+}
+
+/* PROGRESS: instalments and budgets on the same lines as a bar's row. */
+[data-money] .progress-label {
+  line-height: var(--lead-row);
+}
+
+[data-money] .progress > * {
+  line-height: var(--lead-meta);
+}
+
+/* A LIST THAT STARTS OR ENDS ON A ROW GIVES THE ROW'S OWN PADDING BACK TO THE CARD, as it gives its inline padding to
+   the text edge: the first line's words sit where any tile's first words sit under its head, and the last line's words
+   as far from the card's foot as the head's are from its top, not 8 more. The row's fill still reaches round it. */
+[data-money] .block-slot > .block:last-child > :is(.prop, .list):has(> :is(.prop-row, .item):last-child) {
+  margin-block-end: calc(-1 * var(--row-pad-y));
+}
+
+[data-money] .block-slot > .block > .prop:has(> .prop-row:first-child) {
+  margin-block-start: calc(-1 * var(--row-pad-y));
+}
+
+/* "2 more" and "All 147 in Ledger" sit 8 under the last row, on a caption's line box. */
+[data-money] .block-slot > .block-more {
+  padding-block-start: var(--sp-1);
+  line-height: var(--lead-meta);
+}
+
+/* ACCOUNTS' CARDS: a group's name 8 over its cards (was 4, and 8 of its own above it under the head), a group after
+   another 24 down, nothing under the last; each card 16 in on every side (was 12 by 16) at a radius of 12, the card's
+   16 less a step, and its lines on their line boxes: name 15/20, balance 22/26, the rest 12.5/18. */
+[data-money] .block-slot > .document:has(+ .block[data-kind='cards']) p {
+  margin-block: 0 var(--sp-2);
+  line-height: var(--lead-meta);
+}
+
+[data-money] .block-slot > .block[data-kind='cards'] + .document:has(+ .block[data-kind='cards']) p {
+  margin-block-start: var(--sp-5);
+}
+
+[data-money] .cards-grid {
+  margin-block-end: 0;
+}
+
+[data-money] .cards-item {
+  padding: var(--sp-4);
+  border-radius: var(--r-field, 12px);
+}
+
+[data-money] .cards-item .cards-title {
+  line-height: var(--lead-row);
+}
+
+[data-money] .cards-item .cards-value {
+  line-height: var(--lead-figure);
+}
+
+[data-money] .cards-item :is(.cards-when, .cards-label, .cards-fact) {
+  line-height: var(--lead-meta);
+}
+
+[data-money] .cards-item .cards-facts {
+  row-gap: var(--sp-1);
+}
+
+/* ON A PHONE THE ACCOUNTS ARE ROWS TOLD APART BY AIR, as every list's rows are: 12 above and below, no hairline. */
+@media (width < 640px) {
+  [data-money] .cards-item {
+    padding: var(--sp-3) 0;
+  }
+
+  [data-money] .cards-item + .cards-item {
+    border-block-start: 0;
+  }
+}
+
+/* A BILL OR INVOICE ROW (Bills and invoices, Coming up's foot): its name and amount on the UI line, its day and who on
+   the meta line, 2 between. */
+[data-money] .list[data-kind='todo'] > .item {
+  row-gap: var(--row-stack);
+  line-height: var(--lead-ui);
+}
+
+[data-money] .list[data-kind='todo'] > .item > :is(.item-title, .item-detail) {
+  line-height: var(--lead-ui);
+}
+
+[data-money] .list[data-kind='todo'] > .item > :is(.item-meta, .item-under) {
+  line-height: var(--lead-meta);
+}
+
+/* A RING'S LEGEND (Reports, Spending by category): each part on the control line, its share on the meta line. */
+[data-money] .split-item > :is(.split-label, .split-value) {
+  line-height: var(--lead-ctl);
+}
+
+[data-money] .split-item > .split-share {
+  line-height: var(--lead-meta);
+}
+
+[data-money] .list[data-kind='todo'] > .item > :is(.item-detail, .item-meta) {
+  margin-block-start: 0;
+}
+
+/* Its menu is a 28 control on an 18 line: it overhangs the line by 5 each side rather than making the row 10 taller,
+   so the row is title 20, 2, meta 18 and 8 round them (56, `--row-h-2`). */
+[data-money] .list[data-kind='todo'] > .item > .item-more {
+  margin-block: calc((var(--lead-meta) - var(--ctl-panel)) / 2);
 }

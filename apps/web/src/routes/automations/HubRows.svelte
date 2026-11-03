@@ -340,6 +340,7 @@
   .fold-on {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: var(--fw-medium);
     white-space: nowrap;
   }
@@ -384,6 +385,7 @@
     padding-inline: var(--sp-3);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 600;
     list-style: none;
   }
@@ -432,6 +434,7 @@
     margin: 0 0 var(--sp-2) calc(var(--sp-3) + var(--well-l) + var(--sp-3));
     color: var(--ink);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
     text-decoration: underline;
     text-decoration-color: var(--rule);

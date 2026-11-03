@@ -82,3 +82,35 @@ public enum Typeface {
     }
     #endif
 }
+
+/// HOW FAR APART WRAPPED LINES SIT, as the web's line-heights set them. Plus Jakarta Sans draws its lines 1.26 em apart
+/// by itself (ascent 1.038 + descent 0.222, no line gap), which is tight for reading: the web reads body at 1.5, a row's
+/// words and meta at about 1.4. SwiftUI's `lineSpacing` adds the difference between lines (never above the first or under
+/// the last, so a one-line label keeps its height), scaled with Dynamic Type as the face is.
+///
+/// - `body`: reading text at 14, 1.5 (21 apart): a paragraph, an empty state's line, a toast, a field's words.
+/// - `row`: a row's subject at 15 when it wraps, 1.36 (20.4 apart), the ops row title's 15/20.
+/// - `meta`: meta and helper text at 12.5 when it wraps, 1.42 (17.75 apart): a why, a refusal, a privacy line.
+public enum Leading: Sendable {
+    case body, row, meta
+}
+
+private struct LeadingSpace: ViewModifier {
+    @ScaledMetric(relativeTo: .body) private var body14: CGFloat = 3.5
+    @ScaledMetric(relativeTo: .body) private var row15: CGFloat = 1.5
+    @ScaledMetric(relativeTo: .footnote) private var meta12: CGFloat = 2
+    let leading: Leading
+
+    func body(content: Content) -> some View {
+        switch leading {
+        case .body: content.lineSpacing(body14)
+        case .row: content.lineSpacing(row15)
+        case .meta: content.lineSpacing(meta12)
+        }
+    }
+}
+
+public extension View {
+    /// Set wrapped lines the web's distance apart (`Leading`).
+    func leading(_ leading: Leading) -> some View { modifier(LeadingSpace(leading: leading)) }
+}

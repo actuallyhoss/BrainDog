@@ -246,7 +246,7 @@
      that led nowhere reads as a quiet screen of the app rather than a page of its own. `Empty` keeps its words at the
      measure; the column is not capped here. */
   .page {
-    padding: var(--inset) var(--gutter) var(--sp-8);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   .opening {
@@ -259,7 +259,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lh-body);
   }
 
   .opening-tile {

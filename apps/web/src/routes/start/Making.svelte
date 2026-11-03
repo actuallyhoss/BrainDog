@@ -87,7 +87,7 @@
     color: var(--ink);
     font-size: var(--fs-page);
     font-weight: 600;
-    line-height: 1.2;
+    line-height: var(--lead-page);
   }
 
   .name:focus {
@@ -139,7 +139,7 @@
     overflow: hidden;
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -151,7 +151,7 @@
     gap: var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .tile[data-state='made'] .state {

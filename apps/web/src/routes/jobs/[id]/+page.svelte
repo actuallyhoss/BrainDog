@@ -354,7 +354,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap, 24px) var(--gutter) var(--page-bottom, 64px);
     /* NO CAP: the page runs the window's width to the gutters, and each line of prose keeps `--measure` below. */
   }
 
@@ -414,7 +414,7 @@
   .fact {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--row-stack, 2px);
     min-inline-size: 0;
   }
 
@@ -440,7 +440,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui, 20px);
   }
 
   /* ── the transcript, on the ground ── */
@@ -507,7 +507,7 @@
   .call {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
+    gap: var(--row-stack, 2px);
   }
 
   @media (min-width: 640px) {

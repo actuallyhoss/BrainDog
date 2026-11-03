@@ -259,7 +259,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .from-row {
@@ -316,7 +316,7 @@
     color: var(--ink);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     resize: vertical;
   }
 
@@ -324,6 +324,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .from-said {
@@ -333,6 +334,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .from-voice {
@@ -348,6 +350,7 @@
     margin-block-end: var(--sp-1);
     color: var(--ink);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 600;
   }
 
@@ -358,5 +361,6 @@
     min-block-size: var(--tap);
     color: var(--ink);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 </style>

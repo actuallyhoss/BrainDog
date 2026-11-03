@@ -473,10 +473,10 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    gap: 12px;
+    gap: var(--sp-3);
     block-size: 100%;
     box-sizing: border-box;
-    padding: 16px;
+    padding: var(--tile-pad-lead);
     border: 1px solid var(--card-edge, transparent);
     border-radius: var(--r-tile, 16px);
     background: color-mix(in oklab, var(--ph) var(--h-wash), var(--tile));
@@ -497,7 +497,7 @@
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    gap: 12px;
+    gap: var(--row-gap);
   }
 
   .h-top:has(> .h-page-acts) {
@@ -532,7 +532,8 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 22px;
+    line-height: var(--lead-head);
+    letter-spacing: var(--track-head);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -551,7 +552,7 @@
   .h-health {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--sp-1);
   }
 
   .h-health .dot {
@@ -574,7 +575,7 @@
     font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.02em;
-    line-height: 30px;
+    line-height: var(--lead-figure);
     overflow-wrap: anywhere;
     text-wrap: pretty;
   }
@@ -583,7 +584,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
 
@@ -616,8 +617,8 @@
     display: grid;
     grid-template-columns: 18px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 10px;
-    min-block-size: 36px;
+    gap: var(--sp-3);
+    min-block-size: var(--ctl-h);
   }
 
   .ck + .ck {
@@ -650,12 +651,12 @@
   /* A DAY OR AN AGE BESIDE A STEP IS A BADGE (ops look): a 22px capsule in the soft fill, its tone when it has one. */
   .ck-chip,
   .chip-age {
-    padding: 2px 8px;
+    padding: var(--sp-0) var(--sp-2);
     border-radius: var(--r-pill, 999px);
     background: var(--soft-fill, var(--tile-2));
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-cap);
     white-space: nowrap;
   }
 
@@ -675,9 +676,9 @@
   .h-acts {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--toolbar-gap);
     min-inline-size: 0;
-    margin-block-start: 4px;
+    margin-block-start: var(--sp-1);
   }
 
   /* A LONG TASK NAME IN THE BUTTON IS CUT, never wider than the hero. */
@@ -690,13 +691,10 @@
   }
 
   @media (width >= 640px) {
-    .hero {
-      padding: 24px;
-    }
-
     .h-head {
       font-size: var(--fs-page);
-      line-height: 36px;
+      line-height: var(--lead-page);
+      letter-spacing: var(--track-page, -0.021em);
     }
   }
 
@@ -713,8 +711,8 @@
     font-family: var(--font-display);
     font-size: var(--fs-figure);
     font-weight: 600;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
+    letter-spacing: -0.02em;
+    line-height: var(--lead-figure);
   }
 
   .s-sub,
@@ -763,7 +761,7 @@
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    padding-block: 7px;
+    padding-block: var(--sp-2);
     border-block-start: 1px solid var(--sep, var(--rule));
     font-size: var(--fs-body);
     line-height: 20px;
@@ -808,14 +806,14 @@
     display: grid;
     grid-template-columns: 12px 52px minmax(0, 1fr);
     align-items: start;
-    gap: 10px;
-    padding-block: 6px;
+    gap: var(--sp-3);
+    padding-block: var(--sp-2);
   }
 
   .stop + .stop::before {
     content: '';
     position: absolute;
-    inset-block: -6px 50%;
+    inset-block: calc(-1 * var(--sp-2)) 50%;
     inset-inline-start: 5px;
     inline-size: 2px;
     background: var(--rule);
@@ -891,10 +889,10 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
-    margin-block-end: 12px;
-    padding: 10px 12px;
-    border-radius: 10px;
+    gap: var(--sp-2) var(--sp-3);
+    margin-block-end: var(--sp-3);
+    padding: var(--sp-3);
+    border-radius: var(--r-ctl);
     background: var(--warn-tint);
     color: var(--ink-2);
     font-size: var(--fs-meta);
@@ -919,7 +917,7 @@
   .n-cells {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px 12px;
+    gap: var(--sp-5) var(--sp-4);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -954,7 +952,7 @@
     font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.02em;
-    line-height: 28px;
+    line-height: var(--lead-figure);
   }
 
   .n-cell[data-stale] .n-fig {
@@ -995,8 +993,8 @@
 
   /* WHAT IT PLANS FOR, under what it measured and apart from it. */
   .n-plan {
-    margin: 12px 0 0;
-    padding-block-start: 10px;
+    margin: var(--divider-space) 0 0;
+    padding-block-start: var(--divider-space);
     border-block-start: 1px solid var(--sep, var(--rule));
     color: var(--ink-2);
     font-size: var(--fs-meta);
@@ -1015,12 +1013,24 @@
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: baseline;
-    gap: 12px;
-    padding-block: 8px;
+    gap: var(--sp-3);
+    padding-block: var(--sp-2);
   }
 
   .li + .li {
     border-block-start: 1px solid var(--sep, var(--rule));
+  }
+
+  /* THE LIST STARTS ON THE TILE'S GAP AND ENDS ON ITS PADDING (rhythm pass, 3 Nov): the first row's top padding and the
+     last one's foot added 8px under the heading and 8px of orphan at the tile's end. */
+  .li:first-child,
+  .stop:first-child {
+    padding-block-start: 0;
+  }
+
+  .li:last-child,
+  .stop:last-child {
+    padding-block-end: 0;
   }
 
   .li:not(:has(.li-when)) {
@@ -1041,7 +1051,7 @@
      them all together and the lines still start on one edge. */
   :global(.t-happened) .li-list {
     grid-template-columns: auto minmax(0, 1fr);
-    column-gap: 12px;
+    column-gap: var(--sp-3);
   }
 
   :global(.t-happened) .li {
@@ -1100,14 +1110,14 @@
   .shape-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--inset);
+    gap: var(--tile-gap);
     align-items: start;
   }
 
   .shape-part {
     display: flex;
     flex-direction: column;
-    gap: var(--inset);
+    gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
@@ -1150,16 +1160,23 @@
   }
 
   @media (width >= 1100px) {
+    /* ON THE SAME TWELVE COLUMNS AS THE ROW ABOVE (rhythm pass, 3 Nov): at 2fr and 1fr the columns stood 4px off the
+       hero's eight and four, so Numbers ended short of the hero's edge and Tasks started past Path's. */
     .shape-row[data-cols] {
-      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+      grid-template-columns: repeat(12, minmax(0, 1fr));
       align-items: stretch;
     }
 
     .shape-row[data-cols] > .shape-col {
       display: flex;
       flex-direction: column;
-      gap: var(--inset);
+      grid-column: span 8;
+      gap: var(--tile-gap);
       min-inline-size: 0;
+    }
+
+    .shape-row[data-cols] > .shape-col + .shape-col {
+      grid-column: span 4;
     }
 
     .shape-row[data-cols] .shape-part {
@@ -1190,7 +1207,7 @@
   .w-cols {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 16px 24px;
+    gap: var(--sp-4) var(--sp-5);
   }
 
   /* WITH YOU FIRST ON A PHONE: what waits on the reader is read before what agents hold. */
@@ -1215,11 +1232,11 @@
   }
 
   .w-head {
-    margin: 0 0 4px;
+    margin: 0 0 var(--sp-1);
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .w-list,
@@ -1236,21 +1253,21 @@
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr);
     align-items: center;
-    gap: 12px;
-    min-block-size: 52px;
+    gap: var(--row-gap);
+    min-block-size: var(--row-h-2);
     border-radius: var(--r-ctl);
   }
 
   /* NO RULES BETWEEN TASK ROWS (ops look): each row is its own rounded wash under the pointer, held 8px out so its words
      stay on the tile's text edge, and the rows stand 2px apart so two lit rows never touch. */
   .w-row {
-    margin-inline: -8px;
-    padding-inline: 8px;
+    margin-inline: calc(-1 * var(--sp-2));
+    padding-inline: var(--sp-2);
     transition: background-color var(--d-state) var(--ease-out);
   }
 
   .w-row + .w-row {
-    margin-block-start: 2px;
+    margin-block-start: var(--sp-0);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -1263,7 +1280,7 @@
     box-sizing: border-box;
     inline-size: 20px;
     block-size: 20px;
-    margin-inline-start: 2px;
+    justify-self: center;
     border: 2px solid var(--rule-strong);
     border-radius: 50%;
   }
@@ -1319,7 +1336,7 @@
   .w-more {
     align-self: start;
     justify-self: start;
-    margin-block-start: 4px;
+    margin-block-start: var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
@@ -1348,8 +1365,8 @@
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr);
     align-items: center;
-    gap: 12px;
-    min-block-size: 52px;
+    gap: var(--row-gap);
+    min-block-size: var(--row-h-2);
   }
 
   .p-name {
@@ -1361,10 +1378,16 @@
     display: grid;
     grid-template-columns: 16px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 12px;
-    min-block-size: 44px;
-    border-block-end: 1px solid var(--sep, var(--rule));
+    gap: var(--row-gap);
+    min-block-size: var(--row-h);
+    padding-block: var(--row-pad-y);
+    box-sizing: border-box;
     color: var(--ink-3);
+  }
+
+  /* A RULE BETWEEN TWO ROWS, never one under the last (rhythm pass, 3 Nov): it stood alone at the tile's foot. */
+  .r-row + .r-row {
+    border-block-start: 1px solid var(--sep, var(--rule));
   }
 
   .r-words {
@@ -1450,7 +1473,7 @@
   /* THE BOX TO TELL THEM, AT THE FOOT AND IN INK: Send is the screen's red everywhere else, and here the hero's button
      is the one red thing on the page. */
   .a-tell {
-    margin-block-start: 8px;
+    margin-block-start: var(--sp-3);
   }
 
   /* WHERE THE TILE GROWS TO END LEVEL WITH THE WORK'S COLUMN (`cols`, L32), the box goes to its foot, so the room is
@@ -1469,7 +1492,7 @@
   /* ── agents here today ── */
   .day {
     display: grid;
-    gap: 6px;
+    gap: var(--sp-2);
   }
 
   .track {
@@ -1504,14 +1527,15 @@
     justify-content: space-between;
     color: var(--ink-3);
     font-size: var(--fs-cap);
+    line-height: var(--lead-cap);
   }
 
   .a-row {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr);
     align-items: center;
-    gap: 12px;
-    min-block-size: 52px;
+    gap: var(--row-gap);
+    min-block-size: var(--row-h-2);
   }
 
   /* ── what landed (proj F9) ── */

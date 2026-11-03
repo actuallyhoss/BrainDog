@@ -350,7 +350,7 @@
 
 {#snippet backUpButton()}
   {#if anOwner && copiesFrom === 'live'}
-    <Button weight="primary" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
+    <Button weight="primary" size="sm" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
   {/if}
 {/snippet}
 
@@ -623,6 +623,7 @@
   .every-export {
     margin: var(--sp-2) 0 0;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .every-export a {
@@ -663,6 +664,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* What failed is read, not skimmed past, so it takes the second ink rather than the date's dim. */
@@ -675,7 +677,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
@@ -700,7 +702,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* THE STRIP HOLDS ITS SQUARES AT UP TO 16PX (`waffle.ts`), so it is no wider than thirty of them and the two dates
@@ -717,7 +719,7 @@
     gap: var(--sp-3);
     color: var(--ink-3);
     font-size: var(--fs-cap);
-    line-height: 16px;
+    line-height: var(--lead-cap);
     font-variant-numeric: tabular-nums;
   }
 
@@ -732,7 +734,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .policy {
@@ -740,7 +742,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   @media (width < 640px) {

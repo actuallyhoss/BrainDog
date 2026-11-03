@@ -314,9 +314,10 @@
   .ins[data-line] .ins-said {
     flex: 1 1 auto;
     min-inline-size: 0;
-    min-block-size: var(--ctl-h);
-    max-block-size: calc(5 * 22px + 2 * var(--sp-2));
-    padding-block: calc((var(--ctl-h) - 22px) / 2);
+    min-block-size: var(--field-h, 36px);
+    max-block-size: calc(4 * var(--lead-ui, 20px) + var(--field-h, 36px));
+    padding-block: calc((var(--field-h, 36px) - var(--lead-ui, 20px)) / 2);
+    line-height: var(--lead-ui, 20px);
   }
 
   .ins-line > .ins-pick {

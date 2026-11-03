@@ -12,7 +12,9 @@
  * ONE COLUMN (a phone, a narrow window) needs none of it, and a page being arranged keeps the plain grid.
  */
 
-const ROW = 4;
+/* ONE PIXEL A ROW (spacing pass, 3 Nov): at four, each tile's span rounded its height up to the next four, so the gap
+   under a tile came out anywhere from 16 to 19.9px and no two gaps on the board matched. At one it is the tile gap. */
+const ROW = 1;
 /**
  * NEIGHBOURS THAT ALMOST LINE UP DO LINE UP (empty states 2, polish): with one account and one bill, Accounts stood 8px
  * taller than Due soon beside it, from the account's 36px well against the bill's 28px day, which reads as a slip and
@@ -88,7 +90,7 @@ export function masonry(host: HTMLElement): () => void {
       }
       const h = t.getBoundingClientRect().height;
       heights.set(t, h);
-      /* A tile that draws nothing takes one row of four pixels and no gap. */
+      /* A tile that draws nothing takes one row of a pixel and no gap. */
       const rows = h === 0 ? 1 : rowsFor(h, gap);
       const was = t.style.getPropertyValue('--money-rows');
       if (was !== String(rows)) t.style.setProperty('--money-rows', String(rows));

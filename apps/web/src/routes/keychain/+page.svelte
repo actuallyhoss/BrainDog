@@ -1185,7 +1185,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
     /* THE PAGE'S CAP IS THE TOKEN EVERY SCREEN SHARES (design 6.7), not a width of its own. */
     max-inline-size: var(--page-max);
   }
@@ -1198,6 +1198,7 @@
     max-inline-size: 640px;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .agent-add p {
@@ -1222,6 +1223,7 @@
   .figure-unit {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
     letter-spacing: 0;
   }
@@ -1307,6 +1309,7 @@
   .group-count {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 400;
   }
 
@@ -1385,6 +1388,7 @@
   .key-details {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .key-details {
@@ -1632,6 +1636,7 @@
     padding: var(--sp-2) var(--sp-3);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1664,6 +1669,7 @@
     color: var(--ink);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
     user-select: all;
   }
@@ -1678,6 +1684,7 @@
   .shown-left {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1790,10 +1797,6 @@
   /* ── a phone ──────────────────────────────────────────────────────────── */
 
   @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-
     /* THE ADD MOVES TO THE TOOLBAR as a circle, and the list's own pill goes. */
     .add-phone {
       display: contents;

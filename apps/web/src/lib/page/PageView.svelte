@@ -1565,7 +1565,7 @@
   }
 
   .body-wrap ~ .page-offer:not(:has(~ .page-offer)) {
-    padding-block-end: var(--sp-9);
+    padding-block-end: var(--page-bottom);
   }
 
   .hosted {
@@ -1579,7 +1579,7 @@
 
   /* The blocks' bars stand in the board's gutter, where the first tile will be. */
   .waiting-body {
-    padding: var(--sp-4) var(--gutter) var(--sp-8);
+    padding: var(--tile-gap) var(--gutter) var(--page-bottom);
   }
 
   /* ── a home's page menu ───────────────────────────────────────────────────
@@ -1681,7 +1681,7 @@
 
   /* THE STRIP SITS IN THE PAGE'S OWN GUTTER, over the first tile, with the gap a row of tiles keeps. */
   .page-filters {
-    padding: var(--sp-3) var(--gutter) 0;
+    padding: var(--tile-gap) var(--gutter) 0;
   }
 
   /* THE LEAD TILE'S FIRST ROW: the glyph and the name at 17/600 on one line, the count quiet beside it, the parent in
@@ -1873,7 +1873,7 @@
   /* A PAGE THAT CANNOT BE DRAWN IS ONE SENTENCE, NOT A GRID, inside the page's own gutter, so it sits where the page
      would have, and at the measure a sentence is read at. */
   .said {
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--sp-5) var(--gutter) var(--page-bottom);
     max-inline-size: calc(var(--measure) + 2 * var(--gutter));
     /* CENTRED, as a mistyped address's card is (`routes/[id]`): the two whole-screen states stood in two places (AF19). */
     margin-inline: auto;
@@ -1920,7 +1920,7 @@
 
   @media (width < 900px) {
     .said {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
+      padding: var(--sp-4) var(--gutter) var(--page-bottom);
     }
 
     /* ONE AT A TIME ON A PHONE: the side the switch has not chosen is not drawn. */

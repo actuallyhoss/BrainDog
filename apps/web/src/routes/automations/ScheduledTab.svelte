@@ -143,7 +143,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* EACH ACTION ON ITS CLOCK IS ITS OWN ROW AND ITS PRESS UNDER IT, with the ledger's hairline between two of them,
@@ -171,6 +171,6 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 </style>

@@ -460,7 +460,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap, 24px) var(--gutter) var(--page-bottom, 64px);
   }
 
   /* THE FIRST VIEW: what a job is beside the machines, eight columns to four from a desk's width, one on a phone. */
@@ -494,7 +494,7 @@
     column-gap: var(--sp-3);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 1.55;
+    line-height: var(--lh-body);
   }
 
   .step-n {
@@ -540,7 +540,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 1.55;
+    line-height: var(--lh-body);
   }
 
   .enrol p {
@@ -554,7 +554,7 @@
   .machine-main {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--row-stack, 2px);
     min-inline-size: 0;
   }
 
@@ -601,7 +601,7 @@
     grid-area: side;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-    gap: var(--inset);
+    gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
@@ -636,7 +636,7 @@
     margin-block-start: auto;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui, 20px);
   }
 
   /* ── a run ── */
@@ -654,7 +654,7 @@
   .run .line-detail {
     display: flex;
     align-items: center;
-    column-gap: 6px;
+    column-gap: var(--sp-2);
     min-inline-size: 0;
   }
 
@@ -673,7 +673,7 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-2);
     color: var(--ink-2);
     font-weight: 500;
   }
@@ -746,7 +746,7 @@
   .kinds {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--row-stack, 2px);
     margin-block-end: var(--sp-4);
   }
 

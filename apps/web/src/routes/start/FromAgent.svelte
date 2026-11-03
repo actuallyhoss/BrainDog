@@ -142,13 +142,13 @@
     color: var(--ink);
     font-size: var(--fs-page);
     font-weight: 600;
-    line-height: 1.2;
+    line-height: var(--lead-page);
   }
   .headline {
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-head);
-    line-height: 1.45;
+    line-height: var(--lead-head);
   }
   /* THE TWO STEPS SIDE BY SIDE WHERE THEY FIT, one above the other on a phone. */
   .steps {
@@ -176,7 +176,7 @@
   .fix {
     margin: 0;
     font-size: var(--fs-body);
-    line-height: 1.45;
+    line-height: var(--lh-body);
   }
   .hint,
   .step {

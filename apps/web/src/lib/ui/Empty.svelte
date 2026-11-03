@@ -240,17 +240,11 @@
     margin-inline: auto;
     text-align: center;
     max-inline-size: 640px;
-    padding: var(--sp-5);
+    padding: var(--tile-pad-lead);
     background: var(--tile);
-    border: 1px solid var(--card-edge);
+    border: 0;
     border-radius: var(--r-tile);
-    box-shadow: var(--shadow-card);
-  }
-
-  @media (width < 640px) {
-    .empty:not(.compact) {
-      padding: calc(var(--sp-4) + var(--sp-1));
-    }
+    box-shadow: var(--card);
   }
 
   /* ON A SURFACE ALREADY, the same column without a second tile: a tile never holds a tile. `:where`, so a section's
@@ -260,7 +254,7 @@
     margin-inline: 0;
     text-align: start;
     max-inline-size: 56ch;
-    padding: var(--sp-2) 0;
+    padding: 0;
     background: none;
     border: 0;
     box-shadow: none;
@@ -270,7 +264,8 @@
   /* THE WELL, 40px and neutral, 16 above the title. */
   .empty-glyph {
     display: flex;
-    margin-block-end: var(--sp-2);
+    /* 12 to the title: the column's 8 and 4 more. */
+    margin-block-end: var(--sp-1);
   }
 
   /* 17 AT 600 IN INK: an empty state is a sentence, not a poster, and it leads the space the rows would fill the way a
@@ -281,7 +276,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-head);
     font-weight: var(--fw-semi);
-    line-height: 24px;
+    line-height: var(--lead-head);
     text-wrap: balance;
   }
 
@@ -327,7 +322,9 @@
     flex-wrap: wrap;
     gap: var(--sp-2);
     max-inline-size: none;
-    padding: var(--sp-2) 0;
+    /* NO PADDING OF ITS OWN IN A CARD (rhythm, 3 Nov): the card's head gap places it, so the line sits 12 under the
+       heading as any first row does. It added 8 above and below. */
+    padding: 0;
     background: none;
     border: 0;
     border-radius: 0;
@@ -339,7 +336,7 @@
     font-family: inherit;
     font-size: var(--fs-body);
     font-weight: var(--fw-regular);
-    line-height: 22px;
+    line-height: var(--lead-ui);
     letter-spacing: normal;
   }
 
@@ -387,7 +384,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lead-ui);
   }
 
   .empty-query {
@@ -449,7 +446,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* THE REASON IS QUIET AND WRAPS, as `ReadState`'s is. It is there for whoever reports the fault,

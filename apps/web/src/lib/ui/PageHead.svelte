@@ -494,7 +494,7 @@
     z-index: var(--z-sheet);
     box-sizing: border-box;
     /* The Mac app's title bar sits above the head; --shell-inset is 0 in a browser. */
-    padding: calc(20px + var(--shell-inset, 0px)) var(--gutter) 0;
+    padding: calc(var(--page-top) + var(--shell-inset, 0px)) var(--gutter) 0;
     /* And in the Mac app, a head drawn with no frame round it starts after the traffic lights (`--shell-lead`). */
     padding-inline-start: max(var(--gutter), var(--shell-lead, 0px));
   }
@@ -513,7 +513,9 @@
 
   /* A kicker already stands between the row and the top of the work. A titled head draws no kicker (the bar holds the
      way), so it keeps the full gap (AH34: Today's first line sat 4 under the bar's rule). */
-  .page-head[data-kicked] {
+  /* ONLY UNDER A KICKER THAT IS DRAWN (rhythm, 3 Nov): a question's head kept the kicker's short gap with no kicker
+     over it (the bar's crumb had taken it), and its name sat 4 under the banner where every other page's sits 24. */
+  .kicker + .page-head[data-kicked] {
     padding-block-start: calc(var(--sp-1) + var(--shell-inset, 0px));
   }
 
@@ -563,8 +565,8 @@
     font-family: var(--font-display);
     font-size: var(--fs-page);
     font-weight: var(--fw-semi);
-    line-height: calc(34 / 28);
-    letter-spacing: -0.02em;
+    line-height: var(--lead-page);
+    letter-spacing: var(--track-page);
     text-wrap: balance;
     /* Coming back, it waits for the compact title to go. */
     transition: opacity var(--swap-out) var(--ease-out) var(--swap-out);
@@ -765,7 +767,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: var(--fw-regular);
-    line-height: calc(24 / 17);
+    line-height: var(--lead-head);
     text-wrap: pretty;
   }
 
@@ -832,6 +834,17 @@
      `besideLead`) left a 52px band of nothing over the page for it. */
   .page-head[data-titled]:not(:has(.head-said, .head-actions > :not(dialog))) {
     padding-block-start: 0;
+    /* AND THE WORK UNDER IT STARTS ON THE PAGE'S TOP STEP, not the head's gap: a screen pads its top by
+       `--page-head-gap` (16 on a phone) for the head it draws, and with nothing drawn its first line stood 16 under the
+       bar where Today's stands 12. */
+    margin-block-end: calc(var(--page-top) - var(--page-head-gap));
+  }
+
+  /* A SENTENCE ALONE ENDS WITH ITS LINE (cleanup, 3 Nov): it keeps the 36 row's place at the top, so it stands where a
+     sentence beside buttons does (AH34), but the row's other 7 under it made the head 31 from its content, not 24. */
+  .page-head[data-titled]:has(.head-said):not(:has(.head-actions > :not(dialog))) .head-main {
+    min-block-size: 0;
+    padding-block-start: calc((var(--ctl-h) - var(--lead-head)) / 2);
   }
 
   .page-said.head-said {
@@ -845,6 +858,12 @@
   /* UNDER THE SENTENCE, in the gutter, a step below it. */
   .head-below {
     padding: var(--sp-3) var(--gutter) 0;
+  }
+
+  /* NOTHING UNDER THE SENTENCE, NO STEP FOR IT: an empty row still took its 12, so Add-ons' search stood 36 under the
+     head where every screen's first content stands 24 (cleanup, 3 Nov). */
+  .head-below:not(:has(*)) {
+    display: none;
   }
 
   @media (width < 900px) {
@@ -914,6 +933,12 @@
       margin-inline-start: calc(-1 * var(--sp-2));
       color: var(--ink);
       text-decoration: none;
+    }
+
+    /* THE MARK ON THE GUTTER (rhythm, 3 Nov): its 28px drawing sits 8 inside the 44 tap, so the tap starts 4 in and
+       the mark's left edge lands on the content's 16, as the face's right edge does at the other end. It was 12. */
+    .bar-mark {
+      margin-inline-start: calc(-1 * var(--sp-1));
     }
 
     /* A NAME TOO LONG FOR ONE LINE TAKES TWO (skills pass follow-up, 2 Nov): "Defaults for new agents" was cut to
@@ -1000,10 +1025,10 @@
     .page-head {
       position: static;
       z-index: auto;
-      padding: var(--sp-3) var(--gutter) 0;
+      padding: var(--page-top) var(--gutter) 0;
     }
 
-    .page-head[data-kicked] {
+    p.kicker + .page-head[data-kicked] {
       padding-block-start: var(--sp-1);
     }
 
@@ -1025,8 +1050,8 @@
       grid-template-columns: minmax(0, 1fr);
       align-items: start;
       font-size: var(--fs-page-phone);
-      line-height: calc(28 / 22);
-      letter-spacing: -0.015em;
+      line-height: var(--lead-figure);
+      letter-spacing: var(--track-figure);
     }
 
     .page-name:has(> :is(.name-icon, .name-well)) {

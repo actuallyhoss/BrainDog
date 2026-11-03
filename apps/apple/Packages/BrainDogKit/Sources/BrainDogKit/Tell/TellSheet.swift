@@ -367,6 +367,7 @@ public struct TellSheet: View {
                     Text(said)
                         .font(Typeface.meta)
                         .foregroundStyle(model.saidIsRefusal ? Palette.red : Palette.ink2)
+                        .leading(.meta)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.updatesFrequently)
                 }
@@ -399,6 +400,7 @@ public struct TellSheet: View {
         TextField("", text: $model.text, prompt: Text(model.mode == .ask ? Words.askLike : Words.tellLike).foregroundStyle(Palette.ink3), axis: .vertical)
             .font(Typeface.body)
             .foregroundStyle(Palette.ink)
+            .leading(.body)
             .lineLimit(3...8)
             .textFieldStyle(.plain)
             .focused($typing)
@@ -419,7 +421,8 @@ public struct TellSheet: View {
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(attachment.name).font(Typeface.bodyMedium).foregroundStyle(Palette.ink).lineLimit(1).truncationMode(.middle)
-                Text(Words.attachmentGoes(attachment.kind)).font(Typeface.meta).foregroundStyle(Palette.ink3).fixedSize(horizontal: false, vertical: true)
+                Text(Words.attachmentGoes(attachment.kind)).font(Typeface.meta).foregroundStyle(Palette.ink3).leading(.meta)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
             Button {
@@ -452,9 +455,11 @@ public struct TellSheet: View {
             rowView(row)
         } else if line.told.rows.isEmpty {
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text(line.sentence).font(Typeface.bodyMedium).foregroundStyle(Palette.ink).lineLimit(2)
-                if let why = line.told.why {
-                    Text(why).font(Typeface.meta).foregroundStyle(Palette.ink2).fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(line.sentence).font(Typeface.bodyMedium).foregroundStyle(Palette.ink).lineLimit(2).leading(.row)
+                    if let why = line.told.why {
+                        Text(why).font(Typeface.meta).foregroundStyle(Palette.ink2).leading(.meta).fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 if let offers = line.told.offers, !offers.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -467,7 +472,7 @@ public struct TellSheet: View {
                     }
                 }
             }
-            .padding(.vertical, Space.s2)
+            .padding(.vertical, Space.rowY)
         } else {
             VStack(spacing: 0) {
                 ForEach(Array(line.told.rows.enumerated()), id: \.offset) { _, row in rowView(row) }
@@ -479,9 +484,9 @@ public struct TellSheet: View {
         HStack(alignment: .top, spacing: Space.s3) {
             IconWell(Glyph.named(row.icon), size: .l, tone: row.missing.isEmpty ? .neutral : .warn)
             VStack(alignment: .leading, spacing: 2) {
-                Text(row.said).font(Typeface.bodyMedium).foregroundStyle(Palette.ink).lineLimit(2)
+                Text(row.said).font(Typeface.bodyMedium).foregroundStyle(Palette.ink).lineLimit(2).leading(.row)
                 if !row.detail.isEmpty {
-                    Text(row.detail).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(2)
+                    Text(row.detail).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(2).leading(.meta)
                 }
                 if !row.missing.isEmpty {
                     Text(Words.needs(row.missing)).font(Typeface.meta).foregroundStyle(Palette.warn)
@@ -489,7 +494,7 @@ public struct TellSheet: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, Space.s2)
+        .padding(.vertical, Space.rowY)
         .accessibilityElement(children: .combine)
     }
 
@@ -497,9 +502,12 @@ public struct TellSheet: View {
         HStack(alignment: .top, spacing: Space.s3) {
             IconWell(.check, size: .l, tone: .good)
             VStack(alignment: .leading, spacing: Space.s2) {
-                Text(receipt.said).font(Typeface.body).foregroundStyle(Palette.ink).fixedSize(horizontal: false, vertical: true)
-                if receipt.kept > 0 {
-                    Text(Words.keptInField(receipt.kept)).font(Typeface.meta).foregroundStyle(Palette.ink3).fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(receipt.said).font(Typeface.body).foregroundStyle(Palette.ink).leading(.body).fixedSize(horizontal: false, vertical: true)
+                    if receipt.kept > 0 {
+                        Text(Words.keptInField(receipt.kept)).font(Typeface.meta).foregroundStyle(Palette.ink3).leading(.meta)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 if receipt.batch != nil {
                     Button(Words.undo) { Task { await model.undo() } }
@@ -508,6 +516,6 @@ public struct TellSheet: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, Space.s2)
+        .padding(.vertical, Space.rowY)
     }
 }

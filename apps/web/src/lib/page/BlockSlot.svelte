@@ -1207,13 +1207,14 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--well);
-    margin-block-end: var(--sp-4);
+    /* THE ONE CARD HEAD (rhythm, 3 Nov), as `Tile`'s: a 28 row, its 14/20 name centred, 12 to what it names. */
+    margin-block-end: var(--card-head-gap);
   }
 
   /* THE HEADING'S GLYPH IS BARE (ops style, 3 Nov), as `Tile`'s is: 18px of quiet ink, no well behind it. */
   .block-bar > :global(.well) {
-    inline-size: 18px;
-    block-size: 18px;
+    inline-size: var(--head-glyph);
+    block-size: var(--head-glyph);
     border-radius: 0;
     background: none;
     color: var(--ink-3);
@@ -1231,8 +1232,8 @@
      tile that had one. A bar is `.prop`; there is no `.bar`, so Spent this month and Accounts had none either. */
   :global(.block-slot:has(> .block-bar):has(> .block :is(.cards-grid, .split, .prop)) > .block-bar),
   :global(.block-slot:has(> .block > .list[data-kind='timeline']):not(:has(> .block > .list > .item[data-rich])) > .block-bar) {
-    padding-block-end: var(--sp-3);
-    margin-block-end: var(--sp-2);
+    padding-block-end: 0;
+    margin-block-end: var(--card-head-gap);
     /* NO LINE UNDER A CARD'S HEAD (ops style, 3 Nov): the head is told from its rows by its weight and the air. */
     border-block-end: 0;
   }
@@ -1487,6 +1488,7 @@
   :global(.block-slot.block-slot:has(> .shape-row)) {
     padding: 0;
     background: none;
+    box-shadow: none;
   }
 
   :global(.block-slot.block-slot:has(> .shape-row[data-empty])) {
@@ -1496,6 +1498,7 @@
   :global(.block-slot.block-slot:has(> .desk-part)) {
     padding: 0;
     background: none;
+    box-shadow: none;
     container-type: inline-size;
   }
 
@@ -1515,23 +1518,24 @@
   :global(.block-slot.block-slot:is(:has(> .project-cards), :has(> .project-lanes), :has(> .projects-board))) {
     padding: 0;
     background: none;
+    box-shadow: none;
     container-type: inline-size;
   }
 
   /* AS WIDE AS ITS LANES at a desk, so the bar is a control and not a rule across the page; a phone's is the page's
      width (`Segmented`'s `full`). */
-  /* A LANE'S HEAD HAS THE SPACE ANY SECTION HEAD HAS: 24 between lanes and 12 under its head, never against the card above. */
+  /* A LANE'S HEAD HAS THE SPACE ANY SECTION HEAD HAS: 24 between lanes and 12 under its head (the 4px steps), never against the card above. */
   .project-lanes {
     display: grid;
-    gap: 24px;
+    gap: var(--sp-5);
   }
 
   .lane-head {
-    margin: 0 0 12px;
+    margin: 0 0 var(--sp-3);
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .lane-count {
@@ -1542,7 +1546,7 @@
   .lane-bar {
     display: flex;
     min-inline-size: 0;
-    margin-block-end: 12px;
+    margin-block-end: var(--sp-3);
   }
 
   .lane-bar > :global(*) {
@@ -1555,13 +1559,13 @@
     }
   }
 
-  /* ONE GRID FOR THE ONE CARD (proj section 4), gap 12. Fewer cards than columns leave the row short. COUNTED BY THE ROOM
+  /* ONE GRID FOR THE ONE CARD (proj section 4), a tile gap apart. Fewer cards than columns leave the row short. COUNTED BY THE ROOM
      THE CARDS HAVE, not the window's, since the sidebar of frame B takes some of it: a card never narrower than its
      figure row (about 330), so four from 1,360, three from 1,020, two from 600, one below. */
   .project-cards {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    gap: var(--tile-gap);
     margin: 0;
     padding: 0;
     list-style: none;

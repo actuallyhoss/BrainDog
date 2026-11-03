@@ -84,10 +84,13 @@ struct LockCover: View {
     @State private var lock = Lock.shared
 
     var body: some View {
+        /* THE WELL AND ITS WORD ARE ONE THING, 12 apart; Unlock stands 16 under them, a step further off. */
         VStack(spacing: Space.s4) {
             Spacer()
-            IconWell(.lock, size: .xl)
-            Text(Words.locked).font(Typeface.heading).foregroundStyle(Palette.ink)
+            VStack(spacing: Space.s3) {
+                IconWell(.lock, size: .xl)
+                Text(Words.locked).font(Typeface.heading).foregroundStyle(Palette.ink)
+            }
             if !lock.away {
                 Button(Words.unlock) {
                     Haptic.press.play()

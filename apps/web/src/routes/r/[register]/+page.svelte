@@ -3846,7 +3846,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--tile-gap);
-    padding: var(--sp-2) var(--gutter) var(--sp-9);
+    padding: var(--page-top) var(--gutter) var(--page-bottom);
   }
 
   /* THE LIST'S TILE: its toolbar, the capture line and the rows, a step apart rather than a section apart, so they
@@ -4009,6 +4009,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WHY THE FILTERS HAVE NO NUMBERS, one plain line at the body size under the bar. */
@@ -4016,7 +4017,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 1.4;
+    line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
 
@@ -4027,24 +4028,24 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 8px 16px;
+    gap: var(--sp-2) var(--sp-4);
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 1.4;
+    line-height: var(--lh-body);
   }
 
   /* THE LINE'S BUTTONS, kept together at its end and wrapping as one under the sentence on a phone. */
   .held-acts {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--toolbar-gap);
   }
 
   /* NOBODY IS HELD TWICE: one plain sentence where the people would be. */
   .held-none {
     margin: 0;
-    padding: 24px 0;
+    padding: var(--sp-5) 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
   }
@@ -4054,6 +4055,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* THE HEAD'S NEW BUTTON, drawn only on the arrival, where neither the line that adds a row nor the "+" is. */
@@ -4062,9 +4064,10 @@
   }
 
   @media (width < 640px) {
-    /* THE PHONE'S BOARD: one column, 12 from the edges, and the list's tile a step tighter inside. */
+    /* THE PHONE'S BOARD: one column on the phone's gutter, the head's and the banner's edge (it stood 4px outside them
+       at 12), and the list's tile a step tighter inside. */
     .page {
-      padding: var(--sp-2) var(--sp-3) var(--sp-8);
+      padding: var(--page-top) var(--gutter) var(--page-bottom);
     }
 
     .page :global(.list-tile) {
@@ -4072,16 +4075,10 @@
     }
   }
 
-  @media (640px <= width < 900px) {
-    .page {
-      padding-block-end: var(--sp-8);
-    }
-  }
-
   /* THE PHONE'S PICKED STRIP SITS OVER THE FOOT OF THE LIST, so the list keeps 72px under its last row while it shows. */
   @media (width < 640px) {
     .page[data-picking] {
-      padding-block-end: calc(var(--sp-8) + 72px);
+      padding-block-end: calc(var(--page-bottom) + 72px);
     }
   }
 </style>

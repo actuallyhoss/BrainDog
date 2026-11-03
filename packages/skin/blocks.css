@@ -171,10 +171,12 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    margin-block-end: var(--sp-4);
+    /* 12 TO WHAT IT NAMES (rhythm, 3 Nov), the card head's gap everywhere; it was 16. */
+    margin-block-end: var(--card-head-gap, 12px);
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
+    line-height: var(--lead-ui, 20px);
   }
 
   /* ── grid: the primitive under stat and board ────────────────────────────
@@ -222,9 +224,11 @@
     grid-template-columns: minmax(9ch, 22ch) minmax(0, 1fr) minmax(0, auto);
     gap: var(--sp-3);
     align-items: baseline;
+    align-content: center;
     padding: var(--sp-2) var(--sp-3);
     min-block-size: var(--row-h);
     font-size: var(--fs-body);
+    line-height: var(--lead-ui, 20px);
     border-block-end: 1px solid var(--rule);
   }
 
@@ -244,6 +248,7 @@
   .row-label {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
   }
 
   /* A FIGURE NEVER WRAPS. `GBP 14.00` broken across two lines is not a narrower figure, it is a
@@ -425,12 +430,17 @@
       'marker title state'
       '. detail detail'
       '. meta meta';
-    grid-template-columns: auto minmax(min(16ch, 100%), 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 0 var(--sp-3);
     align-items: baseline;
+    /* The lines sit in the middle of the row's height, never at its top with the spare under them. */
+    align-content: center;
     padding: var(--sp-2) var(--sp-3);
     min-block-size: var(--row-h);
     font-size: var(--fs-body);
+    /* A ROW'S LINE IS 20 (rhythm, 3 Nov), not the paragraph's 1.5: one line in a 44 row is 8 + 20 + 8 and centred, and
+       a title with its meta is 8 + 20 + 2 + 18 + 8, the 56 of a two-line row. */
+    line-height: var(--lead-ui, 20px);
     border-block-end: 1px solid var(--rule);
   }
 
@@ -446,7 +456,7 @@
       'title state'
       'detail detail'
       'meta meta';
-    grid-template-columns: minmax(min(16ch, 100%), 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .list > .item > .item-marker {
@@ -464,12 +474,12 @@
 
   .list > .item > .item-detail {
     grid-area: detail;
-    margin-block-start: var(--sp-1);
+    margin-block-start: var(--row-stack, 2px);
   }
 
   .list > .item > .item-meta {
     grid-area: meta;
-    margin-block-start: var(--sp-1);
+    margin-block-start: var(--row-stack, 2px);
   }
 
   /* A TASK WITH A MENU TAKES A FOURTH TRACK at the end of its first line for the control, so the state keeps its own and
@@ -479,11 +489,14 @@
       'marker title state more'
       '. detail detail detail'
       '. meta meta meta';
-    grid-template-columns: auto minmax(min(16ch, 100%), 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
   }
 
+  /* ITS 28 WELL CENTRED ON THE TITLE'S 20 LINE, giving the 8 back, so the line under the title stays 2 under it and not
+     10, which the well's height had made the first row (cleanup, 3 Nov: Work's rows on a phone). */
   .list > .item > .item-more {
     grid-area: more;
+    margin-block: calc((var(--lead-ui, 20px) - 28px) / 2);
   }
 
   .list > .item > :is(.item-detail, .item-meta, .item-state):empty {
@@ -560,6 +573,7 @@
   .item-detail {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
   }
 
   /* A TASK'S DUE DATE AND WHO CHANGED IT LAST, the renderer's one quiet line under a todo (and a link's note, which
@@ -568,6 +582,7 @@
   .item-meta {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
     font-variant-numeric: tabular-nums;
   }
 

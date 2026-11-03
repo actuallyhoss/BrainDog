@@ -186,7 +186,7 @@
   .fix {
     margin: 0;
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     color: var(--ink-2);
   }
 

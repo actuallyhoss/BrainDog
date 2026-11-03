@@ -78,7 +78,7 @@ private struct ShortcutSettings: View {
         Form {
             Section {
                 LabeledContent("Open the quick panel") {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Space.s2) {
                         Button(recording ? "Press the keys…" : (hotKey.shortcut?.said ?? "Off")) { recording ? stop() : record() }
                             .frame(minWidth: 140)
                         if hotKey.shortcut != nil, !recording {
