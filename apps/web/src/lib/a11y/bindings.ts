@@ -90,7 +90,7 @@ export const BINDINGS: Binding[] = [
      AND THESE ARE TODAY'S WORDS ONLY UNTIL THE LAYOUT HANDS THE RAIL OVER: the letters are read from the rail now
      (`goto.ts`), and `sayGoto` writes `chordOf` of that list into this row before the sheet is drawn, so the sheet
      prints every place's letter. The seven here lead that list and keep their letters. */
-  { id: 'goto', scope: 'document', key: 'g then h d i s k p ,', label: 'Go to Today, Needs you, Inbox, Search, Keychain, Add-ons, Settings', bare: true },
+  { id: 'goto', scope: 'document', key: 'g then h d i s k p ,', label: 'Go to Today, Needs you, Inbox, Search, Keychain, Plugins, Settings', bare: true },
   { id: 'goto-nav', scope: 'document', key: 'g then 1–9', label: 'Go to page 1 to 9 of your nav', bare: true },
   /* `[`, THE KEY THE SIDEBAR'S OWN BUTTONS NAME (`shell/SideBar.svelte`). `⌘\` narrowed the old side rail and went with it. */
   { id: 'sidebar', scope: 'document', key: '[', label: 'Show or hide the sidebar', bare: true },

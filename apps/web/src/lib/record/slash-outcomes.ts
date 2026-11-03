@@ -64,7 +64,7 @@ const NAMES: readonly (readonly [string, readonly string[]])[] = [
   ['Ways to read what arrives', ['pattern', 'patterns']],
   ['Skills', ['skill']],
   ['Catalogue updates', ['catalogue', 'catalog']],
-  ['Add-ons', ['pack', 'packs', 'addons']],
+  ['Plugins', ['pack', 'packs', 'addons', 'plugin', 'plugins']],
   ['Settings', ['settings']],
   ['Choices to make', ['call']],
 ];

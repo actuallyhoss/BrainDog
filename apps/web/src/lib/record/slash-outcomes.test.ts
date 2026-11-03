@@ -56,7 +56,7 @@ test('EACH KIND BY ITS NAME, in the table order, and two keys of one name added 
     ['pattern', 'Ways to read what arrives'],
     ['skill', 'Skills'],
     ['catalogue', 'Catalogue updates'],
-    ['pack', 'Add-ons'],
+    ['pack', 'Plugins'],
     ['settings', 'Settings'],
     ['call', 'Choices to make'],
   ] as const;

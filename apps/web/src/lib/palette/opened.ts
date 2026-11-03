@@ -27,7 +27,7 @@ const HANDLE = /^(?:[A-Z]{1,3}[1-9][0-9]*|[a-z][a-z0-9_]*#[1-9][0-9]*)$/u;
  * THE PLACES WHOSE SCREENS ARE NAMED UNDER THEM, so a screen of one is said with it: "Add-ons: Browse", "Settings:
  * Navigation". Recent said "Browse" alone, which names nothing.
  */
-const WITHIN = new Set(['Add-ons', 'Settings']);
+const WITHIN = new Set(['Plugins', 'Add-ons', 'Settings']);
 
 /** The name a screen gave itself: the first part of its tab title, or `null` when it only said the product or a handle. */
 export function titleIn(tab: string, product: string): string | null {

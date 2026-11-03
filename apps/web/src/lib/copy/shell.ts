@@ -100,7 +100,8 @@ export const shell = {
   /* The rail's heading for the registers, hard-coded there and needed by the phone nav too. `Your things` AND IT WAS
      `Lists`: what sits under it is the person's invoices and tasks, and "list" is how the record stores them (§35). */
   lists: 'Your things',
-  packs: 'Add-ons',
+  /* PLUGINS, as Sam says it (3 Nov): "add-ons" was the word until then. The route is still `/packs` and `/settings/addons`. */
+  packs: 'Plugins',
   keychain: 'Keychain',
   /* THE SIDEBAR'S ONE ROW FOR KEYS, which opens the Keychain, and is called that (audit 6f AF14): the rail and the
      crumb said Keys while the screen, its tab and Settings said Keychain. */
@@ -268,7 +269,7 @@ export const shell = {
      and not read by this build", "{ lte: 400000 } for money in minor units" — under a headline
      figure, quoting a document number and a JSON literal at somebody with no control that edits a
      metric. The author's sentence still prints on the page block, beside the declaration. */
-  figureUnavailable: 'This figure cannot be worked out yet. The add-on that owns it says why.',
+  figureUnavailable: 'This figure cannot be worked out yet. The plugin that owns it says why.',
   /* A WALK AHEAD THAT NEVER WENT UNDER: the last day it looked at, said where the day the money runs out would be. */
   lastsPast: (day: string) => `Lasts past ${day}`,
   /* THE SAME, UNDER A LABEL THAT ALREADY SAYS LASTS: "Lasts" over "Lasts past 3 Sep 2027" said the word twice. */
