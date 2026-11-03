@@ -139,6 +139,8 @@ test('ONE ORDER IS ONE QUESTION, WITH THE AMOUNT FIRST', async () => {
   const asked = cards(api, sql);
   assert.equal(asked.length, 1, asked.join(' | '));
   assert.match(asked[0]!, /^EGP 450\.00 receipt from Corner Shop: Order #1042 received\. Keep it with your money\? https:\/\/mail\.google\.com\//u);
+  /* AND THE MAIL PAGE COUNTS ONE ORDER ONCE. */
+  assert.equal(await figure(api, 'gmail-to-look'), 1);
   close();
 });
 
@@ -157,6 +159,9 @@ test('THE UPDATE FROM 1.1.1 LOSES NOTHING AND REACHES NOTHING NEW, so the night 
   assert.deepEqual((diff as unknown as { conflicts: unknown[] }).conflicts, []);
   await put(api, SHIPPED());
   assert.equal(sql.one<{ version: string }>("SELECT version FROM pack WHERE id = 'gmail'")?.version, '1.2.0');
+  /* A BILL KEPT BEFORE 1.2.0 SAID WHAT IT ASKS IS STILL COUNTED: it holds no ask at all. */
+  sql.exec("UPDATE entry SET fields = json_set(fields, '$.kind', 'bill') WHERE register = 'gmail_mail'");
+  assert.equal(await figure(api, 'gmail-to-look'), 1);
 
   /* THE MAIL 1.1.1 ALREADY LOOKED AT IS NOT ASKED ABOUT AGAIN, whatever the door says of it next. */
   await arrive(api, body({ subject: 'Another', name: 'Ana Ruiz', address: 'ana@ruiz-design.example', snippet: 'Nice to meet you.' }));

@@ -384,7 +384,7 @@ export default async function run(ctx) {
 
   /* "LEAVE THEM" ON A QUESTION ASKED IN PLACE OF MANY leaves each of them: they come off the Mail page's lists. */
   let left = 0;
-  for (const many of await ctx.record.list('gmail_mail', { all: [{ field: 'ask', is: 'many' }, { field: 'answered', is: true }] }, { order: 'seq' })) {
+  for (const many of await every(ctx, 'gmail_mail', { all: [{ field: 'ask', is: 'many' }, { field: 'answered', is: true }] }, 500)) {
     const batch = many.fields.batch;
     if (typeof batch !== 'string' || batch === '') continue;
     for (const row of await every(ctx, 'gmail_mail', { field: 'batch', is: batch }, 500))
