@@ -1,17 +1,17 @@
 {
   "fill": {
-    "solid": "extended-srgb:0.95294,0.95686,0.96471,1.00000"
+    "solid": "extended-srgb:0.81176,0.25490,0.22745,1.00000"
   },
   "fill-specializations": [
     {
       "value": {
-        "solid": "extended-srgb:0.95294,0.95686,0.96471,1.00000"
+        "solid": "extended-srgb:0.81176,0.25490,0.22745,1.00000"
       }
     },
     {
       "appearance": "dark",
       "value": {
-        "solid": "extended-srgb:0.04314,0.04314,0.04314,1.00000"
+        "solid": "extended-srgb:0.72941,0.25882,0.22353,1.00000"
       }
     }
   ],
@@ -22,13 +22,13 @@
           "fill-specializations": [
             {
               "value": {
-                "solid": "extended-srgb:0.81176,0.25490,0.22745,1.00000"
+                "solid": "extended-srgb:1.00000,1.00000,1.00000,1.00000"
               }
             },
             {
               "appearance": "dark",
               "value": {
-                "solid": "extended-srgb:0.72941,0.25882,0.22353,1.00000"
+                "solid": "extended-srgb:1.00000,1.00000,1.00000,1.00000"
               }
             },
             {
@@ -40,7 +40,7 @@
           "image-name": "mark.svg",
           "name": "mark",
           "position": {
-            "scale": 1,
+            "scale": 1.3,
             "translation-in-points": [
               0,
               0
