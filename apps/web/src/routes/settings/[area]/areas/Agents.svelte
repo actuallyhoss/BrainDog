@@ -1054,6 +1054,7 @@
   .who-scope {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
     white-space: nowrap;
   }
@@ -1327,6 +1328,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WHO IS WAITING, one line each, over the six boxes. */
@@ -1399,6 +1401,7 @@
   .plan-detail {
     color: var(--ink-3);
     font-size: var(--fs-cap);
+    line-height: var(--lead-cap);
   }
 
   /* THE FACTS UNDER A NAME WRAP AS WHOLE ITEMS, with space between them and no separator to lead a line. */
@@ -1421,6 +1424,7 @@
     margin: 0;
     color: var(--tone, var(--ink-2));
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
@@ -1560,5 +1564,6 @@
   .theirs-said {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 </style>

@@ -994,6 +994,7 @@
   .field-input#in-key {
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .peek {

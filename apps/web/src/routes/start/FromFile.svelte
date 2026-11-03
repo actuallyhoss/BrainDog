@@ -95,6 +95,7 @@
     overflow: hidden;
     color: var(--ink);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -105,6 +106,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
   }

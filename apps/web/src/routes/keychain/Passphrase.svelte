@@ -290,6 +290,7 @@
     min-block-size: var(--ctl-h-sm);
     color: var(--ink);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
     list-style: none;
     cursor: pointer;
@@ -356,6 +357,7 @@
     margin: 0;
     color: var(--red);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .lock-hidden {
@@ -424,6 +426,7 @@
   .lock-form .lock-text {
     margin-block-start: var(--sp-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* UNDER 640PX, TWO LABELLED ROWS: each row a block, its state as the title, each cell its label above its value. */
@@ -462,6 +465,7 @@
       display: block;
       color: var(--ink-3);
       font-size: var(--fs-meta);
+      line-height: var(--lead-meta);
     }
   }
 

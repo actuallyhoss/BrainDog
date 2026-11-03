@@ -195,6 +195,7 @@
 .settings-place .picture-meta {
   color: var(--ink-3);
   font-size: var(--fs-meta);
+  line-height: var(--lead-meta);
   font-weight: 400;
 }
 
@@ -296,6 +297,7 @@
 .settings-place .field-row-label {
   color: var(--ink-2);
   font-size: var(--fs-meta);
+  line-height: var(--lead-meta);
   font-weight: 500;
 }
 

@@ -298,6 +298,7 @@
     padding: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     list-style: none;
   }
 
@@ -384,6 +385,7 @@
     margin: var(--sp-2) 0 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* THE ONE LINE UNDER EACH CHART that says what it means, at body size in ink, at the tile's foot. */

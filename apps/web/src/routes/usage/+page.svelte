@@ -592,6 +592,7 @@
   .figure-unit {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
     letter-spacing: 0;
   }
@@ -703,6 +704,7 @@
     flex: none;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
@@ -846,6 +848,7 @@
     min-block-size: var(--ctl-h-sm);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
     text-decoration: none;
   }

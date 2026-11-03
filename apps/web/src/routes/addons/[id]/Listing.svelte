@@ -1167,6 +1167,7 @@
   .earlier > summary {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     cursor: pointer;
   }
 
@@ -1210,6 +1211,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
   .told-lines {

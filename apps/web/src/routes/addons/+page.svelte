@@ -503,6 +503,7 @@
   .part-note {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: var(--fw-regular);
   }
 

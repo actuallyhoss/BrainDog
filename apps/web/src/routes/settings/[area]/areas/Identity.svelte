@@ -749,6 +749,7 @@
     margin-inline-start: var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 400;
     white-space: nowrap;
   }
@@ -813,6 +814,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 
@@ -829,6 +831,7 @@
     margin-block-end: var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* 16px TEXT IN EVERY INPUT, at every width, so a phone never zooms into the field. */

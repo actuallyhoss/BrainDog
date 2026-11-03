@@ -872,6 +872,7 @@
   .mock {
     color: var(--ink-3);
     font-size: var(--fs-cap);
+    line-height: var(--lead-cap);
   }
 
   /* FROM 900PX UP, THE INDEX BESIDE THE AREA, narrower than the rail at 200 with its rows at the meta step, so two

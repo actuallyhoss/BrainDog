@@ -173,6 +173,7 @@
   .card-fix {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* THE ONE LINE UNDER THE CHART that says what it means. */
@@ -210,6 +211,7 @@
   .fact dt {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .fact dd {
@@ -223,6 +225,7 @@
   .fold {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .fold + .fold {
@@ -357,6 +360,7 @@
     color: var(--ink);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     max-block-size: 20lh;

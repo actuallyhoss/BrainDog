@@ -113,6 +113,7 @@
     .hub-tab {
       padding-inline: 10px;
       font-size: var(--fs-meta);
+      line-height: var(--lead-meta);
     }
   }
 

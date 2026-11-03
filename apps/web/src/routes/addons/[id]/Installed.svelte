@@ -1018,6 +1018,7 @@
     padding: var(--sp-3) var(--sp-3) var(--sp-1);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: var(--fw-medium);
   }
 
@@ -1136,6 +1137,7 @@
   .head-switch-word {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: var(--fw-medium);
   }
 
@@ -1163,6 +1165,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WHAT WAITS IS READ AS A SENTENCE, at body size, under the version: the count and the list it waits for are the words. */
@@ -1312,6 +1315,7 @@
     color: var(--ink-3);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* A SELECT OR A DATE IS A FIELD: the `--tile-2` well, no border, the `--r-pop` corner, 40 tall and 44 under a thumb. The
@@ -1377,6 +1381,7 @@
   .added-meta {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     white-space: nowrap;
   }
 

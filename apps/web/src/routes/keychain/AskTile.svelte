@@ -169,6 +169,7 @@
   .ask-when {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }

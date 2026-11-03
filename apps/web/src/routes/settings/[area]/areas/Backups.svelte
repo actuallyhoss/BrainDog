@@ -623,6 +623,7 @@
   .every-export {
     margin: var(--sp-2) 0 0;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .every-export a {
@@ -663,6 +664,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* What failed is read, not skimmed past, so it takes the second ink rather than the date's dim. */

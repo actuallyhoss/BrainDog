@@ -173,6 +173,7 @@
     margin-block-end: calc(var(--sp-1) - var(--sp-3));
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
 

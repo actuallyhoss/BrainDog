@@ -2347,6 +2347,7 @@
     border-radius: var(--r-ctl);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
   }

@@ -70,6 +70,7 @@
     padding-inline: var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .index {

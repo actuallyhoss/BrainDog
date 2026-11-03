@@ -188,5 +188,6 @@
     gap: var(--sp-1);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 </style>

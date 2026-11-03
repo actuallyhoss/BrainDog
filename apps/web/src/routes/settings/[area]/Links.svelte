@@ -160,12 +160,14 @@
     margin: 0 0 var(--sp-3);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .links-refused {
     margin: 0;
     color: var(--red);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .links {

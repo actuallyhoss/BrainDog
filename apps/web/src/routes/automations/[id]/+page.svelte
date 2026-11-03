@@ -1174,6 +1174,7 @@
     margin: 0 0 var(--sp-3);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WHAT IS WRONG WITH THE WHOLE OF IT, UNDER THE TRIGGER: red words after the glyph, on the
@@ -1186,6 +1187,7 @@
     padding-inline: calc(var(--sp-3) + var(--well-l) + var(--sp-3)) var(--sp-3);
     color: var(--red);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
 
@@ -1203,6 +1205,7 @@
     gap: var(--sp-1);
     margin: 0;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .calls :global(.calls-h) {
@@ -1231,6 +1234,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1441,6 +1445,7 @@
   .version-tag {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
 
@@ -1470,6 +1475,7 @@
     padding: 0;
     list-style: none;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .diff-line {

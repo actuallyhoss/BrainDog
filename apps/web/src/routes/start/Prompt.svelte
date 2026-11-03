@@ -322,6 +322,7 @@
   .said-edit {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* ── the questions ─────────────────────────────────────────────────────── */
@@ -358,6 +359,7 @@
     margin-inline-start: auto;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .ask-q {

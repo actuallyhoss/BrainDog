@@ -703,6 +703,7 @@
 
   .aa[data-size='sm'] {
     font-size: var(--fs-cap);
+    line-height: var(--lead-cap);
   }
 
   .aa[data-size='base'] {
