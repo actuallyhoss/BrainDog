@@ -99,7 +99,7 @@ export const packs = {
       title: (name: string) => `Add-ons by ${name} · BrainDog`,
       description: (name: string, n: number) => `${many(n, 'add-on', 'add-ons')} by ${name} for BrainDog, each showing what it adds before you add it.`,
       heading: (name: string) => `Add-ons by ${name}`,
-      lede: (n: number) => `${many(n, 'add-on', 'add-ons')} listed. Each one shows what it asks for of yours before anything changes.`,
+      lede: (n: number) => `${many(n, 'add-on', 'add-ons')} listed. ${n === 1 ? 'It shows' : 'Each one shows'} what it asks for of yours before anything changes.`,
       back: 'All add-ons',
     },
 
@@ -125,7 +125,7 @@ export const packs = {
       addsNothing: 'It adds no list or page of its own. It works on what your BrainDog already holds.',
       /* THE TILE BESIDE THE DRAWING, by name: what a person will find in their BrainDog after adding it. */
       brings: 'What it brings',
-      ruleCount: (n: number) => `${many(n, 'rule', 'rules')} that run on their own`,
+      ruleCount: (n: number) => (n === 1 ? '1 rule that runs on its own' : `${n} rules that run on their own`),
       exampleCount: (n: number) => `${many(n, 'example entry', 'example entries')} to start from`,
       facts: 'About this add-on',
       publisher: 'Made by',

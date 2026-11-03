@@ -346,8 +346,9 @@
   /* THE AGENT'S CALLS, numbered, in the mono face. A long one scrolls inside the tile, never the page. */
   .term-body {
     margin: 0;
-    padding-inline-start: 22px;
+    padding: 0;
     overflow-x: auto;
+    list-style-position: inside;
     color: var(--on-night);
     font: 400 var(--t-site-14) / 2 var(--font-mono);
   }

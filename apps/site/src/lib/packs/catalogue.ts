@@ -279,7 +279,10 @@ export function callSaid(line: string): string {
   const head = parts[0] ?? '';
   if (!head.startsWith('CALLS OUT ')) return line;
   const hosts = head.slice('CALLS OUT '.length);
-  const when = parts.find((p) => /^every /u.test(p));
+  const when = parts.find((p) => /^every /u.test(p))?.replace(/^every (\d+)([mhd])$/u, (_, n: string, u: string) => {
+    const unit = u === 'm' ? 'minute' : u === 'h' ? 'hour' : 'day';
+    return n === '1' ? `every ${unit}` : `every ${n} ${unit}s`;
+  });
   const key = parts.map((p) => /^key "([^"]+)"/u.exec(p)?.[1]).find((k) => k !== undefined);
   return `Calls ${hosts}${when ? ` ${when}` : ''}${key ? `, with your key "${key}"` : ''}.`;
 }

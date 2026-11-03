@@ -9,7 +9,7 @@ This works with any agent connected to your BrainDog over MCP. Everything it doe
 Say what you want BrainDog to do, in your own words:
 
 ```code | To your agent
-BrainDog has no way to track films I want to watch. Make me an add-on for it.
+Make me an add-on to track films I want to watch.
 ```
 
 In clients that show MCP prompts, such as Claude Code, it is also a slash command: the `addon` prompt, Build an add-on. It takes what you want in a few words and walks the agent through the steps below.
@@ -18,12 +18,10 @@ In clients that show MCP prompts, such as Claude Code, it is also a slash comman
 
 An agent reaches the store and the add-on maker through `act`, each call named and given its arguments.
 
-```spec | What the agent calls
-addons | searches the store | a few words, and every word must match; with nothing found it names the nearest and says how to build one
-addon | reads one listing | who made it, how far it was checked, what it asks for of yours, its versions, and with file true the file itself
-addonNew | starts an add-on | an id, a title and the fields you want; it hands back a file that installs as it is: a list, a page and a Today card
-addonCheck | checks a file against your BrainDog | each refusal with what to change, or Ready with what installing would add and ask you to approve
-```
+- `addons` searches the store. It takes a few words, and every word must match. With nothing found it names the nearest and says how to build one.
+- `addon` reads one listing: who made it, how far it was checked, what it asks for of yours and its versions. With `file: true` it hands back the file itself.
+- `addonNew` starts an add-on from an id, a title and the fields you want. The file it hands back installs as it is: a list, a page and a Today card.
+- `addonCheck` checks a file against your BrainDog. It answers each refusal with what to change, or Ready with what installing would add and ask you to approve.
 
 Then `installPack` with the file puts it to you. It installs nothing on its own.
 
