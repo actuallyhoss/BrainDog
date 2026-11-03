@@ -945,9 +945,11 @@
 
   /* ON A PHONE: name and chip on one line, the next step in two, and one small line for the number and the work. */
   @media (width < 1000px) {
+    /* THREE COLUMNS SO THE NAME IS SIZED BY THE CHIP ALONE: with two, the last work's line ("Tasks changed 5 min ago")
+       set the second column and cut the name and its pin to "North…". */
     .row {
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas: 'name chip' 'next next' 'num work';
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-areas: 'name name chip' 'next next next' 'num work work';
       align-items: center;
     }
 
