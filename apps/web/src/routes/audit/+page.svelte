@@ -41,6 +41,7 @@
   import Bars from '$lib/viz/Bars.svelte';
   import HeatGrid from '$lib/viz/HeatGrid.svelte';
   import Swimlanes from '$lib/viz/Swimlanes.svelte';
+  import { figure, rampAt } from '$lib/viz/shared.ts';
   import { runOf } from '$lib/ui/face.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
@@ -80,6 +81,10 @@
     dayGroups,
     dayOf,
     dayWord,
+    declaredThing,
+    declaresSaid,
+    declareWord,
+    nestQuotes,
     fold,
     historyWords,
     HOURS,
@@ -106,7 +111,6 @@
     tallySaid,
     thingOf,
     type ByWho,
-    type Group,
     type Told,
   } from './lines.ts';
   /* A FIELD PUT ON OR TAKEN OFF A LIST, IN WORDS, from the same helper Home's feed says it with. STATIC, and the lead's
@@ -244,8 +248,26 @@
   const myName = $derived((route.data.me as { name?: string }).name ?? null);
   $effect(() => {
     if (!route.data.live) return;
-    void titlesOf(apiBase()).then((t) => (titles = t));
+    void titlesOf(apiBase())
+      .then((t) => (titles = t))
+      .finally(() => (titled = true));
   });
+
+  /**
+   * THE SCREEN IS DRAWN ONCE, WITH ITS WORDS (3 Nov). The rules' titles, the sentence under the title and the month's
+   * figure each landed a beat after the log, so a line read "Ran Payment files paid" and then "Ran File a paid bill as
+   * spending", the head grew a line and pushed the stream down, and the first tile grew a chart. The three reads go out
+   * beside the log's, and the stream waits for them, a second and a half at most, so it is drawn once and holds still.
+   */
+  let titled = $state(false);
+  let counted = $state(false);
+  let unseenRead = $state(false);
+  let graced = $state(false);
+  onMount(() => {
+    const t = setTimeout(() => (graced = true), 1500);
+    return () => clearTimeout(t);
+  });
+  const sideRead = $derived((titled && counted && unseenRead) || graced);
   async function titlesOf(base: string): Promise<Map<string, string>> {
     const out = new Map<string, string>();
     try {
@@ -307,12 +329,16 @@
     if (!route.data.live) return;
     /* NOT OF SOMEBODY HELD TO A FEW LISTS (collab pass 4): the figure reads the whole log, and a contractor on one project
        was told 404 for it on every open. */
-    if (!may(route.data as unknown as Shell, 'read')) return;
+    if (!may(route.data as unknown as Shell, 'read')) {
+      counted = true;
+      return;
+    }
     untrack(() => {
       void import('@braindog/client')
         .then(({ createClient }) => createClient({ base: apiBase() }).metric('activity-by-who'))
         .then((out) => (byWho = whoPartsOf(out)))
-        .catch(() => (byWho = null));
+        .catch(() => (byWho = null))
+        .finally(() => (counted = true));
     });
   });
   let unseen = $state<{ actors: string[]; capped: boolean; byWho: ByWho | null; upTo?: Cursor | null } | null>(null);
@@ -326,7 +352,10 @@
         if (out.from === 'live') unseen = { actors: out.actors, capped: out.capped, byWho: byWhoOf((out as { byWho?: unknown }).byWho), upTo: out.upTo };
       })
       .catch(() => undefined)
-      .finally(() => closed(true, at));
+      .finally(() => {
+        closed(true, at);
+        unseenRead = true;
+      });
   });
 
   /**
@@ -440,7 +469,8 @@
   const thingFor = (target: string): { text: string; href: string | null; list: string | null } | null => {
     const person = targetSaid(target, me, names);
     if (person) return { text: person.name, href: null, list: null };
-    return thingOf(target, live?.names.get(target) ?? null, listSaid);
+    /* A PAGE, A RULE, A SCRIPT OR A LIST SOMEBODY CHANGED, by its name and with its page (`declaredThing`). */
+    return declaredThing(target, names, listSaid) ?? thingOf(target, live?.names.get(target) ?? null, listSaid);
   };
 
   /**
@@ -504,6 +534,9 @@
   const list = $derived(route.url.searchParams.get('list') ?? '');
   const listName = $derived(list === '' ? '' : listSaid(list));
 
+  /* A FILTER IS ON: the title then counts what it matched, "12 of 195" (3 Nov). With none on it says no count at all,
+     since what it would count is only the lines read so far, and the sentence under it and the stream say the rest. */
+  const narrowed = $derived(Boolean(who || what || when || list));
   const matched = $derived(
     kept.filter(
       (e) =>
@@ -561,7 +594,7 @@
   const whole = $derived(tallyOf(kept, me, names, listSaid));
   /* The line under the title, below `whole`, which it reads. */
   /* THE LIVE LOG IS STILL ON ITS WAY, and the page draws its bars. */
-  const waiting = $derived(Boolean(route.data.live) && !live && !refused);
+  const waiting = $derived(Boolean(route.data.live) && !refused && (!live || !sideRead));
   /* NOT SAID FROM THE FIRST SIXTY WHILE THE WHOLE LOG IS COMING (leftovers8): "More than 60 changes since you were last
      here. Agents made 13 of the newest 60." took two lines on a phone and became "195 changes ... Agents made 8." a beat
      later, one line, and the page under it moved twice. */
@@ -578,15 +611,6 @@
       tone: 'var(--ink-2)',
     })),
   );
-  /* EACH GROUP SAID BY WHO IT IS, so the parts add up to the whole above them: BrainDog's own rules (`rule:handled`,
-     its own updates) are BrainDog's, as their lines say (`actor`), and were counted "by rules" with every other line
-     that was not an agent's or yours, people's included (Z2, finish loop of 30 October). */
-  const tallyMeta = $derived.by(() => {
-    const n = (group: Group): number => tally.groups.find((g) => g.group === group)?.count ?? 0;
-    const said = { agent: historyWords.byAgents, you: historyWords.byYou, person: historyWords.byPeople, rule: historyWords.byRules, record: historyWords.byBrainDog };
-    const order: Group[] = ['agent', 'you', 'person', 'rule', 'record'];
-    return order.flatMap((group) => (n(group) > 0 ? [said[group](n(group))] : [])).join(' · ') || undefined;
-  });
   const tallyReading = $derived(
     tallySaid(
       tally.parts.map((k) => ({ word: k.part, count: k.count, agents: k.agents })),
@@ -671,7 +695,7 @@
             {#each actors as a (a)}
               {@const by = actorSaid(a, me, names, runs.get(a) ?? null)}
               <button type="button" class="mi" role="menuitem" aria-current={who === a ? 'true' : undefined} onclick={() => setParam('by', a)}>
-                <Face name={by.name} you={by.you} kind={by.kind} size="s" /><span class="mi-name">{by.name}</span>{#if who === a}<Icon name="check" size="s" />{/if}
+                <Face name={by.name} you={by.you} kind={by.kind} size="s" /><span class="mi-name" title={by.name}>{by.name}</span>{#if who === a}<Icon name="check" size="s" />{/if}
               </button>
             {/each}
           </Menu>
@@ -732,17 +756,23 @@
        quotation marks, and a note that does not say the title again, its days said as a person says them. -->
   <!-- A RUN OR AN INSTRUCTION THE NOTE NAMES BY ITS HANDLE IS SAID IN WORDS ("Taken by S42." is "Took this."). -->
   {@const told = handlesSaid(t.note, e.by, e.run_by ?? null)}
+  <!-- A CHANGE TO THE SETUP SAYS WHAT IT CHANGED: a page, a rule, a script or a list (`declareWord`). -->
+  {@const word = e.kind === 'declare' ? declareWord(e.target) : kindOf(e.kind).word}
   {@const said = lineSaid(
-    kindOf(e.kind).word,
+    word,
     thing?.text ?? null,
     declared === null && pass === null ? (ran !== null && ranTitle !== null && t.count === 1 ? ranSaid(told, ranTitle, ran.id) : told) : '',
     t.many === null && /^(?:suggestion|decision|prediction):/u.test(e.target ?? ''),
     clock,
   )}
-  {@const note = said.note}
   <!-- SOMEBODY'S ACCESS IS ONE SENTENCE WITH THEM IN IT ("Gave you access"), not the verb beside their name. -->
-  {@const access = pass === null && declared === null && e.target ? (targetSaid(e.target, me, names) ?? null) : null}
+  {@const person = pass === null && declared === null && e.target ? targetSaid(e.target, me, names) : null}
+  <!-- AND A KEY'S, BY THE NAME IT WAS GIVEN (3 Nov): a key the record handed an agent is noted with its label, so the line
+       read "Gave access" over "You · ChatGPT". It is "Gave ChatGPT access", and the label is not said again under it. -->
+  {@const keyHolder = person === null && pass === null && /^token:/u.test(e.target ?? '') && t.note.trim() !== '' ? { name: t.note.trim(), you: false } : null}
+  {@const access = person ?? keyHolder}
   {@const accessLine = access === null ? null : accessSaid(e.kind, access)}
+  {@const note = keyHolder !== null && accessLine !== null ? '' : said.note}
   <!-- WHO DID IT, and before them who asked, where a question asked and answered in one moment is one line (`oneDecision`). -->
   {@const did = ran !== null ? (ran.kind === 'rule' ? historyWords.aRule : historyWords.aScript) : said.done ? didSaid(e.by, me, names, e.run_by ?? null, said.done) : by.name}
   {@const doer = e.asked ? whoWords.askedThen(actorSaid(e.asked, me, names).name, said.done ? did : didSaid(e.by, me, names, e.run_by ?? null, 'answered')) : did}
@@ -760,14 +790,14 @@
              anchor that goes nowhere. -->
         <!-- AND A FIELD PUT ON A LIST IS SAID AS ONE. `declaredOf` makes "Added domain to Projects" of the
              line's target and note, and that sentence is the whole line, so the note is not said twice. -->
-        {#if t.fold}<span class="line-title">{minuteSaid(e.kind, kindOf(e.kind).word, t.count)}</span>
+        {#if t.fold}<span class="line-title">{e.kind === 'declare' ? declaresSaid(t.fold.map((s) => s.e.target)) : minuteSaid(e.kind, kindOf(e.kind).word, t.count)}</span>
         {:else if pass !== null}<span class="line-title">{pass.said}</span>
         {:else if declared !== null}<span class="line-title">{declared}</span>
         {:else if accessLine !== null}<span class="line-title">{accessLine}</span>
         {:else}<span class="line-title"
             >{#if said.verb}<span class="verb">{said.verb}</span>{/if}{#if thing}{said.verb ? ' ' : ''}{#if thing.href}<a class="target tap" href={at(thing.href)}
-                  >{said.quoted ? '“' : ''}<bdi class="target-name" data-own>{thing.text}</bdi>{said.quoted ? '”' : ''}</a
-                >{:else}{said.quoted ? '“' : ''}<bdi class="target-name" data-own>{thing.text}</bdi>{said.quoted ? '”' : ''}{/if}{/if}{#if e.kind === 'share.open'}{thing ? historyWords.withLink : historyWords.aLink}{:else if e.kind === 'share.close' && !thing}{historyWords.aLink}{/if}</span
+                  >{said.quoted ? '“' : ''}<bdi class="target-name" data-own>{said.quoted ? nestQuotes(thing.text) : thing.text}</bdi>{said.quoted ? '”' : ''}</a
+                >{:else}{said.quoted ? '“' : ''}<bdi class="target-name" data-own>{said.quoted ? nestQuotes(thing.text) : thing.text}</bdi>{said.quoted ? '”' : ''}{/if}{/if}{#if e.kind === 'share.open'}{thing ? historyWords.withLink : historyWords.aLink}{:else if e.kind === 'share.close' && !thing}{historyWords.aLink}{/if}</span
           >{/if}
         <span class="line-detail">
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
@@ -826,23 +856,37 @@
   <div class="side">
     {#if lanes.length > 0 || byWho}
       <!-- THE AGENTS' LAST DAY AS LANES, AND THE MONTH BY WHO (AF12): the month's part is the record's figure, BrainDog's
-           own work among it, its sentence saying its span. -->
+           own work among it. -->
       <Tile icon="session" title={historyWords.whoWorked} meta={lanes.length > 0 ? historyWords.lastDay : historyWords.lastMonth}>
         {#if lanes.length > 0}
-          <Swimlanes {lanes} start={clock - LANE_SPAN_MS} end={clock} now={clock} subject={historyWords.lanesSubject} />
-          <p class="reading">{lanesSaid(lanes)}</p>
+          <!-- THE LANES SAY IT, and their sentence is what a screen reader hears (`summary`): the line under them said the
+               lanes again in words, "ChatGPT ran 1 stretch, Cursor 1 and Claude 1", beside the lanes themselves (3 Nov). -->
+          <Swimlanes {lanes} start={clock - LANE_SPAN_MS} end={clock} now={clock} subject={historyWords.lanesSubject} summary={lanesSaid(lanes)} />
         {/if}
         {#if byWho}
-          <Stacked parts={byWho} subject={historyWords.whoSubject} />
-          <p class="reading">{whoSaid(byWho)}</p>
+          <div class="month">
+            <!-- ITS OWN SPAN, SAID ONCE: the tile's corner says the lanes' 24 hours, and this part is the month. -->
+            {#if lanes.length > 0}<p class="caps-label month-head">{historyWords.lastMonth}</p>{/if}
+            <Stacked parts={byWho} subject={historyWords.whoSubject} summary={whoSaid(byWho)} />
+            <!-- EVERY PART A FIGURE BESIDE ITS NAME, in the bar's own colours (3 Nov): "Over the last 30 days you made 360
+                 changes, rules 110, agents 13 and BrainDog 3" buried four numbers in a sentence, and the bar drops the
+                 names of the parts too thin to hold one. The bar's own sentence already says all of it aloud. -->
+            <ul class="viz legend" aria-hidden="true">
+              {#each byWho as p, i (p.label)}
+                <li><span class="swatch" data-tone={rampAt(i)}></span><span class="legend-name">{p.label}</span><span class="legend-n num">{figure(p.value)}</span></li>
+              {/each}
+            </ul>
+          </div>
         {/if}
       </Tile>
     {/if}
 
     {#if matched.length > 0}
-      <Tile icon="history" title={historyWords.whatChanged} count={matched.length} meta={tallyMeta}>
-        <Bars items={topKinds} subject={historyWords.kindsSubject} />
-        <p class="reading">{tallyReading}</p>
+      <!-- NO COUNT, NO SPLIT BY WHO AND NO SENTENCE (3 Nov): the count is the title's, who made them is the sentence
+           under the title and the tile above, and "Ledger is the biggest share: 56 of 195" read the first bar aloud. The
+           bars are the tile, and their sentence is what a screen reader hears. -->
+      <Tile icon="history" title={historyWords.whatChanged}>
+        <Bars items={topKinds} subject={historyWords.kindsSubject} summary={tallyReading} />
       </Tile>
     {/if}
 
@@ -850,6 +894,7 @@
     {#if busy.total >= 10 && busy.values.filter((r) => r.some((v) => v > 0)).length >= 2}
       <Tile icon="clock" title={historyWords.busyHours} meta={historyWords.lastWeek}>
         <HeatGrid rows={busy.rows} cols={HOURS} values={busy.values} subject={historyWords.heatSubject} />
+        <!-- THE ONE READING KEPT: the grid shows where the hours are busy, and this names them. -->
         <p class="reading">{busySaid(busy.values)}</p>
       </Tile>
     {/if}
@@ -859,8 +904,8 @@
 <PageHead
   icon="history"
   title={copy.audit}
-  count={matched.length}
-  total={kept.length}
+  count={narrowed ? matched.length : undefined}
+  total={narrowed ? kept.length : undefined}
   sentence={lead}
   actions={actors.length > 1 || kinds.length > 1 || days.length > 1 || list || offerAll ? (phone ? filterOpen : tools) : undefined}
 />
@@ -899,21 +944,24 @@
       {:else if !refused && matched.length === 0 && (!route.data.live || live)}
         <Empty
           kind={LOG.length === 0 ? 'no-data-yet' : 'no-results'}
-          title={LOG.length === 0 ? copy.auditNone : copy.noneMatching(kept.length, 'entries')}
-          query={LOG.length === 0
-            ? undefined
-            : [who ? actorSaid(who, me, names, runs.get(who) ?? null).name : '', isEventKind(what) ? kindOf(what).word : what].filter(Boolean).join(' · ')}
+          title={LOG.length === 0 ? copy.auditNone : historyWords.noneMatch}
           body={LOG.length === 0 ? copy.auditHolds : undefined}
         >
+          <!-- A FILTER THAT MISSED SAYS SO IN WORDS (3 Nov): "189 entries, none matching:" over the filter set in code type
+               said the filters the toolbar already shows. It offers the two ways on: take them off, or read further back,
+               since a filter applies to what was read. Show more stood under the card, a third press about nothing. -->
           {#snippet actions()}
-            {#if who || what || when || list}<Button href={everything ? '/audit?everything=1' : '/audit'}>{copy.clearFilters}</Button>{/if}
+            {#if moreOlder && LOG.length > 0}<Button weight="quiet" onclick={showMore} disabled={older}>{historyWords.furtherBack}</Button>{/if}
+            {#if narrowed}<Button href={everything ? '/audit?everything=1' : '/audit'}>{copy.clearFilters}</Button>{/if}
           {/snippet}
         </Empty>
       {/if}
 
       {#each bands as day, d (day.key)}
         {#if d === 1 && tiles && phone}{@render sideTiles()}{/if}
-        <Tile class="section" data-surface="tile" title={day.title} count={day.count || undefined}>
+        <!-- A DAY IS ITS NAME ALONE (3 Nov): its count was the lines drawn so far, "Today 30" over a day of 195 changes,
+             and it grew each time Show more was pressed. -->
+        <Tile class="section" data-surface="tile" title={day.title}>
           <div class="section-body">
             {#each day.hours as band (band.key)}
               <!-- THE HOUR IS A SUBHEAD INSIDE ITS DAY, in the meta step and tabular, so the times line up down the tile; with
@@ -931,18 +979,20 @@
       {/each}
       {#if bands.length === 1 && tiles && phone}{@render sideTiles()}{/if}
 
-      <!-- WHAT THE STREAM LEAVES OUT, said once at its foot, and the press that shows it: the same switch as the toolbar's. -->
-      {#if moreRead || moreOlder}
+      <!-- THE STREAM'S FOOT, ONE ROW: more of it, and what it holds back as the one press that shows it (3 Nov). The
+           held-back lines were a sentence, "5 bookkeeping entries hidden. Everything shows them.", telling the reader
+           which control to go and find, in a word that means the ledger everywhere else in BrainDog. -->
+      {#if matched.length > 0}
         <div class="older">
-          <Button weight="quiet" onclick={showMore} disabled={older}>{historyWords.showMore}</Button>
+          {#if moreRead || moreOlder}
+            <Button weight="quiet" onclick={showMore} disabled={older}>{historyWords.showMore}</Button>
+          {:else}
+            <CapLine shown={told.length} total={lines.length} />
+          {/if}
+          {#if hiddenNow > 0}
+            <Button weight="bare" onclick={() => setParam('everything', '1')}>{historyWords.showHidden(hiddenNow)}</Button>
+          {/if}
         </div>
-      {:else}
-        <CapLine shown={told.length} total={lines.length} />
-      {/if}
-
-      <!-- WHAT THE STREAM LEAVES OUT, said once at its foot: the toolbar's Everything shows it, so it is no second press. -->
-      {#if hiddenNow > 0 && matched.length > 0}
-        <p class="foot hidden-line">{historyWords.hidden(hiddenNow)} {historyWords.hiddenWhere}</p>
       {/if}
       {#if olderFix}<p class="foot">{olderFix}</p>{/if}
     </div>
@@ -1017,13 +1067,76 @@
     }
   }
 
-  /* THE ONE LINE UNDER EACH CHART that says what it means, at body size in ink, at the tile's foot. */
+  /* THE BUSY HOURS' ONE LINE, which names the hours the grid only shades: a caption, not a paragraph. */
   .reading {
     margin: 0;
-    margin-block-start: auto;
+    color: var(--ink-2);
+    font: var(--t-meta);
+  }
+
+  /* THE MONTH BY WHO, under the lanes: its span as a caps label, the bar, then each part a figure. */
+  .month {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .month-head {
+    margin: 0;
+    color: var(--ink-3);
+  }
+
+  /* THE KEY BELOW NAMES EVERY PART, so the bar's own names under it (only the parts wide enough to hold one) are not
+     said again: the bar is drawn alone, its 12px, and the room its labels took goes with them. */
+  .month :global(.viz-stacked) {
+    block-size: var(--sp-3);
+    overflow: hidden;
+  }
+
+  /* THE LANES AND THE MONTH ARE TWO SPANS IN ONE TILE, a section's air apart. */
+  :global(.viz) + .month {
+    margin-block-start: var(--sp-2);
+  }
+
+  /* A FIGURE WITH ITS NAME AND ITS PART'S COLOUR, two to a row in the side column: the key a stacked bar needs. */
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr));
+    gap: var(--sp-1) var(--sp-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .legend li {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    font: var(--t-meta);
+  }
+
+  .swatch {
+    flex: none;
+    inline-size: var(--sp-2);
+    block-size: var(--sp-2);
+    border-radius: var(--r-pill);
+    background: var(--c);
+  }
+
+  .legend-name {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink-2);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .legend-n {
+    margin-inline-start: auto;
     color: var(--ink);
-    font-size: var(--fs-body);
-    line-height: var(--lead-ui);
+    font-weight: var(--fw-semi);
+    font-variant-numeric: tabular-nums;
   }
 
   .foot {
@@ -1033,22 +1146,33 @@
     line-height: var(--lead-meta);
   }
 
-  /* A TILE'S FOOT SITS UNDER ITS READING, a step closer than the tile's own gap. */
-  .reading + .foot {
-    margin-block-start: calc(var(--sp-2) - var(--sp-4));
-  }
-
+  /* THE STREAM'S FOOT: Show more, and the held-back lines' one press beside it. */
   .older {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
   }
 
   /* ── a run folded, and what the stream leaves out ────────────────────── */
 
   /* "+9 MORE" SITS WHERE THE LINES IT HOLDS WILL BE, in from the well so it reads as the line above it continued, in the
      second ink. Pressing it puts them there; nothing above it moves. */
+  /* ON THE LINE'S OWN GRID (3 Nov), so its words start where every title above starts, at every width: its indent was
+     sums of the parts, 12 short of the titles at a desk and 4 past them on a phone. The button's own padding is taken
+     back, so its words and the titles share one x. */
   .fold-row {
-    display: flex;
-    padding-inline-start: calc(var(--well-l) + var(--sp-3) + var(--sp-2));
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr);
+    column-gap: var(--sp-3);
+    padding-inline: var(--sp-3);
+    font-size: var(--fs-body);
+  }
+
+  .fold-row > .fold {
+    grid-column: 2;
+    justify-self: start;
+    margin-inline-start: calc(-1 * var(--sp-2));
   }
 
   /* WHAT ONE PASS OF THE UPDATE DID, opened under its line and set in by the well, so it reads as that line's and not
@@ -1087,10 +1211,6 @@
     }
   }
 
-  .hidden-line {
-    max-inline-size: var(--measure);
-    line-height: var(--lh-body);
-  }
 
   /* SAID AS A LINK IN THE SENTENCE, because it is part of it; a button, because it changes the view and goes nowhere. */
 
@@ -1102,7 +1222,39 @@
   }
 
   .sheet-tools .tools {
+    flex-direction: column;
+    align-items: stretch;
     justify-content: flex-start;
+  }
+
+  /* IN THE PHONE'S SHEET THE FILTERS ARE A GROUPED LIST, one row a filter (3 Nov): the track laid out across the sheet
+     was three words on white, "Everything Everyone Every kind", that did not look like anything to press. Each row is a
+     thumb's 44, its word at the start and its chevron at the end, the one that narrows wearing the chosen fill. */
+  .sheet-tools .tools :global(.filters) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-0);
+    padding: var(--sp-1);
+    border-radius: var(--r-tile);
+  }
+
+  .sheet-tools .tools :global(.filters .menu-root),
+  .sheet-tools .tools :global(.filters .menu-trigger) {
+    display: flex;
+    inline-size: 100%;
+  }
+
+  .sheet-tools .tools :global(.filters .segment) {
+    justify-content: space-between;
+    inline-size: 100%;
+    min-block-size: var(--tap);
+    padding-inline: var(--sp-3);
+    border-radius: calc(var(--r-tile) - var(--sp-1));
+    text-align: start;
+  }
+
+  .sheet-tools .seg-menu {
+    max-inline-size: none;
   }
 
   .tools {
@@ -1197,9 +1349,18 @@
   }
 
 
+  /* ONE LINE A CHOICE (3 Nov): a rule's name wrapped to three lines inside a row drawn 32 tall, and the rows were
+     written over each other. A long name is cut, whole in its tooltip, and the menu is never wider than a phone. */
+  .mi {
+    max-inline-size: min(22rem, calc(100vw - 2 * var(--gutter)));
+  }
+
   .mi-name {
     flex: 1;
     min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .mi-n {
@@ -1388,12 +1549,14 @@
       font-family: var(--font-mono);
     }
 
-    /* "SHOW ALL 7" STARTS ON THE WORDS' EDGE (skills pass 2 Nov): its indent counted the well and not the time column
-       before it, so at a desk it stood in the minutes' column, half under the hour. The row's own font, so its `6ch` is
-       the lines' `6ch`; the button's own padding is taken back, so its words and the lines' start on one x. */
+    /* "SHOW ALL 7" STARTS ON THE WORDS' EDGE (skills pass 2 Nov): the time column comes first at a desk, so the row's
+       grid has it too, in the row's own font, so its `6ch` is the lines' `6ch`. */
     .fold-row {
-      font-size: var(--fs-body);
-      padding-inline-start: calc(6ch + var(--well-l) + 2 * var(--sp-3) - var(--sp-2));
+      grid-template-columns: 6ch var(--well-l) minmax(0, 1fr);
+    }
+
+    .fold-row > .fold {
+      grid-column: 3;
     }
   }
 

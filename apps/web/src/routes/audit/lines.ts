@@ -31,7 +31,7 @@ import { cardWords } from '../../lib/decide/card.ts';
 import { settledSaid, slashDidSaid, type SettledWords, type Settling } from '../../lib/record/history-live.ts';
 import { PAGES } from '../../lib/record/held.ts';
 import { moneyInText } from '../../lib/record/money.ts';
-import { actor, humanize, listName, type ActorKind } from '../../lib/record/names.ts';
+import { actor, humanize, listName, ruleNameSaid, type ActorKind } from '../../lib/record/names.ts';
 import type { AuditEvent, EventKind } from '../../lib/record/schema.ts';
 import { runOf } from '../../lib/ui/face.ts';
 import { listed } from '../../lib/viz/shared.ts';
@@ -95,6 +95,13 @@ export const historyWords = {
   showThem: (n: number): string => (n === 1 ? 'Show it' : 'Show them'),
   /* THE FOOT SAYS WHERE THEY ARE rather than being a second press beside Show more. */
   hiddenWhere: 'Everything shows them.',
+  /* AND SINCE 3 NOV IT IS THAT PRESS, one short line at the foot that turns Everything on, where it was a sentence
+     telling the reader which control to find. */
+  showHidden: (n: number): string => (n === 1 ? 'Show 1 hidden line' : `Show ${count(n)} hidden lines`),
+  /* A FILTER THAT MISSED, said once and in words: the filters on are drawn in the toolbar already. */
+  noneMatch: 'Nothing here matches these filters',
+  /* THE FILTERS APPLY TO WHAT WAS READ, so a miss offers the older page, where a match may be. */
+  furtherBack: 'Look further back',
   onlyBooks: 'Nothing changed, apart from BrainDog keeping its own books.',
   /* THE ONE PRESS AT THE STREAM'S FOOT, for more of what was read and then for older lines. */
   showMore: 'Show more',
@@ -433,6 +440,49 @@ export function thingOf(target: string, title: string | null, nameOf: (list: str
   return said === null ? null : { text: said, href: null, list: null };
 }
 
+/* ── a change to a page, a rule, a script or a list ────────────────────── */
+
+type Declared = { kind: 'page' | 'rule' | 'script' | 'list'; id: string };
+
+/** What a `declare` line changed, from its target (`declaration:rule.meet-payees`), or `null` for any other target. */
+export function declaredIn(target: string | undefined): Declared | null {
+  const m = /^declaration:(page|rule|script|register)\.(.+)$/u.exec(target ?? '');
+  if (!m) return null;
+  return { kind: m[1] === 'register' ? 'list' : (m[1] as Declared['kind']), id: m[2]! };
+}
+
+/**
+ * THE VERB A CHANGE TO THE SETUP IS SAID WITH, by what it changed (3 Nov): every `declare` line read "Changed the page",
+ * the rules an upgrade rewrote too, and named nothing, so four rules changed in a minute were "Changed the page, 4 times".
+ */
+export const declareWord = (target: string | undefined): string => `Changed the ${declaredIn(target)?.kind ?? 'page'}`;
+
+/**
+ * WHAT IT CHANGED, by name and with its own page: a page by its title, a rule or a script by the title the Automations
+ * page gives it (`titles`, keyed `rule:<id>` and `script:<id>`), a list by the rail's name for it.
+ */
+export function declaredThing(target: string | undefined, titles: ReadonlyMap<string, string>, nameOf: (list: string) => string = listName): Thing | null {
+  const d = declaredIn(target);
+  if (d === null) return null;
+  if (d.kind === 'page') return thingOf(`page.${d.id}`, null, nameOf);
+  if (d.kind === 'list') return { text: nameOf(d.id), href: `/r/${d.id}`, list: null };
+  const title = titles.get(`${d.kind}:${d.id}`);
+  const href = d.kind === 'rule' ? `/automations/${encodeURIComponent(d.id)}` : `/scripts/${encodeURIComponent(d.id)}`;
+  return { text: title ? ruleNameSaid(title) : humanize(d.id), href, list: null };
+}
+
+/** A minute's run of setup changes as one line: "Changed the rule, 3 times", or "Changed pages and rules, 4 times". */
+export function declaresSaid(targets: readonly (string | undefined)[]): string {
+  const kinds = [...new Set(targets.map((t) => declaredIn(t)?.kind ?? 'page'))];
+  const times = historyWords.times(targets.length);
+  if (kinds.length === 1) return `${declareWord(targets[0])}, ${times}`;
+  const plural = { page: 'pages', rule: 'rules', script: 'scripts', list: 'lists' } as const;
+  return `Changed ${listed(kinds.map((k) => plural[k]))}, ${times}`;
+}
+
+/** A QUESTION THAT QUOTES SOMETHING, QUOTED ITSELF, nests its quotes: “Move ‘Next sprint’ to Doing?”, never “Move "Next sprint" to Doing?”. */
+export const nestQuotes = (text: string): string => text.replace(/"([^"]*)"/gu, '‘$1’');
+
 /* ── a line as a sentence ──────────────────────────────────────────────── */
 
 /**
@@ -499,6 +549,9 @@ export function lineSaid(word: string, thing: string | null, note: string, gover
     if (rest === name) rest = '';
     else if (rest.startsWith(`${name} · `)) rest = rest.slice(name.length + 3).trim();
   }
+  /* A NOTE THAT ONLY SAYS THE VERB AGAIN IS NO NOTE (3 Nov): a row made with no note of its own is noted "created", so
+     every new row read "Created 4 entries" over "You · created · Learnings", the verb twice in one line. */
+  if (rest.toLowerCase() === word.toLowerCase() || (word === 'Changed' && rest === 'changed this')) rest = '';
   rest = datesIn(scriptWords(rest), now);
   if (name !== '' && DONE.test(name)) return { verb: null, quoted: false, done: word.toLowerCase(), note: rest };
   return { verb: word, quoted: governed && name !== '', done: null, note: rest };
