@@ -137,6 +137,16 @@ export type TodayAnswer = {
   version?: number;
 };
 
+/**
+ * ONE LINE OF TODAY ASKED AS A STREAM (finish 3 Nov), before its answer: `head` says how many blocks the page has and the
+ * key each is drawn under (and, for a kept Today, how it is declared, so its board is laid before a card is drawn);
+ * `block` is one block as the page draws it, masked as the answer is, at its place. The whole answer follows as the
+ * stream's last line and is the one that counts.
+ */
+export type TodayLine =
+  | { head: { of: number; keys: string[]; declared?: unknown; declared_version?: number } }
+  | { block: { i: number; value: unknown } };
+
 const valueOf = (out: Result<unknown> | null): unknown => (out !== null && out.ok ? out.value : null);
 /**
  * EACH PART ASKED ON A TURN OF ITS OWN (`turn`), so a call that came in while Today was being drawn, an agent's write or

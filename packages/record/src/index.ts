@@ -265,7 +265,7 @@ import { drewCostWhy } from './design-agent.ts';
 import { drawingsOf, drewDraft, drewFiled, DREW_MODEL_PREF } from './drew.ts';
 import { censusSlices, methods as censusMethods, type CensusPart } from './methods/pages-census.ts';
 import { dropTextFaults, keepTextFaults, keepTextFaultsStep, textFaultsUnderway } from './methods/text-faults.ts';
-import { todayOf, type TodayAnswer, type TodayAsks } from './today.ts';
+import { todayOf, turn as turnOf, type TodayAnswer, type TodayAsks, type TodayLine } from './today.ts';
 import { shapeAnswerOf, type ShapeAsks } from './project-shape.ts';
 import { HOST_SOURCES, hostSourcesOf } from './sources/index.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
@@ -12587,6 +12587,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `today` shares its reads, and they go with it.
    */
   const todayDraws = new WeakMap<CallContext, ReturnType<Kernel['blocksOf']> | null>();
+  /**
+   * WHERE A `today` ASKED AS A STREAM HANDS ITS CARDS ON (finish 3 Nov): set on the copy of the caller `today` draws with,
+   * and taken by the first `previewPage` asked with it, which hands on each block as it is drawn (`TodayLine`).
+   */
+  const todayEmits = new WeakMap<CallContext, (line: TodayLine) => void>();
 
   /**
    * TODAY AS IT WAS LAST DRAWN, BY WHO ASKED AND WHAT BODY (`today`). On a lived-in record Today's body is the slowest
@@ -12664,7 +12669,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * TODAY AS `today` ANSWERS ONE BODY (or a kept page by its slug): held for the owner, drawn now for anybody else. The
    * method itself reads `last` and `shape` around it (`todayLast`).
    */
-  const todayFor = async (args: Record<string, unknown> | undefined, ctx: CallContext): Promise<Result<TodayAnswer>> => {
+  const todayFor = async (args: Record<string, unknown> | undefined, ctx: CallContext, emit?: (line: TodayLine) => void): Promise<Result<TodayAnswer>> => {
     const stop = scoped(ctx, 'read');
     if (stop) return { ok: false as const, refusal: stop };
     const said = (args ?? {}) as Record<string, unknown>;
@@ -12706,6 +12711,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const drawOf = () => {
       const once: CallContext = { ...ctx };
       todayDraws.set(once, null);
+      /* A STREAM'S CARDS, each as it is drawn; a kept Today's head says how it is declared, so its board is laid first. */
+      if (emit !== undefined)
+        todayEmits.set(once, keptVersion === null ? emit : (line) => emit('head' in line ? { head: { ...line.head, declared: body, declared_version: keptVersion! } } : line));
       return todayOf(asks, body as Record<string, unknown>, [...kernel.registers()].map(([, decl]) => decl as never), once, { offer });
     };
     /* AND THE PAGE AS IT IS DECLARED (its title, `board`, the phone's arrangement), so the screen draws a kept Today from
@@ -14326,7 +14334,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          part of `today`, over the one read its other parts draw over too (`todayDraws`). */
       const drawOne = todayDraws.get(ctx) ?? kernel.blocksOf({ inbox: allows(ctx, 'owner') === null || inboxReached(ctx), viewer: viewerOf(ctx), sees: seesFor(ctx) });
       if (todayDraws.has(ctx)) todayDraws.set(ctx, drawOne);
-      const drawnBlocks = written.map((block, i) => {
+      /* TODAY'S CARDS AS EACH IS DRAWN (`todayEmits`, finish 3 Nov): a `today` asked as a stream hands every block on as it
+         is drawn, keyed as the answer keys it and masked as the answer is, between turns of the record's thread, so the
+         screen fills a card the moment it is ready rather than when the slowest is. The whole answer still follows and is
+         the one that counts: a lead line, a ceiling or a key parted differently is put right by it. Taken once, so the
+         second `previewPage` of the same `today` (the cards' key numbers) hands nothing on. */
+      const emitBlock = todayEmits.get(ctx);
+      if (emitBlock !== undefined) todayEmits.delete(ctx);
+      const emitKeys =
+        emitBlock === undefined
+          ? []
+          : partedKeys(
+              written.map(() => ({})),
+              written.map((w, n) => {
+                const own = (w as { key?: unknown } | null)?.key;
+                return { key: typeof own === 'string' && /^[a-z][a-z0-9_-]{0,47}$/u.test(own) ? own : `p${n + 1}` };
+              }),
+            ).map((k) => k.key);
+      if (emitBlock !== undefined) emitBlock({ head: { of: written.length, keys: emitKeys } });
+      const drawOneAt = (block: unknown, i: number) => {
         const plan = plans[i]!;
         const cost = costs[i];
         const drawn =
@@ -14345,7 +14371,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         let text = JSON.stringify(drawn);
         for (const [name, was] of back) text = text.replaceAll(name, was);
         return JSON.parse(text) as typeof drawn;
-      });
+      };
+      const drawnBlocks: ReturnType<typeof drawOneAt>[] = [];
+      /* A TURN ONLY ONCE A FEW MS OF DRAWING HAVE PASSED: quick blocks go out together, and a slow one goes out alone. */
+      let turned = performance.now();
+      for (const [i, block] of written.entries()) {
+        const drawn = drawOneAt(block, i);
+        drawnBlocks.push(drawn);
+        /* THE LEAD LINE OF TODAY'S OWN BODY WAITS FOR THE WHOLE ANSWER, which writes Home's line into it. */
+        if (emitBlock === undefined || (decl.page === 'today' && i === 0)) continue;
+        emitBlock({ block: { i, value: sight.mask(ctx, { ...drawn, key: emitKeys[i] }) } });
+        if (performance.now() - turned < 6) continue;
+        await turnOf();
+        turned = performance.now();
+      }
       /* TODAY'S BODY IS HOME (`todayHome` in the app, drawn here and never installed), so its lead note carries Home's
          line as `said`, as `page` carries a page's: written today from the reading Today holds now (`homeLineFor`). */
       const homeLine = decl.page === 'today' && leadBlockOf(drawnBlocks)?.at === 0 ? homeLineFor(ctx) : null;
@@ -14402,7 +14441,30 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * To the owner, a read may be answered Today as it was last drawn, marked `behind` (`todayKept`); `fresh` is never.
      * `offer: false` leaves out the widget the board's last cell offers, which the app then asks `widgetSuggest` for.
      */
-    async today(args: { body?: unknown; fresh?: boolean; page?: string; offer?: boolean; last?: string; shape?: string } | undefined, ctx: CallContext): Promise<Result<TodayAnswer | null>> {
+    async today(
+      args: { body?: unknown; fresh?: boolean; page?: string; offer?: boolean; last?: string; shape?: string } | undefined,
+      ctx: CallContext,
+      /* ASKED AS A STREAM (`serveApi`, finish 3 Nov): each card handed on as it is drawn, before the answer. A token is
+         answered whole, so what an agent read is the answer its read is counted from. */
+      emit?: (line: TodayLine) => void,
+    ): Promise<Result<TodayAnswer | null>> {
+      /* WHAT WAS HANDED ON IS NOT SENT TWICE: each block of the answer that is the one a line carried is `{ sent: true }`
+         in it, and the screen puts back what it was handed (`today-read.ts`). */
+      const handed = new Map<number, string>();
+      const lines =
+        ctx.principal.kind === 'token' || emit === undefined
+          ? undefined
+          : (line: TodayLine) => {
+              if ('block' in line) handed.set(line.block.i, JSON.stringify(line.block.value));
+              emit(line);
+            };
+      const lean = (got: Result<TodayAnswer | null>): Result<TodayAnswer | null> => {
+        if (handed.size === 0 || !got.ok || got.value === null) return got;
+        const page = got.value.page as { blocks?: unknown[] } | null;
+        if (page === null || typeof page !== 'object' || !Array.isArray(page.blocks)) return got;
+        const blocks = page.blocks.map((b, i) => (handed.get(i) === JSON.stringify(b) ? { sent: true } : b));
+        return ok({ ...got.value, page: { ...page, blocks } });
+      };
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
@@ -14418,16 +14480,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         /* AND THE VERSION IT WAS ASKED AT, taken before it is drawn: a tab that has heard a newer one by the time it takes
            this answer draws it as behind and asks again (`earlyToday`). */
         const at = versionFor(ctx);
-        const got = await todayFor({ ...was.what, ...(was.offer ? {} : { offer: false }) }, ctx);
-        return got.ok ? ok({ ...got.value, asked: was.asked, version: at }) : got;
+        const got = await todayFor({ ...was.what, ...(was.offer ? {} : { offer: false }) }, ctx, lines);
+        return lean(got.ok ? ok({ ...got.value, asked: was.asked, version: at }) : got);
       }
       if (said.shape !== undefined && !TODAY_SHAPES.includes(said.shape as never)) return no('VALUE_MALFORMED', 'shape is phone or wide, the screen Today is asked on.', { at: 'shape', allowed: [...TODAY_SHAPES] });
       const { shape, ...asked } = said;
-      const got = await todayFor(asked, ctx);
+      const got = await todayFor(asked, ctx, lines);
       /* THE FIRST READ OF AN OPEN IS REMEMBERED FOR THAT SHAPE OF SCREEN, so the next open can ask it beside `boot`; a read
          drawn now (`fresh`) is a screen already open, asked again. */
       if (got.ok && shape !== undefined && asked.fresh !== true) void rememberToday(ctx, shape as TodayShape, asked).catch(() => undefined);
-      return got;
+      return lean(got);
     },
 
     /** One figure, by the id a `stat` cell names. */

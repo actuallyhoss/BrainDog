@@ -2454,8 +2454,84 @@ export function createClient(options: ClientOptions) {
     return answered<T>(res.status, body);
   }
 
+  /**
+   * A READ ASKED IN LINES (finish 3 Nov): the method's lines handed to `onLine` as each arrives, and its answer, the
+   * stream's last line (`{ done }`), returned as `call` returns one. A host that answers whole (one built before lines,
+   * or a method without them) is answered as `call` answers, with no line said. A sign-in gone stale is proved again and
+   * asked once more, as `call` does.
+   */
+  async function callLines<T>(name: string, args: Record<string, unknown>, onLine: (line: unknown) => void): Promise<Result<T>> {
+    const once = async (): Promise<Result<T>> => {
+      if (!NAMES.has(name)) return { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no method called ${name}.`, allowed: [...NAMES] } };
+      if (LEAVING) return { ok: false, refusal: unreachable('This page is being left.') };
+      const leaving = new AbortController();
+      OUTGOING.add(leaving);
+      tell();
+      const done = (): void => {
+        if (OUTGOING.delete(leaving)) tell();
+      };
+      let res: Response;
+      try {
+        res = await doFetch(`${base}/api/${name}`, {
+          signal: leaving.signal,
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/x-ndjson, application/json', ...(options.token ? { authorization: `Bearer ${options.token}` } : {}) },
+          body: JSON.stringify(args),
+        });
+      } catch (e) {
+        done();
+        return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
+      }
+      try {
+        if (!(res.headers.get('content-type') ?? '').includes('ndjson') || res.body === null) {
+          let body: unknown;
+          try {
+            body = await res.json();
+          } catch {
+            return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
+          }
+          return answered<T>(res.status, body);
+        }
+        let last: Result<T> | null = null;
+        const said = (text: string): void => {
+          if (text.trim() === '') return;
+          let line: unknown;
+          try {
+            line = JSON.parse(text);
+          } catch {
+            return;
+          }
+          if (line === null || typeof line !== 'object') return;
+          if ('done' in line) last = answered<T>(200, (line as { done: unknown }).done);
+          else onLine(line);
+        };
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let held = '';
+        try {
+          for (let part = await reader.read(); !part.done; part = await reader.read()) {
+            held += decoder.decode(part.value, { stream: true });
+            for (let at = held.indexOf('\n'); at >= 0; at = held.indexOf('\n')) {
+              said(held.slice(0, at));
+              held = held.slice(at + 1);
+            }
+          }
+          said(held + decoder.decode());
+        } catch (e) {
+          return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
+        }
+        return last ?? { ok: false, refusal: unreachable(`${name} ended before its answer`) };
+      } finally {
+        done();
+      }
+    };
+    const out = await once();
+    return provedAgain(out, once, name, false);
+  }
+
   return {
     call,
+    callLines,
     /* THE TWO KEY DOORS. A browser session, no bearer, this origin, and an owner whose last proof is under
        fifteen minutes old, which the record decides. `12 §6` rules 2, 3 and 9. While the keychain is behind its
        passphrase each carries `passphrase` too, and without it the answer is `REQUIRED_MISSING` at `passphrase`; a

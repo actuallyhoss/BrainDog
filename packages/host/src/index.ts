@@ -293,6 +293,13 @@ export type Handler = (args: Record<string, unknown>, ctx: unknown) => Promise<R
 const FIREWALLED = new WeakMap<Record<string, Handler>, (method: string, stripped: readonly string[]) => void>();
 
 /**
+ * A HANDLER THAT CAN ANSWER IN LINES (finish 3 Nov): Today's cards, each handed on as the record draws it. Kept by the
+ * handler itself, so a table a host wraps by spreading it (`withKeychainPassphrase`, `withShareLinks`) still finds it.
+ */
+type LinesHandler = (args: Record<string, unknown>, ctx: unknown, emit: (line: unknown) => void) => Promise<Result<unknown>>;
+const LINES = new WeakMap<Handler, LinesHandler>();
+
+/**
  * The handlers, built once from the record's surface.
  *
  * THE WIRING IS SHARED, not just the table. A test could assert that two hosts wire the same routes;
@@ -579,6 +586,10 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
   for (const name of Object.keys(handlers))
     if (!BY_NAME.has(name)) throw new TypeError(`${name} has a handler and is not in the route table`);
   FIREWALLED.set(handlers, (method, stripped) => api.firewalled?.(method, stripped));
+  /* TODAY IN LINES, where the record takes a third argument to hand its cards to. */
+  const today = (api as unknown as Record<string, unknown>).today;
+  if (handlers.today !== undefined && typeof today === 'function')
+    LINES.set(handlers.today, (a, ctx, emit) => (today as (a: unknown, c: unknown, e: unknown) => Promise<Result<unknown>>).call(api, a, ctx, emit));
   return handlers;
 }
 
@@ -775,6 +786,9 @@ export async function serveApi(
   /* SEVERAL READS IN ONE REQUEST (`routes/reads.ts`): the record checks who asks and the list, and each read is then
      answered here by its own route, as it would be asked alone. */
   if (name === READS) return readsAnswer(handler, handlers, args, ctx);
+  /* ASKED IN LINES (`accept: application/x-ndjson`) OF A METHOD THAT HAS THEM: Today, each card as it is drawn. */
+  const lines = LINES.get(handler);
+  if (lines !== undefined && (request.headers.get('accept') ?? '').includes('application/x-ndjson')) return linesAnswer(name, lines, handlers, args, ctx);
   try {
     const out = await handler(args, ctx);
     /* THE FIREWALL: a field hidden from this caller still on a row of the answer is taken off
@@ -788,6 +802,69 @@ export async function serveApi(
 }
 
 export { FIREWALL_FAULT };
+
+/**
+ * AN ANSWER IN LINES (finish 3 Nov), one JSON value a line (`application/x-ndjson`): each line the method hands on as it
+ * works, through the firewall as the answer is, and last `{ "done": <the answer> }`, the envelope a plain request would
+ * have been answered, which is the one that counts. Always a 200: a refusal is said in `done`. A client that did not ask
+ * for lines is answered as before, whole.
+ */
+function linesAnswer(name: string, lines: LinesHandler, handlers: Record<string, Handler>, args: Record<string, unknown>, ctx: unknown): Response {
+  const text = new TextEncoder();
+  let closed = false;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const send = (value: unknown): void => {
+        if (closed) return;
+        try {
+          controller.enqueue(text.encode(`${JSON.stringify(value)}\n`));
+        } catch {
+          closed = true;
+        }
+      };
+      const emit = (line: unknown): void => {
+        const held = firewall(ctx, { ok: true, value: line });
+        if (held.stripped.length > 0) FIREWALLED.get(handlers)?.(name, held.stripped);
+        if (held.answer.ok) send(held.answer.value);
+      };
+      void (async () => {
+        let done: unknown;
+        try {
+          const out = await lines(args, ctx, emit);
+          const held = firewall(ctx, out);
+          if (held.stripped.length > 0) FIREWALLED.get(handlers)?.(name, held.stripped);
+          done = held.answer;
+        } catch (e) {
+          done = crashed(`/api/${name}`, e);
+        }
+        try {
+          send({ done });
+        } catch {
+          send({ done: crashed(`/api/${name}`, new Error('The answer could not be written.')) });
+        }
+        if (closed) return;
+        closed = true;
+        try {
+          controller.close();
+        } catch {
+          /* The reader went away first. */
+        }
+      })();
+    },
+    cancel() {
+      closed = true;
+    },
+  });
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'content-type': 'application/x-ndjson; charset=utf-8',
+      /* EACH LINE REACHES THE SCREEN AS IT IS WRITTEN, as Slash's do (`slash-ask.ts`): no proxy compresses or holds it. */
+      'cache-control': 'no-store, no-transform',
+      'x-accel-buffering': 'no',
+    },
+  });
+}
 
 /**
  * One method of the table, called by its name from a door that is not HTTP: the MCP's `act`, which does what the app
