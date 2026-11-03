@@ -138,6 +138,8 @@ export async function rehearseMove(r: MoveRehearsal, actor: string): Promise<Res
     title: m.says,
     pack: id,
     runs: { rule: true },
+    egress: [],
+    keys: [],
     reads: m.reads,
     writes: m.writes,
     source: m.source,
@@ -187,7 +189,8 @@ export async function rehearseMove(r: MoveRehearsal, actor: string): Promise<Res
             });
       if (!out.ok) {
         const fix = 'refusal' in out ? out.refusal.fix : 'the entry changed while it was moved';
-        return no('refusal' in out ? out.refusal.code : 'VERSION_STALE', `${id}'s move of your entries was refused at ${w.op === 'create' ? w.register : w.spoken}: ${fix} Nothing was installed, and you still have the version you had.`, { at: 'migrate' });
+        const at = w.op === 'create' ? w.register : (r.kernel.nameOf(w.spoken) ?? w.spoken);
+        return no('refusal' in out ? out.refusal.code : 'VERSION_STALE', `${id}'s move of your entries was refused at ${at}: ${fix} Nothing was installed, and you still have the version you had.`, { at: 'migrate' });
       }
     }
     return ok({ moved: writes.length });
