@@ -20,26 +20,21 @@
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import Skeleton from './Skeleton.svelte';
 
   let { head = false, rows = 5 }: { head?: boolean; rows?: number } = $props();
-
-  /* Widths that read as text of different lengths rather than a barcode of equal ones. */
-  const WIDTHS = ['62%', '48%', '71%', '39%', '56%', '44%', '66%', '52%'];
 </script>
 
-<div class="waiting" class:head role="status" aria-busy="true">
-  <span class="said">{copy.waiting}</span>
+<!-- THE SAME BARS AS EVERY CARD'S SKELETON (`Skeleton.svelte`, ui-perfect 3 Nov): one look for loading everywhere. -->
+<div class="waiting" class:head>
   {#if head}<span class="bar title" aria-hidden="true"></span>{/if}
-  {#each { length: rows } as _, i}
-    <span class="row" aria-hidden="true"><span class="well"></span><span class="bar" style:inline-size={WIDTHS[i % WIDTHS.length]}></span></span>
-  {/each}
+  <Skeleton kind="rows" count={rows} label={copy.waiting} />
 </div>
 
 <style>
   .waiting {
     display: grid;
     gap: 0;
-    animation: waiting-in var(--d-state) var(--ease-out) 300ms backwards;
   }
 
   /* With its own head, it stands where the page head and its list would: the same gutter. */
@@ -47,43 +42,14 @@
     padding: var(--sp-5) var(--gutter);
   }
 
-  .row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    min-block-size: var(--row-h);
-  }
-
-  /* INK AT A FIXED STRENGTH AND NOT A SURFACE STEP: it reads on the board and on a tile alike, where `--tile-2` is all
-     but invisible on the board. */
-  .well {
-    flex: none;
-    inline-size: var(--well-l);
-    block-size: var(--well-l);
-    background: color-mix(in oklab, var(--ink) 6%, transparent);
-    border-radius: var(--r-ctl);
-  }
-
-  .bar {
-    display: block;
-    block-size: 10px;
-    background: color-mix(in oklab, var(--ink) 9%, transparent);
-    border-radius: var(--r-xs);
-  }
-
   .bar.title {
+    display: block;
     inline-size: min(240px, 60%);
     block-size: var(--sp-5);
     margin-block-end: var(--sp-4);
-  }
-
-  .said {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+    border-radius: var(--r-pill);
+    animation: waiting-in var(--d-state) var(--ease-out) 300ms backwards;
   }
 
   @keyframes waiting-in {

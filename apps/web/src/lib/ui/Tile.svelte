@@ -26,7 +26,9 @@
   import { at } from '../at.ts';
   import Icon from './Icon.svelte';
   import IconWell from './IconWell.svelte';
+  import Loads from './Loads.svelte';
   import type { IconName } from './icons.ts';
+  import type { SkeletonKind } from './shape.ts';
 
   let {
     icon,
@@ -40,6 +42,10 @@
     actions,
     children,
     class: extra,
+    ready,
+    skeleton = 'rows',
+    rows,
+    shape,
     ...rest
   }: {
     /** The glyph in the heading's well. */
@@ -60,13 +66,25 @@
     children: Snippet;
     /** Added to `tile`, never in its place. A caller's scoped style does not reach in here, so style it with `:global` or a data attribute. */
     class?: string | undefined;
+    /**
+     * WHETHER THIS TILE'S OWN ANSWER IS IN (ui-perfect, 3 Nov). Given, the heading is drawn at once and the body is a
+     * skeleton at the size this tile had last time (`Loads.svelte`), until it is `true`; after that it never goes back.
+     * Absent, the body is drawn as it always was.
+     */
+    ready?: boolean | undefined;
+    /** The skeleton's shape while it loads: `rows` (default), `lines`, `figure`, `chips` or `table`. */
+    skeleton?: SkeletonKind | undefined;
+    /** How many rows the skeleton draws until this tile has drawn once. */
+    rows?: number | undefined;
+    /** The name its shape is kept under on this page; the title when absent. */
+    shape?: string | undefined;
     [key: string]: unknown;
   } = $props();
 
   const head = $derived(Boolean(icon || title || actions || meta || (href && hrefLabel)));
 </script>
 
-<section class={['tile', extra]} data-lead={lead ? '' : undefined} {...rest}>
+<section class={['tile', extra]} data-lead={lead ? '' : undefined} data-card={shape ?? (ready !== undefined ? (title ?? undefined) : undefined)} data-card-kind={ready !== undefined || shape ? skeleton : undefined} {...rest}>
   {#if head}
     <header class="tile-head">
       {#if icon}<IconWell name={icon} size="m" />{/if}
@@ -88,7 +106,11 @@
       {/if}
     </header>
   {/if}
-  {@render children()}
+  {#if ready === undefined}
+    {@render children()}
+  {:else}
+    <Loads id={shape ?? title ?? icon ?? 'tile'} {ready} kind={skeleton} {rows}>{@render children()}</Loads>
+  {/if}
 </section>
 
 <style>

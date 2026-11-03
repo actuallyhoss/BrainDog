@@ -20,6 +20,13 @@
   let { ready, waiting, children }: { ready: boolean; waiting?: Snippet; children: Snippet } = $props();
 
   let box = $state<HTMLElement>();
+  /* ONCE THE ANSWER HAS BEEN IN, IT STAYS (ui-perfect, 3 Nov): a read that goes out again (a poll, a pull) never fades the
+     skeleton back over content that was there. */
+  let had = $state(false);
+  $effect.pre(() => {
+    if (ready) had = true;
+  });
+  const showing = $derived(ready || had);
   /* WHETHER THIS PART HAS DRAWN ONCE: an answer that is there on the first draw does not fade in. */
   let drawn = false;
   $effect(() => {
@@ -47,8 +54,8 @@
   });
 </script>
 
-<div class="crossfade" bind:this={box} aria-busy={ready ? undefined : 'true'}>
-  {#if ready}
+<div class="crossfade" bind:this={box} aria-busy={showing ? undefined : 'true'}>
+  {#if showing}
     <div class="cf-layer" in:up>{@render children()}</div>
   {:else if waiting}
     <div class="cf-layer" out:down>{@render waiting()}</div>
