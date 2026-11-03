@@ -155,7 +155,7 @@
     align-items: center;
     gap: 7px;
     padding: 8px 11px;
-    border-radius: 8px;
+    border-radius: 999px;
     font: 500 14px/1 var(--ui);
     color: var(--on-night-2);
     cursor: pointer;
@@ -202,7 +202,7 @@
 
   .code {
     overflow: hidden;
-    border-radius: 12px;
+    border-radius: 14px;
     background: var(--term);
     color: var(--term-ink);
   }
@@ -239,7 +239,7 @@
   .cbox-copy {
     all: unset;
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: 999px;
     font: 500 13px/1 var(--ui);
   }
 

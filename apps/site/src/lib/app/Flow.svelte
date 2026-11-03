@@ -58,7 +58,7 @@
     display: grid;
     gap: var(--sp-1);
     padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-pop);
+    border-radius: var(--r-tile);
     background: var(--tile-2);
   }
 

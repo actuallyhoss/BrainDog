@@ -97,9 +97,10 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--tap);
-    padding-inline: var(--sp-3);
+    padding-inline: 14px;
     background: var(--tile);
-    border-radius: 8px;
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 1px var(--sep);
     color: var(--muted);
   }
 

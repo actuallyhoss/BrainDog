@@ -32,12 +32,12 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 14px;
-    border-radius: 12px;
+    padding: 12px 18px;
+    border-radius: 999px;
     background: var(--tile);
     font-size: var(--t-site-15);
-    /* A PLAIN HAIRLINE, as the home band's bar (plan F17): red is kept for the one ask. */
-    box-shadow: inset 0 0 0 1px var(--rule);
+    /* THE APP'S SEARCH CAPSULE: a hairline and the raised lift (red is kept for the one ask). */
+    box-shadow: inset 0 0 0 1px var(--sep), var(--shadow-raised);
   }
   .sl {
     color: var(--red);

@@ -144,11 +144,11 @@
 {/if}
 
 <style>
-  .t { background: var(--tile); border-radius: 14px; padding: 16px; min-width: 0; }
+  .t { background: var(--tile); border-radius: 16px; padding: 16px; min-width: 0; border: 1px solid var(--card-edge); box-shadow: var(--shadow-card); }
   .who { display: flex; align-items: center; gap: 9px; margin-block-end: 8px; }
   .who b { font-weight: 600; font-size: var(--t-site-small); }
   .pface {
-    width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none;
+    width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none;
     background: var(--ph-tint); color: var(--ph);
   }
   .brief { font-size: var(--t-site-18); line-height: 1.5; margin: 0; text-wrap: pretty; }
@@ -171,28 +171,29 @@
   .thd { display: flex; align-items: center; gap: 8px; margin: 2px 4px 0; font: 500 12.5px/1.2 var(--ui); color: var(--muted); }
   .t .thd { margin: 0 0 10px; }
   .r { margin-inline-start: auto; }
-  .hit { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--tile); min-width: 0; }
-  .agent { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; flex: none; background: var(--soft); color: var(--ink); box-shadow: inset 0 0 0 1px var(--rule); }
+  .hit { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--tile); min-width: 0; border: 1px solid var(--card-edge); box-shadow: var(--shadow-card); }
+  .agent { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--soft); color: var(--ink); box-shadow: inset 0 0 0 1px var(--rule); }
   .grow { flex: 1; min-width: 0; }
   .grow b { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .grow span { display: block; color: var(--muted); font-size: var(--t-site-12-5); }
   mark { background: var(--red-tint); color: inherit; border-radius: 3px; padding: 0 1px; }
   .tag { font-size: var(--t-site-11-5); color: var(--muted); white-space: nowrap; }
-  .draft { background: var(--tile); border-radius: 14px; overflow: hidden; min-width: 0; }
+  .draft { background: var(--tile); border-radius: 16px; overflow: hidden; min-width: 0; border: 1px solid var(--card-edge); box-shadow: var(--shadow-card); }
   .draft-top { display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
   .draft-top b { display: block; font: 600 16px/1.2 var(--head); letter-spacing: -0.02em; }
   .draft-top span { display: block; color: var(--muted); font-size: var(--t-site-12); }
   .dtbox { overflow-x: auto; }
   .dtbox:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   .dt { width: 100%; border-collapse: collapse; font-size: var(--t-site-13-5); }
-  .dt th { text-align: start; font-weight: 500; color: var(--muted); font-size: var(--t-site-12); padding: 6px 16px; border-block-start: 1px solid var(--rule2); }
-  .dt td { padding: 8px 16px; border-block-start: 1px solid var(--rule2); white-space: nowrap; }
+  .dt th { text-align: start; font-weight: 500; color: var(--muted); font-size: var(--t-site-12); padding: 6px 16px; }
+  .dt td { padding: 8px 16px; white-space: nowrap; }
+  .dt thead th { background: linear-gradient(var(--sep), var(--sep)) no-repeat center bottom / calc(100% - 24px) 1px; }
   .dt .n { text-align: end; font-variant-numeric: tabular-nums; }
-  .draft-foot { padding: 10px 16px; color: var(--muted); font-size: var(--t-site-12-5); border-block-start: 1px solid var(--rule2); }
+  .draft-foot { padding: 10px 16px; color: var(--muted); font-size: var(--t-site-12-5); border-block-start: 1px solid var(--sep); }
   .rule-s { margin: 0; font-size: var(--t-site-18); line-height: 1.55; text-wrap: pretty; }
   .rule-s b { font-weight: 600; border-block-end: 2px solid var(--faint); }
   .rule-sub { margin-block-start: 10px; }
-  .propose { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: var(--tile); font-size: var(--t-site-13-5); }
+  .propose { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 16px; background: var(--tile); border: 1px solid var(--card-edge); box-shadow: var(--shadow-card); font-size: var(--t-site-13-5); }
   .propose .sub { flex: 1; min-width: 11em; }
   /* THE TWO ANSWERS STAY TOGETHER: in a narrow drawing they go under the line as a pair, never one on each row. */
   .propose .acts { display: flex; gap: 8px; margin-inline-start: auto; }

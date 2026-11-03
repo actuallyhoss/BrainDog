@@ -130,7 +130,7 @@
     place-items: center;
     inline-size: 32px;
     block-size: 32px;
-    border-radius: var(--r-ctl);
+    border-radius: 50%;
     background: var(--paper);
     color: var(--ink2);
   }

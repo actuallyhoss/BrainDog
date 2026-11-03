@@ -108,8 +108,7 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: 36px;
-    padding-inline: 10px;
-    border-inline-start: 3px solid transparent;
+    padding-inline: 12px;
     border-radius: var(--r-ctl);
     color: var(--ink2);
     font-size: var(--t-label);
@@ -122,15 +121,14 @@
   @media (hover: hover) {
     .nav-home:hover,
     .nav-page:hover {
-      background: var(--tile);
+      background: var(--row-wash);
       color: var(--ink);
     }
   }
 
-  /* THE OPEN PAGE: the tile's fill, the ink, bold, and the ink's mark at its start. */
+  /* THE OPEN PAGE: the chosen fill and the ink, as the app's sidebar marks the page you are on. */
   .nav-page[aria-current='page'] {
-    background: var(--tile);
-    border-inline-start-color: var(--ink);
+    background: var(--chosen);
     color: var(--ink);
     font-weight: 600;
   }
