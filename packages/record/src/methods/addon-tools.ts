@@ -31,6 +31,14 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is
 
 /** The longest answer a tool hands back, as JSON. Past it the agent is told to ask for less. */
 const ANSWER_MOST = 16_000;
+/**
+ * THE MOST TIMES AGENTS MAY START ONE ADD-ON'S TOOLS IN A DAY (UTC), all its tools together. A run spends one of the
+ * plan's runs and may call out, so an agent caught in a loop stops here long before the month is spent. The person's
+ * own commands and row actions are not counted.
+ */
+export const AGENT_TOOL_RUNS_PER_DAY = 200;
+/** Where the day's count is kept, by add-on id: `{ day, n }`. */
+const TOOL_RUNS_HOLDER = 'braindog:addon-tool-runs';
 
 /** One installed add-on that is on, with what its manifest gives. */
 type Held = { id: string; title: string; tools: Body[]; commands: Body[]; row_actions: Body[] };
@@ -189,6 +197,19 @@ export function methods(deps: RecordDeps) {
 
       const who = kernel.identity();
       const p = ctx.principal as { kind: string; id?: string; person?: string };
+      /* AN AGENT'S TOOL RUNS ARE COUNTED BY THE DAY, per add-on, before the run, so a refused or failed one counts too. */
+      if (p.kind === 'token' && said.tool !== undefined) {
+        const day = new Date(deps.clock.now()).toISOString().slice(0, 10);
+        const was = kernel.prefsOf(TOOL_RUNS_HOLDER)[addon] as { day?: unknown; n?: unknown } | undefined;
+        const n = was !== undefined && was !== null && was.day === day && typeof was.n === 'number' ? was.n : 0;
+        if (n >= AGENT_TOOL_RUNS_PER_DAY)
+          return no(
+            'RATE_LIMITED',
+            `Agents have started ${held.title}'s tools ${AGENT_TOOL_RUNS_PER_DAY} times today, which is as many as one add-on gets in a day, so nothing ran. They can again tomorrow. If something is calling it over and over, stop it.`,
+            { at: 'tool' },
+          );
+        kernel.setPref(TOOL_RUNS_HOLDER, addon, { day, n: n + 1 });
+      }
       const body = live.body;
       const config = ((r) => (r.ok ? r.value.values : {}))(kernel.packConfig(addon)) as Record<string, never>;
       const ran = (await deps.tryScript({
