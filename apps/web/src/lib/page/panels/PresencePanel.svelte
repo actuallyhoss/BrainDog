@@ -158,6 +158,9 @@
     const m = machinesOf(drawnRuns.filter(isAtWork), drawnRuns.filter((r) => !isAtWork(r)), NO_PLACES);
     /* A MACHINE WITH NO NAME IS SAID MID-SENTENCE IN LOWER CASE (domains lane, 2 Nov): "Running on A machine not named". */
     const named = (name: string) => (name === UNNAMED ? words.unnamed : name);
+    /* A MACHINE WITH NO NAME AND NO PROFILE SAYS NOTHING (3 Nov): "Running on a machine with no name" stood alone under
+       the runs of a record that has one computer, a line that told nobody anything. */
+    if (m.lines.every((l) => l.name === UNNAMED && l.seats.length === 0)) return null;
     const on = m.lines.map((l) => `${named(l.name)}${l.seats.length > 0 ? `, as ${l.seats.join(', ')}` : ''}`);
     return on.length === 0 ? null : words.on(on.join(' and '));
   });

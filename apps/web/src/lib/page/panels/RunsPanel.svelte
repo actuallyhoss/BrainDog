@@ -64,8 +64,9 @@
       drew = false;
       return;
     }
-    /* A RUN AT WORK IS SAID UNDER At work, so it is not a second time here. */
-    lines = out.lines.filter((l) => l.live !== true && OWN.has(l.kind));
+    /* A RUN AT WORK IS SAID UNDER At work, so it is not a second time here; NOR ONE OPEN AND QUIET (3 Nov): At work lists
+       those too, with the hollow dot, and "Building the onboarding screens · Quiet" stood in both tiles. */
+    lines = out.lines.filter((l) => l.live !== true && OWN.has(l.kind) && !(l.kind === 'agent' && l.outcome === runsWords.outcome.open));
     rulesMonth = out.rulesMonth;
     short = out.short;
     drew = lines.length > 0 || rulesMonth > 0;
@@ -123,9 +124,9 @@
     </ul>{/if}
     <p class="runs-foot">
       {#if folded.length > SHOWN && !all}<button type="button" class="runs-more" onclick={() => (all = true)}>{words.more(folded.length - SHOWN)}</button>{/if}
-      <a class="runs-door" href={at('/r/session')}>{words.all}<Icon name="arrow" size="s" /></a>
+      <a class="runs-door" href={at('/r/session')}>{words.all}</a>
       <a class="runs-door" href={at('/jobs?start')}>{runsWords.runAJob}</a>
-      {#if rulesMonth > 0}<a class="runs-door" href={at('/automations')}>{words.rules(rulesMonth)}<Icon name="arrow" size="s" /></a>{/if}
+      {#if rulesMonth > 0}<a class="runs-door" href={at('/automations')}>{words.rules(rulesMonth)}</a>{/if}
     </p>
   </div>
 {/if}
@@ -257,14 +258,16 @@
     line-height: var(--lead-meta, 18px);
   }
 
+  /* THE TILE'S DOORS ARE ONE KIND OF THING (3 Nov): three card action capsules in a row, each 28 tall in the soft fill,
+     where two links with arrows and a third without stood in one line of grey words. */
   .runs-foot {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-1) var(--sp-4);
-    margin: var(--sp-2) 0 0;
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta, 18px);
+    gap: var(--sp-2);
+    margin: var(--sp-3) 0 0;
+    font-size: var(--fs-ctl);
+    line-height: var(--lead-ctl, 20px);
   }
 
   .runs-more,
@@ -272,22 +275,23 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    min-block-size: var(--btn-h-sm, var(--ctl-h-sm));
-    padding: 0;
+    min-block-size: var(--btn-h-sm, 28px);
+    padding: 0 var(--ctl-pad-sm, 12px);
     border: 0;
-    background: none;
-    color: var(--ink-2);
+    border-radius: var(--r-pill, 999px);
+    background: var(--g-on, var(--tile-2));
+    color: var(--ink);
     font: inherit;
+    font-weight: var(--fw-medium, 500);
     text-decoration: none;
     cursor: pointer;
+    transition: background-color var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .runs-more:hover,
     .runs-door:hover {
-      color: var(--ink);
-      text-decoration: underline;
-      text-underline-offset: 3px;
+      background: var(--row-wash-press, var(--hover));
     }
   }
 
@@ -349,19 +353,10 @@
 
   /* THE THREE FOOT ACTIONS ARE SEPARATE BUTTONS on a phone: a fill each, 40px tall, the list door first. */
   @container (width < 560px) {
-    .runs-foot {
-      gap: var(--sp-2);
-      margin-block-start: var(--sp-3);
-    }
-
     .runs-more,
     .runs-door {
       min-block-size: 36px;
       padding-inline: var(--sp-4);
-      border-radius: var(--r-pill, 999px);
-      background: var(--row-wash-press, var(--tile-2));
-      color: var(--ink);
-      font-weight: var(--fw-medium);
     }
   }
 
