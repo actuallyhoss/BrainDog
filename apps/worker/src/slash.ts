@@ -841,6 +841,7 @@ const NEXT_PLAN: Readonly<Record<Plan, Plan | null>> = { free: 'hosted', hosted:
 export function planAgents(sql: Sql, plan: string): void {
   const known = (PLANS as readonly string[]).includes(plan) ? (plan as Plan) : null;
   sql.exec('CREATE TABLE IF NOT EXISTS host_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  planFiles(sql, known);
   if (known === null || PLAN_TABLE[known].agents === null) {
     sql.exec('DELETE FROM host_meta WHERE key = ?', PLAN_AGENTS);
     return;
@@ -850,6 +851,29 @@ export function planAgents(sql: Sql, plan: string): void {
     'INSERT INTO host_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
     PLAN_AGENTS,
     JSON.stringify({ agents: PLAN_TABLE[known].agents, plan: PLAN_TABLE[known].name, next: next === null ? null : PLAN_TABLE[next].name }),
+  );
+}
+
+/** Where the record's kernel reads the plan's room for files (`FILES_KEY` in `packages/kernel/src/attachment.ts`). */
+export const PLAN_FILES = 'plan.files';
+
+/**
+ * A record's room for attached files, moved with its plan: `PLAN_TABLE`'s `files`, its name and the plan above it with
+ * its room, which `writeAttachment` reads at every new file. A plan with no figure takes the row away, and absent is the
+ * kernel's default. Nothing is deleted by a move down; the next file that does not fit is refused, saying why.
+ */
+function planFiles(sql: Sql, known: Plan | null): void {
+  const most = known === null ? null : PLAN_TABLE[known].files;
+  if (known === null || most === null) {
+    sql.exec('DELETE FROM host_meta WHERE key = ?', PLAN_FILES);
+    return;
+  }
+  const next = NEXT_PLAN[known];
+  const nextMost = next === null ? null : PLAN_TABLE[next].files;
+  sql.exec(
+    'INSERT INTO host_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
+    PLAN_FILES,
+    JSON.stringify({ most, plan: PLAN_TABLE[known].name, next: next === null || nextMost === null ? null : { plan: PLAN_TABLE[next].name, most: nextMost } }),
   );
 }
 

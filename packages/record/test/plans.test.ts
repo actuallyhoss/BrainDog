@@ -25,6 +25,7 @@ const EXPECTED: Record<string, PlanFigures> = {
     agents: 3,
     people: 1,
     teams: false,
+    files: GB,
     extra: null,
   },
   hosted: {
@@ -36,6 +37,7 @@ const EXPECTED: Record<string, PlanFigures> = {
     agents: 15,
     people: null,
     teams: false,
+    files: 20 * GB,
     extra: EXTRA,
   },
   plus: {
@@ -47,6 +49,7 @@ const EXPECTED: Record<string, PlanFigures> = {
     agents: 75,
     people: null,
     teams: true,
+    files: 100 * GB,
     extra: EXTRA,
   },
   selfhost: {
@@ -58,6 +61,7 @@ const EXPECTED: Record<string, PlanFigures> = {
     agents: null,
     people: null,
     teams: true,
+    files: null,
     extra: null,
   },
 };

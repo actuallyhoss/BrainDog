@@ -25,7 +25,48 @@ export const ATTACHED_ON_MOST = 100;
 export const ATTACHED_VERSIONS_MOST = 100;
 
 /** The most every attachment of one record may come to, as `ATTACHED_WEIGHT` counts new bytes. */
-export const ATTACHED_RECORD_MOST = 1024 * 1024 * 1024;
+export const ATTACHED_RECORD_MOST = 1_000_000_000;
+
+/**
+ * Where a host keeps the plan's room for files: `host_meta` under `plan.files`, as `plan.agents` keeps its count of
+ * agents (`token.ts`), written by the Worker when the plan moves. Absent, or unreadable, is `ATTACHED_RECORD_MOST`.
+ */
+export const FILES_KEY = 'plan.files';
+
+/** The room the record's files have, the plan it is the room of (`null` when no plan set it), and the plan above it. */
+export type FilesRoom = { most: number; plan: string | null; next: { plan: string; most: number } | null };
+
+/** The room a host wrote for this record's files, or the default. */
+export function filesRoom(sql: Sql): FilesRoom {
+  const fallback: FilesRoom = { most: ATTACHED_RECORD_MOST, plan: null, next: null };
+  if (!sql.one("SELECT 1 AS hit FROM sqlite_master WHERE type = 'table' AND name = 'host_meta'")) return fallback;
+  const said = sql.one<{ value: string }>('SELECT value FROM host_meta WHERE key = ?', FILES_KEY)?.value;
+  if (said === undefined) return fallback;
+  try {
+    const v = JSON.parse(said) as { most?: unknown; plan?: unknown; next?: { plan?: unknown; most?: unknown } | null } | null;
+    if (!Number.isSafeInteger(v?.most) || (v!.most as number) <= 0 || typeof v!.plan !== 'string') return fallback;
+    const n = v!.next;
+    const next = n && typeof n.plan === 'string' && Number.isSafeInteger(n.most) ? { plan: n.plan, most: n.most as number } : null;
+    return { most: v!.most as number, plan: v!.plan, next };
+  } catch {
+    return fallback;
+  }
+}
+
+/** A size as a person reads it: "1 GB", "20 GB", "750 MB". */
+export function roomSaid(bytes: number): string {
+  if (bytes >= 1e9) return `${Math.round((bytes / 1e9) * 10) / 10} GB`;
+  if (bytes >= 1e6) return `${Math.round(bytes / 1e6)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1e3))} KB`;
+}
+
+/** The sentence for a file that does not fit: how full the record is, its room, and the way on. */
+export function roomRefusal(used: number, adding: number, room: FilesRoom): string {
+  const left = Math.max(0, room.most - used);
+  const head = `This file is ${roomSaid(adding)}, and only ${roomSaid(left)} of the ${roomSaid(room.most)} ${room.plan === null ? 'this BrainDog keeps for files' : `${room.plan} keeps for files`} is left.`;
+  const way = room.next === null ? ' Remove files you no longer need, or attach a smaller one.' : ` Remove files you no longer need, or move to ${room.next.plan} for ${roomSaid(room.next.most)}.`;
+  return `${head}${way}`;
+}
 
 /** The counter new attachment bytes are added to (`counter`, which travels). */
 export const ATTACHED_WEIGHT = 'attachment-bytes';

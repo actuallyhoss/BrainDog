@@ -114,6 +114,19 @@ export async function readList(base: string, on: string, io?: Fetch): Promise<Re
   return { ok: true, value: rows.reverse() };
 }
 
+/** How much of its room for files the record has used, for Usage: bytes, the most, and the record's own sentence. */
+export type Room = { used: number; most: number; said: string };
+
+/** The record's room for files, or `null` where its build keeps no attachments or it could not be read. */
+export async function readRoom(base: string, io?: Fetch): Promise<Room | null> {
+  const out = (await client(base, io).call('attachmentRoom', {})) as Wire;
+  if (!out.ok || !isRow(out.value)) return null;
+  const used = Number(out.value.used);
+  const most = Number(out.value.most);
+  if (!Number.isFinite(used) || !Number.isFinite(most) || most <= 0) return null;
+  return { used, most, said: typeof out.value.said === 'string' ? out.value.said : '' };
+}
+
 /** One file: the version asked, or the one it stands at. */
 export async function readOne(base: string, id: string, version?: number, io?: Fetch): Promise<Read<Opened>> {
   const out = (await client(base, io).call('attachment', { id, ...(version === undefined ? {} : { version }) })) as Wire;

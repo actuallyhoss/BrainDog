@@ -21,6 +21,7 @@ import {
   attachedText,
   attachedType,
   holdsKnownKey,
+  roomSaid,
   type AttachedBody,
   type AttachedHeld,
   type AttachedKind,
@@ -283,6 +284,22 @@ export function methods(deps: RecordDeps) {
       const n = wrote.value.n ?? 1;
       const said = fresh ? `Attached ${name} to ${at.words}.` : `Version ${n} of ${name} is on ${at.words}.`;
       return tail(ok({ id: wrote.value.id, name, kind: type.kind, version: n, on: at.words, batch: wrote.value.batch, said }));
+    },
+
+    /**
+     * How much room the record's files take of what it keeps for them, for Settings > Usage: bytes used and the most, the
+     * plan whose room it is, and one sentence. READ.
+     */
+    async attachmentRoom(_args: unknown, ctx: CallContext): Promise<Result<{ used: number; most: number; plan: string | null; next: { plan: string; most: number } | null; said: string }>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      const room = kernel.attachedRoom();
+      const share = room.most > 0 ? Math.min(100, Math.round((room.used / room.most) * 100)) : 0;
+      const said =
+        room.used === 0
+          ? `No files attached yet. ${room.plan === null ? 'This BrainDog keeps' : `${room.plan} keeps`} ${roomSaid(room.most)} for them.`
+          : `Files take ${roomSaid(room.used)} of ${roomSaid(room.most)} (${share}%).${room.next !== null && share >= 80 ? ` ${room.next.plan} keeps ${roomSaid(room.next.most)}.` : ''}`;
+      return ok({ ...room, said });
     },
 
     /** Every file a thing carries now, oldest first, each by its name, kind, size and who put it. READ+. */

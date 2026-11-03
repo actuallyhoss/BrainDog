@@ -45,6 +45,8 @@ export type PlanFigures = {
   people: number | null;
   /** Whether a second person may join the record (teams). Plus and a self-host only; the gate also waits for billing to be on. */
   teams: boolean;
+  /** The most every file attached in a record may come to, in bytes. `null`: the host's own default (`ATTACHED_RECORD_MOST`). */
+  files: number | null;
   /** What usage past the allowance costs, each meter, under a cap the owner sets. `null`: none is sold. */
   extra: { runs: ExtraPrice; requests: ExtraPrice; bytes: ExtraPrice; ms: ExtraPrice } | null;
 };
@@ -80,6 +82,7 @@ export const PLAN_TABLE: Readonly<Record<Plan, PlanFigures>> = {
     agents: 3,
     people: 1,
     teams: false,
+    files: GB,
     extra: null,
   }),
   /* Twenty hourly actions are 14,600 runs, so 15,000 is Cloud's. */
@@ -91,6 +94,7 @@ export const PLAN_TABLE: Readonly<Record<Plan, PlanFigures>> = {
     agents: 15,
     people: null,
     teams: false,
+    files: 20 * GB,
     extra: EXTRA,
   }),
   /* Five times Cloud on every figure, as its card says. */
@@ -102,6 +106,7 @@ export const PLAN_TABLE: Readonly<Record<Plan, PlanFigures>> = {
     agents: 75,
     people: null,
     teams: true,
+    files: 100 * GB,
     extra: EXTRA,
   }),
   /* Counted and never limited: a self-host bills nobody, and its own `ask_cap` holds its asks. */
@@ -113,6 +118,7 @@ export const PLAN_TABLE: Readonly<Record<Plan, PlanFigures>> = {
     agents: null,
     people: null,
     teams: true,
+    files: null,
     extra: null,
   }),
 };

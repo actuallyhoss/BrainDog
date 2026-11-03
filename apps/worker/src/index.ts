@@ -72,7 +72,7 @@ import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/h
 import { alarmScheduler } from './alarm.ts';
 import { fileModelSignMoved } from '@braindog/host/sign-model';
 import { slashDue, slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
-import { PLAN_AGENTS, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
+import { PLAN_AGENTS, PLAN_FILES, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
 import { fallbackWire, includedCandidates, includedInference } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerMeaning, workerModelJobs } from './slash-jobs.ts';
@@ -798,10 +798,14 @@ export class Record$ extends DurableObject<Env> {
     return plan;
   }
 
-  /** Whether this object holds the plan's count of agents yet (`PLAN_AGENTS`), which the kernel reads at every mint. */
+  /**
+   * Whether this object holds the plan's count of agents yet (`PLAN_AGENTS`), which the kernel reads at every mint, and
+   * its room for files (`PLAN_FILES`), which it reads at every new file: a record from before the room was written asks
+   * its plan once more, so a paid record is not held to the default.
+   */
   #agentsHeld(sql: Sql): boolean {
     if (!sql.one("SELECT 1 AS hit FROM sqlite_master WHERE type = 'table' AND name = 'host_meta'")) return false;
-    return Boolean(sql.one('SELECT 1 AS hit FROM host_meta WHERE key = ?', PLAN_AGENTS));
+    return Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM host_meta WHERE key IN (?, ?)', PLAN_AGENTS, PLAN_FILES)?.n ?? 0) === 2;
   }
 
   /**

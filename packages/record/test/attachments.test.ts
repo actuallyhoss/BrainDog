@@ -282,3 +282,24 @@ test("AN AGENT'S OWN UNDO TAKES ITS FILE OFF, and a new version gives way to the
   value(await api.undoOwn({ batch: first.batch }, agent));
   assert.deepEqual(value<{ attachments: Listed[] }>(await api.attachments({ on: task }, agent)).attachments, []);
 });
+
+test("THE RECORD'S ROOM FOR FILES IS ITS PLAN'S: a file past it is refused in words, and Usage reads how full it is", async () => {
+  const { sql, api, put, task } = await record();
+  /* NO PLAN WRITTEN: the default, 1 GB, said as this BrainDog's. */
+  const empty = value<{ used: number; most: number; plan: string | null; said: string }>(await api.attachmentRoom({}, owner));
+  assert.deepEqual([empty.used, empty.most, empty.plan], [0, 1_000_000_000, null]);
+  assert.equal(empty.said, 'No files attached yet. This BrainDog keeps 1 GB for them.');
+  /* THE WORKER WRITES THE PLAN'S ROOM WHERE `plan.agents` IS (`apps/worker/src/slash.ts` `planFiles`); a small one here. */
+  sql.exec('CREATE TABLE IF NOT EXISTS host_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  sql.exec("INSERT INTO host_meta (key, value) VALUES ('plan.files', ?)", JSON.stringify({ most: 3_000, plan: 'Free', next: { plan: 'Cloud', most: 20_000_000_000 } }));
+  const small = pdf(['Small']);
+  value(await api.attachFile({ on: task, name: 'small.pdf', sha256: put(small) }, owner));
+  const big = new TextEncoder().encode('Kiln log. '.repeat(400));
+  const no = refused(await api.attachFile({ on: task, name: 'log.txt', sha256: put(big) }, owner));
+  assert.equal(no.code, 'OUT_OF_BOUNDS');
+  assert.match(no.fix, /^This file is 8 KB, and only \d+ KB of the 3 KB Free keeps for files is left\. Remove files you no longer need, or move to Cloud for 20 GB\.$/u);
+  const room = value<{ used: number; most: number; plan: string; said: string }>(await api.attachmentRoom({}, owner));
+  assert.equal(room.plan, 'Free');
+  assert.ok(room.used > 0 && room.used <= 3_000);
+  assert.match(room.said, /^Files take \d+ KB of 3 KB \(\d+%\)\./u);
+});

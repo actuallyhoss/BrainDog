@@ -486,11 +486,15 @@ export {
   attachedSaid,
   attachedText,
   attachedType,
+  FILES_KEY,
+  filesRoom,
   magicType,
   pageText,
   pdfText,
+  roomSaid,
   type AttachedBody,
   type AttachedKind,
+  type FilesRoom,
 } from './attachment.ts';
 export type { AttachedHeld, AttachedVersion, AttachedWhole } from './api/attachments.ts';
 export { ACTION_VERBS, ACTION_LEVELS, ACTION_AS, ACTION_KEYS, ACTIONS_MOST, BLOCK_VERBS, actionsBody, cutActions, type ActionVerb, type ActionLevel, type DeclaredAction, type OfferedAction, type VerbName } from './row-actions.ts';

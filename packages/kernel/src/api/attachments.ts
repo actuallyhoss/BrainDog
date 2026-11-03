@@ -15,13 +15,15 @@ import type { WriteContext } from '../index.ts';
 import {
   ATTACHED_FIELD,
   ATTACHED_ON_MOST,
-  ATTACHED_RECORD_MOST,
   ATTACHED_VERSIONS_MOST,
   ATTACHED_WEIGHT,
   attachedLines,
   attachedSaid,
   attachedState,
+  filesRoom,
   isAttachedVersion,
+  roomRefusal,
+  type FilesRoom,
   type AttachedBody,
   type AttachedLine,
 } from '../attachment.ts';
@@ -92,6 +94,9 @@ export function extension(parts: KernelParts) {
   return {
     attachedWeight: weight,
 
+    /** How much of its room for files the record has used, and the room (`filesRoom`), for Usage and a refusal. */
+    attachedRoom: (): { used: number } & FilesRoom => ({ used: weight(), ...filesRoom(sql) }),
+
     /** The thing an attachment is on, as the log keys it, or `null` for an id that is no attachment. */
     attachmentOn: (id: string): string | null => placeOf(id)?.target ?? null,
 
@@ -159,8 +164,10 @@ export function extension(parts: KernelParts) {
           if ('back' in asked.said && !versionsIn(lines).some((v) => v.line === (asked.said as { back: string }).back))
             return no('REF_UNKNOWN', 'There is no such version of this file to put back.', { at: 'version' });
         }
-        if (asked.weight > 0 && weight() + asked.weight > ATTACHED_RECORD_MOST)
-          return no('OUT_OF_BOUNDS', `The files here come to ${ATTACHED_RECORD_MOST / 1024 / 1024 / 1024} GB, the most one BrainDog keeps. Remove some, or attach smaller ones.`, { at: 'file' });
+        if (asked.weight > 0) {
+          const room = filesRoom(sql);
+          if (weight() + asked.weight > room.most) return no('OUT_OF_BOUNDS', roomRefusal(weight(), asked.weight, room), { at: 'file' });
+        }
         const to: Json = 'body' in asked.said ? (asked.said.body as unknown as Json) : (asked.said as unknown as Json);
         const line = asked.id === undefined ? id : parts.mint();
         const batch = w.batch ?? parts.mint();

@@ -11,5 +11,6 @@ export const ROUTES: readonly Route[] = [
   { name: 'removeAttachment', group: 'DATA', writes: true, what: 'Take an attachment off its thing. Its bytes stay, so it can be put back.' },
   { name: 'restoreAttachment', group: 'DATA', writes: true, what: 'Put an attachment back, at its newest version or the one named.' },
   { name: 'attachments', group: 'READ+', writes: false, what: 'The files one thing you can see carries, each by its name, kind, size and who put it.', takes: { on: 'text' } },
+  { name: 'attachmentRoom', group: 'READ+', writes: false, what: 'How much of its room for files the record has used: bytes used, the most, the plan whose room it is, and one sentence.' },
   { name: 'attachment', group: 'READ+', writes: false, what: 'One attachment: its version asked or the one it stands at, a slice of its words from `from`, and every version.', takes: { id: 'text', version: 'integer', from: 'integer' } },
 ];
