@@ -38,7 +38,8 @@
   import type { ShapeHold } from './shape-hold.svelte.ts';
   import { LEFT_COLUMN, RIGHT_COLUMN, rowLaid } from './project-parts.ts';
   import { happenedSaid } from './project-facts.ts';
-  import { askHref, askWords } from './ask-about.ts';
+  import { askWords } from './ask-about.ts';
+  import { askAboutHref } from '$lib/query/slash.ts';
 
   let { hold, parts }: { hold: ShapeHold; parts: readonly string[] } = $props();
 
@@ -206,7 +207,7 @@
             {#if facts.soft}<Button href={facts.soft.href}>{facts.soft.said}</Button>{/if}
             <!-- ASK ABOUT THIS (3 Nov): Slash opened with the project named, for a question in his own words. -->
             {#if hold.register !== '' && hold.seq > 0}
-              <Button href={askHref(`${hold.register}#${hold.seq}`)} data-ask-about aria-label={askWords.askAbout}><Icon name="slash" size="s" /><span class="ask-long">{askWords.askAbout}</span><span class="ask-short" aria-hidden="true">{askWords.askShort}</span></Button>
+              <Button href={askAboutHref([`${hold.register}#${hold.seq}`])} data-ask-about aria-label={askWords.askAbout}><Icon name="slash" size="s" /><span class="ask-long">{askWords.askAbout}</span><span class="ask-short" aria-hidden="true">{askWords.askShort}</span></Button>
             {/if}
             <!-- SEND TO…: the project to Slash or an agent, fetched with the hero and not before. -->
             {#if hold.register !== '' && hold.seq > 0}

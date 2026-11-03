@@ -497,11 +497,37 @@ export type Crumb = { label: string; href?: string | undefined };
  * gives no title, and the crumb ends at the place it sits in, still a link back there.
  */
 export function crumbOf(path: string, m: SideModel, lit: string | null, title: string | null, heading: string | null = null, up: Crumb | null = null): Crumb[] {
-  const steps = lit === null && up?.href && up.label.trim() !== '' && path !== up.href ? upTrail(m, up.label, up.href, title) : placed(path, m, lit, title);
+  const steps = upFirst(path, m, lit, up) && up?.href ? upTrail(m, up.label, up.href, title) : placed(path, m, lit, title);
   const h = heading?.trim() ?? '';
   const last = steps[steps.length - 1];
   if (h !== '' && last) last.label = h;
   return h !== '' && !last ? [{ label: h }] : steps;
+}
+
+/**
+ * WHETHER THE LIT ROW IS THE PAGE'S OWN: its address, or one the row stands for (`near`), and not a row the page merely
+ * sits under by the start of its address.
+ */
+export function litExactly(path: string, lit: string, m: SideModel): boolean {
+  if (path === lit) return true;
+  const rows: readonly { href: string; near?: readonly string[] | undefined }[] = [
+    ...m.foot,
+    ...m.more,
+    ...(m.projects ? [...m.projects.things, ...m.projects.kids] : []),
+    ...m.places.flatMap((p) => p.kids),
+    ...m.places,
+  ];
+  return rows.some((r) => r.href === lit && (r.near ?? []).includes(path));
+}
+
+/**
+ * THE WAY BACK A PAGE DECLARES (`up`) WINS OVER A ROW LIT ONLY BY THE START OF THE ADDRESS (3 Nov): a plugin's page said
+ * "Projects › HSBC Egypt alerts" because a row under Projects answered to its address, while the page itself said it
+ * sits under Plugins. A row lit as the page's own still wins.
+ */
+export function upFirst(path: string, m: SideModel, lit: string | null, up: Crumb | null): boolean {
+  if (!up?.href || up.label.trim() === '' || path === up.href) return false;
+  return lit === null || !litExactly(path, lit, m);
 }
 
 /**

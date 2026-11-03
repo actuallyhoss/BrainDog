@@ -37,7 +37,8 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { copy } from '$lib/copy.ts';
-  import { askHref, askWords } from '$lib/page/ask-about.ts';
+  import { askWords } from '$lib/page/ask-about.ts';
+  import { askAboutHref } from '$lib/query/slash.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { keepPrivate } from '$lib/record/privacy-write.ts';
   import * as clipboard from '$lib/clipboard.ts';
@@ -1024,7 +1025,7 @@
     if (!row || row.seq === null || self) return null;
     const name = meets ? String(row.fields[decl?.title ?? ''] ?? '').trim().split(/\s+/u)[0] || decl?.one || '' : '';
     return {
-      href: askHref(`${id}#${row.seq}`),
+      href: askAboutHref([`${id}#${row.seq}`]),
       person: Boolean(meets) && name !== '',
       said: meets && name ? seenWords.askAbout(name) : askWords.askAbout,
       label: meets && name ? seenWords.askIn(name) : askWords.askAbout,
