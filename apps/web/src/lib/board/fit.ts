@@ -85,8 +85,14 @@ export function fitBoard(board: HTMLElement): Animation[] {
   for (const frame of frames) {
     for (const a of frame.getAnimations()) if (a.playState !== 'finished') moving.push(a);
     const box = frame.getBoundingClientRect();
-    const pad = parseFloat(getComputedStyle(frame).paddingBlockEnd) || 0;
-    const room = box.bottom - pad;
+    const frameCss = getComputedStyle(frame);
+    const pad = parseFloat(frameCss.paddingBlockEnd) || 0;
+    /* THE ROOM A FRAME HAS, NOT THE ROOM IT TAKES (blink fix, 3 Nov): at rest a frame is as tall as what it draws, up to its
+       most, so its foot is where its own rows end. Read from there, Your work this week's last row stood 8px into the
+       padding and was cut; with the count's line in the flow the frame reached its most and the same row fitted, so it
+       was put back, and so on. The room is where the frame would stop, its top and its most, whatever it draws now. */
+    const most = frameCss.maxBlockSize.endsWith('px') ? parseFloat(frameCss.maxBlockSize) : Number.NaN;
+    const room = (Number.isFinite(most) ? Math.max(box.bottom, box.top + most) : box.bottom) - pad;
     /* THE OUTERMOST ROWS ONLY: a card's own list is the card's, and goes with it. */
     const rows = [...frame.querySelectorAll<HTMLElement>(ROWS)].filter((row) => {
       if (row.closest(FOOT)) return false;

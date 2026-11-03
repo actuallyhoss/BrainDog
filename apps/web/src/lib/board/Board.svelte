@@ -609,11 +609,13 @@
   /* WHILE `fit.ts` MEASURES, NOTHING IT WROTE TAKES ROOM (blink fix, 3 Nov): its "N more" in the flow, a grown height and
      a quiet foot's room all changed the box it was measuring, so each fit undid the last. Put on and taken off in one task,
      never painted. */
-  .board[data-fit-measure] :global(a[data-fit-more]) {
+  /* GLOBAL, because the mark is put on by `fit.ts` and never by this markup, so a scoped selector for it is one the
+     compiler sees no element for and leaves out of the stylesheet. Nothing else ever wears it. */
+  :global(.board[data-fit-measure] a[data-fit-more]) {
     display: none !important;
   }
 
-  .board[data-fit-measure] :global([data-board-key][data-more]::after) {
+  :global(.board[data-fit-measure] [data-board-key][data-more]::after) {
     content: none !important;
   }
 
