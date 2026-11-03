@@ -5,10 +5,12 @@
 -->
 <script lang="ts">
   import { createClient } from '@braindog/client';
+  import { TONES } from 'braindog-render';
 
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { handOver } from '$lib/motion/open.ts';
+  import Icon from '$lib/ui/Icon.svelte';
   import { BYPASS_PREF, bypassOn, bypassSaid, bypassWords as words } from './bypass.ts';
 
   let { prefs }: { prefs?: Record<string, unknown> | undefined } = $props();
@@ -19,9 +21,15 @@
   let refusal = $state('');
   const on = $derived(kept ?? bypassOn(prefs));
 
+  /* THE LINE HANDS OVER ONLY ON A PRESS. Keyed on `on`, it also swapped when the live shell's prefs landed over the
+     local copy's, a fade on load nobody asked for: the blink on the settings page. A plain swap there. */
+  let pressed = false;
+  const said = (node: Element) => (pressed ? handOver(node) : { duration: 0 });
+
   async function flip(): Promise<void> {
     if (busy) return;
     const was = on;
+    pressed = true;
     busy = true;
     refusal = '';
     kept = !was;
@@ -39,11 +47,19 @@
   <div class="switch-row">
     <div class="switch-row-words">
       <span class="switch-row-title">{words.title}</span>
-      {#key on}<p class="switch-row-line" in:handOver id="bypass-said">{bypassSaid(on)}</p>{/key}
-      <!-- WHAT STILL NEEDS HIM, ONE PRESS AWAY (G15): the second paragraph that stood under the switch on every visit. -->
+      {#key on}<p class="switch-row-line" in:said id="bypass-said">{bypassSaid(on)}</p>{/key}
+      <!-- WHAT STILL NEEDS HIM, ONE PRESS AWAY (G15), AS A LIST (UI pass, 3 Nov): five things, a lock each, then the one
+           line on colleagues' agents. -->
       <details class="bypass-more">
         <summary class="tap">{words.more}</summary>
-        <p class="switch-row-line" id="bypass-still">{words.still}</p>
+        <div class="bypass-still" id="bypass-still">
+          <ul class="still-list">
+            {#each words.stillList as thing (thing)}
+              <li><Icon name="lock" size="s" />{thing}</li>
+            {/each}
+          </ul>
+          <p class="switch-row-line">{words.colleagues}</p>
+        </div>
       </details>
     </div>
     <button
@@ -57,7 +73,7 @@
       onclick={() => void flip()}><span class="switch-track"></span></button
     >
   </div>
-  {#if refusal}<p class="bypass-refused" role="status" in:handOver>{refusal}</p>{/if}
+  {#if refusal}<p class="bypass-refused" role="status" in:handOver><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>{/if}
 </div>
 
 <style>
@@ -108,11 +124,45 @@
     border-radius: var(--r-xs);
   }
 
+  .bypass-still {
+    display: grid;
+    gap: var(--sp-2);
+    padding-block-start: var(--sp-2);
+  }
+
+  .still-list {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .still-list > li {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+  }
+
+  .still-list :global(.icon) {
+    flex: none;
+    color: var(--ink-3);
+  }
+
+  /* WHAT A REFUSED PRESS SAID: the mark in red and the record's own sentence, under the row it belongs to, until the
+     next press. */
   .bypass-refused {
     margin: 0;
     max-inline-size: 75ch;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: 20px;
+    color: var(--ink);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+  }
+
+  .bypass-refused > span {
+    color: var(--red);
   }
 </style>
