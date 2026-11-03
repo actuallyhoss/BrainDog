@@ -704,6 +704,19 @@
     padding-block-start: var(--sp-2);
   }
 
+  /* UNDER A THUMB "3 MORE" IS A 44 TARGET (space pass, 4 Nov): it measured 55x28. It grows unseen; the words stay put. */
+  @media (pointer: coarse) {
+    .board-root:not([data-editing]) .board :global([data-board-key] > a[data-fit-more]) {
+      position: relative;
+    }
+
+    .board-root:not([data-editing]) .board :global([data-board-key] > a[data-fit-more]::before) {
+      content: '';
+      position: absolute;
+      inset: calc((28px - var(--tap)) / 2) calc(-1 * var(--sp-2));
+    }
+  }
+
   .board-root:not([data-editing]) .board :global([data-board-key]:has(.project-cards) > a[data-fit-more]) {
     position: absolute;
     inset-block: 0 auto;

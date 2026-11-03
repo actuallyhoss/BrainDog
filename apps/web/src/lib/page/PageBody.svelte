@@ -2061,6 +2061,19 @@
     margin-block-end: 0;
   }
 
+  /* TWO BLOCKS IN ONE TILE ARE TWO GROUPS, 24 apart (space pass, 4 Nov): on Dashboard's Numbers the chart's dates stood
+     on the next number's name with nothing between them, so each figure read as the caption of the chart above it. */
+  .block-slot > :global(.block:not([data-kind='section']) + .block) {
+    margin-block-start: var(--sp-5);
+  }
+
+  /* UNDER A MOUSE A CHART ENDS ON ITS "Show the numbers", which waits unseen for the pointer and already holds 44 of air. */
+  @media (hover: hover) and (pointer: fine) {
+    .block-slot > :global(.block:has(.lines-numbers) + .block) {
+      margin-block-start: 0;
+    }
+  }
+
   /* While arranging, the block's way to the other column, under its bar and at its leading edge. */
   .area-move {
     display: flex;
