@@ -1,10 +1,10 @@
 {
   "pack": "sentry",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "icon": "triangle-alert",
   "title": "Sentry",
   "summary": "What is breaking in your apps, from Sentry every hour: open issues, new ones, error events and people hit, on each project's page and on Today. An issue that is new and serious, comes back or spikes rings the bell. Reads only; nothing is sent to Sentry.",
-  "changes": "The bell rings once a burst, and only for an issue that has hit at least one person. An issue keeps its alarm while it keeps happening and gets a new one only after a quiet day or after it was resolved and came back.",
+  "changes": "Says plugin where it said add-on, as the app now does. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "uses": [
@@ -80,7 +80,7 @@
         "back": 14,
         "bucket": "day",
         "limit": 4,
-        "empty": "No open errors from Sentry yet. Not connected? Set it up on the Sentry add-on's page.",
+        "empty": "No open errors from Sentry yet. Not connected? Set it up on the Sentry plugin's page.",
         "icon": "triangle-alert"
       },
       "blanks": [],
@@ -334,7 +334,7 @@
         },
         {
           "id": "suggested",
-          "label": "Linked by the add-on to",
+          "label": "Linked by the plugin to",
           "type": "ref",
           "to": "things"
         },

@@ -1,0 +1,220 @@
+{
+  "pack": "flow-check",
+  "version": "1.0.2",
+  "icon": "list-checks",
+  "title": "Flow check",
+  "summary": "A test bench for automations: one automation for each way one can start, the order rules run in, a wait on a question, and the limit on rules starting rules. Each one writes a note that says what started it, so a check can read back what ran.",
+  "changes": "Says plugin where it said add-on, as the app now does. Nothing it reads or writes changed.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "unlisted": true,
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "register": "flow_checks",
+      "pack": "flow-check",
+      "name": "Checks",
+      "one": "check",
+      "holds": "things to check, each with a state, which the automations of this plugin start from",
+      "title": "what",
+      "fields": [
+        { "id": "what", "label": "What", "type": "text", "required": true },
+        {
+          "id": "state",
+          "label": "State",
+          "type": "enum",
+          "values": ["open", "late", "asked", "noted", "done"],
+          "labels": { "open": "Open", "late": "Late", "asked": "Asked", "noted": "Noted", "done": "Done" },
+          "default": "open",
+          "required": true,
+          "index": true
+        },
+        { "id": "ruling", "label": "Ruling", "type": "text" },
+        { "id": "place", "label": "Place", "type": "ref", "to": "flow_notes", "index": true },
+        { "id": "seen", "label": "Seen", "type": "text" }
+      ]
+    },
+    {
+      "register": "flow_notes",
+      "pack": "flow-check",
+      "name": "Notes",
+      "one": "note",
+      "holds": "what each automation of this plugin wrote when it ran, and the places a check can name",
+      "title": "what",
+      "fields": [
+        { "id": "what", "label": "What", "type": "text", "required": true },
+        {
+          "id": "kind",
+          "label": "Kind",
+          "type": "enum",
+          "values": ["trigger", "chain", "place"],
+          "labels": { "trigger": "Started by", "chain": "Chain", "place": "Place" },
+          "default": "trigger",
+          "required": true,
+          "index": true
+        }
+      ]
+    },
+    {
+      "ingest": "flow_check_door",
+      "pack": "flow-check",
+      "channel": "webhook",
+      "match": { "all": [{ "field": "body", "contains": "Check arrived:" }] },
+      "extract": { "what": { "text": { "between": ["Check arrived: ", "."] } } },
+      "writes": { "register": "flow_checks", "confidence": "exact" },
+      "dedupe": ["what"],
+      "on_conflict": "skip"
+    },
+    {
+      "metric": "flow_check_late",
+      "name": "Late checks",
+      "source": "register.flow_checks",
+      "where": "state is late",
+      "value": { "count": "id" },
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "format": "int"
+    },
+    {
+      "rule": "started_by_write",
+      "name": "Note a check that was added",
+      "on": { "written": { "register": "flow_checks", "op": ["create"] } },
+      "when": "state is open",
+      "once_per": ["entry"],
+      "steps": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Started by a check added to Checks", "kind": "trigger" } } }]
+    },
+    {
+      "rule": "started_by_arrival",
+      "name": "Note a check that arrived at the door",
+      "on": { "arrival": { "ingest": "flow_check_door" } },
+      "steps": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Started by an arrival at the door", "kind": "trigger" } } }]
+    },
+    {
+      "rule": "started_by_clock",
+      "name": "Note the clock every 15 minutes",
+      "on": { "every": "15m" },
+      "steps": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Started by the clock every 15 minutes", "kind": "trigger" } } }]
+    },
+    {
+      "rule": "started_by_figure",
+      "name": "Note late checks crossing their line",
+      "on": { "metric": { "id": "flow_check_late", "crosses": { "gte": 1 } } },
+      "steps": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Started by the late checks crossing their line", "kind": "trigger" } } }]
+    },
+    {
+      "rule": "ask_to_chase",
+      "name": "Ask whether to chase a check",
+      "register": "flow_checks",
+      "when": "state is asked",
+      "once_per": ["entry"],
+      "then": [{ "suggest": { "question": "Chase {{what}}?", "options": ["Chase it", "Leave it"] } }]
+    },
+    {
+      "rule": "started_by_decision",
+      "name": "Note a decision on chasing",
+      "on": { "decided": { "about": "rule.ask_to_chase" } },
+      "steps": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Started by a decision in Decide", "kind": "trigger" } } }]
+    },
+    {
+      "rule": "started_by_button",
+      "name": "Note a press of Run now",
+      "on": { "manual": true },
+      "steps": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Started by the Run now button", "kind": "trigger" } } }]
+    },
+    {
+      "rule": "month_end",
+      "name": "Note the last day of each month",
+      "on": { "every": "1mo", "day": "last", "at": "06:00" },
+      "steps": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Started on the last day of the month", "kind": "trigger" } } }]
+    },
+    {
+      "rule": "order_pinned",
+      "name": "A late urgent check is pinned",
+      "register": "flow_checks",
+      "priority": 50,
+      "when": "state is late, what contains urgent",
+      "then": [{ "set": { "field": "ruling", "to": "pinned" } }]
+    },
+    {
+      "rule": "order_brief",
+      "name": "A late check, said briefly",
+      "register": "flow_checks",
+      "when": "state is late",
+      "then": [{ "set": { "field": "ruling", "to": "brief" } }]
+    },
+    {
+      "rule": "order_middle",
+      "name": "A late check about the roof",
+      "register": "flow_checks",
+      "when": "state is late, what contains roof",
+      "then": [{ "set": { "field": "ruling", "to": "middle" } }]
+    },
+    {
+      "rule": "order_longest",
+      "name": "A late check about the guttering",
+      "register": "flow_checks",
+      "when": "state is late, what contains guttering",
+      "then": [{ "set": { "field": "ruling", "to": "longest" } }]
+    },
+    {
+      "rule": "names_a_place",
+      "name": "A check in the boiler room",
+      "register": "flow_checks",
+      "when": "place is Boiler room",
+      "then": [{ "set": { "field": "seen", "to": "In the boiler room" } }]
+    },
+    {
+      "rule": "ask_then_wait",
+      "name": "Ask whether to chase, and wait a quarter of an hour",
+      "on": { "manual": true },
+      "steps": [
+        { "ask_person": { "question": "Chase the late checks?", "options": ["Chase them", "Leave them"], "as": "chase", "wait": "15m" } },
+        {
+          "if": "chase is set",
+          "then": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Somebody answered the question", "kind": "trigger" } } }],
+          "else": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Nobody answered the question in time", "kind": "trigger" } } }]
+        }
+      ]
+    },
+    {
+      "rule": "ask_and_wait_long",
+      "name": "Ask whether to chase, and wait the usual time",
+      "on": { "manual": true },
+      "steps": [{ "ask_person": { "question": "Chase them all next week?", "options": ["Chase them", "Leave them"], "as": "later" } }]
+    },
+    {
+      "rule": "chain_follows",
+      "name": "Follow a chain of notes, rule writes too",
+      "on": { "written": { "register": "flow_notes", "op": ["create"], "from_rules": true } },
+      "when": "kind is chain",
+      "once_per": ["entry"],
+      "steps": [
+        { "if": "what is Link one", "then": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Link two", "kind": "chain" } } }] },
+        { "if": "what is Link two", "then": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Link three", "kind": "chain" } } }] },
+        { "if": "what is Link three", "then": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Link four", "kind": "chain" } } }] },
+        { "if": "what is Link four", "then": [{ "create": { "register": "flow_notes", "bound": 1, "fields": { "what": "Link five", "kind": "chain" } } }] }
+      ]
+    },
+    {
+      "rule": "chain_ignores",
+      "name": "Mark a chain note somebody wrote",
+      "on": { "written": { "register": "flow_notes", "op": ["create"] } },
+      "when": "kind is chain",
+      "once_per": ["entry"],
+      "steps": [{ "note": "Seen by the automation that skips what rules write" }]
+    },
+    {
+      "rule": "note_after_var",
+      "name": "Note who noted a check",
+      "on": { "written": { "register": "flow_checks", "op": ["create"] } },
+      "when": "state is noted",
+      "once_per": ["entry"],
+      "steps": [{ "set_var": { "name": "who", "to": "the clerk" } }, { "note": "Noted by {{vars.who}}" }]
+    }
+  ]
+}

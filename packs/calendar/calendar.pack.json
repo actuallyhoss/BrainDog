@@ -1,10 +1,10 @@
 {
   "pack": "calendar",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "icon": "calendar",
   "title": "Calendar",
   "summary": "Your calendar's events in a list you, your widgets and your agents can read: from Connect Google, every 15 minutes with invitations and your answers, or every hour from its secret ICS link in Google Calendar or Outlook. Nothing is written back to the calendar.",
-  "changes": "Installs without the calendar link: Connect Google fills Events on its own, so the ICS link is now one of two ways in, not a key Install asks for. With no link in your keys, the hourly reader skips quietly.",
+  "changes": "Says plugin where it said add-on, as the app now does. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -477,7 +477,7 @@
             "metric": "events-ahead",
             "lt": 1
           },
-          "body": "Nothing is on your calendar in the next sixty days. If it is not connected yet, Connect Google, or paste your calendar's private link: both are on this add-on's page."
+          "body": "Nothing is on your calendar in the next sixty days. If it is not connected yet, Connect Google, or paste your calendar's private link: both are on this plugin's page."
         },
         {
           "kind": "note",

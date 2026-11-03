@@ -1,0 +1,841 @@
+{
+  "pack": "splits",
+  "version": "1.3.1",
+  "icon": "split",
+  "title": "Splits",
+  "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their splits close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
+  "changes": "Says plugin where it said add-on, as the app now does. Nothing it reads or writes changed.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.0.0 <4.0.0"
+    }
+  },
+  "extends": {
+    "register.transactions": {
+      "fields": [
+        {
+          "id": "shared_with",
+          "label": "Shared with",
+          "type": "text",
+          "search": true
+        },
+        {
+          "id": "split_share",
+          "label": "My share, percent",
+          "type": "int",
+          "min": 0,
+          "max": 100
+        }
+      ]
+    }
+  },
+  "widgets": [
+    {
+      "id": "splits",
+      "title": "Splits",
+      "says": "What you are owed from shared costs, and what you owe.",
+      "group": "money",
+      "for": "personal",
+      "icon": "split",
+      "block": {
+        "kind": "stat",
+        "heading": "Splits",
+        "icon": "split",
+        "empty": "Nothing split yet.",
+        "cells": [
+          {
+            "metric": "splits-to-me",
+            "label": "You are owed"
+          },
+          {
+            "metric": "splits-to-them",
+            "label": "You owe"
+          }
+        ]
+      },
+      "sizes": [
+        "small",
+        "wide",
+        "tall",
+        "large"
+      ],
+      "size": "small",
+      "needs": {
+        "figures": [
+          "splits-to-me"
+        ]
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "You are owed",
+            "said": "¤180"
+          }
+        ]
+      },
+      "words": [
+        "shared",
+        "friends",
+        "split"
+      ],
+      "leads": [
+        "splits"
+      ]
+    }
+  ],
+  "declarations": [
+    {
+      "register": "splits",
+      "name": "Splits",
+      "icon": "split",
+      "one": "split",
+      "holds": "a cost shared with someone, or money handed over to settle up: who it was with, who paid, the amount and your share",
+      "title": "what",
+      "mobile": [
+        "what",
+        "with",
+        "amount"
+      ],
+      "state": "state",
+      "done": [
+        "settled"
+      ],
+      "pack": "splits",
+      "order": {
+        "field": "on",
+        "dir": "desc"
+      },
+      "fields": [
+        {
+          "id": "what",
+          "label": "What",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "on",
+          "label": "Date",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "with",
+          "label": "With",
+          "type": "text",
+          "required": true,
+          "search": true,
+          "index": true
+        },
+        {
+          "id": "kind",
+          "label": "Type",
+          "type": "enum",
+          "values": [
+            "cost",
+            "settle"
+          ],
+          "labels": {
+            "cost": "A shared cost",
+            "settle": "Settling up"
+          },
+          "default": "cost",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "paid_by",
+          "label": "Who paid",
+          "type": "enum",
+          "values": [
+            "me",
+            "them"
+          ],
+          "labels": {
+            "me": "I paid",
+            "them": "They paid"
+          },
+          "default": "me",
+          "required": true
+        },
+        {
+          "id": "amount",
+          "label": "Amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "my_share",
+          "label": "My share, percent",
+          "type": "int",
+          "min": 0,
+          "max": 100,
+          "default": 50
+        },
+        {
+          "id": "part",
+          "label": "To settle",
+          "type": "money"
+        },
+        {
+          "id": "way",
+          "label": "Which way",
+          "type": "enum",
+          "values": [
+            "to_me",
+            "to_them"
+          ],
+          "labels": {
+            "to_me": "Owes you",
+            "to_them": "You owe them"
+          }
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "open",
+            "settled"
+          ],
+          "labels": {
+            "open": "Open",
+            "settled": "Settled"
+          },
+          "default": "open",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "line",
+          "label": "Ledger line",
+          "type": "ref",
+          "to": "transactions"
+        },
+        {
+          "id": "note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "register": "split_people",
+      "name": "Where each person stands",
+      "icon": "users",
+      "one": "person",
+      "holds": "each person you share costs with, in each currency, and what comes back to you or goes back to them once every open split is counted. Written by the Splits plugin",
+      "title": "name",
+      "mobile": [
+        "name",
+        "stands",
+        "way"
+      ],
+      "pack": "splits",
+      "fields": [
+        {
+          "id": "name",
+          "label": "Name",
+          "type": "text",
+          "required": true,
+          "search": true,
+          "index": true
+        },
+        {
+          "id": "stands",
+          "label": "Stands at",
+          "type": "money"
+        },
+        {
+          "id": "way",
+          "label": "Which way",
+          "type": "enum",
+          "values": [
+            "to_me",
+            "to_them",
+            "square"
+          ],
+          "labels": {
+            "to_me": "Owes you",
+            "to_them": "You owe them",
+            "square": "Square"
+          },
+          "index": true
+        },
+        {
+          "id": "open",
+          "label": "Open splits",
+          "type": "int",
+          "min": 0
+        },
+        {
+          "id": "since",
+          "label": "Open since",
+          "type": "day"
+        }
+      ]
+    },
+    {
+      "rule": "splits_from_line",
+      "name": "Write the split of a Ledger line marked shared",
+      "pack": "splits",
+      "on": {
+        "written": {
+          "register": "transactions",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "shared_with",
+            "split_share",
+            "amount",
+            "what",
+            "on",
+            "direction",
+            "state"
+          ]
+        }
+      },
+      "when": "shared_with is set",
+      "steps": [
+        {
+          "script": {
+            "id": "splits",
+            "as": "splitting"
+          }
+        }
+      ]
+    },
+    {
+      "rule": "splits_stand",
+      "name": "Work out a split and where that person stands",
+      "pack": "splits",
+      "on": {
+        "written": {
+          "register": "splits",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "amount",
+            "my_share",
+            "paid_by",
+            "kind",
+            "with"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "splits",
+            "as": "standing"
+          }
+        }
+      ]
+    },
+    {
+      "script": "splits",
+      "title": "Work out splits and where each person stands",
+      "pack": "splits",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "transactions",
+        "splits",
+        "split_people"
+      ],
+      "writes": [
+        "splits",
+        "split_people"
+      ],
+      "source": "/**\n * Splits: what one shared cost leaves with each side, and where each person stands once every cost and every\n * settle-up is counted.\n *\n * STARTED TWO WAYS, and it tells them apart by the list of the row it is handed.\n *\n * A LEDGER LINE MARKED \"SHARED WITH\". Money out is a cost you paid and share; money in is that person settling up\n * with you. The line's split is written, or brought up to date when the line changes: the same words, day and amount,\n * your share (half unless the line's \"My share\" says), and a link back to the line. Taking the name off the line leaves its split\n * as it was, for you to remove.\n *\n * A SPLIT. What it leaves to settle is worked out: of a cost you paid, their share (the amount less yours), which comes\n * back to you; of a cost they paid, your share, which goes back to them; of a settle-up, the whole amount, back to you\n * when you handed it over and back to them when they did. Then everything still open with that person, in that currency, is added up\n * and written on their line in Where each person stands. When it comes to nothing they are square: their open rows in\n * that currency are marked settled, and their line says Square.\n *\n * NAMES ARE MATCHED AS WRITTEN, with spaces at either end and capitals aside, so \"Sam\" and \"sam \" are one person.\n * Open rows are read fifty at a time, at most twenty pages, and the people's lines one page of fifty.\n *\n * IT WRITES THE PARTS, THE WAY, THE STATE AND THE PERSON'S LINE, none of which the automations watch, so it never\n * starts itself again; the split it writes from a Ledger line starts it once more, for that split.\n */\n\nconst money = (m) => m && typeof m === 'object' && Number.isSafeInteger(m.amount) && typeof m.currency === 'string';\nconst key = (s) => String(s || '').trim().toLowerCase();\nconst shareOf = (v) => (Number.isInteger(v) && v >= 0 && v <= 100 ? v : 50);\n\n/** Every open split with one person, in pages of fifty read by `seq`. */\nasync function openWith(ctx, name) {\n  const rows = [];\n  let above = 0;\n  for (let i = 0; i < 20; i++) {\n    const page = await ctx.record.list('splits', { all: [{ field: 'state', is: 'open' }, { field: 'seq', gt: above }] }, { order: 'seq' });\n    for (const r of page) if (key(r.fields.with) === key(name)) rows.push(r);\n    if (page.length < 50) break;\n    above = Math.max(...page.map((r) => r.seq));\n  }\n  return rows;\n}\n\n/** What a split leaves to settle, and which way it goes. */\nexport function partOf(f) {\n  if (!money(f.amount)) return null;\n  const them = f.paid_by === 'them';\n  const share = shareOf(f.my_share);\n  const amount = f.kind === 'settle' ? f.amount.amount : Math.round((f.amount.amount * (them ? share : 100 - share)) / 100);\n  return { part: { amount, currency: f.amount.currency }, way: them ? 'to_them' : 'to_me' };\n}\n\n/** Where one person stands in one currency: positive comes back to you, negative goes back to them. */\nexport function standOf(rows, currency) {\n  let net = 0;\n  let since = null;\n  let open = 0;\n  for (const r of rows) {\n    const p = partOf(r.fields);\n    if (!p || p.part.currency !== currency) continue;\n    net += p.way === 'to_me' ? p.part.amount : -p.part.amount;\n    open += 1;\n    const on = typeof r.fields.on === 'string' ? r.fields.on.slice(0, 10) : null;\n    if (on && (since === null || on < since)) since = on;\n  }\n  return { net, since, open };\n}\n\nasync function fromLine(ctx, line) {\n  const f = line.fields;\n  const name = String(f.shared_with || '').trim();\n  if (name === '' || !money(f.amount) || f.state === 'void') return;\n  const settle = f.direction === 'in';\n  const fields = {\n    what: String(f.what || 'Shared'),\n    on: typeof f.on === 'string' ? f.on.slice(0, 10) : ctx.today(),\n    with: name,\n    kind: settle ? 'settle' : 'cost',\n    paid_by: settle ? 'them' : 'me',\n    amount: f.amount,\n    my_share: shareOf(f.split_share),\n    line: line.id,\n  };\n  const held = await ctx.record.list('splits', { all: [{ field: 'line', is: line.id }] });\n  if (held.length === 0) {\n    ctx.write('splits', { ...fields, state: 'open' });\n    ctx.log('Wrote the split of ' + fields.what + ' with ' + name + '.');\n    return;\n  }\n  const s = held[0];\n  const g = s.fields;\n  const same = g.what === fields.what && g.on === fields.on && key(g.with) === key(name) && g.kind === fields.kind && g.paid_by === fields.paid_by && money(g.amount) && g.amount.amount === fields.amount.amount && g.amount.currency === fields.amount.currency && shareOf(g.my_share) === fields.my_share;\n  if (!same) ctx.update('splits#' + s.seq, fields, s.version);\n}\n\nasync function fromSplit(ctx, split) {\n  const f = split.fields;\n  const p = partOf(f);\n  if (!p) return;\n  const name = String(f.with || '').trim();\n  if (name === '') return;\n  const patch = {};\n  if (!money(f.part) || f.part.amount !== p.part.amount || f.part.currency !== p.part.currency || f.way !== p.way) {\n    patch.part = p.part;\n    patch.way = p.way;\n  }\n  const rows = await openWith(ctx, name);\n  if (f.state === 'open' && !rows.some((r) => r.id === split.id)) rows.push(split);\n  const currency = p.part.currency;\n  const stand = standOf(rows, currency);\n  /* EVERY PERSON'S LINE IS READ AND MATCHED HERE, because the record compares a name with its capitals. */\n  const people = (await ctx.record.list('split_people', null, { order: 'seq' })).filter((r) => key(r.fields.name) === key(name));\n  const mine = people.find((r) => money(r.fields.stands) && r.fields.stands.currency === currency) || people.find((r) => !money(r.fields.stands));\n  const line = {\n    name: mine ? mine.fields.name : name,\n    stands: { amount: Math.abs(stand.net), currency },\n    way: stand.net > 0 ? 'to_me' : stand.net < 0 ? 'to_them' : 'square',\n    open: stand.net === 0 ? 0 : stand.open,\n    since: stand.net === 0 ? null : stand.since,\n  };\n  if (mine) ctx.update('split_people#' + mine.seq, line, mine.version);\n  else ctx.write('split_people', line);\n  if (stand.net === 0 && rows.length > 0) {\n    for (const r of rows) {\n      const q = partOf(r.fields);\n      if (q && q.part.currency === currency && r.id !== split.id) ctx.update('splits#' + r.seq, { state: 'settled' }, r.version);\n    }\n    if (f.state === 'open') patch.state = 'settled';\n    ctx.log(name + ' and you are square in ' + currency + '.');\n  }\n  if (Object.keys(patch).length > 0) ctx.update('splits#' + split.seq, patch, split.version);\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  if (!id) return;\n  const row = await ctx.record.get(String(id));\n  if (!row) return;\n  if (row.register === 'transactions') return fromLine(ctx, row);\n  if (row.register === 'splits') return fromSplit(ctx, row);\n}\n"
+    },
+    {
+      "metric": "splits-to-me",
+      "name": "Comes back to you",
+      "pack": "splits",
+      "source": "register.split_people",
+      "where": "way is to_me",
+      "value": {
+        "sum": "stands"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "splits-to-them",
+      "name": "Goes back from you",
+      "pack": "splits",
+      "source": "register.split_people",
+      "where": "way is to_them",
+      "value": {
+        "sum": "stands"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "splits-people-open",
+      "name": "People not square",
+      "pack": "splits",
+      "source": "register.split_people",
+      "where": "way is to_me or to_them",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "splits-open",
+      "name": "Open splits",
+      "pack": "splits",
+      "source": "register.splits",
+      "where": "state is open",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "splits-held",
+      "name": "Splits",
+      "pack": "splits",
+      "source": "register.splits",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "splits-shared-month",
+      "name": "Shared costs this month",
+      "pack": "splits",
+      "source": "register.splits",
+      "where": "kind is cost, on at least bom",
+      "value": {
+        "sum": "amount"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "splits",
+      "title": "Splits",
+      "pack": "splits",
+      "nav": {
+        "section": "Money",
+        "order": 65
+      },
+      "icon": "split",
+      "requires": [
+        "register.splits",
+        "register.split_people"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "You are owed {{splits-to-me}} and you owe {{splits-to-them}}, across {{splits-people-open}} people.",
+          "when": {
+            "all": [
+              {
+                "metric": "splits-to-me",
+                "gt": 0
+              },
+              {
+                "metric": "splits-to-them",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "You are owed {{splits-to-me}}.",
+          "when": {
+            "all": [
+              {
+                "metric": "splits-to-me",
+                "gt": 0
+              },
+              {
+                "metric": "splits-to-them",
+                "lte": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "You owe {{splits-to-them}}.",
+          "when": {
+            "all": [
+              {
+                "metric": "splits-to-me",
+                "lte": 0
+              },
+              {
+                "metric": "splits-to-them",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "Everyone is square.",
+          "when": {
+            "all": [
+              {
+                "metric": "splits-held",
+                "gt": 0
+              },
+              {
+                "metric": "splits-people-open",
+                "lt": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "note",
+          "span": 12,
+          "body": "Nothing shared yet. Add a shared cost below, or write a name in Shared with on a Ledger line.",
+          "when": {
+            "metric": "splits-held",
+            "lt": 1
+          },
+          "lead": true
+        },
+        {
+          "kind": "stat",
+          "heading": "Where it stands",
+          "icon": "split",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "splits-to-me",
+              "label": "You are owed"
+            },
+            {
+              "metric": "splits-to-them",
+              "label": "You owe"
+            },
+            {
+              "metric": "splits-open",
+              "label": "Open splits"
+            },
+            {
+              "metric": "splits-shared-month",
+              "label": "Shared this month"
+            }
+          ],
+          "when": {
+            "metric": "splits-held",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Each person",
+          "icon": "users",
+          "span": 12,
+          "source": "register.split_people",
+          "where": "way is to_me or to_them",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Name",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "stands",
+              "label": "Stands at",
+              "width": "14ch",
+              "align": "end",
+              "sign": {
+                "field": "way",
+                "minus": "to_them"
+              }
+            },
+            {
+              "field": "way",
+              "label": "Which way",
+              "width": "minmax(16ch,20ch)"
+            },
+            {
+              "field": "open",
+              "label": "Open",
+              "width": "8ch",
+              "align": "end"
+            },
+            {
+              "field": "since",
+              "label": "Since",
+              "width": "13ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "since",
+              "dir": "asc"
+            }
+          ],
+          "limit": 50,
+          "when": {
+            "metric": "splits-people-open",
+            "gt": 0
+          },
+          "empty": "Everyone is square."
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a shared cost",
+          "icon": "plus",
+          "span": 12,
+          "register": "splits"
+        },
+        {
+          "kind": "timeline",
+          "heading": "Open",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.splits",
+          "where": "state is open",
+          "columns": [
+            {
+              "field": "on"
+            },
+            {
+              "field": "what"
+            },
+            {
+              "field": "part",
+              "sign": {
+                "field": "way",
+                "minus": "to_them"
+              }
+            },
+            {
+              "field": "with"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 50,
+          "when": {
+            "metric": "splits-open",
+            "gt": 0
+          },
+          "empty": "Nothing open."
+        },
+        {
+          "kind": "section",
+          "heading": "Settled",
+          "icon": "archive",
+          "span": 12,
+          "fold": true,
+          "when": {
+            "metric": "splits-held",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "timeline",
+          "heading": "Settled splits",
+          "icon": "archive",
+          "span": 12,
+          "source": "register.splits",
+          "where": "state is settled",
+          "columns": [
+            {
+              "field": "on"
+            },
+            {
+              "field": "what"
+            },
+            {
+              "field": "amount"
+            },
+            {
+              "field": "with"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 50,
+          "empty": "Nothing settled yet."
+        }
+      ]
+    },
+    {
+      "page": "split-person",
+      "title": "{{name}}",
+      "pack": "splits",
+      "for": {
+        "register": "split_people"
+      },
+      "icon": "users",
+      "requires": [
+        "register.splits",
+        "register.split_people"
+      ],
+      "blocks": [
+        {
+          "kind": "cards",
+          "lead": true,
+          "span": 12,
+          "source": "register.split_people",
+          "where": "name is {{name}}",
+          "columns": [
+            {
+              "field": "stands",
+              "label": "Stands at",
+              "as": "figure"
+            },
+            {
+              "field": "way",
+              "label": "Which way",
+              "as": "fact"
+            },
+            {
+              "field": "open",
+              "label": "Open splits",
+              "as": "fact"
+            },
+            {
+              "field": "since",
+              "label": "Open since",
+              "as": "fact"
+            }
+          ],
+          "limit": 4
+        },
+        {
+          "kind": "capture",
+          "heading": "Settle up",
+          "icon": "check",
+          "span": 12,
+          "register": "splits",
+          "where": "with is {{name}}"
+        },
+        {
+          "kind": "timeline",
+          "heading": "Open with them",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.splits",
+          "where": "state is open, with is {{name}}",
+          "columns": [
+            {
+              "field": "on"
+            },
+            {
+              "field": "what"
+            },
+            {
+              "field": "part",
+              "sign": {
+                "field": "way",
+                "minus": "to_them"
+              }
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 100,
+          "empty": "Nothing open: you are square."
+        },
+        {
+          "kind": "timeline",
+          "heading": "Settled with them",
+          "icon": "archive",
+          "span": 12,
+          "source": "register.splits",
+          "where": "state is settled, with is {{name}}",
+          "columns": [
+            {
+              "field": "on"
+            },
+            {
+              "field": "what"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 50,
+          "empty": "Nothing settled yet."
+        }
+      ]
+    }
+  ]
+}

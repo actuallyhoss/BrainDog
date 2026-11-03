@@ -1,10 +1,10 @@
 {
   "pack": "stripe",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "icon": "badge-dollar-sign",
   "title": "Stripe",
   "summary": "Reads the Stripe balance, available and pending, and the payouts on their way to the bank from api.stripe.com every hour, into Money's accounts.",
-  "changes": "When Stripe refuses the key, the script's line names it \"Stripe (read only)\", the name the key is shown under everywhere else, where it said the bare label \"stripe\".",
+  "changes": "Says plugin where it said add-on, as the app now does. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -19,7 +19,7 @@
       "type": "text",
       "default": "stripe",
       "label": "Key",
-      "note": "The label of the key in the vault the script sends to Stripe. A label and never the key itself: an add-on that carries a key is refused."
+      "note": "The label of the key in the vault the script sends to Stripe. A label and never the key itself: a plugin that carries a key is refused."
     },
     "book": {
       "type": "number",

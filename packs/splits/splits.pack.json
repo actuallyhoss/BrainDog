@@ -1,10 +1,10 @@
 {
   "pack": "splits",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "icon": "split",
   "title": "Splits",
   "summary": "Costs you share with a partner, flatmates or friends: who paid, your share, and settling up. Each person's line says what comes back to you or goes back to them, and their splits close by themselves when you are square. Mark a Ledger line as shared and its split is written for you.",
-  "changes": "Splits reads like the Ledger: each open and settled split is a line with what it was, who it was with and the whole cost under it, and what comes back to you or goes to them at the end, with its sign. With nothing shared yet the page opens on one line and the box to add a cost.",
+  "changes": "Says plugin where it said add-on, as the app now does. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -228,7 +228,7 @@
       "name": "Where each person stands",
       "icon": "users",
       "one": "person",
-      "holds": "each person you share costs with, in each currency, and what comes back to you or goes back to them once every open split is counted. Written by the Splits add-on",
+      "holds": "each person you share costs with, in each currency, and what comes back to you or goes back to them once every open split is counted. Written by the Splits plugin",
       "title": "name",
       "mobile": [
         "name",

@@ -1,10 +1,10 @@
 {
   "pack": "flow-check",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "icon": "list-checks",
   "title": "Flow check",
   "summary": "A test bench for automations: one automation for each way one can start, the order rules run in, a wait on a question, and the limit on rules starting rules. Each one writes a note that says what started it, so a check can read back what ran.",
-  "changes": "The first version. Now draws its own icon.",
+  "changes": "Says plugin where it said add-on, as the app now does. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "unlisted": true,
@@ -19,7 +19,7 @@
       "pack": "flow-check",
       "name": "Checks",
       "one": "check",
-      "holds": "things to check, each with a state, which the automations of this add-on start from",
+      "holds": "things to check, each with a state, which the automations of this plugin start from",
       "title": "what",
       "fields": [
         { "id": "what", "label": "What", "type": "text", "required": true },
@@ -43,7 +43,7 @@
       "pack": "flow-check",
       "name": "Notes",
       "one": "note",
-      "holds": "what each automation of this add-on wrote when it ran, and the places a check can name",
+      "holds": "what each automation of this plugin wrote when it ran, and the places a check can name",
       "title": "what",
       "fields": [
         { "id": "what", "label": "What", "type": "text", "required": true },
