@@ -1834,14 +1834,22 @@
 <div class="sr-only" role="status" aria-live="polite"></div>
 
 <style>
-  /* THE NAME ASK'S ROOM while its code comes: its banner's height, one line on a desk, stacked on a phone. */
+  /* THE NAME ASK'S ROOM while its code comes: its banner's box, measured (3 Nov), so the banner lands in it and nothing
+     under it moves. It held 150px on a phone after the banner shrank to 98 (its field and presses on one row), and the
+     page jumped up 52px when the banner came; and it stood 12px higher than the banner on a desk (`--inset` where the
+     banner is `--page-top` under the bar). One line from 730px, two lines and a row of presses under it below that. */
   .banner-room {
-    block-size: 64px;
-    margin: var(--inset) var(--gutter) 0;
+    block-size: 62px;
+    margin: var(--page-top) var(--gutter) 0;
+  }
+  @media (width < 730px) {
+    .banner-room {
+      block-size: 90px;
+    }
   }
   @media (width < 640px) {
     .banner-room {
-      block-size: 150px;
+      block-size: 98px;
     }
   }
   /* 127x41 ON EVERY ROUTE, and it is the first target a keyboard user reaches. It sat four pixels

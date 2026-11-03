@@ -148,8 +148,8 @@
               <span class="r-project"><span class="r-dot" style={dotOf(r)} aria-hidden="true"></span>{r.project}</span>
             {/if}
           </span>
-          {#if r.doing}<span class="r-doing" dir="auto">{r.doing}</span>{/if}
-          {#if r.holds}<span class="r-holds" dir="auto">On your word: “{r.holds}”</span>{/if}
+          {#if r.doing}<span class="r-doing own-dir">{r.doing}</span>{/if}
+          {#if r.holds}<span class="r-holds own-dir">On your word: “{r.holds}”</span>{/if}
           <span class="r-time num" data-live={r.live === 'working' && r.began && !r.word ? '' : undefined}>{r.word ?? (r.live === 'quiet' ? words.quiet : r.began)}</span>
           {#if owner && /^S[1-9][0-9]*$/u.test(r.run)}
             <button type="button" class="r-do tap" aria-label={words.controls(r.agent)} aria-haspopup="dialog" onclick={() => void openFor(r)}><Icon name="more" size="s" /></button>
