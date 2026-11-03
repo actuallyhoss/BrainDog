@@ -1382,12 +1382,17 @@ export function settleAbout(deps: Pick<GovernDeps, 'sql' | 'row' | 'mint'>, name
   return out;
 }
 
-/** Take back one open question that can no longer apply, as a press found it: its line, or `null` when it still can. */
+/**
+ * Take back one open question a press found can no longer apply: its line, or `null` when it still can. Only for rows
+ * gone, merged or already so; a row merely edited since keeps the conflict, which hands the press the row as it is now
+ * (the hourly sweep takes that one back if it still cannot apply).
+ */
 export function settleOne(deps: Pick<GovernDeps, 'sql' | 'row' | 'mint'>, id: string, nowMs: number): string | null {
   const q = deps.sql.one<{ id: string; body_kind: string; body: string }>("SELECT id, body_kind, body FROM suggestion WHERE id = ? AND status = 'open'", id);
   if (!q) return null;
   const why = staleWhy(deps, q);
-  if (why !== null) takeBack(deps, q.id, 'system', instant(nowMs), why);
+  if (why === null || why === CHANGED_NOTE) return null;
+  takeBack(deps, q.id, 'system', instant(nowMs), why);
   return why;
 }
 
