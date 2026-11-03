@@ -89,8 +89,9 @@
     box-sizing: border-box;
     block-size: var(--tab-h);
     padding: 4px;
-    /* THE READ-ON FILM, not the sidebar's chrome film: rows pass under this bar, and their words must not show through. */
-    background: var(--glass-regular);
+    /* NEARLY SOLID: rows pass under this bar, and their words must not show through it (the chrome film let "Due soon"
+       read under "Needs you" in dark). The blur still softens what passes. */
+    background: color-mix(in oklab, var(--tile) 92%, transparent);
     -webkit-backdrop-filter: var(--glass-filter);
     backdrop-filter: var(--glass-filter);
     box-shadow: var(--glass-edge), var(--elev-popover);
