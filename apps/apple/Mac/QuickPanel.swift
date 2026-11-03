@@ -325,7 +325,7 @@ struct QuickPanelView: View {
                 if let receipt = tell.receipt {
                     HStack(alignment: .top, spacing: Space.s3) {
                         IconWell(.check, size: .m, tone: .good)
-                        Text(receipt.said).font(Typeface.body).foregroundStyle(Palette.ink).fixedSize(horizontal: false, vertical: true)
+                        Text(receipt.said).font(Typeface.body).foregroundStyle(Palette.ink).leading(.body).fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                         if receipt.batch != nil {
                             Button(Words.undo) { Task { await tell.undo() } }
@@ -344,7 +344,7 @@ struct QuickPanelView: View {
                     }
                 }
                 if let said = tell.said {
-                    Text(said).font(Typeface.meta).foregroundStyle(tell.saidIsRefusal ? Palette.red : Palette.ink2)
+                    Text(said).font(Typeface.meta).foregroundStyle(tell.saidIsRefusal ? Palette.red : Palette.ink2).leading(.meta)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -363,7 +363,7 @@ struct QuickPanelView: View {
                 IconWell(.alert, size: .m, tone: .warn)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(line.sentence).font(Typeface.bodyMedium).foregroundStyle(Palette.ink).lineLimit(1)
-                    Text(line.told.why ?? Words.quickNotPlaced).font(Typeface.meta).foregroundStyle(Palette.ink2).lineLimit(2)
+                    Text(line.told.why ?? Words.quickNotPlaced).font(Typeface.meta).foregroundStyle(Palette.ink2).lineLimit(2).leading(.meta)
                 }
                 Spacer(minLength: 0)
                 if let offer = line.told.offers?.first {

@@ -121,8 +121,15 @@ public enum Space {
     public static let toolbarGap: CGFloat = 6
     /// Between cards.
     public static let cardGap: CGFloat = 16
-    /// A target under a thumb.
+    /// A target under a thumb, and a row's least height.
     public static let tap: CGFloat = 44
+    /// A row's words sit 12 below its top and 12 above its foot (the one text edge, turned on its side), and the row is
+    /// `tap` tall at least: a one-line row with a 32 well is 56, a subject and a meta line 61, never 44 plus padding.
+    public static let rowY: CGFloat = 12
+    /// A segmented control's track in the page tier: 36 tall, its segments 30, 3 in (ops 4.7). A thumb still gets 44.
+    public static let segment: CGFloat = 36
+    /// Under the last thing on a scrolling screen, so it clears the tab bar's accessory and a toast.
+    public static let foot: CGFloat = 48
     /// A control's drawn height: 44 under a thumb, 36 under a pointer.
     #if os(macOS)
     public static let control: CGFloat = 36

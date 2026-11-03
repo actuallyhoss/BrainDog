@@ -117,7 +117,7 @@ struct SearchView: View {
                 Row(spot.label, glyph: .settings)
             } open: { _ in app.search.path.append(.settings) }
         }
-        Color.clear.frame(height: Space.s6).listRowBackground(Color.clear).listRowSeparator(.hidden)
+        Color.clear.frame(height: Space.foot).listRowBackground(Color.clear).listRowSeparator(.hidden)
     }
 
     // MARK: with something typed: the record's search
@@ -171,7 +171,7 @@ struct SearchView: View {
     }
 
     private func plain(_ text: String) -> some View {
-        Text(text).font(Typeface.meta).foregroundStyle(Palette.ink2)
+        Text(text).font(Typeface.meta).foregroundStyle(Palette.ink2).leading(.meta)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
             .listRowInsets(EdgeInsets(top: Space.s3, leading: Space.gutter, bottom: 0, trailing: Space.gutter))

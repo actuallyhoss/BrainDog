@@ -25,7 +25,7 @@ struct MacOffline: View {
                     }
                 }
             }
-            .padding(Space.s6)
+            .padding(Space.s5)
             .frame(maxWidth: 520)
             .card()
             Spacer()

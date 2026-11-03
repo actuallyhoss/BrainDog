@@ -3,26 +3,35 @@ import SwiftUI
 /// The one surface for a group, a card: `--tile` on the board at radius 16, lifted by the card shadow in light and
 /// edged by a 1px rule in dark (`card()`). A heading row is a neutral 28 circle with an 18 glyph, the title at 15/600,
 /// an optional count in ink-3, and one thing at the far end.
+///
+/// A TILE OF ROWS (`rows: true`) keeps the one text edge and no orphan gap: its sides are 12 (the rows' words and the
+/// heading's circle start where a list's do), its top 16, and its foot 4, because the last row already pads its words 12
+/// from its own foot, so the last words sit 16 from the card's edge as the heading does from the top. The heading stands
+/// 4 above the first row, whose own 12 makes the 16.
 public struct Tile<Content: View, Trailing: View>: View {
     let title: String?
     let glyph: Glyph?
     let count: Int?
-    let padding: CGFloat
+    let insets: EdgeInsets
+    let gap: CGFloat
     let content: Content
     let trailing: Trailing
 
-    public init(_ title: String? = nil, glyph: Glyph? = nil, count: Int? = nil, padding: CGFloat = Space.s4,
+    public init(_ title: String? = nil, glyph: Glyph? = nil, count: Int? = nil, padding: CGFloat = Space.s4, rows: Bool = false,
                 @ViewBuilder content: () -> Content, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
         self.title = title
         self.glyph = glyph
         self.count = count
-        self.padding = padding
+        self.insets = rows
+            ? EdgeInsets(top: Space.s4, leading: Space.textInset, bottom: Space.s4 - Space.rowY, trailing: Space.textInset)
+            : EdgeInsets(top: padding, leading: padding, bottom: padding, trailing: padding)
+        self.gap = rows ? Space.s4 - Space.rowY : Space.s3
         self.content = content()
         self.trailing = trailing()
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: Space.s3) {
+        VStack(alignment: .leading, spacing: gap) {
             if let title {
                 HStack(spacing: Space.s2) {
                     if let glyph { IconWell(glyph, size: .m) }
@@ -36,7 +45,7 @@ public struct Tile<Content: View, Trailing: View>: View {
             }
             content
         }
-        .padding(padding)
+        .padding(insets)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card()
     }

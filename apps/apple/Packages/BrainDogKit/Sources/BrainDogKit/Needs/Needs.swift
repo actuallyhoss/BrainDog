@@ -151,7 +151,7 @@ public struct NeedsView: View {
                     header(Words.later, count: model.needs.later.count)
                 }
             }
-            Color.clear.frame(height: Space.s7).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            Color.clear.frame(height: Space.foot).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -186,7 +186,7 @@ public struct NeedsView: View {
     private func note(_ text: String, glyph: Glyph) -> some View {
         HStack(spacing: Space.s2) {
             glyph.image.resizable().frame(width: 16, height: 16).foregroundStyle(Palette.ink3).accessibilityHidden(true)
-            Text(text).font(Typeface.meta).foregroundStyle(Palette.ink2).fixedSize(horizontal: false, vertical: true)
+            Text(text).font(Typeface.meta).foregroundStyle(Palette.ink2).leading(.meta).fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, Space.s1)
         .listRowBackground(Color.clear)
@@ -255,7 +255,7 @@ struct NeedsRow: View {
             HStack(alignment: .center, spacing: Space.s3) {
                 IconWell(glyph, size: .l, tone: question.cost == "undo" ? .warn : .neutral)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(question.question).font(Typeface.row).foregroundStyle(Palette.ink).lineLimit(2)
+                    Text(question.question).font(Typeface.row).foregroundStyle(Palette.ink).lineLimit(2).leading(.row)
                     if let detail { Text(detail).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(1) }
                 }
                 Spacer(minLength: Space.s2)
@@ -263,8 +263,8 @@ struct NeedsRow: View {
                     Text(when).font(Typeface.meta).monospacedDigit().foregroundStyle(Palette.ink3)
                 }
             }
+            .padding(.vertical, Space.rowY)
             .frame(minHeight: Space.tap)
-            .padding(.vertical, Space.s3)
             if !last { Hairline(leading: 32 + Space.s3) }
         }
         .accessibilityElement(children: .combine)
@@ -317,7 +317,7 @@ struct LaterSheet: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             VStack(alignment: .leading, spacing: Space.s1) {
                 Text(Words.laterTitle).font(Typeface.heading).foregroundStyle(Palette.ink)
-                Text(question.question).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(2)
+                Text(question.question).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(2).leading(.meta)
             }
             Segmented([(Until.tomorrow, Words.tomorrow), (.week, Words.nextWeek), (.fortnight, Words.twoWeeks)], chosen: $until)
             Field(Words.whyItWaits) {
@@ -329,7 +329,7 @@ struct LaterSheet: View {
                     .onSubmit { Task { await send() } }
             }
             if let said {
-                Text(said).font(Typeface.meta).foregroundStyle(Palette.red).fixedSize(horizontal: false, vertical: true)
+                Text(said).font(Typeface.meta).foregroundStyle(Palette.red).leading(.meta).fixedSize(horizontal: false, vertical: true)
             }
             Button {
                 Haptic.press.play()

@@ -61,7 +61,7 @@ struct SettingsRoot: View {
                 ForEach(groups) { group in
                     /* WHAT ONLY THIS PHONE HOLDS sits under You, beside Notifications, whose kinds it rings for. */
                     if group.title != groups.first?.title, groups.dropFirst().first?.title == group.title { PhoneTile() }
-                    Tile(group.title) {
+                    Tile(group.title, rows: true) {
                         VStack(spacing: 0) {
                             ForEach(Array(group.areas.enumerated()), id: \.element.id) { index, area in
                                 Button {
@@ -82,13 +82,14 @@ struct SettingsRoot: View {
 
                 Tile(Words.about) {
                     VStack(alignment: .leading, spacing: Space.s2) {
-                        Text(Words.version(version, build)).font(Typeface.body).foregroundStyle(Palette.ink)
+                        Text(Words.version(version, build)).font(Typeface.body).foregroundStyle(Palette.ink).leading(.body)
                         Text("\(Words.billing): \(Words.planManaged)").font(Typeface.meta).foregroundStyle(Palette.ink3)
                     }
                 }
             }
             .padding(.horizontal, Space.gutter)
-            .padding(.vertical, Space.s3)
+            .padding(.top, Space.s3)
+            .padding(.bottom, Space.foot)
         }
         .background(Ground())
         .navigationTitle(Words.settings)
@@ -109,7 +110,7 @@ struct PhoneTile: View {
     @State private var lockSaid: String?
 
     var body: some View {
-        Tile(Words.onThisPhone) {
+        Tile(Words.onThisPhone, rows: true) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .center, spacing: Space.s3) {
                     Row(Words.notifications, detail: line, glyph: .bell)
@@ -153,6 +154,5 @@ struct PhoneTile: View {
         }
         .toggleStyle(.switch)
         .tint(Palette.on)
-        .padding(.vertical, Space.s1)
     }
 }

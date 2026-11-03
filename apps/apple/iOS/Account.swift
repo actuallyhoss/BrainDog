@@ -44,8 +44,8 @@ struct AccountSheet: View {
                                             .accessibilityLabel(Words.signedInHere)
                                     }
                                 }
+                                .padding(.vertical, Space.rowY)
                                 .frame(minHeight: Space.tap)
-                                .padding(.vertical, Space.s2)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -56,7 +56,7 @@ struct AccountSheet: View {
                     .padding(.horizontal, Space.s3)
                     .background(Palette.tile, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
                     if let said {
-                        Text(said).font(Typeface.meta).foregroundStyle(Palette.red).fixedSize(horizontal: false, vertical: true)
+                        Text(said).font(Typeface.meta).foregroundStyle(Palette.red).leading(.meta).fixedSize(horizontal: false, vertical: true)
                     }
                 }
 

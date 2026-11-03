@@ -23,7 +23,7 @@ public struct ShareView: View {
                         Spacer()
                         Button(Words.done, action: close).buttonStyle(.bare)
                     }
-                    Text(Words.shareSignIn).font(Typeface.body).foregroundStyle(Palette.ink2)
+                    Text(Words.shareSignIn).font(Typeface.body).foregroundStyle(Palette.ink2).leading(.body)
                     Spacer(minLength: 0)
                 }
                 .padding(Space.gutter)
