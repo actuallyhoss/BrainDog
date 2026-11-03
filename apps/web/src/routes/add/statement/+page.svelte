@@ -416,7 +416,7 @@
     flex-direction: column;
     gap: var(--sp-6);
     padding: var(--page-top, var(--sp-5)) var(--gutter) var(--sp-9);
-    max-inline-size: min(var(--page-max), 48rem);
+    max-inline-size: 48rem;
   }
 
   .st-step {
