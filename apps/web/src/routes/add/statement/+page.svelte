@@ -377,7 +377,7 @@
       display: flex;
       flex-direction: column;
       border: 1px solid var(--rule-strong);
-      border-radius: 12px;
+      border-radius: var(--r-field, 12px);
       background: var(--tile);
       overflow: hidden;
     }
@@ -409,12 +409,14 @@
     min-inline-size: 0;
     overflow-wrap: anywhere;
   }
+  /* A FORM IS A READING COLUMN (UI pass, 3 Nov): the account track, the drop box and the paste box ran the window's
+     whole width at a desk, 1,180px of field for a file name. The preview table may take a little more. */
   .st-page {
     display: flex;
     flex-direction: column;
     gap: var(--sp-6);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
-    max-inline-size: var(--page-max);
+    padding: var(--page-top, var(--sp-5)) var(--gutter) var(--sp-9);
+    max-inline-size: min(var(--page-max), 48rem);
   }
 
   .st-step {
@@ -490,8 +492,8 @@
     place-items: center;
     min-block-size: 120px;
     padding: var(--sp-5);
-    border: 1px dashed var(--rule);
-    border-radius: var(--r-ctl);
+    border: 1px dashed var(--rule-strong);
+    border-radius: var(--r-field, 12px);
     background: var(--tile);
     color: var(--ink-2);
     font-size: var(--fs-body);
@@ -505,8 +507,8 @@
   }
 
   .st-drop:focus-within {
-    outline: 2px solid var(--focus);
-    outline-offset: 1px;
+    outline: 2px solid var(--focus-ring, var(--focus));
+    outline-offset: 0;
   }
 
   .st-file {
@@ -516,12 +518,13 @@
     cursor: pointer;
   }
 
+  /* A FIELD AS EVERY FIELD IS DRAWN (ops 4.22): 36 under a mouse and 44 under a thumb, radius 12. */
   .st-box {
     inline-size: 100%;
-    min-block-size: 44px;
+    min-block-size: var(--field-h, 36px);
     padding-inline: var(--sp-3);
     border: 1px solid var(--rule-strong);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-field, 12px);
     background: var(--tile);
     color: var(--ink);
     font: inherit;
@@ -529,8 +532,8 @@
   }
 
   .st-box:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 1px;
+    outline: 2px solid var(--focus-ring, var(--focus));
+    outline-offset: 0;
   }
 
   .st-paste {
@@ -588,24 +591,30 @@
     font-size: var(--fs-body);
   }
 
+  /* A TABLE AS EVERY TABLE ON MONEY (ops): an 11px caps head over one hairline, rows told apart by air. */
   .st-table th {
-    padding: var(--sp-2) var(--sp-3);
-    border-block-end: 1px solid var(--rule);
+    padding: var(--sp-3) var(--sp-3) var(--sp-2);
+    border-block-end: 1px solid var(--sep, var(--rule));
     color: var(--ink-3);
-    font-size: var(--fs-meta);
-    font-weight: 500;
+    font: var(--t-caps, 500 11px / 16px var(--font-ui));
+    letter-spacing: var(--track-caps, 0.025em);
+    text-transform: uppercase;
     text-align: start;
   }
 
   .st-table td {
     padding: var(--sp-2) var(--sp-3);
-    border-block-end: 1px solid var(--rule);
     color: var(--ink);
+    line-height: var(--lead-ui, 20px);
     vertical-align: baseline;
   }
 
+  .st-table tbody tr:first-child td {
+    padding-block-start: var(--sp-3);
+  }
+
   .st-table tr:last-child td {
-    border-block-end: 0;
+    padding-block-end: var(--sp-3);
   }
 
   .st-table tr[data-already] td {
