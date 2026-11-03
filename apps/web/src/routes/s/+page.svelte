@@ -347,9 +347,13 @@
     </article>
   {/if}
 
-  <footer class="made">
-    <a class="made-link" href="https://brain.dog" rel="noreferrer" onclick={outside}><Mark height={14} />{words.sharedMade}</a>
-  </footer>
+  <!-- THE CREDIT UNDER A PAGE THAT OPENED. Under "This page is not shared" it was a second way to brain.dog beside the
+       card's own "See what BrainDog is", under the mark that already says BrainDog. -->
+  {#if got?.from === 'live'}
+    <footer class="made">
+      <a class="made-link" href="https://brain.dog" rel="noreferrer" onclick={outside}><Mark height={14} />{words.sharedMade}</a>
+    </footer>
+  {/if}
 </div>
 
 <style>

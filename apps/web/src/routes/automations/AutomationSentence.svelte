@@ -109,7 +109,7 @@
 <section class="sentence" aria-label={w.label}>
   <form onsubmit={ask}>
     <label class="field-label" for="sentence-box">{w.label}</label>
-    <div class="row">
+    <div class="say-row">
       <div class="field field-lg">
         <input id="sentence-box" class="field-input" type="text" bind:value={text} placeholder={example} autocomplete="off" disabled={busy !== ''} aria-invalid={fix !== '' ? 'true' : undefined} aria-describedby={fix !== '' ? 'sentence-fix' : undefined} />
       </div>
@@ -154,28 +154,29 @@
     border-radius: var(--r-tile);
   }
 
-  .row {
+  /* NOT `.row`: the shared rows sheet pads every `.row` 12px at the start, which set the field in from its label. */
+  .say-row {
     display: flex;
     gap: var(--sp-2);
     align-items: center;
   }
 
-  .row :global(.field) {
+  .say-row :global(.field) {
     flex: 1;
     min-inline-size: 0;
   }
 
   /* ON A PHONE THE SENTENCE HAS THE WHOLE WIDTH, so its example is read to its end, and Read it is under it. */
   @media (width < 640px) {
-    .row {
+    .say-row {
       flex-wrap: wrap;
     }
 
-    .row :global(.field) {
+    .say-row :global(.field) {
       flex-basis: 100%;
     }
 
-    .row > :global(.btn) {
+    .say-row > :global(.btn) {
       flex: 1 1 100%;
     }
   }
@@ -202,7 +203,7 @@
     margin-block-start: 1px;
   }
 
-  .row :global(.field:has(input[aria-invalid='true'])) {
+  .say-row :global(.field:has(input[aria-invalid='true'])) {
     box-shadow: inset 0 0 0 1px var(--red);
   }
 
