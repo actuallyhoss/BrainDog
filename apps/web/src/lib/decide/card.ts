@@ -71,12 +71,7 @@ export const cardWords = {
   more: (n: number) => `and ${n} more, on its page`,
   /** Said to a screen reader before who asked, on the line over the question; the question's own page heads its side with it. */
   askedBy: 'Asked by',
-  /** The foot of a money row (today F4): who asked, never leading it. */
-  by: (name: string) => `Asked by ${name}`,
-  /* "BY CHASE LATE PAYMENTS", NOT "ASKED BY YOUR RULE CHASE LATE PAYMENTS" (T14): the rule's name says what asked. */
-  byRule: (name: string) => `By ${name}`,
-  byYou: 'Asked by you',
-  /** Said to a screen reader before a rule's name, where its glyph says it to the eye. */
+  /** Said to a screen reader before a rule's name, where its glyph says it to the eye (the money row's foot and the question page). */
   askedByRule: 'Asked by your rule',
   /** The name on a by-line where the reader asked it. */
   you: 'You',
