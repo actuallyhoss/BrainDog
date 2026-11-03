@@ -132,6 +132,18 @@ public final class AttachModel: Identifiable {
     /// Whether anything is left to send.
     public var hasWaiting: Bool { files.contains { if case .sent = $0.state { false } else { true } } }
 
+    /// The files a drop carried (Finder's, a Mail attachment's), read from their addresses; anything else is left.
+    public static func files(from providers: [NSItemProvider]) async -> [File] {
+        var out: [File] = []
+        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            guard let item = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) else { continue }
+            let url = (item as? URL) ?? (item as? Data).flatMap { URL(dataRepresentation: $0, relativeTo: nil) }
+            guard let url, url.isFileURL, !url.hasDirectoryPath, let file = File(url: url) else { continue }
+            out.append(file)
+        }
+        return out
+    }
+
     public func add(_ file: File) {
         guard !files.contains(where: { $0.name == file.name && $0.data == file.data }) else { return }
         files.append(file)
