@@ -117,8 +117,11 @@
       {#if status.connected}
         <!-- THE ACCOUNT AND WHEN IT LAST SYNCED, ONE LINE; then what that sync brought, as figures. -->
         <p class="account">
-          <Icon name="mail" size="s" /><span class="address">{status.email || w.yourAccount}</span>
-          {#if !status.broken}<span class="synced">{figures || !status.last ? synced : `${synced}: ${status.last.said}`}</span>{/if}
+          <Icon name="mail" size="s" />
+          <span class="who">
+            <span class="address">{status.email || w.yourAccount}</span>
+            {#if !status.broken}<span class="synced">{figures || !status.last ? synced : `${synced}: ${status.last.said}`}</span>{/if}
+          </span>
         </p>
         {#if status.broken}
           <p class="fault" role="status"><Icon name="alert" size="s" /><span>{status.broken}</span></p>
@@ -149,7 +152,7 @@
               {:else}
                 <Button size="sm" disabled={busy} onclick={() => void syncNow()}><Icon name="refresh" size="s" />{w.syncNow}</Button>
               {/if}
-              <Button size="sm" weight="bare" disabled={busy} aria-expanded={false} onclick={() => (asking = true)}>{w.disconnect}</Button>
+              <Button size="sm" weight="bare" disabled={busy} onclick={() => (asking = true)}>{w.disconnect}</Button>
             </div>
           {/if}
         {/if}
@@ -195,9 +198,8 @@
   /* THE ACCOUNT, ONE LINE: its glyph and its address, which may be long and breaks anywhere rather than past the card. */
   .account {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-1) var(--sp-2);
+    align-items: flex-start;
+    gap: var(--sp-2);
     min-inline-size: 0;
     color: var(--ink);
     font: var(--t-ui, 400 14px/20px var(--font-ui));
@@ -206,6 +208,7 @@
 
   .account :global(.icon) {
     flex: none;
+    margin-block-start: 2px;
     color: var(--ink-3);
   }
 
@@ -248,14 +251,18 @@
     line-height: var(--lead-meta);
   }
 
-  /* WHEN IT LAST SYNCED, AFTER THE ADDRESS: a quiet dot between them, and on its own line where the two do not fit. */
-  .synced {
-    font-weight: var(--fw-regular);
+  /* WHEN IT LAST SYNCED, AFTER THE ADDRESS, set apart by air and the quiet ink, and on its own line where the two do not
+     fit: no separator glyph to lead a wrapped line. */
+  .who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--sp-3);
+    min-inline-size: 0;
   }
 
-  .synced::before {
-    content: '·';
-    margin-inline-end: var(--sp-2);
+  .synced {
+    font-weight: var(--fw-regular);
   }
 
   .lede {
