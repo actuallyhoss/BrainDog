@@ -405,6 +405,18 @@
         "type": "string"
       },
       "description": "The places of yours it reads or changes, such as register.ledger. Each is shown to the person before they install."
+    },
+    "migrate": {
+      "description": "migrate: see braindog:grammar/pack for what it holds."
+    },
+    "tools": {
+      "description": "tools: see braindog:grammar/pack for what it holds."
+    },
+    "commands": {
+      "description": "commands: see braindog:grammar/pack for what it holds."
+    },
+    "row_actions": {
+      "description": "row_actions: see braindog:grammar/pack for what it holds."
     }
   }
 }
