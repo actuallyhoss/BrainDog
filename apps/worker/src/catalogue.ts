@@ -13,14 +13,15 @@
  */
 
 import { CATALOGUE_INDEX } from '@braindog/declare/catalogue';
-import { offersFromCatalogue, shelfFromCatalogue, type CatalogueReader } from '@braindog/record/catalogue-offers';
+import { ADVISORIES_FILE } from '@braindog/declare/kennel';
+import { noticesFromCatalogue, offersFromCatalogue, shelfFromCatalogue, type CatalogueReader } from '@braindog/record/catalogue-offers';
 
 import { kennelReader, type KennelBucket } from './kennel.ts';
 
 /** The part of the assets binding read here, so a test hands in a folder. */
 export type Assets = { fetch(request: Request): Promise<Response> };
 
-const PATH = /^(?:index\.json|usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.usecase\.json|packs\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.pack\.json)$/u;
+const PATH = /^(?:index\.json|advisories\.json|usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.usecase\.json|packs\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.pack\.json)$/u;
 
 /**
  * Where the build puts the catalogue: at the root, where the app is.
@@ -57,6 +58,7 @@ export function kennelCatalogueReader(deps: { assets?: Assets | undefined; blobs
   const kennel = kennelReader(deps);
   return async (path) => {
     if (!PATH.test(path)) return null;
+    if (path === ADVISORIES_FILE) return JSON.stringify(await kennel.advisories());
     return path === CATALOGUE_INDEX ? JSON.stringify(await kennel.index()) : kennel.file(path);
   };
 }
@@ -68,6 +70,12 @@ const kennelOf = (assets: Assets | undefined, blobs: KennelBucket | undefined) =
 export const workerCatalogueOffers = (assets: Assets | undefined, blobs?: KennelBucket) => {
   const read = kennelOf(assets, blobs);
   return read === undefined ? undefined : offersFromCatalogue(read);
+};
+
+/** What the Kennel and the bundled folder say of the add-ons a record holds: advisories and yanks, or none when neither is bound. */
+export const workerCatalogueNotices = (assets: Assets | undefined, blobs?: KennelBucket) => {
+  const read = kennelOf(assets, blobs);
+  return read === undefined ? undefined : noticesFromCatalogue(read);
 };
 
 /** The whole catalogue on the Worker, for the arranger (`RecordDeps.catalogueShelf`): the Kennel's and the bundled folder's, or none when neither is bound. */

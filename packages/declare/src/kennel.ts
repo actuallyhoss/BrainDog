@@ -48,8 +48,11 @@ import {
   type Preview,
   type Publisher,
 } from './catalogue.ts';
+import { lookalikes, reachAdded, readableFault, type ReviewMarks } from './kennel-review.ts';
 import { usesFault } from './uses.ts';
 import { isSignature, keyIdOf, REASON_MOST, revocationOf, rotatedFrom, verifiedStatements, verifySignature, type AuthorKey, type KeyStatements, type Signature } from './signing.ts';
+
+export * from './kennel-review.ts';
 
 /** Where every host answers the Kennel: under `/api/*`, which the site already forwards to the app. */
 export const KENNEL_BASE = '/api/kennel/v1/';
@@ -102,7 +105,7 @@ export type Pending = {
   entry: Omit<CatalogueEntry, 'latest' | 'versions'> & { publisher: Publisher };
   version: CatalogueVersion;
   submitted_at: string;
-};
+} & ReviewMarks;
 
 /** A submission the operator refused, kept so the next look at the review list says why. */
 export type Refused = { kind: EntryKind; id: string; version: string; publisher: Publisher; reason: string; at: string };
@@ -388,6 +391,10 @@ export async function acceptSubmission(state: KennelState, text: string, identit
     const unasked = usesFault(doc, true);
     if (unasked) return { ok: false, refusal: unasked };
   }
+  /* CODE A PERSON CAN READ, OR NOTHING (DESIGN.md §2, Raycast): the operator reviews a script by reading it, and so does a
+     person's agent on Decide, so a minified or packed one is refused here, before anything waits, with what gave it away. */
+  const packed = readableFault(doc);
+  if (packed) return { ok: false, refusal: packed };
   const { id, version, author } = subjectOf(file);
   if (state.bundled.entries.some((e) => e.id === id) || state.reserved.includes(installedIdOf({ kind: file.kind, id })))
     return no('PROVIDES_CONFLICT', `${id} is the id of one of BrainDog's own, which the Kennel keeps for it. Give this one another id.`, { at: file.kind });
@@ -477,10 +484,20 @@ export async function acceptSubmission(state: KennelState, text: string, identit
   const path = published.value.path;
   const waitsAt = pendingPath(path, listing.checksum);
   const answer = { kind: file.kind, id, version };
+  /* WHAT THE OPERATOR SHOULD LOOK AT TWICE: a name close to one listed, and what this version reaches that the one before
+     it did not. Neither refuses. */
+  const flags = lookalikes([state.bundled, state.index], id, entry.title);
+  const before = listed === null ? null : (listed.versions.find((v) => v.version === listed.latest)?.reach ?? null);
+  const added = reachAdded(before, listing.reach);
+  const marks: ReviewMarks = { ...(flags.length > 0 ? { flags } : {}), ...(added.length > 0 ? { added } : {}) };
   /* A TRUSTED FILE WAITS TOO, for as long as its index write takes: it is written under its checksum and copied to its
      listed path only once the index names it (`Change`), so a trusted submission that loses the race writes nothing a
      reader is served. */
-  if (trusted(state.publishers, entry.publisher))
+  /* A TRUSTED PUBLISHER LISTS AT ONCE ONLY A VERSION THAT REACHES NOTHING NEW AND LOOKS LIKE NO OTHER NAME (DESIGN.md
+     §4.1): its first version, and any that widens what it reaches, waits for a person like everybody's. The nightly probe
+     is the one exception, since its sign measures a listing that lands at once. */
+  const atOnce = probePublisher(state.publishers, entry.publisher) || (flags.length === 0 && added.length === 0);
+  if (trusted(state.publishers, entry.publisher) && atOnce)
     return ok({
       answer: { state: 'listed', ...answer },
       index: listIn(state.index, entry, listing),
@@ -493,7 +510,7 @@ export async function acceptSubmission(state: KennelState, text: string, identit
   const queued = state.review.pending.filter((p) => !listedAt(state.index, p.entry.kind, p.entry.id, p.version.version)).length;
   if (queued >= PENDING_MOST)
     return no('RATE_LIMITED', `${PENDING_MOST} submissions are waiting for review, which is as many as the Kennel holds. Submit it again in a day or two.`, { at: 'review' });
-  const pending: Pending = { entry, version: listing, submitted_at: now.toISOString() };
+  const pending: Pending = { entry, version: listing, submitted_at: now.toISOString(), ...marks };
   return ok({
     answer: { state: 'review', ...answer },
     index: null,
@@ -702,7 +719,7 @@ export const roundCount = (n: number): number | null => (Number.isFinite(n) ? (C
 
 /** What a request under `KENNEL_BASE` asks for, one reading for every host. */
 export type KennelAsk =
-  | { ask: 'index' | 'counts' | 'submit' | 'yank' | 'mine' | 'review' | 'verdict' | 'publisher' }
+  | { ask: 'index' | 'counts' | 'submit' | 'yank' | 'mine' | 'review' | 'verdict' | 'publisher' | 'advisories' | 'advise' | 'key' | 'report' }
   /** `path` is the file's path inside a catalogue, safe to join: every part was matched whole. */
   | { ask: 'file' | 'preview'; path: string; kind: EntryKind; id: string; version: string };
 
@@ -715,6 +732,8 @@ export function kennelAsk(method: string, pathname: string): KennelAsk | { wrong
   const rest = pathname.slice(KENNEL_BASE.length);
   const read = method === 'GET' || method === 'HEAD';
   if (rest === 'index.json' || rest === 'counts.json') return read ? { ask: rest === 'index.json' ? 'index' : 'counts' } : { wrong: 'method', allow: 'GET, HEAD' };
+  if (rest === 'advisories.json') return read ? { ask: 'advisories' } : { wrong: 'method', allow: 'GET, HEAD' };
+  if (rest === 'advise' || rest === 'key' || rest === 'report') return method === 'POST' ? { ask: rest } : { wrong: 'method', allow: 'POST' };
   const m = FILE.exec(rest);
   if (m) {
     const [, folder, id, version, shape] = m;

@@ -391,7 +391,8 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
        listed nothing, so an add-on published since the last deploy could not be opened anywhere before that deploy. The
        folder is on this disk, so nothing waits on the network. No gate asks for it: their sweeps measure the seed as it
        ships, and a gate's `/packs/browse` stays the empty store it has always measured. */
-    ...(catalogue ? { catalogue: CATALOGUE } : {}),
+    /* A FOLDER NAMED BY PATH IS SERVED IN ITS PLACE, so a walk can hold a catalogue of its own (the Kennel's advisories). */
+    ...(catalogue ? { catalogue: typeof catalogue === 'string' ? catalogue : CATALOGUE } : {}),
     ...(store === undefined ? {} : { keys: store }),
     /* THE STUB AND NOTHING ELSE. `openKey` is left to the host, so the key a script sends is the one this store opens. */
     ...(outside === undefined ? {} : { actions: { send: toOutside(outside), resolve: PUBLIC } }),
@@ -487,6 +488,9 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
   /* THE HANDLE IS ALSO WHAT `openPage` AND `routesFor` READ (`recordAt`): the base, the clock, a read and a setting. */
   return {
     ...recordAt(base),
+    /* THE RECORD ITSELF, for a walk that acts as its owner without a door (an e2e script). No gate reads it. */
+    api: running.api,
+    kernel: running.api.kernel,
     variants: Object.fromEntries(others.map((o) => [o.name, o.record.base])),
     close: async () => {
       for (const o of others) await o.record.close();

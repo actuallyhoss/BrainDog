@@ -22,7 +22,7 @@ import { join } from 'node:path';
 import { env } from 'node:process';
 
 import { readCatalogue, type CatalogueIndex } from '@braindog/declare/catalogue';
-import { DEFAULT_KENNEL, KENNEL_BASE, kennelAsk, mergeIndexes } from '@braindog/declare/kennel';
+import { ADVISORIES_FILE, DEFAULT_KENNEL, KENNEL_BASE, kennelAsk, mergeAdvisories, mergeIndexes, readAdvisories, type Advisories } from '@braindog/declare/kennel';
 import { listedEntries } from '@braindog/declare/catalogue';
 
 import type { Answer } from './catalogue.ts';
@@ -196,13 +196,32 @@ async function mergedIndex(folder: string | undefined, base: string | null, deps
   return mergeIndexes(catalogueIn(local(folder, 'index.json')), theirs);
 }
 
+/** An advisories file's text read as one, or `null`. */
+function advisoriesIn(text: string | null): Advisories | null {
+  if (text === null) return null;
+  try {
+    return readAdvisories(JSON.parse(text) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The folder's advisories and the public Kennel's merged, the folder's first: what a record is told about the add-ons
+ * it holds (DESIGN.md §8). Kept as the index is kept, so the kill switch reaches a self-host on its next index read.
+ */
+async function mergedAdvisories(folder: string | undefined, base: string | null, deps: KennelDeps): Promise<Advisories> {
+  const theirs = base === null ? null : advisoriesIn(await keptText(deps, `${base}${ADVISORIES_FILE}`, (text) => advisoriesIn(text) !== null));
+  return mergeAdvisories(advisoriesIn(local(folder, ADVISORIES_FILE)), theirs);
+}
+
 /** A published file or preview by a path matched whole: the folder's, then the public Kennel's, or `null`. */
 async function fileFrom(folder: string | undefined, base: string | null, deps: KennelDeps, path: string): Promise<string | null> {
   return local(folder, path) ?? (base === null ? null : await fetched(deps, `${base}${path}`, KENNEL_FILE_MOST_BYTES));
 }
 
 /** What `kennelReader` answers: the merged index, and a file by its catalogue path. */
-export type KennelReader = { index(): Promise<CatalogueIndex>; file(path: string): Promise<string | null> };
+export type KennelReader = { index(): Promise<CatalogueIndex>; file(path: string): Promise<string | null>; advisories(): Promise<Advisories> };
 
 /**
  * The Kennel read the way this host installs from it, the self-host's side of the Worker's `kennelReader`
@@ -226,6 +245,10 @@ export function kennelReader(folder: string | undefined, deps?: KennelDeps): Ken
     file: (path) => {
       const { d, base } = bound();
       return fileFrom(folder, base, d, path);
+    },
+    advisories: () => {
+      const { d, base } = bound();
+      return mergedAdvisories(folder, base, d);
     },
   };
 }
@@ -276,10 +299,14 @@ export async function kennelAnswer(method: string, pathname: string, folder: str
         return refused(404, 'ROUTE_UNKNOWN', `This BrainDog holds no ${asked.path}, and ${base === null ? 'it reads no Kennel' : 'the Kennel did not answer for it'}.`);
       return { status: 200, headers: asked.ask === 'file' ? KEPT : READ, body: text };
     }
-    case 'mine':
+    case 'advisories':
+      return { status: 200, headers: READ, body: JSON.stringify(await mergedAdvisories(folder, base, deps)) };
     case 'submit':
     case 'yank':
     case 'mine':
+    case 'advise':
+    case 'key':
+    case 'report':
     case 'review':
     case 'verdict':
     case 'publisher':
