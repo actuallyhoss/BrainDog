@@ -492,8 +492,11 @@
     grid-template-columns: auto minmax(0, 1fr) auto auto;
   }
 
+  /* ITS 28 WELL CENTRED ON THE TITLE'S 20 LINE, giving the 8 back, so the line under the title stays 2 under it and not
+     10, which the well's height had made the first row (cleanup, 3 Nov: Work's rows on a phone). */
   .list > .item > .item-more {
     grid-area: more;
+    margin-block: calc((var(--lead-ui, 20px) - 28px) / 2);
   }
 
   .list > .item > :is(.item-detail, .item-meta, .item-state):empty {
