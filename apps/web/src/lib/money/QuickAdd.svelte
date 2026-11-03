@@ -712,9 +712,9 @@
   .qa-cat {
     display: grid;
     justify-items: center;
-    gap: 6px;
+    gap: var(--sp-1);
     min-inline-size: 0;
-    padding: 9px 3px 8px;
+    padding: var(--sp-2) var(--sp-1);
     border: 1px solid var(--rule);
     border-radius: var(--r-pop);
     background: none;
@@ -724,7 +724,7 @@
   }
 
   .qa-cat[data-on] {
-    padding: 8px 2px 7px;
+    padding: calc(var(--sp-2) - 1px) calc(var(--sp-1) - 1px);
     border: 2px solid var(--ink);
     color: var(--ink);
     font-weight: var(--fw-semi);

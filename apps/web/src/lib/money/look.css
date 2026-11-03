@@ -2298,3 +2298,85 @@
   padding-block-start: var(--sp-1);
   line-height: var(--lead-meta);
 }
+
+/* ACCOUNTS' CARDS: a group's name 8 over its cards (was 4, and 8 of its own above it under the head), a group after
+   another 24 down, nothing under the last; each card 16 in on every side (was 12 by 16) at a radius of 12, the card's
+   16 less a step, and its lines on their line boxes: name 15/20, balance 22/26, the rest 12.5/18. */
+[data-money] .block-slot > .document:has(+ .block[data-kind='cards']) p {
+  margin-block: 0 var(--sp-2);
+  line-height: var(--lead-meta);
+}
+
+[data-money] .block-slot > .block[data-kind='cards'] + .document:has(+ .block[data-kind='cards']) p {
+  margin-block-start: var(--sp-5);
+}
+
+[data-money] .cards-grid {
+  margin-block-end: 0;
+}
+
+[data-money] .cards-item {
+  padding: var(--sp-4);
+  border-radius: var(--r-field, 12px);
+}
+
+[data-money] .cards-item .cards-title {
+  line-height: var(--lead-row);
+}
+
+[data-money] .cards-item .cards-value {
+  line-height: var(--lead-figure);
+}
+
+[data-money] .cards-item :is(.cards-when, .cards-label, .cards-fact) {
+  line-height: var(--lead-meta);
+}
+
+[data-money] .cards-item .cards-facts {
+  row-gap: var(--sp-1);
+}
+
+/* ON A PHONE THE ACCOUNTS ARE ROWS TOLD APART BY AIR, as every list's rows are: 12 above and below, no hairline. */
+@media (width < 640px) {
+  [data-money] .cards-item {
+    padding-block: var(--sp-3);
+  }
+
+  [data-money] .cards-item + .cards-item {
+    border-block-start: 0;
+  }
+}
+
+/* A BILL OR INVOICE ROW (Bills and invoices, Coming up's foot): its name and amount on the UI line, its day and who on
+   the meta line, 2 between. */
+[data-money] .list[data-kind='todo'] > .item {
+  row-gap: var(--row-stack);
+  line-height: var(--lead-ui);
+}
+
+[data-money] .list[data-kind='todo'] > .item > :is(.item-title, .item-detail) {
+  line-height: var(--lead-ui);
+}
+
+[data-money] .list[data-kind='todo'] > .item > :is(.item-meta, .item-under) {
+  line-height: var(--lead-meta);
+}
+
+/* A RING'S LEGEND (Reports, Spending by category): each part on the control line, its share on the meta line. */
+[data-money] .split-item > :is(.split-label, .split-value) {
+  line-height: var(--lead-ctl);
+}
+
+[data-money] .split-item > .split-share {
+  line-height: var(--lead-meta);
+}
+
+[data-money] .list[data-kind='todo'] > .item > :is(.item-detail, .item-meta) {
+  margin-block-start: 0;
+}
+
+/* Its menu is a 28 control on an 18 line: it overhangs the line by 5 each side rather than making the row 10 taller,
+   so the row is title 20, 2, meta 18 and 8 round them (56, `--row-h-2`). */
+[data-money] .list[data-kind='todo'] > .item > .item-more {
+  margin-block: calc((var(--lead-meta) - var(--ctl-panel)) / 2);
+}
