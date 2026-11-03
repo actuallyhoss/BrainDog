@@ -70,7 +70,8 @@ const MARK_NEAREST = `- Call \`pagesCensus\`. For each project whose page headin
 
 const AFTER_AN_IMPORT = AFTER_AN_IMPORT_1.replace(MARK_CLEARED, MARK_NEAREST);
 
-const KEEP_A_RECORD_CURRENT = `# Keep a record current
+/** Version 1 of Keep a record current, kept for `was`: it called what is on offer an add-on. */
+const KEEP_A_RECORD_CURRENT_1 = `# Keep a record current
 
 Use this skill when a session starts and \`context\` shows a red sign, to offer the owner what would cure it, in one question.
 
@@ -82,6 +83,11 @@ Use this skill when a session starts and \`context\` shows a red sign, to offer 
 6. Call \`propose\` once, with \`body_kind\` \`arrange\`, the cause \`setup\`, and a question that names what it keeps current, such as "Keep this BrainDog's money current?".
 7. Change nothing yourself. The owner decides in BrainDog.
 `;
+
+/**
+ * VERSION 2 says plugin where version 1 said add-on, as the app calls them since 3 Nov. Nothing else moved.
+ */
+const KEEP_A_RECORD_CURRENT = KEEP_A_RECORD_CURRENT_1.replace('A cure is an add-on whose', 'A cure is a plugin whose').replace('arrangement: an add-on to install', 'arrangement: a plugin to install');
 
 /** The skills the agents add-on ships, in the order Slash offers them. */
 export const AGENTS_SKILLS: readonly ShippedSkill[] = [
@@ -98,6 +104,7 @@ export const AGENTS_SKILLS: readonly ShippedSkill[] = [
     trigger: 'when a session starts and a sign is red, to offer what would cure it in one question',
     what: 'Reads the signs and what is on offer, and files one question that cures what is red.',
     body: KEEP_A_RECORD_CURRENT,
-    rev: 1,
+    rev: 2,
+    was: [KEEP_A_RECORD_CURRENT_1],
   },
 ];

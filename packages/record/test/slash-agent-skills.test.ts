@@ -65,7 +65,7 @@ test('A FRESH RECORD WITH AGENTS ON is offered both skills the first night, in o
 
   value(await api.decide({ id: asked[0]!.id, decide: { option: 'accept', reason: 'yes' } }, owner));
   const held = skillsOf(sql);
-  assert.deepEqual(held.map((s) => [s.name, s.rev, s.managed]), [['after-an-import', 2, true], ['keep-a-record-current', 1, true]]);
+  assert.deepEqual(held.map((s) => [s.name, s.rev, s.managed]), [['after-an-import', 2, true], ['keep-a-record-current', 2, true]]);
   for (const s of held) assert.equal(s.body, AGENTS_SKILLS.find((x) => x.name === s.name)!.body);
   sql.close();
 });
@@ -99,7 +99,7 @@ test('A NEWER TEXT reaches a skill the record wrote and nobody changed, as its n
   assert.equal(next.kernel.question(asked[0]!.id), 'Take version 3 of the skill after-an-import? The Agents plugin ships a newer text, and yours is still version 2 as it came.');
   value(await next.decide({ id: asked[0]!.id, decide: { option: 'accept', reason: 'yes' } }, owner));
   const held = skillsOf(sql);
-  assert.deepEqual(held.map((s) => [s.name, s.rev]), [['after-an-import', 3], ['keep-a-record-current', 1]]);
+  assert.deepEqual(held.map((s) => [s.name, s.rev]), [['after-an-import', 3], ['keep-a-record-current', 2]]);
   assert.match(held[0]!.body, /One more step\.\n$/u);
   assert.equal(held[1]!.body, 'My own steps.');
   sql.close();
@@ -148,7 +148,7 @@ test('ONLY WHAT IS MISSING is offered, and a record that keeps no skills is offe
   const one = noticeUsage(usage(['after-an-import']), AGENTS);
   assert.equal(one.noticed.find((n) => n.kind === 'skills')?.text, 'The Agents plugin ships a skill for agents that you do not have in Skills yet: keep-a-record-current.');
   assert.deepEqual(one.drafts.map((d) => d.question), ['Give your agents the skill keep-a-record-current? The Agents plugin ships it, and Skills has none by that name yet.']);
-  assert.deepEqual((one.drafts[0]!.body.rows as { managed: boolean; rev: number }[]).map((r) => [r.managed, r.rev]), [[true, 1]]);
+  assert.deepEqual((one.drafts[0]!.body.rows as { managed: boolean; rev: number }[]).map((r) => [r.managed, r.rev]), [[true, 2]]);
   assert.equal(noticeUsage(usage(['after-an-import', 'keep-a-record-current']), AGENTS).drafts.length, 0);
   assert.equal(noticeUsage({ ...usage([]), skills: null }, AGENTS).drafts.length, 0);
   /* AND THE SAME VERSION, OR A TEXT THE ADD-ON NEVER SHIPPED, IS NO NEWER TEXT. */
