@@ -46,7 +46,8 @@
     pushRefused: 'Notifications are off for BrainDog. Turn them on in the device’s Settings, under Notifications.',
     /* A SELF-HOST RINGS NO PHONE AND NO BROWSER (selfhost lane, 2 Nov): push goes out through BrainDog Cloud's keys, so this
        area drew nothing at all there and a colleague waited for a ring that never came. Said once, with where news lands. */
-    selfPushLine: 'This BrainDog runs on its own server, so it can’t ring phones or browsers. Anything handed to you or mentioning you waits in the bell and in Needs you.',
+    /* ONE LINE (ui pass, 3 Nov): it was two, a paragraph explaining the server before saying where news waits. */
+    selfPushLine: 'This server can’t ring phones or browsers. What’s for you waits in the bell and in Needs you.',
   } as const;
 
   /**

@@ -348,6 +348,8 @@
     link?.focus();
   }
   const outCount = $derived(hiddenRows.length + others.length);
+  /** How many pages the fold holds, its row's title. */
+  const foldCount = $derived(others.length - othersShown.length);
   /* WHAT THE FOLD HOLDS, BY KIND: "Pages of 30 projects, 8 people and every agent run", never "1047 more pages". */
   const foldLine = $derived.by(() => {
     const drawn = new Set(othersShown.map((p) => p.href));
@@ -634,7 +636,13 @@
             <li class="page-row page-fold">
               <button type="button" class="line fold-line" onclick={() => (unfolded = true)}>
                 <span class="line-mark"><IconWell name="doc" size="l" /></span>
-                <span class="line-main"><span class="line-title">{foldLine}</span></span>
+                <!-- A COUNT FOR A TITLE AND THE KINDS AS ITS LINE (ui pass, 3 Nov): the whole sentence was the title, cut off
+                     mid-list at the row's end. -->
+                <span class="line-main"
+                  ><span class="line-title">{foldCount === 1 ? '1 more page' : `${foldCount} more pages`}</span><span class="line-detail fold-kinds"
+                    >{foldLine}</span
+                  ></span
+                >
                 <span class="line-amount"></span>
                 <span class="line-when fold-go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
               </button>
@@ -1005,5 +1013,13 @@
       min-inline-size: 0;
       max-inline-size: 12rem;
     }
+  }
+
+  /* THE FOLD'S KINDS ON ONE LINE UNDER ITS COUNT, cut with an ellipsis rather than wrapping the row tall. */
+  .fold-kinds {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

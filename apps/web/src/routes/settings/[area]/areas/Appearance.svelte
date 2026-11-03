@@ -60,11 +60,14 @@
 
   /* THIS AREA'S OWN WORDS, the ones the copy modules do not already hold. */
   const words = {
-    looks: 'How it looks',
-    /* PER RECORD, by the record's name: the look is kept in each record a person opens, not once for the whole account. */
-    hint: (record: string) => (record ? `Kept in ${record}, on all your devices.` : 'Kept in this BrainDog, on all your devices.'),
-    hintPending: 'On this device until the record hears of it.',
-    hintDevice: 'Kept on this device.',
+    /* "YOURS", NOT "HOW IT LOOKS" (ui pass, 3 Nov): the card took its group's name, under a page named Appearance, over a
+       fold named "How your BrainDog looks". It holds the person's own choices; the fold holds everybody's. */
+    looks: 'Yours',
+    /* WHERE IT IS KEPT, AT THE HEAD'S END, where it was a line of its own over the choices. Per record: the look is kept
+       in each record a person opens, not once for the whole account. */
+    hint: 'On all your devices',
+    hintPending: 'On this device for now',
+    hintDevice: 'On this device',
     /* THE PREVIEW'S SENTENCE, with its one phrase that needs the person in red, as a page's headline draws it. */
     /* THE REAL COUNT, the one the badge says, so the preview never contradicts the bar beside it. */
     said: (n: number) => (n === 0 ? 'Nothing needs you today.' : `${n} need${n === 1 ? 's' : ''} you today.`),
@@ -334,9 +337,8 @@
   alone, and the People matrix cites that rule and gets it right, which is the tell: the fix
   was known, written down, and applied to one group.
 -->
-<Tile icon="sun" class="section" data-surface="tile" title={words.looks}>
+<Tile icon="sun" class="section" data-surface="tile" title={words.looks} meta={kept === 'record' ? words.hint : kept === 'pending' ? words.hintPending : words.hintDevice}>
   <div class="section-body looks-host">
-    <p class="hint">{kept === 'record' ? words.hint(props.shell.index.name) : kept === 'pending' ? words.hintPending : words.hintDevice}</p>
     <div class="looks">
       <div class="choices">
         <div class="choice">
@@ -527,9 +529,11 @@
   THE RECORD'S LOOK, which is everybody's, under the person's own choices, which are theirs alone (`21 §6`).
   The editor is its own component with its own styles, because this file's style block is the device choices'.
 -->
+<!-- THE FOLD'S NAME IS THE CARD'S (ui pass, 3 Nov): open, it read "How your BrainDog looks" twice, the summary over a card
+     headed the same. -->
 <details class="more record-look">
   <summary>{copy.lookTitle}</summary>
-<Tile icon="eye" class="section" data-surface="tile" title={copy.lookTitle}>
+<Tile class="section" data-surface="tile">
   <div class="section-body">
     <p class="hint">{copy.lookHint}</p>
     <LookEditor {owner} {staged} />
