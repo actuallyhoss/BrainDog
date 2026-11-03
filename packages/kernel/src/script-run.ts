@@ -130,7 +130,7 @@ export type ScriptRunDeps = Pick<ActionDeps, 'sql' | 'recordId' | 'nowMs' | 'min
    * One notice a run sent (`ctx.notify`), routed as an `active` notice: the note always, one push an hour, nothing inside
    * quiet hours (`digest.ts` `notify`). Absent, a run that notified is refused `NOT_IN_THIS_BUILD`, writing nothing.
    */
-  tell?: (said: { actor: string; say: string }) => void;
+  tell?: (said: { actor: string; say: string; pack?: string | null | undefined }) => void;
 };
 
 /** How many refused runs in a row pause a script. Design section 2, point 8. */

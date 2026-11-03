@@ -90,7 +90,7 @@ export function applyNotices(
   run: { script: string; pack?: string | null | undefined; actor: string },
   handed: unknown,
   nowMs: number,
-  tell: ((said: { actor: string; say: string }) => void) | undefined,
+  tell: ((said: { actor: string; say: string; pack?: string | null | undefined }) => void) | undefined,
 ): Result<number> {
   const list = handed === undefined || handed === null ? [] : handed;
   if (!Array.isArray(list)) return no('VALUE_MALFORMED', 'What it notified is not a list of notices.', { at: 'notices' });
@@ -105,7 +105,8 @@ export function applyNotices(
       const r = 'refusal' in one ? one.refusal : { code: 'VALUE_MALFORMED', fix: 'it is not a notice.' };
       return no(r.code, `Notice ${i + 1}: ${r.fix}`, { at: 'notices' });
     }
-    tell({ actor: run.actor, say: noticeSaid(one.value) });
+    /* WITH ITS ADD-ON, so the note on the bell and the push open the add-on's page and not the record's home. */
+    tell({ actor: run.actor, say: noticeSaid(one.value), pack: run.pack ?? null });
   }
   return ok(list.length);
 }
@@ -198,6 +199,18 @@ export function binStore(sql: Sql, owner: string, nowMs: number): number {
   sql.exec('DELETE FROM pref WHERE person_id = ?', to);
   const n = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM pref WHERE person_id = ?', from)?.n ?? 0);
   sql.exec('UPDATE pref SET person_id = ?, updated_at = ? WHERE person_id = ?', to, instant(nowMs), from);
+  return n;
+}
+
+/**
+ * BINNED STORES PAST THE WINDOW GO FOR GOOD, in the hourly sweep beside the bin's rows: every key under an
+ * `addon-binned:` holder last stamped before `cutoffMs`. Answers how many keys went. Installing the add-on again after that
+ * finds nothing to put back, as its rows.
+ */
+export function purgeBinnedStores(sql: Sql, cutoffMs: number): number {
+  const before = instant(cutoffMs);
+  const n = Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM pref WHERE person_id LIKE 'addon-binned:%' AND updated_at < ?", before)?.n ?? 0);
+  if (n > 0) sql.exec("DELETE FROM pref WHERE person_id LIKE 'addon-binned:%' AND updated_at < ?", before);
   return n;
 }
 

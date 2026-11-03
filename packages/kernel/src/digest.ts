@@ -819,16 +819,19 @@ export function mutedFor(line: { kind: string; actor: string; field: string | nu
 }
 
 /** An in-app note, as the event that IS the notification. */
-export function noteEvent(sql: Sql, mint: () => string, nowMs: number, actor: string, text: string, urgent = false): void {
+export function noteEvent(sql: Sql, mint: () => string, nowMs: number, actor: string, text: string, urgent = false, about?: { target: string; target_kind: string }): void {
   /* A DIGEST'S PROSE IS WRITTEN BY SLASH and its note is not a `note` a model may sign. `prose:
      slash` is the one declaration that puts a model's sentences into a digest, and if the actor of
      that note were ever the model rather than the record, this is where it would land. */
   slashMayWrite(actor, 'note');
   sql.exec(
-    "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, note) VALUES (?, ?, ?, 'note', NULL, NULL, ?, ?)",
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, note) VALUES (?, ?, ?, 'note', ?, ?, ?, ?)",
     mint(),
     instant(nowMs),
     actor,
+    /* WHAT IT IS ABOUT, when a caller says: an add-on's notice names its add-on, so the bell opens its page. */
+    about?.target ?? null,
+    about?.target_kind ?? null,
     urgent ? URGENT_NOTE : null,
     text.slice(0, 280),
   );

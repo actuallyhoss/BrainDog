@@ -64,9 +64,9 @@ export const pushKindIn = (v: unknown): PushKind | null => ((PUSH_KINDS as reado
  * characters, and short. Anything else is no path, so a push that names one opens the record's home, as every push did
  * before. A digest opens its summary's screen, `/agents/summary/<id>`. `/decide/sg_01J...`, `/p/agents`, `/r/tasks/e_9`.
  * `p` IS A PAGE, `/p/agents` among them: `tellFinished` has always sent a finished instruction there, and without `p` here
- * that path was dropped and the tap opened Today.
+ * that path was dropped and the tap opened Today. `addons` IS AN ADD-ON'S OWN PAGE, which its notices open (`ctx.notify`).
  */
-export const PUSH_OPEN = /^\/(?:decide|agents|inbox|r|p)(?:\/[A-Za-z0-9_-]{1,64}){0,3}$/u;
+export const PUSH_OPEN = /^\/(?:decide|agents|inbox|r|p|addons)(?:\/[A-Za-z0-9_-]{1,64}){0,3}$/u;
 export const pushOpenOf = (url: unknown): string | null => (typeof url === 'string' && PUSH_OPEN.test(url) ? url : null);
 
 /** What one delivery found: the ids the service accepted, and the ids it answered 404 or 410 for. */

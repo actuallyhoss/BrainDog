@@ -245,7 +245,7 @@ import { analyse, observe, type Analysis, type Observation } from './observe.ts'
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { firstSlotMs } from './slot.ts';
 import { activeScript, clockOfScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
-import { binStore, noticesLeft, restoreStore, storeOf } from './addon-state.ts';
+import { binStore, noticesLeft, purgeBinnedStores, restoreStore, storeOf } from './addon-state.ts';
 import { finishScript, prepareScript, resumeScript, tryProposal, type ScriptProposal, type ScriptProposed, type ScriptRunDeps, type ScriptRunner } from './script-run.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
 import { extractPull, type ExtractDecl, type ExtractDeps, type Extraction } from './extract.ts';
@@ -9407,7 +9407,15 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     propose: (p, actor) => openSuggestion(governDeps(), actor, p),
     /* A NOTICE FROM A SCRIPT (`ctx.notify`) IS AN ACTIVE ONE: the note on the bell always, one push an hour, and nothing
        that sounds inside quiet hours, which `digestDeps` hands `notify` as the record's own window. */
-    tell: (said) => notify(digestDeps(), { actor: said.actor, say: said.say, level: 'active' }),
+    /* AND IT OPENS ITS ADD-ON'S PAGE, `/addons/<id>`: the note names the add-on (`target_kind: 'pack'`), and the push opens there. */
+    tell: (said) => {
+      const pack = typeof said.pack === 'string' && said.pack !== '' ? said.pack : null;
+      const deps = digestDeps();
+      notify(
+        pack === null ? deps : { ...deps, note: (actor, text, urgent) => noteEvent(sql, mint, clock.now(), actor, text, urgent, { target: pack, target_kind: 'pack' }) },
+        { actor: said.actor, say: said.say, level: 'active', ...(pack === null ? {} : { url: `/addons/${pack}` }) },
+      );
+    },
   });
 
   /**
@@ -9759,6 +9767,8 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     transaction(() => sweepJobs(tokenDeps()));
     /* AND THE DOOR'S MARKS once thirty days old, which no sign reads any more (`door.ts`). */
     transaction(() => sweepDoorMarks(sql, clock.now()));
+    /* AND AN ADD-ON'S STORE REMOVED WITH ITS DATA, once past the window its rows are kept for (`purgeBinnedStores`). */
+    transaction(() => purgeBinnedStores(sql, clock.now() - REMOVED_WINDOW_DAYS * 86_400_000));
     rulesAboutTime();
     figuresWatched();
     /* A FINISHED AUTOMATION RUN IS KEPT NINETY DAYS, and its metered event after that: one line per run, as §4.5 asks.
