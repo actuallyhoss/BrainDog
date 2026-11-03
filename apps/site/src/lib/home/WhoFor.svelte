@@ -161,7 +161,7 @@
   .fig b {
     color: var(--ink);
     font: 600 28px/1 var(--head);
-    letter-spacing: -0.035em;
+    letter-spacing: -0.024em;
   }
 
   /* THE TERMINAL IS A DRAWING OF ONE, so it keeps the night's ground inside the plain tile. */

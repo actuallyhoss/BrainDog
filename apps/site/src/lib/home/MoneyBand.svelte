@@ -137,7 +137,7 @@
 
   .wfig {
     font: 600 34px/40px var(--head);
-    letter-spacing: -0.035em;
+    letter-spacing: -0.024em;
   }
 
   .wsay {

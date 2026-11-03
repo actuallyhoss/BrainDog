@@ -260,7 +260,7 @@
   .drawing-title {
     font-size: var(--t-site-28);
     line-height: 1.1;
-    letter-spacing: -0.035em;
+    letter-spacing: -0.024em;
   }
 
   .note {
@@ -317,7 +317,7 @@
     gap: 10px;
     font-size: var(--t-site-21);
     line-height: 1.2;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.021em;
   }
 
   .count {

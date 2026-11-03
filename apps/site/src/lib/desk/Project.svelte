@@ -90,7 +90,7 @@
   .phead h3 {
     margin: 0;
     font: 600 23px/1.1 var(--head);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.021em;
   }
 
   .phead .sub {

@@ -171,7 +171,7 @@
   .greet {
     margin: 4px 2px 16px;
     font: 600 28px/1.15 var(--head);
-    letter-spacing: -0.035em;
+    letter-spacing: -0.024em;
   }
 
   /* THE BOARD: one twelve-column grid, each widget at its own width as the app's packer lays them (`lib/board/pack.ts`). */
@@ -500,7 +500,7 @@
 
   .pbig {
     font: 600 28px/34px var(--head);
-    letter-spacing: -0.035em;
+    letter-spacing: -0.024em;
     font-variant-numeric: tabular-nums;
   }
 

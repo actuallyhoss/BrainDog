@@ -153,7 +153,7 @@
     font-size: var(--t-feature);
     font-weight: 600;
     line-height: 1.2;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.021em;
     text-wrap: balance;
     scroll-margin-block-start: 24px;
   }
