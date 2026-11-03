@@ -75,9 +75,9 @@ export const kindName = (kind: string): string => KIND_NAMES[kind] ?? kind.charA
 /** The three steps of how far an agent may go, as the segmented control and the row's end say them. */
 export const LEVEL_WORDS: Readonly<Record<Ceiling, string>> = { read: 'Read', propose: 'Suggest', write: 'Write' };
 
-/** What each step means, under the control. */
+/** What each step means, under the control: one short line. */
 export const LEVEL_LINES: Readonly<Record<Ceiling, string>> = {
-  read: 'It reads and changes nothing. Anything it tries to change is refused.',
+  read: 'It reads and changes nothing.',
   propose: 'Every change it wants waits for you in Needs you.',
   write: 'It makes changes itself. Money, keys and deletes still wait for you.',
 };
@@ -108,10 +108,12 @@ export const BUDGET_WORDS: Readonly<Record<ContextBudget, string>> = { 400: 'Sho
 
 /** On finish, as the segmented control says it. */
 export const NOTIFY_WORDS: Readonly<Record<ProfileNotify['on'], string>> = { off: 'Never', told: 'When told', long: 'Long runs' };
+/* EACH SAYS WHAT THE CHOSEN SEGMENT LEAVES OUT, never the segment again ("When told" over "When it finishes something
+   you told it to do"). */
 export const NOTIFY_LINES: Readonly<Record<ProfileNotify['on'], string>> = {
-  off: 'It never tells you. Its work is on the Agents page.',
-  told: 'When it finishes something you told it to do.',
-  long: 'When a run goes on past the minutes you set.',
+  off: 'Its work still shows on the Agents page.',
+  told: 'Only for work you asked it to do.',
+  long: 'When a run goes past the minutes you set.',
 };
 export const NOTIFY_BY_WORDS: Readonly<Record<ProfileNotify['by'], string>> = { push: 'A notification', needs_you: 'Needs you only' };
 

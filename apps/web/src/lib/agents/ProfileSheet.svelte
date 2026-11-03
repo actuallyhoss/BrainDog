@@ -142,6 +142,23 @@
     return `Applies to any app that says it is ${who}.`;
   });
 
+  /* WHAT APPLIES TO IT NOW, ONE SHORT LINE (UI pass, 3 Nov): it was a sentence on matching ("Applies to any app that
+     says it is Claude Code", which the page's name already says) over a second on keys. A page says the one that
+     matters: what holds until he saves, else what the row is bound to. */
+  const note = $derived.by((): string => {
+    if (!row) return '';
+    if (isDefault && (followers.length > 0 || keepers.length > 0)) {
+      const kept = keepers.length > 0 ? `${LIST.format(keepers)} ${keepers.length === 1 ? 'keeps its' : 'keep their'} current settings.` : '';
+      const apply = followers.length > 0 ? `These apply to ${LIST.format(followers)}.` : '';
+      return [kept, apply].filter(Boolean).join(' ');
+    }
+    if (row.follows === 'defaults') return 'It follows Defaults for new agents until you save here.';
+    if (row.follows === 'key') return 'Nothing set yet, so it does what its key allows.';
+    if (row.follows === 'kind') return `It follows ${kindName(row.kind ?? 'other')} until you save here.`;
+    return '';
+  });
+  const lead = $derived(note || (row?.applies === 'name' && !isDefault ? '' : (subtitle ?? '')));
+
   /* WHAT IS PICKED: a project by its spoken name, matched on anything a stored row may hold. */
   const hasPlace = (p: Place): boolean => (d.projects ?? []).some((q) => q === p.spoken || q === p.id || q.toLowerCase() === p.name.toLowerCase());
   const togglePlace = (p: Place) => {
@@ -209,7 +226,8 @@
   <Button weight="primary" disabled={saving} onclick={() => void save()}>Save</Button>
 {/snippet}
 
-<!-- A PART'S HEADING: on a page, the tile's heading row (a neutral well, the title at 15/600); in the sheet, the title. -->
+<!-- A PART'S HEADING: on a page, the one card head (a bare 18px glyph in quiet ink, the name at 14/20 600, a 28 row);
+     in the sheet, the title. -->
 {#snippet head(id: string, icon: IconName, text: string, label = false)}
   {#if page}
     <div class="part-head"><IconWell name={icon} size="m" /><h2 class="part-title" {id}>{#if label}<label for="{ids}-brief-text">{text}</label>{:else}{text}{/if}</h2></div>
@@ -221,7 +239,7 @@
 {#if page}
   <div class="prof-page" data-agent-page={row?.key ?? ''}>
     {#if row}
-      {#if subtitle}<p class="pf-sub">{subtitle}</p>{/if}
+      {#if lead}<p class="pf-sub">{lead}</p>{/if}
       {@render body(row)}
       <div class="pf-foot">{@render foot()}</div>
     {/if}
@@ -234,20 +252,10 @@
 
 {#snippet body(row: AgentRow)}
     <div class="prof" data-profile-sheet={row.key} data-page={page ? '' : undefined} bind:this={root}>
-      {#if isDefault && (followers.length > 0 || keepers.length > 0)}
-        <p class="pf-note">
-          {#if keepers.length > 0}{LIST.format(keepers)} {keepers.length === 1 ? 'keeps' : 'keep'} what {keepers.length === 1 ? 'it has' : 'they have'} now: saving gives {keepers.length === 1 ? 'it settings of its own' : 'each settings of its own'} first.{/if}
-          {#if followers.length > 0}{LIST.format(followers)} {followers.length === 1 ? 'has' : 'have'} no settings of {followers.length === 1 ? 'its' : 'their'} own, so these apply to {followers.length === 1 ? 'it' : 'them'}.{/if}
-        </p>
-      {:else if row.follows === 'defaults'}
-        <p class="pf-note">It follows Defaults for new agents now. Saving here gives it settings of its own.</p>
-      {:else if row.follows === 'key'}
-        <p class="pf-note">Nothing is set for it yet, so its key decides. Write here means as far as its key allows.</p>
-      {:else if row.follows === 'kind'}
-        <p class="pf-note">It follows {kindName(row.kind ?? 'other')} now. Saving here gives this profile settings of its own.</p>
-      {/if}
+      <!-- IN A SHEET THE NOTE SITS IN THE BODY under the sheet's own subtitle; a page says it once, above the parts. -->
+      {#if !page && note}<p class="pf-note">{note}</p>{/if}
 
-      <!-- HOW FAR IT MAY GO -->
+      <!-- HOW FAR IT MAY GO: the three steps and what the chosen one means, one line. -->
       <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-may">
         {@render head(`${ids}-may`, 'vault', 'How far it may go')}
         <Segmented role="group" aria-labelledby="{ids}-may" full>
@@ -255,8 +263,7 @@
             <button type="button" class="segment" aria-pressed={d.ceiling === c} data-on={d.ceiling === c ? '' : undefined} onclick={() => (d.ceiling = c)}>{LEVEL_WORDS[c]}</button>
           {/each}
         </Segmented>
-        <p class="pf-level">{LEVEL_LINES[d.ceiling]}</p>
-        <p class="pf-quiet">Automations, rules and add-ons always ask you first, whatever this says.</p>
+        <p class="pf-quiet">{LEVEL_LINES[d.ceiling]}</p>
       </section>
 
       <!-- WHERE -->
@@ -268,7 +275,7 @@
           <div class="switch-row">
             <div class="switch-row-words">
               <span class="switch-row-title">Every project</span>
-              <p class="switch-row-line" id="{ids}-proj-line">It still reads every project. Changes outside the ones you pick come to you as questions.</p>
+              <p class="switch-row-line" id="{ids}-proj-line">Turn off to pick some. Changes elsewhere wait.</p>
             </div>
             {@render sw(d.projects === null, 'Every project', () => (d.projects = d.projects === null ? [] : null), false, `${ids}-proj-line`)}
           </div>
@@ -290,7 +297,7 @@
           <div class="switch-row">
             <div class="switch-row-words">
               <span class="switch-row-title">Every list</span>
-              <p class="switch-row-line" id="{ids}-list-line">Changes to lists you leave out come to you as questions.</p>
+              <p class="switch-row-line" id="{ids}-list-line">Turn off to pick some. Changes elsewhere wait.</p>
             </div>
             {@render sw(d.lists_write === null, 'Every list', () => (d.lists_write = d.lists_write === null ? [] : null), false, `${ids}-list-line`)}
           </div>
@@ -309,7 +316,7 @@
       <!-- TOOLS -->
       <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-tools">
         {@render head(`${ids}-tools`, 'grid', 'Tools')}
-        <p class="pf-quiet">Its briefing and what you tell it are always on. A tool you turn off is hidden from it.</p>
+        <p class="pf-quiet">A tool you turn off is hidden from it.</p>
         {#each GROUPS as [group, title] (group)}
           <h4 class="group-title">{title}</h4>
           {#if group === 'write' && d.ceiling === 'read'}<p class="pf-quiet">At Read it has none of these.</p>{/if}
@@ -387,29 +394,30 @@
       <!-- LIMITS -->
       <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-limits">
         {@render head(`${ids}-limits`, 'money', 'Cost and limits')}
-        <p class="pf-quiet">Jobs it runs with nobody at the terminal stop at these, so it cannot run up a bill. Empty means no limit.</p>
+        <!-- FOUR LABELLED FIELDS, ONE GRID (UI pass, 3 Nov): the terminal's hours stood as a sentence round a field, and at
+             a tile's width "hours" fell to a line of its own. -->
+        <p class="pf-quiet">Jobs stop at these. In a terminal it is asked to wrap up.</p>
         <div class="caps">
           {#each CAP_FIELDS as [k, label] (k)}
             <label class="cap"><span class="field-label">{label}</span>
               <input class="pickf form-number" type="number" min="0" inputmode="numeric" placeholder="No limit" value={capOf(k)} oninput={(e) => setCap(k, e.currentTarget.value)} />
             </label>
           {/each}
+          <label class="cap"><span class="field-label">Hours in a terminal</span>
+            <input class="pickf form-number" type="number" min="0" max="72" inputmode="numeric" placeholder="No limit" value={capOf('wrap_hours')} oninput={(e) => setCap('wrap_hours', e.currentTarget.value)} />
+          </label>
         </div>
-        <label class="inline-field">
-          <span>In a terminal, ask it to wrap up after</span>
-          <input class="pickf form-number" type="number" min="0" max="72" inputmode="numeric" value={capOf('wrap_hours')} oninput={(e) => setCap('wrap_hours', e.currentTarget.value)} />
-          <span>hours</span>
-        </label>
       </section>
 
       <!-- STOP AND LIVE PUSH -->
       <section class="part" data-surface={page ? 'tile' : undefined} aria-labelledby="{ids}-stop">
-        {@render head(`${ids}-stop`, 'stop', 'Stop and live push')}
+        <!-- "HOW IT RUNS" (UI pass, 3 Nov): the part held its model and how much it reads under "Stop and live push". -->
+        {@render head(`${ids}-stop`, 'session', 'How it runs')}
         <div class="switch-row">
           <div class="switch-row-words">
             <span class="switch-row-title">Stop switch</span>
             <p class="switch-row-line" id="{ids}-hooks-line">
-              {#if hooks}When you press Stop, Claude Code is blocked from its next step on your machine. Off, Stop only refuses its changes to BrainDog.{:else}Only Claude Code can be stopped on the machine. {who} is stopped at BrainDog: its changes are refused.{/if}
+              {#if hooks}Stop also halts it on your machine, not only here.{:else}Claude Code only. Stop still refuses {who}'s changes here.{/if}
             </p>
           </div>
           {@render sw(hooks && d.enforce.hooks, 'Stop switch', () => (d.enforce = { ...d.enforce, hooks: !d.enforce.hooks }), !hooks, `${ids}-hooks-line`)}
@@ -418,7 +426,7 @@
           <div class="switch-row-words">
             <span class="switch-row-title">Live push</span>
             <p class="switch-row-line" id="{ids}-channel-line">
-              {#if hooks}Sends what you tell it into Claude Code while it works, not at its next step. This is a Claude Code preview: it has to be started with a development flag, and asks you to confirm.{:else}Only Claude Code takes live push. {who} hears you at its next step.{/if}
+              {#if hooks}Your words reach it mid-step. Needs a start flag.{:else}Claude Code only. {who} hears you at its next step.{/if}
             </p>
           </div>
           {@render sw(hooks && d.enforce.channel, 'Live push', () => (d.enforce = { ...d.enforce, channel: !d.enforce.channel }), !hooks, `${ids}-channel-line`)}
@@ -426,11 +434,11 @@
         <div class="switch-row">
           <div class="switch-row-words">
             <span class="switch-row-title">News on its answers</span>
-            <p class="switch-row-line" id="{ids}-lines-line">A line on its answers when something changes for it, like a new instruction.</p>
+            <p class="switch-row-line" id="{ids}-lines-line">A line on its answers when something changes.</p>
           </div>
           {@render sw(d.context.lines, 'News on its answers', () => (d.context = { ...d.context, lines: !d.context.lines }), false, `${ids}-lines-line`)}
         </div>
-        <h4 class="group-title" id="{ids}-budget">How much it reads when a run starts</h4>
+        <h4 class="group-title" id="{ids}-budget">How much it reads at the start</h4>
         <Segmented role="group" aria-labelledby="{ids}-budget" full>
           {#each CONTEXT_BUDGETS as b (b)}
             <button type="button" class="segment" aria-pressed={d.context.budget === b} data-on={d.context.budget === b ? '' : undefined} onclick={() => (d.context = { ...d.context, budget: b })}>{BUDGET_WORDS[b]}</button>
@@ -439,7 +447,7 @@
         <label class="model"><span class="field-label">Model</span>
           <input class="pickf" type="text" maxlength="200" placeholder="Sonnet for small fixes, Opus for design" aria-describedby="{ids}-model-help" bind:value={d.model} />
         </label>
-        <p class="pf-quiet" id="{ids}-model-help">Its runner jobs use this. In a terminal it is advice.</p>
+        <p class="pf-quiet" id="{ids}-model-help">Jobs use it. In a terminal it is advice.</p>
       </section>
 
       <p class="pf-said" role="alert">
@@ -487,11 +495,13 @@
     }
   }
 
+  /* A CARD LIKE EVERY OTHER (ops style): the tile's fill, its drawn edge and soft shadow (`--card`), radius 16. */
   .prof[data-page] > .part {
     gap: var(--sp-2);
     padding: var(--tile-pad);
     background: var(--tile);
     border-radius: var(--r-tile);
+    box-shadow: var(--card);
   }
 
   .prof[data-page] > .part + .part {
@@ -508,17 +518,27 @@
     max-inline-size: var(--measure);
   }
 
+  /* THE ONE CARD HEAD, AS `Tile.svelte` DRAWS IT (rhythm, 3 Nov): a 28 row, the glyph bare at 18 in quiet ink with no
+     well behind it, the name at 14/20 600, and 12 to what it names (the part's 8 gap and 4 here). */
   .part-head {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
+    min-block-size: var(--well);
     margin-block-end: var(--sp-1);
   }
 
-  /* A TILE'S TITLE, AS EVERY OTHER TILE IN SETTINGS DRAWS IT: 15/600 on a 22 line (`Tile.svelte`). It was the sheet's
-     17, so an agent's page read a size louder than the list it opened from (skills pass 2 Nov). */
-  .part-head .part-title {
-    line-height: 22px;
+  .part-head > :global(.well) {
+    inline-size: var(--head-glyph);
+    block-size: var(--head-glyph);
+    border-radius: 0;
+    background: none;
+    color: var(--ink-3);
+  }
+
+  .part-head > :global(.well .icon[data-size]) {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
   }
 
   .pf-sub {
@@ -575,19 +595,12 @@
     line-height: 18px;
   }
 
-  .pf-level {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    line-height: 22px;
-  }
-
   .pf-quiet,
   .pf-note {
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* THE NOTE AT THE TOP: what applies to this agent now, on the inner fill so it reads as about the sheet. */
@@ -607,18 +620,21 @@
   }
 
   /* A TOOL IS ONE LINE: its name, then its switch. */
-  /* TWO COLUMNS WHERE A NAME AND ITS SWITCH FIT TWICE, so fourteen switches are seven lines; one on a phone. */
+  /* TWO COLUMNS WHERE A NAME AND ITS SWITCH FIT TWICE (a wide sheet), one in a page's tile and on a phone. ROWS TOLD
+     APART BY AIR, NEVER RULES (ops style): fourteen hairlines made the list a ruled form. */
   .tools {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
     column-gap: var(--sp-6);
   }
 
   .prof .tools > :global(.switch-row) {
-    border-block-start: 1px solid var(--rule);
+    min-block-size: 40px;
+    padding-block: var(--sp-1);
+    border-block-start: 0;
   }
 
-  .tool {
+  .prof .tool {
     align-items: center;
   }
 
@@ -647,18 +663,22 @@
     cursor: pointer;
   }
 
+  /* EVERY FIELD HERE IS THE OPS FIELD (`controls.css` `.field`): the tile's own fill, a 1px drawn edge, radius 12, 36
+     tall (44 under a thumb), and one 2px ring when focused. They were grey wells with no edge, a step off every other
+     field in Settings. */
   .pf-text {
     box-sizing: border-box;
     inline-size: 100%;
     min-inline-size: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--tile-2);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-ctl);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    border-radius: var(--r-field);
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lead-ui);
     resize: vertical;
   }
 
@@ -667,7 +687,7 @@
   @supports (field-sizing: content) {
     .pf-text {
       field-sizing: content;
-      min-block-size: calc(4 * 22px + 2 * var(--sp-2));
+      min-block-size: calc(4 * var(--lead-ui) + 2 * var(--sp-2));
       resize: none;
     }
   }
@@ -679,8 +699,9 @@
 
   .pf-text:focus-visible,
   .pickf:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 0;
+    box-shadow: inset 0 0 0 1px transparent;
   }
 
   .pf-count {
@@ -695,14 +716,15 @@
     color: var(--red);
   }
 
-  /* A SMALL FIELD: a time, a number, a line of text, on the inner fill with no border. */
+  /* A SMALL FIELD: a time, a number, a line of text, as the field above. */
   .pickf {
     box-sizing: border-box;
-    min-block-size: 40px;
+    min-block-size: var(--field-h);
     padding: 0 var(--sp-3);
-    background: var(--tile-2);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-ctl);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    border-radius: var(--r-field);
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
@@ -725,9 +747,10 @@
     gap: var(--sp-2);
   }
 
+  /* TWO BY TWO IN A TILE OR ON A PHONE, FOUR ACROSS WHERE THEY FIT. */
   .caps {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: var(--sp-3);
   }
 
@@ -755,6 +778,7 @@
     display: none;
   }
 
+  /* `--field-h` IS ALREADY 44 UNDER A THUMB (rhythm); kept here for a host that has not taken that token. */
   @media (pointer: coarse) {
     .pickf {
       min-block-size: var(--tap);
