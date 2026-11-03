@@ -1889,6 +1889,16 @@
   .live[data-state='polling'] {
     display: block;
     background: repeating-linear-gradient(90deg, var(--warn-fill) 0 8px, var(--rule) 8px 16px);
+    animation: live-late 1ms step-end 4s backwards;
+  }
+
+  /* ONLY A STATE THAT LASTS IS SHOWN (ui-perfect, 3 Nov): one poll that failed and the next that answered drew the line
+     and took it away a second and a half later, a blink across the top of the window. It shows once the state has held
+     four seconds, and a state that ends sooner is never seen. */
+  @keyframes live-late {
+    from {
+      visibility: hidden;
+    }
   }
 
   /* WARN, NOT DANGER: a dropped connection is a condition to wait out, not a loss. Solid where
@@ -1896,6 +1906,7 @@
   .live[data-state='offline'] {
     display: block;
     background: var(--warn-fill);
+    animation: live-late 1ms step-end 4s backwards;
   }
 
   /**
