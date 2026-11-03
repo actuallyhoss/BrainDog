@@ -518,7 +518,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* THE STEPS: the house segmented control, at its own width, its numbers in the quiet ink. The track is the part's
@@ -790,11 +790,6 @@
     padding-block-start: var(--sp-3);
   }
 
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-  }
 
   /* ON A PHONE THE BAR FLOATS AS GLASS UNDER THE THUMB, above the tab bar, and every action in it is 44px
      and shares the width. */

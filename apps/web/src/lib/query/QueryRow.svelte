@@ -196,6 +196,7 @@
   .q-help {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .q-picks {
@@ -236,6 +237,7 @@
   .q-proposed {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .q-act,

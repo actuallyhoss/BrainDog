@@ -596,7 +596,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* THE PREDICATE IN THE TITLE ROW'S LINE: the sentence's own size and ink, wrapping, because the filter is a sentence
@@ -625,9 +625,4 @@
     font-size: var(--fs-meta);
   }
 
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-3) var(--gutter) var(--sp-8);
-    }
-  }
 </style>

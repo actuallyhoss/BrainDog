@@ -1185,7 +1185,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
     /* THE PAGE'S CAP IS THE TOKEN EVERY SCREEN SHARES (design 6.7), not a width of its own. */
     max-inline-size: var(--page-max);
   }
@@ -1797,10 +1797,6 @@
   /* ── a phone ──────────────────────────────────────────────────────────── */
 
   @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-
     /* THE ADD MOVES TO THE TOOLBAR as a circle, and the list's own pill goes. */
     .add-phone {
       display: contents;

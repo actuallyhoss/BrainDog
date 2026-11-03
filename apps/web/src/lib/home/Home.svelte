@@ -2950,6 +2950,12 @@
     margin-block-end: calc(var(--section-head-gap) - var(--sp-5));
   }
 
+  /* AND 24 OVER IT ON A PHONE TOO, when it is the page's first line (cleanup, 3 Nov): the page's top step there is 12,
+     the same as the 12 under it, so the heading floated halfway between the bar and the cards it names. */
+  .page > .today-head:first-child {
+    margin-block-start: calc(var(--sp-5) - var(--page-top));
+  }
+
   /* A TILE DRAWS ITS 1PX EDGE INSIDE ITS BOX (`.tile`, style.css), so Late's and Arrivals' words stood 1 further in and 1
      lower than every other card's. The edge comes out of the padding, and all the board's text shares one edge. */
   .body[data-board] :global([data-board-key] > :is(.desk-part, .board-part) > .tile),

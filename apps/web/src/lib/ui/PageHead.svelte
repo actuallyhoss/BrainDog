@@ -834,6 +834,17 @@
      `besideLead`) left a 52px band of nothing over the page for it. */
   .page-head[data-titled]:not(:has(.head-said, .head-actions > :not(dialog))) {
     padding-block-start: 0;
+    /* AND THE WORK UNDER IT STARTS ON THE PAGE'S TOP STEP, not the head's gap: a screen pads its top by
+       `--page-head-gap` (16 on a phone) for the head it draws, and with nothing drawn its first line stood 16 under the
+       bar where Today's stands 12. */
+    margin-block-end: calc(var(--page-top) - var(--page-head-gap));
+  }
+
+  /* A SENTENCE ALONE ENDS WITH ITS LINE (cleanup, 3 Nov): it keeps the 36 row's place at the top, so it stands where a
+     sentence beside buttons does (AH34), but the row's other 7 under it made the head 31 from its content, not 24. */
+  .page-head[data-titled]:has(.head-said):not(:has(.head-actions > :not(dialog))) .head-main {
+    min-block-size: 0;
+    padding-block-start: calc((var(--ctl-h) - var(--lead-head)) / 2);
   }
 
   .page-said.head-said {

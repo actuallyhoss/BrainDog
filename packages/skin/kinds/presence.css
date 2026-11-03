@@ -327,8 +327,13 @@
     grid-template-columns: 24px minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 0 var(--sp-3);
-    min-block-size: 44px;
-    padding-block: var(--sp-1);
+    min-block-size: var(--row-h, 44px);
+    padding-block: var(--row-pad-y, 8px);
+  }
+
+  /* ITS WORDS ON THE ROW'S LINE BOX (20), as Recent runs' names under it are. */
+  .pres[data-line] .pres-what {
+    line-height: var(--lead-ui, 20px);
   }
 
   .pres[data-line] .pres-face {

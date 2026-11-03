@@ -87,7 +87,7 @@
   .wt {
     --cw: 286px;
     --rh: 183px;
-    --g: 12px;
+    --g: var(--tile-gap, 12px);
     --s: 1;
     --w: calc(var(--c) * var(--cw) + (var(--c) - 1) * var(--g));
     --h: calc(var(--r) * var(--rh) + (var(--r) - 1) * var(--g));
@@ -194,8 +194,8 @@
 
   .wt-wait {
     display: grid;
-    gap: 8px;
-    padding: 16px;
+    gap: var(--sp-2);
+    padding: var(--tile-pad);
   }
 
   .wt-wait span {

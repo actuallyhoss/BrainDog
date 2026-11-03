@@ -482,7 +482,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* THE TWO KINDS OF FILE TAKE THEIR WORDS' WIDTH, never a grey band across the page (agents F27). */
@@ -685,9 +685,4 @@
     margin-block-start: var(--sp-5);
   }
 
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-  }
 </style>

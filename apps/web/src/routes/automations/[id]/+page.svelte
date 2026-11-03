@@ -1047,7 +1047,7 @@
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* FOUR TABS WRAP RATHER THAN PUSH THE PAGE SIDEWAYS on a 320px screen, where their words do not fit one row. The

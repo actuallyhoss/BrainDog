@@ -860,7 +860,8 @@
     color: var(--ink-3);
     font-size: var(--fs-caps, 11px);
     font-weight: 500;
-    letter-spacing: 0.025em;
+    line-height: var(--lead-caps, 16px);
+    letter-spacing: var(--track-caps, 0.025em);
     text-transform: uppercase;
   }
 

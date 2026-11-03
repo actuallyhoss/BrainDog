@@ -97,7 +97,7 @@
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
-    padding: 32px;
+    padding: var(--sp-6);
     background: var(--tile);
     border: 1px solid var(--card-edge);
     border-radius: var(--r-sheet);
@@ -116,9 +116,11 @@
     min-inline-size: 0;
   }
 
+  /* ON A PHONE ONE STEP ALL ROUND (cleanup, 3 Nov): 24 over and under the words with 20 at the sides read as a card
+     taller than its words. */
   @media (width < 640px) {
     .entry-sheet {
-      padding: 24px 20px;
+      padding: var(--sp-5);
     }
   }
 
@@ -169,7 +171,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lh-body);
     text-wrap: pretty;
     overflow-wrap: anywhere;
   }
@@ -178,7 +180,7 @@
     .entry :global(.entry-title),
     .entry :global(h1.empty-title) {
       font-size: var(--fs-figure);
-      line-height: 28px;
+      line-height: var(--lead-figure);
       letter-spacing: -0.015em;
     }
   }

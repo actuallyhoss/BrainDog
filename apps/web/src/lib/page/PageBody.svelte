@@ -1554,9 +1554,14 @@
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: var(--tile-gap);
-    /* A TILE GAP UNDER WHAT STANDS ABOVE (rhythm pass, 3 Nov): 12 put the first tile closer to a banner over it than the
-       tiles stand to each other at a desk; the foot is the page's own step, which clears the phone's tab bar. */
-    padding: var(--tile-gap) var(--gutter) var(--page-bottom);
+    /* THE PAGE'S TOP STEP UNDER THE BAR, as every screen's first content stands (cleanup, 3 Nov): the tile gap put a
+       tiled page's first card 16 under the bar at a desk where Today's and Search's stand 24. Under a head that draws
+       a row of its own, the head's gap instead. The foot is the page's own step, which clears the phone's tab bar. */
+    padding: var(--page-top) var(--gutter) var(--page-bottom);
+  }
+
+  :global(.page-head:not([data-tiled])) ~ .page {
+    padding-block-start: var(--page-head-gap);
   }
 
   /* THE ROW CURSOR'S RING, drawn only once a key has moved it: the focus ink, round the row, never the brand's red. */
@@ -2120,7 +2125,6 @@
   @media (width < 900px) {
     .page {
       grid-template-columns: minmax(0, 1fr);
-      padding: var(--tile-gap) var(--gutter) var(--page-bottom);
     }
 
     .area,

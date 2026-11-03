@@ -362,7 +362,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
     min-inline-size: 0;
   }
 
@@ -568,11 +568,6 @@
     }
   }
 
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-  }
 
   @media (width >= 640px) {
     .cards {

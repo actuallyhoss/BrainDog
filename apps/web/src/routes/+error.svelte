@@ -58,7 +58,7 @@
      12 from the top of the work where a title row would stand, and `Empty` keeping its own words to the measure. No
      tile: a failure is a sentence, its request id and the two ways on, not a card. */
   .page {
-    padding: var(--inset) var(--gutter) var(--sp-8);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
   /* Support, only under the failure a retry cannot mend; the muted text token and the page's own measure. */
   .stuck {

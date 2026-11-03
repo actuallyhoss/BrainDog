@@ -225,6 +225,7 @@
     color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
+    line-height: var(--lead-ctl);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),

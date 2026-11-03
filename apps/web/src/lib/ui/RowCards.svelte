@@ -458,8 +458,18 @@
     }
 
     /* ONE HAIRLINE BETWEEN ROWS, in the soft line a row takes at every width. */
+    /* TOLD APART BY AIR, NOT RULES (RHYTHM 4, cleanup 3 Nov): rows 2 apart, and the wash under a press shows the row. */
     .cards li + li {
-      border-block-start: 1px solid var(--rule);
+      margin-block-start: var(--sp-0);
+    }
+
+    .card-line {
+      border-radius: var(--r-ctl);
+      transition: background-color var(--d-state) var(--ease-out);
+    }
+
+    .card-line:active:not([data-picked]) {
+      background: var(--hover);
     }
 
     /* THE CARD AND ITS VERB SHARE A LINE. `align-items: stretch` so the menu button is the height of
@@ -513,14 +523,15 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       align-content: center;
-      /* The card's two lines are 4px apart. */
-      gap: var(--sp-1) var(--sp-3);
+      /* The card's two lines are 2px apart, a row's title to its meta (`--row-stack`). */
+      gap: var(--row-stack) var(--sp-3);
       /* A two-line row: 44px on both axes and then some, so the whole card is the target. */
       min-block-size: var(--row-h-2);
       /* Next to no inline padding: there is no box for the text to be inset from. */
-      padding: var(--sp-2) var(--sp-1);
+      padding: var(--row-pad-y) var(--sp-1);
       color: var(--ink);
-      font-size: var(--fs-body);
+      font-size: var(--fs-row);
+      line-height: var(--lead-row);
       text-decoration: none;
     }
 
@@ -613,6 +624,7 @@
       white-space: nowrap;
       color: var(--ink-3);
       font-size: var(--fs-meta);
+      line-height: var(--lead-meta);
       font-variant-numeric: tabular-nums;
     }
 
@@ -628,6 +640,7 @@
       justify-content: flex-end;
       gap: var(--sp-2);
       font-size: var(--fs-meta);
+      line-height: var(--lead-meta);
     }
 
     .card:has(.card-end) .card-b {
