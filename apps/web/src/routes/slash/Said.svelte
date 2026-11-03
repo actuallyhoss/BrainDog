@@ -18,7 +18,16 @@
 
   let { text, figures = {}, icons }: { text: string; figures?: Record<string, unknown>; icons: ReadonlyMap<string, string> } = $props();
 
-  const pieces = $derived(cited(text, figures));
+  /**
+   * WHAT HAS ARRIVED WHOLE: a brace still streaming in ("{{ref:tas") is held back until it closes, so its letters never
+   * flash as words before the mention takes their place.
+   */
+  function settled(t: string): string {
+    const open = t.lastIndexOf('{{');
+    if (open !== -1 && t.indexOf('}}', open) === -1) return t.slice(0, open);
+    return t.endsWith('{') ? t.slice(0, -1) : t;
+  }
+  const pieces = $derived(cited(settled(text), figures));
   let opened = $state<number | null>(null);
   const glyph = (href: string): IconName => (icons.get(/^\/r\/([^/]+)\//u.exec(href)?.[1] ?? '') ?? 'rows') as IconName;
   const totalWords = (minor: number, currency: string | null): string => (currency === null ? integer(minor) : moneyInText(money(minor, currency)));

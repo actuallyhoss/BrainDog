@@ -653,178 +653,6 @@
     margin-block-start: var(--sp-4);
   }
 
-  /* ── the Ask tile ─────────────────────────────────────────────────────── */
-
-  .slash-ask {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .slash-ask-label {
-    max-inline-size: var(--measure);
-    font-weight: 400;
-  }
-
-  /* THE FIELD AND ITS PRESS ON ONE LINE: the field takes the room, the pill with its key cap at the end. */
-  .slash-ask-row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  .slash-ask-row .field {
-    flex: 1 1 auto;
-    min-inline-size: 0;
-  }
-
-  .slash-ask-go {
-    flex: none;
-  }
-
-  /* THE ANSWER, UNDER A HAIRLINE ONCE THERE IS ONE: what was asked, where Slash looked, the rows, then Slash's sentence
-     beside its face, the model, and the fold. One column, top to bottom. */
-  .slash-answer {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    min-inline-size: 0;
-  }
-
-  .slash-answer {
-    padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--sep, var(--rule));
-  }
-
-  .slash-asked {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--sp-2);
-    margin: 0;
-  }
-
-  .slash-asked-said {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
-  .slash-asked-q {
-    min-inline-size: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: 600;
-    line-height: var(--lead-ui, 20px);
-    overflow-wrap: anywhere;
-  }
-
-  /* THE SOURCE LINE: where what it read came from and how many, in meta with the rows glyph, before any of Slash's words. */
-  .slash-source {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta, 18px);
-    overflow-wrap: anywhere;
-  }
-
-  .slash-source :global(.icon) {
-    flex: none;
-    color: var(--ink-3);
-  }
-
-  .slash-source-n {
-    color: var(--ink-3);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .slash-rows {
-    margin-block: calc(-1 * var(--sp-1));
-  }
-
-  .slash-row-go {
-    display: grid;
-    place-items: center;
-    color: var(--ink-3);
-  }
-
-  /* SLASH'S SENTENCE, BESIDE ITS FACE: an answer is somebody's, and the model that drew it is named under it. */
-  .slash-second {
-    display: grid;
-    grid-template-columns: var(--well) minmax(0, 1fr);
-    align-items: start;
-    gap: var(--sp-3);
-  }
-
-  .slash-second-words {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    padding-block-start: var(--sp-1);
-  }
-
-  .slash-text {
-    margin: 0;
-    max-inline-size: var(--measure);
-    color: var(--ink);
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-    overflow-wrap: anywhere;
-  }
-
-  .slash-second-do {
-    display: flex;
-  }
-
-  /* THE CARD IN PLACE, its own container as in the palette, washed while Enter in the field is its answer. */
-  .slash-card {
-    container-type: inline-size;
-    padding: var(--sp-3);
-    border-radius: var(--r-pop);
-  }
-
-  .slash-card:empty {
-    display: none;
-  }
-
-  .slash-card[data-armed] {
-    background: var(--hover);
-  }
-
-  .slash-card > :global(.queue-card) {
-    padding-block: 0;
-    border-block-start: 0;
-  }
-
-  /* `23 §8`'s footer: receded and small, but always there. */
-  .slash-model {
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta, 18px);
-    overflow-wrap: anywhere;
-  }
-
-  .slash-fold {
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
-  .slash-fold ul {
-    margin: var(--sp-2) 0 0;
-    padding-inline-start: var(--sp-4);
-    overflow-wrap: anywhere;
-  }
-
-  .slash-summary {
-    inline-size: fit-content;
-    color: var(--ink-2);
-    font-weight: 500;
-    cursor: pointer;
-  }
-
   /* ── the lists ────────────────────────────────────────────────────────── */
 
   /* A ROW THAT IS NOT A LINK STILL TAKES THE WASH under the pointer, and the hairlines either side step
@@ -903,30 +731,18 @@
    * rows do not have.
    */
   @media (width < 640px) {
-    .slash-ask-row {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .slash-ask-go {
-      display: grid;
-    }
-
-    .slash-list .line,
-    .slash-rows .line {
+    .slash-list .line {
       grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
       gap: var(--row-stack, 2px) var(--sp-3);
     }
 
-    .slash-list .line-mark,
-    .slash-rows .line-mark {
+    .slash-list .line-mark {
       grid-column: 1;
       grid-row: 1 / span 2;
       align-self: start;
     }
 
-    .slash-list .line-main,
-    .slash-rows .line-main {
+    .slash-list .line-main {
       grid-column: 2;
       grid-row: 1;
     }
@@ -937,8 +753,7 @@
       justify-content: flex-start;
     }
 
-    .slash-list .line-verbs,
-    .slash-row-go {
+    .slash-list .line-verbs {
       grid-column: 3;
       grid-row: 1 / span 2;
       align-self: center;

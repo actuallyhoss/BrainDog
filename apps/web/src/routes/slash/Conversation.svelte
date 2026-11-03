@@ -160,7 +160,9 @@
 
           {#if turn.text}
             <p class="text" dir="auto"><Said text={turn.text} figures={turn.figures} {icons} /></p>
-          {:else if turn.streaming && turn.actions.length === 0}
+          {:else if turn.streaming}
+            <!-- HELD UNTIL THE WORDS COME, even under a card that came first, so the words take the bars' place and the
+                 card under them does not move. -->
             <div class="skeleton" aria-hidden="true"><span></span><span></span></div>
           {/if}
 
