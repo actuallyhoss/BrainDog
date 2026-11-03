@@ -114,7 +114,7 @@
     padding-block: var(--sp-1);
     box-sizing: border-box;
     font-size: var(--fs-body);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-regular);
   }
 
   .l-face {
@@ -133,8 +133,9 @@
     font-weight: var(--fw-semi);
   }
 
+  /* ROWS TOLD APART BY AIR, NOT A HAIRLINE (ui-perfect, 3 Nov), as every other card on Today: the ops look's rows. */
   .l-row + .l-row {
-    border-block-start: 1px solid var(--rule);
+    margin-block-start: var(--sp-1);
   }
 
   .l-row[data-arrived] {
@@ -170,9 +171,10 @@
     overflow-wrap: anywhere;
   }
 
+  /* WHAT CAME AT A ROW TITLE'S WEIGHT, 500: at 600 over two lines it was the loudest thing on the board. */
   .l-name {
     color: var(--ink);
-    font-weight: 600;
+    font-weight: var(--fw-medium);
     text-decoration: none;
   }
 

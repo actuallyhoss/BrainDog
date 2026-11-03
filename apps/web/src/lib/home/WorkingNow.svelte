@@ -278,13 +278,19 @@
     font-weight: 500;
   }
 
-  /* WORKING THIS MINUTE: a still live dot before how long (frame F22: one pulse on a change, never a loop). */
-  .r-time[data-live]::before {
-    content: '';
-    inline-size: 6px;
-    block-size: 6px;
-    border-radius: var(--r-round);
-    background: var(--live);
+  /* WORKING THIS MINUTE IS THE FACE'S DOT (ui-perfect, 3 Nov): a second green dot before "heard 2 min ago" said the
+     same thing twice on one line. The time is plain meta. */
+
+  /* THE ⋯ WAITS FOR THE ROW UNDER A MOUSE: on every row at rest it was a column of marks nobody was reading. A thumb
+     still sees it, and a keyboard brings it with focus. */
+  @media (hover: hover) and (pointer: fine) {
+    .run .r-do {
+      opacity: 0;
+    }
+
+    .run:is(:hover, :focus-within) .r-do {
+      opacity: 1;
+    }
   }
 
   /* THE OWNER'S PRESS: a quiet 28px glyph button, a thumb's 44 to press (`.tap`), the row's whole height. */
