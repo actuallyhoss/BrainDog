@@ -24,6 +24,7 @@
 /* THE KERNEL'S WINDOW, IMPORTED, so the number is never written a second time here. */
 import { REMOVED_WINDOW_DAYS, instant } from '@braindog/kernel';
 
+import { BINNED } from '../addon-data.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -43,6 +44,11 @@ export type RemovedAddon = {
   stayed: RemovedList[];
   /** Whether installing `version` again puts back the settings and the schedules. Inside the window, always. */
   back: boolean;
+  /**
+   * How many of its entries went into the bin with it, when it was removed with its data (`addon-data.ts`). Installing it
+   * again inside the window puts them back. Absent when it was removed without them.
+   */
+  binned?: number;
 };
 
 /** What `packsRemoved` answers: the add-ons taken out within the window, newest first (the shape `apps/web` `routes/packs/removed.ts` reads). */
@@ -96,6 +102,18 @@ export function methods(deps: RemovedDeps) {
         return { list: name, rows: Number(count) };
       });
 
+  /* WHAT A REMOVAL WITH DATA PUT IN THE BIN, kept in the owner's settings under `braindog:binned` (`addon-data.ts` `BINNED`). */
+  const binnedOf = (pack: string): { binned?: number } => {
+    const row = sql.one<{ value: string }>('SELECT value FROM pref WHERE person_id = ? AND key = ?', BINNED, pack);
+    if (row === undefined) return {};
+    try {
+      const n = (JSON.parse(row.value) as { rows?: unknown }).rows;
+      return typeof n === 'number' && n > 0 ? { binned: n } : {};
+    } catch {
+      return {};
+    }
+  };
+
   return {
     /**
      * The add-ons taken out of this record within the window, newest first, each with what stayed and whether a
@@ -126,6 +144,7 @@ export function methods(deps: RemovedDeps) {
           back_until: Number.isNaN(until) ? r.removed_at : instant(until),
           stayed: listsOf(r.pack),
           back: Number.isNaN(until) ? false : until >= now,
+          ...binnedOf(r.pack),
         };
       });
       return { ok: true as const, value: removed satisfies PacksRemovedAnswer };
