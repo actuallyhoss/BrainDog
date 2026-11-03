@@ -835,7 +835,7 @@
   .col {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-5);
+    gap: var(--sp-6);
     min-inline-size: 0;
   }
 
@@ -868,18 +868,22 @@
      (`--ctl-h` is 44 there). A label may wrap: at 320 the longest one is wider than a nowrap pill can be. */
   .col :global(.btn) {
     inline-size: 100%;
-    min-block-size: max(40px, var(--ctl-h));
+    min-block-size: 44px;
+    border-radius: var(--r-pill);
+    font-size: var(--fs-body);
     white-space: normal;
     text-align: center;
   }
 
-  /* THE FOOT OF THE SHEET: a hairline, then the one way to a BrainDog of your own. */
+  /* THE FOOT OF THE SHEET: a hairline that stops short of nothing, then the one way to a BrainDog of your own, centred
+     under the buttons it follows. */
   .new-here {
     margin: 0;
-    padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--rule);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--sep, var(--rule));
     font-size: var(--fs-body);
     line-height: 22px;
+    text-align: center;
   }
 
   /* A 44PX TARGET ON A PHONE, as every way on from this screen is, without making a line of text look like a button. */
@@ -889,6 +893,14 @@
     min-block-size: var(--tap);
     color: var(--red);
     font-weight: 500;
+    text-decoration: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .new-link:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
   }
 
   /* SENTENCES, AT THE BODY SIZE AND MEASURE: what is happening, and what a link does. */

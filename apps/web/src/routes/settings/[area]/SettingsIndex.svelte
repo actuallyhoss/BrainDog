@@ -83,11 +83,13 @@
   .group-title {
     margin: 0 0 var(--sp-2);
     padding-block-end: var(--sp-2);
-    border-block-end: 1px solid var(--rule);
+    padding-inline: var(--title-inset, 12px);
+    border-block-end: 1px solid var(--sep, var(--rule));
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    letter-spacing: -0.01em;
+    line-height: 22px;
   }
 
   /* CLASS NAMES OF ITS OWN, because `.rows`, `.row` and `.glyph` are `blocks.css`'s and `.line` is
@@ -115,7 +117,7 @@
     column-gap: var(--sp-3);
     min-block-size: var(--rail-item-h);
     padding-inline: var(--sp-1) var(--sp-2);
-    border-radius: var(--r-pop);
+    border-radius: var(--r-ctl);
     color: var(--ink-2);
     text-decoration: none;
     transition:
@@ -168,8 +170,9 @@
   /* THE CURRENT AREA IS "HERE", DRAWN AS THE RAIL DRAWS ITS OWN: the tile's fill under the row, the glyph in ink with
      no fill behind it, and the name at 600 in ink. One selection in the product, not two. INK, NOT RED (design pass
      1 Nov, M27): Look B keeps red for what is wrong or late, never for what is chosen, as the checkboxes went (M6). */
+  /* AND IN THE OPS STYLE THAT FILL IS THE CHOSEN TINT, a different hue from the hover wash and twice as strong. */
   .area-row[aria-current='page'] {
-    background: var(--tile);
+    background: var(--chosen);
     color: var(--ink);
   }
 
@@ -185,7 +188,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .area-row:not([aria-current]):hover {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
       color: var(--ink);
     }
   }
@@ -205,18 +208,19 @@
 
     .index[data-beside] .group-title {
       margin: 0 0 var(--sp-1);
-      padding: 0;
+      padding: 0 var(--sp-2);
       border: 0;
       color: var(--ink-3);
       font-size: var(--fs-meta);
       font-weight: var(--fw-medium);
+      letter-spacing: 0;
       line-height: 18px;
     }
 
     .index[data-beside] .area-row {
       grid-template-columns: 24px minmax(0, 1fr);
       column-gap: var(--sp-2);
-      min-block-size: 32px;
+      min-block-size: 34px;
       border-radius: var(--r-ctl);
     }
 
@@ -258,7 +262,7 @@
       inset-block-start: 0;
       inset-inline: calc(var(--sp-1) + var(--well-l) + var(--sp-3)) var(--sp-2);
       block-size: 1px;
-      background: var(--rule);
+      background: var(--sep, var(--rule));
       pointer-events: none;
     }
 

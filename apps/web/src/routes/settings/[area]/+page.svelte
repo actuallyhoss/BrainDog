@@ -814,7 +814,7 @@
     inset-block-start: 0;
     inset-inline: calc(var(--sp-3) + var(--well-l) + var(--sp-3)) var(--sp-3);
     block-size: 1px;
-    background: var(--rule);
+    background: var(--sep, var(--rule));
     pointer-events: none;
   }
 

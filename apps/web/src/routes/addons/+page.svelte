@@ -424,10 +424,21 @@
 
   /* THE LIST SEARCH'S FIELD (L44): the shared `.field`, a fill with no edge; it was the only bordered field on a board.
      The store has no tile under it, so the fill is the tile's own, as a list's search fill reads against its tile. */
+  /* A CAPSULE ON THE GROUND, as the category control beside it is (ops: controls are capsules): the tile's fill, a
+     0.5px edge drawn inside, and the accent ring on focus. */
   .find {
     flex: 1 1 16rem;
     max-inline-size: 24rem;
+    min-block-size: var(--ctl-page, 36px);
+    padding-inline: 14px;
     background: var(--tile);
+    border-radius: var(--r-pill, 999px);
+    box-shadow: inset 0 0 0 0.5px var(--g-line, var(--rule)), var(--shadow-raised, none);
+  }
+
+  .find:focus-within {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--focus-ring, var(--focus));
   }
 
   .find-input {

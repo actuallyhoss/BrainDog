@@ -142,23 +142,49 @@
   }
 
   /* A PAGE ON THE BAR CARRIES A TICK AS WELL AS ITS FILL, so the state is never colour alone. */
+  /* A CAPSULE EACH (ops 4.8): the soft fill at rest, the chosen tint with the ink at 600 and a tick when it is on the
+     bar. An ink slab per chosen page was the heaviest thing on the screen. */
   .pick {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-3);
-    background: var(--tile-2);
+    min-block-size: var(--ctl-panel, 28px);
+    padding-inline: 12px;
+    background: var(--soft-fill, var(--tile-2));
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     color: var(--ink-2);
     font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: 500;
     cursor: pointer;
+    transition:
+      background-color var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out),
+      scale var(--d-press-out, 190ms) var(--spring-press, ease-out);
+  }
+
+  .pick:active {
+    scale: 0.97;
   }
 
   .pick[data-on] {
-    background: var(--ink);
-    color: var(--tile);
+    background: var(--chosen-2);
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .pick:not([data-on]):hover {
+      background: var(--soft-fill-hover, var(--hover));
+      color: var(--ink);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .pick {
+      min-block-size: var(--tap);
+    }
   }
 
   .usual {

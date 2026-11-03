@@ -86,18 +86,22 @@
     align-items: start;
     gap: var(--sp-3);
     justify-self: center;
-    inline-size: min(440px, 100%);
+    inline-size: min(420px, 100%);
     min-inline-size: 0;
   }
 
-  /* A TILE: its fill and radius, 24 in (20 on a phone). No border and no shadow: a tile is told by its fill. */
+  /* THE SHEET, IN THE OPS STYLE (3 Nov): one solid card on the ambient ground, the sheet's 22px corner, a 1px edge in its
+     own colour and the soft two-layer card shadow in light (none in dark, where the lighter fill carries it). Never
+     glass: people read and type on it. */
   .entry-sheet {
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
-    padding: var(--sp-5);
+    padding: 32px;
     background: var(--tile);
-    border-radius: var(--r-tile);
+    border: 1px solid var(--card-edge);
+    border-radius: var(--r-sheet);
+    box-shadow: var(--shadow-card);
     color: var(--ink);
   }
 
@@ -114,23 +118,25 @@
 
   @media (width < 640px) {
     .entry-sheet {
-      padding: 20px;
+      padding: 24px 20px;
     }
   }
 
   /* FROM 900PX THE SHEET STANDS 48 UNDER THE BRAND ROW. With a rail, the sheet keeps its 440 and the rail beside it is
      as wide as its short lines need, both from the same top edge, and the pair is centred as one: a rail given the rest
      of 1040 held the sheet left of centre with an empty third on its right (audit f, AF24). */
+  /* AND IT STANDS IN THE UPPER THIRD OF A LAPTOP'S WINDOW, not pinned under the brand row: the eye lands on the title
+     where it expects a sign-in to be, and the ground stays quiet round it. */
   @media (width >= 900px) {
     .entry {
-      row-gap: var(--sp-7);
+      row-gap: clamp(var(--sp-7), 12vh, 136px);
       padding-block-start: calc(var(--sp-5) + env(safe-area-inset-top));
     }
 
     .entry-board[data-paired] {
-      grid-template-columns: minmax(0, 440px) minmax(0, 320px);
+      grid-template-columns: minmax(0, 420px) minmax(0, 320px);
       column-gap: var(--sp-6);
-      inline-size: min(calc(440px + var(--sp-6) + 320px), 100%);
+      inline-size: min(calc(420px + var(--sp-6) + 320px), 100%);
     }
   }
 
@@ -145,8 +151,8 @@
     font-family: var(--font-display);
     font-size: var(--fs-page);
     font-weight: 600;
-    letter-spacing: -0.01em;
-    line-height: 34px;
+    letter-spacing: var(--track-page, -0.021em);
+    line-height: 32px;
     text-wrap: balance;
     overflow-wrap: anywhere;
   }
@@ -158,7 +164,7 @@
     outline: none;
   }
 
-  /* THE ONE SENTENCE UNDER IT: 15/22 in the second ink. */
+  /* THE ONE SENTENCE UNDER IT, in the second ink. */
   .entry :global(.entry-lede) {
     margin: 0;
     color: var(--ink-2);
@@ -173,6 +179,43 @@
     .entry :global(h1.empty-title) {
       font-size: var(--fs-figure);
       line-height: 28px;
+      letter-spacing: -0.015em;
+    }
+  }
+
+  /* ── Fields and buttons on every entry screen (ops 4.22, 4.5) ─────────── */
+
+  /* A FIELD IS A 12PX BOX WITH A HAIRLINE EDGE on the sheet's own fill, 44 tall, and focus is the accent's 2px ring on
+     the box with no gap (ops: a text field shows focus by its edge, never an outline a step away). */
+  .entry :global(.entry-sheet .field) {
+    min-block-size: 44px;
+    padding-inline: 14px;
+    background: var(--tile);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-field);
+    transition:
+      border-color var(--d-state) var(--ease-out),
+      box-shadow var(--d-state) var(--ease-out);
+  }
+
+  .entry :global(.entry-sheet .field:focus-within) {
+    outline: none;
+    border-color: transparent;
+    box-shadow: 0 0 0 2px var(--focus-ring);
+  }
+
+  .entry :global(.entry-sheet .field .field-input) {
+    min-block-size: 42px;
+  }
+
+  /* EVERY BUTTON ON AN ENTRY SCREEN IS A CAPSULE (ops: circles and capsules, never rounded squares). */
+  .entry :global(.entry-sheet .btn) {
+    border-radius: var(--r-pill);
+  }
+
+  @media (forced-colors: active) {
+    .entry :global(.entry-sheet .field:focus-within) {
+      outline: 2px solid Highlight;
     }
   }
 
