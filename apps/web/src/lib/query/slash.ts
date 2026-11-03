@@ -32,3 +32,10 @@ export function describeWith(base: string, listName: string): (words: string) =>
     return out.ok && out.value.predicate ? (out.value.predicate as Predicate) : null;
   };
 }
+
+/**
+ * THE ADDRESS THAT OPENS SLASH ABOUT THESE ROWS: `/slash?with=people%2320,tasks%2312`, each row a chip in the composer and
+ * sent with every ask, the field focused. For an "Ask about this" button: `href={at(askAboutHref(['people#20']))}`.
+ * A ref is a row's spoken id (`people#20`), or `decide:`, `run:` or `sign:` and an id; at most eight are taken.
+ */
+export const askAboutHref = (refs: readonly string[]): string => `/slash?with=${refs.map((r) => encodeURIComponent(r)).join(',')}`;
