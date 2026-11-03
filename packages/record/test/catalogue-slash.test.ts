@@ -36,6 +36,9 @@ test('a newer catalogue version is asked about once, with who signed it, and not
   });
   const first = value<{ id: string }>(await api.propose({ question: 'Install Bookshelf?', body_kind: 'pack', body: { install: 'bookshelf', doc: doc('1.0.0', [BOOKS, SHELF]) } }, owner));
   value(await api.decide({ id: first.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
+  /* FROM THE STORE, as the app installs a store add-on (`kennel`): a file a proposal carries goes in as made here, which
+     the store never offers to update (`updatesFromStore`). */
+  sql.exec("UPDATE pack SET source = 'kennel' WHERE id = 'bookshelf'");
   const version = () => sql.all<{ version: string }>("SELECT version FROM pack WHERE id = 'bookshelf'")[0]?.version;
   assert.equal(version(), '1.0.0');
 

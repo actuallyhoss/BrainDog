@@ -40,6 +40,9 @@ async function record(next: ReturnType<typeof doc>, now: { at: number }) {
   assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
   const first = value<{ id: string }>(await api.propose({ question: 'Install Bookshelf?', body_kind: 'pack', body: { install: 'bookshelf', doc: doc('1.0.0', [BOOKS, SHELF]) } }, owner));
   value(await api.decide({ id: first.id, decide: { option: 'accept', reason: 'yes' } } as never, owner));
+  /* FROM THE STORE, as the app installs a store add-on (`kennel`): a file a proposal carries goes in as made here, which
+     the store never updates (`updatesFromStore`). */
+  sql.exec("UPDATE pack SET source = 'kennel' WHERE id = 'bookshelf'");
   return { api, sql };
 }
 
