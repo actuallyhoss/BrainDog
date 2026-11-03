@@ -4649,6 +4649,33 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return grant ? ok({ entry: out.value, grant }) : no('OUT_OF_BOUNDS', `There is no grant behind ${args.field}.`, { at: args.field });
   }
 
+  /**
+   * A key answers to the name its row has now. In the write's transaction, after the row is stored.
+   *
+   * THE ROW AND THE GRANT EACH HELD A NAME, and only a deposit wrote the grant's. A key put away as
+   * "sketchpad-metrics (vault)" and renamed on the Keys screen to "sketchpad-metrics" listed under the new name
+   * everywhere a person looks, while every lookup an action makes (`keyNamed`, by the grant's label) still knew it by
+   * the old one: accepting a poll that names the key was refused "Add the key called "sketchpad-metrics" to the
+   * keychain", for a key the keychain listed. So whenever a row whose secret field holds a live grant is written, the
+   * grant takes the row's title. Any write heals a row renamed before this existed.
+   *
+   * ONLY THE NAME. What a key opens is the host it is held to, and a row edit never moves that (`pinHost`). A name
+   * this write gives is no reach a writer lacked: depositing a key under any label was always theirs. A title the
+   * keychain would not take as a label, empty or past its 120 characters, leaves the grant's as it is.
+   */
+  function keyNamedAsRow(entry: Entry): void {
+    const decl = registers.get(entry.register);
+    if (!decl || entry.deleted_at !== null) return;
+    const title = entry.fields[decl.title];
+    const name = typeof title === 'string' ? title.trim() : '';
+    if (name === '' || name.length > 120) return;
+    for (const f of decl.fields) {
+      if (f.type !== 'secret' || f.retired) continue;
+      const held = entry.fields[f.id];
+      if (typeof held === 'string' && held !== '') sql.exec('UPDATE grant SET label = ? WHERE id = ? AND revoked_at IS NULL AND label <> ?', name, held, name);
+    }
+  }
+
   /* ── the write path ──────────────────────────────────────────────────── */
 
   function write(register: string, ref: string | null, patch: Patch, w: WriteContext, door: Door = {}): Result<Entry> {
@@ -5296,6 +5323,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         );
         const entry = byId(id, true)!;
         reproject(entry);
+        keyNamedAsRow(entry);
         rekeyEntry(null, entry, w);
         rediary(entry);
         /* A `create` ROW CARRIES THE WHOLE SHAPE, with `field` null and `to_v` the row as JCS — so
@@ -5330,6 +5358,7 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       );
       const entry = byId(current.id, true)!;
       reproject(entry);
+      keyNamedAsRow(entry);
       rekeyEntry(current, entry, w);
       rediary(entry);
 
