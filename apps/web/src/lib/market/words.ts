@@ -7,19 +7,23 @@
 import type { Category } from '@braindog/declare/catalogue';
 
 export const words = {
-  searchLabel: 'Search add-ons and starters',
-  /* THE WAY FROM THE STORE TO WHAT THIS RECORD HOLDS, Settings › Add-ons. */
-  yours: 'Your add-ons',
+  /* PLUGINS, THE READER'S WORD (3 Nov, Sam: "rename addons to plugins"). The code, the API, the MCP acts and the
+     database keep `addon` and `pack`; only what a person reads says plugin. */
+  plugins: 'Plugins',
+  reading: 'Reading',
+  searchLabel: 'Search plugins and starters',
+  /* THE WAY FROM THE STORE TO WHAT THIS RECORD HOLDS, Settings › Plugins. */
+  yours: 'Your plugins',
   /* THE WAY TO PUBLISH ONE, for anybody signed in: it waits for review before anyone else sees it. */
-  publish: 'Publish an add-on',
-  searchHint: 'Search add-ons and starters',
+  publish: 'Publish a plugin',
+  searchHint: 'Search plugins and starters',
   /* THE STORE: starters first, then the shelves, and what the record suggests itself. */
   store: {
     sentence: 'Each shows its plan before anything changes.',
     suggested: 'Suggested for you',
     suggestedNote: 'from your own BrainDog',
     featured: 'From BrainDog',
-    featuredNote: 'made and kept up to date by BrainDog',
+    featuredNote: 'kept up to date for you',
     starters: 'Starters',
     startersNote: 'whole setups to begin with',
     examples: 'Example setups',
@@ -60,7 +64,7 @@ export const words = {
     open: (name: string): string => `Open ${name}`,
   },
   all: 'All',
-  categoriesLabel: 'Kinds of add-on',
+  categoriesLabel: 'Kinds of plugin',
   categories: {
     'made-by-braindog': 'Made by BrainDog',
     'ways-of-working': 'Starters',
@@ -74,7 +78,7 @@ export const words = {
   } satisfies Record<Category, string>,
   orderLabel: 'Order',
   orders: { 'for-you': 'For you', installed: 'Most used', newest: 'Newest' },
-  kinds: { module: 'Part of BrainDog', usecase: 'Starter', pack: 'Add-on' },
+  kinds: { module: 'Part of BrainDog', usecase: 'Starter', pack: 'Plugin' },
   nothingFound: 'Nothing matches that search',
   nothingFoundBody: 'Try fewer words.',
   installs: (n: number): string => `On ${n}+ BrainDogs`,
@@ -136,7 +140,7 @@ export const words = {
   waitsNote: 'They arrive once you have what they wait for.',
   /* THE PLAN CHANGED BETWEEN READING IT AND PRESSING INSTALL (`PLAN_STALE`, after the record re-planned and found it
      says something else): the fresh plan is shown with this over it, and nothing was installed. Never "you". */
-  planMoved: 'Something in your BrainDog changed what this add-on would do, so nothing was installed yet. This is the plan as it is now.',
+  planMoved: 'Something in your BrainDog changed what this plugin would do, so nothing was installed yet. This is the plan as it is now.',
   /* WHAT A PART WAITS FOR WHEN IT NAMES A ROLE AND NOT A LIST (`@braindog/declare` `when.ts`): whichever list plays the
      role will do, so it is said in plain words and never as one list's name. */
   waitsOn: { rates: 'exchange rates', meets: 'a list of people', org: 'a list of organisations' } as Readonly<Record<string, string>>,
@@ -155,7 +159,7 @@ export const words = {
   /** The press when what an add-on needs is not here yet (AH6): it adds that part, and Install follows. */
   addFirst: (parts: string): string => `Add ${parts} first`,
   needsFirstRefused: (title: string, parts: string): string => `${title} needs ${parts} first. Add ${parts}, then ${title}.`,
-  needsSomethingFirst: (title: string): string => `${title} needs another add-on first, one that keeps a list it points at.`,
+  needsSomethingFirst: (title: string): string => `${title} needs another plugin first, one that keeps a list it points at.`,
   update: (to: string): string => `Update to ${to}`,
   turnOn: (title: string): string => `Turn on ${title}`,
   installed: 'Installed',
@@ -187,7 +191,7 @@ export const words = {
   countHosts: (n: number): string => (n === 1 ? 'Calls 1 host' : `Calls ${n} hosts`),
   /* THE BROWSE TITLE ROW'S SENTENCE: how many there are, and how many this record holds already. */
   sentence: (n: number, held: number | null): string =>
-    held === null || held === 0 ? `${n} to pick from.` : `${n} to pick from. Your BrainDog holds ${held} ${held === 1 ? 'add-on' : 'add-ons'} in all, the built-in ones too.`,
+    held === null || held === 0 ? `${n} to pick from.` : `${n} to pick from. Your BrainDog holds ${held} ${held === 1 ? 'plugin' : 'plugins'} in all, the built-in ones too.`,
   /* WHAT A USE CASE BRINGS OF ITS OWN, said once under its drawing: its lists by name. */
   ownLists: (names: readonly string[]): string => names.join(', '),
   /* THE DETAIL PAGE'S PLAN: the row that names every host it calls, and the tail of a row that names more than fit. */

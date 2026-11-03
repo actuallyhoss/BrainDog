@@ -18,7 +18,7 @@ const and = (xs: readonly string[]): string => new Intl.ListFormat('en-GB', { ty
 
 export const asksWords = {
   title: 'What it asks for',
-  note: 'An add-on can only use what is named here.',
+  note: 'A plugin can only use what is named here.',
   reads: (names: readonly string[]): string => `Reads your ${and(names)}`,
   changes: (names: readonly string[]): string => `Reads and changes your ${and(names)}`,
   figures: (names: readonly string[]): string => `Reads your ${names.length === 1 ? 'figure' : 'figures'} ${and(names)}`,
@@ -34,7 +34,7 @@ export const asksWords = {
   nothing: 'Only its own lists. It sends nothing out.',
   github: (repo: string, commit: string): string => `From GitHub: ${repo}, commit ${commit}`,
   unreviewed: 'Not reviewed by BrainDog. Anyone can publish on GitHub. It can only do what is listed below.',
-  gitAsked: (n: number): string => (n === 1 ? 'An add-on from GitHub has a new version. It waits on Decide.' : `${n} add-ons from GitHub have new versions. They wait on Decide.`),
+  gitAsked: (n: number): string => (n === 1 ? 'A plugin from GitHub has a new version. It waits on Decide.' : `${n} plugins from GitHub have new versions. They wait on Decide.`),
 } as const;
 
 /** `git:owner/repo@<sha>:path`, as a pinned add-on keeps it, read as the repository and the short commit; anything else is `null`. */

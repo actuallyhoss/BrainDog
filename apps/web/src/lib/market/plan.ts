@@ -36,7 +36,7 @@ export const words = {
   update: (name: string) => `Update ${name}`,
   reinstall: (name: string) => `Install ${name} again`,
   downgrade: (name: string) => `Go back to the earlier ${name}`,
-  updateAll: (n: number) => (n === 1 ? 'Update 1 add-on' : `Update all ${n}`),
+  updateAll: (n: number) => (n === 1 ? 'Update 1 plugin' : `Update all ${n}`),
   updateAllTitle: (n: number) => (n === 1 ? 'One update' : `${n} updates`),
   updateAvailable: 'Update available',
   notNow: 'Not now',
@@ -61,7 +61,7 @@ export const words = {
   /* THE NUMBERS A PLAN ADDS, AS ONE ROW: seventeen of them named one under another buried its lists. */
   withPage: (detail: string | null) => (detail ? `${detail}, and its own page` : 'With its own page'),
   addsNumbers: (n: number) => (n === 1 ? 'and 1 number' : `and ${n.toLocaleString('en-GB')} numbers`),
-  handed: 'already here, under another add-on',
+  handed: 'already here, under another plugin',
   /** What an add-on's patterns read, by how each arrives (AH11). */
   readsBy: (ways: readonly string[]): string =>
     `Reads ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(ways)} you forward, and files each as it comes in`,
@@ -84,10 +84,10 @@ export const words = {
   extendsLine: (fields: readonly string[]) => `adds ${fields.join(', ')}`,
   pageAdds: 'Adds to your pages',
   /* A PAGE IT ADDS TO, BY ITS NAME, AND WHAT GOES ON IT BY THE TILES' OWN HEADINGS: "Money", "Cash counts, Last count".
-     The record's own sentence ("adds a block to Money from count-cash") named a block and the add-on's id. */
+     The record's own sentence ("adds a block to Money from count-cash") named a block and the plugin's id. */
   pageAddsLine: (headings: readonly string[], n: number) =>
     headings.length > 0 ? new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(headings) : n === 1 ? 'a tile' : `${n.toLocaleString('en-GB')} tiles`,
-  pageMissing: (page: string) => `It adds to your ${page} page, which is not here yet. Add the add-on that brings ${page} first.`,
+  pageMissing: (page: string) => `It adds to your ${page} page, which is not here yet. Add the plugin that brings ${page} first.`,
   settings: 'Settings',
   settingKept: (value: string) => `kept at ${value}`,
   settingDefault: (value: string) => `set to ${value}`,
@@ -121,7 +121,7 @@ export const words = {
   uses: 'Once it is in, it may use',
   may: 'It may also',
   mayNote: 'Approving this approves these too. Each one is checked every time it runs.',
-  usesNote: 'Only these. An add-on cannot reach a list it does not name.',
+  usesNote: 'Only these. A plugin cannot reach a list it does not name.',
   needs: (name: string, range: string, has: string | null) => (has ? `Needs ${name} ${range}, and you have ${has}` : `Needs ${name} ${range}, which you do not have`),
   breaks: (name: string, version: string, range: string) => `${name} ${version} needs ${range} of this, which this version is not`,
   format: 'This file is written for a newer BrainDog than yours',
@@ -226,7 +226,7 @@ function keysOf(d: Body): KeyStep[] {
   });
 }
 
-/** One pack's part of the plan. A single add-on is one part; a use case is one part per pack, in the order they go in. */
+/** One pack's part of the plan. A single plugin is one part; a use case is one part per pack, in the order they go in. */
 export type Part = { key: string; title: string; move: string; sections: Section[]; calls: Call[] };
 
 export type Sheet = {
@@ -256,7 +256,7 @@ function namer(nameOf: (id: string) => string): (id: string) => string {
   };
 }
 
-/** A page an add-on adds to, by its name: `money` and `page.money` are both "Money". */
+/** A page a plugin adds to, by its name: `money` and `page.money` are both "Money". */
 const pageName = (page: string, name: (id: string) => string): string => name(`page.${page.replace(/^(?:page\.)+/u, '')}`);
 
 /** What a plan adds to other pages, a row a page: its name, and the headings of the tiles it puts there. */

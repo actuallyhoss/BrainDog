@@ -118,7 +118,7 @@ export function wayBack(r: Pick<Removed, 'id' | 'version'>, modules: ReadonlyMap
   const entry = kennel?.entries.find((e) => e.kind === kind && e.id === id) ?? null;
   const kept = entry?.versions.find((v) => v.version === r.version && v.yanked === undefined);
   const newest = kept ? kept.version : entry ? (offeredVersion(entry)?.version ?? null) : null;
-  return { kind: 'page', href: `/addons/${encodeURIComponent(id)}${kind === 'pack' ? '?kind=pack' : ''}`, newest };
+  return { kind: 'page', href: `/plugins/${encodeURIComponent(id)}${kind === 'pack' ? '?kind=pack' : ''}`, newest };
 }
 
 /**

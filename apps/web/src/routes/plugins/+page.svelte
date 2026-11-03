@@ -1,5 +1,5 @@
 <!--
-  The store: everything a record can add, at `/addons`. What this record already holds is Settings › Add-ons.
+  The store: everything a record can add, at `/plugins`. What this record already holds is Settings › Plugins.
 
   ONE LISTING MODEL. The starters this build ships and every entry the catalogue lists are read into `Listing`s by
   `listingsOf` (`$lib/market/listing.ts`), so they are searched and named the same way everywhere. Anything private,
@@ -51,12 +51,13 @@
   import { suggestionsOf, type SignRead } from '$lib/market/suggest.ts';
   import { words } from '$lib/market/words.ts';
   import { drew } from '../../lib/ui/screen.svelte.ts';
-  import { INSTALLED_AT } from './moved.ts';
-  import { miniOf } from './mini.ts';
-  import { readHostCatalogue } from './catalogue.ts';
-  import { addonHref } from './share/addon-from.ts';
+  import { INSTALLED_AT } from '../addons/moved.ts';
+  import { miniOf } from '../addons/mini.ts';
+  import { readHostCatalogue } from '../addons/catalogue.ts';
+  import { addonHref } from '../addons/share/addon-from.ts';
   import Swap from '$lib/motion/Swap.svelte';
-  import { cardsIn } from './cards-in.ts';
+  import { cardsIn } from '../addons/cards-in.ts';
+  import PluginSkeleton from '../addons/PluginSkeleton.svelte';
   import { asksWords } from '$lib/market/asks.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { heldMine, madeWords, waitingOf, type AddonLine, type OpenRow } from '$lib/market/made-here.ts';
@@ -73,7 +74,7 @@
   let questions = $state.raw<string[] | null>(null);
   /** What this record holds as the record says it (`addons {installed: true}`), for Made by you; `null` until read. */
   let mine = $state.raw<AddonLine[] | null>(null);
-  /** The open questions whole, for an add-on an agent made that waits on Decide. */
+  /** The open questions whole, for a plugin an agent made that waits on Decide. */
   let openRows = $state.raw<OpenRow[]>([]);
 
   let query = $state(page.url.searchParams.get('q') ?? '');
@@ -253,7 +254,7 @@
   $effect(() => drew('ready'));
 </script>
 
-<svelte:head><title>{titleOf(part ? copy.notShared.title : copy.packs)}</title></svelte:head>
+<svelte:head><title>{titleOf(part ? copy.notShared.title : words.plugins)}</title></svelte:head>
 
 <!-- ON A PHONE THE TWO WAYS ON SIT UNDER THE SENTENCE (1 Nov): beside it they squeezed "Each shows its plan before
      anything changes." into five lines of two words. -->
@@ -268,7 +269,7 @@
   <PageHead title={copy.notShared.title} headless />
   <NotFound title={copy.notShared.title} body={copy.notShared.body} />
 {:else}
-<PageHead icon="packs" title={copy.packs} sentence={store.sentence} actions={phone.current ? undefined : ways}>
+<PageHead icon="packs" title={words.plugins} sentence={store.sentence} actions={phone.current ? undefined : ways}>
   {#snippet below()}{#if phone.current}<div class="ways">{@render ways()}</div>{/if}{/snippet}
 </PageHead>
 
@@ -307,6 +308,10 @@
 
   <!-- A CHIP PRESSED CHANGES EVERY SHELF UNDER IT AT ONCE: the shelves shown fade out and the chosen one up in their place
        (`Swap`, skills pass 2 Nov), where they swapped in one frame. Keyed on the chip alone, so a search typed does not fade. -->
+  {#if !settled && !kennelRefused}
+    <!-- WHILE THE STORE AND THE RECORD ARE READ, THE SHELVES' CARDS AT THEIR SIZE (3 Nov), under the real search. -->
+    <PluginSkeleton kind="store" />
+  {/if}
   {#if settled}
   <Swap key={chip}>
   <div class="shelves">
@@ -318,7 +323,7 @@
           <StoreCard title={w.title} line={madeWords.waitingLine} href={`/decide/${encodeURIComponent(w.question)}`} icon="ask" hue={SHELF_SLOTS.starters} cue={madeWords.decide} badge={{ text: madeWords.waiting, tone: 'warn' }} />
         {/each}
         {#each held.made as l (l.id)}
-          <StoreCard title={l.title} line={l.summary} href={`/addons/${encodeURIComponent(l.id)}`} icon="code" hue={SHELF_SLOTS.starters} cue={madeWords.open} held badge={{ text: madeWords.card(l.here?.version ?? null), tone: 'info' }} />
+          <StoreCard title={l.title} line={l.summary} href={`/plugins/${encodeURIComponent(l.id)}`} icon="code" hue={SHELF_SLOTS.starters} cue={madeWords.open} held badge={{ text: madeWords.card(l.here?.version ?? null), tone: 'info' }} />
         {/each}
       </ul>
     </section>
@@ -329,7 +334,7 @@
       <h2 class="part-h" id="store-linked">{madeWords.linked}<span class="part-note">{madeWords.linkedNote}</span></h2>
       <ul class="cards">
         {#each held.linked as l (l.id)}
-          <StoreCard title={l.title} line={l.summary} href={`/addons/${encodeURIComponent(l.id)}`} icon="link" hue={SHELF_SLOTS.starters} cue={madeWords.open} held badge={{ text: madeWords.cardLinked(l.here?.version ?? null), tone: 'warn' }} />
+          <StoreCard title={l.title} line={l.summary} href={`/plugins/${encodeURIComponent(l.id)}`} icon="link" hue={SHELF_SLOTS.starters} cue={madeWords.open} held badge={{ text: madeWords.cardLinked(l.here?.version ?? null), tone: 'warn' }} />
         {/each}
       </ul>
     </section>

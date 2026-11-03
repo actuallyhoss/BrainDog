@@ -63,6 +63,9 @@
   import { words } from '$lib/market/words.ts';
   import { readyFor, readyWords, type Ready } from '$lib/market/update-ready.ts';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
+  import { frame } from '$lib/shell/frame.svelte.ts';
+  import { STORE_AT } from '../moved.ts';
+  import PluginSkeleton from '../PluginSkeleton.svelte';
   import { hostedHere } from '../../settings/billing.ts';
   import { listWords, moduleTitle, oneOf } from '../sharing.ts';
   import Preview from '../Preview.svelte';
@@ -382,6 +385,15 @@
     if (listing) drew('ready');
   });
 
+  /* THE BAR'S CRUMB IS "Plugins › <name>", the store first, whatever the sidebar lights (3 Nov, Sam). */
+  $effect(() => {
+    const up = { label: words.plugins, href: STORE_AT };
+    frame.up = up;
+    return () => {
+      if (frame.up === up) frame.up = null;
+    };
+  });
+
   async function reread() {
     if (!client) return;
     const again = await choose(client);
@@ -400,7 +412,7 @@
 
   /* ── an update that is ready ────────────────────────────────────────────── */
 
-  /* WHAT THE NEW VERSION CHANGES, for a record that holds an earlier one of an add-on from outside: read from the two
+  /* WHAT THE NEW VERSION CHANGES, for a record that holds an earlier one of a plugin from outside: read from the two
      files the store holds (`update-ready.ts`), once per listing and pair of versions, and never for a built-in, whose
      update the plan sheet already describes. */
   let ready = $state.raw<Ready | null>(null);
@@ -432,7 +444,7 @@
   let filed = $state<string | null>(null);
 
   /* WHAT THE INSTALL SENDS AND WHAT WAITS, as sentences under the plan (`offer.ts`): which key goes to which host and how
-     often, and the parts left out until the record holds a list. Both are empty for most add-ons, and then nothing is
+     often, and the parts left out until the record holds a list. Both are empty for most plugins, and then nothing is
      drawn. */
   const waits = $derived(planned ? waitsOf(planned, (id) => names.get(id) ?? moduleTitle(id)) : []);
 
@@ -562,7 +574,7 @@
         else refused = asked;
       } else if (out.code === 'PLAN_STALE' && !out.first && file) {
         /* THE PLAN SAYS SOMETHING ELSE NOW: the record installs a plan that only moved in time by itself, so this one
-           changed what the add-on would do. Read again and shown, with one line over it, never a refusal to press past. */
+           changed what the plugin would do. Read again and shown, with one line over it, never a refusal to press past. */
         const held = states;
         const fresh = await planFor(client, listing, file, held, copy.writeRaced, () => waitingOf(fetch, kennel, held));
         if (fresh.ok) {
@@ -583,7 +595,7 @@
     }
   }
 
-  /** Undo of a first install: the add-on taken back out, its lists and what they hold kept, as Uninstall keeps them. */
+  /** Undo of a first install: the plugin taken back out, its lists and what they hold kept, as Uninstall keeps them. */
   async function takeBack(id: string, title: string) {
     const c = client;
     if (!c) return;
@@ -652,13 +664,17 @@
   );
 </script>
 
-<svelte:head><title>{titleOf(listing?.title, copy.packs)}</title></svelte:head>
+<svelte:head><title>{titleOf(listing?.title, words.plugins)}</title></svelte:head>
 
 <!-- THE WAY BACK IS THE HEAD'S: a kicker at 1440 and the back link in the phone's bar, on the gutter like every detail
      page's, where a bare button above the lead sat off it. -->
 <!-- `sentence=""`: the page says nothing under its name, so no line is held for one and given back when it settles,
      which pulled every tile up by its height (verify6, 2 Nov). -->
-<PageHead icon={glyph} kicker={copy.packs} back="/addons" title={listing?.title ?? copy.packs} sentence="" />
+{#if !listing && !looked}
+  <!-- WHILE THE STORE IS READ, THE CARDS' SHELLS AT THEIR SIZE (3 Nov), never a page of nothing. -->
+  <PluginSkeleton kind="listing" />
+{:else}
+<PageHead icon={glyph} kicker={words.plugins} back={STORE_AT} title={listing?.title ?? words.plugins} sentence="" />
 
 <!-- ONE VERSION ON THE VERSIONS TILE: the newest, and each earlier one under the fold. -->
 {#snippet versionRow(v: CatalogueVersion)}
@@ -697,7 +713,7 @@
       </Empty>
     {:else if looked}
       <Empty kind="no-results" title={words.missing} body={words.missingBody}>
-        {#snippet actions()}<Button href="/addons">{copy.browseAll}</Button>{/snippet}
+        {#snippet actions()}<Button href="/plugins">{copy.browseAll}</Button>{/snippet}
       </Empty>
     {/if}
   {:else}
@@ -762,7 +778,8 @@
            is called; then every host it calls, or that it calls none. Read from the file, never written for the page. -->
       <div class="adds-cell" aria-busy={planRead ? undefined : 'true'}>
         <!-- NO COUNT OVER NOTHING: "What it adds 0" over the hosts it calls read as a mistake. -->
-        <Tile icon="plus" title={words.adds} count={addsTotal || undefined}>
+        <!-- NO TOTAL BESIDE THE NAME: 1 list, 1 page, 4 numbers and 8 rules summed to "17", a count of nothing. -->
+        <Tile icon="plus" title={words.adds}>
           {#if addsTotal === 0}<p class="quiet">{words.addsNothing}</p>{/if}
           {#if planRows.length > 0}
             <ul class="plan">
@@ -805,16 +822,16 @@
         </div>
       {/if}
 
-      <!-- ITS PAGES, DRAWN: the use case's rail and Home, or an add-on's pages through the real renderer, each on a well of
+      <!-- ITS PAGES, DRAWN: the use case's rail and Home, or a plugin's pages through the real renderer, each on a well of
            the ground's colour inside the tile. A listing with no drawing has no tile for one: what it adds already names
            its pages. A drawing that could not be read says so. -->
       <!-- ITS ROOM HELD WHILE THE PREVIEW IS READ (verify6, 2 Nov): a version that says it has one had the tile land over
            Versions and Details once read, and pushed them down by its height (0.10 to 0.15 of the screen at 1512). -->
       {#if u || preview.state === 'ready' || preview.state === 'refused' || previewComing}
         <div class="wide-cell">
-          <!-- AN EXAMPLE, SAID SO (AM9): the drawing holds the add-on's own made-up rows, and "Studio rent £1,650" under
+          <!-- AN EXAMPLE, SAID SO (AM9): the drawing holds the plugin's own made-up rows, and "Studio rent £1,650" under
                Its pages read as his own rent, on a record whose rent is EGP 12,000. -->
-          <Tile icon="projects" title={words.pages} meta={u || preview.state === 'ready' ? words.anExample : undefined}>
+          <Tile icon="projects" title={words.pages}>
             {#if u || preview.state === 'ready'}<p class="quiet">{words.exampleLine}</p>{/if}
             {#if u}
               <Preview preview={previewOf(u)} large />
@@ -910,6 +927,7 @@
     {#if doable}<div class="act narrow-only">{@render act()}</div>{/if}
   {/if}
 </div>
+{/if}
 
 <style>
   .page {
@@ -1096,9 +1114,6 @@
     color: var(--ink-2);
   }
 
-  .plan-row + .plan-row {
-    border-block-start: 1px solid var(--rule);
-  }
 
   /* THE GLYPH SITS ON THE FIRST LINE, level with the kind and its count, however many lines the names take. */
   .plan-row > :global(.icon) {
@@ -1151,9 +1166,6 @@
     gap: var(--sp-1) var(--sp-3);
   }
 
-  .log-row + .log-row {
-    border-block-start: 1px solid var(--rule);
-  }
 
   .loud {
     color: var(--ink);

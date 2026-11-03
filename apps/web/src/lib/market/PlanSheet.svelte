@@ -51,7 +51,7 @@
     onapprove: () => void;
     oncancel: () => void;
     extra?: Snippet | undefined;
-    /** A field by its label where the plan's own document knows it (a field an add-on lays on a list), before the record's. */
+    /** A field by its label where the plan's own document knows it (a field a plugin lays on a list), before the record's. */
     fieldOf?: ((list: string, field: string) => string | null) | undefined;
     /**
      * Reads the plan again, while a key it sends is not there yet: every few seconds and when the window comes back, so

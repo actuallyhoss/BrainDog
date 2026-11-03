@@ -43,7 +43,7 @@
   /* THE SKILLS THE RECORD KEEPS AND WHICH ARE TICKED, by row number. */
   let skillOffer = $state.raw<OfferedSkill[]>([]);
   let skillTicks = $state.raw<ReadonlySet<number>>(new Set());
-  /* A FIX OR AN UPDATE: the same form, sent as a later version of an add-on already sent. `forId` keeps its id. */
+  /* A FIX OR AN UPDATE: the same form, sent as a later version of a plugin already sent. `forId` keeps its id. */
   let forId = $state<string | null>(null);
   let version = $state('1.0.0');
   let changes = $state('');

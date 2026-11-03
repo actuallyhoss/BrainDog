@@ -11,7 +11,6 @@ import { CORE_PACK } from '@braindog/declare';
 const joined = (parts: readonly string[]): string =>
   parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 
-const counted = (n: number, one: string, many: string): string => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 
 /**
  * HOW MANY ADD-ONS ARE IN THIS BRAINDOG, ONE COUNT FOR BOTH TABS (packs-browse-390-light.png): Browse said "7
@@ -21,22 +20,22 @@ const counted = (n: number, one: string, many: string): string => `${n.toLocaleS
 export const installedCount = (states: readonly unknown[] | null): number | null => (states === null ? null : states.filter((s) => (s as { id?: unknown }).id !== CORE_PACK).length);
 
 export const words = {
-  tabsLabel: 'Add-ons',
+  tabsLabel: 'Plugins',
   /* TWO HALVES OF ONE PLACE (agents F8): what is in, and what there is to add. Updates sit at the top of Installed
      while there are any, and installing from a file or a link is in the page's "⋯". */
   tabs: { installed: 'Installed', browse: 'Browse' },
-  browse: 'Browse add-ons',
+  browse: 'Browse plugins',
   more: 'More',
   from: 'Install from a file or link',
   fromDone: 'Done',
   /* THE TITLE ROW'S SENTENCE. An update is never urgent, so no phrase in it is red. `updates` is `null`
      while the newer versions are still being looked for, and the sentence then says only what is installed. */
+  /* THE COUNT IS THE LIST'S OWN ("Your plugins 2"), so the sentence says only whether they are up to date (3 Nov: "2
+     plugins installed" over a card that said 2). Nothing while the newer versions are still being looked for. */
   sentence: (installed: number, updates: number | null): string => {
-    const head = counted(installed, 'add-on installed', 'add-ons installed');
-    if (installed === 0) return '';
-    if (updates === null) return `${head}.`;
-    if (updates === 0) return installed === 1 ? `${head}, and it is up to date.` : `${head}, and every one is up to date.`;
-    return `${head}, and ${updates.toLocaleString('en-GB')} ${updates === 1 ? 'has an update' : 'have an update'}.`;
+    if (installed === 0 || updates === null) return '';
+    if (updates === 0) return 'All up to date.';
+    return `${updates.toLocaleString('en-GB')} ${updates === 1 ? 'update' : 'updates'} ready.`;
   },
   /* THE LIST'S OWN HEADING, and the updates' when that tab is open. */
   installedTitle: 'Installed',
@@ -45,7 +44,7 @@ export const words = {
   seePlan: 'See the plan',
   planning: 'Reading the plan',
   updateAll: 'Update all',
-  updated: (n: number) => (n === 1 ? '1 add-on is updated.' : `${n} add-ons are updated.`),
+  updated: (n: number) => (n === 1 ? '1 plugin is updated.' : `${n} plugins are updated.`),
   /* ONE PASSED OVER IS NAMED: an earlier update of the same run already brought it to its version. */
   alreadyIn: (names: readonly string[]) => `${joined(names)} ${names.length === 1 ? 'was' : 'were'} already in.`,
   /**
@@ -62,7 +61,7 @@ export const words = {
   /* WHAT AN UPDATE'S ROW SAYS: the versions it moves between are in its tooltip, for whoever wants them. */
   updateAvailable: 'Update available',
   /* INSTALL FROM. */
-  fromBlurb: 'A starter or an add-on somebody shared: a file, an https address, a file in a GitHub repository, or its text pasted in.',
+  fromBlurb: 'A starter or a plugin somebody shared: a file, an https address, a file in a GitHub repository, or its text pasted in.',
   address: 'An https address, or a file in a GitHub repository',
   addressHint: 'BrainDog reads it, so a site that blocks browsers still works.',
   read: 'Read it',
@@ -77,13 +76,13 @@ export const words = {
   waitingTitle: 'Waiting on you',
   update: 'Update',
   /* AN UPDATE FROM OUTSIDE BRAINDOG ALWAYS ASKS, and BrainDog's own one waits here only when it would lose or newly reach something. */
-  outsideAsks: 'Add-ons from outside BrainDog always ask first.',
+  outsideAsks: 'Plugins from outside BrainDog always ask first.',
   yourStarter: (title: string) => `Your starter: ${title}`,
   starterTurnedOn: (names: readonly string[]) => `Turned on ${joined(names)}`,
   changeStarter: 'Change starter',
   shareStarter: 'Share as a file',
-  yoursTitle: 'Your add-ons',
-  findAddons: 'Find add-ons',
+  yoursTitle: 'Your plugins',
+  findAddons: 'Find plugins',
   partOf: 'Part of BrainDog',
   /* WHAT FOLLOWS THE NAMES, each name a link to its own page: "Projects, Work and Agents are always on and update themselves." */
   partOfTail: (n: number) => (n === 1 ? 'is always on and updates itself.' : 'are always on and update themselves.'),

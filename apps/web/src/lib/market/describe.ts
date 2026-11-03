@@ -1,7 +1,7 @@
 /**
  * ONE DESCRIPTION OF AN ADD-ON, said the same on the three screens that name one: its row on Installed, its own
  * page, and its row in the store. Each counted on its own: Installed counted the record's lists and the rules, the store
- * the catalogue's lists and pages, and the add-on's page summed lists and pages into one number. Now each asks this.
+ * the catalogue's lists and pages, and the plugin's page summed lists and pages into one number. Now each asks this.
  *
  * A BUILT-IN IS READ FROM ITS MODULE, its lists and the pages a person opens by name (a page drawn for each row of a list
  * is not one of them); anything else from what its listing says it adds. PURE, so `node --test` holds it.

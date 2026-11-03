@@ -79,7 +79,7 @@
   let catalogueNames = $state.raw<Map<string, string>>(new Map());
   /* AND ITS LINE, what the catalogue says it is for, where this build's modules do not know it. */
   let catalogueSays = $state.raw<Map<string, string>>(new Map());
-  /* AND THE ICON ITS CATALOGUE ENTRY CARRIES, unlisted entries too, since an installed add-on is one a record holds by id. */
+  /* AND THE ICON ITS CATALOGUE ENTRY CARRIES, unlisted entries too, since an installed plugin is one a record holds by id. */
   let catalogueIcons = $state.raw<Map<string, string>>(new Map());
   /* A USE CASE'S PACK BY ITS USE CASE, "Solo founder", and a module by the name it goes by, never `usecase-founder`. */
   const nameOf = (id: string) => byId.get(id)?.name ?? catalogueNames.get(id) ?? moduleName(id);
@@ -171,7 +171,7 @@
 
   /** An add-on nobody described says what it adds, in a sentence, and never lists names bare. */
   const listsLine = (names: readonly string[]): string =>
-    names.length === 0 ? 'An add-on with no lists of its own.' : `Adds the ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`} ${names.length === 1 ? 'list' : 'lists'}.`;
+    names.length === 0 ? 'A plugin with no lists of its own.' : `Adds the ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`} ${names.length === 1 ? 'list' : 'lists'}.`;
 
   /** The second line of a row: off said as off, else what the add-on or its use case is for, else the lists it keeps. */
   const lineOf = (state: PackState): string =>
@@ -664,7 +664,7 @@
     <Menu label={words.more} align="end">
       {#snippet trigger()}<span class="more"><Icon name="more" size="m" /><span class="vh">{words.more}</span></span>{/snippet}
       <button type="button" class="mi" role="menuitem" onclick={() => (from = true)}><Icon name="download" size="s" />{words.from}</button>
-      <a class="mi" role="menuitem" href={at('/addons/share')}><Icon name="share" size="s" />{copy.shareSetup}</a>
+      <a class="mi" role="menuitem" href={at('/plugins/share')}><Icon name="share" size="s" />{copy.shareSetup}</a>
     </Menu>
   </div>
 </div>
@@ -703,7 +703,7 @@
     <Tile icon={iconFor(starterId) ?? 'projects'} title={words.yourStarter(starter.title)} count={installed.find((x) => x.id === starterId)?.version ?? undefined}>
       {#snippet actions()}
         <Button size="sm" href={`${STORE_AT}?chip=starters`}>{words.changeStarter}</Button>
-        <Button size="sm" weight="bare" href="/addons/share">{words.shareStarter}</Button>
+        <Button size="sm" weight="bare" href="/plugins/share">{words.shareStarter}</Button>
       {/snippet}
       <p class="starter-line">{starter.summary}</p>
       {#if on.length > 0}<p class="aside">{words.starterTurnedOn(on)}</p>{/if}
@@ -725,7 +725,7 @@
           <li class="addon-row" data-off={off ? '' : undefined} data-needs={block ? '' : undefined} in:lineIn out:dismiss animate:flip={springy()}>
             <div class="line addon">
               <span class="line-mark"><IconWell name={iconFor(state.id) ?? glyphOf(byId.get(state.id)?.pages, page.data.nav ?? [])} size="l" /></span>
-              <a class="addon-main" href={at(`/addons/${state.id}`)}>
+              <a class="addon-main" href={at(`/plugins/${state.id}`)}>
                 <span class="line-title addon-name">{name}</span>
                 <span class="line-detail addon-line">{lineOf(state)}</span>
                 {#if holdsOn(state.id)}<span class="addon-holds num">{holdsOn(state.id)}</span>{/if}
@@ -733,7 +733,7 @@
               <span class="line-verbs">
                 <Menu label={market.more(name)} align="end">
                   {#snippet trigger()}<span class="more"><Icon name="more" size="m" /><span class="vh">{market.more(name)}</span></span>{/snippet}
-                  <a class="mi" role="menuitem" href={at(`/addons/${state.id}`)}><Icon name="settings" size="s" />{packWords.settings}</a>
+                  <a class="mi" role="menuitem" href={at(`/plugins/${state.id}`)}><Icon name="settings" size="s" />{packWords.settings}</a>
                   <button type="button" class="mi" role="menuitem" onclick={() => showAdds(state.id)}><Icon name="eye" size="s" />{copy.installDiff}</button>
                   <!-- ON AND OFF IN THE "⋯", never a bare switch on the row: what stops it is said under the row. -->
                   <button type="button" class="mi" role="menuitem" aria-label={copy.packSwitch(name)} disabled={busy !== null} onclick={() => turn(state.id, off)}><Icon name={off ? 'check' : 'close'} size="s" />{off ? words.turnOn : words.turnOff}</button>
@@ -770,7 +770,7 @@
     <p class="part-of">
       <span class="part-of-h">{words.partOf}</span>
       <span>
-        {#each coreHeld as c, i (c.id)}{i === 0 ? '' : i === coreHeld.length - 1 ? ' and ' : ', '}<a class="tap" href={at(`/addons/${c.id}`)}>{nameOf(c.id)}</a>{/each}
+        {#each coreHeld as c, i (c.id)}{i === 0 ? '' : i === coreHeld.length - 1 ? ' and ' : ', '}<a class="tap" href={at(`/plugins/${c.id}`)}>{nameOf(c.id)}</a>{/each}
         {words.partOfTail(coreHeld.length)}
       </span>
     </p>

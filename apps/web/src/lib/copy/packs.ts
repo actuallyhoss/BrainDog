@@ -24,7 +24,7 @@ export const packs = {
     'BrainDog can fetch what your currencies are worth from a public address once a day, so money in more than one currency adds up in your home currency. One action fetches every currency your money is in. Open it again when you start using a new currency.',
   ratesKeep: 'Keep rates current',
   ratesTurnedOff: 'Exchange rates are no longer fetched. Turn it on again to bring them back.',
-  noPacksYet: 'No add-ons installed',
+  noPacksYet: 'No plugins installed',
   /* The Keychain's words are in `record/keychain.ts`, which only its two routes load. */
 
   /* packs */
@@ -54,20 +54,20 @@ export const packs = {
   packIsOff: (name: string) => `${name} is off`,
   packTurnOn: (name: string) => `Turn on ${name}`,
   packScopesInUse: (names: string[]) => `Its projects are still used by ${list(names)}`,
-  packNothingToSet: 'This add-on has nothing to set',
-  packNotInstalled: (id: string) => `There is no add-on called ${id} here`,
-  packNotInstalledWhy: 'Add-ons shows the ones you have, and the ones you could add.',
+  packNothingToSet: 'This plugin has nothing to set',
+  packNotInstalled: (id: string) => `There is no plugin called ${id} here`,
+  packNotInstalledWhy: 'Plugins shows the ones you have, and the ones you could add.',
   packNothingToSetWhy: 'It adds the lists and pages below, and nothing about it needs choosing.',
   /* THE SENTENCE UNDER THE TITLE. The screen was `Packs`, a word nobody brings with them; it is
-     `Add-ons` now, the reader's word for an installable thing with an author. The API, the docs and
+     `Plugins` now, the reader's word for an installable thing with an author. The API, the docs and
      the `mcp` surface keep `pack`. It says what an add-on brings, which is also what fills the screen while none is
      installed. "It is readable text, and nothing in it runs" was a sentence about how an add-on is built, and a person
      choosing one is asking what they get. */
-  packBlurb: 'An add-on brings ready-made lists and pages.',
+  packBlurb: 'A plugin brings ready-made lists and pages.',
 
   /* USE CASES, SHARED AND INSTALLED. A use case is a file like an add-on, planned and
      approved the same way, so these sentences say what it arranges and never how the screen works. */
-  browseAll: 'All starters and add-ons',
+  browseAll: 'All starters and plugins',
   chooseFile: 'Choose a file',
   shareAddressNotOne: 'That is not a web address. Paste the whole https address of the file.',
   shareAddressHttps: 'A starter is read only from an https address.',
@@ -87,7 +87,7 @@ export const packs = {
   browseHome: 'Today',
   browseLists: 'Lists',
   browseNoRail: 'Nothing added to the menu',
-  shareNoUseCase: 'No starter here, so it carries your add-ons and placed pages.',
+  shareNoUseCase: 'No starter here, so it carries your plugins and placed pages.',
   shareTitle: 'Title',
   shareVersion: 'Version',
   shareSummary: 'What it is for',

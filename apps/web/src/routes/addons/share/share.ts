@@ -14,7 +14,7 @@ import { handleName } from 'braindog-render';
 
 export const words = {
   /* THE PAGE'S SENTENCE (agents F27): what the file is, in the words a person uses for it, and what stays out. */
-  what: 'Your add-ons, pages and names in one file. Your entries stay out unless you pick them.',
+  what: 'Your plugins, pages and names in one file. Your entries stay out unless you pick them.',
   /* TWO STEPS, SINCE the screens scope of 24 October: name the file, then pick what goes in and send it. */
   about: '1. Name the file',
   send: '2. Pick what goes in, then send it',

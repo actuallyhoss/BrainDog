@@ -1,7 +1,7 @@
 /**
- * Where an old add-on address lands now. Add-ons lived under `/packs`; they live under `/addons`, and what this record
- * holds is Settings › Add-ons. Every old address keeps working: a link somebody shared, a Decide card filed before the
- * move, a bookmark.
+ * Where an old plugin address lands now. Plugins lived under `/packs`, then under `/addons` (until 3 Nov, when Sam
+ * renamed add-ons to plugins); they live under `/plugins`, and what this record holds is Settings › Plugins. Every old
+ * address keeps working: a link somebody shared, a Decide card filed before the move, a push, a bookmark.
  *
  * - `/packs`, and `/packs?tab=updates` or `?tab=installed`: Settings › Add-ons. `?tab=from` keeps asking for the
  *   install-from-a-file part there.
@@ -15,7 +15,13 @@
 /** Settings › Add-ons, what this record holds. */
 export const INSTALLED_AT = '/settings/addons';
 /** The store. */
-export const STORE_AT = '/addons';
+export const STORE_AT = '/plugins';
+
+/** The address an old `/addons` address means now: `rest` is what followed `/addons/`, `search` its query with the `?`. */
+export function pluginsFrom(rest: string, search: string): string {
+  const parts = rest.split('/').filter((p) => p !== '');
+  return `${STORE_AT}${parts.length > 0 ? `/${parts.join('/')}` : ''}${search}`;
+}
 
 /** The address an old `/packs` address means now: `rest` is what followed `/packs/`, `search` its query with the `?`. */
 export function movedFrom(rest: string, search: string): string {

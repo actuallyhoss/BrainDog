@@ -78,6 +78,9 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
+  import { frame } from '$lib/shell/frame.svelte.ts';
+  import { STORE_AT } from '../moved.ts';
+  import PluginSkeleton from '../PluginSkeleton.svelte';
   import { moduleName } from '@braindog/seed/usecases/names';
   import { SPEAKS } from '$lib/voice.ts';
   import { words as market } from '$lib/market/words.ts';
@@ -123,7 +126,7 @@
 
   let from = $state<'reading' | 'ready' | 'refused'>('reading');
   let refusal = $state('');
-  /** The record does not hold this add-on at all, which is an address and not a failure. */
+  /** The record does not hold this plugin at all, which is an address and not a failure. */
   let unknown = $state(false);
   let settings = $state<PackConfig | null>(null);
   /** Whether this use case is the only one on, so its voice is the record's whatever `speaks` says. */
@@ -245,7 +248,7 @@
   /* A DOOR'S CONNECT RECIPE, read from the same file (`connect.ts`), so an add-on that takes things in from somewhere
      else says how to set that up on its own page. */
   let recipes = $state<Recipe[]>([]);
-  /* CONNECT GOOGLE, on the two add-ons it fills (`$lib/google`): with Google connected, Gmail's paste steps give way to it. */
+  /* CONNECT GOOGLE, on the two plugins it fills (`$lib/google`): with Google connected, Gmail's paste steps give way to it. */
   const googleFor = $derived(id === 'gmail' ? 'gmail' : id === 'calendar' ? 'calendar' : null);
   let google = $state<GoogleStatus | null>(null);
   async function readHolds(s: PackConfig, want: string) {
@@ -268,7 +271,7 @@
   /** The version the store offers past the one held, and where its plan is read: the store's page, or the Updates card for one only this build ships. */
   const newer = $derived(found && installed?.version ? newerThan(found.listing, installed.version) : null);
   const updateAt = $derived(
-    found === null ? null : found.shippedOnly || found.tier === 'link' ? '/settings/addons' : `/addons/${encodeURIComponent(found.listing.id)}?kind=${found.listing.kind}&update`,
+    found === null ? null : found.shippedOnly || found.tier === 'link' ? '/settings/addons' : `/plugins/${encodeURIComponent(found.listing.id)}?kind=${found.listing.kind}&update`,
   );  let turning = $state(false);
   /** The record's sentence when it refused the switch; the cascade that answers a dependent is offered on /packs. */
   let turnSaid = $state('');
@@ -431,6 +434,16 @@
   }
   $effect(() => {
     if (from === 'ready') drew('ready');
+  });
+
+  /* THE BAR'S CRUMB IS "Plugins › <name>" (3 Nov, Sam: "Projects › HSBC Egypt alerts"): the page says where it sits, the
+     store, so the crumb's first step is the way back there whatever the sidebar lights. */
+  $effect(() => {
+    const up = { label: market.plugins, href: STORE_AT };
+    frame.up = up;
+    return () => {
+      if (frame.up === up) frame.up = null;
+    };
   });
 
   const entries = $derived(Object.entries(settings?.config ?? {}));
@@ -623,7 +636,7 @@
 </script>
 
 <svelte:window {onkeydown} />
-<svelte:head><title>{titleOf(name, copy.packs)}</title></svelte:head>
+<svelte:head><title>{titleOf(name, market.plugins)}</title></svelte:head>
 
 {#if from === 'refused'}
   <div class="page">
@@ -637,29 +650,16 @@
       title={unknown ? copy.packNotInstalled(id) : refusal}
       body={unknown ? copy.packNotInstalledWhy : undefined}
     >
-      {#snippet actions()}<Button href="/settings/addons">{copy.packs}</Button>{/snippet}
+      {#snippet actions()}<Button href={STORE_AT}>{market.plugins}</Button>{/snippet}
     </Empty>
   </div>
-{:else if from === 'ready' && settings && (drawable || waitedLong)}
-  <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/settings/addons" title={name} sentence="">
+{:else if !(from === 'ready' && settings && (drawable || waitedLong))}
+  <!-- WHILE IT IS READ, THE CARDS' OWN SHELLS AT THEIR SIZE, never an empty page or a spinner. -->
+  <PluginSkeleton kind="installed" title={pack?.name ?? listing?.title ?? null} />
+{:else}
+  <PageHead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} kicker={market.plugins} back={STORE_AT} title={name} sentence="">
     {#snippet actions()}
       {#if newer && updateAt}<Button weight="primary" size="sm" href={updateAt}>{market.about.updateTo(newer)}</Button>{/if}
-      {#if installed && !core}
-        <!-- THE SWITCH WITH ITS WORD BESIDE IT, so it reads as the add-on's own on and off, not a setting of the page. -->
-        <label class="head-switch">
-          <span class="head-switch-word" aria-hidden="true">{installed.disabled_at === null ? turnWords.on : turnWords.off}</span>
-          <button
-            type="button"
-            class="switch"
-            role="switch"
-            aria-checked={installed.disabled_at === null}
-            aria-label={copy.packSwitch(name)}
-            aria-expanded={asking}
-            disabled={turning}
-            onclick={pressSwitch}
-          ><span class="switch-track"></span></button>
-        </label>
-      {/if}
     {/snippet}
   </PageHead>
 
@@ -672,11 +672,27 @@
     <div class="lead-cell" aria-busy={widgetsRead && holds !== undefined ? undefined : 'true'}>
      <Tile lead icon={(pack && isGlyph(pack.icon) ? pack.icon : null) ?? glyphOf(pack?.pages, page.data.nav ?? [])} title={copy.useCaseFor} aria-label={copy.useCaseFor}>
       {#if blurb}<p class="summary">{blurb}</p>{/if}
-      <p class="about">
-        {#if installed?.version ?? settings.version}{@const v = (installed?.version ?? settings.version)!}<span class="num">{installed?.disabled_at ? market.about.off(v) : market.about.on(v)}</span>{/if}
-        {#if core}<span>{market.about.partOf}</span>{/if}
-        {#if installed?.disabled_at}<span>{copy.packTurnedOff}</span>{/if}
-      </p>
+      <!-- ITS STATE ON ONE LINE: the switch with its word, then its version. It stood alone in a row over the cards. -->
+      <div class="state">
+        {#if installed && !core}
+          <label class="head-switch">
+            <button
+              type="button"
+              class="switch"
+              role="switch"
+              aria-checked={installed.disabled_at === null}
+              aria-label={copy.packSwitch(name)}
+              aria-expanded={asking}
+              disabled={turning}
+              onclick={pressSwitch}
+            ><span class="switch-track"></span></button>
+            <span class="head-switch-word" aria-hidden="true">{installed.disabled_at === null ? turnWords.on : turnWords.off}</span>
+          </label>
+        {:else if core}
+          <span class="pill-badge" data-tone="good">{market.about.partOf}</span>
+        {/if}
+        {#if installed?.version ?? settings.version}<span class="state-meta num">{market.versionOf((installed?.version ?? settings.version)!)}</span>{/if}
+      </div>
       {#if asking}
         <div class="turn-ask" role="group" aria-label={copy.packSwitch(name)}>
           <p class="turn-ask-said">{turnWords.ask(name, addedLists.length + (pack ? shownPages.length : storePages.length))}</p>
@@ -711,17 +727,12 @@
     </div>
 
     <div class="wide-cell stack">
-    <!-- WHERE IT CAME FROM, WHAT IT MAY DO HERE, AND SHARE (store lane E): the record's word on each. -->
-    <Origin {id} onsummary={(s) => (ownSummary = s)} />
-    {#if googleFor === 'calendar' && installed}
-      <!-- TWO WAYS IN, SAID ONCE (Calendar 2.1.1): Install asks for no key, so the page says both here. -->
-      <p class="ways">Connect Google, or paste your calendar's private link.</p>
-    {/if}
     {#if googleFor && installed}
       <GoogleConnect place={googleFor} onstatus={(s) => (google = s)} />
     {/if}
-    {#if googleFor === 'calendar' && installed}
-      <CalendarLink label={typeof settings?.values.address === 'string' ? settings.values.address : 'Calendar link'} google={google?.connected === true && !google.broken} />
+    <!-- THE CALENDAR'S SECOND WAY IN, ONLY WHILE GOOGLE IS NOT CONNECTED: once it is, the link card said "not needed". -->
+    {#if googleFor === 'calendar' && installed && google !== null && !(google.connected && !google.broken)}
+      <CalendarLink label={typeof settings?.values.address === 'string' ? settings.values.address : 'Calendar link'} google={false} />
     {/if}
     {#each recipes as recipe (recipe.ingest)}
       {#if !(googleFor === 'gmail' && google?.connected && !google.broken)}
@@ -1014,9 +1025,12 @@
       </Tile>
      </div>
     {/if}
-    {#if found}
-      <div class="about-row"><About listing={found.listing} tier={found.tier} held={installed?.version ?? settings.version ?? null} /></div>
-    {/if}
+    <!-- WHAT IT MAY DO HERE, ITS DETAILS AND ITS VERSIONS, under everything this record holds of it (store lane E, and
+         3 Nov: where it came from, who made it and what it reaches each said once). -->
+    <div class="about-row">
+      <Origin {id} onsummary={(s) => (ownSummary = s)} adds={addedLists.length + addedPages.length > 0} licence={found?.listing.license ?? null} offered={found ? market.about.tiers[found.tier] : null} />
+      {#if found}<About listing={found.listing} held={installed?.version ?? settings.version ?? null} />{/if}
+    </div>
    </div>
   </div>
 {/if}

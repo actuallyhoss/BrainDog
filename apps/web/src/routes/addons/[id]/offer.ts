@@ -122,7 +122,7 @@ export function waitsOf(p: Planned, nameOf: (id: string) => string): string[] {
 }
 
 /**
- * The record's plan for a listing. `doc` is an add-on's verified document, or `null` for a module, whose document is
+ * The record's plan for a listing. `doc` is a plugin's verified document, or `null` for a module, whose document is
  * built for this record here; `text` is a use case's file, verified for a Kennel one and built for a built-in one.
  */
 export async function planFor(

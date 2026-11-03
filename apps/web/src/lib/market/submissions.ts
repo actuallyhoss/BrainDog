@@ -41,7 +41,7 @@ export const stateWords = {
   sendingAs: (title: string, version: string): string => `Sending ${title} again as version ${version}`,
   changes: 'What changed',
   changesHint: 'A line or two, shown to anyone who installed it when they are offered the update.',
-  startOver: 'Start a new add-on instead',
+  startOver: 'Start a new plugin instead',
 } as const;
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);

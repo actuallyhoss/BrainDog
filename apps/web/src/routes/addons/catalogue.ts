@@ -252,7 +252,7 @@ export function trustLine(trust: Trust, publisher: string): { text: string; loud
     case 'rotated':
       return { text: `Signed by ${publisher}, as before`, loud: false };
     case 'first':
-      return { text: `First add-on you have seen from ${publisher}`, loud: false };
+      return { text: `First plugin you have seen from ${publisher}`, loud: false };
     case 'changed':
       return { text: 'Signed by a different key than before', loud: true };
     case 'revoked':

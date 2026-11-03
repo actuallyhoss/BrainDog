@@ -1,22 +1,19 @@
 <!--
-  What the store knows of an add-on this record holds, drawn on its one page: what it
-  reaches outside the record, said even when it is nothing; its versions, newest first, with the one on this record
-  marked; and who made it, under what licence, and where it is offered.
+  What the store knows of a plugin this record holds, drawn on its one page: its versions, newest first, with the one on
+  this record marked. What it reaches and who made it are the record's word, said once by `Origin.svelte`'s cards
+  (3 Nov: "What it reaches" said again what "What it may do here" says, and "Made by" what "Where it came from" says).
 
   READ FROM THE SAME LISTING THE STORE DRAWS (`found.ts`), so the two never disagree on a version or a host.
 -->
 <script lang="ts">
   import type { CatalogueVersion } from '@braindog/declare/catalogue';
   import Tile from '$lib/ui/Tile.svelte';
-  import { latestOf, type Listing } from '$lib/market/listing.ts';
+  import type { Listing } from '$lib/market/listing.ts';
   import { words } from '$lib/market/words.ts';
-  import { callSaid } from '../catalogue.ts';
-  import type { Tier } from './found.ts';
 
-  let { listing, tier, held }: { listing: Listing; tier: Tier; held: string | null } = $props();
+  let { listing, held }: { listing: Listing; held: string | null } = $props();
 
   const about = words.about;
-  const calls = $derived(latestOf(listing)?.reach.calls_out ?? []);
   /* THE NEWEST, THE ONE ON THIS RECORD, AND THE REST FOLDED, so the version he runs is never under the fold. */
   const shown = $derived(listing.versions.filter((v, i) => i === 0 || v.version === held));
   const folded = $derived(listing.versions.filter((v) => !shown.includes(v)));
@@ -35,18 +32,6 @@
 {/snippet}
 
 <div class="about-cell">
-  <Tile icon="globe" title={about.reaches} count={calls.length || undefined}>
-    {#if calls.length === 0}
-      <p class="said">{about.reachesNothing}</p>
-    {:else}
-      <ul class="log">
-        {#each calls as call, i (i)}<li class="log-row">{callSaid(call)}</li>{/each}
-      </ul>
-    {/if}
-  </Tile>
-</div>
-
-<div class="about-cell">
   <Tile icon="history" title={words.versions} count={listing.versions.length}>
     <ol class="log versions">
       {#each shown as v (v.version)}{@render versionRow(v)}{/each}
@@ -62,31 +47,11 @@
   </Tile>
 </div>
 
-<div class="about-cell">
-  <Tile icon="info" title={about.madeBy}>
-    <dl class="facts">
-      <dt>{about.author}</dt>
-      <dd>{listing.publisher?.name ?? listing.author}</dd>
-      <dt>{words.licence}</dt>
-      <dd>{listing.license}</dd>
-      <dt>{about.listedAt}</dt>
-      <dd>{about.tiers[tier]}</dd>
-    </dl>
-  </Tile>
-</div>
-
 <style>
   .about-cell {
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
-  }
-
-  .said {
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta);
   }
 
   .log {
@@ -106,9 +71,6 @@
     line-height: var(--lead-meta);
   }
 
-  .log-row + .log-row {
-    border-block-start: 1px solid var(--rule);
-  }
 
   .v-line {
     display: flex;
@@ -154,25 +116,5 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: var(--lead-meta);
-  }
-
-  .facts {
-    display: grid;
-    grid-template-columns: minmax(6ch, max-content) minmax(0, 1fr);
-    gap: var(--sp-2) var(--sp-4);
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta);
-  }
-
-  .facts dt {
-    color: var(--ink-3);
-  }
-
-  .facts dd {
-    margin: 0;
-    min-inline-size: 0;
-    overflow-wrap: anywhere;
   }
 </style>

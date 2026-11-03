@@ -70,10 +70,10 @@ export const publishWords = {
   added: (kind: string, title: string): string => `Adds the ${kind} ${title}`,
   removed: (kind: string, title: string): string => `Takes out the ${kind} ${title}`,
   changed: (kind: string, title: string): string => `Changes the ${kind} ${title}`,
-  needs: (name: string): string => `Needs the ${name} add-on too`,
-  /* SEVERAL AS ONE LINE (design pass, 1 Nov): a whole starter's file said "Needs the … add-on too" twenty-two times
+  needs: (name: string): string => `Needs the ${name} plugin too`,
+  /* SEVERAL AS ONE LINE (design pass, 1 Nov): a whole starter's file said "Needs the … plugin too" twenty-two times
      over, a column of one sentence with the names at its end. */
-  needsAll: (names: readonly string[]): string => `Needs these add-ons too: ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(names)}`,
+  needsAll: (names: readonly string[]): string => `Needs these plugins too: ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(names)}`,
   needsNoMore: (name: string): string => `No longer needs ${name}`,
   callsNew: (host: string): string => `Calls out to ${host}, which it did not before`,
   callsNoMore: (host: string): string => `No longer calls out to ${host}`,
@@ -157,7 +157,7 @@ export const publishedLink = (s: Submitted): string => (s.state === 'listed' ? p
  * page's menu does not load the built-in use cases that file reads), else Browse.
  */
 export const publishedHref = (s: Submitted): string =>
-  s.state === 'listed' ? `/addons/${encodeURIComponent(s.id)}${s.kind === 'pack' ? '?kind=pack' : ''}` : '/addons';
+  s.state === 'listed' ? `/plugins/${encodeURIComponent(s.id)}${s.kind === 'pack' ? '?kind=pack' : ''}` : '/plugins';
 
 /* ── reading the Kennel ─────────────────────────────────────────────────── */
 

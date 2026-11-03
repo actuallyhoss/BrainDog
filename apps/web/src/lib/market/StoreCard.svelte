@@ -1,9 +1,9 @@
 <!--
   One card of the store: its icon in its shelf's colour, its name, one or two lines of what it does, then at its foot
-  who made it, said once ("By BrainDog" with a check, "Reviewed", or its author), and the one cue: Add, Added, Turn on,
-  Update, or "Your starter". A suggested card carries its reason from the record above its foot.
+  who made it when it is not BrainDog ("Reviewed", or its author), and the one cue: Add, Added, Turn on, Update, or
+  "Your starter". A suggested card carries its reason from the record above its foot.
 
-  THE WHOLE CARD IS ONE LINK, to the add-on's own page, where its plan is read before anything changes. The cue names
+  THE WHOLE CARD IS ONE LINK, to the plugin's own page, where its plan is read before anything changes. The cue names
   that page's press and never installs.
 -->
 <script lang="ts">
@@ -56,11 +56,11 @@
   {#if note}<p class="sc-note">{note}</p>{/if}
   {#if why}<p class="sc-why"><Icon name="info" size="s" /><span>{why}</span></p>{/if}
   <div class="sc-foot">
+    <!-- BRAINDOG'S OWN SAYS NOTHING HERE (3 Nov): "By BrainDog" stood on nearly every card, under a shelf already called
+         From BrainDog. Somebody else's names its author, so the one that differs is the one that is said. -->
     {#if badge}
       <span class="pill-badge" data-tone={badge.tone ?? undefined}>{badge.text}</span>
-    {:else if ours}
-      <span class="sc-by">{words.store.byBrainDog}</span>
-    {:else if by}
+    {:else if by && !ours}
       <span class="sc-by">{by}</span>
     {/if}
     <a class="sc-cue" href={at(href)} data-held={held ? '' : undefined}>{cue}<span class="vh">, {title}</span></a>

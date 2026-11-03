@@ -1,26 +1,37 @@
 <!--
-  Connect Google, as one tile: on the Gmail and Calendar add-on pages and in Settings, What comes in.
+  Connect Google, as one card: on the Gmail and Calendar plugin pages and in Settings, What comes in.
 
-  ONE GOOGLE ACCOUNT A RECORD, READ ONLY. Not connected, it says what is read and offers Connect Google, which goes to
-  Google's own page and back here. Connected, it says the address and the last sync, with Sync now and Disconnect, which
-  revokes the access at Google and forgets it here. Only an owner sees the buttons; anybody else sees the line.
+  ONE GOOGLE ACCOUNT A RECORD, READ ONLY. Not connected, it names what comes in (mail, calendar, contacts) and offers
+  Connect Google, which goes to Google's own page and back here. Connected, it is the account and its state as a chip in
+  the card's head, what the last sync brought as three figures, and Sync now and Disconnect. Only an owner sees the
+  buttons; anybody else sees the state.
+
+  EACH FACT ONCE (3 Nov, Sam: "Connected as" above a sentence that said the counts, and a status line under the
+  buttons that said "connected" again, squeezed into a 100px column). The state is the head's chip; the counts are
+  figures; what an action did is a toast, which goes away; only a failure stays, as a full-width line at the top of the
+  card. The old Apps Script's stop steps are behind one disclosure, for the few who still run it.
+
+  THE WAY BACK FROM GOOGLE (`?google=`) IS SAID ONCE AND TAKEN OFF THE ADDRESS, so a reload does not say it again.
 
   `onstatus` tells the page it sits on, so the Gmail page can put this in place of the script's paste steps.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { sinceWords } from 'braindog-render';
+  import { at } from '$lib/at.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { backLine, connectUrl, googleDisconnect, googleStatus, googleSyncNow, type GoogleStatus } from './google.ts';
+  import type { IconName } from '$lib/ui/icons.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { backLine, connectUrl, figuresOf, googleDisconnect, googleStatus, googleSyncNow, googleWords as w, type GoogleStatus } from './google.ts';
 
   let {
     place,
     onstatus,
   }: {
-    /** Which page it sits on, so the words fit: an add-on's page names what that add-on gets. */
+    /** Which page it sits on, so the words fit: a plugin's page names what that plugin gets. */
     place: 'gmail' | 'calendar' | 'settings';
     onstatus?: ((status: GoogleStatus | null) => void) | undefined;
   } = $props();
@@ -29,11 +40,19 @@
   let read = $state(false);
   let busy = $state(false);
   let asking = $state(false);
-  let said = $state<{ line: string; bad: boolean } | null>(null);
+  /** A failure that stays until the next press: Google refused, or a press did not go through. */
+  let fault = $state<string | null>(null);
 
   $effect(() => {
     untrack(() => {
-      said = backLine(new URLSearchParams(location.search).get('google'));
+      const url = new URL(location.href);
+      const back = backLine(url.searchParams.get('google'));
+      if (back) {
+        if (back.bad) fault = back.line;
+        else toasts.push(back.line, { intent: 'good' });
+        url.searchParams.delete('google');
+        history.replaceState(history.state, '', `${url.pathname}${url.search}${url.hash}`);
+      }
       void load();
     });
   });
@@ -45,94 +64,115 @@
   }
 
   async function disconnect() {
-    if (!asking) {
-      asking = true;
-      return;
-    }
     busy = true;
     asking = false;
+    fault = null;
     const next = await googleDisconnect();
     busy = false;
     if (next) {
       status = next;
-      said = { line: 'Google is disconnected. BrainDog can no longer read it, and what came in stays.', bad: false };
+      toasts.push(w.disconnected, { intent: 'good' });
       onstatus?.(status);
-    } else said = { line: 'That did not go through. Try again.', bad: true };
+    } else fault = w.failed;
   }
 
   async function syncNow() {
     busy = true;
+    fault = null;
     const next = await googleSyncNow();
     busy = false;
     if (next) {
       status = next;
-      said = { line: 'Syncing now. New mail, events and contacts arrive within a minute.', bad: false };
-    } else said = { line: 'That did not go through. Try again.', bad: true };
+      toasts.push(w.syncing, { intent: 'good' });
+    } else fault = w.failed;
   }
 
-  const reads = $derived(
-    place === 'gmail'
-      ? 'Connect Google and BrainDog reads your Gmail every 15 minutes, with your calendar and contacts too. Nothing to paste, and nothing is ever sent, changed or deleted in Google.'
-      : place === 'calendar'
-        ? 'Connect Google and BrainDog reads your calendar every 15 minutes, invitations and your answers included, with your Gmail and contacts too. Nothing is ever changed in Google.'
-        : 'One Google account, read only: Gmail into the Gmail add-on, Calendar with invitations into Events, and contacts to fill in People, every 15 minutes. A contact is only added when you write to each other, meet, or they are already in BrainDog. Nothing is ever sent, changed or deleted in Google.',
-  );
-  const last = $derived(status?.last ? `Last sync ${sinceWords(status.last.at, recordNow())}: ${status.last.said}.` : 'The first sync runs within a few minutes.');
+  const figures = $derived(status?.last ? figuresOf(status.last.said) : null);
+  const synced = $derived(status?.last ? w.lastSync(sinceWords(status.last.at, recordNow())) : w.firstSync);
+  /* WHAT WAITS FOR A PLUGIN THAT IS NOT IN, each with the way to it. */
   const missing = $derived(
-    status?.connected
-      ? [!status.mail ? 'Install the Gmail add-on to bring mail in.' : '', !status.events ? 'Install the Calendar add-on to bring events in.' : ''].filter(Boolean).join(' ')
-      : '',
+    status?.connected && !status.broken
+      ? [...(!status.mail ? [{ id: 'gmail', said: w.needsGmail }] : []), ...(!status.events ? [{ id: 'calendar', said: w.needsCalendar }] : [])]
+      : [],
   );
+  const brings: readonly { glyph: IconName; said: string }[] = [
+    { glyph: 'mail', said: 'Gmail' },
+    { glyph: 'calendar', said: 'Calendar' },
+    { glyph: 'people', said: 'Contacts' },
+  ];
 </script>
 
 {#if read && status}
-  <Tile icon="plug" class="section" data-surface="tile" title={status.connected ? 'Google' : 'Connect Google'}>
+  <Tile icon="plug" class="section google-card" data-surface="tile" title={status.connected ? w.title : w.connectTitle}>
+    {#snippet actions()}
+      {#if status?.connected}
+        <span class="pill-badge" data-tone={status.broken ? 'bad' : 'good'}>{status.broken ? w.stopped : w.connected}</span>
+      {/if}
+    {/snippet}
     <div class="section-body google">
+      {#if fault}
+        <p class="fault" role="alert"><Icon name="alert" size="s" /><span>{fault}</span></p>
+      {/if}
+
       {#if status.connected}
-        <p class="who"><span class="dot" data-tone={status.broken ? 'bad' : 'good'} aria-hidden="true"></span>{status.broken ? 'Stopped' : 'Connected'} as <strong>{status.email || 'your Google account'}</strong></p>
+        <p class="account"><Icon name="mail" size="s" /><span class="address">{status.email || w.yourAccount}</span></p>
         {#if status.broken}
-          <p class="line" data-tone="bad">{status.broken}</p>
+          <p class="fault" role="status"><Icon name="alert" size="s" /><span>{status.broken}</span></p>
+        {:else if figures}
+          <div class="figures" role="group" aria-label={synced}>
+            {#each figures as f (f.label)}
+              <p class="figure"><span class="figure-n num">{f.n}</span><span class="figure-l">{f.label}</span></p>
+            {/each}
+            <p class="synced">{synced}</p>
+          </div>
         {:else}
-          <p class="hint">{last}</p>
+          <p class="synced">{status.last ? `${synced}: ${status.last.said}.` : synced}</p>
         {/if}
-        {#if place === 'gmail'}
-          <p class="hint">Your Gmail comes in through Google now, so the script in your Google account is not needed. You can stop it: run stop in its project at script.google.com, or delete the project.</p>
-        {:else if place === 'calendar'}
-          <p class="hint">Events come in through Google now, so the ICS link is not needed. If it is still in your keys both keep working, and an event is never written twice.</p>
-        {/if}
-        {#if missing}<p class="hint">{missing}</p>{/if}
+        {#each missing as m (m.id)}
+          <p class="wait">{m.said} <a class="tap" href={at(`/plugins/${m.id}?kind=pack`)}>{w.get}</a></p>
+        {/each}
+
         {#if status.owner}
           {#if asking}
-            <p class="line">Disconnect Google? BrainDog stops reading it and Google forgets the access. What already came in stays.</p>
-            <div class="row-actions">
-              <Button weight="primary" tone="bad" disabled={busy} onclick={() => void disconnect()}>Disconnect</Button>
-              <Button weight="bare" disabled={busy} onclick={() => (asking = false)}>Keep it</Button>
+            <div class="ask" role="group" aria-label={w.disconnectAsk}>
+              <p class="ask-said">{w.disconnectAsk}</p>
+              <div class="row-actions">
+                <Button size="sm" weight="primary" tone="bad" disabled={busy} onclick={() => void disconnect()}>{w.disconnect}</Button>
+                <Button size="sm" weight="bare" disabled={busy} onclick={() => (asking = false)}>{w.keep}</Button>
+              </div>
             </div>
           {:else}
             <div class="row-actions">
               {#if status.broken}
-                <Button weight="primary" disabled={busy} onclick={() => location.assign(connectUrl())}>Connect Google again</Button>
+                <Button size="sm" weight="primary" disabled={busy} onclick={() => location.assign(connectUrl())}>{w.again}</Button>
               {:else}
-                <Button size="sm" disabled={busy} onclick={() => void syncNow()}>Sync now</Button>
+                <Button size="sm" disabled={busy} onclick={() => void syncNow()}><Icon name="refresh" size="s" />{w.syncNow}</Button>
               {/if}
-              <Button size="sm" weight="bare" disabled={busy} onclick={() => void disconnect()}>Disconnect</Button>
+              <Button size="sm" weight="bare" disabled={busy} aria-expanded={false} onclick={() => (asking = true)}>{w.disconnect}</Button>
             </div>
           {/if}
         {/if}
+
+        {#if place === 'gmail' && !status.broken}
+          <details class="how">
+            <summary class="tap">{w.scriptAsk}</summary>
+            <p>{w.scriptStop}</p>
+          </details>
+        {/if}
       {:else}
-        <p class="hint">{reads}</p>
+        <p class="lede">{place === 'settings' ? w.leadSettings : w.lead}</p>
+        <ul class="brings" aria-label={w.bringsLabel}>
+          {#each brings as b (b.said)}<li><Icon name={b.glyph} size="s" />{b.said}</li>{/each}
+        </ul>
         {#if !status.on}
-          <p class="hint">Connect Google is not set up on this BrainDog yet.</p>
+          <p class="wait">{w.notSetUp}</p>
         {:else if status.owner}
           <div class="row-actions">
-            <Button weight="primary" disabled={busy} onclick={() => location.assign(connectUrl())}>Connect Google</Button>
+            <Button weight="primary" disabled={busy} onclick={() => location.assign(connectUrl())}>{w.connect}</Button>
           </div>
         {:else}
-          <p class="hint">The owner of this BrainDog can connect it.</p>
+          <p class="wait">{w.ownerOnly}</p>
         {/if}
-      {/if}
-      {#if said}
-        <p class="line" role="status" data-tone={said.bad ? 'bad' : undefined}>{#if said.bad}<span class="glyph" aria-hidden="true"><Icon name="alert" /></span>{/if}{said.line}</p>
       {/if}
     </div>
   </Tile>
@@ -140,54 +180,175 @@
 
 <style>
   .google {
-    display: grid;
-    gap: var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    min-inline-size: 0;
   }
-  .who,
-  .hint,
-  .line {
+
+  .google > p,
+  .how p {
     margin: 0;
   }
-  .who {
+
+  /* THE ACCOUNT, ONE LINE: its glyph and its address, which may be long and breaks anywhere rather than past the card. */
+  .account {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
+    min-inline-size: 0;
     color: var(--ink);
-    font-size: var(--fs-body);
+    font: var(--t-ui, 400 14px/20px var(--font-ui));
+    font-weight: var(--fw-medium);
+  }
+
+  .account :global(.icon) {
+    flex: none;
+    color: var(--ink-3);
+  }
+
+  .address {
+    min-inline-size: 0;
     overflow-wrap: anywhere;
   }
-  .who strong {
-    font-weight: var(--fw-semi);
+
+  /* WHAT THE LAST SYNC BROUGHT, AS FIGURES: each count over its word, and when it was, at the row's end. */
+  .figures {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--sp-3) var(--sp-6);
+    min-inline-size: 0;
   }
-  .hint {
+
+  .figure {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+  }
+
+  .figure-n {
+    color: var(--ink);
+    font-size: var(--fs-figure);
+    font-weight: var(--fw-semi);
+    line-height: var(--lead-figure);
+    letter-spacing: var(--track-figure);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .figure-l,
+  .synced,
+  .wait,
+  .lede {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
-  .line {
+
+  .synced {
+    margin: 0 0 0 auto;
+    padding-block-end: 2px;
+  }
+
+  .lede {
     color: var(--ink-2);
-    font-size: var(--fs-meta);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    max-inline-size: 60ch;
+    text-wrap: pretty;
   }
-  .line[data-tone='bad'] {
+
+  .wait a {
+    color: var(--link, var(--ink));
+    font-weight: var(--fw-medium);
+  }
+
+  /* WHAT COMES IN, AS CHIPS: three things, each its glyph and its word. */
+  .brings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .brings li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    block-size: 28px;
+    padding-inline: var(--sp-3);
+    border-radius: var(--r-pill);
+    background: var(--soft-fill, var(--tile-2));
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+  }
+
+  .brings li :global(.icon) {
+    color: var(--ink-3);
+  }
+
+  /* A FAILURE IS A FULL-WIDTH LINE, its glyph and its words in the danger tint, never a squeezed column. */
+  .fault {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-ctl);
+    background: var(--red-tint);
+    color: var(--ink);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+  }
+
+  .fault :global(.icon) {
+    flex: none;
+    margin-block-start: 1px;
     color: var(--red);
   }
-  .glyph {
-    display: inline-flex;
-    margin-inline-end: var(--sp-1);
-    vertical-align: -2px;
+
+  .ask {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
   }
-  .dot {
-    inline-size: 6px;
-    block-size: 6px;
-    border-radius: var(--r-round);
-    background: var(--good);
-    flex: none;
+
+  .ask-said {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
   }
-  .dot[data-tone='bad'] {
-    background: var(--red);
-  }
+
   .row-actions {
     display: flex;
-    gap: var(--sp-2);
     flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  /* THE OLD SCRIPT, FOR THE FEW WHO RUN IT: one quiet disclosure at the card's foot. */
+  .how {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+  }
+
+  .how summary {
+    inline-size: fit-content;
+    cursor: pointer;
+    color: var(--ink-2);
+    font-weight: var(--fw-medium);
+  }
+
+  .how p {
+    margin-block-start: var(--sp-2);
+    max-inline-size: 60ch;
   }
 </style>

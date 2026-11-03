@@ -1,5 +1,5 @@
 /**
- * A door's connect recipe, as an add-on's page shows it: the steps to set a sender up somewhere else, and the text to
+ * A door's connect recipe, as a plugin's page shows it: the steps to set a sender up somewhere else, and the text to
  * paste there with this record's address already in it.
  *
  * NOTHING HERE NAMES AN ADD-ON. A webhook ingest checked by a token in its path may carry `connect`: a title, a line on

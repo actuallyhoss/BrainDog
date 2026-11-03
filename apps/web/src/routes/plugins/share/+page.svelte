@@ -1,5 +1,5 @@
 <!--
-  Share this setup: `/addons/share`.
+  Share this setup: `/plugins/share`.
 
   WHAT GOES IN THE FILE IS SAID BEFORE THE BUTTON, and none of the record's rows go in unless one is ticked here. The
   record writes the file (`exportUseCase`), reading it back through the door a stranger's file comes in by, so a row
@@ -33,7 +33,7 @@
   import { useCase } from '@braindog/seed/usecases';
   import { useCaseName } from '@braindog/seed/usecases/names';
   import { builtInFile, previewOf } from '@braindog/seed/usecases/share';
-  import { catalogueTitles, readShippedCatalogue } from '../catalogue.ts';
+  import { catalogueTitles, readShippedCatalogue } from '../../addons/catalogue.ts';
   import { changeLines, changesSince, kennelFetch, publishedHref, publishedLink, publishedSaid, publishedText, publishWords, submitToKennel, type Submitted } from '$lib/market/publish.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
@@ -49,13 +49,13 @@
   import Tile from '$lib/ui/Tile.svelte';
   import '$lib/ui/forms.css';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
-  import Preview from '../Preview.svelte';
-  import { drawnOrder, exportShared, listWords, moduleTitle, offeredVersion, rowTitle, speakingOf, speakingStates } from '../sharing.ts';
-  import { skillsOnce, words, type SkillOffer } from './share.ts';
+  import Preview from '../../addons/Preview.svelte';
+  import { drawnOrder, exportShared, listWords, moduleTitle, offeredVersion, rowTitle, speakingOf, speakingStates } from '../../addons/sharing.ts';
+  import { skillsOnce, words, type SkillOffer } from '../../addons/share/share.ts';
   import { goto } from '$app/navigation';
   import Segmented from '$lib/ui/Segmented.svelte';
-  import AddonFrom from './AddonFrom.svelte';
-  import { ADDON_MODE, MODE_PARAM, modeOf, words as addonWords, type Mode } from './addon-from.ts';
+  import AddonFrom from '../../addons/share/AddonFrom.svelte';
+  import { ADDON_MODE, MODE_PARAM, modeOf, words as addonWords, type Mode } from '../../addons/share/addon-from.ts';
 
   /* TWO MODES, ONE SCREEN: the whole setup as a use case, or an add-on from what the person made. The Add-ons
      screen's offer opens the second by `?mode=addon`, and a switch keeps the address in step without a reload. By

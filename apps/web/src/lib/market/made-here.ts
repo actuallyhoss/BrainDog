@@ -1,5 +1,5 @@
 /**
- * Add-ons made in this BrainDog, and where any add-on here came from: what the store's "Made by you" shelf, an add-on's
+ * Add-ons made in this BrainDog, and where any add-on here came from: what the store's "Made by you" shelf, a plugin's
  * own page and Decide read off the record's `addons` and `addon` answers (`packages/record/src/methods/addons.ts`).
  *
  * THE RECORD SAYS WHERE IT CAME FROM, NEVER THE FILE. Trust is the record's word (`made-here`, `from-a-link`, `reviewed`,
@@ -75,7 +75,23 @@ export const madeWords = {
   /* WHAT IT MAY DO HERE, read off what it put in this BrainDog. */
   may: 'What it may do here',
   mayNote: 'Read from what it added here, not from what it says about itself.',
-  mayNothing: 'It added nothing that runs or reaches outside.',
+  mayNothing: 'Nothing that runs on its own or reaches outside.',
+  mayLists: 'Lists',
+  mayPages: 'Pages',
+  mayRowPages: (n: number): string => (n === 1 ? 'a page for each row' : `${n} pages for each row`),
+  /* THE DETAILS CARD: who made it, whether anybody reviewed it, and where it came from, as rows. */
+  details: 'Details',
+  madeByLabel: 'Made by',
+  reviewLabel: 'Review',
+  fromLabel: 'From',
+  licenceLabel: 'Licence',
+  offeredLabel: 'Offered',
+  madeHereBy: (who: string | null): string => (who === null ? 'You, here' : `${who.charAt(0).toUpperCase()}${who.slice(1)}, here`),
+  onlyHere: 'Only in this BrainDog. The store never updates it.',
+  unknownMaker: 'Not said',
+  aFile: 'A file',
+  canOnly: 'It can only do what is under What it may do here.',
+  shareShort: 'Goes as its setup, never your entries.',
   /* SHARE */
   share: 'Share',
   shareNote: 'It goes as its setup, never your entries.',
@@ -138,6 +154,43 @@ export function originOf(a: AddonAnswer, maker: string | null): { line: string; 
       return { line: a.by ? `By ${a.by}` : madeWords.signed, note: madeWords.linkUnreviewed, badge: madeWords.signed, tone: 'warn' };
     default:
       return { line: a.by ? `By ${a.by}` : madeWords.notReviewed, note: madeWords.linkUnreviewed, badge: madeWords.notReviewed, tone: 'warn' };
+  }
+}
+
+/** One row of the Details card: its label, its value, a link for the value, and a chip with its tone. */
+export type SourceRow = { label: string; value: string; href?: string; chip?: { text: string; tone: 'good' | 'warn' | 'info' }; mark?: 'check' };
+
+/**
+ * WHERE IT CAME FROM, AS ROWS (3 Nov, Sam: a green "Made by BrainDog" chip and then "Made by BrainDog" in words). Each
+ * fact once: who made it, a review chip only where it says something the maker does not (never for BrainDog's own), and
+ * where a linked one was read from. The note, when there is one, is one line.
+ */
+export function sourceOf(a: AddonAnswer, maker: string | null): { rows: SourceRow[]; note: string | null } {
+  const git = gitOf(a.from);
+  switch (a.trust) {
+    case 'braindog':
+      return { rows: [{ label: madeWords.madeByLabel, value: 'BrainDog', mark: 'check' }], note: null };
+    case 'reviewed':
+      return { rows: [{ label: madeWords.madeByLabel, value: a.by || madeWords.unknownMaker, chip: { text: madeWords.reviewed, tone: 'good' } }], note: null };
+    case 'made-here':
+      return { rows: [{ label: madeWords.madeByLabel, value: madeWords.madeHereBy(maker), chip: { text: madeWords.madeHereShort, tone: 'info' } }], note: madeWords.onlyHere };
+    case 'from-a-link': {
+      const gh = a.github ?? (git ? { repo: git.repo, commit: shortRef(git.ref) } : null);
+      let host: string | null = null;
+      try {
+        host = a.from && /^https:/u.test(a.from) ? new URL(a.from).host : null;
+      } catch {
+        host = null;
+      }
+      const from: SourceRow = gh
+        ? { label: madeWords.fromLabel, value: `${gh.repo} at ${gh.commit}`, href: `https://github.com/${gh.repo}` }
+        : { label: madeWords.fromLabel, value: host ?? madeWords.aFile };
+      return { rows: [...(a.by ? [{ label: madeWords.madeByLabel, value: a.by }] : []), from, { label: madeWords.reviewLabel, value: '', chip: { text: madeWords.notReviewed, tone: 'warn' } }], note: madeWords.canOnly };
+    }
+    case 'signed':
+      return { rows: [{ label: madeWords.madeByLabel, value: a.by || madeWords.unknownMaker, chip: { text: 'Signed, not reviewed', tone: 'warn' } }], note: madeWords.canOnly };
+    default:
+      return { rows: [{ label: madeWords.madeByLabel, value: a.by || madeWords.unknownMaker, chip: { text: madeWords.notReviewed, tone: 'warn' } }], note: madeWords.canOnly };
   }
 }
 

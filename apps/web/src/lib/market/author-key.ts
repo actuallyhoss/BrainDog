@@ -13,7 +13,7 @@
  * closes over the private half; a failure answers `null` and no error is passed on, so no message can carry it.
  *
  * ONE KEY PER PERSON, NOT PER BROWSER. The key was kept in one slot and outlived sign-out, so whoever signed in next on
- * the same browser published or took back the last person's add-ons as them, and a trusted publisher's version lists
+ * the same browser published or took back the last person's plugins as them, and a trusted publisher's version lists
  * without review. Each person's key is kept under their own id now (`publisher:<person>`), read off the session at the
  * press, and a browser with nobody signed in has no key. THE ONE KEY KEPT BEFORE THIS, in the bare `publisher` slot,
  * goes to the first person who asks for a key on this browser: it is the key their add-ons are pinned to, and a fresh

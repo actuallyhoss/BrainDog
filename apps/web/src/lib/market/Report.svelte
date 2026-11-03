@@ -42,7 +42,7 @@
 </script>
 
 <details class="report">
-  <summary class="tap">Report this add-on</summary>
+  <summary class="tap">Report this plugin</summary>
   <label class="field">
     <span>What is wrong with it</span>
     <textarea rows="3" maxlength="1000" bind:value={why}></textarea>

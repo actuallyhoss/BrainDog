@@ -3,7 +3,7 @@
  * last 90 days of a pair once it holds rates enough to say something.
  *
  * THE TILE HELD NO RATE. It was a sentence and a button, so the page where the fetch is set up never showed what it
- * fetched. The rates are rows of the list that declares `rates:` (the kernel's `fx.ts`), so the page asks the add-on's
+ * fetched. The rates are rows of the list that declares `rates:` (the kernel's `fx.ts`), so the page asks the plugin's
  * own lists what they declare and reads the one that says it. No list is named here: an add-on that keeps its rates
  * under another name draws the same tile.
  *

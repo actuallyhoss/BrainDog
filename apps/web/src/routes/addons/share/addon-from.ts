@@ -16,19 +16,19 @@
 export const words = {
   modeGroup: 'What to share',
   modeUseCase: 'Your whole starter',
-  modeAddon: 'An add-on',
+  modeAddon: 'A plugin',
   sentence: 'Tick what you made. It goes as its setup, never its entries.',
-  cannot: 'This BrainDog cannot make an add-on yet.',
+  cannot: 'This BrainDog cannot make a plugin yet.',
   nothing: 'Nothing of your own yet. Make a list, a page or an automation and it shows here.',
   reading: 'Reading what you made',
   picks: 'What goes in',
-  title: 'What the add-on is called',
+  title: 'What the plugin is called',
   preview: 'What it would add',
   previewNone: 'Tick something to see what it would add.',
-  drafting: 'Writing the add-on',
-  download: 'Download the add-on',
+  drafting: 'Writing the plugin',
+  download: 'Download the plugin',
   downloaded: (file: string): string => `Saved as ${file}.`,
-  untitledAddon: 'My add-on',
+  untitledAddon: 'My plugin',
   needed: 'one more thing it needs',
   /* THE STORE: what a stranger sees of it before it is listed, and what it asks of the one who installs it. */
   oneLine: 'One line about it',
@@ -44,7 +44,7 @@ export const words = {
   /* SKILLS: the text of a skill goes with the add-on when ticked, is read by whoever reviews it, and is shown by name to
      whoever installs it, who is asked first. */
   skillsHeading: 'Skills for agents',
-  skillsHint: 'A skill goes out with its steps. They are read when the add-on is reviewed, and whoever installs it is asked before their agents get it. Keep emails, links and keys out of it.',
+  skillsHint: 'A skill goes out with its steps. They are read when the plugin is reviewed, and whoever installs it is asked before their agents get it. Keep emails, links and keys out of it.',
   skillLine: (name: string, trigger: string): string => `${name}: ${trigger}`,
   givesSkill: (name: string): string => `Gives agents the skill ${name}`,
   /* A FIX OR AN UPDATE: the same form, sent as a later version of the same add-on. */
@@ -52,7 +52,7 @@ export const words = {
   changesHint: 'A line or two. Anyone who installed it sees this when they are offered the update.',
   changesNeeded: 'Say what changed before sending an update.',
   sendingAgain: (title: string, version: string): string => `Sending ${title} again as version ${version}`,
-  newInstead: 'Start a new add-on instead',
+  newInstead: 'Start a new plugin instead',
   fixAndSend: 'Fix it and send it again',
   publishUpdate: 'Publish an update',
   sendUpdate: 'Send the update',
@@ -97,7 +97,7 @@ const OTHER = { heading: 'Other things', one: '' };
 /** The query that opens this mode, so the Add-ons screen's offer links straight to it. */
 export const MODE_PARAM = 'mode';
 export const ADDON_MODE = 'addon';
-export const addonHref = `/addons/share?${MODE_PARAM}=${ADDON_MODE}`;
+export const addonHref = `/plugins/share?${MODE_PARAM}=${ADDON_MODE}`;
 export type Mode = 'usecase' | 'addon';
 export const modeOf = (search: URLSearchParams): Mode => (search.get(MODE_PARAM) === ADDON_MODE ? 'addon' : 'usecase');
 
