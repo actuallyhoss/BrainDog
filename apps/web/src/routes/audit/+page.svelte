@@ -1223,6 +1223,17 @@
     padding-block: var(--sp-1);
   }
 
+  /* THE FEED'S ROWS ARE OPS CARD ROWS (4.15): no hairline between two lines, and the row wash, rounded, is the only
+     thing a pointer adds. The lines sit 2px apart so two washes never touch. */
+  .act {
+    border-radius: 10px;
+    margin-block: 1px;
+  }
+
+  .ledger > li + li > .act::after {
+    display: none;
+  }
+
   /* THE SAME MINUTE AS THE LINE ABOVE IS NOT SAID AGAIN (G28). */
   .act .line-when[data-same] time {
     visibility: hidden;
@@ -1259,7 +1270,7 @@
   @media (hover: hover) and (pointer: fine) {
     /* ITS OWN TARGET, `> .line`: a step opened under a pass is a line of its own, and hovering it washes it alone. */
     .ledger > li:has(> .line .target:hover) > .line {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
     }
 
     .ledger > li:has(> .line .target:hover) > .line::after,
@@ -1343,7 +1354,7 @@
     }
 
     .hour-band + .hour-band {
-      border-block-start: 1px solid var(--rule);
+      margin-block-start: var(--sp-1);
     }
 
     .act {

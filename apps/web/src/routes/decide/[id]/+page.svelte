@@ -1218,7 +1218,7 @@
             {/if}
       {/if}{/snippet}
   {#snippet whoMore()}
-    <Button weight="bare" size="sm" aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>
+    <Button weight="glass" size="sm" data-circle aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>
   {/snippet}
 
   <div class="page" data-narrow={asking ? undefined : ''}>
@@ -2362,6 +2362,8 @@
     margin-inline-start: calc(var(--sp-2) * -1);
   }
 
+  /* AN ANSWER IS A BOX ON THE CARD, not a card in a card (ops 2.7.2): the field radius, a hairline, the card's own fill,
+     and the row wash under a pointer. Chosen is the accent's tint with its edge, a different hue from the hover. */
   .dc-option {
     display: flex;
     flex-direction: column;
@@ -2369,12 +2371,23 @@
     min-inline-size: 0;
     padding: var(--sp-4);
     border: 1px solid var(--rule);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-field, 12px);
     background: var(--tile);
+    transition:
+      background var(--d-state) var(--ease-out),
+      border-color var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .dc-option:not([data-bare], [data-checked]):hover {
+      background: var(--tile) linear-gradient(var(--row-wash), var(--row-wash));
+      border-color: var(--rule-strong);
+    }
   }
 
   .dc-option[data-checked] {
-    border-color: var(--ink);
+    background: var(--chosen);
+    border-color: var(--on);
   }
 
   /* THE SUGGESTED ONE WEARS THE ACCENT'S EDGE, as well as its word, so the row is read from it. */
@@ -2433,13 +2446,15 @@
     margin: 0;
   }
 
+  /* THE ANSWER'S NAME IS A CARD HEADER (ops 4.17): 15/600, a hair tight. */
   .dc-option-name {
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--fs-head);
+    font-size: var(--fs-row, 15px);
     font-weight: var(--fw-semi);
-    line-height: 1.3;
+    line-height: 20px;
+    letter-spacing: -0.005em;
     overflow-wrap: anywhere;
   }
 
@@ -2534,6 +2549,23 @@
     .q-head :global(.page-head .name-words) {
       -webkit-line-clamp: 3;
       line-clamp: 3;
+    }
+  }
+
+  /* THE ⋯ BY THE TITLE IS A GLASS CIRCLE (ops 4.1): one glyph, so as wide as it is tall, a tap wide under a thumb. */
+  .page :global(.btn[data-circle]),
+  :global(.q-head .btn[data-circle]) {
+    inline-size: var(--ctl-page, 36px);
+    min-inline-size: 0;
+    block-size: var(--ctl-page, 36px);
+    padding: 0;
+  }
+
+  @media (pointer: coarse) {
+    .page :global(.btn[data-circle]),
+    :global(.q-head .btn[data-circle]) {
+      inline-size: var(--tap);
+      block-size: var(--tap);
     }
   }
 </style>

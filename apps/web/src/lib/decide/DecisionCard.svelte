@@ -1114,7 +1114,7 @@
       grid-column: 2;
       min-inline-size: 0;
       padding-inline-start: var(--sp-5);
-      border-inline-start: 1px solid var(--rule);
+      border-inline-start: 1px solid var(--sep, var(--rule));
     }
 
     .dc[data-side]:not([data-compact]) .dc-part {
@@ -1251,10 +1251,17 @@
     margin-inline-start: calc(var(--sp-1) * -1);
     padding: 0;
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     background: none;
     color: var(--ink-3);
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .dc-info:hover {
+      background: var(--row-wash);
+    }
   }
 
   .dc-info:hover,
@@ -1444,8 +1451,11 @@
   }
 
   /* A CARD CHOSEN FOR A BULK ANSWER keeps an ink edge, a shape and not a shade. */
+  /* PICKED FOR ANSWERING TOGETHER: the chosen tint with the accent's edge (ops: a selected row is the accent, never a
+     darker grey). */
   .queue-card[data-selected] {
-    box-shadow: inset 0 0 0 1.5px var(--ink-2);
+    background: var(--chosen);
+    box-shadow: inset 0 0 0 1.5px var(--on);
   }
 
   /* HOW MANY THINGS A JOINED QUESTION CHANGES, quiet beside its words. Held to the question's last word by a no-break
