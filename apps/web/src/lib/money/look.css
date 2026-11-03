@@ -1927,12 +1927,17 @@
 /* ONE HAIRLINE BETWEEN ROWS, FROM TEXT EDGE TO TEXT EDGE, in the separator ink: the Ledger's strip as it was, and a due
    list's now the same, where its border ran out to the tile's edges. The border keeps its pixel, unseen. */
 [data-money] .list[data-kind='timeline'] > .item[data-rich],
-[data-money] .list[data-kind='timeline'] > .item:not([data-rich]) {
+[data-money] .list[data-kind='timeline']:not([data-days]) > .item:not([data-rich]) {
   border-block-end-color: transparent;
   background-image: linear-gradient(var(--mo-sep), var(--mo-sep));
   background-repeat: no-repeat;
   background-position: center bottom;
   background-size: calc(100% - 2 * var(--sp-3)) 1px;
+}
+
+/* A LIST OF WHAT IS DUE BY DAY KEEPS ITS ONE HAIRLINE BETWEEN DAYS, in the separator ink. */
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) > :is(.item-day, .item-day + .item) {
+  border-block-start-color: var(--mo-sep);
 }
 
 [data-money] .list[data-kind='timeline'] > .item:last-child,

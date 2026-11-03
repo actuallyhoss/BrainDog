@@ -389,7 +389,7 @@
     place-items: center;
     inline-size: var(--sp-5);
     block-size: var(--sp-5);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     color: var(--ink-3);
     transition:
       background var(--d-state) var(--ease-out),
@@ -399,7 +399,7 @@
   .kb-mark:hover,
   .kb-menu:has(:focus-visible) .kb-mark,
   .kb-menu[data-open] .kb-mark {
-    background: var(--hover);
+    background: var(--row-wash, var(--hover));
     color: var(--ink);
   }
 
@@ -444,7 +444,7 @@
 
   .kb-item:hover,
   .kb-item:focus-visible {
-    background: var(--hover);
+    background: var(--row-wash, var(--hover));
     color: var(--ink);
   }
 
@@ -454,7 +454,7 @@
     display: grid;
     gap: var(--sp-2);
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
   }
 
   .kb-head {
@@ -482,7 +482,7 @@
   }
 
   .kb-draft + .kb-draft {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
   }
 
   .kb-draft-text {
