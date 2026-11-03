@@ -1063,7 +1063,7 @@ export type PublicRead = { ok: true; text: string; bytes: number } | { ok: false
  * THE SAME FENCE AS A SCHEDULED ACTION, without the declared origin: https only; never a host written as a private or
  * local address, and on the self-host never a name that resolves to one (`pin`); redirects three at most, each hop
  * checked again, to any public host; ten seconds; 300 KB counted as it streams. NOTHING IS SENT WITH IT: no cookie, no
- * key, no header of the record's. The text goes back to the caller, which reads it through `readShared` like a file.
+ * key, no header of the record's. A plain `user-agent` goes, since GitHub's API refuses a request without one. The text goes back to the caller, which reads it through `readShared` like a file.
  */
 export function readPublic<P extends object | undefined = undefined>(options: { send: Send<P>; pin?: Pin<P> | undefined }): (address: string) => Promise<PublicRead> {
   return async (address) => {
@@ -1081,7 +1081,7 @@ export function readPublic<P extends object | undefined = undefined>(options: { 
         if (refusedHost(url) !== null) return { ok: false, fix: `${url.host} is a private or local address, so nothing was read from it.` };
         const pinned = options.pin ? await within(options.pin(url, signal), signal) : (undefined as P);
         if (typeof pinned === 'string') return { ok: false, fix: pinned };
-        const response = await options.send(url, { method: 'GET', headers: { accept: 'application/json' }, redirect: 'manual', signal }, pinned);
+        const response = await options.send(url, { method: 'GET', headers: { accept: 'application/json', 'user-agent': 'BrainDog' }, redirect: 'manual', signal }, pinned);
         if (response.status >= 300 && response.status < 400) {
           const location = response.headers.get('location');
           await response.body?.cancel().catch(() => undefined);

@@ -24,6 +24,7 @@ import type { Result } from '@braindog/ports';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
+import { GIT_UNREVIEWED, parseGit, repoSaid, shortSha } from '../git-channel.ts';
 
 type Body = Record<string, unknown>;
 
@@ -490,6 +491,14 @@ export function methods(deps: RecordDeps) {
           trust_said: TRUST_SAID[trust],
           ...(h!.source_ref === null ? {} : { from: h!.source_ref }),
         });
+        /* FROM GITHUB: the repository, the commit it is pinned to, and that nobody reviewed it (`git-channel.ts`). */
+        const git = h!.source === 'git' && h!.source_ref !== null ? parseGit(h!.source_ref) : null;
+        if (git !== null)
+          Object.assign(out, {
+            ...(h!.author === null || h!.author === 'Made in this BrainDog' ? { by: `${repoSaid(git)} on GitHub` } : {}),
+            trust_said: GIT_UNREVIEWED,
+            github: { repo: repoSaid(git), commit: shortSha(git.ref), path: git.path },
+          });
       }
       if (h !== undefined) {
         const here: Body = { version: h.version, on: h.on };
@@ -510,7 +519,9 @@ export function methods(deps: RecordDeps) {
       out.next =
         h === undefined
           ? `Install: act installPack {"id":"${String(out.id)}"} puts it to the person on Decide.`
-          : entry === undefined
+          : entry === undefined && isMap(out.github)
+            ? `A newer tag on ${String(out.github.repo)} is asked about on Decide by itself. To pick a version: act installPack {"source":{"kind":"git","ref":"${String(out.github.repo)}@<tag>:${String(out.github.path)}"}}.`
+            : entry === undefined
             ? `Change it: edit file, raise its version, act addonCheck {"doc":<file>}, then act installPack {"doc":<file>}.`
             : `It is here.${isMap(out.here) && h.on === false ? ' It is off: act enablePack {"id"}.' : ''}`;
       return { ok: true, value: out };
