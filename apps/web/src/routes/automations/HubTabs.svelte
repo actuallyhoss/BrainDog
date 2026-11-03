@@ -81,8 +81,13 @@
   }
 
   /* UNDER THE SENTENCE, ON THE BOARD: the track in the tile's colour, as a quiet control beside the name is drawn. */
+  /* ON THE PAGE'S GROUND THE TRACK IS GLASS (ops 4.7, the page tier): the control floats over the ambient light with a
+     0.5px edge, and its chosen segment is the solid thumb. */
   :global(.head-below .hub-tabs) {
-    background: var(--tile);
+    background: var(--g-fill, var(--tile));
+    -webkit-backdrop-filter: var(--g-bf, none);
+    backdrop-filter: var(--g-bf, none);
+    box-shadow: inset 0 0 0 0.5px var(--g-line, transparent);
   }
 
   /* AT ITS OWN WIDTH FROM 640, under the sentence's start; the whole width only on a phone (`full`). */
