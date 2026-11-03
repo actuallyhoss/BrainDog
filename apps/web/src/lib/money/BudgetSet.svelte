@@ -17,7 +17,8 @@
   import Button from '$lib/ui/Button.svelte';
   import type { Fields } from '$lib/record/schema.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import IconWell from '$lib/ui/IconWell.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
+  import { tick } from 'svelte';
   import type { Ledger } from './ledger.ts';
 
   /* THE CATEGORIES ARE THE LIST THE LEDGER FILES A LINE UNDER (`ledger.ts`), handed by the page, never named here: its
@@ -31,19 +32,21 @@
 
   const words = {
     heading: 'Set a budget',
-    lede: 'The most to spend in each category, and whether that is for a week, a month or a year.',
+    /* NO LEDE OVER THE LINES (UI pass, 3 Nov): each line says it, a category, the most to spend and what for. */
+    change: 'Change budgets',
+    done: 'Done',
     name: 'Category',
     most: 'Most to spend',
     per: 'For',
     periods: { week: 'A week', month: 'A month', year: 'A year' } satisfies Record<Period, string>,
     none: 'No budget',
-    another: (n: number) => `Set another (${n} more ${n === 1 ? 'category' : 'categories'})`,
+    another: (n: number) => `Show ${n} more ${n === 1 ? 'category' : 'categories'}`,
     saved: (name: string) => `${name}'s budget is saved.`,
     cleared: (name: string) => `${name} has no budget now.`,
     empty: 'No category you spend in yet.',
     /* AN EMPTY BOOK IS OFFERED THE EVERYDAY CATEGORIES (audit 31 Oct h, AH14): Budgets said "No category you spend in
        yet" over nothing to press, and a first budget could not be set before the first spending. */
-    starters: 'No category yet. Set the most to spend on any of these, and it is kept as a category.',
+    starters: 'No categories yet. Set a budget on any of these and it becomes one.',
     starterNames: ['Home', 'Food', 'Transport', 'Health', 'Fun', 'Subscriptions', 'Other'],
     bad: 'Write the most to spend as an amount, such as 250.',
     noCurrency: 'Set your home currency in Money first, so a budget says which money it is.',
@@ -178,6 +181,30 @@
   });
   const hiddenCount = $derived((lines?.length ?? 0) - shownLines.length);
 
+  /* OPEN WHILE NOTHING IS SET (the first budget is set here), and on a press once something is. Decided once, on the
+     first read, so the form never closes under the hand setting the first budget. */
+  const anySet = $derived((lines ?? []).some((l) => l.minor !== null));
+  let editing = $state(false);
+  let decided = false;
+  $effect(() => {
+    if (decided || lines === null) return;
+    decided = true;
+    if (!lines.some((l) => l.minor !== null)) editing = true;
+  });
+  const open = $derived(editing);
+  let list = $state<HTMLUListElement | undefined>();
+
+  async function start() {
+    editing = true;
+    await tick();
+    list?.querySelector('input')?.focus();
+  }
+
+  function finish() {
+    editing = false;
+    openAll = false;
+  }
+
   function setPeriod(l: Line, v: string) {
     if (!isPeriod(v) || v === l.period) return;
     l.period = v;
@@ -186,86 +213,132 @@
 </script>
 
 {#if lines !== null}
-  <section class="bset" aria-labelledby="bset-h">
-    <header class="bset-head">
-      <IconWell name="wallet" />
-      <div>
-        <h2 class="bset-title" id="bset-h">{words.heading}</h2>
-        <p class="bset-lede">{words.lede}</p>
-      </div>
-    </header>
-    {#if lines.length === 0}
-      <p class="bset-lede">{words.empty}</p>
-    {:else}
-      {#if lines.every((l) => l.seq < 0)}<p class="bset-lede">{words.starters}</p>{/if}
-      <ul class="bset-lines">
-        {#each shownLines as l (l.key)}
-          <li class="bset-line">
-            <span class="bset-name" dir="auto">{l.name}</span>
-            <label class="bset-most">
-              <span class="sr-only">{words.most}, {l.name}</span>
-              <span class="bset-cur" aria-hidden="true">{l.currency === null ? '' : (symbolOf(l.currency) ?? l.currency)}</span>
-              <input
-                class="num"
-                inputmode="decimal"
-                placeholder={words.none}
-                bind:value={l.typed}
-                disabled={busy === l.seq}
-                onchange={() => setAmount(l)}
-                onkeydown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
-              />
-            </label>
-            <label class="bset-per">
-              <span class="sr-only">{words.per}, {l.name}</span>
-              <select value={l.period} disabled={busy === l.seq || l.minor === null} onchange={(e) => setPeriod(l, (e.currentTarget as HTMLSelectElement).value)}>
-                {#each Object.entries(words.periods) as [v, said] (v)}<option value={v}>{said}</option>{/each}
-              </select>
-            </label>
-          </li>
-        {/each}
-      </ul>
-      {#if hiddenCount > 0}
-        <span class="bset-more"><Button weight="quiet" onclick={() => (openAll = true)}>{words.another(hiddenCount)}</Button></span>
+  {#if !open}
+    <!-- THE BUDGETS ARE ALREADY ON THE PAGE AS BARS, so the form that sets them waits behind one line (UI pass, 3 Nov): it
+         listed every category and its amount a second time under the bars that say them. -->
+    <button type="button" class="bset-open surface-card" onclick={start}>
+      <span class="bset-glyph"><Icon name="edit" size="l" /></span>
+      <span>{words.change}</span>
+    </button>
+  {:else}
+    <section class="bset surface-card" aria-labelledby="bset-h">
+      <header class="bset-head">
+        <span class="bset-glyph"><Icon name="wallet" size="l" /></span>
+        <h2 class="bset-title" id="bset-h">{anySet ? words.change : words.heading}</h2>
+        {#if anySet}<Button size="sm" onclick={finish}>{words.done}</Button>{/if}
+      </header>
+      {#if lines.length === 0}
+        <p class="bset-lede">{words.empty}</p>
+      {:else}
+        {#if lines.every((l) => l.seq < 0)}<p class="bset-lede">{words.starters}</p>{/if}
+        <ul class="bset-lines" bind:this={list}>
+          {#each shownLines as l (l.key)}
+            <li class="bset-line">
+              <span class="bset-name" dir="auto">{l.name}</span>
+              <label class="bset-field bset-most">
+                <span class="sr-only">{words.most}, {l.name}</span>
+                <span class="bset-cur" aria-hidden="true">{l.currency === null ? '' : (symbolOf(l.currency) ?? l.currency)}</span>
+                <input
+                  class="num"
+                  inputmode="decimal"
+                  placeholder={words.none}
+                  bind:value={l.typed}
+                  disabled={busy === l.seq}
+                  onchange={() => setAmount(l)}
+                  onkeydown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
+                />
+              </label>
+              <label class="bset-field bset-per">
+                <span class="sr-only">{words.per}, {l.name}</span>
+                <select value={l.period} disabled={busy === l.seq || l.minor === null} onchange={(e) => setPeriod(l, (e.currentTarget as HTMLSelectElement).value)}>
+                  {#each Object.entries(words.periods) as [v, said] (v)}<option value={v}>{said}</option>{/each}
+                </select>
+              </label>
+            </li>
+          {/each}
+        </ul>
+        {#if hiddenCount > 0}
+          <span class="bset-more"><Button size="sm" onclick={() => (openAll = true)}>{words.another(hiddenCount)}</Button></span>
+        {/if}
       {/if}
-    {/if}
-  </section>
+    </section>
+  {/if}
 {/if}
 
 <style>
-  .bset-more {
-    justify-self: start;
+  /* THE CLOSED FORM IS ONE CARD LINE, as Accounts' "Add an account" is: a glyph and the words, the whole line pressable. */
+  .bset-open {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: 56px;
+    padding: 0 var(--tile-pad, 20px);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium, 500);
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--d-state, 120ms) var(--ease-out, ease-out);
+  }
+
+  .bset-open:hover {
+    background: color-mix(in oklab, var(--tile), var(--ink) 4%);
+  }
+
+  .bset-open:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
   }
 
   .bset {
     display: grid;
-    gap: var(--sp-3);
+    gap: var(--card-head-gap, 12px);
     padding: var(--tile-pad, 20px);
-    background: var(--tile);
-    border-radius: var(--r-tile, 16px);
   }
 
+  /* THE ONE CARD HEAD (rhythm 5): a 28 row, the bare 18 glyph in the third ink, the name 14/20 600, any aside at 28. */
   .bset-head {
     display: flex;
-    gap: var(--sp-3);
-    align-items: flex-start;
+    gap: var(--sp-2);
+    align-items: center;
+    min-block-size: 28px;
+  }
+
+  .bset-glyph {
+    display: inline-flex;
+    flex: none;
+    color: var(--ink-3);
+  }
+
+  .bset-glyph :global(.icon) {
+    inline-size: var(--head-glyph, 18px);
+    block-size: var(--head-glyph, 18px);
   }
 
   .bset-title {
+    flex: 1;
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--fs-body);
     font-weight: 600;
+    line-height: var(--lead-ui, 20px);
   }
 
   .bset-lede {
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
   }
 
+  /* ROWS TOLD APART BY AIR, NOT RULES, and kept to a reading width so a name is never a screen away from its amount. */
   .bset-lines {
     display: grid;
+    gap: var(--sp-2);
+    max-inline-size: 40rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -273,24 +346,36 @@
 
   .bset-line {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) minmax(0, 8rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 10rem) minmax(0, 8.5rem);
     gap: var(--sp-2);
     align-items: center;
-    padding-block: var(--sp-2);
-    border-block-start: 1px solid var(--rule);
   }
 
   .bset-name {
     overflow: hidden;
     color: var(--ink);
+    font-size: var(--fs-row, 15px);
+    line-height: var(--lead-row, 20px);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .bset-most {
+  /* A FIELD AS EVERY FIELD IS DRAWN (ops 4.22): the tile's fill, a 1px edge, radius 12, one ring when focused. */
+  .bset-field {
     display: flex;
     gap: var(--sp-1);
     align-items: center;
+    box-sizing: border-box;
+    min-block-size: var(--field-h, 36px);
+    padding-inline: var(--sp-3);
+    background: var(--tile);
+    border-radius: var(--r-field, 12px);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+  }
+
+  .bset-field:focus-within {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 0;
   }
 
   .bset-cur {
@@ -298,29 +383,41 @@
     font-size: var(--fs-meta);
   }
 
-  .bset-most input,
-  .bset-per select {
+  .bset-field input,
+  .bset-field select {
+    flex: 1;
     inline-size: 100%;
     min-inline-size: 0;
-    min-block-size: 36px;
-    padding: 0 var(--sp-2);
+    min-block-size: calc(var(--field-h, 36px) - 2px);
+    padding: 0;
     color: var(--ink);
     font: inherit;
-    background: var(--tile-2);
-    border: 1px solid var(--rule);
-    border-radius: var(--r-ctl);
+    font-size: var(--fs-body);
+    background: none;
+    border: 0;
+    appearance: none;
   }
 
-  /* UNDER A THUMB A FIELD IS 44 TALL (Look B "44 on a phone"; design pass, 1 Nov): these were 36. */
-  @media (pointer: coarse) {
-    .bset-most input,
-    .bset-per select {
-      min-block-size: var(--tap);
-    }
+  .bset-field input:focus-visible,
+  .bset-field select:focus-visible {
+    /* focus-ok: the field's own ring above is the one focus. */
+    outline: none;
   }
 
-  .bset-most input {
+  .bset-field input {
     text-align: end;
+  }
+
+  .bset-field input::placeholder {
+    color: var(--ink-3);
+  }
+
+  .bset-field:has(:disabled) {
+    opacity: 0.6;
+  }
+
+  .bset-more {
+    justify-self: start;
   }
 
   .sr-only {
@@ -335,10 +432,15 @@
   @media (max-width: 560px) {
     .bset-line {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      row-gap: var(--sp-1);
     }
 
     .bset-name {
       grid-column: 1 / -1;
+    }
+
+    .bset-lines {
+      gap: var(--sp-3);
     }
   }
 </style>
