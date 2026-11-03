@@ -17,6 +17,9 @@ import { callOf } from './words.ts';
 
 type Args = Record<string, unknown>;
 
+/** "legal name, nationality and Discord id". */
+const said = (l: readonly string[]): string => (l.length > 1 ? `${l.slice(0, -1).join(', ')} and ${l.at(-1)}` : l.join(''));
+
 /** A list keeps people as fields when it has the fields People 4.7.0 added: a record on an older People has none. */
 export const keepsFacts = (fields: readonly { id: string }[] | undefined): boolean =>
   Array.isArray(fields) && fields.some((f) => f.id === 'legal_name') && fields.some((f) => f.id === 'discord');
@@ -34,7 +37,7 @@ export function noteRefusal(note: unknown, row: Args, at: string, rebuild: (fiel
   const named = Object.keys(facts).join(', ');
   return {
     code: 'VALUE_MALFORMED',
-    fix: `The note says ${read.found.join(', ')}, and each has a field of its own: ${named}. Put them there and keep the note for what no field holds.`,
+    fix: `The note says their ${said(read.found)}, and each has a field of its own: ${named}. Put them there and keep the note for what no field holds.`,
     at,
     try: rebuild({ ...facts, ...(rest === undefined ? {} : { note: rest }) }),
   } as Refusal;
