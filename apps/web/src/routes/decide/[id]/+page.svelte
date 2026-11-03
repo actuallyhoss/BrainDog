@@ -1218,7 +1218,7 @@
             {/if}
       {/if}{/snippet}
   {#snippet whoMore()}
-    <Button weight="bare" size="sm" aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>
+    <Button weight="glass" size="sm" data-circle aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>
   {/snippet}
 
   <div class="page" data-narrow={asking ? undefined : ''}>
@@ -2549,6 +2549,23 @@
     .q-head :global(.page-head .name-words) {
       -webkit-line-clamp: 3;
       line-clamp: 3;
+    }
+  }
+
+  /* THE ⋯ BY THE TITLE IS A GLASS CIRCLE (ops 4.1): one glyph, so as wide as it is tall, a tap wide under a thumb. */
+  .page :global(.btn[data-circle]),
+  :global(.q-head .btn[data-circle]) {
+    inline-size: var(--ctl-page, 36px);
+    min-inline-size: 0;
+    block-size: var(--ctl-page, 36px);
+    padding: 0;
+  }
+
+  @media (pointer: coarse) {
+    .page :global(.btn[data-circle]),
+    :global(.q-head .btn[data-circle]) {
+      inline-size: var(--tap);
+      block-size: var(--tap);
     }
   }
 </style>

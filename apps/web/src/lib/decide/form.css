@@ -626,3 +626,16 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
     padding-block: var(--sp-2);
   }
 }
+
+/* IN A CARD THE ANSWERS ARE CARD ACTION PILLS (ops 4.6): 28px capsules at 13px under a pointer, the card's question
+   being the thing read and the buttons the thing pressed. A thumb keeps the tap's height (above). The question's own
+   page keeps the page tier for its main answers; its option cards' buttons are in a card, so they are pills too. */
+@media (hover: hover) and (pointer: fine) {
+  .dc .dc-actions > .dc-btn,
+  .dc-option-foot > .dc-btn {
+    min-block-size: var(--ctl-panel, 28px);
+    padding: 0 12px;
+    font-size: 13px;
+    line-height: 18px;
+  }
+}
