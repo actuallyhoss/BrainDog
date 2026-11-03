@@ -2755,11 +2755,12 @@
      never rounded squares), a figure at the stat numeral's 28/30 and no bigger, and answers drawn as capsules the size
      of their words. On a phone the same, a step smaller, so a card is as tall as what it says. */
 
+  /* THE GREETING IS A SECTION HEADING (17/600) UNDER THE PAGE'S OWN TITLE, which the bar already says at 28. */
   .today-hi {
-    font-size: var(--fs-figure);
+    font-size: var(--fs-head);
     font-weight: var(--fw-semi);
-    line-height: 28px;
-    letter-spacing: -0.015em;
+    line-height: 22px;
+    letter-spacing: -0.01em;
   }
 
   .body[data-board] :global(:is(.block-bar, .tile-head)) {
@@ -2881,11 +2882,6 @@
   }
 
   @media (width < 640px) {
-    .today-hi {
-      font-size: 20px;
-      line-height: 26px;
-    }
-
     .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child .cell-figure) {
       font-size: 24px;
       line-height: 28px;
