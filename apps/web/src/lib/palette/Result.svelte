@@ -77,16 +77,17 @@
     min-inline-size: 0;
   }
 
-  /* THE GLYPH IN A 28px NEUTRAL WELL, 16 inside it: the palette's row size, never a tone. */
+  /* THE GLYPH BARE, AS A MENU ROW'S IS (ops 4.10): 16 in a 24px slot, in the second ink, no well behind it on the glass. */
   .result-glyph {
     display: flex;
     flex: none;
   }
 
   .result-glyph :global(.well) {
-    inline-size: 28px;
-    block-size: 28px;
-    background: var(--tile-2);
+    inline-size: 24px;
+    block-size: 24px;
+    background: none;
+    box-shadow: none;
     color: var(--ink-2);
   }
 

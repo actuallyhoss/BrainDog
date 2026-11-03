@@ -1954,9 +1954,9 @@
   }
 
   /**
-   * A CENTRED MODAL, OVER THE SCRIM (frame F6): 640 wide or the screen less 16 a side, 96 from the top, at most 560 tall
-   * and the list scrolls inside past that. A tile's surface, one strong hairline, radius 16, and solid: no glass, no
-   * shadow. Its height is its content's.
+   * A CENTRED MODAL, OVER THE SCRIM (the ops palette, 3 Nov): 640 wide or the screen less 16 a side, 12% of the window
+   * from the top, at most 78% of it tall and the list scrolls inside past that. Clear glass at the sheet radius (22),
+   * its specular edge and the modal shadow: the one floating thing over the page. Its height is its content's.
    *
    * IN OVER `--d-panel` FROM .98 OF ITS SIZE, OUT OVER `--d-panel-out` AS A FADE, never laid out on the way. Under
    * `prefers-reduced-motion` it fades only.
@@ -1967,7 +1967,7 @@
    */
   .palette {
     position: fixed;
-    inset-block-start: 96px;
+    inset-block-start: 12vh;
     /* AS TALL AS WHAT IT HOLDS: the UA puts a modal's end edge on the window's, which stretched it to its cap. */
     inset-block-end: auto;
     inset-inline: 0;
@@ -1978,12 +1978,15 @@
     inline-size: min(640px, calc(100vw - 2 * var(--sp-4)));
     max-inline-size: none;
     block-size: auto;
-    max-block-size: min(560px, calc(100dvh - 160px));
+    max-block-size: min(78vh, calc(100dvh - 12vh - var(--sp-6)));
     margin: 0 auto;
     padding: 0;
-    background: var(--tile);
-    border: 1px solid var(--rule-strong);
-    border-radius: var(--r-tile);
+    background: var(--glass-clear, var(--tile));
+    -webkit-backdrop-filter: var(--glass-filter, none);
+    backdrop-filter: var(--glass-filter, none);
+    border: 0;
+    border-radius: var(--r-sheet, 22px);
+    box-shadow: var(--glass-edge, inset 0 0 0 1px var(--rule-strong)), var(--elev-modal, none);
     color: var(--ink);
     overflow: hidden;
     opacity: 1;
@@ -2008,7 +2011,7 @@
     inline-size: min(640px, max(var(--from-w), 560px), calc(100vw - 2 * var(--sp-4)));
     max-block-size: min(640px, calc(100dvh - var(--from-top) - var(--sp-6)));
     margin: 0;
-    border-radius: var(--r-pop);
+    border-radius: var(--r-sheet, 22px);
     transform-origin: top;
     transition:
       opacity var(--d-panel) var(--ease-out),
@@ -2038,7 +2041,7 @@
     inline-size: auto;
     max-block-size: min(640px, calc(100dvh - var(--from-top) - var(--sp-6)));
     margin: 0;
-    border-radius: var(--r-pop);
+    border-radius: var(--r-sheet, 22px);
     transform-origin: top right;
   }
 
@@ -2124,8 +2127,8 @@
     gap: var(--sp-3);
     min-block-size: 56px;
     padding-block: 0;
-    padding-inline: var(--sp-4);
-    border-block-end: 1px solid var(--rule);
+    padding-inline: calc(var(--sp-4) + 2px) var(--sp-3);
+    border-block-end: 1px solid var(--sep, var(--rule));
     color: var(--ink-3);
     transition: border-color var(--d-state) var(--ease-out);
   }
@@ -2134,7 +2137,6 @@
      that says it is live: its edge darkens toward the ink. Never the accent, which under the query
      read as a validation error before anything had been typed. */
   .p-head:focus-within {
-    border-block-end-color: var(--ink-2);
     color: var(--ink-2);
   }
 
@@ -2156,7 +2158,8 @@
     border-radius: var(--r-xs);
     background: none;
     color: var(--ink);
-    font-size: var(--fs-head);
+    font-size: var(--fs-row, 15px);
+    letter-spacing: -0.005em;
   }
 
   /* The caret is the platform's own focus indicator for a text field, and the panel opens with focus
@@ -2219,9 +2222,9 @@
   }
 
   .p-chip {
-    padding: var(--sp-1) var(--sp-2);
-    border-radius: var(--r-ctl);
-    background: var(--board);
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: var(--r-pill, 999px);
+    background: var(--row-wash-press, var(--board));
     color: var(--ink);
     font-size: var(--fs-body);
   }
@@ -2254,12 +2257,15 @@
   }
 
   /* A META HEADING OVER EACH GROUP: the meta step, at 500, in the lowest text ink. */
+  /* A CAPS LABEL OVER EACH GROUP (ops 2.3): 11px at 500, a little tracked, in the lowest text ink, on the rows' text edge. */
   .p-group {
     margin: 0;
-    padding: var(--sp-3) var(--sp-2) var(--sp-1);
+    padding: var(--sp-3) var(--sp-3) var(--sp-1);
     color: var(--ink-3);
-    font-size: var(--fs-meta);
+    font-size: var(--fs-caps, 11px);
     font-weight: var(--fw-medium);
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
   }
 
   /* A ROW'S HEIGHT, 44, WITH A FINE POINTER OR A COARSE ONE, AND 56px ON A PHONE, where a result is two lines
@@ -2271,8 +2277,9 @@
     align-items: center;
     gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: var(--tap);
-    padding: var(--sp-1) var(--sp-2);
+    min-block-size: 40px;
+    margin-block: 1px;
+    padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-2);
     border: 0;
     border-radius: var(--r-ctl);
     background: none;
@@ -2283,6 +2290,12 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
+  @media (pointer: coarse) {
+    .p-row {
+      min-block-size: var(--tap);
+    }
+  }
+
   @media (width < 640px) {
     .p-row {
       min-block-size: var(--row-h-2);
@@ -2291,7 +2304,8 @@
 
   /* THE CURSOR ROW IS THE WASH, and the pointer moves the cursor, so hover and the cursor are one state. */
   .p-row[data-cursor] {
-    background: var(--hover);
+    background: var(--menu-row-fill, var(--hover));
+    transition-duration: 0ms;
   }
 
   /* AND THE QUIET LINE STEPS UP ONE INK ON IT: `--ink-3` is measured against the ground, and over the wash in the dark
@@ -2347,14 +2361,15 @@
     align-items: center;
     gap: var(--sp-1);
     flex: none;
-    min-block-size: 32px;
-    padding: 0 var(--sp-2);
+    min-block-size: var(--ctl-panel, 28px);
+    padding: 0 var(--sp-3);
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     background: none;
     color: var(--ink-3);
     font: inherit;
-    font-size: var(--fs-ctl);
+    font-size: var(--fs-cap);
+    font-weight: var(--fw-medium);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -2363,7 +2378,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .p-mode:hover {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
       color: var(--ink);
     }
   }
@@ -2387,9 +2402,9 @@
     align-items: center;
     gap: var(--sp-1);
     min-block-size: var(--btn-h-sm);
-    padding-inline: var(--sp-2);
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    padding-inline: var(--sp-3);
+    background: var(--row-wash-press, var(--tile-2));
+    border-radius: var(--r-pill, 999px);
     color: var(--ink);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
@@ -2406,9 +2421,9 @@
     display: inline-flex;
     align-items: center;
     min-block-size: var(--btn-h-sm);
-    padding-inline-start: var(--sp-2);
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    padding-inline-start: var(--sp-3);
+    background: var(--row-wash-press, var(--tile-2));
+    border-radius: var(--r-pill, 999px);
     color: var(--ink);
   }
 
@@ -2429,7 +2444,7 @@
     padding-inline: var(--sp-1);
     background: none;
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     color: var(--ink-2);
     font: inherit;
     font-weight: var(--fw-medium);
@@ -2437,8 +2452,8 @@
   }
 
   .p-harder {
-    padding-inline: var(--sp-2);
-    background: var(--tile-2);
+    padding-inline: var(--sp-3);
+    background: var(--row-wash-press, var(--tile-2));
     color: var(--ink);
   }
 
@@ -2446,7 +2461,7 @@
     .p-attached-x:hover,
     .p-at:hover,
     .p-harder:hover {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
       color: var(--ink);
     }
   }
@@ -2509,9 +2524,9 @@
     align-items: center;
     gap: var(--sp-1) var(--sp-2);
     padding: var(--sp-2) var(--sp-4);
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
     color: var(--ink-3);
-    font-size: var(--fs-meta);
+    font-size: var(--fs-cap);
   }
 
   /**
@@ -2533,8 +2548,7 @@
       max-block-size: calc(100dvh - var(--kb, 0px));
       padding-block-start: env(safe-area-inset-top, 0px);
       border: 0;
-      border-block-end: 1px solid var(--rule-strong);
-      border-radius: 0 0 var(--r-tile) var(--r-tile);
+      border-radius: 0 0 var(--r-sheet, 22px) var(--r-sheet, 22px);
       translate: 0;
     }
 
@@ -2566,8 +2580,9 @@
       gap: var(--sp-2);
       min-block-size: var(--tap);
       padding-inline: var(--sp-3);
-      background: var(--tile-2);
-      border-radius: var(--r-pop);
+      background: var(--row-wash, var(--tile-2));
+      box-shadow: inset 0 0 0 0.5px var(--g-line, transparent);
+      border-radius: var(--r-pill, 999px);
     }
 
     .p-input {
@@ -2600,7 +2615,21 @@
   /* UNDER FORCED COLOURS the palette's edge is the system's text colour. */
   @media (forced-colors: active) {
     .palette {
-      border-color: CanvasText;
+      border: 1px solid CanvasText;
+    }
+  }
+
+  /* NO GLASS WHERE IT CANNOT BLUR, OR WHERE LESS TRANSPARENCY IS ASKED FOR: the tile, solid. */
+  @supports not (backdrop-filter: blur(1px)) {
+    .palette {
+      background: var(--tile);
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .palette {
+      background: var(--tile);
+      backdrop-filter: none;
     }
   }
 </style>
