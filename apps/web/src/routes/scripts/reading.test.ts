@@ -85,12 +85,13 @@ test('a row of the page’s scripts block says what starts it and where it stand
   assert.equal(odd.said, 'Not run yet');
 });
 
-test('the screen draws the declared page through the one reader, and says its own line in the head', async () => {
+test('the screen draws the declared page through the one reader, and says no line of counts in the head', async () => {
   const { readFileSync } = await import('node:fs');
   const screen = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(screen, /<PageView slug=\{SLUG\} got=\{drawn\} mode="home" unfolded \{reread\} \/>/u, 'every script is drawn, none folded');
   assert.match(screen, /from '@braindog\/seed\/packs\/scripts'/u);
-  assert.match(screen, /sentenceOf\(rows\)/u);
+  /* NO LINE OF COUNTS SINCE 3 Nov ("i dont like those briefs at all, remove them"): each row says its runs. */
+  assert.doesNotMatch(screen, /sentenceOf\(rows\)/u);
   assert.doesNotMatch(screen, /HubRows/u, 'the list is the page’s table now, not rows built by hand');
 });
 
