@@ -16,7 +16,7 @@ export const DESK = {
   greet: (hour: number, name: string): string =>
     `${hour >= 5 && hour < 12 ? 'Good morning' : hour >= 12 && hour < 18 ? 'Good afternoon' : 'Good evening'}, ${name}`,
   /** The sidebar's places that the desk does not open, drawn so the frame is the app's, and the projects' heading. */
-  more: { work: 'Work', people: 'People', projects: 'Projects', inPlay: '4 in play', addons: 'Add-ons', settings: 'Settings' },
+  more: { work: 'Work', people: 'People', projects: 'Projects', inPlay: '4 in play', addons: 'Plugins', settings: 'Settings' },
   bell: 'What happened',
   /** The phone's last tab, the sidebar as a page. */
   menu: 'Menu',

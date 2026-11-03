@@ -1,5 +1,5 @@
 /**
- * `/build`: the address the guide to building an add-on was promised at, sent on to the pack docs.
+ * `/build`: the address the guide to building a plugin was promised at, sent on to the pack docs.
  *
  * THE GUIDE IS THE DOCS, NOT A SECOND COPY OF THEM. The pack guide's pages
  * are in `src/docs/06-packs/`, so this address only has to arrive there. It is not a line in `nav.ts`, whose list is
@@ -20,10 +20,10 @@ export const prerender = true;
 const GUIDE = '/docs/packs/first-pack';
 
 const words = {
-  title: 'Building an add-on',
+  title: 'Building a plugin',
   /* Rests on `src/docs/06-packs/`, the pages this address sends a reader to. */
-  lede: 'The guide to building an add-on is in the docs, from your first add-on to publishing it on the Kennel.',
-  link: 'Build your first add-on',
+  lede: 'The guide to building a plugin is in the docs, from your first plugin to publishing it on the Kennel.',
+  link: 'Build your first plugin',
   source: 'BrainDog on GitHub',
   legal: 'Legal',
 };

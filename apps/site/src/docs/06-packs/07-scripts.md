@@ -60,7 +60,7 @@ const said = await ctx.propose({
 
 - **Answered at once, in the record's words.** The question is tried against the record as it is asked, so the script reads `{ ok: true, value }` or the refusal it would get anywhere else, `{ ok: false, refusal: { code, fix, at } }`. `value.queued` is a new question, `value.joined` one already waiting with that cause, and `value.answered` one the owner answered before, which is not asked again.
 - **Filed when the run finishes**, with its writes. A run that throws files none of its questions.
-- **Only about what it may write.** Every list its rows name, and every row an answer would change, is one in `writes`. A script cannot propose a change to the record's lists, automations or add-ons: that is a person's or an agent's to ask.
+- **Only about what it may write.** Every list its rows name, and every row an answer would change, is one in `writes`. A script cannot propose a change to the record's lists, automations or plugins: that is a person's or an agent's to ask.
 - **Never applied by itself.** Nothing a script proposes is written until the owner accepts it, and what accepting writes is signed by the owner.
 - **Twenty questions a run.** A question that joins one waiting is not counted, so the next run files the rest. A run may call it 200 times in all.
 - **Asked once.** Give a `cause`, a short key such as `kpi-backfill:<project>`, and a second run joins the open question rather than filing another.

@@ -1,5 +1,5 @@
 <!--
-  `/addons`: the add-on store as a stranger sees it. Every public listing as a card, a search, and the categories as one
+  `/plugins`: the plugin store as a stranger sees it. Every public listing as a card, a search, and the categories as one
   segmented control.
 
   THE SITE'S DESIGN: the night head with the search in its slot, then the store on the board's ground with
@@ -15,7 +15,7 @@
   import Seo from '$lib/site/Seo.svelte';
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
-  import { ADDONS } from '$lib/links.ts';
+  import { PLUGINS } from '$lib/links.ts';
   import { packs } from '$lib/copy/packs.ts';
   import Cards from '$lib/packs/Cards.svelte';
   import { filtersOf, matches, type Category } from '$lib/packs/catalogue.ts';
@@ -41,7 +41,7 @@
   }
 </script>
 
-<Seo title={w.meta.title} description={w.meta.description} path={ADDONS} />
+<Seo title={w.meta.title} description={w.meta.description} path={PLUGINS} />
 <PageHead title={w.title} lead={w.lede}>
   {#if data.cards.length > 0}
     <div class="head-search" role="search">
@@ -303,7 +303,7 @@
     color: var(--on-night);
   }
 
-  /* A TERMINAL, drawn: the band's own tile, the four commands of the first add-on in the mono face. */
+  /* A TERMINAL, drawn: the band's own tile, the four commands of the first plugin in the mono face. */
   .term {
     min-inline-size: 0;
     margin: 0;

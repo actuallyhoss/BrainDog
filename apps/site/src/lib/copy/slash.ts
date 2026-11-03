@@ -77,7 +77,7 @@ export const slashPage = {
     questions: [
       { q: 'Does Slash change things on its own?', a: 'No. It changes what you ask for, and every change has an undo.' },
       /* CHECKED AGAINST THE PRODUCT (leftovers9, 2 Nov): Slash holds every change to money, keys, sharing, deletes or
-         add-ons as a card, even one asked for (`waitsFor` in `packages/mcp/src/slash-tools.ts`), and no switch lifts
+         plugins as a card, even one asked for (`waitsFor` in `packages/mcp/src/slash-tools.ts`), and no switch lifts
          that for Slash. Your own agents are not held the same way: one you tell to delete something does it, and with
          "Let your agents do everything without asking" on, money goes through too (`docs/03-agents/04-scopes.md`). So the
          answer is said of Slash, and the agents get their own half, where "always wait" read as true of them as well. */

@@ -1,8 +1,8 @@
-# The add-on file
+# The plugin file
 
 A pack is one file, `<id>.pack.json` or `<id>.pack.yaml`: a manifest saying what the pack is and what it needs, then its declarations and example rows. A record reads both forms through one parser, so choose whichever you would rather write.
 
-## A whole add-on
+## A whole plugin
 
 This is the smallest useful pack, a list of things to do and a page of what is still open. It is the shape `braindog addon new` starts every pack in, shortened here by its `author` and `license` lines.
 

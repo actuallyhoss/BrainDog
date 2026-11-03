@@ -82,7 +82,7 @@ Every change moves BrainDog's version on by one, so a version names a moment.
 
 ## Where lists come from
 
-A list comes from your first run, from an add-on in **Add-ons**, or from a proposal by Slash or an agent that you accept in Needs you. Whatever adds a list shows you its fields and any example rows before anything is written, and example rows are marked so you can clear them.
+A list comes from your first run, from a plugin in **Plugins**, or from a proposal by Slash or an agent that you accept in Needs you. Whatever adds a list shows you its fields and any example rows before anything is written, and example rows are marked so you can clear them.
 
 Adding a list to the sidebar and taking it off never touches its rows. A list that leaves the sidebar keeps every row it held.
 

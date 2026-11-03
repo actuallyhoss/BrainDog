@@ -78,7 +78,7 @@ export const home = {
     },
   },
 
-  /* THE BUSINESS SIDE (3 November): money as a reason to stay, said for the founder. The add-on names are the
+  /* THE BUSINESS SIDE (3 November): money as a reason to stay, said for the founder. The plugin names are the
      catalogue's own (`packs/`); Stripe and Mercury read balances and payouts only, so nothing here says revenue. */
   money: {
     title: 'The business side, where your agents can see it.',
@@ -201,7 +201,7 @@ export const home = {
       },
       {
         q: 'Can an agent spend money or delete things?',
-        /* THE OWNER'S SWITCH (2 November) covers money, settings, add-ons, the team, sharing, making keys, imports and
+        /* THE OWNER'S SWITCH (2 November) covers money, settings, plugins, the team, sharing, making keys, imports and
            exports; never handing over, deleting the whole BrainDog or reading a key's value, and paying stays in
            Billing (`docs/03-agents/04-scopes.md`). */
         a: 'Not unless you say so. Money, keys, sharing and deletes ask every time. You can let your own agents do everything without asking, but reading a key, giving BrainDog away, deleting it and paying stay yours even then.',

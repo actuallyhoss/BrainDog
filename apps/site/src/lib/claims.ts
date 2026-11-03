@@ -113,5 +113,5 @@ export const CLAIMS: readonly Claim[] = [
 
   /* The packs pages (`copy/packs.ts`). */
   { id: 'pack-asks-first', said: 'Opens BrainDog, which shows what this adds and asks before anything changes.', where: 'packs.detail.installNote', state: 'true' },
-  { id: 'pack-preview-fresh', said: 'Drawn by BrainDog in a fresh BrainDog with only this add-on on', where: 'packs.detail.previewNote', state: 'true' },
+  { id: 'pack-preview-fresh', said: 'Drawn by BrainDog in a fresh BrainDog with only this plugin on', where: 'packs.detail.previewNote', state: 'true' },
 ];

@@ -1,6 +1,6 @@
-# Your first add-on
+# Your first plugin
 
-This page makes a small add-on from nothing, a reading list, and takes it through the five commands that carry any pack from an idea to the Kennel. What each command prints is shown as it prints it, so you can tell at a glance whether yours did the same.
+This page makes a small plugin from nothing, a reading list, and takes it through the five commands that carry any pack from an idea to the Kennel. What each command prints is shown as it prints it, so you can tell at a glance whether yours did the same.
 
 You need the `braindog` command line, which [the SDK](/docs/packs/sdk) says how to get. Nothing on this page sends anything anywhere until the last step.
 
@@ -14,7 +14,7 @@ braindog addon new reading-list --title "Reading list" --author "Your name"
 Reading list 1.0.0 written to /home/you/reading-list: reading-list.pack.json with one list, a page over it and two example rows, reading-list.test.json and a README. Check it with braindog addon check reading-list, and test it with braindog addon test reading-list.
 ```
 
-The folder holds three files. `reading-list.pack.json` is the add-on itself: one list called Items, a page that shows what is still open, and two example rows. `reading-list.test.json` is its test, and `README.md` says in five lines how to check, test and publish it. Add `--yaml` to write `reading-list.pack.yaml` instead; a record reads both the same way.
+The folder holds three files. `reading-list.pack.json` is the plugin itself: one list called Items, a page that shows what is still open, and two example rows. `reading-list.test.json` is its test, and `README.md` says in five lines how to check, test and publish it. Add `--yaml` to write `reading-list.pack.yaml` instead; a record reads both the same way.
 
 A list that carries example rows needs a `tags` field, because that is where each example is marked so it can be told from your real rows and cleared in one action. Make sure yours has one:
 
@@ -43,7 +43,7 @@ Reading list 1.0.0 reads as an add-on: 1 lists, 1 pages and 2 example rows. Noth
   Installs in a scratch BrainDog: 2 declarations and 2 example rows, and one page.
 ```
 
-`check` reads the file the way BrainDog will, then installs it in a scratch BrainDog in memory. The lines in the middle are the plan an owner sees before installing: what the add-on adds, what it needs installed first, and every host it would call out to. The last line says the install went through.
+`check` reads the file the way BrainDog will, then installs it in a scratch BrainDog in memory. The lines in the middle are the plan an owner sees before installing: what the plugin adds, what it needs installed first, and every host it would call out to. The last line says the install went through.
 
 When something is wrong, the last line says what, with its code in brackets. Here the page was pointed at a list called `books` that nothing declares:
 
@@ -66,7 +66,7 @@ Reading list 1.0.0, tested in a scratch BrainDog after installing it:
   passed  row 1's state is "open".
 ```
 
-The test installs the add-on with its example rows, writes each row in `rows` as a person would, and then holds the record to each line of `expect`. The starting test writes one row, so the list holds three. When an expectation does not hold, it says so, and the command ends with a failure a script or a CI job can see:
+The test installs the plugin with its example rows, writes each row in `rows` as a person would, and then holds the record to each line of `expect`. The starting test writes one row, so the list holds three. When an expectation does not hold, it says so, and the command ends with a failure a script or a CI job can see:
 
 ```code | What it prints when a test fails
 Reading list 1.0.0, tested in a scratch BrainDog after installing it:
@@ -85,7 +85,7 @@ braindog addon preview reading-list
 Previewing Reading list 1.0.0 on a scratch BrainDog. Open http://localhost:5870/addons/reading-list?kind=pack and press Review the plan. Stop with Ctrl+C; the scratch BrainDog is removed.
 ```
 
-`preview` starts a whole BrainDog on your machine with nothing in it but your add-on in its catalogue. Open the address, review the plan, install it, and use its page the way somebody who installs it will. `--port <n>` chooses another port. Starting the scratch BrainDog takes a little while the first time.
+`preview` starts a whole BrainDog on your machine with nothing in it but your plugin in its catalogue. Open the address, review the plan, install it, and use its page the way somebody who installs it will. `--port <n>` chooses another port. Starting the scratch BrainDog takes a little while the first time.
 
 ## Publish it
 

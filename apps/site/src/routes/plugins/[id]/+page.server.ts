@@ -1,6 +1,6 @@
 /**
- * `/addons/<id>`: one public listing, prerendered for every one there is (`entries`), so the strict prerender builds
- * each page from the bundled catalogue and the Kennel's index, and an unlisted or withdrawn add-on has no page at all.
+ * `/plugins/<id>`: one public listing, prerendered for every one there is (`entries`), so the strict prerender builds
+ * each page from the bundled catalogue and the Kennel's index, and an unlisted or withdrawn plugin has no page at all.
  *
  * THE DRAWING IS DIALECT TEXT built here (`previewOf`, or `addsSrc` when no preview was made) and drawn by
  * `lib/app/Page.svelte`, the product's renderer, so the page carries words and never a file path.
@@ -32,7 +32,7 @@ export const prerender = true;
 
 const listed = async () => (await readEntries()).filter(isPublic);
 
-/* NO PAGE PER ADD-ON WHILE `/addons` IS HELD (`HELD` in `launch.ts`): none is prerendered, so none is written. */
+/* NO PAGE PER PLUGIN WHILE `/plugins` IS HELD (`HELD` in `launch.ts`): none is prerendered, so none is written. */
 export const entries: EntryGenerator = async () => (held() ? [] : (await listed()).map((e) => ({ id: slugOf(e) })));
 
 export const load: PageServerLoad = async ({ params }) => {

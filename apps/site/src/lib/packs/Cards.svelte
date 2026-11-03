@@ -1,5 +1,5 @@
 <!--
-  A grid of add-on cards, for the store (`/addons`) and an author's page (`/addons/by/<who>`).
+  A grid of plugin cards, for the store (`/plugins`) and an author's page (`/plugins/by/<who>`).
 
   A CARD SAYS WHAT A STRANGER WEIGHS: its name, one line, what it brings, who made it and how far it was checked, and
   how many hold it when the Kennel counted ten or more. "Made by BrainDog" is drawn only where the catalogue says
@@ -11,7 +11,7 @@
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
-  import { ADDONS } from '$lib/links.ts';
+  import { PLUGINS } from '$lib/links.ts';
   import { packs } from '$lib/copy/packs.ts';
   import type { Card } from './catalogue.ts';
 
@@ -27,7 +27,7 @@
         <span class="icon-well"><Icon name={card.glyph} size="m" /></span>
         <span class="kind">{w.kind[card.kind]}</span>
       </div>
-      <h2 class="name"><a class="card-link" href="{ADDONS}/{card.slug}">{card.title}</a></h2>
+      <h2 class="name"><a class="card-link" href="{PLUGINS}/{card.slug}">{card.title}</a></h2>
       <p class="summary">{card.summary}</p>
       <p class="brings">{card.adds.length ? card.adds.join(' · ') : w.worksOn}</p>
       <p class="foot">
@@ -108,7 +108,7 @@
     text-decoration: none;
   }
 
-  /* THE TITLE'S LINK COVERS THE CARD, so a press anywhere on it opens the add-on. */
+  /* THE TITLE'S LINK COVERS THE CARD, so a press anywhere on it opens the plugin. */
   .card-link::before {
     content: '';
     position: absolute;

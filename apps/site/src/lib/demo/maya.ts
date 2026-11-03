@@ -611,7 +611,7 @@ export const MAKES: Make[] = [
  */
 export const MONEY_BAND: {
   accounts: { name: string; book: string; cents: number; icon: IconName }[];
-  /** NET WORTH, week by week: cash and what the add-ons hold, less what is owed. */
+  /** NET WORTH, week by week: cash and what the plugins hold, less what is owed. */
   worth: { cents: number; change: string; series: number[]; parts: { name: string; cents: number; icon: IconName }[] };
   budgets: { name: string; spent: number; of: number; icon: IconName; period: string }[];
   coming: { name: string; when: string; cents: number; icon: IconName }[];

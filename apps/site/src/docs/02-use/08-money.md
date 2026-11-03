@@ -21,9 +21,9 @@ Reports | In and out by month, spending by category, and this month against last
 
 Press **+** anywhere in BrainDog to add money out, money in or a move between your own accounts. It suggests the payee and the category you used last time, and writes the line to the ledger. A move between your accounts is written as two lines, one out and one in, so neither counts as spending.
 
-## Add-ons for the rest
+## Plugins for the rest
 
-Money keeps accounts, bills, budgets and the forecast. Add the rest from Add-ons when you need it: Investments and gold, Certificates, Property, Insurance, Debts, Goals, Trips and Zakat. Each adds its own pages beside Money's.
+Money keeps accounts, bills, budgets and the forecast. Add the rest from Plugins when you need it: Investments and gold, Certificates, Property, Insurance, Debts, Goals, Trips and Zakat. Each adds its own pages beside Money's.
 
 Cash now is read from your accounts, rolled forward from each account's newest balance through what has moved since. Every figure after it reads the same walk, so no two of them disagree.
 
@@ -98,9 +98,9 @@ After an import, BrainDog offers a category for each new line by who it was paid
 
 - Type it: press **+** for a payment, or add an account on Accounts.
 - Import a bank statement as a CSV, as above.
-- Connect Stripe or Mercury from Add-ons, and balances and transactions arrive on their own. See [The inbox and doors](/docs/use/inbox-and-doors).
+- Connect Stripe or Mercury from Plugins, and balances and transactions arrive on their own. See [The inbox and doors](/docs/use/inbox-and-doors).
 - Forward card alerts or bank texts, and teach a rule to file them.
-- **Count the cash**, an add-on, writes down what is actually in a cash box or account and puts the difference from what BrainDog expected into the ledger.
+- **Count the cash**, a plugin, writes down what is actually in a cash box or account and puts the difference from what BrainDog expected into the ledger.
 
 ## Ask about it
 

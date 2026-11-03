@@ -1,10 +1,10 @@
 /**
- * `/addons/by/<who>`: every public listing one author has, prerendered for every author with one (`entries`).
+ * `/plugins/by/<who>`: every public listing one author has, prerendered for every author with one (`entries`).
  *
  * WHO AN AUTHOR IS comes from the catalogue (`publisher`, its kind and id), never from a name typed in a file: two
  * publishers who both call themselves "Ada" get two pages (`authorsOf`).
  *
- * HELD WITH THE STORE (`HELD` in `launch.ts`): no page is prerendered while `/addons` is held.
+ * HELD WITH THE STORE (`HELD` in `launch.ts`): no page is prerendered while `/plugins` is held.
  */
 import { error } from '@sveltejs/kit';
 import { held } from '$lib/launch.ts';

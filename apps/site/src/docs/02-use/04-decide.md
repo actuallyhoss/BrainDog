@@ -47,7 +47,7 @@ A proposed change shows what it will do before you accept it. For a page, what w
 If it | Needs you shows
 Adds rows | Each row, and that nothing is added until you accept
 Adds a page | The page drawn, what it reads from, and where it sits
-Installs an add-on | What it adds, its example rows, and the rows of yours it touches
+Installs a plugin | What it adds, its example rows, and the rows of yours it touches
 Calls a service | Which service, with which key, sending what, and how often
 Renames something | Each word that changes, and what it will read afterwards
 Takes something away | What goes, and that the rows stay
@@ -59,7 +59,7 @@ If only part of a change could be applied, Needs you says what was done and kept
 
 ## Who can answer
 
-The owner answers everything. A colleague who **Can decide** can answer questions and change rows. Changes that arrange BrainDog itself, such as installing an add-on or adding a page, are the owner's to accept. See [Sharing and access](/docs/use/sharing).
+The owner answers everything. A colleague who **Can decide** can answer questions and change rows. Changes that arrange BrainDog itself, such as installing a plugin or adding a page, are the owner's to accept. See [Sharing and access](/docs/use/sharing).
 
 ## Talk it over
 

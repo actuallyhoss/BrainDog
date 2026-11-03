@@ -1,9 +1,9 @@
 /**
- * The add-on catalogue, read once at build time for `/addons`, every `/addons/<id>` and every `/addons/by/<who>`.
+ * The plugin catalogue, read once at build time for `/plugins`, every `/plugins/<id>` and every `/plugins/by/<who>`.
  *
  * TWO SOURCES, MERGED (`mergeEntries`): the catalogue bundled with the web app (`apps/web/static/catalogue/`, written by
  * `tools/catalogue/from-packs.mjs`), and the Kennel's public index (`GET /api/kennel/v1/index.json`), which holds every
- * add-on somebody else published and reviewed. The bundled one is read from disk and always there; the Kennel is asked
+ * plugin somebody else published and reviewed. The bundled one is read from disk and always there; the Kennel is asked
  * once over the network and waited on a few seconds at most, so a build with no network still draws BrainDog's own.
  *
  * `BRAINDOG_KENNEL` names another Kennel (its `/api/kennel/v1` address, for a local one) or `off` for none.

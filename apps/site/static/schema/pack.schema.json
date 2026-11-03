@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://brain.dog/schema/pack.schema.json",
-  "title": "BrainDog add-on",
-  "description": "An add-on file (.pack.json). Made from the lists BrainDog reads; the record's own check decides, run braindog addon check.",
+  "title": "BrainDog plugin",
+  "description": "A plugin file (.pack.json). Made from the lists BrainDog reads; the record's own check decides, run braindog addon check.",
   "type": "object",
   "required": [
     "pack",
@@ -20,7 +20,7 @@
     "pack": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{0,62}$",
-      "description": "The add-on id: lower-case letters, digits and dashes."
+      "description": "The plugin id: lower-case letters, digits and dashes."
     },
     "version": {
       "type": "string",
@@ -60,7 +60,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Other add-ons it needs, by id, with a version range such as >=1.0.0."
+          "description": "Other plugins it needs, by id, with a version range such as >=1.0.0."
         }
       }
     },

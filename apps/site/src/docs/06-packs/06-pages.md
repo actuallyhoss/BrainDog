@@ -2,7 +2,7 @@
 
 A pack's page is a declared page: a title, a place in the rail, the lists it reads, and blocks in order. It uses the same keys as any page in the dialect, so [declared pages](/docs/dialect/pages) is the reference for every key and every kind of block. This page is what a pack author needs on top of it.
 
-## A page in an add-on
+## A page in a plugin
 
 ```code | A page with a side rail
 {

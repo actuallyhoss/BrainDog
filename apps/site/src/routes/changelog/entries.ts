@@ -145,9 +145,9 @@ export const ENTRIES: Entry[] = [
   {
     date: '2026-11-02',
     kind: 'shipped',
-    title: 'Sentry in the add-on store, and Stripe and Mercury read only',
+    title: 'Sentry in the plugin store, and Stripe and Mercury read only',
     body:
-      'The Sentry add-on links Sentry projects to yours, with their open issues and error numbers. Stripe and Mercury say which read-only key to make. Weather and Calendar draw better on Today.',
+      'The Sentry plugin links Sentry projects to yours, with their open issues and error numbers. Stripe and Mercury say which read-only key to make. Weather and Calendar draw better on Today.',
     commits: ['dd1bf3944', '6230e27d6', '31787f040', '265db20f8', 'd42666e55'],
   },
   {
@@ -163,7 +163,7 @@ export const ENTRIES: Entry[] = [
     kind: 'changed',
     title: 'Dark mode is grey, and pages stop jumping',
     body:
-      'Dark mode lost its red tint and reads grey. Today, Search, Needs you, Keychain, Add-ons and project pages now draw in place without shifting as they load.',
+      'Dark mode lost its red tint and reads grey. Today, Search, Needs you, Keychain, Plugins and project pages now draw in place without shifting as they load.',
     commits: ['fa3f844df', '77a128882', '750d4cb53', '2eda61853'],
   },
   {
@@ -265,9 +265,9 @@ export const ENTRIES: Entry[] = [
   {
     date: '2026-10-20',
     kind: 'shipped',
-    title: 'Publish your own add-on to the store',
+    title: 'Publish your own plugin to the store',
     body:
-      'You can publish an add-on of your own to the store, where it is reviewed on admin and can be unpublished later. Publishers see their submissions and are offered updates and skills. Not released yet.',
+      'You can publish a plugin of your own to the store, where it is reviewed on admin and can be unpublished later. Publishers see their submissions and are offered updates and skills. Not released yet.',
     commits: ['cd045eb3', '4b8db9bf'],
   },
   {
@@ -349,9 +349,9 @@ export const ENTRIES: Entry[] = [
   {
     date: '2026-09-28',
     kind: 'shipped',
-    title: 'Add-ons, people and comments in the app, and pages you change by describing them',
+    title: 'Plugins, people and comments in the app, and pages you change by describing them',
     body:
-      'Add-ons can be browsed, searched, installed and updated from inside the app. ' +
+      'Plugins can be browsed, searched, installed and updated from inside the app. ' +
       'You can invite people from Settings and comment on a row. ' +
       'Describe a change to a page and Slash draws it beside the page as it is, for you to keep or drop.',
     commits: ['4c204b5c', 'df828225'],
@@ -843,7 +843,7 @@ export const ENTRIES: Entry[] = [
     title: 'A use case can be shared as a signed file, and a later version is offered',
     body:
       'A catalogue holds versions that never change, a bump it works out for itself, and a ' +
-      'checksum. The web lists add-ons beside use cases and says which key signed each one. A ' +
+      'checksum. The web lists plugins beside use cases and says which key signed each one. A ' +
       'newer version of what a record holds is filed as a proposal and installed only if it is ' +
       'accepted.',
     commits: ['b027b418', 'c0cc921c', '858aa3fd'],

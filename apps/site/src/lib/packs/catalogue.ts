@@ -205,9 +205,9 @@ export const slugOf = (e: Pick<Entry, 'kind' | 'id'>): string => (e.kind === 'us
 export const installPath = (app: string, e: Pick<Entry, 'kind' | 'id'>): string => `${app}/addons/${encodeURIComponent(e.id)}?kind=${e.kind}`;
 
 /**
- * THE BUNDLED CATALOGUE AND THE KENNEL'S INDEX AS ONE LIST. The bundled one is the build's own (BrainDog's add-ons, as
+ * THE BUNDLED CATALOGUE AND THE KENNEL'S INDEX AS ONE LIST. The bundled one is the build's own (BrainDog's plugins, as
  * this deploy ships them), so for an entry both hold it is the one drawn; the Kennel adds every entry the bundled one
- * lacks, which is every add-on somebody else published. Bundled order first, then the Kennel's.
+ * lacks, which is every plugin somebody else published. Bundled order first, then the Kennel's.
  */
 export function mergeEntries(bundled: readonly Entry[], kennel: readonly Entry[]): Entry[] {
   const key = (e: Pick<Entry, 'kind' | 'id'>): string => `${e.kind}:${e.id}`;
@@ -385,7 +385,7 @@ export function glyphOf(e: Entry, pageIcon: string | null): IconName {
 
 export type Card = {
   slug: string;
-  /** The author's page, `/addons/by/<who>`. */
+  /** The author's page, `/plugins/by/<who>`. */
   who: string;
   trust: Trust;
   /** A use case sets up a whole way of working; a pack adds to one. */
@@ -451,7 +451,7 @@ export function matches(card: Pick<Card, 'find'>, query: string): boolean {
 /**
  * The category filters: each category at least one card is in, with its count, in `CATEGORIES`' order.
  *
- * "MADE BY BRAINDOG" IS NOT ONE. It says who made an add-on, not what it does, and every card already says that in its
+ * "MADE BY BRAINDOG" IS NOT ONE. It says who made a plugin, not what it does, and every card already says that in its
  * own foot, so as a segment beside "Use cases" and "Lists" it would only repeat "All" while BrainDog makes them all.
  */
 export function filtersOf(cards: readonly Pick<Card, 'categories'>[]): { category: Category; name: string; count: number }[] {

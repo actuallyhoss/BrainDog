@@ -11,7 +11,7 @@ Export | What is in it
 Everything, in one file | All of it: its lists, pages, rules and rows
 The way you work | Your lists, pages, figures and rules, without a single row of what you wrote in them
 What you wrote | Every row you have written, without the lists and pages around them
-A starter for someone else | The way you work, as an add-on somebody else can install, with your rows left out
+A starter for someone else | The way you work, as a plugin somebody else can install, with your rows left out
 ```
 
 ```steps
@@ -40,7 +40,7 @@ Archive a row | It leaves every list until it is put back. History keeps every c
 Hide a page from the sidebar | It leaves your sidebar only. Settings, under Navigation, shows it again
 Remove a block from a page | The block goes. The rows it read stay in their list
 Take a list out of the sidebar | The list leaves the sidebar. Its rows are kept
-Turn an add-on off | Its lists leave the sidebar. The rows are kept, and turning it on again brings them back
+Turn a plugin off | Its lists leave the sidebar. The rows are kept, and turning it on again brings them back
 ```
 
 Nothing in History can be deleted. Every change, and who made it, stays there for as long as your BrainDog exists.

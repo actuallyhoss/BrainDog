@@ -19,7 +19,7 @@ Opened with nothing typed, Slash shows what matters now, or a few questions that
 
 ## Ask for a change
 
-Ask Slash to add a task, change a field, add a person, or draft a page or a rule. What you asked for and can be undone happens at once, with a receipt and **Undo** for a few seconds, and it stays in your history. A change that touches money, keys, sharing, deletes or add-ons comes back as a card instead: press Enter to do it, or Esc to leave it. A draft page or rule waits in [Needs you](/docs/use/decide) until you accept it. When Slash read text from outside your BrainDog, such as mail or an import, it asks before every change in that conversation.
+Ask Slash to add a task, change a field, add a person, or draft a page or a rule. What you asked for and can be undone happens at once, with a receipt and **Undo** for a few seconds, and it stays in your history. A change that touches money, keys, sharing, deletes or plugins comes back as a card instead: press Enter to do it, or Esc to leave it. A draft page or rule waits in [Needs you](/docs/use/decide) until you accept it. When Slash read text from outside your BrainDog, such as mail or an import, it asks before every change in that conversation.
 
 ## What Slash notices
 

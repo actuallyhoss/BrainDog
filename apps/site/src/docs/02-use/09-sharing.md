@@ -8,8 +8,8 @@ A role says what somebody can do across all of your BrainDog. You pick one when 
 
 ```comparison | The five roles
 Role | What they can do | What they can't
-Owner | Everything, including people, add-ons, settings, Keys, export and deleting this BrainDog | Nothing is kept from an owner
-Can decide | See and change everything, answer what needs a decision, and invite people | Open Keys, change add-ons or settings, export, or make an owner
+Owner | Everything, including people, plugins, settings, Keys, export and deleting this BrainDog | Nothing is kept from an owner
+Can decide | See and change everything, answer what needs a decision, and invite people | Open Keys, change plugins or settings, export, or make an owner
 Can edit | See, add and change what is here, and comment | Answer what needs a decision, invite anyone, or open Keys
 Can add | Add new things and comment | See what is here, even what they added, unless you also let them view it
 Can view | See what you give them | Change, add or delete anything
@@ -36,7 +36,7 @@ Invite people and change what they can do | Owner, and Can decide for anybody bu
 Share a project or a list with someone | Owner, Can decide
 Connect their own agents | Everyone, up to their own role
 Let their agents act without asking | Only an owner, for their own agents
-Add-ons, settings and what runs on its own | Owner
+Plugins, settings and what runs on its own | Owner
 Keys | Owner
 Export, backups and deleting this BrainDog | Owner
 Make someone an owner, or hand ownership over | Owner
@@ -75,7 +75,7 @@ Their agents see what they see and nothing more. Every change a colleague or the
 
 ## Hand ownership over
 
-To give your BrainDog to somebody already in it, press **Make owner** on their row in People. A sheet says what changes before anything does: they become an owner, and people, add-ons, settings, Keys, export and deleting it are theirs. You stay on as **Can decide**, so you keep seeing and changing everything and lose only what an owner does. Only they can make you an owner again.
+To give your BrainDog to somebody already in it, press **Make owner** on their row in People. A sheet says what changes before anything does: they become an owner, and people, plugins, settings, Keys, export and deleting it are theirs. You stay on as **Can decide**, so you keep seeing and changing everything and lose only what an owner does. Only they can make you an owner again.
 
 Press **Hand it over** to do it, or **Keep it** to leave things as they are. If you signed in a while ago, BrainDog asks you to confirm it's you first. It happens in one step, and both sides of it are kept in Activity. Only an owner can hand a BrainDog over, and never an agent, whatever its key or switch says.
 
@@ -156,7 +156,7 @@ An agent you connect works at a level too: read only, read and propose changes t
 
 ## Share how you work, without the rows
 
-**Share this setup**, in Settings under Export, packs the way your BrainDog works (its lists, pages and rules) as an add-on somebody else can install. You pick which rows, if any, go with it as examples. Nothing else of yours leaves.
+**Share this setup**, in Settings under Export, packs the way your BrainDog works (its lists, pages and rules) as a plugin somebody else can install. You pick which rows, if any, go with it as examples. Nothing else of yours leaves.
 
 ## Who can share
 

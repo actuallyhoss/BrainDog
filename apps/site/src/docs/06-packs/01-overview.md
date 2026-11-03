@@ -1,6 +1,6 @@
-# Add-ons
+# Plugins
 
-An add-on (a pack, in its file and the command line) is one file of data for a record, written as one file of data: the lists it adds, the pages over them, and the figures, rules, digests and scripts that go with them. Anybody can write one, and a record installs it through the same door whether BrainDog wrote it or you did.
+A plugin (a pack, in its file and the command line) is one file of data for a record, written as one file of data: the lists it adds, the pages over them, and the figures, rules, digests and scripts that go with them. Anybody can write one, and a record installs it through the same door whether BrainDog wrote it or you did.
 
 ## BrainDog is the shell
 
@@ -8,7 +8,7 @@ The core of BrainDog knows how to keep lists, draw pages, count figures, run rul
 
 So a pack is the way to give a record a shape of its own: a set of lists and pages for one kind of work, shared as a file.
 
-## What an add-on can declare
+## What a plugin can declare
 
 A pack's `declarations` are each one of a closed set of kinds, listed in [The kinds](/docs/packs/kinds). The ones a pack reaches for most:
 
@@ -42,7 +42,7 @@ Nothing is installed without a plan first. The record works out everything the p
 
 A pack may place its own pages in the rail. It never moves yours.
 
-## What an add-on cannot do
+## What a plugin cannot do
 
 - Read a list it did not declare or require.
 - Write any row except its own example rows, which are counted on their own line in the plan.
@@ -58,16 +58,16 @@ A pack can still mislead: a figure could add up the wrong field under a plausibl
 
 ## Uninstalling
 
-Declarations belong to the pack, and rows belong to you. Uninstalling retires the pack's lists and pages and keeps every row written under them: they stop being shown, they stay in every export, and installing the pack again brings them back. A pack can also be turned off and on again from the record's add-ons, keeping its version and settings, unless another pack that is on still leans on it.
+Declarations belong to the pack, and rows belong to you. Uninstalling retires the pack's lists and pages and keeps every row written under them: they stop being shown, they stay in every export, and installing the pack again brings them back. A pack can also be turned off and on again from the record's plugins, keeping its version and settings, unless another pack that is on still leans on it.
 
 ## Build one with your agent
 
-You do not need to write the file yourself. Ask the agent you work with for what BrainDog lacks: it looks in the store, writes an add-on when nothing fits, checks it against your BrainDog and asks you on Needs you before anything is installed. [Build one with your agent](/docs/packs/with-your-agent) has the calls and what you see.
+You do not need to write the file yourself. Ask the agent you work with for what BrainDog lacks: it looks in the store, writes a plugin when nothing fits, checks it against your BrainDog and asks you on Needs you before anything is installed. [Build one with your agent](/docs/packs/with-your-agent) has the calls and what you see.
 
 ## Where to go next
 
 - [Build one with your agent](/docs/packs/with-your-agent): ask for what BrainDog lacks, and approve what it makes.
-- [Your first add-on](/docs/packs/first-pack): a pack from nothing to the Kennel, with what each command prints.
+- [Your first plugin](/docs/packs/first-pack): a pack from nothing to the Kennel, with what each command prints.
 - [The pack file](/docs/packs/format): the manifest and the declarations, key by key.
 - [The kinds](/docs/packs/kinds): one example of each thing a pack can declare.
 - [Settings](/docs/packs/settings): what the owner chooses, and how a pack reads it.
@@ -78,4 +78,4 @@ You do not need to write the file yourself. Ask the agent you work with for what
 - [Publishing and review](/docs/packs/publishing): putting a pack on the Kennel, and taking a version back.
 - [The catalogue](/docs/packs/catalogue): where records find packs and install them.
 - [What a pack can and cannot do](/docs/packs/limits): the whole list, and the one thing no check prevents.
-- [When an add-on will not install](/docs/packs/refusals): each sentence a pack can meet, and where.
+- [When a plugin will not install](/docs/packs/refusals): each sentence a pack can meet, and where.

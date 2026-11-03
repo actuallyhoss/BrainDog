@@ -39,7 +39,7 @@ export const docsWords = {
     agents: { label: 'Agents', blurb: 'Connecting an agent, its tools, keys and grants, and the command line.', glyph: 'plug' },
     api: { label: 'The API', blurb: 'The HTTP calls a key may make, doors and webhooks, and their limits.', glyph: 'terminal' },
     dialect: { label: 'Writing pages', blurb: 'Every block a page can draw, each shown beside the text that draws it.', glyph: 'layers' },
-    packs: { label: 'Add-ons', blurb: 'What an add-on declares, and how to write and publish one.', glyph: 'board' },
+    packs: { label: 'Plugins', blurb: 'What a plugin declares, and how to write and publish one.', glyph: 'board' },
   } as const satisfies Record<Section, { label: string; blurb: string; glyph: IconName }>,
 
   /** A section card with no page in it yet. */

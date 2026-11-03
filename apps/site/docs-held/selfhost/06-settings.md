@@ -43,7 +43,7 @@ BRAINDOG_BACKUP_AT | when the nightly copy is taken | HH:MM in UTC, 03:20 when u
 ```params | Packs
 BRAINDOG_CATALOGUE | a catalogue folder of your own | offered first; the one bundled with the app when unset
 BRAINDOG_KENNEL | the public catalogue | the Kennel on brain.dog when unset, or off for none
-BRAINDOG_OUTBOUND | whether add-ons send requests to other servers | off when unset, and their scheduled actions are held; on lets them. The public catalogue has its own switch, BRAINDOG_KENNEL
+BRAINDOG_OUTBOUND | whether plugins send requests to other servers | off when unset, and their scheduled actions are held; on lets them. The public catalogue has its own switch, BRAINDOG_KENNEL
 ```
 
 ## The app

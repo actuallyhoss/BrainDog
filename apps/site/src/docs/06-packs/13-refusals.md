@@ -1,4 +1,4 @@
-# When an add-on will not install
+# When a plugin will not install
 
 A pack that cannot install is refused with one sentence saying what is wrong and what to do, and a code in capitals naming the kind of fault. `braindog addon check` says the same sentence a record would, so you meet each of these on your own machine first. This page lists them by where you meet them, each with its sentence.
 
@@ -31,8 +31,8 @@ reading-list needs format 2 and this BrainDog is at 1. Update BrainDog.
 reading-list needs primitives 9 and this BrainDog renders 1. Update BrainDog, or ask the author for a build against the primitives it renders.
 ```
 
-- **`PACK_OVER_CAP`**, a file past the size an add-on may be: "This file is <n> KB, and an add-on is at most <n> KB. Ship fewer example rows, or split it."
-- **`PACK_MALFORMED`**, a file that is not an add-on at all: "This is not an add-on file: it has no pack in it." A starter gets "This is a use-case file, not an add-on. Publish it as a use case."
+- **`PACK_OVER_CAP`**, a file past the size a plugin may be: "This file is <n> KB, and an add-on is at most <n> KB. Ship fewer example rows, or split it."
+- **`PACK_MALFORMED`**, a file that is not a plugin at all: "This is not an add-on file: it has no pack in it." A starter gets "This is a use-case file, not an add-on. Publish it as a use case."
 
 ## What it needs installed first
 

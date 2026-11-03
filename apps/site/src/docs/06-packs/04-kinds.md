@@ -1,6 +1,6 @@
 # The kinds
 
-Every declaration in a pack is one kind, named by its first key, and the list of kinds is closed: it is the kinds on this page. A declaration that begins with anything else is refused before the rest of it is read. This page has one example of each, and every example here installs as written, beside the reading list from [your first add-on](/docs/packs/first-pack).
+Every declaration in a pack is one kind, named by its first key, and the list of kinds is closed: it is the kinds on this page. A declaration that begins with anything else is refused before the rest of it is read. This page has one example of each, and every example here installs as written, beside the reading list from [your first plugin](/docs/packs/first-pack).
 
 ```spec | The kinds, in the order KINDS names them
 register | a list | its fields, their types, which one is the title

@@ -34,10 +34,10 @@ export default {
         if (status === 404 && HELD.includes(path)) return;
         throw new Error(message);
       },
-      /* `/addons/[id]` and `/addons/by/[who]` name no page while the store is held, so they are never reached; anything
+      /* `/plugins/[id]` and `/plugins/by/[who]` name no page while the store is held, so they are never reached; anything
          else unseen still stops the build. */
       handleUnseenRoutes: ({ routes, message }) => {
-        if (held() && routes.every((r) => r === '/addons/[id]' || r === '/addons/by/[who]')) return;
+        if (held() && routes.every((r) => r === '/plugins/[id]' || r === '/plugins/by/[who]')) return;
         throw new Error(message);
       },
     },

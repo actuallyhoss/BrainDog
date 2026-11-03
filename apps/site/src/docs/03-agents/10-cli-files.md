@@ -1,6 +1,6 @@
-# The command line: pages and add-ons
+# The command line: pages and plugins
 
-The commands for building with `braindog`: pages as files you can edit, and starters and add-ons you can build, test and share. [The first page](/docs/agents/cli) covers signing in, keys and sessions.
+The commands for building with `braindog`: pages as files you can edit, and starters and plugins you can build, test and share. [The first page](/docs/agents/cli) covers signing in, keys and sessions.
 
 ## Pages as files
 
@@ -30,16 +30,16 @@ braindog starter search [words] | List what a catalogue holds, the Kennel unless
 braindog starter preview <file> | Start a scratch BrainDog on this machine with the file in its catalogue, removed when it stops
 ```
 
-## Add-ons
+## Plugins
 
-An add-on adds lists, pages, figures and rules to a BrainDog. The add-on commands match the starter ones, and add a test. `braindog pack` is the old name and still works.
+A plugin adds lists, pages, figures and rules to a BrainDog. The plugin commands match the starter ones, and add a test. `braindog pack` is the old name and still works.
 
-```comparison | Add-ons
+```comparison | Plugins
 Command | What it does
-braindog addon new <id> | Write a first add-on folder: its manifest, a first page over a first list with two example rows, its test and a README
-braindog addon check <file or folder> | Read an add-on, warn on any key its manifest does not take, and install it in a scratch BrainDog, saying every refusal BrainDog would give
-braindog addon test <folder> | Install the add-on in a scratch BrainDog, write the rows in its test file, and say each expectation as passed or failed
-braindog addon preview <file or folder> | Start a scratch BrainDog with the add-on in its catalogue, and print its page
+braindog addon new <id> | Write a first plugin folder: its manifest, a first page over a first list with two example rows, its test and a README
+braindog addon check <file or folder> | Read a plugin, warn on any key its manifest does not take, and install it in a scratch BrainDog, saying every refusal BrainDog would give
+braindog addon test <folder> | Install the plugin in a scratch BrainDog, write the rows in its test file, and say each expectation as passed or failed
+braindog addon preview <file or folder> | Start a scratch BrainDog with the plugin in its catalogue, and print its page
 braindog addon diff <a> <b> | As for a starter
 braindog addon search [words] | As for a starter
 braindog addon install <id or file> | As for a starter: a proposal, never an install

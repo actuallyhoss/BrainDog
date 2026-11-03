@@ -53,7 +53,7 @@ export const shell = {
     home: 'Home',
     slash: 'Slash',
     agents: 'Agents',
-    packs: 'Add-ons',
+    packs: 'Plugins',
     pricing: 'Pricing',
     download: 'Download',
     docs: 'Docs',

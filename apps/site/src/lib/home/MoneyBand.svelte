@@ -2,7 +2,7 @@
   "Your money, in one place": Money as the app draws it since the 30 October Money look. Net worth leads, its line over
   twelve weeks and what it is made of (cash, her gold, a fund, less the card), then the accounts as cards each with its
   glyph, the budgets each with its category's glyph and what is left of its own period, and what is coming up signed by
-  the way it goes. One line under it names the add-ons that hang off it. Spending stays ink; red is only for a budget
+  the way it goes. One line under it names the plugins that hang off it. Spending stays ink; red is only for a budget
   gone over, as in the app.
 
   The words are `copy/home.ts`; every name and figure is Maya's (`demo/maya.ts`, `MONEY_BAND`). Static: nothing here

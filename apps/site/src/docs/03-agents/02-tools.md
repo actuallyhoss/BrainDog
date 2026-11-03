@@ -73,7 +73,7 @@ propose {"question": "Which client should we chase first?", "body_kind": "option
 
 ## Anything else the app does
 
-`act` makes any call the app makes, by its name, with the agent's own grant: settings, add-ons and their settings, automations, boards, books, sharing, Needs you, export. `braindog:calls` lists every call it makes and what each takes. A client that reads no resources can ask `act` itself: the call `calls` with a word in `q` lists the calls whose name or line holds it. A call that is misnamed is refused with the nearest one as its `try`. The record decides who may make each one, as it does in the app, and a change the agent's rung asks about waits on Needs you. What only you do in a browser (an add-on on or off, its settings, a declaration, taking a key out of service) is asked instead, and lands when you say yes. A key's value never passes through it either way.
+`act` makes any call the app makes, by its name, with the agent's own grant: settings, plugins and their settings, automations, boards, books, sharing, Needs you, export. `braindog:calls` lists every call it makes and what each takes. A client that reads no resources can ask `act` itself: the call `calls` with a word in `q` lists the calls whose name or line holds it. A call that is misnamed is refused with the nearest one as its `try`. The record decides who may make each one, as it does in the app, and a change the agent's rung asks about waits on Needs you. What only you do in a browser (a plugin on or off, its settings, a declaration, taking a key out of service) is asked instead, and lands when you say yes. A key's value never passes through it either way.
 
 ```code | text
 act {"call": "calls", "args": {"q": "automation"}}

@@ -6,6 +6,9 @@
 # the ones the app (its update feed) and /download name, so they never change when the files move
 # (tools/desktop/release.mjs --publish uploads them).
 /desktop/* https://download.brain.dog/:splat 302
-# The add-on store was /packs until 3 November. An old link or a shared listing lands on the same add-on at /addons.
-/packs /addons 301
-/packs/* /addons/:splat 301
+# The plugin store was /packs until 3 November and /addons until later that day. An old link or a shared listing
+# lands on the same plugin at /plugins, in one hop.
+/packs /plugins 301
+/packs/* /plugins/:splat 301
+/addons /plugins 301
+/addons/* /plugins/:splat 301

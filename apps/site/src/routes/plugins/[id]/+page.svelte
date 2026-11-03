@@ -1,7 +1,7 @@
 <!--
-  `/addons/<id>`: one add-on, as a stranger weighs it before adding it.
+  `/plugins/<id>`: one plugin, as a stranger weighs it before adding it.
 
-  THE SITE'S DESIGN: the night head holds the way back, the add-on's name and its one line, who made it (a link to all
+  THE SITE'S DESIGN: the night head holds the way back, the plugin's name and its one line, who made it (a link to all
   of theirs), how far it was checked and how many hold it, and "Add to BrainDog" as the page's one red. Under it, on the
   board's ground, first what it asks for of yours, because that is the decision, then the drawing of what it adds
   beside three tiles: what it brings by name, who made it, and its versions.
@@ -23,7 +23,7 @@
   import Page from '$lib/app/Page.svelte';
   import type { Span } from '$lib/examples/types.ts';
   import { LAUNCH } from '$lib/launch.ts';
-  import { ADDONS } from '$lib/links.ts';
+  import { PLUGINS } from '$lib/links.ts';
   import { packs } from '$lib/copy/packs.ts';
   import PageHead from '$lib/site/PageHead.svelte';
   import type { PageProps } from './$types';
@@ -47,18 +47,18 @@
   const wide = (src: string): Span[] => parse(src, { page: true }).map((_, at) => ({ at, cols: 12 }));
 </script>
 
-<Seo title={d.title(card.title)} description={card.summary} path="{ADDONS}/{card.slug}" />
+<Seo title={d.title(card.title)} description={card.summary} path="{PLUGINS}/{card.slug}" />
 {#snippet back()}
-  <a class="back" href={ADDONS}><Icon name="back" size="m" />{d.back}</a>
+  <a class="back" href={PLUGINS}><Icon name="back" size="m" />{d.back}</a>
 {/snippet}
 
 <PageHead title={card.title} lead={card.summary} before={back}>
   <p class="meta-row">
     <span class="tag">{w.kind[card.kind]}</span>
     {#if card.ours}
-      <a class="maker" href="{ADDONS}/by/{card.who}"><Mark height={14} tone="inherit" />{w.ours}</a>
+      <a class="maker" href="{PLUGINS}/by/{card.who}"><Mark height={14} tone="inherit" />{w.ours}</a>
     {:else}
-      <a class="maker" href="{ADDONS}/by/{card.who}">{w.by(card.publisher)}</a>
+      <a class="maker" href="{PLUGINS}/by/{card.who}">{w.by(card.publisher)}</a>
       <span class="tag">{w.trust[card.trust]}</span>
     {/if}
     {#if card.installs !== null}<span class="num">{w.installs(card.installs)}</span>{/if}
@@ -158,7 +158,7 @@
           {/if}
           <div class="fact"><dt>{d.latest}</dt><dd class="num">{card.version}</dd></div>
         </dl>
-        <a class="more-by" href="{ADDONS}/by/{card.who}">{d.moreBy(card.publisher)}<Icon name="arrow" size="s" /></a>
+        <a class="more-by" href="{PLUGINS}/by/{card.who}">{d.moreBy(card.publisher)}<Icon name="arrow" size="s" /></a>
       </section>
 
       <section class="tile" aria-labelledby="versions-title">

@@ -34,7 +34,7 @@ Save the look | The owner saves it. A colleague sends it to the owner in Needs y
 
 The editor also sets the corners: Square, Soft or Round. **Use the house look** puts it back in the house look at any time.
 
-Nothing that fails can be saved: the look waits until every pair marked Fails is fixed. An add-on that brings a look with colours that cannot be read offers **Fix and install**, with a fix ready for each colour, for you to check before it goes in.
+Nothing that fails can be saved: the look waits until every pair marked Fails is fixed. A plugin that brings a look with colours that cannot be read offers **Fix and install**, with a fix ready for each colour, for you to check before it goes in.
 
 ## The design book
 

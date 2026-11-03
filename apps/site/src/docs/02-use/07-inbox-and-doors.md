@@ -8,7 +8,7 @@ Things arrive in your BrainDog on their own: forwarded mail, bank texts, what a 
 Door | What sends to it | Where you set it up
 Forwarded mail | A forwarding rule at your mail provider | Settings, under Ingest
 A web address | A phone shortcut, a script, another service's webhook | Automations, under Doors, and Settings, under Ingest
-A connector | Stripe, Mercury and other add-ons that fetch on a clock | Add-ons
+A connector | Stripe, Mercury and other plugins that fetch on a clock | Plugins
 A report key | A project sending its own numbers to a page | On that page, under Send numbers here
 ```
 
@@ -77,7 +77,7 @@ When the owner saves a rule, what it reads waits in Needs you until they press *
 
 ## Connectors
 
-A connector is an add-on that fetches on a clock. Stripe reads your balance and the payouts on their way to the bank. Mercury reads your account balances and recent transactions. Card alerts reads a card alert, forwarded by mail or posted as a text, into Money as a transaction.
+A connector is a plugin that fetches on a clock. Stripe reads your balance and the payouts on their way to the bank. Mercury reads your account balances and recent transactions. Card alerts reads a card alert, forwarded by mail or posted as a text, into Money as a transaction.
 
 Installing one shows each service it will call, with which key and how often, before you accept. Its key lives in the Keychain. Each connector is listed under Automations, under Scheduled, and says when it last ran and why it paused, if it did. A figure fed by one that has stopped shows a gap and says it is stale, rather than holding yesterday's number.
 

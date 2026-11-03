@@ -14,7 +14,7 @@
    *   tools    night: nothing gets explained twice, the notes the agents left and the connect line.
    *   chores   agents ask until they've earned your trust: the questions, where each agent stands, what got done,
    *            and under them the floor and the three promises that keep it yours.
-   *   money    the business side, where your agents can see it: the app's Money home on Maya's books, and the add-ons.
+   *   money    the business side, where your agents can see it: the app's Money home on Maya's books, and the plugins.
    *   together bring your team, and their agents: roles, mentions and faces, read-only links (2 November).
    *   slash    or just ask BrainDog: the bar and its answer.
    *   yours    Free while in early access: the page's last call to action.

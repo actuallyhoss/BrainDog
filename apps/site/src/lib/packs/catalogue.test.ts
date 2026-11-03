@@ -1,5 +1,5 @@
 /**
- * The add-on store's cards: who made one is the catalogue's word, never the file's, and the categories the store
+ * The plugin store's cards: who made one is the catalogue's word, never the file's, and the categories the store
  * offers as its one control.
  *
  *   node --test apps/site/src/lib/packs/catalogue.test.ts
@@ -57,7 +57,7 @@ test('a card says what kind of listing it is', () => {
   assert.equal(card?.slug, 'usecase-rent');
 });
 
-test('the control offers what an add-on does, never who made it', () => {
+test('the control offers what a plugin does, never who made it', () => {
   const all = cards({
     format: 1,
     entries: [

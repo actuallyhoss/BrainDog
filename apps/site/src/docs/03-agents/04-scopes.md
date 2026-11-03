@@ -36,7 +36,7 @@ A write token asks before money, keys and deletes. When you tell it to make one 
 
 ## Letting your own agents act without asking
 
-Settings › Agents has one switch for the owner: **Let your agents do everything without asking**. Off, agents ask before deletes, money, keys, add-ons and settings, and after reading things from outside. On, your own agents do anything you can do here without asking: money, settings, add-ons, your team, sharing, making keys, imports and exports. Each change still names its agent and can be undone.
+Settings › Agents has one switch for the owner: **Let your agents do everything without asking**. Off, agents ask before deletes, money, keys, plugins and settings, and after reading things from outside. On, your own agents do anything you can do here without asking: money, settings, plugins, your team, sharing, making keys, imports and exports. Each change still names its agent and can be undone.
 
 The switch never covers three things:
 

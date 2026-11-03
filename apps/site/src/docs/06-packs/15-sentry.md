@@ -1,6 +1,6 @@
 # Sentry
 
-The Sentry add-on reads what is breaking in your apps from Sentry every hour and keeps it beside your projects: each project's open errors, the new ones, how many error events there were in a day and how many people they hit. It only reads. Nothing is ever sent to Sentry.
+The Sentry plugin reads what is breaking in your apps from Sentry every hour and keeps it beside your projects: each project's open errors, the new ones, how many error events there were in a day and how many people they hit. It only reads. Nothing is ever sent to Sentry.
 
 ## What it adds
 
@@ -11,7 +11,7 @@ The Sentry add-on reads what is breaking in your apps from Sentry every hour and
 
 ## When it tells you
 
-An issue that is new and high priority, comes back after it was resolved, or is happening a lot more than usual rings the bell once, with the project, the error and how many people it hit. Inside your quiet hours nothing sounds. If it has hit at least as many people as the add-on's setting says (20 to start), it also waits for you in Needs you, with the link to it on Sentry. An issue that calms down and turns again later rings again.
+An issue that is new and high priority, comes back after it was resolved, or is happening a lot more than usual rings the bell once, with the project, the error and how many people it hit. Inside your quiet hours nothing sounds. If it has hit at least as many people as the plugin's setting says (20 to start), it also waits for you in Needs you, with the link to it on Sentry. An issue that calms down and turns again later rings again.
 
 ## Connect it
 
@@ -19,7 +19,7 @@ An issue that is new and high priority, comes back after it was resolved, or is 
 
 2. Put the token in your keys as Sentry token. From a terminal, `braindog keys put "Sentry token" --opens us.sentry.io` reads it from standard input; or paste it where Install asks for it.
 
-3. Install Sentry from Add-ons and set Organization to the part of your Sentry address before `.sentry.io`. Leave Region at `us.sentry.io` unless your organization is kept in the EU.
+3. Install Sentry from Plugins and set Organization to the part of your Sentry address before `.sentry.io`. Leave Region at `us.sentry.io` unless your organization is kept in the EU.
 
 4. Within the hour, open Errors and check each Sentry project points at the right project of yours.
 

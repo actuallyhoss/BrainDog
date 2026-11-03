@@ -15,10 +15,10 @@ export const SOURCE: string | null = 'https://github.com/actuallyhoss/BrainDog';
 /* The site's own pages. A header or footer link to one shows only once its route exists, which
    `nav.ts` reads from the tree, so naming an address here draws nothing by itself. */
 export const DOCS = '/docs';
-/** The add-on store. It was `/packs` until 3 November; `static/_redirects` sends the old address here. */
-export const ADDONS = '/addons';
+/** The plugin store. It was `/packs`, then `/addons`, until 3 November; `static/_redirects` sends both here. */
+export const PLUGINS = '/plugins';
 /** The store's old name, kept for `copy.ts`, which passes every address on. */
-export const PACKS = ADDONS;
+export const PACKS = PLUGINS;
 export const SUPPORT = '/support';
 export const SECURITY = '/security';
 /**

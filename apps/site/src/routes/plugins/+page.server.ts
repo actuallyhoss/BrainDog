@@ -1,12 +1,12 @@
 /**
- * `/addons`: a card for every public listing, read at build time from the bundled catalogue and the Kennel's index
- * (`lib/packs/read.server.ts`), so an add-on somebody else published is here the day after it is listed and deployed.
+ * `/plugins`: a card for every public listing, read at build time from the bundled catalogue and the Kennel's index
+ * (`lib/packs/read.server.ts`), so a plugin somebody else published is here the day after it is listed and deployed.
  *
  * A SERVER LOAD, so the cards ride in the prerendered HTML and the page reads whole with scripting off;
  * the search box and the filters only narrow what is already drawn.
  *
  * HELD UNTIL THE SITE IS PUBLIC (`HELD` in `launch.ts`), as `/changelog` is: it answers 404, so the build
- * writes no `addons.html` and the site's own 404 page answers the address. The catalogue is read the day it is shown.
+ * writes no `plugins.html` and the site's own 404 page answers the address. The catalogue is read the day it is shown.
  */
 import { error } from '@sveltejs/kit';
 import { held } from '$lib/launch.ts';
