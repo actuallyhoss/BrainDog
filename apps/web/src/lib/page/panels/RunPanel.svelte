@@ -40,7 +40,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import { runLines, runWords } from './run-lines.ts';
-  import { readRunParts, runTalk, type RunParts, type RunRow, type TalkKey } from './run-talk.ts';
+  import { readRunParts, runTalk, talkWords, type RunParts, type RunRow, type TalkKey } from './run-talk.ts';
   import { PRESENCE_WORDS, presenceSaid } from '$lib/ui/presence-words.ts';
   import { Instruct, Instructions, Presence, type ControlMark } from 'braindog-render/svelte';
   import { AGENT_MARKS, isMarked } from '@braindog/skin/agent-marks.ts';
@@ -218,9 +218,15 @@
   async function readTold(handle: string) {
     const [p, t] = await Promise.all([io.presence(), io.threads(20, handle)]);
     if (handle !== run) return;
-    open = p.ok ? p.value : [];
+    /* A READ THAT FAILS ON THE FIFTEEN-SECOND CLOCK KEEPS WHAT WAS DRAWN (3 Nov, "things blinking"): it emptied the live
+       row and what he told it, and the next read drew them again, so a busy record's run page blinked. Only the first
+       read decides that nothing is there. */
+    const first = toldIt === null && open.length === 0;
+    if (p.ok) open = p.value;
+    else if (first) open = [];
     /* THE RECORD LISTS THREADS TO THE OWNER ALONE: a refusal here is a reader who may not tell, and draws nothing. */
-    toldIt = t.ok ? t.value : null;
+    if (t.ok) toldIt = t.value;
+    else if (first) toldIt = null;
     const seen = runsOf(open);
     const missing = toldIt ? unknownRuns(toldIt, seen) : [];
     runsKnown = missing.length === 0 ? seen : new Map([...seen, ...(await io.runs(missing))]);
@@ -279,7 +285,18 @@
     };
   });
   const me = $derived(open.find((r) => r.run === run && r.state !== 'ended') ?? quiet);
-  const meRow = $derived(me ? { ...presenceOf(me, open, places, toldIt ?? []), href: null, busy: holding } : null);
+  /* THE LIVE ROW DOES NOT SAY THE PAGE'S TITLE AGAIN (3 Nov): "Claude  Shipping webhook retries" under a page titled
+     "Shipping webhook retries". The agent's name stands alone; what it is doing stays where it differs from the title. */
+  const meRow = $derived.by(() => {
+    if (!me) return null;
+    const v = presenceOf(me, open, places, toldIt ?? []);
+    return { ...v, doing: v.doing && sameAsTitle(v.doing) ? null : v.doing, href: null, busy: holding };
+  });
+  /* WHILE THE LIVE ROW STANDS, IT SAYS WHO, WHERE AND SINCE WHEN ("on Tidepool · running 2 min"), so "Who and where"
+     and a single open "When it worked" under it said the same a second time. A finished run keeps both. */
+  const STARTED = talkWords.started('').trim();
+  const liveSays = (t: { key: TalkKey; lines: readonly string[] }): boolean =>
+    meRow !== null && toldIt !== null && (t.key === 'who' || (t.key === 'stretches' && t.lines.length === 1 && t.lines[0]!.startsWith(STARTED)));
   const tellView = $derived.by(() => {
     /* A QUIET RUN IS TOLD AS ITSELF, read when it next checks in: the composer's runs are the ones present now, so it is
        handed this one as waiting, or Tell would have gone to anybody. */
@@ -352,16 +369,18 @@
 </script>
 
 {#snippet spoken(keys: readonly TalkKey[])}
-  {#each talk.filter((t) => keys.includes(t.key)) as part (part.key)}
+  {#each talk.filter((t) => keys.includes(t.key) && !liveSays(t)) as part (part.key)}
     <div class="run-part" role="group" aria-label={part.heading}>
       <h3 class="run-meta run-head">{part.heading}</h3>
-      {#if part.lines.length === 1}
-        <p class="run-next">{part.lines[0]}</p>
-      {:else}
-        <ul class="run-lines">
-          {#each part.lines as line}<li class="run-line">{line}</li>{/each}
-        </ul>
-      {/if}
+      <div class="run-body">
+        {#if part.lines.length === 1}
+          <p class="run-next">{part.lines[0]}</p>
+        {:else}
+          <ul class="run-lines">
+            {#each part.lines as line}<li class="run-line">{line}</li>{/each}
+          </ul>
+        {/if}
+      </div>
     </div>
   {/each}
 {/snippet}
@@ -392,12 +411,13 @@
   {#if toldViews.length > 0}
     <div class="run-part" role="group" aria-label="What you told it">
       <h3 class="run-meta run-head">What you told it</h3>
-      <Instructions threads={toldViews} {mark} ontakeback={(k) => void takeBackIt(k)} onundo={(k) => void undoIt(k)} />
+      <div class="run-body"><Instructions threads={toldViews} {mark} ontakeback={(k) => void takeBackIt(k)} onundo={(k) => void undoIt(k)} /></div>
     </div>
   {/if}
   {@render spoken(BEFORE)}
   <div class="run-part" role="group" aria-label={didSaid}>
     {#if talk.length > 0}<h3 class="run-meta run-head">{didSaid}</h3>{/if}
+    <div class="run-body">
     {#if from === 'refused'}
       <p class="run-said" role="status">{fix}</p>
     {:else if plan && plan.steps.length === 0}
@@ -417,11 +437,13 @@
         {/if}
       </div>
     {/if}
+    </div>
   </div>
   {@render spoken(BETWEEN)}
   {#if step}
     <div class="run-part run-step" role="group" aria-label={stepSaid.heading}>
-      <p class="run-meta">{step.left ?? stepSaid.heading}</p>
+      <h3 class="run-meta run-head">{step.left ?? stepSaid.heading}</h3>
+      <div class="run-body">
       <p class="run-next">{step.next}</p>
       {#if step.fate}<p class="run-said" role="status">{step.fate}.</p>{/if}
       {#if step.open}
@@ -437,6 +459,7 @@
           <div class="run-do"><Button size="sm" onclick={() => (closing = true)}>{stepSaid.close}</Button></div>
         {/if}
       {/if}
+      </div>
     </div>
   {/if}
   {@render spoken(AFTER)}
@@ -446,9 +469,10 @@
 <style>
   .run {
     display: grid;
-    gap: var(--sp-2);
+    gap: var(--sp-4);
     min-inline-size: 0;
     padding-block-start: var(--sp-2);
+    container: run / inline-size;
   }
 
   /* ONE PART OF THE CONVERSATION: its heading as a 13px line, then what it says, a hairline between it and the part
@@ -464,9 +488,28 @@
     gap: var(--sp-3);
   }
 
-  .run-part + .run-part {
-    padding-block-start: var(--sp-2);
-    border-block-start: 1px solid var(--rule);
+  /* A PART IS A LABEL AND WHAT IT SAYS (3 Nov): the label on the left in the meta ink and the words beside it from a
+     tablet up, stacked on a phone, the parts told apart by air. A rule ran the tile's whole width between every two. */
+  .run-body {
+    display: grid;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+  }
+
+  .run-part:not(:has(> .run-head)) > .run-body {
+    grid-column: 1 / -1;
+  }
+
+  @container run (inline-size >= 560px) {
+    .run-part:has(> .run-head) {
+      grid-template-columns: 12rem minmax(0, 1fr);
+      column-gap: var(--sp-4);
+      align-items: baseline;
+    }
+
+    .run-part > .run-head {
+      line-height: var(--lead-ui, 20px);
+    }
   }
 
   .run-head {
@@ -510,16 +553,21 @@
     line-height: 1.55;
   }
 
-  /* A RECTANGLE, as every field is: radius 8, the field's flat fill, no border of its own. */
+  /* A FIELD AS EVERY FIELD IS (ops 4.22): 36 tall, radius 12, the tile's fill, a 1px edge, the focus ring on focus. */
   .run-input {
-    min-block-size: 36px;
-    padding-inline: var(--sp-2);
-    border: 0;
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
+    min-block-size: var(--field-h, 36px);
+    padding-inline: var(--sp-3);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-field, 12px);
+    background: var(--tile);
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
+  }
+
+  .run-input:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--focus-ring, var(--focus));
   }
 
   .run-lines {
@@ -529,18 +577,16 @@
     list-style: none;
   }
 
-  /* ONE CHANGE A LINE, at the body size and its line height, a hairline between, as the page's other lists. */
-  .run-line {
-    padding-block: var(--sp-2);
-    border-block-start: 1px solid var(--rule);
-    color: var(--ink);
-    font-size: var(--fs-body);
-    line-height: 1.55;
-    overflow-wrap: anywhere;
+  /* ONE CHANGE A LINE, at the body size, told apart by air and never a rule (ops rows, 3 Nov). */
+  .run-lines {
+    gap: var(--sp-1);
   }
 
-  .run-line:first-child {
-    border-block-start: 0;
+  .run-line {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    overflow-wrap: anywhere;
   }
 
   .run-said {
@@ -555,7 +601,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
-    padding-block-start: var(--sp-2);
+    padding-block-start: var(--sp-1);
   }
 
   /* THE CONFIRM'S SENTENCE takes its own line, so the two presses under it never squeeze it on a phone. */
