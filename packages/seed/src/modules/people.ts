@@ -14,6 +14,7 @@
 import type { MeetsFields, OrgFields } from '@braindog/kernel';
 
 import { day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister } from './base.ts';
+import { PEOPLE_FIELDS_SCRIPT } from './people/note-facts.js';
 
 /**
  * People's two lists, each saying which list `meet` writes for its kind (`meets:` a person, `org:` an organisation), and
@@ -60,8 +61,8 @@ export const ORGANISATIONS: Fields[] = [
 export const PEOPLE: Fields[] = [
   { name: 'Mara Lindqvist', role: 'client', rate: null, email: 'mara@halden.example', keys: ['email:mara@halden.example'], org: 1, note: 'Runs accounts payable at Halden.', met: ['2026-08-28 · mail from halden.example'], in_touch: day(-6) },
   { name: 'Tom Ashby', role: 'client', rate: null, email: 'tom.ashby@ravensworth.example', keys: ['email:tom.ashby@ravensworth.example'], org: 2, note: '', met: ['2026-07-27 · mail from ravensworth.example'], in_touch: day(-38) },
-  { name: 'J. Okonkwo', role: 'contractor', rate: gbp(45_000), email: 'jo@okonkwo.example', keys: ['email:jo@okonkwo.example', 'github:jokonkwo'], note: 'Illustration, invoices monthly', handles: ['git:jokonkwo'], met: ['2026-08-20 · commit 3f2a91c in kiln-site'], in_touch: day(-2) },
-  { name: 'Ada Vine', role: 'accountant', rate: null, email: 'ada@pellvine.example', keys: ['email:ada@pellvine.example'], aliases: ['A. Vine'], org: 3, note: 'Year end is 31 March', met: ['2026-04-28 · mail from pellvine.example'], in_touch: day(-128) },
+  { name: 'J. Okonkwo', role: 'contractor', rate: gbp(45_000), email: 'jo@okonkwo.example', keys: ['email:jo@okonkwo.example', 'github:jokonkwo'], note: 'Illustration, invoices monthly', handles: ['git:jokonkwo'], met: ['2026-08-20 · commit 3f2a91c in kiln-site'], in_touch: day(-2), legal_name: 'Jide Okonkwo', goes_by: 'Jo', titles: ['Illustrator at Halden Type Co'], nationality: 'Nigerian', city: 'Leeds', country: 'United Kingdom', timezone: 'Europe/London', github: 'jokonkwo', instagram: 'jo.draws', terms: 'Invoices monthly, paid in 30 days', paperwork: ['Licence for the specimen art'] },
+  { name: 'Ada Vine', role: 'accountant', rate: null, email: 'ada@pellvine.example', keys: ['email:ada@pellvine.example'], aliases: ['A. Vine'], org: 3, note: 'Legal name Ada Margaret Vine. British. Year end is 31 March.', met: ['2026-04-28 · mail from pellvine.example'], in_touch: day(-128) },
   { name: 'Lars Holm', role: 'other', rate: null, email: 'lars@nordhaven.example', keys: ['email:lars@nordhaven.example'], org: 4, note: 'Support at the registry.' },
   { name: 'S. Marchetti', role: 'contractor', rate: gbp(62_000), email: 'sm@marchetti.example', keys: ['email:sm@marchetti.example', 'github:smarchetti'], note: 'Backend, two days a week', handles: ['git:smarchetti'], met: ['2026-08-27 · commit 8b1e4d0 in portage', '2026-09-02 · commit c47d19e in portage'], in_touch: day(-1) },
 ];
@@ -224,6 +225,18 @@ export const PEOPLE_AUTOMATIONS: Record<string, unknown>[] = [
       },
     ],
   },
+  /* THE FACTS IN A NOTE, OFFERED AS FIELDS, SINCE People 4.7.0: `script.people_fields` reads every person's note and
+     asks once a person whether to keep what it found as their fields (`people/note-facts.js`). It runs the night after
+     the update and every night after, asking nobody twice; this rule is its Run now button, which the owner presses on
+     Automations and an agent reaches with `act automationRun {rule: "people-fields"}`. */
+  {
+    rule: 'people-fields',
+    name: "Offer the facts in each person's note as fields",
+    pack: 'people',
+    on: { manual: true },
+    steps: [{ script: { id: 'people_fields', as: 'reading', input: {} } }],
+  },
+  PEOPLE_FIELDS_SCRIPT,
 ];
 
 export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
@@ -293,6 +306,53 @@ export const PEOPLE_REGISTERS: Record<string, PeopleRegister> = {
       { id: 'email', type: 'email', unique: true, index: true },
       /* THE ORGANISATION THEY ARE WITH, SINCE People 3.0.0: a client's accounts contact is with the client. */
       { id: 'org', label: 'Organisation', type: 'ref', to: 'organisations', index: true },
+      /* WHO SOMEBODY IS, AS FIELDS AND NOT AS SENTENCES, SINCE People 4.7.0 (3 Nov, Sam: "his name should be a field,
+         discord username a field"). Every fact below was a line of `note`, "Legal name **Callum Doran**. Irish. Discord
+         id ...", which nobody could sort, search or edit apart, and which an agent had to read whole to find one handle.
+         Each is optional, so a row written before keeps every value it had and simply has these empty; the person's
+         page hides an empty one and offers it under Add a field. `script.people_fields` offers to move what a note
+         already says into them, one question a person, and `note` is left for what no field holds.
+
+         THE NAME THEY GO BY ON PAPER AND THE ONE THEY GO BY: `name` stays the title, the name the record knows them by;
+         `aliases` stays the names `meet` matches on. */
+      { id: 'legal_name', label: 'Legal name', type: 'text', search: true },
+      { id: 'goes_by', label: 'Goes by', type: 'text' },
+      /* WHAT THEY ARE TO YOU, AS A PERSON, beside `role`, which is what they are to the work: a wife who is also a
+         company's officer is both. Family words only; the work words are `role`'s. */
+      {
+        id: 'relation',
+        label: 'To you',
+        type: 'enum',
+        values: ['wife', 'husband', 'partner', 'parent', 'child', 'sibling', 'family', 'friend', 'mentor', 'other'],
+        labels: { wife: 'Wife', husband: 'Husband', partner: 'Partner', parent: 'Parent', child: 'Child', sibling: 'Sibling', family: 'Family', friend: 'Friend', mentor: 'Mentor', other: 'Other' },
+      },
+      /* WHAT THEY DO WHERE, one line each as said, "CPO at Quartz", "Brand owner at Tamsin": the page links the part after
+         "at" to the project or organisation of that name. */
+      { id: 'titles', label: 'Roles', type: 'list', of: 'text' },
+      /* ONE SHORT LINE ABOUT THEM, drawn under their name; `note` below it is everything else. */
+      { id: 'about', label: 'About', type: 'text' },
+      { id: 'nationality', label: 'Nationality', type: 'text' },
+      { id: 'country', label: 'Country', type: 'text' },
+      { id: 'city', label: 'City', type: 'text' },
+      /* AN IANA ZONE, "Europe/Dublin", or an offset as somebody said it, "UTC+2". */
+      { id: 'timezone', label: 'Time zone', type: 'text' },
+      { id: 'birthday', label: 'Birthday', type: 'day' },
+      { id: 'languages', label: 'Speaks', type: 'list', of: 'text' },
+      { id: 'phones', label: 'Phone', type: 'list', of: 'text' },
+      /* EACH PLATFORM ITS OWN FIELD, the login as they write it, never a link: the page makes the link. `handles` and
+         `keys` stay as `meet` writes them, and the page still reads them; these are what a person types and reads. */
+      { id: 'discord', label: 'Discord', type: 'text', index: true },
+      { id: 'discord_id', label: 'Discord id', type: 'text', index: true },
+      { id: 'github', label: 'GitHub', type: 'text', index: true },
+      { id: 'x', label: 'X', type: 'text' },
+      { id: 'instagram', label: 'Instagram', type: 'text' },
+      { id: 'linkedin', label: 'LinkedIn', type: 'text' },
+      { id: 'telegram', label: 'Telegram', type: 'text' },
+      { id: 'whatsapp', label: 'WhatsApp', type: 'text' },
+      /* THE DEAL IN WORDS, "10% of Otters.gg gross, paid monthly", beside `rate`, which is a figure. */
+      { id: 'terms', label: 'Deal', type: 'text' },
+      /* PAPERWORK STILL OPEN, one line each, "Signed IP assignment", "W-8BEN": taken off when it is done. */
+      { id: 'paperwork', label: 'Paperwork to do', type: 'list', of: 'text' },
       { id: 'note', type: 'text' },
       /* EVERY WAY THEY ARE KNOWN, SINCE People 3.0.0, as `kind:value` (`email:`, `github:`, `phone:`): what `meet`
          matches on, kept by the kernel in one place so no two people hold one key. */
@@ -591,62 +651,11 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
        button on the whole list, two presses away. It opens the list's name line ("Who?"). */
     header: { action: { verb: 'row.create', label: 'Add a person' } },
     blocks: [
-      {
-        /* THE PAGE'S ONE LINE, said from the figures, so the line and the chart under it cannot disagree. A clause whose
-           every figure is nought is left out by the writer (`leadOf` in apps/web), so a record where nobody is quiet
-           does not say "0 quiet". `person(s)` is "person" for one and "people" for more (`manyOf` in the writers), so
-           the line says the list's own word one press away, "1 person besides you" (AN16), never "contacts".
-
-           HOW MANY STANDS IN A CLAUSE OF ITS OWN, so the line never says "0 of your 12 contacts were in touch" about a
-           record that simply has no Last in touch days yet (people `meet` adds, until it stamps the day): it says
-           "12 contacts" and stops. BESIDES YOU (31 Oct, audit m AM17): the list shows the owner too, so "1 contact" sat
-           over two names. */
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { metric: 'people-quiet', is: 0 },
-        /* NOT HOW MANY WERE IN TOUCH, SINCE People 3.4.0: In touch under it says that figure with its month as a line,
-           and a page says a figure once. */
-        /* A QUESTION THAT ADDS OR CHANGES SOMEBODY IS ABOUT THEM: "Add Priya to People?"
-           names no row of its own, and the line said no question was open while it waited in Needs you. The kernel
-           counts a rowset on People here now (`openOnList`), and Waiting on you lists it. */
-        /* PEOPLE AND ORGANISATIONS COUNTED APART, AND THE CLIENTS NAMED WHILE THEY ARE FEW, SINCE People 4.3.0 (2 Nov,
-           the first run: a freelancer with Fenwick and Acme, both organisations, read "2 people besides you", and once
-           they were kept as organisations the line said nothing). Three or fewer clients, all in one list, are named
-           ("Fenwick and Acme, 2 clients"); more, or clients in both lists, are counted. A clause at nought is left out,
-           so a record of people alone reads as it did. */
-        says: [
-          /* JUST YOU, SINCE people 4.4.0 (empty states, 2 Nov): every clause below is nought on a new record, so the page
-             said "Nothing in People yet" over a list that holds you. */
-          {
-            when: { all: [{ metric: 'people-count', is: 0 }, { metric: 'organisations-count', is: 0 }, { metric: 'questions-open-in:people', is: 0 }] },
-            body: 'Just you so far.',
-          },
-          {
-            when: { all: [{ metric: 'organisations-clients', gt: 0 }, { metric: 'organisations-clients', lte: 3 }, { metric: 'people-clients', is: 0 }] },
-            body: '{{questions-open-in:people}} question(s) for you, {{organisations-clients.names}}, {{organisations-clients}} client(s), {{people-count}} person(s) besides you, {{organisations-not-clients}} other organisation(s)',
-          },
-          {
-            when: { all: [{ metric: 'people-clients', gt: 0 }, { metric: 'people-clients', lte: 3 }, { metric: 'organisations-clients', is: 0 }] },
-            body: '{{questions-open-in:people}} question(s) for you, {{people-clients.names}}, {{people-clients}} client(s), {{people-not-clients}} other person(s) besides you, {{organisations-count}} organisation(s)',
-          },
-          {
-            when: { any: [{ metric: 'organisations-clients', gt: 0 }, { metric: 'people-clients', gt: 0 }] },
-            body: '{{questions-open-in:people}} question(s) for you, {{organisations-clients}} client organisation(s), {{people-clients}} client(s) in People, {{people-not-clients}} other person(s) besides you, {{organisations-not-clients}} other organisation(s)',
-          },
-          { body: '{{questions-open-in:people}} question(s) for you, {{people-count}} person(s) besides you, {{organisations-count}} organisation(s)' },
-        ],
-      },
-      {
-        /* WHO HAS GONE QUIET, BY NAME, SINCE People 2.7.0 (the visual review of October 2nd), where the line said "1 quiet
-           for three months or more": the one quiet longest and since when (`.first`, `.since`), and how many more. From
-           this record's people, whoever they are; a record where nobody is quiet says the counts above instead. */
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { metric: 'people-quiet', gt: 0 },
-        body: '{{questions-open-in:people}} question(s) for you, {{people-quiet.first}} has been quiet since {{people-quiet.since}}, and {{people-quiet.more}} other(s) have too',
-      },
+      /* NO LINE OVER THE PAGE, SINCE People 4.7.0 (3 Nov, Sam, of "1 client organisation, 2 clients in People, 22 other
+         people besides you, 22 other organisations.": "i dont like those briefs at all, remove them"). The line counted
+         what the cards under it already show, and said who had gone quiet, which each card's Last spoke says. What it
+         said that nothing else did, the questions waiting about somebody here, is Waiting on you below, drawn only while
+         one is open. The figures it read stay declared, since a page somebody made may draw on them. */
       {
         /* WHAT IS ASKED ABOUT SOMEBODY ON THIS RECORD, SINCE People 3.4.0, answered where they are shown, three
            at a time, and the rest are in Decide. Each line above opens on how many (`questions-open-in:people`, the open

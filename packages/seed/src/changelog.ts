@@ -150,6 +150,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
+    {
+      version: '4.7.0',
+      notes:
+        "A person's details are fields of their own: legal name, the name they go by, what they are to you, their roles, nationality, country, city, time zone, birthday, languages, phones, Discord, GitHub, X, Instagram, LinkedIn, Telegram, WhatsApp, the deal and the paperwork still to do. BrainDog offers to move what each note already says into them, one question a person. People no longer opens on a line of counts.",
+    },
     { version: '4.6.0', notes: 'A person can be one of your staff, not only someone you work with.' },
     { version: '4.5.0', notes: 'A person can be your co-founder or business partner, not only a collaborator.' },
     { version: '4.4.1', notes: 'People says how many organisations you deal with once, and the line under it is the way to them.' },

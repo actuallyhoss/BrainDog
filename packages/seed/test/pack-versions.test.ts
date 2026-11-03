@@ -4141,6 +4141,22 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'people@4.7.0': {
+    holds: `
+      metric.organisations-clients metric.organisations-count metric.organisations-from-card-texts metric.organisations-known
+      metric.organisations-not-clients metric.people-clients metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d
+      metric.people-in-touch-90d metric.people-not-clients metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders rule.people-fields
+      script.people_fields
+    `,
+    declares: '928a7671f80e8530',
+    history: [
+      'People 4.7.0, fin-people1104 of 3 November: `register.people` keeps a person\'s facts as fields, `script.people_fields` and `rule.people-fields` offer to move what a note says into them, and `page.people` drops its line of counts -> 928a7671f80e8530',
+    ],
+  },
+
   'portfolio@1.31.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged

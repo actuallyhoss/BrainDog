@@ -999,11 +999,21 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   (`page.all-numbers`). estate 2.8.1: Services says only what it costs a month, which no tile says whole, and not the
  *   questions Waiting on you counts (`page.estate`). money-core 3.38.5: Filing rules drops what the rules filed in 30
  *   days, said by each rule under it (`page.money-rules`).
+ * - people 4.7.0 (fin-people1104, 3 Nov, Sam: "instead of just long text, i want them to be parsed as fields ... his
+ *   name should be a field, discord username a field"): `register.people` gains a field for each fact a note used to
+ *   say (`legal_name`, `goes_by`, `relation`, `titles`, `about`, `nationality`, `country`, `city`, `timezone`, `birthday`,
+ *   `languages`, `phones`, `discord`, `discord_id`, `github`, `x`, `instagram`, `linkedin`, `telegram`, `whatsapp`,
+ *   `terms`, `paperwork`), every one optional, so a row keeps every value it held. `script.people_fields` reads each
+ *   person's note by plain patterns and asks once a person to keep what it found as fields, a rowset the owner answers,
+ *   nightly and from `rule.people-fields`, its Run now (`modules/people/note-facts.js`). And People drops its opening
+ *   line of counts ("1 client organisation, 2 clients in People, 22 other people besides you", "i dont like those briefs
+ *   at all, remove them"); the questions it counted are Waiting on you, drawn while one is open (`page.people`). Two
+ *   ids added and none taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.31.1',
-  people: '4.6.0',
+  people: '4.7.0',
   'money-core': '3.38.5',
   estate: '2.8.1',
   work: '1.26.1',
