@@ -63,6 +63,7 @@
 <style>
   .waiting {
     display: grid;
+    align-content: start;
     gap: 0;
   }
 
