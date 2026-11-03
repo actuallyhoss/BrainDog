@@ -58,7 +58,7 @@ test('THE LONG FORM IS ONE KIND WHOLE, ASKED BY NAME, and a name that is not a k
   assert.equal(wrong.code, 'ENUM_VALUE_UNKNOWN');
   assert.match(wrong.fix, /no kind of block called donut\. Read grammar kinds/u);
   assert.ok(wrong.allowed?.includes('kind/spec'));
-  assert.match(refusal(grammarOf('yaml')).fix, /or kinds, or kind\/<name> for one kind whole\./u);
+  assert.match(refusal(grammarOf('yaml')).fix, /or pack, or kind\/<name> for one kind whole\./u);
 });
 
 test('THE PAGE GRAMMAR STILL LISTS THE KINDS BY NAME, and points at the kinds grammar for what each is for', () => {

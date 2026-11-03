@@ -114,6 +114,7 @@ const shelfEntry = (e: IndexEntry, version: string, modules: readonly string[]):
 export function shelfFromCatalogue(read: CatalogueReader): CatalogueShelf {
   const no = (code: Refusal['code'], fix: string): Result<ShelfFetched> => ({ ok: false, refusal: { code, fix, at: 'file' } });
   return {
+    index: () => indexOf(read),
     listed: async () => {
       const index = await indexOf(read);
       if (index === null) return [];

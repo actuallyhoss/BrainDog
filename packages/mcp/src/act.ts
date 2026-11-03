@@ -56,6 +56,16 @@ export const doorTakes = (row: CallRow): boolean => (DOOR_GROUPS.has(row.group) 
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 const map = (v: unknown): Record<string, unknown> | null => (typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
+/**
+ * A short mark of a file's text, so the same add-on file asked twice is asked once and a changed one is a new question
+ * (`propose`'s `cause`). Not a checksum anybody relies on: the record holds the file it plans to its own.
+ */
+const shortHash = (said: string): string => {
+  let h = 5381;
+  for (let i = 0; i < said.length; i++) h = ((h << 5) + h + said.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(16).padStart(8, '0');
+};
+
 /** The proposal one owner-only call is asked as, or `null` where no question can say it. */
 export type Ask = { question: string; body_kind: 'pack' | 'settings' | 'change' | 'rowset'; body: Record<string, unknown>; cause: string };
 
@@ -77,9 +87,17 @@ export const keyAsk = (key: { spoken: string; version: number; name: string | nu
 export const ASKS: Readonly<Record<string, (args: Record<string, unknown>) => Ask | null>> = {
   enablePack: (a) => ((id) => (id === null ? null : { question: `Turn on ${id}?`, body_kind: 'pack', body: { enable: id }, cause: `act:enablePack:${id}` }))(text(a.id)),
   disablePack: (a) => ((id) => (id === null ? null : { question: `Turn off ${id}?`, body_kind: 'pack', body: { disable: id }, cause: `act:disablePack:${id}` }))(text(a.id)),
+  /* AND THE FILE GOES WITH IT, for an add-on the store does not hold: an agent's own, made for something this BrainDog
+     lacks. Asked with the id alone, the record looked it up in the catalogue and answered that nothing by that name is on
+     offer, so an add-on an agent wrote could never reach the person. The record still plans the file itself and refuses
+     one sent for an id the store holds (`arrange.ts` `prepare`), so a file cannot pass itself off as a listed add-on. */
   installPack: (a) =>
-    ((id) => (id === null ? null : { question: `Add ${id}?`, body_kind: 'pack', body: { install: id }, cause: `act:installPack:${id}` }))(
-      text(a.id) ?? text(map(map(a.doc)?.manifest)?.id) ?? text(map(a.doc)?.id),
+    ((id, doc) =>
+      id === null
+        ? null
+        : { question: `Add ${text(doc?.title) ?? id}?`, body_kind: 'pack', body: { install: id, ...(doc === null ? {} : { doc }) }, cause: `act:installPack:${id}${doc === null ? '' : `@${text(doc.version) ?? ''}:${shortHash(JSON.stringify(doc))}`}` })(
+      text(a.id) ?? text(map(a.doc)?.pack) ?? text(map(map(a.doc)?.manifest)?.id) ?? text(map(a.doc)?.id),
+      map(a.doc),
     ),
   setPackConfig: (a) => {
     const id = text(a.id) ?? text(a.pack);

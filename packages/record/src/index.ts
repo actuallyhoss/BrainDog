@@ -15511,6 +15511,71 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
+     * An add-on file checked against this record without installing it: `{ doc }`, the file or its text. It answers
+     * `{ ready, refusal? }` and, when it reads, what installing it would add, change and take away, what it would ask the
+     * person to approve, the keys the keychain cannot give it yet, and the call that asks.
+     *
+     * `planPack`'S READ HALF, OPEN TO AN AGENT. A plan is an owner's in a browser, because the sheet it draws is where an
+     * install is approved; an agent writing an add-on for a feature this BrainDog lacks had no way to learn its file was
+     * refused short of filing it on Decide, and each try was a question the person had to throw away. This plans the file
+     * the same way (`normaliseChecked`, `plan`, the unheld-list and keys checks) and writes nothing, files nothing and
+     * arms nothing, so the only way the file goes in is still the person's yes. Somebody who reads the whole BrainDog,
+     * since the plan counts the rows of every list it would touch.
+     */
+    async addonCheck(args: { doc?: unknown } | undefined, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      if (!readsEveryList(ctx)) return no('FORBIDDEN', 'An add-on is checked by somebody who can read the whole BrainDog.', { at: 'principal' });
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['doc']);
+      if (extra) return { ok: false as const, refusal: extra };
+      let doc: unknown = args?.doc;
+      if (doc === undefined || doc === null) return no('REQUIRED_MISSING', 'Send the add-on file as doc: act addonNew starts one.', { at: 'doc' });
+      if (typeof doc === 'string')
+        try {
+          doc = JSON.parse(doc);
+        } catch {
+          return no('VALUE_MALFORMED', 'doc is the add-on file, as JSON or its text.', { at: 'doc' });
+        }
+      const said = (r: Refusal) => ok({ ready: false, refusal: { code: r.code, fix: r.fix, ...(r.at === undefined ? {} : { at: r.at }) }, say: `Not yet: ${r.fix}${r.at === undefined ? '' : ` (at ${r.at})`}` });
+      const pack = await normaliseChecked(doc, { kind: 'paste' });
+      if (!pack.ok) return said((pack as { refusal: Refusal }).refusal);
+      const id = pack.value.manifest.pack;
+      /* AN ID THE STORE HOLDS IS THE STORE'S: proposed with a file, it is refused (`arrange.ts` `prepare`), and an update
+         from the store would one day replace it. Said here, before the person is asked. */
+      const listed = (deps.catalogue ?? []).find((e) => e.id === id) ?? null;
+      const shelved = listed === null && deps.catalogueShelf ? await deps.catalogueShelf.fetch(id) : null;
+      if (listed !== null || shelved !== null)
+        return said({ code: 'PROVIDES_CONFLICT', fix: `${id} is an add-on in the store, so a file of your own takes another id.`, at: 'pack' });
+      const diff = await plan(pack.value, installedState(ctx));
+      const unheld = unresolvedFault(diff);
+      if (unheld) return said(unheld);
+      const keys = keysNotReady(pack.value, diff, (name, paged) => kernel.keyReady(name, paged));
+      const lines = (xs: readonly { id: string; summary: string }[]) => xs.map((x) => `${x.id}: ${x.summary}`);
+      const blocked = diff.conflicts.length > 0;
+      return ok({
+        ready: !blocked,
+        pack: { id, version: pack.value.manifest.version, title: pack.value.manifest.title ?? id },
+        direction: diff.direction,
+        ...(diff.installed_version === null ? {} : { from: diff.installed_version }),
+        adds: lines(diff.adds),
+        ...(diff.changes.length === 0 ? {} : { changes: lines(diff.changes) }),
+        ...(diff.retires.length === 0 ? {} : { retires: diff.retires.map((r) => `${r.id}${r.rows > 0 ? `, keeping its ${r.rows} entries` : ''}`) }),
+        ...(diff.extends.length === 0 ? {} : { extends: diff.extends.map((e) => `${e.id}: ${e.adds.join(', ')}`) }),
+        ...((diff.widgets ?? []).length === 0 ? {} : { today_cards: (diff.widgets ?? []).map((w) => w.title) }),
+        ...((diff.skills ?? []).length === 0 ? {} : { skills: (diff.skills ?? []).map((s) => s.name) }),
+        ...(diff.calls_out.length === 0 ? {} : { calls_out: diff.calls_out.map((c) => c.line) }),
+        ...(diff.approve.length === 0 ? {} : { approve: diff.approve }),
+        ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
+        ...(keys.length === 0 ? {} : { keys_missing: keys }),
+        ...(diff.conflicts.length === 0 ? {} : { conflicts: diff.conflicts }),
+        ...(diff.warnings.length === 0 ? {} : { warnings: diff.warnings.map((w) => w.say) }),
+        say: blocked
+          ? `It reads, and clashes with what is here: ${diff.conflicts.length} ${diff.conflicts.length === 1 ? 'conflict' : 'conflicts'}.`
+          : `Ready. Installing ${diff.direction === 'install' ? 'adds' : 'changes'} ${diff.adds.length + diff.changes.length} ${diff.adds.length + diff.changes.length === 1 ? 'part' : 'parts'}${diff.approve.length === 0 ? '' : `, and asks the person to approve ${diff.approve.length} ${diff.approve.length === 1 ? 'line' : 'lines'}`}. act installPack {"doc":<this file>} puts it to them on Decide.`,
+      });
+    },
+
+    /**
      * Apply the plan somebody approved, and nothing else.
      *
      * THE HASH IS THE APPROVAL. `planHash` carries the record's version and a digest of what the plan says, the pack's

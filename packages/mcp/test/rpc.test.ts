@@ -134,7 +134,7 @@ test('ping answers, and the prompts are start, wrap and ask', async () => {
   const { surface, calls } = stub();
   assert.deepEqual(result(await handle(req('ping'), surface, ctx)), { resultType: 'complete' });
   const listed = result<{ prompts: { name: string }[] }>(await handle(req('prompts/list'), surface, ctx));
-  assert.deepEqual(listed.prompts.map((p) => p.name), ['start', 'wrap', 'ask']);
+  assert.deepEqual(listed.prompts.map((p) => p.name), ['start', 'wrap', 'ask', 'addon']);
   assert.equal(calls.length, 0, 'a prompt read the record');
 });
 
