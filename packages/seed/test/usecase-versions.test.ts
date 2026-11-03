@@ -2639,7 +2639,7 @@ const DECLARED: Record<string, Version> = {
       setting.voice_fills_with setting.voice_nothing_due
     `,
     declares: '6ca58a22141bf3d4',
-    history: ["Products no longer opens on a count of products and how many run low (no briefs, 3 Nov); a block taken away, no id added or taken away -> 6ca58a22141bf3d4"],
+    history: ["`page.products` no longer opens on a count of products and how many run low (no briefs, 3 Nov); a block taken away, no id added or taken away -> 6ca58a22141bf3d4"],
   },
   'guide@1.7.0': {
     holds: `
@@ -2888,7 +2888,7 @@ const DECLARED: Record<string, Version> = {
       setting.voice_working_now
     `,
     declares: '34ceb0044973d7e5',
-    history: ["Team's Home, Sprints and Agent work no longer open on a line counting tickets (no briefs, 3 Nov); three blocks taken away, no id added or taken away -> 34ceb0044973d7e5"],
+    history: ["`page.home-team`, `page.cycles` and `page.agent-work` no longer open on a line counting tickets (no briefs, 3 Nov); three blocks taken away, no id added or taken away -> 34ceb0044973d7e5"],
   },
 };
 

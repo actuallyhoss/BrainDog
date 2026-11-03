@@ -58,34 +58,14 @@ const opened = (k: Kernel, slug: string): PageResult => {
 const on = (offset: number): string => new Date(NOW + offset * 86_400_000).toISOString().slice(0, 10);
 const after = (offset: number) => (p: (typeof PEOPLE)[number]) => typeof p.in_touch === 'string' && p.in_touch > on(offset);
 
-test('PEOPLE OPENS ON ONE LINE SAID FROM ITS OWN FIGURES, and the figures count the sample’s people', async () => {
+test('PEOPLE OPENS ON NO LINE SINCE 4.7.0, and its figures still count the sample’s people', async () => {
   const k = await seeded();
   const page = opened(k, 'people');
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], String(b.heading));
 
-  /* TWO LINES ON ONE FIGURE, SO EXACTLY ONE IS DRAWN: who has gone quiet, by name, while anybody has, and otherwise the
-     counts (People 2.7.0). */
-  const leads = page.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true);
-  assert.equal(leads.length, 2);
-  const [counts, quiet] = leads as (typeof leads[number] & { body?: string; drawn?: boolean })[];
-  const body = String(counts!.body);
-  for (const id of ['people-count']) assert.ok(body.includes(`{{${id}}}`), `the line does not say ${id}`);
-  assert.ok(!body.includes('{{people-in-touch-30d}}'), 'In touch says it under the line, and a page says a figure once');
-  /* HOW MANY IS A CLAUSE OF ITS OWN, and each other clause holds one figure, so a record with no Last in touch days
-     (whoever `meet` added) reads "12 contacts" and never "0 of your 12 contacts were in touch". */
-  const clauses = body.split(/,\s+/u);
-  assert.match(clauses[0]!, /^\{\{questions-open-in:people\}\} question\(s\) for you$/u);
-  assert.match(clauses[1]!, /^\{\{people-count\}\} contact\(s\) besides you$/u);
-  for (const clause of clauses.slice(1)) assert.equal(clause.match(/\{\{/gu)?.length, 1, clause);
-  /* THE SAMPLE HAS SOMEBODY QUIET, so the named line is the one drawn, and it names the one quiet longest, from the rows. */
-  assert.equal(counts!.drawn, false);
-  assert.notEqual(quiet!.drawn, false);
-  assert.match(String(quiet!.body), /^\{\{questions-open-in:people\}\} question\(s\) for you, \{\{people-quiet\.first\}\} has been quiet since \{\{people-quiet\.since\}\}/u);
-  const longest = [...PEOPLE].filter((p) => typeof p.in_touch === 'string' && p.in_touch < on(-90)).sort((a, b) => String(a.in_touch).localeCompare(String(b.in_touch)));
-  const values = (quiet as { values?: Record<string, unknown> }).values ?? {};
-  assert.equal(values['people-quiet.first'], longest[0]!.name);
-  assert.equal(values['people-quiet.since'], longest[0]!.in_touch);
-  assert.equal(values['people-quiet.more'], longest.length - 1);
+  /* NO LINE OF COUNTS AND NO "QUIET SINCE" LINE (3 Nov, "i dont like those briefs at all, remove them"): the cards say
+     how many and when each spoke last. The figures the lines read stay declared and still count. */
+  assert.deepEqual(page.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true), []);
 
   const read = (id: string) => {
     const out = k.metric(METRICS[id] as never);
@@ -124,9 +104,9 @@ test('PEOPLE SHOWS EACH PERSON ONCE, as a line with the day they last spoke, the
   assert.equal(cards.rows[0]?.fields.name, 'S. Marchetti');
   assert.equal(cards.rows.length, PEOPLE.length, 'somebody nobody has been in touch with is left off Everyone');
 
-  /* WHO HAS GONE QUIET IS STILL SAID FIRST, BY NAME, in the page's line, and the figure the second list drew on is kept. */
-  const line = page.blocks.find((b) => (b as { lead?: boolean }).lead === true && b.drawn !== false);
-  assert.match(String((line as { body?: unknown }).body), /\{\{people-quiet\.first\}\} has been quiet since/u);
+  /* NO LINE OVER THE PAGE, SINCE People 4.7.0 ("i dont like those briefs at all, remove them"): who has gone quiet is
+     each card's Last spoke, and the figure the second list drew on is kept. */
+  assert.ok(!page.blocks.some((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true), 'People opens on a line again');
   const within = k.metric(METRICS['people-in-touch-90d'] as never);
   assert.ok(within.ok, sayOf(within));
   assert.equal(within.value.value, PEOPLE.filter((p) => typeof p.in_touch === 'string' && String(p.in_touch) >= on(-90)).length);
@@ -139,7 +119,7 @@ test('PEOPLE SHOWS EACH PERSON ONCE, as a line with the day they last spoke, the
   }
 });
 
-test('A RECORD WHERE NOBODY WAS IN TOUCH STILL SHOWS EVERYONE, and says how many people it keeps', async () => {
+test('A RECORD WHERE NOBODY WAS IN TOUCH STILL SHOWS EVERYONE, and no line counts them', async () => {
   const k = await seeded();
   const listed = k.list({ register: 'people', limit: 50 });
   assert.ok(listed.ok, sayOf(listed));
@@ -147,7 +127,8 @@ test('A RECORD WHERE NOBODY WAS IN TOUCH STILL SHOWS EVERYONE, and says how many
   for (const r of listed.value.rows) assert.ok(k.update('people', `people#${r.seq}`, { in_touch: null }, { actor: 'p_1' }).ok);
   const page = opened(k, 'people');
   assert.equal(page.blocks.find((b) => b.heading === 'Everyone')?.rows.length, PEOPLE.length);
-  assert.notEqual(page.blocks[0]?.drawn, false, 'the line is left off while there are people to name');
+  /* AND NO LINE COUNTS THEM, SINCE People 4.7.0: the cards are the count. */
+  assert.ok(!page.blocks.some((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true && b.drawn !== false), 'People opens on a line of counts again');
 });
 
 test('PEOPLE STILL NEEDS NO OTHER LIST: its figures read People alone', () => {
@@ -329,14 +310,13 @@ test('A PERSON\'S PAGE SAYS THEIR ORGANISATION AND WHERE THEY WERE SEEN, NEVER A
   assert.match(String(everyone?.where), /self is not true/u);
   assert.deepEqual(everyone?.columns?.map((c) => c.field), ['name', 'note', 'projects', 'in_touch']);
 
-  /* THE PEOPLE PAGE SAYS HOW MANY ORGANISATIONS AND OPENS THEIR LIST, SINCE People 4.1.0: the organisations are their
-     own list under People in the sidebar, and the line says the count that list draws. */
-  const line = opened(k, 'people').blocks.find((b) => b.kind === 'note' && String((b as { body?: unknown }).body ?? '').includes('{{organisations-count}}')) as
-    | (PageResult['blocks'][number] & { body?: string; values?: Record<string, unknown> })
+  /* THE PEOPLE PAGE OPENS THE ORGANISATIONS' LIST, SINCE People 4.1.0, and no longer counts them (4.4.1, and no line
+     of counts at all since 4.7.0): the way to them is one link, drawn while there are any. */
+  const line = opened(k, 'people').blocks.find((b) => b.kind === 'note' && String((b as { body?: unknown }).body ?? '').includes('(/r/organisations)')) as
+    | (PageResult['blocks'][number] & { body?: string })
     | undefined;
-  assert.ok(line && line.drawn !== false, 'People does not say how many organisations');
-  assert.match(String(line.body), /\(\/r\/organisations\)/u);
-  assert.equal(line.values?.['organisations-count'], ORGANISATIONS.length);
+  assert.ok(line && line.drawn !== false, 'People has no way to the organisations');
+  assert.doesNotMatch(String(line.body), /\{\{organisations-count\}\}/u);
   assert.equal(opened(k, 'people').blocks.find((b) => b.heading === 'Organisations'), undefined, 'People still lists the organisations');
 });
 
@@ -354,7 +334,7 @@ const twiceOn = (page: PageResult): Drawn | undefined => (page.blocks as Drawn[]
 /** A page's blocks as they were drawn, less the one note, so two readings of a page can be held side by side. */
 const others = (page: PageResult) => (page.blocks as Drawn[]).filter((b) => b !== twiceOn(page)).map((b) => [b.kind, b.heading ?? null, b.drawn !== false, b.body ?? null]);
 
-test('SOMEBODY HELD TWICE IS SAID UNDER THE PAGE\'S LINE, by how many and never by a number of theirs', async () => {
+test('SOMEBODY HELD TWICE IS SAID OVER THE CARDS, by how many and never by a number of theirs', async () => {
   const k = await seeded();
   /* TWO OF ONE NAME, NEITHER WITH AN ADDRESS: the plain rule's pair, which the figure counts as one too many. */
   for (const more of [{ role: 'contractor' }, {}]) {
@@ -373,9 +353,9 @@ test('SOMEBODY HELD TWICE IS SAID UNDER THE PAGE\'S LINE, by how many and never 
   assert.doesNotMatch(String(note.body), /Decide/u);
   assert.equal((note as { values?: Record<string, unknown> }).values?.['held-twice'], 1);
   assert.equal((note as { values?: Record<string, unknown> }).values?.['held-twice-shown'], 2);
-  /* AFTER THE PAGE'S LINE AND BEFORE THE CARDS, and not a second headline: a page opens on one sentence. */
+  /* BEFORE THE CARDS, after Waiting on you, and never a headline: People opens on no line since 4.7.0. */
   const at = page.blocks.indexOf(note);
-  assert.equal(at, 3);
+  assert.equal(at, 1);
   assert.ok((page.blocks.slice(0, at) as Drawn[]).every((b) => (b.kind === 'note' && b.lead === true) || b.heading === 'Waiting on you'));
   assert.equal(page.blocks[at + 1]?.heading, 'Everyone');
   assert.notEqual(note.lead, true);

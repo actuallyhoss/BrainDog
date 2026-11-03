@@ -92,30 +92,16 @@ test('EACH PAGE DECLARES WAITING ON YOU over its own list, three drawn, only whi
   }
 });
 
-test('EVERY LINE OPENS ON A CLAUSE OF ITS OWN that counts what waits, so the writer can leave it out at nought', () => {
-  for (const [page, list] of Object.entries(PAGE_LIST) as [keyof typeof PAGE_LIST, string][]) {
-    const leads = blocksOf(page).filter((b) => b.kind === 'note' && b.lead === true);
-    assert.ok(leads.length >= 1, `${page} has a line`);
-    for (const lead of leads) {
-      const clauses = String(lead.body).split(/,\s+/u);
-      assert.equal(clauses[0], `{{${figureOf(list)}}} question(s) for you`, `${page}: the line opens on how many wait`);
-      assert.ok(clauses.length >= 2, `${page}: the line still says something once the clause goes`);
+test('NO LINE COUNTS WHAT WAITS, SINCE People 4.7.0 and estate 2.8.1: Waiting on you says it, and only while something does', () => {
+  for (const page of Object.keys(PAGE_LIST) as (keyof typeof PAGE_LIST)[]) {
+    for (const lead of blocksOf(page).filter((b) => b.kind === 'note' && b.lead === true)) {
+      assert.doesNotMatch(String(lead.body), /questions-open-in|question\(s\) for you/u, `${page}: a line counts the questions again`);
       assert.doesNotMatch(String(lead.body), /—/u, 'an em dash in words a person reads');
     }
   }
 });
 
-/** The writer's rule for a line, as `leadOf` keeps it: a clause whose every figure reads nought goes. */
-const said = (body: string, values: Record<string, unknown>): string =>
-  body
-    .split(/,\s+/u)
-    .filter((clause) => {
-      const holes = [...clause.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/gu)].map((m) => m[1]!);
-      return holes.length === 0 || holes.some((h) => Number(values[h] ?? 0) !== 0);
-    })
-    .join(', ');
-
-test('AT NOUGHT NO QUEUE IS DRAWN AND THE CLAUSE GOES; AT THREE THE QUEUE DRAWS THREE AND THE LINE SAYS 3', async () => {
+test('AT NOUGHT NO QUEUE IS DRAWN; AT THREE THE QUEUE DRAWS THREE, AND NO LINE COUNTS THEM', async () => {
   const k = await seeded();
   /* A question about something else, so a page never counts the whole record's questions as its own. */
   ask(k, 'Move the kiln firing to Friday?', 'things#1');
@@ -123,9 +109,10 @@ test('AT NOUGHT NO QUEUE IS DRAWN AND THE CLAUSE GOES; AT THREE THE QUEUE DRAWS 
     const blocks = answered(k, page);
     const queue = blocks.find((b) => b.kind === 'queue')!;
     assert.equal(queue.drawn, false, `${page} draws Waiting on you with nothing asked about its ${list}`);
-    const lead = blocks.find((b) => b.kind === 'note' && b.lead === true && b.drawn !== false)!;
-    assert.equal(Number(lead.values?.[figureOf(list)]), 0, `${page}: the figure reads nought`);
-    assert.doesNotMatch(said(String(lead.body), lead.values ?? {}), /for you/u, `${page}: the clause goes at nought`);
+    /* NO LINE COUNTS THE QUESTIONS, SINCE People 4.7.0 and estate 2.8.1 ("i dont like those briefs at all"): the queue is
+       where they are said, drawn only while one is asked. */
+    for (const b of blocks.filter((x) => x.kind === 'note' && x.lead === true && x.drawn !== false))
+      assert.doesNotMatch(String(b.body), /questions-open-in|for you/u, `${page}: a line counts the questions again`);
   }
 
   for (const [n, name] of ['Ask Wren Halloway about the March invoice?', 'Merge Orrin Bask into Orrin Basker?', 'Thank Tamsin Vale for the referral?'].entries()) ask(k, name, `people#${n + 1}`);
@@ -136,9 +123,8 @@ test('AT NOUGHT NO QUEUE IS DRAWN AND THE CLAUSE GOES; AT THREE THE QUEUE DRAWS 
     assert.notEqual(queue.drawn, false, `${page} draws Waiting on you`);
     assert.equal(queue.queue?.length, 3, `${page} draws three`);
     assert.ok(queue.queue!.every((q) => q.list === list), `${page} draws only questions about its ${list}`);
-    const lead = blocks.find((b) => b.kind === 'note' && b.lead === true && b.drawn !== false)!;
-    assert.equal(Number(lead.values?.[figureOf(list)]), 3, `${page}: the figure reads three`);
-    assert.match(said(String(lead.body), lead.values ?? {}), /^\{\{questions-open-in:[a-z]+\}\} question\(s\) for you, /u, `${page}: the line opens on how many wait`);
+    for (const b of blocks.filter((x) => x.kind === 'note' && x.lead === true && x.drawn !== false))
+      assert.doesNotMatch(String(b.body), /questions-open-in|for you/u, `${page}: a line counts the questions again`);
   }
 });
 
