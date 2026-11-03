@@ -3032,6 +3032,12 @@
     padding: calc(var(--tile-pad) - 1px);
   }
 
+  /* WITH NO DOOR UNDER IT, THE LAST QUESTION ENDS ON THE CARD'S PADDING (space pass, 4 Nov): its own 16 and the card's
+     20 stood 38 under Keep it against the head's 21 over. */
+  .body[data-board] :global(.block-slot[data-key='needs-you'] .queue:not(:has(> a.queue-more)) > .qa:last-of-type .queue-card) {
+    padding-block-end: 0;
+  }
+
   /* NEEDS YOU ENDS ON ITS PADDING LIKE THE REST: at a desk its foot was 12, the others 20. */
   .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large']) {
     padding-block-end: var(--tile-pad);
