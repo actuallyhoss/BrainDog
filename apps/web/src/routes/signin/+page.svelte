@@ -46,7 +46,7 @@
   import { isApp, openOutside } from '$lib/shell.ts';
   import { copy } from '$lib/copy.ts';
   import { forgetRead } from '$lib/record/forget-read.ts';
-  import { words } from './words.ts';
+  import { words, wordsOf } from './words.ts';
   import { googleStart, googleWhy, onwardOf, stateOf, type GoogleWhy, type How, type Shelf, type Step, type Ways } from '$lib/signin.ts';
   import { actable, mailHeld, noDoorYet } from './first-door.ts';
   import { titleOf } from '$lib/title.ts';
@@ -585,7 +585,7 @@
      long sentence with the address in its middle. -->
 {#snippet whose(kind: 'magic' | 'claim', email: string)}
   <div class="whose">
-    <span class="whose-label">{words.linkIsFor(kind)}</span>
+    <span class="whose-label">{wordsOf.linkIsFor(kind)}</span>
     <p class="address"><Icon name="mail" size="m" /><span>{email}</span></p>
     <span class="whose-label">{words.notYou}</span>
   </div>
@@ -630,7 +630,7 @@
       {:else if view.name === 'insecure'}
         <div class="said"><Empty kind="no-permission" heading title={copy.insecureTitle} body={copy.insecureWhy} /></div>
       {:else if view.name === 'locked' && doors}
-        <Notice tone="warn" icon="clock" title={words.sendPaused(view.minutes)}>{words.sendPausedWhy}</Notice>
+        <Notice tone="warn" icon="clock" title={wordsOf.sendPaused(view.minutes)}>{words.sendPausedWhy}</Notice>
       {:else if view.name === 'locked'}
         <div class="said"><Empty kind="no-permission" title={copy.lockedTitle(view.minutes)} body={copy.lockedWhy} /></div>
       {:else if view.name === 'rejected'}
@@ -642,7 +642,7 @@
           </Notice>
         </div>
       {:else if view.name === 'link-expired'}
-        <Notice tone="bad" title={copy.linkExpiredTitle}>{view.ways?.magic === true || view.link === 'claim' ? words.expiredWhy(view.link) : copy.linkExpiredWhy(view.link, false)}</Notice>
+        <Notice tone="bad" title={copy.linkExpiredTitle}>{view.ways?.magic === true || view.link === 'claim' ? wordsOf.expiredWhy(view.link) : copy.linkExpiredWhy(view.link, false)}</Notice>
       {:else if view.name === 'link-sent'}
         <div class="calm" role="status">
           <IconWell name="check" size="card" tone="earn" />
