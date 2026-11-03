@@ -28,6 +28,7 @@ type Row = Record<string, unknown>;
 
 /* Which questions arrange the record: `arranging.ts`'s, where a page's queue asks it without this file. */
 import { ARRANGING, isArranging } from './arranging.ts';
+import { publishAskOf, publishAskWords } from '../../../lib/market/publish-asked.ts';
 export { ARRANGING, isArranging };
 
 /**
@@ -645,6 +646,12 @@ function sendsOf(body: Row, ctx: Context): { lines: string[]; hosts: Set<string>
  */
 export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arranged | null {
   if (!isArranging(kind)) return null;
+  /* A PUBLISH CHANGES NOTHING HERE: it says what goes, and that the store reviews it (`publish-asked.ts`). */
+  const publishing = publishAskOf(kind, body);
+  if (publishing !== null) {
+    const lead = publishAskWords.lead(publishing.title, publishing.version);
+    return { lead, parts: [{ part: 'packs', lines: [publishAskWords.goes, publishAskWords.review] }], summary: '', said: copy.arrangeSaid(lead, []) };
+  }
   const ctx: Context = { ...screen, names: namesOf(body) };
   const parts: Part[] = [];
   const packs = isRow(body.packs) ? body.packs : {};

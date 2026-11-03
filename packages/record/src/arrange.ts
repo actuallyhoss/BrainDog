@@ -353,6 +353,11 @@ export type ArrangeDeps = {
    */
   readGit?: ((address: string) => Promise<{ ok: true; value: GitRead } | { ok: false; fix: string }>) | undefined;
   readAddress?: ReadAddress | undefined;
+  /**
+   * Whether an add-on may go to the store from here, made in this BrainDog, with its title, version and checksum
+   * (`publishable` in `index.ts`). Absent, a publish question is refused.
+   */
+  publishable?: ((id: string) => Promise<Result<{ id: string; title: string; version: string; checksum: string }>>) | undefined;
 };
 
 /** What a proposal found in the host's whole catalogue: each document by pack id, the modules under it, and its entry. */
@@ -1386,6 +1391,17 @@ export function arranger(d: ArrangeDeps) {
     }
 
     if (kind === 'pack') {
+      /* PUBLISH AN ADD-ON MADE HERE TO THE STORE, `{ publish: id }`: an agent's ask through `act publishAddon`. Filed with the
+         version and checksum held now, so the yes publishes what the question showed. It changes nothing in this record;
+         the owner's browser signs the file with their key and sends it on the yes (Decide), and the store reviews it. */
+      if (typeof body.publish === 'string') {
+        if (body.to !== undefined && body.to !== 'store')
+          return refuse('VALUE_MALFORMED', 'A question publishes to the store only. For GitHub, act publishAddon {"id","to":"github"} hands back the line the person runs.', 'body.to');
+        if (!d.publishable) return refuse('PULL_ORIGIN_REFUSED', 'This BrainDog cannot publish add-ons.', 'body.publish');
+        const can = await d.publishable(body.publish);
+        if (!can.ok) return { ok: false, refusal: { ...(can as { refusal: Refusal }).refusal, at: 'body.publish' } };
+        return ok({ publish: can.value.id, to: 'store', title: can.value.title, version: can.value.version, checksum: can.value.checksum });
+      }
       if (typeof body.enable === 'string' || typeof body.disable === 'string') {
         const verb = typeof body.enable === 'string' ? 'enable' : 'disable';
         const id = String(body[verb]);
@@ -1984,6 +2000,15 @@ export function arranger(d: ArrangeDeps) {
   }
 
   async function apply(kind: 'pack' | 'settings' | 'arrange', body: Body, actor: string, by: Own = {}): Promise<Result<Body>> {
+    /* A PUBLISH WRITES NOTHING HERE. The yes is the owner's word that the browser sent the file (Decide sends it first);
+       only an add-on still at the version the question showed is answered, so the store has what was read. */
+    if (kind === 'pack' && typeof body.publish === 'string') {
+      const can = d.publishable ? await d.publishable(body.publish) : null;
+      if (can === null || !can.ok) return can ?? refuse('PULL_ORIGIN_REFUSED', 'This BrainDog cannot publish add-ons.', 'body.publish');
+      if (can.value.version !== body.version || can.value.checksum !== body.checksum)
+        return refuse('PLAN_STALE', `${can.value.title} is at ${can.value.version} now, not the ${String(body.version)} this asked about. Ask again to publish the version held now.`, 'body.version');
+      return ok({ said: [`Sent ${can.value.title} ${can.value.version} to the store. BrainDog reviews it before it is listed.`], published: [{ id: can.value.id, version: can.value.version }] });
+    }
     const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[]; me: string[]; rows: string[]; declarations: string[]; said: string[] } = {
       said: [],
       installed: [],
@@ -2428,6 +2453,12 @@ export function arranger(d: ArrangeDeps) {
    * yes installs it.
    */
   async function askAgain(kind: 'pack' | 'settings' | 'arrange', body: Body): Promise<{ body: Body; said: string } | null> {
+    /* A PUBLISH WHOSE ADD-ON MOVED ON ASKS FOR THE VERSION HELD NOW, so the next yes publishes that one. */
+    if (kind === 'pack' && typeof body.publish === 'string') {
+      const fresh = await prepare('pack', { publish: body.publish });
+      if (!fresh.ok || fresh.value.version === body.version) return null;
+      return { body: fresh.value, said: `${String(fresh.value.title)} is at ${String(fresh.value.version)} now, so this asks to publish ${String(fresh.value.version)}. Read it again, and accept to publish it.` };
+    }
     if (kind !== 'pack' || typeof body.install !== 'string') return null;
     const id = body.install;
     const fresh = await prepare('pack', { install: id, ...(isMap(body.doc) ? { doc: body.doc } : {}) });

@@ -574,6 +574,7 @@ const PACK = {
     'act installPack {"doc"}: asks the person on Decide. Nothing installs until they say yes, unless they let agents act without asking.',
     'To change it later: act addon {"id","file":true}, edit, raise version, check, installPack again. The person approves the update the same way.',
     'From GitHub: act installPack {"source":{"kind":"git","ref":"owner/repo@v1.0.0:x.pack.json"}}. It is pinned to the commit the tag points at, and a newer semver tag on that repo is asked about by itself.',
+    'To share one made here: act publishAddon {"id"} asks the person on Decide to publish it to the BrainDog store, which reviews it; their browser signs it, so only their yes sends it. act publishAddon {"id","to":"github"} answers the line they run to put it on their own GitHub.',
   ],
   manifest: {
     pack: 'the id, lower-case letters, digits and dashes; not one the store already holds',

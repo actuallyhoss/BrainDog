@@ -105,6 +105,11 @@ export const ASKS: Readonly<Record<string, (args: Record<string, unknown>) => As
       text(a.id) ?? text(map(a.doc)?.pack) ?? text(map(map(a.doc)?.manifest)?.id) ?? text(map(a.doc)?.id),
       map(a.doc),
     ),
+  /* PUBLISH AN ADD-ON MADE HERE TO THE STORE: the record files it with the title and version held now (`arrange.ts`), and
+     the owner's browser signs and sends the file on the yes. GitHub is never asked: `publishAddon {to: "github"}`
+     answers the line the person runs. */
+  publishAddon: (a) =>
+    ((id) => (id === null || (a.to !== undefined && a.to !== 'store') ? null : { question: `Publish ${id} to the BrainDog store?`, body_kind: 'pack', body: { publish: id, to: 'store' }, cause: `act:publishAddon:${id}` }))(text(a.id)),
   setPackConfig: (a) => {
     const id = text(a.id) ?? text(a.pack);
     const values = map(a.values);

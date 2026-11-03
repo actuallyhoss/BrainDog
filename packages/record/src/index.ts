@@ -3921,6 +3921,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     }
   };
 
+  /** Whether a question is an ask to publish an add-on to the store (`{ publish }`, `arrange.ts`). */
+  const publishAsk = (row: unknown): boolean => {
+    const r = row as { body_kind?: unknown; body?: unknown } | null | undefined;
+    if (r?.body_kind !== 'pack') return false;
+    let body: unknown = r.body;
+    if (typeof body === 'string')
+      try {
+        body = JSON.parse(body) as unknown;
+      } catch {
+        return false;
+      }
+    return body !== null && typeof body === 'object' && typeof (body as { publish?: unknown }).publish === 'string';
+  };
+  /**
+   * AN ADD-ON THAT MAY GO TO THE STORE FROM HERE: one made in this BrainDog, by the person or an agent. BrainDog's own
+   * parts are in the store already, one from the store is its publisher's, and one from GitHub or a link is its author's
+   * to publish. Answers what a publish question shows: its title, the version and the checksum held now.
+   */
+  const publishable = async (id: string): Promise<Result<{ id: string; title: string; version: string; checksum: string }>> => {
+    const row = sql.one<{ source: string; version: string | null; checksum: string; manifest: string }>('SELECT source, version, checksum, manifest FROM pack WHERE id = ?', id);
+    if (row === undefined) return no('DECLARATION_UNKNOWN', `${id} is not installed here, so there is nothing to publish. act addons {"installed":true} lists what is.`, { at: 'id' });
+    let title = id;
+    try {
+      const m = JSON.parse(row.manifest) as { title?: unknown };
+      if (typeof m.title === 'string' && m.title.trim() !== '') title = m.title.trim();
+    } catch {
+      /* The id stands in for a title. */
+    }
+    const { shippedVersion } = await import('@braindog/seed/packs/quiet');
+    if (row.source === 'local' && shippedVersion(id) !== undefined) return no('FORBIDDEN', `${title} is BrainDog's own, and is in the store already.`, { at: 'id' });
+    if (row.source === 'kennel') return no('FORBIDDEN', `${title} came from the store, so it is listed there already. To publish a change of yours, give it an id of its own.`, { at: 'id' });
+    if (row.source === 'git' || row.source === 'url') return no('FORBIDDEN', `${title} came from a link, so whoever wrote it publishes it. To publish a change of yours, give it an id of its own.`, { at: 'id' });
+    if (row.version === null) return no('VALUE_MALFORMED', `${title} says no version, so it cannot be published. Raise its version and install it again.`, { at: 'id' });
+    return ok({ id, title, version: row.version, checksum: row.checksum });
+  };
+
   /* WHAT AN AGENT OR SLASH MAY ASK TO CHANGE ABOUT THIS RECORD, and how the owner's press applies it (`arrange.ts`). */
   const arrangement = arranger({
     kernel,
@@ -3929,6 +3965,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
     shelf: deps.catalogueShelf,
     sourceOf: (id) => sql.one<{ source: string }>('SELECT source FROM pack WHERE id = ?', id)?.source ?? null,
+    publishable,
     ...(deps.readAddress ? { readGit: (address: string) => readGit(deps.readAddress!, address), readAddress: deps.readAddress } : {}),
     kept: (pack, diff, packSaid) => {
       try {
@@ -9841,6 +9878,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const by = agentFor(ctx);
     if (by === null || ctx.principal.kind !== 'token') return null;
     if (typeof kind !== 'string' || kind === 'options') return null;
+    /* A PUBLISH WAITS FOR THE OWNER'S OWN YES: the browser signs and sends the file (`publishAsk`). */
+    if (publishAsk(kernel.governanceRow('suggestion', id))) return null;
     const profile = profileOf(ctx);
     if (profile !== null && (profile.lists_write !== null || profile.projects !== null)) return null;
     const found = kernel.findRun(ctx.session ?? {}, ctx.principal.id);
@@ -13792,6 +13831,57 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return ok(await gitPass(null));
     },
 
+    /**
+     * PUBLISH AN ADD-ON MADE HERE: `{ id, to?: "store" | "github" }`.
+     *
+     * TO GITHUB IS THE PERSON'S OWN STEP, never through BrainDog: the answer is the line they run from a folder holding
+     * the file (`braindog addon publish --github`, on their own `gh`), so no GitHub credential ever passes through here.
+     * Anybody who reads the whole BrainDog may ask for it.
+     *
+     * TO THE STORE THE FILE GOES SIGNED BY THE KEY THE OWNER'S BROWSER KEEPS, so only the owner in a browser is answered:
+     * with the file, which the app signs and sends. An agent is refused `NEEDS_BROWSER_SESSION`, and `act` files the
+     * question in its place ("Publish Watch list 0.2.0 to the BrainDog store?", `arrange.ts`), which the owner answers on
+     * Decide; even his switch to act without asking does not answer it (`bypassAccept`).
+     */
+    async publishAddon(args: { id?: unknown; to?: unknown } | undefined, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const takes = ['id', 'to'];
+      const extra = Object.keys(said).find((k) => !takes.includes(k));
+      if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes ${takes.join(', ')}.`, { at: extra, allowed: takes });
+      const id = typeof said.id === 'string' ? said.id.trim() : '';
+      if (id === '') return no('REQUIRED_MISSING', 'Which add-on? Send its id, as act addons {"installed":true} answers it.', { at: 'id' });
+      const to = said.to === undefined ? 'store' : said.to;
+      if (to !== 'store' && to !== 'github') return no('VALUE_MALFORMED', 'to is store or github.', { at: 'to', allowed: ['store', 'github'] });
+      if (!readsEveryList(ctx)) return no('FORBIDDEN', 'An add-on is published by somebody who can read the whole BrainDog.', { at: 'id' });
+      const can = await publishable(id);
+      if (!can.ok) return can;
+      const { title, version } = can.value;
+      if (to === 'github') {
+        const line = 'braindog addon publish --github';
+        return ok({
+          publish: id,
+          to: 'github',
+          title,
+          version,
+          line,
+          steps: [
+            `Save the file in a folder of its own: act addon {"id":"${id}","file":true} hands it back, as ${id}.pack.json.`,
+            `From that folder, run: ${line}`,
+            'It uses your own GitHub sign-in (gh), makes the repository if there is none, tags the version and prints the line anybody installs it from.',
+          ],
+          say: `To put ${title} ${version} on your GitHub, save its file in a folder of its own and run there: ${line}. It uses your own GitHub sign-in; BrainDog never holds it.`,
+        });
+      }
+      if (ctx.principal.kind !== 'person' || ctx.pressedIn !== undefined || ctx.onWord !== undefined || ctx.ordered !== undefined)
+        return no('NEEDS_BROWSER_SESSION', `Publishing to the store signs ${title} with the key the owner's browser keeps. Ask the owner: act publishAddon files the question on Decide.`, { at: 'principal' });
+      const owner = admin(ctx, 'publish an add-on');
+      if (owner) return { ok: false as const, refusal: owner };
+      /* THE OWNER'S BROWSER READS THE FILE (`addon {file: true}`), checks it is this version, signs it and sends it. */
+      return ok({ publish: id, to: 'store', title, version, checksum: can.value.checksum });
+    },
+
     /** `fetchShared` under the name it had when only a use case could be read this way. It stays for one release. */
     async fetchUseCase(args: { url: string } | undefined, ctx: CallContext) {
       const stop = admin(ctx, 'read a use case from the web');
@@ -15525,6 +15615,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             }
           const filed = await arrangement.prepare(args.body_kind, body);
           if (!filed.ok) return filed;
+          /* A PUBLISH IS ASKED IN ITS OWN WORDS, with the title and the version the yes publishes. */
+          if (args.body_kind === 'pack' && typeof filed.value.publish === 'string')
+            args = { ...args, question: `Publish ${String(filed.value.title)} ${String(filed.value.version)} to the BrainDog store?` };
           const opened = kernel.propose({ ...args, body: filed.value }, { ...writerOf(ctx), sees: (list, id) => sight.mayWrite(ctx, list, id) });
           const asked = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
           /* ANSWERED FROM MEMORY (govern-47): the person already said, so nothing is decided again here. */
@@ -15604,6 +15697,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A QUESTION HANDED TO SOMEBODY IS HERS OR AN OWNER'S TO ANSWER; put off is anybody's. */
       const handed = args.defer === undefined ? kernel.deciderFault(String(args.id), actorOf(ctx), ctx.principal.kind === 'person' && ctx.principal.level === 'owner') : null;
       if (handed !== null) return no('FORBIDDEN', handed, { at: 'id' });
+      /* A YES TO PUBLISH IS THE OWNER'S, IN A BROWSER: the file goes out signed by the key their browser keeps, sent by Decide
+         before the yes. A press in a chat, an agent on his word and his switch to act without asking answer nothing here. */
+      if (args.decide?.option === 'accept' && publishAsk(target) && (ctx.principal.kind !== 'person' || ctx.pressedIn !== undefined || ctx.onWord !== undefined || ctx.ordered !== undefined))
+        return no('NEEDS_BROWSER_SESSION', 'Publishing to the store signs the file with the key the owner\'s browser keeps. Answer this one on Decide in the app.', { at: 'id' });
       /* NO VERDICT IS A MISSING ANSWER, NOT A BAD ONE. With none of the three it fell through to the
          resolve branch and was refused "undefined is not a way to resolve one". */
       if (args.decide === undefined && args.defer === undefined && args.resolved_as === undefined)
