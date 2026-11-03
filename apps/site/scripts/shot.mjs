@@ -185,7 +185,7 @@ function serveBuild() {
 /**
  * ONE PAGE PER ROUTE WITH A PARAMETER, unless `--all` asks for every one.
  *
- * `/packs/[id]`, `/docs/[section]/[slug]` and `/legal/[name]` each prerender a page per value from
+ * `/addons/[id]`, `/docs/[section]/[slug]` and `/legal/[name]` each prerender a page per value from
  * one template, and forty shots of one template teach a person at a desk nothing the first does
  * not. The templates are read from `src/routes`, and the first page of each in the sitemap's order
  * stands for the rest. The daily look at the live site passes `--all`: a cookie or an outside script

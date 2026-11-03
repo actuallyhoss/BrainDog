@@ -116,10 +116,10 @@ test('the header row is Agents, Pricing, Security and Docs', () => {
   assert.deepEqual(row.map((p) => p.path), ['/agents', '/pricing', '/security', '/docs']);
 });
 
-test('/packs is held, so the sitemap and the 404 do not name it', () => {
+test('/addons is held, so the sitemap and the 404 do not name it', () => {
   assert.equal(LAUNCH.public, false);
-  assert.ok((HELD as readonly string[]).includes('/packs'));
-  assert.ok(!PAGES.some((p) => p.path === '/packs' || p.path === '/changelog'), 'PAGES names a held page');
+  assert.ok((HELD as readonly string[]).includes('/addons'));
+  assert.ok(!PAGES.some((p) => p.path === '/addons' || p.path === '/changelog'), 'PAGES names a held page');
 });
 
 const links = (launch: { legal: boolean; repo: boolean; public: boolean }) =>

@@ -32,8 +32,8 @@ registerHooks({
     return next(specifier, context);
   },
 });
-const packsPage = await import('../src/routes/packs/+page.server.ts');
-const packPage = await import('../src/routes/packs/[id]/+page.server.ts');
+const packsPage = await import('../src/routes/addons/+page.server.ts');
+const packPage = await import('../src/routes/addons/[id]/+page.server.ts');
 
 const OFF = { ...LAUNCH, public: false };
 const ON = { ...LAUNCH, public: true };
@@ -54,7 +54,7 @@ test('the flag is off until the owner flips it, and it holds the page and its fe
   assert.equal(held(), true);
   /* The pricing page came back on 20 October as the early access page, three of the pages for one kind of person
      went, and the teams page went while inviting people is held (22 October). */
-  assert.deepEqual([...HELD], ['/changelog', '/changelog.xml', '/packs', '/download', '/for/personal', '/for/students', '/for/new-projects']);
+  assert.deepEqual([...HELD], ['/changelog', '/changelog.xml', '/addons', '/download', '/for/personal', '/for/students', '/for/new-projects']);
 });
 
 test('with the flag off the header, the footer, the 404 and the sitemap hold no changelog place', () => {
@@ -95,13 +95,13 @@ test('with the flag off the feed answers not found, and with it on the feed is t
 });
 
 test('with the flag off the packs are no place: not in the header, the footer, the 404 or the sitemap', () => {
-  assert.ok(!reachable(OFF).some((p) => p.path === '/packs'), 'the packs are still a place with the flag off');
-  assert.ok(!LIVE.some((p) => p.path === '/packs'), 'LIVE names the packs while they are held');
-  assert.ok(!PAGES.some((p) => p.path === '/packs'), 'PAGES, which the 404 and the sitemap read, names the packs');
+  assert.ok(!reachable(OFF).some((p) => p.path === '/addons'), 'the packs are still a place with the flag off');
+  assert.ok(!LIVE.some((p) => p.path === '/addons'), 'LIVE names the packs while they are held');
+  assert.ok(!PAGES.some((p) => p.path === '/addons'), 'PAGES, which the 404 and the sitemap read, names the packs');
 });
 
 test('with a copy of the flag on the packs are back as a place, and never in the header row', () => {
-  const place = reachable(ON).find((p) => p.path === '/packs');
+  const place = reachable(ON).find((p) => p.path === '/addons');
   assert.ok(place, 'the packs are not a place with the flag on');
   assert.equal(place.header, false, 'the packs left the header row with the site design');
 });
@@ -124,7 +124,7 @@ test(
   'a build made with the flag as it stands writes the changelog, its feed and the packs only when the site is public',
   STRICT ? {} : { skip: 'reads the build only under SITE_BUILT=1, where it was just made from this tree' },
   () => {
-    for (const file of ['changelog.html', 'changelog.xml', 'packs.html']) {
+    for (const file of ['changelog.html', 'changelog.xml', 'addons.html']) {
       const there = existsSync(new URL(file, BUILD));
       if (held()) assert.ok(!there, `${WHERE} holds ${file} while the changelog is held, so brain.dog would show it`);
       else assert.ok(there, `${WHERE} holds no ${file}, and LAUNCH.public is on`);

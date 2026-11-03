@@ -60,8 +60,13 @@ A pack can still mislead: a figure could add up the wrong field under a plausibl
 
 Declarations belong to the pack, and rows belong to you. Uninstalling retires the pack's lists and pages and keeps every row written under them: they stop being shown, they stay in every export, and installing the pack again brings them back. A pack can also be turned off and on again from the record's add-ons, keeping its version and settings, unless another pack that is on still leans on it.
 
+## Build one with your agent
+
+You do not need to write the file yourself. Ask the agent you work with for what BrainDog lacks: it looks in the store, writes an add-on when nothing fits, checks it against your BrainDog and asks you on Needs you before anything is installed. [Build one with your agent](/docs/packs/with-your-agent) has the calls and what you see.
+
 ## Where to go next
 
+- [Build one with your agent](/docs/packs/with-your-agent): ask for what BrainDog lacks, and approve what it makes.
 - [Your first add-on](/docs/packs/first-pack): a pack from nothing to the Kennel, with what each command prints.
 - [The pack file](/docs/packs/format): the manifest and the declarations, key by key.
 - [The kinds](/docs/packs/kinds): one example of each thing a pack can declare.

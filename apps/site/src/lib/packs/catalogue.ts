@@ -22,7 +22,25 @@ export const CATEGORIES = ['made-by-braindog', 'ways-of-working', 'modules', 'te
 export type Category = (typeof CATEGORIES)[number];
 const isCategory = (v: unknown): v is Category => typeof v === 'string' && (CATEGORIES as readonly string[]).includes(v);
 
-export type Reach = { lists: string[]; pages: string[]; rules: string[]; examples: number; hosts: string[] };
+export type Reach = {
+  lists: string[];
+  pages: string[];
+  rules: string[];
+  examples: number;
+  hosts: string[];
+  /** The modules it needs first, by id. */
+  modules: string[];
+  /** The skills it teaches agents, by id. */
+  skills: string[];
+  /** Today cards it ships for the sheet, by title. */
+  widgets: string[];
+  /** Lists or roles a part of it waits for. */
+  waits: string[];
+  /** Places of yours it reads or changes, read from the file (`uses`). */
+  uses: { id: string; writes: boolean }[];
+  /** Each call out as the plan says it (`calls_out[].line`). */
+  calls: string[];
+};
 
 export type Version = {
   version: string;
@@ -32,6 +50,10 @@ export type Version = {
   notes?: string;
   yanked?: { reason: string };
   preview?: true;
+  /** The operator listed it after review. */
+  reviewed?: true;
+  /** Its author signed it with their key. */
+  signed?: true;
 };
 
 export type Entry = {
@@ -47,6 +69,8 @@ export type Entry = {
   publisher: string | null;
   /** Who the catalogue knows published it: BrainDog itself, an author key, or a signed-in person. */
   publisherKind: 'braindog' | 'key' | 'person' | null;
+  /** The catalogue's id for that publisher, which a page never shows. */
+  publisherId: string | null;
   unlisted: boolean;
 };
 
@@ -57,14 +81,40 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is
 function reachOf(v: unknown): Reach {
   const r = isObject(v) ? v : {};
   const calls = Array.isArray(r['calls_out']) ? r['calls_out'] : [];
-  const hosts = calls.map((c) => (isObject(c) ? str(c['host']) : null)).filter((h): h is string => h !== null && h !== '');
+  const lines = calls.map((c) => (isObject(c) ? str(c['line']) : null)).filter((l): l is string => l !== null && l !== '');
+  /* EVERY HOST A CALL NAMES, not only its first: a line may say three ("calendar.google.com, outlook.office365.com and
+     outlook.live.com"), and `host` keeps the first alone. */
+  const hosts = [
+    ...calls.map((c) => (isObject(c) ? str(c['host']) : null)).filter((h): h is string => h !== null && h !== ''),
+    ...lines.flatMap((l) => hostsIn(l)),
+  ];
+  const used = Array.isArray(r['uses']) ? r['uses'] : [];
   return {
     lists: strings(r['lists']),
     pages: strings(r['pages']),
     rules: strings(r['rules']),
     examples: typeof r['examples'] === 'number' ? r['examples'] : 0,
     hosts: [...new Set(hosts)],
+    modules: strings(r['modules']),
+    skills: strings(r['skills']),
+    widgets: strings(r['widgets']),
+    waits: strings(r['waits']),
+    uses: used.flatMap((u) => {
+      const id = isObject(u) ? str(u['id']) : null;
+      return id === null || !isObject(u) ? [] : [{ id, writes: u['writes'] === true }];
+    }),
+    calls: lines,
   };
+}
+
+/** The hosts a plan's call line names: `CALLS OUT a.com, b.com and c.com · every 1h · ...`. */
+function hostsIn(line: string): string[] {
+  const m = /^CALLS OUT (.+?)(?: · |$)/u.exec(line);
+  if (!m) return [];
+  return (m[1] ?? '')
+    .split(/, | and /u)
+    .map((h) => h.trim())
+    .filter((h) => /^[a-z0-9.-]+\.[a-z]{2,}$/u.test(h));
 }
 
 function versionOf(v: unknown): Version | null {
@@ -85,6 +135,8 @@ function versionOf(v: unknown): Version | null {
     ...(notes !== null && notes.trim() !== '' ? { notes: notes.trim() } : {}),
     ...(yanked ? { yanked } : {}),
     ...(v['preview'] === true ? { preview: true as const } : {}),
+    ...(typeof v['reviewed'] === 'string' ? { reviewed: true as const } : {}),
+    ...(isObject(v['signature']) ? { signed: true as const } : {}),
   };
 }
 
@@ -116,6 +168,7 @@ function entryOf(v: unknown): Entry | null {
     categories: Array.isArray(categories) ? categories.filter(isCategory) : [],
     publisher,
     publisherKind,
+    publisherId: isObject(by) ? str(by['id']) : null,
     unlisted: v['unlisted'] === true,
   };
 }
@@ -144,8 +197,119 @@ export const isPublic = (e: Entry): boolean => !e.unlisted && offered(e) !== nul
  */
 export const slugOf = (e: Pick<Entry, 'kind' | 'id'>): string => (e.kind === 'usecase' ? `usecase-${e.id}` : e.id);
 
-/** Where the app installs it: `/packs/browse/<id>?kind=...` on the app's name, opened in the signed-in person's record. */
-export const installPath = (app: string, e: Pick<Entry, 'kind' | 'id'>): string => `${app}/packs/browse/${encodeURIComponent(e.id)}?kind=${e.kind}`;
+/**
+ * Where the app installs it: `/addons/<id>?kind=...` on the app's name, the store's own listing in the signed-in
+ * person's BrainDog, which shows the plan and asks before it writes. `kind` always rides along, because the app reads a
+ * listing with none as a use case.
+ */
+export const installPath = (app: string, e: Pick<Entry, 'kind' | 'id'>): string => `${app}/addons/${encodeURIComponent(e.id)}?kind=${e.kind}`;
+
+/**
+ * THE BUNDLED CATALOGUE AND THE KENNEL'S INDEX AS ONE LIST. The bundled one is the build's own (BrainDog's add-ons, as
+ * this deploy ships them), so for an entry both hold it is the one drawn; the Kennel adds every entry the bundled one
+ * lacks, which is every add-on somebody else published. Bundled order first, then the Kennel's.
+ */
+export function mergeEntries(bundled: readonly Entry[], kennel: readonly Entry[]): Entry[] {
+  const key = (e: Pick<Entry, 'kind' | 'id'>): string => `${e.kind}:${e.id}`;
+  const have = new Set(bundled.map(key));
+  return [...bundled, ...kennel.filter((e) => !have.has(key(e)))];
+}
+
+/* ── Who made it ────────────────────────────────────────────────────────────────────────────── */
+
+/** An author's address segment: their name as words joined by hyphens, `braindog` for BrainDog. */
+export const whoSlug = (name: string): string =>
+  name
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '') || 'someone';
+
+/**
+ * Every author with at least one public listing: their address, their name, and whether it is BrainDog. Two publishers
+ * whose names make the same address share it only when they are the same publisher; the second is told apart by its kind.
+ */
+export function authorsOf(entries: readonly Entry[]): { slug: string; name: string; ours: boolean; key: string }[] {
+  const out = new Map<string, { slug: string; name: string; ours: boolean; key: string }>();
+  const taken = new Map<string, string>();
+  for (const e of entries.filter(isPublic)) {
+    const name = e.publisher ?? e.author;
+    if (name.trim() === '') continue;
+    const key = publisherKeyOf(e);
+    if (out.has(key)) continue;
+    let slug = whoSlug(name);
+    if (taken.has(slug) && taken.get(slug) !== key) slug = `${slug}-${e.publisherKind ?? 'author'}`;
+    taken.set(slug, key);
+    out.set(key, { slug, name, ours: e.publisherKind === 'braindog', key });
+  }
+  return [...out.values()];
+}
+
+/** Who published an entry, as one key: the catalogue's kind and id when it knows them, else the author line. */
+export const publisherKeyOf = (e: Entry): string =>
+  e.publisherKind !== null && e.publisherId !== null ? `${e.publisherKind}:${e.publisherId}` : `author:${e.publisher ?? e.author}`;
+
+/* ── Trust and asks ─────────────────────────────────────────────────────────────────────────── */
+
+export type Trust = 'braindog' | 'reviewed' | 'signed' | 'unreviewed';
+
+/** How far a listing is trusted, as the record says it (`trustOfEntry` in `packages/record/src/methods/addons.ts`). */
+export function trustOf(e: Entry): Trust {
+  const v = offered(e);
+  if (e.publisherKind === 'braindog') return 'braindog';
+  if (v?.reviewed === true) return 'reviewed';
+  if (v?.signed === true) return 'signed';
+  return 'unreviewed';
+}
+
+/** A list, a page or a figure id as words: `register.money_goals` is "the money goals list". */
+const placeWords = (id: string): string => {
+  const at = id.indexOf('.');
+  const kind = at === -1 ? '' : id.slice(0, at);
+  const words = (at === -1 ? id : id.slice(at + 1)).replace(/[_-]+/gu, ' ');
+  return kind === 'register' ? `the ${words} list` : kind === 'page' ? `the ${words} page` : kind === 'metric' ? `the ${words} figure` : words;
+};
+
+/**
+ * A plan's call line as a person reads it: `CALLS OUT a.com · every 1h · key "X" to the host its keychain entry opens`
+ * is `Calls a.com every 1h, with your key "X".` A line in another shape is said as it is, less its capitals.
+ */
+export function callSaid(line: string): string {
+  const parts = line.split(' · ').map((p) => p.trim());
+  const head = parts[0] ?? '';
+  if (!head.startsWith('CALLS OUT ')) return line;
+  const hosts = head.slice('CALLS OUT '.length);
+  const when = parts.find((p) => /^every /u.test(p))?.replace(/^every (\d+)([mhd])$/u, (_, n: string, u: string) => {
+    const unit = u === 'm' ? 'minute' : u === 'h' ? 'hour' : 'day';
+    return n === '1' ? `every ${unit}` : `every ${n} ${unit}s`;
+  });
+  const key = parts.map((p) => /^key "([^"]+)"/u.exec(p)?.[1]).find((k) => k !== undefined);
+  return `Calls ${hosts}${when ? ` ${when}` : ''}${key ? `, with your key "${key}"` : ''}.`;
+}
+
+/**
+ * WHAT IT ASKS FOR OF YOURS, in the lines the app and an agent read before installing (`reachLines` in
+ * `packages/record/src/methods/addons.ts`), word for word but for the call lines, said plainly here (`callSaid`). The
+ * site imports nothing from the record, so the frames are written out again; change both together.
+ */
+export function asksOf(r: Reach): string[] {
+  const out: string[] = [];
+  const names = (all: readonly string[]): string => all.map((n) => nameOf(n) || n).join(', ');
+  if (r.modules.length > 0) out.push(`Needs ${r.modules.join(', ')} installed first.`);
+  if (r.lists.length > 0) out.push(`Adds ${r.lists.length === 1 ? 'a list' : `${r.lists.length} lists`}: ${names(r.lists)}.`);
+  if (r.pages.length > 0) out.push(`Adds ${r.pages.length === 1 ? 'a page' : `${r.pages.length} pages`}: ${names(r.pages)}.`);
+  const reads = r.uses.filter((u) => !u.writes).map((u) => placeWords(u.id));
+  const writes = r.uses.filter((u) => u.writes).map((u) => placeWords(u.id));
+  if (writes.length > 0) out.push(`Changes yours: ${writes.join(', ')}.`);
+  if (reads.length > 0) out.push(`Reads yours: ${reads.join(', ')}.`);
+  if (r.rules.length > 0) out.push(`Runs ${r.rules.length === 1 ? 'an automation' : `${r.rules.length} automations`} while nobody is looking.`);
+  for (const c of r.calls) out.push(callSaid(c));
+  if (r.skills.length > 0) out.push(`Teaches your agents: ${r.skills.join(', ')}.`);
+  if (r.widgets.length > 0) out.push(`Today cards to add: ${r.widgets.join(', ')}.`);
+  if (r.waits.length > 0) out.push(`Some parts wait until you hold: ${r.waits.join(', ')}.`);
+  if (r.examples > 0) out.push(`Starts with ${r.examples} example ${r.examples === 1 ? 'entry' : 'entries'}.`);
+  return out;
+}
 
 /* ── Install counts ─────────────────────────────────────────────────────────────────────────── */
 
@@ -221,6 +385,9 @@ export function glyphOf(e: Entry, pageIcon: string | null): IconName {
 
 export type Card = {
   slug: string;
+  /** The author's page, `/addons/by/<who>`. */
+  who: string;
+  trust: Trust;
   /** A use case sets up a whole way of working; a pack adds to one. */
   kind: Entry['kind'];
   title: string;
@@ -241,7 +408,11 @@ export type Card = {
   find: string;
 };
 
-export function cardOf(e: Entry, counts: ReadonlyMap<string, number>, pageIcon: string | null): Card | null {
+/**
+ * One card. `who` is the author's address from `authorsOf`, which tells two authors of one name apart; left out, it is
+ * made from the name.
+ */
+export function cardOf(e: Entry, counts: ReadonlyMap<string, number>, pageIcon: string | null, who?: string): Card | null {
   const v = offered(e);
   if (v === null || e.unlisted) return null;
   const publisher = e.publisher ?? e.author;
@@ -255,6 +426,8 @@ export function cardOf(e: Entry, counts: ReadonlyMap<string, number>, pageIcon: 
   const categories = e.categories;
   return {
     slug: slugOf(e),
+    who: who ?? whoSlug(publisher),
+    trust: trustOf(e),
     kind: e.kind,
     title: e.title,
     summary: e.summary,

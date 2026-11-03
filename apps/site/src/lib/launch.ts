@@ -38,8 +38,9 @@ export type LaunchFlag = keyof typeof LAUNCH;
  * changelog stay held"), the Mac download until a signed build exists, and the pages for personal records, students
  * and new projects (20 October: the slogan is about a business, and those pull the other way), and the page for
  * teams while inviting people is held (22 October). The pricing page
- * came back on 20 October as the one-plan early access page with no prices. The sources stay (`routes/changelog/entries.ts`, the catalogue `routes/packs/` reads); only
- * what a visitor can reach is held. A pack's own page (`/packs/<id>`) is never prerendered while `/packs` is held.
+ * came back on 20 October as the one-plan early access page with no prices. The sources stay (`routes/changelog/entries.ts`, the catalogue `routes/addons/` reads); only
+ * what a visitor can reach is held. An add-on's own page (`/addons/<id>`) and an author's (`/addons/by/<who>`) are never
+ * prerendered while `/addons` is held. The store was `/packs` until 3 November, and `static/_redirects` sends that there.
  *
  * A HELD ADDRESS ANSWERS 404 AND WRITES NO FILE, so the site's own 404 page answers it the way it answers any miss
  * (`not_found_handling` in `wrangler.jsonc`). `nav.ts` drops it from the header, the footer, the 404's list and the
@@ -48,7 +49,7 @@ export type LaunchFlag = keyof typeof LAUNCH;
 export const HELD: readonly string[] = [
   '/changelog',
   '/changelog.xml',
-  '/packs',
+  '/addons',
   /* THE MAC DOWNLOAD UNTIL A NOTARISED DMG IS PUBLISHED (`desktop.ts`, set by `tools/desktop/release.mjs --publish`). */
   ...(DESKTOP_NOTARIZED ? [] : ['/download']),
   ...Object.values(cases.drawn.moreFor)
