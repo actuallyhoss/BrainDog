@@ -45,6 +45,43 @@ export type TodayCards = {
  */
 export type TodayAnswer = { page: PageAnswer; handled: unknown; shared: unknown; cards: TodayCards | null; behind?: true };
 
+/**
+ * TODAY AS ITS CARDS ARRIVE (finish 3 Nov): what a read asked in lines has been handed so far, before its answer. `keys`
+ * is the key each block is drawn under, `blocks` each block drawn so far at its place (`undefined` while it is being
+ * drawn), and for a kept Today how it is declared, so its board can be laid before the last card is in.
+ */
+export type TodayPartial = { of: number; keys: readonly string[]; blocks: readonly unknown[]; declared?: unknown; declared_version?: number };
+
+/** A client that may ask in lines (`callLines`), as `@braindog/client` does from 3 Nov. */
+type LinesClient = Pick<Client, 'call'> & { callLines?: <T>(name: string, args: Record<string, unknown>, onLine: (line: unknown) => void) => Promise<PageSaid | { ok: true; value: T }> };
+
+/**
+ * TODAY ASKED IN LINES: the record hands on each block as it draws it, and `onPart` is told what has arrived each time,
+ * so the screen fills a card the moment it is ready. The answer that ends the stream is the one returned, its blocks
+ * that a line already carried (`{ sent: true }`) put back from the lines. A host that answers whole says no part.
+ */
+async function todayInLines(client: LinesClient, asked: Record<string, unknown>, onPart: (part: TodayPartial) => void): Promise<PageSaid> {
+  const part: { of: number; keys: string[]; blocks: unknown[]; declared?: unknown; declared_version?: number } = { of: 0, keys: [], blocks: [] };
+  const out = (await client.callLines!<TodayAnswer>('today', asked, (line) => {
+    const l = line as { head?: { of?: unknown; keys?: unknown; declared?: unknown; declared_version?: unknown }; block?: { i?: unknown; value?: unknown } };
+    if (l.head && typeof l.head.of === 'number' && Array.isArray(l.head.keys)) {
+      part.of = l.head.of;
+      part.keys = l.head.keys.filter((k): k is string => typeof k === 'string');
+      if (l.head.declared !== undefined) part.declared = l.head.declared;
+      if (typeof l.head.declared_version === 'number') part.declared_version = l.head.declared_version;
+      return;
+    }
+    if (l.block && typeof l.block.i === 'number' && l.block.i >= 0 && l.block.i < part.of) {
+      part.blocks[l.block.i] = l.block.value;
+      onPart({ ...part, blocks: [...part.blocks] });
+    }
+  })) as PageSaid;
+  if (!out.ok) return out;
+  const page = (out.value as unknown as TodayAnswer).page as { blocks?: unknown[] } | null;
+  if (page && Array.isArray(page.blocks)) page.blocks = page.blocks.map((b, i) => ((b as { sent?: unknown } | null)?.sent === true ? part.blocks[i] : b));
+  return out;
+}
+
 /** How long a held answer is read from, whatever the version says, as a kept read is (`KEPT_READ_MS`). */
 export const TODAY_HELD_MS = 300_000;
 
@@ -165,13 +202,15 @@ export function boardReadOf(body: Record<string, unknown>, page: unknown, left: 
  * `left` is what a phone left out of `body` (`phone-ask.ts`), which the offer still reads as on the board.
  */
 export async function askToday(
-  client: Pick<Client, 'call'>,
+  client: LinesClient,
   base: string,
   body: Record<string, unknown>,
   fresh = false,
   kept: string | null = null,
   left: readonly Record<string, unknown>[] = [],
   shape?: TodayShape,
+  /* EACH CARD AS IT ARRIVES (finish 3 Nov), where the screen has nothing drawn yet to keep. */
+  onPart?: (part: TodayPartial) => void,
 ): Promise<PageSaid> {
   /* A KEPT TODAY (`kept`, its slug) IS ASKED BY ITS SLUG, and a host without `today` has no such read: the caller reads the
      page itself. */
@@ -182,7 +221,9 @@ export async function askToday(
      next open to ask beside `boot` (`earlyToday`). */
   const shaped = shape !== undefined && !fresh && !shapeless.has(base);
   const asked = { ...what, ...(fresh ? { fresh: true } : {}), ...(apart ? { offer: false } : {}), ...(shaped ? { shape } : {}) };
-  const out = (async () => (shape !== undefined && !fresh ? await earlyToday(base, shape, what, !apart) : null) ?? client.call<TodayAnswer>('today', asked))();
+  const ask = (): Promise<PageSaid> =>
+    onPart !== undefined && typeof client.callLines === 'function' ? todayInLines(client, asked, onPart) : (client.call<TodayAnswer>('today', asked) as unknown as Promise<PageSaid>);
+  const out = (async () => (shape !== undefined && !fresh ? await earlyToday(base, shape, what, !apart) : null) ?? ask())() as unknown as Promise<Awaited<ReturnType<typeof client.call<TodayAnswer>>>>;
   const entry: Held = { base, token: tokenNow(), at: Date.now(), answer: out.then((o) => (o.ok ? o.value : null), () => null) };
   held = entry;
   const got = await out;
@@ -200,12 +241,12 @@ export async function askToday(
   if (held === entry) held = null;
   if ('refusal' in got && apart && got.refusal.at === 'offer') {
     offerIn.add(base);
-    return askToday(client, base, body, fresh, kept, left, shape);
+    return askToday(client, base, body, fresh, kept, left, shape, onPart);
   }
   /* A RECORD BUILT BEFORE `shape` refuses it, and is asked without it from then on. */
   if ('refusal' in got && shaped && got.refusal.at === 'shape') {
     shapeless.add(base);
-    return askToday(client, base, body, fresh, kept, left, shape);
+    return askToday(client, base, body, fresh, kept, left, shape, onPart);
   }
   if ('refusal' in got && UNSERVED.has(got.refusal.code)) {
     without.add(base);

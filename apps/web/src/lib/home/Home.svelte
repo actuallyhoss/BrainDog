@@ -107,6 +107,9 @@
   /* TODAY'S SKELETON IS THE BOARD IT WILL BE (`today-shape.ts`, ui-perfect 3 Nov): each card's cell and height as this
      device last drew them, kept once the board rests and stood in its cells while the record answers. */
   import TodaySkeleton from '$lib/home/TodaySkeleton.svelte';
+  import { isPending } from '$lib/home/today-partial.ts';
+  import SkeletonCard from '$lib/ui/SkeletonCard.svelte';
+  import { cardShape, shapeKey } from '$lib/ui/shape.ts';
   import { firstShape, keepShape, readShape, shapeOf } from '$lib/home/today-shape.ts';
   import { landed as tileLanded } from '$lib/home/tile-landed.ts';
   tileLanded.hold = LateHold;
@@ -426,6 +429,8 @@
 
   /** The record's answer for Home's page, `null` while it is out or when this host cannot draw Today's body. */
   let got = $state<Opened | null>(null);
+  /** Whether `got` is Today with cards still arriving (`today-partial.ts`), not yet the record's whole answer. */
+  let partial = $state(false);
   /** Whether the first read has come back, so a host that cannot draw Today's body is told from one still reading. */
   let settled = $state(false);
   /** A read of Home's own is out: `listen` waits for it rather than asking again on top of it. STATE, because the board
@@ -691,15 +696,33 @@
   const pageKept = new Set<string>();
 
   /** A kept board drawn from the record's one `today` read, or `null` to read it as a page. */
-  async function keptToday(slug: string, fresh: boolean): Promise<Opened | null> {
-    const [m, t, tiles, h] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts'), import('./handled.ts')]);
+  async function keptToday(slug: string, fresh: boolean, onPage?: (o: Opened) => void): Promise<Opened | null> {
+    const [m, t, tiles, h, part] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts'), import('./handled.ts'), onPage ? import('./today-partial.ts') : null]);
     const base = apiBase();
+    /* EACH CARD AS IT ARRIVES (`today-partial.ts`), laid on the board as it is declared, where nothing is drawn yet. */
+    const parts =
+      onPage && part
+        ? part.partsReader(
+            base,
+            { liveOf: m.liveOf, tilesLanded: tiles.tilesLanded, words: (raw) => (keptWordsNow({ blocks: raw }) as { blocks: unknown[] }).blocks },
+            (p) => (Array.isArray((p.declared as { blocks?: unknown } | undefined)?.blocks) ? ((p.declared as { blocks: Record<string, unknown>[] }).blocks) : []),
+            pendingOf,
+            (blocks, now, p) => {
+              const d = p.declared as Record<string, unknown> | undefined;
+              if (d === undefined || d === null || typeof d !== 'object' || d.board !== true) return null;
+              const { blocks: _kept, ...own } = d;
+              return { from: 'live', page: { page: { ...(own as unknown as LivePageDecl), page: slug, ...(p.declared_version === undefined ? {} : { declared_version: p.declared_version }) }, blocks: quietHeld(blocks) }, now } satisfies Opened;
+            },
+            (o) => onPage(o as Opened),
+          )
+        : null;
     let declared: Record<string, unknown> | null = null;
     let version: number | undefined;
     let answered: unknown = null;
     let beside: Promise<TodayAnswer | null> | null = null;
     const drawn = await m.drawnOf({ page: slug, blocks: [] }, base, undefined, async (client) => {
-      const asked = await t.askToday(client, base, {}, fresh, slug, [], untrack(() => narrow.current) ? 'phone' : 'wide');
+      const asked = await t.askToday(client, base, {}, fresh, slug, [], untrack(() => narrow.current) ? 'phone' : 'wide', parts?.onPart);
+      parts?.stop();
       beside = t.lastToday(base);
       /* IN TODAY'S WORDS, where it was kept with older ones (`kept-words.ts`, A5). */
       const out = asked.ok ? { ...asked, value: keptWordsNow(asked.value) } : asked;
@@ -730,13 +753,13 @@
   }
 
   /** Home's page, from whichever of the three sources the record holds. */
-  async function readBody(slug: string | null, spoken: HomeVoice, held: Holds, fresh = false): Promise<Opened | null> {
+  async function readBody(slug: string | null, spoken: HomeVoice, held: Holds, fresh = false, onPage?: (o: Opened) => void): Promise<Opened | null> {
     if (slug !== null) {
       /* A KEPT TODAY IS ONE READ: the record's `today`, by its slug, draws the kept page with every tile's part beside it,
          as it draws the body. A kept page that is not a board (arranged before boards), or a host without it, is read as
          any page is, and remembered, so it costs the one read after. */
       if (slug === KEPT_HOME && !pageKept.has(apiBase())) {
-        const kept = await keptToday(slug, fresh);
+        const kept = await keptToday(slug, fresh, onPage);
         if (kept !== null) return kept;
         pageKept.add(apiBase());
       }
@@ -764,13 +787,27 @@
        a cold phone's Today for a widget it does not draw. */
     if (asked.blocks.some((b) => (b as { key?: unknown }).key === 'projects')) void import('./ProjectCards.svelte').catch(() => null);
     /* WITH EVERY TILE'S PART BESIDE IT, in the record's one `today` read (`today-read.ts`), which the tiles take theirs from. */
-    const [m, t, tiles, h] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts'), import('./handled.ts')]);
+    const [m, t, tiles, h, part] = await Promise.all([import('$lib/record/page-drawn.ts'), import('./today-read.ts'), import('./tile-code.ts'), import('./handled.ts'), onPage ? import('./today-partial.ts') : null]);
     const base = apiBase();
+    /* EACH CARD AS IT ARRIVES (`today-partial.ts`), where nothing is drawn yet: laid as the answer's own blocks are. */
+    const pageDecl = { page: body.page, title: body.title, ...(body.layout ? { layout: body.layout } : {}), ...(body.board ? { board: true } : {}), ...(body.phone ? { phone: body.phone } : {}), ...(left.length > 0 ? { phoneOnly: true } : {}) } as LivePageDecl;
+    const parts =
+      onPage && part
+        ? part.partsReader(
+            base,
+            { liveOf: m.liveOf, tilesLanded: tiles.tilesLanded },
+            () => asked.blocks as unknown as Record<string, unknown>[],
+            pendingOf,
+            (blocks, now) => ({ from: 'live', page: { page: pageDecl, blocks: quietHeld(withLeft(blocks, body.blocks, left, (b) => leftBlock(b, now) as unknown as LiveBlock)) }, now }) satisfies Opened,
+            (o) => onPage(o as Opened),
+          )
+        : null;
     /* AND THE SHOWN TILES' OWN CODE THE MOMENT THE ANSWER SAYS WHICH THEY ARE (`tile-code.ts`), beside the page reader's. */
     let answered: unknown = null;
     let beside: Promise<TodayAnswer | null> | null = null;
     let drawn = await m.drawnOf(asked, base, undefined, async (client) => {
-      const out = await t.askToday(client, base, asked as unknown as Record<string, unknown>, fresh, null, leftOut, shape);
+      const out = await t.askToday(client, base, asked as unknown as Record<string, unknown>, fresh, null, leftOut, shape, parts?.onPart);
+      parts?.stop();
       beside = t.lastToday(base);
       if (out.ok) {
         tiles.askTiles((out.value as { blocks?: unknown }).blocks);
@@ -800,7 +837,7 @@
       const blocks = withLeft(drawn.blocks, body.blocks, left, (b) => leftBlock(b, at) as unknown as LiveBlock);
       return {
         from: 'live',
-        page: { page: { page: body.page, title: body.title, ...(body.layout ? { layout: body.layout } : {}), ...(body.board ? { board: true } : {}), ...(body.phone ? { phone: body.phone } : {}), ...(left.length > 0 ? { phoneOnly: true } : {}) } as LivePageDecl, blocks: quietHeld(blocks) },
+        page: { page: pageDecl, blocks: quietHeld(blocks) },
         now: drawn.now,
       };
     }
@@ -855,14 +892,30 @@
     /* THE TAB'S FIRST READ OF TODAY TAKES WHAT `boot` SAID WAS NEW; a later one (another voice, lists learnt) asks. */
     const before = mine === 1 ? newsFirst() : newsNow();
     const first = new Promise<void>((done) => setTimeout(done, HANDLED_WAIT_MS));
+    /* WITH NOTHING DRAWN YET (no copy, nothing this tab kept), EACH CARD IS DRAWN AS IT ARRIVES (finish 3 Nov,
+       `today-partial.ts`): the board is laid at once, the cards still being drawn stand as their kept skeleton in their
+       own cells, and the whole answer takes over below. Never over something drawn, and never after the answer. */
+    let ended = false;
+    const onPage =
+      was === null && !viaCopy && untrack(() => got) === null
+        ? (o: Opened) => {
+            if (ended || mine !== pageRead || slug !== declares || (untrack(() => got) !== null && !untrack(() => partial))) return;
+            got = o;
+            partial = true;
+          }
+        : undefined;
     /* TODAY'S OWN BODY BRINGS WHAT WAS HANDLED WITH IT (`tilesBeside`), so it waits for nothing beside it. */
-    void Promise.all([readBody(slug, spoken, held), slug === null || slug === KEPT_HOME ? null : Promise.race([handledLanded, first])])
+    void Promise.all([readBody(slug, spoken, held, false, onPage), slug === null || slug === KEPT_HOME ? null : Promise.race([handledLanded, first])])
       .then(([out]) => {
+        ended = true;
         if (slug !== declares) return;
+        /* A PAGE OF CARDS STILL ARRIVING IS NOT A PAGE DRAWN: whatever the read ends as replaces it. */
+        const wasPartial = untrack(() => partial);
+        partial = false;
         /* A QUIET READ THAT FAILS KEEPS WHAT IS DRAWN, as every quiet read does (`read.ts`): what this tab drew, and what
            the record answered it before, when Today is read again over lists learnt again. Replaced by a refusal or
            nothing, every tile left its cell until the next read. */
-        if (out?.from !== 'live' && (was || (untrack(() => got)?.from === 'live' && !untrack(() => fromCopy)))) {
+        if (out?.from !== 'live' && !wasPartial && (was || (untrack(() => got)?.from === 'live' && !untrack(() => fromCopy)))) {
           readFailed = true;
           /* AND THE SCREEN IS NOT MARKED REFUSED over the page it keeps (review of 30 October, R7): it is closed as drawn,
              since it is, and the next read asks again (`readFailed`). */
@@ -886,7 +939,12 @@
         if (ok && (slug === null || (slug === KEPT_HOME && !pageKept.has(apiBase())))) void import('./today-read.ts').then((t) => (t.wasBehind(apiBase()) ? reread() : undefined));
       })
       .catch(() => {
+        ended = true;
         readFailed = true;
+        if (untrack(() => partial)) {
+          partial = false;
+          got = null;
+        }
       })
       .finally(() => {
         reading = false;
@@ -1067,6 +1125,10 @@
       shaped.blocks.map((b, n): Desked<LiveBlock> => {
         /* A BLOCK HELD FROM THIS READER TAKES NO CELL, whichever way the page reached the tab (kept or read). */
         if ((b as { held?: true }).held === true) return { ...b, drawn: false };
+        /* A CARD STILL ARRIVING KEEPS ITS CELL (`today-partial.ts`): it is not empty, it is not in yet. */
+        /* ONLY WHERE THIS DEVICE LAST DREW A CARD (`skelShape`): one that was empty or hidden then waits unseen, so the
+           board stands as it last stood and the answer lands without moving it. */
+        if (isPending(b)) return { ...b, drawn: skelKeys.has(b.key ?? '') };
         if (n === lateTile) return { ...b, drawn: true, desk: { kind: 'late', lines: bandShown, heading: band.lines.length > 0 ? bandHeading(bandShown, late?.more ?? 0, words.band) : late?.heading || voice.overdue, more: late?.more ?? 0, most: board ? lateMost : phone.current ? 3 : 5 } };
         if (lateAt.includes(n) || bandAt.includes(n)) return { ...b, drawn: false };
         /* WHAT ARRIVED IS HOME'S OWN READING (`Landed.svelte`), drawn in the place of the feed it stands for. */
@@ -1080,6 +1142,16 @@
       recordNow(),
       named,
     );
+    /* A CARD STILL ARRIVING KEEPS ITS CELL whatever the desk made of its empty stand-in (Working now with no runs is not
+       drawn): only under its own key, so a part the stand-in was split into takes none. */
+    if (partial && live) {
+      const arriving = new Set(live.page.blocks.filter(isPending).map((b) => b.key));
+      for (const [n, b] of desk.entries()) {
+        if (!isPending(b) || b.drawn || !arriving.has(b.key) || !skelKeys.has(b.key ?? '')) continue;
+        const { desk: _desk, ...plain } = b;
+        desk[n] = { ...plain, drawn: true } as typeof b;
+      }
+    }
     /* WHO IS WORKING SHOWS WHAT ITS FRAME HOLDS, as it is laid (`workingLaid`); All agents has the rest. */
     if (!board) return desk;
     const most = DESK_SHOWS[workingLaid()];
@@ -1196,13 +1268,18 @@
     for (const b of deskedRaw) {
       const k = boardKeyOf(b);
       if (!k || !kinds.has(k) || counted.has(k)) continue;
+      /* A CARD STILL ARRIVING KEEPS ITS SIZE until it is in: its rows are not known yet. */
+      if (isPending(b)) {
+        counted.set(k, null);
+        continue;
+      }
       counted.set(k, b.drawn || k === 'needs-you' ? rowsOf(b as unknown as Parameters<typeof rowsOf>[0]) : null);
       if (deskLines(b)) tall.add(k);
     }
     /* NEEDS YOU WITH NOTHING ASKED IS ITS FOOT ALONE, the calm line, and a red sign's line under it when there is one. A
        question is a tall line with its answers, so with any asked it keeps its frame. */
     const asked = counted.get('needs-you');
-    if (kinds.has('needs-you')) counted.set('needs-you', asked === 0 || asked === null || asked === undefined ? (signsSaid ? 1 : 0) : null);
+    if (kinds.has('needs-you') && !(deskedRaw ?? []).some((b) => b.key === 'needs-you' && isPending(b))) counted.set('needs-you', asked === 0 || asked === null || asked === undefined ? (signsSaid ? 1 : 0) : null);
     /* WHAT LANDED BY THE LINES IT IS DRAWN AS: two writes an hour are one line each (`arrivalsOf`). */
     if (kinds.has('arrivals')) counted.set('arrivals', landedKit ? landedKit.arrivalsOf(landed).length : landed.length);
     for (const [k, rows] of counted) {
@@ -1228,7 +1305,7 @@
     if (!board || declares !== null || !deskedRaw || boardModel.onPhone) return out;
     for (const b of deskedRaw) {
       const k = boardKeyOf(b);
-      if (!k || out.has(k) || !b.drawn) continue;
+      if (!k || out.has(k) || !b.drawn || isPending(b)) continue;
       const rows = rowsOf(b as unknown as Parameters<typeof rowsOf>[0]);
       if (rows !== null) out.set(k, rows);
     }
@@ -1248,6 +1325,9 @@
     const widgetKeys = new Set(boardWidgets.map((w) => w.key));
     const fit = raw.map((b) => {
       const k = boardKeyOf(b);
+      /* A CARD STILL ARRIVING STANDS ONLY IN A CELL OF ITS OWN: a part that is never a tile (a sign, the late band's
+         lists) waits unseen, and lands where it always does. */
+      if (isPending(b) && b.drawn && (!k || boardModel.placeOf(k) === null)) return { ...b, drawn: false };
       if (k && b.drawn && ((widgetKeys.has(k) && boardModel.placeOf(k) === null) || !onBoardToday(b))) return { ...b, drawn: false };
       /* A FRAME LAID TALLER AT REST SHOWS WHAT ITS TALLER SIZE SHOWS (`boardRest`, a table from the sheet). */
       const rest = boardRest.get(k ?? '');
@@ -1276,6 +1356,9 @@
      board and seldom holds a draft, so their code is not on the cold open's path. */
   /* AND THE OFFER TO CLEAR THE EXAMPLES, which reads the record before it draws anything, so its code comes with that read. */
   let ClearExamples = $state.raw<typeof ClearExamplesOf | null>(null);
+  /* ITS ROOM WHILE ITS CODE COMES (finish 3 Nov): the height it took here last time, 0 where it said nothing
+     (`ClearExamples.svelte`), so its card lands in place and never pushes Today down. Only for the owner it is drawn for. */
+  const examplesRoom = untrack(() => (data.live && data.me?.owner ? (cardShape(shapeKey(), 'clear-examples')?.h ?? 0) : 0));
   $effect(() => {
     if (ClearExamples === null && data.live) void import('$lib/ui/ClearExamples.svelte').then((m) => (ClearExamples = m.default), () => undefined);
   });
@@ -1336,6 +1419,13 @@
   const skelCols = $derived(narrow.current ? 2 : 4);
   const skelShape = $derived(readShape(apiBase(), skelCols) ?? firstShape(skelCols));
   const boardWaits = $derived(board && !data.refused && (got === null ? !settled : PageView === null));
+  /** The cards this device last drew on Today's board, which a card still arriving keeps a cell for. */
+  const skelKeys = $derived(new Set(skelShape.cards.map((c) => c.key)));
+  /** The skeleton a card still arriving draws in its cell: as this device last drew it, else a few rows. */
+  function pendingOf(key: string): import('./today-partial.ts').Pending {
+    const c = untrack(() => skelShape).cards.find((x) => x.key === key);
+    return c ? { kind: c.kind, rows: c.rows, h: c.h, cols: untrack(() => skelCols) } : true;
+  }
   let bodyEl = $state<HTMLElement | null>(null);
   $effect(() => {
     if (!board || !settled || fromCopy || got?.from !== 'live' || data.refused || boardModel.editing || boardModel.settling) return;
@@ -1511,7 +1601,7 @@
   const needsDrawn = $derived((desked?.blocks ?? []).some((b) => b.key === 'needs-you' && b.drawn));
 
   /* NOTHING TO DRAW AT ALL: the line says so, and nothing under it. A host that cannot draw Today's body is calm too. */
-  const calm = $derived((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null));
+  const calm = $derived(!partial && ((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null)));
 
   /* WHETHER THE PAGE'S READER IS DRAWN. */
   const reader = $derived((drawn !== null && (!calm || Boolean(shaped?.capture))) || !settled);
@@ -1777,7 +1867,9 @@
 {#snippet inside(i: number)}
   {@const b = drawn?.from === 'live' ? (drawn.page.blocks[i] as Desked<LiveBlock>) : undefined}
   {@const key = boardKeyOf(b)}
-  {#if b?.key === 'needs-you'}
+  {#if b && isPending(b)}
+    <!-- A CARD STILL ARRIVING draws its skeleton alone (`PageBody`). -->
+  {:else if b?.key === 'needs-you'}
     {#if signsSaid}<a class="signs-line" href={inApp('/p/health')}>{signsSaid}</a>{/if}
     {@render needsFoot()}
   {/if}
@@ -1837,7 +1929,7 @@
     </Empty>
   {:else}
     <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain. -->
-    {#if data.live && ClearExamples}<ClearExamples />{/if}
+    {#if data.live && ClearExamples}<ClearExamples />{:else if examplesRoom > 0}<div class="examples-room surface-card" style:block-size={`${examplesRoom}px`} aria-busy="true"><SkeletonCard fill kind="lines" rows={1} /></div>{/if}
 
     <!-- WHAT THE MODEL FOUND IN THE SIGN-UP WORDS BEYOND THE BUILD, each a draft kept with one press (1 Nov). -->
     {#if drafting && FirstDrafts}<FirstDrafts options={tellOptions} />{/if}
@@ -2002,6 +2094,12 @@
 
   /* ON THE BOARD, NOT ON A TILE: the greeting as the page's sentence row, 17 in the text face and the ink, as every
      page's first line is (`head-row.css`), since the bar now says the page's name (plan F5). */
+  .examples-room {
+    box-sizing: border-box;
+    padding: var(--tile-pad);
+    overflow: clip;
+  }
+
   .today-head {
     display: grid;
     gap: var(--sp-2);

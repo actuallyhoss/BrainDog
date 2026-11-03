@@ -12,6 +12,12 @@
   out what it answered.
 -->
 <script lang="ts">
+  import SkeletonCard from '$lib/ui/SkeletonCard.svelte';
+  /** The height a Today card still arriving was last drawn at, which its cell keeps until it is in. */
+  const pendingH = (b: unknown): string | undefined => {
+    const p = (b as { pending?: { h?: unknown } | true } | null)?.pending;
+    return p !== undefined && p !== true && typeof p.h === 'number' ? `${p.h}px` : undefined;
+  };
   import { flushSync, tick, untrack, type Snippet } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
@@ -249,7 +255,14 @@
   /* A WIDGET THAT SAYS ITS OWN EMPTY LINE (`saysEmpty`, `home/widget-empty.ts`) holds nothing on purpose, and stays drawn. */
   const quiet = $derived(
     judgedWith(blocks, held, (bs) => emptyHidden(bs, mode === 'page')).map((b, i) =>
-      bareHeading(b) ? { ...b, drawn: false } : !b.drawn && blocks[i]?.drawn && blocks[i]?.saysEmpty === true ? blocks[i]! : b,
+      /* A TODAY CARD STILL ARRIVING is not empty, it is not in yet: it keeps its cell (`today-partial.ts`). */
+      (blocks[i] as { pending?: unknown } | undefined)?.pending !== undefined
+        ? blocks[i]!
+        : bareHeading(b)
+          ? { ...b, drawn: false }
+          : !b.drawn && blocks[i]?.drawn && blocks[i]?.saysEmpty === true
+            ? blocks[i]!
+            : b,
     ),
   );
   const drawable = $derived(mode === 'preview' || arranging ? arranged(blocks) : quiet);
@@ -1285,6 +1298,8 @@
       style="--span:{spans.get(slot.i) ?? slot.span}{cell ? `;grid-area:${cell.area}` : ''}"
       data-board-key={cell?.key}
       data-size={cell?.size}
+      aria-busy={(block as { pending?: unknown }).pending !== undefined ? 'true' : undefined}
+      style:min-block-size={pendingH(block)}
       data-full={(spans.get(slot.i) ?? slot.span) >= COLUMNS ? '' : undefined}
       data-arranging={arranging ? '' : undefined}
       data-cursor={!arranging && mode === 'page' && reading[cursor]?.slot.i === slot.i ? '' : undefined}
@@ -1399,7 +1414,11 @@
 
 <!-- THE BLOCK ITSELF, inside its tile: one snippet, so a folded note and every other block draw the same part. -->
 {#snippet tile(slot: Slot, block: LiveBlock, at: number)}
-  {#if later === null || arranging || !later.has(slot.i)}<BlockSlot
+  {@const pend = (block as { pending?: { kind?: string; rows?: number; cols?: number } | true }).pending}
+  {#if pend !== undefined}
+    <!-- A TODAY CARD STILL ARRIVING (`today-partial.ts`, finish 3 Nov): its kept skeleton, in its own cell. -->
+    <SkeletonCard fill kind={pend === true ? 'list' : pend.kind} rows={pend === true ? 3 : pend.rows} cols={pend === true ? 4 : pend.cols} seed={slot.i} />
+  {:else if later === null || arranging || !later.has(slot.i)}<BlockSlot
     block={sectioned.get(at) ?? block}
     i={slot.i}
     {ids}
