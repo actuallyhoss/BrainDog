@@ -30,7 +30,7 @@ import {
   type Reach,
   type Signature,
 } from '@braindog/declare/catalogue';
-import { DEFAULT_KENNEL, KENNEL_BASE, publisherKey, signYank, type Pending, type Refused } from '@braindog/declare/kennel';
+import { DEFAULT_KENNEL, KENNEL_BASE, publisherKey, readAdvise, signYank, type Advisory, type Pending, type Refused, type Report } from '@braindog/declare/kennel';
 import { no, ok, refused, type Refusal, type Result } from '@braindog/ports';
 
 import { oneLine, printable } from './clip.ts';
@@ -210,7 +210,7 @@ export async function yankFromKennel(
 /* ── the operator's review ──────────────────────────────────────────────── */
 
 const REVIEW_USAGE =
-  'braindog kennel review takes nothing (what waits), show <kind> <id> <version>, list <kind> <id> <version> [--reason <why>], refuse <kind> <id> <version> --reason <why>, or trust <publisher> [--probe], each with --kennel <host> for a Kennel other than the public one.';
+  'braindog kennel advise ... is the kill switch (braindog kennel advise for how). braindog kennel review takes nothing (what waits), show <kind> <id> <version>, list <kind> <id> <version> [--reason <why>], refuse <kind> <id> <version> --reason <why>, or trust <publisher> [--probe], each with --kennel <host> for a Kennel other than the public one.';
 
 /** What a version reaches, as the review says it: one line for lists and pages, and every calls-out line on its own. */
 function reachSaid(given: Reach): string[] {
@@ -222,11 +222,86 @@ function reachSaid(given: Reach): string[] {
   ];
 }
 
-type Waiting = { entry: Pending['entry']; version: Pending['version']; submitted_at: string; text: string };
+type Waiting = Pick<Pending, 'entry' | 'version' | 'submitted_at' | 'flags' | 'added' | 'note'> & { text: string };
+
+/**
+ * What the Kennel marked on a waiting submission for the reviewer: names close to listed ones, what it reaches that the
+ * version before did not, and the model's note, which is said as the model's and decides nothing.
+ */
+function marksSaid(p: Pick<Pending, 'flags' | 'added' | 'note'>): string[] {
+  const shown = printable({ flags: p.flags ?? [], added: p.added ?? [], note: p.note?.text ?? null });
+  return [
+    ...shown.flags.map((f) => `  Look twice: ${oneLine(f)}`),
+    ...shown.added.map((a) => `  New in this version: ${oneLine(a)}`),
+    ...(shown.note === null ? [] : [`  The model's note (it decides nothing): ${oneLine(shown.note)}`]),
+  ];
+}
+
+const ADVISE_USAGE =
+  'braindog kennel advise <kind> <id> --versions <1.2.0,<1.3.0 or *> --action warn|disable --reason <why> [--severity low|high|critical], or braindog kennel advise withdraw <kind> <id>, each with --kennel <host>.';
+
+/**
+ * `braindog kennel advise`, the operator's kill switch: a warning or a switch-off for every record holding the add-on at
+ * those versions, read beside the index. Withdrawn, records stop hearing it; one already off stays off until its owner
+ * turns it back on.
+ */
+async function advise(args: string[], io: AgentIo): Promise<number> {
+  const { rest, kennel: given } = takeKennel(args);
+  let values: { versions?: string | undefined; action?: string | undefined; reason?: string | undefined; severity?: string | undefined };
+  let positionals: string[];
+  try {
+    ({ values, positionals } = parseArgs({
+      args: rest,
+      allowPositionals: true,
+      strict: true,
+      options: { versions: { type: 'string' }, action: { type: 'string' }, reason: { type: 'string' }, severity: { type: 'string' } },
+    }));
+  } catch {
+    io.say(ADVISE_USAGE);
+    return 1;
+  }
+  const operator = io.env.PROVISION_KEY;
+  if (!operator) {
+    io.say("braindog kennel advise is the operator's, and takes the operator key: set PROVISION_KEY in the environment. Nothing was sent.");
+    return 1;
+  }
+  let base: string;
+  try {
+    base = kennelBase(given);
+  } catch (e) {
+    io.say(e instanceof Error ? e.message : 'That is not a Kennel address.');
+    return 1;
+  }
+  const withdraw = positionals[0] === 'withdraw';
+  const [kind, id, ...extra] = withdraw ? positionals.slice(1) : positionals;
+  if (kind === undefined || id === undefined || extra.length > 0) {
+    io.say(ADVISE_USAGE);
+    return 1;
+  }
+  const body = withdraw
+    ? { kind, id, action: 'withdraw' }
+    : { kind, id, versions: (values.versions ?? '').split(',').map((v) => v.trim()).filter((v) => v !== ''), action: values.action, reason: values.reason, ...(values.severity === undefined ? {} : { severity: values.severity }) };
+  /* READ HERE AS THE DOOR READS IT, so a wrong flag is said before anything is sent. */
+  const asked = readAdvise(body);
+  if (!asked.ok) return refuse(io, asked, saidWithCode(asked));
+  const got = await kennelCall<{ state: string; at?: string }>(base, 'advise', io, { method: 'POST', body, bearer: operator });
+  if (!got.ok) return refuse(io, got, saidWithCode(got));
+  io.answer?.({ value: got.value });
+  const a = asked.value;
+  io.out(
+    a.action === 'withdraw'
+      ? `Every advisory on ${oneLine(id)} is withdrawn. A BrainDog that turned it off keeps it off until its owner turns it back on.`
+      : a.action === 'disable'
+        ? `${oneLine(id)} ${oneLine(a.versions.join(', '))} is switched off on every BrainDog that holds it, the next time each reads the Kennel (within the hour), with one card saying why.`
+        : `Every BrainDog holding ${oneLine(id)} ${oneLine(a.versions.join(', '))} is asked on Needs you whether to turn it off, with the reason, the next time it reads the Kennel.`,
+  );
+  return 0;
+}
 
 /** `braindog kennel review ...`, the operator's half of the Kennel. */
 export async function kennel(args: string[], io: AgentIo): Promise<number> {
   const [noun, ...after] = args;
+  if (noun === 'advise') return advise(after, io);
   if (noun !== 'review') {
     io.say(REVIEW_USAGE);
     return 1;
@@ -255,7 +330,7 @@ export async function kennel(args: string[], io: AgentIo): Promise<number> {
   const [verb, ...more] = positionals;
 
   if (verb === undefined) {
-    const got = await kennelCall<{ pending: Pending[]; refused: Refused[] }>(base, 'review', io, { bearer: operator });
+    const got = await kennelCall<{ pending: Pending[]; refused: Refused[]; reports?: Report[]; advisories?: Advisory[] }>(base, 'review', io, { bearer: operator });
     if (!got.ok) return refuse(io, got, saidWithCode(got));
     io.answer?.({ value: got.value });
     const { pending, refused: turned } = got.value;
@@ -264,7 +339,12 @@ export async function kennel(args: string[], io: AgentIo): Promise<number> {
       const shown = printable(p);
       io.out(`${shown.entry.kind} ${shown.entry.id} ${shown.version.version}  ${shown.entry.title} by ${shown.entry.publisher.name} (${publisherKey(p.entry.publisher)}), sent ${saidDay(shown.submitted_at)}`);
       for (const line of reachSaid(p.version.reach)) io.out(line);
+      for (const line of marksSaid(p)) io.out(line);
     }
+    const reports = got.value.reports ?? [];
+    if (reports.length > 0) io.out(`Reported lately: ${reports.slice(0, 5).map((r) => oneLine(`${r.kind} ${r.id}${r.version === null ? '' : ` ${r.version}`} (${r.why})`)).join('; ')}.`);
+    const advised = got.value.advisories ?? [];
+    if (advised.length > 0) io.out(`Advisories standing: ${advised.map((a) => oneLine(`${a.id} ${a.versions.join(',')} ${a.action}`)).join('; ')}.`);
     if (turned.length > 0) io.out(`Refused lately: ${turned.slice(0, 5).map((r) => oneLine(`${r.kind} ${r.id} ${r.version} (${r.reason})`)).join('; ')}.`);
     return 0;
   }
@@ -323,6 +403,7 @@ export async function kennel(args: string[], io: AgentIo): Promise<number> {
   const shown = printable({ title: waiting.entry.title, author: waiting.entry.author, publisher: waiting.entry.publisher.name });
   io.out(`${shown.title} ${oneLine(version)} by ${shown.author}, sent by ${shown.publisher} (${publisherKey(waiting.entry.publisher)}).`);
   for (const line of reachSaid(waiting.version.reach)) io.out(line);
+  for (const line of marksSaid(waiting)) io.out(line);
   const now = new Date();
   const checked = await checkInScratch(read.value, true, now.getTime());
   for (const line of checked.lines) io.out(line);

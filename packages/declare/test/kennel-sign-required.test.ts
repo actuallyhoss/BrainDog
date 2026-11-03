@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import type { Result } from '@braindog/ports';
 
 import { addKeyStatement, emptyCatalogue, fileChecksum, newAuthorKey, rotateKey, type CatalogueIndex } from '../src/catalogue.ts';
-import { acceptSubmission, emptyPublishers, emptyReview, publisherKey, trustIn, type Change, type Identity, type KennelState, type Publishers, type Review } from '../src/kennel.ts';
+import { acceptSubmission, reviewVerdict, emptyPublishers, emptyReview, publisherKey, trustIn, type Change, type Identity, type KennelState, type Publishers, type Review } from '../src/kennel.ts';
 import { signVersion, type AuthorKey } from '../src/signing.ts';
 
 const NOW = new Date('2026-10-15T10:00:00Z');
@@ -56,11 +56,19 @@ async function signedBy(key: AuthorKey, text: string, name?: string): Promise<Id
   return { kind: 'key', signature: signed.value, ...(name ? { name } : {}) };
 }
 
-/** Submits and applies; the submission must be taken. */
+/**
+ * Submits and applies; the submission must be taken. A version that waits (a trusted publisher's first, which reaches
+ * everything new) is listed by the operator here, so a claim is in the index as before.
+ */
 async function publish(k: ReturnType<typeof kennel>, text: string, identity: Identity, now = NOW): Promise<void> {
   const sent = await acceptSubmission(k.state(), text, identity, now);
   assert.ok(sent.ok, JSON.stringify(sent));
   k.apply(sent.value);
+  if (sent.value.answer.state !== 'review') return;
+  const { kind, id, version } = sent.value.answer;
+  const listed = reviewVerdict(k.state(), { kind, id, version, verdict: 'list', reason: '' }, now);
+  assert.ok(listed.ok, JSON.stringify(listed));
+  k.apply(listed.value);
 }
 
 const person = (id: string): Identity => ({ kind: 'person', id });

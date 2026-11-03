@@ -29,10 +29,12 @@ const VERSION = /^(?:0|[1-9]\d{0,5})\.(?:0|[1-9]\d{0,5})\.(?:0|[1-9]\d{0,5})$/u;
 
 /* ── readable source ────────────────────────────────────────────────────── */
 
-/** The longest line a readable script holds. A long data: picture in a drawn view is not counted (`readable`). */
-export const LINE_MOST = 400;
+/** The longest line a readable script holds: hand-written code reaches about 600 (a long pattern in the Gmail add-on), minified code thousands. A data: picture in a drawn view is not counted. */
+export const LINE_MOST = 1_000;
 /** Past this many characters, a script of very few lines is one squeezed onto them. */
 const SQUEEZED_FROM = 3_000;
+/** The most characters a readable script's lines average, once it is long enough to judge. */
+const AVERAGE_MOST = 160;
 /** The longest run of encoded text a script may carry: past it, the script carries code or data nobody can read. */
 const ENCODED_MOST = 512;
 
@@ -67,6 +69,9 @@ export function unreadable(text: string, what: 'script' | 'view'): string | null
   const long = lines.findIndex((l) => chars(l) > LINE_MOST);
   if (long !== -1) return `line ${String(long + 1)} is ${String(chars(lines[long]!))} characters long, and a readable line is at most ${String(LINE_MOST)}`;
   if (chars(plain) > SQUEEZED_FROM && lines.length <= 3) return `it is ${String(chars(plain))} characters on ${String(lines.length)} lines, which reads as minified`;
+  /* A MINIFIER THAT WRAPS ITS LINES still writes them full: hand-written code averages well under a hundred characters a line. */
+  const average = chars(plain) / lines.length;
+  if (chars(plain) > SQUEEZED_FROM && average > AVERAGE_MOST) return `its lines average ${String(Math.round(average))} characters, which reads as minified`;
   const hexNames = plain.match(/\b_0x[0-9a-f]{3,}\b/giu)?.length ?? 0;
   if (hexNames >= 3) return 'it names things like _0x1a2b, the way an obfuscator writes code';
   const escapes = plain.match(/\\x[0-9a-f]{2}|\\u[0-9a-f]{4}/giu)?.length ?? 0;
