@@ -25,6 +25,7 @@ import { extension as retype } from './retype.ts';
 import { extension as personName } from './person-name.ts';
 import { extension as visuals } from './visuals.ts';
 import { extension as zone } from './zone.ts';
+import { extension as attachments } from './attachments.ts';
 /* END EXTENSIONS */
 
 export function extensions(parts: KernelParts) {
@@ -41,6 +42,7 @@ export function extensions(parts: KernelParts) {
     ...personName(parts),
     ...visuals(parts),
     ...zone(parts),
+    ...attachments(parts),
     /* END EXTENSIONS */
   };
 }

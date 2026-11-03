@@ -74,6 +74,7 @@ import { ROUTES as READS } from './reads.ts';
 import { ROUTES as TODAY } from './today.ts';
 import { ROUTES as WIDGETS } from './widgets.ts';
 import { ROUTES as board } from './board.ts';
+import { ROUTES as ATTACHMENTS } from './attachments.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -139,5 +140,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...READS,
   ...TODAY,
   ...WIDGETS,
+  ...ATTACHMENTS,
   /* END ROUTES */
 ];
