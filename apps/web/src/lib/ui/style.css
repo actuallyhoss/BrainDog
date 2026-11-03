@@ -111,6 +111,8 @@
     --ctl-pad: 16px;
     --ctl-pad-sm: 12px;
     --gap-glyph: 8px;
+    /* A card's heading glyph: bare, 18, in the quiet ink. */
+    --head-glyph: 18px;
 
     /* Rows. */
     --row-pad-y: 8px;
@@ -646,10 +648,10 @@
   .field:has(> .field-input[type='search']),
   .field:has(> input[type='search']) {
     border-radius: var(--r-pill);
-    padding-inline: 14px;
+    padding-inline: var(--ctl-pad);
   }
   .field-input.head-search {
-    padding-inline: 14px;
+    padding-inline: var(--ctl-pad);
     border-radius: var(--r-pill);
     background: var(--g-fill);
     -webkit-backdrop-filter: var(--g-bf);

@@ -21,7 +21,10 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    padding: var(--sp-3) var(--sp-3) var(--sp-1);
+    /* A CAPTION LINE WITH ITS SPACE ABOVE (rhythm, 3 Nov): the cell's 44 line made "Late 1" a 60 row. 16 over the
+       name's 20 line and 4 under it, so the head sits with the rows it names. */
+    padding: var(--sp-4) var(--sp-3) var(--sp-1);
+    line-height: var(--lead-ui, 20px);
   }
 
   .rowgroup .tr-group:hover {

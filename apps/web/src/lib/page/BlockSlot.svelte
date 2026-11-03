@@ -1207,13 +1207,14 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--well);
-    margin-block-end: var(--sp-4);
+    /* THE ONE CARD HEAD (rhythm, 3 Nov), as `Tile`'s: a 28 row, its 14/20 name centred, 12 to what it names. */
+    margin-block-end: var(--card-head-gap);
   }
 
   /* THE HEADING'S GLYPH IS BARE (ops style, 3 Nov), as `Tile`'s is: 18px of quiet ink, no well behind it. */
   .block-bar > :global(.well) {
-    inline-size: 18px;
-    block-size: 18px;
+    inline-size: var(--head-glyph);
+    block-size: var(--head-glyph);
     border-radius: 0;
     background: none;
     color: var(--ink-3);
@@ -1231,8 +1232,8 @@
      tile that had one. A bar is `.prop`; there is no `.bar`, so Spent this month and Accounts had none either. */
   :global(.block-slot:has(> .block-bar):has(> .block :is(.cards-grid, .split, .prop)) > .block-bar),
   :global(.block-slot:has(> .block > .list[data-kind='timeline']):not(:has(> .block > .list > .item[data-rich])) > .block-bar) {
-    padding-block-end: var(--sp-3);
-    margin-block-end: var(--sp-2);
+    padding-block-end: 0;
+    margin-block-end: var(--card-head-gap);
     /* NO LINE UNDER A CARD'S HEAD (ops style, 3 Nov): the head is told from its rows by its weight and the air. */
     border-block-end: 0;
   }

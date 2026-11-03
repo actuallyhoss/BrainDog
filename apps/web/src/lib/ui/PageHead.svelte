@@ -767,7 +767,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: var(--fw-regular);
-    line-height: calc(24 / 17);
+    line-height: var(--lead-head);
     text-wrap: pretty;
   }
 
