@@ -1,17 +1,17 @@
 import CoreText
 import SwiftUI
 
-/// Look B's type in SwiftUI (plan 3.5, `loop/DESIGN-SYSTEM.md` "Type"): Lexend 600 for names and big figures only, Geist
-/// 400/500/600 for every other word, Geist Mono for times and code.
+/// BrainDog's type in SwiftUI, in the ops look (`loop/plans/ops-look-2026-11-03/SPEC.md`, 2 and 7): one family, Plus
+/// Jakarta Sans, at 400, 500 and 600 only, for every word from the page's name to a caption; Geist Mono for times and
+/// code. Dense sizes: a row 15, body 14, meta 12.5, a caption 12, the page's name 28 at 600 drawn tight (`tight`).
 ///
 /// EVERY SIZE SCALES WITH DYNAMIC TYPE. Each is `Font.custom(_:size:relativeTo:)` against the text style a person's
 /// setting moves, so 15 at Large is 15 and grows with it, as the system's own text does.
 ///
-/// THE FONTS ARE THE OFL TTFs, BUNDLED, because the web's woff2 files cannot be registered on iOS: Lexend SemiBold, Geist
-/// as one variable font (its weight axis gives 400, 500 and 600), and Geist Mono. `register()` runs once at launch.
+/// THE FONTS ARE THE OFL TTFs, BUNDLED, because the web's woff2 files cannot be registered on iOS: Plus Jakarta Sans as
+/// one variable font (its weight axis gives 400, 500 and 600) and Geist Mono. `register()` runs once at launch.
 public enum Typeface {
-    static let lexend = "Lexend-SemiBold"
-    static let geist = "Geist"
+    static let family = "Plus Jakarta Sans"
     static let mono = "Geist Mono"
 
     /// Make the bundled faces available to this process. Idempotent; a face already registered is left as it is.
@@ -26,41 +26,59 @@ public enum Typeface {
     }
     nonisolated(unsafe) private static var registered = false
 
-    private static func lexend(_ size: CGFloat, _ style: Font.TextStyle) -> Font { .custom(lexend, size: size, relativeTo: style) }
-    private static func geist(_ size: CGFloat, _ weight: Font.Weight, _ style: Font.TextStyle) -> Font {
-        .custom(geist, size: size, relativeTo: style).weight(weight)
+    private static func face(_ size: CGFloat, _ weight: Font.Weight, _ style: Font.TextStyle) -> Font {
+        .custom(family, size: size, relativeTo: style).weight(weight)
     }
 
-    /// A page's one big number, Lexend 34.
-    public static let hero = lexend(34, .largeTitle)
-    /// A page's name at full width, Lexend 28.
-    public static let page = lexend(28, .title)
-    /// A page's name on a phone and in a nav bar, and a tile's figure, Lexend 22.
-    public static let figure = lexend(22, .title2)
-    /// A sheet's title, Geist 17 semibold.
-    public static let heading = geist(17, .semibold, .headline)
-    /// A tile's heading, Geist 15 semibold.
-    public static let tileHeading = geist(15, .semibold, .subheadline)
-    /// Body text and a row's subject, Geist 15.
-    public static let body = geist(15, .regular, .body)
-    /// A row's subject when it leads, Geist 15 medium.
-    public static let bodyMedium = geist(15, .medium, .body)
-    /// A control's label, Geist 14 medium; 15 on a phone, where a control is 44 tall.
-    public static let control = geist(15, .medium, .callout)
-    /// Dates, ages, counts and helper text, Geist 13.
-    public static let meta = geist(13, .regular, .footnote)
-    /// A caption, an axis, a tag, Geist 12 medium.
-    public static let caption = geist(12, .medium, .caption)
+    /// How much tighter a title is drawn, in points at its size: -0.021em, as the ops titles are.
+    public static func tight(_ size: CGFloat) -> CGFloat { -0.021 * size }
+
+    /// A page's one big number, 30 semibold.
+    public static let hero = face(30, .semibold, .largeTitle)
+    /// A page's name at full width, 28 semibold (draw it with `.tracking(Typeface.tight(28))`).
+    public static let page = face(28, .semibold, .title)
+    /// A page's name on a phone and in a nav bar, and a tile's figure, 22 semibold.
+    public static let figure = face(22, .semibold, .title2)
+    /// A sheet's title and a section's heading, 17 semibold.
+    public static let heading = face(17, .semibold, .headline)
+    /// A card's heading, 15 semibold.
+    public static let tileHeading = face(15, .semibold, .subheadline)
+    /// Reading text, 14.
+    public static let body = face(14, .regular, .body)
+    /// A row's subject, 15.
+    public static let row = face(15, .regular, .body)
+    /// A row's subject when it leads, 15 medium.
+    public static let bodyMedium = face(15, .medium, .body)
+    /// A control's label, 500: 14 on a phone, 13 on a Mac.
+    #if os(macOS)
+    public static let control = face(13, .medium, .callout)
+    #else
+    public static let control = face(14, .medium, .callout)
+    #endif
+    /// A segmented control's label, Geist 14 (its weight set by whether it is chosen).
+    public static let segment = Font.custom(family, size: 13, relativeTo: .callout)
+    /// An initial in a face, at the face's own size.
+    public static func initial(_ size: CGFloat) -> Font { .custom(family, size: size).weight(.semibold) }
+    /// Dates, ages, counts and helper text, 12.5.
+    public static let meta = face(12.5, .regular, .footnote)
+    /// A caption, an axis, a tag, 12 medium.
+    public static let caption = face(12, .medium, .caption)
+    /// A tiny group header in capitals, 11 medium (draw it with `.textCase(.uppercase).tracking(0.3)`).
+    public static let caps = face(11, .medium, .caption2)
     /// Times in a log, codes, key caps: Geist Mono 13.
     public static let code = Font.custom(mono, size: 13, relativeTo: .footnote)
     /// A one-time code being typed: Geist Mono at 22, so six digits read as one thing.
     public static let codeEntry = Font.custom(mono, size: 22, relativeTo: .title2)
 
     #if canImport(UIKit)
-    /// Lexend 22 as a UIKit font, for the navigation bar's title, scaled as the title style is.
-    public static func navTitleFont() -> UIFont {
-        let base = UIFont(name: lexend, size: 22) ?? .systemFont(ofSize: 22, weight: .semibold)
-        return UIFontMetrics(forTextStyle: .title2).scaledFont(for: base)
+    /// The family at 22 semibold as a UIKit font, for the navigation bar's title, scaled as the title style is.
+    public static func navTitleFont(size: CGFloat = 22) -> UIFont {
+        let descriptor = UIFontDescriptor(fontAttributes: [
+            .family: family,
+            .traits: [UIFontDescriptor.TraitKey.weight: UIFont.Weight.semibold],
+        ])
+        let base = UIFont(descriptor: descriptor, size: size)
+        return UIFontMetrics(forTextStyle: .title2).scaledFont(for: base.familyName == family ? base : .systemFont(ofSize: size, weight: .semibold))
     }
     #endif
 }

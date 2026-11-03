@@ -57,7 +57,7 @@ struct MenuBarPanel: View {
             HStack(spacing: Space.s2) {
                 if session.signedIn, model.boot?.level.adds ?? true {
                     Button { model.openTell() } label: { Text(Words.tellLine) }
-                        .buttonStyle(BDButtonStyle(.quiet, onTile: true, full: false))
+                        .buttonStyle(BDButtonStyle(.quiet, full: false))
                         .fixedSize()
                 }
                 Spacer(minLength: 0)
@@ -68,7 +68,7 @@ struct MenuBarPanel: View {
         }
         .padding(Space.s4)
         .frame(width: 340)
-        .background(Palette.tile)
+        /* THE MENU BAR'S OWN GLASS is the ground here: floating chrome, as the ops menus are. */
         .task { await model.read() }
     }
 }

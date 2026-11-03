@@ -24,7 +24,9 @@ struct AccountSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: Space.s2) {
-                    Text(Words.yourBrainDogs).font(Typeface.caption).foregroundStyle(Palette.ink3).accessibilityAddTraits(.isHeader)
+                    Text(Words.yourBrainDogs).font(Typeface.caps).textCase(.uppercase).tracking(0.3).foregroundStyle(Palette.ink3)
+                        .padding(.leading, Space.s3)
+                        .accessibilityAddTraits(.isHeader)
                     VStack(spacing: 0) {
                         ForEach(Array(shown.enumerated()), id: \.element.id) { index, row in
                             Button {
@@ -48,11 +50,11 @@ struct AccountSheet: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityAddTraits(row.slug == here ? .isSelected : [])
-                            if index < shown.count - 1 { Hairline() }
+                            if index < shown.count - 1 { Hairline(leading: 32 + Space.s3) }
                         }
                     }
-                    .padding(.horizontal, Space.s4)
-                    .background(Palette.tile2, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+                    .padding(.horizontal, Space.s3)
+                    .background(Palette.tile, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
                     if let said {
                         Text(said).font(Typeface.meta).foregroundStyle(Palette.red).fixedSize(horizontal: false, vertical: true)
                     }
@@ -69,7 +71,7 @@ struct AccountSheet: View {
                             Spacer(minLength: 0)
                         }
                     }
-                    .buttonStyle(.quietOnTile)
+                    .buttonStyle(.quiet)
 
                     Button(Words.signOut) {
                         Task {
@@ -79,16 +81,13 @@ struct AccountSheet: View {
                             await Session.shared.signOut()
                         }
                     }
-                    .buttonStyle(.quietOnTile)
+                    .buttonStyle(.quiet)
                 }
             }
             .padding(Space.gutter)
             .padding(.top, Space.s2)
         }
-        .background(Palette.tile)
         .presentationDetents([.medium, .large])
-        .presentationBackground(Palette.tile)
-        .presentationCornerRadius(Radius.tile)
         .presentationDragIndicator(.visible)
         .task { reach = (try? await Calls.reach()) ?? [] }
     }

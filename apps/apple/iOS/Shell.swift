@@ -30,8 +30,6 @@ struct Shell: View {
         .sheet(isPresented: $app.tellOpen) {
             TellSheet(model: app.tell)
                 .presentationDetents([.medium, .large])
-                .presentationBackground(Palette.tile)
-                .presentationCornerRadius(Radius.tile)
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $app.accountOpen) {
@@ -149,7 +147,7 @@ struct WebPage: View {
     }
 }
 
-/// A screen's bar, as the web's phone bar draws it (plan 3.3): the page's name on the leading side in Lexend 22, and on a
+/// A screen's bar, as the web's phone bar draws it (plan 3.3): the page's name on the leading side at 22/600, and on a
 /// pushed screen the way back before it, with no glass round the back. The system's own back wears a glass circle on
 /// iOS 26 and drops the name to a second row, and an inline-large name collapses to the centre as the page scrolls, so
 /// both are drawn here and the system's title is left empty. The edge swipe back is kept (`SwipeBack`).
@@ -176,6 +174,7 @@ struct ScreenBar: ViewModifier {
                         }
                         Text(title)
                             .font(Typeface.figure)
+                            .tracking(Typeface.tight(22))
                             .foregroundStyle(Palette.ink)
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -226,7 +225,8 @@ struct SwipeBack: UIViewControllerRepresentable {
     }
 }
 
-/// A root's bar: the bell (Activity) and the face (the Account sheet). No glass round either (plan 3.3).
+/// A root's bar: the bell (Activity) and the face (the Account sheet), together in the system's glass capsule, as the
+/// ops page keeps its controls in one glass cluster at the top right.
 struct RootTools: ToolbarContent {
     let stack: Stack
     @State private var app = AppModel.shared
@@ -246,7 +246,6 @@ struct RootTools: ToolbarContent {
             }
             .accessibilityLabel(Words.account)
         }
-        .sharedBackgroundVisibility(.hidden)
     }
 }
 
@@ -264,12 +263,12 @@ struct Offline: View {
                 .buttonStyle(BDButtonStyle(.quiet, onTile: true, full: false))
             }
             .padding(Space.s4)
-            .background(Palette.tile, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+            .card()
             .padding(Space.gutter)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.board)
+        .background(Ground())
     }
 }
 

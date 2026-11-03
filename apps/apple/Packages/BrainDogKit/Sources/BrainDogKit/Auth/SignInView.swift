@@ -141,6 +141,7 @@ public struct SignInView: View {
                 VStack(alignment: .leading, spacing: Space.s2) {
                     Text(Words.signInTitle)
                         .font(Typeface.page)
+                        .tracking(Typeface.tight(28))
                         .foregroundStyle(Palette.ink)
                         .accessibilityAddTraits(.isHeader)
                     if case .ask = flow.step {
@@ -286,7 +287,7 @@ public struct SignInView: View {
     }
 }
 
-/// A labelled field: the label in meta ink-3 above, the field 44 tall in a tile-2 well at radius 8.
+/// A labelled field: the label in meta ink-3 above, the field 44 tall in a tile well at radius 12 with a 1px rule edge.
 struct Field<Content: View>: View {
     let label: String
     let content: Content
@@ -303,7 +304,7 @@ struct Field<Content: View>: View {
                 .textFieldStyle(.plain)
                 .padding(.horizontal, Space.s3)
                 .frame(minHeight: Space.tap)
-                .background(Palette.tile2, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                .fieldWell()
         }
     }
 }

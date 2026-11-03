@@ -27,11 +27,11 @@ struct MacOffline: View {
             }
             .padding(Space.s6)
             .frame(maxWidth: 520)
-            .background(Palette.tile, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+            .card()
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.board)
+        .background(Ground())
     }
 }
 

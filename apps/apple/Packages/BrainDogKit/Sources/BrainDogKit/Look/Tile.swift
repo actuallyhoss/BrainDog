@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The one surface for a group (`loop/DESIGN-SYSTEM.md`, Tile): `--tile` on the board, radius 16, no border, no shadow,
-/// told from the board by its fill alone. A heading row is a neutral 28 well with an 18 glyph, the title at 15/600, an
-/// optional count in ink-3, and one thing at the far end.
+/// The one surface for a group, a card: `--tile` on the board at radius 16, lifted by the card shadow in light and
+/// edged by a 1px rule in dark (`card()`). A heading row is a neutral 28 circle with an 18 glyph, the title at 15/600,
+/// an optional count in ink-3, and one thing at the far end.
 public struct Tile<Content: View, Trailing: View>: View {
     let title: String?
     let glyph: Glyph?
@@ -38,12 +38,12 @@ public struct Tile<Content: View, Trailing: View>: View {
         }
         .padding(padding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.tile, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+        .card()
     }
 }
 
-/// A what, as a square well (a who is round): 28, 32 for a row, 40 for a card, 56 large. Neutral by default; a tone only
-/// on a row that means it.
+/// A what, in a circle: 28, 32 for a row, 40 for a card, 56 large. Neutral by default; a tone only on a row that means
+/// it. A who is a circle too, told apart by the initial it carries (`Face`).
 public struct IconWell: View {
     public enum Size: Sendable {
         case m, l, card, xl
@@ -70,7 +70,7 @@ public struct IconWell: View {
             .frame(width: size.glyph, height: size.glyph)
             .foregroundStyle(ink)
             .frame(width: size.side, height: size.side)
-            .background(ground, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+            .background(ground, in: Circle())
             .accessibilityHidden(true)
     }
 
@@ -107,7 +107,7 @@ public struct Face: View {
 
     public var body: some View {
         Text(String(name.trimmingCharacters(in: .whitespaces).prefix(1)).uppercased())
-            .font(.custom("Geist", size: side * 0.42).weight(.semibold))
+            .font(Typeface.initial(side * 0.42))
             .foregroundStyle(Palette.ink2)
             .frame(width: side, height: side)
             .background(Palette.tile2, in: Circle())

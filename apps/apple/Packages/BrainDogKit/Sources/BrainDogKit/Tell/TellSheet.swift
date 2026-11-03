@@ -388,7 +388,6 @@ public struct TellSheet: View {
             .padding(.top, Space.s2)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Palette.tile)
         .onChange(of: model.mode) { _, _ in model.opened(mode: model.mode) }
         /* THE KEYBOARD COMES UP FOR AN EMPTY FIELD; words that arrived with it (a share, Siri) are read first. */
         .onAppear { typing = model.receipt == nil && model.text.isEmpty }
@@ -405,7 +404,7 @@ public struct TellSheet: View {
             .focused($typing)
             .padding(Space.s3)
             .frame(minHeight: 96, alignment: .topLeading)
-            .background(Palette.tile2, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+            .fieldWell()
             .accessibilityLabel(model.mode == .ask ? Words.ask : Words.tell)
     }
 
@@ -442,7 +441,7 @@ public struct TellSheet: View {
             VStack(spacing: 0) {
                 ForEach(Array(model.lines.enumerated()), id: \.element.id) { index, line in
                     lineView(line)
-                    if index < model.lines.count - 1 { Hairline() }
+                    if index < model.lines.count - 1 { Hairline(leading: 32 + Space.s3) }
                 }
             }
         }

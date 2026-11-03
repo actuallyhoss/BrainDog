@@ -86,7 +86,7 @@ struct LockCover: View {
     var body: some View {
         VStack(spacing: Space.s4) {
             Spacer()
-            Glyph.lock.image.resizable().frame(width: 32, height: 32).foregroundStyle(Palette.ink3).accessibilityHidden(true)
+            IconWell(.lock, size: .xl)
             Text(Words.locked).font(Typeface.heading).foregroundStyle(Palette.ink)
             if !lock.away {
                 Button(Words.unlock) {
@@ -98,6 +98,6 @@ struct LockCover: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Palette.board)
+        .background(Ground())
     }
 }

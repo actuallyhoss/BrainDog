@@ -1,14 +1,14 @@
 import SwiftUI
 
-/// The four button weights (`loop/DESIGN-SYSTEM.md`, Button), all rectangles at radius 8, 44 tall under a thumb.
+/// The four button weights in the ops look: every one a capsule, 44 tall under a thumb and 36 on a Mac.
 ///
-/// - `primary`: red fill, white words. One per screen, the one main action, and never disabled for a missing field:
-///   pressing it says what is missing.
-/// - `ink`: ink fill, tile words. The suggested answer, or a strong choice on a screen whose one red is spent elsewhere.
-/// - `quiet`: the default. Tile on the board, tile-2 on a tile.
-/// - `bare`: words in ink-2 and nothing round them.
+/// - `primary`: the accent's fill, white words, raised a little off the page. One per screen, the one main action, and
+///   never disabled for a missing field: pressing it says what is missing.
+/// - `ink`: ink fill, tile words. The suggested answer, or a strong choice on a screen whose one accent is spent elsewhere.
+/// - `quiet`: the default. A tile capsule with a 1px rule edge on the board; tile-2 with no edge on a card or a sheet.
+/// - `bare`: words in ink-2 and nothing round them until pressed.
 ///
-/// A PRESS IS A FILL CHANGE AND A LITTLE GIVE: scale .98 over 70 ms, and only the fill under Reduce Motion.
+/// A PRESS IS A FILL CHANGE AND A LITTLE GIVE: scale .98 over 70 ms, and only the fill under Reduce Motion. Nothing lifts.
 public struct BDButtonStyle: ButtonStyle {
     public enum Weight: Sendable { case primary, ink, quiet, bare }
 
@@ -40,10 +40,14 @@ public struct BDButtonStyle: ButtonStyle {
                 .font(Typeface.control)
                 .foregroundStyle(ink)
                 .lineLimit(1)
-                .padding(.horizontal, weight == .bare ? 0 : 16)
-                .frame(maxWidth: full ? .infinity : nil, minHeight: 44)
-                .background(fill(down), in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                .padding(.horizontal, weight == .bare ? Space.s3 : Space.s4)
+                .frame(maxWidth: full ? .infinity : nil, minHeight: Space.control)
+                .background(fill(down), in: Capsule(style: .continuous))
+                .overlay {
+                    if weight == .quiet && !onTile { Capsule(style: .continuous).strokeBorder(Palette.rule, lineWidth: 1).accessibilityHidden(true) }
+                }
+                .elevation(weight == .primary && enabled ? .raised : .flat)
+                .contentShape(Capsule(style: .continuous))
                 .scaleEffect(down && !still ? 0.98 : 1)
                 .opacity(enabled ? 1 : 0.5)
                 .animation(.easeOut(duration: 0.07), value: down)
@@ -77,14 +81,23 @@ public extension ButtonStyle where Self == BDButtonStyle {
     static var bare: BDButtonStyle { BDButtonStyle(.bare, full: false) }
 }
 
-/// The shapes Look B allows (`--r-ctl`, `--r-pop`, `--r-tile`), and the spacing steps.
+/// The radii the ops look allows. A control is never a rounded square: it is a circle (one glyph) or a capsule (a word,
+/// or a group of controls), drawn with `Circle` and `Capsule`. Inner radius = outer radius minus the gap between them.
 public enum Radius {
-    /// Buttons, chips, fields, segments, wells.
+    /// A small chip or a menu row's fill, and a thumbnail.
     public static let control: CGFloat = 8
+    /// A row's fill (a selected or pressed row, a result under the keys).
+    public static let row: CGFloat = 10
+    /// Fields, menus, popovers and a list box.
+    public static let field: CGFloat = 12
     /// Menus and popovers.
     public static let pop: CGFloat = 12
-    /// Tiles and sheets.
+    /// A card on the board.
     public static let tile: CGFloat = 16
+    /// A toast.
+    public static let toast: CGFloat = 20
+    /// A floating panel (the Mac's quick panel).
+    public static let panel: CGFloat = 22
 }
 
 /// `--sp-1` to `--sp-8`.
@@ -101,4 +114,10 @@ public enum Space {
     public static let gutter: CGFloat = 16
     /// A target under a thumb.
     public static let tap: CGFloat = 44
+    /// A control's drawn height: 44 under a thumb, 36 under a pointer.
+    #if os(macOS)
+    public static let control: CGFloat = 36
+    #else
+    public static let control: CGFloat = 44
+    #endif
 }
