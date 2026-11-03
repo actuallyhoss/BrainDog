@@ -5,7 +5,7 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
-    "test": "node --test gmail.test.ts",
+    "test": "node --test gmail.test.ts gmail-asks.test.ts gmail-record.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }
 }

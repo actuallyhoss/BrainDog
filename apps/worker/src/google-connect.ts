@@ -474,7 +474,10 @@ type Mail = {
   to: string[];
   /** Whether he wrote in the thread after this one came in. */
   answered: boolean;
-  /** For one that came in: whether he is on its To (one of his own addresses), only on Cc or Bcc, or it cannot be said. */
+  /**
+   * For one that came in: one of his own addresses is on its To, only on its Cc, or on neither (a Bcc, a list, an address
+   * forwarded in that Gmail does not send as), which says nothing either way.
+   */
   toMe: 'to' | 'cc' | 'unknown';
   /** A calendar's mail (`isInvite`), or one about an event the calendar holds (`aboutEvent`). */
   event: boolean;
@@ -488,8 +491,13 @@ type Mail = {
   link: string;
 };
 
-/** The body the Gmail add-on's door reads, line for line what its Apps Script posts. */
-export function mailBody(m: Mail, zone: string): string {
+/**
+ * The body the Gmail add-on's door reads, line for line what its Apps Script posts. NO LINE IS ADDED FOR WHAT 1.2.0 READS,
+ * because a door that misses a line it extracts proposes the mail instead of writing it, and every script already pasted
+ * would miss it: a mail he is only copied on says `gmail.reply= no`, and a calendar's says `gmail.kind= event` only to an
+ * add-on whose list has that word (`event`), else `none`.
+ */
+export function mailBody(m: Mail, zone: string, said: { event?: boolean } = {}): string {
   return [
     'BrainDog Gmail 1',
     `gmail.message= ${m.id}`,
@@ -503,9 +511,7 @@ export function mailBody(m: Mail, zone: string): string {
     `gmail.unread= ${m.unread ? 'yes' : 'no'}`,
     `gmail.reply= ${m.reply ? 'yes' : 'no'}`,
     `gmail.person= ${m.person ? 'yes' : 'no'}`,
-    `gmail.to_me= ${m.toMe}`,
-    `gmail.event= ${m.event ? 'yes' : 'no'}`,
-    `gmail.kind= ${m.kind}`,
+    `gmail.kind= ${m.event && said.event === true ? 'event' : m.kind}`,
     `gmail.link= ${m.link}`,
     `gmail.snippet= ${m.snippet}`,
     'gmail.end',
@@ -551,13 +557,15 @@ async function readMail(get: Get, id: string, me: string, mine: ReadonlySet<stri
     looksLikeNewsletter(`${subject} ${snippet}`, other.address);
   const thread = str(m.threadId);
   const event = !out && isInvite(subject, from.address, parseAddress(h['sender'] ?? '').address, h['content-type'] ?? '');
-  /* ON TO, OR ONLY COPIED: one of his own addresses on To is a mail to him; Cc, Bcc or a list he is on is not. */
+  /* ON TO, OR ONLY COPIED: one of his own addresses on To is a mail to him, and one only on Cc is a mail he is copied on. */
   const own = new Set([...mine, keyOf('email', me)].filter((k): k is string => k !== null));
-  const toMe = out ? 'unknown' : addressesIn(h['to'] ?? '').some((a) => own.has(keyOf('email', a) ?? '')) ? 'to' : 'cc';
+  const his = (header: string): boolean => addressesIn(h[header] ?? '').some((a) => own.has(keyOf('email', a) ?? ''));
+  const toMe = out ? 'unknown' : his('to') ? 'to' : his('cc') ? 'cc' : 'unknown';
   const unread = !out && labels.includes('UNREAD') && labels.includes('INBOX');
-  /* AN INVITATION IS ANSWERED IN THE CALENDAR, never waiting on a reply in Gmail. */
-  const replied = !out && !bulk && !event && labels.includes('INBOX') && (await answered(get, thread, id, me));
-  const reply = !out && !bulk && !event && labels.includes('INBOX') && !replied;
+  /* AN INVITATION IS ANSWERED IN THE CALENDAR, AND A MAIL HE IS ONLY COPIED ON WAITS ON SOMEBODY ELSE'S REPLY. */
+  const waits = !out && !bulk && !event && toMe !== 'cc' && labels.includes('INBOX');
+  const replied = waits && (await answered(get, thread, id, me));
+  const reply = waits && !replied;
   return {
     id,
     thread,
@@ -676,6 +684,8 @@ export type Writer = {
   zone: string;
   /** The Gmail add-on is on: mail goes through its door. */
   mail: boolean;
+  /** Its list knows a calendar's mail by `gmail.kind= event` (Gmail 1.2.0). Older versions are sent `none` for one. */
+  eventHint?: boolean;
   /** The Calendar add-on is on; `invites` when its list holds who invited and the answer (2.1.0). */
   events: boolean;
   invites: boolean;
@@ -876,7 +886,7 @@ async function gmailPass(get: Get, conn: Connection, w: Writer, now: number): Pr
       if (whole !== null && (await w.arriveWhole(whole))) read += 1;
       handed.add(id);
     }
-    if (!(await w.arrive(mailBody(mail, w.zone)))) {
+    if (!(await w.arrive(mailBody(mail, w.zone, { event: w.eventHint === true })))) {
       later.push(id);
       continue;
     }
@@ -1171,6 +1181,7 @@ export function googleWriter(api: RecordApi): Writer {
   return {
     zone: api.kernel.identity()?.tz ?? 'UTC',
     mail: api.kernel.register('gmail_mail') !== undefined,
+    eventHint: api.kernel.register('gmail_mail')?.fields.some((f) => f.id === 'hint' && (f.values ?? []).includes('event')) === true,
     events: hasField('key'),
     invites: hasField('response') && hasField('organiser'),
     arrive: async (body) => {

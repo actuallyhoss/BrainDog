@@ -7,13 +7,21 @@ subject, who it is from or to, the day, a snippet of at most 160 characters and 
 - **Mail**: one row a mail of the last two weeks, found again by its Gmail id, so a mail that is read or answered later
   is updated, never written twice. Whether it is unread, whether it is waiting on your reply, and whether it looks like
   a bill, a receipt or a date.
-- **People and organisations**: every hour the add-on meets the person behind a mail from a person (not a newsletter, a
-  no-reply address or a notification) and everyone you write to, by their address, and moves their Last in touch to the
-  mail's day. Their organisation is met by the address's domain, unless it is a mail service anybody can sign up to.
-- **Needs you**: a mail waiting on your reply, a bill, a receipt, and a date from a person are each asked about once,
-  with the link to the mail. Nothing acts in Gmail: you answer and you act. Your answer changes the mail's row at once
-  (1.1.0): **I replied** or **No reply needed** takes it off Waiting on your reply, and **Not a bill** or **Not a
-  receipt** clears what it looked like. **I will reply** leaves it waiting until Gmail shows your reply.
+- **People and organisations** (1.2.0): nobody is added for being in your mail. Somebody already in People is linked
+  to their mail and their Last in touch moves to the mail's day. Somebody new is added only when they are of use: in
+  the last two weeks you wrote to them and they wrote to you as a person, or you both wrote in one thread, the rule
+  Connect Google keeps for your contacts. One of your own addresses is you. A shared inbox or a machine (info@,
+  support@, admin@, no-reply@, notifications@), a newsletter or a list is never a person, and a display name that is
+  only an address is no name. An organisation comes only with a person of use from it.
+- **Needs you** (1.2.0): asked once, with the link to the mail. A reply only when a person wrote to you directly (on
+  To, not only Cc or a list), nobody answered since, it is not an invitation, its update or a machine's mail, and it
+  asks you something; a forward with nothing asked by whoever forwarded it is for your information. One question a
+  thread: a newer mail joins the one waiting. One bill or receipt an order or invoice, with the amount first: the same
+  order number, or the same amount within ten days from one seller or a payment service, is one. A date only from a
+  person naming a day, never for an invitation or an event already on your calendar. A first look, or an hour that
+  would ask more than five, asks one question in their place ("12 mails may need you"); **Leave them** takes them all
+  off the lists. Nothing acts in Gmail: you answer and you act. **I replied** or **No reply needed** takes a mail off
+  Waiting on your reply, and **Not a bill** or **Not a receipt** clears what it looked like.
 - **Bills and receipts** (1.1.0): the hourly script decides, once, when it first looks at a mail. A bill needs
   "invoice" in its subject, or bill words with an amount in a currency or a sender known to send bills (a biller's
   domain such as stripe.com, or an address such as billing@). A receipt needs receipt or order words with the same.
@@ -27,6 +35,10 @@ subject, who it is from or to, the day, a snippet of at most 160 characters and 
   every run was refused before it read a mail, and nobody was met and nothing reached Needs you. An hour with no new
   mail now does nothing. People and organisations are matched as the record matches them (an address in any case,
   Gmail's dots and +tags, a known organisation's subdomains), so meeting somebody already there never stops the run.
+- **What 1.2.0 reads that the door did not** comes in the lines it already had: Connect Google says a mail you are only
+  copied on is not waiting on your reply, and calls a calendar's mail (an invitation by its sender or type, or a mail
+  about an event your calendar holds) `event` as Gmail's guess, once the add-on knows that word. A script pasted before
+  keeps working, and the hourly script reads invitations and forwards from their subject and words.
 - A **Mail** page, and two Today widgets: **Mail** (need a reply, unread) and **Waiting on your reply**. Both stay off
   the board until the first mail arrives; until then the Connect tile on the add-on page is where to start.
 

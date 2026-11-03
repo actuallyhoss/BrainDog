@@ -5,6 +5,8 @@
  * sent), the subject, the day, a short snippet of up to 160 characters, the link to it in Gmail,
  * and whether it is unread and waiting for your reply. Never the whole mail, never an attachment.
  *
+ * A mail you are only copied on, and a calendar's invitation or its update, is never said to wait on your reply.
+ *
  * A mail still waiting on your reply, or still unread, is kept and looked at again after it is 14 days old, until you
  * reply, read it or archive it, so BrainDog never forgets it (at most CARRY_MOST of them).
  *
@@ -38,6 +40,7 @@ function read() {
   var store = PropertiesService.getUserProperties();
   var told = JSON.parse(store.getProperty('told') || '{}');
   var me = String(Gmail.Users.getProfile('me').emailAddress).toLowerCase();
+  var mine = ownAddresses(me);
   var listed = Gmail.Users.Messages.list('me', { q: 'newer_than:' + LOOK_BACK_DAYS + 'd -in:spam -in:trash -in:chats', maxResults: 100 }).messages || [];
   var keep = {};
   var posts = [];
@@ -47,7 +50,7 @@ function read() {
     keep[id] = was;
     /* A MAIL ALREADY TOLD AS DONE IS NOT ASKED AGAIN: only new ones and ones still unread or waiting are read. */
     if (was === 'done') continue;
-    var mail = readOne(id, me);
+    var mail = readOne(id, me, mine);
     if (mail === null) continue;
     var state = mail.unread || mail.reply ? 'open:' + mail.unread + ':' + mail.reply : 'done';
     keep[id] = state;
@@ -67,7 +70,7 @@ function read() {
     if (posts.length >= MOST_A_RUN) return;
     var mail = null;
     try {
-      mail = readOne(id, me);
+      mail = readOne(id, me, mine);
     } catch (e) {
       /* GONE FROM GMAIL (deleted for good): nothing more to say about it. */
       delete keep[id];
@@ -96,10 +99,30 @@ function read() {
   store.setProperty('told', JSON.stringify(keep));
 }
 
-function readOne(id, me) {
+/** Every address that is yours: this account's, and each Gmail sends as. */
+function ownAddresses(me) {
+  var mine = {};
+  mine[me] = true;
+  try {
+    (Gmail.Users.Settings.SendAs.list('me').sendAs || []).forEach(function (a) { mine[String(a.sendAsEmail).toLowerCase()] = true; });
+  } catch (e) {
+    /* The list could not be read: this account's address is enough. */
+  }
+  return mine;
+}
+
+/** Whether one of your addresses is in a header that may list several. */
+function yoursIn(header, mine) {
+  return (String(header || '').match(/[^\s<>()[\]"',;:]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/gi) || []).some(function (a) { return mine[a.toLowerCase()] === true; });
+}
+
+/* A CALENDAR'S OWN MAIL: an invitation, its update, an answer to one, or a cancelling. */
+var INVITE_SUBJECT = /^(?:(?:updated |new )?invitation(?: with note)?|accepted|declined|tentatively accepted|tentative|maybe|cancel+ed(?: event)?|event cancel+ed|updated event|new event|proposed new time)\s*(?:\([^)]*\))?\s*:/i;
+
+function readOne(id, me, mine) {
   var m = Gmail.Users.Messages.get('me', id, {
     format: 'metadata',
-    metadataHeaders: ['From', 'To', 'Subject', 'Date', 'List-Unsubscribe', 'List-Id', 'Precedence', 'Auto-Submitted'],
+    metadataHeaders: ['From', 'To', 'Cc', 'Subject', 'Date', 'List-Unsubscribe', 'List-Id', 'Precedence', 'Auto-Submitted', 'Sender', 'Content-Type'],
   });
   var labels = m.labelIds || [];
   var h = {};
@@ -117,8 +140,12 @@ function readOne(id, me) {
   /* A NEWSLETTER is sent to a list or filed by Gmail as promotions, social or forums. It never raises a bill or a receipt. */
   var newsletter = Boolean(h['list-id'] || /bulk|list/i.test(h['precedence'] || '') ||
     labels.some(function (l) { return /^CATEGORY_(PROMOTIONS|SOCIAL|FORUMS)$/.test(l); }) || looksLikeNewsletter(subject + ' ' + snippet, other.address));
+  var calendar = /^calendar-(notification|server)@google\.com$/i;
+  var event = !out && (INVITE_SUBJECT.test(subject) || calendar.test(from.address) || calendar.test(parseAddress(h['sender'] || '').address) || /text\/calendar/i.test(h['content-type'] || ''));
+  /* COPIED ONLY: one of your addresses on Cc and none on To. */
+  var copied = !out && !yoursIn(h['to'], mine || {}) && yoursIn(h['cc'], mine || {});
   var unread = !out && labels.indexOf('UNREAD') !== -1 && labels.indexOf('INBOX') !== -1;
-  var reply = !out && !bulk && labels.indexOf('INBOX') !== -1 && !answered(m.threadId, id, me);
+  var reply = !out && !bulk && !event && !copied && labels.indexOf('INBOX') !== -1 && !answered(m.threadId, id, me);
   var at = new Date(Number(m.internalDate));
   return {
     id: id,
@@ -132,7 +159,7 @@ function readOne(id, me) {
     unread: unread,
     reply: reply,
     person: !bulk,
-    kind: out ? 'none' : newsletter ? 'list' : kindOf(subject, snippet, other.address),
+    kind: out || event ? 'none' : newsletter ? 'list' : kindOf(subject, snippet, other.address),
     link: 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(me) + '#all/' + m.threadId,
   };
 }
