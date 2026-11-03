@@ -343,8 +343,10 @@
     background: var(--tile);
     /* IT FLOATS WITH NO SCRIM, SO IT TAKES THE ONE EDGE a floating layer has: 1px of
        `--rule-strong`, and no shadow. */
-    border: 1px solid var(--rule-strong);
-    border-radius: var(--r-tile);
+    border: 0;
+    /* THE OPS RIGHT-HAND PANEL (3 Nov): radius 24, its four-layer depth, no edge. */
+    border-radius: var(--r-panel);
+    box-shadow: var(--shadow-panel);
     color: var(--ink);
     transform: var(--dock-off);
     opacity: var(--dock-gone-opacity);
@@ -403,9 +405,9 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--tile-2, var(--hover));
+    background: var(--soft-fill);
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     color: var(--ink-2);
     cursor: pointer;
     transition:

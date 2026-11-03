@@ -242,7 +242,9 @@
     max-inline-size: 640px;
     padding: var(--sp-5);
     background: var(--tile);
+    border: 1px solid var(--card-edge);
     border-radius: var(--r-tile);
+    box-shadow: var(--shadow-card);
   }
 
   @media (width < 640px) {
@@ -260,6 +262,8 @@
     max-inline-size: 56ch;
     padding: var(--sp-2) 0;
     background: none;
+    border: 0;
+    box-shadow: none;
     border-radius: 0;
   }
 

@@ -440,8 +440,12 @@
     /* `translate` and not `transform`, because the pop owns `transform` and the two compose. */
     translate: var(--menu-shift) var(--menu-lift);
     padding: var(--sp-1);
-    background: var(--tile);
-    border: 1px solid var(--rule-strong);
+    /* GLASS, READ ON (ops 5.5, 3 Nov): the regular film, radius 12, 4px inside, the popover's elevation. */
+    background: var(--glass-regular);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    box-shadow: var(--glass-edge), var(--elev-popover);
+    border: 0;
     border-radius: var(--r-pop);
     color: var(--ink);
     /* AT ITS ANCHOR: the corner it hangs from, at the start or the end. */
@@ -510,15 +514,15 @@
     gap: var(--sp-2);
     box-sizing: border-box;
     inline-size: 100%;
-    min-block-size: 36px;
+    min-block-size: 32px;
     margin: 0;
     padding-block: 0;
-    padding-inline: var(--sp-2) var(--sp-3);
+    padding-inline: 10px;
     appearance: none;
     background: none;
     border: 0;
-    border-radius: var(--r-ctl);
-    color: var(--ink);
+    border-radius: var(--r-menu-row);
+    color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-ctl);
     font-weight: var(--fw-regular);
@@ -530,14 +534,15 @@
   }
 
   .menu :global([role^='menuitem']:focus-visible) {
-    background: var(--hover);
+    background: var(--menu-row-fill);
   }
 
   /* HOVER ONLY UNDER A POINTER THAT HOVERS (skills pass follow-up, 2 Nov): on a phone's bottom sheet a tap latched the
      fill on the item touched. */
   @media (hover: hover) and (pointer: fine) {
     .menu :global([role^='menuitem']:hover) {
-      background: var(--hover);
+      background: var(--menu-row-fill);
+      color: var(--ink);
     }
 
     .menu :global([role^='menuitem'][aria-disabled='true']:hover),

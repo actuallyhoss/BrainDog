@@ -81,7 +81,7 @@
     gap: var(--sp-4);
     box-sizing: border-box;
     min-inline-size: 0;
-    block-size: 56px;
+    block-size: 64px;
     padding-inline: var(--gutter);
   }
 
@@ -134,9 +134,10 @@
     overflow: hidden;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--fs-head);
+    font-size: 26px;
     font-weight: var(--fw-semi);
-    letter-spacing: -0.01em;
+    line-height: 32px;
+    letter-spacing: var(--track-page);
     text-overflow: ellipsis;
   }
 
@@ -179,9 +180,13 @@
     min-inline-size: 200px;
     block-size: 36px;
     padding: 0 var(--sp-2) 0 var(--sp-3);
-    border: 1px solid var(--rule);
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    /* A GLASS CAPSULE on the ground (ops 4.1), the search's one door. */
+    border: 0;
+    background: var(--g-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
+    border-radius: var(--r-pill);
     color: var(--ink-3);
     font-size: var(--fs-ctl);
     text-align: start;
@@ -198,7 +203,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .bar-ask:hover {
-      border-color: var(--rule-strong);
+      background: var(--g-fill-hover);
     }
   }
 

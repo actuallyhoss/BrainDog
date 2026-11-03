@@ -249,11 +249,15 @@
     gap: var(--sp-3);
     box-sizing: border-box;
     max-inline-size: min(480px, 100%);
-    min-block-size: 48px;
-    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
-    background: var(--toast, var(--ink));
-    border-radius: var(--r-ctl);
-    color: var(--on-toast, var(--tile));
+    min-block-size: 44px;
+    padding: 6px 6px 6px var(--sp-4);
+    /* THE OPS TOAST (3 Nov): one glass pill at the foot of the window, read on, radius 20. */
+    background: var(--glass-regular);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    box-shadow: var(--glass-edge), var(--elev-popover);
+    border-radius: var(--r-chrome);
+    color: var(--ink);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
     line-height: 20px;
@@ -305,7 +309,7 @@
     display: grid;
     place-items: center;
     flex: none;
-    color: var(--on-toast, var(--tile));
+    color: var(--ink);
   }
 
   .text {
@@ -320,28 +324,26 @@
     align-items: center;
     gap: var(--sp-2);
     flex: none;
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-2);
-    background: none;
+    min-block-size: 32px;
+    padding: 0 var(--sp-3);
+    /* THE ACTION IS AN ACCENT CAPSULE (ops 4.12): the chosen tint, the accent's words. */
+    background: var(--chosen);
     border: 0;
-    border-radius: var(--r-ctl);
-    color: var(--on-toast, var(--tile));
+    border-radius: var(--r-pill);
+    color: var(--link);
     font: inherit;
     font-weight: var(--fw-semi);
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
 
   .undo :global(.kbd) {
-    background: color-mix(in oklab, var(--on-toast, var(--tile)) 16%, transparent);
-    color: var(--on-toast, var(--tile));
+    background: color-mix(in oklab, var(--ink) 16%, transparent);
+    color: var(--ink);
   }
 
   .undo:active {
-    background: color-mix(in oklab, var(--on-toast, var(--tile)) 16%, transparent);
+    background: color-mix(in oklab, var(--ink) 16%, transparent);
   }
 
   /* `tap` EXPANDS THE HIT AREA WITHOUT MOVING THE GLYPH: a 32px close to the eye, 44 to a thumb. */
@@ -354,8 +356,8 @@
     padding: 0;
     background: none;
     border: 0;
-    border-radius: var(--r-ctl);
-    color: color-mix(in oklab, var(--on-toast, var(--tile)) 72%, transparent);
+    border-radius: var(--r-pill);
+    color: var(--ink-3);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -366,15 +368,15 @@
   @media (hover: hover) and (pointer: fine) {
     .undo:hover,
     .close:hover {
-      background: color-mix(in oklab, var(--on-toast, var(--tile)) 12%, transparent);
-      color: var(--on-toast, var(--tile));
+      background: color-mix(in oklab, var(--ink) 12%, transparent);
+      color: var(--ink);
     }
   }
 
   /* THE FOCUS RING IN THE BAR'S OWN COLOUR, since the page's ink ring would vanish on a dark bar. */
   .undo:focus-visible,
   .close:focus-visible {
-    outline: 2px solid var(--on-toast, var(--tile));
+    outline: 2px solid var(--ink);
     outline-offset: -2px;
   }
 

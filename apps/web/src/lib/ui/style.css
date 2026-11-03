@@ -65,6 +65,9 @@
     --window-inset: 12px;
     --tile-gap: 16px;
     --rail: 220px;
+    /* THE PHONE BAR FLOATS: 60 tall, 8 over the home indicator. */
+    --tab-h: 60px;
+    --tabbar: calc(var(--tab-h) + 8px + env(safe-area-inset-bottom));
 
     /* MOTION: the ops springs, beside the house's eases. */
     --spring-press: linear(0, 0.158, 0.438, 0.683, 0.852, 0.949, 0.995, 1.013, 1.015, 1.012, 1.008, 1);
@@ -253,16 +256,24 @@
   }
 
   /* A CARD: the one surface for content. Solid, a 1px edge in its own colour, the soft two-layer shadow in light. */
-  .card {
-    background: var(--tile);
+  .surface-card,
+  .tile {
     border: 1px solid var(--card-edge);
-    border-radius: var(--r-tile);
     box-shadow: var(--shadow-card);
   }
-  .card.is-link {
+  .surface-card {
+    background: var(--tile);
+    border-radius: var(--r-tile);
+  }
+  /* A TILE NEVER HOLDS A TILE: one inside a tile, a sheet or a panel has no edge and no shadow of its own. */
+  :is(.tile, .surface-card, .sheet, .dock-body, dialog) .tile {
+    border: 0;
+    box-shadow: none;
+  }
+  .surface-card.is-link {
     transition: box-shadow 150ms var(--ease-standard), border-color 150ms var(--ease-standard);
   }
-  .card.is-link:hover {
+  .surface-card.is-link:hover {
     box-shadow: var(--shadow-card-hover);
     border-color: var(--rule-strong);
   }
@@ -367,7 +378,7 @@
   }
 
   /* A BADGE: the one static status mark, a capsule. Tones from the palette's tints. */
-  .badge {
+  .pill-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -380,13 +391,13 @@
     font-weight: var(--fw-semi);
     white-space: nowrap;
   }
-  .badge[data-tone='good'] { background: var(--good-tint); color: var(--good); }
-  .badge[data-tone='warn'] { background: var(--warn-tint); color: var(--warn); }
-  .badge[data-tone='bad'] { background: var(--red-tint); color: var(--red); }
-  .badge[data-tone='info'] { background: var(--info-tint); color: var(--info); }
+  .pill-badge[data-tone='good'] { background: var(--good-tint); color: var(--good); }
+  .pill-badge[data-tone='warn'] { background: var(--warn-tint); color: var(--warn); }
+  .pill-badge[data-tone='bad'] { background: var(--red-tint); color: var(--red); }
+  .pill-badge[data-tone='info'] { background: var(--info-tint); color: var(--info); }
 
   /* A CAPS LABEL: the tiny group header (menus, the palette, a table's head). Never a title. */
-  .caps {
+  .caps-label {
     font-size: var(--fs-caps);
     font-weight: var(--fw-medium);
     letter-spacing: 0.025em;

@@ -734,7 +734,7 @@
         <svg class="s-side-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.75" y="4.75" width="16.5" height="14.5" rx="3" /><path d="M9.25 4.75v14.5" /></svg>
       </button>
     </div>
-    <nav class="s-scroll" aria-label={words.nav} bind:this={rows} {@attach litSlide('.s-row[aria-current="page"], .s-title[aria-current="page"]', { fill: 'var(--nav-selected)' })}>
+    <nav class="s-scroll" aria-label={words.nav} bind:this={rows} {@attach litSlide('.s-row[aria-current="page"], .s-title[aria-current="page"]', { fill: 'var(--chosen)' })}>
       <ul class="s-list">
         {#each model.places as p (p.key)}{@render place(p)}{/each}
       </ul>
@@ -770,8 +770,14 @@
     inline-size: 100%;
     block-size: 100%;
     min-inline-size: 0;
-    background: var(--nav);
-    border-inline-end: 1px solid var(--rule);
+    /* A FLOATING GLASS CARD (ops 4.31, 3 Nov): the chrome film over the ambient ground, radius 20, 8px inside. */
+    padding: 4px var(--sp-2) var(--sp-2);
+    background: var(--glass-chrome);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    box-shadow: var(--glass-edge), var(--elev-chrome);
+    border-radius: var(--r-chrome);
+    border-inline-end: 0;
   }
 
   /* THE HEAD: 56 tall, its hairline on the bar's, the switcher at the start and the hide button at the end. */
@@ -781,22 +787,22 @@
     gap: var(--sp-2);
     box-sizing: border-box;
     flex: none;
-    block-size: calc(56px + var(--shell-inset, 0px));
-    padding: var(--shell-inset, 0px) var(--sp-3) 0 max(var(--sp-3), var(--shell-lead, 0px));
-    border-block-end: 1px solid var(--rule);
+    block-size: 48px;
+    padding: 0 var(--sp-1) 0 max(var(--sp-2), calc(var(--shell-lead, 0px) - var(--window-inset)));
+    border-block-end: 0;
   }
 
   .s-hide {
     display: grid;
     place-items: center;
     flex: none;
-    inline-size: 32px;
-    block-size: 32px;
+    inline-size: var(--ctl-panel);
+    block-size: var(--ctl-panel);
     margin-inline-start: auto;
     padding: 0;
     border: 0;
     background: none;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     color: var(--ink-3);
     cursor: pointer;
   }
@@ -936,15 +942,17 @@
     gap: var(--sp-2);
     box-sizing: border-box;
     inline-size: 100%;
-    min-block-size: 30px;
-    padding-inline: var(--sp-2);
+    /* THE OPS SIDEBAR ROW: 36 tall (34 here, BrainDog's rail is longer), radius 10, 14/400, 2px apart. */
+    min-block-size: 34px;
+    margin-block: 1px;
+    padding-inline: 10px;
     border: 0;
     background: none;
     border-radius: var(--r-ctl);
     color: var(--ink-2);
     font: inherit;
-    font-size: var(--fs-ctl);
-    font-weight: var(--fw-medium);
+    font-size: 14px;
+    font-weight: var(--fw-regular);
     text-align: start;
     text-decoration: none;
     cursor: pointer;
@@ -968,9 +976,9 @@
 
   /* THE ONE LIT ROW: the nav's chosen fill, the words in ink at 600. */
   .s-row[aria-current='page'] {
-    background: var(--nav-selected);
+    background: var(--chosen);
     color: var(--ink);
-    font-weight: var(--fw-semi);
+    font-weight: var(--fw-medium);
   }
 
   .s-row[aria-current='page'] :global(.icon) {
@@ -1188,8 +1196,9 @@
 
   .s-rule {
     block-size: 1px;
-    margin: var(--sp-3) var(--sp-2);
-    background: var(--rule);
+    margin: var(--sp-2) 10px;
+    border-radius: 1px;
+    background: var(--sep);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -1200,7 +1209,7 @@
     .s-hide:hover,
     .s-title:not([aria-current='page']):hover,
     .s-ricon:not([aria-current='page']):hover {
-      background: var(--hover);
+      background: var(--row-wash);
       color: var(--ink);
     }
   }
@@ -1261,8 +1270,12 @@
     box-sizing: border-box;
     inline-size: 100%;
     block-size: 100%;
-    background: var(--nav);
-    border-inline-end: 1px solid var(--rule);
+    background: var(--glass-chrome);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    box-shadow: var(--glass-edge), var(--elev-chrome);
+    border-radius: var(--r-chrome);
+    border-inline-end: 0;
   }
 
   .s-rhead {
@@ -1271,9 +1284,8 @@
     box-sizing: border-box;
     flex: none;
     inline-size: 100%;
-    block-size: calc(56px + var(--shell-inset, 0px));
-    padding-block-start: var(--shell-inset, 0px);
-    border-block-end: 1px solid var(--rule);
+    block-size: 52px;
+    border-block-end: 0;
   }
 
   /* IN THE MAC APP THE RAIL'S HEAD IS WHERE THE TRAFFIC LIGHTS STAND (`--shell-lead`), so the mark gives them its place;
@@ -1308,7 +1320,7 @@
   }
 
   .s-ricon[aria-current='page'] {
-    background: var(--nav-selected);
+    background: var(--chosen);
     color: var(--ink);
   }
 

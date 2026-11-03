@@ -48,7 +48,7 @@
   const lit = $derived(nowhere ? null : (tabs.find((t) => isHere(t, path))?.key ?? null));
 </script>
 
-<nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length + 1}`} {@attach litSlide('.tab[aria-current="page"] .badge-slot', { fill: 'var(--nav-selected)' })}>
+<nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length + 1}`} {@attach litSlide('.tab[aria-current="page"] .badge-slot', { fill: 'var(--chosen)' })}>
   {#each tabs as tab (tab.key)}
     <a class="tab tap" href={at(tab.href)} aria-current={lit === tab.key ? 'page' : undefined} in:arrive>
       <span class="badge-slot">
@@ -76,18 +76,24 @@
    * EQUAL TABS, AND FIVE OF THEM FIT THE NARROWEST PHONE: 320 over five is 64 across, so every tab clears 44 on both axes
    * before a word is shortened.
    */
+  /* THE OPS PHONE BAR (3 Nov): a floating glass capsule 12px off each side and 8px over the home indicator, the
+     destinations in one capsule. `--tabbar` (style.css) is its height, the gap and the indicator, so what clears the
+     bar still clears it. */
   .tabs {
     position: fixed;
-    inset-block-end: 0;
-    inset-inline: 0;
+    inset-block-end: calc(env(safe-area-inset-bottom) + 8px);
+    inset-inline: calc(env(safe-area-inset-left) + 12px) calc(env(safe-area-inset-right) + 12px);
     z-index: var(--z-sheet);
     display: grid;
     grid-template-columns: repeat(var(--tabs, 4), minmax(0, 1fr));
     box-sizing: border-box;
-    block-size: var(--tabbar);
-    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    background: var(--nav);
-    border-block-start: 1px solid var(--rule);
+    block-size: var(--tab-h);
+    padding: 4px;
+    background: var(--glass-chrome);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    box-shadow: var(--glass-edge), var(--elev-popover);
+    border-radius: var(--r-pill);
     /* HELD STILL IN A PAGE CHANGE: the page's pictures pass under it (`app.css` gives this name no animation). */
     view-transition-name: tabbar;
     /* A HELD THUMB ON A TAB IS NOT A LINK TO PREVIEW OR WORDS TO SELECT, as an app's own tab bar is not. */
@@ -108,16 +114,17 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--sp-1);
+    gap: 2px;
     min-inline-size: 0;
-    min-block-size: max(var(--tap), var(--tab-h));
+    min-block-size: var(--tap);
     padding: 0 var(--sp-1);
     border: 0;
+    border-radius: var(--r-pill);
     background: none;
-    color: var(--ink-3);
-    font-size: var(--fs-cap);
+    color: var(--ink-2);
+    font-size: 11px;
     font-weight: var(--fw-medium);
-    line-height: calc(16 / 12);
+    line-height: calc(14 / 11);
     text-decoration: none;
   }
 
@@ -134,12 +141,12 @@
     display: grid;
     place-items: center;
     inline-size: 44px;
-    block-size: 28px;
-    border-radius: var(--r-ctl);
+    block-size: 26px;
+    border-radius: var(--r-pill);
   }
 
   .tab[aria-current='page'] .badge-slot {
-    background: var(--nav-selected);
+    background: var(--chosen);
     color: var(--ink);
   }
 
@@ -176,7 +183,7 @@
     block-size: 8px;
     border-radius: var(--r-round);
     background: var(--live);
-    outline: 2px solid var(--nav);
+    outline: 2px solid var(--tile);
   }
 
   .sr-only {

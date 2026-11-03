@@ -868,9 +868,21 @@
       position: absolute;
       inset: 0;
       z-index: -1;
-      background: var(--nav);
-      box-shadow: inset 0 -1px 0 var(--rule);
+      /* THE OPS PHONE BAR (3 Nov): clear over the ambient ground at the top of the page, and glass chrome with a hairline
+         once the page has scrolled under it (`data-past`). */
+      background: transparent;
+      box-shadow: inset 0 -0.5px 0 transparent;
       pointer-events: none;
+      transition:
+        background-color var(--d-swap) var(--ease-out),
+        box-shadow var(--d-swap) var(--ease-out);
+    }
+
+    .head-bar:is([data-past], [data-under])::before {
+      background: var(--glass-regular);
+      -webkit-backdrop-filter: var(--glass-filter);
+      backdrop-filter: var(--glass-filter);
+      box-shadow: inset 0 -0.5px 0 var(--sep);
     }
 
     /* WHERE YOU ARE, AND OVER IT THE TITLE ONCE THE NAME HAS GONE UNDER THE BAR: one cell, two pieces, a cross-fade
@@ -910,8 +922,9 @@
       overflow: hidden;
       color: var(--ink);
       font-family: var(--font-display);
-      font-size: var(--fs-head);
+      font-size: 20px;
       font-weight: var(--fw-semi);
+      letter-spacing: var(--track-figure);
       line-height: 1.2;
       text-wrap: balance;
       -webkit-box-orient: vertical;

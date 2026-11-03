@@ -55,8 +55,9 @@
     flex: none;
     inline-size: var(--well);
     block-size: var(--well);
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
+    /* A CIRCLE (ops: circles and capsules, 3 Nov). */
+    border-radius: var(--r-pill);
+    background: var(--soft-fill);
     color: var(--ink-2);
     font-family: var(--font-ui);
     font-size: var(--fs-meta);

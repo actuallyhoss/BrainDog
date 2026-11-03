@@ -391,31 +391,42 @@
   .bell-trigger {
     display: block;
     padding: 0;
-    background: none;
+    /* A GLASS CIRCLE on a desk (ops 4.1, 3 Nov); bare on a phone's bar. */
+    background: var(--g-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     color: inherit;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
 
+  .bell[data-phone] .bell-trigger {
+    background: none;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .bell-trigger:hover {
-      background: var(--hover);
+      background-color: var(--g-fill-hover);
     }
   }
 
   .bell-trigger[aria-expanded='true'] {
-    background: var(--hover);
+    background-image: linear-gradient(var(--g-on), var(--g-on));
   }
 
   .bell-face {
     position: relative;
     display: grid;
     place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
-    color: var(--ink-3);
+    inline-size: var(--ctl-page);
+    block-size: var(--ctl-page);
+    color: var(--ink);
   }
 
   .bell[data-phone] .bell-face {
@@ -472,9 +483,13 @@
     box-sizing: border-box;
     inline-size: min(400px, calc(100dvw - 2 * var(--sp-3)));
     max-block-size: min(560px, calc(100dvh - 72px));
-    background: var(--tile);
-    border: 1px solid var(--rule-strong);
-    border-radius: var(--r-pop);
+    /* GLASS, READ ON (ops 2.7.5 regular), radius 16, the popover's elevation. */
+    background: var(--glass-regular);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    box-shadow: var(--glass-edge), var(--elev-popover);
+    border: 0;
+    border-radius: var(--r-tile);
     color: var(--ink);
     transform-origin: 100% 0;
     transition-property: transform, opacity;

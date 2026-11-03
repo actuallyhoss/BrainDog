@@ -85,9 +85,10 @@
   .you-face {
     display: grid;
     place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
-    background: var(--tile-2);
+    inline-size: var(--ctl-page);
+    block-size: var(--ctl-page);
+    background: var(--g-fill);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
     border-radius: var(--r-round);
     color: var(--ink);
     font-size: var(--fs-meta);

@@ -60,7 +60,7 @@
     block-size: 18px;
     padding-inline: var(--sp-1);
     line-height: 18px;
-    box-shadow: 0 0 0 2px var(--nav);
+    box-shadow: 0 0 0 2px var(--tile);
   }
 
   @media (forced-colors: active) {

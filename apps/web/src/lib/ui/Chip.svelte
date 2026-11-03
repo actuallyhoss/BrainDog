@@ -36,8 +36,8 @@
     box-sizing: border-box;
     min-block-size: var(--btn-h-sm);
     padding-inline: var(--sp-2);
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    background: var(--soft-fill);
+    border-radius: var(--r-pill);
     color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);

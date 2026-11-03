@@ -1982,8 +1982,9 @@
     padding: var(--shell-inset, 0px) 0 0;
     /* THE MAC APP'S TRAFFIC LIGHTS IN THIS ROW: what of their room the sidebar's column does not already give. */
     padding-inline-start: max(0px, calc(var(--shell-lead, 0px) - var(--side-col, 0px)));
-    background: var(--nav);
-    border-block-end: 1px solid var(--rule);
+    /* THE OPS STYLE (3 Nov): no band. The bar's title and controls stand on the ambient ground, on the work's line. */
+    background: none;
+    border-block-end: 0;
   }
 
   .shell[data-shape='bar'] .body {
@@ -2017,7 +2018,11 @@
     display: flex;
     min-block-size: 0;
     overflow: hidden;
-    background: var(--nav);
+    /* THE SIDEBAR IS A FLOATING CARD (ops 4.31): the column is the ground, and `SideBar.svelte` draws the glass card in it,
+       12px from the window's top, bottom and start. */
+    box-sizing: border-box;
+    padding: calc(var(--window-inset) + var(--shell-inset, 0px)) 0 var(--window-inset) var(--window-inset);
+    background: none;
   }
 
   /* A DOCKED PANEL STANDS UNDER THE BAR, not under its edge. On a phone it is the bottom sheet (`Panel.svelte`,

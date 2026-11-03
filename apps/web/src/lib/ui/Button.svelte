@@ -1,5 +1,5 @@
 <!--
-  One control, three weights, and every one of them a rectangle (and INK, the neutral strong fill: `--ink` with
+  One control, three weights, and every one of them a capsule since the ops style (3 Nov) (and INK, the neutral strong fill: `--ink` with
   `--tile` words, for a suggested answer where the screen's one red is spent elsewhere).
 
   PRIMARY is the red fill with white words, one per screen: `--red-fill` at rest, `--red-fill-hover` under the pointer,
@@ -85,10 +85,11 @@
 </svelte:element>
 
 <style>
-  /* A RECTANGLE TOLD BY ITS FILL: no border on any weight, radius 8, the label at 14 medium. On the board a quiet
-     button is the tile's colour, so it reads as a control and not a hole. */
+  /* A CAPSULE (the ops style, 3 Nov): no border on any weight, the label at 13 medium. On the board a quiet button is
+     a glass control (a light film, a blur and a 0.5px hairline), so it floats over the ambient ground; on a tile it is a
+     soft fill of the ink. */
   .btn {
-    --btn-fill: var(--tile);
+    --btn-fill: var(--g-fill);
 
     display: inline-flex;
     align-items: center;
@@ -96,10 +97,13 @@
     gap: var(--sp-2);
     box-sizing: border-box;
     min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
+    padding: 0 14px;
     background: var(--btn-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     color: var(--ink);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
@@ -112,18 +116,22 @@
     transition:
       background var(--d-press) var(--ease-out),
       color var(--d-press) var(--ease-out),
-      scale var(--d-menu) var(--ease-out);
+      scale var(--d-press-out) var(--spring-press);
   }
 
   /* ON A TILE, A SHEET OR A PANEL the quiet fill is a step under the surface, `--tile-2`, so it still reads as a thing
      to press on white. */
-  :global(:is(.tile, .sheet, dialog, .menu, [data-surface='tile'], .block-slot)) .btn {
-    --btn-fill: var(--tile-2);
+  :global(:is(.tile, .card, .sheet, dialog, .menu, [data-surface='tile'], .block-slot)) .btn {
+    --btn-fill: var(--soft-fill);
+
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
   }
 
   .btn[data-size='sm'] {
     min-block-size: var(--btn-h-sm);
-    padding: 0 var(--sp-2);
+    padding: 0 12px;
   }
 
   /* A KEY CAP ASKS FOR A LITTLE LESS ROOM AT ITS END, so the cap sits in the corner the way the label sits in the other. */
@@ -139,8 +147,8 @@
   /* THE PRESS: a step deeper than the fill, and 98% of its size, while it is held. It goes in over `--d-press` and lets
      go over `--d-menu`. Under reduced motion only the fill changes. */
   .btn:active:not(:disabled) {
-    background: color-mix(in oklab, var(--ink) 8%, var(--btn-fill));
-    scale: 0.98;
+    background-image: linear-gradient(var(--g-on), var(--g-on));
+    scale: 0.97;
     transition-duration: var(--d-press);
   }
 
@@ -155,6 +163,9 @@
     --btn-fill: var(--red-fill);
 
     background: var(--btn-fill);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: var(--shadow-raised);
     color: var(--on-red);
   }
 
@@ -167,6 +178,9 @@
     --btn-fill: var(--ink);
 
     background: var(--btn-fill);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: var(--shadow-raised);
     color: var(--tile);
   }
 
@@ -176,6 +190,9 @@
 
   .btn[data-weight='bare'] {
     background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
     color: var(--ink-2);
   }
 
@@ -190,7 +207,11 @@
      also a hovered one. */
   @media (hover: hover) and (pointer: fine) {
     .btn:hover:not(:disabled):not(:active) {
-      background: var(--hover);
+      background-color: var(--g-fill-hover);
+    }
+
+    :global(:is(.tile, .card, .sheet, dialog, .menu, [data-surface='tile'], .block-slot)) .btn:hover:not(:disabled):not(:active) {
+      background-color: var(--soft-fill-hover);
     }
 
     .btn[data-weight='primary']:hover:not(:disabled):not(:active) {
@@ -202,7 +223,7 @@
     }
 
     .btn[data-weight='bare']:hover:not(:disabled):not(:active) {
-      background: var(--hover);
+      background: var(--row-wash);
       color: var(--ink);
     }
   }
@@ -226,7 +247,8 @@
   }
 
   .btn:is([data-weight='primary'], [data-weight='ink']):disabled {
-    background: var(--tile-2);
+    background: var(--soft-fill);
+    box-shadow: none;
     color: var(--ink-3);
   }
 

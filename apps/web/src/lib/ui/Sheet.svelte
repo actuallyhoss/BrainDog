@@ -347,7 +347,9 @@
     overflow: hidden;
     background: var(--tile);
     border: 0;
-    border-radius: var(--r-tile);
+    /* A SHEET IS RADIUS 22 WITH THE MODAL ELEVATION (ops 2.5, 2.7.1). */
+    border-radius: var(--r-sheet);
+    box-shadow: var(--elev-modal);
     color: var(--ink);
     transform: var(--sheet-off);
     opacity: var(--sheet-gone-opacity);
@@ -479,9 +481,9 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--tile-2);
+    background: var(--soft-fill);
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     color: var(--ink-2);
     cursor: pointer;
     transition:
@@ -491,7 +493,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .sheet-close:hover {
-      background: var(--hover, var(--tile-2));
+      background: var(--soft-fill-hover);
       color: var(--ink);
     }
   }

@@ -81,11 +81,15 @@
     box-sizing: border-box;
     min-block-size: 40px;
     padding: 0 var(--sp-3);
-    background: var(--tile-2);
+    /* THE OPS FIELD (3 Nov): the tile's own fill, a 1px edge, radius 12. */
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-ctl);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    border-radius: var(--r-field);
     color: var(--ink-3);
-    transition: background var(--d-state) var(--ease-out);
+    transition:
+      background var(--d-state) var(--ease-out),
+      box-shadow var(--d-state) var(--ease-out);
   }
 
   /* ONE FOCUS, ON THE WRAPPER: the 2px ink ring offset 2, which is the a11y layer's ring for every other
@@ -93,9 +97,9 @@
      round a field nobody had typed in yet read as a validation error. */
   .field:focus-within,
   .capture-field:focus-within {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
-    box-shadow: none;
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 0;
+    box-shadow: inset 0 0 0 1px transparent;
   }
 
   .field .field-input:focus-visible {
@@ -199,10 +203,11 @@
     display: flex;
     flex-wrap: wrap;
     gap: 2px;
-    padding: 2px;
-    background: var(--tile-2);
+    /* A CAPSULE TRACK with a 3px inset (ops 4.7, the track variant on a page or a card). */
+    padding: 3px;
+    background: var(--soft-fill);
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
   }
 
   /**
@@ -211,11 +216,11 @@
    * Its label is `--fs-ctl`.
    */
   .segment {
-    min-block-size: calc(var(--ctl-h) - 4px);
+    min-block-size: calc(var(--ctl-h) - 6px);
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-xs);
+    border-radius: var(--r-pill);
     color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
@@ -271,6 +276,7 @@
   /* THE CHOSEN SEGMENT: raised, in the ink at 600. */
   .segment[data-on] {
     background: var(--segment-on);
+    box-shadow: var(--shadow-raised), inset 0 0 0 0.5px var(--g-sel-line);
     color: var(--ink);
     font-weight: var(--fw-semi);
   }
@@ -359,7 +365,8 @@
     inline-size: var(--w);
     block-size: var(--h);
     background: var(--segment-on);
-    border-radius: var(--r-xs);
+    box-shadow: var(--shadow-raised), inset 0 0 0 0.5px var(--g-sel-line);
+    border-radius: var(--r-pill);
     transform: translate(var(--x), var(--y));
     /* A TRAVEL, NOT A STATE: over the swap's step, so the eye can follow it from one choice to the next (it was the
        90ms state step, which read as a jump at 80px and more). Its width follows with it. */
@@ -376,10 +383,12 @@
   /* The thumb is the selection now, so the segment under it draws none of its own. */
   .segmented[data-thumb] > .segment[data-on] {
     background: none;
+    box-shadow: none;
   }
 
   .segmented[data-thumb] > li > .segment[data-on] {
     background: none;
+    box-shadow: none;
   }
 
   /* A TRACK WHERE MORE THAN ONE CAN BE CHOSEN is given `many` (`data-many`), and the component then draws it no
