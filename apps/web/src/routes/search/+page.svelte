@@ -73,6 +73,8 @@
     recent: 'Changed lately',
     changes: (n: number) => `${n} changes`,
     entries: (n: number) => n.toLocaleString('en'),
+    fewer: 'Try fewer words, or other words for it.',
+    askSlash: 'Ask Slash',
   } as const;
 
   /* ── where to jump, before anything is typed ── */
@@ -461,9 +463,12 @@
       {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
   {:else if shown === 'none'}
-    <Empty kind="no-results" title={copy.searchNone(q)} body={copy.searchNoneNext}>
+    <!-- NOTHING FOUND: the words to try, and the ways on, none of them louder than the field he is typing in. Where a
+         model is behind Slash, asking it is the first way on: it reads meaning where the search reads letters. -->
+    <Empty kind="no-results" title={copy.searchNone(q)} body={words.fewer}>
       {#snippet actions()}
-        <Button weight="primary" onclick={clearSearch}>{copy.searchClear}</Button>
+        {#if route.data.slash === true}<Button weight="primary" href={at(`/slash?q=${encodeURIComponent(q)}`)}><Icon name="slash" size="m" />{words.askSlash}</Button>{/if}
+        <Button onclick={clearSearch}>{copy.searchClear}</Button>
         <Button weight="bare" href="/audit">{copy.searchInHistory}</Button>
       {/snippet}
     </Empty>
@@ -577,7 +582,12 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
     gap: var(--tile-gap);
-    align-items: start;
+    /* A ROW'S TILES SHARE ITS HEIGHT, so three tiles side by side end on one line. */
+    align-items: stretch;
+  }
+
+  .lately {
+    display: grid;
   }
 
   /* FOUR ACROSS ON A WIDE PAGE, Changed lately two of them, and no tile left alone on the second row: with five tiles the
@@ -673,6 +683,13 @@
     border: 1px solid var(--card-edge, transparent);
     border-radius: var(--r-tile);
     box-shadow: var(--shadow-card, none);
+  }
+
+  /* A SEARCH FIELD IS A CAPSULE (ops look 9), 44 tall across the page, its glyph on the text edge. */
+  .search-field {
+    min-block-size: 44px;
+    padding-inline: 16px;
+    border-radius: var(--r-pill);
   }
 
   /* SIXTEEN PIXELS AT EVERY WIDTH, as every input in the product is, so a phone does not zoom the page
