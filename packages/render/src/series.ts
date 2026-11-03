@@ -389,8 +389,11 @@ export function evenPlaces(cells: readonly string[]): string[] {
      rule for one figure (`totalSaid`). The name stays for its callers. */
   return cells.map((c) => (/\d/u.test(c) ? (wholeFigure(c) === c ? totalSaid(c) : wholeFigure(c)) : c));
 }
-/** The key for a bar drawn at half strength: a month not over yet, or still to come. */
-export const SERIES_PALER = 'Paler: not over yet';
+/**
+ * The key for a bar drawn at half strength: a month not over yet, or still to come. ITS SWATCH IS THE PALER BAR, so the
+ * words say only what it means (moneyseed, 3 Nov): "Paler: not over yet" said the swatch over in a word.
+ */
+export const SERIES_PALER = 'Not over yet';
 export const SERIES_PARTIAL = 'so far';
 export const SERIES_AHEAD = 'expected';
 /** The current bucket when it counts money due later in it beside what was paid so far. */

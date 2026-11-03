@@ -1017,13 +1017,16 @@ export function tileOf(
         : quantity(r.value, r.unit),
     /* A NOTE THE CELL DECLARES is said instead of the target, each figure it names formatted as declared, and a converted
        figure says as of which day's rates. */
-    /* THE DOT STAYS WITH THE FACT BEFORE IT (T1), so a wrapped note starts its second line with a fact, not a dot. */
-    /* AND A FACT THAT ENDS ON A FULL STOP LETS IT GO BEFORE THE DOT (domains lane, 2 Nov): "(179 days). · Lowest" was two
+    /* A FACT THAT ENDS ON A FULL STOP LETS IT GO BEFORE THE NEXT (domains lane, 2 Nov): "(179 days). · Lowest" was two
        stops in a row. The last keeps its own. */
     note: [said(unsaid ? liveWords.unsaid : decl ? targetSaid(decl, r) : ''), lowest, across]
       .filter((part): part is string => Boolean(part))
       .map((part, i, all) => (i < all.length - 1 ? part.replace(/\.\s*$/u, '') : part))
-      .join('\u00a0· '),
+      /* THE DOT GOES WITH THE FACT AFTER IT (moneyseed, 3 Nov): held to the fact before (T1), Today's "Lasts to 30 Oct ·
+         Lowest −£16,213 on 7 Nov" wrapped at 1280 to "Lasts to 30 Oct ·" over "Lowest …", a dot hanging off the end of
+         a line. Now a wrap breaks before the dot, and the second line opens "· Lowest". A line break of its own is not
+         an option here: a stat's row is one line of the page dialect, which folds a newline to a space (`escapeCell`). */
+      .join(' ·\u00a0'),
     /* A MISSED TARGET IS AMBER, and red only on a tile its page declared `bad`: the day the cash runs out. AND CASH NOW
        UNDER NOTHING, the one figure that is red wherever it is drawn: money below nought is the thing that needs the person. */
     tone: met === null ? undefined : met ? 'good' : cell.metric === 'cash-now' && r.value < 0 ? 'bad' : missed,
@@ -1095,10 +1098,14 @@ export const WAITING_TO_CLEAR = 'Waiting to clear';
  * line's chip, so it stays. Only a list of money moved (one with an account and an amount) whose state field holds
  * `pending`.
  */
-export function pendingSaid(register: string, columns: readonly { field?: unknown }[], entries: readonly Entry[], rows: { cells: (string | null)[] }[]): void {
+export function pendingSaid(register: string, columns: readonly { field?: unknown }[], entries: readonly Entry[], rows: { cells: (string | null)[] }[], where?: unknown): void {
   const state = REGISTERS[register]?.state;
   const at = columns.findIndex((c) => c.field === 'account');
   if (!state || (at !== 3 && at !== 4) || !columns.some((c) => c.field === 'amount')) return;
+  /* NOT IN A LIST OF NOTHING BUT LINES WAITING TO CLEAR (moneyseed, 3 Nov): the Ledger's "Waiting to clear" tile drew
+     "2 Sep · Production · Waiting to clear" under its own heading of those words. There every line is pending, so the
+     line keeps its account. */
+  if (typeof where === 'string' && where.split(',').some((part) => part.trim() === `${state} is pending`)) return;
   entries.forEach((e, n) => {
     const row = rows[n];
     if (!row || e.fields[state] !== 'pending') return;
@@ -2344,7 +2351,7 @@ export function blockOf(
   if (kind === 'cards') freeSaid(register, columns, drawnEntries, rows);
   /* A LEDGER LINE STILL WAITING TO CLEAR SAYS SO IN THE TILE (finish F3), as the Ledger lists it apart and Budgets counts
      it: Money home's Ledger drew the pending £2,500 like any cleared line. Said at the end of the line under the name. */
-  if (kind === 'timeline') pendingSaid(register, columns, entries, rows);
+  if (kind === 'timeline') pendingSaid(register, columns, entries, rows, b.where);
   /* AND ONLY A CLOSE DAY WEARS THE AMBER in a timeline (`urgentOnly`), not every line due in the next two weeks. */
   if (kind === 'timeline') urgentOnly(register, drawnEntries, rows, now);
   /* WHETHER AN AGENT IS ON EACH ROW, which the record works out from the row's history and its live
