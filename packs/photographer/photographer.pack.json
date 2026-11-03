@@ -1,10 +1,10 @@
 {
   "pack": "photographer",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "icon": "file-image",
   "title": "Photographer",
   "summary": "Shoots from the first enquiry to the fee paid, what each one still owes the client and by when, and the gear with the day its cover ends.",
-  "changes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
+  "changes": "Shoots and Still to send no longer open on a count of shoots and deliverables, since the figures and lists under them show them. Nothing it reads or writes changed.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
@@ -99,13 +99,6 @@
           "when": { "metric": "shoots-open", "is": 0 },
           "body": "No shoot is on the books yet. Add the first enquiry, and it starts on the board."
         },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "metric": "shoots-open", "gt": 0 },
-          "body": "{{shoots-booked-month}} shoot(s) booked this month, {{deliverables-late}} deliverable(s) late"
-        },
         { "kind": "capture", "heading": "A new enquiry?", "icon": "plus", "span": 12, "register": "shoots" },
         {
           "kind": "stat",
@@ -139,12 +132,6 @@
       "requires": [ "register.shoots", "register.deliverables", "register.gear" ],
       "pack": "photographer",
       "blocks": [
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "body": "{{deliverables-open}} deliverable(s) still to send, {{deliverables-late}} of them late"
-        },
         {
           "kind": "table",
           "heading": "Still to send",

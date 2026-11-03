@@ -1,0 +1,733 @@
+{
+  "pack": "new-project",
+  "version": "1.0.4",
+  "icon": "projects",
+  "title": "Starting a project",
+  "summary": "Now part of New project guide. A guide for something new: three stages (idea, first users, first money), the next steps at each as a checklist an agent can tick, the decisions you made with reasons, and a weekly page on where it stands.",
+  "changes": "The guide no longer opens on a count of steps to do and done, since the steps under it show them. Nothing it reads or writes changed.",
+  "unlisted": true,
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "register": "fresh_starts",
+      "name": "Projects",
+      "icon": "rocket",
+      "one": "project",
+      "holds": "each thing you are starting, in a line, and the stage it has reached",
+      "title": "name",
+      "mobile": [
+        "name",
+        "stage"
+      ],
+      "pack": "new-project",
+      "delete": "refuse_while_referenced",
+      "fields": [
+        {
+          "id": "name",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "about",
+          "label": "In a line",
+          "type": "text"
+        },
+        {
+          "id": "stage",
+          "label": "Stage",
+          "type": "enum",
+          "values": [
+            "idea",
+            "first_users",
+            "first_money"
+          ],
+          "labels": {
+            "idea": "Idea",
+            "first_users": "First users",
+            "first_money": "First money"
+          },
+          "index": true,
+          "required": true,
+          "default": "idea"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "venture_steps",
+      "name": "Next steps",
+      "icon": "task",
+      "one": "step",
+      "holds": "what to do at each stage, in order, ticked when done by you or by an agent",
+      "title": "what",
+      "mobile": [
+        "what",
+        "stage",
+        "done"
+      ],
+      "pack": "new-project",
+      "fields": [
+        {
+          "id": "what",
+          "label": "Step",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "why",
+          "label": "Why it matters",
+          "type": "text"
+        },
+        {
+          "id": "venture",
+          "label": "Project",
+          "type": "ref",
+          "to": "fresh_starts",
+          "index": true
+        },
+        {
+          "id": "stage",
+          "label": "Stage",
+          "type": "enum",
+          "values": [
+            "idea",
+            "first_users",
+            "first_money"
+          ],
+          "labels": {
+            "idea": "Idea",
+            "first_users": "First users",
+            "first_money": "First money"
+          },
+          "index": true,
+          "required": true,
+          "default": "idea"
+        },
+        {
+          "id": "rank",
+          "label": "Order",
+          "type": "int"
+        },
+        {
+          "id": "done",
+          "label": "Done",
+          "type": "bool",
+          "default": false
+        },
+        {
+          "id": "done_on",
+          "label": "Done on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "agent",
+          "label": "Ticked by",
+          "type": "text",
+          "index": true
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ],
+      "steps": {
+        "of": "venture",
+        "done": "done",
+        "order": "rank"
+      }
+    },
+    {
+      "register": "venture_choices",
+      "name": "Decisions",
+      "icon": "ask",
+      "one": "decision",
+      "holds": "each choice you made on the project and the reason for it",
+      "title": "what",
+      "mobile": [
+        "what",
+        "decided_on"
+      ],
+      "order": {
+        "field": "decided_on",
+        "dir": "desc"
+      },
+      "pack": "new-project",
+      "fields": [
+        {
+          "id": "what",
+          "label": "Decision",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "why",
+          "label": "Because",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "venture",
+          "label": "Project",
+          "type": "ref",
+          "to": "fresh_starts",
+          "index": true
+        },
+        {
+          "id": "decided_on",
+          "label": "Decided on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "venture_weeks",
+      "name": "Weekly notes",
+      "icon": "calendar-days",
+      "one": "week",
+      "holds": "one note a week on where the project stands and what comes next",
+      "title": "gist",
+      "mobile": [
+        "gist",
+        "week_of"
+      ],
+      "order": {
+        "field": "week_of",
+        "dir": "desc"
+      },
+      "pack": "new-project",
+      "fields": [
+        {
+          "id": "gist",
+          "label": "Where it stands",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "venture",
+          "label": "Project",
+          "type": "ref",
+          "to": "fresh_starts",
+          "index": true
+        },
+        {
+          "id": "week_of",
+          "label": "Week of",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "next",
+          "label": "Next week",
+          "type": "text"
+        },
+        {
+          "id": "worry",
+          "label": "In the way",
+          "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "page": "guide",
+      "title": "Your project",
+      "nav": {
+        "section": "Project",
+        "order": 10
+      },
+      "icon": "rocket",
+      "pack": "new-project",
+      "requires": [
+        "register.fresh_starts",
+        "register.venture_steps",
+        "register.venture_choices"
+      ],
+      "blocks": [
+        {
+          "kind": "cards",
+          "lead": true,
+          "heading": "Where you are",
+          "icon": "rocket",
+          "span": 12,
+          "source": "register.fresh_starts",
+          "columns": [
+            {
+              "field": "name",
+              "as": "title"
+            },
+            {
+              "field": "about",
+              "as": "reply",
+              "edit": true
+            },
+            {
+              "field": "stage",
+              "label": "Stage",
+              "as": "fact"
+            },
+            {
+              "metric": "guide-done-by-week",
+              "as": "trend"
+            }
+          ],
+          "limit": 3,
+          "empty": "Add your project and say which stage it is at."
+        },
+        {
+          "kind": "steps",
+          "heading": "Idea: next steps",
+          "icon": "thing",
+          "span": 12,
+          "source": "register.venture_steps",
+          "where": "stage is idea",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "why",
+              "label": "Why it matters"
+            }
+          ],
+          "order": [
+            {
+              "field": "rank",
+              "dir": "asc"
+            },
+            {
+              "field": "seq",
+              "dir": "asc"
+            }
+          ],
+          "limit": 30,
+          "empty": "No step at idea yet."
+        },
+        {
+          "kind": "steps",
+          "heading": "First users: next steps",
+          "icon": "people",
+          "span": 12,
+          "source": "register.venture_steps",
+          "where": "stage is first_users",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "why",
+              "label": "Why it matters"
+            }
+          ],
+          "order": [
+            {
+              "field": "rank",
+              "dir": "asc"
+            },
+            {
+              "field": "seq",
+              "dir": "asc"
+            }
+          ],
+          "limit": 30,
+          "empty": "No step at first users yet."
+        },
+        {
+          "kind": "steps",
+          "heading": "First money: next steps",
+          "icon": "coins",
+          "span": 12,
+          "source": "register.venture_steps",
+          "where": "stage is first_money",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "why",
+              "label": "Why it matters"
+            }
+          ],
+          "order": [
+            {
+              "field": "rank",
+              "dir": "asc"
+            },
+            {
+              "field": "seq",
+              "dir": "asc"
+            }
+          ],
+          "limit": 30,
+          "empty": "No step at first money yet."
+        },
+        {
+          "kind": "table",
+          "heading": "Decisions and why",
+          "icon": "ask",
+          "span": 12,
+          "source": "register.venture_choices",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Decision",
+              "width": "minmax(18ch,1fr)"
+            },
+            {
+              "field": "why",
+              "label": "Because",
+              "width": "minmax(20ch,2fr)"
+            },
+            {
+              "field": "decided_on",
+              "label": "Decided",
+              "width": "13ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "decided_on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 20,
+          "empty": "No decision yet. Write one down with its reason."
+        }
+      ]
+    },
+    {
+      "page": "guide-week",
+      "title": "This week",
+      "nav": {
+        "section": "Project",
+        "order": 20
+      },
+      "icon": "calendar-days",
+      "pack": "new-project",
+      "requires": [
+        "register.venture_weeks",
+        "register.venture_steps"
+      ],
+      "blocks": [
+        {
+          "kind": "cards",
+          "lead": true,
+          "heading": "Where it stands",
+          "icon": "calendar-days",
+          "span": 12,
+          "source": "register.venture_weeks",
+          "columns": [
+            {
+              "field": "gist",
+              "as": "title"
+            },
+            {
+              "field": "week_of",
+              "label": "Week of",
+              "as": "when"
+            },
+            {
+              "field": "next",
+              "label": "Next week",
+              "as": "fact"
+            },
+            {
+              "field": "worry",
+              "label": "In the way",
+              "as": "fact"
+            }
+          ],
+          "order": [
+            {
+              "field": "week_of",
+              "dir": "desc"
+            }
+          ],
+          "limit": 1,
+          "empty": "No note yet. An agent or you can write the first one on Friday."
+        },
+        {
+          "kind": "stat",
+          "heading": "The week in steps",
+          "icon": "gauge",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "guide-done-week",
+              "label": "Ticked in 7 days"
+            },
+            {
+              "metric": "guide-steps-open",
+              "label": "Still to do"
+            },
+            {
+              "metric": "guide-by-agent",
+              "label": "Ticked by an agent"
+            }
+          ]
+        },
+        {
+          "kind": "table",
+          "heading": "Ticked this week",
+          "icon": "circle-check",
+          "span": 12,
+          "source": "register.venture_steps",
+          "where": "done is true, done_on after -7d",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Step"
+            },
+            {
+              "field": "stage",
+              "label": "Stage"
+            },
+            {
+              "field": "agent",
+              "label": "By"
+            },
+            {
+              "field": "done_on",
+              "label": "Done",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "done_on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 20,
+          "empty": "Nothing ticked this week."
+        },
+        {
+          "kind": "table",
+          "heading": "Earlier weeks",
+          "icon": "archive",
+          "span": 12,
+          "source": "register.venture_weeks",
+          "columns": [
+            {
+              "field": "week_of",
+              "label": "Week of",
+              "width": "13ch"
+            },
+            {
+              "field": "gist",
+              "label": "Where it stood"
+            }
+          ],
+          "order": [
+            {
+              "field": "week_of",
+              "dir": "desc"
+            }
+          ],
+          "limit": 12,
+          "empty": "Earlier weeks show here."
+        }
+      ]
+    },
+    {
+      "metric": "guide-steps-open",
+      "name": "Steps still to do",
+      "source": "register.venture_steps",
+      "where": "done is not true",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "guide-steps-done",
+      "name": "Steps done",
+      "source": "register.venture_steps",
+      "where": "done is true",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "guide-done-week",
+      "name": "Steps ticked in 7 days",
+      "source": "register.venture_steps",
+      "where": "done is true, done_on after -7d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "guide-by-agent",
+      "name": "Steps ticked by an agent",
+      "source": "register.venture_steps",
+      "where": "done is true, agent is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "guide-done-by-week",
+      "name": "Steps done, by week",
+      "source": "register.venture_steps",
+      "where": "done is true, done_on after -63d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none",
+      "group_by": "done_on",
+      "bucket": "week"
+    },
+    {
+      "rule": "guide_after_tick",
+      "name": "Ask what comes next when a step is ticked",
+      "register": "venture_steps",
+      "when": "done is true",
+      "once_per": [
+        "entry"
+      ],
+      "enabled": false,
+      "then": [
+        {
+          "suggest": {
+            "question": "{{what}} is done. Move on to the next step?",
+            "options": [
+              "Yes",
+              "Not yet"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "seeds": [
+    {
+      "register": "fresh_starts",
+      "fields": {
+        "name": "Lanternfish",
+        "about": "A small tool that sorts a photographer's receipts.",
+        "stage": "first_users"
+      }
+    },
+    {
+      "register": "venture_steps",
+      "fields": {
+        "what": "Write the problem in one sentence",
+        "stage": "idea",
+        "rank": 1,
+        "done": true,
+        "done_on": {
+          "day": "-20"
+        }
+      }
+    },
+    {
+      "register": "venture_steps",
+      "fields": {
+        "what": "Talk to five people who have it",
+        "why": "Hearing it in their words beats guessing.",
+        "stage": "first_users",
+        "rank": 1,
+        "done": true,
+        "done_on": {
+          "day": "-3"
+        },
+        "agent": "wren"
+      }
+    },
+    {
+      "register": "venture_steps",
+      "fields": {
+        "what": "Get three of them using it for a week",
+        "stage": "first_users",
+        "rank": 2
+      }
+    },
+    {
+      "register": "venture_steps",
+      "fields": {
+        "what": "Ask one user to pay a small price",
+        "why": "A yes or a no is worth more than a compliment.",
+        "stage": "first_money",
+        "rank": 1
+      }
+    },
+    {
+      "register": "venture_choices",
+      "fields": {
+        "what": "Start with photographers only",
+        "why": "One kind of customer is easier to reach and to please.",
+        "decided_on": {
+          "day": "-14"
+        }
+      }
+    },
+    {
+      "register": "venture_weeks",
+      "fields": {
+        "gist": "Five conversations done, three people want to try it.",
+        "week_of": {
+          "day": "-3"
+        },
+        "next": "Set up the trial for Priya and Teodor.",
+        "worry": "The import is slow."
+      }
+    }
+  ]
+}

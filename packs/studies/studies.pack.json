@@ -1,10 +1,10 @@
 {
   "pack": "studies",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "icon": "graduation-cap",
   "title": "Studies",
   "summary": "Now part of Student. Your courses, assignments with due dates, marks as numbers with a trend for each course, a reading list and study sessions. Says what is due this week first.",
-  "changes": "Now part of Student, which holds what this brought. A record that holds this keeps it, and it still installs by its name. Nothing in it changed.",
+  "changes": "Studies no longer opens on a count of work due and late, since the lists under it show them. Nothing it reads or writes changed.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
@@ -287,12 +287,6 @@
         "register.study_sessions"
       ],
       "blocks": [
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "body": "{{studies-due-week}} due this week, {{studies-late}} late."
-        },
         {
           "kind": "table",
           "heading": "Due this week",

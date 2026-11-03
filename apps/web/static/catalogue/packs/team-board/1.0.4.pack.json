@@ -1,0 +1,516 @@
+{
+  "pack": "team-board",
+  "version": "1.0.4",
+  "icon": "board",
+  "title": "Team task list",
+  "summary": "Now part of Team board. Tasks with an owner, a person or an agent, a status and a priority, a board to move them across, and a page that says who is doing what right now, fed by agent sessions.",
+  "changes": "The board no longer opens on a count of open, blocked and urgent tasks, since the board shows them. Nothing it reads or writes changed.",
+  "unlisted": true,
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "register": "teammates",
+      "name": "Team",
+      "icon": "people",
+      "one": "member",
+      "holds": "each person and each agent that can own a task",
+      "title": "name",
+      "mobile": [
+        "name",
+        "kind"
+      ],
+      "pack": "team-board",
+      "delete": "refuse_while_referenced",
+      "fields": [
+        {
+          "id": "name",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "kind",
+          "label": "Kind",
+          "type": "enum",
+          "values": [
+            "person",
+            "agent"
+          ],
+          "labels": {
+            "person": "Person",
+            "agent": "Agent"
+          },
+          "index": true,
+          "required": true,
+          "default": "person"
+        },
+        {
+          "id": "login",
+          "label": "Handle",
+          "type": "text"
+        },
+        {
+          "id": "role",
+          "label": "Role",
+          "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "team_tasks",
+      "name": "Team tasks",
+      "icon": "task",
+      "one": "task",
+      "holds": "each task, who owns it, how urgent it is and where it stands",
+      "title": "what",
+      "mobile": [
+        "what",
+        "owner",
+        "state"
+      ],
+      "state": "state",
+      "done": [
+        "done"
+      ],
+      "pack": "team-board",
+      "fields": [
+        {
+          "id": "what",
+          "label": "Task",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "owner",
+          "label": "Owner",
+          "type": "ref",
+          "to": "teammates",
+          "index": true
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "todo",
+            "doing",
+            "review",
+            "blocked",
+            "done"
+          ],
+          "labels": {
+            "todo": "To do",
+            "doing": "Doing",
+            "review": "In review",
+            "blocked": "Blocked",
+            "done": "Done"
+          },
+          "index": true,
+          "required": true,
+          "default": "todo"
+        },
+        {
+          "id": "priority",
+          "label": "Priority",
+          "type": "enum",
+          "values": [
+            "urgent",
+            "high",
+            "normal",
+            "low"
+          ],
+          "labels": {
+            "urgent": "Urgent",
+            "high": "High",
+            "normal": "Normal",
+            "low": "Low"
+          },
+          "index": true,
+          "default": "normal"
+        },
+        {
+          "id": "due",
+          "label": "Due",
+          "type": "day",
+          "index": true,
+          "deadline": true
+        },
+        {
+          "id": "done_on",
+          "label": "Done on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "note",
+          "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "page": "team-board",
+      "title": "Board",
+      "nav": {
+        "section": "Team",
+        "order": 10
+      },
+      "icon": "board",
+      "pack": "team-board",
+      "requires": [
+        "register.teammates",
+        "register.team_tasks"
+      ],
+      "blocks": [
+        {
+          "kind": "capture",
+          "heading": "What needs doing?",
+          "icon": "plus",
+          "span": 12,
+          "register": "team_tasks"
+        },
+        {
+          "kind": "board",
+          "span": 12,
+          "source": "register.team_tasks",
+          "columns": [
+            {
+              "field": "state"
+            },
+            {
+              "field": "what"
+            },
+            {
+              "field": "priority"
+            },
+            {
+              "field": "owner"
+            }
+          ],
+          "order": [
+            {
+              "field": "priority",
+              "dir": "asc"
+            },
+            {
+              "field": "due",
+              "dir": "asc"
+            }
+          ],
+          "working": true
+        }
+      ]
+    },
+    {
+      "page": "team-now",
+      "title": "Who is doing what",
+      "nav": {
+        "section": "Team",
+        "order": 20
+      },
+      "icon": "session",
+      "pack": "team-board",
+      "requires": [
+        "register.team_tasks"
+      ],
+      "blocks": [
+        {
+          "kind": "cards",
+          "lead": true,
+          "heading": "Agents working now",
+          "icon": "session",
+          "span": 12,
+          "source": "sessions.working",
+          "columns": [
+            {
+              "field": "doing",
+              "as": "title"
+            },
+            {
+              "field": "agent",
+              "as": "who"
+            },
+            {
+              "field": "last_seen",
+              "as": "when"
+            }
+          ],
+          "limit": 12,
+          "empty": "No agent is working right now. Agents you connect show here while they work."
+        },
+        {
+          "kind": "table",
+          "heading": "Doing now",
+          "icon": "activity",
+          "span": 12,
+          "source": "register.team_tasks",
+          "where": "state is doing",
+          "columns": [
+            {
+              "field": "owner",
+              "label": "Who",
+              "width": "minmax(10ch,18ch)"
+            },
+            {
+              "field": "what",
+              "label": "Doing",
+              "width": "minmax(18ch,1fr)"
+            },
+            {
+              "field": "priority",
+              "label": "Priority",
+              "width": "12ch"
+            },
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "priority",
+              "dir": "asc"
+            }
+          ],
+          "limit": 30,
+          "empty": "Nobody has a task in progress."
+        },
+        {
+          "kind": "table",
+          "heading": "Blocked",
+          "icon": "octagon-alert",
+          "span": 12,
+          "source": "register.team_tasks",
+          "where": "state is blocked",
+          "columns": [
+            {
+              "field": "owner",
+              "label": "Who"
+            },
+            {
+              "field": "what",
+              "label": "Task"
+            },
+            {
+              "field": "note",
+              "label": "Why"
+            }
+          ],
+          "limit": 20,
+          "when": {
+            "metric": "team-blocked",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Waiting for review",
+          "icon": "hourglass",
+          "span": 12,
+          "source": "register.team_tasks",
+          "where": "state is review",
+          "columns": [
+            {
+              "field": "owner",
+              "label": "Who"
+            },
+            {
+              "field": "what",
+              "label": "Task"
+            }
+          ],
+          "limit": 20,
+          "empty": "Nothing is waiting for review."
+        },
+        {
+          "kind": "agents",
+          "heading": "What agents did",
+          "icon": "activity",
+          "span": 12,
+          "source": "activity",
+          "first": 5,
+          "empty": "No agent has changed anything here yet."
+        }
+      ]
+    },
+    {
+      "metric": "team-open",
+      "name": "Open tasks",
+      "source": "register.team_tasks",
+      "where": "state is not done",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "team-blocked",
+      "name": "Blocked tasks",
+      "source": "register.team_tasks",
+      "where": "state is blocked",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "team-urgent",
+      "name": "Urgent tasks",
+      "source": "register.team_tasks",
+      "where": "state is not done, priority is urgent",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "team-doing",
+      "name": "Tasks in progress",
+      "source": "register.team_tasks",
+      "where": "state is doing",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "team-done-week",
+      "name": "Done in 7 days",
+      "source": "register.team_tasks",
+      "where": "state is done, done_on after -7d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "rule": "team_ask_unblock",
+      "name": "Ask what unblocks a blocked task",
+      "register": "team_tasks",
+      "when": "state is blocked",
+      "once_per": [
+        "entry"
+      ],
+      "enabled": false,
+      "then": [
+        {
+          "suggest": {
+            "question": "Who can unblock {{what}}?",
+            "options": [
+              "Ask the owner",
+              "Give it to someone else"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "seeds": [
+    {
+      "register": "teammates",
+      "fields": {
+        "name": "Mara Lindqvist",
+        "kind": "person",
+        "login": "mara",
+        "role": "Lead"
+      }
+    },
+    {
+      "register": "teammates",
+      "fields": {
+        "name": "Teodor Vance",
+        "kind": "person",
+        "login": "teo",
+        "role": "Design"
+      }
+    },
+    {
+      "register": "teammates",
+      "fields": {
+        "name": "Wren",
+        "kind": "agent",
+        "login": "wren",
+        "role": "Writes drafts and fixes"
+      }
+    },
+    {
+      "register": "team_tasks",
+      "fields": {
+        "what": "Draft the spring newsletter",
+        "state": "doing",
+        "priority": "normal",
+        "due": {
+          "day": "+3"
+        }
+      }
+    },
+    {
+      "register": "team_tasks",
+      "fields": {
+        "what": "Fix the checkout rounding bug",
+        "state": "review",
+        "priority": "high"
+      }
+    },
+    {
+      "register": "team_tasks",
+      "fields": {
+        "what": "Book the venue for May",
+        "state": "blocked",
+        "priority": "urgent",
+        "note": "Waiting for the quote."
+      }
+    },
+    {
+      "register": "team_tasks",
+      "fields": {
+        "what": "Update the pricing page",
+        "state": "todo",
+        "priority": "low"
+      }
+    }
+  ]
+}

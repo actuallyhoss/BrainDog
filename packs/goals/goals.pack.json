@@ -1,10 +1,10 @@
 {
   "pack": "goals",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "icon": "star",
   "title": "Goals",
   "summary": "What you are saving for: a goal for an account, a currency or a value you keep up, a target and a day, how much to put by each month, and whether you are on track.",
-  "changes": "Opens on what to add and a box to add the first goal when there are none, counted by a new Goals figure.",
+  "changes": "Goals no longer opens on how many goals are behind, since the figures under it say so. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -453,16 +453,6 @@
             "metric": "goals-count",
             "lt": 1
           }
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": {
-            "metric": "goals-count",
-            "gt": 0
-          },
-          "body": "{{goals-behind}} of {{goals-saving}} goals {{bad:behind}}."
         },
         {
           "kind": "stat",

@@ -1,0 +1,160 @@
+{
+  "usecase": "studies",
+  "version": "1.1.0",
+  "title": "Studies",
+  "summary": "Courses, assignments and when they are due, your marks as numbers with a trend for each course, and what you are reading.",
+  "changes": "Home no longer opens on a count of work due and late, since the lists under it show them. Nothing you hold changes.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "individual",
+  "tone": "plain and encouraging",
+  "signals": [
+    "studies",
+    "my courses",
+    "assignments",
+    "assignment",
+    "due dates",
+    "grades",
+    "my grades",
+    "marks",
+    "grade trend",
+    "reading list",
+    "study sessions",
+    "coursework",
+    "homework",
+    "revision"
+  ],
+  "modules": [
+    "studies"
+  ],
+  "needs": [
+    "studies"
+  ],
+  "voice": {
+    "coming_up": "Due this week",
+    "nothing_due": "Nothing is due in the next two weeks. A good time to get ahead.",
+    "fills_with": "What is due, your marks and what you are reading show up here as you add your courses."
+  },
+  "skills": [],
+  "pack": {
+    "pack": "usecase-studies",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "page": "home-studies",
+        "title": "Today",
+        "icon": "home",
+        "requires": [
+          "register.session"
+        ],
+        "blocks": [
+          {
+            "kind": "table",
+            "lead": true,
+            "heading": "Due this week",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "register.assignments",
+            "where": "state is todo or doing, due after yesterday, due before +8d",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Assignment",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "course",
+                "label": "Course",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "due",
+                "label": "Due",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "due",
+                "dir": "asc"
+              }
+            ],
+            "limit": 8,
+            "empty": "{{config:voice_nothing_due}}"
+          },
+          {
+            "kind": "stat",
+            "heading": "How it is going",
+            "icon": "gauge",
+            "span": 12,
+            "cells": [
+              {
+                "metric": "studies-late",
+                "label": "Late"
+              },
+              {
+                "metric": "studies-average",
+                "label": "Average mark"
+              },
+              {
+                "metric": "studies-minutes-week",
+                "label": "Minutes studied, 7 days"
+              }
+            ]
+          },
+          {
+            "kind": "cards",
+            "heading": "Courses",
+            "icon": "notebook-pen",
+            "span": 12,
+            "source": "register.courses",
+            "where": "state is running",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "goal",
+                "label": "Aiming for",
+                "as": "fact"
+              },
+              {
+                "metric": "course-marks:{{name}}",
+                "as": "trend"
+              }
+            ],
+            "limit": 6,
+            "empty": "{{config:voice_fills_with}}"
+          },
+          {
+            "kind": "queue",
+            "heading": "Needs your call",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "limit": 5,
+            "when": {
+              "metric": "questions-open",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "feed",
+            "heading": "What changed",
+            "icon": "activity",
+            "span": 12,
+            "source": "activity",
+            "first": 8,
+            "empty": "{{config:voice_fills_with}}"
+          }
+        ]
+      }
+    ]
+  }
+}

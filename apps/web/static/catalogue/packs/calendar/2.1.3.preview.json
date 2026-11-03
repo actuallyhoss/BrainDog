@@ -1,0 +1,246 @@
+{
+  "format": 1,
+  "made_at": "2026-11-03T21:09:23.513Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Nothing is on your calendar in the next sixty days. If it is not connected yet, Connect Google, or paste your calendar's private link: both are on this plugin's page.",
+          "heading": "Nothing coming up",
+          "icon": "calendar",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "events-ahead"
+          },
+          "key": "k1fdre0w",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "day",
+              "label": "Day",
+              "width": "12ch"
+            },
+            {
+              "field": "time",
+              "label": "At",
+              "width": "7ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "organiser",
+              "label": "From",
+              "width": "minmax(10ch,16ch)"
+            }
+          ],
+          "empty": "No invitations waiting on your answer.",
+          "heading": "Invitations to answer",
+          "icon": "mail",
+          "kind": "table",
+          "limit": 20,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "day"
+            },
+            {
+              "dir": "asc",
+              "field": "time"
+            }
+          ],
+          "source": "register.events",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "events-invites"
+          },
+          "where": "invite is true, response is waiting, gone is not true, day after yesterday",
+          "key": "k0nr8xms",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "time",
+              "label": "At",
+              "width": "7ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "place",
+              "label": "Where",
+              "width": "minmax(10ch,16ch)"
+            }
+          ],
+          "empty": "Nothing today.",
+          "heading": "Today",
+          "icon": "calendar-check",
+          "kind": "table",
+          "limit": 20,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "time"
+            }
+          ],
+          "source": "register.events",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "events-today"
+          },
+          "where": "gone is not true, day is today",
+          "key": "k0n398tg",
+          "rows": [
+            {
+              "id": "01M6HKXJDS4D71P7B9MW2Y176A",
+              "register": "events",
+              "seq": 1,
+              "fields": {
+                "all_day": false,
+                "gone": false,
+                "invite": false,
+                "what": "Standup",
+                "day": "2026-11-03",
+                "time": "09:30"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDS4D71P7B9N08VXD40",
+              "register": "events",
+              "seq": 2,
+              "fields": {
+                "all_day": false,
+                "gone": false,
+                "invite": false,
+                "what": "Lunch with Sam",
+                "day": "2026-11-03",
+                "time": "13:00",
+                "place": "Dishoom"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "day",
+              "label": "Day",
+              "width": "12ch"
+            },
+            {
+              "field": "time",
+              "label": "At",
+              "width": "7ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "place",
+              "label": "Where",
+              "width": "minmax(10ch,16ch)"
+            }
+          ],
+          "empty": "Nothing coming up.",
+          "heading": "Coming up",
+          "icon": "calendar-days",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "day"
+            },
+            {
+              "dir": "asc",
+              "field": "time"
+            }
+          ],
+          "source": "register.events",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "events-ahead"
+          },
+          "where": "gone is not true, day after today",
+          "key": "k1ece7ul",
+          "rows": [
+            {
+              "id": "01M6HKXJDS4D71P7B9N3YG4REN",
+              "register": "events",
+              "seq": 3,
+              "fields": {
+                "all_day": false,
+                "gone": false,
+                "invite": false,
+                "what": "Design review",
+                "day": "2026-11-05",
+                "time": "15:00"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        }
+      ],
+      "icon": "calendar",
+      "nav": {
+        "order": 20,
+        "section": "Life"
+      },
+      "pack": "calendar",
+      "page": "events",
+      "requires": [
+        "register.events"
+      ],
+      "title": "Events",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "events",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

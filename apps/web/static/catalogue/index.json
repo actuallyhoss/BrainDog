@@ -263,8 +263,43 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.1.2",
+      "latest": "2.1.3",
       "versions": [
+        {
+          "version": "2.1.3",
+          "checksum": "61cf22f3376669960f9cd899c137475af2f32a7a144d017c6eca032a07837cc3",
+          "bytes": 30683,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Events"
+            ],
+            "pages": [
+              "Events"
+            ],
+            "rules": [
+              "Ask about an invitation you have not answered"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "calendar.google.com",
+                "line": "CALLS OUT calendar.google.com, outlook.office365.com and outlook.live.com · every 1h · key \"Calendar link\" to the host its keychain entry opens",
+                "key": "Calendar link"
+              }
+            ],
+            "widgets": [
+              "Next meetings",
+              "Today's events",
+              "Invitations"
+            ]
+          },
+          "notes": "Events no longer opens on a line counting what is on today and coming up, since the lists under it show them. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "2.1.2",
           "checksum": "dc2bca416705702c5dae18b43aedefe715cb6699880ccddc37b44ce78b83d6db",
@@ -666,8 +701,45 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.3",
+      "latest": "2.0.4",
       "versions": [
+        {
+          "version": "2.0.4",
+          "checksum": "8e27fff289fe6f97ddcf166a85599f765fcd0d3416cb2e7b438c6e608d330614",
+          "bytes": 23664,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Certificates"
+            ],
+            "pages": [
+              "Certificates"
+            ],
+            "rules": [
+              "Work out what a certificate has earned",
+              "Ask to move a certificate's next payout on when its payout is booked"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.transactions",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Certificates no longer opens on the next payout day, since the table shows each one's. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "2.0.3",
           "checksum": "983e565581c47b61377ca0b3f712ab42d5d129433d90e669803ca04efad0f220",
@@ -1821,8 +1893,66 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.3.0",
+      "latest": "1.3.1",
       "versions": [
+        {
+          "version": "1.3.1",
+          "checksum": "bd0615fad0139c8d0390f7610bbc356eaeac81861384895d0d2d72a17cfbe94d",
+          "bytes": 92600,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Mail"
+            ],
+            "pages": [
+              "Mail"
+            ],
+            "rules": [
+              "Ask about a mail a person is waiting on your reply to",
+              "Ask about a mail that looks like a bill",
+              "Ask about a mail that looks like a receipt",
+              "Ask about a mail from a person with a date in it",
+              "Ask once about many mails at a time",
+              "Take a mail you replied to off Waiting on your reply",
+              "Take a mail that needs no reply off Waiting on your reply",
+              "Clear a mail you said is not a bill",
+              "Clear a mail you said is not a receipt",
+              "Add a receipt you said to add to Money",
+              "Leave the mails you said to leave"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Mail",
+              "Waiting on your reply"
+            ],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": true
+              },
+              {
+                "id": "register.organisations",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Mail no longer opens on a count of what waits on your reply and what is unread, since the page lists them. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "1.3.0",
           "checksum": "8113818a1137af2afab9a6645e443286fe9a6f498b436eada3780286670323b9",
@@ -2139,8 +2269,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.2.0",
+      "latest": "2.2.1",
       "versions": [
+        {
+          "version": "2.2.1",
+          "checksum": "9c9c465dd8a07ab5eaa45048d90c71925b08bb4319ad5f631d615fb7c8706348",
+          "bytes": 19898,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Goals"
+            ],
+            "pages": [
+              "Goals"
+            ],
+            "rules": [
+              "goals_pace",
+              "goals_pace_on_balance"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Savings goals"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Goals no longer opens on how many goals are behind, since the figures under it say so. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "2.2.0",
           "checksum": "c6c0e401ce6a46bc1993a55ad98e097c2e27ae9aa405b4c2b936db01dae3c41a",
@@ -2532,8 +2698,60 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "3.7.1",
+      "latest": "3.7.2",
       "versions": [
+        {
+          "version": "3.7.2",
+          "checksum": "ad160819e451ba8a1a7a2e8db8b90177769cf349f04f2e04d16d0fb6ef948e32",
+          "bytes": 62739,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings",
+              "Buys",
+              "Gold rates"
+            ],
+            "pages": [
+              "Investments and gold",
+              "{{label}}"
+            ],
+            "rules": [
+              "holdings_cost",
+              "holdings_buy",
+              "holdings_rate",
+              "Say when a price is over 30 days old",
+              "Say when a gold rate is over 7 days old"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "latest.currency-api.pages.dev",
+                "line": "CALLS OUT latest.currency-api.pages.dev, cdn.jsdelivr.net and api.gold-api.com · every 1d · no key",
+                "key": null
+              }
+            ],
+            "widgets": [
+              "Gold price"
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.fx",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Holdings no longer opens on a count of what you hold. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "3.7.1",
           "checksum": "9e46b491f0f7fc229ba1552c81186f9cc6c54061762e7a91998b3a9612d54925",
@@ -3320,8 +3538,42 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "2.0.5",
+      "latest": "2.0.6",
       "versions": [
+        {
+          "version": "2.0.6",
+          "checksum": "fba79acb362075231df871cd7f53c2287a2f4aba1649a971973d8d2fa06a44fd",
+          "bytes": 35187,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Policies",
+              "Illustration years"
+            ],
+            "pages": [
+              "Insurance",
+              "{{name}}"
+            ],
+            "rules": [
+              "insurance_figures"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.recurring",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Insurance no longer opens on the fund value and next maturity, since the figures and cards under it show them. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "2.0.5",
           "checksum": "a92d651b84619a8afc5958d759d0756ed49196be01d8ba9e340ff464e6adced2",
@@ -3691,8 +3943,42 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.3",
+      "latest": "1.0.4",
       "versions": [
+        {
+          "version": "1.0.4",
+          "checksum": "5d90d9d19fc2f653ab3a00a61d91faa1b93b37c2990056d466f22d174e655b7c",
+          "bytes": 14186,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Properties",
+              "Tenancies",
+              "Rent received",
+              "Repairs"
+            ],
+            "pages": [
+              "Lettings",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Lettings no longer opens on the rent due and received, since This month shows both. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "1.0.3",
           "checksum": "206eedb012ea0d39e109ba65e04d4b491318db9f78c5d7792001e30b3db6b289",
@@ -3826,8 +4112,49 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "3.0.1",
+      "latest": "3.0.2",
       "versions": [
+        {
+          "version": "3.0.2",
+          "checksum": "67a18e48dfee6e4eadd36793e2b6d356381534d7b9296bd641a3c6edaf6311df",
+          "bytes": 21416,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "pad"
+            ],
+            "lists": [
+              "Parts",
+              "Steps",
+              "Helpers",
+              "Budget lines",
+              "Price check",
+              "Lessons"
+            ],
+            "pages": [
+              "Desk",
+              "{{name}}",
+              "Numbers"
+            ],
+            "rules": [],
+            "examples": 1,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.notes",
+                "writes": false
+              },
+              {
+                "id": "governance.open",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "The desk no longer opens on a count of essential steps done. The line that asks for the first essential step stays. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "3.0.1",
           "checksum": "4f1c0368f7db285fb015ff2138df67d1b0ce6d908a8d4968d4f2e5e81e1eccce",
@@ -4795,8 +5122,36 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.3",
+      "latest": "1.0.4",
       "versions": [
+        {
+          "version": "1.0.4",
+          "checksum": "7a5a40da2e1db9caa9408acff0fa34502eef4faff7e2a25eb3cda7a9f453de2e",
+          "bytes": 17336,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Projects",
+              "Next steps",
+              "Decisions",
+              "Weekly notes"
+            ],
+            "pages": [
+              "Your project",
+              "This week"
+            ],
+            "rules": [
+              "Ask what comes next when a step is ticked"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The guide no longer opens on a count of steps to do and done, since the steps under it show them. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "1.0.3",
           "checksum": "fd3aeec0109146814067607bd46c57f9a5ee25e8c18b03a6721ec597725d910c",
@@ -5150,8 +5505,42 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.3",
+      "latest": "1.0.4",
       "versions": [
+        {
+          "version": "1.0.4",
+          "checksum": "167d24bb6945845b62af871ff994672fb5096cc7e95ccd64508d6c5da040a175",
+          "bytes": 10578,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Shoots",
+              "Deliverables",
+              "Gear"
+            ],
+            "pages": [
+              "Shoots",
+              "Due",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Shoots and Still to send no longer open on a count of shoots and deliverables, since the figures and lists under them show them. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "1.0.3",
           "checksum": "92bbc808969d5d18d609e41a9a5815040fd62e241de91d44f1156c2bb98767dd",
@@ -8406,8 +8795,35 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.3",
+      "latest": "1.0.4",
       "versions": [
+        {
+          "version": "1.0.4",
+          "checksum": "1617904ab74b11690ad701bc07972508adaff593a43a611b95afbf0f80559f9c",
+          "bytes": 16265,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Reading list",
+              "Study sessions"
+            ],
+            "pages": [
+              "Studies"
+            ],
+            "rules": [
+              "Ask whether to plan study for a new assignment"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Studies no longer opens on a count of work due and late, since the lists under it show them. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "1.0.3",
           "checksum": "2905ac1f13dbdd94cfda1e602db035e25322e82cc0bd821565ac300867b040b9",
@@ -8996,8 +9412,44 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.0.3",
+      "latest": "1.0.4",
       "versions": [
+        {
+          "version": "1.0.4",
+          "checksum": "97ec3f35ac5649d7b5812d86aac5847251577312203fc95fd67724ad32a01d1b",
+          "bytes": 11655,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Team",
+              "Team tasks"
+            ],
+            "pages": [
+              "Board",
+              "Who is doing what"
+            ],
+            "rules": [
+              "Ask what unblocks a blocked task"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "sessions.working",
+                "writes": false
+              },
+              {
+                "id": "activity",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "The board no longer opens on a count of open, blocked and urgent tasks, since the board shows them. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "1.0.3",
           "checksum": "61aae770b1544c6522170ccab25060703469d5d1c4aedcd02f1b782c071d9f5e",
@@ -9123,8 +9575,44 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.1.0",
+      "latest": "2.1.1",
       "versions": [
+        {
+          "version": "2.1.1",
+          "checksum": "01d40f87b4c78164b70c353dae34a441568db87354b62674126ab40b076d6038",
+          "bytes": 20289,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Trips"
+            ],
+            "pages": [
+              "Trips",
+              "{{name}}"
+            ],
+            "rules": [
+              "File the Ledger's lines of a trip's days into it"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Trip countdown"
+            ],
+            "uses": [
+              {
+                "id": "register.transactions",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "Trips no longer opens on a count of trips. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "2.1.0",
           "checksum": "edfb9933d81ba7747d0485f80672e90853bd8ab199a65ecc045ab663850688b4",
@@ -10734,8 +11222,30 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "b894e2c98b13cbb529bc1ffc6fff63a932c961d0ac9f7ed96ec7d80d17492b7f",
+          "bytes": 3171,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people",
+              "landlord"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Today no longer opens on how many questions need your call, since Needs your call lists them. Nothing you hold changes."
+        },
         {
           "version": "1.0.0",
           "checksum": "491cba2cf8d72d1cf56dd34cb53c5e2757d25098f3ff5ffb08b83d92f6eace84",
@@ -10804,8 +11314,29 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "starter",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "6d4844ed5feda4bf6406450a504298676fd82d83df5a7119150ac730f207811d",
+          "bytes": 3413,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "new-project"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Home no longer opens on a count of steps to do and ticked, since the steps under it show them. Nothing you hold changes."
+        },
         {
           "version": "1.0.0",
           "checksum": "d1bb0c5092c1ae231d084faebdd19e51277a300a788b650bec58581bd611f95f",
@@ -11284,8 +11815,30 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "e84a0d579dd21d6666f91467cef9cc21fb3767d9fbca26763b4044c073d60ed4",
+          "bytes": 3234,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people",
+              "photographer"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Today no longer opens on how many questions need your call, since Needs your call lists them. Nothing you hold changes."
+        },
         {
           "version": "1.0.0",
           "checksum": "d546ec962efee041d13ed679cb0e83c15f58c8dcec90112dd08e32a051d0925e",
@@ -11354,8 +11907,30 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "e3019c2d72798f05bbef7ec35f2e8449b73a7e9f831264764bf8729ea50123ef",
+          "bytes": 3146,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people",
+              "retainer-hours"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Today no longer opens on how many questions need your call, since Needs your call lists them. Nothing you hold changes."
+        },
         {
           "version": "1.0.0",
           "checksum": "2848e9bf9b5bfc5e68eefae426ae2ad7a25d2925fc5b9035b6ca743543037449",
@@ -11814,8 +12389,29 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "7e9c6c513b2142897aaddcd24db4831b90547f3f65f8d146c980ddada5266d31",
+          "bytes": 4203,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "studies"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Home no longer opens on a count of work due and late, since the lists under it show them. Nothing you hold changes."
+        },
         {
           "version": "1.0.0",
           "checksum": "2b34c143afc44e6a6e2570e4c57f6d36b6195d1b0c6a94a2a970b6ec1b60e3c5",
@@ -12553,8 +13149,29 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "team",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "fcabde0e62779fc07c254a3d61fb189ba653ec8a75ff4b7ed76bfd4ec545479d",
+          "bytes": 3938,
+          "published_at": "2026-11-03T21:11:35.176Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "team-board"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Home no longer opens on a count of open, blocked and urgent tasks, since the lists under it show them. Nothing you hold changes."
+        },
         {
           "version": "1.0.0",
           "checksum": "1547ded20e5d4d375d16715521809680a97a8609548adcc1a636f58736cc5b6c",

@@ -1,9 +1,9 @@
 {
   "usecase": "studies",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "title": "Studies",
   "summary": "Courses, assignments and when they are due, your marks as numbers with a trend for each course, and what you are reading.",
-  "changes": "The first version.",
+  "changes": "Home no longer opens on a count of work due and late, since the lists under it show them. Nothing you hold changes.",
   "author": "BrainDog",
   "license": "MIT",
   "audience": "individual",
@@ -52,12 +52,6 @@
           "register.session"
         ],
         "blocks": [
-          {
-            "kind": "note",
-            "lead": true,
-            "span": 12,
-            "body": "{{studies-due-week}} due this week, {{studies-late}} late."
-          },
           {
             "kind": "table",
             "lead": true,

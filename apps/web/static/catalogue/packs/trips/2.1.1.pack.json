@@ -1,0 +1,523 @@
+{
+  "pack": "trips",
+  "version": "2.1.1",
+  "icon": "plane",
+  "title": "Trips",
+  "summary": "Name a trip with its dates and file the Ledger's lines into it, and each trip says what it cost in total, by category and in each currency.",
+  "changes": "Trips no longer opens on a count of trips. Nothing it reads or writes changed.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.0.0 <4.0.0"
+    }
+  },
+  "extends": {
+    "register.transactions": {
+      "fields": [
+        {
+          "id": "trip",
+          "label": "Trip",
+          "type": "ref",
+          "to": "trips"
+        }
+      ]
+    }
+  },
+  "widgets": [
+    {
+      "id": "trip-countdown",
+      "title": "Trip countdown",
+      "says": "The days until your next trip, or the one you pick. It leaves the board on its own once you are back.",
+      "group": "life",
+      "for": "personal",
+      "icon": "plane",
+      "block": {
+        "kind": "drawn",
+        "heading": "{{trip}}",
+        "icon": "plane",
+        "source": "register.trips",
+        "where": "name is \"{{trip}}\"",
+        "columns": [
+          {
+            "field": "name"
+          },
+          {
+            "field": "from"
+          },
+          {
+            "field": "to"
+          }
+        ],
+        "order": [
+          {
+            "field": "from",
+            "dir": "asc"
+          }
+        ],
+        "limit": 1,
+        "until": "{{trip_until}}",
+        "code": "<div class=\"trip\" id=\"trip\"></div>\n<style>\n  .trip { display: grid; gap: 4px; }\n  .trip button { all: unset; cursor: pointer; display: grid; gap: 4px; }\n  .trip .n { font-size: 40px; line-height: 1.05; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }\n  .trip .what { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n  .trip .when { color: var(--ink-3); font-size: 13px; }\n  .trip .road { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }\n  .trip .road i { display: block; width: 8px; height: 8px; border-radius: 4px; background: var(--rule); }\n  .trip .road i.on { background: var(--red); }\n  .trip.small .n { font-size: 32px; }\n  .trip.small .when, .trip.small .road, .trip.wide .road, .trip.full .road { display: none; }\n  .trip .none { color: var(--ink-3); }\n</style>\n<script>\n  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];\n  function day(s) {\n    var m = /^(\\d{4})-(\\d{2})-(\\d{2})/.exec(String(s == null ? '' : s));\n    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null;\n  }\n  function said(t) { var d = new Date(t); return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()]; }\n  function today() { var n = new Date(); return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()); }\n  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }\n  braindog.on(function (data, theme, size) {\n    var box = document.getElementById('trip');\n    box.className = 'trip ' + (size || 'wide');\n    box.textContent = '';\n    var now = today();\n    var rows = data.rows.filter(function (r) {\n      var end = day(r.fields.to) || day(r.fields.from);\n      return end !== null && end >= now;\n    });\n    if (rows.length === 0) { box.append(el('p', 'none', 'No trip coming up.')); return; }\n    var r = rows[0];\n    var from = day(r.fields.from) || now;\n    var to = day(r.fields.to) || from;\n    var name = r.fields.name == null || r.fields.name === '' ? 'Your trip' : String(r.fields.name);\n    var left = Math.round((from - now) / 864e5);\n    var b = el('button');\n    b.onclick = function () { braindog.open(r.ref); };\n    if (left > 0) {\n      b.append(el('div', 'n', left === 1 ? '1 day' : left + ' days'), el('div', 'what', 'until ' + name));\n    } else {\n      var k = Math.round((now - from) / 864e5) + 1;\n      var all = Math.round((to - from) / 864e5) + 1;\n      b.append(el('div', 'n', all > 1 ? 'Day ' + k + ' of ' + all : 'Today'), el('div', 'what', name));\n    }\n    b.append(el('div', 'when', to !== from ? said(from) + ' to ' + said(to) : said(from)));\n    if (left > 0 && left <= 60) {\n      var road = el('div', 'road');\n      for (var i = 0; i < Math.min(left, 42); i++) road.append(el('i', i === 0 ? 'on' : null));\n      b.append(road);\n    }\n    box.append(b);\n  });\n</script>"
+      },
+      "blanks": [
+        {
+          "id": "trip",
+          "asks": "Which trip?",
+          "from": {
+            "source": "register.trips",
+            "field": "name",
+            "where": "to after yesterday",
+            "order": [
+              {
+                "field": "from",
+                "dir": "asc"
+              }
+            ],
+            "until": "to",
+            "starts": "from"
+          }
+        }
+      ],
+      "sizes": [
+        "small",
+        "wide",
+        "tall"
+      ],
+      "size": "small",
+      "needs": {
+        "lists": [
+          "trips"
+        ]
+      },
+      "rows": {
+        "title": "name",
+        "day": "from"
+      },
+      "example": {
+        "figures": [
+          {
+            "label": "until Lisbon",
+            "said": "16 days"
+          }
+        ]
+      },
+      "words": [
+        "travel",
+        "holiday",
+        "countdown",
+        "flight",
+        "days until",
+        "next trip",
+        "trip"
+      ],
+      "asked": [
+        {
+          "match": "\\b(trip|travel|flight|holiday)\\b",
+          "about": "your trip"
+        }
+      ],
+      "leads": [
+        "trips"
+      ],
+      "near": {
+        "day": "from",
+        "within": 14,
+        "unnamed": "Your trip"
+      }
+    }
+  ],
+  "declarations": [
+    {
+      "register": "trips",
+      "name": "Trips",
+      "icon": "plane",
+      "one": "trip",
+      "holds": "a journey with the days it ran, and a colour, so the Ledger's lines from those days can be filed into it",
+      "title": "name",
+      "mobile": [
+        "name",
+        "from",
+        "to"
+      ],
+      "pack": "trips",
+      "order": {
+        "field": "from",
+        "dir": "desc"
+      },
+      "fields": [
+        {
+          "id": "name",
+          "label": "Name",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "from",
+          "label": "From",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "to",
+          "label": "To",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "hue",
+          "label": "Colour",
+          "type": "enum",
+          "values": [
+            "blue",
+            "green",
+            "amber",
+            "red",
+            "violet",
+            "teal",
+            "pink",
+            "grey"
+          ],
+          "default": "blue"
+        },
+        {
+          "id": "note",
+          "type": "text"
+        },
+        {
+          "id": "filed_from",
+          "label": "Filed from",
+          "type": "day"
+        },
+        {
+          "id": "filed_to",
+          "label": "Filed to",
+          "type": "day"
+        }
+      ]
+    },
+    {
+      "rule": "file_trip",
+      "name": "File the Ledger's lines of a trip's days into it",
+      "pack": "trips",
+      "on": {
+        "written": {
+          "register": "trips",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "from",
+            "to"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "file_trip",
+            "as": "filed"
+          }
+        }
+      ]
+    },
+    {
+      "script": "file_trip",
+      "title": "File a trip's days",
+      "pack": "trips",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "trips",
+        "transactions"
+      ],
+      "writes": [
+        "transactions",
+        "trips"
+      ],
+      "source": "/**\n * Trips: the lines of the Ledger that fall inside a trip's dates, filed into the trip.\n *\n * STARTED BY THE PACK'S AUTOMATION WHEN A TRIP IS CREATED OR ITS FROM OR TO CHANGES, which hands it the trip's id.\n *\n * ONLY LINES NOBODY HAS FILED. A line already in a trip, this one or another, stays where it is, so a person's choice\n * is never written over and two trips that overlap do not fight: the first to be written keeps the days they share.\n * A line the Ledger counts as void is left out, and so is a move between a person's own accounts.\n *\n * A TRIP WITHOUT BOTH DATES FILES NOTHING. A line is filed by its day, and a trip with one end has no range.\n *\n * A BUSY RANGE IS READ WHOLE. The record answers a page of fifty at a time with no cursor, so the lines are asked for\n * by number, halves of the range cut again while they come back full; past sixty reads it files what it has and says so.\n *\n * WHEN THE DATES MOVE, THE LINES THE TRIP FILED THAT NOW FALL OUTSIDE THEM ARE TAKEN OUT AGAIN. The trip remembers the days\n * it last filed (`filed_from` and `filed_to`), so a line is taken out only when it sits in this trip and on a day that\n * was inside what the trip last filed but is outside its dates now. A line a person put in the trip from outside those\n * days stays, and so does one in another trip. A trip that has filed nothing yet takes nothing out.\n *\n * IT WRITES THE LINE'S TRIP AND THE TRIP'S OWN REMEMBERED DAYS, and the automation watches only the trip's `from` and\n * `to`, so it does not start itself again.\n */\n\nconst DAY_MS = 86_400_000;\nconst dayOf = (day) => new Date(Date.parse(`${day}T00:00:00.000Z`) - DAY_MS).toISOString().slice(0, 10);\n\n/**\n * Every row of a list that `where` lets through. A script's list is one page of fifty, in the list's own order and with\n * no cursor, so the rows are asked for by number instead: the top number is found by asking above the highest seen,\n * then (0, top] is cut in halves until each half comes back short. At most 60 reads; `short` says some were left.\n */\nasync function every(ctx, register, where) {\n  const PAGE = 50;\n  const READS = 60;\n  let reads = 0;\n  const ask = (above, upto) => {\n    reads += 1;\n    const parts = [...(where ? [where] : []), ...(above > 0 ? [{ field: 'seq', gt: above }] : []), ...(upto === null ? [] : [{ field: 'seq', lte: upto }])];\n    return parts.length === 0 ? ctx.record.list(register) : ctx.record.list(register, parts.length === 1 ? parts[0] : { all: parts });\n  };\n  const first = await ask(0, null);\n  if (first.length < PAGE) return first;\n  const seen = new Map(first.map((r) => [r.id, r]));\n  let top = Math.max(...first.map((r) => r.seq));\n  for (;;) {\n    if (reads >= READS) break;\n    const above = await ask(top, null);\n    for (const r of above) seen.set(r.id, r);\n    if (above.length < PAGE) break;\n    top = Math.max(...above.map((r) => r.seq));\n  }\n  const spans = [[0, top]];\n  let short = false;\n  while (spans.length > 0) {\n    if (reads >= READS) {\n      short = true;\n      break;\n    }\n    const [a, b] = spans.pop();\n    const page = await ask(a, b);\n    for (const r of page) seen.set(r.id, r);\n    if (page.length >= PAGE && b - a > 1) {\n      const mid = Math.floor((a + b) / 2);\n      spans.push([a, mid], [mid, b]);\n    }\n  }\n  const rows = [...seen.values()];\n  rows.short = short;\n  return rows;\n}\n\n/** Lines on a day after `from` and on or before `to` that no trip holds yet. */\nconst allIn = (ctx, from, to) =>\n  every(ctx, 'transactions', { all: [{ field: 'on', gt: from }, { field: 'on', lte: to }, { field: 'trip', empty: true }, { field: 'state', not: 'void' }, { field: 'transfer', is: false }] });\n\nexport default async function run(ctx) {\n  const trip = await ctx.record.get(String(ctx.input.id));\n  if (trip === null) {\n    ctx.log('The trip that started this run is gone, so nothing was filed.');\n    return;\n  }\n  const from = typeof trip.fields.from === 'string' ? trip.fields.from.slice(0, 10) : '';\n  const to = typeof trip.fields.to === 'string' ? trip.fields.to.slice(0, 10) : '';\n  if (from === '' || to === '' || to < from) {\n    ctx.log(`${String(trip.fields.name)} has no usable dates, so nothing was filed.`);\n    return;\n  }\n  const before = typeof trip.fields.filed_from === 'string' && typeof trip.fields.filed_to === 'string' ? [trip.fields.filed_from.slice(0, 10), trip.fields.filed_to.slice(0, 10)] : null;\n  let out = 0;\n  if (before !== null && (before[0] < from || before[1] > to)) {\n    const held = await every(ctx, 'transactions', { all: [{ field: 'trip', is: trip.id }, { field: 'on', gte: before[0] }, { field: 'on', lte: before[1] }] });\n    for (const r of held) {\n      const on = typeof r.fields.on === 'string' ? r.fields.on.slice(0, 10) : '';\n      if (on !== '' && (on < from || on > to)) {\n        ctx.update(`transactions#${r.seq}`, { trip: null }, r.version);\n        out += 1;\n      }\n    }\n  }\n  const rows = await allIn(ctx, dayOf(from), to);\n  const short = rows.short === true;\n  for (const r of rows) ctx.update(`transactions#${r.seq}`, { trip: trip.id }, r.version);\n  if (before === null || before[0] !== from || before[1] !== to) ctx.update(`trips#${trip.seq}`, { filed_from: from, filed_to: to }, trip.version);\n  ctx.log(`Filed ${rows.length} lines into ${String(trip.fields.name)}${out > 0 ? ` and took ${out} outside its days out` : ''}.`);\n  if (short) ctx.log(`There are more unfiled lines in those dates than one run reads, so ${rows.length} were filed. Save the trip again to file more.`);\n}\n"
+    },
+    {
+      "metric": "trip-spent",
+      "name": "Spent on one trip",
+      "pack": "trips",
+      "source": "register.transactions",
+      "where": "state is cleared, transfer is false, trip is {{it}}, direction is out",
+      "value": {
+        "sum": "amount"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "trip-back",
+      "name": "Money back on one trip",
+      "pack": "trips",
+      "source": "register.transactions",
+      "where": "state is cleared, transfer is false, trip is {{it}}, direction is in",
+      "value": {
+        "sum": "amount"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "trip-lines",
+      "name": "Lines filed in one trip",
+      "pack": "trips",
+      "source": "register.transactions",
+      "where": "state is cleared, trip is {{it}}",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "trip-spent-by-trip",
+      "name": "Spent on each trip",
+      "pack": "trips",
+      "source": "register.transactions",
+      "where": "state is cleared, transfer is false, direction is out, trip is set",
+      "value": {
+        "sum": "amount"
+      },
+      "group_by": "trip",
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "trips-count",
+      "name": "Trips",
+      "pack": "trips",
+      "source": "register.trips",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "trips",
+      "title": "Trips",
+      "pack": "trips",
+      "nav": {
+        "section": "Money",
+        "order": 60
+      },
+      "icon": "plane",
+      "requires": [
+        "register.trips",
+        "register.transactions"
+      ],
+      "blocks": [
+        {
+          "kind": "bar",
+          "heading": "Spent on each trip",
+          "icon": "chart-bar",
+          "span": 12,
+          "source": "metric.trip-spent-by-trip",
+          "empty": "Nothing filed yet."
+        },
+        {
+          "kind": "table",
+          "heading": "Every trip",
+          "icon": "plane",
+          "span": 12,
+          "source": "register.trips",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Trip",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "from",
+              "label": "From",
+              "width": "13ch"
+            },
+            {
+              "field": "to",
+              "label": "To",
+              "width": "13ch"
+            },
+            {
+              "field": "hue",
+              "label": "Colour",
+              "width": "10ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "from",
+              "dir": "desc"
+            }
+          ],
+          "limit": 100,
+          "empty": "No trips yet."
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a trip",
+          "icon": "plus",
+          "span": 12,
+          "register": "trips"
+        }
+      ]
+    },
+    {
+      "page": "trip",
+      "title": "{{name}}",
+      "pack": "trips",
+      "for": {
+        "register": "trips"
+      },
+      "icon": "plane",
+      "requires": [
+        "register.trips",
+        "register.transactions"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "From {{day:from}}, until {{day:to}}."
+        },
+        {
+          "kind": "stat",
+          "heading": "What it cost",
+          "icon": "wallet",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "trip-spent:{{name}}",
+              "label": "Spent"
+            },
+            {
+              "metric": "trip-back:{{name}}",
+              "label": "Money back"
+            },
+            {
+              "metric": "trip-lines:{{name}}",
+              "label": "Lines filed"
+            }
+          ]
+        },
+        {
+          "kind": "split",
+          "heading": "Where it went, by category",
+          "icon": "chart-pie",
+          "span": 12,
+          "source": "register.transactions",
+          "where": "state is cleared, transfer is false, trip is {{name}}, direction is out",
+          "columns": [
+            {
+              "field": "category"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "limit": 8,
+          "unset": "Uncategorised",
+          "when": {
+            "metric": "trip-spent:{{name}}",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "split",
+          "heading": "By account, in its own currency",
+          "icon": "coins",
+          "span": 12,
+          "source": "register.transactions",
+          "where": "state is cleared, transfer is false, trip is {{name}}, direction is out",
+          "columns": [
+            {
+              "field": "account"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "limit": 8,
+          "when": {
+            "metric": "trip-spent:{{name}}",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Its lines",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.transactions",
+          "where": "trip is {{name}}",
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "category",
+              "label": "Category",
+              "width": "minmax(12ch,18ch)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 100,
+          "empty": "Nothing filed yet."
+        }
+      ],
+      "nav": {
+        "section": "Money",
+        "order": 61
+      }
+    }
+  ]
+}

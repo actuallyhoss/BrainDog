@@ -1,9 +1,9 @@
 {
   "usecase": "retainer-hours",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "title": "Agency",
   "summary": "Each client's retainer, the hours worked against it this month, and what to invoice.",
-  "changes": "The first version.",
+  "changes": "Today no longer opens on how many questions need your call, since Needs your call lists them. Nothing you hold changes.",
   "author": "BrainDog",
   "license": "MIT",
   "audience": "individual",
@@ -54,12 +54,6 @@
           "register.session"
         ],
         "blocks": [
-          {
-            "kind": "note",
-            "lead": true,
-            "span": 12,
-            "body": "{{questions-open}} question(s) need your call"
-          },
           {
             "kind": "stat",
             "lead": true,

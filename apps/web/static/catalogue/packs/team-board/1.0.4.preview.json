@@ -1,0 +1,387 @@
+{
+  "format": 1,
+  "made_at": "2026-11-03T21:09:23.513Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "heading": "What needs doing?",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "team_tasks",
+          "span": 12,
+          "key": "k0rbmvpe",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "columns": [
+            {
+              "field": "state"
+            },
+            {
+              "field": "what"
+            },
+            {
+              "field": "priority"
+            },
+            {
+              "field": "owner"
+            }
+          ],
+          "kind": "board",
+          "order": [
+            {
+              "dir": "asc",
+              "field": "priority"
+            },
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.team_tasks",
+          "span": 12,
+          "working": true,
+          "key": "k1mimixe",
+          "rows": [
+            {
+              "id": "01M6HKXJDSFE59HR40R7D44YAS",
+              "register": "team_tasks",
+              "seq": 3,
+              "fields": {
+                "what": "Book the venue for May",
+                "state": "blocked",
+                "priority": "urgent",
+                "note": "Waiting for the quote.",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "blocked",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDSFE59HR40R3C7W6RJ",
+              "register": "team_tasks",
+              "seq": 2,
+              "fields": {
+                "what": "Fix the checkout rounding bug",
+                "state": "review",
+                "priority": "high",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "review",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDSFE59HR40QY6QE1VH",
+              "register": "team_tasks",
+              "seq": 1,
+              "fields": {
+                "what": "Draft the spring newsletter",
+                "state": "doing",
+                "priority": "normal",
+                "due": "2026-11-06",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "doing",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDSFE59HR40RB9GBM1M",
+              "register": "team_tasks",
+              "seq": 4,
+              "fields": {
+                "what": "Update the pricing page",
+                "state": "todo",
+                "priority": "low",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "todo",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 4,
+          "refusals": [],
+          "working_now": [
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      ],
+      "icon": "board",
+      "nav": {
+        "order": 10,
+        "section": "Team"
+      },
+      "pack": "team-board",
+      "page": "team-board",
+      "requires": [
+        "register.teammates",
+        "register.team_tasks"
+      ],
+      "title": "Board",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "team-board",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "doing"
+            },
+            {
+              "as": "who",
+              "field": "agent"
+            },
+            {
+              "as": "when",
+              "field": "last_seen"
+            }
+          ],
+          "empty": "No agent is working right now. Agents you connect show here while they work.",
+          "heading": "Agents working now",
+          "icon": "session",
+          "kind": "cards",
+          "lead": true,
+          "limit": 12,
+          "source": "sessions.working",
+          "span": 12,
+          "key": "k0ub0zzj",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "scopes": [],
+          "scope_marks": [],
+          "helpers": []
+        },
+        {
+          "columns": [
+            {
+              "field": "owner",
+              "label": "Who",
+              "width": "minmax(10ch,18ch)"
+            },
+            {
+              "field": "what",
+              "label": "Doing",
+              "width": "minmax(18ch,1fr)"
+            },
+            {
+              "field": "priority",
+              "label": "Priority",
+              "width": "12ch"
+            },
+            {
+              "align": "end",
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            }
+          ],
+          "empty": "Nobody has a task in progress.",
+          "heading": "Doing now",
+          "icon": "activity",
+          "kind": "table",
+          "limit": 30,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "priority"
+            }
+          ],
+          "source": "register.team_tasks",
+          "span": 12,
+          "where": "state is doing",
+          "key": "k1k858un",
+          "rows": [
+            {
+              "id": "01M6HKXJDSFE59HR40QY6QE1VH",
+              "register": "team_tasks",
+              "seq": 1,
+              "fields": {
+                "what": "Draft the spring newsletter",
+                "state": "doing",
+                "priority": "normal",
+                "due": "2026-11-06",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "doing",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "owner",
+              "label": "Who"
+            },
+            {
+              "field": "what",
+              "label": "Task"
+            },
+            {
+              "field": "note",
+              "label": "Why"
+            }
+          ],
+          "heading": "Blocked",
+          "icon": "octagon-alert",
+          "kind": "table",
+          "limit": 20,
+          "source": "register.team_tasks",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "team-blocked"
+          },
+          "where": "state is blocked",
+          "key": "k0uwoo50",
+          "rows": [
+            {
+              "id": "01M6HKXJDSFE59HR40R7D44YAS",
+              "register": "team_tasks",
+              "seq": 3,
+              "fields": {
+                "what": "Book the venue for May",
+                "state": "blocked",
+                "priority": "urgent",
+                "note": "Waiting for the quote.",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "blocked",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "owner",
+              "label": "Who"
+            },
+            {
+              "field": "what",
+              "label": "Task"
+            }
+          ],
+          "empty": "Nothing is waiting for review.",
+          "heading": "Waiting for review",
+          "icon": "hourglass",
+          "kind": "table",
+          "limit": 20,
+          "source": "register.team_tasks",
+          "span": 12,
+          "where": "state is review",
+          "key": "k0up9cu6",
+          "rows": [
+            {
+              "id": "01M6HKXJDSFE59HR40R3C7W6RJ",
+              "register": "team_tasks",
+              "seq": 2,
+              "fields": {
+                "what": "Fix the checkout rounding bug",
+                "state": "review",
+                "priority": "high",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "review",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "empty": "No agent has changed anything here yet.",
+          "first": 5,
+          "heading": "What agents did",
+          "icon": "activity",
+          "kind": "agents",
+          "source": "activity",
+          "span": 12,
+          "key": "k1mhdntf",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "feed": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "session",
+      "nav": {
+        "order": 20,
+        "section": "Team"
+      },
+      "pack": "team-board",
+      "page": "team-now",
+      "requires": [
+        "register.team_tasks"
+      ],
+      "title": "Who is doing what",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "team-now",
+        "basis": "r103vfif",
+        "by": "rule",
+        "hide": [
+          "k1mhdntf"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

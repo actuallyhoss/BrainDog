@@ -1,0 +1,391 @@
+{
+  "pack": "landlord",
+  "version": "1.0.4",
+  "icon": "home",
+  "title": "Landlord",
+  "summary": "The flats and houses you rent out, each tenancy with its rent, deposit and end day, the rent that came in and the repairs. Says what is due this month, what arrived, who has not paid, what is empty and which tenancy ends next.",
+  "changes": "Lettings no longer opens on the rent due and received, since This month shows both. Nothing it reads or writes changed.",
+  "unlisted": true,
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": { "format": 1, "primitives": 1, "packs": { "people": ">=3.3.0 <5.0.0" } },
+  "declarations": [
+    {
+      "register": "rentals",
+      "name": "Properties",
+      "icon": "building",
+      "one": "property",
+      "holds": "each flat, house or room you rent out, where it is and what it is",
+      "title": "name",
+      "mobile": [ "name", "street", "kind" ],
+      "pack": "landlord",
+      "delete": "refuse_while_referenced",
+      "fields": [
+        { "id": "name", "type": "text", "required": true, "search": true },
+        { "id": "street", "label": "Address", "type": "text", "search": true },
+        {
+          "id": "kind",
+          "label": "Kind",
+          "type": "enum",
+          "values": [ "flat", "house", "room", "shop", "other" ],
+          "labels": { "flat": "Flat", "house": "House", "room": "Room", "shop": "Shop", "other": "Other" },
+          "index": true
+        },
+        { "id": "note", "type": "text" }
+      ]
+    },
+    {
+      "register": "tenancies",
+      "name": "Tenancies",
+      "icon": "key",
+      "one": "tenancy",
+      "holds": "who rents each property, for how much, from when to when, and the deposit held",
+      "title": "name",
+      "mobile": [ "name", "rent", "let_until" ],
+      "state": "state",
+      "done": [ "ended" ],
+      "pack": "landlord",
+      "delete": "refuse_while_referenced",
+      "fields": [
+        { "id": "name", "label": "Tenancy", "type": "text", "required": true, "search": true },
+        { "id": "rental", "label": "Property", "type": "ref", "to": "rentals", "required": true, "index": true },
+        { "id": "tenant", "label": "Tenant", "type": "ref", "to": "people", "index": true },
+        { "id": "rent", "label": "Monthly rent", "type": "money", "required": true },
+        { "id": "rent_day", "label": "Rent falls on day", "type": "int" },
+        { "id": "moved_in", "label": "Starts", "type": "day", "index": true },
+        { "id": "let_until", "label": "Ends", "type": "day", "index": true, "deadline": true, "remind": [ "-60d" ] },
+        { "id": "deposit_held", "label": "Deposit", "type": "money" },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [ "signed", "live", "notice", "ended" ],
+          "labels": { "signed": "Signed, not started", "live": "Live", "notice": "Notice given", "ended": "Ended" },
+          "index": true,
+          "required": true
+        }
+      ]
+    },
+    {
+      "register": "rent_in",
+      "name": "Rent received",
+      "icon": "receipt",
+      "one": "payment",
+      "holds": "each rent payment that arrived, which tenancy it was for and the day",
+      "title": "what",
+      "mobile": [ "what", "amount", "on" ],
+      "order": { "field": "on", "dir": "desc" },
+      "pack": "landlord",
+      "fields": [
+        { "id": "what", "label": "For", "type": "text", "required": true, "search": true },
+        { "id": "tenancy", "label": "Tenancy", "type": "ref", "to": "tenancies", "required": true, "index": true },
+        { "id": "amount", "type": "money", "required": true, "currency_from": "tenancy.rent" },
+        { "id": "on", "label": "Received on", "type": "day", "required": true, "index": true }
+      ]
+    },
+    {
+      "register": "repairs",
+      "name": "Repairs",
+      "icon": "wrench",
+      "one": "repair",
+      "holds": "what needed fixing at each property, what it cost, and when it was reported and done",
+      "title": "what",
+      "mobile": [ "what", "cost", "fixed_on" ],
+      "pack": "landlord",
+      "fields": [
+        { "id": "what", "type": "text", "required": true, "search": true },
+        { "id": "rental", "label": "Property", "type": "ref", "to": "rentals", "required": true, "index": true },
+        { "id": "cost", "type": "money" },
+        { "id": "raised_on", "label": "Reported", "type": "day", "index": true },
+        { "id": "fixed_on", "label": "Done", "type": "day", "index": true }
+      ]
+    },
+    {
+      "page": "lettings",
+      "title": "Lettings",
+      "nav": { "section": "Lettings", "order": 10 },
+      "icon": "key",
+      "pack": "landlord",
+      "requires": [ "register.rentals", "register.tenancies", "register.rent_in", "register.repairs" ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "rentals-held", "lt": 1 },
+          "body": "Add a property, then its tenancy, and the month's rent shows here."
+        },
+        {
+          "kind": "stat",
+          "heading": "This month",
+          "icon": "gauge",
+          "span": 12,
+          "when": { "metric": "rentals-held", "gt": 0 },
+          "cells": [
+            { "metric": "rent-roll", "label": "Rent due this month" },
+            { "metric": "rent-in-month", "label": "Received this month" },
+            { "metric": "rentals-empty", "label": "Empty" },
+            { "metric": "repairs-open", "label": "Open repairs" },
+            { "metric": "repair-cost-year", "label": "Repairs this year" },
+            { "metric": "deposits-held", "label": "Deposits held" }
+          ]
+        },
+        {
+          "kind": "table",
+          "heading": "Not paid this month",
+          "icon": "circle-alert",
+          "span": 12,
+          "source": "register.tenancies",
+          "where": {
+            "all": [
+              { "field": "state", "in": [ "live", "notice" ] },
+              { "none": [ { "pointed": { "register": "rent_in", "by": "tenancy", "where": { "field": "on", "gte": "bom" } } } ] }
+            ]
+          },
+          "columns": [
+            { "field": "name", "label": "Tenancy" },
+            { "field": "rental", "label": "Property" },
+            { "field": "rent", "label": "Monthly rent", "align": "end" },
+            { "field": "rent_day", "label": "Falls on day", "align": "end" }
+          ],
+          "order": [ { "field": "rent_day", "dir": "asc" } ],
+          "limit": 12,
+          "when": { "metric": "unpaid-month", "gt": 0 }
+        },
+        {
+          "kind": "timeline",
+          "heading": "Ending next",
+          "icon": "calendar-clock",
+          "span": 12,
+          "source": "register.tenancies",
+          "where": "state is live or notice, let_until is set",
+          "columns": [ { "field": "let_until" }, { "field": "name" }, { "field": "rental" } ],
+          "order": [ { "field": "let_until", "dir": "asc" } ],
+          "limit": 3,
+          "empty": "No tenancy has an end day yet."
+        },
+        {
+          "kind": "cards",
+          "heading": "Properties",
+          "icon": "building",
+          "span": 12,
+          "source": "register.rentals",
+          "columns": [
+            { "field": "name", "as": "title" },
+            { "field": "street", "label": "Address", "as": "fact" },
+            { "field": "kind", "label": "Kind", "as": "fact" },
+            { "field": "note", "as": "reply" }
+          ],
+          "order": [ { "field": "name", "dir": "asc" } ],
+          "limit": 24,
+          "empty": "No properties yet. Add the first one you rent out."
+        }
+      ]
+    },
+    {
+      "page": "rental",
+      "title": "{{name}}",
+      "for": { "register": "rentals" },
+      "nav": { "section": "Properties", "order": 20 },
+      "icon": "building",
+      "pack": "landlord",
+      "requires": [ "register.rentals", "register.tenancies", "register.rent_in", "register.repairs" ],
+      "blocks": [
+        {
+          "kind": "cards",
+          "lead": true,
+          "span": 12,
+          "source": "register.rentals",
+          "where": "name is {{name}}",
+          "columns": [
+            { "field": "name", "as": "title" },
+            { "field": "street", "label": "Address", "as": "fact" },
+            { "field": "kind", "label": "Kind", "as": "fact" },
+            { "field": "note", "as": "reply" }
+          ],
+          "limit": 1
+        },
+        {
+          "kind": "stat",
+          "heading": "Here",
+          "icon": "gauge",
+          "span": 12,
+          "cells": [
+            { "metric": "rent-due-at:{{name}}", "label": "Rent due this month" },
+            { "metric": "repairs-open-at:{{name}}", "label": "Open repairs" }
+          ]
+        },
+        {
+          "kind": "table",
+          "heading": "Tenancies",
+          "icon": "key",
+          "span": 12,
+          "source": "register.tenancies",
+          "where": "rental is {{name}}",
+          "columns": [
+            { "field": "name", "label": "Tenancy" },
+            { "field": "tenant", "label": "Tenant" },
+            { "field": "rent", "label": "Monthly rent", "align": "end" },
+            { "field": "let_until", "label": "Ends", "align": "end" },
+            { "field": "state", "label": "Status" }
+          ],
+          "order": [ { "field": "let_until", "dir": "asc" } ],
+          "limit": 12,
+          "empty": "Nobody rents {{name}} yet."
+        },
+        {
+          "kind": "table",
+          "heading": "Not paid this month",
+          "icon": "circle-alert",
+          "span": 12,
+          "source": "register.tenancies",
+          "where": {
+            "all": [
+              { "field": "rental", "is": "{{name}}" },
+              { "field": "state", "in": [ "live", "notice" ] },
+              { "none": [ { "pointed": { "register": "rent_in", "by": "tenancy", "where": { "field": "on", "gte": "bom" } } } ] }
+            ]
+          },
+          "columns": [
+            { "field": "name", "label": "Tenancy" },
+            { "field": "rent", "label": "Monthly rent", "align": "end" },
+            { "field": "rent_day", "label": "Falls on day", "align": "end" }
+          ],
+          "limit": 12,
+          "empty": "Everyone at {{name}} has paid this month."
+        },
+        {
+          "kind": "table",
+          "heading": "Repairs",
+          "icon": "wrench",
+          "span": 12,
+          "source": "register.repairs",
+          "where": "rental is {{name}}",
+          "columns": [
+            { "field": "what", "label": "Repair" },
+            { "field": "cost", "label": "Cost", "align": "end" },
+            { "field": "raised_on", "label": "Reported", "align": "end" },
+            { "field": "fixed_on", "label": "Done", "align": "end" }
+          ],
+          "order": [ { "field": "raised_on", "dir": "desc" } ],
+          "limit": 12,
+          "empty": "No repairs at {{name}}."
+        }
+      ]
+    },
+    {
+      "metric": "rent-roll",
+      "name": "Rent due this month",
+      "source": "register.tenancies",
+      "where": "state is live or notice",
+      "value": { "sum": "rent" },
+      "format": "money",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "rent-in-month",
+      "name": "Rent received this month",
+      "source": "register.rent_in",
+      "where": "on at least bom",
+      "value": { "sum": "amount" },
+      "format": "money",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "unpaid-month",
+      "name": "Not paid this month",
+      "source": "register.tenancies",
+      "where": {
+        "all": [
+          { "field": "state", "in": [ "live", "notice" ] },
+          { "none": [ { "pointed": { "register": "rent_in", "by": "tenancy", "where": { "field": "on", "gte": "bom" } } } ] }
+        ]
+      },
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "rentals-empty",
+      "name": "Empty properties",
+      "source": "register.rentals",
+      "where": { "none": [ { "pointed": { "register": "tenancies", "by": "rental", "where": { "field": "state", "in": [ "live", "notice" ] } } } ] },
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "repairs-open",
+      "name": "Open repairs",
+      "source": "register.repairs",
+      "where": "fixed_on is empty",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "repair-cost-year",
+      "name": "Repairs this year",
+      "source": "register.repairs",
+      "where": "raised_on at least boy, cost is set",
+      "value": { "sum": "cost" },
+      "format": "money",
+      "target": { "gte": 0 },
+      "window": "90d",
+      "compare": "none"
+    },
+    {
+      "metric": "deposits-held",
+      "name": "Deposits held",
+      "source": "register.tenancies",
+      "where": "state is live or notice, deposit_held is set",
+      "value": { "sum": "deposit_held" },
+      "format": "money",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "rentals-held",
+      "name": "Properties",
+      "source": "register.rentals",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "rent-due-at",
+      "name": "Rent due this month here",
+      "source": "register.tenancies",
+      "where": "rental is {{it}}, state is live or notice",
+      "value": { "sum": "rent" },
+      "format": "money",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "repairs-open-at",
+      "name": "Open repairs here",
+      "source": "register.repairs",
+      "where": "rental is {{it}}, fixed_on is empty",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    }
+  ]
+}

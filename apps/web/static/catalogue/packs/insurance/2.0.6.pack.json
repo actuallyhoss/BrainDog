@@ -1,0 +1,952 @@
+{
+  "pack": "insurance",
+  "version": "2.0.6",
+  "icon": "shield",
+  "title": "Insurance",
+  "summary": "Your life and savings policies: who the insurer is, what the premium is and where it is paid, the cover, what the fund is worth and from when, and when it matures.",
+  "changes": "Insurance no longer opens on the fund value and next maturity, since the figures and cards under it show them. Nothing it reads or writes changed.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.0.0 <4.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "policies",
+      "name": "Policies",
+      "icon": "shield",
+      "one": "policy",
+      "holds": "each insurance policy with its insurer, number, premium, cover, what the fund is worth and from which day, and when it matures",
+      "title": "name",
+      "mobile": [
+        "name",
+        "fund_value",
+        "matures_on"
+      ],
+      "state": "state",
+      "done": [
+        "matured",
+        "lapsed"
+      ],
+      "pack": "insurance",
+      "fields": [
+        {
+          "id": "name",
+          "label": "Policy",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "insurer",
+          "label": "Insurer",
+          "type": "text",
+          "required": true,
+          "search": true,
+          "index": true
+        },
+        {
+          "id": "number",
+          "label": "Policy number",
+          "type": "text",
+          "search": true
+        },
+        {
+          "id": "cost",
+          "label": "Premium is the repeating item",
+          "type": "ref",
+          "to": "recurring",
+          "index": true
+        },
+        {
+          "id": "cover",
+          "label": "Cover",
+          "type": "money"
+        },
+        {
+          "id": "fund_value",
+          "label": "Fund value",
+          "type": "money"
+        },
+        {
+          "id": "fund_as_of",
+          "label": "Fund value as of",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "maturity_benefit",
+          "label": "Paid out at maturity",
+          "type": "money"
+        },
+        {
+          "id": "starts_on",
+          "label": "Starts",
+          "type": "day"
+        },
+        {
+          "id": "matures_on",
+          "label": "Matures",
+          "type": "day",
+          "index": true,
+          "deadline": true,
+          "remind": [
+            "-90d"
+          ]
+        },
+        {
+          "id": "illustration",
+          "label": "Insurer illustration",
+          "type": "json"
+        },
+        {
+          "id": "age_at_start",
+          "label": "Age at start",
+          "type": "int",
+          "min": 0,
+          "max": 120
+        },
+        {
+          "id": "per_year",
+          "label": "Premiums a year",
+          "type": "money"
+        },
+        {
+          "id": "paid",
+          "label": "Premiums paid so far",
+          "type": "money"
+        },
+        {
+          "id": "times",
+          "label": "Premiums paid, how many",
+          "type": "int"
+        },
+        {
+          "id": "term_pct",
+          "label": "Percent of term gone",
+          "type": "int"
+        },
+        {
+          "id": "illustrated",
+          "label": "Illustrated fund this year",
+          "type": "money"
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "live",
+            "paid_up",
+            "matured",
+            "lapsed"
+          ],
+          "labels": {
+            "live": "Live",
+            "paid_up": "Paid up",
+            "matured": "Matured",
+            "lapsed": "Lapsed"
+          },
+          "default": "live",
+          "index": true,
+          "required": true
+        },
+        {
+          "id": "note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "register": "illustration_years",
+      "name": "Illustration years",
+      "icon": "rows",
+      "one": "illustration year",
+      "holds": "one year of a policy's illustration: the low, mid and high fund the insurer printed, and the age that year. It is laid out from the policy's illustration, so it is not typed",
+      "title": "year",
+      "mobile": [
+        "year",
+        "age",
+        "mid"
+      ],
+      "pack": "insurance",
+      "order": {
+        "field": "year",
+        "dir": "asc"
+      },
+      "fields": [
+        {
+          "id": "of",
+          "label": "Policy",
+          "type": "ref",
+          "to": "policies",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "year",
+          "label": "Year",
+          "type": "int",
+          "min": 1900,
+          "max": 2300,
+          "required": true
+        },
+        {
+          "id": "age",
+          "label": "Age",
+          "type": "int",
+          "min": 0,
+          "max": 150
+        },
+        {
+          "id": "low",
+          "label": "Low",
+          "type": "money"
+        },
+        {
+          "id": "mid",
+          "label": "Mid",
+          "type": "money"
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "type": "money"
+        }
+      ]
+    },
+    {
+      "rule": "insurance_figures",
+      "pack": "insurance",
+      "on": {
+        "written": {
+          "register": "policies",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "cost",
+            "starts_on",
+            "matures_on",
+            "illustration",
+            "cover",
+            "fund_value",
+            "age_at_start"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "insurance_figures",
+            "as": "worked"
+          }
+        }
+      ]
+    },
+    {
+      "script": "insurance_figures",
+      "title": "Work out premiums paid and the term of each policy",
+      "pack": "insurance",
+      "runs": {
+        "rule": true,
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "policies",
+        "recurring",
+        "illustration_years"
+      ],
+      "writes": [
+        "policies",
+        "illustration_years"
+      ],
+      "source": "/**\n * What each policy has cost so far and where it stands: the premiums paid since it started, the premiums in a year, the\n * share of its term gone, and what its illustration says the fund is worth this year.\n *\n * STARTED WITH A ROW'S ID when its premium, start, maturity or illustration is written, it works that row out. Started\n * with no id, once a day, it works out every policy still running, so the term moves on without anybody touching a row.\n *\n * THE PREMIUM IS THE REPEATING LINE THE POLICY POINTS AT. Its amount and how often it comes round are read from there,\n * so a premium changed in Repeating changes this the next time it runs. Premiums paid is the number of payments that\n * fell between the policy's first day (its own start, else the line's \"Since\") and today, or its maturity if that came\n * first, times the line's amount. A line that ended stops counting at its end. A policy with no premium line, or with\n * no first day, is left as it is.\n *\n * THE DAYS PAYMENTS FALL ON ARE COUNTED FROM THE FIRST DAY: every month on the same day of the month (the last day of a\n * shorter month), every week or two on the same weekday, twice a month on that day and the fifteen days after it.\n *\n * THE ILLUSTRATION is what the insurer printed: `{ \"rows\": [ { \"year\": 2030, \"low\": 900000, \"mid\": 1100000, \"high\":\n * 1400000 } ] }` with amounts in the smallest unit of the policy's cover (or of `currency` when it names one). The\n * mid figure of this year's row, or of the latest earlier year, is written into `illustrated`. Rows it cannot read are\n * left out and nothing is made up.\n *\n * THE ILLUSTRATION IS ALSO LAID OUT AS ROWS, one a year of the policy in `illustration_years` (year, age, low, mid, high),\n * so the policy's page can table them and draw the three lines. A row of the illustration may name an `age`; otherwise\n * it is the policy's `age_at_start` plus the years since it started. A year the illustration no longer holds is taken\n * out, and a year already laid out is only written when a figure changed.\n *\n * It never writes a fund value: that is what the insurer's statement says, typed with the day it is from.\n */\n\nconst DAY_MS = 86_400_000;\nconst PER_YEAR = { weekly: 52, fortnightly: 26, twice_monthly: 24, monthly: 12, quarterly: 4, yearly: 1 };\nconst MONTHS = { monthly: 1, quarterly: 3, yearly: 12, twice_monthly: 1 };\n\nconst isDay = (v) => typeof v === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(v);\nconst ms = (day) => Date.parse(`${day}T00:00:00Z`);\nconst dayOf = (n) => new Date(n).toISOString().slice(0, 10);\nconst money = (m) => m !== null && typeof m === 'object' && typeof m.amount === 'number' && typeof m.currency === 'string';\nconst same = (a, b) => (money(a) && money(b) ? a.amount === b.amount && a.currency === b.currency : a === b);\n\n/** `day` moved on by `n` months, keeping its day of the month or the last day of a shorter month. */\nfunction months(day, n) {\n  const [y, m, d] = day.split('-').map(Number);\n  const first = Date.UTC(y, m - 1 + n, 1);\n  const last = new Date(Date.UTC(y, m + n, 0)).getUTCDate();\n  const at = new Date(first);\n  return Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), Math.min(d, last));\n}\n\n/** How many payments of a line that comes round `every` fall from `start` to `end`, both included. */\nfunction payments(start, end, every) {\n  if (!isDay(start) || !isDay(end) || end < start) return 0;\n  const stop = ms(end);\n  let count = 0;\n  if (every === 'weekly' || every === 'fortnightly') {\n    const step = (every === 'weekly' ? 7 : 14) * DAY_MS;\n    return Math.floor((stop - ms(start)) / step) + 1;\n  }\n  const gap = MONTHS[every];\n  if (!gap) return 0;\n  for (let n = 0; n < 2400; n++) {\n    const at = months(start, n * gap);\n    if (at > stop) break;\n    count += 1;\n    if (every === 'twice_monthly' && at + 15 * DAY_MS <= stop) count += 1;\n  }\n  return count;\n}\n\n/** The mid figure the illustration gives for this year, or for the latest year before it. */\nfunction illustratedMid(text, year, currency) {\n  let doc = text;\n  if (typeof doc === 'string') {\n    try { doc = JSON.parse(doc); } catch { return null; }\n  }\n  const rows = doc && Array.isArray(doc.rows) ? doc.rows : [];\n  let best = null;\n  for (const r of rows) {\n    if (!r || typeof r.year !== 'number' || typeof r.mid !== 'number') continue;\n    if (r.year <= year && (best === null || r.year > best.year)) best = r;\n  }\n  if (best === null) return null;\n  const code = typeof doc.currency === 'string' ? doc.currency : currency;\n  return code ? { amount: Math.round(best.mid), currency: code } : null;\n}\n\n/** The illustration's readable rows, one a year, as money in the currency the illustration or the policy is in. */\nfunction illustrationRows(text, currency, startYear, ageAtStart) {\n  let doc = text;\n  if (typeof doc === 'string') {\n    try { doc = JSON.parse(doc); } catch { return []; }\n  }\n  const code = doc && typeof doc.currency === 'string' ? doc.currency : currency;\n  const list = doc && Array.isArray(doc.rows) ? doc.rows : [];\n  if (!code) return [];\n  const seen = new Map();\n  for (const r of list) {\n    if (!r || !Number.isInteger(r.year) || typeof r.low !== 'number' || typeof r.mid !== 'number' || typeof r.high !== 'number') continue;\n    const age = Number.isInteger(r.age) ? r.age : startYear !== null && Number.isInteger(ageAtStart) ? ageAtStart + (r.year - startYear) : null;\n    seen.set(r.year, { year: r.year, age, low: { amount: Math.round(r.low), currency: code }, mid: { amount: Math.round(r.mid), currency: code }, high: { amount: Math.round(r.high), currency: code } });\n  }\n  return [...seen.values()].sort((a, b) => a.year - b.year);\n}\n\n/** Bring the policy's `illustration_years` rows level with its illustration. */\nasync function layOut(ctx, row, cover) {\n  const f = row.fields;\n  const startYear = isDay(f.starts_on) ? Number(f.starts_on.slice(0, 4)) : null;\n  const want = f.illustration ? illustrationRows(f.illustration, cover, startYear, f.age_at_start) : [];\n  const have = await ctx.record.list('illustration_years', { field: 'of', is: row.id });\n  const byYear = new Map(have.filter((h) => !h.fields.deleted_at && !h.deleted_at).map((h) => [h.fields.year, h]));\n  for (const w of want) {\n    const h = byYear.get(w.year);\n    byYear.delete(w.year);\n    if (!h) {\n      ctx.write('illustration_years', Object.fromEntries(Object.entries({ of: row.id, ...w }).filter(([, v]) => v !== null)));\n      continue;\n    }\n    const patch = {};\n    for (const key of ['age', 'low', 'mid', 'high']) if (!same(h.fields[key] ?? null, w[key])) patch[key] = w[key];\n    if (Object.keys(patch).length > 0) ctx.update('illustration_years#' + h.seq, patch, h.version);\n  }\n  for (const h of byYear.values()) ctx.update('illustration_years#' + h.seq, { deleted_at: true }, h.version);\n}\n\nasync function work(ctx, row, today) {\n  const f = row.fields;\n  const line = typeof f.cost === 'string' ? await ctx.record.get(f.cost) : null;\n  const next = {};\n  const set = (key, value) => {\n    if (value === null ? f[key] !== null && f[key] !== undefined : !same(f[key], value)) next[key] = value;\n  };\n  if (line && money(line.fields.amount) && PER_YEAR[line.fields.every]) {\n    const amount = line.fields.amount;\n    set('per_year', { amount: Math.round(amount.amount * PER_YEAR[line.fields.every]), currency: amount.currency });\n    const start = isDay(f.starts_on) ? f.starts_on : isDay(line.fields.started) ? line.fields.started : null;\n    if (start !== null) {\n      let end = today;\n      if (isDay(f.matures_on) && f.matures_on < end) end = f.matures_on;\n      if (isDay(line.fields.ends) && line.fields.ends < end) end = line.fields.ends;\n      const n = payments(start, end, line.fields.every);\n      set('paid', { amount: n * amount.amount, currency: amount.currency });\n      set('times', n);\n    }\n  }\n  if (isDay(f.starts_on) && isDay(f.matures_on) && f.matures_on > f.starts_on) {\n    const gone = (ms(today) - ms(f.starts_on)) / (ms(f.matures_on) - ms(f.starts_on));\n    set('term_pct', Math.max(0, Math.min(100, Math.round(gone * 100))));\n  }\n  const cover = money(f.cover) ? f.cover.currency : money(f.fund_value) ? f.fund_value.currency : null;\n  const mid = f.illustration ? illustratedMid(f.illustration, Number(today.slice(0, 4)), cover) : null;\n  if (mid !== null || f.illustrated) set('illustrated', mid);\n  if (Object.keys(next).length > 0) ctx.update('policies#' + row.seq, next, row.version);\n  await layOut(ctx, row, cover);\n}\n\n/**\n * Every row of a list that `where` lets through. A script's list is one page of fifty, in the list's own order and with\n * no cursor, so the rows are asked for by number instead: the top number is found by asking above the highest seen,\n * then (0, top] is cut in halves until each half comes back short. At most 60 reads; `short` says some were left.\n */\nasync function every(ctx, register, where) {\n  const PAGE = 50;\n  const READS = 60;\n  let reads = 0;\n  const ask = (above, upto) => {\n    reads += 1;\n    const parts = [...(where ? [where] : []), ...(above > 0 ? [{ field: 'seq', gt: above }] : []), ...(upto === null ? [] : [{ field: 'seq', lte: upto }])];\n    return parts.length === 0 ? ctx.record.list(register) : ctx.record.list(register, parts.length === 1 ? parts[0] : { all: parts });\n  };\n  const first = await ask(0, null);\n  if (first.length < PAGE) return first;\n  const seen = new Map(first.map((r) => [r.id, r]));\n  let top = Math.max(...first.map((r) => r.seq));\n  for (;;) {\n    if (reads >= READS) break;\n    const above = await ask(top, null);\n    for (const r of above) seen.set(r.id, r);\n    if (above.length < PAGE) break;\n    top = Math.max(...above.map((r) => r.seq));\n  }\n  const spans = [[0, top]];\n  let short = false;\n  while (spans.length > 0) {\n    if (reads >= READS) {\n      short = true;\n      break;\n    }\n    const [a, b] = spans.pop();\n    const page = await ask(a, b);\n    for (const r of page) seen.set(r.id, r);\n    if (page.length >= PAGE && b - a > 1) {\n      const mid = Math.floor((a + b) / 2);\n      spans.push([a, mid], [mid, b]);\n    }\n  }\n  const rows = [...seen.values()];\n  rows.short = short;\n  return rows;\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);\n  const rows = id ? [await ctx.record.get(id)] : await every(ctx, 'policies', { field: 'state', is: 'live' });\n  for (const row of rows) if (row) await work(ctx, row, today);\n}\n"
+    },
+    {
+      "metric": "policies-live",
+      "name": "Policies",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "state is live",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policies-fund",
+      "name": "Fund value",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "state is live, fund_value is set",
+      "value": {
+        "sum": "fund_value"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policies-cover",
+      "name": "Cover",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "state is live, cover is set",
+      "value": {
+        "sum": "cover"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policies-year",
+      "name": "Premiums a year",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "state is live, per_year is set",
+      "value": {
+        "sum": "per_year"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policies-paid",
+      "name": "Premiums paid so far",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "paid is set",
+      "value": {
+        "sum": "paid"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policies-fund-on",
+      "name": "Oldest fund value",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "state is live, fund_value is set, fund_as_of is set",
+      "value": {
+        "min": "fund_as_of"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policies-fund-stale",
+      "name": "Fund values over 90 days old",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "state is live, fund_value is set, fund_as_of before -90d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policies-next",
+      "name": "Next maturity",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "state is live, matures_on is set",
+      "value": {
+        "min": "matures_on"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-fund-at",
+      "name": "Fund value",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "name is {{it}}, fund_value is set",
+      "value": {
+        "sum": "fund_value"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-cover-at",
+      "name": "Cover",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "name is {{it}}, cover is set",
+      "value": {
+        "sum": "cover"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-paid-at",
+      "name": "Premiums paid so far",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "name is {{it}}, paid is set",
+      "value": {
+        "sum": "paid"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-payments-at",
+      "name": "Premiums paid",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "name is {{it}}, times is set",
+      "value": {
+        "sum": "times"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-year-at",
+      "name": "Premiums a year",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "name is {{it}}, per_year is set",
+      "value": {
+        "sum": "per_year"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-fund-on-at",
+      "name": "Fund value as of",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "name is {{it}}, fund_as_of is set",
+      "value": {
+        "min": "fund_as_of"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-matures-at",
+      "name": "Matures",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "name is {{it}}, matures_on is set",
+      "value": {
+        "min": "matures_on"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-term-at",
+      "name": "Percent of term gone",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "name is {{it}}, term_pct is set",
+      "value": {
+        "sum": "term_pct"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-benefit-at",
+      "name": "Paid out at maturity",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "name is {{it}}, maturity_benefit is set",
+      "value": {
+        "sum": "maturity_benefit"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-illustrated-at",
+      "name": "Illustrated fund this year",
+      "pack": "insurance",
+      "source": "register.policies",
+      "where": "name is {{it}}, illustrated is set",
+      "value": {
+        "sum": "illustrated"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "policy-years-at",
+      "name": "Years illustrated",
+      "pack": "insurance",
+      "source": "register.illustration_years",
+      "where": "of is {{it}}",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "insurance",
+      "title": "Insurance",
+      "pack": "insurance",
+      "nav": {
+        "section": "Money",
+        "order": 50
+      },
+      "icon": "shield",
+      "requires": [
+        "register.policies"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "policies-live",
+            "lt": 1
+          },
+          "body": "No policies yet. [Add one](/r/policies?new=1) with its cover, its premium and when it matures."
+        },
+        {
+          "kind": "stat",
+          "heading": "Your policies",
+          "icon": "shield",
+          "span": 12,
+          "when": {
+            "metric": "policies-live",
+            "gt": 0
+          },
+          "cells": [
+            {
+              "metric": "policies-fund",
+              "label": "Fund value"
+            },
+            {
+              "metric": "policies-cover",
+              "label": "Cover"
+            },
+            {
+              "metric": "policies-year",
+              "label": "Premiums a year"
+            },
+            {
+              "metric": "policies-paid",
+              "label": "Premiums paid so far"
+            }
+          ]
+        },
+        {
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "metric": "policies-live",
+                "gt": 0
+              },
+              {
+                "metric": "policies-fund-stale",
+                "is": 0
+              },
+              {
+                "metric": "policies-fund",
+                "gt": 0
+              }
+            ]
+          },
+          "body": "Oldest fund value from {{day:policies-fund-on}}."
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "when": {
+            "metric": "policies-fund-stale",
+            "gt": 0
+          },
+          "body": "Oldest fund value from {{day:policies-fund-on}}, {{bad:over 90 days ago}}."
+        },
+        {
+          "kind": "cards",
+          "heading": "Policies",
+          "icon": "shield",
+          "span": 12,
+          "source": "register.policies",
+          "columns": [
+            {
+              "field": "name",
+              "as": "title"
+            },
+            {
+              "field": "fund_value",
+              "label": "Fund value",
+              "as": "figure"
+            },
+            {
+              "field": "insurer",
+              "label": "Insurer",
+              "as": "fact"
+            },
+            {
+              "field": "fund_as_of",
+              "label": "Fund value as of",
+              "as": "fact"
+            },
+            {
+              "field": "matures_on",
+              "label": "Matures",
+              "as": "fact"
+            }
+          ],
+          "order": [
+            {
+              "field": "matures_on",
+              "dir": "asc"
+            }
+          ],
+          "limit": 24,
+          "empty": "No policies yet."
+        },
+        {
+          "kind": "table",
+          "heading": "Premiums and cover",
+          "icon": "shield",
+          "span": 12,
+          "source": "register.policies",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Policy",
+              "width": "minmax(16ch,2fr)"
+            },
+            {
+              "field": "cover",
+              "label": "Cover",
+              "align": "end"
+            },
+            {
+              "field": "per_year",
+              "label": "Premiums a year",
+              "align": "end"
+            },
+            {
+              "field": "paid",
+              "label": "Premiums paid so far",
+              "align": "end"
+            },
+            {
+              "field": "state",
+              "label": "Status"
+            }
+          ],
+          "order": [
+            {
+              "field": "name",
+              "dir": "asc"
+            }
+          ],
+          "limit": 50,
+          "empty": "No policies yet."
+        }
+      ]
+    },
+    {
+      "page": "policy",
+      "title": "{{name}}",
+      "for": {
+        "register": "policies"
+      },
+      "pack": "insurance",
+      "nav": {
+        "section": "Policies",
+        "order": 20
+      },
+      "icon": "shield",
+      "requires": [
+        "register.policies",
+        "register.illustration_years"
+      ],
+      "blocks": [
+        {
+          "kind": "cards",
+          "lead": true,
+          "span": 12,
+          "source": "register.policies",
+          "where": "name is {{name}}",
+          "columns": [
+            {
+              "field": "name",
+              "as": "title"
+            },
+            {
+              "field": "insurer",
+              "label": "Insurer",
+              "as": "fact"
+            },
+            {
+              "field": "number",
+              "label": "Policy number",
+              "as": "fact"
+            },
+            {
+              "field": "cost",
+              "label": "Premium is",
+              "as": "fact"
+            },
+            {
+              "field": "note",
+              "as": "reply"
+            }
+          ],
+          "limit": 1
+        },
+        {
+          "kind": "stat",
+          "heading": "Fund and cover",
+          "icon": "shield",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "policy-fund-at:{{name}}",
+              "label": "Fund value"
+            },
+            {
+              "metric": "policy-cover-at:{{name}}",
+              "label": "Cover"
+            },
+            {
+              "metric": "policy-illustrated-at:{{name}}",
+              "label": "Illustrated fund this year"
+            }
+          ]
+        },
+        {
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "metric": "policy-fund-on-at:{{name}}",
+            "gt": 0
+          },
+          "body": "Fund value from {{day:policy-fund-on-at:{{name}}}}."
+        },
+        {
+          "kind": "stat",
+          "heading": "Premiums",
+          "icon": "wallet",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "policy-paid-at:{{name}}",
+              "label": "Premiums paid so far"
+            },
+            {
+              "metric": "policy-payments-at:{{name}}",
+              "label": "Premiums paid"
+            },
+            {
+              "metric": "policy-year-at:{{name}}",
+              "label": "Premiums a year"
+            }
+          ]
+        },
+        {
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "metric": "policy-matures-at:{{name}}",
+            "gt": 0
+          },
+          "body": "Matures {{day:policy-matures-at:{{name}}}}, {{policy-term-at:{{name}}}}% of the term gone."
+        },
+        {
+          "kind": "stat",
+          "heading": "Maturity",
+          "icon": "calendar-clock",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "policy-benefit-at:{{name}}",
+              "label": "Paid out at maturity"
+            }
+          ]
+        },
+        {
+          "kind": "drawn",
+          "heading": "Illustrated fund by year",
+          "icon": "chart-line",
+          "span": 12,
+          "source": "register.illustration_years",
+          "where": "of is {{name}}",
+          "columns": [
+            {
+              "field": "year",
+              "label": "Year"
+            },
+            {
+              "field": "low",
+              "label": "Low"
+            },
+            {
+              "field": "mid",
+              "label": "Expected"
+            },
+            {
+              "field": "high",
+              "label": "High"
+            }
+          ],
+          "order": [
+            {
+              "field": "year",
+              "dir": "asc"
+            }
+          ],
+          "limit": 100,
+          "height": 240,
+          "code": "<svg id=\"c\" width=\"100%\" height=\"200\" role=\"img\" aria-label=\"Illustrated fund by year, low, mid and high\"></svg>\n<style>svg text{font:12px var(--font,system-ui,sans-serif);fill:var(--ink-2)}.l{fill:none;stroke-width:2}.k{font-weight:600}</style>\n<script>\nbraindog.on(function (d) {\n  var f = d.columns.map(function (c) { return c.field; });\n  var rows = d.rows.map(function (r) { return r.fields; }).filter(function (r) { return r.year && r.mid; }).sort(function (a, b) { return a.year - b.year; });\n  var svg = document.getElementById('c');\n  var out = '';\n  svg.innerHTML = '';\n  if (rows.length < 2) return;\n  var W = svg.clientWidth || 600, H = 200, L = 8, R = 56, T = 12, B = 22;\n  var val = function (m) { return m && typeof m.amount === 'number' ? m.amount : null; };\n  var all = [];\n  rows.forEach(function (r) { ['low', 'mid', 'high'].forEach(function (k) { var v = val(r[k]); if (v !== null) all.push(v); }); });\n  var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);\n  if (hi === lo) hi = lo + 1;\n  var y0 = rows[0].year, y1 = rows[rows.length - 1].year;\n  var x = function (y) { return L + ((y - y0) / Math.max(1, y1 - y0)) * (W - L - R); };\n  var y = function (v) { return T + (1 - (v - lo) / (hi - lo)) * (H - T - B); };\n  var add = function (name, attrs, text) { var a = ''; for (var k in attrs) a += ' ' + k + '=\"' + attrs[k] + '\"'; out += '<' + name + a + '>' + (text || '') + '</' + name + '>'; };\n  [['low', 'Low', 'var(--ink-3)'], ['mid', 'Mid', 'var(--ink)'], ['high', 'High', 'var(--good)']].forEach(function (s) {\n    var pts = rows.filter(function (r) { return val(r[s[0]]) !== null; });\n    add('polyline', { 'class': 'l', stroke: s[2], points: pts.map(function (r) { return x(r.year) + ',' + y(val(r[s[0]])); }).join(' ') });\n    var last = pts[pts.length - 1];\n    add('text', { x: x(last.year) + 6, y: y(val(last[s[0]])) + 4, 'class': 'k' }, s[1]);\n  });\n  add('text', { x: L, y: H - 6 }, String(y0));\n  add('text', { x: W - R, y: H - 6, 'text-anchor': 'end' }, String(y1));\n  svg.innerHTML = out;\n});\n</script>",
+          "when": {
+            "metric": "policy-years-at:{{name}}",
+            "gt": 1
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Year by year",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.illustration_years",
+          "where": "of is {{name}}",
+          "columns": [
+            {
+              "field": "year",
+              "width": "8ch",
+              "label": "Year"
+            },
+            {
+              "field": "age",
+              "width": "8ch",
+              "label": "Age"
+            },
+            {
+              "field": "low",
+              "align": "end",
+              "label": "Low"
+            },
+            {
+              "field": "mid",
+              "align": "end",
+              "label": "Expected"
+            },
+            {
+              "field": "high",
+              "align": "end",
+              "label": "High"
+            }
+          ],
+          "order": [
+            {
+              "field": "year",
+              "dir": "asc"
+            }
+          ],
+          "limit": 100,
+          "empty": "No illustration entered.",
+          "when": {
+            "metric": "policy-years-at:{{name}}",
+            "gt": 0
+          }
+        }
+      ]
+    }
+  ]
+}

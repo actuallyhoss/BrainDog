@@ -1,0 +1,152 @@
+{
+  "usecase": "team-board",
+  "version": "1.1.0",
+  "title": "Team task list",
+  "summary": "The tasks your team and its agents are working on: who owns each, its status and priority, a board, and who is doing what right now.",
+  "changes": "Home no longer opens on a count of open, blocked and urgent tasks, since the lists under it show them. Nothing you hold changes.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "team",
+  "tone": "plain and direct",
+  "signals": [
+    "team task list",
+    "task list for my team",
+    "team tasks",
+    "our tasks",
+    "task board",
+    "kanban",
+    "who is doing what",
+    "agents and people",
+    "agentic task list",
+    "sprint",
+    "standup"
+  ],
+  "modules": [
+    "team-board"
+  ],
+  "needs": [
+    "team-board"
+  ],
+  "voice": {
+    "coming_up": "Due soon",
+    "nothing_due": "Nothing is due in the next two weeks.",
+    "fills_with": "Tasks, owners and what agents are doing show up here as you add them."
+  },
+  "skills": [],
+  "pack": {
+    "pack": "usecase-team-board",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "page": "home-team-board",
+        "title": "Today",
+        "icon": "home",
+        "requires": [
+          "register.session"
+        ],
+        "blocks": [
+          {
+            "kind": "cards",
+            "lead": true,
+            "heading": "Agents working now",
+            "icon": "session",
+            "span": 12,
+            "source": "sessions.working",
+            "columns": [
+              {
+                "field": "doing",
+                "as": "title"
+              },
+              {
+                "field": "agent",
+                "as": "who"
+              },
+              {
+                "field": "last_seen",
+                "as": "when"
+              }
+            ],
+            "limit": 6,
+            "empty": "No agent is working right now."
+          },
+          {
+            "kind": "table",
+            "heading": "Doing now",
+            "icon": "activity",
+            "span": 12,
+            "source": "register.team_tasks",
+            "where": "state is doing",
+            "columns": [
+              {
+                "field": "owner",
+                "label": "Who",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "what",
+                "label": "Doing",
+                "width": "minmax(18ch,1fr)"
+              },
+              {
+                "field": "due",
+                "label": "Due",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "limit": 8,
+            "empty": "{{config:voice_fills_with}}"
+          },
+          {
+            "kind": "table",
+            "heading": "Blocked",
+            "icon": "octagon-alert",
+            "span": 12,
+            "source": "register.team_tasks",
+            "where": "state is blocked",
+            "columns": [
+              {
+                "field": "owner",
+                "label": "Who"
+              },
+              {
+                "field": "what",
+                "label": "Task"
+              }
+            ],
+            "limit": 8,
+            "when": {
+              "metric": "team-blocked",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "queue",
+            "heading": "Needs your call",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "limit": 5,
+            "when": {
+              "metric": "questions-open",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "feed",
+            "heading": "What changed",
+            "icon": "activity",
+            "span": 12,
+            "source": "activity",
+            "first": 8,
+            "empty": "{{config:voice_fills_with}}"
+          }
+        ]
+      }
+    ]
+  }
+}

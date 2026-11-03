@@ -1,0 +1,128 @@
+{
+  "usecase": "photographer",
+  "version": "1.1.0",
+  "title": "Photographer",
+  "summary": "Your shoots from the first enquiry to the fee paid, the galleries each client is still owed, and your gear.",
+  "changes": "Today no longer opens on how many questions need your call, since Needs your call lists them. Nothing you hold changes.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "individual",
+  "tone": "plain, the house voice",
+  "signals": [
+    "photographer",
+    "photography",
+    "shoots",
+    "shoot",
+    "photo shoot",
+    "clients",
+    "galleries",
+    "gallery",
+    "bookings",
+    "booking",
+    "weddings",
+    "wedding photographer",
+    "portraits",
+    "headshots",
+    "editing",
+    "deliverables",
+    "camera",
+    "gear",
+    "lenses",
+    "enquiries"
+  ],
+  "modules": [
+    "people",
+    "photographer"
+  ],
+  "needs": [
+    "photographer"
+  ],
+  "voice": {
+    "coming_up": "Shoots and galleries due",
+    "nothing_due": "No shoot or gallery is due in the next two weeks.",
+    "fills_with": "Your next shoots and the galleries still to deliver show up here as you add your bookings."
+  },
+  "skills": [],
+  "pack": {
+    "pack": "usecase-photographer",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "page": "home-photographer",
+        "title": "Today",
+        "icon": "home",
+        "requires": [
+          "register.session"
+        ],
+        "blocks": [
+          {
+            "kind": "stat",
+            "lead": true,
+            "heading": "What you have",
+            "icon": "wallet",
+            "span": 12,
+            "source": "figures.home"
+          },
+          {
+            "kind": "table",
+            "heading": "{{config:voice_coming_up}}",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "deadlines",
+            "horizon": 14,
+            "columns": [
+              {
+                "field": "title",
+                "label": "Description",
+                "width": "minmax(14ch,1fr)"
+              },
+              {
+                "field": "amount",
+                "label": "Amount",
+                "width": "15ch",
+                "align": "end",
+                "sign": {
+                  "field": "direction",
+                  "minus": "out"
+                }
+              },
+              {
+                "field": "day",
+                "label": "Due",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "limit": 8,
+            "empty": "{{config:voice_nothing_due}}"
+          },
+          {
+            "kind": "queue",
+            "heading": "Needs your call",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "limit": 5,
+            "when": {
+              "metric": "questions-open",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "feed",
+            "heading": "What changed",
+            "icon": "history",
+            "span": 12,
+            "source": "activity",
+            "first": 8,
+            "empty": "{{config:voice_fills_with}}"
+          }
+        ]
+      }
+    ]
+  }
+}

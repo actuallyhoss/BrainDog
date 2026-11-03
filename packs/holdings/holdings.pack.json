@@ -1,10 +1,10 @@
 {
   "pack": "holdings",
-  "version": "3.7.1",
+  "version": "3.7.2",
   "icon": "chart-pie",
   "title": "Investments and gold",
   "summary": "What you own beyond cash: funds, shares, certificates, policies and gold by karat and gram. Each buy with its day, count, price and fees; what each holding is worth now from a price you give or the gold rate; and what it has gained, with how it splits by kind.",
-  "changes": "The gold rate and where it sits stand side by side as two halves at a desk's width, as the page meant them to, with the line about an old gold rate above the pair.",
+  "changes": "Holdings no longer opens on a count of what you hold. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -1012,16 +1012,6 @@
           "when": {
             "metric": "holdings-count",
             "lt": 1
-          }
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "body": "{{holdings-count}} holding(s).",
-          "when": {
-            "metric": "holdings-count",
-            "gt": 0
           }
         },
         {

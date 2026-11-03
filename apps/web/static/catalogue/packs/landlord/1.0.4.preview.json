@@ -1,0 +1,234 @@
+{
+  "format": 1,
+  "made_at": "2026-11-03T21:09:23.513Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Add a property, then its tenancy, and the month's rent shows here.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "rentals-held"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "cells": [
+            {
+              "label": "Rent due this month",
+              "metric": "rent-roll"
+            },
+            {
+              "label": "Received this month",
+              "metric": "rent-in-month"
+            },
+            {
+              "label": "Empty",
+              "metric": "rentals-empty"
+            },
+            {
+              "label": "Open repairs",
+              "metric": "repairs-open"
+            },
+            {
+              "label": "Repairs this year",
+              "metric": "repair-cost-year"
+            },
+            {
+              "label": "Deposits held",
+              "metric": "deposits-held"
+            }
+          ],
+          "heading": "This month",
+          "icon": "gauge",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "rentals-held"
+          },
+          "key": "k1bko50p",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Tenancy"
+            },
+            {
+              "field": "rental",
+              "label": "Property"
+            },
+            {
+              "align": "end",
+              "field": "rent",
+              "label": "Monthly rent"
+            },
+            {
+              "align": "end",
+              "field": "rent_day",
+              "label": "Falls on day"
+            }
+          ],
+          "heading": "Not paid this month",
+          "icon": "circle-alert",
+          "kind": "table",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "rent_day"
+            }
+          ],
+          "source": "register.tenancies",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "unpaid-month"
+          },
+          "where": {
+            "all": [
+              {
+                "field": "state",
+                "in": [
+                  "live",
+                  "notice"
+                ]
+              },
+              {
+                "none": [
+                  {
+                    "pointed": {
+                      "by": "tenancy",
+                      "register": "rent_in",
+                      "where": {
+                        "field": "on",
+                        "gte": "bom"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "key": "k12pe77n",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "let_until"
+            },
+            {
+              "field": "name"
+            },
+            {
+              "field": "rental"
+            }
+          ],
+          "empty": "No tenancy has an end day yet.",
+          "heading": "Ending next",
+          "icon": "calendar-clock",
+          "kind": "timeline",
+          "limit": 3,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "let_until"
+            }
+          ],
+          "source": "register.tenancies",
+          "span": 12,
+          "where": "state is live or notice, let_until is set",
+          "key": "k0iiqy4b",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "fact",
+              "field": "street",
+              "label": "Address"
+            },
+            {
+              "as": "fact",
+              "field": "kind",
+              "label": "Kind"
+            },
+            {
+              "as": "reply",
+              "field": "note"
+            }
+          ],
+          "empty": "No properties yet. Add the first one you rent out.",
+          "heading": "Properties",
+          "icon": "building",
+          "kind": "cards",
+          "limit": 24,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.rentals",
+          "span": 12,
+          "key": "k1re6pjz",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "key",
+      "nav": {
+        "order": 10,
+        "section": "Lettings"
+      },
+      "pack": "landlord",
+      "page": "lettings",
+      "requires": [
+        "register.rentals",
+        "register.tenancies",
+        "register.rent_in",
+        "register.repairs"
+      ],
+      "title": "Lettings",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "lettings",
+        "basis": "r03mrqp7",
+        "by": "rule",
+        "hide": [
+          "k1re6pjz"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

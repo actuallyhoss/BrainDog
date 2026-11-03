@@ -1,0 +1,488 @@
+{
+  "format": 1,
+  "made_at": "2026-11-03T21:09:23.513Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "No goals yet. Add what you are saving for, how much and by when, and each month says what to put by.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "goals-count"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "heading": "Add a goal",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "money_goals",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "goals-count"
+          },
+          "key": "k0h07d5c",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "To put by each month",
+              "metric": "goals-need"
+            },
+            {
+              "label": "Saving for",
+              "metric": "goals-saving"
+            },
+            {
+              "label": "Behind",
+              "metric": "goals-behind"
+            },
+            {
+              "label": "Reached",
+              "metric": "goals-reached"
+            }
+          ],
+          "heading": "Where the goals stand",
+          "kind": "stat",
+          "span": 12,
+          "key": "k1jbzajr",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Saving for",
+              "metric": "goals-saving",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 2,
+                "unit": null,
+                "rows": 2,
+                "refusals": [],
+                "held": 3,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Behind",
+              "metric": "goals-behind",
+              "target": {
+                "lte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 3,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Reached",
+              "metric": "goals-reached",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 1,
+                "unit": null,
+                "rows": 1,
+                "refusals": [],
+                "held": 3,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "goals-need": {
+              "name": "To put by each month",
+              "source": "register.money_goals",
+              "where": "state is saving, need is set",
+              "value": {
+                "sum": "need"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "goals-saving": {
+              "name": "Goals being saved for",
+              "source": "register.money_goals",
+              "where": "state is saving",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "goals-behind": {
+              "name": "Goals behind",
+              "source": "register.money_goals",
+              "where": "state is saving, pace is behind",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            },
+            "goals-reached": {
+              "name": "Goals reached",
+              "source": "register.money_goals",
+              "where": "state is reached",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "target"
+            },
+            {
+              "field": "by"
+            }
+          ],
+          "empty": "No goals yet.",
+          "heading": "How far each has come",
+          "icon": "star",
+          "kind": "progress",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "seq"
+            }
+          ],
+          "source": "register.money_goals",
+          "span": 12,
+          "spent": "goals-have-by-name",
+          "where": "state is not paused",
+          "key": "k0acg4to",
+          "rows": [
+            {
+              "id": "01M6HKXJDS9W4F71EN7MANB7Q1",
+              "register": "money_goals",
+              "seq": 1,
+              "fields": {
+                "name": "Emergency fund",
+                "kind": "value",
+                "target": {
+                  "amount": 1200000,
+                  "currency": "USD"
+                },
+                "have": {
+                  "amount": 780000,
+                  "currency": "USD"
+                },
+                "by": "2027-07-01",
+                "started_on": "2026-06-06",
+                "state": "saving"
+              },
+              "state": "saving",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDS9W4F71EN7XF2X4YF",
+              "register": "money_goals",
+              "seq": 2,
+              "fields": {
+                "name": "New laptop",
+                "kind": "value",
+                "target": {
+                  "amount": 240000,
+                  "currency": "USD"
+                },
+                "have": {
+                  "amount": 60000,
+                  "currency": "USD"
+                },
+                "by": "2027-01-17",
+                "started_on": "2026-09-04",
+                "state": "saving"
+              },
+              "state": "saving",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDS9W4F71EN852YMF79",
+              "register": "money_goals",
+              "seq": 3,
+              "fields": {
+                "name": "Summer trip",
+                "kind": "value",
+                "target": {
+                  "amount": 350000,
+                  "currency": "USD"
+                },
+                "have": {
+                  "amount": 350000,
+                  "currency": "USD"
+                },
+                "by": "2026-10-24",
+                "started_on": "2026-04-17",
+                "state": "reached"
+              },
+              "state": "reached",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 3,
+          "refusals": [],
+          "readings": [
+            {
+              "metric": "goals-have-by-name",
+              "reading": {
+                "value": 1190000,
+                "unit": "USD",
+                "rows": 3,
+                "refusals": [],
+                "backs": [
+                  "money_goals#1",
+                  "money_goals#2",
+                  "money_goals#3"
+                ],
+                "held": 3,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true,
+                "groups": [
+                  {
+                    "key": "Emergency fund",
+                    "value": 780000,
+                    "rows": 1,
+                    "state": "full"
+                  },
+                  {
+                    "key": "Summer trip",
+                    "value": 350000,
+                    "rows": 1,
+                    "state": "full"
+                  },
+                  {
+                    "key": "New laptop",
+                    "value": 60000,
+                    "rows": 1,
+                    "state": "full"
+                  }
+                ],
+                "more": 0
+              }
+            }
+          ],
+          "wholeRead": {
+            "rows": [],
+            "total": 1790000,
+            "unit": "USD"
+          },
+          "figures": {
+            "goals-have-by-name": {
+              "name": "Held so far, by goal",
+              "source": "register.money_goals",
+              "where": "have is set",
+              "value": {
+                "sum": "have"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              },
+              "group_by": "name"
+            }
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "have",
+              "label": "Have"
+            },
+            {
+              "field": "target",
+              "label": "Target"
+            },
+            {
+              "field": "by",
+              "label": "By"
+            },
+            {
+              "field": "need",
+              "label": "Needed a month"
+            },
+            {
+              "field": "pace",
+              "label": "Pace"
+            },
+            {
+              "field": "under",
+              "label": "Part of"
+            }
+          ],
+          "empty": "No goals yet.",
+          "heading": "Every goal",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "by"
+            }
+          ],
+          "source": "register.money_goals",
+          "span": 12,
+          "key": "k1gr1sgj",
+          "rows": [
+            {
+              "id": "01M6HKXJDS9W4F71EN852YMF79",
+              "register": "money_goals",
+              "seq": 3,
+              "fields": {
+                "name": "Summer trip",
+                "kind": "value",
+                "target": {
+                  "amount": 350000,
+                  "currency": "USD"
+                },
+                "have": {
+                  "amount": 350000,
+                  "currency": "USD"
+                },
+                "by": "2026-10-24",
+                "started_on": "2026-04-17",
+                "state": "reached"
+              },
+              "state": "reached",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDS9W4F71EN7XF2X4YF",
+              "register": "money_goals",
+              "seq": 2,
+              "fields": {
+                "name": "New laptop",
+                "kind": "value",
+                "target": {
+                  "amount": 240000,
+                  "currency": "USD"
+                },
+                "have": {
+                  "amount": 60000,
+                  "currency": "USD"
+                },
+                "by": "2027-01-17",
+                "started_on": "2026-09-04",
+                "state": "saving"
+              },
+              "state": "saving",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDS9W4F71EN7MANB7Q1",
+              "register": "money_goals",
+              "seq": 1,
+              "fields": {
+                "name": "Emergency fund",
+                "kind": "value",
+                "target": {
+                  "amount": 1200000,
+                  "currency": "USD"
+                },
+                "have": {
+                  "amount": 780000,
+                  "currency": "USD"
+                },
+                "by": "2027-07-01",
+                "started_on": "2026-06-06",
+                "state": "saving"
+              },
+              "state": "saving",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 3,
+          "refusals": []
+        }
+      ],
+      "icon": "star",
+      "nav": {
+        "order": 50,
+        "section": "Money"
+      },
+      "pack": "goals",
+      "page": "goals",
+      "requires": [
+        "register.money_goals"
+      ],
+      "title": "Goals",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "goals",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

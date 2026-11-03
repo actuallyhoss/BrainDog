@@ -1,10 +1,10 @@
 {
   "pack": "insurance",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "icon": "shield",
   "title": "Insurance",
   "summary": "Your life and savings policies: who the insurer is, what the premium is and where it is paid, the cover, what the fund is worth and from when, and when it matures.",
-  "changes": "Says what to add when there are no policies yet, with a link to add the first, and no longer shows a fund value line before there is one.",
+  "changes": "Insurance no longer opens on the fund value and next maturity, since the figures and cards under it show them. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -587,16 +587,6 @@
         "register.policies"
       ],
       "blocks": [
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": {
-            "metric": "policies-live",
-            "gt": 0
-          },
-          "body": "{{policies-fund}} in funds. Next maturity {{day:policies-next}}."
-        },
         {
           "kind": "note",
           "lead": true,

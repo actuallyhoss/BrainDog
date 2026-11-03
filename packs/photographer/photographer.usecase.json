@@ -1,9 +1,9 @@
 {
   "usecase": "photographer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "title": "Photographer",
   "summary": "Your shoots from the first enquiry to the fee paid, the galleries each client is still owed, and your gear.",
-  "changes": "The first version.",
+  "changes": "Today no longer opens on how many questions need your call, since Needs your call lists them. Nothing you hold changes.",
   "author": "BrainDog",
   "license": "MIT",
   "audience": "individual",
@@ -59,12 +59,6 @@
           "register.session"
         ],
         "blocks": [
-          {
-            "kind": "note",
-            "lead": true,
-            "span": 12,
-            "body": "{{questions-open}} question(s) need your call"
-          },
           {
             "kind": "stat",
             "lead": true,

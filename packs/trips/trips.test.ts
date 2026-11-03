@@ -86,7 +86,7 @@ function ledger(api: Api): { account: string; food: string; hotel: string; lines
 
 test('THE FILE: trips 2.0.0 on money-core, one list, a rule and its script, two pages, and a trip field on the Ledger with no index', () => {
   const doc = shipped();
-  assert.deepEqual([doc.pack, doc.version, doc.license], ['trips', '2.1.0', 'Apache-2.0']);
+  assert.deepEqual([doc.pack, doc.version, doc.license], ['trips', '2.1.1', 'Apache-2.0']);
   assert.equal(doc.seeds, undefined, 'no example rows');
   const kinds = (k: string) => doc.declarations.filter((d) => k in d).map((d) => d[k]);
   assert.deepEqual(kinds('register'), ['trips']);

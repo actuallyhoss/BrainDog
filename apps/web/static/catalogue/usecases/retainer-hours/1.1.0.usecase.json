@@ -1,0 +1,123 @@
+{
+  "usecase": "retainer-hours",
+  "version": "1.1.0",
+  "title": "Agency",
+  "summary": "Each client's retainer, the hours worked against it this month, and what to invoice.",
+  "changes": "Today no longer opens on how many questions need your call, since Needs your call lists them. Nothing you hold changes.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "individual",
+  "tone": "plain, the house voice",
+  "signals": [
+    "retainer",
+    "retainers",
+    "hours",
+    "billable hours",
+    "timesheets",
+    "timesheet",
+    "clients",
+    "client work",
+    "invoices",
+    "invoice",
+    "hours used",
+    "monthly retainer",
+    "time tracking",
+    "log my time",
+    "billing"
+  ],
+  "modules": [
+    "people",
+    "retainer-hours"
+  ],
+  "needs": [
+    "retainer-hours"
+  ],
+  "voice": {
+    "coming_up": "Due soon",
+    "nothing_due": "No invoice or retainer is due in the next two weeks.",
+    "fills_with": "Each client's hours against their retainer and the invoices to send show up here as you log your time."
+  },
+  "skills": [],
+  "pack": {
+    "pack": "usecase-retainer-hours",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "page": "home-retainer-hours",
+        "title": "Today",
+        "icon": "home",
+        "requires": [
+          "register.session"
+        ],
+        "blocks": [
+          {
+            "kind": "stat",
+            "lead": true,
+            "heading": "What you have",
+            "icon": "wallet",
+            "span": 12,
+            "source": "figures.home"
+          },
+          {
+            "kind": "table",
+            "heading": "{{config:voice_coming_up}}",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "deadlines",
+            "horizon": 14,
+            "columns": [
+              {
+                "field": "title",
+                "label": "Description",
+                "width": "minmax(14ch,1fr)"
+              },
+              {
+                "field": "amount",
+                "label": "Amount",
+                "width": "15ch",
+                "align": "end",
+                "sign": {
+                  "field": "direction",
+                  "minus": "out"
+                }
+              },
+              {
+                "field": "day",
+                "label": "Due",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "limit": 8,
+            "empty": "{{config:voice_nothing_due}}"
+          },
+          {
+            "kind": "queue",
+            "heading": "Needs your call",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "limit": 5,
+            "when": {
+              "metric": "questions-open",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "feed",
+            "heading": "What changed",
+            "icon": "history",
+            "span": 12,
+            "source": "activity",
+            "first": 8,
+            "empty": "{{config:voice_fills_with}}"
+          }
+        ]
+      }
+    ]
+  }
+}

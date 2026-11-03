@@ -1,0 +1,230 @@
+{
+  "format": 1,
+  "made_at": "2026-11-03T21:09:23.513Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "No shoot is on the books yet. Add the first enquiry, and it starts on the board.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "is": 0,
+            "metric": "shoots-open"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "heading": "A new enquiry?",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "shoots",
+          "span": 12,
+          "key": "k1ijof22",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "cells": [
+            {
+              "label": "Booked this month",
+              "metric": "shoots-booked-month"
+            },
+            {
+              "label": "Fees not yet paid",
+              "metric": "shoot-fees-owed"
+            },
+            {
+              "label": "Next shoot",
+              "metric": "shoot-next-day"
+            }
+          ],
+          "heading": "This month",
+          "icon": "gauge",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "shoots-open"
+          },
+          "key": "k1bko50p",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "state"
+            },
+            {
+              "field": "name"
+            },
+            {
+              "field": "day"
+            },
+            {
+              "field": "who"
+            },
+            {
+              "field": "fee"
+            }
+          ],
+          "empty": "No shoots yet.",
+          "heading": "By status",
+          "icon": "board",
+          "kind": "board",
+          "order": [
+            {
+              "dir": "asc",
+              "field": "day"
+            }
+          ],
+          "source": "register.shoots",
+          "span": 12,
+          "key": "k0lbtqwt",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "image",
+      "nav": {
+        "order": 10,
+        "section": "Shoots"
+      },
+      "pack": "photographer",
+      "page": "shoots",
+      "requires": [
+        "register.shoots",
+        "register.deliverables"
+      ],
+      "title": "Shoots",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "shoots",
+        "basis": "r1uj34qd",
+        "by": "rule",
+        "hide": [
+          "k0lbtqwt"
+        ]
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "what",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "field": "shoot",
+              "label": "Shoot",
+              "width": "minmax(12ch,20ch)"
+            },
+            {
+              "align": "end",
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            }
+          ],
+          "empty": "Nothing is waiting to be sent.",
+          "heading": "Still to send",
+          "icon": "package",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.deliverables",
+          "span": 12,
+          "where": "sent is empty",
+          "key": "k0stx78x",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "item",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "cost",
+              "label": "Cost",
+              "width": "14ch"
+            },
+            {
+              "align": "end",
+              "field": "cover",
+              "label": "Cover ends",
+              "width": "13ch"
+            }
+          ],
+          "empty": "No cover ends in the next 90 days.",
+          "heading": "Cover ending in the next 90 days",
+          "icon": "box",
+          "kind": "table",
+          "order": [
+            {
+              "dir": "asc",
+              "field": "cover"
+            }
+          ],
+          "source": "register.gear",
+          "span": 12,
+          "where": "cover after yesterday, cover before +90d",
+          "key": "k03g1xe0",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "calendar-clock",
+      "nav": {
+        "order": 20,
+        "section": "Shoots"
+      },
+      "pack": "photographer",
+      "page": "shoots-due",
+      "requires": [
+        "register.shoots",
+        "register.deliverables",
+        "register.gear"
+      ],
+      "title": "Due",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "shoots-due",
+        "basis": "r0duna4h",
+        "by": "rule",
+        "hide": [
+          "k03g1xe0"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

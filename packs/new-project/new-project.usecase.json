@@ -1,9 +1,9 @@
 {
   "usecase": "new-project",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "title": "Starting a project",
   "summary": "Something new you want walked through: the stages from idea to first money, the next step at each, the decisions you made and a weekly note on where it stands.",
-  "changes": "The first version.",
+  "changes": "Home no longer opens on a count of steps to do and ticked, since the steps under it show them. Nothing you hold changes.",
   "author": "BrainDog",
   "license": "MIT",
   "audience": "starter",
@@ -49,12 +49,6 @@
           "register.session"
         ],
         "blocks": [
-          {
-            "kind": "note",
-            "lead": true,
-            "span": 12,
-            "body": "{{guide-steps-open}} step(s) still to do, {{guide-done-week}} ticked this week."
-          },
           {
             "kind": "cards",
             "lead": true,

@@ -1,0 +1,128 @@
+{
+  "usecase": "landlord",
+  "version": "1.1.0",
+  "title": "Landlord",
+  "summary": "The flats and houses you rent out, who rents each one, the rent that came in and the repairs waiting.",
+  "changes": "Today no longer opens on how many questions need your call, since Needs your call lists them. Nothing you hold changes.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "individual",
+  "tone": "plain, the house voice",
+  "signals": [
+    "landlord",
+    "flats",
+    "flat",
+    "tenants",
+    "tenant",
+    "rent",
+    "rent out",
+    "renting",
+    "rental",
+    "rentals",
+    "lettings",
+    "letting",
+    "property",
+    "properties",
+    "repairs",
+    "repair",
+    "deposit",
+    "tenancy",
+    "tenancies",
+    "lease"
+  ],
+  "modules": [
+    "people",
+    "landlord"
+  ],
+  "needs": [
+    "landlord"
+  ],
+  "voice": {
+    "coming_up": "Rent and repairs due",
+    "nothing_due": "No rent or repair is due in the next two weeks.",
+    "fills_with": "The rent due, the rent that came in and the repairs waiting show up here as you add your properties."
+  },
+  "skills": [],
+  "pack": {
+    "pack": "usecase-landlord",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "page": "home-landlord",
+        "title": "Today",
+        "icon": "home",
+        "requires": [
+          "register.session"
+        ],
+        "blocks": [
+          {
+            "kind": "stat",
+            "lead": true,
+            "heading": "What you have",
+            "icon": "wallet",
+            "span": 12,
+            "source": "figures.home"
+          },
+          {
+            "kind": "table",
+            "heading": "{{config:voice_coming_up}}",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "deadlines",
+            "horizon": 14,
+            "columns": [
+              {
+                "field": "title",
+                "label": "Description",
+                "width": "minmax(14ch,1fr)"
+              },
+              {
+                "field": "amount",
+                "label": "Amount",
+                "width": "15ch",
+                "align": "end",
+                "sign": {
+                  "field": "direction",
+                  "minus": "out"
+                }
+              },
+              {
+                "field": "day",
+                "label": "Due",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "limit": 8,
+            "empty": "{{config:voice_nothing_due}}"
+          },
+          {
+            "kind": "queue",
+            "heading": "Needs your call",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "limit": 5,
+            "when": {
+              "metric": "questions-open",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "feed",
+            "heading": "What changed",
+            "icon": "history",
+            "span": 12,
+            "source": "activity",
+            "first": 8,
+            "empty": "{{config:voice_fills_with}}"
+          }
+        ]
+      }
+    ]
+  }
+}

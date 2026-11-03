@@ -1,0 +1,567 @@
+{
+  "pack": "certificates",
+  "version": "2.0.4",
+  "icon": "landmark",
+  "title": "Certificates",
+  "summary": "Bank certificates and fixed deposits: the rate, what each has earned so far, when it pays next and when it matures. Its payouts and the principal coming back are walked into Cash ahead.",
+  "changes": "Certificates no longer opens on the next payout day, since the table shows each one's. Nothing it reads or writes changed.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.29.0 <4.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "certificates",
+      "name": "Certificates",
+      "icon": "landmark",
+      "one": "certificate",
+      "holds": "a certificate or fixed deposit: what was put in, the rate, how often it pays out and when it matures. Its payouts and the principal coming back are walked into Cash ahead",
+      "title": "bank",
+      "mobile": [
+        "bank",
+        "amount",
+        "next_payout"
+      ],
+      "state": "state",
+      "done": [
+        "matured",
+        "closed"
+      ],
+      "pack": "certificates",
+      "fields": [
+        {
+          "id": "bank",
+          "label": "Issuer",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "amount",
+          "label": "Principal",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "rate",
+          "label": "Rate a year",
+          "type": "decimal",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "required": true
+        },
+        {
+          "id": "term",
+          "label": "Term in months",
+          "type": "int",
+          "min": 1
+        },
+        {
+          "id": "start",
+          "label": "Started",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "pays",
+          "label": "Each payout",
+          "type": "money"
+        },
+        {
+          "id": "every",
+          "label": "Pays out",
+          "type": "enum",
+          "values": [
+            "monthly",
+            "quarterly",
+            "yearly"
+          ],
+          "labels": {
+            "monthly": "Every month",
+            "quarterly": "Every quarter",
+            "yearly": "Every year"
+          },
+          "default": "monthly",
+          "index": true,
+          "required": true
+        },
+        {
+          "id": "next_payout",
+          "label": "Next payout",
+          "type": "day",
+          "index": true,
+          "deadline": true,
+          "remind": [
+            "-3d",
+            "0d"
+          ]
+        },
+        {
+          "id": "flow",
+          "label": "Which way",
+          "type": "enum",
+          "values": [
+            "in"
+          ],
+          "labels": {
+            "in": "Money in"
+          },
+          "default": "in",
+          "required": true
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "live",
+            "matured",
+            "closed"
+          ],
+          "default": "live",
+          "index": true,
+          "required": true
+        },
+        {
+          "id": "ends",
+          "label": "Matures",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "roll",
+          "label": "Interest is added to the principal",
+          "type": "bool",
+          "default": false
+        },
+        {
+          "id": "accrued",
+          "label": "Earned so far",
+          "type": "money"
+        },
+        {
+          "id": "interest",
+          "label": "Interest over the term",
+          "type": "money"
+        },
+        {
+          "id": "at_maturity",
+          "label": "Value at maturity",
+          "type": "money"
+        },
+        {
+          "id": "account",
+          "label": "Pays into",
+          "type": "ref",
+          "to": "accounts"
+        },
+        {
+          "id": "note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "rule": "certificates_accrue",
+      "name": "Work out what a certificate has earned",
+      "pack": "certificates",
+      "on": {
+        "written": {
+          "register": "certificates",
+          "op": [
+            "create",
+            "update"
+          ],
+          "fields": [
+            "amount",
+            "rate",
+            "term",
+            "start",
+            "every",
+            "ends",
+            "roll"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "certificates_accrue",
+            "as": "accruing"
+          }
+        }
+      ]
+    },
+    {
+      "script": "certificates_accrue",
+      "title": "Work out what each certificate has earned and when it pays",
+      "pack": "certificates",
+      "runs": {
+        "rule": true,
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "certificates"
+      ],
+      "writes": [
+        "certificates"
+      ],
+      "source": "/**\n * What each certificate has earned and when it pays: the interest so far written into `accrued`, the interest over the\n * whole term into `interest`, and whatever the row left empty and could be worked out from the rest.\n *\n * STARTED WITH A ROW'S ID when a certificate is added or its principal, rate, term, start, cadence or maturity changes;\n * started with no id, once a day, it brings every live certificate up to today. Interest is the rate a year on the\n * principal: simple unless the certificate compounds, when it is added to the principal every month. It is counted from\n * the start to today, and never past the day it matures.\n *\n * `at_maturity` is the value the certificate has on the day it matures: the principal, grown at its rate over the whole\n * term when it compounds. It is always written, because Cash ahead walks it as the money coming back.\n *\n * WHAT IS WORKED OUT ONLY WHEN IT IS EMPTY, so a person's own word always wins. `ends` is the start and the term in\n * months. `payout` is one cycle's interest on a certificate that pays it out (not one that compounds). `next_payout` is\n * one cycle after the start, and never after the day it matures. Each amount is in the principal's currency.\n */\nconst DAY = 86_400_000;\n\nconst dayOf = (text) => {\n  const m = typeof text === 'string' ? /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(text) : null;\n  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;\n};\n\nconst written = (ms) => new Date(ms).toISOString().slice(0, 10);\n\nconst monthsOn = (text, n) => {\n  const at = dayOf(text);\n  if (at === null) return null;\n  const d = new Date(at);\n  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n + 1, 0)).getUTCDate();\n  return written(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, Math.min(d.getUTCDate(), last)));\n};\n\nconst CYCLE = { monthly: 1, quarterly: 3, yearly: 12 };\n\n/** Interest on `principal` (minor units) over `days`, at `rate` percent a year; compounded monthly when asked. */\nexport function interestOver(principal, rate, days, compound) {\n  if (!(days > 0) || !(rate > 0)) return 0;\n  if (!compound) return Math.round((principal * rate * days) / 36_500);\n  const months = days / 30.4375;\n  return Math.round(principal * (Math.pow(1 + rate / 1200, months) - 1));\n}\n\n/** What to write onto one certificate to bring it level, as a patch; empty when it is level already. */\nexport function levelled(fields, today) {\n  const money = (m) => m && typeof m.amount === 'number' && typeof m.currency === 'string';\n  const same = (a, b) => money(a) && a.amount === b.amount && a.currency === b.currency;\n  const out = {};\n  const principal = fields.amount;\n  if (!money(principal) || typeof fields.rate !== 'number') return out;\n  const start = dayOf(fields.start);\n  if (start === null) return out;\n  let ends = fields.ends;\n  if (!dayOf(ends) && typeof fields.term === 'number' && fields.term > 0) {\n    ends = monthsOn(fields.start, Math.round(fields.term));\n    out.ends = ends;\n  }\n  const compound = fields.roll === true;\n  const step = CYCLE[fields.every];\n  if (!money(fields.pays) && !compound && step) out.pays = { amount: interestOver(principal.amount, fields.rate, (step * 365) / 12, false), currency: principal.currency };\n  if (!dayOf(fields.next_payout) && step && !compound) {\n    const first = monthsOn(fields.start, step);\n    out.next_payout = dayOf(ends) !== null && dayOf(first) > dayOf(ends) ? ends : first;\n  }\n  const stop = dayOf(ends);\n  const until = Math.max(start, Math.min(dayOf(today), stop === null ? Infinity : stop));\n  const accrued = { amount: interestOver(principal.amount, fields.rate, (until - start) / DAY, compound), currency: principal.currency };\n  if (!same(fields.accrued, accrued)) out.accrued = accrued;\n  if (stop !== null) {\n    const whole = { amount: interestOver(principal.amount, fields.rate, (stop - start) / DAY, compound), currency: principal.currency };\n    if (!same(fields.interest, whole)) out.interest = whole;\n    /* WHAT COMES BACK ON THE DAY IT MATURES: the principal, and for one that compounds the interest grown into it. */\n    const back = { amount: principal.amount + (compound ? whole.amount : 0), currency: principal.currency };\n    if (!same(fields.at_maturity, back)) out.at_maturity = back;\n  }\n  return out;\n}\n\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('certificates', { field: 'state', is: 'live' });\n  const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);\n  for (const row of rows) {\n    if (!row) continue;\n    const next = levelled(row.fields, today);\n    if (Object.keys(next).length === 0) continue;\n    ctx.update('certificates#' + row.seq, next, row.version);\n  }\n}\n"
+    },
+    {
+      "rule": "certificates_payout",
+      "name": "Ask to move a certificate's next payout on when its payout is booked",
+      "pack": "certificates",
+      "on": {
+        "written": {
+          "register": "transactions",
+          "op": [
+            "create"
+          ]
+        }
+      },
+      "when": "direction is in, state is cleared",
+      "steps": [
+        {
+          "script": {
+            "id": "certificates_payout",
+            "as": "asking",
+            "input": {
+              "line": "{{trigger.entry}}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "script": "certificates_payout",
+      "title": "Ask to move a certificate's next payout on when it is booked",
+      "pack": "certificates",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "transactions",
+        "certificates"
+      ],
+      "writes": [
+        "certificates"
+      ],
+      "source": "/**\n * Ask to move a certificate's next payout on when its payout is booked. Money in lands on the Ledger, and the certificate\n * still says the payout is due, so Cash ahead walks it a second time and Coming up reads it late.\n *\n * WHAT IT LOOKS FOR. Handed a Ledger line that came in and is cleared, `payoutOf` keeps the live certificates whose\n * payout is that amount in that currency, that pay into that account (or name none), and whose next payout is within\n * five days of the line. EXACTLY ONE IS THE CERTIFICATE; none or several and nothing is asked.\n *\n * IT ASKS, AND WRITES NOTHING BY ITSELF. One question on Decide, \"Pay-out of Fenwick Bank is booked. Move its next\n * payout on to 14 December?\", whose first answer carries the one write: `next_payout`, one cycle on, the day the host's\n * `ctx.cycle` walks (Cash ahead's own step). When that is past the day it matures, the answer marks it matured instead.\n * \"Leave it\" writes nothing.\n */\n\n/** WHAT THE WALK READS OF A CERTIFICATE TO STEP IT, Cash ahead's own leg, written into the script as data. */\nconst LEG = { on: 'next_payout', every: { field: 'every', months: { monthly: 1, quarterly: 3, yearly: 12 } }, ends: 'ends' };\n\nconst MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];\n\nconst isDay = (d) => typeof d === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(d);\n\nconst words = (d) => {\n  const m = isDay(d) ? /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(d) : null;\n  return m ? Number(m[3]) + ' ' + MONTHS[Number(m[2]) - 1] : String(d);\n};\n\nconst apart = (a, b) => Math.abs(Date.parse(a + 'T00:00:00Z') - Date.parse(b + 'T00:00:00Z')) / 86_400_000;\n\nexport function payoutOf(line, certificates) {\n  const f = line.fields;\n  if (f.direction !== 'in' || f.state !== 'cleared' || !f.amount || !isDay(f.on)) return { nothing: 'The line is not money in that has cleared, so no certificate was looked for.' };\n  const found = certificates.filter((c) => {\n    const g = c.fields;\n    if (g.state !== 'live' || !g.pays || g.pays.amount !== f.amount.amount || g.pays.currency !== f.amount.currency) return false;\n    if (g.account && g.account !== f.account) return false;\n    return isDay(g.next_payout) && apart(g.next_payout, f.on) <= 5;\n  });\n  if (found.length !== 1) return { nothing: found.length === 0 ? 'No certificate pays this amount about now, so nothing was asked.' : 'More than one certificate pays this amount about now, so nothing was asked.' };\n  return { certificate: found[0] };\n}\n\nexport function moveOn(certificate, next) {\n  const g = certificate.fields;\n  const name = String(g.bank ?? '').trim() || 'The certificate';\n  if (!(isDay(next) && isDay(g.next_payout) && next > g.next_payout)) return { nothing: name + ' has no later payout day to move to, so nothing was asked.' };\n  const matured = isDay(g.ends) && next > g.ends;\n  return {\n    ask: {\n      cause: 'certificates.payout.' + certificate.spoken + ':' + g.next_payout,\n      question: matured ? 'Its last payout is booked for ' + name + '. Mark the certificate matured?' : 'Payout of ' + name + ' is booked. Move its next payout on to ' + words(next) + '?',\n      about: certificate.spoken,\n      options: [\n        matured\n          ? { id: 'move', label: 'Mark it matured', because: 'It is no longer walked, so Cash ahead stops counting its payouts.', patches: [{ id: certificate.spoken, version: certificate.version, fields: { state: 'matured' } }] }\n          : { id: 'move', label: 'Move it on', because: 'The next payout becomes ' + words(next) + ', so it is not read late or counted twice.', patches: [{ id: certificate.spoken, version: certificate.version, fields: { next_payout: next } }] },\n        { id: 'leave', label: 'Leave it', because: 'The certificate keeps ' + words(g.next_payout) + ' as its next payout.' },\n      ],\n    },\n  };\n}\n\nexport default async function run(ctx) {\n  const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};\n  const said = typeof input.line === 'string' ? input.line : '';\n  if (!/^transactions#\\d+$/.test(said) && !/^[0-9A-Za-z_-]+$/.test(said)) {\n    ctx.log('The script was handed no line, so no certificate was looked for.');\n    return null;\n  }\n  const row = await ctx.record.get(said);\n  if (!row || row.register !== 'transactions' || !Number.isSafeInteger(row.seq)) return null;\n  const rows = await ctx.record.list('certificates', { all: [{ field: 'state', is: 'live' }] });\n  const certificates = rows.map((r) => ({ id: r.id, spoken: 'certificates#' + r.seq, version: r.version, fields: r.fields }));\n  const found = payoutOf({ fields: row.fields }, certificates);\n  if (found.nothing) {\n    ctx.log(found.nothing);\n    return null;\n  }\n  if (typeof ctx.cycle !== 'function') {\n    ctx.log('The host hands no next day, so nothing was asked.');\n    return null;\n  }\n  let next;\n  try {\n    next = await ctx.cycle(found.certificate.fields.next_payout, { leg: LEG, fields: found.certificate.fields });\n  } catch {\n    next = undefined;\n  }\n  const out = moveOn(found.certificate, next);\n  if (out.nothing) {\n    ctx.log(out.nothing);\n    return null;\n  }\n  return { ask: out.ask };\n}\n"
+    },
+    {
+      "metric": "certificates-count",
+      "name": "Live certificates",
+      "pack": "certificates",
+      "source": "register.certificates",
+      "where": "state is live",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "certificates-principal",
+      "name": "Put in",
+      "pack": "certificates",
+      "source": "register.certificates",
+      "where": "state is live",
+      "value": {
+        "sum": "amount"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "certificates-accrued",
+      "name": "Earned so far",
+      "pack": "certificates",
+      "source": "register.certificates",
+      "where": "state is live",
+      "value": {
+        "sum": "accrued"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "certificates-interest",
+      "name": "Interest over the terms",
+      "pack": "certificates",
+      "source": "register.certificates",
+      "where": "state is live",
+      "value": {
+        "sum": "interest"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "certificates-maturity",
+      "name": "Worth at maturity",
+      "pack": "certificates",
+      "source": "register.certificates",
+      "where": "state is live",
+      "value": {
+        "sum": "at_maturity"
+      },
+      "format": "money",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "certificates-next-payout",
+      "name": "Next payout",
+      "pack": "certificates",
+      "source": "register.certificates",
+      "where": "state is live, next_payout is set",
+      "value": {
+        "min": "next_payout"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "certificates-next-matures",
+      "name": "Next to mature",
+      "pack": "certificates",
+      "source": "register.certificates",
+      "where": "state is live, ends is set",
+      "value": {
+        "min": "ends"
+      },
+      "format": "day",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "page": "certificates",
+      "title": "Certificates",
+      "pack": "certificates",
+      "nav": {
+        "section": "Money",
+        "order": 45
+      },
+      "icon": "landmark",
+      "requires": [
+        "register.certificates"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "No certificates yet. Add one below with its bank, its rate and when it pays.",
+          "when": {
+            "metric": "certificates-count",
+            "is": 0
+          }
+        },
+        {
+          "kind": "stat",
+          "heading": "What they hold",
+          "icon": "landmark",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "certificates-principal",
+              "label": "Put in"
+            },
+            {
+              "metric": "certificates-accrued",
+              "label": "Earned so far"
+            },
+            {
+              "metric": "certificates-interest",
+              "label": "Interest over the terms"
+            },
+            {
+              "metric": "certificates-maturity",
+              "label": "Worth at maturity"
+            },
+            {
+              "metric": "certificates-next-matures",
+              "label": "Next to mature"
+            }
+          ],
+          "when": {
+            "metric": "certificates-count",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Your certificates",
+          "icon": "landmark",
+          "span": 12,
+          "source": "register.certificates",
+          "where": "state is live",
+          "columns": [
+            {
+              "field": "bank",
+              "width": "minmax(14ch,2fr)"
+            },
+            {
+              "field": "amount",
+              "width": "16ch",
+              "align": "end",
+              "label": "Put in"
+            },
+            {
+              "field": "rate",
+              "width": "9ch",
+              "align": "end",
+              "label": "Rate a year"
+            },
+            {
+              "field": "accrued",
+              "label": "Earned so far",
+              "width": "16ch",
+              "align": "end"
+            },
+            {
+              "field": "pays",
+              "width": "16ch",
+              "align": "end",
+              "label": "Pays each time"
+            },
+            {
+              "field": "next_payout",
+              "width": "13ch",
+              "label": "Next payout"
+            },
+            {
+              "field": "ends",
+              "width": "13ch",
+              "label": "Ends"
+            },
+            {
+              "field": "at_maturity",
+              "label": "Worth at maturity",
+              "width": "16ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "next_payout",
+              "dir": "asc"
+            }
+          ],
+          "limit": 100,
+          "empty": "None live."
+        },
+        {
+          "kind": "capture",
+          "heading": "Add a certificate",
+          "icon": "plus",
+          "span": 12,
+          "register": "certificates"
+        },
+        {
+          "kind": "section",
+          "heading": "Matured and closed",
+          "icon": "archive",
+          "span": 12,
+          "fold": true
+        },
+        {
+          "kind": "table",
+          "span": 12,
+          "source": "register.certificates",
+          "where": "state is not live",
+          "columns": [
+            {
+              "field": "bank",
+              "width": "minmax(14ch,2fr)"
+            },
+            {
+              "field": "amount",
+              "width": "16ch",
+              "align": "end",
+              "label": "Put in"
+            },
+            {
+              "field": "rate",
+              "width": "9ch",
+              "align": "end",
+              "label": "Rate a year"
+            },
+            {
+              "field": "accrued",
+              "label": "Earned so far",
+              "width": "16ch",
+              "align": "end"
+            },
+            {
+              "field": "pays",
+              "width": "16ch",
+              "align": "end",
+              "label": "Pays each time"
+            },
+            {
+              "field": "next_payout",
+              "width": "13ch",
+              "label": "Next payout"
+            },
+            {
+              "field": "ends",
+              "width": "13ch",
+              "label": "Ends"
+            },
+            {
+              "field": "at_maturity",
+              "label": "Worth at maturity",
+              "width": "16ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "ends",
+              "dir": "desc"
+            }
+          ],
+          "limit": 100
+        }
+      ]
+    }
+  ]
+}

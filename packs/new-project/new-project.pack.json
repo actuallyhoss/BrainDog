@@ -1,10 +1,10 @@
 {
   "pack": "new-project",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "icon": "projects",
   "title": "Starting a project",
   "summary": "Now part of New project guide. A guide for something new: three stages (idea, first users, first money), the next steps at each as a checklist an agent can tick, the decisions you made with reasons, and a weekly page on where it stands.",
-  "changes": "Now part of New project guide, which holds what this brought. A record that holds this keeps it, and it still installs by its name. Nothing in it changed.",
+  "changes": "The guide no longer opens on a count of steps to do and done, since the steps under it show them. Nothing it reads or writes changed.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
@@ -271,12 +271,6 @@
         "register.venture_choices"
       ],
       "blocks": [
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "body": "{{guide-steps-open}} step(s) still to do, {{guide-steps-done}} done."
-        },
         {
           "kind": "cards",
           "lead": true,

@@ -158,7 +158,7 @@ test('BEFORE THE ADD-ON: a record with People has no properties, no tenancies an
 
 test('THE FILE IS landlord 1.0.1 on People, data only: four lists, two pages, ten figures, no script and no example rows', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version, doc.author, doc.license], ['landlord', '1.0.3', 'BrainDog', 'MIT']);
+  assert.deepEqual([doc.pack, doc.version, doc.author, doc.license], ['landlord', '1.0.4', 'BrainDog', 'MIT']);
   assert.deepEqual((doc.requires as Body).packs, { people: '>=3.3.0 <5.0.0' });
   const kinds = (key: string) => doc.declarations.filter((d) => key in d).map((d) => d[key]);
   assert.deepEqual(kinds('register'), ['rentals', 'tenancies', 'rent_in', 'repairs']);
@@ -174,7 +174,7 @@ test('INSTALLED FROM THE FILE on a fresh record with People, with nothing refuse
   assert.deepEqual(diff.conflicts, []);
   assert.ok(diff.adds.some((a) => a.id === 'page.lettings'));
   await put(api, file());
-  assert.equal(api.kernel.packs().find((p) => p.id === 'landlord')?.version, '1.0.3');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'landlord')?.version, '1.0.4');
   sql.close();
 });
 

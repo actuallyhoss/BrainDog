@@ -1,9 +1,9 @@
 {
   "usecase": "team-board",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "title": "Team task list",
   "summary": "The tasks your team and its agents are working on: who owns each, its status and priority, a board, and who is doing what right now.",
-  "changes": "The first version.",
+  "changes": "Home no longer opens on a count of open, blocked and urgent tasks, since the lists under it show them. Nothing you hold changes.",
   "author": "BrainDog",
   "license": "MIT",
   "audience": "team",
@@ -49,12 +49,6 @@
           "register.session"
         ],
         "blocks": [
-          {
-            "kind": "note",
-            "lead": true,
-            "span": 12,
-            "body": "{{team-open}} open, {{team-blocked}} blocked, {{team-urgent}} urgent."
-          },
           {
             "kind": "cards",
             "lead": true,

@@ -1,10 +1,10 @@
 {
   "pack": "trips",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "icon": "plane",
   "title": "Trips",
   "summary": "Name a trip with its dates and file the Ledger's lines into it, and each trip says what it cost in total, by category and in each currency.",
-  "changes": "Brings its Trip countdown widget for Today, which was BrainDog’s own until now.",
+  "changes": "Trips no longer opens on a count of trips. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -338,12 +338,6 @@
         "register.transactions"
       ],
       "blocks": [
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "body": "{{trips-count}} trips."
-        },
         {
           "kind": "bar",
           "heading": "Spent on each trip",

@@ -151,7 +151,7 @@ test('BEFORE THE ADD-ON: a record with People has no shoots, no Shoots page and 
 
 test('THE FILE IS photographer 1.0.1 on People 3, with three lists, three pages, six figures and no script or seeds', () => {
   const doc = file() as { pack: string; version: string; license: string; requires: { packs: Body }; seeds?: unknown; declarations: Body[] };
-  assert.deepEqual([doc.pack, doc.version, doc.license], ['photographer', '1.0.3', 'MIT']);
+  assert.deepEqual([doc.pack, doc.version, doc.license], ['photographer', '1.0.4', 'MIT']);
   assert.deepEqual(doc.requires.packs, { people: '>=3.3.0 <5.0.0' });
   assert.equal(doc.seeds, undefined);
   assert.deepEqual(doc.declarations.filter((d) => d.register).map((d) => d.register), ['shoots', 'deliverables', 'gear']);
@@ -174,7 +174,7 @@ test('IT GOES IN ON PEOPLE AS BRAINDOG SHIPS IT, which the range in the file tak
   const { api, sql } = await record();
   const held = api.kernel.packs().find((p) => p.id === 'people')!.version;
   assert.match(held, /^4\./, `People ${held} is inside >=3.3.0 <5.0.0`);
-  assert.equal(api.kernel.packs().find((p) => p.id === 'photographer')?.version, '1.0.3');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'photographer')?.version, '1.0.4');
   sql.close();
 });
 

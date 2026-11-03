@@ -1,0 +1,581 @@
+{
+  "format": 1,
+  "made_at": "2026-11-03T21:09:23.513Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Assignment",
+              "width": "minmax(18ch,1fr)"
+            },
+            {
+              "field": "course",
+              "label": "Course",
+              "width": "minmax(10ch,18ch)"
+            },
+            {
+              "align": "end",
+              "field": "due",
+              "label": "Due",
+              "width": "13ch"
+            }
+          ],
+          "empty": "Nothing is due this week.",
+          "heading": "Due this week",
+          "icon": "calendar-clock",
+          "kind": "table",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.assignments",
+          "span": 12,
+          "where": "state is todo or doing, due after yesterday, due before +8d",
+          "key": "k05h55za",
+          "rows": [
+            {
+              "id": "01M6HKXJDS179NV50T9SPCZYYA",
+              "register": "assignments",
+              "seq": 1,
+              "fields": {
+                "what": "Field report on salt marshes",
+                "state": "doing",
+                "due": "2026-11-07",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "doing",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDS179NV50T9XM1Y0XJ",
+              "register": "assignments",
+              "seq": 2,
+              "fields": {
+                "what": "Problem set 3",
+                "state": "todo",
+                "due": "2026-11-09",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "todo",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Assignment"
+            },
+            {
+              "field": "course",
+              "label": "Course"
+            },
+            {
+              "align": "end",
+              "field": "due",
+              "label": "Was due"
+            }
+          ],
+          "heading": "Late",
+          "icon": "circle-alert",
+          "kind": "table",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "due"
+            }
+          ],
+          "source": "register.assignments",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "studies-late"
+          },
+          "where": "state is todo or doing, due before today",
+          "key": "k0j02ye2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Due this week",
+              "metric": "studies-due-week"
+            },
+            {
+              "label": "Late",
+              "metric": "studies-late"
+            },
+            {
+              "label": "Average mark",
+              "metric": "studies-average"
+            },
+            {
+              "label": "Minutes studied, 7 days",
+              "metric": "studies-minutes-week"
+            }
+          ],
+          "heading": "How it is going",
+          "icon": "gauge",
+          "kind": "stat",
+          "span": 12,
+          "key": "k0d5gjzk",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Due this week",
+              "metric": "studies-due-week",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 2,
+                "unit": null,
+                "rows": 2,
+                "refusals": [],
+                "held": 3,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Late",
+              "metric": "studies-late",
+              "target": {
+                "lte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 3,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Average mark",
+              "metric": "studies-average",
+              "target": {
+                "gte": 0
+              },
+              "format": "decimal",
+              "reading": {
+                "value": 68,
+                "unit": null,
+                "rows": 1,
+                "refusals": [],
+                "held": 3,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Minutes studied, 7 days",
+              "metric": "studies-minutes-week",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 50,
+                "unit": null,
+                "rows": 1,
+                "refusals": [],
+                "backs": [
+                  "study_sessions#1"
+                ],
+                "held": 1,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "studies-due-week": {
+              "name": "Due this week",
+              "source": "register.assignments",
+              "where": "state is todo or doing, due after yesterday, due before +8d",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "studies-late": {
+              "name": "Late work",
+              "source": "register.assignments",
+              "where": "state is todo or doing, due before today",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            },
+            "studies-average": {
+              "name": "Average mark",
+              "source": "register.assignments",
+              "where": "mark is set",
+              "value": {
+                "avg": "mark"
+              },
+              "format": "decimal",
+              "target": {
+                "gte": 0
+              }
+            },
+            "studies-minutes-week": {
+              "name": "Minutes studied in 7 days",
+              "source": "register.study_sessions",
+              "where": "on after -7d",
+              "value": {
+                "sum": "minutes"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "fact",
+              "field": "teacher",
+              "label": "Taught by"
+            },
+            {
+              "as": "fact",
+              "field": "goal",
+              "label": "Aiming for"
+            },
+            {
+              "as": "trend",
+              "metric": "course-marks:{{name}}"
+            }
+          ],
+          "empty": "Add a course and its marks will draw a trend here.",
+          "heading": "Courses",
+          "icon": "notebook-pen",
+          "kind": "cards",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.courses",
+          "span": 12,
+          "where": "state is running",
+          "key": "k024tqnn",
+          "rows": [
+            {
+              "id": "01M6HKXJDS179NV50T9M3VTSEP",
+              "register": "courses",
+              "seq": 1,
+              "fields": {
+                "state": "running",
+                "name": "Coastal Ecology",
+                "teacher": "Dr Priya Raman",
+                "term": "Autumn",
+                "goal": 75,
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDS179NV50T9P4V4WD2",
+              "register": "courses",
+              "seq": 2,
+              "fields": {
+                "state": "running",
+                "name": "Statistics II",
+                "teacher": "Prof Samuel Achterberg",
+                "term": "Autumn",
+                "goal": 70,
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": [],
+          "trends": [
+            null,
+            null
+          ]
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Assignment",
+              "width": "minmax(18ch,1fr)"
+            },
+            {
+              "field": "course",
+              "label": "Course",
+              "width": "minmax(10ch,18ch)"
+            },
+            {
+              "align": "end",
+              "field": "mark",
+              "label": "Mark",
+              "width": "10ch"
+            },
+            {
+              "align": "end",
+              "field": "marked_on",
+              "label": "Marked",
+              "width": "13ch"
+            }
+          ],
+          "empty": "No mark yet.",
+          "heading": "Marks",
+          "icon": "circle-check",
+          "kind": "table",
+          "limit": 20,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "marked_on"
+            }
+          ],
+          "source": "register.assignments",
+          "span": 12,
+          "where": "state is marked, mark is set",
+          "key": "k0uqyifm",
+          "rows": [
+            {
+              "id": "01M6HKXJDS179NV50TA0064EBN",
+              "register": "assignments",
+              "seq": 3,
+              "fields": {
+                "what": "Problem set 2",
+                "state": "marked",
+                "mark": 68,
+                "marked_on": "2026-10-22",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": "marked",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Title"
+            },
+            {
+              "field": "by",
+              "label": "By"
+            }
+          ],
+          "empty": "Nothing is being read.",
+          "heading": "Reading now",
+          "icon": "doc",
+          "kind": "table",
+          "limit": 10,
+          "source": "register.course_reads",
+          "span": 6,
+          "where": "state is reading",
+          "key": "k0etlpnb",
+          "rows": [
+            {
+              "id": "01M6HKXJDS179NV50TA5V32MT6",
+              "register": "course_reads",
+              "seq": 1,
+              "fields": {
+                "name": "An introduction to tidal flats",
+                "by": "Ines Duarte",
+                "state": "reading",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Title"
+            },
+            {
+              "field": "course",
+              "label": "Course"
+            }
+          ],
+          "empty": "Nothing is queued.",
+          "heading": "Queued",
+          "icon": "inbox",
+          "kind": "table",
+          "limit": 20,
+          "source": "register.course_reads",
+          "span": 6,
+          "where": "state is queued",
+          "key": "k0fapnh6",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "What you did"
+            },
+            {
+              "field": "course",
+              "label": "Course"
+            },
+            {
+              "align": "end",
+              "field": "minutes",
+              "label": "Minutes"
+            },
+            {
+              "align": "end",
+              "field": "on",
+              "label": "Day"
+            }
+          ],
+          "empty": "No session yet.",
+          "heading": "Study sessions",
+          "icon": "clock",
+          "kind": "table",
+          "limit": 10,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.study_sessions",
+          "span": 12,
+          "key": "k09ia8hh",
+          "rows": [
+            {
+              "id": "01M6HKXJDS179NV50TA89ZKC1Y",
+              "register": "study_sessions",
+              "seq": 1,
+              "fields": {
+                "what": "Revised sampling methods",
+                "on": "2026-11-02",
+                "minutes": 50,
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        }
+      ],
+      "icon": "notebook-pen",
+      "nav": {
+        "order": 10,
+        "section": "Studies"
+      },
+      "pack": "studies",
+      "page": "studies",
+      "requires": [
+        "register.courses",
+        "register.assignments",
+        "register.course_reads",
+        "register.study_sessions"
+      ],
+      "title": "Studies",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "studies",
+        "basis": "r18hz29c",
+        "by": "rule",
+        "hide": [
+          "k0fapnh6"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

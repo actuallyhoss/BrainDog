@@ -1,10 +1,10 @@
 {
   "pack": "landlord",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "icon": "home",
   "title": "Landlord",
   "summary": "The flats and houses you rent out, each tenancy with its rent, deposit and end day, the rent that came in and the repairs. Says what is due this month, what arrived, who has not paid, what is empty and which tenancy ends next.",
-  "changes": "Goes in beside People 4.0.0, which moved Health, Scripts, Calendar and Activity into the pages BrainDog keeps. Nothing in it changed.",
+  "changes": "Lettings no longer opens on the rent due and received, since This month shows both. Nothing it reads or writes changed.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
@@ -108,13 +108,6 @@
       "pack": "landlord",
       "requires": [ "register.rentals", "register.tenancies", "register.rent_in", "register.repairs" ],
       "blocks": [
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": { "metric": "rentals-held", "gt": 0 },
-          "body": "{{rent-roll}} rent due this month, and {{rent-in-month}} received so far."
-        },
         {
           "kind": "note",
           "lead": true,

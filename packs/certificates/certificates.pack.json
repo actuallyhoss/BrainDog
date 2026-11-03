@@ -1,10 +1,10 @@
 {
   "pack": "certificates",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "icon": "landmark",
   "title": "Certificates",
   "summary": "Bank certificates and fixed deposits: the rate, what each has earned so far, when it pays next and when it matures. Its payouts and the principal coming back are walked into Cash ahead.",
-  "changes": "Says what to add when there are no certificates yet.",
+  "changes": "Certificates no longer opens on the next payout day, since the table shows each one's. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -384,16 +384,6 @@
         "register.certificates"
       ],
       "blocks": [
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "body": "Next payout {{day:certificates-next-payout}}.",
-          "when": {
-            "metric": "certificates-count",
-            "gt": 0
-          }
-        },
         {
           "kind": "note",
           "lead": true,

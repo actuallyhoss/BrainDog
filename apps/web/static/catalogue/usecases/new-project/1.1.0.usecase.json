@@ -1,0 +1,131 @@
+{
+  "usecase": "new-project",
+  "version": "1.1.0",
+  "title": "Starting a project",
+  "summary": "Something new you want walked through: the stages from idea to first money, the next step at each, the decisions you made and a weekly note on where it stands.",
+  "changes": "Home no longer opens on a count of steps to do and ticked, since the steps under it show them. Nothing you hold changes.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "starter",
+  "tone": "plain and steady",
+  "signals": [
+    "starting a project",
+    "start a project",
+    "new project",
+    "new idea",
+    "side project",
+    "first users",
+    "first customers",
+    "first money",
+    "launch my idea",
+    "what should i do next",
+    "step by step"
+  ],
+  "modules": [
+    "new-project"
+  ],
+  "needs": [
+    "new-project"
+  ],
+  "voice": {
+    "coming_up": "Next steps",
+    "nothing_due": "Every step at this stage is done.",
+    "fills_with": "Your stage, the next steps and the decisions you make show up here as you add your project."
+  },
+  "skills": [],
+  "pack": {
+    "pack": "usecase-new-project",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "page": "home-new-project",
+        "title": "Today",
+        "icon": "home",
+        "requires": [
+          "register.session"
+        ],
+        "blocks": [
+          {
+            "kind": "cards",
+            "lead": true,
+            "heading": "Where you are",
+            "icon": "rocket",
+            "span": 12,
+            "source": "register.fresh_starts",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "stage",
+                "label": "Stage",
+                "as": "fact"
+              },
+              {
+                "metric": "guide-done-by-week",
+                "as": "trend"
+              }
+            ],
+            "limit": 3,
+            "empty": "{{config:voice_fills_with}}"
+          },
+          {
+            "kind": "steps",
+            "heading": "{{config:voice_coming_up}}",
+            "icon": "task",
+            "span": 12,
+            "source": "register.venture_steps",
+            "where": "done is not true",
+            "columns": [
+              {
+                "field": "what"
+              },
+              {
+                "field": "stage",
+                "label": "Stage"
+              }
+            ],
+            "order": [
+              {
+                "field": "rank",
+                "dir": "asc"
+              },
+              {
+                "field": "seq",
+                "dir": "asc"
+              }
+            ],
+            "limit": 5,
+            "empty": "{{config:voice_nothing_due}}"
+          },
+          {
+            "kind": "queue",
+            "heading": "Needs your call",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "limit": 5,
+            "when": {
+              "metric": "questions-open",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "feed",
+            "heading": "What changed",
+            "icon": "activity",
+            "span": 12,
+            "source": "activity",
+            "first": 8,
+            "empty": "{{config:voice_fills_with}}"
+          }
+        ]
+      }
+    ]
+  }
+}

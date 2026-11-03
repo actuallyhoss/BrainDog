@@ -1,10 +1,10 @@
 {
   "pack": "gmail",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "icon": "mail",
   "title": "Gmail",
   "summary": "Your Gmail in BrainDog: who you are in touch with, mail waiting on your reply, and bills, receipts and dates to look at. A short script in your own Google account sends the subject, sender, day, a short snippet and the link. Reads only; nothing is ever sent from your Gmail.",
-  "changes": "Settles more on its own. A reply you send in Gmail closes the question it answers. A receipt or a bill already on your Ledger is kept with that line and asks nothing, and a receipt for a bill closes the bill's question. Add it to Money adds the line. Not a receipt is remembered for that sender or account. Deleting a person no longer waits on their mail.",
+  "changes": "Mail no longer opens on a count of what waits on your reply and what is unread, since the page lists them. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "uses": [
@@ -833,42 +833,6 @@
             "lt": 1
           },
           "body": "Open Plugins, then Gmail, and press Make the address. It shows a short script with your address already in it and four steps to paste it into Google. Your mail arrives within a minute after that."
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": {
-            "all": [
-              {
-                "metric": "gmail-mail",
-                "gt": 0
-              },
-              {
-                "metric": "gmail-needs-reply",
-                "gt": 0
-              }
-            ]
-          },
-          "body": "{{gmail-needs-reply}} waiting on your reply and {{gmail-unread}} unread in the last two weeks."
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "span": 12,
-          "when": {
-            "all": [
-              {
-                "metric": "gmail-mail",
-                "gt": 0
-              },
-              {
-                "metric": "gmail-needs-reply",
-                "lt": 1
-              }
-            ]
-          },
-          "body": "Nothing is waiting on your reply. {{gmail-unread}} unread in the last two weeks."
         },
         {
           "kind": "link",

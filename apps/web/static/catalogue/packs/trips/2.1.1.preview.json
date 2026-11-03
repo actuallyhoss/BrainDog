@@ -1,0 +1,706 @@
+{
+  "format": 1,
+  "made_at": "2026-11-03T21:09:23.513Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "empty": "Nothing filed yet.",
+          "heading": "Spent on each trip",
+          "icon": "chart-bar",
+          "kind": "bar",
+          "source": "metric.trip-spent-by-trip",
+          "span": 12,
+          "key": "k0vztay9",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "metric": "trip-spent-by-trip",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true,
+                "groups": [],
+                "more": 0
+              }
+            }
+          ],
+          "figures": {
+            "trip-spent-by-trip": {
+              "name": "Spent on each trip",
+              "source": "register.transactions",
+              "where": "state is cleared, transfer is false, direction is out, trip is set",
+              "value": {
+                "sum": "amount"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              },
+              "group_by": "trip"
+            }
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Trip",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "from",
+              "label": "From",
+              "width": "13ch"
+            },
+            {
+              "field": "to",
+              "label": "To",
+              "width": "13ch"
+            },
+            {
+              "field": "hue",
+              "label": "Colour",
+              "width": "10ch"
+            }
+          ],
+          "empty": "No trips yet.",
+          "heading": "Every trip",
+          "icon": "plane",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "from"
+            }
+          ],
+          "source": "register.trips",
+          "span": 12,
+          "key": "k1ndxgri",
+          "rows": [
+            {
+              "id": "01M6HKXJDSDQVCHT35P0G7SFTP",
+              "register": "trips",
+              "seq": 1,
+              "fields": {
+                "name": "Lisbon",
+                "from": "2026-11-23",
+                "to": "2026-11-30",
+                "hue": "amber"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDSDQVCHT35P9P43BC8",
+              "register": "trips",
+              "seq": 2,
+              "fields": {
+                "name": "Work offsite, Berlin",
+                "from": "2026-09-24",
+                "to": "2026-09-27",
+                "hue": "blue"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
+        },
+        {
+          "heading": "Add a trip",
+          "icon": "plus",
+          "kind": "capture",
+          "register": "trips",
+          "span": 12,
+          "key": "k1sv815o",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        }
+      ],
+      "icon": "plane",
+      "nav": {
+        "order": 60,
+        "section": "Money"
+      },
+      "pack": "trips",
+      "page": "trips",
+      "requires": [
+        "register.trips",
+        "register.transactions"
+      ],
+      "title": "Trips",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "trips",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "body": "From {{day:from}}, until {{day:to}}.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "from": "2026-11-23",
+            "to": "2026-11-30"
+          },
+          "read_as": {
+            "from": "field",
+            "to": "field"
+          },
+          "figures": {}
+        },
+        {
+          "cells": [
+            {
+              "label": "Spent",
+              "metric": "trip-spent:Lisbon"
+            },
+            {
+              "label": "Money back",
+              "metric": "trip-back:Lisbon"
+            },
+            {
+              "label": "Lines filed",
+              "metric": "trip-lines:Lisbon"
+            }
+          ],
+          "heading": "What it cost",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 12,
+          "key": "k0rc5e17",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Spent",
+              "metric": "trip-spent:Lisbon",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Money back",
+              "metric": "trip-back:Lisbon",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Lines filed",
+              "metric": "trip-lines:Lisbon",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "trip-spent": {
+              "name": "Spent on one trip",
+              "source": "register.transactions",
+              "where": "state is cleared, transfer is false, trip is {{it}}, direction is out",
+              "value": {
+                "sum": "amount"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "trip-back": {
+              "name": "Money back on one trip",
+              "source": "register.transactions",
+              "where": "state is cleared, transfer is false, trip is {{it}}, direction is in",
+              "value": {
+                "sum": "amount"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "trip-lines": {
+              "name": "Lines filed in one trip",
+              "source": "register.transactions",
+              "where": "state is cleared, trip is {{it}}",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          },
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "field": "category"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "heading": "Where it went, by category",
+          "icon": "chart-pie",
+          "kind": "split",
+          "limit": 8,
+          "source": "register.transactions",
+          "span": 12,
+          "unset": "Uncategorised",
+          "when": {
+            "gt": 0,
+            "metric": "trip-spent:Lisbon"
+          },
+          "where": "state is cleared, transfer is false, trip is Lisbon, direction is out",
+          "key": "k0zt90e8",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "account"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "heading": "By account, in its own currency",
+          "icon": "coins",
+          "kind": "split",
+          "limit": 8,
+          "source": "register.transactions",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "trip-spent:Lisbon"
+          },
+          "where": "state is cleared, transfer is false, trip is Lisbon, direction is out",
+          "key": "k0bjvalf",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "category",
+              "label": "Category",
+              "width": "minmax(12ch,18ch)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            }
+          ],
+          "empty": "Nothing filed yet.",
+          "heading": "Its lines",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.transactions",
+          "span": 12,
+          "where": "trip is Lisbon",
+          "key": "k1bd3b0s",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "register": "trips"
+      },
+      "icon": "plane",
+      "nav": {
+        "order": 61,
+        "section": "Money"
+      },
+      "pack": "trips",
+      "page": "lisbon",
+      "requires": [
+        "register.trips",
+        "register.transactions"
+      ],
+      "title": "Lisbon",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "param": {
+        "register": "trips",
+        "seq": 1,
+        "title": "Lisbon"
+      },
+      "look": {
+        "look": "trip",
+        "basis": "r0k6b71k",
+        "by": "rule",
+        "hide": [
+          "k1bd3b0s"
+        ]
+      }
+    },
+    {
+      "blocks": [
+        {
+          "body": "From {{day:from}}, until {{day:to}}.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "from": "2026-09-24",
+            "to": "2026-09-27"
+          },
+          "read_as": {
+            "from": "field",
+            "to": "field"
+          },
+          "figures": {}
+        },
+        {
+          "cells": [
+            {
+              "label": "Spent",
+              "metric": "trip-spent:Work offsite, Berlin"
+            },
+            {
+              "label": "Money back",
+              "metric": "trip-back:Work offsite, Berlin"
+            },
+            {
+              "label": "Lines filed",
+              "metric": "trip-lines:Work offsite, Berlin"
+            }
+          ],
+          "heading": "What it cost",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 12,
+          "key": "k0rc5e17",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Spent",
+              "metric": "trip-spent:Work offsite, Berlin",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Money back",
+              "metric": "trip-back:Work offsite, Berlin",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Lines filed",
+              "metric": "trip-lines:Work offsite, Berlin",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "trip-spent": {
+              "name": "Spent on one trip",
+              "source": "register.transactions",
+              "where": "state is cleared, transfer is false, trip is {{it}}, direction is out",
+              "value": {
+                "sum": "amount"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "trip-back": {
+              "name": "Money back on one trip",
+              "source": "register.transactions",
+              "where": "state is cleared, transfer is false, trip is {{it}}, direction is in",
+              "value": {
+                "sum": "amount"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "trip-lines": {
+              "name": "Lines filed in one trip",
+              "source": "register.transactions",
+              "where": "state is cleared, trip is {{it}}",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          },
+          "drawn": false,
+          "why": "empty"
+        },
+        {
+          "columns": [
+            {
+              "field": "category"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "heading": "Where it went, by category",
+          "icon": "chart-pie",
+          "kind": "split",
+          "limit": 8,
+          "source": "register.transactions",
+          "span": 12,
+          "unset": "Uncategorised",
+          "when": {
+            "gt": 0,
+            "metric": "trip-spent:Work offsite, Berlin"
+          },
+          "where": "state is cleared, transfer is false, trip is \"Work offsite, Berlin\", direction is out",
+          "key": "k0zt90e8",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "account"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "heading": "By account, in its own currency",
+          "icon": "coins",
+          "kind": "split",
+          "limit": 8,
+          "source": "register.transactions",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "trip-spent:Work offsite, Berlin"
+          },
+          "where": "state is cleared, transfer is false, trip is \"Work offsite, Berlin\", direction is out",
+          "key": "k0bjvalf",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Date",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "category",
+              "label": "Category",
+              "width": "minmax(12ch,18ch)"
+            },
+            {
+              "align": "end",
+              "field": "amount",
+              "label": "Amount",
+              "width": "15ch"
+            }
+          ],
+          "empty": "Nothing filed yet.",
+          "heading": "Its lines",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.transactions",
+          "span": 12,
+          "where": "trip is \"Work offsite, Berlin\"",
+          "key": "k1bd3b0s",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "register": "trips"
+      },
+      "icon": "plane",
+      "nav": {
+        "order": 61,
+        "section": "Money"
+      },
+      "pack": "trips",
+      "page": "work-offsite-berlin",
+      "requires": [
+        "register.trips",
+        "register.transactions"
+      ],
+      "title": "Work offsite, Berlin",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "param": {
+        "register": "trips",
+        "seq": 2,
+        "title": "Work offsite, Berlin"
+      },
+      "look": {
+        "look": "trip",
+        "basis": "r0k6b71k",
+        "by": "rule",
+        "hide": [
+          "k1bd3b0s"
+        ]
+      }
+    }
+  ]
+}

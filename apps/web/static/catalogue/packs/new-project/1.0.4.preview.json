@@ -1,0 +1,659 @@
+{
+  "format": 1,
+  "made_at": "2026-11-03T21:09:23.513Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "reply",
+              "edit": true,
+              "field": "about"
+            },
+            {
+              "as": "fact",
+              "field": "stage",
+              "label": "Stage"
+            },
+            {
+              "as": "trend",
+              "metric": "guide-done-by-week"
+            }
+          ],
+          "empty": "Add your project and say which stage it is at.",
+          "heading": "Where you are",
+          "icon": "rocket",
+          "kind": "cards",
+          "lead": true,
+          "limit": 3,
+          "source": "register.fresh_starts",
+          "span": 12,
+          "key": "k0gxfz3d",
+          "rows": [
+            {
+              "id": "01M6HKXJDS074EVT2CX863Q56H",
+              "register": "fresh_starts",
+              "seq": 1,
+              "fields": {
+                "name": "Lanternfish",
+                "about": "A small tool that sorts a photographer's receipts.",
+                "stage": "first_users",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": [],
+          "trends": [
+            [
+              1,
+              0,
+              1,
+              0
+            ]
+          ]
+        },
+        {
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "why",
+              "label": "Why it matters"
+            }
+          ],
+          "empty": "No step at idea yet.",
+          "heading": "Idea: next steps",
+          "icon": "thing",
+          "kind": "steps",
+          "limit": 30,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "rank"
+            },
+            {
+              "dir": "asc",
+              "field": "seq"
+            }
+          ],
+          "source": "register.venture_steps",
+          "span": 12,
+          "where": "stage is idea",
+          "key": "k1co96st",
+          "rows": [
+            {
+              "id": "01M6HKXJDS074EVT2CXADDKPBD",
+              "register": "venture_steps",
+              "seq": 1,
+              "fields": {
+                "what": "Write the problem in one sentence",
+                "stage": "idea",
+                "rank": 1,
+                "done": true,
+                "done_on": "2026-10-14",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": [],
+          "done_now": [
+            true
+          ],
+          "next": null
+        },
+        {
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "why",
+              "label": "Why it matters"
+            }
+          ],
+          "empty": "No step at first users yet.",
+          "heading": "First users: next steps",
+          "icon": "people",
+          "kind": "steps",
+          "limit": 30,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "rank"
+            },
+            {
+              "dir": "asc",
+              "field": "seq"
+            }
+          ],
+          "source": "register.venture_steps",
+          "span": 12,
+          "where": "stage is first_users",
+          "key": "k0icm4n2",
+          "rows": [
+            {
+              "id": "01M6HKXJDS074EVT2CXEEZC24H",
+              "register": "venture_steps",
+              "seq": 2,
+              "fields": {
+                "what": "Talk to five people who have it",
+                "why": "Hearing it in their words beats guessing.",
+                "stage": "first_users",
+                "rank": 1,
+                "done": true,
+                "done_on": "2026-10-31",
+                "agent": "wren",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDS074EVT2CXHMHBGW9",
+              "register": "venture_steps",
+              "seq": 3,
+              "fields": {
+                "done": false,
+                "what": "Get three of them using it for a week",
+                "stage": "first_users",
+                "rank": 2,
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": [],
+          "done_now": [
+            true,
+            false
+          ],
+          "next": 1
+        },
+        {
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "why",
+              "label": "Why it matters"
+            }
+          ],
+          "empty": "No step at first money yet.",
+          "heading": "First money: next steps",
+          "icon": "coins",
+          "kind": "steps",
+          "limit": 30,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "rank"
+            },
+            {
+              "dir": "asc",
+              "field": "seq"
+            }
+          ],
+          "source": "register.venture_steps",
+          "span": 12,
+          "where": "stage is first_money",
+          "key": "k0kwx94a",
+          "rows": [
+            {
+              "id": "01M6HKXJDS074EVT2CXKR9AVTM",
+              "register": "venture_steps",
+              "seq": 4,
+              "fields": {
+                "done": false,
+                "what": "Ask one user to pay a small price",
+                "why": "A yes or a no is worth more than a compliment.",
+                "stage": "first_money",
+                "rank": 1,
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": [],
+          "done_now": [
+            false
+          ],
+          "next": 0
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Decision",
+              "width": "minmax(18ch,1fr)"
+            },
+            {
+              "field": "why",
+              "label": "Because",
+              "width": "minmax(20ch,2fr)"
+            },
+            {
+              "align": "end",
+              "field": "decided_on",
+              "label": "Decided",
+              "width": "13ch"
+            }
+          ],
+          "empty": "No decision yet. Write one down with its reason.",
+          "heading": "Decisions and why",
+          "icon": "ask",
+          "kind": "table",
+          "limit": 20,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "decided_on"
+            }
+          ],
+          "source": "register.venture_choices",
+          "span": 12,
+          "key": "k1ejsdwe",
+          "rows": [
+            {
+              "id": "01M6HKXJDS074EVT2CXPQMJ4TQ",
+              "register": "venture_choices",
+              "seq": 1,
+              "fields": {
+                "what": "Start with photographers only",
+                "why": "One kind of customer is easier to reach and to please.",
+                "decided_on": "2026-10-20",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        }
+      ],
+      "icon": "rocket",
+      "nav": {
+        "order": 10,
+        "section": "Project"
+      },
+      "pack": "new-project",
+      "page": "guide",
+      "requires": [
+        "register.fresh_starts",
+        "register.venture_steps",
+        "register.venture_choices"
+      ],
+      "title": "Your project",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "guide",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "gist"
+            },
+            {
+              "as": "when",
+              "field": "week_of",
+              "label": "Week of"
+            },
+            {
+              "as": "fact",
+              "field": "next",
+              "label": "Next week"
+            },
+            {
+              "as": "fact",
+              "field": "worry",
+              "label": "In the way"
+            }
+          ],
+          "empty": "No note yet. An agent or you can write the first one on Friday.",
+          "heading": "Where it stands",
+          "icon": "calendar-days",
+          "kind": "cards",
+          "lead": true,
+          "limit": 1,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "week_of"
+            }
+          ],
+          "source": "register.venture_weeks",
+          "span": 12,
+          "key": "k1qdgv7b",
+          "rows": [
+            {
+              "id": "01M6HKXJDS074EVT2CXT45DGN9",
+              "register": "venture_weeks",
+              "seq": 1,
+              "fields": {
+                "gist": "Five conversations done, three people want to try it.",
+                "week_of": "2026-10-31",
+                "next": "Set up the trial for Priya and Teodor.",
+                "worry": "The import is slow.",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "cells": [
+            {
+              "label": "Ticked in 7 days",
+              "metric": "guide-done-week"
+            },
+            {
+              "label": "Still to do",
+              "metric": "guide-steps-open"
+            },
+            {
+              "label": "Ticked by an agent",
+              "metric": "guide-by-agent"
+            }
+          ],
+          "heading": "The week in steps",
+          "icon": "gauge",
+          "kind": "stat",
+          "span": 12,
+          "key": "k1d7q4m0",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Ticked in 7 days",
+              "metric": "guide-done-week",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 1,
+                "unit": null,
+                "rows": 1,
+                "refusals": [],
+                "held": 4,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Still to do",
+              "metric": "guide-steps-open",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 2,
+                "unit": null,
+                "rows": 2,
+                "refusals": [],
+                "held": 4,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Ticked by an agent",
+              "metric": "guide-by-agent",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 1,
+                "unit": null,
+                "rows": 1,
+                "refusals": [],
+                "held": 4,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "guide-done-week": {
+              "name": "Steps ticked in 7 days",
+              "source": "register.venture_steps",
+              "where": "done is true, done_on after -7d",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "guide-steps-open": {
+              "name": "Steps still to do",
+              "source": "register.venture_steps",
+              "where": "done is not true",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "guide-by-agent": {
+              "name": "Steps ticked by an agent",
+              "source": "register.venture_steps",
+              "where": "done is true, agent is set",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "label": "Step"
+            },
+            {
+              "field": "stage",
+              "label": "Stage"
+            },
+            {
+              "field": "agent",
+              "label": "By"
+            },
+            {
+              "align": "end",
+              "field": "done_on",
+              "label": "Done"
+            }
+          ],
+          "empty": "Nothing ticked this week.",
+          "heading": "Ticked this week",
+          "icon": "circle-check",
+          "kind": "table",
+          "limit": 20,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "done_on"
+            }
+          ],
+          "source": "register.venture_steps",
+          "span": 12,
+          "where": "done is true, done_on after -7d",
+          "key": "k0xi6g49",
+          "rows": [
+            {
+              "id": "01M6HKXJDS074EVT2CXEEZC24H",
+              "register": "venture_steps",
+              "seq": 2,
+              "fields": {
+                "what": "Talk to five people who have it",
+                "why": "Hearing it in their words beats guessing.",
+                "stage": "first_users",
+                "rank": 1,
+                "done": true,
+                "done_on": "2026-10-31",
+                "agent": "wren",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "week_of",
+              "label": "Week of",
+              "width": "13ch"
+            },
+            {
+              "field": "gist",
+              "label": "Where it stood"
+            }
+          ],
+          "empty": "Earlier weeks show here.",
+          "heading": "Earlier weeks",
+          "icon": "archive",
+          "kind": "table",
+          "limit": 12,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "week_of"
+            }
+          ],
+          "source": "register.venture_weeks",
+          "span": 12,
+          "key": "k06aylny",
+          "rows": [
+            {
+              "id": "01M6HKXJDS074EVT2CXT45DGN9",
+              "register": "venture_weeks",
+              "seq": 1,
+              "fields": {
+                "gist": "Five conversations done, three people want to try it.",
+                "week_of": "2026-10-31",
+                "next": "Set up the trial for Priya and Teodor.",
+                "worry": "The import is slow.",
+                "tags": [
+                  "example"
+                ]
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        }
+      ],
+      "icon": "calendar-days",
+      "nav": {
+        "order": 20,
+        "section": "Project"
+      },
+      "pack": "new-project",
+      "page": "guide-week",
+      "requires": [
+        "register.venture_weeks",
+        "register.venture_steps"
+      ],
+      "title": "This week",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "guide-week",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

@@ -1,0 +1,703 @@
+{
+  "pack": "studies",
+  "version": "1.0.4",
+  "icon": "graduation-cap",
+  "title": "Studies",
+  "summary": "Now part of Student. Your courses, assignments with due dates, marks as numbers with a trend for each course, a reading list and study sessions. Says what is due this week first.",
+  "changes": "Studies no longer opens on a count of work due and late, since the lists under it show them. Nothing it reads or writes changed.",
+  "unlisted": true,
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "register": "courses",
+      "name": "Courses",
+      "icon": "notebook-pen",
+      "one": "course",
+      "holds": "each course you take, who teaches it and the mark you are aiming for",
+      "title": "name",
+      "mobile": [
+        "name",
+        "goal"
+      ],
+      "pack": "studies",
+      "delete": "refuse_while_referenced",
+      "fields": [
+        {
+          "id": "name",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "teacher",
+          "label": "Taught by",
+          "type": "text"
+        },
+        {
+          "id": "term",
+          "label": "Term",
+          "type": "text"
+        },
+        {
+          "id": "goal",
+          "label": "Aiming for",
+          "type": "decimal",
+          "min": 0,
+          "max": 100
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "running",
+            "finished"
+          ],
+          "labels": {
+            "running": "Running",
+            "finished": "Finished"
+          },
+          "index": true,
+          "default": "running"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "assignments",
+      "name": "Assignments",
+      "icon": "task",
+      "one": "assignment",
+      "holds": "each piece of work, the course it is for, when it is due and the mark it got",
+      "title": "what",
+      "mobile": [
+        "what",
+        "due",
+        "state"
+      ],
+      "state": "state",
+      "done": [
+        "handed_in",
+        "marked"
+      ],
+      "pack": "studies",
+      "delete": "refuse_while_referenced",
+      "fields": [
+        {
+          "id": "what",
+          "label": "Assignment",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "course",
+          "label": "Course",
+          "type": "ref",
+          "to": "courses",
+          "index": true
+        },
+        {
+          "id": "due",
+          "label": "Due",
+          "type": "day",
+          "index": true,
+          "deadline": true
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "todo",
+            "doing",
+            "handed_in",
+            "marked"
+          ],
+          "labels": {
+            "todo": "To do",
+            "doing": "Working on it",
+            "handed_in": "Handed in",
+            "marked": "Marked"
+          },
+          "index": true,
+          "required": true,
+          "default": "todo"
+        },
+        {
+          "id": "mark",
+          "label": "Mark",
+          "type": "decimal",
+          "min": 0,
+          "max": 100
+        },
+        {
+          "id": "marked_on",
+          "label": "Marked on",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "note",
+          "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "course_reads",
+      "name": "Reading list",
+      "icon": "doc",
+      "one": "reading",
+      "holds": "books, articles and papers to read, for a course or for yourself",
+      "title": "name",
+      "mobile": [
+        "name",
+        "state"
+      ],
+      "pack": "studies",
+      "fields": [
+        {
+          "id": "name",
+          "label": "Title",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "by",
+          "label": "By",
+          "type": "text"
+        },
+        {
+          "id": "course",
+          "label": "Course",
+          "type": "ref",
+          "to": "courses",
+          "index": true
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "queued",
+            "reading",
+            "finished"
+          ],
+          "labels": {
+            "queued": "Queued",
+            "reading": "Reading",
+            "finished": "Finished"
+          },
+          "index": true,
+          "default": "queued"
+        },
+        {
+          "id": "thoughts",
+          "label": "A line on it",
+          "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "study_sessions",
+      "name": "Study sessions",
+      "icon": "clock",
+      "one": "session",
+      "holds": "each stretch of study, for which course, on what day and for how many minutes",
+      "title": "what",
+      "mobile": [
+        "what",
+        "minutes",
+        "on"
+      ],
+      "order": {
+        "field": "on",
+        "dir": "desc"
+      },
+      "pack": "studies",
+      "fields": [
+        {
+          "id": "what",
+          "label": "What you did",
+          "type": "text",
+          "required": true,
+          "search": true
+        },
+        {
+          "id": "course",
+          "label": "Course",
+          "type": "ref",
+          "to": "courses",
+          "index": true
+        },
+        {
+          "id": "on",
+          "label": "Day",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "minutes",
+          "label": "Minutes",
+          "type": "int",
+          "min": 1
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "page": "studies",
+      "title": "Studies",
+      "nav": {
+        "section": "Studies",
+        "order": 10
+      },
+      "icon": "notebook-pen",
+      "pack": "studies",
+      "requires": [
+        "register.courses",
+        "register.assignments",
+        "register.course_reads",
+        "register.study_sessions"
+      ],
+      "blocks": [
+        {
+          "kind": "table",
+          "heading": "Due this week",
+          "icon": "calendar-clock",
+          "span": 12,
+          "source": "register.assignments",
+          "where": "state is todo or doing, due after yesterday, due before +8d",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Assignment",
+              "width": "minmax(18ch,1fr)"
+            },
+            {
+              "field": "course",
+              "label": "Course",
+              "width": "minmax(10ch,18ch)"
+            },
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "13ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "due",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "empty": "Nothing is due this week."
+        },
+        {
+          "kind": "table",
+          "heading": "Late",
+          "icon": "circle-alert",
+          "span": 12,
+          "source": "register.assignments",
+          "where": "state is todo or doing, due before today",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Assignment"
+            },
+            {
+              "field": "course",
+              "label": "Course"
+            },
+            {
+              "field": "due",
+              "label": "Was due",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "due",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "when": {
+            "metric": "studies-late",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "stat",
+          "heading": "How it is going",
+          "icon": "gauge",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "studies-due-week",
+              "label": "Due this week"
+            },
+            {
+              "metric": "studies-late",
+              "label": "Late"
+            },
+            {
+              "metric": "studies-average",
+              "label": "Average mark"
+            },
+            {
+              "metric": "studies-minutes-week",
+              "label": "Minutes studied, 7 days"
+            }
+          ]
+        },
+        {
+          "kind": "cards",
+          "heading": "Courses",
+          "icon": "notebook-pen",
+          "span": 12,
+          "source": "register.courses",
+          "where": "state is running",
+          "columns": [
+            {
+              "field": "name",
+              "as": "title"
+            },
+            {
+              "field": "teacher",
+              "label": "Taught by",
+              "as": "fact"
+            },
+            {
+              "field": "goal",
+              "label": "Aiming for",
+              "as": "fact"
+            },
+            {
+              "metric": "course-marks:{{name}}",
+              "as": "trend"
+            }
+          ],
+          "order": [
+            {
+              "field": "name",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "empty": "Add a course and its marks will draw a trend here."
+        },
+        {
+          "kind": "table",
+          "heading": "Marks",
+          "icon": "circle-check",
+          "span": 12,
+          "source": "register.assignments",
+          "where": "state is marked, mark is set",
+          "columns": [
+            {
+              "field": "what",
+              "label": "Assignment",
+              "width": "minmax(18ch,1fr)"
+            },
+            {
+              "field": "course",
+              "label": "Course",
+              "width": "minmax(10ch,18ch)"
+            },
+            {
+              "field": "mark",
+              "label": "Mark",
+              "width": "10ch",
+              "align": "end"
+            },
+            {
+              "field": "marked_on",
+              "label": "Marked",
+              "width": "13ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "marked_on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 20,
+          "empty": "No mark yet."
+        },
+        {
+          "kind": "table",
+          "heading": "Reading now",
+          "icon": "doc",
+          "span": 6,
+          "source": "register.course_reads",
+          "where": "state is reading",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Title"
+            },
+            {
+              "field": "by",
+              "label": "By"
+            }
+          ],
+          "limit": 10,
+          "empty": "Nothing is being read."
+        },
+        {
+          "kind": "table",
+          "heading": "Queued",
+          "icon": "inbox",
+          "span": 6,
+          "source": "register.course_reads",
+          "where": "state is queued",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Title"
+            },
+            {
+              "field": "course",
+              "label": "Course"
+            }
+          ],
+          "limit": 20,
+          "empty": "Nothing is queued."
+        },
+        {
+          "kind": "table",
+          "heading": "Study sessions",
+          "icon": "clock",
+          "span": 12,
+          "source": "register.study_sessions",
+          "columns": [
+            {
+              "field": "what",
+              "label": "What you did"
+            },
+            {
+              "field": "course",
+              "label": "Course"
+            },
+            {
+              "field": "minutes",
+              "label": "Minutes",
+              "align": "end"
+            },
+            {
+              "field": "on",
+              "label": "Day",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 10,
+          "empty": "No session yet."
+        }
+      ]
+    },
+    {
+      "metric": "studies-due-week",
+      "name": "Due this week",
+      "source": "register.assignments",
+      "where": "state is todo or doing, due after yesterday, due before +8d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "studies-late",
+      "name": "Late work",
+      "source": "register.assignments",
+      "where": "state is todo or doing, due before today",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "studies-average",
+      "name": "Average mark",
+      "source": "register.assignments",
+      "where": "mark is set",
+      "value": {
+        "avg": "mark"
+      },
+      "format": "decimal",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "studies-minutes-week",
+      "name": "Minutes studied in 7 days",
+      "source": "register.study_sessions",
+      "where": "on after -7d",
+      "value": {
+        "sum": "minutes"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "course-marks",
+      "name": "Mark, by month",
+      "source": "register.assignments",
+      "where": "course is {{it}}, mark is set, marked_on after -365d",
+      "value": {
+        "avg": "mark"
+      },
+      "format": "decimal",
+      "target": {
+        "gte": 0
+      },
+      "window": "365d",
+      "compare": "none",
+      "group_by": "marked_on",
+      "bucket": "month"
+    },
+    {
+      "rule": "studies_plan_sessions",
+      "name": "Ask whether to plan study for a new assignment",
+      "register": "assignments",
+      "when": "state is todo",
+      "once_per": [
+        "entry"
+      ],
+      "enabled": false,
+      "then": [
+        {
+          "suggest": {
+            "question": "Plan a study session for {{what}}?",
+            "options": [
+              "Add one",
+              "Not now"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "seeds": [
+    {
+      "register": "courses",
+      "fields": {
+        "name": "Coastal Ecology",
+        "teacher": "Dr Priya Raman",
+        "term": "Autumn",
+        "goal": 75
+      }
+    },
+    {
+      "register": "courses",
+      "fields": {
+        "name": "Statistics II",
+        "teacher": "Prof Samuel Achterberg",
+        "term": "Autumn",
+        "goal": 70
+      }
+    },
+    {
+      "register": "assignments",
+      "fields": {
+        "what": "Field report on salt marshes",
+        "state": "doing",
+        "due": {
+          "day": "+4"
+        }
+      }
+    },
+    {
+      "register": "assignments",
+      "fields": {
+        "what": "Problem set 3",
+        "state": "todo",
+        "due": {
+          "day": "+6"
+        }
+      }
+    },
+    {
+      "register": "assignments",
+      "fields": {
+        "what": "Problem set 2",
+        "state": "marked",
+        "mark": 68,
+        "marked_on": {
+          "day": "-12"
+        }
+      }
+    },
+    {
+      "register": "course_reads",
+      "fields": {
+        "name": "An introduction to tidal flats",
+        "by": "Ines Duarte",
+        "state": "reading"
+      }
+    },
+    {
+      "register": "study_sessions",
+      "fields": {
+        "what": "Revised sampling methods",
+        "on": {
+          "day": "-1"
+        },
+        "minutes": 50
+      }
+    }
+  ]
+}

@@ -1,0 +1,292 @@
+{
+  "pack": "photographer",
+  "version": "1.0.4",
+  "icon": "file-image",
+  "title": "Photographer",
+  "summary": "Shoots from the first enquiry to the fee paid, what each one still owes the client and by when, and the gear with the day its cover ends.",
+  "changes": "Shoots and Still to send no longer open on a count of shoots and deliverables, since the figures and lists under them show them. Nothing it reads or writes changed.",
+  "unlisted": true,
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": { "format": 1, "primitives": 1, "packs": { "people": ">=3.3.0 <5.0.0" } },
+  "words": {
+    "shoots": { "name": "Shoots", "one": "shoot" },
+    "deliverables": { "name": "Deliverables", "one": "deliverable" },
+    "gear": { "name": "Gear", "one": "piece of gear" }
+  },
+  "declarations": [
+    {
+      "register": "shoots",
+      "icon": "image",
+      "name": "Shoots",
+      "one": "shoot",
+      "holds": "each job from the first enquiry to the fee paid: who it is for, the day, the place and the fee",
+      "title": "name",
+      "mobile": [ "name", "day", "state" ],
+      "state": "state",
+      "done": [ "paid" ],
+      "pack": "photographer",
+      "fields": [
+        { "id": "name", "label": "Shoot", "type": "text", "required": true, "search": true },
+        { "id": "who", "label": "Client", "type": "ref", "to": "people", "index": true },
+        { "id": "day", "label": "Day", "type": "day", "index": true },
+        { "id": "place", "label": "Place", "type": "text", "search": true },
+        { "id": "fee", "label": "Fee", "type": "money" },
+        { "id": "taken", "label": "Paid so far", "type": "money" },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [ "enquiry", "booked", "shot", "delivered", "paid" ],
+          "labels": { "enquiry": "Enquiry", "booked": "Booked", "shot": "Shot", "delivered": "Delivered", "paid": "Paid" },
+          "transitions": {
+            "enquiry": { "to": [ "booked" ] },
+            "booked": { "to": [ "enquiry", "shot" ] },
+            "shot": { "to": [ "delivered" ] },
+            "delivered": { "to": [ "shot", "paid" ] },
+            "paid": { "to": [ "delivered" ] }
+          },
+          "default": "enquiry",
+          "index": true,
+          "required": true
+        },
+        { "id": "note", "type": "document" }
+      ]
+    },
+    {
+      "register": "deliverables",
+      "icon": "package",
+      "name": "Deliverables",
+      "one": "deliverable",
+      "holds": "what each shoot still owes the client, such as the edited set or the album, and the day it is due",
+      "title": "what",
+      "mobile": [ "what", "due", "shoot" ],
+      "pack": "photographer",
+      "fields": [
+        { "id": "what", "label": "What", "type": "text", "required": true, "search": true },
+        { "id": "shoot", "label": "Shoot", "type": "ref", "to": "shoots", "index": true, "required": true },
+        { "id": "due", "label": "Due", "type": "day", "index": true, "deadline": true, "remind": [ "-3d", "0d" ] },
+        { "id": "sent", "label": "Sent on", "type": "day", "index": true }
+      ]
+    },
+    {
+      "register": "gear",
+      "icon": "box",
+      "name": "Gear",
+      "one": "piece of gear",
+      "holds": "the cameras, lenses and lights you own, what each one cost, and the day its cover ends",
+      "title": "item",
+      "mobile": [ "item", "cost", "cover" ],
+      "pack": "photographer",
+      "fields": [
+        { "id": "item", "label": "Item", "type": "text", "required": true, "search": true },
+        { "id": "cost", "label": "Cost", "type": "money" },
+        { "id": "cover", "label": "Cover ends", "type": "day", "index": true, "deadline": true, "remind": [ "-30d", "0d" ] }
+      ]
+    },
+    {
+      "page": "shoots",
+      "title": "Shoots",
+      "nav": { "section": "Shoots", "order": 10 },
+      "icon": "image",
+      "requires": [ "register.shoots", "register.deliverables" ],
+      "pack": "photographer",
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "shoots-open", "is": 0 },
+          "body": "No shoot is on the books yet. Add the first enquiry, and it starts on the board."
+        },
+        { "kind": "capture", "heading": "A new enquiry?", "icon": "plus", "span": 12, "register": "shoots" },
+        {
+          "kind": "stat",
+          "heading": "This month",
+          "icon": "gauge",
+          "span": 12,
+          "when": { "metric": "shoots-open", "gt": 0 },
+          "cells": [
+            { "metric": "shoots-booked-month", "label": "Booked this month" },
+            { "metric": "shoot-fees-owed", "label": "Fees not yet paid" },
+            { "metric": "shoot-next-day", "label": "Next shoot" }
+          ]
+        },
+        {
+          "kind": "board",
+          "heading": "By status",
+          "icon": "board",
+          "span": 12,
+          "source": "register.shoots",
+          "columns": [ { "field": "state" }, { "field": "name" }, { "field": "day" }, { "field": "who" }, { "field": "fee" } ],
+          "order": [ { "field": "day", "dir": "asc" } ],
+          "empty": "No shoots yet."
+        }
+      ]
+    },
+    {
+      "page": "shoots-due",
+      "title": "Due",
+      "nav": { "section": "Shoots", "order": 20 },
+      "icon": "calendar-clock",
+      "requires": [ "register.shoots", "register.deliverables", "register.gear" ],
+      "pack": "photographer",
+      "blocks": [
+        {
+          "kind": "table",
+          "heading": "Still to send",
+          "icon": "package",
+          "span": 12,
+          "source": "register.deliverables",
+          "where": "sent is empty",
+          "columns": [
+            { "field": "what", "width": "minmax(20ch,1fr)" },
+            { "field": "shoot", "label": "Shoot", "width": "minmax(12ch,20ch)" },
+            { "field": "due", "label": "Due", "width": "13ch", "align": "end" }
+          ],
+          "order": [ { "field": "due", "dir": "asc" } ],
+          "limit": 50,
+          "empty": "Nothing is waiting to be sent."
+        },
+        {
+          "kind": "table",
+          "heading": "Cover ending in the next 90 days",
+          "icon": "box",
+          "span": 12,
+          "source": "register.gear",
+          "where": "cover after yesterday, cover before +90d",
+          "columns": [
+            { "field": "item", "width": "minmax(20ch,1fr)" },
+            { "field": "cost", "label": "Cost", "width": "14ch", "align": "end" },
+            { "field": "cover", "label": "Cover ends", "width": "13ch", "align": "end" }
+          ],
+          "order": [ { "field": "cover", "dir": "asc" } ],
+          "empty": "No cover ends in the next 90 days."
+        }
+      ]
+    },
+    {
+      "page": "shoot",
+      "title": "{{name}}",
+      "for": { "register": "shoots" },
+      "icon": "image",
+      "requires": [ "register.shoots", "register.deliverables" ],
+      "pack": "photographer",
+      "blocks": [
+        {
+          "kind": "cards",
+          "lead": true,
+          "span": 12,
+          "source": "register.shoots",
+          "where": "name is {{name}}",
+          "columns": [
+            { "field": "name", "label": "Shoot", "as": "title" },
+            { "field": "who", "label": "Client", "as": "who" },
+            { "field": "day", "label": "Day", "as": "when" },
+            { "field": "fee", "label": "Fee", "as": "figure" },
+            { "field": "place", "label": "Place", "as": "fact" },
+            { "field": "taken", "label": "Paid so far", "as": "fact" },
+            { "field": "state", "label": "Status", "as": "fact" }
+          ],
+          "limit": 1
+        },
+        {
+          "kind": "table",
+          "heading": "What it still owes",
+          "icon": "package",
+          "span": 12,
+          "source": "register.deliverables",
+          "where": "shoot is {{name}}",
+          "columns": [
+            { "field": "what", "width": "minmax(20ch,1fr)" },
+            { "field": "due", "label": "Due", "width": "13ch", "align": "end" },
+            { "field": "sent", "label": "Sent on", "width": "13ch", "align": "end" }
+          ],
+          "order": [ { "field": "due", "dir": "asc" } ],
+          "empty": "Nothing is owed on {{name}} yet."
+        },
+        {
+          "kind": "note",
+          "document": true,
+          "heading": "Notes",
+          "icon": "doc",
+          "span": 12,
+          "body": "{{note}}",
+          "empty": "Nothing is written about {{name}} yet."
+        }
+      ]
+    },
+    {
+      "metric": "shoots-open",
+      "name": "Shoots not yet paid",
+      "pack": "photographer",
+      "source": "register.shoots",
+      "where": "state is not paid",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "shoots-booked-month",
+      "name": "Booked this month",
+      "pack": "photographer",
+      "source": "register.shoots",
+      "where": "state is not enquiry, day after bom-1d, day before eom+1d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "shoot-fees-owed",
+      "name": "Fees not yet paid",
+      "pack": "photographer",
+      "source": "register.shoots",
+      "where": "state is booked or shot or delivered, fee is set",
+      "value": { "diff": { "of": { "sum": "fee" }, "per": { "sum": "taken" } } },
+      "format": "money",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "shoot-next-day",
+      "name": "Next shoot",
+      "pack": "photographer",
+      "source": "register.shoots",
+      "where": "state is booked, day after yesterday",
+      "value": { "min": "day" },
+      "format": "day",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "deliverables-open",
+      "name": "Still to send",
+      "pack": "photographer",
+      "source": "register.deliverables",
+      "where": "sent is empty",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "deliverables-late",
+      "name": "Late to send",
+      "pack": "photographer",
+      "source": "register.deliverables",
+      "where": "sent is empty, due before today",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    }
+  ]
+}

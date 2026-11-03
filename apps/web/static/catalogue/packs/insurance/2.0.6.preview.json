@@ -1,0 +1,1357 @@
+{
+  "format": 1,
+  "made_at": "2026-11-03T21:09:23.513Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "No policies yet. [Add one](/r/policies?new=1) with its cover, its premium and when it matures.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "policies-live"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Fund value",
+              "metric": "policies-fund"
+            },
+            {
+              "label": "Cover",
+              "metric": "policies-cover"
+            },
+            {
+              "label": "Premiums a year",
+              "metric": "policies-year"
+            },
+            {
+              "label": "Premiums paid so far",
+              "metric": "policies-paid"
+            }
+          ],
+          "heading": "Your policies",
+          "icon": "shield",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "policies-live"
+          },
+          "key": "k1keczc0",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Cover",
+              "metric": "policies-cover",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 85000000,
+                "unit": "USD",
+                "rows": 2,
+                "refusals": [],
+                "backs": [
+                  "policies#1",
+                  "policies#2"
+                ],
+                "held": 2,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "policies-fund": {
+              "name": "Fund value",
+              "source": "register.policies",
+              "where": "state is live, fund_value is set",
+              "value": {
+                "sum": "fund_value"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policies-cover": {
+              "name": "Cover",
+              "source": "register.policies",
+              "where": "state is live, cover is set",
+              "value": {
+                "sum": "cover"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policies-year": {
+              "name": "Premiums a year",
+              "source": "register.policies",
+              "where": "state is live, per_year is set",
+              "value": {
+                "sum": "per_year"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policies-paid": {
+              "name": "Premiums paid so far",
+              "source": "register.policies",
+              "where": "paid is set",
+              "value": {
+                "sum": "paid"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "body": "Oldest fund value from {{day:policies-fund-on}}.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "policies-live"
+              },
+              {
+                "is": 0,
+                "metric": "policies-fund-stale"
+              },
+              {
+                "gt": 0,
+                "metric": "policies-fund"
+              }
+            ]
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Oldest fund value from {{day:policies-fund-on}}, {{bad:over 90 days ago}}.",
+          "kind": "note",
+          "span": 12,
+          "tone": "warn",
+          "when": {
+            "gt": 0,
+            "metric": "policies-fund-stale"
+          },
+          "key": "k08lez9h-3",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "figure",
+              "field": "fund_value",
+              "label": "Fund value"
+            },
+            {
+              "as": "fact",
+              "field": "insurer",
+              "label": "Insurer"
+            },
+            {
+              "as": "fact",
+              "field": "fund_as_of",
+              "label": "Fund value as of"
+            },
+            {
+              "as": "fact",
+              "field": "matures_on",
+              "label": "Matures"
+            }
+          ],
+          "empty": "No policies yet.",
+          "heading": "Policies",
+          "icon": "shield",
+          "kind": "cards",
+          "limit": 24,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "matures_on"
+            }
+          ],
+          "source": "register.policies",
+          "span": 12,
+          "key": "k11ipdzb",
+          "rows": [
+            {
+              "id": "01M6HKXJDSE7T13JXJWQG7T6FC",
+              "register": "policies",
+              "seq": 2,
+              "fields": {
+                "name": "Term life",
+                "insurer": "Oakfield Life",
+                "cover": {
+                  "amount": 50000000,
+                  "currency": "USD"
+                },
+                "starts_on": "2024-05-17",
+                "matures_on": "2044-05-12",
+                "state": "live"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDSE7T13JXJWGFXVJ0B",
+              "register": "policies",
+              "seq": 1,
+              "fields": {
+                "name": "Home cover",
+                "insurer": "Brightside Mutual",
+                "cover": {
+                  "amount": 35000000,
+                  "currency": "USD"
+                },
+                "starts_on": "2025-09-29",
+                "state": "live"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "name",
+              "label": "Policy",
+              "width": "minmax(16ch,2fr)"
+            },
+            {
+              "align": "end",
+              "field": "cover",
+              "label": "Cover"
+            },
+            {
+              "align": "end",
+              "field": "per_year",
+              "label": "Premiums a year"
+            },
+            {
+              "align": "end",
+              "field": "paid",
+              "label": "Premiums paid so far"
+            },
+            {
+              "field": "state",
+              "label": "Status"
+            }
+          ],
+          "empty": "No policies yet.",
+          "heading": "Premiums and cover",
+          "icon": "shield",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "name"
+            }
+          ],
+          "source": "register.policies",
+          "span": 12,
+          "key": "k1mmoh7c",
+          "rows": [
+            {
+              "id": "01M6HKXJDSE7T13JXJWGFXVJ0B",
+              "register": "policies",
+              "seq": 1,
+              "fields": {
+                "name": "Home cover",
+                "insurer": "Brightside Mutual",
+                "cover": {
+                  "amount": 35000000,
+                  "currency": "USD"
+                },
+                "starts_on": "2025-09-29",
+                "state": "live"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HKXJDSE7T13JXJWQG7T6FC",
+              "register": "policies",
+              "seq": 2,
+              "fields": {
+                "name": "Term life",
+                "insurer": "Oakfield Life",
+                "cover": {
+                  "amount": 50000000,
+                  "currency": "USD"
+                },
+                "starts_on": "2024-05-17",
+                "matures_on": "2044-05-12",
+                "state": "live"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
+        }
+      ],
+      "icon": "shield",
+      "nav": {
+        "order": 50,
+        "section": "Money"
+      },
+      "pack": "insurance",
+      "page": "insurance",
+      "requires": [
+        "register.policies"
+      ],
+      "title": "Insurance",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "look": {
+        "look": "insurance",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "fact",
+              "field": "insurer",
+              "label": "Insurer"
+            },
+            {
+              "as": "fact",
+              "field": "number",
+              "label": "Policy number"
+            },
+            {
+              "as": "fact",
+              "field": "cost",
+              "label": "Premium is"
+            },
+            {
+              "as": "reply",
+              "field": "note"
+            }
+          ],
+          "kind": "cards",
+          "lead": true,
+          "limit": 1,
+          "source": "register.policies",
+          "span": 12,
+          "where": "name is Home cover",
+          "key": "k0iw0tsp",
+          "rows": [
+            {
+              "id": "01M6HKXJDSE7T13JXJWGFXVJ0B",
+              "register": "policies",
+              "seq": 1,
+              "fields": {
+                "name": "Home cover",
+                "insurer": "Brightside Mutual",
+                "cover": {
+                  "amount": 35000000,
+                  "currency": "USD"
+                },
+                "starts_on": "2025-09-29",
+                "state": "live"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "cells": [
+            {
+              "label": "Fund value",
+              "metric": "policy-fund-at:Home cover"
+            },
+            {
+              "label": "Cover",
+              "metric": "policy-cover-at:Home cover"
+            },
+            {
+              "label": "Illustrated fund this year",
+              "metric": "policy-illustrated-at:Home cover"
+            }
+          ],
+          "heading": "Fund and cover",
+          "icon": "shield",
+          "kind": "stat",
+          "span": 12,
+          "key": "k0etub0e",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Cover",
+              "metric": "policy-cover-at:Home cover",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 35000000,
+                "unit": "USD",
+                "rows": 1,
+                "refusals": [],
+                "backs": [
+                  "policies#1"
+                ],
+                "held": 1,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "policy-fund-at": {
+              "name": "Fund value",
+              "source": "register.policies",
+              "where": "name is {{it}}, fund_value is set",
+              "value": {
+                "sum": "fund_value"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policy-cover-at": {
+              "name": "Cover",
+              "source": "register.policies",
+              "where": "name is {{it}}, cover is set",
+              "value": {
+                "sum": "cover"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policy-illustrated-at": {
+              "name": "Illustrated fund this year",
+              "source": "register.policies",
+              "where": "name is {{it}}, illustrated is set",
+              "value": {
+                "sum": "illustrated"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "body": "Fund value from {{day:policy-fund-on-at:Home cover}}.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "policy-fund-on-at:Home cover"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Premiums paid so far",
+              "metric": "policy-paid-at:Home cover"
+            },
+            {
+              "label": "Premiums paid",
+              "metric": "policy-payments-at:Home cover"
+            },
+            {
+              "label": "Premiums a year",
+              "metric": "policy-year-at:Home cover"
+            }
+          ],
+          "heading": "Premiums",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 12,
+          "key": "k0xdgucp",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Premiums paid so far",
+              "metric": "policy-paid-at:Home cover",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 1,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Premiums paid",
+              "metric": "policy-payments-at:Home cover",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 1,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Premiums a year",
+              "metric": "policy-year-at:Home cover",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 1,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "policy-paid-at": {
+              "name": "Premiums paid so far",
+              "source": "register.policies",
+              "where": "name is {{it}}, paid is set",
+              "value": {
+                "sum": "paid"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policy-payments-at": {
+              "name": "Premiums paid",
+              "source": "register.policies",
+              "where": "name is {{it}}, times is set",
+              "value": {
+                "sum": "times"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policy-year-at": {
+              "name": "Premiums a year",
+              "source": "register.policies",
+              "where": "name is {{it}}, per_year is set",
+              "value": {
+                "sum": "per_year"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          },
+          "drawn": false,
+          "why": "unsaid"
+        },
+        {
+          "body": "Matures {{day:policy-matures-at:Home cover}}, {{policy-term-at:Home cover}}% of the term gone.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "policy-matures-at:Home cover"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid out at maturity",
+              "metric": "policy-benefit-at:Home cover"
+            }
+          ],
+          "heading": "Maturity",
+          "icon": "calendar-clock",
+          "kind": "stat",
+          "span": 12,
+          "key": "k1nsd3fw",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Paid out at maturity",
+              "metric": "policy-benefit-at:Home cover",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 1,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "policy-benefit-at": {
+              "name": "Paid out at maturity",
+              "source": "register.policies",
+              "where": "name is {{it}}, maturity_benefit is set",
+              "value": {
+                "sum": "maturity_benefit"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          },
+          "drawn": false,
+          "why": "unsaid"
+        },
+        {
+          "code": "<svg id=\"c\" width=\"100%\" height=\"200\" role=\"img\" aria-label=\"Illustrated fund by year, low, mid and high\"></svg>\n<style>svg text{font:12px var(--font,system-ui,sans-serif);fill:var(--ink-2)}.l{fill:none;stroke-width:2}.k{font-weight:600}</style>\n<script>\nbraindog.on(function (d) {\n  var f = d.columns.map(function (c) { return c.field; });\n  var rows = d.rows.map(function (r) { return r.fields; }).filter(function (r) { return r.year && r.mid; }).sort(function (a, b) { return a.year - b.year; });\n  var svg = document.getElementById('c');\n  var out = '';\n  svg.innerHTML = '';\n  if (rows.length < 2) return;\n  var W = svg.clientWidth || 600, H = 200, L = 8, R = 56, T = 12, B = 22;\n  var val = function (m) { return m && typeof m.amount === 'number' ? m.amount : null; };\n  var all = [];\n  rows.forEach(function (r) { ['low', 'mid', 'high'].forEach(function (k) { var v = val(r[k]); if (v !== null) all.push(v); }); });\n  var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);\n  if (hi === lo) hi = lo + 1;\n  var y0 = rows[0].year, y1 = rows[rows.length - 1].year;\n  var x = function (y) { return L + ((y - y0) / Math.max(1, y1 - y0)) * (W - L - R); };\n  var y = function (v) { return T + (1 - (v - lo) / (hi - lo)) * (H - T - B); };\n  var add = function (name, attrs, text) { var a = ''; for (var k in attrs) a += ' ' + k + '=\"' + attrs[k] + '\"'; out += '<' + name + a + '>' + (text || '') + '</' + name + '>'; };\n  [['low', 'Low', 'var(--ink-3)'], ['mid', 'Mid', 'var(--ink)'], ['high', 'High', 'var(--good)']].forEach(function (s) {\n    var pts = rows.filter(function (r) { return val(r[s[0]]) !== null; });\n    add('polyline', { 'class': 'l', stroke: s[2], points: pts.map(function (r) { return x(r.year) + ',' + y(val(r[s[0]])); }).join(' ') });\n    var last = pts[pts.length - 1];\n    add('text', { x: x(last.year) + 6, y: y(val(last[s[0]])) + 4, 'class': 'k' }, s[1]);\n  });\n  add('text', { x: L, y: H - 6 }, String(y0));\n  add('text', { x: W - R, y: H - 6, 'text-anchor': 'end' }, String(y1));\n  svg.innerHTML = out;\n});\n</script>",
+          "columns": [
+            {
+              "field": "year",
+              "label": "Year"
+            },
+            {
+              "field": "low",
+              "label": "Low"
+            },
+            {
+              "field": "mid",
+              "label": "Expected"
+            },
+            {
+              "field": "high",
+              "label": "High"
+            }
+          ],
+          "heading": "Illustrated fund by year",
+          "height": 240,
+          "icon": "chart-line",
+          "kind": "drawn",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "year"
+            }
+          ],
+          "source": "register.illustration_years",
+          "span": 12,
+          "when": {
+            "gt": 1,
+            "metric": "policy-years-at:Home cover"
+          },
+          "where": "of is Home cover",
+          "key": "k161uf5t",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "year",
+              "label": "Year",
+              "width": "8ch"
+            },
+            {
+              "field": "age",
+              "label": "Age",
+              "width": "8ch"
+            },
+            {
+              "align": "end",
+              "field": "low",
+              "label": "Low"
+            },
+            {
+              "align": "end",
+              "field": "mid",
+              "label": "Expected"
+            },
+            {
+              "align": "end",
+              "field": "high",
+              "label": "High"
+            }
+          ],
+          "empty": "No illustration entered.",
+          "heading": "Year by year",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "year"
+            }
+          ],
+          "source": "register.illustration_years",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "policy-years-at:Home cover"
+          },
+          "where": "of is Home cover",
+          "key": "k0mjvpy0",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "register": "policies"
+      },
+      "icon": "shield",
+      "nav": {
+        "order": 20,
+        "section": "Policies"
+      },
+      "pack": "insurance",
+      "page": "home-cover",
+      "requires": [
+        "register.policies",
+        "register.illustration_years"
+      ],
+      "title": "Home cover",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "param": {
+        "register": "policies",
+        "seq": 1,
+        "title": "Home cover"
+      },
+      "look": {
+        "look": "policy",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      }
+    },
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "name"
+            },
+            {
+              "as": "fact",
+              "field": "insurer",
+              "label": "Insurer"
+            },
+            {
+              "as": "fact",
+              "field": "number",
+              "label": "Policy number"
+            },
+            {
+              "as": "fact",
+              "field": "cost",
+              "label": "Premium is"
+            },
+            {
+              "as": "reply",
+              "field": "note"
+            }
+          ],
+          "kind": "cards",
+          "lead": true,
+          "limit": 1,
+          "source": "register.policies",
+          "span": 12,
+          "where": "name is Term life",
+          "key": "k0iw0tsp",
+          "rows": [
+            {
+              "id": "01M6HKXJDSE7T13JXJWQG7T6FC",
+              "register": "policies",
+              "seq": 2,
+              "fields": {
+                "name": "Term life",
+                "insurer": "Oakfield Life",
+                "cover": {
+                  "amount": 50000000,
+                  "currency": "USD"
+                },
+                "starts_on": "2024-05-17",
+                "matures_on": "2044-05-12",
+                "state": "live"
+              },
+              "state": "live",
+              "version": 1,
+              "created_at": "2026-11-03T21:09:23.513Z",
+              "updated_at": "2026-11-03T21:09:23.513Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "cells": [
+            {
+              "label": "Fund value",
+              "metric": "policy-fund-at:Term life"
+            },
+            {
+              "label": "Cover",
+              "metric": "policy-cover-at:Term life"
+            },
+            {
+              "label": "Illustrated fund this year",
+              "metric": "policy-illustrated-at:Term life"
+            }
+          ],
+          "heading": "Fund and cover",
+          "icon": "shield",
+          "kind": "stat",
+          "span": 12,
+          "key": "k0etub0e",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Cover",
+              "metric": "policy-cover-at:Term life",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 50000000,
+                "unit": "USD",
+                "rows": 1,
+                "refusals": [],
+                "backs": [
+                  "policies#2"
+                ],
+                "held": 1,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "policy-fund-at": {
+              "name": "Fund value",
+              "source": "register.policies",
+              "where": "name is {{it}}, fund_value is set",
+              "value": {
+                "sum": "fund_value"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policy-cover-at": {
+              "name": "Cover",
+              "source": "register.policies",
+              "where": "name is {{it}}, cover is set",
+              "value": {
+                "sum": "cover"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policy-illustrated-at": {
+              "name": "Illustrated fund this year",
+              "source": "register.policies",
+              "where": "name is {{it}}, illustrated is set",
+              "value": {
+                "sum": "illustrated"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "body": "Fund value from {{day:policy-fund-on-at:Term life}}.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "policy-fund-on-at:Term life"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Premiums paid so far",
+              "metric": "policy-paid-at:Term life"
+            },
+            {
+              "label": "Premiums paid",
+              "metric": "policy-payments-at:Term life"
+            },
+            {
+              "label": "Premiums a year",
+              "metric": "policy-year-at:Term life"
+            }
+          ],
+          "heading": "Premiums",
+          "icon": "wallet",
+          "kind": "stat",
+          "span": 12,
+          "key": "k0xdgucp",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Premiums paid so far",
+              "metric": "policy-paid-at:Term life",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 1,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Premiums paid",
+              "metric": "policy-payments-at:Term life",
+              "target": {
+                "gte": 0
+              },
+              "format": "int",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 1,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            },
+            {
+              "label": "Premiums a year",
+              "metric": "policy-year-at:Term life",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 1,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "policy-paid-at": {
+              "name": "Premiums paid so far",
+              "source": "register.policies",
+              "where": "name is {{it}}, paid is set",
+              "value": {
+                "sum": "paid"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policy-payments-at": {
+              "name": "Premiums paid",
+              "source": "register.policies",
+              "where": "name is {{it}}, times is set",
+              "value": {
+                "sum": "times"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policy-year-at": {
+              "name": "Premiums a year",
+              "source": "register.policies",
+              "where": "name is {{it}}, per_year is set",
+              "value": {
+                "sum": "per_year"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          },
+          "drawn": false,
+          "why": "unsaid"
+        },
+        {
+          "body": "Matures {{day:policy-matures-at:Term life}}, {{policy-term-at:Term life}}% of the term gone.",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "policy-matures-at:Term life"
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "policy-matures-at:Term life": "2044-05-12",
+            "policy-term-at:Term life": 0
+          },
+          "read_as": {
+            "policy-matures-at:Term life": "figure",
+            "policy-term-at:Term life": "figure"
+          },
+          "figures": {
+            "policy-matures-at": {
+              "name": "Matures",
+              "source": "register.policies",
+              "where": "name is {{it}}, matures_on is set",
+              "value": {
+                "min": "matures_on"
+              },
+              "format": "day",
+              "target": {
+                "gte": 0
+              }
+            },
+            "policy-term-at": {
+              "name": "Percent of term gone",
+              "source": "register.policies",
+              "where": "name is {{it}}, term_pct is set",
+              "value": {
+                "sum": "term_pct"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "cells": [
+            {
+              "label": "Paid out at maturity",
+              "metric": "policy-benefit-at:Term life"
+            }
+          ],
+          "heading": "Maturity",
+          "icon": "calendar-clock",
+          "kind": "stat",
+          "span": 12,
+          "key": "k1nsd3fw",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Paid out at maturity",
+              "metric": "policy-benefit-at:Term life",
+              "target": {
+                "gte": 0
+              },
+              "format": "money",
+              "reading": {
+                "value": 0,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 1,
+                "unsaid": true,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": true
+              }
+            }
+          ],
+          "figures": {
+            "policy-benefit-at": {
+              "name": "Paid out at maturity",
+              "source": "register.policies",
+              "where": "name is {{it}}, maturity_benefit is set",
+              "value": {
+                "sum": "maturity_benefit"
+              },
+              "format": "money",
+              "target": {
+                "gte": 0
+              }
+            }
+          },
+          "drawn": false,
+          "why": "unsaid"
+        },
+        {
+          "code": "<svg id=\"c\" width=\"100%\" height=\"200\" role=\"img\" aria-label=\"Illustrated fund by year, low, mid and high\"></svg>\n<style>svg text{font:12px var(--font,system-ui,sans-serif);fill:var(--ink-2)}.l{fill:none;stroke-width:2}.k{font-weight:600}</style>\n<script>\nbraindog.on(function (d) {\n  var f = d.columns.map(function (c) { return c.field; });\n  var rows = d.rows.map(function (r) { return r.fields; }).filter(function (r) { return r.year && r.mid; }).sort(function (a, b) { return a.year - b.year; });\n  var svg = document.getElementById('c');\n  var out = '';\n  svg.innerHTML = '';\n  if (rows.length < 2) return;\n  var W = svg.clientWidth || 600, H = 200, L = 8, R = 56, T = 12, B = 22;\n  var val = function (m) { return m && typeof m.amount === 'number' ? m.amount : null; };\n  var all = [];\n  rows.forEach(function (r) { ['low', 'mid', 'high'].forEach(function (k) { var v = val(r[k]); if (v !== null) all.push(v); }); });\n  var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);\n  if (hi === lo) hi = lo + 1;\n  var y0 = rows[0].year, y1 = rows[rows.length - 1].year;\n  var x = function (y) { return L + ((y - y0) / Math.max(1, y1 - y0)) * (W - L - R); };\n  var y = function (v) { return T + (1 - (v - lo) / (hi - lo)) * (H - T - B); };\n  var add = function (name, attrs, text) { var a = ''; for (var k in attrs) a += ' ' + k + '=\"' + attrs[k] + '\"'; out += '<' + name + a + '>' + (text || '') + '</' + name + '>'; };\n  [['low', 'Low', 'var(--ink-3)'], ['mid', 'Mid', 'var(--ink)'], ['high', 'High', 'var(--good)']].forEach(function (s) {\n    var pts = rows.filter(function (r) { return val(r[s[0]]) !== null; });\n    add('polyline', { 'class': 'l', stroke: s[2], points: pts.map(function (r) { return x(r.year) + ',' + y(val(r[s[0]])); }).join(' ') });\n    var last = pts[pts.length - 1];\n    add('text', { x: x(last.year) + 6, y: y(val(last[s[0]])) + 4, 'class': 'k' }, s[1]);\n  });\n  add('text', { x: L, y: H - 6 }, String(y0));\n  add('text', { x: W - R, y: H - 6, 'text-anchor': 'end' }, String(y1));\n  svg.innerHTML = out;\n});\n</script>",
+          "columns": [
+            {
+              "field": "year",
+              "label": "Year"
+            },
+            {
+              "field": "low",
+              "label": "Low"
+            },
+            {
+              "field": "mid",
+              "label": "Expected"
+            },
+            {
+              "field": "high",
+              "label": "High"
+            }
+          ],
+          "heading": "Illustrated fund by year",
+          "height": 240,
+          "icon": "chart-line",
+          "kind": "drawn",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "year"
+            }
+          ],
+          "source": "register.illustration_years",
+          "span": 12,
+          "when": {
+            "gt": 1,
+            "metric": "policy-years-at:Term life"
+          },
+          "where": "of is Term life",
+          "key": "k161uf5t",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "year",
+              "label": "Year",
+              "width": "8ch"
+            },
+            {
+              "field": "age",
+              "label": "Age",
+              "width": "8ch"
+            },
+            {
+              "align": "end",
+              "field": "low",
+              "label": "Low"
+            },
+            {
+              "align": "end",
+              "field": "mid",
+              "label": "Expected"
+            },
+            {
+              "align": "end",
+              "field": "high",
+              "label": "High"
+            }
+          ],
+          "empty": "No illustration entered.",
+          "heading": "Year by year",
+          "icon": "rows",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "year"
+            }
+          ],
+          "source": "register.illustration_years",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "policy-years-at:Term life"
+          },
+          "where": "of is Term life",
+          "key": "k0mjvpy0",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "for": {
+        "register": "policies"
+      },
+      "icon": "shield",
+      "nav": {
+        "order": 20,
+        "section": "Policies"
+      },
+      "pack": "insurance",
+      "page": "term-life",
+      "requires": [
+        "register.policies",
+        "register.illustration_years"
+      ],
+      "title": "Term life",
+      "read_at": "2026-11-03T21:09:23.513Z",
+      "zone": "UTC",
+      "param": {
+        "register": "policies",
+        "seq": 2,
+        "title": "Term life"
+      },
+      "look": {
+        "look": "policy",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      }
+    }
+  ]
+}

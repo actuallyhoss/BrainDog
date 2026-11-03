@@ -1,10 +1,10 @@
 {
   "pack": "launch-desk",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "icon": "flag-triangle-right",
   "title": "Launch desk",
   "summary": "A desk for launching a thing in parts: where it stands in one sentence, each part in its own colour and picture with its next step, the steps on a calendar by the day they are due, the calls waiting on you, a pad beside it, and a price check.",
-  "changes": "The price check works its sums out itself: costs together, the least price that holds (that times Times cost, 2.5 at first and yours to change) and the room, the price less that least price, all drawn beside what you type. The rule and script that added them up are gone, so the add-on carries no code. The line saying whether the price passes and the tiles of costs and share are gone too: a room below nought is too thin. Now draws its own icon.",
+  "changes": "The desk no longer opens on a count of essential steps done. The line that asks for the first essential step stays. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -454,24 +454,6 @@
             "is": 0
           },
           "body": "Nothing essential is written down yet. Add the steps this launch cannot go without, and mark them essential."
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "when": {
-            "metric": "essentials-share",
-            "lt": 1
-          },
-          "body": "{{essentials-done}} of the {{essentials}} essential step(s) are done."
-        },
-        {
-          "kind": "note",
-          "lead": true,
-          "when": {
-            "metric": "essentials-share",
-            "is": 1
-          },
-          "body": "All {{essentials}} essential step(s) are done."
         },
         {
           "kind": "queue",
