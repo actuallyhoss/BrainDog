@@ -85,6 +85,7 @@
   import type { CatalogueIndex } from '@braindog/declare/catalogue';
   import { readHostCatalogue, readShippedCatalogue } from '../catalogue.ts';
   import About from './About.svelte';
+  import Origin from './Origin.svelte';
   import { foundListing, newerThan } from './found.ts';
   import Connect from './Connect.svelte';
   import GoogleConnect from '$lib/google/GoogleConnect.svelte';
@@ -114,7 +115,9 @@
   const listing = $derived(pack || !found || found.listing.installedId !== id ? null : found.listing);
   /* A use case's pack by its use case, never `usecase-founder`. */
   const name = $derived(pack?.name ?? listing?.title ?? moduleName(id));
-  const blurb = $derived(pack?.blurb ?? listing?.summary ?? '');
+  /** The line the record holds for an add-on no catalogue lists (one made here, or from a link), read by `Origin`. */
+  let ownSummary = $state('');
+  const blurb = $derived(pack?.blurb ?? listing?.summary ?? ownSummary);
   /* THE CURRENCY THE RECORD'S MONEY IS IN, read as Settings > Words and money reads it, for a home currency not saved. */
   const moneyIn = $derived(((page.data.index as { currency?: string | null } | undefined)?.currency || homeCurrency() || '').toUpperCase());
 
@@ -694,6 +697,8 @@
     </div>
 
     <div class="wide-cell stack">
+    <!-- WHERE IT CAME FROM, WHAT IT MAY DO HERE, AND SHARE (store lane E): the record's word on each. -->
+    <Origin {id} ours={new Set(firstPartyModules().map((m) => m.id))} onsummary={(s) => (ownSummary = s)} />
     {#if googleFor === 'calendar' && installed}
       <!-- TWO WAYS IN, SAID ONCE (Calendar 2.1.1): Install asks for no key, so the page says both here. -->
       <p class="ways">Connect Google, or paste your calendar's private link.</p>
