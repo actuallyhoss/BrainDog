@@ -1253,6 +1253,11 @@ export const CHANGED_NOTE = 'Taken back: what it asked about changed since, so i
 /** The line under a question whose rows, or the row it is about, are gone. */
 export const GONE_NOTE = 'Taken back: what it asked about is gone.';
 
+/** The line under a question whose rows already hold what it would write, so there is nothing left to answer. */
+export const DONE_NOTE = 'Taken back: it is already so, so there is nothing to answer.';
+/** The line under a "same person?" question when one of the rows it names is deleted or merged already. */
+export const MERGED_NOTE = 'Taken back: one of them is already deleted or merged, so there is nothing left to merge.';
+
 /** How many open questions one sweep reads, so an hour's tick costs the same whatever the queue holds. */
 const STALE_BOUND = 200;
 
@@ -1273,11 +1278,32 @@ const STALE_BOUND = 200;
 export function staleWhy(deps: Pick<GovernDeps, 'sql' | 'row'>, q: { id: string; body_kind: string; body: unknown }): string | null {
   const body = isMap(q.body) ? q.body : typeof q.body === 'string' ? parse(q.body) : null;
   if (body === null) return null;
-  /* ONE UPDATE ROW: `gone`, `changed`, or `null` when an answer can still write it. */
-  const rowFate = (list: string, r: Record<string, unknown>): 'gone' | 'changed' | null => {
+  /* WHETHER A ROW ALREADY HOLDS WHAT A PATCH WOULD WRITE: each field the same, a link by the row it names, and
+     `deleted_at` by whether the row is deleted. */
+  const holds = (list: string, id: string, deleted: boolean, patch: Record<string, unknown>): boolean => {
+    const keys = Object.keys(patch);
+    if (keys.length === 0) return false;
+    const stored = deps.sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', id);
+    const fields = stored === undefined ? null : parse(stored.fields);
+    if (fields === null) return false;
+    return keys.every((k) => {
+      const v = patch[k];
+      if (k === 'deleted_at') return (v === null) === !deleted;
+      if (JSON.stringify(fields[k] ?? null) === JSON.stringify(v ?? null)) return true;
+      const spoken = typeof v === 'string' ? /^([a-z][a-z0-9_]{0,31})#[1-9]\d*$/u.exec(v) : null;
+      return spoken !== null && deps.row(spoken[1]!, v as string)?.id === fields[k];
+    });
+  };
+  /* ONE UPDATE ROW: `gone`, `changed`, `done` when it already holds what it would be given, or `null` when an answer can
+     still write it. A row deleted since is gone unless the question brings it back, even where the question would
+     delete it too: a merge's fold deletes the row it folds, and a row the owner deleted is not folded into anybody. */
+  const rowFate = (list: string, r: Record<string, unknown>): 'gone' | 'changed' | 'done' | null => {
     if (typeof r.at !== 'string') return null;
     const row = deps.row(list, r.at);
-    if (!row || row.deleted) return isMap(r.patch) && Object.hasOwn(r.patch, 'deleted_at') ? null : 'gone';
+    if (!row) return 'gone';
+    const patch = isMap(r.patch) ? r.patch : {};
+    if (holds(list, row.id, row.deleted, patch)) return 'done';
+    if (row.deleted) return patch.deleted_at === null ? null : 'gone';
     if (typeof r.version !== 'number') return null;
     const now = deps.sql.one<{ version: number }>('SELECT version FROM entry WHERE id = ?', row.id);
     if (!now || now.version === r.version) return null;
@@ -1291,11 +1317,25 @@ export function staleWhy(deps: Pick<GovernDeps, 'sql' | 'row'>, q: { id: string;
   }
   if (q.body_kind === 'rowset' && typeof body.register === 'string') {
     const register = body.register;
+    /* A "SAME PERSON?" QUESTION NAMES ITS PEOPLE (`candidates`): with fewer than two of them still standing, one was
+       deleted or merged already, and there is nobody left to merge. */
+    const named = listOf(body.candidates).filter(isMap).filter((c) => typeof c.at === 'string');
+    if (named.length >= 2) {
+      const standing = named.filter((c) => {
+        const row = deps.row(register, c.at as string);
+        if (!row || row.deleted) return false;
+        const f = deps.sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', row.id);
+        const into = f === undefined ? undefined : parse(f.fields)?.merged_into;
+        return typeof into !== 'string' || into === '';
+      });
+      if (standing.length < 2) return MERGED_NOTE;
+    }
     const fates = listOf(body.rows)
       .filter(isMap)
       .map((r) => rowFate(typeof r.register === 'string' ? r.register : register, r));
     if (fates.includes('gone')) return GONE_NOTE;
     if (fates.includes('changed')) return CHANGED_NOTE;
+    if (fates.length > 0 && fates.every((f) => f === 'done')) return DONE_NOTE;
     return null;
   }
   if (q.body_kind === 'options') {
@@ -1306,12 +1346,47 @@ export function staleWhy(deps: Pick<GovernDeps, 'sql' | 'row'>, q: { id: string;
       if (!lists.ok) return null;
       const each = [...lists.value].flatMap(([list, rows]) => rows.map((r) => rowFate(list, r)));
       if (each.length === 0 || each.some((f) => f === null)) return null;
-      return each.every((f) => f === 'gone') ? 'gone' : 'changed';
+      /* AN OPTION WHOSE ROWS ALREADY HOLD WHAT IT WRITES leaves nothing to ask either: picking it changes nothing. */
+      return each.every((f) => f === 'gone') ? 'gone' : each.every((f) => f === 'done') ? 'done' : 'changed';
     });
     if (fates.some((f) => f === null)) return null;
-    return fates.every((f) => f === 'gone') ? GONE_NOTE : CHANGED_NOTE;
+    return fates.every((f) => f === 'gone') ? GONE_NOTE : fates.some((f) => f === 'done') ? DONE_NOTE : CHANGED_NOTE;
   }
   return null;
+}
+
+/**
+ * Take back, now, each open question naming row `id` that can no longer apply (`staleWhy`): what a delete or a merge
+ * of that row runs, so a "same person?" card about somebody just deleted leaves Needs you at once rather than at the
+ * next hourly sweep, or on a press answered VERSION_STALE. Run it inside the caller's transaction.
+ */
+export function settleAbout(deps: Pick<GovernDeps, 'sql' | 'row' | 'mint'>, names: readonly string[], nowMs: number): string[] {
+  /* A QUESTION NAMES A ROW BY ITS ID OR ITS SPOKEN NAME, `people#3`, read whole with its closing quote so `people#31`
+     is not `people#3`. */
+  const said = names.filter((n) => n !== '').map((n) => JSON.stringify(n));
+  if (said.length === 0) return [];
+  const open = deps.sql.all<{ id: string; body_kind: string; body: string }>(
+    "SELECT id, body_kind, body FROM suggestion WHERE status = 'open' AND body_kind IN ('rowset', 'options') AND EXISTS (SELECT 1 FROM json_each(?) AS n WHERE instr(body, n.value) > 0) LIMIT 50",
+    JSON.stringify(said),
+  );
+  const at = instant(nowMs);
+  const out: string[] = [];
+  for (const q of open) {
+    const why = staleWhy(deps, q);
+    if (why === null) continue;
+    takeBack(deps, q.id, 'system', at, why);
+    out.push(q.id);
+  }
+  return out;
+}
+
+/** Take back one open question that can no longer apply, as a press found it: its line, or `null` when it still can. */
+export function settleOne(deps: Pick<GovernDeps, 'sql' | 'row' | 'mint'>, id: string, nowMs: number): string | null {
+  const q = deps.sql.one<{ id: string; body_kind: string; body: string }>("SELECT id, body_kind, body FROM suggestion WHERE id = ? AND status = 'open'", id);
+  if (!q) return null;
+  const why = staleWhy(deps, q);
+  if (why !== null) takeBack(deps, q.id, 'system', instant(nowMs), why);
+  return why;
 }
 
 /**

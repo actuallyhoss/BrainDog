@@ -157,6 +157,8 @@ import {
   countGovernance,
   countOpenQuestions,
   sweepStale,
+  settleAbout,
+  settleOne,
   apartIds,
   apartJson,
   NOT_APART,
@@ -4720,6 +4722,14 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        once, and a detector that counted it would propose changing a field because a record is busy. */
     if (refused(out) && out.refusal.at)
       observe(sql, clock.now(), [{ kind: 'write.refused', subject: `${register}.${out.refusal.at}:${out.refusal.code}` }]);
+    /* A ROW DELETED, BROUGHT BACK OR MERGED TAKES BACK EVERY OPEN QUESTION ABOUT IT THAT NO LONGER APPLIES (`settleAbout`),
+       now, saying why: a "same person?" card about somebody just deleted leaves Needs you at once. */
+    if (out.ok && !door.decided && !door.merge && (patch.deleted_at !== undefined || patch.merged_into !== undefined)) {
+      const row = out.value;
+      const prefix = registers.get(row.register)?.seq_prefix;
+      const names = [row.id, ...(row.seq === null ? [] : [`${row.register}#${row.seq}`, ...(prefix && prefix !== '#' ? [`${prefix}${row.seq}`] : [])])];
+      settleAbout(governDeps(), names, clock.now());
+    }
     return out;
   }
 
@@ -9541,6 +9551,28 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   /** One answer through the gate, in its own savepoint; `batch` is the one a group answer shares (`decideMany`). */
   function decideOne(id: string, verdict: Verdict, actor: string, batch?: string): Result<Decided> {
+    const out = decideAttempt(id, verdict, actor, batch);
+    /* A PRESS ON A QUESTION THAT NO LONGER APPLIES CLOSES IT, saying why, instead of leaving it to be pressed again and
+       answered VERSION_STALE for ever: its rows were deleted, merged, or already hold what it asked (`staleWhy`). */
+    if (!out.ok && !('defer' in verdict)) {
+      const why = transaction(() => settleOne(governDeps(), id, clock.now()));
+      if (why !== null) return no<Decided>('refusal' in out ? out.refusal.code : 'VERSION_STALE', `${why} It is off Needs you now.`, { at: 'id' });
+    }
+    /* AND AN ANSWER THAT DELETED OR MERGED ROWS TAKES BACK THE OTHER OPEN QUESTIONS ABOUT THEM THAT NO LONGER APPLY: a
+       second "same person?" card about two people one card already merged. */
+    if (out.ok && out.value.wrote.length > 0)
+      transaction(() => {
+        for (const id of out.value.wrote) {
+          const row = byId(id, true);
+          if (!row || row.seq === null) continue;
+          const prefix = registers.get(row.register)?.seq_prefix;
+          settleAbout(governDeps(), [row.id, `${row.register}#${row.seq}`, ...(prefix && prefix !== '#' ? [`${prefix}${row.seq}`] : [])], clock.now());
+        }
+      });
+    return out;
+  }
+
+  function decideAttempt(id: string, verdict: Verdict, actor: string, batch?: string): Result<Decided> {
     return attempt(sql, transaction, () => {
       const whole = mergePickFault(id, verdict);
       if (whole) return { ok: false as const, refusal: whole };
