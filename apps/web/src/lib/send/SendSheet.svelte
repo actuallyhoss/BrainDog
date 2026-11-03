@@ -1,24 +1,29 @@
 <!--
   THE SEND SHEET: where a row, a question, a project, a run or a sign goes, and what goes with it.
 
-  IT DROPS FROM WHAT OPENED IT, never a centred modal: a tile 400 wide hung under the button (or the row), clamped to the
-  window, with no scrim. ON A PHONE, or with nothing to hang from, it rises from the bottom as the app's bottom sheet does,
-  over a scrim, its top corners 16 and a grab handle.
+  THE APP'S ONE SHEET (`Sheet.svelte`, narrow): from 900 up a drawer in from the right edge over a dimmed page, 420 wide
+  and the window's height; below 900 the bottom sheet with its handle. Esc, a press on the dimmed page and Close shut it,
+  the focus stays inside while it is open and goes back to what opened it after (Sam, 3 Nov: "on pc it should show from
+  the right side, not from the bottom"). It used to hang under the button as a popover, and rose from the bottom on a
+  desk whenever a menu opened it, since a closed menu left nothing to hang from.
 
-  TOP TO BOTTOM: who takes it, as one radio list (Auto first and chosen, with one line saying what it will do; Slash with
-  Quick or Deep; Claude on each machine, with its profile and repository where the runner said; each session running now,
-  with its live dot; the next agent on a project), then a note, then what is attached (each removable, and + to find
-  more), then "May change", off, with the line that says what always comes back, then Send. ⌘↵ sends, Esc closes.
+  TOP TO BOTTOM: the title names what goes ("Send “Ship webhook retries”"); a search where there are enough to choose
+  from; who takes it, one row each with its glyph, its name and one line, the chosen one ticked (Auto, Slash with Quick or
+  Deep, each session running now, Claude on each machine with its profile and repository, the next agent to start); a
+  note; what is attached, each removable, and + to find more; "Let it make changes", off. The foot's button names where
+  it goes. ⌘↵ sends.
 
   A HOST WITHOUT THE TARGETS DOOR LISTS AUTO AND SLASH ALONE, and Auto goes to Slash.
 -->
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { apiBase } from '../at.ts';
-  import { overlays } from '../a11y/keys.svelte.ts';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
+  import type { IconName } from '../ui/icons.ts';
+  import IconWell from '../ui/IconWell.svelte';
   import Segmented from '../ui/Segmented.svelte';
+  import Sheet from '../ui/Sheet.svelte';
   import { toasts } from '../ui/toast.svelte.ts';
   import AttachPicker from './AttachPicker.svelte';
   import { deliver } from './convos.svelte.ts';
@@ -27,8 +32,11 @@
 
   let { ask, onclose }: { ask: SheetAsk; onclose: () => void } = $props();
 
+  /** How long the drawer takes to go, so it is unmounted after its close has played and not in the middle of it. */
+  const GONE_MS = 320;
+
   const uid = `send-${Math.random().toString(36).slice(2, 8)}`;
-  let el = $state<HTMLElement>();
+  let open = $state(true);
   let list = $state<Target[] | null | undefined>(undefined);
   let choice = $state<string>('auto');
   let mode = $state<'quick' | 'deep'>('quick');
@@ -40,14 +48,37 @@
   let fix = $state<string | null>(null);
   let profile = $state('');
   let repo = $state('');
-  let pos = $state<{ top: number; left: number; maxH: number } | null>(null);
-  let phone = $state(false);
+  let q = $state('');
+  let body = $state<HTMLElement>();
 
-  const macs = $derived(list?.filter((t) => t.kind === 'mac') ?? []);
-  const sessions = $derived(list?.filter((t) => t.kind === 'session') ?? []);
-  const nexts = $derived(list?.filter((t) => t.kind === 'next') ?? []);
-  const chosen = $derived(list?.find((t) => t.id === choice) ?? null);
+  /** One way to send, as the sheet draws it: the target, or Auto and Slash, which are the sheet's own. */
+  type Way = { id: string; name: string; line: string; icon: IconName; live?: boolean; t?: Target };
+
   const auto = $derived(autoLine(list ?? null, ask.project ?? null));
+  const own = $derived<Way[]>([
+    { id: 'auto', name: sendWords.auto, line: auto, icon: 'git-branch' },
+    { id: 'slash', name: sendWords.slash, line: '', icon: 'slash' },
+  ]);
+  const wayOf = (t: Target, icon: IconName): Way => ({ id: t.id, name: t.label, line: t.detail, icon, live: t.live, t });
+  const groups = $derived<{ key: string; head: string | null; ways: Way[] }[]>([
+    { key: 'own', head: null, ways: own },
+    { key: 'session', head: sendWords.running, ways: (list ?? []).filter((t) => t.kind === 'session').map((t) => wayOf(t, 'session')) },
+    { key: 'mac', head: sendWords.machines, ways: (list ?? []).filter((t) => t.kind === 'mac').map((t) => wayOf(t, 'monitor')) },
+    { key: 'next', head: sendWords.nextUp, ways: (list ?? []).filter((t) => t.kind === 'next').map((t) => wayOf(t, 'clock')) },
+  ]);
+  const count = $derived(groups.reduce((n, g) => n + g.ways.length, 0));
+  /* THE SEARCH SHOWS WHERE THERE ARE ENOUGH TO LOOK THROUGH: two or three rows are read faster than they are searched. */
+  const searchable = $derived(count > 3);
+  const words = (w: Way) => `${w.name} ${w.line}`.toLocaleLowerCase();
+  const shown = $derived.by(() => {
+    const said = q.trim().toLocaleLowerCase();
+    if (!said) return groups.filter((g) => g.ways.length > 0);
+    return groups.map((g) => ({ ...g, ways: g.ways.filter((w) => words(w).includes(said)) })).filter((g) => g.ways.length > 0);
+  });
+  const chosen = $derived(list?.find((t) => t.id === choice) ?? null);
+  /* THE BUTTON SAYS WHERE IT GOES: "Send" for Auto, else "Send to" the target's first name ("Cursor", not its machine). */
+  const goWord = $derived(choice === 'auto' ? sendWords.send : sendWords.sendToFull(choice === 'slash' ? sendWords.slash : (chosen?.label.split(' · ')[0] ?? sendWords.slash)));
+  const title = $derived(attach.length > 1 ? sendWords.titleMany(attach.length) : sendWords.titleOne(attach[0]?.label ?? ''));
 
   /* WHERE IT OPENS: the preset, else the last target for this kind of thing where it is still reachable, else Auto. */
   function settle(got: Target[] | null) {
@@ -62,50 +93,38 @@
     } else if (got?.some((t) => t.id === last.target)) choice = last.target;
   }
 
-  function place() {
-    phone = matchMedia('(width < 640px)').matches || !ask.anchor;
-    if (phone || !ask.anchor) return void (pos = null);
-    const r = ask.anchor.getBoundingClientRect();
-    const width = Math.min(400, innerWidth - 32);
-    const left = Math.max(16, Math.min(r.left, innerWidth - width - 16));
-    const below = innerHeight - r.bottom - 16;
-    const top = below >= 320 ? r.bottom + 6 : Math.max(16, r.top - Math.min(560, r.top - 16) - 6);
-    pos = { top, left, maxH: below >= 320 ? below - 6 : Math.min(560, r.top - 22) };
-  }
-
   onMount(() => {
-    overlays.open();
-    place();
     const ctl = new AbortController();
+    /* ON A DESK THE CARET GOES TO THE CHOSEN ROW, so the arrows walk the list and typing a letter is not lost; the search
+       is one Shift+Tab back. On a phone nothing is focused, which would raise the keyboard over the list. */
+    const desk = matchMedia('(width >= 900px) and (pointer: fine)').matches;
     void readTargets(apiBase(), ctl.signal).then((got) => {
       list = got;
       settle(got);
-      queueMicrotask(() => el?.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.focus());
+      if (desk)
+        queueMicrotask(() => body?.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.focus());
     });
-    queueMicrotask(() => el?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus());
-    /* A PRESS OUTSIDE CLOSES IT, but not the one that opened it, which is still on its way. */
-    const away = (e: PointerEvent) => {
-      const t = e.target as Node | null;
-      if (t && (el?.contains(t) || ask.anchor?.contains(t))) return;
-      onclose();
-    };
-    setTimeout(() => document.addEventListener('pointerdown', away, { signal: ctl.signal }), 0);
-    addEventListener('resize', place, { signal: ctl.signal });
-    return () => {
-      ctl.abort();
-      overlays.close();
-    };
+    return () => ctl.abort();
   });
 
+  /** Close: the drawer plays its way out, then the sheet is taken off the page. */
+  function shut() {
+    open = false;
+  }
+
+  function closed() {
+    setTimeout(onclose, GONE_MS);
+  }
+
   function onkeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
+    /* ESC SHUTS THE ATTACH SEARCH FIRST, and the sheet only on the next press; the sheet's own Esc closes it. */
+    if (e.key === 'Escape' && picking) {
       e.preventDefault();
       e.stopPropagation();
-      if (picking) picking = false;
-      else onclose();
+      picking = false;
       return;
     }
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && open) {
       e.preventDefault();
       e.stopPropagation();
       void go();
@@ -139,7 +158,7 @@
       return;
     }
     toasts.push(sendWords.sent(out.label));
-    onclose();
+    shut();
   }
 
   const remove = (ref: string) => (attach = attach.filter((a) => a.ref !== ref));
@@ -151,312 +170,281 @@
 
 <svelte:window onkeydowncapture={onkeydown} />
 
-{#if phone}<div class="ss-scrim" aria-hidden="true"></div>{/if}
-<div
-  bind:this={el}
-  class="ss"
-  data-phone={phone ? '' : undefined}
-  role="dialog"
-  aria-modal="false"
-  aria-labelledby="{uid}-h"
-  style:inset-block-start={pos ? `${pos.top}px` : undefined}
-  style:inset-inline-start={pos ? `${pos.left}px` : undefined}
-  style:max-block-size={pos ? `${pos.maxH}px` : undefined}
->
-  {#if phone}<span class="ss-grab" aria-hidden="true"></span>{/if}
-  <div class="ss-head">
-    <h2 class="ss-title" id="{uid}-h">{sendWords.sheet}</h2>
-    <button type="button" class="ss-x tap" aria-label={sendWords.close} onclick={onclose}><Icon name="close" size="s" /></button>
-  </div>
-
-  <div class="ss-body">
-    <fieldset class="ss-to">
-      <legend class="ss-vh">{sendWords.sheet}</legend>
-      <label class="ss-opt" data-on={choice === 'auto' ? '' : undefined}>
-        <input type="radio" name="{uid}-to" value="auto" bind:group={choice} />
-        <span class="ss-words"><span class="ss-name">{sendWords.auto}</span><span class="ss-line">{auto}</span></span>
-      </label>
-      <label class="ss-opt" data-on={choice === 'slash' ? '' : undefined}>
-        <input type="radio" name="{uid}-to" value="slash" bind:group={choice} />
-        <span class="ss-words"><span class="ss-name">{sendWords.slash}</span></span>
-        <Segmented class="ss-mode" role="group" aria-label={sendWords.slash}>
-          <button type="button" class="segment" data-on={mode === 'quick' ? '' : undefined} aria-pressed={mode === 'quick'} onclick={() => ((mode = 'quick'), (choice = 'slash'))}>{sendWords.quick}</button>
-          <button type="button" class="segment" data-on={mode === 'deep' ? '' : undefined} aria-pressed={mode === 'deep'} onclick={() => ((mode = 'deep'), (choice = 'slash'))}>{sendWords.deep}</button>
-        </Segmented>
-      </label>
-      {#each macs as t (t.id)}
-        <label class="ss-opt" data-on={choice === t.id ? '' : undefined}>
-          <input type="radio" name="{uid}-to" value={t.id} bind:group={choice} />
-          <span class="ss-words"><span class="ss-name" dir="auto">{t.label}</span>{#if t.detail}<span class="ss-line" dir="auto">{t.detail}</span>{/if}</span>
+<Sheet bind:open {title} narrow caret={false} onclose={closed}>
+  <div class="ss" bind:this={body}>
+    <section class="ss-part" aria-labelledby="{uid}-to">
+      <h3 class="ss-label" id="{uid}-to">{sendWords.to}</h3>
+      {#if searchable}
+        <label class="ss-find">
+          <Icon name="search" size="s" />
+          <span class="ss-vh">{sendWords.find}</span>
+          <input type="search" bind:value={q} placeholder={sendWords.find} autocomplete="off" spellcheck="false" />
         </label>
-        {#if choice === t.id && (t.profiles || t.repos)}
-          <div class="ss-picks">
-            {#if t.profiles}
-              <label class="ss-pick"><span class="ss-vh">{sendWords.profile}</span>
-                <select class="ss-select" bind:value={profile} aria-label={sendWords.profile}>
-                  <option value="">{sendWords.anyProfile}</option>
-                  {#each t.profiles as p (p)}<option value={p}>{p}</option>{/each}
-                </select>
-              </label>
-            {/if}
-            {#if t.repos}
-              <label class="ss-pick"><span class="ss-vh">{sendWords.repo}</span>
-                <select class="ss-select" bind:value={repo} aria-label={sendWords.repo}>
-                  <option value="">{sendWords.anyRepo}</option>
-                  {#each t.repos as r (r)}<option value={r}>{r}</option>{/each}
-                </select>
-              </label>
-            {/if}
-          </div>
-        {/if}
-      {/each}
-      {#if sessions.length > 0}
-        <p class="ss-group" aria-hidden="true">{sendWords.running}</p>
-        {#each sessions as t (t.id)}
-          <label class="ss-opt" data-on={choice === t.id ? '' : undefined}>
-            <input type="radio" name="{uid}-to" value={t.id} bind:group={choice} />
-            <span class="ss-words">
-              <span class="ss-name" dir="auto">{#if t.live}<span class="ss-live" aria-hidden="true"></span>{/if}{t.label}</span>
-              {#if t.detail}<span class="ss-line" dir="auto">{t.detail}</span>{/if}
-            </span>
-          </label>
-        {/each}
       {/if}
-      {#each nexts as t (t.id)}
-        <label class="ss-opt" data-on={choice === t.id ? '' : undefined}>
-          <input type="radio" name="{uid}-to" value={t.id} bind:group={choice} />
-          <span class="ss-words"><span class="ss-name" dir="auto">{t.label}</span>{#if t.detail}<span class="ss-line" dir="auto">{t.detail}</span>{/if}</span>
-        </label>
-      {/each}
-      {#if list === undefined}<p class="ss-wait" role="status"><span class="ss-bar"></span></p>{/if}
-    </fieldset>
 
-    <label class="ss-label" for="{uid}-note">{sendWords.note}</label>
-    <textarea id="{uid}-note" class="ss-note" rows="2" bind:value={note} placeholder={sendWords.notePlaceholder}></textarea>
+      <div class="ss-ways" role="radiogroup" aria-labelledby="{uid}-to">
+        {#each shown as g (g.key)}
+          {#if g.head}<p class="ss-group" aria-hidden="true">{g.head}</p>{/if}
+          {#each g.ways as w (w.id)}
+            <label class="ss-way" data-on={choice === w.id ? '' : undefined}>
+              <input class="ss-vh" type="radio" name="{uid}-way" value={w.id} bind:group={choice} />
+              <span class="ss-well">
+                <IconWell name={w.icon} size="l" tone={choice === w.id ? 'ink' : undefined} />
+                {#if w.live}<span class="ss-live" aria-hidden="true"></span>{/if}
+              </span>
+              <span class="ss-words">
+                <span class="ss-name" dir="auto">{w.name}</span>
+                {#if w.line}<span class="ss-line" dir="auto">{w.line}</span>{/if}
+              </span>
+              {#if w.id === 'slash'}
+                <Segmented class="ss-mode" role="group" aria-label={sendWords.slash}>
+                  <button type="button" class="segment" data-on={mode === 'quick' ? '' : undefined} aria-pressed={mode === 'quick'} onclick={() => ((mode = 'quick'), (choice = 'slash'))}>{sendWords.quick}</button>
+                  <button type="button" class="segment" data-on={mode === 'deep' ? '' : undefined} aria-pressed={mode === 'deep'} onclick={() => ((mode = 'deep'), (choice = 'slash'))}>{sendWords.deep}</button>
+                </Segmented>
+              {:else}
+                <span class="ss-tick" aria-hidden="true">{#if choice === w.id}<Icon name="check" size="s" />{/if}</span>
+              {/if}
+            </label>
+            {#if choice === w.id && w.t && (w.t.profiles || w.t.repos)}
+              <div class="ss-picks">
+                {#if w.t.profiles}
+                  <select class="ss-select" bind:value={profile} aria-label={sendWords.profile}>
+                    <option value="">{sendWords.anyProfile}</option>
+                    {#each w.t.profiles as p (p)}<option value={p}>{p}</option>{/each}
+                  </select>
+                {/if}
+                {#if w.t.repos}
+                  <select class="ss-select" bind:value={repo} aria-label={sendWords.repo}>
+                    <option value="">{sendWords.anyRepo}</option>
+                    {#each w.t.repos as r (r)}<option value={r}>{r}</option>{/each}
+                  </select>
+                {/if}
+              </div>
+            {/if}
+          {/each}
+        {/each}
+        {#if list === undefined}
+          <p class="ss-wait" role="status" aria-label={sendWords.running}><span class="ss-bar"></span><span class="ss-bar ss-bar-short"></span></p>
+        {:else if shown.length === 0}
+          <p class="ss-none" role="status">{sendWords.findNone(q.trim())}</p>
+        {/if}
+      </div>
+    </section>
 
-    <div class="ss-attached" role="group" aria-label={sendWords.attached}>
-      <span class="ss-label">{sendWords.attached}</span>
+    <section class="ss-part">
+      <label class="ss-label" for="{uid}-note">{sendWords.note}</label>
+      <textarea id="{uid}-note" class="ss-note" rows="3" bind:value={note} placeholder={sendWords.notePlaceholder}></textarea>
+    </section>
+
+    <section class="ss-part" aria-labelledby="{uid}-att">
+      <h3 class="ss-label" id="{uid}-att">{sendWords.attached}</h3>
       <ul class="ss-chips">
         {#each attach as a (a.ref)}
           <li class="ss-chip">
+            <Icon name="link" size="s" />
             <span class="ss-chip-name" dir="auto">{a.label}</span>
-            <button type="button" class="ss-chip-x tap" aria-label={sendWords.remove(a.label)} onclick={() => remove(a.ref)}><Icon name="close" size="s" /></button>
+            <button type="button" class="ss-chip-x tap" aria-label={sendWords.remove(a.label)} title={sendWords.remove(a.label)} onclick={() => remove(a.ref)}><Icon name="close" size="s" /></button>
           </li>
         {/each}
         <li>
-          <button type="button" class="ss-add tap" aria-label={sendWords.attach} aria-expanded={picking} onclick={() => (picking = !picking)}><Icon name="plus" size="s" /></button>
+          <button type="button" class="ss-add tap" aria-label={sendWords.attach} title={sendWords.attach} aria-expanded={picking} onclick={() => (picking = !picking)}><Icon name="plus" size="s" /></button>
         </li>
       </ul>
       {#if picking}<AttachPicker onpick={add} onclose={() => (picking = false)} taken={attach.map((a) => a.ref)} />{/if}
+    </section>
+
+    <div class="ss-may">
+      <span class="ss-words">
+        <span class="ss-name" id="{uid}-may">{sendWords.mayChange}</span>
+        <span class="ss-line">{sendWords.mayLine}</span>
+      </span>
+      <button type="button" class="switch" role="switch" aria-checked={mayChange} aria-labelledby="{uid}-may" onclick={() => (mayChange = !mayChange)}>
+        <span class="switch-track" aria-hidden="true"></span>
+      </button>
     </div>
-
-    <label class="ss-may">
-      <input type="checkbox" bind:checked={mayChange} />
-      <span class="ss-words"><span class="ss-name">{sendWords.mayChange}</span><span class="ss-line">{sendWords.mayLine}</span></span>
-    </label>
   </div>
 
-  <div class="ss-foot">
+  {#snippet footer()}
     {#if fix}<p class="ss-fix" role="status">{fix}</p>{/if}
-    <Button weight="primary" kbd="⌘↵" disabled={sending} onclick={() => void go()}>{sending ? sendWords.sending : sendWords.send}</Button>
-  </div>
-</div>
+    <Button weight="primary" kbd="⌘↵" disabled={sending} onclick={() => void go()}>{sending ? sendWords.sending : goWord}</Button>
+  {/snippet}
+</Sheet>
 
 <style>
-  /* A TILE HUNG FROM WHAT OPENED IT: flat, the tile's colour, one 1px edge as every menu has, radius 16, no shadow. */
+  /* THREE PARTS 24 APART, each a 12/500 label 8 above what it names, on the sheet body's own 16 edge. */
   .ss {
-    position: fixed;
-    z-index: var(--z-palette);
     display: flex;
     flex-direction: column;
-    inline-size: min(400px, calc(100vw - 32px));
-    max-block-size: min(640px, calc(100dvh - 32px));
-    background: var(--tile);
-    border: 1px solid var(--rule-strong);
-    border-radius: var(--r-tile);
-    color: var(--ink);
+    gap: var(--sp-5);
     font-size: var(--fs-body);
-    animation: ss-drop var(--d-menu) var(--ease-out);
   }
 
-  @keyframes ss-drop {
-    from {
-      opacity: 0;
-    }
-  }
-
-  /* ON A PHONE, THE BOTTOM SHEET: the window's width, its top corners 16, above the keyboard, up from below. */
-  .ss[data-phone] {
-    inset-inline: 0;
-    inset-block-end: var(--kb);
-    inline-size: auto;
-    max-block-size: calc(88dvh - var(--kb));
-    border: 0;
-    border-end-start-radius: 0;
-    border-end-end-radius: 0;
-    padding-block-end: env(safe-area-inset-bottom);
-    animation: ss-rise var(--d-panel) var(--ease-sheet);
-  }
-
-  @keyframes ss-rise {
-    from {
-      transform: translateY(100%);
-    }
-  }
-
-  .ss-scrim {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-palette);
-    background: var(--scrim);
-  }
-
-  .ss-grab {
-    align-self: center;
-    inline-size: 36px;
-    block-size: 4px;
-    margin-block-start: var(--sp-2);
-    background: var(--rule-strong);
-    border-radius: var(--r-xs);
-  }
-
-  .ss-head {
+  .ss-part {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
     gap: var(--sp-2);
-    padding-block: var(--sp-3) 0;
-    padding-inline: var(--sp-4) var(--sp-3);
+    min-inline-size: 0;
   }
 
-  .ss-title {
+  .ss-label {
     margin: 0;
-    font-family: var(--font-display);
-    font-size: var(--fs-head);
-    font-weight: var(--fw-semi);
-  }
-
-  .ss-x {
-    display: grid;
-    place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
-    background: none;
-    border: 0;
-    border-radius: var(--r-ctl);
+    font-family: var(--font-ui);
     color: var(--ink-3);
-    cursor: pointer;
-  }
-
-  .ss-body {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-4);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  .ss-to {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin: 0;
-    padding: 0;
-    border: 0;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: 16px;
   }
 
   .ss-vh {
     position: absolute;
     inline-size: 1px;
     block-size: 1px;
+    margin: 0;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
   }
 
-  /* ONE TARGET A ROW: its radio, its name and one line, the chosen one on the hover fill. */
-  .ss-opt,
-  .ss-may {
+  /* THE SEARCH: the control's height, the quiet fill, its glyph at the start. */
+  .ss-find {
     display: flex;
-    align-items: flex-start;
-    gap: var(--sp-3);
-    min-block-size: 40px;
-    padding: var(--sp-2) var(--sp-2);
-    border-radius: var(--r-ctl);
-    cursor: pointer;
-  }
-
-  .ss-opt[data-on] {
-    background: var(--tile-2);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .ss-opt:hover:not([data-on]) {
-      background: var(--hover);
-    }
-  }
-
-  .ss-opt input,
-  .ss-may input {
-    flex: none;
-    margin: 0;
-    margin-block-start: 3px;
-    accent-color: var(--ink);
-  }
-
-  .ss-words {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 2px;
-    min-inline-size: 0;
-  }
-
-  .ss-name {
-    display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-3);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-3);
+  }
+
+  .ss-find:focus-within {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  .ss-find input {
+    flex: 1;
+    min-inline-size: 0;
+    block-size: 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+    outline: 0;
+    color: var(--ink);
+    font: inherit;
     font-size: var(--fs-ctl);
-    font-weight: var(--fw-medium);
   }
 
-  .ss-line {
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    line-height: 1.4;
+  .ss-find input::-webkit-search-cancel-button {
+    display: none;
   }
 
-  .ss-opt :global(.ss-mode) {
-    flex: none;
-    align-self: center;
-  }
-
-  .ss-live {
-    flex: none;
-    inline-size: 7px;
-    block-size: 7px;
-    background: var(--live);
-    border-radius: var(--r-round);
+  .ss-ways {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .ss-group {
-    margin: 0;
-    margin-block-start: var(--sp-2);
+    margin: var(--sp-3) 0 var(--sp-1);
     padding-inline: var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
   }
 
+  /* ONE WAY A ROW: its glyph in a 32 well, its name and one line, and a tick at the end on the chosen one, which also
+     sits on the quiet fill. The radio is there for a keyboard and a reader, not drawn. */
+  .ss-way {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: 52px;
+    padding: var(--sp-2);
+    border-radius: var(--r-ctl);
+    cursor: pointer;
+  }
+
+  .ss-way[data-on] {
+    background: var(--tile-2);
+  }
+
+  .ss-way:has(input:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: -2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .ss-way:hover:not([data-on]) {
+      background: var(--hover);
+    }
+  }
+
+  .ss-well {
+    position: relative;
+    display: grid;
+  }
+
+  .ss-live {
+    position: absolute;
+    inset-block-end: -2px;
+    inset-inline-end: -2px;
+    inline-size: 10px;
+    block-size: 10px;
+    background: var(--live);
+    border: 2px solid var(--tile);
+    border-radius: var(--r-round);
+  }
+
+  .ss-words {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .ss-name {
+    overflow: hidden;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ss-line {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 16px;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .ss-tick {
+    display: grid;
+    place-items: center;
+    inline-size: 20px;
+    color: var(--ink);
+  }
+
+  .ss-way :global(.ss-mode) {
+    flex: none;
+  }
+
   .ss-picks {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
-    padding-inline-start: calc(var(--sp-2) + 13px + var(--sp-3));
+    padding: var(--sp-1) var(--sp-2) var(--sp-2) calc(var(--sp-2) + 32px + var(--sp-3));
   }
 
   .ss-select {
+    flex: 1 1 140px;
+    min-inline-size: 0;
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-2);
     background: var(--tile-2);
@@ -468,29 +456,36 @@
   }
 
   .ss-wait {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
     margin: 0;
-    padding: var(--sp-2);
+    padding: var(--sp-3) var(--sp-2);
   }
 
   .ss-bar {
     display: block;
     block-size: 12px;
-    inline-size: 60%;
+    inline-size: 70%;
     background: var(--tile-2);
     border-radius: var(--r-xs);
   }
 
-  .ss-label {
-    color: var(--ink-2);
+  .ss-bar-short {
+    inline-size: 40%;
+  }
+
+  .ss-none {
+    margin: 0;
+    padding: var(--sp-3) var(--sp-2);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
-    font-weight: var(--fw-medium);
   }
 
   .ss-note {
     box-sizing: border-box;
     inline-size: 100%;
-    min-block-size: 64px;
-    margin-block-start: calc(var(--sp-2) * -1);
+    min-block-size: 76px;
     padding: var(--sp-2) var(--sp-3);
     background: var(--tile-2);
     border: 0;
@@ -498,39 +493,37 @@
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
+    line-height: 20px;
     resize: vertical;
-  }
-
-  .ss-attached {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
   }
 
   .ss-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-1);
+    gap: var(--sp-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  /* A CHIP IS A RECTANGLE, the quiet fill, its name cut, and its × to take it off. */
+  /* A CHIP: the link glyph, the name cut, and its × to take it off, on the quiet fill. */
   .ss-chip {
     display: inline-flex;
     align-items: center;
+    gap: var(--sp-1);
     max-inline-size: 100%;
-    min-block-size: 28px;
+    min-block-size: 32px;
     padding-inline-start: var(--sp-2);
     background: var(--tile-2);
     border-radius: var(--r-ctl);
+    color: var(--ink-3);
     font-size: var(--fs-ctl);
   }
 
   .ss-chip-name {
     overflow: hidden;
-    max-inline-size: 240px;
+    max-inline-size: 260px;
+    color: var(--ink);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -539,8 +532,9 @@
   .ss-add {
     display: grid;
     place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
+    inline-size: 32px;
+    block-size: 32px;
+    padding: 0;
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
@@ -554,7 +548,6 @@
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .ss-x:hover,
     .ss-chip-x:hover,
     .ss-add:hover {
       background: var(--hover);
@@ -562,38 +555,34 @@
     }
   }
 
-  .ss-foot {
+  /* LET IT MAKE CHANGES: its name and one line, and the switch at the end, on a hairline above. */
+  .ss-may {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: flex-end;
-    gap: var(--sp-2);
-    padding: var(--sp-3) var(--sp-4);
+    gap: var(--sp-3);
+    padding-block-start: var(--sp-4);
     border-block-start: 1px solid var(--rule);
+  }
+
+  .ss-may .ss-words {
+    flex: 1;
   }
 
   .ss-fix {
     flex: 1 1 100%;
     margin: 0;
-    color: var(--ink-2);
+    color: var(--red, var(--ink-2));
     font-size: var(--fs-meta);
   }
 
-  .ss[data-phone] .ss-foot :global(.btn) {
-    flex: 1;
-  }
-
   @media (pointer: coarse) {
-    .ss-opt,
-    .ss-may {
-      min-block-size: var(--tap);
+    .ss-way {
+      min-block-size: 56px;
     }
-  }
 
-  @media (prefers-reduced-motion: reduce) {
-    .ss,
-    .ss[data-phone] {
-      animation: ss-drop 120ms linear;
+    .ss-find,
+    .ss-select {
+      min-block-size: var(--tap);
     }
   }
 </style>

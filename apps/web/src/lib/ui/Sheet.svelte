@@ -48,6 +48,7 @@
     kind,
     fit = false,
     wide = false,
+    narrow = false,
     caret = true,
     onclose,
     children,
@@ -62,6 +63,8 @@
     fit?: boolean | undefined;
     /** A gallery's drawer: from 900 up, 760 wide rather than 480, so what it lays out is seen at the size it will be. */
     wide?: boolean | undefined;
+    /** A picker's drawer: from 900 up, 420 wide rather than 480, for a list of choices and a short note (Send to). */
+    narrow?: boolean | undefined;
     /**
      * Whether the caret goes to the first field as it opens (the default). Off for a sheet that is read first and typed
      * into second, the run sheet from Today, whose message box opened in a heavy focus ring.
@@ -268,6 +271,7 @@
   data-kind={kind}
   data-fit={fit ? '' : undefined}
   data-wide={wide ? '' : undefined}
+  data-narrow={narrow ? '' : undefined}
   aria-labelledby={kind === 'menu' ? undefined : `${uid}-title`}
   aria-label={kind === 'menu' ? title : undefined}
   onclick={onbackdrop}
@@ -375,6 +379,10 @@
   @media (width >= 900px) {
     .sheet[data-wide] {
       inline-size: min(760px, calc(100vw - 2 * var(--inset)));
+    }
+
+    .sheet[data-narrow] {
+      inline-size: min(420px, calc(100vw - 2 * var(--inset)));
     }
   }
 

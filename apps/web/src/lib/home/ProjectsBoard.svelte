@@ -25,7 +25,10 @@
   import Button from '$lib/ui/Button.svelte';
   import ItemMenu from '$lib/ui/ItemMenu.svelte';
   import { ownMenu } from '$lib/ui/context-menu.ts';
+  import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import { navPrefs } from '$lib/nav-prefs.svelte.ts';
+  import { pinWords, togglePin } from '$lib/shell/pin-project.ts';
   import ProjectWell from '$lib/ui/ProjectWell.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import { slotStyle } from './project-cards.ts';
@@ -146,14 +149,20 @@
 
     {#if b.groups.length > 0}
       <section class="b-list" aria-label="Projects in play">
+        {#if navPrefs.pins.length === 0}<p class="b-pinhint"><Icon name="pin" size="s" />{pinWords.hint}</p>{/if}
         <div class="r-head" aria-hidden="true"><span>Project</span><span>Next step</span><span>Needs</span><span>Number</span><span>Last work</span></div>
         {#each b.groups as g (g.id)}
           <h3 class="g-head">{g.name} <span>{g.said}</span></h3>
           <ul class="rows">
             {#each g.rows as r (r.key)}
               {@const s = trail(r)}
+              {@const on = navPrefs.isPinned(r.href)}
               <li class="row" data-quiet={g.id === 'quiet' ? '' : undefined} {@attach ownMenu((p) => ((menuRow = r), (point = p)))} in:arrive out:depart animate:flip={springy()}>
-                <a class="r-name" href={at(r.href)}><ProjectWell mark={r.mark} name={r.name} hue={r.hue} /><span class="r-title own-dir">{r.name}</span></a>
+                <div class="r-nm">
+                  <a class="r-name" href={at(r.href)}><ProjectWell mark={r.mark} name={r.name} hue={r.hue} /><span class="r-title own-dir">{r.name}</span></a>
+                  <!-- PIN TO SIDEBAR (3 Nov): only pinned projects are listed in the sidebar, so the pin lives here, on every row. -->
+                  <button type="button" class="r-pin tap" aria-pressed={on} aria-label={on ? pinWords.unpinName(r.name) : pinWords.pinName(r.name)} title={on ? pinWords.unpin : pinWords.pin} onclick={() => void togglePin(r.href, r.name)}><Icon name="pin" size="s" /></button>
+                </div>
                 <p class="r-next own-dir" data-none={r.next === '' ? '' : undefined}>{r.next || 'No next step'}</p>
                 <div class="r-chip">{#if r.chip}<span class="chip" data-tone={r.chip.tone}>{#if r.chip.tone === 'late'}<span class="dot"></span>{/if}{r.chip.text}</span>{/if}</div>
                 <div class="r-num" style={slotStyle(r.hue)}>
@@ -200,7 +209,13 @@
   <div class="b-reading" data-board-reading><Waiting rows={4} /></div>
 {/if}
 
-<ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.href} send={menuRow?.key ?? null} />
+<ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.href} send={menuRow?.key ?? null}>
+  {#if menuRow}
+    {@const m = menuRow}
+    {@const on = navPrefs.isPinned(m.href)}
+    <button role="menuitem" type="button" onclick={() => void togglePin(m.href, m.name)}><Icon name="pin" size="s" /><span class="mi-name">{on ? pinWords.unpin : pinWords.pin}</span></button>
+  {/if}
+</ItemMenu>
 
 {#snippet week(title: string, icon: 'clock' | 'calendar' | 'activity' | 'globe', tone: 'late' | 'warn' | 'plain', t: Board['week']['late'])}
   <!-- A DIV IN THE LIST'S ROLE, never a section, which axe refuses a listitem role on (Q60 of 29 October). -->
@@ -679,7 +694,7 @@
     .row {
       /* NEXT STEP LESS, THE NUMBER AND THE LAST WORK MORE (the lists review, L31): "Up 19% since 25 Oct" broke over three
          lines in 190px and "Tasks changed 5 min ago" over two, beside a next step with room to spare. */
-      grid-template-columns: 170px minmax(0, 1.2fr) 112px minmax(0, 1fr) minmax(0, 0.8fr);
+      grid-template-columns: 200px minmax(0, 1.2fr) 112px minmax(0, 1fr) minmax(0, 0.8fr);
       align-items: start;
     }
 
@@ -720,6 +735,67 @@
 
   .row[data-quiet] {
     padding-block: 9px;
+  }
+
+  /* THE NAME AND ITS PIN: the pin at the name's end, shown on the row under the pointer, and always once it is pinned. */
+  .r-nm {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-inline-size: 0;
+  }
+
+  .r-nm .r-name {
+    flex: 1;
+  }
+
+  .r-pin {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: var(--ink-3);
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out),
+      opacity var(--d-state) var(--ease-out);
+  }
+
+  .r-pin[aria-pressed='true'] {
+    background: var(--soft-fill);
+    color: var(--ink);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .r-pin[aria-pressed='false'] {
+      opacity: 0;
+    }
+
+    .row:hover .r-pin,
+    .r-pin:focus-visible {
+      opacity: 1;
+    }
+
+    .r-pin:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
+  }
+
+  .b-pinhint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .r-name {
@@ -875,7 +951,7 @@
       align-items: center;
     }
 
-    .r-name {
+    .r-nm {
       grid-area: name;
     }
 

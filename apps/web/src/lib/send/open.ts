@@ -17,7 +17,7 @@ export type SheetAsk = {
   /** The kind of thing it starts from, whose last target the sheet's send becomes (a row's list, `decide`, `run`, `sign`). */
   kind: string;
   attach: Attached[];
-  /** What the sheet drops from. With none, or on a phone, it rises from the bottom. */
+  /** What opened it. The sheet is mounted inside the dialog this is in, where there is one; it no longer hangs from it. */
   anchor?: Element | null | undefined;
   preset?: Preset | undefined;
   /** The project the thing is on, by its ref, so Auto can say a session working on it takes it. */
@@ -46,6 +46,7 @@ export async function openSheet(ask: SheetAsk): Promise<void> {
   /* INSIDE THE DIALOG IT WAS OPENED FROM, where there is one: a modal dialog (the row's panel as a sheet, the palette)
      makes everything outside it inert, so a sheet on the body could not be pressed. */
   const target = ask.anchor?.closest('dialog[open]') ?? document.body;
-  const app = mount(SendSheet, { target, props: { ask, onclose: closeSheet } });
+  /* ITS OWN CLOSE TAKES ONLY ITSELF AWAY: it lands after the drawer has gone, by which time another may be open. */
+  const app: Record<string, unknown> = mount(SendSheet, { target, props: { ask, onclose: () => shown?.app === app && closeSheet() } });
   shown = { app, back };
 }

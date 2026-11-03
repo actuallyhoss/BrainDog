@@ -49,6 +49,8 @@ export const PATHS = {
   /* Ask, the Slash field. `star` draws the same, because every caller that named `star` meant Slash, and
      the icon set allows no star in the product. */
   slash: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M14.25 7.75l-4.5 8.5"/>',
+  /* A PIN, the sidebar's: what keeps a project in it (3 Nov). */
+  pin: '<path d="M9 4.75h6l-1 5.5 3.25 3.5H6.75L10 10.25z"/><path d="M12 13.75v5.5"/>',
   star: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M14.25 7.75l-4.5 8.5"/>',
   inbox: '<path d="M3.75 13.25 6.4 5.9a2 2 0 0 1 1.88-1.15h7.44a2 2 0 0 1 1.88 1.15l2.65 7.35"/><path d="M3.75 13.25v4.5a2.5 2.5 0 0 0 2.5 2.5h11.5a2.5 2.5 0 0 0 2.5-2.5v-4.5h-5l-1.5 2.5h-3.5l-1.5-2.5z"/>',
   /* The Inbox page, mail that came in: an envelope, so the tray stays Needs you's alone. */

@@ -1290,6 +1290,7 @@ export type Page<T> = { rows: T[]; matched: number; cursor: string | null };
 export const PREF_KEYS = [
   'nav.order',
   'nav.hidden',
+  'nav.pins',
   'nav.shape',
   'nav.tabs',
   'pen.suggest',
@@ -1399,6 +1400,8 @@ export const APART_PREF = 'decide.agents_apart' satisfies PrefKey;
 export type Prefs = {
   'nav.order'?: string[];
   'nav.hidden'?: string[];
+  /** The projects kept in the sidebar, by address (`/p/tidepool`), in the order pinned; absent is none (3 Nov). */
+  'nav.pins'?: string[];
   'nav.shape'?: 'side' | 'rail' | 'bar' | 'menu';
   /** The pages on the phone's bar after Today, at most four, in order (absent is the rail's first). */
   'nav.tabs'?: string[];
@@ -14836,6 +14839,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (value !== null && (key === 'nav.order' || key === 'nav.hidden')) {
         if (!texts(value, 500, (s) => s.startsWith('/')))
           return no('VALUE_MALFORMED', `${key} is a list of at most 500 addresses, each starting with /, or null to take it away.`, { at: 'value' });
+        kept = [...new Set(value)];
+      } else if (value !== null && key === 'nav.pins') {
+        if (!texts(value, 100, (s) => s.startsWith('/')))
+          return no('VALUE_MALFORMED', 'nav.pins is a list of at most 100 project addresses, each starting with /, or null to take it away.', { at: 'value' });
         kept = [...new Set(value)];
       } else if (value !== null && key === 'nav.tabs') {
         if (!texts(value, 4, (s) => s.startsWith('/')))

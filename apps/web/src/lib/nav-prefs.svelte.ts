@@ -25,6 +25,11 @@ import { putBackVersion, shelve, shelvedOf, unshelve, shelfId, type Declared, ty
 const HIDDEN = 'bd_nav_hidden';
 /* THE DEVICE'S COPY OF THE PHONE BAR, so a reload draws it before `boot` answers. */
 const TABS = 'bd_nav_tabs';
+/* THE DEVICE'S COPY OF THE PROJECTS PINNED TO THE SIDEBAR, under the key the sidebar kept its own pins in before they
+   were the person's (`PINS_KEY` in `shell/side.ts`), so pins made on this device carry over to the record. */
+const PINS = 'bd_side_pins';
+/** The most projects one person pins, the record's own cap. */
+export const PINS_MOST = 100;
 /** Pages on the phone bar besides Today, the record's own cap. */
 export const TABS_MOST = 4;
 /* THE DEVICE'S COPIES OF THE HOME PAGE AND THE NAMES, for a tab with no record, kept beside the hidden list for its
@@ -54,6 +59,8 @@ export type Prefs = {
   'nav.order'?: string[];
   'nav.hidden'?: string[];
   'nav.tabs'?: string[];
+  /** THE PROJECTS KEPT IN THE SIDEBAR, by address, in the order pinned. Absent is none. */
+  'nav.pins'?: string[];
   /** `rail` and `side` are an older build's words, read as no choice (`shapeKept`). */
   'nav.shape'?: NavShape | 'rail' | 'side';
   'pen.suggest'?: boolean;
@@ -205,6 +212,7 @@ export type Start = {
   order?: string[];
   hidden?: string[];
   tabs?: string[];
+  pins?: string[];
   shape?: NavShape | undefined;
   suggest?: boolean | undefined;
   dismissed?: string[];
@@ -218,6 +226,7 @@ const fromDevice = (): Start => {
     order: held.nav ?? [],
     hidden: readList(HIDDEN),
     tabs: readList(TABS),
+    pins: readList(PINS).filter((h) => h.startsWith('/')),
     shape: held.shape === 'bar' || held.shape === 'menu' ? held.shape : undefined,
     suggest: held.suggestPages,
     dismissed: readList(DISMISSED),
@@ -259,6 +268,8 @@ export class NavPrefs {
   hidden = $state<string[]>([]);
   /** The pages the person put on the phone bar after Today; empty is the rail's first four. */
   tabs = $state<string[]>([]);
+  /** The projects pinned to the sidebar, by address: the only projects the sidebar lists (3 Nov). */
+  pins = $state<string[]>([]);
   /**
    * The shape somebody chose, on a record or on this device, or `undefined` while nobody has, so a rail somebody picked
    * reads apart from the default.
@@ -291,6 +302,7 @@ export class NavPrefs {
     this.order = start.order ?? [];
     this.hidden = start.hidden ?? [];
     this.tabs = start.tabs ?? [];
+    this.pins = start.pins ?? [];
     this.chosen = start.shape;
     this.suggest = start.suggest ?? true;
     this.dismissed = start.dismissed ?? [];
@@ -321,6 +333,12 @@ export class NavPrefs {
     keepList(HIDDEN, this.hidden);
     this.tabs = strings(prefs['nav.tabs']);
     keepList(TABS, this.tabs);
+    /* THE PINS ARE THE RECORD'S ONCE IT HOLDS ANY. Before then, the pins this device kept (the sidebar's own, from when
+       a pin only put a project on top) are the person's first pins, and are sent up once. */
+    if ('nav.pins' in prefs) {
+      this.pins = strings(prefs['nav.pins']);
+      keepList(PINS, this.pins);
+    } else if (this.pins.length > 0) void this.#commit('nav.pins', this.pins, () => {});
 
     const held = pref.read();
     /* A LEGACY `rail` OR `side` GOES STRAIGHT TO THE DEFAULT, past the cookie: the cookie's copy was written from it. */
@@ -486,6 +504,26 @@ export class NavPrefs {
     return this.#commit('nav.tabs', kept, () => {
       this.tabs = before;
       keepList(TABS, before);
+    });
+  }
+
+  /** Whether a project, by its address, is pinned to the sidebar. */
+  isPinned = (href: string): boolean => this.pins.includes(href);
+
+  /** A project pinned to the sidebar, at the end, or taken off it. */
+  setPinned(href: string, on: boolean): Promise<Saved> {
+    const before = this.pins;
+    const next = on ? [...new Set([...before, href])].slice(-PINS_MOST) : before.filter((h) => h !== href);
+    this.pins = next;
+    keepList(PINS, next);
+    /* A HOST OLDER THAN THE KEY refuses it by name ("key is one of …"): the pin is then kept on this device, as the
+       sidebar's pins were before, rather than taken back with a sentence listing every setting. */
+    return this.#commit('nav.pins', next, () => {}).then((saved): Saved => {
+      if (saved.from !== 'refused') return saved;
+      if (/^key is one of/u.test(saved.fix)) return { from: 'device' };
+      this.pins = before;
+      keepList(PINS, before);
+      return saved;
     });
   }
 

@@ -1,7 +1,7 @@
 <!--
   "Send to…" as a menu's first item: the send sheet with the thing the menu is about attached, the same sheet a row's `s`
-  and its Send button open. A selection's menu says how many ("Send 3 to…"). The menu closes on the press, so the sheet
-  rises from the bottom, or drops from `anchor` where the caller still has the thing on the screen.
+  and its Send button open. A selection's menu says how many ("Send 3 to…"). The menu closes on the press, and the sheet
+  comes in from the right edge on a desk and up from the bottom on a phone (`SendSheet`).
 -->
 <script lang="ts">
   import Icon from '../ui/Icon.svelte';

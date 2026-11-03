@@ -4,8 +4,9 @@
   A 56px head on the bar's line: BrainDog's mark and name (`Brand.svelte`) and the button that hides it.
   Then the places, Today, Needs you and the record's own (Work, Money, Agents, People), each with its count, the red one
   only for what needs you and a live dot for an agent at work. Then the projects: the heading is the portfolio page,
-  "+" adds one, the ones in play by this week (pins, late, an agent at work, money in), Parked and Finished folded, and
-  the lists that belong to the projects. Then More lists, folded, for whatever has no place. At the foot what the record
+  "+" adds one, then ONLY THE PROJECTS PINNED HERE (`nav.pins`, Pin to sidebar on a project's page and on Projects), by
+  name, each with its late count and live dot, and the lists that belong to the projects. Every other project is on the
+  Projects page. Then More lists, folded, for whatever has no place. At the foot what the record
   is run with: the inbox, add-ons, usage, suggested changes when any, and Settings.
 
   EACH LIST LIVES UNDER THE PLACE IT BELONGS TO (`side.ts` `homesOf`) and unfolds when you are in that place, so Money's
@@ -33,12 +34,12 @@
   import { drew, rested } from '../ui/screen.svelte.ts';
   import { knowProjects } from '../page/known-project.ts';
   import { keepOrder } from './project-order.ts';
+  import { navPrefs } from '../nav-prefs.svelte.ts';
   import { frame } from './frame.svelte.ts';
   import Brand from './Brand.svelte';
   import { glide, ms, opens as opening, placeIn } from '$lib/motion/index.ts';
   import {
     COUNTS_KEY,
-    PINS_KEY,
     SIDE_MAX,
     SIDE_MIN,
     byWeek,
@@ -47,7 +48,6 @@
     factOf,
     holdsProjects,
     leadOf,
-    pinsKept,
     shownName,
     splitOf,
     widthOf,
@@ -124,8 +124,8 @@
     add: 'Add a project',
     late: 'late',
     working: 'An agent is at work',
-    pin: (name: string) => `Keep ${name} on top`,
-    unpin: (name: string) => `Stop keeping ${name} on top`,
+    pin: (name: string) => `Pin ${name} to the sidebar`,
+    unpin: (name: string) => `Take ${name} out of the sidebar`,
     parts: (name: string) => `${name}, its parts`,
     resize: 'Sidebar width',
     none: 'No projects yet.',
@@ -252,15 +252,10 @@
     return () => clearTimeout(t);
   });
 
-  /* THE PINS ON THIS DEVICE (pick 3), by address. */
-  let pins = $state<string[]>([]);
-  $effect(() => {
-    try {
-      pins = pinsKept(localStorage.getItem(PINS_KEY));
-    } catch {
-      pins = [];
-    }
-  });
+  /* THE PINS ARE THE PERSON'S (`nav.pins`, kept by the record and on every device), and ONLY A PINNED PROJECT IS LISTED
+     HERE (Sam, 3 Nov: "i dont need all of our projects to show in the sidebar, only the starred/pinned ones,
+     everything else is under projects page"). The rest are on the Projects page the heading leads to. */
+  const pins = $derived(navPrefs.pins);
   /* THE PIN IS OUT OF THE TAB ORDER (audit Q57: a stop beside every project doubled the walk to the page): the arrow
      toward the row's end reaches it from its row, and the arrow back returns. */
   function toPin(e: KeyboardEvent): void {
@@ -278,12 +273,7 @@
     row.focus();
   }
   function pin(href: string): void {
-    pins =pins.includes(href) ? pins.filter((h) => h !== href) : [...pins, href];
-    try {
-      localStorage.setItem(PINS_KEY, JSON.stringify(pins));
-    } catch {
-      /* A browser that keeps nothing keeps the pin for this tab only. */
-    }
+    void navPrefs.setPinned(href, !navPrefs.isPinned(href));
   }
 
   const busy = $derived(new Set(working.filter((w): w is string => typeof w === 'string' && w !== '')));
@@ -293,6 +283,8 @@
   };
   const split = $derived(read ? splitOf(read.rows.map(full), read.lanes) : null);
   const play = $derived(split ? byWeek(split.play) : []);
+  /* WHAT THE SIDEBAR LISTS: the pinned projects, whatever their lane, by name. */
+  const pinned = $derived(split ? byWeek([...split.play, ...split.parked, ...split.finished].filter((p) => p.pinned)) : []);
   /* ONE ORDER EVERYWHERE: the order drawn here is the one Today's projects are drawn in (`project-order.ts`). */
   $effect(() => {
     if (answered) keepOrder(base, play.map((p) => p.key));
@@ -309,8 +301,7 @@
   /* WHICH FOLDS ARE OPEN. Parked and Finished are shut on every load, and open by themselves on a project of theirs. */
   /** Each place's own More, opened or shut by a press; `null` follows the row in view. */
   let placeMore = $state<Record<string, boolean | null>>({});
-  let folds = $state<{ parked: boolean | null; finished: boolean | null; more: boolean | null }>({ parked: null, finished: null, more: null });
-  const foldOpen = (key: 'parked' | 'finished', list: readonly SideProject[]): boolean => folds[key] ?? list.some((p) => isLit(p.href));
+  let folds = $state<{ more: boolean | null }>({ more: null });
   /* OPEN ON THE PHONE'S MENU (audit 31 Oct m, AM13): the Menu is a page with room, and an add-on just installed (Pad,
      Reading) sat shut inside More lists, so Menu read as though it had no way in. A press still shuts it. */
   const moreOpen = $derived(folds.more ?? (phone || model.more.some((l) => isLit(l.href))));
@@ -522,23 +513,6 @@
   </li>
 {/snippet}
 
-{#snippet fold(key: 'parked' | 'finished', list: SideProject[], label: string, icon: IconName)}
-  {#if list.length > 0}
-    {@const open = foldOpen(key, list)}
-    <li>
-      <button type="button" class="s-row s-fold tap" aria-expanded={open} onclick={() => turn(() => (folds[key] = !open))}>
-        <Icon name={icon} size="m" /><span class="s-name">{label}</span><span class="s-count num">{list.length}</span>
-        <span class="s-fold-caret" aria-hidden="true"><Icon name="chevronDown" size="s" /></span>
-      </button>
-      {#if open}
-        <ul class="s-list s-nested" in:opening>
-          {#each list as p (p.key)}{@render project(p)}{/each}
-        </ul>
-      {/if}
-    </li>
-  {/if}
-{/snippet}
-
 {#snippet link(l: SideLink, nested: boolean)}
   <li in:placeIn={{ hold: settling() }}>
     <a class="s-row s-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={isLit(l.href) ? 'page' : undefined}>
@@ -608,7 +582,8 @@
 {#snippet projectsPart()}
   {#if showProjects && model.projects}
     <div class="s-head">
-      {#if model.projects.href}<a class="s-title tap" href={at(model.projects.href)} aria-current={isLit(model.projects.href) ? 'page' : undefined}>{model.projects.label}</a>{:else}<span class="s-title">{model.projects.label}</span>{/if}
+      <!-- LIT ON THE PROJECTS PAGE, AND ON A PROJECT NOT PINNED HERE, whose way back is this heading. -->
+      {#if model.projects.href}<a class="s-title tap" href={at(model.projects.href)} aria-current={isLit(model.projects.href) || (projectLit !== undefined && !pinned.some((p) => p.href === projectLit)) ? 'page' : undefined}>{model.projects.label}</a>{:else}<span class="s-title">{model.projects.label}</span>{/if}
       {#if split}<span class="s-count">{words.inPlay(split.play.length)}</span>{/if}
       {#if read}
         <a class="s-add tap" href={at(`/r/${read.list}?new=1`)} aria-label={words.add} title={words.add}><Icon name="plus" size="m" /><span class="sr-only">{words.add}</span></a>
@@ -616,9 +591,7 @@
     </div>
     {#if read && split}
       <ul class="s-list">
-        {#each play as p (p.key)}{@render project(p)}{/each}
-        {@render fold('parked', split.parked, read.label('parked'), 'archive')}
-        {@render fold('finished', split.finished, read.label([...read.lanes.finished][0] ?? 'retired'), 'check')}
+        {#each pinned as p (p.key)}{@render project(p)}{/each}
         {#each model.projects.kids as k (k.href)}{@render link(k, false)}{/each}
         {#if penUnder && pen}
           <li>
@@ -626,7 +599,7 @@
           </li>
         {/if}
       </ul>
-    {:else if !answered}
+    {:else if !answered && pins.length > 0}
       {@render outline()}
     {/if}
   {/if}
@@ -1148,14 +1121,8 @@
     }
   }
 
-  /* A PINNED ROW KEEPS ITS PIN IN VIEW only where nothing else sits at its end. */
-  .s-item:has(> .s-row .s-late, > .s-row .s-dot) > .s-pin[data-on]:not(:focus-visible) {
-    opacity: 0;
-  }
-
-  .s-item:not(:has(> .s-row .s-late, > .s-row .s-dot)) > .s-pin[data-on] {
-    opacity: 1;
-  }
+  /* EVERY PROJECT HERE IS PINNED NOW (3 Nov), so a pin drawn on each row said nothing: it shows under the pointer only,
+     as the way to take the project out of the sidebar. */
 
   /* THE OPEN PROJECT'S PARTS: under its name, a hairline at their start, the one in view in ink. Never lit: the
      project is the page's one lit row. */

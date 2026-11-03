@@ -35,7 +35,7 @@ const APP = [
   'stop', 'play', 'money', 'calendar', 'board', 'rows', 'obligation', 'service', 'thing', 'people', 'task', 'doc',
   'tag', 'bell', 'session', 'drag', 'arrowUp', 'arrowDown', 'grid', 'edit', 'trash', 'archive', 'eye', 'download',
   'refresh', 'star', 'ban', 'info', 'ask', 'more', 'keyboard', 'code', 'observe', 'history', 'lock', 'key',
-  'learning', 'skill', 'plug', 'globe', 'mail',
+  'learning', 'skill', 'plug', 'globe', 'mail', 'pin',
   /* The rail's places by their own names, as the design system's glyph list gives them. */
   'today', 'work', 'projects', 'activity', 'slash',
 ] as const;

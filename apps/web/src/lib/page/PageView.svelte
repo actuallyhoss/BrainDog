@@ -116,6 +116,7 @@
   import { masonry } from '$lib/money/masonry.ts';
   import { headsSection, SETUP_KEY, type SetupFacts } from '$lib/money/setup.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
+  import { pinHref, pinWords, togglePin } from '$lib/shell/pin-project.ts';
   import { arrivedNow, keepLook, keptHere, lookOrder, lookPage, offerKey, offered, offerUndo, placedOf, undoLook } from './look.ts';
 
   let {
@@ -1214,6 +1215,9 @@
               : dataHref && !showSource && !roomy.current
                 ? [{ label: words.showData, icon: 'rows' as const, href: dataHref }]
                 : []),
+            ...(projectPage
+              ? [{ label: navPrefs.isPinned(pinHref(slug)) ? pinWords.unpin : pinWords.pin, icon: 'pin' as const, onclick: () => void togglePin(pinHref(slug), live.page.page.title) }]
+              : []),
             ...importItem,
             ...contactsItem,
           ]}
