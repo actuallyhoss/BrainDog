@@ -34,6 +34,11 @@
   const now = (): number => recordNow();
   const said = $derived(stateOf(s, now()));
   const recent = $derived(recentOf(s));
+  /* WHAT IT MAY TOUCH, as key and value; the month is drawn as figures over them, so it is not a fact twice. */
+  const facts = $derived(factsOf(s, named).filter((f) => f.label !== words.monthLabel));
+  /* A LIST OF NAMES IS DRAWN AS CHIPS, one a list or origin; nothing is one quiet word. */
+  const listy = (label: string): readonly string[] | null =>
+    label === words.reads ? s.reads.map(named) : label === words.writes ? s.writes.map(named) : label === words.fetches ? s.egress : label === words.keys ? s.keys : null;
 
   let busy = $state(false);
   /** The last refused resume: the record's sentence, and whether signing in again answers it. */
@@ -79,7 +84,15 @@
     <Segments total={recent.total} done={recent.ok} subject={shown.recentSubject} />
     <p class="reading legend">{shown.legend(recent.total, recent.ok)}</p>
   {/if}
-  <p class="reading">{startsBy(s)} {recent?.said ?? words.noRuns}</p>
+  <!-- WHAT STARTS IT, and how its recent runs went where the history holds them. "No runs in recent history" under
+       "Last ran just now" read as a contradiction, so a script with runs this month says nothing more. -->
+  <p class="reading">{startsBy(s)}{recent ? ` ${recent.said}` : s.month.runs === 0 ? ` ${words.noRuns}` : ''}</p>
+
+  <!-- THE MONTH AS FIGURES: its runs, and what was refused in red when any was. -->
+  <div class="figs">
+    <p class="fig"><span class="fig-n num">{s.month.runs.toLocaleString('en-GB')}</span><span class="fig-l">{s.month.runs === 1 ? 'run this month' : 'runs this month'}</span></p>
+    <p class="fig" data-bad={s.month.refused > 0 ? '' : undefined}><span class="fig-n num">{s.month.refused.toLocaleString('en-GB')}</span><span class="fig-l">refused</span></p>
+  </div>
 
   {#if said.resume || failed?.script === s.script}
     <div class="card-do">
@@ -95,16 +108,23 @@
 
   <!-- WHAT IT MAY TOUCH, AND HOW CLOSE IT IS TO PAUSING: a pure list, meta words over their values. -->
   <dl class="facts">
-    {#each factsOf(s, named) as f (f.label)}
+    {#each facts as f (f.label)}
+      {@const names = listy(f.label)}
       <div class="fact">
         <dt>{f.label}</dt>
-        <dd>{f.value}</dd>
+        {#if names && names.length > 0}
+          <dd class="chips">{#each names as n (n)}<span class="chip">{n}</span>{/each}</dd>
+        {:else if names}
+          <dd class="none">{words.nothing}</dd>
+        {:else}
+          <dd>{f.value}</dd>
+        {/if}
       </div>
     {/each}
   </dl>
 
   <details class="fold">
-    <summary class="fold-head tap"><Icon name="chevron" size="s" />{words.recent}</summary>
+    <summary class="fold-head tap"><Icon name="chevron" size="s" />{words.recent}{#if s.recent.length > 0}<span class="fold-n num">{s.recent.length}</span>{/if}</summary>
     {#if s.recent.length === 0}
       <p class="fold-none">{words.noRuns}</p>
     {:else}
@@ -133,7 +153,7 @@
   </details>
 
   <details class="fold">
-    <summary class="fold-head tap"><Icon name="chevron" size="s" />{words.versions}</summary>
+    <summary class="fold-head tap"><Icon name="chevron" size="s" />{words.versions}{#if s.versions.length > 0}<span class="fold-n num">{s.versions.length}</span>{/if}</summary>
     <p class="fold-none">{words.versionsFrom}</p>
     <ol class="versions">
       {#each s.versions as v (v.version)}
@@ -194,17 +214,74 @@
      the page sideways at 320. */
   .facts {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
-    gap: var(--sp-3) var(--sp-4);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+    gap: var(--sp-4);
     margin: 0;
-    padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--rule);
+  }
+
+  /* THE MONTH'S FIGURES: the number at the figure's size, its words small beside it. */
+  .figs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-6);
+  }
+
+  .fig {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: 0;
+  }
+
+  .fig-n {
+    color: var(--ink);
+    font: var(--t-figure, 600 22px / 26px var(--font-ui));
+    letter-spacing: var(--track-figure, -0.02em);
+  }
+
+  .fig-l {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .fig[data-bad] .fig-n,
+  .fig[data-bad] .fig-l {
+    color: var(--red);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 24px;
+    padding-inline: 10px;
+    border-radius: var(--r-pill);
+    background: var(--soft-fill);
+    color: var(--ink);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    overflow-wrap: anywhere;
+  }
+
+  .fact dd.none {
+    color: var(--ink-3);
+  }
+
+  .fold-n {
+    margin-inline-start: var(--sp-1);
+    color: var(--ink-3);
+    font-weight: 400;
   }
 
   .fact {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--sp-1);
     min-inline-size: 0;
   }
 
@@ -283,11 +360,6 @@
   .run,
   .version {
     padding-block: var(--sp-2);
-  }
-
-  .run + .run,
-  .version + .version {
-    border-block-start: 1px solid var(--rule);
   }
 
   .run-line,

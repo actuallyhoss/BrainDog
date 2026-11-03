@@ -26,6 +26,7 @@
   import { readScripts } from '$lib/record/scripts.ts';
   import { listName } from '$lib/record/names.ts';
   import Button from '$lib/ui/Button.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
 
   const shell = $derived(page.data as unknown as Shell);
   const owner = $derived(shell.me.level === 'owner');
@@ -83,11 +84,18 @@
 
 <svelte:head><title>{titleOf(held?.script.row.title ?? words.parent)}</title></svelte:head>
 
-<PageHead icon="code" title={held?.script.row.title ?? words.parent} kicker={words.parent} back="/scripts" sentence="" />
+<!-- CHANGE IT IS THE PAGE'S ONE ACTION, in the head beside the name; it stood alone under the card. -->
+{#snippet change()}
+  {#if held !== null && held.id === id && opened.value !== null && !formOpen}
+    <Button weight="glass" onclick={() => (changing = id)}><Icon name="edit" size="m" />{words.change}</Button>
+  {/if}
+{/snippet}
+
+<PageHead icon="code" title={held?.script.row.title ?? words.parent} kicker={words.parent} back="/scripts" sentence="" actions={change} />
 <div class="page">
   {#if mine}<ScriptCard s={mine} {named} onresumed={() => standing.reread()} />{/if}
   {#if held !== null && held.id === id && opened.value !== null && !formOpen}
-    <div class="change"><Button onclick={() => (changing = id)}>{words.change}</Button></div>
+    <!-- The form waits behind Change it, in the head. -->
   {:else if held !== null && held.id === id && opened.value !== null}
     {#key held}
       <ScriptForm
@@ -110,10 +118,6 @@
 </div>
 
 <style>
-  .change {
-    display: flex;
-  }
-
   .page {
     display: flex;
     flex-direction: column;
