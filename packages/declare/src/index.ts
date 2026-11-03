@@ -4107,7 +4107,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   if (diff.approve.length > 0 && approve.length === 0)
     return no<Applied>(
       'REQUIRED_MISSING',
-      `${diff.pack.id} calls other services. Approve the ${diff.approve.length === 1 ? 'line' : `${diff.approve.length} lines`} its plan calls out, then install.`,
+      `${diff.pack.id} ${diff.calls_out.some((c) => c.change !== 'same') ? 'calls other services' : 'asks for more than lists and pages'}. Approve the ${diff.approve.length === 1 ? 'line' : `${diff.approve.length} lines`} its plan shows, then install.`,
       { at: 'approve' },
     );
   if (approve.length !== diff.approve.length || approve.some((line, i) => line !== diff.approve[i]))

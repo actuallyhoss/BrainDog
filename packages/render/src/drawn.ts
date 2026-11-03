@@ -251,7 +251,7 @@ export type DrawnAsk =
   | { open: string }
   | { picture: string }
   /* A ROW ADDED OR CHANGED BY ITS VIEW (add-ons phase 4): the host forwards it to the record, which checks it against the
-     block's declared `actions:`, the add-on's own lists and `uses` writes, and the viewer's ladder, then writes as the
+     block's declared `acts:`, the add-on's own lists and `uses` writes, and the viewer's ladder, then writes as the
      viewer. `id` is the frame's own, to answer it by. */
   | { act: DrawnAct };
 

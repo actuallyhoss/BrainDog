@@ -522,7 +522,7 @@
     if (to !== null) void goto(inApp(to));
   }
   /* AND A ROW ITS VIEW ADDS OR CHANGES (add-ons phase 4), on a page that writes and is not being arranged: the record
-     checks it against this block's own `actions:` by its declared index and writes it as the reader, then the page is
+     checks it against this block's own `acts:` by its declared index and writes it as the reader, then the page is
      read again so the new row shows. A board's widget and a preview write nothing. */
   const drawnActs = $derived(writes !== null && !arranging && widget === null && menuSlug !== null ? menuSlug : null);
   async function actDrawn(act: DrawnAct): Promise<unknown> {

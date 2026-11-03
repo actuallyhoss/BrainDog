@@ -596,7 +596,7 @@ const PACK = {
   },
   declarations: {
     register: 'a list: grammar register',
-    page: 'a page with blocks: grammar page, and grammar kinds for every block. A drawn block is your own HTML and script in a sandboxed frame that reads the rows it is given and reaches no network. With actions: ["create:register.<list>", "update:register.<list>"] its view may call braindog.create(list, fields) and braindog.update(ref, patch), each answering {ok, value} or {ok: false, refusal}: the record checks the action is declared and the list is its own or one uses names, then writes as whoever is looking',
+    page: 'a page with blocks: grammar page, and grammar kinds for every block. A drawn block is your own HTML and script in a sandboxed frame that reads the rows it is given and reaches no network. With acts: ["create:register.<list>", "update:register.<list>"] its view may call braindog.create(list, fields) and braindog.update(ref, patch), each answering {ok, value} or {ok: false, refusal}: the record checks the action is declared and the list is its own or one uses names, then writes as whoever is looking',
     metric: 'a figure: grammar metric',
     rule: 'an automation, with triggers and steps: braindog:grammar/automations',
     script: 'JavaScript run in a sandbox on a clock, at a door or from a rule, with egress hosts and keys named: braindog:grammar/script',

@@ -54,7 +54,7 @@
     whose?: string | null;
     /**
      * A row its view asks to add or change (`braindog.create` / `braindog.update`), handed to the record, which checks it
-     * against the block's own `actions:` and writes as the reader. `null` where nothing writes (a preview, a board): the
+     * against the block's own `acts:` and writes as the reader. `null` where nothing writes (a preview, a board): the
      * view is then answered that it cannot. What comes back is posted to the frame as plain JSON.
      */
     onact?: ((act: DrawnAct) => Promise<unknown>) | null;

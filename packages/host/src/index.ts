@@ -342,7 +342,7 @@ export type RecordSurface = {
   digestToday(args: never, ctx: never): Promise<Result<unknown>>;
   markRead(args: { upTo?: number | string } | undefined, ctx: never): Promise<Result<unknown>>;
   setPref(args: never, ctx: never): Promise<Result<unknown>>;
-  /** OPTIONAL as `scriptTry` is: a drawn view's write, checked against its block's actions (add-ons phase 4). */
+  /** OPTIONAL as `scriptTry` is: a drawn view's write, checked against its block's acts (add-ons phase 4). */
   drawnAct?(args: never, ctx: never): Promise<Result<unknown>>;
   subscribePush(args: never, ctx: never): Promise<Result<unknown>>;
   unsubscribePush(args: never, ctx: never): Promise<Result<unknown>>;

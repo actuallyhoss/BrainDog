@@ -1,7 +1,7 @@
 /**
  * What an add-on may do beyond lists and calls out (phase 4), as the lines its plan asks the owner to approve: a script
  * that may send notices (`notifies: true`), one that asks Slash's model (`model: { most_per_run }`), and a drawn view
- * that may add or change rows (`actions:` on a `drawn` block). Read off the file, never taken from its author.
+ * that may add or change rows (`acts:` on a `drawn` block). Read off the file, never taken from its author.
  *
  * ON THE PLAN AS `approve` LINES, beside the calls out, so `install` arms nothing unless the same lines come back with
  * it, and an update that keeps what was approved before asks for nothing again (`change: 'same'`), as a call out does.
@@ -39,8 +39,8 @@ export function mayLinesOfDecl(d: Decl): string[] {
     const name = titled(body, String(body.page ?? d.id));
     const out: string[] = [];
     for (const b of blocks) {
-      if (!isMap(b) || b.kind !== 'drawn' || b.actions === undefined) continue;
-      const { creates, updates } = drawnWrites(b.actions);
+      if (!isMap(b) || b.kind !== 'drawn' || b.acts === undefined) continue;
+      const { creates, updates } = drawnWrites(b.acts);
       const parts = [
         creates.length > 0 ? `add rows to ${and(creates.map(listWords))}` : '',
         updates.length > 0 ? `change rows in ${and(updates.map(listWords))}` : '',

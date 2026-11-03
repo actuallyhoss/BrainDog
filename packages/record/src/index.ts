@@ -14441,7 +14441,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * A row added or changed by a drawn block's own view (add-ons phase 4), forwarded by the frame's host page.
      *
      * NOTHING THE FRAME SAYS IS TAKEN ON ITS WORD. The block is read here, off the page's live declaration by its
-     * declared index, and the action must be one its `actions:` names (`create:register.<list>` or
+     * declared index, and the action must be one its `acts:` names (`create:register.<list>` or
      * `update:register.<list>`). On an add-on's page the list must be one of its own or one its `uses` line names, so a
      * view never reaches a list its plan did not show. Then the row is written AS THE VIEWER, through `create` or
      * `update` with the caller's own context, so their ladder, their lens and every check a typed write meets apply.
@@ -14466,11 +14466,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const block = body !== null && Array.isArray(body.blocks) ? (body.blocks[args.block] as Record<string, unknown> | undefined) : undefined;
       if (block === undefined || block === null || typeof block !== 'object' || block.kind !== 'drawn')
         return no('REF_UNKNOWN', `There is no drawn block ${args.block + 1} on ${args.page}.`, { at: 'block' });
-      const { creates, updates } = drawnWrites(block.actions);
+      const { creates, updates } = drawnWrites(block.acts);
       const list = args.create !== undefined ? args.create.list : (/^([a-z][a-z0-9_-]{0,31})#(\d+)$/u.exec(String(args.update?.ref ?? ''))?.[1] ?? '');
       const verb = args.create !== undefined ? 'create' : 'update';
       if (!(verb === 'create' ? creates : updates).includes(list))
-        return no('FORBIDDEN', `This view did not declare ${verb}:register.${list || '?'} in its actions, so nothing was written.`, { at: 'actions' });
+        return no('FORBIDDEN', `This view did not declare ${verb}:register.${list || '?'} in its acts, so nothing was written.`, { at: 'acts' });
       /* ON AN ADD-ON'S PAGE, ITS OWN LIST OR ONE ITS `uses` LINE NAMES, and nothing else. */
       if (row?.pack) {
         const own = sql.one<{ n: number }>("SELECT count(*) AS n FROM declaration WHERE id = ? AND superseded_at IS NULL AND coalesce(pack_id, json_extract(body, '$.pack')) = ?", `register.${list}`, row.pack)?.n ?? 0;
@@ -14483,7 +14483,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }
         const named = Array.isArray(uses) && uses.includes(`register.${list}`);
         if (Number(own) === 0 && !named && Array.isArray(uses))
-          return no('FORBIDDEN', `${list} is not one of this add-on's own lists and its uses line does not name it, so its view may not write there.`, { at: 'actions' });
+          return no('FORBIDDEN', `${list} is not one of this add-on's own lists and its uses line does not name it, so its view may not write there.`, { at: 'acts' });
       }
       if (args.create !== undefined) {
         if (args.create.fields === null || typeof args.create.fields !== 'object' || Array.isArray(args.create.fields)) return no('VALUE_MALFORMED', 'fields is the new row, field by field.', { at: 'create.fields' });
