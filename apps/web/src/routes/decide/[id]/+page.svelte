@@ -1625,7 +1625,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--tile-gap);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* ASK ME LATER: the clock and its words, quiet, after the answers; 44 tall under a thumb. */
@@ -1780,6 +1780,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WHO ASKED IS THE LINE OVER THE ANSWERS, close over them as a card's by-line is over its question. */
@@ -1892,7 +1893,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: var(--lh-head);
+    line-height: var(--lead-ui);
   }
 
   /* EACH PART UNDER ITS OWN SMALL HEADING. */
@@ -2089,13 +2090,13 @@
     font-family: var(--font-ui);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: 1.4;
+    line-height: var(--lead-ui);
   }
 
   .commit-field {
     inline-size: 100%;
-    min-block-size: 40px;
-    padding: 10px var(--sp-3);
+    min-block-size: var(--field-h);
+    padding: var(--sp-2) var(--sp-3);
     background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
@@ -2334,11 +2335,6 @@
     font-weight: var(--fw-semi);
   }
 
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-3) var(--gutter) var(--sp-8);
-    }
-  }
 
   /* ── the options as cards (today F9) ──────────────────────────────────
      TWO SIDE BY SIDE where each has 240px, and three or more one under the other (2 Nov: three left one card alone on
@@ -2417,13 +2413,13 @@
   /* A FEW OF THE ROWS AN ANSWER CHANGES, a quiet list in the card, each one line. */
   .dc-sample {
     display: grid;
-    gap: 2px;
+    gap: var(--row-stack);
     margin: 0;
     padding: 0;
     list-style: none;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .dc-sample > li {
@@ -2453,7 +2449,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-row, 15px);
     font-weight: var(--fw-semi);
-    line-height: 20px;
+    line-height: var(--lead-row);
     letter-spacing: -0.005em;
     overflow-wrap: anywhere;
   }
@@ -2523,7 +2519,7 @@
   .q-head :global(.page-head .page-name) {
     max-inline-size: calc(var(--q-text) + 180px);
     font-size: var(--fs-figure);
-    line-height: calc(28 / 22);
+    line-height: var(--lead-figure);
     letter-spacing: -0.01em;
   }
 
