@@ -117,7 +117,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
-    padding: var(--sp-4) var(--gutter) var(--sp-8);
+    padding: var(--page-head-gap, 24px) var(--gutter) var(--page-bottom, 64px);
   }
 
   .lead {

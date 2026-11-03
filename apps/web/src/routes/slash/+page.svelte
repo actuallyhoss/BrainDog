@@ -720,7 +720,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-6);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap, 24px) var(--gutter) var(--page-bottom, 64px);
     max-inline-size: 60rem;
   }
 
@@ -755,8 +755,8 @@
     font-family: var(--font-display);
     font-size: var(--fs-figure);
     font-weight: 600;
-    line-height: 34px;
-    letter-spacing: -0.02em;
+    line-height: var(--lead-figure, 26px);
+    letter-spacing: var(--track-figure, -0.02em);
     font-variant-numeric: tabular-nums;
   }
 
@@ -773,7 +773,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui, 20px);
   }
 
   .slash-said,
@@ -782,7 +782,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta, 18px);
   }
 
   .slash-hint {
@@ -795,7 +795,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui, 20px);
   }
 
   /* ONE THING TO TRY, a quiet line that asks the example in the Ask tile: a press, drawn as words and not as a button. */
@@ -825,7 +825,7 @@
     margin: 0;
     max-inline-size: var(--measure);
     font-size: var(--fs-cap);
-    line-height: 16px;
+    line-height: var(--lead-cap, 16px);
   }
 
   .slash-drafts-link {
@@ -865,14 +865,14 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 2px var(--sp-2);
+    gap: var(--row-stack, 2px) var(--sp-2);
     inline-size: fit-content;
     max-inline-size: 100%;
     padding: var(--sp-2);
     border-radius: var(--r-pop);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta, 18px);
     list-style: none;
     cursor: pointer;
   }
@@ -988,7 +988,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui, 20px);
     overflow-wrap: anywhere;
   }
 
@@ -1000,7 +1000,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta, 18px);
     overflow-wrap: anywhere;
   }
 
@@ -1037,7 +1037,7 @@
     flex-direction: column;
     gap: var(--sp-2);
     min-inline-size: 0;
-    padding-block-start: 4px;
+    padding-block-start: var(--sp-1);
   }
 
   .slash-text {
@@ -1045,7 +1045,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
 
@@ -1078,7 +1078,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta, 18px);
     overflow-wrap: anywhere;
   }
 
@@ -1124,7 +1124,7 @@
 
   .slash-sentence {
     font-weight: 400;
-    line-height: 22px;
+    line-height: var(--lh-body);
   }
 
   .slash-noticed .line,
@@ -1139,7 +1139,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0 6px;
+    gap: 0 var(--sp-2);
   }
 
   .dot {
@@ -1157,7 +1157,7 @@
   /* WHO DRAFTED IT, after the state and a middle dot, in the same quiet line. */
   .slash-by::before {
     content: '·';
-    margin-inline-end: 6px;
+    margin-inline-end: var(--sp-2);
     color: var(--ink-3);
   }
 
@@ -1169,10 +1169,6 @@
     .page,
     .more-body {
       gap: var(--sp-5);
-    }
-
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
   }
 
@@ -1194,7 +1190,7 @@
     .slash-list .line,
     .slash-rows .line {
       grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
-      gap: 2px var(--sp-3);
+      gap: var(--row-stack, 2px) var(--sp-3);
     }
 
     .slash-list .line-mark,

@@ -119,6 +119,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-regular);
+    line-height: var(--lead-ui, 20px);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -137,6 +138,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
+    line-height: var(--lead-meta, 18px);
   }
 
   .result-line {
@@ -145,6 +147,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -155,6 +158,7 @@
     color: var(--red);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
+    line-height: var(--lead-meta, 18px);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -172,7 +176,12 @@
     white-space: nowrap;
   }
 
-  /* "SHOW ALL 13": a red word, the one link look in the list. */
+  /* "SHOW ALL 13": a red word, the one link look in the list, on the glyphs' and group labels' edge (4 into the row's
+     24px glyph slot) rather than 4 short of it. */
+  .result[data-more] {
+    padding-inline-start: var(--sp-1);
+  }
+
   .result[data-more] .result-title {
     color: var(--red);
     font-weight: var(--fw-medium);
@@ -183,7 +192,7 @@
     .result-head {
       flex-direction: column;
       align-items: stretch;
-      gap: var(--sp-1);
+      gap: var(--row-stack, 2px);
     }
 
     .result-title {

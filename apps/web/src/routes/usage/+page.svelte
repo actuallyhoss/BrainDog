@@ -519,11 +519,12 @@
 
 <style>
   .page {
+    --head-glyph: 18px;
     container-type: inline-size;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    gap: var(--tile-gap);
+    padding: var(--page-head-gap, 24px) var(--gutter) var(--page-bottom, 64px);
     max-inline-size: var(--page-max);
   }
 
@@ -554,7 +555,7 @@
   .tiles {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--inset);
+    gap: var(--tile-gap);
     align-items: stretch;
   }
 
@@ -574,7 +575,7 @@
     }
   }
 
-  /* THE FIGURE (`t-figure`): 30 on 34 at 600, and the unit beside it in the meta step. */
+  /* THE FIGURE (`t-figure`): 22 on 26 at 600, and the unit beside it in the meta step. */
   .figure {
     display: flex;
     align-items: baseline;
@@ -584,8 +585,8 @@
     font-family: var(--font-display);
     font-size: var(--fs-figure);
     font-weight: 600;
-    line-height: 34px;
-    letter-spacing: -0.02em;
+    line-height: var(--lead-figure, 26px);
+    letter-spacing: var(--track-figure, -0.02em);
     font-variant-numeric: tabular-nums;
   }
 
@@ -603,7 +604,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
   /* THE WAY TO START AN EMPTY MONTH, under its line in the allowance tile. */
@@ -617,14 +618,14 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lh-body);
   }
 
   .aside-line {
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta, 18px);
   }
 
   /* FOUR RINGS IN A ROW, and two by two where four do not fit. Each ring's name and figures sit under it. */
@@ -653,13 +654,13 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui, 20px);
   }
 
   .ring-line {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta, 18px);
     font-variant-numeric: tabular-nums;
   }
 
@@ -683,7 +684,7 @@
     margin: 0;
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui, 20px);
   }
 
   .use-group-name {
@@ -701,17 +702,21 @@
 
   .use-counts {
     flex: none;
+    gap: var(--sp-1);
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 400;
+    line-height: var(--lead-meta, 18px);
     font-variant-numeric: tabular-nums;
   }
 
   /* AN ACTION'S ROW STARTS WHERE THE TILE'S NAME DOES, past its heading well, so the list reads as that heading's own.
      It was the 32 of a row's well under a 28 heading well (8 off the name), and on a tile with no well a 44 indent
      under nothing. */
+  /* THE HEADING'S GLYPH IS BARE AT 18 NOW (Tile, ops style), not a 28 well, so the name stands 18 + 12 in and the rows
+     pull out by the text edge from there: they were 10 past the name. */
   .use-list {
-    margin-inline-start: var(--well);
+    margin-inline-start: calc(var(--head-glyph) + var(--sp-3) - var(--title-inset, 12px));
   }
 
   .use-row {
@@ -782,7 +787,7 @@
 
   .use-more {
     margin-block-start: var(--sp-2);
-    margin-inline-start: calc(var(--well) + var(--sp-3));
+    margin-inline-start: calc(var(--head-glyph) + var(--sp-3));
     padding: 0;
     background: none;
     border: 0;
@@ -790,6 +795,7 @@
     font: inherit;
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
+    line-height: var(--lead-meta, 18px);
     cursor: pointer;
   }
 
@@ -837,7 +843,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta, 18px);
   }
 
   .use-all {
@@ -856,21 +862,17 @@
     }
   }
 
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-  }
-
   /* ON A PHONE A ROW'S COUNTS WRAP UNDER ITS NAME rather than squeezing it, and an action's row starts at the gutter. */
   @media (width < 640px) {
+    /* THE LIST'S OWN PULL OUT BY THE TEXT EDGE STAYS, so a row's words start on the card's edge with "8 more" under them;
+       a 0 here put the rows 12 in and left "8 more" 12 short of them. */
     .use-list {
-      margin-inline-start: 0;
+      margin-inline-start: calc(-1 * var(--title-inset, 12px));
     }
 
     .use-row {
       grid-template-columns: minmax(0, 1fr);
-      gap: 2px;
+      gap: var(--row-stack, 2px);
     }
 
     .use-row .line-when {
@@ -882,7 +884,7 @@
 
     .use-group-h {
       flex-wrap: wrap;
-      row-gap: 2px;
+      row-gap: var(--row-stack, 2px);
     }
 
     /* ONLY A PROJECT'S HEADING SETS ITS COUNTS PAST A WELL: an action's row has none, and its "36 runs" sat indented under

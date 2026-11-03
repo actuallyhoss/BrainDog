@@ -131,7 +131,9 @@
 {/if}
 
 <style>
+  /* THE MARK'S SLOT IS A FACE'S (24): Agents at work above draws a 24px face, so the names in both tiles start level. */
   .runs {
+    --run-mark: 24px;
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
@@ -150,12 +152,12 @@
      hairline between rows, the words 12px in so the wash under the pointer reaches the tile's edge, rows 2px apart. */
   .runs-line {
     display: grid;
-    grid-template-columns: var(--icon-s) minmax(0, 1fr) auto;
+    grid-template-columns: var(--run-mark) minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--sp-3);
-    min-block-size: 40px;
+    gap: var(--row-gap, 12px);
+    min-block-size: var(--row-h, 44px);
     margin-block: 1px;
-    padding: var(--sp-1) var(--title-inset, 12px);
+    padding: var(--row-pad-y, 8px) var(--row-pad-x, 12px);
     border-radius: var(--r-ctl);
     transition: background-color var(--d-state) var(--ease-out);
   }
@@ -166,12 +168,12 @@
     }
   }
 
-  /* WHAT RAN, AT THE ROW'S START: an agent's own mark or the kind's glyph, in one 16px box so the names start level. */
+  /* WHAT RAN, AT THE ROW'S START: an agent's own mark or the kind's glyph, centred in the face's slot so the names start level. */
   .runs-mark {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    inline-size: var(--icon-s);
+    inline-size: var(--run-mark);
     color: var(--ink-2);
   }
 
@@ -185,7 +187,7 @@
     overflow: hidden;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lead-ui, 20px);
     text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -213,7 +215,7 @@
     gap: var(--sp-3);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta, 18px);
     white-space: nowrap;
   }
 
@@ -252,6 +254,7 @@
     margin: 0 0 var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
   }
 
   .runs-foot {
@@ -261,7 +264,7 @@
     gap: var(--sp-1) var(--sp-4);
     margin: var(--sp-2) 0 0;
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta, 18px);
   }
 
   .runs-more,
@@ -291,9 +294,9 @@
   /* ON A NARROW TILE what ran keeps the row's first line and the rest goes under it, so neither is cut to a word. */
   @container (width < 560px) {
     .runs-line {
-      grid-template-columns: var(--icon-s) minmax(0, 1fr);
-      gap: 2px var(--sp-3);
-      padding-block: var(--sp-2);
+      grid-template-columns: var(--run-mark) minmax(0, 1fr);
+      gap: var(--row-stack, 2px) var(--row-gap, 12px);
+      padding-block: var(--row-pad-y, 8px);
     }
 
     .runs-name {
@@ -329,7 +332,7 @@
         display: flex;
         align-items: center;
         min-block-size: 44px;
-        margin-block: -11px;
+        margin-block: calc((var(--lead-ui, 20px) - var(--tap)) / 2);
       }
     }
 
@@ -337,8 +340,8 @@
     @container (width < 560px) {
       a.runs-name {
         min-block-size: 44px;
-        padding-block: 11px;
-        margin-block: -11px;
+        padding-block: calc((var(--tap) - var(--lead-ui, 20px)) / 2);
+        margin-block: calc((var(--lead-ui, 20px) - var(--tap)) / 2);
         box-sizing: border-box;
       }
     }
