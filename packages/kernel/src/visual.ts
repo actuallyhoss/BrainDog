@@ -73,6 +73,7 @@ const SCRIPT_RULES: readonly { test: RegExp; fix: string }[] = [
 ];
 
 const SCRIPTS = /<script\b[^>]*>([\s\S]*?)<\/script\s*>/giu;
+const SCRIPT_OPENS = /<script\b([^>]*)>/giu;
 const HANDLERS = /\son[a-z]+\s*=\s*("[^"]*"|'[^']*')/giu;
 const ADDRESSED = /(?:\s|^)(src|href|action|formaction|poster|data|xlink:href|background)\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/giu;
 const SRCSET = /\ssrcset\s*=\s*("[^"]*"|'[^']*')/giu;
@@ -102,6 +103,15 @@ export function visualPage(html: string, names: ReadonlySet<string>): { page: st
   if (tag) return { fault: TAG_SAID[tag[1]!.toLowerCase()] ?? OTHER_TAG };
   if (/@import\b/iu.test(page)) return { fault: 'it imports a stylesheet, and a visual loads nothing. Write the styles in it.' };
   if (/\bshadowroot(?:mode|clonable|delegatesfocus|serializable)\b/iu.test(page)) return { fault: 'it opens a shadow root, and a visual draws in its own page. Write the markup as it is.' };
+  /* A SCRIPT LOADED FROM ELSEWHERE (`<script src="https://cdn…">`) IS SAID HERE, before the scripts are taken out of the
+     markup below, which took its `src` with them: the frame blocked the load and the visual drew blank with no word why. */
+  for (const m of page.matchAll(SCRIPT_OPENS)) {
+    const src = /(?:\s|^)src\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/iu.exec(m[1] ?? '');
+    if (src && !stays(src[1]!, names))
+      return {
+        fault: `its script loads ${clip(unquote(src[1]!))}, and a visual loads nothing from elsewhere, so it would draw blank. Write the script's code into the page, or attach the page as a file (braindog attach page.html --to <thing>), where the usual chart and style libraries load.`,
+      };
+  }
   /* THE MARKUP AND ITS STYLES ARE READ FOR ADDRESSES WITHOUT ITS SCRIPTS, where `src = …` is a variable and not a tag's. */
   const markup = page.replace(SCRIPTS, '');
   for (const m of markup.matchAll(ADDRESSED))

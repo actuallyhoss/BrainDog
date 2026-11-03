@@ -47,6 +47,7 @@
   import Button from '$lib/ui/Button.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import SlashUsage from '$lib/ui/SlashUsage.svelte';
+  import FilesRoom from '$lib/attach/FilesRoom.svelte';
   import Bars from '$lib/viz/Bars.svelte';
   import { lineIn } from '$lib/motion';
   import HeatGrid from '$lib/viz/HeatGrid.svelte';
@@ -509,6 +510,8 @@
       {#if view.current && view.owner}
         <SlashUsage month={view.month} />
       {/if}
+      <!-- THE ROOM FOR ATTACHED FILES, THIS RECORD'S: how much its files take of what its plan keeps for them. -->
+      {#if view.current}<FilesRoom />{/if}
       {#snippet failed(_error, reset)}
         <!-- A SENTENCE UNDER DETAILS, NEVER THE EXCEPTION: the thrown message reaches the console through `onerror`. -->
         <ReadState state="fault" screen={words.usage} refusal={words.usageThrew} onretry={reset} />

@@ -4,8 +4,8 @@
  * keep or throw away in BrainDog; with an agent's token every version is one by default (`attachVisual`). `--undo <batch>` takes it back as the receipt says.
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { fixOf, refused, type Result } from '@braindog/ports';
@@ -15,7 +15,11 @@ import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { refuse } from './json.ts';
 import { isObject, type AgentIo } from './skills.ts';
 
-const USAGE = 'braindog attach takes a page and its pictures, as in braindog attach audit.html img/before.png --on "Fix the login" [--title <title>] [--visual <id>] [--draft] [--host <host>], or --undo <batch>.';
+const USAGE =
+  'braindog attach puts files on a task or a project as they are, as in braindog attach brief.pdf artifact.html --to "Fix the login" [--name <name>], or lists them with --list --to "Fix the login". With --on it draws a page and its pictures as a visual instead: braindog attach audit.html img/before.png --on "Fix the login" [--title <title>] [--visual <id>] [--draft]. Either takes [--host <host>], or --undo <batch>. To keep every attached file beside an export: braindog attach --pull <folder>; to put them back after a restore or an import: braindog attach --push <folder>.';
+
+/** The most one attached file may be, as the file door holds it (`ATTACHED_MOST`), asked here so a large one never leaves the machine. */
+export const ATTACHED_MOST = 25 * 1024 * 1024;
 
 /** The most a page may be, as the record holds it (`VISUAL_PAGE_MOST`), asked here so a long one never leaves the machine. */
 export const PAGE_MOST = 512 * 1024;
@@ -60,14 +64,14 @@ type Attached = { visual?: unknown; version?: unknown; batch?: unknown; said?: u
 
 /** `braindog attach`, and its exit code: 0 kept, 1 refused, 3 unreachable. */
 export async function attachCommand(args: string[], io: AgentIo): Promise<number> {
-  let values: { on?: string | undefined; title?: string | undefined; visual?: string | undefined; draft?: boolean | undefined; undo?: string | undefined; host?: string | undefined };
+  let values: { on?: string | undefined; to?: string | undefined; name?: string | undefined; list?: boolean | undefined; pull?: string | undefined; push?: string | undefined; title?: string | undefined; visual?: string | undefined; draft?: boolean | undefined; undo?: string | undefined; host?: string | undefined };
   let positionals: string[];
   try {
     ({ values, positionals } = parseArgs({
       args,
       strict: true,
       allowPositionals: true,
-      options: { on: { type: 'string' }, title: { type: 'string' }, visual: { type: 'string' }, draft: { type: 'boolean' }, undo: { type: 'string' }, host: { type: 'string' } },
+      options: { on: { type: 'string' }, to: { type: 'string' }, name: { type: 'string' }, list: { type: 'boolean' }, pull: { type: 'string' }, push: { type: 'string' }, title: { type: 'string' }, visual: { type: 'string' }, draft: { type: 'boolean' }, undo: { type: 'string' }, host: { type: 'string' } },
     }));
   } catch {
     io.say(USAGE);
@@ -97,6 +101,24 @@ export async function attachCommand(args: string[], io: AgentIo): Promise<number
     io.out(printable(typeof v.say === 'string' ? v.say : 'Taken back.'));
     for (const line of Array.isArray(v.lines) ? v.lines : []) if (typeof line === 'string') io.out(printable(line));
     return 0;
+  }
+
+  /* ── every attached file to a folder (`--pull`), or back from one (`--push`) ── */
+  if (values.pull !== undefined || values.push !== undefined) {
+    if (positionals.length > 0 || values.on !== undefined || values.to !== undefined || (values.pull !== undefined && values.push !== undefined)) {
+      io.say(USAGE);
+      return 1;
+    }
+    return values.pull !== undefined ? pullFiles(resolve(io.cwd, values.pull), client, to.key, io) : pushFiles(resolve(io.cwd, values.push!), client, to.key, io);
+  }
+
+  /* ── files as they are, on a thing (`--to`), or the files a thing holds (`--list`) ── */
+  if (values.to !== undefined) {
+    if (values.on !== undefined || values.draft === true || values.visual !== undefined || values.to.trim() === '') {
+      io.say(USAGE);
+      return 1;
+    }
+    return attachFiles(values.to.trim(), positionals, values.name, values.list === true, client, to.key, io);
   }
 
   const [file, ...more] = positionals;
@@ -159,5 +181,138 @@ export async function attachCommand(args: string[], io: AgentIo): Promise<number
   const v = done.value;
   io.out(printable(typeof v.said === 'string' ? v.said : 'Attached.'));
   if (typeof v.batch === 'string' && v.batch !== '') io.out(printable(`To undo it: braindog attach --undo ${v.batch}`));
+  return 0;
+}
+
+type Kept = { id?: unknown; said?: unknown; batch?: unknown; unchanged?: unknown };
+type Client = ReturnType<typeof clientFor>;
+
+const sized = (n: number): string => (n < 1024 ? `${n} B` : n < 1_048_576 ? `${Math.round(n / 1024)} KB` : `${(n / 1_048_576).toFixed(1)} MB`);
+
+/**
+ * `braindog attach <file>... --to <thing>`: each file through the file door under its own name (`?name=`), then
+ * `attachFile` with the hash the door answered, so the record reads the file again and decides what it is. One refused
+ * stops the rest, with its sentence. `--list` reads what the thing holds instead.
+ */
+async function attachFiles(on: string, paths: string[], name: string | undefined, list: boolean, client: Client, host: string, io: AgentIo): Promise<number> {
+  const unreachable = (r: Result<unknown>): boolean => refused(r) && r.refusal.code === 'UNREACHABLE';
+  const old = (r: Result<unknown>): boolean => refused(r) && (r.refusal.code === 'ROUTE_UNKNOWN' || r.refusal.code === 'NOT_IN_THIS_BUILD');
+  if (list) {
+    if (paths.length > 0) {
+      io.say(USAGE);
+      return 1;
+    }
+    const got: Result<unknown> = await client.call('attachments', { on });
+    if (!got.ok) return refuse(io, got, unreachable(got) ? `${host} did not answer.` : old(got) ? 'Your BrainDog is older than this command and keeps no attachments yet.' : printable(fixOf(got)));
+    io.answer?.({ value: got.value });
+    const files = isObject(got.value) && Array.isArray(got.value.attachments) ? got.value.attachments : [];
+    if (files.length === 0) io.out(printable(`Nothing is attached to ${isObject(got.value) ? String(got.value.on) : on}.`));
+    for (const f of files) if (isObject(f)) io.out(printable(`${String(f.name)}  ${String(f.kind)}, ${sized(Number(f.bytes ?? 0))}  ${String(f.id)}`));
+    return 0;
+  }
+  if (paths.length === 0 || (name !== undefined && paths.length > 1)) {
+    io.say(USAGE);
+    return 1;
+  }
+  for (const given of paths) {
+    const path = resolve(io.cwd, given);
+    if (!existsSync(path) || !statSync(path).isFile()) {
+      io.say(`There is no file at ${given}.`);
+      return 1;
+    }
+    if (statSync(path).size > ATTACHED_MOST) {
+      io.say(`${given} is larger than ${ATTACHED_MOST / 1024 / 1024} MB. Attach a smaller file.`);
+      return 1;
+    }
+    const called = name ?? basename(path);
+    const kept = await client.putFile(new Uint8Array(readFileSync(path)), called);
+    if (!kept.ok) return refuse(io, kept, unreachable(kept) ? `${host} did not answer, so nothing was attached.` : printable(`${called}: ${fixOf(kept)}`));
+    const done: Result<Kept> = await client.call<Kept>('attachFile', { on, name: called, sha256: kept.value.sha256 });
+    if (!done.ok) return refuse(io, done, unreachable(done) ? `${host} did not answer, so ${called} was not attached.` : old(done) ? 'Your BrainDog is older than this command and keeps no attachments yet. It will once it is updated.' : printable(`${called}: ${fixOf(done)}`));
+    io.answer?.({ value: done.value });
+    io.out(printable(typeof done.value.said === 'string' ? done.value.said : `Attached ${called}.`));
+  }
+  return 0;
+}
+
+/** The list a pull writes beside the files, which a push reads: every version of every file, by its hash. */
+export const MANIFEST = 'attachments.json';
+
+type Pulled = { sha256: string; name: string; mime: string; bytes: number; id: string; version: number; on: string; standing: boolean };
+
+/**
+ * `braindog attach --pull <folder>`: every file attached anywhere the caller can see, every version, each once under its
+ * hash, with `attachments.json` naming what each is and where it is attached. The record's export holds the lines; this
+ * holds the bytes they name, so the two together are the whole record.
+ */
+async function pullFiles(folder: string, client: Client, host: string, io: AgentIo): Promise<number> {
+  const got: Result<{ files?: unknown }> = await client.call<{ files?: unknown }>('attachmentFiles', {});
+  if (!got.ok) return refuse(io, got, refused(got) && got.refusal.code === 'UNREACHABLE' ? `${host} did not answer, so nothing was pulled.` : printable(fixOf(got)));
+  const files = (Array.isArray(got.value.files) ? got.value.files : []).filter((f): f is Pulled => isObject(f) && typeof f.sha256 === 'string' && /^[0-9a-f]{64}$/u.test(f.sha256));
+  mkdirSync(folder, { recursive: true });
+  let kept = 0;
+  let had = 0;
+  const gone: string[] = [];
+  for (const sha of new Set(files.map((f) => f.sha256))) {
+    const at = join(folder, sha);
+    if (existsSync(at)) {
+      had++;
+      continue;
+    }
+    const bytes = await client.getFile(sha);
+    if (!bytes.ok) return refuse(io, bytes, refused(bytes) && bytes.refusal.code === 'UNREACHABLE' ? `${host} did not answer, so the pull stopped at ${kept} files.` : printable(fixOf(bytes)));
+    if (bytes.value === null) {
+      gone.push(files.find((f) => f.sha256 === sha)!.name);
+      continue;
+    }
+    writeFileSync(at, bytes.value, { mode: 0o600 });
+    kept++;
+  }
+  writeFileSync(join(folder, MANIFEST), `${JSON.stringify({ host, pulled_at: new Date().toISOString(), files }, null, 2)}\n`, { mode: 0o600 });
+  io.answer?.({ value: { folder, files: files.length, kept, had, gone } });
+  const total = kept + had;
+  io.out(printable(`Pulled ${total === 1 ? 'one file' : `${total} files`} to ${folder}${had > 0 ? ` (${had} already there)` : ''}, with ${MANIFEST} naming each.`));
+  if (gone.length > 0) io.out(printable(`${gone.length === 1 ? 'One file is' : `${gone.length} files are`} not kept on ${host} any more: ${gone.slice(0, 5).join(', ')}.`));
+  return 0;
+}
+
+/**
+ * `braindog attach --push <folder>`: the files a pull kept, put back through the file door under their own names, each
+ * held to its hash, then the record asked to read their words again. For a record restored or imported from its
+ * export, whose lines name files its new store does not hold yet.
+ */
+async function pushFiles(folder: string, client: Client, host: string, io: AgentIo): Promise<number> {
+  const list = join(folder, MANIFEST);
+  if (!existsSync(list)) {
+    io.say(`There is no ${MANIFEST} in ${folder}. Pull the files first: braindog attach --pull <folder>`);
+    return 1;
+  }
+  let files: Pulled[];
+  try {
+    const read = JSON.parse(readFileSync(list, 'utf8')) as { files?: unknown };
+    files = (Array.isArray(read.files) ? read.files : []).filter((f): f is Pulled => isObject(f) && typeof f.sha256 === 'string' && /^[0-9a-f]{64}$/u.test(f.sha256) && typeof f.name === 'string');
+  } catch {
+    io.say(`${MANIFEST} in ${folder} could not be read. Pull the files again.`);
+    return 1;
+  }
+  let sent = 0;
+  const absent: string[] = [];
+  for (const sha of new Set(files.map((f) => f.sha256))) {
+    const name = files.find((f) => f.sha256 === sha)!.name;
+    const at = join(folder, sha);
+    if (!existsSync(at)) {
+      absent.push(name);
+      continue;
+    }
+    const kept = await client.putFile(new Uint8Array(readFileSync(at)), name);
+    if (!kept.ok) return refuse(io, kept, refused(kept) && kept.refusal.code === 'UNREACHABLE' ? `${host} did not answer, so the push stopped at ${sent} files.` : printable(`${name}: ${fixOf(kept)}`));
+    sent++;
+  }
+  const mend: Result<{ said?: unknown; missing?: unknown }> = await client.call<{ said?: unknown; missing?: unknown }>('mendAttachments', {});
+  if (!mend.ok) return refuse(io, mend, printable(fixOf(mend)));
+  io.answer?.({ value: { sent, absent, ...mend.value } });
+  io.out(printable(`Put ${sent === 1 ? 'one file' : `${sent} files`} back on ${host}.`));
+  if (absent.length > 0) io.out(printable(`${absent.length === 1 ? 'One file named in the list is' : `${absent.length} files named in the list are`} not in ${folder}: ${absent.slice(0, 5).join(', ')}.`));
+  if (typeof mend.value.said === 'string') io.out(printable(mend.value.said));
   return 0;
 }

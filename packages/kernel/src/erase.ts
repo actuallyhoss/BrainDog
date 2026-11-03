@@ -14,7 +14,8 @@
  * `outbox` work that names the subject is cancelled, `done` with its payload erased.
  *
  * THE TWENTIETH STORE IS NOT HERE. An attachment's bytes are outside the object, so each key goes on the outbox as one
- * `erase.r2` row and the host deletes it after the commit.
+ * `erase.r2` row and the host deletes it after the commit: a row's file field, a visual's page, and an attached file's
+ * bytes and the page its words were kept in.
  *
  * A MATCH IS A CASE-INSENSITIVE SUBSTRING, which over-erases a longer word containing the subject. That is the right
  * direction to be wrong in for a legal request, and it is why a subject is three characters or more.
@@ -93,6 +94,20 @@ function pageOf(field: string | null, toV: string | null): string | null {
   try {
     const said = JSON.parse(toV) as { page?: unknown };
     return typeof said.page === 'string' && /^[0-9a-f]{64}$/.test(said.page) ? said.page : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The bytes and the words one attachment version line names, by hash, or `null` for any other line. */
+function attachedBodyOf(toV: string | null): { sha256: string; bytes: number; text: { sha256: string; chars: number } | null } | null {
+  if (toV === null) return null;
+  try {
+    const o = JSON.parse(toV) as { sha256?: unknown; bytes?: unknown; text?: { sha256?: unknown; chars?: unknown } };
+    if (typeof o.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(o.sha256)) return null;
+    const t = o.text;
+    const text = t && typeof t.sha256 === 'string' && /^[0-9a-f]{64}$/.test(t.sha256) ? { sha256: t.sha256, chars: typeof t.chars === 'number' ? t.chars : 0 } : null;
+    return { sha256: o.sha256, bytes: typeof o.bytes === 'number' ? o.bytes : 0, text };
   } catch {
     return null;
   }
@@ -194,6 +209,45 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
 
   /* ── event: the payload of every event that names the subject or is about a row that was erased ── */
   const about = new Set(erasedEntries.map((e) => `entry:${e}`));
+  /* AN ATTACHMENT'S BYTES AND ITS WORDS ARE KEPT OUTSIDE THE FILE TOO (`attachment.ts`), and its lines name them by hash.
+     Read before the scrub below tombstones those lines, or the hashes would be lost with the names. One goes whole, every
+     version, when any line of it names a subject (its name, its note), when its words do (the host read them, as it
+     reads a visual's page), or when it is on a row erased above. Its bytes and its words are queued to go, and every
+     other line that names those bytes is tombstoned with it, so nothing is left pointing at a file that is gone. */
+  const attachedFiles = new Map<string, number>();
+  const attachedPages = new Map<string, number>();
+  {
+    const groups = new Map<string, { target: string; lines: { to_v: string | null; note: string | null }[] }>();
+    for (const l of sql.all<{ target: string | null; field: string; to_v: string | null; note: string | null }>(
+      "SELECT target, field, to_v, note FROM event WHERE kind = 'note' AND field GLOB 'attached:*' ORDER BY rowid",
+    )) {
+      if (l.target === null) continue;
+      const key = `${l.target}\u0000${l.field}`;
+      const g = groups.get(key) ?? { target: l.target, lines: [] };
+      g.lines.push({ to_v: l.to_v, note: l.note });
+      groups.set(key, g);
+    }
+    for (const g of groups.values()) {
+      const bodies = g.lines.map((l) => attachedBodyOf(l.to_v)).filter((b) => b !== null);
+      const hit =
+        about.has(g.target) ||
+        /* A FILE NAME IS WRITTEN WITH ITS WORDS RUN TOGETHER (`mara-quill-contract.pdf`), so it is read with its
+           separators as spaces too, as a cause is below. */
+        g.lines.some((l) => names(l.to_v, subjects) || names(l.note, subjects) || names(l.to_v?.replace(/[-_.]+/gu, ' '), subjects)) ||
+        bodies.some((b) => b.text !== null && (deps.pages?.has(b.text.sha256) ?? false));
+      if (!hit) continue;
+      for (const b of bodies) {
+        attachedFiles.set(b.sha256, b.bytes);
+        if (b.text !== null) attachedPages.set(b.text.sha256, b.text.chars);
+      }
+      bump('attachment', 1);
+    }
+  }
+  const namesErasedFile = (field: string | null, toV: string | null): boolean => {
+    if (field === null || !field.startsWith('attached:') || toV === null || (attachedFiles.size === 0 && attachedPages.size === 0)) return false;
+    const b = attachedBodyOf(toV);
+    return b !== null && (attachedFiles.has(b.sha256) || (b.text !== null && attachedPages.has(b.text.sha256)));
+  };
   /* A VISUAL'S PAGE IS TEXT KEPT OUTSIDE THE FILE, which the scan of columns never reads. One the host found naming a
      subject has its version line tombstoned here, so it is never served again, and its bytes deleted after the commit. */
   const pagesErased = new Set<string>();
@@ -204,7 +258,7 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
     const page = pageOf(ev.field, ev.to_v);
     const pageHit = page !== null && (deps.pages?.has(page) ?? false);
     if (pageHit) pagesErased.add(page);
-    const hit = pageHit || (ev.target !== null && about.has(ev.target)) || names(ev.field, subjects) || names(ev.from_v, subjects) || names(ev.to_v, subjects) || names(ev.note, subjects);
+    const hit = pageHit || namesErasedFile(ev.field, ev.to_v) || (ev.target !== null && about.has(ev.target)) || names(ev.field, subjects) || names(ev.from_v, subjects) || names(ev.to_v, subjects) || names(ev.note, subjects);
     if (!hit) continue;
     sql.exec(
       'UPDATE event SET field = CASE WHEN field IS NULL OR NOT ? THEN field ELSE ? END, from_v = CASE WHEN from_v IS NULL THEN NULL ELSE ? END, to_v = CASE WHEN to_v IS NULL THEN NULL ELSE ? END, note = CASE WHEN note IS NULL THEN NULL ELSE ? END WHERE id = ?',
@@ -347,9 +401,14 @@ export function eraseSubjects(deps: EraseDeps, subjects: readonly string[], pers
   bump('metric_point', 0);
 
   /* ── the twentieth store, through the outbox ── */
+  for (const key of attachedFiles.keys()) keys.add(key);
+  for (const key of attachedPages.keys()) pagesErased.add(key);
   for (const key of keys) deps.enqueue({ erase: id, key });
   for (const key of pagesErased) deps.enqueue({ erase: id, key, page: true });
   if (pagesErased.size > 0) bump('visual_page', pagesErased.size);
+  /* AND THE WEIGHT THEY WERE COUNTED AT GOES WITH THEM (`attachment-bytes`), so the room an erasure frees is room again. */
+  const freed = [...attachedFiles.values(), ...attachedPages.values()].reduce((a, b) => a + b, 0);
+  if (freed > 0) sql.exec("UPDATE counter SET next = max(0, next - ?) WHERE name = 'attachment-bytes'", freed);
 
   const rows = Object.values(counts).reduce((a, b) => a + b, 0);
   sql.exec(

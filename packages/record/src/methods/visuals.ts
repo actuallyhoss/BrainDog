@@ -41,6 +41,10 @@ export type VisualStore = {
   getPage(sha256: string): Promise<Uint8Array | null>;
   /** What the file store holds under one hash: its length and its type, or `null`. */
   file(sha256: string): Promise<{ bytes: number; mime: string } | null>;
+  /** The file store's bytes under one hash, or `null`: an attachment's words are read from them (`attachments.ts`). */
+  getFile?(sha256: string): Promise<Uint8Array | null>;
+  /** Keeps bytes in the file store under their hash, for a file an agent hands in as text. The same bytes again change nothing. */
+  putFile?(sha256: string, bytes: Uint8Array, mime: string): Promise<void>;
 };
 
 /** One picture as a call names it: the name the page uses, and the hash its bytes were put under. */

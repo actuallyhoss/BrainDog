@@ -328,6 +328,8 @@
     <!-- WHAT THE ROW HOLDS TO LOOK AT, loaded with the drawer's first row and not with the page, so a page that only lists
          its rows carries none of it. -->
     {#await import('../visual/VisualStrip.svelte') then { default: VisualStrip }}<VisualStrip on="{r.register}#{r.seq}" />{/await}
+    <!-- THE FILES PUT ON THE ROW FOR CONTEXT, with a place to drop more. -->
+    {#await import('../attach/Attachments.svelte') then { default: Attachments }}<Attachments on="{r.register}#{r.seq}" />{/await}
     <!-- WHAT WAS SENT FROM THIS ROW, and what came back. -->
     {#await import('../send/SendStrip.svelte') then { default: SendStrip }}<SendStrip ref="{r.register}#{r.seq}" kind={r.register} label={titleOf(entry, shape)} />{/await}
     <form class="p-form" novalidate onsubmit={save}>

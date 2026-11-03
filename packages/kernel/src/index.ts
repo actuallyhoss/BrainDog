@@ -473,6 +473,30 @@ export {
   type VisualPicture,
 } from './visual.ts';
 export type { VisualHeld, VisualVersion, VisualWhole } from './api/visuals.ts';
+export {
+  ATTACHED_FIELD,
+  ATTACHED_KINDS,
+  ATTACHED_MOST,
+  ATTACHED_NAME_MOST,
+  ATTACHED_ON_MOST,
+  ATTACHED_RECORD_MOST,
+  ATTACHED_TEXT_MOST,
+  attachedKind,
+  attachedName,
+  attachedSaid,
+  attachedText,
+  attachedType,
+  FILES_KEY,
+  filesRoom,
+  magicType,
+  pageText,
+  pdfText,
+  roomSaid,
+  type AttachedBody,
+  type AttachedKind,
+  type FilesRoom,
+} from './attachment.ts';
+export type { AttachedHeld, AttachedVersion, AttachedWhole } from './api/attachments.ts';
 export { ACTION_VERBS, ACTION_LEVELS, ACTION_AS, ACTION_KEYS, ACTIONS_MOST, BLOCK_VERBS, actionsBody, cutActions, type ActionVerb, type ActionLevel, type DeclaredAction, type OfferedAction, type VerbName } from './row-actions.ts';
 /* THE ONE CLOCK (`presence.ts`): every reader that asks whether a run is working, quiet or gone asks here. */
 export {
@@ -558,7 +582,7 @@ export { shapeGrant };
 export type { SessionHints } from './session.ts';
 export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
 export { branchName, codeName, placeOnce, projectSuggestions, suggestProjects, remoteKey, SUGGEST_AFTER, type ProjectSuggestion, type SeenRun, type Candidate } from './scope.ts';
-export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
+export { coerce, FIELD_TYPES, holdsKnownKey, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
 export { splitOf, splitOfFields, rowsBySplit, type SplitField } from './row-parts.ts';
 export { briefFromNote, cleanImportedNote, noteWithoutLeftovers, type NoteFields } from './note-clean.ts';

@@ -448,6 +448,16 @@ export function looksLikeCredential(text: string): boolean {
 }
 
 /**
+ * Whether a text holds a key in a known issuer's shape, and only that: `looksLikeCredential` without its long-random-run
+ * test. For a whole file (an attachment's words), where minified script and inline pictures are long random runs that
+ * are not keys, the shapes alone are what can be told apart.
+ */
+export function holdsKnownKey(text: string): boolean {
+  const seen = text.replace(INVISIBLE, '');
+  return KEY_SHAPES.some((shape) => shape.test(seen)) || basicCredential(seen);
+}
+
+/**
  * Whether any string in a JSON value, a key of one of its objects included, looks like a key.
  *
  * A WALK WITH ITS OWN STACK, NOT A RECURSION. Recursing a call per level, a document about 3,500 levels deep threw

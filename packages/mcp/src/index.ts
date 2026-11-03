@@ -210,6 +210,10 @@ export type McpSurface<C> = {
   calls?(): readonly CallRow[];
   /** Hang a page on a thing, or give one it carries a new version (`methods/visuals.ts`). Optional like `undoOwn`. */
   attachVisual?(args: { on: string; page: string; title?: string; draft?: boolean }, ctx: C): Answer;
+  /** Put a file on a thing, list a thing's files, and read one's words (`methods/attachments.ts`). Optional likewise. */
+  attachFile?(args: { on: string; name: string; text?: string; sha256?: string }, ctx: C): Answer;
+  attachments?(args: { on: string }, ctx: C): Answer;
+  attachment?(args: { id: string; from?: number }, ctx: C): Answer;
   sessionsLive?(args: Record<string, never>, ctx: C): Answer;
   /**
    * The record's whole log, newest first, a page at a time, held to what the caller may see. READ+.
@@ -948,6 +952,11 @@ const PREFIXED = /^[A-Z]{1,4}[1-9][0-9]*$/;
 
 /** A row's own id, the ULID a ref field holds. The record reads one as it reads a spoken id. */
 const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+/** An attachment as `get` reads it: its id, and where in its words to start (`<id>@12000`), as its last answer said. */
+const FILE_AT = /^([0-9A-HJKMNP-TV-Z]{26})(?:@([0-9]{1,9}))?$/;
+/** A note that is a file's name, which keeps `log`'s page as a file: words, a dot and a text ending. */
+const sizeSaid = (n: number): string => (n < 1024 ? `${n} B` : n < 1_048_576 ? `${Math.round(n / 1024)} KB` : `${(n / 1_048_576).toFixed(1)} MB`);
+const FILE_NAME = /^[^\s/\\][^/\\]{0,190}\.(?:html?|md|markdown|txt|csv|tsv|json|xml|svg)$/iu;
 
 const parse = (spoken: unknown): { register: string; seq: number } | null => {
   const m = typeof spoken === 'string' ? QUALIFIED.exec(spoken.trim()) : null;
@@ -2685,13 +2694,63 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if (typeof args.spoken !== 'string' || args.spoken.trim() === '')
       return { result: { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Say in spoken what the page is on: a task, a project, or a question as SG5.', at: 'spoken' } } };
     if (typeof args.page !== 'string') return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'page is the HTML itself, with its style and script.', at: 'page' } } };
+    /* A NOTE THAT IS A FILE'S NAME KEEPS THE PAGE AS A FILE, AS IT IS (`methods/attachments.ts`): a Claude artifact that
+       loads its libraries, a markdown write-up, a CSV. No argument of its own, because the list has no tokens for one;
+       the refusal below names it to an agent whose artifact a visual would not take. */
+    if (typeof args.note === 'string' && FILE_NAME.test(args.note.trim()) && surface.attachFile) {
+      const kept = await surface.attachFile({ on: args.spoken.trim(), name: args.note.trim(), text: args.page }, ctx);
+      if (!kept.ok) return { result: await failed(kept, ctx, turn) };
+      /* THE UNDO RECEIPT TAKES IT OFF AGAIN: the record's undo puts an attachment back where it stood (`undo.ts`). */
+      turn.batch = batchIn(kept.value);
+      const said = isObject(kept.value) && typeof kept.value.said === 'string' ? kept.value.said : 'Attached.';
+      return { result: kept, say: () => said };
+    }
     const title = typeof args.note === 'string' && args.note.trim() !== '' ? { title: args.note.trim() } : {};
     if (args.draft !== undefined && typeof args.draft !== 'boolean') return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'draft is true for a page to be kept or thrown away, or left out.', at: 'draft' } } };
     const out = await surface.attachVisual({ on: args.spoken.trim(), page: args.page, ...title, ...(args.draft === true ? { draft: true } : {}) }, ctx);
+    if (!out.ok && 'refusal' in out && surface.attachFile && out.refusal.at === 'page' && out.refusal.code === 'VALUE_MALFORMED')
+      return { result: await failed({ ok: false, refusal: { ...out.refusal, fix: `${out.refusal.fix} To keep it as it is, as a file, send note as its file name, such as dashboard.html.` } }, ctx, turn) };
     if (!out.ok) return { result: await failed(out, ctx, turn) };
     turn.batch = batchIn(out.value);
     const said = isObject(out.value) && typeof out.value.said === 'string' ? out.value.said : 'Drawn.';
     return { result: out, say: () => said };
+  };
+
+  /** The files on a row an agent just read, or none: a record without attachments, or a row it cannot name, has none. */
+  const filesOn = async (row: unknown, ctx: C): Promise<{ id: string; name: string; kind: string; bytes: number }[]> => {
+    const spoken = isObject(row) && typeof row.spoken === 'string' ? row.spoken : null;
+    if (spoken === null || !surface.attachments) return [];
+    const got = await surface.attachments({ on: spoken }, ctx);
+    if (!got.ok || !isObject(got.value) || !Array.isArray(got.value.attachments)) return [];
+    return got.value.attachments.flatMap((a) =>
+      isObject(a) && typeof a.id === 'string' && typeof a.name === 'string' ? [{ id: a.id, name: a.name, kind: String(a.kind ?? 'file'), bytes: Number(a.bytes ?? 0) }] : [],
+    );
+  };
+
+  /**
+   * One attachment's words for an agent, a slice from `from`, with where the next slice starts; `null` when the record
+   * holds no attachment by that id this caller can see, so `get` answers it as any id that names nothing.
+   */
+  const fileRead = async (id: string, from: number, ctx: C, _turn: Turn): Promise<Done | null> => {
+    if (!surface.attachment) return null;
+    const got = await surface.attachment({ id, ...(from > 0 ? { from } : {}) }, ctx);
+    if (!got.ok || !isObject(got.value)) return null;
+    const a = got.value;
+    const more = typeof a.more === 'number' ? `${id}@${a.more}` : null;
+    const value = bare({
+      id,
+      name: a.name,
+      kind: a.kind,
+      bytes: a.bytes,
+      on: a.on,
+      version: a.version,
+      ...(a.gone === true ? { removed: true } : {}),
+      text: typeof a.text === 'string' ? a.text : null,
+      ...(more === null ? {} : { more }),
+    });
+    const head = `${String(a.name)} (${String(a.kind)}, ${sizeSaid(Number(a.bytes ?? 0))}) on ${String(a.on)}${a.gone === true ? ', removed' : ''}`;
+    const words = typeof a.text === 'string' ? a.text : 'It holds no words this reader can find: a picture, a scan or a document to open in BrainDog.';
+    return { result: { ok: true, value }, say: () => [head, '', words, ...(more === null ? [] : ['', `More: get ${more}`])].join('\n') };
   };
 
   const run: Record<string, (args: Args, ctx: C, turn: Turn) => Promise<Done>> = {
@@ -2822,9 +2881,13 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const at = parse(args.spoken);
       const said = typeof args.spoken === 'string' ? args.spoken.trim() : '';
       /* A ROW ID TOO, because a ref field holds one: `thing: 01M2...` was a value no tool could follow. */
+      /* AN ATTACHMENT BY ITS ID, its words a slice at a time (`<id>@12000` for the next), as a row lists it below. */
+      const fileAt = FILE_AT.exec(said);
+      if (fileAt && fileAt[2] !== undefined) return (await fileRead(fileAt[1]!, Number(fileAt[2]), ctx, turn)) ?? { result: missing(said) };
       if (at || PREFIXED.test(said) || ROW_ID.test(said)) {
         const got = await surface.get(at ?? { spoken: said }, ctx);
         if (!got.ok) return { result: got };
+        if ((got.value === null || got.value === undefined) && fileAt) return (await fileRead(fileAt[1]!, 0, ctx, turn)) ?? { result: missing(said) };
         if (got.value === null || got.value === undefined) return { result: missing(said) };
         if (!isEntry(got.value)) {
           const value = bare(got.value);
@@ -2835,13 +2898,16 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         const entry = kept.entry;
         const row = await entryOut(entry, ctx, turn);
         const folded = kept.from === null ? null : await addressOf(kept.from.register, kept.from.seq ?? 0, ctx);
-        const value = { ...fittedRow(row), ...(folded === null ? {} : { merged_from: folded }) };
+        /* AND THE FILES PUT ON IT FOR CONTEXT, each by name, kind, size and the id `get` reads its words by. None, no key. */
+        const files = await filesOn(row, ctx);
+        const value = { ...fittedRow(row), ...(folded === null ? {} : { merged_from: folded }), ...(files.length === 0 ? {} : { files }) };
         return {
           result: { ok: true, value },
           say: (look) =>
             [
               ...(folded === null ? [] : [`${namedIn(titleOf(kept.from!.fields, look.decl(kept.from!.register)), folded, look)} was merged into this one:`]),
               ...rowWhole(value as Shaped, entry.register, look),
+              ...(files.length === 0 ? [] : [`Files (get an id to read one): ${files.map((f) => `${f.name} (${f.kind}, ${sizeSaid(f.bytes)}) ${f.id}`).join('; ')}`]),
             ].join('\n'),
         };
       }

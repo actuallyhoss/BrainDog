@@ -95,6 +95,7 @@ import { methods as metricsMethods } from './metrics.ts';
 import { methods as readsMethods } from './reads.ts';
 import { methods as widgetsMethods } from './widgets.ts';
 import { methods as zone } from './zone.ts';
+import { methods as attachmentsMethods } from './attachments.ts';
 /* END METHODS */
 
 /**
@@ -337,6 +338,7 @@ export function methods(deps: RecordDeps) {
     ...readsMethods(deps),
     ...widgetsMethods(deps),
     ...zone(deps),
+    ...attachmentsMethods(deps),
     /* END METHODS */
   };
 }

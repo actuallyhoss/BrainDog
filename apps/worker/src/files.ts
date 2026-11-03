@@ -26,6 +26,7 @@
  * tests of which path is which. `index.ts` has one dispatch line for it in `route()`.
  */
 
+import { ATTACHED_MOST, attachedName, attachedType } from '@braindog/kernel';
 import type { CallContext } from '@braindog/record';
 import type { Refusal } from '@braindog/ports';
 import type { LimitClass, LimitDoor } from '@braindog/host/limits';
@@ -204,6 +205,8 @@ const NO_STORE: Refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog keeps
 const NO_FILE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'There is no file by that name here.' };
 const NOT_HERE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'A file is put with PUT /api/files/<sha256> and read with GET /api/files/<sha256>.' };
 const TOO_BIG: Refusal = { code: 'OUT_OF_BOUNDS', fix: 'A file here is at most 2 MB. Send a smaller one.' };
+const TOO_BIG_ATTACHED: Refusal = { code: 'OUT_OF_BOUNDS', fix: `An attached file is at most ${ATTACHED_MOST / 1024 / 1024} MB. Send a smaller one.` };
+const NO_NAME: Refusal = { code: 'BODY_MALFORMED', fix: 'name is the file\'s own name with its ending, such as brief.pdf or mockup.html.' };
 const NOT_TAKEN: Refusal = { code: 'BODY_MALFORMED', fix: 'A file here is a PNG, JPEG, GIF, WebP or AVIF picture, or a PDF.' };
 const MISLABELLED = (said: string, found: string): Refusal => ({ code: 'BODY_MALFORMED', fix: `This file was sent as ${said} and is ${found}. Send it with its own type.` });
 const MISMATCH: Refusal = { code: 'CHECKSUM_MISMATCH', fix: 'These bytes do not hash to the address they were put at, so nothing was kept; put them at their own hash.' };
@@ -252,7 +255,7 @@ export async function serveFiles(request: Request, deps: FileDeps): Promise<Resp
   const over = await deps.limit({ door: door.door, ctx }, reading ? 'read' : 'write');
   if (over !== null) return withCookie(over, cookie);
 
-  const out = reading ? await give(request, deps.blobs, record, ctx, asked.sha256!, deps.held) : await keep(request, deps.blobs, record, ctx, asked.sha256, deps.bytes);
+  const out = reading ? await give(request, deps.blobs, record, ctx, asked.sha256!, deps.held) : await keep(request, deps.blobs, record, ctx, asked.sha256, deps.bytes, url.searchParams.get('name'));
   return withCookie(out, cookie);
 }
 
@@ -263,22 +266,28 @@ export async function serveFiles(request: Request, deps: FileDeps): Promise<Resp
  * not the ones the client hashed are not the file it meant, so what they look like says nothing. A name that is not a
  * hash at all is the same refusal, because no bytes could hash to it.
  */
-async function keep(request: Request, blobs: FileBucket | undefined, record: string, ctx: CallContext, at: string | null, spend?: FileDeps['bytes']): Promise<Response> {
+async function keep(request: Request, blobs: FileBucket | undefined, record: string, ctx: CallContext, at: string | null, spend?: FileDeps['bytes'], name: string | null = null): Promise<Response> {
   if (!writesFiles(ctx)) return refuse(403, CANNOT_WRITE);
   if (blobs === undefined) return refuse(501, NO_STORE);
   if (at !== null && !SHA256.test(at)) return refuse(422, MISMATCH);
+  /* A PUT THAT NAMES ITS FILE (`?name=`) IS AN ATTACHMENT (`methods/attachments.ts`): any type, up to 25 MB, typed by its
+     bytes and then its name (`attachedType`), never by its header. One that names none is a file field's, as before. */
+  const named = name === null ? null : attachedName(name);
+  if (name !== null && named === null) return refuse(400, NO_NAME);
+  const most = named === null ? FILE_MOST : ATTACHED_MOST;
+  const big = named === null ? TOO_BIG : TOO_BIG_ATTACHED;
   /* AN HONEST HEADER THAT SAYS TOO MUCH IS REFUSED BEFORE A BYTE IS READ; a dishonest one is caught by the count. */
   const length = Number(request.headers.get('content-length') ?? '0');
-  if (Number.isFinite(length) && length > FILE_MOST) return refuse(413, TOO_BIG);
-  const bytes = await bodyUpTo(request.body, FILE_MOST);
-  if (bytes === null) return refuse(413, TOO_BIG);
+  if (Number.isFinite(length) && length > most) return refuse(413, big);
+  const bytes = await bodyUpTo(request.body, most);
+  if (bytes === null) return refuse(413, big);
   if (bytes.byteLength === 0) return refuse(400, EMPTY);
   const sha256 = await sha256Of(bytes);
   if (at !== null && at !== sha256) return refuse(422, MISMATCH);
-  const mime = sniff(bytes);
+  const mime = named === null ? sniff(bytes) : attachedType(bytes, named).mime;
   if (mime === null) return refuse(415, NOT_TAKEN);
   const said = typeSaid(request.headers.get('content-type'));
-  if (!agrees(said, mime)) return refuse(415, MISLABELLED(said, mime));
+  if (named === null && !agrees(said, mime)) return refuse(415, MISLABELLED(said, mime));
   /* THE SAME BYTES ARE ALREADY THE SAME FILE, so a second put finds them and writes nothing; the answer is the first's. */
   const key = fileKey(record, sha256);
   if ((await blobs.head(key)) === null) {

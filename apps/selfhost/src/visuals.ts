@@ -9,7 +9,7 @@ import { join } from 'node:path';
 
 import type { VisualStore } from '@braindog/record';
 
-import { SHA256, sniff } from './files.ts';
+import { keepType, SHA256, sniff } from './files.ts';
 
 /** The folder a record's visual pages live in: `pages/` inside its files' folder. */
 export const pagesFolder = (blobs: string): string => join(blobs, 'pages');
@@ -56,6 +56,28 @@ export function diskVisuals(blobs: string): VisualStore {
         closeSync(fd);
       }
       return { bytes: size, mime: sniff(head) ?? 'application/octet-stream' };
+    },
+    /* AN ATTACHMENT'S BYTES, read once when it is attached so its words can be kept (`methods/attachments.ts`). */
+    getFile: async (sha256) => {
+      if (!SHA256.test(sha256)) return null;
+      try {
+        return new Uint8Array(readFileSync(join(blobs, sha256)));
+      } catch (e) {
+        if ((e as { code?: unknown }).code === 'ENOENT') return null;
+        throw e;
+      }
+    },
+    /* A FILE AN AGENT HANDS IN AS TEXT, kept where the file door keeps one: under a temporary name, then moved into place. */
+    putFile: async (sha256, bytes, mime) => {
+      if (!SHA256.test(sha256)) throw new Error('A file is named by its SHA-256, and this name is not one.');
+      const target = join(blobs, sha256);
+      mkdirSync(blobs, { recursive: true, mode: 0o700 });
+      if (!existsSync(target)) {
+        const passing = `${target}.${randomBytes(6).toString('hex')}.part`;
+        writeFileSync(passing, bytes, { mode: 0o600 });
+        renameSync(passing, target);
+      }
+      if (typeof mime === 'string') keepType(blobs, sha256, mime);
     },
   };
 }

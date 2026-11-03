@@ -22,6 +22,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { ATTACHED_MOST, attachedName, attachedType } from '@braindog/kernel';
 import type { CallContext } from '@braindog/record';
 import type { Refusal } from '@braindog/ports';
 
@@ -84,6 +85,35 @@ export function eraseFile(folder: string | null, sha256: string): void {
   if (!SHA256.test(sha256)) throw new Error('an erase.r2 names the file it deletes by its SHA-256, and this one does not');
   if (folder === null) return;
   rmSync(join(folder, sha256), { force: true });
+  rmSync(typeFile(folder, sha256), { force: true });
+}
+
+/**
+ * WHERE AN ATTACHMENT'S TYPE IS KEPT BESIDE ITS BYTES, as the Worker keeps it in the object's metadata: `<sha256>.type`,
+ * the one line `attachedType` read from its bytes and its name when it came. A disk keeps no type, and without it an
+ * SVG, which has no first bytes of its own, went out as text and never showed as a picture.
+ */
+export const typeFile = (folder: string, sha256: string): string => join(folder, `${sha256}.type`);
+
+/** Keeps an attachment's type beside it, once; a type already kept for the same bytes stays. */
+export function keepType(folder: string, sha256: string, mime: string): void {
+  if (!SHA256.test(sha256) || !/^[a-z]+\/[a-z0-9.+-]+$/u.test(mime)) return;
+  const at = typeFile(folder, sha256);
+  if (!existsSync(at)) writeFileSync(at, mime, { mode: 0o600 });
+}
+
+/**
+ * The type kept beside a file, when it is a picture: only a picture is served by it, so an SVG shows as one (in an
+ * `<img>`, where its script never runs, and inert under the door's `sandbox` when opened on its own). Every other kind
+ * is typed from its bytes as before.
+ */
+function keptPicture(folder: string, sha256: string): string | null {
+  try {
+    const mime = readFileSync(typeFile(folder, sha256), 'utf8').trim();
+    return /^image\/[a-z0-9.+-]+$/u.test(mime) ? mime : null;
+  } catch {
+    return null;
+  }
 }
 
 const answer = (status: number, body: unknown, extra: Record<string, string> = {}): Response =>
@@ -96,6 +126,8 @@ const NO_STORE: Refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'A record held in me
 const NO_FILE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'There is no file by that name here.' };
 const NOT_HERE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'A file is put with PUT /api/files/<sha256> and read with GET /api/files/<sha256>.' };
 const TOO_BIG: Refusal = { code: 'OUT_OF_BOUNDS', fix: 'A file here is at most 2 MB. Send a smaller one.' };
+const TOO_BIG_ATTACHED: Refusal = { code: 'OUT_OF_BOUNDS', fix: `An attached file is at most ${ATTACHED_MOST / 1024 / 1024} MB. Send a smaller one.` };
+const NO_NAME: Refusal = { code: 'BODY_MALFORMED', fix: 'name is the file\'s own name with its ending, such as brief.pdf or mockup.html.' };
 const NOT_TAKEN: Refusal = { code: 'BODY_MALFORMED', fix: 'A file here is a PNG, JPEG, GIF, WebP or AVIF picture, or a PDF.' };
 const MISLABELLED = (said: string, found: string): Refusal => ({ code: 'BODY_MALFORMED', fix: `This file was sent as ${said} and is ${found}. Send it with its own type.` });
 const MISMATCH: Refusal = { code: 'CHECKSUM_MISMATCH', fix: 'These bytes do not hash to the address they were put at, so nothing was kept; put them at their own hash.' };
@@ -118,7 +150,7 @@ export async function serveFiles(request: Request, ctx: CallContext, folder: str
   if (collection && method !== 'PUT') return refuse(405, NOT_HERE, { allow: 'PUT' });
   if (one && method !== 'GET' && method !== 'HEAD' && method !== 'PUT') return refuse(405, NOT_HERE, { allow: 'GET, HEAD, PUT' });
   if (one && method !== 'PUT') return give(ctx, folder, one[1]!, method === 'HEAD', held);
-  return keep(request, ctx, folder, one ? one[1]! : null);
+  return keep(request, ctx, folder, one ? one[1]! : null, new URL(request.url).searchParams.get('name'));
 }
 
 /**
@@ -146,13 +178,33 @@ export function keepAttachment(folder: string, bytes: Uint8Array): { sha256: str
  * `PUT /api/files` and `PUT /api/files/<sha256>`, in the Worker's order: `at` is the hash the path named, compared
  * before the type is read, and a name that is not a hash is the same refusal, because no bytes could hash to it.
  */
-async function keep(request: Request, ctx: CallContext, folder: string | null, at: string | null): Promise<Response> {
+async function keep(request: Request, ctx: CallContext, folder: string | null, at: string | null, name: string | null = null): Promise<Response> {
   if (!writesFiles(ctx)) return refuse(403, CANNOT_WRITE);
   if (folder === null) return refuse(501, NO_STORE);
   if (at !== null && !SHA256.test(at)) return refuse(422, MISMATCH);
+  /* A PUT THAT NAMES ITS FILE (`?name=`) IS AN ATTACHMENT, as on the Worker: any type, up to 25 MB, typed by its bytes and
+     then its name, never by its header. */
+  const named = name === null ? null : attachedName(name);
+  if (name !== null && named === null) return refuse(400, NO_NAME);
   /* THE BODY IS ALREADY IN MEMORY, weighed against the host's own ceiling as it arrived (`server.ts` `answer`); this is
      the file's smaller one. */
   const bytes = new Uint8Array(await request.arrayBuffer());
+  if (named !== null) {
+    if (bytes.byteLength > ATTACHED_MOST) return refuse(413, TOO_BIG_ATTACHED);
+    if (bytes.byteLength === 0) return refuse(400, EMPTY);
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    if (at !== null && sha256 !== at) return refuse(422, MISMATCH);
+    const mime = attachedType(bytes, named).mime;
+    mkdirSync(folder, { recursive: true });
+    const target = join(folder, sha256);
+    if (!existsSync(target)) {
+      const passing = `${target}.${randomBytes(6).toString('hex')}.part`;
+      writeFileSync(passing, bytes, { mode: 0o600 });
+      renameSync(passing, target);
+    }
+    keepType(folder, sha256, mime);
+    return answer(200, { sha256, mime, bytes: bytes.byteLength });
+  }
   if (bytes.byteLength > FILE_MOST) return refuse(413, TOO_BIG);
   if (bytes.byteLength === 0) return refuse(400, EMPTY);
   if (at !== null && createHash('sha256').update(bytes).digest('hex') !== at) return refuse(422, MISMATCH);
@@ -182,6 +234,8 @@ function give(ctx: CallContext, folder: string | null, sha256: string, head: boo
   } catch {
     return refuse(404, NO_FILE);
   }
-  const headers = { ...FILE_HEADERS, 'content-type': sniff(bytes) ?? 'application/octet-stream', 'content-length': String(bytes.byteLength) };
+  /* AN ATTACHMENT WITH NO SIGNATURE IS TEXT OR BYTES, read as the door read it (`attachedType`): a disk keeps no type. */
+  const typed = sniff(bytes) ?? keptPicture(folder, sha256) ?? (attachedType(bytes, '').kind === 'text' ? 'text/plain; charset=utf-8' : 'application/octet-stream');
+  const headers = { ...FILE_HEADERS, 'content-type': typed, 'content-length': String(bytes.byteLength) };
   return new Response(head ? null : Uint8Array.from(bytes), { status: 200, headers });
 }

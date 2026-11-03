@@ -2744,10 +2744,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const subjects = subjectsOf(given).filter((s) => s.length >= 3);
     if (subjects.length === 0) return [];
     const pages = new Set<string>();
-    for (const line of sql.all<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'note' AND field LIKE 'visual:%' AND to_v IS NOT NULL")) {
+    /* AND THE WORDS OF AN ATTACHED FILE, kept as a page the same way (`attachment.ts`): a brief that names the person
+       goes with its bytes, though its file name names nobody. */
+    for (const line of sql.all<{ field: string; to_v: string }>(
+      "SELECT field, to_v FROM event WHERE kind = 'note' AND (field LIKE 'visual:%' OR field GLOB 'attached:*') AND to_v IS NOT NULL",
+    )) {
       let page: unknown;
       try {
-        page = (JSON.parse(line.to_v) as { page?: unknown }).page;
+        const said = JSON.parse(line.to_v) as { page?: unknown; text?: { sha256?: unknown } };
+        page = line.field.startsWith('attached:') ? said.text?.sha256 : said.page;
       } catch {
         continue;
       }
@@ -3332,6 +3337,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       fileRefsKept = { at, by };
     }
     return fileRefsKept.by.get(sha256) ?? [];
+  };
+
+  /**
+   * The things a file is attached to (`methods/attachments.ts`), as its bytes or its words, for `fileHeld`: every
+   * attachment line walked once and kept while the log stands still, as `fileRefs` keeps the rows.
+   */
+  let attachedKept: { at: number; by: Map<string, Set<string>> } | null = null;
+  const attachedOn = (sha256: string): readonly string[] => {
+    const at = Number(sql.one<{ e: number | null }>('SELECT max(rowid) AS e FROM event')?.e ?? 0);
+    if (attachedKept?.at !== at) {
+      const by = new Map<string, Set<string>>();
+      const add = (sha: unknown, target: string) => {
+        if (typeof sha !== 'string') return;
+        const set = by.get(sha) ?? new Set<string>();
+        set.add(target);
+        by.set(sha, set);
+      };
+      for (const line of sql.all<{ target: string; to_v: string }>("SELECT target, to_v FROM event WHERE kind = 'note' AND field GLOB 'attached:*' AND to_v IS NOT NULL AND target IS NOT NULL")) {
+        try {
+          const said = JSON.parse(line.to_v) as { sha256?: unknown; text?: { sha256?: unknown } };
+          add(said.sha256, line.target);
+          add(said.text?.sha256, line.target);
+        } catch {
+          /* AN ERASED LINE NAMES NO FILE. */
+        }
+      }
+      attachedKept = { at, by };
+    }
+    return [...(attachedKept.by.get(sha256) ?? [])];
   };
 
   /**
@@ -17302,6 +17336,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         Object.values(ctx.hides ?? {}).some((fields) => fields.length > 0);
       /* A record with no private row keeps nothing from a caller who reads all of it, and is not walked for them. */
       if (!narrowed && sql.one<{ y: number }>('SELECT 1 AS y FROM entry_private LIMIT 1') === undefined) return false;
+      /* A FILE ATTACHED TO A THING IS THERE FOR WHOEVER SEES THE THING (`methods/attachments.ts`). One a caller sees no
+         thing of is held unless a row they read names it, so "no row names it" below no longer answers it. */
+      const attached = attachedOn(sha256);
+      if (attached.some((target) => sightOf(ctx, target) !== null)) return false;
       /* EVERY ANSWER THAT HANDS THE BYTES OVER IS CHECKED AGAINST THE ROW ITSELF FIRST (RE6 of the review of 30 Oct, e).
          The map is kept by the newest line of the log and the newest row, and a write that leaves neither (the kernel's
          `json_set` repairs, an erasure) left it a step behind in the leak's direction: a file put on a private row that
@@ -17313,7 +17351,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (fresh) fileRefsKept = null;
         const naming = fileRefs(sha256);
         if (naming.length === 0) {
-          if (fresh || !somewhere()) return false;
+          if (fresh || !somewhere()) return attached.length > 0;
           continue;
         }
         if (!narrowed && kernel.privateAmong(naming.map((row) => row.id)).size === 0) {
