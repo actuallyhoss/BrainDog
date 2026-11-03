@@ -37,14 +37,13 @@ const person = (id: keyof typeof forPages.person.who): Place => ({
  * Every page a reader may be sent to, home aside. The legal texts under `/legal/` are not places: the footer links them
  * and the sitemap names them once `LAUNCH.legal` is on (`LEGAL_TEXTS` in `links.ts`).
  *
- * THE HEADER'S ROW (20 October, Slash out of it 3 November): Agents, Pricing, Security, Docs, then "Sign in" and "Get early
+ * THE HEADER'S ROW (20 October; Slash left it on 3 November, its page and footer link kept): Agents, Pricing, Security,
+ * Docs, then "Sign in" and "Get early
  * access", which `+layout.svelte` draws because they are not pages of this site. Packs left the row with that design;
  * it and the changelog are held until the site is public (`HELD` in `launch.ts`), and the changelog comes back to
  * the row's end the day `LAUNCH.public` is on (`reachable` below).
  */
 export const PLACES: readonly Place[] = [
-  /* SLASH LEFT THE HEADER'S ROW (3 November, the site story): an assistant inside the app is expected now, not a
-     reason to come. Its page stays, linked from the footer and the home page's Slash band. */
   place('/slash', 'slash', false),
   place('/agents', 'agents', true),
   place(PACKS, 'packs', false),

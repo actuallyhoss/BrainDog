@@ -53,34 +53,34 @@ export const pricing = {
      */
     early: {
       title: 'Free while in early access.',
-      lede: 'BrainDog is invite only for now. Everything in it is free while we open it up.',
+      lede: 'BrainDog is invite only for now, and everything in it is free while we open it up.',
       plan: {
         name: 'Free',
         price: '$0',
         lines: (f: Figures) => [
-          'The whole app',
-          `${grouped(f.agents)} AI tools connected`,
-          `${grouped(f.credits)} Slash questions a month`,
-          `${grouped(f.allowance.runs)} automation runs a month`,
+          'Every feature',
+          `${grouped(f.agents)} agents connected, such as Claude Code, Cursor and ChatGPT`,
+          `${grouped(f.credits)} questions a month to Slash, the built-in assistant`,
+          `Rules and automations that run on their own, ${grouped(f.allowance.runs)} times a month`,
           'Invite the people you work with',
-          'Export any time',
+          'Export everything, any time',
         ],
       },
       /* ONE LINE FOR WHAT COMES LATER (plan F20): a tile naming Cloud and Cloud Plus with two "Coming soon" rows said
          nothing a reader could act on. Still his N2 words: both named, coming soon, priced at launch. */
-      later: { say: 'Cloud and Cloud Plus are coming soon, priced at launch; nothing you make now is lost.' },
+      later: { say: 'Paid plans for more agents, more questions and your team come later, priced at launch. Nothing you set up now is lost.' },
       faq: {
         title: 'Questions people ask',
         questions: [
-          { q: 'What is a Slash question?', a: 'One question or one change, however much work it takes. Your brief, filing and your rules never spend one.' },
-          { q: 'What counts as an AI tool?', a: 'Each app you connect. Claude on your laptop is one, Cursor is another.' },
+          { q: 'What counts as an agent?', a: 'Each app or machine you connect. Claude Code on your laptop is one, Cursor is another, ChatGPT is a third.' },
+          { q: 'What is a Slash question?', a: 'One question or one change to the built-in assistant, however much work it takes. The briefing, filing and your rules never spend one.' },
           { q: 'Can I take my data out?', a: 'Yes, all of it, as one file, whenever you like.' },
         ],
       },
     },
     // A headline with no price in it: `plans.test.ts` checks that "$12 a month" never leads.
-    title: 'Free for one person.',
-    sub: 'Every plan has the whole app. You pay for room: more AI tools, more questions, and on Cloud Plus more people.',
+    title: 'Free to start.',
+    sub: 'Every plan has every feature. You pay for room: more agents, more questions, and on Cloud Plus, your team.',
     /** The three cards, Free first. A line that carries a figure is filled from the plan's row of `TABLE`. */
     cards: {
       free: {
@@ -89,37 +89,37 @@ export const pricing = {
         mine: 'Your plan',
         // The free door is `makeFree` in `billing.ts`: no Stripe call and no card.
         per: 'no card',
-        lines: (f: Figures) => ['The whole app', `${grouped(f.agents)} AI tools connected`, `${grouped(f.credits)} Slash questions a month`, people(f.teams)],
+        lines: (f: Figures) => ['Every feature', `${grouped(f.agents)} agents connected`, `${grouped(f.credits)} Slash questions a month`, people(f.teams)],
       },
       cloud: {
         per: 'a month',
         cta: 'Choose Cloud',
-        lines: (f: Figures) => [`${grouped(f.agents)} AI tools connected`, `${grouped(f.credits)} Slash questions a month`, people(f.teams), 'More runs, data and script time'],
+        lines: (f: Figures) => [`${grouped(f.agents)} agents connected`, `${grouped(f.credits)} Slash questions a month`, people(f.teams), 'More automation runs, data and script time'],
       },
       plus: {
         per: 'a month',
         cta: 'Choose Cloud Plus',
         // Five times is every figure in `ALLOWANCE.plus` over `ALLOWANCE.hosted`, held by `plans.test.ts`.
-        lines: (f: Figures) => [`${grouped(f.agents)} AI tools connected`, `${grouped(f.credits)} Slash questions a month`, people(f.teams), 'Five times Cloud'],
+        lines: (f: Figures) => [`${grouped(f.agents)} agents connected`, `${grouped(f.credits)} Slash questions a month`, people(f.teams), "Five times Cloud's room"],
       },
       /** A paid card's word in its button's place while `LAUNCH.billing` is off. Plain text: nothing to press. */
       soon: 'Coming soon',
     },
     holds: {
-      title: 'What each plan holds',
+      title: 'What each plan includes',
       // The month is `nextMonth` in `directory.ts`; `mayRun` holds the work that needs more until then.
-      say: 'Per record, each month. Nothing stops at the limit. It waits for next month.',
+      say: 'Per BrainDog, each month. Nothing stops at the limit: it waits for next month.',
       /** The header a screen reader hears over the meters' names; drawn hidden, as the prototype's empty cell. */
       what: 'What it holds',
       /** The table's seven rows, in the order they are drawn: a name and a plan's cell from its own figures. */
       rows: [
         // `agents` in `PLAN_TABLE`: agent keys a record holds live at once.
-        { key: 'agents', name: 'AI tools connected', cell: (f: Figures) => grouped(f.agents) },
+        { key: 'agents', name: 'Agents connected', cell: (f: Figures) => grouped(f.agents) },
         // One question or draft is one credit, however many passes it takes (`packages/slash/src/types.ts`).
         { key: 'credits', name: 'Slash questions', cell: (f: Figures) => grouped(f.credits) },
         { key: 'people', name: 'People', cell: (f: Figures) => people(f.teams) },
         { key: 'runs', name: 'Automation runs', cell: (f: Figures) => grouped(f.allowance.runs) },
-        { key: 'requests', name: 'Requests to other services', cell: (f: Figures) => grouped(f.allowance.requests) },
+        { key: 'requests', name: 'Calls to other services', cell: (f: Figures) => grouped(f.allowance.requests) },
         { key: 'bytes', name: 'Data fetched', cell: (f: Figures) => size(f.allowance.bytes) },
         { key: 'ms', name: 'Script time', cell: (f: Figures) => hours(f.allowance.ms) },
       ],
@@ -144,9 +144,9 @@ export const pricing = {
       /** `billing: true` is a question drawn only while `LAUNCH.billing` is on: nobody can cancel what nobody sells. */
       questions: [
         // `ASK_CAP_*` and `BACKGROUND_ASKS_MONTH` in `packages/slash/src/types.ts`: the brief and filing spend no question.
-        { q: 'What is a Slash question?', a: 'One question or one change, however much work it takes. Your brief, filing and your rules never spend one.' },
         // An agent key per app (`agents` in `PLAN_TABLE`).
-        { q: 'What counts as an AI tool?', a: 'Each app you connect. Claude on your laptop is one, Cursor is another.' },
+        { q: 'What counts as an agent?', a: 'Each app or machine you connect. Claude Code on your laptop is one, Cursor is another, ChatGPT is a third.' },
+        { q: 'What is a Slash question?', a: 'One question or one change to the built-in assistant, however much work it takes. The briefing, filing and your rules never spend one.' },
         // Export is the CLI's and Settings' one file, on every plan.
         { q: 'Can I take my data out?', a: 'Yes, all of it, as one file, on every plan.' },
         // The portal is `billing.ts`; export is never withheld from a lapsed record.

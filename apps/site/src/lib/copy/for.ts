@@ -102,36 +102,36 @@ export const forPages = {
       },
 
       founder: {
-        nav: 'For small businesses',
-        title: 'For small businesses · BrainDog',
+        nav: 'For founders',
+        title: 'For founders · BrainDog',
         description:
-          'Money, customers and invoices in one place. A late invoice is put to you to chase, and receipts file ' +
-          'themselves.',
-        tag: 'For small businesses',
-        said: 'I run it on my own. Who owes me, and how long does the money last?',
-        /* Automations are `apps/web/src/routes/automations/`; Needs you (once Decide) is `apps/web/src/routes/decide/`. */
+          'For founders running several projects with AI agents: every agent starts caught up, one list holds what ' +
+          'waits on you, and the money is in the same place.',
+        tag: 'For founders',
+        said: "Four projects, three agents, and I'm the only one who knows where everything stands.",
+        /* Money's own rule `invoice-late` (`packages/seed/src/modules/money/rules.ts`) puts a late invoice to you;
+           the floor in `packages/kernel/src/change-kind.ts` holds anything that moves money for a yes. */
         sub:
-          'Keep your money, customers and invoices in one place. Import your bank statements and your contacts to ' +
-          'start. A late invoice is put to you to chase, and receipts file themselves.',
+          'BrainDog keeps each project\'s next step, decisions and money in one place your agents read before they start. ' +
+          'Late invoices are put to you to chase, receipts are filed, and anything that moves money waits for your yes.',
         rows: [
+          {
+            head: 'Your agents, where you can see them',
+            /* The app's Agents page: who is working now, and what each did (`apps/web/src/lib/record/PresencePanel.svelte`). */
+            said: 'See which agent is on which project right now, and what each one did today, without asking any of them.',
+            draw: { page: 'agents', at: 0 },
+          },
+          {
+            head: 'One list of what needs you',
+            /* Needs you, `apps/web/src/routes/decide/`: an invoice put to you, or a change an agent asks to make. */
+            said: 'An invoice twelve days late, a change an agent wants to make: each waits with what happens if you say yes.',
+            draw: { page: 'needs', at: 0 },
+          },
           {
             head: 'Money in and out, month by month',
             /* The net form of `series`, `KINDS` in `packages/render/src/kinds.ts`. */
             said: 'See what came in and what went out each month, without keeping a spreadsheet up to date.',
             draw: { page: 'home', at: 2 },
-          },
-          {
-            head: 'Late invoices get chased',
-            /* Money's own rule, `invoice-late` and `invoice-chased` in `packages/seed/src/modules/money/rules.ts`: asked a week
-               after the due day, and the reminder is written only after the yes. */
-            said: 'A week after an invoice is due, you are asked whether to chase it. Say yes, and a reminder is written for you to send.',
-            draw: { page: 'automations', at: 0 },
-          },
-          {
-            head: 'Receipts file themselves',
-            /* docs/07 §4, as on the personal page. */
-            said: 'Forward receipts by email. After a few of one kind, you are asked how to file them, and the rest land under costs on their own.',
-            draw: { page: 'inbox', at: 0 },
           },
         ],
       },
@@ -140,22 +140,21 @@ export const forPages = {
         nav: 'For teams and agencies',
         title: 'For teams and agencies · BrainDog',
         description:
-          'Invite your team by email, each with their own sign-in and a role in plain words. Everyone sees what is theirs, and every change says who made it.',
+          'Invite your team by email, each with a role in plain words. Their agents get exactly their access, and every change says who made it.',
         tag: 'For teams and agencies',
-        said: "We run projects for clients. What's open, who has it, and what's late?",
+        said: "Five of us, a dozen clients, and everyone's agents working at once.",
         /* THE DOCS' WORDS (`docs/02-use/09-sharing.md`): a second person joins with their own sign-in, at a role or on the
            parts they are given; an agent sees what its person sees. Cloud Plus is not named while billing is off. */
         sub:
-          'Give each client a project and invite your team by email, each with their own sign-in: Can view, Can add, Can ' +
-          'edit or Can decide, or only the parts you choose, so Money can stay yours. Mention someone with @ and their ' +
-          'phone rings. Send a client a read-only link to their project, with or without money. Everyone sees what is ' +
-          'next, and every change says who made it.',
+          'Give each client a project and invite your team by email, each with a role in plain words. Their agents get ' +
+          'their access and no more, every change says who made it, person or agent, and a client can get a read-only ' +
+          'link to their own project.',
         rows: [
           {
-            head: 'The board and the numbers together',
-            /* `series` beside `board`, both `KINDS` in `packages/render/src/kinds.ts`. */
-            said: 'How many tickets closed each week, drawn from the same list the board is.',
-            draw: { page: 'home', at: 2 },
+            head: "Who's working on what, agents included",
+            /* The app's Agents page; an agent acts with its person's access (`docs/03-agents/04-scopes.md`). */
+            said: 'Every person and every agent working now, and what each changed today.',
+            draw: { page: 'agents', at: 0 },
           },
           {
             head: 'Every review finds a reviewer',
@@ -164,10 +163,10 @@ export const forPages = {
             draw: { page: 'automations', at: 0 },
           },
           {
-            head: 'The release, as a checklist',
-            /* The `todo` kind, as on the students page. */
-            said: 'Everyone ticks off their part, and the list shows what is still open before it goes out.',
-            draw: { page: 'release', at: 0 },
+            head: 'The board and the numbers together',
+            /* `series` beside `board`, both `KINDS` in `packages/render/src/kinds.ts`. */
+            said: 'How many tickets closed each week, drawn from the same list the board is.',
+            draw: { page: 'home', at: 2 },
           },
         ],
       },

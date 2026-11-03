@@ -77,7 +77,7 @@ export const application = {
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
   description:
-    `One place that remembers your projects, money and people, shows what needs you on a Today board of widgets you arrange, keeps your personal money (budgets, subscriptions, splits, net worth and gold), and shares that memory with ${APPS_AND}.`,
+    `A shared record of your projects, decisions and money that ${APPS_AND} read before they start and update when they stop, with one list of what waits on you and every change signed and undoable.`,
   publisher: { '@id': ORG_ID },
   offers: LAUNCH.billing
     ? [TABLE.free, TABLE.hosted, TABLE.plus].map((row) => ({

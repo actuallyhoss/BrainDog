@@ -101,14 +101,14 @@ If you say chase it | Mark it as chased, and write a reminder for you to send | 
       glyph: 'people',
       src: `~~~cards | Working now
 who | fact: Doing | when
-Bookkeeper | Matching September's receipts to costs | now
-Inbox filer | Reading a receipt for hosting | 1 min ago
+Claude | Client portal: invoice export | now
+Cursor | Landing page: pricing copy | 4 min ago
 ~~~
 
 ~~~agents | What they did
-Bookkeeper | 6 | changed September's costs | today
-Inbox filer | 3 | added Receipt for hosting | today
-Bookkeeper | 1 | added Hollis and Park's invoice | Mon 21 Sep
+Claude | 6 | changed Client portal's next step | today
+Cursor | 3 | changed Pricing page copy | today
+ChatGPT | 1 | added Hollis and Park's invoice | Mon 21 Sep
 ~~~`,
       layout: [
         { at: 0, cols: 12 },

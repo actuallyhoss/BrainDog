@@ -1,50 +1,66 @@
 /**
- * The page that connects an AI tool, `/agents`: the head, what an AI tool gets and what it can't do, the brief it
- * starts with, the row for developers, and the early access strip. Rewritten
+ * The page that connects an agent, `/agents`: the head, the briefing a session starts with, what it starts with and
+ * how it earns your trust, the agents working now, the row for developers, and the early access strip. Rewritten
  * so a reader who is not a developer reads it too, with the developer's detail
  * one row away.
  *
  * The connect steps themselves are data in `lib/connect/apps.ts`, beside the box that draws them, so the home page and
  * this page say the same lines. The made-up names are the demo record's (`lib/demo/maya.ts`).
  */
-import { PEOPLE, PROJECTS } from '../demo/maya.ts';
 import { APPS_AND } from '../agents.ts';
 import { DOCS } from '../links.ts';
 
-const DANA = PEOPLE.dana.name.split(' ')[0] ?? PEOPLE.dana.name;
-const TIDEPOOL = PROJECTS.tidepool.name;
-
 export const agents = {
   agents: {
-    title: 'Connect your AI tools in one line.',
-    lead: `${APPS_AND} can read your BrainDog, suggest changes and leave notes. You approve each one once, and no key is copied anywhere.`,
+    title: 'Connect your agents in one line.',
+    lead: `${APPS_AND} connect to one address. You approve each once in BrainDog and no key is copied anywhere. From then on, every session starts caught up.`,
+    /* THE BRIEFING FIRST (3 November story, S5): the terminal explains it faster than the list, so it leads. */
+    brief: {
+      title: 'Every session starts with a briefing.',
+      say: "Before you type a word, Claude Code shows where the project stands, the next step the last session left and what's waiting on you. When it stops, it leaves a handoff for whichever agent comes next.",
+    },
     gets: {
-      title: 'What your AI tool gets',
+      title: 'What every session starts with',
       lines: [
-        "Your brief first: where things stand, what's next and what waits on you.",
-        `Names, never codes, so it talks about ${DANA} and ${TIDEPOOL} the way you do.`,
-        'Your scripts and automations, read by their names.',
-        'A receipt and an undo for everything it writes.',
+        'Where each project stands, and the one next step the last session left.',
+        "Who else is working right now, and where, so two agents don't trip over each other.",
+        'The lessons earlier sessions wrote down, and the skills that apply here.',
+        "What's waiting on you, and the keys it may use, by name only.",
       ],
     },
+    /* HOW IT EARNS YOUR TRUST, in place of "What it can't do" (3 November): since the switch went fully inclusive on
+       2 November an owner's own agents may manage the team, so "invite or remove people, switch or no switch" was no
+       longer true. The ladder is `packages/record/src/ladder.ts` (offer after 10 kept in 14 days; an undo, three noes,
+       a burst or outside text drops it); the floor is `packages/kernel/src/change-kind.ts`; what the switch never
+       covers is `docs/03-agents/04-scopes.md`. */
     cannot: {
       title: 'How it earns your trust',
       lines: [
-        'It asks first. A new agent\'s changes arrive as questions, each with what would happen and why.',
+        "It asks first. A new agent's changes arrive as questions, each with what would happen and why.",
         'It earns one kind at a time. Keep ten changes of a kind and it may make that kind alone. One undo, or an email it just read, puts it back to asking.',
         'Some things always ask. Deletes, money, keys and sharing never climb. Reading a key, giving BrainDog away and deleting it stay yours even if you let your own agents do everything.',
-        'It can\'t hide what it did. Every change carries its name, and you can undo it.',
+        "It can't hide what it did. Every change carries its name, and you can undo it.",
       ],
     },
-    brief: {
-      title: 'It starts with your brief.',
-      say: "Claude knows what's next before you say a word, and leaves a note when it's done.",
+    /* WATCH THEM, AND STOP THEM (S3): the app's Agents page, `apps/web/src/lib/record/instruct.ts` (tell, pause,
+       redirect, stop) and `PresencePanel.svelte`. Claude Code hears it through its hooks at its next tool call; any
+       other agent at its next call to BrainDog. The drawn rows are Maya's `TODAY.working`. */
+    watch: {
+      title: 'Watch them, and stop them',
+      say: 'The Agents page in BrainDog shows every agent working now, on which project, since when. Tell one something, pause it, redirect it or stop it. Claude Code hears it at its next step; other agents at their next call to BrainDog.',
+      head: 'Working now',
+      pause: 'Pause',
+      resume: 'Resume',
+      stop: 'Stop',
+      paused: 'Paused',
+      stopped: 'Stopped at its next step',
+      label: 'The Agents page in BrainDog: each agent working now, with Pause and Stop beside it',
     },
     dev: {
       title: 'For developers',
       links: [
         { label: 'The command line', href: `${DOCS}/agents/cli` },
-        { label: 'Scopes, tokens and the switch', href: `${DOCS}/agents/scopes` },
+        { label: 'What each token may do', href: `${DOCS}/agents/scopes` },
         { label: 'All agent docs', href: `${DOCS}/agents/connect` },
       ],
     },

@@ -81,19 +81,20 @@ export const docsWords = {
     title: 'BrainDog',
     /* The home page's sentence (`meta.home` in `lib/copy/shell.ts`), said in the third person for a reader who is not the owner. */
     summary:
-      "BrainDog keeps a person's or a business's projects, money and people in one place, shared by them and every AI agent they use. It tells them where things stand and asks only what matters.",
-    /* THE FACTS AN AI SEARCH TOOL QUOTES, one line each, plain and true on the day the site ships: what is in the app,
-       how agents reach it, what it costs and who runs it. */
+      "BrainDog is a shared record of a person's or a small team's projects, decisions and money. " +
+      `${APPS_AND} read it over MCP before they start and leave a handoff when they stop. Agents ask before touching ` +
+      'money, keys or deletes, and the person answers in one list.',
+    /* THE FACTS AN AI SEARCH TOOL QUOTES, one line each, plain and true on the day the site ships: how agents reach it,
+       what they start with, how they earn trust, what is in the app, what it costs and who runs it. */
     factsTitle: 'What it is',
     facts: [
-      'For a business, for personal use, or both: your work, your money and your life in one place.',
-      'Today is a board of widgets you arrange: what needs you, which agents are working, how long the cash lasts, what is coming up, and any widget you ask for in plain words. A widget an agent adds stays a draft until you keep it.',
-      'Needs you holds the questions only a person should answer. Money, keys, sharing and deletes always wait for a yes, and every change has a name and an undo.',
-      'Projects, Work (with a timeline), People and Agents are built in. Money is a whole section: net worth, accounts, ledger, budgets by the week, month or year with what is left, forecast, coming up, payees, reports and quick add.',
-      'Add-ons extend Money and the rest: subscriptions, splitting costs with friends, investments and gold (with a daily gold price), certificates, property, insurance, zakat, trips, debts and goals.',
-      'Slash: press ⌘J anywhere to ask in plain words or ask for a change, with an undo.',
-      `${APPS_AND} connect over MCP at https://app.brain.dog/mcp, approved once with OAuth. The command line sets up a machine with \`braindog setup\`.`,
-      'Free is $0, with every feature, 3 AI tools and 20 Slash questions a month; sign-up is by invite for now. ' +
+      'Agents connect over MCP at https://app.brain.dog/mcp, approved once with OAuth. Claude Code users run `braindog setup`, which adds a start hook that prints the briefing at every session.',
+      'The briefing: where the project stands, the last handoff\'s next step, who else is working now, what waits on the person, and the learnings, skills and keys (by name) that apply.',
+      'Needs you holds the questions only a person should answer. Every agent starts by asking before each change and earns the right to act alone one kind of change at a time (offered after ten kept changes of that kind; an undo, three declines, a burst of writes or reading outside text puts it back). Deletes, money, keys and sharing always ask unless the owner lets their own agents do everything. Every change has a name and an undo.',
+      'The Agents page shows every agent working now; the person can tell one something, pause, redirect or stop it.',
+      'Projects, Work, People, Agents and Money are built in. Money: cash ahead, accounts, ledger, budgets, forecast, coming up, payees, reports. Stripe and Mercury connect read only; bank statements import as CSV.',
+      'Slash: the built-in assistant. Press ⌘J to ask in plain words or ask for a change, with an undo.',
+      'Free is $0, with every feature, 3 connected agents and 20 Slash questions a month; sign-up is by invite for now. ' +
         (LAUNCH.billing ? 'Cloud and Cloud Plus are paid monthly; see https://brain.dog/pricing.' : 'Cloud and Cloud Plus, paid monthly, are coming soon, priced at launch.'),
       'The app is at https://app.brain.dog. BrainDog is made by Quartz Apps LLC. Support: support@brain.dog.',
     ],
@@ -101,7 +102,7 @@ export const docsWords = {
       'Each docs page below is the page as dialect text: Markdown with fenced blocks such as stat, steps and comparison that a BrainDog page draws. The address of each is the page address with .md on the end.',
     /* THE SITE'S OWN PAGES, before the docs: each line is the page's name and its search result (`meta` in `lib/copy/shell.ts`). */
     site: 'Site',
-    pages: { home: 'Home', slash: 'Slash', agents: 'Connect your AI tools', pricing: 'Pricing', security: 'Security', support: 'Support', docs: 'Docs' },
+    pages: { home: 'Home', slash: 'Slash', agents: 'Connect your agents', pricing: 'Pricing', security: 'Security', support: 'Support', docs: 'Docs' },
     connect: 'Connecting',
     /* `MCP` in `lib/links.ts`, `servesMcp` in `apps/worker/src/route.ts`. The address is code; the words around it are not. */
     address: 'The address agents connect to',

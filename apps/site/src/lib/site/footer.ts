@@ -39,8 +39,8 @@ export const footerGroups = (launch: Flags = LAUNCH): FootGroup[] => {
       links: [
         ...page(forWho.founder.href, f.small),
         ...page(forWho.team.href, f.teams),
-        /* NO "PERSONAL USE" LINK (3 November): the footer says what the page says; your own money is in the questions
-           and the docs. */
+        /* No "Personal use" here since the 3 November story: the site speaks to founders and teams, and personal money
+           stays in the FAQ and the docs. */
         ...(live.has(DOCS) ? [{ href: DEVELOPERS, label: f.developers }] : []),
       ],
     },

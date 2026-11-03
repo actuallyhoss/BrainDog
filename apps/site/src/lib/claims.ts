@@ -22,7 +22,6 @@
  * anybody can read the code is `not-yet`, and `claims.test.ts` asks for it to be marked again once `LAUNCH.repo` is on.
  */
 import type { LaunchFlag } from './launch.ts';
-import { APPS_AND } from './agents.ts';
 
 export type ClaimState = 'true' | 'flag' | 'not-yet';
 
@@ -70,7 +69,7 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'faq-chatgpt-paid', said: 'ChatGPT needs a paid plan for this', where: 'faq.questions.2.a', state: 'true' },
 
   /* The Slash page (`copy/slash.ts`, its own export `slashPage`, which the ledger reads beside `site`). */
-  { id: 'slash-asks-first', said: 'Anything with money, keys, sharing or deletes waits for your yes.', where: 'slashPage.head.lead', state: 'true' },
+  { id: 'slash-asks-first', said: 'Money, keys, sharing and deletes come back to you as a question first.', where: 'slashPage.make.body.1', state: 'true' },
   { id: 'own-key-no-limit', said: 'or no limit with your own AI key', where: 'slashPage.tally.say', state: 'true' },
   { id: 'finding-free', said: 'Finding is free and never spends a question.', where: 'slashPage.find.body.1', state: 'true' },
   { id: 'own-key-unlimited', said: 'Questions on your own key have no monthly limit.', where: 'slashPage.faq.questions.2.a', state: 'true' },
@@ -82,25 +81,22 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'agent-earns-kind', said: 'Keep ten changes of a kind and it may make that kind alone. One undo, or an email it just read, puts it back to asking.', where: 'agents.cannot.lines.1', state: 'true' },
   { id: 'switch-never', said: 'Reading a key, giving BrainDog away and deleting it stay yours even if you let your own agents do everything.', where: 'agents.cannot.lines.2', state: 'true' },
   { id: 'agent-signs-writes', said: 'Every change carries its name, and you can undo it.', where: 'agents.cannot.lines.3', state: 'true' },
-  { id: 'agent-write-undo', said: 'A receipt and an undo for everything it writes.', where: 'agents.gets.lines.3', state: 'true' },
-  { id: 'five-apps-connect', said: `${APPS_AND} can read your BrainDog, suggest changes and leave notes.`, where: 'agents.lead', state: 'true' },
 
   /* The pricing page (`copy/pricing.ts`, `pricing`): the early access page while billing is off, then the plans. */
-  { id: 'early-free', said: 'Everything in it is free while we open it up.', where: 'pricing.early.lede', state: 'true', flag: 'signup' },
-  { id: 'nothing-lost', said: 'nothing you make now is lost', where: 'pricing.early.later.say', state: 'true' },
+  { id: 'early-free', said: 'everything in it is free while we open it up.', where: 'pricing.early.lede', state: 'true', flag: 'signup' },
+  { id: 'nothing-lost', said: 'Nothing you set up now is lost.', where: 'pricing.early.later.say', state: 'true' },
   { id: 'export-any-time-early', said: 'Yes, all of it, as one file, whenever you like.', where: 'pricing.early.faq.questions.2.a', state: 'true' },
   { id: 'export-every-plan', said: 'Yes, all of it, as one file, on every plan.', where: 'pricing.faq.questions.2.a', state: 'true' },
   { id: 'cancel-any-time', said: 'Yes, from Settings.', where: 'pricing.faq.questions.3.a', state: 'flag', flag: 'billing' },
   { id: 'extra-use-soon', said: 'Coming soon.', where: 'pricing.extra.soon', state: 'not-yet', flag: 'extra', soon: true },
-  { id: 'waits-next-month', said: 'Nothing stops at the limit. It waits for next month.', where: 'pricing.holds.say', state: 'true' },
-  { id: 'brief-spends-no-ask', said: 'Your brief, filing and your rules never spend one.', where: 'pricing.faq.questions.0.a', state: 'true' },
+  { id: 'waits-next-month', said: 'Nothing stops at the limit: it waits for next month.', where: 'pricing.holds.say', state: 'true' },
+  { id: 'brief-spends-no-ask', said: 'The briefing, filing and your rules never spend one.', where: 'pricing.faq.questions.1.a', state: 'true' },
   { id: 'extra-use-capped', said: 'Turn it on with a monthly cap, and BrainDog never goes past it.', where: 'pricing.extra.say', state: 'flag', flag: 'extra' },
 
   /* The pages for each kind of person (`copy/for.ts`). */
   { id: 'bills-file-themselves', said: 'Once it knows their shape, each lands in the right list with its amount and due day.', where: 'person.who.personal.rows.0.said', state: 'true' },
   { id: 'students-reminded', said: 'Automations remind you before things are due', where: 'person.who.student.sub', state: 'true' },
-  { id: 'late-invoice-drafted', said: 'Say yes, and a reminder is written for you to send.', where: 'person.who.founder.rows.1.said', state: 'true' },
-  { id: 'team-who-changed', said: 'every change says who made it.', where: 'person.who.team.sub', state: 'true' },
+  { id: 'team-who-changed', said: 'every change says who made it, person or agent', where: 'person.who.team.sub', state: 'true' },
 
   /* The trust pages (`copy/trust.ts`) and the shared words (`copy/shell.ts`). */
   { id: 'licence', said: 'The software is licensed under the Apache License 2.0', where: 'legal.licence.body.0', state: 'true' },
@@ -110,7 +106,7 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'terms-meta', said: 'and its Terms of Service and Privacy Policy', where: 'meta.legal.description', state: 'true', flag: 'legal' },
   { id: 'support-before-signup', said: 'The support address is published here before sign-up opens.', where: 'support.mail.pending', state: 'not-yet' },
   { id: 'issues-on-github', said: 'Report a fault as an issue, or ask a question in Discussions', where: 'support.github.body', state: 'flag', flag: 'repo' },
-  { id: 'no-shared-table', said: 'Nothing is shared between customers', where: 'security.kept.facts.0.text', state: 'true' },
+  { id: 'no-shared-table', said: "apart from every other customer's", where: 'security.kept.facts.0.text', state: 'true' },
   { id: 'sealed-copies', said: 'Every night a copy is sealed to a key kept outside Cloudflare', where: 'security.kept.facts.2.text', state: 'true' },
   { id: 'no-password', said: 'There is no password to steal.', where: 'security.kept.facts.3.text', state: 'true' },
   { id: 'token-reach', said: 'Reading a key, handing BrainDog over or deleting it needs you, signed in, even when you let your own agents do everything else.', where: 'security.kept.facts.4.text', state: 'true' },

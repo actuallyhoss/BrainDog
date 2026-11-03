@@ -2,7 +2,7 @@
  * The words every page shares: the product's name, each page's search result, the header, the footer (which
  * carries the slogan) and the 404. Which pages the header, the footer and the 404 list is `nav.ts`'s.
  */
-import { APPS_AND, APPS_OR } from '../agents.ts';
+import { APPS_AND } from '../agents.ts';
 import { LAUNCH } from '../launch.ts';
 
 export const shell = {
@@ -15,22 +15,23 @@ export const shell = {
       description: `${APPS_AND} read where your projects stand before they start, leave a handoff when they stop, and ask before touching money or keys.`,
     },
     slash: {
-      title: 'Slash: press ⌘J and ask anything · BrainDog',
+      title: 'Slash, the assistant built into BrainDog',
       description:
-        'Press ⌘J anywhere in BrainDog and ask in plain words. Slash answers with your numbers and makes the changes ' +
-        'you ask for, each with an undo.',
+        'Press ⌘J on any page and ask in plain words. Slash answers from your own numbers, shows what it read, and ' +
+        'makes the changes you ask for with an undo.',
     },
     pricing: {
       title: 'Pricing: free in early access · BrainDog',
-      description:
-        'BrainDog is Free: every feature, 3 AI tools and 20 Slash questions a month. ' +
-        (LAUNCH.billing ? 'Cloud and Cloud Plus are monthly plans with more of each.' : 'Cloud and Cloud Plus are coming soon, priced at launch.'),
+      description: LAUNCH.billing
+        ? 'Free to start with 3 connected agents. Cloud and Cloud Plus add more agents, more questions and, on Cloud Plus, your team.'
+        : 'BrainDog is free while invite only: every feature, 3 connected agents and 20 questions to the built-in assistant a ' +
+          'month. Paid plans come later, priced at launch.',
     },
     agents: {
-      title: 'Connect Claude, ChatGPT and Cursor · BrainDog',
+      title: `Connect ${APPS_AND} · BrainDog`,
       description:
-        `Connect ${APPS_OR} to BrainDog in one line. Each starts from your ` +
-        "brief and leaves a note when it's done.",
+        'One address and one approval per agent. From then on every session starts with where things stand and ends ' +
+        'with a handoff for the next one.',
     },
     notFound: {
       title: 'Page not found · BrainDog',
@@ -42,11 +43,11 @@ export const shell = {
     },
     download: {
       title: 'BrainDog for iPhone and Mac',
-      description: 'The BrainDog apps for iPhone and Mac are coming. Until then, BrainDog works in any browser.',
+      description: 'The iPhone and Mac apps are coming. Until then BrainDog works in any browser, on your phone too.',
     },
     changelog: {
       title: 'Changelog · BrainDog',
-      description: "What shipped in BrainDog and when, in the repository's own words.",
+      description: 'Everything that shipped in BrainDog, day by day.',
     },
   },
 
