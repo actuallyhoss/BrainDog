@@ -883,7 +883,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .more-summary:hover {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
     }
   }
 
@@ -967,7 +967,7 @@
 
   .slash-answer {
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
   }
 
   .slash-asked {
@@ -1106,7 +1106,7 @@
      aside so the fill is one shape. */
   @media (hover: hover) and (pointer: fine) {
     .slash-list > li:hover > div.line {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
     }
 
     .slash-list > li:hover > .line::after,

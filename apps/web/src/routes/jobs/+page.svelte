@@ -548,7 +548,7 @@
   }
 
   .machine + .machine {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
   }
 
   .machine-main {
@@ -767,7 +767,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .kind:hover {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
     }
   }
 

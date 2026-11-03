@@ -14,18 +14,17 @@
      `cards-grid` and not `cards`, because the register's phone list and `/decide` already own that
      name, and a rule here is global. */
 
-  /* THE FIRST ROW'S HAIRLINE IS CUT: the grid is drawn two pixels up and clipped by them (one pixel would be exactly
-     the hairline, and pixel snapping left half of it showing), so the tile's heading is the only thing over the first
-     cards, whichever of them the tracks put in the first row. */
+  /* NO HAIRLINES BETWEEN CARDS (the ops style, 3 Nov): each card pads its words 12px in, so the grid stands 12px out
+     on both sides and every card's text stays on the tile's text edge while the wash under the pointer reaches past
+     it. Cards 2px apart, so two washes never touch. */
   .cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr));
     align-items: start;
-    gap: 0 var(--sp-5);
-    margin: -2px 0 0;
+    gap: 2px var(--sp-2);
+    margin: 0 calc(-1 * var(--title-inset, 12px));
     padding: 0;
     list-style: none;
-    clip-path: inset(2px 0 0);
   }
 
   /* NEVER MORE COLUMNS THAN CARDS (`data-cards`, from `src/cards.ts`): three cards sat in four columns with a hole
@@ -59,8 +58,9 @@
     flex-direction: column;
     gap: var(--sp-3);
     min-inline-size: 0;
-    padding: var(--sp-4) 0;
-    border-block-start: 1px solid var(--rule);
+    padding: var(--sp-3) var(--title-inset, 12px);
+    border-radius: var(--r-ctl);
+    transition: background-color var(--d-state) var(--ease-out);
     /* EVERY ROW OF A TILE IS AS TALL AS THE NEXT: a card is never shorter than a row. */
     min-block-size: var(--row-h);
   }
@@ -75,19 +75,19 @@
 
   /* AND UNDER A THUMB A NAME'S ROW IS STILL 44 TALL. The whole card is its title's target (`.cards-title a::before`
      below), so a card at a row's air is a 36px target: "Studio current account" under Last confirmed on Money
-     measured 448x36. The card grows and the name sits in the middle of it; under a mouse nothing moves. AND ONE MORE
-     FOR THE HAIRLINE: the target is the card inside its border, so a 44px card was a 43px target, measured. */
+     measured 448x36. The card grows and the name sits in the middle of it; under a mouse nothing moves. */
   @media (pointer: coarse) {
     .cards-grid:not(:has(> .cards-item > :not(.cards-head))) > .cards-item {
       justify-content: center;
-      min-block-size: calc(var(--tap) + 1px);
+      min-block-size: var(--tap);
     }
   }
 
-  .cards-item:has(.cards-title a):hover .cards-title {
-    text-decoration: underline;
-    text-decoration-color: var(--rule-strong);
-    text-underline-offset: 3px;
+  /* A CARD THAT OPENS TAKES THE ROW WASH UNDER THE POINTER, as every row does (ops 4.15): no underline, no lift. */
+  @media (hover: hover) and (pointer: fine) {
+    .cards-item:has(.cards-title a):hover {
+      background-color: var(--row-wash, var(--hover));
+    }
   }
 
   /* A RUN NOT HEARD FROM LATELY, dimmed and not hidden, so it still says what it was doing. ONLY ITS FACE AND ITS FACTS
@@ -129,9 +129,13 @@
     padding: 6px;
   }
 
+  /* A FACE IS A DISC WITH A HAIRLINE RING (ops 4.25): the initial at 600 on the step-under fill. */
   .cards-face {
     background: var(--tile-2);
     border-radius: var(--r-round);
+    box-shadow: inset 0 0 0 1px var(--sep, var(--rule));
+    color: var(--ink-2);
+    font-weight: var(--fw-semi);
   }
 
   .cards-who .cards-face {

@@ -548,7 +548,7 @@
     inline-size: 100%;
     min-block-size: 48px;
     background: var(--tile);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-field, 12px);
   }
 
   /* ── where to jump ─────────────────────────────────────────────────────── */
@@ -560,12 +560,16 @@
     min-inline-size: 0;
   }
 
+  /* A CAPS LABEL OVER EACH WAY TO JUMP (ops 2.3), on the text edge. */
   .jump-title {
     margin: 0;
+    padding-inline: var(--title-inset, 12px);
     color: var(--ink-3);
-    font-size: var(--fs-meta);
+    font-size: var(--fs-caps, 11px);
     font-weight: var(--fw-medium);
-    line-height: 18px;
+    letter-spacing: 0.025em;
+    line-height: 16px;
+    text-transform: uppercase;
   }
 
   /* FOUR ACROSS WHERE THERE IS ROOM, two on a narrow desk, one on a phone: the tiles keep a readable width and fill
@@ -622,7 +626,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .place:hover {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
     }
   }
 
@@ -667,7 +671,9 @@
   .quiet {
     padding: var(--tile-pad);
     background: var(--tile);
+    border: 1px solid var(--card-edge, transparent);
     border-radius: var(--r-tile);
+    box-shadow: var(--shadow-card, none);
   }
 
   /* SIXTEEN PIXELS AT EVERY WIDTH, as every input in the product is, so a phone does not zoom the page
@@ -695,6 +701,7 @@
   /* THE ONE LINE THAT READS THE CHART, under it, and the quiet line about meaning in the same voice. */
   .reading {
     margin: 0;
+    padding-inline: var(--title-inset, 12px);
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 20px;

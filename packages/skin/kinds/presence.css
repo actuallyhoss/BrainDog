@@ -11,24 +11,30 @@
   /* A STEP UNDER THE TILE'S HEADING, as the composer's field sits under its own. */
   .pres {
     display: grid;
-    margin: var(--sp-3) 0 0;
+    margin: var(--sp-1) 0 0;
     padding: 0;
     list-style: none;
     container-type: inline-size;
   }
 
+  /* A CARD ROW (ops 4.15, 3 Nov): no hairline between runs; each row pads its words 12px in, so the wash under the
+     pointer reaches the tile's edge while the face stays on the heading's line, and rows stand 2px apart. */
   .pres-row {
     display: grid;
     grid-template-columns: 28px minmax(0, 1fr) auto;
     align-items: start;
     gap: var(--sp-1) var(--sp-3);
-    padding-block: var(--sp-3);
-    border-block-start: 1px solid var(--rule);
+    margin-block: 1px;
+    margin-inline: calc(-1 * var(--title-inset, 12px));
+    padding: var(--sp-3) var(--title-inset, 12px);
+    border-radius: var(--r-ctl);
+    transition: background-color var(--d-state) var(--ease-out);
   }
 
-  .pres-row:first-child {
-    border-block-start: 0;
-    padding-block-start: 0;
+  @media (hover: hover) and (pointer: fine) {
+    .pres-row:hover {
+      background-color: var(--row-wash, var(--hover));
+    }
   }
 
   /* THE FACE: a 28px disc in the step-under fill, the maker's mark 16px in it, and the live dot at its end
@@ -41,6 +47,7 @@
     block-size: 28px;
     border-radius: var(--r-round);
     background: var(--tile-2);
+    box-shadow: inset 0 0 0 0.5px var(--g-line, transparent);
     color: var(--ink);
   }
 
@@ -199,13 +206,13 @@
     align-items: center;
     justify-content: center;
     min-block-size: var(--btn-h-sm, var(--ctl-h-sm));
-    padding: 0 var(--sp-2);
+    padding: 0 var(--sp-3);
     border: 0;
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
+    border-radius: var(--r-pill, 999px);
+    background: var(--row-wash-press, var(--tile-2));
     color: var(--ink);
     font: inherit;
-    font-size: var(--fs-ctl);
+    font-size: var(--fs-cap);
     font-weight: var(--fw-medium);
     white-space: nowrap;
     cursor: pointer;
@@ -232,6 +239,10 @@
       background: var(--hover);
     }
 
+    .pres-btn:active:not(:disabled) {
+      scale: 0.97;
+    }
+
     .pres-btn[data-weight='primary']:hover {
       background: var(--red-fill-hover);
     }
@@ -243,7 +254,7 @@
     gap: var(--sp-2);
     margin-block-start: var(--sp-2);
     padding: var(--sp-3);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-field, 12px);
     background: var(--tile-2);
   }
 
@@ -264,10 +275,11 @@
     box-sizing: border-box;
     inline-size: 100%;
     min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-2);
+    padding-inline: var(--sp-3);
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-field, 12px);
     background: var(--tile);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
@@ -315,12 +327,8 @@
     grid-template-columns: 24px minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 0 var(--sp-3);
-    min-block-size: 40px;
+    min-block-size: 44px;
     padding-block: var(--sp-1);
-  }
-
-  .pres[data-line] .pres-row:first-child {
-    padding-block-start: var(--sp-1);
   }
 
   .pres[data-line] .pres-face {
@@ -396,9 +404,9 @@
   .pres-proj[data-chip] {
     align-items: center;
     gap: 6px;
-    padding: 2px var(--sp-2);
-    border-radius: var(--r-xs);
-    background: var(--tile-2);
+    padding: 1px var(--sp-2);
+    border-radius: var(--r-pill, 999px);
+    background: var(--row-wash-press, var(--tile-2));
     color: var(--ink-2);
     line-height: 18px;
   }
@@ -460,15 +468,15 @@
     font-weight: var(--fw-medium);
   }
 
-  /* MORE: a 32px quiet square with three dots, the presses behind it; 44 under a thumb. */
+  /* MORE: a 28px quiet circle with three dots (the panel tier), the presses behind it; 44 under a thumb. */
   .pres-more {
     display: inline-grid;
     place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
+    inline-size: var(--ctl-panel, 28px);
+    block-size: var(--ctl-panel, 28px);
     padding: 0;
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-round);
     background: transparent;
     color: var(--ink-3);
     cursor: pointer;
@@ -487,7 +495,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .pres-more:hover:not(:disabled) {
-      background: var(--hover);
+      background: var(--row-wash-press, var(--hover));
       color: var(--ink);
     }
   }
