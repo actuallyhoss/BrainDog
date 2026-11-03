@@ -369,6 +369,12 @@ type Said = {
   commit: boolean;
   /** Meet only somebody the record has reason to know (`MeetArgs.only`). */
   only?: 'known';
+  /**
+   * The day the owner was last in touch with them, when the caller knows it better than "today" (`meetContact`: the
+   * mail or the meeting it saw), or `null` for no such day: being in somebody's address book is not being in touch.
+   * Left out, a meeting is the day in touch, as ever.
+   */
+  touched?: string | null;
 };
 
 function normalise(args: MeetArgs, typed = false, token = false): Result<Said> {
@@ -606,11 +612,12 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
   } else {
     linked = project !== null;
     const placed = placeKeys(list, keys, s, veiled);
+    const touched = s.touched === undefined ? day : s.touched;
     written = deps.write(list.register, null, {
       [at.name]: s.name ?? nameFromKeys(keys),
       ...placed,
       ...(project === null || at.projects === undefined ? {} : { [at.projects]: [project] }),
-      ...(at.in_touch === undefined ? {} : { [at.in_touch]: day }),
+      ...(at.in_touch === undefined || touched === null ? {} : { [at.in_touch]: touched }),
       ...(at.org === undefined || org === null ? {} : { [at.org]: org }),
       [at.met]: [line],
     });
@@ -653,6 +660,179 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
     linked,
     merge: question,
   });
+}
+
+/**
+ * One card of the owner's own address book (`meetContact`): the name on it, every address and phone it holds, and what
+ * the caller saw of the two of them besides.
+ */
+export type ContactArgs = {
+  name?: string;
+  emails?: readonly string[];
+  phones?: readonly string[];
+  /** The addresses the owner's own account goes by, beside his own person's: the address connected and its aliases. */
+  own?: readonly string[];
+  /** What the caller saw that makes them of use: `mail`, a thread both of them wrote in; `event`, a small meeting together. */
+  use?: 'mail' | 'event';
+  /** The last day the owner was in touch with them, `YYYY-MM-DD`, from that mail or that meeting. */
+  day?: string;
+  /** Lists whose rows never say the owner knows somebody, because the caller fills them itself (its mail, its events). */
+  skip?: readonly string[];
+  /** Where the card came from: `Google Contacts`. */
+  source: string;
+};
+
+/**
+ * What became of a card: folded into the owner (`self`), filled in on somebody already kept (`matched`), added because
+ * they are of use (`why`), or left out. `wrote` says whether anything was written; `undo` is a strong fold's batch.
+ */
+export type ContactMet = { did: 'self' | 'matched' | 'added' | 'skipped'; why?: 'mail' | 'event' | 'named'; row: MetRow | null; wrote: boolean; undo?: string };
+
+/** How a person added from a card says why, after its source. */
+const CONTACT_WHY = { mail: 'a mail thread you both wrote in', event: 'a meeting together', named: 'already named in this record' } as const;
+
+/**
+ * BEING IN AN ADDRESS BOOK IS NOT A REASON TO BE IN PEOPLE. One card of the owner's own address book, as the record's
+ * own sync of his account reads it (Google Contacts), and never a person for that alone:
+ *
+ *   1. ONE OF HIS OWN ADDRESSES (one his own person holds, or one his account goes by, `own`) makes the card his: what
+ *      else it holds is carried onto his own row, and nobody is added. With no row marked as him, nothing is written.
+ *   2. AN ADDRESS OR A PHONE SOMEBODY KEPT ALREADY ANSWERS TO, in any case and with Gmail's dots, makes the card theirs:
+ *      the card's other addresses and phones that nobody else answers to become theirs, a name fills theirs only when
+ *      they have none (another goes with their other names), and Last in touch moves to the day the caller saw them,
+ *      never back. Never a second row.
+ *   3. SOMEBODY NEW IS ADDED ONLY WHEN THEY ARE OF USE: the caller saw a mail thread both of them wrote in, or a small
+ *      meeting together (`use`), or this record already names them (`namedIn`). They are met as the owner's own word,
+ *      so the strong rules may fold them into somebody kept, with one Undo, and Last in touch is that day or none.
+ *   4. EVERYONE ELSE IS LEFT OUT, and nothing about them is kept: no row, no mention. A shared inbox or a machine's
+ *      address is an organisation's and never a person's, a key an organisation holds says a company's card, and a card
+ *      that bears the owner's own full name is never added as somebody else.
+ *
+ * A card is the owner's own word for who somebody is, since only he and his devices write his address book, so what it
+ * carries onto a person is believed. Nobody but the record's own sync says what it holds (`meetContact` in the record).
+ */
+export function meetContact(deps: PeopleDeps, args: ContactArgs): Result<ContactMet> {
+  const list = deps.list;
+  if (!list) return no<ContactMet>('REGISTER_UNKNOWN', 'No list declares meets:, so nobody can be met. Nothing was written.', { at: 'register' });
+  const fault = partsFault(list, 'meets');
+  if (fault) return fault;
+  const source = clip(unaddressed(textOf(args.source) ?? 'an address book'));
+  const named = nameOnly(textOf(args.name));
+  const name = named === undefined ? undefined : clip(named, 120);
+  const left: Result<ContactMet> = ok({ did: 'skipped', row: null, wrote: false });
+
+  const mails: { address: string; key: string }[] = [];
+  for (const raw of args.emails ?? []) {
+    const from = typeof raw === 'string' ? parseFrom(raw) : null;
+    const key = from === null ? null : keyOf('email', from.address);
+    if (from !== null && key !== null && !mails.some((m) => m.key === key)) mails.push({ address: from.address, key });
+  }
+  /* A SHARED INBOX OR A MACHINE IS AN ORGANISATION SPEAKING, as everywhere `meet` reads an address. */
+  const theirs = mails.filter((m) => !isOrganisationAddress(m.address));
+  const phones = [...new Set((args.phones ?? []).map((p) => (typeof p === 'string' ? keyOf('phone', p) : null)).filter((k): k is string => k !== null))];
+  const keys = [...theirs.map((m) => m.key), ...phones];
+  if (keys.length === 0) return left;
+  const day = typeof args.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.day) ? args.day : undefined;
+
+  const mine = selfRows(deps, list).filter((r) => deps.hidden?.(r.id) !== true);
+  const ownKeys = new Set([...mine.flatMap((r) => keysOfRow(list, r)), ...(args.own ?? []).flatMap((a) => ((k) => (k === null ? [] : [k]))(keyOf('email', String(a))))]);
+  if (keys.some((k) => ownKeys.has(k))) {
+    if (mine.length === 0) return left;
+    return filledIn(deps, list, keptOf(deps, list, mine), theirs, keys, { self: true, source });
+  }
+
+  const held = holders(deps.sql, list.register, keys).filter((h) => deps.hidden?.(h.id) !== true);
+  const hit = held[0] === undefined ? null : rowById(deps.sql, held[0].id);
+  if (hit !== null) {
+    const self = list.fields.self !== undefined && hit.fields[list.fields.self] === true;
+    return filledIn(deps, list, hit, theirs, keys, { self, source, ...(name === undefined ? {} : { name }), ...(day === undefined ? {} : { day }) });
+  }
+  /* A KEY ANOTHER LIST HOLDS (an organisation's address or number) SAYS THE CARD IS A COMPANY'S. */
+  if (keys.some((k) => ((h) => h !== null && h.register !== list.register)(seenHolderOf(deps, k)))) return left;
+  const spoken = name === undefined ? '' : nameKey(name);
+  if (spoken.includes(' ') && mine.some((r) => namesOf(list, r).includes(spoken))) return left;
+
+  const why = args.use ?? (namedIn(deps, list, name, theirs.map((m) => m.address), args.skip ?? []) ? 'named' : undefined);
+  if (why === undefined) return left;
+  const first = theirs[0];
+  const met = meetPerson(deps, list, {
+    source: clip(`${source}, ${CONTACT_WHY[why]}`),
+    untrusted: false,
+    commit: false,
+    kind: 'person',
+    keys: keys.filter((k) => k !== first?.key),
+    ...(name === undefined ? {} : { name }),
+    ...(first === undefined ? {} : { email: first.address }),
+    touched: day ?? null,
+  });
+  if (!met.ok) return met as Result<never>;
+  return ok({ did: met.value.created ? 'added' : 'matched', why, row: met.value.row, wrote: true, ...(met.value.undo === undefined ? {} : { undo: met.value.undo }) });
+}
+
+/**
+ * What a card adds to somebody it is: the addresses and phones they lack that nobody else answers to, and for anybody but
+ * the owner a name where they have none, another of their names, and a later day in touch. Nothing they hold is replaced,
+ * and a card that adds nothing writes nothing, so reading the same book again is quiet.
+ */
+function filledIn(
+  deps: PeopleDeps,
+  list: DeclaredList<MeetsFields>,
+  row: Row,
+  mails: readonly { address: string; key: string }[],
+  keys: readonly string[],
+  o: { self: boolean; source: string; name?: string; day?: string },
+): Result<ContactMet> {
+  const at = list.fields;
+  const f = row.fields;
+  const has = new Set(keysOfRow(list, row));
+  const spelled = mails.find((m) => !has.has(m.key));
+  const patch: Record<string, unknown> = keysPatch(deps, list, row, keys, spelled === undefined ? {} : { email: spelled.address });
+  const added = keys.filter((k) => !has.has(k) && (seenHolderOf(deps, k)?.id ?? row.id) === row.id);
+  if (!o.self) {
+    if (o.name !== undefined && textOf(f[at.name]) === undefined) patch[at.name] = o.name;
+    else if (at.aliases !== undefined) {
+      const alias = aliasOf(list, row, o.name, keys);
+      if (alias !== null) patch[at.aliases] = [...listOf(f[at.aliases]), alias];
+    }
+    if (o.day !== undefined && at.in_touch !== undefined && later(o.day, f[at.in_touch]) === o.day && f[at.in_touch] !== o.day) patch[at.in_touch] = o.day;
+  }
+  const did = o.self ? 'self' : 'matched';
+  if (Object.keys(patch).length === 0) return ok({ did, row: metRow(deps, list.register, row), wrote: false });
+  const day = instant(deps.nowMs).slice(0, 10);
+  patch[at.met] = metLines(listOf(f[at.met]), [`${day} · ${o.source}`]);
+  const written = deps.write(list.register, row.id, patch, { version: row.version });
+  if (!written.ok) return written as Result<never>;
+  sourceKeys(deps.sql, row.id, added, o.source);
+  return ok({ did, row: metRow(deps, list.register, written.value), wrote: true });
+}
+
+/**
+ * Whether this record already names somebody, outside the lists that say nothing of it: People itself, who they would
+ * be, and the lists the caller fills from the same source (`skip`). Their address or their full name in a row's words (a
+ * task, a project, a ledger line; an organisation's row by address only, since a card named like a company is the
+ * company's), the record shared with their address, or their full name said in the work and kept as a mention (one
+ * an arrival left says nothing). A name of one word names nobody: "Mom", "Fofo".
+ */
+function namedIn(deps: PeopleDeps, list: DeclaredList<MeetsFields>, name: string | undefined, addresses: readonly string[], skip: readonly string[]): boolean {
+  const words = (text: string): string => text.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, ' ').split(/\s+/).filter(Boolean).join(' ');
+  const inWords = (phrase: string, not: readonly string[]): boolean =>
+    phrase !== '' &&
+    deps.sql.one(
+      'SELECT 1 AS y FROM entry_fts f JOIN entry e ON e.rowid = f.rowid WHERE entry_fts MATCH ? AND e.deleted_at IS NULL AND e.register NOT IN (SELECT value FROM json_each(?)) LIMIT 1',
+      `"${phrase}"`,
+      JSON.stringify(not),
+    ) !== undefined;
+  const people = [list.register, ...skip];
+  for (const a of addresses) {
+    if (inWords(words(a), people)) return true;
+    if (deps.sql.one("SELECT 1 AS y FROM share WHERE who_kind = 'email' AND lower(who) = ? AND revoked_at IS NULL LIMIT 1", a.toLowerCase()) !== undefined) return true;
+  }
+  const full = name === undefined ? '' : words(name);
+  if (!full.includes(' ')) return false;
+  if (inWords(full, [...people, ...(deps.orgs === undefined ? [] : [deps.orgs.register])])) return true;
+  return deps.sql
+    .all<{ source: string }>("SELECT source FROM entity_mention WHERE kind = 'person' AND name_key = ?", nameKey(name!))
+    .some((m) => !ARRIVED.test(m.source) && !RELAYED.test(m.source));
 }
 
 /**

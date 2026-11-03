@@ -29,7 +29,7 @@ import type { AccountCall, SignupCall } from '@braindog/ports';
 import { GOOGLE_ROUTES, googleOn, serveGoogle } from './google.ts';
 /* CONNECT GOOGLE: one Google account per record, read only, synced on the record's alarm (`google-connect.ts`). */
 import {
-  BROKEN_GONE, CONNECTION_KEY, accessOf, callbackSlug, connectOn, finishConnect, openToken, revokeToken, sealToken, servesConnect, startConnect, statusOf, swapCode, syncOnce,
+  BROKEN_GONE, CONNECTION_KEY, accessOf, callbackSlug, connectOn, finishConnect, googleWriter, openToken, revokeToken, sealToken, servesConnect, startConnect, statusOf, swapCode, syncOnce,
   CONNECT_ROUTES, SYNC_EVERY_MS, type ConnectSaid, type Connection, type Status as GoogleStatus, type Writer as GoogleWriter,
 } from './google-connect.ts';
 import { DESKTOP_ROUTES, serveDesktop } from './desktop-signin.ts';
@@ -1388,44 +1388,9 @@ export class Record$ extends DurableObject<Env> {
     return store && wrapping && record ? { store, wrapping, record } : null;
   }
 
-  /** What the sync writes through: the add-ons' own door and lists, as the system. */
+  /** What the sync writes through: the add-ons' own door and lists, and the people rule, as the system (`googleWriter`). */
   #googleWriter(api: RecordApi): GoogleWriter {
-    const sys: CallContext = { principal: { kind: 'system', id: 'google' } };
-    const events = api.kernel.register('events');
-    const hasField = (id: string): boolean => events?.fields.some((f) => f.id === id) === true;
-    return {
-      zone: api.kernel.identity()?.tz ?? 'UTC',
-      mail: api.kernel.register('gmail_mail') !== undefined,
-      events: hasField('key'),
-      invites: hasField('response') && hasField('organiser'),
-      arrive: async (body) => {
-        const bytes = new TextEncoder().encode(body);
-        const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
-        const out = await api.arrive({ channel: 'webhook', headers: { 'content-type': 'text/plain; charset=utf-8' }, body, sha256, verified: true, ingest: 'gmail_in' });
-        return out.ok;
-      },
-      heldEvents: async (fromDay) => {
-        const held = new Map<string, { seq: number; version: number; fields: Record<string, unknown> }>();
-        let cursor: string | null = null;
-        for (let i = 0; i < 20; i++) {
-          const page = await api.list({ register: 'events', where: { all: [{ field: 'day', gte: fromDay }] }, limit: 200, cursor }, sys);
-          if (!page.ok) break;
-          for (const r of page.value.rows) if (r.seq !== null && typeof r.fields.key === 'string') held.set(r.fields.key, { seq: r.seq, version: r.version, fields: r.fields });
-          cursor = page.value.cursor;
-          if (cursor === null) break;
-        }
-        return held;
-      },
-      addEvent: async (fields) => {
-        await api.create({ register: 'events', fields: fields as never }, sys);
-      },
-      changeEvent: async (seq, version, patch) => {
-        await api.update({ register: 'events', seq, version, patch: patch as never }, sys);
-      },
-      meet: async (said) => {
-        await api.meet({ ...said, source: 'Google Contacts' }, sys);
-      },
-    };
+    return googleWriter(api);
   }
 
   /** One sync, when one is due: the refresh token opened for it and dropped after, and the connection kept. */

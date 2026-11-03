@@ -75,7 +75,7 @@
       ? 'Connect Google and BrainDog reads your Gmail every 15 minutes, with your calendar and contacts too. Nothing to paste, and nothing is ever sent, changed or deleted in Google.'
       : place === 'calendar'
         ? 'Connect Google and BrainDog reads your calendar every 15 minutes, invitations and your answers included, with your Gmail and contacts too. Nothing is ever changed in Google.'
-        : 'One Google account, read only: Gmail into the Gmail add-on, Calendar with invitations into Events, and contacts into People, every 15 minutes. Nothing is ever sent, changed or deleted in Google.',
+        : 'One Google account, read only: Gmail into the Gmail add-on, Calendar with invitations into Events, and contacts to fill in People, every 15 minutes. A contact is only added when you write to each other, meet, or they are already in BrainDog. Nothing is ever sent, changed or deleted in Google.',
   );
   const last = $derived(status?.last ? `Last sync ${sinceWords(status.last.at, recordNow())}: ${status.last.said}.` : 'The first sync runs within a few minutes.');
   const missing = $derived(

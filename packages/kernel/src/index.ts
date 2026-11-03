@@ -308,7 +308,7 @@ import {
 } from './keychain.ts';
 import { slashMayWrite } from './slash.ts';
 import { meetPatternedSender, readMailArrival, tasksList, type MailOutcome } from './mail-arrival.ts';
-import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
+import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet as meetPerson, meetContact as meetCard, resolveJob, type ContactArgs, type ContactMet, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyLists, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { clashes, foldPlan as sameFoldPlan, sameDoor, type FoldGroup, type SameGroup } from './same.ts';
@@ -734,7 +734,7 @@ export {
   type BackfillDeps, type BackfillOptions, type BackfillSuggestion, type Backfilled, type Named as BackfillNamed, type Slice as BackfillSlice, type SliceName as BackfillSliceName,
 } from './backfill.ts';
 export { MET_CAP, PEOPLE, RESOLVE_PAIRS_NIGHT, pairHash, peopleTwiceIds, peopleTwiceIdsIn } from './people.ts';
-export type { MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts';
+export type { ContactArgs, ContactMet, MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts';
 /* THE BANDS A MODEL'S ANSWER IS SETTLED IN (`people.ts`). Nothing here folds by itself: `settleVerdicts` folds
    only for a caller that hands it the switch, and no caller in this file does. */
 export { BAND_ASK, BAND_SURE, corroborated, settleVerdicts, type BandFold, type Settlement, type SettleOpts } from './people.ts';
@@ -12421,6 +12421,23 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           args,
         );
         /* A STRONG MERGE KEEPS WHAT THE TWO DISAGREED ON too, in its own batch, so Undo takes it back with the rest. */
+        if (!met.ok || met.value.undo === undefined) return met;
+        const carried = carryFolds(met.value.undo, as);
+        return carried.ok ? met : (carried as Result<never>);
+      });
+    },
+
+    /**
+     * One card of the owner's own address book (`people.ts` `meetContact`): folded into his own person, filled in on
+     * somebody kept, added only when they are of use, or left out with nothing kept. For the record's own sync of his
+     * account; the record refuses anybody else. Written as `w`, as one transaction, a strong fold's disagreements kept.
+     */
+    meetContact: (args: ContactArgs, w: WriteContext): Result<ContactMet> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      const as: WriteContext = { actor: w.actor, ...(w.principal === undefined ? {} : { principal: w.principal }) };
+      return attempt(sql, transaction, () => {
+        const met = meetCard(peopleDeps(as, () => null, (p) => openSuggestion(governDeps(), () => signedBy(as), p)), args);
         if (!met.ok || met.value.undo === undefined) return met;
         const carried = carryFolds(met.value.undo, as);
         return carried.ok ? met : (carried as Result<never>);

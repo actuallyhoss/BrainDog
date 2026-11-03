@@ -44,7 +44,7 @@ import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { boardStepsOn, stepsOf, type BoardBody, type BoardStep } from './board-steps.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
-import type { EraseReport, EraseRequest } from '@braindog/kernel';
+import type { ContactArgs, ContactMet, EraseReport, EraseRequest } from '@braindog/kernel';
 import { NOBODY, subjectsOf, admitHostSources, costRows, localDays, railRoom, raiseFault, readableZone, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
@@ -15484,6 +15484,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          (`CEILING`), so nothing it meets is written, and nothing is asked either, since the owner chose for it to suggest. */
       if (CEILING[caller.scope] !== 'quiet') return tail(ok(mentioned(kind, said, caller, null)));
       return tail(metOnLadder(ctx, caller, kind, said, sent, by));
+    },
+
+    /**
+     * One card of the owner's own address book, from the record's own sync of his account (`meetContact` in the kernel):
+     * folded into him, filled in on somebody kept, added only when they are of use, or left out.
+     *
+     * THE SYSTEM ONLY. A card is believed as the owner's own word, so nothing a key, a rule or a person sends is read as
+     * one, and no door names this: it is the sync's, as `arrive` is the doors'.
+     */
+    async meetContact(args: ContactArgs, ctx: CallContext): Promise<Result<ContactMet>> {
+      if (ctx.principal.kind !== 'system') return no('FORBIDDEN', "Only this record's own sync of a connected account says what its address book holds.", { at: 'principal' });
+      const people = kernel.meetsList();
+      const stop = guard(ctx, 'propose', people?.register);
+      if (stop) return { ok: false, refusal: stop };
+      return tail(kernel.meetContact(args, writerOf(ctx)));
     },
 
     /* ── THE DECISION GATE ─────────────────────────── */

@@ -19,14 +19,20 @@
  * WHAT IT WRITES IS WHAT THE ADD-ONS ALREADY TAKE. Mail goes through the Gmail add-on's own door (`gmail_in`), as the
  * same lines its Apps Script posts, so its list, pages, questions, Today widgets and people-meeting see nothing new.
  * Events go into the Calendar add-on's list under the very key its ICS reader uses (the event's iCalendar id, and the
- * day for one time of a repeating event), so the two never write the same event twice. People are met by address,
- * which fills what is blank and changes nothing a person typed.
+ * day for one time of a repeating event), so the two never write the same event twice.
+ *
+ * NOBODY IS ADDED TO PEOPLE FOR BEING IN GOOGLE CONTACTS (`meetContact` in the kernel). A card holding one of his own
+ * addresses is his, a card somebody kept already answers to fills in what they lack, and a card is a new person only
+ * when they are of use: a mail thread both of them wrote in, a small meeting together, or a name the record already
+ * says. The rest is left out, and the sync's line says how many of each.
  *
  * ITS OWN FILE, free of `cloudflare:`, so it is read in Node. Nothing here logs a value.
  */
 
 import { grantKey, openSealed, seal } from '@braindog/host';
 import { appNext } from '@braindog/host/auth';
+import { keyOf } from '@braindog/kernel';
+import type { CallContext, RecordApi } from '@braindog/record';
 
 import { unwrap, type KeyStore } from './keys.ts';
 
@@ -294,8 +300,19 @@ export type Connection = {
   last?: { at: number; said: string; ok: boolean } | undefined;
   gmail?: { history?: string | undefined; open?: Record<string, string> | undefined; pending?: string[] | undefined } | undefined;
   calendar?: { sync?: string | undefined; full?: number | undefined; name?: string | undefined } | undefined;
-  contacts?: { sync?: string | undefined; page?: string | undefined } | undefined;
+  /** `full` is when the whole book was last read, and `whole` is set while one is read a page at a time. */
+  contacts?: { sync?: string | undefined; page?: string | undefined; full?: number | undefined; whole?: boolean | undefined } | undefined;
+  /**
+   * Who he was in touch with, as the passes saw it, for the people rule: an address's key to the last day he wrote to
+   * it (`sent`), it wrote to him as a person and not a list or a machine (`heard`), or the two were on a small meeting
+   * (`met`). Kept for the look-back window and no more.
+   */
+  touch?: Touch | undefined;
+  /** The addresses the account sends as (Gmail's send-as list), read once a day: his own, never anybody to add. */
+  own?: { list: string[]; at: number } | undefined;
 };
+
+export type Touch = { sent?: Record<string, string> | undefined; heard?: Record<string, string> | undefined; met?: Record<string, string> | undefined };
 
 /** What the app is told: never the token, never a Google id. */
 export type Status = {
@@ -416,6 +433,10 @@ type Mail = {
   out: boolean;
   name: string;
   address: string;
+  /** Who he wrote to, for one he sent: every address on To and Cc. */
+  to: string[];
+  /** Whether he wrote in the thread after this one came in. */
+  answered: boolean;
   subject: string;
   snippet: string;
   at: number;
@@ -449,7 +470,10 @@ export function mailBody(m: Mail, zone: string): string {
   ].join('\n');
 }
 
-const HEADERS = ['From', 'To', 'Subject', 'Date', 'List-Unsubscribe', 'List-Id', 'Precedence', 'Auto-Submitted'];
+const HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date', 'List-Unsubscribe', 'List-Id', 'Precedence', 'Auto-Submitted'];
+
+/** Every address in a header that may list several (`"Lovelace, Ada" <ada@x.com>, bob@y.com`), lower case. */
+const addressesIn = (text: string): string[] => [...new Set([...text.matchAll(/[^\s<>()[\]"',;:]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/giu)].map((m) => m[0].toLowerCase()))];
 
 async function readMail(get: Get, id: string, me: string): Promise<Mail | null> {
   const q = new URLSearchParams({ format: 'metadata' });
@@ -479,13 +503,16 @@ async function readMail(get: Get, id: string, me: string): Promise<Mail | null> 
     looksLikeNewsletter(`${subject} ${snippet}`, other.address);
   const thread = str(m.threadId);
   const unread = !out && labels.includes('UNREAD') && labels.includes('INBOX');
-  const reply = !out && !bulk && labels.includes('INBOX') && !(await answered(get, thread, id, me));
+  const replied = !out && !bulk && labels.includes('INBOX') && (await answered(get, thread, id, me));
+  const reply = !out && !bulk && labels.includes('INBOX') && !replied;
   return {
     id,
     thread,
     out,
     name: clean(other.name || other.address, 120),
     address: other.address,
+    to: out ? addressesIn(`${h['to'] ?? ''}, ${h['cc'] ?? ''}`).filter((a) => a !== me) : [],
+    answered: replied,
     subject,
     snippet,
     at: Number(m.internalDate) || Date.now(),
@@ -526,9 +553,85 @@ export type Writer = {
   heldEvents(fromDay: string): Promise<Map<string, { seq: number; version: number; fields: Record<string, unknown> }>>;
   addEvent(fields: Record<string, unknown>): Promise<void>;
   changeEvent(seq: number, version: number, patch: Record<string, unknown>): Promise<void>;
-  /** Meet somebody by address. Fills what is blank; never changes what a person typed. */
-  meet(said: { name?: string; email: string; org?: string }): Promise<void>;
+  /**
+   * One Google Contacts card, for the people rule (`meetContact` in the kernel): folded into him, filled in on somebody
+   * kept, added when they are of use, or left out. Says which.
+   */
+  contact(said: ContactSaid): Promise<ContactDid>;
 };
+
+/** A card as the Contacts pass hands it on, with what the passes saw of the two of them. */
+export type ContactSaid = { name?: string; emails: string[]; phones: string[]; own: string[]; use?: 'mail' | 'event'; day?: string };
+export type ContactDid = 'self' | 'matched' | 'added' | 'skipped';
+
+/* ── who he is in touch with ─────────────────────────────────────────────── */
+
+/** The most addresses each kind of touch keeps, the newest. */
+const TOUCH_MOST = 500;
+/** A meeting of more people than this, him included, is a mass invite and says nothing about who he knows. */
+const MEETING_MOST = 10;
+
+/** `map` with an address's key moved to `day` when that is later. An address that is no address is left out. */
+function touched(map: Record<string, string> | undefined, address: string, day: string): Record<string, string> {
+  const out = { ...(map ?? {}) };
+  const key = keyOf('email', address);
+  if (key !== null && (out[key] ?? '') < day) out[key] = day;
+  return out;
+}
+
+/** `map` without the days before `from`, and only its newest `TOUCH_MOST`. */
+const pruned = (map: Record<string, string> | undefined, from: string): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(map ?? {})
+      .filter(([, day]) => day >= from)
+      .sort((a, b) => (a[1] < b[1] ? 1 : a[1] > b[1] ? -1 : 0))
+      .slice(0, TOUCH_MOST),
+  );
+
+/**
+ * What a mail says about who he is in touch with. One he sent says he wrote to everybody on it; one that came in from a
+ * person (not a list, a notification or a no-reply address) says they wrote to him, and one he answered in its thread
+ * says he wrote back.
+ */
+function touchMail(t: Touch, m: Mail, day: string): Touch {
+  if (m.out) return { ...t, sent: m.to.reduce((map, a) => touched(map, a, day), t.sent) };
+  if (!m.person) return t;
+  return { ...t, heard: touched(t.heard, m.address, day), ...(m.answered ? { sent: touched(t.sent, m.address, day) } : {}) };
+}
+
+/** What an event says: everybody else on a meeting of at most `MEETING_MOST` people that he is on and did not decline. */
+function touchEvent(t: Touch, e: Record<string, unknown>, day: string): Touch {
+  const people = arr(e.attendees).filter((a) => a.resource !== true);
+  const self = people.find((a) => a.self === true);
+  if (e.status === 'cancelled' || self === undefined || self.responseStatus === 'declined' || people.length < 2 || people.length > MEETING_MOST) return t;
+  return { ...t, met: people.filter((a) => a.self !== true).reduce((map, a) => touched(map, str(a.email), day), t.met) };
+}
+
+/**
+ * What the passes saw of a card's addresses within the window: `mail` when he wrote to one and it wrote to him, else
+ * `event` when they met, and the latest such day, never later than today (a meeting ahead is not a day in touch yet).
+ */
+function seenOf(t: Touch, emails: readonly string[], from: string, today: string): { use?: 'mail' | 'event'; day?: string } {
+  let use: 'mail' | 'event' | undefined;
+  let day = '';
+  for (const e of emails) {
+    const key = keyOf('email', e);
+    if (key === null) continue;
+    const sent = t.sent?.[key] ?? '';
+    const heard = t.heard?.[key] ?? '';
+    const met = t.met?.[key] ?? '';
+    if (sent >= from && heard >= from) {
+      use = 'mail';
+      for (const d of [sent, heard]) if (d > day) day = d;
+    }
+    if (met >= from) {
+      use ??= 'event';
+      const d = met > today ? today : met;
+      if (d > day) day = d;
+    }
+  }
+  return { ...(use === undefined ? {} : { use }), ...(day === '' ? {} : { day }) };
+}
 
 async function gmailPass(get: Get, conn: Connection, w: Writer, now: number): Promise<string> {
   const me = conn.email.toLowerCase();
@@ -600,6 +703,7 @@ async function gmailPass(get: Get, conn: Connection, w: Writer, now: number): Pr
     if (mail === null) continue;
     /* OLDER THAN THE WINDOW AND NOT ONE STILL WAITING: left alone, as the Apps Script leaves it. */
     if (mail.at < since && !Object.hasOwn(open, id)) continue;
+    if (mail.at >= since) conn.touch = touchMail(conn.touch ?? {}, mail, wallIn(mail.at, w.zone).day);
     if (!(await w.arrive(mailBody(mail, w.zone)))) {
       later.push(id);
       continue;
@@ -686,6 +790,7 @@ async function calendarPass(get: Get, conn: Connection, w: Writer, now: number):
       for (const e of arr(got.items)) {
         const one = eventFields(e, zone, name, w.invites);
         if (one) seen.set(one.key, one.fields);
+        if (one && typeof one.fields.day === 'string') conn.touch = touchEvent(conn.touch ?? {}, e, one.fields.day);
       }
       page = str(got.nextPageToken);
       sync = str(got.nextSyncToken) || sync;
@@ -757,15 +862,50 @@ async function calendarPass(get: Get, conn: Connection, w: Writer, now: number):
 
 /* ── Contacts ────────────────────────────────────────────────────────────── */
 
-const MEET_MOST = 150;
+/** The most cards one run looks at; the rest wait for the next, from the page it stopped on. */
+const CARDS_MOST = 400;
 
-async function contactsPass(get: Get, conn: Connection, w: Writer): Promise<string> {
+/**
+ * The addresses his account goes by: the one connected, and Gmail's send-as list, read once a day. A list that cannot be
+ * read keeps the last one, and is tried again the next day.
+ */
+async function ownOf(get: Get, conn: Connection, now: number): Promise<string[]> {
+  if (conn.own === undefined || conn.own.at + FULL_EVERY_MS <= now) {
+    try {
+      const got = await get(`${GMAIL}/settings/sendAs`);
+      const list = arr(got.sendAs).map((x) => str(x.sendAsEmail).trim().toLowerCase()).filter((a) => a.includes('@'));
+      conn.own = { list: [...new Set(list)].slice(0, 20), at: now };
+    } catch {
+      conn.own = { list: conn.own?.list ?? [], at: now };
+    }
+  }
+  return [...new Set([conn.email.trim().toLowerCase(), ...conn.own.list])].filter((a) => a.includes('@'));
+}
+
+/**
+ * Google Contacts, for the people rule: each card is handed on with every address and phone it holds and what the other
+ * passes saw of the two of them (`seenOf`), and the record decides (`meetContact`). A card is never a person for being a
+ * card. THE WHOLE BOOK IS READ AGAIN ONCE A DAY, so a card left out yesterday is looked at again once he has written to
+ * them; between, only the cards Google says changed.
+ */
+async function contactsPass(get: Get, conn: Connection, w: Writer, now: number): Promise<string> {
   const st = { ...(conn.contacts ?? {}) };
-  let met = 0;
   let page = st.page ?? '';
   let sync = st.sync;
+  let whole = st.whole === true;
+  if (page === '' && (sync === undefined || (st.full ?? 0) + FULL_EVERY_MS <= now)) {
+    sync = undefined;
+    whole = true;
+  }
+  const from = wallIn(now - LOOK_BACK_DAYS * 86_400_000, w.zone).day;
+  const today = wallIn(now, w.zone).day;
+  conn.touch = { sent: pruned(conn.touch?.sent, from), heard: pruned(conn.touch?.heard, from), met: pruned(conn.touch?.met, from) };
+  const touch = conn.touch;
+  let own: string[] | null = null;
+  const did = { self: 0, matched: 0, added: 0, skipped: 0 };
+  let looked = 0;
   const base = (): URLSearchParams => {
-    const q = new URLSearchParams({ personFields: 'names,emailAddresses,organizations', pageSize: '200', requestSyncToken: 'true' });
+    const q = new URLSearchParams({ personFields: 'names,emailAddresses,phoneNumbers', pageSize: '200', requestSyncToken: 'true' });
     if (sync) q.set('syncToken', sync);
     if (page) q.set('pageToken', page);
     return q;
@@ -775,32 +915,44 @@ async function contactsPass(get: Get, conn: Connection, w: Writer): Promise<stri
     try {
       got = await get(`${PEOPLE}?${base()}`);
     } catch (e) {
-      /* AN EXPIRED SYNC TOKEN: start over from the first page. */
+      /* AN EXPIRED SYNC TOKEN: start over from the first page, the whole book. */
       if (e instanceof Fault && (e.status === 410 || e.status === 400) && (sync || page)) {
         sync = undefined;
         page = '';
+        whole = true;
         continue;
       }
       throw e;
     }
     for (const p of arr(got.connections)) {
       if (((p.metadata ?? {}) as { deleted?: unknown }).deleted === true) continue;
-      const email = str(arr(p.emailAddresses)[0]?.value).trim().toLowerCase();
-      if (!email.includes('@')) continue;
+      const emails = arr(p.emailAddresses).map((x) => str(x.value).trim()).filter((e) => e.includes('@'));
+      const phones = arr(p.phoneNumbers).map((x) => str(x.canonicalForm).trim() || str(x.value).trim()).filter((n) => n !== '');
+      if (emails.length === 0 && phones.length === 0) continue;
+      own ??= await ownOf(get, conn, now);
       const name = clean(str(arr(p.names)[0]?.displayName), 120);
-      const org = clean(str(arr(p.organizations)[0]?.name), 120);
-      await w.meet({ email, ...(name ? { name } : {}), ...(org ? { org } : {}) });
-      met += 1;
+      did[await w.contact({ ...(name ? { name } : {}), emails, phones, own, ...seenOf(touch, emails, from, today) })] += 1;
+      looked += 1;
     }
     page = str(got.nextPageToken);
     if (!page) {
       sync = str(got.nextSyncToken) || sync;
+      if (whole) st.full = now;
+      whole = false;
       break;
     }
-    if (met >= MEET_MOST) break;
+    if (looked >= CARDS_MOST) break;
   }
-  conn.contacts = { sync, ...(page ? { page } : {}) };
-  return met === 0 ? 'contacts up to date' : `${String(met)} ${met === 1 ? 'contact' : 'contacts'}`;
+  conn.contacts = { sync, ...(page ? { page } : {}), ...(st.full === undefined ? {} : { full: st.full }), ...(whole ? { whole: true } : {}) };
+  return contactsLine(did);
+}
+
+/** The Contacts pass's line: who the cards turned out to be, so nobody is added without the sync saying so. */
+export function contactsLine(did: Record<ContactDid, number>): string {
+  const matched = did.self + did.matched;
+  if (matched + did.added + did.skipped === 0) return 'contacts up to date';
+  const left = did.skipped === 0 ? '' : `, ${String(did.skipped)} ${did.skipped === 1 ? 'contact' : 'contacts'} not added`;
+  return `${String(matched)} ${matched === 1 ? 'person' : 'people'} matched, ${String(did.added)} added${left}`;
 }
 
 /* ── one sync ────────────────────────────────────────────────────────────── */
@@ -823,7 +975,56 @@ export async function syncOnce(conn: Connection, access: string, w: Writer, send
   };
   if (w.mail) await part('Gmail', () => gmailPass(get, conn, w, now));
   if (w.events) await part('Calendar', () => calendarPass(get, conn, w, now));
-  await part('Contacts', () => contactsPass(get, conn, w));
+  await part('Contacts', () => contactsPass(get, conn, w, now));
   conn.last = { at: now, said: said.join(', '), ok };
   conn.due = now + SYNC_EVERY_MS;
+}
+
+/* ── what the sync writes through ────────────────────────────────────────── */
+
+/** The lists this sync fills itself, whose rows never say he knows somebody: the Gmail add-on's mail, the Calendar's events. */
+const OWN_LISTS = ['gmail_mail', 'events'] as const;
+
+/**
+ * What the sync writes through: the add-ons' own door and lists, and the people rule, as the system. HERE AND NOT IN THE
+ * RECORD'S OBJECT, so the one the alarm runs is the one `node --test` runs (`test/google-people.test.ts`).
+ */
+export function googleWriter(api: RecordApi): Writer {
+  const sys: CallContext = { principal: { kind: 'system', id: 'google' } };
+  const events = api.kernel.register('events');
+  const hasField = (id: string): boolean => events?.fields.some((f) => f.id === id) === true;
+  return {
+    zone: api.kernel.identity()?.tz ?? 'UTC',
+    mail: api.kernel.register('gmail_mail') !== undefined,
+    events: hasField('key'),
+    invites: hasField('response') && hasField('organiser'),
+    arrive: async (body) => {
+      const bytes = new TextEncoder().encode(body);
+      const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
+      const out = await api.arrive({ channel: 'webhook', headers: { 'content-type': 'text/plain; charset=utf-8' }, body, sha256, verified: true, ingest: 'gmail_in' });
+      return out.ok;
+    },
+    heldEvents: async (fromDay) => {
+      const held = new Map<string, { seq: number; version: number; fields: Record<string, unknown> }>();
+      let cursor: string | null = null;
+      for (let i = 0; i < 20; i++) {
+        const page = await api.list({ register: 'events', where: { all: [{ field: 'day', gte: fromDay }] }, limit: 200, cursor }, sys);
+        if (!page.ok) break;
+        for (const r of page.value.rows) if (r.seq !== null && typeof r.fields.key === 'string') held.set(r.fields.key, { seq: r.seq, version: r.version, fields: r.fields });
+        cursor = page.value.cursor;
+        if (cursor === null) break;
+      }
+      return held;
+    },
+    addEvent: async (fields) => {
+      await api.create({ register: 'events', fields: fields as never }, sys);
+    },
+    changeEvent: async (seq, version, patch) => {
+      await api.update({ register: 'events', seq, version, patch: patch as never }, sys);
+    },
+    contact: async (said) => {
+      const out = await api.meetContact({ ...said, skip: [...OWN_LISTS], source: 'Google Contacts' }, sys);
+      return out.ok ? out.value.did : 'skipped';
+    },
+  };
 }
