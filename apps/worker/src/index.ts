@@ -4177,7 +4177,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        hosts file was written before the app moved to the root; a page load there was sent on by `legacyRedirect`. */
     /* THE FRAME A DRAWN BLOCK IS DRAWN IN, before `appPath`, which would read `drawn-frame` as a record's name. It is
        answered from code under its own policy and never through `asPage` (`@braindog/host/drawn-frame`). */
-    if (isDrawnFrame(url.pathname)) return drawnFrame(request.method);
+    if (isDrawnFrame(url.pathname)) return drawnFrame(request.method, url.pathname);
     const app = appPath(url.pathname);
     /* A RECORD'S PUBLIC KEY, UNDER ITS NAME, before the page and the API are told apart: it is neither. */
     if (app !== null && app.slug !== null && servesKey(app.rest)) return recordKey(request, env, app.slug);

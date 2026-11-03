@@ -2654,7 +2654,7 @@ async function answer(
   /* THE FRAME A DRAWN BLOCK IS DRAWN IN, WITH OR WITHOUT A BUILT SHELL: it is code under its own policy and never a file
      of the build (`@braindog/host/drawn-frame`), so a host started with no shell, as the gates' record and `vite dev`
      behind it are, answered "The app is not built yet" inside every drawn widget (add-ons pass 3, 2 Nov). */
-  if (shell === null && isDrawnFrame(path)) return write(res, drawnFrame(method));
+  if (shell === null && isDrawnFrame(path)) return write(res, drawnFrame(method, path));
   if (!/^\/+api(?:\/|$)/.test(path))
     return write(
       res,

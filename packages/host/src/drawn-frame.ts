@@ -69,12 +69,64 @@ export function drawnFrameHeaders(): Headers {
   });
 }
 
-/** Whether a path is the frame's, so a host answers it before it reads the path as a record's name. */
-export const isDrawnFrame = (pathname: string): boolean => pathname === DRAWN_FRAME_PATH;
+/* ── the attached page's frame ──────────────────────────────────────────── */
 
-/** The frame, for a GET or a HEAD; any other method is refused, as it is for every page of the app. */
-export function drawnFrame(method: string): Response {
+/**
+ * Where an attached page is drawn (`methods/attachments.ts`): a Claude artifact or any `.html` file somebody put on a
+ * task, shown as it is. Under `drawn-frame/`, so the name no record can take already covers it.
+ *
+ * NOT THE DRAWN BLOCK'S POLICY, BECAUSE AN ARTIFACT IS NOT A DRAWN BLOCK. A visual is BrainDog's own page and loads
+ * nothing; an artifact is written against the libraries its maker's tool offers (React and Chart.js from cdnjs, Tailwind
+ * from its CDN, fonts from Google) and is blank without them. So this frame lets scripts, styles, fonts and pictures
+ * come from those five script hosts and Google Fonts, AND NOTHING ELSE AT ALL:
+ *
+ * - `sandbox allow-scripts` and no `allow-same-origin`: an origin that holds nothing, so no cookie, no storage, and the
+ *   app's API answers it as a stranger. No `allow-top-navigation`, no popups, no forms.
+ * - `connect-src 'none'`: no fetch, XHR, WebSocket or beacon, so it cannot send what it shows anywhere.
+ * - pictures only inline or from those hosts: no pixel from anywhere else learns who opened it, or when.
+ * - `form-action 'none'` and `base-uri 'none'`: no sign-in form that posts, no base that moves its links.
+ * - `'unsafe-eval'` inside this frame only, for an artifact that compiles its JSX in the browser; the origin it runs in
+ *   holds nothing for it to reach.
+ * - `frame-ancestors 'self'`: only BrainDog's own pages hold it.
+ */
+export const FILE_FRAME_PATH = '/drawn-frame/file';
+
+/** The hosts an artifact may load its libraries from: the ones Claude's artifacts are written against. */
+export const ARTIFACT_HOSTS = ['https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net', 'https://unpkg.com', 'https://cdn.tailwindcss.com', 'https://code.jquery.com'] as const;
+
+const CDNS = ARTIFACT_HOSTS.join(' ');
+
+/** Its policy, said above line by line. */
+export const FILE_FRAME_POLICY = [
+  'sandbox allow-scripts',
+  "default-src 'none'",
+  `script-src 'unsafe-inline' 'unsafe-eval' ${CDNS}`,
+  `style-src 'unsafe-inline' ${CDNS} https://fonts.googleapis.com`,
+  `font-src data: ${CDNS} https://fonts.gstatic.com`,
+  `img-src data: blob: ${CDNS}`,
+  'media-src data: blob:',
+  "connect-src 'none'",
+  "form-action 'none'",
+  "base-uri 'none'",
+  "frame-ancestors 'self'",
+].join('; ');
+
+/** The headers the attached page's frame is answered with: the drawn frame's, under its own policy. */
+export function fileFrameHeaders(): Headers {
   const headers = drawnFrameHeaders();
+  headers.set('content-security-policy', FILE_FRAME_POLICY);
+  return headers;
+}
+
+/** Whether a path is one of the two frames, so a host answers it before it reads the path as a record's name. */
+export const isDrawnFrame = (pathname: string): boolean => pathname === DRAWN_FRAME_PATH || pathname === FILE_FRAME_PATH;
+
+/**
+ * The frame, for a GET or a HEAD; any other method is refused, as it is for every page of the app. `pathname` picks the
+ * attached page's frame; the same document, under its own policy.
+ */
+export function drawnFrame(method: string, pathname: string = DRAWN_FRAME_PATH): Response {
+  const headers = pathname === FILE_FRAME_PATH ? fileFrameHeaders() : drawnFrameHeaders();
   if (method !== 'GET' && method !== 'HEAD') {
     headers.set('allow', 'GET, HEAD');
     headers.set('cache-control', 'no-store');

@@ -97,7 +97,7 @@ function readsAsText(bytes: Uint8Array): boolean {
   if (head.includes(0)) return false;
   try {
     /* A SEQUENCE CUT AT THE 64 KB EDGE IS NOT A FAULT, so the decoder is asked to stream. */
-    new TextDecoder('utf-8', { fatal: true }).decode(head, { stream: head.length < bytes.length });
+    new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(head, { stream: head.length < bytes.length });
     return true;
   } catch {
     return false;

@@ -38,5 +38,18 @@ export function cloudVisuals(bucket: VisualBucket, record: () => string): Visual
       const object = await bucket.head(fileKey(record(), sha256));
       return object === null ? null : { bytes: object.size, mime: object.httpMetadata?.contentType ?? 'application/octet-stream' };
     },
+    /* AN ATTACHMENT'S BYTES, read once when it is attached so its words can be kept (`methods/attachments.ts`). */
+    getFile: async (sha256) => {
+      if (!SHA256.test(sha256)) return null;
+      const object = await bucket.get(fileKey(record(), sha256));
+      return object === null ? null : new Uint8Array(await object.arrayBuffer());
+    },
+    /* A FILE AN AGENT HANDS IN AS TEXT, kept where the file door keeps one, under its hash and the type the record read. */
+    putFile: async (sha256, bytes, mime) => {
+      if (!SHA256.test(sha256)) throw new Error('A file is named by its SHA-256, and this name is not one.');
+      const key = fileKey(record(), sha256);
+      if ((await bucket.head(key)) !== null) return;
+      await bucket.put(key, bytes, { httpMetadata: { contentType: mime } });
+    },
   };
 }

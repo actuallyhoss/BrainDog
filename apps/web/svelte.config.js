@@ -97,7 +97,9 @@ export default {
         'script-src': ['self', ...inlineHashes('script'), TURNSTILE],
         'style-src-elem': ['self', ...inlineHashes('style')],
         'style-src-attr': ['unsafe-inline'],
-        'frame-src': ['self', ...EMBEDS, TURNSTILE],
+        /* `blob:` FOR AN ATTACHED PDF ONLY, which the browser's own viewer draws from a `blob:` the app makes with the type
+           `application/pdf` and no other (`lib/attach/AttachmentViewer.svelte`), so a blob in a frame is never a page. */
+        'frame-src': ['self', 'blob:', ...EMBEDS, TURNSTILE],
         'object-src': ['none'],
         'base-uri': ['none'],
       },

@@ -136,7 +136,7 @@ export function shellOf(dir: string): (request: Request, origin: string) => Resp
   return (request, origin) => {
     /* THE FRAME A DRAWN BLOCK IS DRAWN IN is answered from code under its own policy, as the Worker answers it, and is
        never a file of the build (`@braindog/host/drawn-frame`). */
-    if (isDrawnFrame(new URL(request.url).pathname)) return drawnFrame(request.method);
+    if (isDrawnFrame(new URL(request.url).pathname)) return drawnFrame(request.method, new URL(request.url).pathname);
     const headers = new Headers({
       'x-content-type-options': 'nosniff',
       'content-security-policy': "frame-ancestors 'none'",
