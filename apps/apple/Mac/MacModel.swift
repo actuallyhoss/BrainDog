@@ -165,7 +165,7 @@ final class MacModel: NSObject, UNUserNotificationCenterDelegate {
             desk.emit("slash", prefill.isEmpty ? nil : prefill)
         case .visit(let path, _):
             desk.go(path)
-        case .ready, .haptic, .signedOut, .title, .places, .pushAsk, .drag, .titleBarDoubleClick:
+        case .ready, .haptic, .signedOut, .title, .places, .pushAsk, .drag, .titleBarDoubleClick, .scheme:
             break
         }
     }
