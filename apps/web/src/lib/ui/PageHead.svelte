@@ -582,7 +582,7 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    /* Look B: page names wear Lexend, text stays Geist. */
+    /* Page names at 600, tight; the one face throughout. */
     font-family: var(--font-display);
     font-size: var(--fs-page);
     font-weight: var(--fw-semi);

@@ -99,7 +99,7 @@
     margin: 0;
     font-size: var(--t-site-21);
     line-height: 1.2;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.021em;
     overflow-wrap: anywhere;
   }
 

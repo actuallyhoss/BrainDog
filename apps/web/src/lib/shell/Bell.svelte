@@ -545,7 +545,7 @@
     border-block-end: 1px solid var(--rule);
   }
 
-  /* GEIST, AS EVERY TILE'S AND SHEET'S HEADING IS (Look B): Lexend is for page names and big figures. */
+  /* THE ONE FACE, AS EVERY TILE'S AND SHEET'S HEADING IS. */
   .bell-title {
     margin: 0;
     font-family: var(--font-ui);

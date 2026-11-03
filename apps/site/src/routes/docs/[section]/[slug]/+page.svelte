@@ -180,7 +180,7 @@
     margin: 0;
     font-size: var(--t-section);
     line-height: 1.02;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.028em;
     text-wrap: balance;
   }
 

@@ -145,7 +145,6 @@
      tabular-proportional is for QUANTITY (13 §3.2). */
   .num {
     font-variant-numeric: tabular-nums;
-    font-feature-settings: 'ss02';
   }
 
   /* Arabic sits at a different optical size: no capitals, no x-height, weight above and below the

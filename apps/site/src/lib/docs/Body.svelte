@@ -145,7 +145,7 @@
     }
   }
 
-  /* A part's heading in Lexend, set tight; a heading a reader jumps to keeps a little air above it. */
+  /* A part's heading at 600, set tight; a heading a reader jumps to keeps a little air above it. */
   .doc-h {
     max-inline-size: 34ch;
     margin: 0;
@@ -153,7 +153,7 @@
     font-size: var(--t-feature);
     font-weight: 600;
     line-height: 1.2;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.021em;
     text-wrap: balance;
     scroll-margin-block-start: 24px;
   }

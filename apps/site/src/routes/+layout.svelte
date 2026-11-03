@@ -205,7 +205,7 @@
     block-size: 64px;
   }
 
-  /* THE BRAND: the mark in red and the name in Lexend 600, the footer's the same. */
+  /* THE BRAND: the mark in red and the name at 600, the footer's the same. */
   .brand {
     display: flex;
     flex: none;

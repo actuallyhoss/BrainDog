@@ -48,6 +48,6 @@ test('the book opens on Look B, the design system the app is drawn in', () => {
   const book = designBook({ look: '', scale: '' });
   assert.ok(book.look.length > 5);
   assert.ok(book.look.some((l) => /pills/u.test(l)), 'says no pills');
-  assert.ok(book.look.some((l) => /Lexend/u.test(l)), 'names the display face');
+  assert.ok(book.look.some((l) => /Plus Jakarta Sans/u.test(l)), 'names the face');
   assert.ok(book.check.some((l) => /Look B/u.test(l)), 'the check holds a design to it');
 });

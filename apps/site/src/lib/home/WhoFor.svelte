@@ -138,7 +138,7 @@
   .fig b {
     color: var(--ink);
     font: 600 28px/1 var(--head);
-    letter-spacing: -0.035em;
+    letter-spacing: -0.024em;
   }
 
   /* ONE QUESTION AS NEEDS YOU DRAWS IT: the ask, then its two answers as the app's small buttons, drawn only. */

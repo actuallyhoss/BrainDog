@@ -15,12 +15,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>BrainDog</title>
     <style>
+      @font-face {
+        font-family: 'Plus Jakarta Sans';
+        src: url('/fonts/jakarta.woff2?v=817f') format('woff2');
+        font-weight: 200 800;
+        font-display: swap;
+      }
+
       html,
       body {
         margin: 0;
         background: Canvas;
         color: CanvasText;
-        font-family: Geist, 'Geist Fallback', system-ui, -apple-system, 'Segoe UI', sans-serif;
+        font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
       }
 
       main {
@@ -36,7 +43,6 @@
 
       h1 {
         margin: 0;
-        font-family: Lexend, 'Lexend Fallback', system-ui, sans-serif;
         font-size: 22px;
         font-weight: 600;
         line-height: 1.3;

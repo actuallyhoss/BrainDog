@@ -50,7 +50,7 @@
   h3 {
     font-size: var(--t-feature);
     line-height: 1.1;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.021em;
   }
 
   .say {

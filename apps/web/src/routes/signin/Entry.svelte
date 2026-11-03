@@ -150,7 +150,7 @@
 
   /* ── The words every entry screen opens with ───────────────────────────── */
 
-  /* THE ENTRY SCREENS' ONE TITLE, a page's name as PageHead draws one: Lexend 600 at 28/34, 22/28 under 900. The same
+  /* THE ENTRY SCREENS' ONE TITLE, a page's name as PageHead draws one: 600 at 28/34, 22/28 under 900. The same
      at every width in one face, so the title never changes typeface as the window narrows (first F7). */
   .entry :global(.entry-title),
   .entry :global(h1.empty-title) {

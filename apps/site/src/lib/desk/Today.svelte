@@ -492,7 +492,7 @@
 
   .pbig {
     font: 600 28px/34px var(--head);
-    letter-spacing: -0.035em;
+    letter-spacing: -0.024em;
     font-variant-numeric: tabular-nums;
   }
 

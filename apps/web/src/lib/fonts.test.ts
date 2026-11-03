@@ -32,15 +32,15 @@ test('every font the sheet asks for carries the hash of the file both apps serve
   }
 });
 
-test('the shell preloads Geist and Lexend at the addresses the sheet asks for, and nothing else', () => {
+test('the shell preloads the one face at the address the style layer asks for, and nothing else', () => {
   const shell = read('apps/web/src/app.html').replace(/<!--[\s\S]*?-->/g, '');
+  const style = read('apps/web/src/lib/ui/style.css');
+  const face = /url\('\/fonts\/(jakarta\.woff2\?v=([0-9a-f]+))'\)/.exec(style);
+  assert.ok(face, 'style.css does not name jakarta.woff2 with a ?v=');
+  for (const app of ['apps/web', 'apps/site']) assert.equal(face[2], hash(`${app}/static/fonts/jakarta.woff2`), `${app}'s jakarta.woff2 is not ?v=${face[2]}`);
   const preloads = [...shell.matchAll(/<link rel="preload" href="%sveltekit\.assets%\/fonts\/([^"]+)" as="font" type="font\/woff2" crossorigin \/>/g)].map((m) => m[1]);
-  const address = (file: string) => {
-    const one = asked.find((a) => a.file === file);
-    return `${file}?v=${one?.v}`;
-  };
-  assert.deepEqual(preloads, [address('geist.woff2'), address('lexend-600.woff2')]);
-  assert.equal([...shell.matchAll(/rel="preload"/g)].length, preloads.length, 'every preload is one of the two faces');
+  assert.deepEqual(preloads, [face[1]]);
+  assert.equal([...shell.matchAll(/rel="preload"/g)].length, preloads.length, 'the one preload is the face');
 });
 
 test('the shell declares the two sized fallbacks the stacks name, each on Arial', () => {

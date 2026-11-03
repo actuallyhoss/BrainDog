@@ -3,16 +3,29 @@
    Sam: "i want the ui to look more like ops encore ui", then "i dont mean ops encore colors, i mean just the style".
    So nothing here writes a colour of its own: every new token is a mix of the palette `house.css` generates (the board,
    the tile, the ink, the accent fill), so a person's accent, dark and high contrast follow by themselves. What it adds
-   is the STYLE: capsules and circles, a soft ambient ground, solid cards with a two-layer shadow, glass only
+   is the STYLE: one face, capsules and circles, a soft ambient ground, solid cards with a two-layer shadow, glass only
    on floating chrome, translucent washes for hover, and the ops elevation tiers. The spec is
    `loop/plans/ops-look-2026-11-03/SPEC.md`.
 
    Imported by `routes/+layout.svelte` after every other sheet, so its values win a tie in each layer. App only: the
    marketing site keeps Look B. */
 
+/* The file is `tools/fonts/jakarta.py`'s: upstream's variable font (wght 200 to 800) with its capitals centred in the
+   line, a word space that reads at 14, and the arrows and Latin Extended-A in the subset. */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/fonts/jakarta.woff2?v=817f') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+  unicode-range: U+0000-017F, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @layer tokens {
   :root {
-    /* FACES: Geist for words and Lexend for titles, from tokens.css (Sam asked for the old fonts back, 3 Nov). */
+    /* ONE FACE for every word, titles and figures too (ops: one family, 400/500/600). Geist Mono stays for code. */
+    --font-ui: 'Plus Jakarta Sans', 'Jakarta Fallback', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: var(--font-ui);
 
     /* TYPE: dense desktop sizes. */
     --fs-cap: 12px;
@@ -79,7 +92,6 @@
     --lh-tight: 1.25;
     --track-caps: 0.025em;
     --track-head: -0.01em;
-    --track-body: 0.005em;
     /* The type pairs as one shorthand each: `font: var(--t-row)`. */
     --t-caps: var(--fw-medium) var(--fs-caps) / var(--lead-caps) var(--font-ui);
     --t-cap: var(--fw-regular) var(--fs-cap) / var(--lead-cap) var(--font-ui);
@@ -340,6 +352,9 @@
   body {
     background: var(--ambient);
     background-color: var(--board);
+    /* TABULAR EVERYWHERE, as the site is. Jakarta's own figures are far apart in width (a 0 is 0.73 em, a 1 is 0.37), so
+       a date in a line reads uneven and a column does not align; its tabular set is 0.60 em each. */
+    font-variant-numeric: tabular-nums;
   }
 
   :where(h1, h2, h3, h4) {

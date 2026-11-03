@@ -4,7 +4,7 @@
  *
  * THE LOOK IS THE SITE DESIGN OF 17 OCTOBER as the redesign rebuilt it: a dark night band at the top of every page (the header, then the page's own head), then
  * full-bleed colour bands, each on its own ground in both schemes, with flat radius-16 tiles inside, and a dark
- * footer. No glass, no gradients, no glows, no shadows. Titles are Lexend 600 set tight, every other word is Geist.
+ * footer. No glass, no gradients, no glows, no shadows. Titles are Plus Jakarta Sans 600 set tight, every other word is Plus Jakarta Sans at 400 or 500.
  * Red is the app's two tokens: `--red-fill` under white words (the start button, and in the drawn app a count) and
  * `--red` for red words and marks (late, needs you, links). The only solid red button on a page is Start free (1 Nov).
  *
@@ -12,6 +12,54 @@
  * ground, the buttons, the cards, the tables, the questions and the key cap, beside the older tile grid the kept
  * pages still draw (`.in`, `.band`, `.tile`) until each is restyled. A component's own look is in the component.
  */
+
+/**
+ * THE APP'S ONE FACE (3 Nov): Plus Jakarta Sans for every word, titles and figures too, as the app sets it
+ * (`apps/web/src/lib/ui/style.css`, the ops-look spec). Geist Mono stays for code and key caps. The file is
+ * `tools/fonts/jakarta.py`'s. The fallback is Arial widened to Jakarta's stance per weight, the app's own measured
+ * numbers (`apps/web/src/app.html`), so a title does not move when the face lands.
+ */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/fonts/jakarta.woff2?v=817f') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+  unicode-range: U+0000-017F, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Jakarta Fallback';
+  src: local('Arial'), local('ArialMT');
+  font-weight: 100 450;
+  size-adjust: 106.2%;
+  ascent-override: 94.16%;
+  descent-override: 24.48%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-017F, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212;
+}
+
+@font-face {
+  font-family: 'Jakarta Fallback';
+  src: local('Arial'), local('ArialMT');
+  font-weight: 451 550;
+  size-adjust: 107.3%;
+  ascent-override: 93.2%;
+  descent-override: 24.23%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-017F, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212;
+}
+
+@font-face {
+  font-family: 'Jakarta Fallback';
+  src: local('Arial Bold'), local('Arial-BoldMT');
+  font-weight: 551 900;
+  size-adjust: 102%;
+  ascent-override: 98.04%;
+  descent-override: 25.49%;
+  line-gap-override: 0%;
+  unicode-range: U+0000-017F, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212;
+}
 
 @layer components {
   :root {
@@ -104,10 +152,15 @@
   /**
    * THE APP'S STYLE, ON THE SITE (3 Nov). The app took the ops dashboard's style in its own colours; the site follows
    * so a visitor sees the same thing here as after they sign in. Colours stay Look B's: every value below is a mix of
-   * the palette's own tokens. What changes is the shapes (capsule controls, concentric radii), the solid
+   * the palette's own tokens. What changes is the face, the shapes (capsule controls, concentric radii), the solid
    * cards with a soft two-layer shadow in light and none in dark, and glass only on chrome that floats.
    */
   :root {
+    --ui: 'Plus Jakarta Sans', 'Jakarta Fallback', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --head: var(--ui);
+    --font-ui: var(--ui);
+    --font-display: var(--ui);
+
     --r-xs: 6px;
     --r-ctl: 10px;
     --r-pill: 999px;
@@ -473,7 +526,7 @@
     font-size: var(--t-site-hero);
     font-weight: 600;
     line-height: var(--lh-site-hero);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.021em;
     text-wrap: balance;
   }
 
@@ -836,7 +889,7 @@
     max-inline-size: 14ch;
     font-size: var(--t-section);
     line-height: 1.02;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.028em;
     text-wrap: balance;
   }
 
@@ -1048,7 +1101,7 @@
     margin: 0;
     max-inline-size: 17ch;
     font: 600 var(--t-section) / 1.02 var(--head);
-    letter-spacing: -0.04em;
+    letter-spacing: -0.028em;
     text-wrap: balance;
   }
 
