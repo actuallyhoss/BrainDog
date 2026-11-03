@@ -289,7 +289,7 @@ const emit = (envelope: unknown): void => writeFileSync(1, `${JSON.stringify(env
 
 /** What `--json` is, said the same at the foot of `--help` and of the whole usage. */
 const JSON_LINE =
-  '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, keys headers, keys helper, run, hook, setup, env apply, the sync verbs but inventory, starter preview, addon preview, init and serve do not take it.';
+  '--json answers with one JSON document on stdout and moves every other line to stderr. mcp, keys exec, keys headers, keys helper, run, hook, setup, env apply, the sync verbs but inventory, starter preview, addon preview, addon dev, init and serve do not take it.';
 
 const fullUsage = () =>
   [
@@ -364,12 +364,16 @@ const fullUsage = () =>
     '  Install the add-on in a scratch BrainDog, write the rows in its <id>.test.json and say each expectation as passed or failed. Nothing is sent.',
     'braindog addon preview <file|dir> [--port <n>]',
     '  Start a scratch BrainDog on this machine with the add-on in its catalogue, and print its page. Removed when it stops.',
+    'braindog addon dev <dir> [--port <n>]',
+    '  Start a scratch BrainDog with the add-on installed and watch its folder: each save of the file or a .js script is checked and installed again, with what changed or why it was refused. Removed when it stops.',
     'braindog addon diff|search|install|yank <...>',
     '  The same as for a starter: diff <a> <b>, search [words] [--from <catalogue> | --kennel [host]], install <id|file> [--from <catalogue>], yank <id> <version> --reason <why>.',
     'braindog addon install <file> --force | braindog addon uninstall <id> [--force]',
     '  --force on addon install or addon uninstall takes away a list that still holds items, keeping every one of them. It lifts that refusal only.',
     'braindog addon publish <file> --to <folder> | --kennel [host] [--sign <key file>]',
     '  Add an add-on version to a catalogue folder, or submit it to the Kennel and say whether it is listed or waits for review, signed with an author key or as the person signed in.',
+    'braindog addon publish [<dir>] --github [--repo owner/name]',
+    '  Push the folder to GitHub with your gh, tag v<version>, and print the git: line that installs it. A version already published is never moved.',
     'braindog kennel review [show|list|refuse <kind> <id> <version>] [--reason <why>] [--kennel <host>] | trust <publisher> [--probe]',
     "  The Kennel operator's review, with PROVISION_KEY set: what waits; show installs one in a scratch BrainDog and prints what it reaches and calls out to; list sends it with a preview of its pages; refuse says why; trust lists a publisher's files at once, and with --probe marks the nightly probe's key, the one publisher whose ids may begin probe-.",
     'braindog addon key <file> --author <name>',
@@ -550,7 +554,7 @@ const GROUPS: [string, [string, string][]][] = [
     ['feed propose <file>', 'Ask for each live feed a setup file lists'],
   ]],
   ['Add-ons', [
-    ['addon new|check|test|preview', 'Write, check and try an add-on here (also: pack)'],
+    ['addon new|check|test|preview|dev', 'Write, check and try an add-on here (also: pack)'],
     ['addon install|uninstall <id>', 'Ask the owner to install an add-on, or remove one'],
     ['addon publish|yank|diff|search', 'Publish, take back, compare or find add-ons'],
     ['addon key <verb>', 'Make, rotate or revoke an author key'],
@@ -1347,7 +1351,7 @@ const cut = takeJson(rest);
 /* AND `env apply`, WHICH PRINTS FOR A PERSON AND ASKS AT THE TERMINAL AS `setup` DOES, so the flag reaches its own strict
    `parseArgs` and is refused there in its own words. The sync verbs but `inventory` are the same. */
 const syncAct = command === 'sync' && SYNC_VERBS.includes(rest[0] ?? '');
-const noEnvelope = ((command === 'usecase' || command === 'pack') && rest[0] === 'preview') || (command === 'env' && rest[0] === 'apply') || syncAct;
+const noEnvelope = ((command === 'usecase' || command === 'pack') && rest[0] === 'preview') || (command === 'pack' && rest[0] === 'dev') || (command === 'env' && rest[0] === 'apply') || syncAct;
 const takesJson = !noEnvelope && (JSON_COMMANDS.has(command ?? '') || (command === 'keys' && (rest[0] === 'put' || rest[0] === 'list' || rest[0] === 'scan')));
 const args = takesJson ? cut.rest : rest;
 if (takesJson && cut.json) json = machine(say);

@@ -168,14 +168,14 @@ export function planLines(diff: Plan): string[] {
  * Said in lines; `installed` when it went in, `same` when the file is the one installed last (`last`), which is what
  * the save that copies a script into the file wakes, and nothing is said for it.
  */
-export async function devInstall(file: string, client: PackCalls, io: AgentIo, last: { text: string | null } = { text: null }, saved = false): Promise<'installed' | 'same' | 'refused'> {
+export async function devInstall(file: string, client: PackCalls, io: AgentIo, last: { text: string | null } = { text: null }, saved: string | null = null): Promise<'installed' | 'same' | 'refused'> {
   const read = readFolder(file);
   if (!read.ok) {
     io.say(`  ${read.fix}`);
     return 'refused';
   }
   if (read.text === last.text) return 'same';
-  if (saved) io.out(`${basename(file)} saved:`);
+  if (saved !== null) io.out(`${saved} saved:`);
   keepInStep(file, read, io);
   const door = await readCatalogueFile(read.text);
   if (!door.ok) {
@@ -340,6 +340,7 @@ export async function dev(args: string[], io: AgentIo): Promise<number> {
   let timer: NodeJS.Timeout | null = null;
   let running = false;
   let again = false;
+  const named = new Set<string>();
   const pass = async () => {
     if (running) {
       again = true;
@@ -347,7 +348,8 @@ export async function dev(args: string[], io: AgentIo): Promise<number> {
     }
     running = true;
     const t0 = Date.now();
-    const went = await devInstall(found.file, client, io, last, true);
+    const went = await devInstall(found.file, client, io, last, named.size === 0 ? basename(found.file) : [...named].join(', '));
+    named.clear();
     if (went === 'installed') io.out(`  In ${Date.now() - t0} ms. Reload the page to see it.`);
     /* AFTER A REFUSAL THE NEXT SAVE IS ALWAYS TRIED, the one that puts the file back as it was installed included. */
     if (went === 'refused') last.text = null;
@@ -358,7 +360,9 @@ export async function dev(args: string[], io: AgentIo): Promise<number> {
     }
   };
   const watcher = watch(found.dir, (_event, name) => {
-    if (name === null || !(PACK_FILE.test(name) || name.endsWith('.js'))) return;
+    /* AN EDITOR'S OWN SCRATCH FILES (`.name.swp`, `.!123!name.js`) START WITH A DOT AND ARE NOT THE ADD-ON'S. */
+    if (name === null || basename(name).startsWith('.') || !(PACK_FILE.test(name) || name.endsWith('.js'))) return;
+    named.add(basename(name));
     if (timer !== null) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = null;
