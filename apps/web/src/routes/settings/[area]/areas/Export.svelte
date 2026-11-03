@@ -106,6 +106,11 @@
     oneFile: 'Everything, in one file',
     checkLine: 'Checked in this browser. Sent nowhere.',
     checkGo: 'Check a file',
+    /* THE BUTTON SAYS THE ACT, THE ROW SAYS WHAT LEAVES (ui pass, 3 Nov): "The way you work" beside "Export the way you
+       work" said the row's title twice; the full words stay the button's name for a screen reader. */
+    download: 'Download',
+    exportGo: 'Export',
+    shareGo: 'Share',
     wayTitle: 'The way you work',
     wayLine: (things: string) => `How ${things} are set up, without their entries.`,
     rowsTitle: 'What you wrote',
@@ -130,23 +135,25 @@
 <!-- THE ONE ACTION EACH ROW OFFERS, declared here so a row whose action is the owner's is handed
      none at all for a colleague, rather than an empty slot at the end of the row. -->
 {#snippet exportWhole()}
-  <Button weight="primary" disabled={exporting !== null} aria-busy={exporting === 'record'} onclick={() => takeCopy('record')}>{copy.export}</Button>
+  <Button weight="primary" disabled={exporting !== null} aria-busy={exporting === 'record'} onclick={() => takeCopy('record')}>{words.download}</Button>
 {/snippet}
 {#snippet exportPack()}
-  <Button disabled={exporting !== null} aria-busy={exporting === 'pack'} onclick={() => takeCopy('pack')}>{copy.exportPack}</Button>
+  <Button disabled={exporting !== null} aria-busy={exporting === 'pack'} aria-label={copy.exportPack} onclick={() => takeCopy('pack')}>{words.exportGo}</Button>
 {/snippet}
 {#snippet exportRows()}
-  <Button disabled={exporting !== null} aria-busy={exporting === 'rows'} onclick={() => takeCopy('rows')}>{copy.exportRows}</Button>
+  <Button disabled={exporting !== null} aria-busy={exporting === 'rows'} aria-label={copy.exportRows} onclick={() => takeCopy('rows')}>{words.exportGo}</Button>
 {/snippet}
 {#snippet checkOne()}
   <Button disabled={checking} aria-busy={checking} onclick={() => checkInput?.click()}>{words.checkGo}</Button>
 {/snippet}
 {#snippet shareOne()}
-  <Button href="/addons/share">{copy.shareSetup}</Button>
+  <Button href="/addons/share" aria-label={copy.shareSetup}>{words.shareGo}</Button>
 {/snippet}
 
 {#if !factsRead}<span data-hold hidden></span>{/if}
-<Tile icon="download" class="section" data-surface="tile" title={copy.yourData}>
+<!-- WHEN IT WAS LAST TAKEN, AT THE HEAD'S END (ui pass, 3 Nov): "Never exported" stood alone between the head and the
+     first row. -->
+<Tile icon="download" class="section" data-surface="tile" title={copy.yourData} meta={lastExport || undefined}>
   <div class="section-body">
     <!-- THE WHOLE CONTENT OF THIS SCREEN WAS TWO DEAD BUTTONS, on the page that carries the
          product's central promise: take your record and go. They say what they would do.
@@ -163,7 +170,6 @@
          `.dogl` until the record gave the name up: `.dog` is a PAGE's source now, one page to
          a file, which is what somebody means when they open the source of a page. The three
          layers are unchanged; only the name on the container moved. -->
-    {#if lastExport}<p class="last-export">{lastExport}</p>{/if}
     <!-- WHAT THE FILE IS, ONCE: the row under says it, so the line that repeated it over the row is gone (agents F27). -->
     <!--
       AND THE COPY IS THE OWNER'S TO TAKE, WHILE THE CHECK IS ANYBODY'S.
@@ -210,7 +216,6 @@
      half: your lists, pages, metrics and rules without a single row of your business in it. -->
 <Tile icon="download" class="section" data-surface="tile" title={copy.takeAway}>
   <div class="section-body">
-    <p class="hint">{copy.takeAwayWhat}</p>
     <!-- THE SAME LADDER AS THE WHOLE COPY ABOVE: a slice of the record is still the record, so a
          colleague is shown both rows and handed neither button. `Share this setup` stays for everybody,
          because it is a link to a screen that explains itself. -->
@@ -222,14 +227,6 @@
 </Tile>
 
 <style>
-  /* WHEN IT WAS LAST TAKEN, the first line in the tile, at body size. */
-  .last-export {
-    margin: 0 0 var(--sp-2);
-    color: var(--ink);
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-  }
-
   .file-pick {
     display: none;
   }

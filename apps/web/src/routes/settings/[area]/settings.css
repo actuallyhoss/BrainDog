@@ -492,7 +492,11 @@
   }
 }
 
-.settings-place .how > :not(summary) {
+.settings-place .how > code {
+  margin: 0;
+}
+
+.settings-place .how > p {
   margin: 0;
   max-inline-size: var(--measure);
   color: var(--ink-3);

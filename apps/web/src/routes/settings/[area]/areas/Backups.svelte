@@ -31,6 +31,12 @@
 
   let { shell }: AreaProps = $props();
 
+  /* THIS AREA'S OWN WORDS (ui pass, 3 Nov): the key's one line and the disclosure under it. */
+  const backupWords = {
+    keyLine: 'Keep a copy of the key file somewhere other than this machine.',
+    how: 'Why and how',
+  } as const;
+
   /**
    * THE TITLES OF THIS AREA'S ROWS. What a host does not do was three paragraphs, identical on
    * both hosts; each is a row now, titled by the state it is in, and the paragraph's one sentence that
@@ -502,13 +508,23 @@
          purpose, so the fix is not to print it here; it is to say where it already is. -->
     <!-- ONE ROW, AND THE HOST'S HALF OF THE ANSWER AS ITS LINE. The two sentences were two paragraphs on
          both hosts, and the second is only true on a self-host, where the key is a file its owner made. -->
-    <p class="hint">{shell.host === 'cloud' ? copy.theKeyIs : copy.theKeyWhere}</p>
-    <!-- THE DOCKER WAY OFF THE VOLUME ONLY IN THE IMAGE (PK5), and from a host older than the flag, which did not say. -->
-    {#if shell.host !== 'cloud' && (shell.image || shell.host !== 'self-host')}
-      <p class="hint">{copy.downloadNeedsKey} {copy.theKeyDocker}</p>
-      <CodeLine text={copy.theKeyDockerCommand} />
-    {:else if shell.host !== 'cloud'}
-      <p class="hint">{copy.downloadNeedsKey}</p>
+    <!-- ONE LINE, AND THE WHY UNDER "HOW" (ui pass, 3 Nov): two paragraphs of grey stood here on every visit, though
+         what they ask is done once. -->
+    {#if shell.host === 'cloud'}
+      <p class="hint">{copy.theKeyIs}</p>
+    {:else}
+      <p class="key-line">{backupWords.keyLine}</p>
+      <details class="how">
+        <summary class="how-head tap"><Icon name="chevron" size="s" />{backupWords.how}</summary>
+        <p>{copy.theKeyWhere}</p>
+        <!-- THE DOCKER WAY OFF THE VOLUME ONLY IN THE IMAGE (PK5), and from a host older than the flag, which did not say. -->
+        {#if shell.image || shell.host !== 'self-host'}
+          <p>{copy.downloadNeedsKey} {copy.theKeyDocker}</p>
+          <CodeLine text={copy.theKeyDockerCommand} />
+        {:else}
+          <p>{copy.downloadNeedsKey}</p>
+        {/if}
+      </details>
     {/if}
   </div>
 </Tile>
@@ -678,6 +694,15 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: var(--lead-meta);
+  }
+
+  /* THE KEY'S ONE LINE, read, so the body ink; "Why and how" under it. */
+  .key-line {
+    margin: 0 0 var(--sp-1);
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
   }
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
