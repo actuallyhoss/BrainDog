@@ -2058,7 +2058,7 @@
     flex-direction: column;
     gap: var(--sp-5);
     max-inline-size: var(--page-max);
-    padding: var(--sp-4) var(--gutter) var(--sp-7);
+    padding: var(--page-top) var(--gutter) var(--page-bottom);
     min-inline-size: 0;
   }
 
@@ -2715,11 +2715,6 @@
 
   /* ── narrower ─────────────────────────────────────────────────────────── */
 
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-2) var(--gutter) var(--sp-8);
-    }
-  }
 
   /* ON A PHONE THE FIGURES ARE TWO BY TWO, rather than a stack of rows pushing what needs you off the screen.
 
@@ -2934,5 +2929,88 @@
       position: absolute;
       inset: -4px 0;
     }
+  }
+
+  /* ── the rhythm pass (3 Nov, RHYTHM.md) ───────────────────────────────
+     Measured at 390, 820 and 1440 and set on the shared steps: the greeting hugs the board it heads, every card's text
+     starts the same distance in, a card's head is `--card-head-gap` over its first line, and nothing leaves air at a
+     card's foot that its top does not have. */
+
+  /* ON A PHONE THE SHELL ALREADY HOLDS THE TAB BAR'S HEIGHT UNDER THE PAGE (`main`'s own padding), so the page adds only
+     its step of air: `--page-bottom` there counts the bar again, and Edit Today stood 148 over it. */
+  @media (width < 640px) {
+    .page {
+      padding-block-end: var(--sp-5);
+    }
+  }
+
+  /* THE GREETING HEADS THE BOARD, SO IT SITS NEARER IT THAN WHAT IS ABOVE IT: 24 over it and `--section-head-gap` under
+     (12 on a phone, 16 wider). It stood 8 under the name card and 24 over the board, which read as the card's caption. */
+  .today-head {
+    margin-block-end: calc(var(--section-head-gap) - var(--sp-5));
+  }
+
+  /* A TILE DRAWS ITS 1PX EDGE INSIDE ITS BOX (`.tile`, style.css), so Late's and Arrivals' words stood 1 further in and 1
+     lower than every other card's. The edge comes out of the padding, and all the board's text shares one edge. */
+  .body[data-board] :global([data-board-key] > :is(.desk-part, .board-part) > .tile),
+  .body[data-board] :global(.board-part > .tile) {
+    padding: calc(var(--tile-pad) - 1px);
+  }
+
+  /* NEEDS YOU ENDS ON ITS PADDING LIKE THE REST: at a desk its foot was 12, the others 20. */
+  .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large']) {
+    padding-block-end: var(--tile-pad);
+  }
+
+  /* A LIST'S ROWS CARRY THEIR OWN 8 OF AIR FOR THE HOVER WASH, so under a head the list rises by it: the first title is
+     `--card-head-gap` under the head, as a figure or a line is, not 20. And a list that ends the card gives its last 8
+     back, so the foot is the card's padding. */
+  .body[data-board] :global([data-board-key] > .block-bar + .block > .list) {
+    margin-block-start: calc(-1 * var(--row-pad-y));
+  }
+
+  .body[data-board] :global([data-board-key] > .block:last-child > .list) {
+    margin-block-end: calc(-1 * var(--row-pad-y));
+  }
+
+  /* CASH COMING IN AND GOING OUT ARE TWO ROWS, 8 OF AIR EACH SIDE as a dense row has, not 12: at 12 a pair of one-line
+     figures took 94 and floated apart from the cash they explain. */
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:nth-child(n + 2)) {
+    padding-block: var(--sp-2);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash']:not([data-size='wide']) .grid > .cell:first-child:not(:last-child)) {
+    padding-block-end: var(--sp-2);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:last-child) {
+    padding-block-end: 0;
+  }
+
+  /* A FIGURE THAT ENDS ITS CARD ENDS ON THE CARD'S PADDING (Owed to you, Spending): a stat's last row kept its 12 under it,
+     so those cards had 28 at the foot and 16 at the top. */
+  .body[data-board] :global([data-board-key] > .block[data-kind='stat']:last-child .grid > .cell:last-child),
+  .body[data-board] :global([data-board-key][data-size='small'] > .block[data-kind='stat'] .grid > .cell:first-child) {
+    padding-block-end: 0;
+  }
+
+  /* AND A SMALL'S ONE FIGURE STARTS `--card-head-gap` UNDER ITS HEAD, not a row's 12 more below it. */
+  .body[data-board] :global([data-board-key][data-size='small'] > .block[data-kind='stat'] .grid > .cell:first-child) {
+    padding-block-start: 0;
+  }
+
+  /* A LIST'S TITLE NEVER ASKS FOR MORE THAN ITS CARD HAS: the skin's `min(16ch, 100%)` floor is 141 at 14px, and beside a
+     20 mark and two 12 gaps it ran 44 past a 181 card at 820 ("Pack the Hart Str"). On the board the title column
+     takes what is left and wraps. */
+  .body[data-board] :global([data-board-key] .list > .item) {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .body[data-board] :global([data-board-key] .list > .item:not(:has(> .item-marker))) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .body[data-board] :global([data-board-key] .list > .item:has(> .item-more)) {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
   }
 </style>
