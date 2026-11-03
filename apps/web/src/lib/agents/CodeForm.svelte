@@ -218,8 +218,10 @@
     inline-size: var(--box-w);
     min-inline-size: 32px;
     block-size: var(--box-h);
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    /* EACH DIGIT'S BOX IS THE OPS FIELD (3 Nov): the tile's fill, a 1px edge, radius 12, as every other field. */
+    background: var(--tile);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    border-radius: var(--r-field);
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--fs-figure);
@@ -247,8 +249,8 @@
 
   /* THE BOX THE NEXT DIGIT GOES IN wears the focus ring, and a caret blinks in it. */
   .code-box[data-next] {
-    outline: 2px solid var(--focus);
-    outline-offset: -2px;
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 0;
   }
 
   .code-caret {
@@ -407,7 +409,7 @@
 
   [data-size='lead'] .code-said {
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lh-body);
   }
 
   @media (width < 640px) {

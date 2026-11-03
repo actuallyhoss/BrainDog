@@ -53,7 +53,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lh-body);
   }
 
   .quiet {
@@ -75,9 +75,7 @@
     align-items: center;
   }
 
-  .sum + .sum {
-    border-block-start: 1px solid var(--rule);
-  }
+  /* ROWS TOLD APART BY AIR, never a rule between them (ops style). */
 
   .sum a {
     color: var(--ink);
