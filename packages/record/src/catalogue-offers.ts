@@ -30,6 +30,7 @@ import {
   type CatalogueIndex,
 } from '@braindog/declare/catalogue';
 import type { Refusal, Result } from '@braindog/ports';
+import { ADVISORIES_FILE, noticesFor, readAdvisories, type Advisories, type Notice } from '@braindog/declare/kennel';
 
 import type { CatalogueShelf, ShelfEntry, ShelfFetched } from './arrange.ts';
 import type { CatalogueOffer } from './slash.ts';
@@ -154,4 +155,60 @@ export function shelfFromCatalogue(read: CatalogueReader): CatalogueShelf {
       return { ok: true, value: { ...shelfEntry(entry, latest.version, modules), doc } };
     },
   };
+}
+
+/* ── what the store says about what a record holds ───────────────────────── */
+
+/** One add-on held here: its version, and the checksum its `pack` row keeps (`null` for one the seed owns with no row). */
+export type HeldPack = { id: string; version: string; checksum: string | null; on: boolean };
+
+/**
+ * THE KILL SWITCH AND THE YANK, AS A RECORD HEARS THEM (DESIGN.md §8, PHASES.md Lane H): every advisory and yank the
+ * catalogue says of an add-on at the version held here, read beside the index (`advisories.json`).
+ *
+ * ONLY FOR THE STORE'S OWN FILE. An add-on made here, pasted or from GitHub can share an id and a version with one in the
+ * store, and the store's word is not about it (the slug hijack, DESIGN.md §4.4, the other way round). So a notice is
+ * kept only when the version held is the one the store lists, byte for byte as read: the listed file is fetched, held
+ * to the index's checksum, read through its door, and its pack checksum compared with the one this record installed.
+ * A seed-owned add-on (no `pack` row) is BrainDog's own and is the store's when the store's entry is BrainDog's.
+ */
+export function noticesFromCatalogue(read: CatalogueReader): (held: readonly HeldPack[]) => Promise<(Notice & { on: boolean })[]> {
+  return async (held) => {
+    const index = await indexOf(read);
+    if (index === null) return [];
+    let advisories: Advisories | null = null;
+    try {
+      const text = await read(ADVISORIES_FILE);
+      advisories = text === null ? null : readAdvisories(JSON.parse(text));
+    } catch {
+      advisories = null;
+    }
+    const out: (Notice & { on: boolean })[] = [];
+    for (const h of held) {
+      const entry = index.entries.find((e) => e.kind === 'pack' && installedIdOf(e) === h.id);
+      if (entry === undefined) continue;
+      const said = noticesFor(index, advisories, 'pack', entry.id, h.version);
+      if (said.length === 0) continue;
+      if (!(await theStores(read, entry, h))) continue;
+      for (const n of said) out.push({ ...n, id: h.id, on: h.on });
+    }
+    return out;
+  };
+}
+
+/** Whether the version held is the file the store lists at that version (`noticesFromCatalogue`). */
+async function theStores(read: CatalogueReader, entry: IndexEntry, h: HeldPack): Promise<boolean> {
+  if (h.checksum === null) return entry.publisher?.kind === 'braindog';
+  const listed = entry.versions.find((v) => v.version === h.version);
+  if (listed === undefined) return false;
+  try {
+    const text = await read(catalogueFile(entry.id, h.version, entry.kind));
+    if (text === null) return false;
+    const verified = await verifyVersion(entry, listed, text);
+    if (!verified.ok) return false;
+    const file = await readCatalogueFile(text, { kind: 'url' });
+    return file.ok && file.value.kind === 'pack' && file.value.file.pack.checksum === h.checksum;
+  } catch {
+    return false;
+  }
 }

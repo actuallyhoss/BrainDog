@@ -196,9 +196,13 @@ test('A VERDICT NEVER HANDS A LISTED ID TO ANOTHER PUBLISHER, when a stranger\'s
   const listed = await acceptSubmission(before, first, await signedBy(owner, first), NOW);
   const waiting = await acceptSubmission(before, later, await signedBy(stranger, later), NOW);
   assert.ok(listed.ok && waiting.ok, JSON.stringify([listed, waiting]));
-  assert.equal(listed.value.answer.state, 'listed');
+  /* A TRUSTED PUBLISHER'S FIRST VERSION WAITS TOO (it reaches everything new), and the operator lists it first. */
+  assert.equal(listed.value.answer.state, 'review');
   assert.equal(waiting.value.answer.state, 'review');
   k.apply(listed.value);
+  const owners = reviewVerdict(k.state(), { kind: 'pack', id: 'bookshelf', version: '1.0.0', verdict: 'list', reason: '' }, NOW);
+  assert.ok(owners.ok, JSON.stringify(owners));
+  k.apply(owners.value);
   k.apply(waiting.value);
 
   const verdict = reviewVerdict(k.state(), { kind: 'pack', id: 'bookshelf', version: '2.0.0', verdict: 'list', reason: 'Read it through.' }, NOW);

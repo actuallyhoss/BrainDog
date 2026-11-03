@@ -162,11 +162,20 @@ test("a bundled id, another publisher's id, a key nobody named, a stray manifest
   assert.equal(code(named), 'PROVIDES_CONFLICT', "a file from outside was taken under BrainDog's own name");
 });
 
-test('a trusted publisher lists at once, and an eleventh submission in a day waits until the first is a day old', async () => {
+test('a trusted publisher lists at once a version that reaches nothing new, and an eleventh submission in a day waits until the first is a day old', async () => {
   const k = kennel();
   const key = await newAuthorKey('Halden');
   k.trust(publisherKey({ kind: 'key', id: key.key_id }));
-  for (let i = 0; i < 10; i += 1) {
+  /* ITS FIRST VERSION REACHES EVERYTHING NEW, so it waits for a person like anybody's, and the operator lists it. */
+  const firstText = addon('1.0.0');
+  const first = await acceptSubmission(k.state(), firstText, await signedBy(key, firstText), NOW);
+  assert.ok(first.ok, JSON.stringify(first));
+  assert.equal(first.value.answer.state, 'review');
+  k.apply(first.value);
+  const looked = reviewVerdict(k.state(), { kind: 'pack', id: 'bookshelf', version: '1.0.0', verdict: 'list', reason: '' }, NOW);
+  assert.ok(looked.ok, JSON.stringify(looked));
+  k.apply(looked.value);
+  for (let i = 1; i < 10; i += 1) {
     const text = addon(`1.0.${i}`);
     const out = await acceptSubmission(k.state(), text, await signedBy(key, text), NOW);
     assert.ok(out.ok, JSON.stringify(out));
@@ -198,6 +207,9 @@ test('a yank by the key that signed it marks the version and keeps its file; ano
   const out = await acceptSubmission(k.state(), text, await signedBy(key, text), NOW);
   assert.ok(out.ok, JSON.stringify(out));
   k.apply(out.value);
+  const looked = reviewVerdict(k.state(), { kind: 'pack', id: 'bookshelf', version: '1.0.0', verdict: 'list', reason: '' }, NOW);
+  assert.ok(looked.ok, JSON.stringify(looked));
+  k.apply(looked.value);
   const asked = { kind: 'pack' as const, id: 'bookshelf', version: '1.0.0', reason: 'The shelf page drops rows.' };
 
   const other = await newAuthorKey('Mallory');

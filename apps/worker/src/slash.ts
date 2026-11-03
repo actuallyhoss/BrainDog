@@ -443,6 +443,28 @@ export function includedModel(env: SlashEnv, onFail?: OnModelFail): WorkerSlashM
 }
 
 /**
+ * The Kennel's pre-review note over the included model (`kennel.ts` `noted`), or `undefined` where there is none. One ask,
+ * a short answer, the same JSON reading as the record's asks. Nobody's record and nobody's allowance: the Kennel asks it
+ * for the operator, at most once a submission, under the submission limits.
+ */
+export function kennelNoteModel(env: SlashEnv): ((instructions: string, input: unknown) => Promise<unknown>) | undefined {
+  const inference = includedInference(env);
+  if (inference === undefined) return undefined;
+  return async (instructions, input) => {
+    const reply = await inference.complete({
+      model: INCLUDED_MODEL,
+      maxTokens: 600,
+      jsonSchema: { type: 'object', properties: { note: { type: 'string' } }, required: ['note'], additionalProperties: false },
+      messages: [
+        { role: 'system', content: instructions },
+        { role: 'user', content: JSON.stringify(input) },
+      ],
+    });
+    return answerOf(reply.text);
+  };
+}
+
+/**
  * How a request leaves this Worker and how a sealed key is opened. Both are injected so a test needs no network and no KEK.
  *
  * `open` TAKES THE ASKER'S ID SO A TEST-INJECTED OPENER STILL SIGNS AS THEM: `wireOf` passes its own `actor` through to

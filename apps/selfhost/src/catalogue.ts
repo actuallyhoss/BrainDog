@@ -19,8 +19,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CATALOGUE_INDEX } from '@braindog/declare/catalogue';
+import { ADVISORIES_FILE } from '@braindog/declare/kennel';
 import type { CatalogueOffer } from '@braindog/record';
-import { offersFromCatalogue, shelfFromCatalogue, type CatalogueReader } from '@braindog/record/catalogue-offers';
+import { noticesFromCatalogue, offersFromCatalogue, shelfFromCatalogue, type CatalogueReader } from '@braindog/record/catalogue-offers';
 
 import { kennelReader, type KennelDeps } from './kennel.ts';
 
@@ -69,7 +70,7 @@ export function catalogueFolder(named: string | undefined, shell: string | undef
 }
 
 /** The two shapes a catalogue lists, as a path inside it: no `..`, no other file. */
-const PATH = /^(?:index\.json|usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.usecase\.json|packs\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.pack\.json)$/u;
+const PATH = /^(?:index\.json|advisories\.json|usecases\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.usecase\.json|packs\/[a-z][a-z0-9-]{0,62}\/\d{1,6}\.\d{1,6}\.\d{1,6}\.pack\.json)$/u;
 
 /**
  * The catalogue a record installs from, read through the Kennel (`kennel.ts` `kennelReader`): the folder's index and the
@@ -80,6 +81,7 @@ export function kennelCatalogueReader(dir: string | undefined, deps?: KennelDeps
   const kennel = kennelReader(dir, deps);
   return async (path) => {
     if (!PATH.test(path)) return null;
+    if (path === ADVISORIES_FILE) return JSON.stringify(await kennel.advisories());
     return path === CATALOGUE_INDEX ? JSON.stringify(await kennel.index()) : kennel.file(path);
   };
 }
@@ -88,6 +90,9 @@ export function kennelCatalogueReader(dir: string | undefined, deps?: KennelDeps
 export function catalogueOffersFrom(dir: string | undefined, deps?: KennelDeps): (held: readonly { id: string; version: string; on: boolean }[]) => Promise<CatalogueOffer[]> {
   return offersFromCatalogue(kennelCatalogueReader(dir, deps));
 }
+
+/** What the folder and the Kennel say of the add-ons a record holds: advisories and yanks (`noticesFromCatalogue`). */
+export const catalogueNoticesFrom = (dir: string | undefined, deps?: KennelDeps) => noticesFromCatalogue(kennelCatalogueReader(dir, deps));
 
 /** The whole catalogue, the folder's and the Kennel's, for the arranger to install from (`RecordDeps.catalogueShelf`, `shelfFromCatalogue`). */
 export const catalogueShelfFrom = (dir: string | undefined, deps?: KennelDeps) => shelfFromCatalogue(kennelCatalogueReader(dir, deps));

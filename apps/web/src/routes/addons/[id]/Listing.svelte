@@ -49,6 +49,7 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import { glyphOf, ownIcon } from '$lib/market/ListingCard.svelte';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
+  import Report from '$lib/market/Report.svelte';
   import { words as planWords } from '$lib/market/plan.ts';
   import { keyPut, type KeyPut } from '$lib/market/key-put.ts';
   import { keyName } from '$lib/market/key-names.ts';
@@ -863,6 +864,10 @@
               <dd>{words.examples(adds ? adds.examples : (reach?.examples ?? 0))}</dd>
             {/if}
           </dl>
+          <!-- SOMEBODY ELSE'S ADD-ON FROM THE STORE CAN BE REPORTED to the person who reviews it (Lane H). -->
+          {#if listing.source === 'kennel' && !ours && listing.kind !== 'module'}
+            <Report kind={listing.kind === 'usecase' ? 'usecase' : 'pack'} id={listing.id} version={latest?.version} />
+          {/if}
         </Tile>
       </div>
     </div>

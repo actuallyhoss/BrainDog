@@ -2514,6 +2514,12 @@ export type RecordDeps = {
    * `catalogueDrafts`). Slash asks about each on Decide through the same `prepare`; absent, it asks about none.
    */
   catalogueOffers?: ((held: readonly { id: string; version: string; on: boolean }[]) => Promise<readonly CatalogueOffer[]>) | undefined;
+  /**
+   * What the store says of the add-ons held here, at the versions held: the operator's advisories and authors' yanks
+   * (`catalogue-offers.ts` `noticesFromCatalogue`). The record turns off what an advisory disables and asks on Needs
+   * you once for each (`noticesTick`). Absent, it hears none.
+   */
+  catalogueNotices?: ((held: readonly import('./catalogue-offers.ts').HeldPack[]) => Promise<readonly (import('@braindog/declare/kennel').Notice & { on: boolean })[]>) | undefined;
   /** The host's whole catalogue, for the arranger (`catalogue-offers.ts` `shelfFromCatalogue`). Absent, only `catalogue` is offered. */
   catalogueShelf?: CatalogueShelf | undefined;
   /**
@@ -2731,7 +2737,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'kept' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed' | 'visuals'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'kept' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueNotices' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed' | 'visuals'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
    * WHAT IS HELD THAT THE STORE KEEPS CURRENT (`updatesFromStore`): every pack but one made here, from a link or from
@@ -5207,6 +5213,68 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     }
     kernel.setPref(GIT_HOLDER, 'asked', asked);
     return out;
+  };
+  /**
+   * THE STORE'S KILL SWITCH AND ITS YANKS, HEARD HERE (DESIGN.md §8, PHASES.md Lane H). Once an hour, beside the update
+   * pass, the record reads what the store says of the add-ons it holds (`catalogueNotices`) and, for each notice it has
+   * not acted on:
+   *   - an advisory that disables turns the add-on off (rows kept, `disablePack`) and asks "Turn it back on?" on Needs
+   *     you with the reason, so the owner may turn it back on knowingly;
+   *   - an advisory that warns, or a yank of the version held, asks "Turn it off?" with the reason, and changes nothing.
+   * EACH NOTICE ONCE, kept by its key in the record's own prefs (`NOTICES_HOLDER`): an owner who said yes to turning it
+   * back on is never overruled by the same advisory, and a card is never filed twice. A notice about an add-on that is
+   * already off is left for later and not kept, so turning it on without the card is met by the card.
+   */
+  const NOTICES_HOLDER = 'braindog:store-notices';
+  const NOTICES_LAST = 'last';
+  const NOTICES_EVERY_MS = 3_600_000;
+  let noticesRunning = false;
+  const noticesDue = (): boolean => {
+    if (noticesRunning || !deps.catalogueNotices) return false;
+    const last = kernel.prefsOf(NOTICES_HOLDER)[NOTICES_LAST];
+    return typeof last !== 'number' || clock.now() - last >= NOTICES_EVERY_MS;
+  };
+  const noticesTick = async (force = false): Promise<string[]> => {
+    if (!deps.catalogueNotices || noticesRunning || (!force && !noticesDue())) return [];
+    noticesRunning = true;
+    try {
+      kernel.setPref(NOTICES_HOLDER, NOTICES_LAST, clock.now());
+      const { shippedVersion } = await import('@braindog/seed/packs/quiet');
+      const rows = new Map(sql.all<{ id: string; checksum: string }>('SELECT id, checksum FROM pack').map((r) => [r.id, r.checksum]));
+      const held = kernel
+        .packStates()
+        .filter((p) => p.version !== null || !rows.has(p.id))
+        .map((p) => ({ id: p.id, version: p.version ?? shippedVersion(p.id) ?? '0.0.0', checksum: rows.get(p.id) ?? null, on: p.disabled_at === null }));
+      const notices = await deps.catalogueNotices(held);
+      const done = kernel.prefsOf(NOTICES_HOLDER);
+      const said: string[] = [];
+      const actor = 'system';
+      for (const n of notices) {
+        if (Object.hasOwn(done, n.key) || !n.on) continue;
+        let off = false;
+        if (n.action === 'disable') {
+          const turned = kernel.disablePack(n.id, { actor });
+          off = turned.ok;
+        }
+        const name = `${n.title} ${n.version}`;
+        const question =
+          n.action === 'disable'
+            ? off
+              ? `BrainDog turned off ${name}: ${n.reason} Turn it back on?`
+              : `BrainDog says to turn off ${name}, and it could not be turned off here: ${n.reason} Turn it off?`
+            : n.from === 'yank'
+              ? `${name} was taken back by whoever published it: ${n.reason} Turn it off?`
+              : `BrainDog warns about ${name}: ${n.reason} Turn it off?`;
+        const body = n.action === 'disable' && off ? { enable: n.id } : { disable: n.id };
+        const prepared = await arrangement.prepare('pack', body);
+        const filed = prepared.ok ? kernel.propose({ question, body_kind: 'pack', body: prepared.value }, actor) : prepared;
+        kernel.setPref(NOTICES_HOLDER, n.key, { at: clock.now(), action: n.action, off, ...(filed.ok ? { card: filed.value.id } : {}) });
+        said.push(off ? `${name} was turned off: ${n.reason}` : `${name} is asked about on Decide: ${n.reason}`);
+      }
+      return said;
+    } finally {
+      noticesRunning = false;
+    }
   };
 
   /** The passes the tick kept, newest last, which a read of the log folds (`passFolder`). */
@@ -13383,6 +13451,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const state = slashDailyState();
         const due =
           (await firstPartyDue(today)) ||
+          noticesDue() ||
           (state.on && (state.last !== today || lookStepOf(today) !== null || headlinesAgainDue(today) || briefAgainDue(clock.now())));
         return { ran: false, why: due ? 'later' : state.on ? 'today' : 'off' };
       }
@@ -13391,6 +13460,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const updates = await firstPartyTick(today).catch(() => ["The check for BrainDog's own updates could not run, and runs again on the next tick."]);
       /* AND ADD-ONS FROM GITHUB, once a day: a newer tag is asked about, never put in (`gitPass`). */
       await gitPass(today).catch(() => undefined);
+      /* AND WHAT THE STORE SAYS OF WHAT IS HELD, once an hour, whether Slash is on or not (`noticesTick`). */
+      updates.push(...(await noticesTick().catch(() => ["The store's word on the add-ons here could not be read, and is read again in an hour."])));
       const state = slashDailyState();
       if (!state.on) return { ran: false, why: 'off' };
       /* THE DAY'S LOOK BEGUN ON AN EARLIER TICK GOES ON FROM THE STEP IT KEPT. */

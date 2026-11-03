@@ -307,7 +307,10 @@ test('what a scratch requires is read from BrainDog\'s own modules and from what
   const deps = depsOf(blobs, scratch);
   const key = await newAuthorKey('Halden');
   await serveKennel(post('publisher', { publisher: `key:${key.key_id}`, trusted: true }, operator), deps);
-  assert.equal(((await (await serveKennel(post('submit', await signed(LIBRARY, key)), deps)).json()) as Envelope).value?.state, 'listed');
+  /* A TRUSTED PUBLISHER'S FIRST VERSION WAITS, and the operator lists it. */
+  assert.equal(((await (await serveKennel(post('submit', await signed(LIBRARY, key)), deps)).json()) as Envelope).value?.state, 'review');
+  const verdict = await serveKennel(post('review', { kind: 'pack', id: 'bookshelf', version: String(LIBRARY.version), verdict: 'list', reason: '' }, operator), deps);
+  assert.equal(((await verdict.json()) as Envelope).value?.state, 'listed');
 
   const found = await kennelRequired({ blobs, assets }, ['people', 'bookshelf', 'nobody-lists-this'], new Date(NOW));
   assert.deepEqual(

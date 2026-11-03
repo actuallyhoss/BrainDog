@@ -58,7 +58,7 @@ import { cutOffReadable, mayPropose } from '@braindog/kernel';
 import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
 import { keyLockout, nearPeer, ONE_PLACE, peerSlowFor, placeOf, proxied, slowedLine, type KeyLockout, type PeerSlow, type Place, type ProxyTrust } from './key-lockout.ts';
-import { catalogueAnswer, catalogueFolder, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
+import { catalogueAnswer, catalogueFolder, catalogueNoticesFrom, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
 import { serveKennelTo, servesKennel, type KennelDeps } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, signCopies, type FileSnapshots } from './snapshots.ts';
@@ -1866,6 +1866,7 @@ export async function start(options: {
        the arranger: the folder first, then the public Kennel (`kennel.ts` `kennelReader`), so an add-on published only
        to the Kennel installs by its id here as on the Cloud. With BRAINDOG_KENNEL=off, the folder alone. */
     catalogueOffers: catalogueOffersFrom(catalogueDir, options.kennel),
+    catalogueNotices: catalogueNoticesFrom(catalogueDir, options.kennel),
     catalogueShelf: catalogueShelfFrom(catalogueDir, options.kennel),
     snapshots: kept,
     destroy,
