@@ -380,16 +380,18 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* FILTER AND EACH FILTER THAT IS ON: rectangles the toolbar's height in the quiet fill, radius 8, never a pill. */
+  /* FILTER AND EACH FILTER THAT IS ON: capsules the toolbar's height in the soft fill (ops look, 3 Nov: every control a
+     circle or a capsule), the 0.5px edge a glass control wears. */
   .sift {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: 36px;
-    padding: 0 var(--sp-3);
-    background: var(--tile-2);
+    min-block-size: var(--ctl-page, 36px);
+    padding: 0 14px;
+    background: var(--soft-fill, var(--tile-2));
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, var(--r-ctl));
+    box-shadow: inset 0 0 0 0.5px var(--g-line, transparent);
     color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-ctl);
@@ -409,7 +411,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .sift:not([data-on]):hover {
-      background: var(--hover);
+      background: var(--soft-fill-hover, var(--hover));
       color: var(--ink);
     }
   }
@@ -417,7 +419,7 @@
   /* A FILTER THAT IS ON IS INK ON THE WELL, edged by the field's hairline, as every filter strip draws its choice (Look
      B: red is never "chosen"), and its cross takes it off. */
   .sift[data-on] {
-    background: var(--tile-2);
+    background: var(--soft-fill, var(--tile-2));
     box-shadow: inset 0 0 0 1px var(--rule-strong);
     color: var(--ink);
   }
@@ -436,7 +438,7 @@
     padding-inline-end: var(--sp-2);
   }
 
-  /* THE PHONE'S ONE FILTER CONTROL IS A 44px SQUARE with the glyph and, when values are on, how many. */
+  /* THE PHONE'S ONE FILTER CONTROL IS A 44px CIRCLE with the glyph and, when values are on, how many (then a capsule). */
   .sift-sheet {
     justify-content: center;
     gap: var(--sp-1);

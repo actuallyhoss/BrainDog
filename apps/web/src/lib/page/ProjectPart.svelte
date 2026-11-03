@@ -477,8 +477,10 @@
     block-size: 100%;
     box-sizing: border-box;
     padding: 16px;
+    border: 1px solid var(--card-edge, transparent);
     border-radius: var(--r-tile, 16px);
     background: color-mix(in oklab, var(--ph) var(--h-wash), var(--tile));
+    box-shadow: var(--shadow-card, none);
   }
 
   /* A PARKED OR FINISHED PROJECT IS DRAWN QUIET: no wash of its colour, and its well greyed, so it reads as resting. */
@@ -619,7 +621,7 @@
   }
 
   .ck + .ck {
-    border-block-start: 1px solid color-mix(in oklab, var(--rule) 70%, transparent);
+    border-block-start: 1px solid var(--sep, color-mix(in oklab, var(--rule) 70%, transparent));
   }
 
   .ck-box {
@@ -645,11 +647,12 @@
     text-underline-offset: 3px;
   }
 
+  /* A DAY OR AN AGE BESIDE A STEP IS A BADGE (ops look): a 22px capsule in the soft fill, its tone when it has one. */
   .ck-chip,
   .chip-age {
     padding: 2px 8px;
-    border-radius: 6px;
-    background: var(--tile-2);
+    border-radius: var(--r-pill, 999px);
+    background: var(--soft-fill, var(--tile-2));
     color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: 18px;
@@ -761,7 +764,7 @@
     justify-content: space-between;
     gap: 12px;
     padding-block: 7px;
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
     font-size: var(--fs-body);
     line-height: 20px;
   }
@@ -994,7 +997,7 @@
   .n-plan {
     margin: 12px 0 0;
     padding-block-start: 10px;
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
     color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: 18px;
@@ -1017,7 +1020,7 @@
   }
 
   .li + .li {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
   }
 
   .li:not(:has(.li-when)) {
@@ -1235,11 +1238,25 @@
     align-items: center;
     gap: 12px;
     min-block-size: 52px;
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
+  }
+
+  /* NO RULES BETWEEN TASK ROWS (ops look): each row is its own rounded wash under the pointer, held 8px out so its words
+     stay on the tile's text edge, and the rows stand 2px apart so two lit rows never touch. */
+  .w-row {
+    margin-inline: -8px;
+    padding-inline: 8px;
+    transition: background-color var(--d-state) var(--ease-out);
   }
 
   .w-row + .w-row {
-    border-block-start: 1px solid var(--rule);
+    margin-block-start: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .w-row:has(a.w-words:hover) {
+      background: var(--row-wash, var(--hover));
+    }
   }
 
   .w-tick {
@@ -1265,7 +1282,7 @@
   .a-name {
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--fs-body);
+    font-size: var(--fs-row, var(--fs-body));
     line-height: 20px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1279,7 +1296,6 @@
     align-content: center;
   }
 
-  a.w-words:hover .w-title,
   a.p-words:hover .p-name {
     text-decoration: underline;
     text-underline-offset: 2px;
@@ -1347,7 +1363,7 @@
     align-items: center;
     gap: 12px;
     min-block-size: 44px;
-    border-block-end: 1px solid var(--rule);
+    border-block-end: 1px solid var(--sep, var(--rule));
     color: var(--ink-3);
   }
 

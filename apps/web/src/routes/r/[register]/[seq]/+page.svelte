@@ -2443,16 +2443,16 @@
     gap: var(--sp-3);
   }
 
-  /* "Add a field" IS A BUTTON, a rectangle in the quiet fill like every secondary verb, with its plus. The menu's own
-     button carries the hit box; this is what it looks like. */
+  /* "Add a field" IS A BUTTON, a 28px capsule in the soft fill like every secondary verb in a card (ops look), with its
+     plus. The menu's own button carries the hit box; this is what it looks like. */
   .add-field {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-block-size: 32px;
+    min-block-size: var(--ctl-panel, 28px);
     padding: 0 var(--sp-3);
-    background: var(--tile-2);
-    border-radius: 8px;
+    background: var(--soft-fill, var(--tile-2));
+    border-radius: var(--r-pill, 999px);
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
@@ -2463,7 +2463,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     :global(.menu-trigger:hover > .add-field) {
-      background: var(--tile-2);
+      background: var(--soft-fill-hover, var(--tile-2));
       color: var(--ink);
     }
   }
@@ -2486,7 +2486,7 @@
     padding: 0;
     background: none;
     border: 0;
-    border-radius: 8px;
+    border-radius: var(--r-pill, 999px);
     color: var(--ink-3);
     cursor: pointer;
     transition:
@@ -2496,7 +2496,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .edit-field:hover {
-      background: var(--tile-2);
+      background: var(--soft-fill, var(--tile-2));
       color: var(--ink);
     }
   }
@@ -2540,7 +2540,7 @@
     padding: var(--sp-2) var(--sp-3);
     background: var(--tile-2);
     border: 0;
-    border-radius: 8px;
+    border-radius: var(--r-field, 12px);
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
@@ -2583,8 +2583,8 @@
     gap: var(--sp-2);
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--hover);
-    border-radius: 8px;
+    background: var(--soft-fill, var(--hover));
+    border-radius: var(--r-ctl);
     color: var(--ink-2);
     font-size: var(--fs-meta);
   }
@@ -2683,7 +2683,7 @@
     gap: var(--sp-3);
     min-block-size: 44px;
     padding: 6px var(--sp-2);
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
     color: inherit;
     text-decoration: none;
   }
@@ -2704,7 +2704,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .item-link:hover {
-      background: var(--tile-2);
+      background: var(--row-wash, var(--tile-2));
     }
   }
 
@@ -2820,17 +2820,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    inline-size: var(--ctl-h);
-    block-size: var(--ctl-h);
-    background: var(--hover);
-    border-radius: 8px;
+    inline-size: var(--ctl-page, var(--ctl-h));
+    block-size: var(--ctl-page, var(--ctl-h));
+    background: var(--g-fill, var(--hover));
+    border-radius: var(--r-pill, 999px);
+    box-shadow: inset 0 0 0 0.5px var(--g-line, transparent);
     color: var(--ink);
     transition: background var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
     :global(.menu-trigger:hover > .head-more) {
-      background: var(--tile-2);
+      background: var(--g-fill-hover, var(--tile-2));
     }
   }
 

@@ -321,15 +321,16 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* THE STATE'S MENU READS AS THE BUTTONS BESIDE IT: the quiet fill, 32 tall, its chevron after the words. */
+  /* THE STATE'S MENU READS AS THE BUTTONS BESIDE IT: a capsule in the soft fill, the control's height, its chevron after
+     the words. */
   .picked-verb {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    padding: 0 14px;
+    background: var(--soft-fill, var(--tile-2));
+    border-radius: var(--r-pill, var(--r-ctl));
     color: var(--ink);
     font-weight: var(--fw-medium);
     transition: background var(--d-state) var(--ease-out);
@@ -337,7 +338,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     :global(.menu-trigger):hover > .picked-verb {
-      background: var(--hover);
+      background: var(--soft-fill-hover, var(--hover));
     }
   }
 
@@ -351,7 +352,7 @@
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, var(--r-ctl));
     color: var(--ink-2);
     font: inherit;
     font-weight: var(--fw-medium);
@@ -361,7 +362,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .picked-clear:hover {
-      background: var(--hover);
+      background: var(--soft-fill, var(--hover));
       color: var(--ink);
     }
   }
@@ -423,7 +424,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .scope-place:hover {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
     }
   }
 
@@ -450,8 +451,11 @@
       min-block-size: 56px;
       padding: 0 var(--sp-3);
       overflow-x: auto;
-      background: var(--tile);
-      border-block-start: 1px solid var(--rule);
+      background: var(--glass-chrome, var(--tile));
+      -webkit-backdrop-filter: var(--glass-filter, none);
+      backdrop-filter: var(--glass-filter, none);
+      border-block-start: 0;
+      box-shadow: var(--glass-edge, inset 0 1px 0 var(--rule)), var(--elev-chrome, none);
       scrollbar-width: none;
     }
 

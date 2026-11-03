@@ -739,17 +739,51 @@
   /* THE HAIRLINES STOP AT THE WORDS (1 Nov, L4): the grid hangs a cell's padding into the gutter so a washed row has
      room round its words, and the row's border ran those 12px past the tile's padding at both ends. The rule is drawn
      inset by that padding instead, and goes where the border went: under a washed row and over it. */
-  .table-slot :global(:is(.rowgroup .tr, .th-row)) {
+  /* ROWS ARE SEPARATED BY THE WASH, NOT BY RULES (ops look, 3 Nov): one hairline under the header, inset to the text
+     edge, and none between rows. Hover, the caret and a selection are each a rounded fill inset 3px from the row's
+     neighbours, so two lit rows never touch. */
+  .table-slot :global(.rowgroup .tr) {
     border-block-end-color: transparent;
-    background-image: linear-gradient(var(--rule), var(--rule));
+    background: none;
+  }
+
+  .table-slot :global(.th-row) {
+    border-block-end-color: transparent;
+    background-image: linear-gradient(var(--sep, var(--rule)), var(--sep, var(--rule)));
     background-size: calc(100% - 2 * var(--sp-3)) 1px;
     background-position: 50% 100%;
     background-repeat: no-repeat;
   }
 
-  .table-slot :global(.rowgroup .tr:is(:hover, [data-focused], [aria-selected='true'])),
-  .table-slot :global(.rowgroup .tr:has(+ :is(:hover, [data-focused], [aria-selected='true']))) {
-    background-size: 0 0;
+  .table-slot :global(.rowgroup .tr::before) {
+    content: '';
+    position: absolute;
+    inset: 2px 0;
+    z-index: -1;
+    border-radius: var(--r-ctl);
+    pointer-events: none;
+    transition: background-color var(--d-state) var(--ease-out);
+  }
+
+  .table-slot :global(.rowgroup) {
+    isolation: isolate;
+  }
+
+  .table-slot :global(.rowgroup .tr:hover::before),
+  .table-slot :global(.rowgroup .tr[data-focused]:not([aria-selected='true'])::before) {
+    background: var(--row-wash, var(--hover));
+  }
+
+  .table-slot :global(.rowgroup .tr:active::before) {
+    background: var(--row-wash-press, var(--hover));
+  }
+
+  .table-slot :global(.rowgroup .tr[aria-selected='true']) {
+    background: none;
+  }
+
+  .table-slot :global(.rowgroup .tr[aria-selected='true']::before) {
+    background: var(--chosen);
   }
 
   /* HEARD AND NOT SEEN: the state a row was born in, which the column leaves out (L9). */
@@ -821,10 +855,13 @@
   }
 
   /* THE HEADS ARE QUIET: the meta size in the second ink, one hairline under them, and nothing else. */
+  /* THE HEADER IS A CAPS LABEL (ops look): 11px, 500, a little tracking, in the third ink. */
   .table-slot :global(.th) {
     color: var(--ink-3);
-    font-size: var(--fs-meta);
+    font-size: var(--fs-caps, 11px);
     font-weight: 500;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
   }
 
   /* A FIGURE READS AS A FIGURE: right-aligned by its column (`columnsFor`) and set in tabular figures, so a column of
@@ -872,20 +909,10 @@
 
   /* THE KEYBOARD'S ROW IS THE WASH, as the cursor row is on every list, and not a raised band; the focus
      ring still marks it while the grid has focus. A selected row keeps `--red-tint`. */
-  .table-slot :global(.rowgroup .tr[data-focused]:not([aria-selected='true'])) {
-    background: var(--hover);
-  }
-
-  /* AND ONLY WHILE THE KEYBOARD IS IN THE LIST. At rest the caret sits on the first row, which nobody chose, and its
-     band read as a pointer stuck on it: the row's wash, its box and its verbs on a list nobody had touched. Away from
-     the grid the caret's row is a row like the others, hairlines and all, and it comes back the moment focus does. */
-  .table-slot:not(:focus-within) :global(.rowgroup .tr[data-focused]:not([aria-selected='true'], :hover)) {
-    background: linear-gradient(var(--rule), var(--rule)) 50% 100% / calc(100% - 2 * var(--sp-3)) 1px no-repeat;
-    border-radius: 0;
-  }
-
-  .table-slot:not(:focus-within) :global(.rowgroup .tr:has(+ .tr[data-focused]:not([aria-selected='true'], :hover)):not(:hover, [aria-selected='true'])) {
-    background-size: calc(100% - 2 * var(--sp-3)) 1px;
+  /* THE CARET'S ROW AWAY FROM THE GRID is a row like the others: the wash only while the grid has focus or under the
+     pointer. */
+  .table-slot:not(:focus-within) :global(.rowgroup .tr[data-focused]:not([aria-selected='true'], :hover)::before) {
+    background: none;
   }
 
   /**

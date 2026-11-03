@@ -54,7 +54,8 @@
 {/if}
 
 <style>
-  /* AT THE TRAILING EDGE, as wide as it needs, the strong glass at level two: Decide's bar. */
+  /* AT THE TRAILING EDGE, as wide as it needs: floating chrome, so glass (ops look), a capsule with its controls inside
+     it, the popover's lift. */
   .batch {
     position: sticky;
     inset-block-end: var(--sp-4);
@@ -67,9 +68,11 @@
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
     padding: 6px 6px 6px var(--sp-4);
-    background: var(--tile);
-    border-radius: var(--r-tile);
-    border: 1px solid var(--rule-strong);
+    background: var(--glass-regular, var(--tile));
+    -webkit-backdrop-filter: var(--glass-filter, none);
+    backdrop-filter: var(--glass-filter, none);
+    border-radius: var(--r-chrome, var(--r-tile));
+    box-shadow: var(--glass-edge, 0 0 0 1px var(--rule-strong)), var(--elev-popover, none);
   }
 
 
@@ -86,9 +89,9 @@
     min-inline-size: 0;
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    background: var(--hover);
+    background: var(--soft-fill, var(--hover));
     border: 0;
-    border-radius: var(--r-pop);
+    border-radius: var(--r-pill, var(--r-pop));
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--fs-body);

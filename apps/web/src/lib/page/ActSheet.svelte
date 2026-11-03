@@ -116,7 +116,7 @@
   .act-value {
     display: block;
     padding: 12px;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-field, var(--r-ctl));
     background: var(--tile-2);
     font-family: var(--font-mono);
     font-size: var(--fs-body);

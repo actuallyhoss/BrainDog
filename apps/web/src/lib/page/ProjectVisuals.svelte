@@ -674,7 +674,7 @@
     gap: 12px;
     min-block-size: 36px;
     padding-block: 6px;
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
     font-size: var(--fs-ctl);
   }
 

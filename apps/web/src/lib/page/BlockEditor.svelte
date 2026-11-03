@@ -634,7 +634,7 @@
     block-size: var(--ctl-h);
     background: none;
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, var(--r-ctl));
     color: var(--ink-3);
     cursor: pointer;
     transition:
@@ -643,7 +643,7 @@
   }
 
   .icon-btn:hover {
-    background: var(--hover);
+    background: var(--soft-fill, var(--hover));
     color: var(--ink);
   }
 
@@ -661,7 +661,7 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, var(--r-ctl));
     color: var(--ink);
   }
 

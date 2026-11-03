@@ -1949,9 +1949,12 @@
     inline-size: max-content;
     z-index: var(--z-raise);
     padding: 4px 12px;
-    border-radius: var(--r-ctl);
-    background: var(--tile);
-    border: 1px solid var(--rule);
+    border-radius: var(--r-pill, var(--r-ctl));
+    background: var(--glass-regular, var(--tile));
+    -webkit-backdrop-filter: var(--glass-filter, none);
+    backdrop-filter: var(--glass-filter, none);
+    border: 0;
+    box-shadow: var(--glass-edge, 0 0 0 1px var(--rule)), var(--elev-popover, none);
     color: var(--ink-2);
     font-size: var(--fs-cap);
     pointer-events: none;
