@@ -2,7 +2,7 @@
  * The words every page shares: the product's name, each page's search result, the header, the footer (which
  * carries the slogan) and the 404. Which pages the header, the footer and the 404 list is `nav.ts`'s.
  */
-import { APPS_OR } from '../agents.ts';
+import { APPS_AND, APPS_OR } from '../agents.ts';
 import { LAUNCH } from '../launch.ts';
 
 export const shell = {
@@ -11,10 +11,8 @@ export const shell = {
   /** The search result and the shared card, about 150 characters each. */
   meta: {
     home: {
-      title: 'BrainDog · Give your business a memory',
-      description:
-        'BrainDog remembers your projects, money and people, shows what needs you on a Today you arrange, and ' +
-        'shares it with Claude and Cursor. Free in early access.',
+      title: 'BrainDog · Every AI agent starts where the last one stopped',
+      description: `${APPS_AND} read where your projects stand before they start, leave a handoff when they stop, and ask before touching money or keys.`,
     },
     slash: {
       title: 'Slash: press ⌘J and ask anything · BrainDog',
@@ -87,7 +85,7 @@ export const shell = {
   /** The early access line: the hero's under its buttons, and the strip that closes an inner page. */
   early: {
     strong: 'Early access, invite only.',
-    rest: "It's free while we open it up.",
+    rest: 'Free while we open it up.',
   },
 
   /** The dark footer: the brand with no blurb, three groups of plain links (`lib/site/footer.ts`) and the owner. */
@@ -98,9 +96,8 @@ export const shell = {
       help: 'Help',
     },
     /* The links that are not a page's own label: who it is for, then the texts. */
-    small: 'Small businesses',
+    small: 'Founders',
     teams: 'Teams and agencies',
-    personal: 'Personal use',
     developers: 'Developers',
     terms: 'Terms',
     privacy: 'Privacy',

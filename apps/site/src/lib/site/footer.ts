@@ -22,7 +22,6 @@ type Flags = { legal: boolean; repo: boolean; public: boolean };
 
 /** Where a developer is sent from the footer: connecting an AI tool, the docs' first page for them. */
 export const DEVELOPERS = `${DOCS}/agents/connect`;
-export const PERSONAL = `${DOCS}/use/money`;
 
 /** The footer's groups under these flags, each link in the order the design gives it. */
 export const footerGroups = (launch: Flags = LAUNCH): FootGroup[] => {
@@ -40,8 +39,8 @@ export const footerGroups = (launch: Flags = LAUNCH): FootGroup[] => {
       links: [
         ...page(forWho.founder.href, f.small),
         ...page(forWho.team.href, f.teams),
-        /* Personal use as much as business (29 October): the Money docs page until a page of its own is shown. */
-        ...(live.has(DOCS) ? [{ href: PERSONAL, label: f.personal }] : []),
+        /* NO "PERSONAL USE" LINK (3 November): the footer says what the page says; your own money is in the questions
+           and the docs. */
         ...(live.has(DOCS) ? [{ href: DEVELOPERS, label: f.developers }] : []),
       ],
     },

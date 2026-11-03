@@ -1,25 +1,24 @@
 <!--
-  "Who it's for" (2a section 2): three readers, three tiles, a real icon in a 40px well, a title, one line, a small
-  drawing that differs per tile, and the way on. ONE NEUTRAL TILE FOR ALL THREE, AND THE ICON CARRIES THE COLOUR (plan
-  F14, Look B: no tinted cards for decoration): amber for a small business, ink for building with AI, blue for your own
-  life, each in its well. The words are
-  `copy/home.ts`; the names in the drawings are Maya's (`demo/maya.ts`).
+  "How it works" (3 November, the site story; it was "Who it's for"): three steps, three tiles, a real icon in a 40px
+  well, a title, one line, a small drawing that differs per tile, and the way on. ONE NEUTRAL TILE FOR ALL THREE, AND
+  THE ICON CARRIES THE COLOUR (plan F14, Look B: no tinted cards for decoration): amber to connect, ink for the session
+  that starts caught up, blue for what waits on you, each in its well. The words are `copy/home.ts`; the names in the
+  drawings are Maya's (`demo/maya.ts`).
 
-  YOUR OWN LIFE (29 October, personal use as much as business) is drawn as what is coming up in Maya's own book, the
-  same rows the Money band shows.
+  The first step draws the makers it connects, the second the briefing in a terminal, the third the first of Maya's
+  questions as Needs you draws it, with its two answers (drawn, not pressable: the desk above is where they work).
 
   ON A PHONE, THREE PLAIN LINES: each tile is its icon and its way on, one line with an arrow, and the title is
   said to a screen reader. The cards and their sentences were most of a screen at 390.
 -->
 <script lang="ts">
+  import AgentMark from '$lib/AgentMark.svelte';
   import Icon from '$lib/Icon.svelte';
   import { home } from '$lib/copy/home.ts';
-  import { MONEY_BAND, usd } from '$lib/demo/maya.ts';
-  import { spark } from '$lib/desk/draw.ts';
+  import { NEEDS } from '$lib/demo/maya.ts';
 
   const w = home.who;
-  /* The small business's drawing: the cash over three months, as a shape and never as money. */
-  const cash = spark([48.2, 47.1, 46.4], 220, 56);
+  const ask = NEEDS[0]!;
 </script>
 
 <section class="band band--who" aria-labelledby="who-title">
@@ -27,13 +26,13 @@
     <h2 id="who-title" class="band-h2">{w.title}</h2>
     <div class="cols trio">
       <article class="ftile c4 amber">
-        <span class="fwell"><Icon name="store" /></span>
+        <span class="fwell"><Icon name="plug" /></span>
         <h3>{w.small.title}</h3>
         <p class="say">{w.small.say}</p>
         <div class="draw">
-          <svg class="cash" viewBox="0 0 220 56" preserveAspectRatio="none" aria-hidden="true">
-            <path class="a" d={cash.fill} /><path class="l" d={cash.line} vector-effect="non-scaling-stroke" />
-          </svg>
+          <p class="marks" aria-hidden="true">
+            {#each home.hero.makers as maker (maker.id)}<span class="mk"><AgentMark id={maker.id} size={20} /></span>{/each}
+          </p>
           <p class="fig"><b>{w.small.figure}</b> <span>{w.small.figureSay}</span></p>
         </div>
         <a class="onward" href={w.small.href}>{w.small.link}<Icon name="arrow-right" size="s" /></a>
@@ -50,13 +49,12 @@
       </article>
 
       <article class="ftile c4 blue">
-        <span class="fwell"><Icon name="house" /></span>
+        <span class="fwell"><Icon name="inbox" /></span>
         <h3>{w.life.title}</h3>
         <p class="say">{w.life.say}</p>
-        <div class="draw">
-          {#each MONEY_BAND.coming as c (c.name)}
-            <p class="due"><span>{c.name}</span><span class="when">{c.when}</span><b class="num">{usd(c.cents)}</b></p>
-          {/each}
+        <div class="draw ask">
+          <p class="q">{ask.ask}</p>
+          <p class="acts" aria-hidden="true"><span class="btn ink sm">{ask.yes}</span><span class="btn line sm">{ask.no}</span></p>
         </div>
         <a class="onward" href={w.life.href}>{w.life.link}<Icon name="arrow-right" size="s" /></a>
       </article>
@@ -136,20 +134,19 @@
     margin: 0;
   }
 
-  .cash {
-    display: block;
-    inline-size: 100%;
-    block-size: 40px;
+  /* THE MAKERS IT CONNECTS, each mark in a small round chip, in the hero's order. */
+  .marks {
+    display: flex;
+    gap: 8px;
   }
 
-  .cash .l {
-    fill: none;
-    stroke: var(--cat-amber);
-    stroke-width: 2;
-  }
-
-  .cash .a {
-    fill: color-mix(in srgb, var(--cat-amber) 14%, transparent);
+  .mk {
+    display: grid;
+    place-items: center;
+    inline-size: 36px;
+    block-size: 36px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
   }
 
   .fig {
@@ -180,28 +177,29 @@
     font-weight: 500;
   }
 
-  /* WHAT IS COMING UP IN HER OWN BOOK: three rows, the name, the day and the amount, as the app's Coming up lists them. */
-  .due {
+  /* ONE QUESTION AS NEEDS YOU DRAWS IT: the ask, then its two answers as the app's small buttons, drawn only. */
+  .ask {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 12px;
-    padding: 6px 0;
-    border-block-start: 0;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+  }
+
+  .ask .q {
     color: var(--ink);
     font-size: var(--t-site-14);
+    line-height: 1.45;
+    font-weight: 500;
   }
 
-  .due:first-child {
-    border-block-start: 0;
+  .acts {
+    display: flex;
+    gap: 6px;
   }
 
-  .due .when {
-    color: var(--ink2);
-  }
-
-  .due b {
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
+  .acts .btn {
+    pointer-events: none;
   }
 
   /* THE WAY ON is the site's one (`.onward`), at the tile's foot. */

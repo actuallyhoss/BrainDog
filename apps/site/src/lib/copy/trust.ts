@@ -116,9 +116,9 @@ export const trust = {
         },
         // docs/16-DECISIONS.md ADR-060 (scopes read, propose, write; no admin scope; VAULT and erasure stay a browser session).
         {
-          title: 'What an AI tool can do',
+          title: 'What an agent can do',
           glyph: 'agent',
-          text: 'An AI tool can read, suggest and write, and nothing more. Opening keys, inviting people, handing over, restoring a copy or deleting everything needs you, signed in, even when you let your own agents act without asking.',
+          text: 'An agent can read, suggest and write, and starts out asking before every change to your work. It earns the right to act alone one kind of change at a time, and loses it on an undo. Reading a key, handing BrainDog over or deleting it needs you, signed in, even when you let your own agents do everything else.',
         },
         // apps/web/src/routes/settings/[area]/areas/Export.svelte; docs/12-SECURITY.md §8 (the export).
         {

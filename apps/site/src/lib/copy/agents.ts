@@ -28,12 +28,12 @@ export const agents = {
       ],
     },
     cannot: {
-      title: "What it can't do",
+      title: 'How it earns your trust',
       lines: [
-        'See a key. It uses them from the Keychain, by name.',
-        'Move money or delete without your yes, unless you switch that on for your own agents.',
-        'Invite or remove people, hand over the BrainDog or pay, switch or no switch.',
-        'Hide what it did. Everything it writes carries its name.',
+        'It asks first. A new agent\'s changes arrive as questions, each with what would happen and why.',
+        'It earns one kind at a time. Keep ten changes of a kind and it may make that kind alone. One undo, or an email it just read, puts it back to asking.',
+        'Some things always ask. Deletes, money, keys and sharing never climb. Reading a key, giving BrainDog away and deleting it stay yours even if you let your own agents do everything.',
+        'It can\'t hide what it did. Every change carries its name, and you can undo it.',
       ],
     },
     brief: {

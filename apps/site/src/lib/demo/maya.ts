@@ -358,12 +358,23 @@ export const ASKED: Asked[] = [
     id: 'key',
     kind: 'Key',
     by: 'Cursor',
-    ask: 'A Stripe key was pasted into a note. Move it to the Keychain?',
-    why: 'AI tools can still use it from the Keychain, without ever seeing it.',
-    yes: 'Move it',
+    /* "SEALED", NOT "THE KEYCHAIN" (3 November): on the site the app's screen name reads as Apple's. */
+    ask: 'A Stripe key was pasted into a note. Seal it away?',
+    why: 'Agents can still use it by name, without seeing it.',
+    yes: 'Seal it',
     no: 'Not now',
-    done: 'Key moved to the Keychain, note cleaned',
+    done: 'Key sealed, note cleaned',
   },
+];
+
+/**
+ * WHERE EACH AGENT STANDS, as Settings says it (`apps/web/src/lib/ui/TrustRows.svelte`): one agent that has earned one
+ * kind of change, with "Ask again" beside it, and one still asking about everything. The home page's trust band draws
+ * it above what got done on its own.
+ */
+export const TRUST: { agent: AgentId; say: string; again: boolean }[] = [
+  { agent: 'claude', say: 'Claude may add tasks on its own, since 3 Oct', again: true },
+  { agent: 'cursor', say: 'Cursor asks before every change', again: false },
 ];
 
 /**
@@ -593,13 +604,14 @@ export const MAKES: Make[] = [
 ];
 
 /**
- * THE MONEY BAND ON THE HOME PAGE: Maya's money across her two books, hers and Ferment & Co's, as the app's Money home
- * draws it (the 27 October rebuild): the accounts, this month's budgets and what is coming up. The two bank balances add
- * up to the desk's "$48,210 across 2 accounts"; the card is owed, so it is not counted there.
+ * THE MONEY BAND ON THE HOME PAGE: the business side of Maya's money, as the app's Money home draws it (the 27 October
+ * rebuild): the accounts, this month's budgets and what is coming up, in and out. Her own checking sits beside the
+ * business, kept apart. The two bank balances add up to the desk's "$48,210 across 2 accounts"; the card is owed, so it
+ * is not counted there. COMING UP IS SIGNED AS THE BAND SAYS IT: a positive amount goes out, a negative one comes in.
  */
 export const MONEY_BAND: {
   accounts: { name: string; book: string; cents: number; icon: IconName }[];
-  /** NET WORTH, SINCE the 30 October Money look: cash, what the add-ons hold (her gold among it) less what is owed, week by week. */
+  /** NET WORTH, week by week: cash and what the add-ons hold, less what is owed. */
   worth: { cents: number; change: string; series: number[]; parts: { name: string; cents: number; icon: IconName }[] };
   budgets: { name: string; spent: number; of: number; icon: IconName; period: string }[];
   coming: { name: string; when: string; cents: number; icon: IconName }[];
@@ -610,25 +622,24 @@ export const MONEY_BAND: {
     { name: 'Amex', book: 'Maya', cents: -124_000, icon: 'card' },
   ],
   worth: {
-    cents: 6_212_000,
+    cents: 5_167_000,
     change: 'Up 4% in 12 weeks',
-    series: [57.1, 57.6, 57.2, 58.4, 58.9, 58.6, 59.8, 60.4, 60.1, 61.2, 61.7, 62.1],
+    series: [49.6, 50.0, 49.7, 50.6, 51.0, 50.8, 51.6, 52.0, 51.8, 52.5, 51.2, 51.7],
     parts: [
       { name: 'Cash', cents: 4_821_000, icon: 'cash' },
-      { name: 'Gold, 40 g', cents: 1_045_000, icon: 'coins' },
       { name: 'Index fund', cents: 470_000, icon: 'trend-up' },
       { name: 'Owed on the card', cents: -124_000, icon: 'card' },
     ],
   },
   budgets: [
-    { name: 'Groceries', spent: 41_200, of: 60_000, icon: 'store', period: 'this month' },
-    { name: 'Eating out', spent: 23_800, of: 20_000, icon: 'tag', period: 'this month' },
-    { name: 'Coffee', spent: 2_100, of: 3_500, icon: 'clock', period: 'this week' },
+    { name: 'Software', spent: 41_200, of: 60_000, icon: 'code', period: 'this month' },
+    { name: 'Contractors', spent: 523_800, of: 500_000, icon: 'users', period: 'this month' },
+    { name: 'Ads', spent: 21_000, of: 35_000, icon: 'tag', period: 'this month' },
   ],
   coming: [
-    { name: 'Rent', when: 'Sat 1', cents: 210_000, icon: 'house' },
-    { name: 'Gym', when: 'Mon 3', cents: 4_500, icon: 'repeat' },
-    { name: 'Car insurance', when: 'Wed 12', cents: 9_600, icon: 'shield' },
+    { name: 'AWS', when: 'Sat 1', cents: CENTS.awsCard, icon: 'cloud' },
+    { name: 'Dana Reyes', when: 'Fri 7', cents: CENTS.danaInvoice, icon: 'person' },
+    { name: 'Northbound pays', when: 'Wed 12', cents: -CENTS.northboundInvoice, icon: 'cash' },
   ],
 };
 

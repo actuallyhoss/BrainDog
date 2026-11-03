@@ -1042,19 +1042,20 @@
     color: var(--ink);
   }
 
-  /* THE TOGETHER BAND (2 November) sits between the chores' grey and the AI band's night, so it takes the Slash band's
-     white ground, which neither neighbour wears, and its tiles take that band's grey. */
+  /* THE TOGETHER BAND (2 November) sits between the money band's white and the Slash band's white since the site
+     story's order (3 November), so it takes the quiet grey, and its tiles the white card that grey carries. */
   .band--together {
-    background: var(--band-slash);
+    background: var(--band-yours);
     color: var(--ink);
-    /* IN DARK ITS GROUND AND THE AI BAND'S UNDER IT ARE A STEP APART, so the seam is drawn: the footer's hairline, which
-       is the night itself in light and so not seen there (it was the chores band's until this band came between). */
-    border-block-end: 1px solid var(--foot-rule);
+    --band-slash-tile: var(--band-yours-tile);
   }
 
+  /* THE AI BAND sits between How it works and the trust band, both a step from its ground in dark, so both seams are
+     drawn: the footer's hairline, which is the night itself in light and so not seen there. */
   .band--tools {
     background: var(--band-ai);
     color: var(--on-night);
+    border-block: 1px solid var(--foot-rule);
   }
 
   .band--slash {

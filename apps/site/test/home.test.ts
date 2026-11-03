@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { home } from '../src/lib/copy/home.ts';
-import { APP_NAMES, CODEX_LISTED } from '../src/lib/agents.ts';
+import { APP_NAMES, APPS_AND, CODEX_LISTED } from '../src/lib/agents.ts';
 import { BUILD, missing, when } from './built.ts';
 
 const NO_BUILD = missing(['index.html'], 'the home page checks read the built page');
@@ -33,44 +33,47 @@ function strings(value: unknown, path = 'home'): [string, string][] {
 /* The words the site never says in prose (docs/54-WRITING.md), whole words and either case. */
 const NEVER = /\b(rows?|list items?|entit(?:y|ies)|register|schemas?|slugs?|MCP|packs?|credentials?|snapshots?)\b/i;
 
-test('home.ts holds the words of site 2a at the key paths the ledger reads', () => {
-  assert.equal(home.hero.title, 'Give your business a memory.');
-  assert.equal(home.hero.sub, 'One place that remembers your work, your money and your life, and tells you what needs you today. The people you work with and your AI tools use it too.');
-  assert.equal(home.hero.secondary, 'Connect your AI tools');
+test('home.ts holds the words of the site story at the key paths the ledger reads', () => {
+  assert.equal(home.hero.title, 'Stop re-explaining your work.');
+  assert.equal(
+    home.hero.sub,
+    `BrainDog keeps where your projects stand, what you decided and who owes you in one place. ${APPS_AND} read it first, so each picks up where the last one stopped, and they ask before touching money, keys or deletes.`,
+  );
+  assert.equal(home.hero.secondary, 'Connect your agents');
   assert.equal(home.hero.works, 'Works with');
   assert.deepEqual(
     home.hero.makers.map((m) => m.name),
     APP_NAMES,
   );
-  assert.equal(home.who.title, "Who it's for");
+  assert.equal(home.who.title, 'How it works');
   assert.deepEqual(
     [home.who.small.title, home.who.build.title, home.who.life.title],
-    ['Run a small business', 'Build with AI', 'Keep your own life in order'],
+    ['Connect the agents you already use', 'Each session starts caught up', 'You answer what needs you'],
   );
-  assert.deepEqual([home.who.small.href, home.who.build.href, home.who.life.href], ['/for/founders', '/agents', '/docs/use/money']);
-  assert.equal(home.chores.title, 'It does the filing, you make the calls, and it stays yours.');
+  assert.deepEqual([home.who.small.href, home.who.build.href, home.who.life.href], ['/agents', '/agents', '/docs/use/decide']);
+  assert.equal(home.chores.title, "Agents ask until they've earned your trust.");
   assert.equal(
     home.chores.say,
-    'Filing, naming and sorting just happen, each with a reason and an undo. You only see what needs a person.',
+    "A new agent asks before every change to your work. Once you've kept ten of its changes of one kind, BrainDog offers to let it make that kind on its own, and only that kind. One undo puts it back to asking.",
   );
   assert.equal(
     home.chores.floor,
-    'Money, keys, sharing and deletes wait for your yes. Only you can let your own agents skip that, and keys and people stay yours even then.',
+    'Deletes, money, keys and sharing ask every time. You can let your own agents skip that; reading a key, giving BrainDog away and deleting it stay yours either way.',
   );
-  assert.equal(home.tools.title, 'Your AI tools share one memory.');
+  assert.equal(home.tools.title, 'Nothing gets explained twice.');
   assert.equal(
     home.tools.say,
-    "Each one starts from your brief, reads your scripts and automations by name, and leaves a note when it's done. Nothing gets explained twice.",
+    "Every agent reads the same page: each project's next step, the decisions and why, the dead ends already tried, the lessons learned and the keys it may use, by name. What Claude learns on Monday, Cursor knows on Tuesday.",
   );
-  assert.equal(home.slash.title, 'Press ⌘J and ask anything.');
+  assert.equal(home.slash.title, 'Or just ask BrainDog.');
   assert.equal(home.yours.title, 'It stays yours.');
   assert.deepEqual(home.yours.points.map((p) => p.text), [
-    'Every change has a name on it, and an undo.',
-    'Export everything as one file, any time.',
-    'AI tools use your keys without ever seeing them.',
+    'Every change carries a name, person or agent, and an undo.',
+    'See which agents are working now, and pause, redirect or stop one from any browser.',
+    'Agents use your keys without ever seeing them.',
   ]);
   assert.equal(home.free.title, 'Free while in early access.');
-  assert.equal(home.faq.questions.length, 7);
+  assert.equal(home.faq.questions.length, 9);
   assert.ok(!('closing' in home), 'home has no recap close (site F1)');
 });
 
@@ -105,25 +108,26 @@ const text = (html: string): string =>
     .replace(/&(#?\w+);/g, (all, name: string) => ENTITIES[name] ?? all)
     .replace(/\s+/g, ' ');
 
-test('the built home page has one h1, the slogan', when(NO_BUILD), () => {
+test('the built home page has one h1, the headline', when(NO_BUILD), () => {
   const h1s = [...page().matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)];
   assert.equal(h1s.length, 1, 'one h1');
-  assert.equal(text(h1s[0]![1]!).trim(), 'Give your business a memory.');
+  assert.equal(text(h1s[0]![1]!).trim(), 'Stop re-explaining your work.');
   assert.match(h1s[0]![0], /\bid="hero-title"/, 'the h1 is #hero-title, which scripts/product.mjs reads');
 });
 
-test('the hero is section.hero with the slogan and the .sub sentence', when(NO_BUILD), () => {
+test('the hero is section.hero with the headline and the .sub sentence', when(NO_BUILD), () => {
   const html = page();
   const hero = html.match(/<section\b[^>]*class="[^"]*\bhero\b[^"]*"[^>]*>[\s\S]*?<\/section>/);
   assert.ok(hero, 'section.hero');
   assert.match(hero[0], /id="hero-title"/);
-  assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*One place that remembers your work/);
+  assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*BrainDog keeps where your projects stand/);
 });
 
-test('the five bands and the ask, in order, and no close after them', when(NO_BUILD), () => {
+test('the six bands and the ask, in order, and no close after them', when(NO_BUILD), () => {
   const said = text(page());
-  /* "IT STAYS YOURS" IS THE CHORES BAND'S, and the questions are the pricing page's (plan F12, 1 Nov). */
-  const order = [home.who.title, home.money.title, home.chores.title, home.tools.title, home.slash.title, home.free.title];
+  /* "IT STAYS YOURS" IS THE TRUST BAND'S, the questions are the pricing page's (plan F12, 1 Nov), and the order is the
+     site story's (3 Nov): how it works, then the band that sells the product. */
+  const order = [home.who.title, home.tools.title, home.chores.title, home.money.title, home.together.title, home.slash.title, home.free.title];
   let at = 0;
   for (const heading of order) {
     const found = said.indexOf(heading, at);

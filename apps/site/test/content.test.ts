@@ -412,10 +412,10 @@ test('the home page opens on the hero with the desk, then its six bands in order
   );
 
   /* SITE 2a (20 October): one product picture, then full-bleed bands that each say one new thing, and no close.
-     Money joined as the second band on 29 October (personal use as much as business). */
+     The order is the site story's (3 November): how it works, then the band that sells the product. */
   const bands = [...html.matchAll(/<section\b[^>]*\sclass="[^"]*\bband--([a-z]+)\b/g)].map((m) => m[1]);
-  assert.equal(bands.length, 7, `index.html draws ${bands.length} bands, where the page holds seven: who, money, chores, tools, slash, yours and the questions`);
-  assert.deepEqual(bands, ['who', 'money', 'chores', 'tools', 'slash', 'yours'], 'the bands are in the order the page says them');
+  assert.equal(bands.length, 7, `index.html draws ${bands.length} bands, where the page holds seven: who, tools, chores, money, together, slash and yours`);
+  assert.deepEqual(bands, ['who', 'tools', 'chores', 'money', 'together', 'slash', 'yours'], 'the bands are in the order the page says them');
 
   const pictures = [...html.matchAll(/<(?:picture|img)\b[^>]*>/g)].map((m) => m[0]);
   assert.deepEqual(pictures, [], 'index.html draws a photograph again, where the product on this page is drawn in HTML and CSS');

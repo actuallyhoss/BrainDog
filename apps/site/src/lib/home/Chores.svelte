@@ -1,6 +1,7 @@
 <!--
-  The chores band: "It does the filing, you make the calls, and it stays yours." (site 2a sections 3 and 6, one band
-  since plan F12: eight bands was too many for a page whose job is one ask). UNDER THE DRAWING, WHAT KEEPS IT YOURS: the
+  The trust band: "Agents ask until they've earned your trust." (3 November, the site story; it was the chores band,
+  site 2a sections 3 and 6, one band since plan F12). ABOVE WHAT GOT DONE, WHERE EACH AGENT STANDS, as Settings says it
+  (`TRUST` in `demo/maya.ts`): one agent trusted with one kind, one still asking. UNDER THE DRAWING, WHAT KEEPS IT YOURS: the
   floor and the three promises of "It stays yours", four short lines in a row, and the way to how it is kept safe. What waits for a person, on a tile,
   beside what got done on its own, on the band's grey; under both, the floor no rule and no AI tool can lower. The band
   was red until 1 Nov; the only solid red on a page is Start free now, so the answer is ink as the app draws one.
@@ -16,10 +17,11 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
+  import AgentMark from '$lib/AgentMark.svelte';
   import Icon from '$lib/Icon.svelte';
   import type { IconName } from '$lib/icons.ts';
   import { home } from '$lib/copy/home.ts';
-  import { ASKED, HANDLED } from '$lib/demo/maya.ts';
+  import { ASKED, HANDLED, TRUST } from '$lib/demo/maya.ts';
   import { asked } from '$lib/desk/needs.svelte.ts';
 
   const words = home.chores;
@@ -84,6 +86,16 @@
         {/if}
       </div>
       <div class="done c5">
+        <p class="hd">{words.trust}</p>
+        <ul class="items trust">
+          {#each TRUST as t (t.agent)}
+            <li class="item">
+              <span class="mk"><AgentMark id={t.agent} size={16} /></span>
+              <p>{t.say}</p>
+              {#if t.again}<span class="again" aria-hidden="true">{words.askAgain}</span>{/if}
+            </li>
+          {/each}
+        </ul>
         <p class="hd"><Icon name="check" size="s" />{words.done}<span class="n num">{words.today(chores.length + done.length)}</span></p>
         <ul class="items" aria-live="polite">
           {#each done as ask (ask.id)}
@@ -252,6 +264,27 @@
   .item p {
     flex: 1;
     min-inline-size: 0;
+  }
+
+  /* WHERE EACH AGENT STANDS: its mark, the line Settings says, and "Ask again" drawn beside a kind it may do alone. */
+  .trust {
+    margin-block-end: 16px;
+  }
+
+  .mk {
+    display: inline-flex;
+    flex: none;
+  }
+
+  .again {
+    color: var(--ink2);
+    font-size: var(--t-site-14);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .done .hd + .items {
+    margin-block-start: 0;
   }
 
   .why2 {
