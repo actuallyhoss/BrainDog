@@ -85,6 +85,35 @@ export function eraseFile(folder: string | null, sha256: string): void {
   if (!SHA256.test(sha256)) throw new Error('an erase.r2 names the file it deletes by its SHA-256, and this one does not');
   if (folder === null) return;
   rmSync(join(folder, sha256), { force: true });
+  rmSync(typeFile(folder, sha256), { force: true });
+}
+
+/**
+ * WHERE AN ATTACHMENT'S TYPE IS KEPT BESIDE ITS BYTES, as the Worker keeps it in the object's metadata: `<sha256>.type`,
+ * the one line `attachedType` read from its bytes and its name when it came. A disk keeps no type, and without it an
+ * SVG, which has no first bytes of its own, went out as text and never showed as a picture.
+ */
+export const typeFile = (folder: string, sha256: string): string => join(folder, `${sha256}.type`);
+
+/** Keeps an attachment's type beside it, once; a type already kept for the same bytes stays. */
+export function keepType(folder: string, sha256: string, mime: string): void {
+  if (!SHA256.test(sha256) || !/^[a-z]+\/[a-z0-9.+-]+$/u.test(mime)) return;
+  const at = typeFile(folder, sha256);
+  if (!existsSync(at)) writeFileSync(at, mime, { mode: 0o600 });
+}
+
+/**
+ * The type kept beside a file, when it is a picture: only a picture is served by it, so an SVG shows as one (in an
+ * `<img>`, where its script never runs, and inert under the door's `sandbox` when opened on its own). Every other kind
+ * is typed from its bytes as before.
+ */
+function keptPicture(folder: string, sha256: string): string | null {
+  try {
+    const mime = readFileSync(typeFile(folder, sha256), 'utf8').trim();
+    return /^image\/[a-z0-9.+-]+$/u.test(mime) ? mime : null;
+  } catch {
+    return null;
+  }
 }
 
 const answer = (status: number, body: unknown, extra: Record<string, string> = {}): Response =>
@@ -173,6 +202,7 @@ async function keep(request: Request, ctx: CallContext, folder: string | null, a
       writeFileSync(passing, bytes, { mode: 0o600 });
       renameSync(passing, target);
     }
+    keepType(folder, sha256, mime);
     return answer(200, { sha256, mime, bytes: bytes.byteLength });
   }
   if (bytes.byteLength > FILE_MOST) return refuse(413, TOO_BIG);
@@ -205,7 +235,7 @@ function give(ctx: CallContext, folder: string | null, sha256: string, head: boo
     return refuse(404, NO_FILE);
   }
   /* AN ATTACHMENT WITH NO SIGNATURE IS TEXT OR BYTES, read as the door read it (`attachedType`): a disk keeps no type. */
-  const typed = sniff(bytes) ?? (attachedType(bytes, '').kind === 'text' ? 'text/plain; charset=utf-8' : 'application/octet-stream');
+  const typed = sniff(bytes) ?? keptPicture(folder, sha256) ?? (attachedType(bytes, '').kind === 'text' ? 'text/plain; charset=utf-8' : 'application/octet-stream');
   const headers = { ...FILE_HEADERS, 'content-type': typed, 'content-length': String(bytes.byteLength) };
   return new Response(head ? null : Uint8Array.from(bytes), { status: 200, headers });
 }

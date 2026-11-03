@@ -9,7 +9,7 @@ import { join } from 'node:path';
 
 import type { VisualStore } from '@braindog/record';
 
-import { SHA256, sniff } from './files.ts';
+import { keepType, SHA256, sniff } from './files.ts';
 
 /** The folder a record's visual pages live in: `pages/` inside its files' folder. */
 export const pagesFolder = (blobs: string): string => join(blobs, 'pages');
@@ -68,14 +68,16 @@ export function diskVisuals(blobs: string): VisualStore {
       }
     },
     /* A FILE AN AGENT HANDS IN AS TEXT, kept where the file door keeps one: under a temporary name, then moved into place. */
-    putFile: async (sha256, bytes) => {
+    putFile: async (sha256, bytes, mime) => {
       if (!SHA256.test(sha256)) throw new Error('A file is named by its SHA-256, and this name is not one.');
       const target = join(blobs, sha256);
-      if (existsSync(target)) return;
       mkdirSync(blobs, { recursive: true, mode: 0o700 });
-      const passing = `${target}.${randomBytes(6).toString('hex')}.part`;
-      writeFileSync(passing, bytes, { mode: 0o600 });
-      renameSync(passing, target);
+      if (!existsSync(target)) {
+        const passing = `${target}.${randomBytes(6).toString('hex')}.part`;
+        writeFileSync(passing, bytes, { mode: 0o600 });
+        renameSync(passing, target);
+      }
+      if (typeof mime === 'string') keepType(blobs, sha256, mime);
     },
   };
 }
