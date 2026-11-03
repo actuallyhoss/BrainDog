@@ -109,6 +109,26 @@ public final class Client: Sendable {
         throw CallFailure.failed(status: 200)
     }
 
+    /// A file sent to be attached (`PUT /api/files?name=`, as the web's Attachments section sends one): the door takes any
+    /// type at up to 25 MB when the put names its file, and types it from its bytes, never from what is said here. The
+    /// answer is its hash, which `attachFile` then puts on a task or project.
+    public func put(attaching data: Data, name: String) async throws(CallFailure) -> SentFile {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+#?")
+        let named = name.addingPercentEncoding(withAllowedCharacters: allowed) ?? "file"
+        var request = URLRequest(url: Server.url("/api/files?name=\(named)"))
+        request.httpMethod = "PUT"
+        request.timeoutInterval = 120
+        request.setValue("application/octet-stream", forHTTPHeaderField: "content-type")
+        request.setValue(Server.originText, forHTTPHeaderField: "origin")
+        if let cookie = Session.shared.cookieHeader { request.setValue(cookie, forHTTPHeaderField: "cookie") }
+        request.httpBody = data
+        let answer = try await send(request, path: "/api/files")
+        if let sent = try? JSONDecoder().decode(SentFile.self, from: answer) { return sent }
+        if let wrapped = try? JSONDecoder().decode(Envelope<SentFile>.self, from: answer), let sent = wrapped.value { return sent }
+        throw CallFailure.failed(status: 200)
+    }
+
     /// One request on the origin, its `Set-Cookie` kept, and its status read the one way every call reads it.
     private func send(_ request: URLRequest, path: String) async throws(CallFailure) -> Data {
         let data: Data

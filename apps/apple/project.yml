@@ -256,13 +256,17 @@ targets:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareController
           NSExtensionAttributes:
-            # Text, one link, or one photo or file (a PDF, a receipt): what Tell can take with its words.
+            # Text, one link or page, or up to ten photos or files (a PDF, a receipt, a page saved from Claude): what Tell
+            # takes with its words, and what Attach puts on a project or a task. Safari's page comes as it is drawn
+            # (`Share/Page.js`).
+            NSExtensionJavaScriptPreprocessingFile: Page
             NSExtensionActivationRule:
               NSExtensionActivationSupportsText: true
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
-              NSExtensionActivationSupportsImageWithMaxCount: 1
-              NSExtensionActivationSupportsFileWithMaxCount: 1
-              NSExtensionActivationSupportsAttachmentsWithMaxCount: 2
+              NSExtensionActivationSupportsWebPageWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+              NSExtensionActivationSupportsFileWithMaxCount: 10
+              NSExtensionActivationSupportsAttachmentsWithMaxCount: 10
 
   ShareMac:
     type: app-extension
@@ -297,9 +301,9 @@ targets:
             NSExtensionActivationRule:
               NSExtensionActivationSupportsText: true
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
-              NSExtensionActivationSupportsImageWithMaxCount: 1
-              NSExtensionActivationSupportsFileWithMaxCount: 1
-              NSExtensionActivationSupportsAttachmentsWithMaxCount: 2
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+              NSExtensionActivationSupportsFileWithMaxCount: 10
+              NSExtensionActivationSupportsAttachmentsWithMaxCount: 10
 
   NotifyService:
     type: app-extension
