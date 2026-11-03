@@ -13,7 +13,7 @@
   import { at } from '$lib/at.ts';
   import Button from '$lib/ui/Button.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import { FRESH, PUT_BACK, removedLines, versionSaid, type Removed, type Way } from './removed.ts';
+  import { FRESH, PUT_BACK, binnedSaid, removedLines, versionSaid, type Removed, type Way } from './removed.ts';
 
   let {
     rows,
@@ -64,6 +64,7 @@
             <span class="gone-main">
               <span class="line-title gone-name">{name}</span>
               <span class="line-detail gone-line">{l?.when}. {l?.stayed}</span>
+              {#if r.binned}<span class="line-detail gone-line">{binnedSaid(r.binned)}</span>{/if}
               {#if version}<span class="line-detail gone-line">{version}</span>{/if}
               {#if !r.back}<span class="line-detail gone-line">{FRESH}</span>{/if}
             </span>
