@@ -76,6 +76,10 @@ export const cardWords = {
   /* "BY CHASE LATE PAYMENTS", NOT "ASKED BY YOUR RULE CHASE LATE PAYMENTS" (T14): the rule's name says what asked. */
   byRule: (name: string) => `By ${name}`,
   byYou: 'Asked by you',
+  /** Said to a screen reader before a rule's name, where its glyph says it to the eye. */
+  askedByRule: 'Asked by your rule',
+  /** The name on a by-line where the reader asked it. */
+  you: 'You',
   /** THE CARD'S SIDE, ON A WIDE TILE: why it is asked and what it changes, each under a quiet heading. */
   why: 'Why it’s asked',
   changes: 'What it changes',

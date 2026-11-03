@@ -35,6 +35,7 @@
   import { day, since, symbolText } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
+  import { stillTyping } from '$lib/a11y/typed.ts';
   import { iconFor, whoDid } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { installWords } from '$lib/record/actions.ts';
@@ -166,7 +167,8 @@
     const money = live?.question ? moneyRowOf(spoken(live.question.title)) : null;
     const title = typeof held === 'string' && held.trim() !== '' ? held.trim() : (money?.title ?? '');
     const href = rowHref(named.spoken) ?? `/r/${named.list}/${named.seq}`;
-    aboutRow = fields && title !== '' ? { title, href, line: aboutLine(lists.get(named.list) ?? listName(named.list), money) } : null;
+    /* THE LIST ALONE UNDER ITS NAME: the amount and how late are the question's title, one line over it (3 Nov). */
+    aboutRow = fields && title !== '' ? { title, href, line: aboutLine(lists.get(named.list) ?? listName(named.list), null) } : null;
   }
 
   /**
@@ -181,8 +183,13 @@
     keysHeld = out.ok ? heldOf(out.value) : undefined;
   }
 
+  /* WHEN THIS QUESTION OPENED, in the keys' own clock (`KeyboardEvent.timeStamp`): a key that lands within the second
+     after is the hands still typing where they came from (the palette's box, a reason on the last question), and never
+     an answer, a decline or a put-off here (3 Nov: typed on its way in, a key landed on the question it opened). */
+  let openedAt = Number.NEGATIVE_INFINITY;
   $effect(() => {
     const id = String(page.params.id);
+    openedAt = typeof performance === 'undefined' ? Number.NEGATIVE_INFINITY : performance.now();
     untrack(() => void readLive(id));
   });
 
@@ -400,13 +407,14 @@
    * The same buttons, the same words and the same weight here, from the same reading of the question (`money-row.ts`).
    */
   const moneyRow = $derived(question && !merge ? moneyRowOf(spoken(question.title), question.options.map((o) => o.title)) : null);
-  /** "Your rule Chase late payments", as the card's foot says who asked, where a rule asked. */
+  /* A RULE BY ITS NAME ALONE, as its card's by-line says it (3 Nov): "Your rule Ask whether to keep a service before it
+     renews" read as one broken sentence. The face's glyph says it is a rule, and a screen reader hears "Asked by your rule". */
   const askerSaid = $derived.by(() => {
     if (!asker) return '';
     if (asker.kind === 'automation') return nameWords.automation;
     if (asker.kind !== 'rule') return asker.name;
     const rule = asker.name.replace(/^A rule: /u, '');
-    return `Your rule ${rule.charAt(0).toUpperCase()}${rule.slice(1)}`;
+    return `${rule.charAt(0).toUpperCase()}${rule.slice(1)}`;
   });
   /* THE MONEY ACCEPTING WOULD WRITE, in each currency it is in, for the rows that are ticked: the button names it. */
   const moves = $derived(question && live ? movesOf(live.rowset, live.registers, picked) : []);
@@ -705,6 +713,8 @@
     if (typing() || fromInput(e.target)) return;
     if (silenced(e)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    /* NOT AS THE PAGE OPENS: the hands may still be typing where they came from. */
+    if (e.isComposing || stillTyping(openedAt, e.timeStamp)) return;
 
     /* `1` TO `9` REACH AN ANSWER, and Enter on it then gives it: a number puts the focus there and sends nothing. */
     const n = Number(e.key);
@@ -999,6 +1009,12 @@
   const doesAny = $derived(
     Boolean((story && !settled) || (preview && !settled) || picking || creates.length || updates.length || calling || (costed && question?.cost)),
   );
+  /* A PART'S OWN HEADING ONLY BESIDE ANOTHER PART (3 Nov): alone under "What it changes", "Before and after" said the
+     heading over it twice. What it calls out and what deciding late costs keep theirs, which say something else. */
+  const doesParts = $derived(
+    [Boolean(story && !settled), Boolean(preview && !settled), picking, creates.length > 0, updates.length > 0, Boolean(calling && live), Boolean(costed && question?.cost)].filter(Boolean).length,
+  );
+  const partHeads = $derived(doesParts > 1);
 
   /**
    * THE SIDE BESIDE THE CHOICES (`side.ts`), for a question still open: the share the asker gave on the question's body
@@ -1162,7 +1178,7 @@
 
                   {#if preview && !settled}
                     <section class="changed">
-                      <h3 class="does-h">{copy.proposalWillAppear}</h3>
+                      {#if partHeads}<h3 class="does-h">{copy.proposalWillAppear}</h3>{/if}
                       <Proposed proposed={preview} />
                       <!-- A SCRIPT'S SOURCE, WHOLE AND FOLDED: it is what runs, and code keeps its lines, which a line of the
                            preview cannot. A scrolling box a keyboard can reach, as the canvas's written body is. -->
@@ -1178,7 +1194,7 @@
 
                   {#if picking}
                     <section class="changed">
-                      <h3 class="does-h">{pickWords.heading}</h3>
+                      {#if partHeads}<h3 class="does-h">{pickWords.heading}</h3>{/if}
                       <p class="pick-hint">{pickWords.hint}</p>
                       <ul class="picks">
                         {#each pickable as row (row.n)}
@@ -1205,14 +1221,14 @@
 
                   {#if creates.length}
                     <section class="changed">
-                      <h3 class="does-h">{pickWords.heading}</h3>
+                      {#if partHeads}<h3 class="does-h">{pickWords.heading}</h3>{/if}
                       <Changes updates={creates} />
                     </section>
                   {/if}
 
                   {#if updates.length}
                     <section class="changed">
-                      <h3 class="does-h">{changeWords.heading}</h3>
+                      {#if partHeads}<h3 class="does-h">{changeWords.heading}</h3>{/if}
                       <Changes {updates} />
                     </section>
                   {/if}
@@ -1333,7 +1349,7 @@
 
         <!-- WHO ASKED AND WHEN, the quiet line over the answers, as a card's by-line is over its question. -->
         <p class="gate-by">
-          <span class="dc-sr">{cardWords.askedBy}</span>
+          <span class="dc-sr">{asker?.kind === 'rule' ? cardWords.askedByRule : cardWords.askedBy}</span>
           {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{askerSaid}</span>{/if}
           <!-- WHEN, AS ITS CARD SAYS IT: a money row's card says the day ("3 Sep"), every other card how long ago. -->
           <span class="gate-when">{since(question.opened, now)}</span>
@@ -1794,15 +1810,21 @@
 
   /* ── who asked, and why ────────────────────────────────────────────────── */
 
+  /* ONE LINE, THE FACE, THE NAME AND WHEN: a long name (a rule's is a sentence) wraps inside its own span, at most two
+     lines, and never leaves the face alone on a row over it and the time on a third (390, 3 Nov). */
   .gate-by {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
+    min-inline-size: 0;
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: var(--lead-meta);
+  }
+
+  .gate-by > :global(.face) {
+    flex: none;
   }
 
   /* WHO ASKED IS THE LINE OVER THE ANSWERS, close over them as a card's by-line is over its question. */
@@ -1811,11 +1833,18 @@
   }
 
   .gate-who {
+    display: -webkit-box;
+    min-inline-size: 0;
+    overflow: hidden;
     color: var(--ink-2);
     font-weight: var(--fw-medium);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .gate-when {
+    flex: none;
     font-variant-numeric: tabular-nums;
   }
 

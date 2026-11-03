@@ -40,6 +40,7 @@
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import type { Opened } from '$lib/record/page-live.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
+  import { stillTyping } from '$lib/a11y/typed.ts';
   import { goto } from '$app/navigation';
   import { choose, type PackState } from '$lib/record/packs.ts';
   import { hostedHere } from '../settings/billing.ts';
@@ -306,6 +307,9 @@
    * whole on its own page, where Accept names the amount and a key never accepts money (`press.ts` `acceptKey`).
    */
   let goAt = 0;
+  /* WHEN THE PAGE OPENED, in the keys' clock: Enter, Backspace and the answer keys wait out the second after it, when the
+     hands may still be typing in the box they came from (the palette's), so a typed key never answers a question here. */
+  const openedAt = typeof performance === 'undefined' ? Number.NEGATIVE_INFINITY : performance.now();
 
   /**
    * The question under the cursor: the card holding the focus, or the one the cursor's ring is on.
@@ -340,6 +344,7 @@
     const act = keyAct(e.key);
     const queued = queueAct(e.key);
     if ((act === null && queued === null) || Date.now() - goAt < 1000) return;
+    if (e.isComposing || stillTyping(openedAt, e.timeStamp)) return;
     const card = questionUnder();
     if (!card) return;
     if (queued !== null) return void queueKey(e, card, queued);
@@ -848,12 +853,22 @@
   }
 
   /* EACH QUESTION IS AN OPS CARD (2.7.2): solid tile, its 1px edge and the two-layer card shadow (none in dark). */
+  /* AND EVERY CARD ENDS WHERE THE LEAD ENDS (3 Nov): under a lead stopped at a reading width, the cards across the
+     whole board made two right edges, one 340px past the other. In a column narrower than that nothing changes. */
   .body :global(.block-slot > .queue > .qa) {
+    max-inline-size: calc(var(--measure, 72ch) + 2 * var(--tile-pad-lead));
     padding: var(--tile-pad);
     border: 1px solid var(--card-edge, transparent);
     background: var(--tile);
     border-radius: var(--r-tile);
     box-shadow: var(--shadow-card, none);
+  }
+
+  /* AN ANSWERED CARD'S LINE IS THE TILE'S WHOLE CONTENT (3 Nov): its own grey fill drew a box inside the card's box.
+     The tile is the box here; the line keeps its check, its words and Undo on the card's own ground. */
+  .body :global(.block-slot > .queue > .qa .qa-done) {
+    padding: 0;
+    background: none;
   }
 
   /* THE TILE IS THE EDGE NOW: no hairline over a question and no band of air under the lead. */

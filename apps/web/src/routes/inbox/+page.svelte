@@ -1196,7 +1196,9 @@
 <style>
   /* THE SELF-HOST'S FOLD, under the one button: its summary a quiet line, and the command the tile's width when open. */
   /* ITS OWN LINE UNDER THE BUTTON: the empty tile's actions take the tile's width here, so the fold wraps under them. */
-  .clear :global(.empty-actions) {
+  /* AT THE START, UNDER THE WORDS AND THE COMMAND (3 Nov): Empty centres a screen's actions with a rule that outweighed
+     this one, so "Other ways in" stood alone in the middle under a tile read from its start edge. */
+  .page .clear :global(.empty:not(.compact) .empty-actions) {
     align-self: stretch;
     justify-content: flex-start;
   }

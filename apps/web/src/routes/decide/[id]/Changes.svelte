@@ -45,6 +45,7 @@
   import { placeNamed, placesIn, words as scopeWords, type Place, type Scope } from '$lib/record/scope-move.ts';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import { closedSaid, moreReasons, noteWords, words, type NoteChange, type Updated } from './changes.ts';
+  import { stateWord } from '$lib/decide/state-word.ts';
 
   let { updates, compact = false }: { updates: readonly Updated[]; compact?: boolean } = $props();
 
@@ -164,14 +165,16 @@
           <!-- A NEW ROW HAS NO BEFORE: each field is what it would hold, with nothing struck through. -->
           <p class="change-line">
             <span class="change-label">{c.label}</span>
-            <span class="plain"><span class="now">{c.after ?? words.empty}</span></span>
+            <span class="plain"><span class="now">{stateWord(c.after) ?? words.empty}</span></span>
           </p>
         {:else}
           <p class="change-line">
             <span class="change-label">{c.label}</span>
             <span class="plain">
-              <del class="was"><span class="vh">{words.before}: </span>{c.before ?? words.empty}</del>
-              <ins class="now"><span class="vh">{words.after}: </span>{c.after ?? words.empty}</ins>
+              <del class="was"><span class="vh">{words.before}: </span>{stateWord(c.before) ?? words.empty}</del>
+              <!-- THE ARROW SAYS WHICH WAY IT GOES, as a move's chips have it: two words side by side read as a pair. -->
+              <span class="move-to" aria-hidden="true">→</span>
+              <ins class="now"><span class="vh">{words.after}: </span>{stateWord(c.after) ?? words.empty}</ins>
             </span>
           </p>
         {/if}
@@ -291,7 +294,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: var(--sp-1) var(--sp-3);
+    gap: var(--sp-1) var(--sp-2);
     min-inline-size: 0;
     overflow-wrap: anywhere;
   }

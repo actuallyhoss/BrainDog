@@ -78,7 +78,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, answerRowOf, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, leadOf, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
+  import { answeredLine, answerRowOf, cardOf, cardWords, hardSaid, hardWhy, inlineOf, keptWay, ladderLine, leadOf, pressOf, pressSaid, primaryOf, putsOff, saysChanges, startsOn, wayTail } from './card.ts';
   import { leave, pointerOff, settle, snapshot } from './settle.ts';
   import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
   import { haptic } from '$lib/shell.ts';
@@ -89,6 +89,7 @@
   import { refs as sendRefs } from '$lib/send/send.ts';
   import { ownMenu } from '$lib/ui/context-menu.ts';
   import { amountAnswer, moneyRowOf, outcomeOf } from './money-row.ts';
+  import { stateWord } from './state-word.ts';
   import { presses } from '$lib/data/held.svelte.ts';
   import { history } from '$lib/data/undo.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -195,6 +196,9 @@
   const primaryDoes = $derived(card.ways.find((w) => w.key === primary)?.because.trim() ?? '');
   /* AT MOST TWO ANSWERS AND ONE QUIET LATER (`answerRowOf`): the asker's own "Later" is that Later, never beside ours. */
   const answerRow = $derived(answerRowOf(card.ways, primary));
+  /* AN ANSWER OF THE ASKER'S OWN ON THE ROW THAT ONLY PUTS IT OFF ("Not now") IS THE CARD'S LATER: a second, quiet
+     "Later" beside it said the same thing twice, as the question's own page already knows (`putsOff`). */
+  const ownLater = $derived(answerRow.shown.some((w) => putsOff(w.label)));
   /* "CAN'T BE UNDONE EASILY" SAYS WHY, in words of what the answer does (`hardWhy`), never the bare warning. */
   const hardReason = $derived(hardLine ? hardWhy(card, Array.isArray(question.kinds) ? question.kinds : []) : '');
   /* THE LADDER'S RULE ("Changes like this ask until …") IS NOT WHY THIS QUESTION MATTERS: it waits behind an info mark. */
@@ -320,11 +324,15 @@
   /* AN AGE IS ONE PIECE: "12h ago" never breaks between its two words at a line's end (phone, 390). */
   const whenSaid = $derived(card.when.replace(/ /gu, '\u00a0'));
 
-  const askedLine = $derived.by(() => {
-    if (!row) return '';
-    const rule = card.by.kind === 'rule' ? card.by.name.replace(/^A rule: /u, '') : null;
-    const who = rule !== null ? cardWords.byRule(rule.charAt(0).toUpperCase() + rule.slice(1)) : card.by.kind === 'you' ? cardWords.byYou : cardWords.by(card.by.name);
-    return card.when ? `${who} · ${whenSaid}` : who;
+  /* WHO ASKED, AS EVERY OTHER CARD'S BY-LINE SAYS IT (3 Nov): the face and the name, then how long ago. "By Ask whether to
+     keep a service before it renews" read as a broken sentence; the rule's glyph says it is a rule, and a screen reader
+     hears "Asked by your rule". */
+  const askedName = $derived.by(() => {
+    if (card.by.kind === 'rule') {
+      const rule = card.by.name.replace(/^A rule: /u, '');
+      return rule.charAt(0).toUpperCase() + rule.slice(1);
+    }
+    return card.by.kind === 'you' ? cardWords.you : card.by.name;
   });
 
   /**
@@ -716,9 +724,9 @@
   {:else if inlined && answerRow.more > 0 && drawn}
     <!-- MORE ANSWERS THAN A ROW HOLDS: the rest, and putting it off, are chosen on the question's own page. -->
     <a class="dc-btn dc-later" data-weight="bare" href={at(card.href)}><span class="dc-later-words">{cardWords.otherAnswers(answerRow.more)}</span></a>
-  {:else if notNow && kept}
+  {:else if notNow && kept && !ownLater}
     <button type="button" class="dc-btn dc-later" data-weight="bare" aria-disabled="true" aria-label={queueWords.notNow}><Icon name="clock" size="s" /><span class="dc-later-words">{queueWords.notNow}</span></button>
-  {:else if notNow}
+  {:else if notNow && !ownLater}
     <a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)} aria-label={queueWords.notNow} title={queueWords.notNow}><Icon name="clock" size="s" /><span class="dc-later-words">{queueWords.notNow}</span></a>
   {/if}
 {/snippet}
@@ -763,7 +771,9 @@
       </div>
     {/if}
     {#if fix || bulkFix}<p class="qa-fix dr-fix" role="status">{fix || bulkFix}</p>{/if}
-    {#if !compact}<p class="dr-asked" dir="auto">{askedLine}</p>{/if}
+    {#if !compact}<p class="dr-asked" dir="auto"
+        ><span class="dc-sr">{card.by.kind === 'rule' ? cardWords.askedByRule : cardWords.askedBy}</span><Face name={card.by.name} kind={card.by.kind} size="s" /><span class="dr-who">{askedName}</span>{#if card.when}<span class="dr-when">{whenSaid}</span>{/if}</p
+      >{/if}
     {#if pick && drawn}
       <button type="button" role="checkbox" class="queue-select qa-select tap dr-select" aria-checked={chosenForAll} aria-label={pageWords.pick(card.question)} aria-disabled={kept ? 'true' : undefined} onclick={kept ? undefined : () => pick?.toggle(question)}
         ><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
@@ -943,7 +953,9 @@
       {#if drawn && !compact && phase !== 'asking'}
         <!-- ITS ROW HELD WHILE ITS CODE COMES (one 44px row of verbs): it landed under the answers and pushed the cards
              under it down on a phone. -->
-        {#await import('$lib/send/DecideAsk.svelte')}<div class="da-held" aria-hidden="true"></div>{:then { default: DecideAsk }}<DecideAsk id={question.id} title={card.question} />{/await}
+        <!-- IN A BOX OF THE CARD'S OWN, so it keeps its place under the answers: Ask Slash and Hand it off are another
+             component's, which the card's order rule did not reach, so once loaded they jumped over the answers. -->
+        <div class="dc-ask">{#await import('$lib/send/DecideAsk.svelte')}<div class="da-held" aria-hidden="true"></div>{:then { default: DecideAsk }}<DecideAsk id={question.id} title={card.question} />{/await}</div>
       {/if}
     </div>
     {#if side}
@@ -975,7 +987,7 @@
                     {#if s.said !== null}
                       <span dir="auto">{s.said}</span>
                     {:else}
-                      <span class="dc-before" dir="auto">{s.before}</span><span class="dc-to"><Icon name="arrow" size="s" /><span class="dc-said">{cardWords.to}</span></span><span dir="auto">{s.after}</span>
+                      <span class="dc-before" dir="auto">{stateWord(s.before)}</span><span class="dc-to"><Icon name="arrow" size="s" /><span class="dc-said">{cardWords.to}</span></span><span dir="auto">{stateWord(s.after)}</span>
                     {/if}
                   </li>
                 {/each}
@@ -1623,11 +1635,35 @@
     margin-block-start: var(--sp-2);
   }
 
+  /* THE FOOT IS A BY-LINE LIKE ANY CARD'S: the face, the name (a rule's runs to two lines at most), how long ago. */
   .dr-asked {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
     margin: var(--sp-1) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: var(--lead-meta);
+  }
+
+  .dr-asked > :global(.face) {
+    flex: none;
+  }
+
+  .dr-who {
+    display: -webkit-box;
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--ink-2);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .dr-when {
+    flex: none;
+    font-variant-numeric: tabular-nums;
   }
 
   .dc-row > .dr-select {
