@@ -865,7 +865,7 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    padding-inline: var(--sp-2) 0;
+    padding-inline: var(--sp-3) 0;
     margin-block: var(--sp-4) var(--sp-1);
   }
 
@@ -944,7 +944,8 @@
     inline-size: 100%;
     /* THE OPS SIDEBAR ROW: 36 tall (34 here, BrainDog's rail is longer), radius 10, 14/400, 2px apart. */
     min-block-size: 34px;
-    margin-block: 1px;
+    /* 2 apart, so a row's pitch is 36 (rhythm, 3 Nov: it was 35, the margins collapsing to 1). */
+    margin-block: var(--sp-0);
     padding-inline: 10px;
     border: 0;
     background: none;
@@ -953,6 +954,7 @@
     font: inherit;
     font-size: 14px;
     font-weight: var(--fw-regular);
+    line-height: var(--lead-ui);
     text-align: start;
     text-decoration: none;
     cursor: pointer;
@@ -1034,9 +1036,11 @@
 
   /* A QUIET LINE UNDER THE PROJECTS (the page ideas): no glyph, its name on the projects' names' edge, the third ink. */
   .s-quiet {
-    padding-inline-start: calc(var(--sp-2) + 20px + var(--sp-2));
+    /* On the labels' edge: the row's 10, the glyph's 20 and the gap's 8 (it was 2 short). */
+    padding-inline-start: calc(10px + 20px + var(--sp-2));
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: var(--fw-regular);
   }
 

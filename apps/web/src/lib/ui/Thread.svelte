@@ -295,6 +295,7 @@
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 600;
+    line-height: var(--lead-meta);
   }
 
   .thread-quiet {

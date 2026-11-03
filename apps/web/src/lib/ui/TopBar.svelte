@@ -81,7 +81,10 @@
     gap: var(--sp-4);
     box-sizing: border-box;
     min-inline-size: 0;
-    block-size: 64px;
+    /* ON THE WINDOW LINE (rhythm, 3 Nov): the bar's row is 56 under the window inset, so the page name and every
+       control centre at 40, the same line as the sidebar's brand row. */
+    block-size: calc(56px + var(--window-inset));
+    padding-block-start: var(--window-inset);
     padding-inline: var(--gutter);
   }
 
@@ -189,6 +192,7 @@
     border-radius: var(--r-pill);
     color: var(--ink-3);
     font-size: var(--fs-ctl);
+    line-height: var(--lead-ctl);
     text-align: start;
     cursor: text;
     transition: border-color var(--d-state) var(--ease-out);
