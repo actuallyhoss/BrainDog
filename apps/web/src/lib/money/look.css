@@ -38,7 +38,9 @@
    on one screen. The one class more is what lets Money's head be a head. */
 .hosted[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) {
   gap: var(--sp-1);
-  padding: var(--sp-2) 0 var(--sp-1);
+  /* NO STEP OF ITS OWN OVER IT: the page's top step already stands over the sentence, which stood 8 lower than every
+     other page's first line (cleanup, 3 Nov). */
+  padding: 0 0 var(--sp-1);
   background: none;
   /* NOR THE CARD'S EDGE: the lead tile wears one since the rhythm pass, and with the fill gone it drew an empty outline
      round Money's sentence (cleanup, 3 Nov). */
