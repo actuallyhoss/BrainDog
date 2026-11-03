@@ -2406,7 +2406,7 @@
   }
 
   .dc-option[data-bare] > .dc-option-foot > .dc-btn {
-    min-block-size: var(--tap);
+    min-block-size: var(--btn-h);
     font-size: var(--fs-body);
   }
 
@@ -2498,7 +2498,7 @@
     .dc-option-foot > .dc-btn,
     .dc-option-acts > .dc-btn {
       flex: 1 1 0;
-      min-block-size: var(--tap);
+      min-block-size: var(--btn-h);
     }
   }
 
