@@ -350,7 +350,7 @@
 
 {#snippet backUpButton()}
   {#if anOwner && copiesFrom === 'live'}
-    <Button weight="primary" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
+    <Button weight="primary" size="sm" disabled={backingUp} aria-busy={backingUp} onclick={backUp}>{copy.snapshotNow}</Button>
   {/if}
 {/snippet}
 

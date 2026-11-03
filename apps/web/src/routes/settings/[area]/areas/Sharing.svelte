@@ -329,7 +329,7 @@
        its empty state at half the width and left a hole beside it at a desk. -->
   <Tile icon="link" data-wide="" title={copy.sharingShared} count={liveCount + linkCount || undefined}>
     {#snippet actions()}
-      <Button weight="quiet" onclick={() => askSheet()}><Icon name="plus" size="s" />{copy.sharingShare}</Button>
+      <Button weight="quiet" size="sm" onclick={() => askSheet()}><Icon name="plus" size="s" />{copy.sharingShare}</Button>
     {/snippet}
     {#if sections.shared.length === 0 && linkCount === 0}
       <Empty kind="no-data-yet" compact title={copy.sharingNothing} />
@@ -445,6 +445,7 @@
     color: var(--ink);
     font-size: var(--fs-meta);
     font-weight: 600;
+    line-height: var(--lead-meta);
   }
 
   .see-as-pick .field-input,

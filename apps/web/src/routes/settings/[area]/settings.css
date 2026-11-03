@@ -439,3 +439,12 @@
 .settings-place .btn {
   border-radius: var(--r-pill, 999px);
 }
+
+/* NO AIR LEFT HANGING AT A CARD'S END (spacing pass 3 Nov): a hint, a command or a form that ends an area's tile kept the
+   bottom margin it carries for whatever usually follows it, so the tile's last line stood 32 or more off its edge while
+   its first stood 20 under its head. The last thing drawn in a tile, or in the body under its head, takes none; a sheet
+   (a `<dialog>`) after it is not drawn in the tile, so it is passed over. */
+.settings-place .tile > :nth-last-child(1 of :not(dialog, template, [hidden])),
+.settings-place .tile > .section-body > :nth-last-child(1 of :not(dialog, template, [hidden])) {
+  margin-block-end: 0;
+}

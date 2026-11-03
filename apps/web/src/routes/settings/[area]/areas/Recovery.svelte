@@ -173,7 +173,7 @@
 {/if}
 
 {#snippet signInToAdd()}
-  <Button href={signinFor(page.url)}>{copy.addPasskey}</Button>
+  <Button size="sm" href={signinFor(page.url)}>{copy.addPasskey}</Button>
 {/snippet}
 
 <!-- THE WAYS BACK IN, IN THE ORDER THEY ARE NEEDED: one passkey lost, all of them lost, and too many tries. -->
