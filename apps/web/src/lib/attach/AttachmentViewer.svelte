@@ -298,7 +298,7 @@
     padding: 0 8px;
     background: var(--tile-2);
     border: 1px solid var(--rule);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-field, 12px);
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-meta);
@@ -313,7 +313,7 @@
     padding: 0;
     background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     color: var(--ink-2);
     cursor: pointer;
   }
@@ -434,10 +434,9 @@
       flex-basis: calc(100% - 56px);
     }
 
+    /* DRAWN AT ITS SIZE UNDER A THUMB TOO (ops style): `.tap` gives it the 44px it needs to be pressed. */
     .a-close {
       order: 1;
-      inline-size: 44px;
-      block-size: 44px;
     }
 
     .a-tools {

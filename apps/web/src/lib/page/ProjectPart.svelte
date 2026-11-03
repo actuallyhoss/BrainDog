@@ -773,6 +773,12 @@
     margin: 8px 0 0;
   }
 
+  /* WHERE THE PATH LEADS STANDS AT THE TILE'S FOOT (3 Nov): Path grows to the hero's height beside it (the row ends
+     level), and the room it was given stood as a blank band under the aim. The stops keep the top, the aim the foot. */
+  .s-aim {
+    margin-block-start: auto;
+  }
+
   .s-year {
     margin: 8px 0 0;
     color: var(--ink);
