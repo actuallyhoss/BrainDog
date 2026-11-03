@@ -113,7 +113,7 @@ Then | Post it in the team's channel | action
       glyph: 'people',
       src: `~~~cards | Working now
 who | fact: Doing | when
-Triage | Reading two new support emails | now
+Triage | Sorting new support emails | now
 Release notes writer | Drafting Thursday's notes | 4 min ago
 ~~~
 

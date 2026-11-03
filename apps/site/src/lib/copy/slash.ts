@@ -60,7 +60,7 @@ export const slashPage = {
   tally: {
     title: 'How questions are counted',
     say:
-      'Each question or change counts as one question, however much reading it takes. Finding things, your brief and the work ' +
+      'Each question or change counts as one question, however much reading it takes. Finding things, the briefing and the work ' +
       `Slash does in the background cost nothing. Free includes ${FREE} Slash questions a month, or no limit with your ` +
       'own AI key.',
     after: "When the month's questions run out, Slash says when they come back. Everything else keeps working.",
