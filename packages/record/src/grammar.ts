@@ -573,6 +573,7 @@ const PACK = {
     'act addonCheck {"doc"}: every refusal with its fix, or what installing it adds and asks the person to approve. Repeat until ready.',
     'act installPack {"doc"}: asks the person on Decide. Nothing installs until they say yes, unless they let agents act without asking.',
     'To change it later: act addon {"id","file":true}, edit, raise version, check, installPack again. The person approves the update the same way.',
+    'From GitHub: act installPack {"source":{"kind":"git","ref":"owner/repo@v1.0.0:x.pack.json"}}. It is pinned to the commit the tag points at, and a newer semver tag on that repo is asked about by itself.',
   ],
   manifest: {
     pack: 'the id, lower-case letters, digits and dashes; not one the store already holds',

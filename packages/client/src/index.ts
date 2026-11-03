@@ -2928,6 +2928,8 @@ export function createClient(options: ClientOptions) {
      * plan to read like a chosen file. Answers `{ url, text, bytes }`.
      */
     fetchShared: (args: { url: string }) => call<unknown>('fetchShared', args as Record<string, unknown>),
+    /** Add-ons from GitHub with a newer tag, each asked about on Decide. Answers `{ asked, refused, notes }`. */
+    gitUpdates: () => call<unknown>('gitUpdates', {}),
     /** `fetchShared` under its old name, kept for one release. */
     fetchUseCase: (args: { url: string }) => call<unknown>('fetchUseCase', args as Record<string, unknown>),
     /** This BrainDog's arrangement as a use-case file, with only the example rows named by list and number. */

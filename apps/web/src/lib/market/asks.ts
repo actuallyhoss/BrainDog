@@ -29,7 +29,18 @@ export const asksWords = {
   skills: (n: number): string => (n === 1 ? 'Gives your agents 1 skill' : `Gives your agents ${n} skills`),
   views: (names: readonly string[]): string => `Sees your ${and(names)}`,
   nothing: 'Only its own lists. It sends nothing out.',
+  github: (repo: string, commit: string): string => `From GitHub: ${repo}, commit ${commit}`,
+  unreviewed: 'Not reviewed by BrainDog. Anyone can publish on GitHub. It can only do what is listed below.',
+  gitAsked: (n: number): string => (n === 1 ? 'An add-on from GitHub has a new version. It waits on Decide.' : `${n} add-ons from GitHub have new versions. They wait on Decide.`),
 } as const;
+
+/** `git:owner/repo@<sha>:path`, as a pinned add-on keeps it, read as the repository and the short commit; anything else is `null`. */
+export function githubOf(ref: string | null | undefined): { repo: string; commit: string } | null {
+  const m = /^git:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([A-Za-z0-9_./-]+):/u.exec(ref ?? '');
+  if (!m) return null;
+  const at = m[2]!;
+  return { repo: m[1]!, commit: /^[0-9a-f]{40}$/u.test(at) ? at.slice(0, 7) : at };
+}
 
 /** A view of the whole record in words, as the line "Sees your …" ends; one this build does not know is its id in words. */
 const VIEW_WORDS: Readonly<Record<string, string>> = {

@@ -32,6 +32,7 @@
   import { diffOf, install, notOwner, planFor, type OfferClient, type Planned } from './[id]/offer.ts';
   import { afterInstall, installShared, keepVoice, readOnHost, relabelled, speakingStates, useCaseTitle, voiceQuestion } from './sharing.ts';
   import { words } from './words.ts';
+  import { githubOf } from '$lib/market/asks.ts';
 
   let {
     client,
@@ -54,7 +55,9 @@
   let filed = $state<string | null>(null);
   let planned = $state.raw<Planned | null>(null);
   /** What was read, so a stale plan is read again and a refused install is filed on Decide as the same file. */
-  let last: { text: string; source: 'local' | 'url' | 'paste'; ref: string | null; title: string; version: string; id: string } | null = null;
+  let last: { text: string; source: 'local' | 'url' | 'paste' | 'git'; ref: string | null; title: string; version: string; id: string } | null = null;
+  /** The repository and commit a GitHub file was read at, for the sheet's line and warning. */
+  let github = $state<{ repo: string; commit: string } | null>(null);
 
   /* WHOSE VOICE THE RECORD KEEPS, asked when another use case speaks now (`sharing.ts` `voiceQuestion`). */
   let asked = $state<{ now: string; title: string } | null>(null);
@@ -63,10 +66,11 @@
   let heard: Awaited<ReturnType<typeof speakingStates>> = [];
   const updates = $derived(planned?.kind === 'usecase' ? relabelled(planned.plan) : []);
 
-  async function planText(text: string, source: 'local' | 'url' | 'paste', ref: string | null) {
+  async function planText(text: string, source: 'local' | 'url' | 'paste' | 'git', ref: string | null) {
     said = null;
     filed = null;
     planned = null;
+    github = source === 'git' ? githubOf(ref) : null;
     if (!client) return;
     const { readCatalogueFile } = await import('@braindog/declare/catalogue');
     const file = await readCatalogueFile(text, { kind: source, ...(ref === null ? {} : { ref }) });
@@ -84,8 +88,14 @@
       title: f.kind === 'usecase' ? f.shared.usecase.title : f.file.title,
       version: f.kind === 'usecase' ? f.shared.usecase.version : f.file.pack.manifest.version,
     };
-    /* NOT THE STORE'S, WHATEVER ITS ID: a file from this device or pasted is made here, a link is its link. */
-    const from = source === 'url' && ref !== null ? (ref.startsWith('git:') ? { kind: 'git' as const, ref } : { kind: 'url' as const, ref }) : { kind: 'paste' as const };
+    /* NOT THE STORE'S, WHATEVER ITS ID: a file from this device or pasted is made here, a link is its link.
+       A GITHUB FILE IS PLANNED AND INSTALLED AS ONE, pinned to the commit the host read it at, so its updates come from that repository. */
+    const from =
+      source === 'git' && ref !== null
+        ? { kind: 'git' as const, ref }
+        : source === 'url' && ref !== null
+          ? ref.startsWith('git:') ? { kind: 'git' as const, ref } : { kind: 'url' as const, ref }
+          : { kind: 'paste' as const };
     const out = await planFor(client, { kind: f.kind, id, source: 'file' }, { doc: f.kind === 'pack' ? f.file.doc : null, text, from }, installed, copy.writeRaced);
     if (!out.ok) {
       said = { fix: out.fix, code: out.code };
@@ -130,7 +140,8 @@
       if (!read.ok) {
         said = { fix: read.fix, code: read.code };
         planned = null;
-      } else await planText(read.text, 'url', address.trim());
+      } else if (read.pinned !== undefined) await planText(read.text, 'git', read.pinned);
+      else await planText(read.text, 'url', address.trim());
     });
   }
 
@@ -144,7 +155,7 @@
     if (!client || !last) return;
     const c = client;
     const question = copy.catalogueQuestion(last.title, last.version, null, null);
-    const body = p.kind === 'pack' ? { install: last.id, doc: p.doc } : { file: last.text };
+    const body = p.kind === 'pack' && last.source === 'git' && last.ref !== null ? { source: { kind: 'git' as const, ref: last.ref } } : p.kind === 'pack' ? { install: last.id, doc: p.doc } : { file: last.text };
     const out = await fileProposal((name, args) => c.call(name, args), { question, body_kind: 'pack', body });
     if (out.ok) filed = out.id;
     else said = { fix: out.fix, code: out.code };
@@ -226,7 +237,7 @@
 </div>
 
 {#if planned}
-  <PlanSheet diff={diffOf(planned)} {nameOf} hosted={hostedHere(page.data as unknown as Shell)} {busy} onapprove={approve} oncancel={() => (planned = null)}>
+  <PlanSheet diff={diffOf(planned)} {nameOf} {github} hosted={hostedHere(page.data as unknown as Shell)} {busy} onapprove={approve} oncancel={() => (planned = null)}>
     {#snippet extra()}
       {#if updates.length > 0 && planned?.kind === 'usecase'}
         <label class="from-pick-row">

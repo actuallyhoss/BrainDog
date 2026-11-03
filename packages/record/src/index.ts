@@ -174,6 +174,8 @@ import { grammarOf } from './grammar.ts';
 import { askedFault, declinedInput, describe, pinMoved, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDeclined, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
 import { describedGrammar } from './grammar.ts';
 import { lookLanding, skillBearings, skillDraftInput, skillDraftOf } from './slash.ts';
+import { gitLook, parseGit, readGit, repoSaid, shortSha, type GitOffer } from './git-channel.ts';
+import { fileChecksum } from '@braindog/declare/catalogue';
 import {
   askedOn,
   factsBasis,
@@ -3919,6 +3921,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
     shelf: deps.catalogueShelf,
     sourceOf: (id) => sql.one<{ source: string }>('SELECT source FROM pack WHERE id = ?', id)?.source ?? null,
+    ...(deps.readAddress ? { readGit: (address: string) => readGit(deps.readAddress!, address), readAddress: deps.readAddress } : {}),
     kept: (pack, diff, packSaid) => {
       try {
         keptAsk(pack, diff, packSaid);
@@ -5151,6 +5154,59 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       firstPartyRunning = false;
     }
   };
+  /**
+   * ADD-ONS FROM GITHUB, ASKED ABOUT WHEN THEIR REPOSITORY TAGS A NEWER VERSION (`git-channel.ts`). Once a day from the
+   * tick, and whenever the owner opens the store (`gitUpdates`). Each newer version is read at its tag's commit and filed
+   * as an update question through `prepare`, the plan Decide shows being the record's own; never put in quietly, since
+   * nobody reviewed it. A version already asked about is not asked again. One asked about whose tag now points at a file
+   * with other bytes is refused `CHECKSUM_MISMATCH` and not asked again: the question already filed stays pinned to the
+   * file it showed, and its yes is held to that file (`arrange.ts` `gitHeld`).
+   */
+  const GIT_HOLDER = 'braindog:git-updates';
+  type GitAsked = { version: string; sha: string; checksum: string; question: string };
+  const gitPass = async (today: string | null): Promise<{ asked: { id: string; question: string; to: string }[]; refused: { id: string; code: 'CHECKSUM_MISMATCH'; fix: string }[]; notes: string[] }> => {
+    const out = { asked: [] as { id: string; question: string; to: string }[], refused: [] as { id: string; code: 'CHECKSUM_MISMATCH'; fix: string }[], notes: [] as string[] };
+    if (!deps.readAddress) return out;
+    const prefs = kernel.prefsOf(GIT_HOLDER) as { day?: unknown; asked?: unknown };
+    if (today !== null && prefs.day === today) return out;
+    const held = sql.all<{ id: string; version: string; source_ref: string | null }>("SELECT id, version, source_ref FROM pack WHERE source = 'git' AND source_ref IS NOT NULL AND disabled_at IS NULL");
+    if (today !== null) kernel.setPref(GIT_HOLDER, 'day', today);
+    if (held.length === 0) return out;
+    const asked = { ...((prefs.asked !== null && typeof prefs.asked === 'object' ? prefs.asked : {}) as Record<string, GitAsked>) };
+    for (const h of held) {
+      const look = await gitLook(deps.readAddress, { id: h.id, version: h.version, source_ref: h.source_ref! }).catch(() => ({ id: h.id, offer: null, note: `${h.id}'s repository could not be read.` }));
+      if (look.note !== null) out.notes.push(look.note);
+      const o: GitOffer | null = look.offer;
+      if (o === null) continue;
+      const was = asked[o.id];
+      if (was !== undefined && was.version === o.to) {
+        if (was.checksum !== o.checksum)
+          out.refused.push({
+            id: o.id,
+            code: 'CHECKSUM_MISMATCH',
+            fix: `${o.title} ${o.tag} on ${repoSaid(parseGit(o.pinned)!)} now points at commit ${shortSha(o.sha)} with a different file from the one already asked about (commit ${shortSha(was.sha)}). It is not asked about again, and the question waiting installs only the file it showed.`,
+          });
+        continue;
+      }
+      const prepared = await arrangement.prepare('pack', { source: { kind: 'git', ref: o.pinned }, tag: o.tag });
+      if (!prepared.ok) {
+        out.notes.push(`${o.title} ${o.to} from GitHub would not plan: ${(prepared as { refusal: Refusal }).refusal.fix}`);
+        continue;
+      }
+      const repo = repoSaid(parseGit(o.pinned)!);
+      const question = `Update ${o.title} from ${o.from} to ${o.to}? From GitHub, ${repo} ${o.tag} (commit ${shortSha(o.sha)}). Not reviewed by BrainDog.`.slice(0, 280);
+      const put = kernel.propose({ question, body_kind: 'pack', body: prepared.value }, 'system');
+      if (!put.ok) {
+        out.notes.push(`${o.title} ${o.to} from GitHub could not be asked about: ${'refusal' in put ? put.refusal.fix : 'it moved while it was asked'}`);
+        continue;
+      }
+      asked[o.id] = { version: o.to, sha: o.sha, checksum: o.checksum, question: put.value.id };
+      out.asked.push({ id: o.id, question, to: o.to });
+    }
+    kernel.setPref(GIT_HOLDER, 'asked', asked);
+    return out;
+  };
+
   /** The passes the tick kept, newest last, which a read of the log folds (`passFolder`). */
   const updatePasses = (): UpdatePass[] => passesOf(kernel.prefsOf(FIRST_PARTY_HOLDER)[FIRST_PARTY_LAST]);
 
@@ -12237,16 +12293,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (typeof said.url !== 'string' || said.url.trim() === '' || said.url.length > 2048)
       return no('REQUIRED_MISSING', 'url is the https address of a shared file, or git:owner/repo@ref:path.', { at: 'url' });
     const asked = said.url.trim();
-    let url = asked;
-    if (asked.startsWith('git:')) {
-      const git = /^git:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)@([A-Za-z0-9_./-]+):([^\s?#]+)$/u.exec(asked);
-      if (!git) return no('VALUE_MALFORMED', 'A git address reads git:owner/repo@ref:path, such as git:someone/kit@main:kit.usecase.json.', { at: 'url' });
-      const [, owner, repo, ref, path] = git;
-      url = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${String(path).replace(/^\/+/u, '')}`;
-    }
+    if (asked.startsWith('git:') && parseGit(asked) === null)
+      return no('VALUE_MALFORMED', 'A git address reads git:owner/repo@ref:path, such as git:someone/kit@main:kit.usecase.json.', { at: 'url' });
     if (!deps.readAddress)
       return no('PULL_ORIGIN_REFUSED', 'This host does not read addresses. Download the file, then choose it as a file.', { at: 'url' });
-    const read = await deps.readAddress(url);
+    /* A GIT ADDRESS IS PINNED BEFORE IT IS READ (`git-channel.ts`): its ref turned into the commit it points at now, the
+       file read at that commit, and the pinned address answered beside the text, so the install keeps the commit and a
+       branch or tag moved later changes nothing that is in. */
+    if (asked.startsWith('git:')) {
+      const got = await readGit(deps.readAddress, asked);
+      if (!got.ok) return no('PULL_ORIGIN_REFUSED', got.fix, { at: 'url' });
+      const g = got.value;
+      return ok({ url: asked, text: g.text, bytes: g.bytes, pinned: g.pinned, repo: repoSaid(g.at), commit: g.sha, checksum: await fileChecksum(g.text).catch(() => null) });
+    }
+    const read = await deps.readAddress(asked);
     if (!read.ok) return no('PULL_ORIGIN_REFUSED', read.fix, { at: 'url' });
     return ok({ url: asked, text: read.text, bytes: read.bytes });
   };
@@ -13292,6 +13352,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* BRAINDOG'S OWN MODULES FIRST, ONCE A DEPLOY AND ONCE A DAY, whether Slash is on or not (`firstPartyTick`). A check
          that breaks outside its own try (a module of this build that will not load) never costs the day its look. */
       const updates = await firstPartyTick(today).catch(() => ["The check for BrainDog's own updates could not run, and runs again on the next tick."]);
+      /* AND ADD-ONS FROM GITHUB, once a day: a newer tag is asked about, never put in (`gitPass`). */
+      await gitPass(today).catch(() => undefined);
       const state = slashDailyState();
       if (!state.on) return { ran: false, why: 'off' };
       /* THE DAY'S LOOK BEGUN ON AN EARLIER TICK GOES ON FROM THE STEP IT KEPT. */
@@ -13609,6 +13671,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = admin(ctx, 'read a shared file from the web');
       if (stop) return { ok: false as const, refusal: stop };
       return readSharedAt(args);
+    },
+
+    /**
+     * Add-ons installed from GitHub whose repository tags a newer version, each asked about on Decide (`gitPass`), as the
+     * store page opens and once a day from the tick. Answers what was asked, what was refused and why, and what could not
+     * be read. An owner's in a browser, as `fetchShared` is: it makes this host read GitHub.
+     */
+    async gitUpdates(_args: unknown, ctx: CallContext) {
+      const stop = admin(ctx, 'look for updates on GitHub');
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(await gitPass(null));
     },
 
     /** `fetchShared` under the name it had when only a use case could be read this way. It stays for one release. */

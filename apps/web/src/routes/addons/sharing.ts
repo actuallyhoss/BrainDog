@@ -69,7 +69,10 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
  * A `git:` address is turned into the raw file on GitHub by the host, so it is checked there as an https one is; here
  * it is only held to its shape, so a typing slip is said before anything is asked.
  */
-export async function readOnHost(client: Pick<SharingClient, 'fetchShared'>, address: string): Promise<{ ok: true; text: string } | { ok: false; fix: string; code: string | null }> {
+export async function readOnHost(
+  client: Pick<SharingClient, 'fetchShared'>,
+  address: string,
+): Promise<{ ok: true; text: string; pinned?: string } | { ok: false; fix: string; code: string | null }> {
   const asked = address.trim();
   let url: string;
   if (asked.startsWith('git:')) {
@@ -91,7 +94,9 @@ export async function readOnHost(client: Pick<SharingClient, 'fetchShared'>, add
     return { ok: false, fix: refusal.fix, code: refusal.code };
   }
   const v = out.value;
-  return isMap(v) && typeof v.text === 'string' ? { ok: true, text: v.text } : { ok: false, fix: copy.writeRaced, code: null };
+  /* A GIT ADDRESS COMES BACK PINNED to the commit its ref pointed at (`git-channel.ts`), which the install keeps. */
+  if (isMap(v) && typeof v.text === 'string') return { ok: true, text: v.text, ...(typeof v.pinned === 'string' ? { pinned: v.pinned } : {}) };
+  return { ok: false, fix: copy.writeRaced, code: null };
 }
 
 /** `git:owner/repo@ref:path`, as the host reads it (`fetchShared` in `@braindog/record`). */

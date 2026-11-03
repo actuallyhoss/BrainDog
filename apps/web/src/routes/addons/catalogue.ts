@@ -306,7 +306,12 @@ async function keepKey(keys: Keys, subject: string, keyId: string): Promise<bool
 
 /* ── asking on Decide ───────────────────────────────────────────────────── */
 
-export type CatalogueProposal = { question: string; body_kind: 'pack'; body: { file: string } | { install: string; doc: Record<string, unknown> } };
+export type CatalogueProposal = {
+  question: string;
+  body_kind: 'pack';
+  /** A GitHub file is asked for by its pinned address, `{ source: { kind: "git", ref } }`, and the record reads it again. */
+  body: { file: string } | { install: string; doc: Record<string, unknown> } | { source: { kind: 'git'; ref: string } };
+};
 
 /**
  * The proposal that asks for a version on Decide: a use case carries its file\'s text, an add-on the id the record holds it

@@ -91,8 +91,14 @@ export const ASKS: Readonly<Record<string, (args: Record<string, unknown>) => As
      lacks. Asked with the id alone, the record looked it up in the catalogue and answered that nothing by that name is on
      offer, so an add-on an agent wrote could never reach the person. The record still plans the file itself and refuses
      one sent for an id the store holds (`arrange.ts` `prepare`), so a file cannot pass itself off as a listed add-on. */
+  /* OR A FILE ON GITHUB, `{ source: { kind: "git", ref: "owner/repo@v1.2.0:x.pack.json" } }`: the record reads it, pins it to
+     the commit and plans it (`arrange.ts` `prepare`), and the question says the repository and that nobody reviewed it. */
   installPack: (a) =>
-    ((id, doc) =>
+    map(a.source)?.kind === 'git' && text(map(a.source)?.ref) !== null
+      ? ((ref) => ({ question: `Add the add-on from GitHub at ${ref}? Not reviewed by BrainDog.`, body_kind: 'pack' as const, body: { source: { kind: 'git', ref } }, cause: `act:installPack:git:${ref}` }))(
+          String(text(map(a.source)?.ref)).replace(/^git:/u, ''),
+        )
+      : ((id, doc) =>
       id === null
         ? null
         : { question: `Add ${text(doc?.title) ?? id}?`, body_kind: 'pack', body: { install: id, ...(doc === null ? {} : { doc }) }, cause: `act:installPack:${id}${doc === null ? '' : `@${text(doc.version) ?? ''}:${shortHash(JSON.stringify(doc))}`}` })(

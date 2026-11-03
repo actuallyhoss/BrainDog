@@ -215,6 +215,8 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { doc: 'json', text: 'text', source: 'json', modules: 'json' } },
   { name: 'fetchShared', group: 'ADMIN', writes: false, what: 'The text of a shared use-case or add-on file at an https address or git:owner/repo@ref:path, read by the host with no credentials. It writes nothing.',
     takes: { url: 'text' } },
+  { name: 'gitUpdates', group: 'ADMIN', writes: true, what: 'Add-ons installed from GitHub whose repository tags a newer version, each asked about on Decide; a tag moved to other bytes is refused.',
+    takes: {} },
   { name: 'fetchUseCase', group: 'ADMIN', writes: false, what: 'The text of a shared use-case file at an https address, read by the host with no credentials. It writes nothing.',
     takes: { url: 'text' } },
   /* THE WHOLE FIRST RUN AS ONE CALL. The browser ran it as a script of a dozen calls, so a closed tab left a
