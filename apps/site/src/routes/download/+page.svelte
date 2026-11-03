@@ -15,7 +15,7 @@
 </script>
 
 <Seo title={site.meta.download.title} description={site.meta.download.description} path="/download" />
-<PageHead title="BrainDog for iPhone and Mac" lead="The apps are coming. Until then, BrainDog works in any browser, on your phone too." />
+<PageHead title="BrainDog for iPhone and Mac" lead="The apps are coming: a notification the moment something needs you, and sharing into BrainDog from any app. Until then, BrainDog works in any browser, on your phone too." />
 
 <section class="wrap">
   {#if DESKTOP_NOTARIZED}

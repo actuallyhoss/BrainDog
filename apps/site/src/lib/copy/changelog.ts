@@ -24,7 +24,7 @@ const entries = (n: number): string => `${n} ${n === 1 ? 'entry' : 'entries'}`;
 export const changelog = {
   changelog: {
     title: 'Changelog',
-    lede: "What shipped and when, in the repository's own words.",
+    lede: 'What shipped, day by day.',
     count: (n: number, days: number) => `${entries(n)} over ${days} days`,
 
     /* THE KIND IS A WORD AND A SHAPE, NEVER A HUE: the control and each entry's tag name it beside its own

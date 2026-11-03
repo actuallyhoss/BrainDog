@@ -82,10 +82,10 @@ export const trust = {
   security: {
     meta: {
       title: 'Security · BrainDog',
-      description: 'How your BrainDog is kept safe: its own database, sealed keys, sealed nightly copies, sign-in with no password and export at any time.',
+      description: 'How BrainDog keeps your projects, money and keys safe: a database of your own, sealed keys, sealed nightly copies, no password, and agents that ask first.',
     },
     title: 'Security',
-    lede: 'How your BrainDog is kept safe, and how to tell us about a weakness.',
+    lede: "How your projects, money and keys are kept safe, from other people and from an agent's mistake, and how to tell us about a weakness.",
     kept: {
       title: 'How your BrainDog is kept',
       /* One tile each on /security: a short name, the glyph its well draws, and the fact as it has always been worded. */
@@ -94,7 +94,7 @@ export const trust = {
         {
           title: 'Its own database',
           glyph: 'server',
-          text: "Every BrainDog is its own database. Nothing is shared between customers, so no one else's search can reach yours.",
+          text: "Your BrainDog is its own database, apart from every other customer's, so nobody else's search can reach yours.",
         },
         // docs/16-DECISIONS.md ADR-062; apps/worker/src/vault.ts and keys.ts (the host seals, the record stores).
         {
@@ -114,11 +114,14 @@ export const trust = {
           glyph: 'shield',
           text: 'You sign in with your email, Google or a passkey. There is no password to steal.',
         },
-        // docs/16-DECISIONS.md ADR-060 (scopes read, propose, write; no admin scope; VAULT and erasure stay a browser session).
+        // docs/16-DECISIONS.md ADR-060 (scopes read, propose, write; no admin scope). The ladder is
+        // packages/record/src/ladder.ts; what the owner's switch never covers is `NEVER_BYPASS` (handOver, deleteRecord,
+        // erase) and reading a key's value, docs/03-agents/04-scopes.md. Since 2 November the switch covers the team, so
+        // inviting people left this list (3 November), and restoring a copy with it.
         {
-          title: 'What an AI tool can do',
+          title: 'What an agent can do',
           glyph: 'agent',
-          text: 'An AI tool can read, suggest and write, and nothing more. Opening keys, inviting people, handing over, restoring a copy or deleting everything needs you, signed in, even when you let your own agents act without asking.',
+          text: 'An agent can read, suggest and write, and starts out asking before every change to your work. It earns the right to act alone one kind of change at a time, and loses it on an undo. Reading a key, handing BrainDog over or deleting it needs you, signed in, even when you let your own agents do everything else.',
         },
         // apps/web/src/routes/settings/[area]/areas/Export.svelte; docs/12-SECURITY.md §8 (the export).
         {
@@ -134,7 +137,7 @@ export const trust = {
       recordName: (n: number) => (n === 1 ? 'Yours' : "Someone else's"),
       sealed: ['A key you connect', 'Sealed first', 'Stored, never in the clear'],
       sealedLabel: 'A key you connect is sealed first, then stored, and never kept in the clear',
-      sealedNote: 'AI tools and scripts use your keys without ever seeing them.',
+      sealedNote: 'Agents and scripts use your keys without ever seeing them.',
       /* The pricing table's own figure: `Nightly, last 30 kept` (`copy/pricing.ts`). */
       nights: 'Thirty nights of sealed copies, the newest last',
       nightsFrom: '30 nights ago',
@@ -143,7 +146,7 @@ export const trust = {
       signin: ['A link by email', 'Or Google', 'Or a passkey', 'No password, anywhere'],
       signinLabel: 'Signing in: a link by email, Google or a passkey, and no password field',
       /* WHAT AN AI TOOL CAN DO IS THE AGENTS PAGE'S, said once there (plan F21): a second table here could drift from it. */
-      reachLink: "What an AI tool can and can't do",
+      reachLink: "What an agent can and can't do",
       reachHref: '/agents',
       exportName: 'Everything, in one file',
       exportNote: 'Every list, page and rule in it',

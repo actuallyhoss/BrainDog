@@ -22,7 +22,6 @@
  * anybody can read the code is `not-yet`, and `claims.test.ts` asks for it to be marked again once `LAUNCH.repo` is on.
  */
 import type { LaunchFlag } from './launch.ts';
-import { APPS_AND } from './agents.ts';
 
 export type ClaimState = 'true' | 'flag' | 'not-yet';
 
@@ -40,57 +39,64 @@ export type Claim = {
 };
 
 export const CLAIMS: readonly Claim[] = [
-  /* The home page (`copy/home.ts`, spread into `site`, so `hero.sub` is its `home.hero.sub`). */
-  { id: 'ai-tools-read', said: 'The people you work with and your AI tools use it too.', where: 'hero.sub', state: 'true' },
-  { id: 'today-each-morning', said: 'on one page each morning', where: 'who.small.say', state: 'true' },
-  { id: 'agents-leave-a-note', said: "leaves a note when it's done", where: 'tools.say', state: 'true' },
-  { id: 'chores-reason-undo', said: 'each with a reason and an undo', where: 'chores.say', state: 'true' },
-  { id: 'floor-waits', said: 'Money, keys, sharing and deletes wait for your yes.', where: 'chores.floor', state: 'true' },
-  { id: 'floor-switch', said: 'Only you can let your own agents skip that, and handing it over, deleting it and reading a key stay yours even then.', where: 'chores.floor', state: 'true' },
-  { id: 'together-invite-mail', said: 'Invite someone by email and pick what they can do in plain words.', where: 'together.say', state: 'true' },
-  { id: 'together-make-owner', said: 'When you step back, Make owner hands it over.', where: 'together.roles.say', state: 'true' },
-  { id: 'together-mention', said: 'Type @ in a comment and pick a name.', where: 'together.mention.say', state: 'true' },
+  /* The home page (`copy/home.ts`, spread into `site`, so `hero.sub` is its `home.hero.sub`). The site story of 3
+     November: each is checked against the code in `loop/plans/site-story-2026-11-03/COPY.md` ("Claims"). */
+  { id: 'picks-up-where-stopped', said: 'so each picks up where the last one stopped', where: 'hero.sub', state: 'true' },
+  { id: 'asks-before-money-keys-deletes', said: 'they ask before touching money, keys or deletes', where: 'hero.sub', state: 'true' },
+  { id: 'connect-no-key-copied', said: 'You approve each once, and no key is copied anywhere.', where: 'who.small.say', state: 'true' },
+  { id: 'briefing-who-else', said: 'who else is working', where: 'who.build.say', state: 'true' },
+  { id: 'session-writes-next-step', said: 'When it stops, it writes the next step down.', where: 'who.build.say', state: 'true' },
+  { id: 'learns-monday-knows-tuesday', said: 'What Claude learns on Monday, Cursor knows on Tuesday.', where: 'tools.say', state: 'true' },
+  { id: 'new-agent-asks', said: 'A new agent asks before every change to your work.', where: 'chores.say', state: 'true' },
+  { id: 'ladder-offer-ten', said: "Once you've kept ten of its changes of one kind, BrainDog offers to let it make that kind on its own, and only that kind.", where: 'chores.say', state: 'true' },
+  { id: 'ladder-undo-drops', said: 'One undo puts it back to asking.', where: 'chores.say', state: 'true' },
+  { id: 'floor-waits', said: 'Deletes, money, keys and sharing ask every time.', where: 'chores.floor', state: 'true' },
+  { id: 'floor-switch', said: 'You can let your own agents skip that; reading a key, giving BrainDog away and deleting it stay yours either way.', where: 'chores.floor', state: 'true' },
+  { id: 'undo-any-change', said: 'Every change carries a name, person or agent, and an undo.', where: 'yours.points.0.text', state: 'true' },
+  { id: 'stop-from-browser', said: 'See which agents are working now, and pause, redirect or stop one from any browser.', where: 'yours.points.1.text', state: 'true' },
+  { id: 'keys-unseen', said: 'Agents use your keys without ever seeing them.', where: 'yours.points.2.text', state: 'true' },
+  { id: 'statement-csv', said: "Import any bank's statement as a CSV and each line is filed; your choices become rules for the next one.", where: 'money.addons', state: 'true' },
+  { id: 'stripe-mercury-read-only', said: 'Stripe and Mercury connect read only.', where: 'money.addons', state: 'true' },
+  { id: 'together-invite-mail', said: 'Invite people by email and choose what each can see and change.', where: 'together.say', state: 'true' },
+  { id: 'together-agents-access', said: 'Their agents get exactly their access, no more, and every change says who made it.', where: 'together.say', state: 'true' },
+  { id: 'together-mention', said: 'Type @ and a name in a comment, and their phone gets a notification.', where: 'together.mention.say', state: 'true' },
   { id: 'together-link-money', said: 'Money stays off it unless you add it.', where: 'together.link.say', state: 'true' },
-  { id: 'together-contacts', said: 'Bring your contacts in from a CSV or vCard, and anyone already here is skipped.', where: 'together.imports', state: 'true' },
-  { id: 'statement-rules', said: 'your choices become rules so the next one files itself', where: 'money.addons', state: 'true' },
-  { id: 'scripts-by-name', said: 'reads your scripts and automations by name', where: 'tools.say', state: 'true' },
-  { id: 'slash-card-yes', said: 'Money, keys, sharing and deletes wait for your yes.', where: 'slash.say', state: 'true' },
-  { id: 'undo-any-change', said: 'Every change has a name on it, and an undo.', where: 'yours.points.0.text', state: 'true' },
-  { id: 'export-any-time', said: 'Export everything as one file, any time.', where: 'yours.points.1.text', state: 'true' },
-  { id: 'keys-unseen', said: 'AI tools use your keys without ever seeing them.', where: 'yours.points.2.text', state: 'true' },
+  { id: 'together-contacts', said: 'Bring contacts in from a CSV or vCard. Anyone already here is skipped.', where: 'together.imports', state: 'true' },
+  { id: 'slash-change-undo', said: 'Ask for a change and it makes it, with an undo.', where: 'slash.say', state: 'true' },
   { id: 'invite-only', said: 'BrainDog is invite only for now.', where: 'free.say', state: 'true', flag: 'signup' },
+  { id: 'faq-switch-never', said: 'but reading a key, giving BrainDog away, deleting it and paying stay yours even then.', where: 'faq.questions.3.a', state: 'true' },
+  { id: 'faq-trust-settings', said: 'You can see where each agent stands, and put any kind back to asking, in Settings.', where: 'faq.questions.4.a', state: 'true' },
+  { id: 'faq-chatgpt-paid', said: 'ChatGPT needs a paid plan for this', where: 'faq.questions.2.a', state: 'true' },
 
   /* The Slash page (`copy/slash.ts`, its own export `slashPage`, which the ledger reads beside `site`). */
-  { id: 'slash-asks-first', said: 'Anything with money, keys, sharing or deletes waits for your yes.', where: 'slashPage.head.lead', state: 'true' },
+  { id: 'slash-asks-first', said: 'Money, keys, sharing and deletes come back to you as a question first.', where: 'slashPage.make.body.1', state: 'true' },
   { id: 'own-key-no-limit', said: 'or no limit with your own AI key', where: 'slashPage.tally.say', state: 'true' },
   { id: 'finding-free', said: 'Finding is free and never spends a question.', where: 'slashPage.find.body.1', state: 'true' },
   { id: 'own-key-unlimited', said: 'Questions on your own key have no monthly limit.', where: 'slashPage.faq.questions.2.a', state: 'true' },
 
-  /* The connect page (`copy/agents.ts`). */
+  /* The connect page (`copy/agents.ts`). The trust lines are the site story's (3 November): since the owner's switch
+     went fully inclusive on 2 November, inviting and removing people is his own agents' to do when it is on. */
   { id: 'mcp-approve-once', said: 'no key is copied anywhere', where: 'agents.lead', state: 'true' },
-  { id: 'agent-sees-no-key', said: 'See a key. It uses them from the Keychain, by name.', where: 'agents.cannot.lines.0', state: 'true' },
-  { id: 'agent-asks-first', said: 'Move money or delete without your yes, unless you switch that on for your own agents.', where: 'agents.cannot.lines.1', state: 'true' },
-  { id: 'switch-never', said: 'Invite or remove people, hand over the BrainDog or pay, switch or no switch.', where: 'agents.cannot.lines.2', state: 'true' },
-  { id: 'agent-signs-writes', said: 'Hide what it did. Everything it writes carries its name.', where: 'agents.cannot.lines.3', state: 'true' },
-  { id: 'agent-write-undo', said: 'A receipt and an undo for everything it writes.', where: 'agents.gets.lines.3', state: 'true' },
-  { id: 'five-apps-connect', said: `${APPS_AND} can read your BrainDog, suggest changes and leave notes.`, where: 'agents.lead', state: 'true' },
+  { id: 'agent-asks-first', said: "A new agent's changes arrive as questions, each with what would happen and why.", where: 'agents.cannot.lines.0', state: 'true' },
+  { id: 'agent-earns-kind', said: 'Keep ten changes of a kind and it may make that kind alone. One undo, or an email it just read, puts it back to asking.', where: 'agents.cannot.lines.1', state: 'true' },
+  { id: 'switch-never', said: 'Reading a key, giving BrainDog away and deleting it stay yours even if you let your own agents do everything.', where: 'agents.cannot.lines.2', state: 'true' },
+  { id: 'agent-signs-writes', said: 'Every change carries its name, and you can undo it.', where: 'agents.cannot.lines.3', state: 'true' },
 
   /* The pricing page (`copy/pricing.ts`, `pricing`): the early access page while billing is off, then the plans. */
-  { id: 'early-free', said: 'Everything in it is free while we open it up.', where: 'pricing.early.lede', state: 'true', flag: 'signup' },
-  { id: 'nothing-lost', said: 'nothing you make now is lost', where: 'pricing.early.later.say', state: 'true' },
+  { id: 'early-free', said: 'everything in it is free while we open it up.', where: 'pricing.early.lede', state: 'true', flag: 'signup' },
+  { id: 'nothing-lost', said: 'Nothing you set up now is lost.', where: 'pricing.early.later.say', state: 'true' },
   { id: 'export-any-time-early', said: 'Yes, all of it, as one file, whenever you like.', where: 'pricing.early.faq.questions.2.a', state: 'true' },
   { id: 'export-every-plan', said: 'Yes, all of it, as one file, on every plan.', where: 'pricing.faq.questions.2.a', state: 'true' },
   { id: 'cancel-any-time', said: 'Yes, from Settings.', where: 'pricing.faq.questions.3.a', state: 'flag', flag: 'billing' },
   { id: 'extra-use-soon', said: 'Coming soon.', where: 'pricing.extra.soon', state: 'not-yet', flag: 'extra', soon: true },
-  { id: 'waits-next-month', said: 'Nothing stops at the limit. It waits for next month.', where: 'pricing.holds.say', state: 'true' },
-  { id: 'brief-spends-no-ask', said: 'Your brief, filing and your rules never spend one.', where: 'pricing.faq.questions.0.a', state: 'true' },
+  { id: 'waits-next-month', said: 'Nothing stops at the limit: it waits for next month.', where: 'pricing.holds.say', state: 'true' },
+  { id: 'brief-spends-no-ask', said: 'The briefing, filing and your rules never spend one.', where: 'pricing.faq.questions.1.a', state: 'true' },
   { id: 'extra-use-capped', said: 'Turn it on with a monthly cap, and BrainDog never goes past it.', where: 'pricing.extra.say', state: 'flag', flag: 'extra' },
 
   /* The pages for each kind of person (`copy/for.ts`). */
   { id: 'bills-file-themselves', said: 'Once it knows their shape, each lands in the right list with its amount and due day.', where: 'person.who.personal.rows.0.said', state: 'true' },
   { id: 'students-reminded', said: 'Automations remind you before things are due', where: 'person.who.student.sub', state: 'true' },
-  { id: 'late-invoice-drafted', said: 'Say yes, and a reminder is written for you to send.', where: 'person.who.founder.rows.1.said', state: 'true' },
-  { id: 'team-who-changed', said: 'every change says who made it.', where: 'person.who.team.sub', state: 'true' },
+  { id: 'team-who-changed', said: 'every change says who made it, person or agent', where: 'person.who.team.sub', state: 'true' },
 
   /* The trust pages (`copy/trust.ts`) and the shared words (`copy/shell.ts`). */
   { id: 'licence', said: 'The software is licensed under the Apache License 2.0', where: 'legal.licence.body.0', state: 'true' },
@@ -100,10 +106,10 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'terms-meta', said: 'and its Terms of Service and Privacy Policy', where: 'meta.legal.description', state: 'true', flag: 'legal' },
   { id: 'support-before-signup', said: 'The support address is published here before sign-up opens.', where: 'support.mail.pending', state: 'not-yet' },
   { id: 'issues-on-github', said: 'Report a fault as an issue, or ask a question in Discussions', where: 'support.github.body', state: 'flag', flag: 'repo' },
-  { id: 'no-shared-table', said: 'Nothing is shared between customers', where: 'security.kept.facts.0.text', state: 'true' },
+  { id: 'no-shared-table', said: "apart from every other customer's", where: 'security.kept.facts.0.text', state: 'true' },
   { id: 'sealed-copies', said: 'Every night a copy is sealed to a key kept outside Cloudflare', where: 'security.kept.facts.2.text', state: 'true' },
   { id: 'no-password', said: 'There is no password to steal.', where: 'security.kept.facts.3.text', state: 'true' },
-  { id: 'token-reach', said: 'Opening keys, inviting people, handing over, restoring a copy or deleting everything needs you, signed in, even when you let your own agents act without asking.', where: 'security.kept.facts.4.text', state: 'true' },
+  { id: 'token-reach', said: 'Reading a key, handing BrainDog over or deleting it needs you, signed in, even when you let your own agents do everything else.', where: 'security.kept.facts.4.text', state: 'true' },
   { id: 'report-before-signup', said: 'The address for reporting a weakness is published here before sign-up opens.', where: 'security.report.pending', state: 'not-yet' },
 
   /* The packs pages (`copy/packs.ts`). */

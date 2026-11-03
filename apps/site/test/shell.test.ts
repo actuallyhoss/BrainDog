@@ -110,10 +110,10 @@ test('PageHead draws one h1 and its lead', async () => {
   assert.ok(head.includes('Every plan has the whole app.'));
 });
 
-test('the header row is Slash, Agents, Pricing, Security and Docs', () => {
+test('the header row is Agents, Pricing, Security and Docs', () => {
   const row = reachable({ public: false }).filter((p) => p.header);
-  assert.deepEqual(row.map((p) => p.label), ['Slash', 'Agents', 'Pricing', 'Security', 'Docs']);
-  assert.deepEqual(row.map((p) => p.path), ['/slash', '/agents', '/pricing', '/security', '/docs']);
+  assert.deepEqual(row.map((p) => p.label), ['Agents', 'Pricing', 'Security', 'Docs']);
+  assert.deepEqual(row.map((p) => p.path), ['/agents', '/pricing', '/security', '/docs']);
 });
 
 test('/packs is held, so the sitemap and the 404 do not name it', () => {
@@ -145,10 +145,10 @@ test("the footer is Product, Who it's for and Help, plain links and no blurb", (
     [
       ['Product', ['Slash', 'Agents', 'Pricing', 'Security']],
       /* NO TEAMS WHILE INVITING PEOPLE IS HELD: its page answers 404, so the footer draws no link to it. */
-      ["Who it's for", ['Small businesses', 'Personal use', 'Developers']],
+      ["Who it's for", ['Founders', 'Developers']],
       ['Help', ['Docs', 'Support', 'Legal']],
     ],
   );
-  assert.deepEqual(groups[1]?.links.map((l) => l.href), ['/for/founders', '/docs/use/money', '/docs/agents/connect']);
+  assert.deepEqual(groups[1]?.links.map((l) => l.href), ['/for/founders', '/docs/agents/connect']);
   assert.ok(!('tagline' in shell.footer), 'the footer carries no blurb');
 });

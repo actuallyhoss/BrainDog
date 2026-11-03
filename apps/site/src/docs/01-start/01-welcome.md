@@ -1,6 +1,6 @@
 # Welcome to BrainDog
 
-BrainDog keeps everything you keep track of in one place, arranged around you. You and your AI agents keep it up to date, and every change says who made it.
+BrainDog keeps where your projects stand, what you decided and what money is moving, in one place that you and your agents share. Agents read it before they start and leave a handoff when they stop, and every change says who made it.
 
 ## What your BrainDog holds
 

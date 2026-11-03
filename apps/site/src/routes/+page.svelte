@@ -4,19 +4,19 @@
   /**
    * brain.dog's home page, rebuilt in the redesign.
    *
-   * ONE PRODUCT PICTURE, THEN FIVE BANDS THAT EACH SAY ONE NEW THING, AND THE ASK (plan F12, 1 Nov: eight bands was too
-   * many for a page whose job is one ask). The dark hero with the slogan, two buttons, the
-   * early access line and the makers, then Maya's desk across the hero's edge (`lib/desk/Desk.svelte`), drawn as the
-   * app's own Today. Under it, full-bleed bands, each on its own ground in both schemes so two neighbours never share
-   * one (`--band-*` in Look B):
+   * ONE PRODUCT PICTURE, THEN BANDS THAT EACH SAY ONE NEW THING, AND THE ASK (plan F12, 1 Nov; the order is the site
+   * story's, 3 Nov: the band that sells the product comes right after how it works). The dark hero with the headline,
+   * two buttons, the early access line and the makers, then Maya's desk across the hero's edge
+   * (`lib/desk/Desk.svelte`), drawn as the app's own Today. Under it, full-bleed bands, each on its own ground in both
+   * schemes so two neighbours never share one (`--band-*` in Look B):
    *
-   *   who      Who it's for: three readers (a small business, building with AI, your own life), each a tile.
-   *   money    Your money, in one place: the app's Money home on Maya's two books, and the add-ons.
-   *   chores   it does the filing, you make the calls, and it stays yours: the questions the desk does not show,
+   *   who      How it works: connect your agents, each session starts caught up, you answer what needs you.
+   *   tools    night: nothing gets explained twice, the notes the agents left and the connect line.
+   *   chores   agents ask until they've earned your trust: the questions, where each agent stands, what got done,
    *            and under them the floor and the three promises that keep it yours.
-   *   together bring in the people you work with: roles, mentions and faces, read-only links (2 November).
-   *   tools    night: your AI tools share one memory, the notes and the connect line.
-   *   slash    Press ⌘J and ask anything, the bar and its answer.
+   *   money    the business side, where your agents can see it: the app's Money home on Maya's books, and the add-ons.
+   *   together bring your team, and their agents: roles, mentions and faces, read-only links (2 November).
+   *   slash    or just ask BrainDog: the bar and its answer.
    *   yours    Free while in early access: the page's last call to action.
    *
    * The questions are the pricing page's now, where they are asked.
@@ -44,13 +44,16 @@
   import WhoFor from '$lib/home/WhoFor.svelte';
   import Yours from '$lib/home/Yours.svelte';
   import Start from '$lib/site/Start.svelte';
+
+  const title = home.hero.title.split(' ');
 </script>
 
 <Seo title={site.meta.home.title} description={site.meta.home.description} path="/" ld={[organization, website, application]} />
 <section class="hero night" aria-labelledby="hero-title">
   <span class="hero-mark" aria-hidden="true"><Mark tone="line" height={731} /></span>
   <div class="wrap copy">
-    <h1 id="hero-title">{home.hero.title}</h1>
+    <!-- A HYPHENATED WORD STAYS WHOLE ("re-explaining"), so the phone never breaks the headline after "re-". -->
+    <h1 id="hero-title">{#each title as word, i}{#if i > 0}{' '}{/if}{#if word.includes('-')}<span class="whole">{word}</span>{:else}{word}{/if}{/each}</h1>
     <p class="lead sub">{home.hero.sub}</p>
     <div class="ctas">
       <Start />
@@ -72,10 +75,10 @@
 </section>
 
 <WhoFor />
-<MoneyBand />
-<Chores />
-<Together />
 <Tools />
+<Chores />
+<MoneyBand />
+<Together />
 <SlashBand />
 <Yours />
 
@@ -112,6 +115,10 @@
     line-height: 0.98;
     letter-spacing: -0.021em;
     text-wrap: balance;
+  }
+
+  .whole {
+    white-space: nowrap;
   }
 
   .lead {

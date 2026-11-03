@@ -51,7 +51,7 @@ const EVERY_APP: readonly ConnectApp[] = [
       {
         where: 'In a terminal',
         code: `${CLI_INSTALL}\nbraindog setup https://app.brain.dog/<your-record>`,
-        hint: 'Approve the six digits it prints in BrainDog. Claude then starts every session from your brief.',
+        hint: 'Approve the six digits it prints in BrainDog. Claude Code then starts every session with the briefing.',
       },
     ],
   },

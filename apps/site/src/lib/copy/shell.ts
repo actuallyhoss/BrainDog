@@ -2,7 +2,7 @@
  * The words every page shares: the product's name, each page's search result, the header, the footer (which
  * carries the slogan) and the 404. Which pages the header, the footer and the 404 list is `nav.ts`'s.
  */
-import { APPS_OR } from '../agents.ts';
+import { APPS_AND } from '../agents.ts';
 import { LAUNCH } from '../launch.ts';
 
 export const shell = {
@@ -11,28 +11,27 @@ export const shell = {
   /** The search result and the shared card, about 150 characters each. */
   meta: {
     home: {
-      title: 'BrainDog · Give your business a memory',
-      description:
-        'BrainDog remembers your projects, money and people, shows what needs you on a Today you arrange, and ' +
-        'shares it with Claude and Cursor. Free in early access.',
+      title: 'BrainDog · Every AI agent starts where the last one stopped',
+      description: `${APPS_AND} read where your projects stand before they start, leave a handoff when they stop, and ask before touching money or keys.`,
     },
     slash: {
-      title: 'Slash: press ⌘J and ask anything · BrainDog',
+      title: 'Slash, the assistant built into BrainDog',
       description:
-        'Press ⌘J anywhere in BrainDog and ask in plain words. Slash answers with your numbers and makes the changes ' +
-        'you ask for, each with an undo.',
+        'Press ⌘J on any page and ask in plain words. Slash answers from your own numbers, shows what it read, and ' +
+        'makes the changes you ask for with an undo.',
     },
     pricing: {
       title: 'Pricing: free in early access · BrainDog',
-      description:
-        'BrainDog is Free: every feature, 3 AI tools and 20 Slash questions a month. ' +
-        (LAUNCH.billing ? 'Cloud and Cloud Plus are monthly plans with more of each.' : 'Cloud and Cloud Plus are coming soon, priced at launch.'),
+      description: LAUNCH.billing
+        ? 'Free to start with 3 connected agents. Cloud and Cloud Plus add more agents, more questions and, on Cloud Plus, your team.'
+        : 'BrainDog is free while invite only: every feature, 3 connected agents and 20 questions to the built-in assistant a ' +
+          'month. Paid plans come later, priced at launch.',
     },
     agents: {
-      title: 'Connect Claude, ChatGPT and Cursor · BrainDog',
+      title: `Connect ${APPS_AND} · BrainDog`,
       description:
-        `Connect ${APPS_OR} to BrainDog in one line. Each starts from your ` +
-        "brief and leaves a note when it's done.",
+        'One address and one approval per agent. From then on every session starts with where things stand and ends ' +
+        'with a handoff for the next one.',
     },
     notFound: {
       title: 'Page not found · BrainDog',
@@ -44,11 +43,11 @@ export const shell = {
     },
     download: {
       title: 'BrainDog for iPhone and Mac',
-      description: 'The BrainDog apps for iPhone and Mac are coming. Until then, BrainDog works in any browser.',
+      description: 'The iPhone and Mac apps are coming. Until then BrainDog works in any browser, on your phone too.',
     },
     changelog: {
       title: 'Changelog · BrainDog',
-      description: "What shipped in BrainDog and when, in the repository's own words.",
+      description: 'Everything that shipped in BrainDog, day by day.',
     },
   },
 
@@ -87,7 +86,7 @@ export const shell = {
   /** The early access line: the hero's under its buttons, and the strip that closes an inner page. */
   early: {
     strong: 'Early access, invite only.',
-    rest: "It's free while we open it up.",
+    rest: 'Free while we open it up.',
   },
 
   /** The dark footer: the brand with no blurb, three groups of plain links (`lib/site/footer.ts`) and the owner. */
@@ -98,9 +97,8 @@ export const shell = {
       help: 'Help',
     },
     /* The links that are not a page's own label: who it is for, then the texts. */
-    small: 'Small businesses',
+    small: 'Founders',
     teams: 'Teams and agencies',
-    personal: 'Personal use',
     developers: 'Developers',
     terms: 'Terms',
     privacy: 'Privacy',
