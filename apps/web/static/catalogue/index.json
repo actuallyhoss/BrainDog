@@ -1821,8 +1821,57 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.2.1",
       "versions": [
+        {
+          "version": "1.2.1",
+          "checksum": "3338a09d8967437f3c903078194f3f89aaf5ae6f5296c5435eb585445b85620b",
+          "bytes": 82332,
+          "published_at": "2026-11-03T20:26:51.108Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Mail"
+            ],
+            "pages": [
+              "Mail"
+            ],
+            "rules": [
+              "Ask about a mail a person is waiting on your reply to",
+              "Ask about a mail that looks like a bill",
+              "Ask about a mail that looks like a receipt",
+              "Ask about a mail from a person with a date in it",
+              "Ask once about many mails at a time",
+              "Take a mail you replied to off Waiting on your reply",
+              "Take a mail that needs no reply off Waiting on your reply",
+              "Clear a mail you said is not a bill",
+              "Clear a mail you said is not a receipt",
+              "Leave the mails you said to leave"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Mail",
+              "Waiting on your reply"
+            ],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": true
+              },
+              {
+                "id": "register.organisations",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "Setup says to open Plugins, then Gmail, where it said Add-ons. Nothing it reads or writes changed.",
+          "preview": true
+        },
         {
           "version": "1.2.0",
           "checksum": "f12dc32d72f505dce6613233ca1989b8064784da3ff1bc945743c3517e4bce38",
@@ -2310,12 +2359,34 @@
       "kind": "pack",
       "id": "hello",
       "title": "Hello",
-      "summary": "A list of things to do and a page showing what is still open: the smallest useful add-on, in the shape braindog pack new starts every one.",
+      "summary": "A list of things to do and a page showing what is still open: the smallest useful plugin, in the shape braindog pack new starts every one.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.2",
+      "latest": "1.0.3",
       "versions": [
+        {
+          "version": "1.0.3",
+          "checksum": "a2b84abe0bdf8228bde2590fd9b8a17219c5b1e6b05e62bdc89e117866f86e43",
+          "bytes": 2416,
+          "published_at": "2026-11-03T20:26:51.108Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Items"
+            ],
+            "pages": [
+              "Hello"
+            ],
+            "rules": [],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Kept out of the store's list, where it was beside the plugins you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon. It says plugin where it said add-on, as the app now does.",
+          "preview": true
+        },
         {
           "version": "1.0.2",
           "checksum": "d4d88afffd3c339c025254848e97b64c10e9266f7dcdc645da84dac3203e2d74",
@@ -4047,8 +4118,47 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.3.0",
+      "latest": "1.3.1",
       "versions": [
+        {
+          "version": "1.3.1",
+          "checksum": "d9e44350dcf633c199dd11b078dc292982f3937256c69ddafd3a8378086c2ea0",
+          "bytes": 29907,
+          "published_at": "2026-11-03T20:26:51.108Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [
+              {
+                "host": "api.mercury.com",
+                "line": "CALLS OUT api.mercury.com · every 1h · key \"Mercury (read only)\" to the host its keychain entry opens",
+                "key": "Mercury (read only)"
+              }
+            ],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Each Mercury account says it is fed by the bank in Money's own No bank feed, so Money never posts a repeating line to it itself. It says plugin where it said add-on, as the app now does."
+        },
         {
           "version": "1.3.0",
           "checksum": "85aa8c49f3ad08cf421ef2cee468f55132e2fd7109feb0df9e00c3ac9cf85d20",
@@ -7524,12 +7634,31 @@
       "kind": "pack",
       "id": "slash-desk",
       "title": "Slash on your machine",
-      "summary": "Now part of Jobs on your machine (Starter jobs): the job that composes a page on your machine is one of its kinds. Install that add-on for it.",
+      "summary": "Now part of Jobs on your machine (Starter jobs): the job that composes a page on your machine is one of its kinds. Install that plugin for it.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.0.0",
+      "latest": "2.0.1",
       "versions": [
+        {
+          "version": "2.0.1",
+          "checksum": "829c29dd471de56d1fb0d5454f979b6390fa7125f6e335c26c7b5fd7f787eec8",
+          "bytes": 699,
+          "published_at": "2026-11-03T20:26:51.108Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "agents"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Now part of Jobs on your machine. A record that held this keeps the same job, still approved, now from there. It says plugin where it said add-on, as the app now does."
+        },
         {
           "version": "2.0.0",
           "checksum": "68e622d2db4321a813bf084dd0a55aac118bfdf6c7f5e760ed30b00b73551868",

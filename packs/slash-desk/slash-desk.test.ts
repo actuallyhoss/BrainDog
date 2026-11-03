@@ -83,7 +83,7 @@ test('the kind is one of Jobs on your machine, and the old id says it is part of
   assert.deepEqual(decl.args, [{ id: 'page', label: 'Page', max: 64 }]);
   const old = retired();
   assert.equal(old.pack, 'slash-desk');
-  assert.equal(old.version, '2.0.0');
+  assert.equal(old.version, '2.0.1');
   assert.match(String(old.summary), /^Now part of Jobs on your machine/u);
   assert.deepEqual(old.declarations, []);
   assert.deepEqual(old.hands, { 'job.slash-desk': 'job-starter' });

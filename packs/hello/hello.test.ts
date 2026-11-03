@@ -48,7 +48,7 @@ test('BEFORE THE ADD-ON: a new record has no Hello page', async () => {
 test('THE FILE IS WHAT braindog pack new WRITES: the same list, page, example rows and test', () => {
   const file = doc();
   const starter = packStarter('hello', 'Hello', 'BrainDog');
-  assert.deepEqual([file.pack, file.version, file.title], ['hello', '1.0.2', 'Hello']);
+  assert.deepEqual([file.pack, file.version, file.title], ['hello', '1.0.3', 'Hello']);
   assert.deepEqual(file.requires, starter.requires);
   assert.deepEqual(file.declarations, starter.declarations);
   assert.deepEqual(file.seeds, starter.seeds);

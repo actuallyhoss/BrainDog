@@ -1,0 +1,22 @@
+{
+  "pack": "slash-desk",
+  "version": "2.0.1",
+  "icon": "slash",
+  "title": "Slash on your machine",
+  "summary": "Now part of Jobs on your machine (Starter jobs): the job that composes a page on your machine is one of its kinds. Install that plugin for it.",
+  "changes": "Now part of Jobs on your machine. A record that held this keeps the same job, still approved, now from there. It says plugin where it said add-on, as the app now does.",
+  "unlisted": true,
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "agents": "^1.0.0"
+    }
+  },
+  "hands": {
+    "job.slash-desk": "job-starter"
+  },
+  "declarations": []
+}

@@ -1,10 +1,10 @@
 {
   "pack": "gmail",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "icon": "mail",
   "title": "Gmail",
   "summary": "Your Gmail in BrainDog: who you are in touch with, mail waiting on your reply, and bills, receipts and dates to look at. A short script in your own Google account sends the subject, sender, day, a short snippet and the link. Reads only; nothing is ever sent from your Gmail.",
-  "changes": "Asks far less. A reply only when a person wrote to you directly and asks you something, never for an invitation, its updates, a list or a forward sent for your information. One question a thread, and one an order or invoice, with the amount first. A date never for an invitation or an event already on your calendar. A first look, or an hour with more than five, asks once: 12 mails may need you. Nobody is added to People unless you both wrote lately.",
+  "changes": "Setup says to open Plugins, then Gmail, where it said Add-ons. Nothing it reads or writes changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "uses": [
@@ -765,7 +765,7 @@
             "metric": "gmail-mail",
             "lt": 1
           },
-          "body": "Open Add-ons, then Gmail, and press Make the address. It shows a short script with your address already in it and four steps to paste it into Google. Your mail arrives within a minute after that."
+          "body": "Open Plugins, then Gmail, and press Make the address. It shows a short script with your address already in it and four steps to paste it into Google. Your mail arrives within a minute after that."
         },
         {
           "kind": "note",

@@ -438,7 +438,7 @@ test('THE PACK CARRIES ledger.js AS ITS SOURCE, byte for byte, on its host, key 
   ]);
   const cards = JSON.parse(readFileSync(new URL('../card-alerts/card-alerts.pack.json', import.meta.url), 'utf8')) as { extends?: unknown };
   assert.equal(cards.extends, undefined, 'another bank door lays the payee field again');
-  assert.deepEqual([doc.version, typeof doc.changes], ['1.3.0', 'string']);
+  assert.deepEqual([doc.version, typeof doc.changes], ['1.3.1', 'string']);
   /* THE CHANGES LINE IS READ BY A PERSON ON THE ADD-ON'S PAGE: plain words, no dash for a comma, no id. */
   assert.equal(/[—–]|mercury_|#\d/.test(String(doc.changes)), false, String(doc.changes));
 });

@@ -1,0 +1,106 @@
+{
+  "pack": "hello",
+  "version": "1.0.3",
+  "icon": "star",
+  "title": "Hello",
+  "summary": "A list of things to do and a page showing what is still open: the smallest useful plugin, in the shape braindog pack new starts every one.",
+  "changes": "Kept out of the store's list, where it was beside the plugins you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon. It says plugin where it said add-on, as the app now does.",
+  "unlisted": true,
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "register": "items",
+      "name": "Items",
+      "title": "name",
+      "fields": [
+        {
+          "id": "name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "id": "state",
+          "type": "enum",
+          "values": [
+            "open",
+            "done"
+          ],
+          "default": "open"
+        },
+        {
+          "id": "due",
+          "type": "day"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "page": "hello",
+      "title": "Hello",
+      "nav": {
+        "section": "Hello",
+        "order": 10
+      },
+      "icon": "board",
+      "requires": [
+        "register.items"
+      ],
+      "blocks": [
+        {
+          "kind": "table",
+          "heading": "Open",
+          "span": 12,
+          "source": "register.items",
+          "where": "state is open",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Item",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "field": "due",
+              "label": "Due",
+              "width": "14ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "due",
+              "dir": "asc"
+            }
+          ],
+          "limit": 20,
+          "empty": "Nothing is open."
+        }
+      ]
+    }
+  ],
+  "seeds": [
+    {
+      "register": "items",
+      "fields": {
+        "name": "Write the first real item",
+        "due": "2026-10-01"
+      }
+    },
+    {
+      "register": "items",
+      "fields": {
+        "name": "Delete these two examples",
+        "state": "done"
+      }
+    }
+  ]
+}

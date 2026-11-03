@@ -1,10 +1,10 @@
 {
   "pack": "hello",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "icon": "star",
   "title": "Hello",
-  "summary": "A list of things to do and a page showing what is still open: the smallest useful add-on, in the shape braindog pack new starts every one.",
-  "changes": "Kept out of the store's list, where it was beside the add-ons you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon.",
+  "summary": "A list of things to do and a page showing what is still open: the smallest useful plugin, in the shape braindog pack new starts every one.",
+  "changes": "Kept out of the store's list, where it was beside the plugins you would choose. A record that holds it keeps it, and it still installs by its name. Nothing in it changed. Now draws its own icon. It says plugin where it said add-on, as the app now does.",
   "unlisted": true,
   "author": "BrainDog",
   "license": "Apache-2.0",
