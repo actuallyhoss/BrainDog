@@ -67,7 +67,7 @@ export type ScriptUsage = { fetches: number; bytes: number; wall_ms: number; cpu
  * the sandbox started. `held` is the host's to say because the allowance is the Directory's, exactly as for a `call`.
  */
 export type ScriptAnswer =
-  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage; ask?: unknown; proposals?: unknown }
+  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage; ask?: unknown; proposals?: unknown; answer?: unknown }
   | { refused: { code: string | null; why: string }; log: string; usage: ScriptUsage }
   | { held: { until: number; say: string } };
 

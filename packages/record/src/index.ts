@@ -7584,6 +7584,41 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * THE READS AN INSTALLED SCRIPT IS HANDED WHEN A PERSON OR AN AGENT STARTS IT (an add-on's tool, command or row action,
+   * `methods/addon-tools.ts`): `scriptTry`'s reads, in its words, the caller's own `list` and `get` narrowed to the
+   * script's `reads:`, a secret field off every row, a filter on one refused. So a tool reads no more than its caller
+   * may and no more than its scheduled run would.
+   */
+  const scriptReadsAs = (script: string, declared: readonly string[], ctx: CallContext) => {
+    const ceiling = ctx.registers === undefined || ctx.registers === '*' ? [...declared] : declared.filter((r) => (ctx.registers as readonly string[]).includes(r));
+    const as: CallContext = { ...ctx, registers: ceiling };
+    return {
+      list: async (register: string, where: unknown, options: unknown = null) => {
+        if (where !== null && (typeof where !== 'object' || Array.isArray(where)))
+          throw new Error(`${script} filtered ${register} with ${JSON.stringify(where)}, and a script filters with a predicate tree, such as {"field":"name","is":"Acme"}, so nothing was read.`);
+        const field = namesSealed(where, register);
+        if (field !== null) throw new Error(`${script} filtered ${register} on ${field}, which is a secret, and a script may not ask what a secret field holds.`);
+        if (
+          options !== null &&
+          (typeof options !== 'object' || Array.isArray(options) || Object.entries(options).some(([k, v]) => !((k === 'includeDeleted' && typeof v === 'boolean') || (k === 'order' && v === 'seq'))))
+        )
+          throw new Error(`${script} listed ${register} with the options ${JSON.stringify(options)}, and a script's list takes {"includeDeleted":true}, {"order":"seq"} or nothing, so nothing was read.`);
+        const deleted = (options as { includeDeleted?: unknown } | null)?.includeDeleted;
+        const bySeq = (options as { order?: unknown } | null)?.order === 'seq';
+        const asked = { ...(typeof deleted === 'boolean' ? { includeDeleted: deleted } : {}), ...(bySeq ? { order: [{ field: 'seq', dir: 'asc' }] } : {}) };
+        const page = await api.list({ register, ...(where === null ? {} : { where }), ...asked } as never, as);
+        if (!page.ok) throw new Error(fixOf(page));
+        return page.value.rows.map(unsealed);
+      },
+      get: async (spoken: string) => {
+        const row = await api.get({ spoken } as never, as);
+        if (!row.ok) throw new Error(fixOf(row));
+        return row.value === null ? null : unsealed(row.value);
+      },
+    };
+  };
+
+  /**
    * Whether a governance row is about a register this caller cannot reach.
    *
    * ONLY A `rowset` NAMES ONE. An `options` body is a question and its answers, a `pattern` is a
@@ -11615,7 +11650,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const got = kernel.metric(filled, {});
     return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
   };
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.catalogueShelf === undefined ? {} : { catalogueShelf: deps.catalogueShelf }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), agentFor, landNow: (ctx, id) => bypassAccept(ctx, id, 'rowset'), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, previewAs: (args, ctx) => api.previewPage(args as never, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.catalogueShelf === undefined ? {} : { catalogueShelf: deps.catalogueShelf }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), agentFor, landNow: (ctx, id) => bypassAccept(ctx, id, 'rowset'), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, previewAs: (args, ctx) => api.previewPage(args as never, ctx) as Promise<Result<unknown>>, ...(deps.tryScript === undefined ? {} : { tryScript: deps.tryScript }), scriptReadsAs, writeAs: (op, args, ctx) => (op === 'create' ? api.create(args as never, ctx) : op === 'update' ? api.update(args as never, ctx) : api.get(args as never, ctx)) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -15563,6 +15598,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(diff.extends.length === 0 ? {} : { extends: diff.extends.map((e) => `${e.id}: ${e.adds.join(', ')}`) }),
         ...((diff.widgets ?? []).length === 0 ? {} : { today_cards: (diff.widgets ?? []).map((w) => w.title) }),
         ...((diff.skills ?? []).length === 0 ? {} : { skills: (diff.skills ?? []).map((s) => s.name) }),
+        ...((diff.tools ?? []).length === 0 ? {} : { tools: (diff.tools ?? []).map((t) => `addon.${id}.${t.name}: ${t.says}${t.writes ? ' (may change rows)' : ''}`) }),
+        ...((diff.commands ?? []).length === 0 ? {} : { commands: (diff.commands ?? []).map((c) => c.title) }),
+        ...((diff.row_actions ?? []).length === 0 ? {} : { row_actions: (diff.row_actions ?? []).map((a) => `${a.title} on ${a.list}`) }),
         ...(diff.calls_out.length === 0 ? {} : { calls_out: diff.calls_out.map((c) => c.line) }),
         ...(diff.approve.length === 0 ? {} : { approve: diff.approve }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),

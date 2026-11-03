@@ -85,6 +85,9 @@ export function reachLines(reach: Reach | undefined): string[] {
   for (const c of reach.calls_out) out.push(c.line);
   if (reach.skills.length > 0) out.push(`Teaches your agents: ${reach.skills.join(', ')}.`);
   if ((reach.widgets ?? []).length > 0) out.push(`Today cards to add: ${(reach.widgets ?? []).join(', ')}.`);
+  for (const t of reach.tools ?? []) out.push(`Gives your agents a tool: ${t.says.replace(/\.$/u, '')}${t.writes ? ', and it may change rows' : ''}.`);
+  if ((reach.commands ?? []).length > 0) out.push(`Adds to the command bar: ${(reach.commands ?? []).join(', ')}.`);
+  for (const a of reach.row_actions ?? []) out.push(`Adds an action on ${a.list.replace(/^register\./u, '').replace(/[_-]+/gu, ' ')} rows: ${a.title}.`);
   if ((reach.waits ?? []).length > 0) out.push(`Some parts wait until you hold: ${(reach.waits ?? []).join(', ')}.`);
   if (reach.examples > 0) out.push(`Starts with ${reach.examples} example ${reach.examples === 1 ? 'entry' : 'entries'}.`);
   return out;
@@ -102,6 +105,8 @@ function reachShort(reach: Reach | undefined): string | undefined {
   const hosts = [...new Set(reach.calls_out.map((c) => c.host).filter((h): h is string => h !== null))];
   if (hosts.length > 0) parts.push(`calls ${hosts.join(', ')}`);
   if ((reach.widgets ?? []).length > 0) parts.push('Today cards');
+  if ((reach.tools ?? []).length > 0) parts.push('agent tools');
+  if ((reach.commands ?? []).length > 0 || (reach.row_actions ?? []).length > 0) parts.push('commands');
   if (reach.skills.length > 0) parts.push('agent skills');
   return parts.length === 0 ? undefined : parts.join(', ');
 }
@@ -291,6 +296,19 @@ export function methods(deps: RecordDeps) {
     if (rules > 0) out.push(`${rules === 1 ? 'An automation' : `${rules} automations`} that run while nobody is looking.`);
     const digests = of('digest').length;
     if (digests > 0) out.push(`${digests === 1 ? 'A digest' : `${digests} digests`} it sends you.`);
+    /* WHO MAY START ITS SCRIPTS, read off the manifest this record stores (`addon-tools.ts`). */
+    let m: Body = {};
+    try {
+      const read = JSON.parse(sql.one<{ manifest: string }>('SELECT manifest FROM pack WHERE id = ?', pack)?.manifest ?? '{}') as unknown;
+      if (isMap(read)) m = read;
+    } catch {
+      m = {};
+    }
+    const listOf = (key: string): Body[] => (Array.isArray(m[key]) ? (m[key] as unknown[]).filter(isMap) : []);
+    for (const t of listOf('tools')) out.push(`A tool for your agents, addon.${pack}.${String(t.name)}: ${String(t.says)}${t.writes === true ? ' It may change rows, as whoever calls it.' : ''}`);
+    const commands = listOf('commands').map((c) => String(c.title ?? c.id));
+    if (commands.length > 0) out.push(`In the command bar: ${commands.join(', ')}.`);
+    for (const a of listOf('row_actions')) out.push(`An action on ${String(a.list).replace(/^register\./u, '').replace(/[_-]+/gu, ' ')} rows: ${String(a.title)}.`);
     return out;
   };
 

@@ -138,6 +138,12 @@ export type Reach = {
    * when it uses any. Read from the file, so a reviewer and a store say what it can reach whatever its author wrote.
    */
   uses?: { id: string; writes: boolean }[];
+  /** The tools it gives agents, by what each says, with whether it may change rows. Absent when none. */
+  tools?: { says: string; writes: boolean }[];
+  /** What it puts in the command bar, by title. Absent when nothing. */
+  commands?: string[];
+  /** The actions it puts on rows: the list's id and the action's title. Absent when none. */
+  row_actions?: { list: string; title: string }[];
 };
 
 export type Bump = 'major' | 'minor' | 'patch';
@@ -225,7 +231,7 @@ export type CatalogueEntry = {
  * The closed list of keys an add-on's manifest may say, which the SDK and the Kennel hold a file to. The record itself
  * stays lenient and reads what it knows. `unlisted` flags a pack named for one person or one bank.
  */
-export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills', 'icon', 'widgets', 'uses'] as const;
+export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills', 'icon', 'widgets', 'uses', 'tools', 'commands', 'row_actions'] as const;
 
 export const PREVIEW_FORMAT = 1;
 
@@ -447,6 +453,9 @@ export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
     ...(s.pack?.manifest.widgets?.length ? { widgets: s.pack.manifest.widgets.map((w) => w.title) } : {}),
     ...waitsOf(s.pack),
     ...usesIn(file),
+    ...(s.pack?.manifest.tools?.length ? { tools: s.pack.manifest.tools.map((t) => ({ says: t.says, writes: t.writes === true })) } : {}),
+    ...(s.pack?.manifest.commands?.length ? { commands: s.pack.manifest.commands.map((c) => c.title) } : {}),
+    ...(s.pack?.manifest.row_actions?.length ? { row_actions: s.pack.manifest.row_actions.map((a) => ({ list: a.list, title: a.title })) } : {}),
   };
 }
 

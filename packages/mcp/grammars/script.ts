@@ -29,7 +29,7 @@ export const SCRIPT_GRAMMAR = {
   body: {
     script: 'the name, the same as in the id: lower-case letters, digits, - and _, starting with a letter, at most 32 (required)',
     title: 'text',
-    runs: '{"every":"1h"}, no more often than every 15m; {"every":"1d","at":"09:00"} every day at that time in the record\'s time zone (at needs an every of whole days: 1d, 2d or 1w); {"door":"<ingest id>"} whose verified arrivals start it; or {"rule":true} so a rule may run it. At least one of every, door and rule (required)',
+    runs: '{"every":"1h"}, no more often than every 15m; {"every":"1d","at":"09:00"} every day at that time in the record\'s time zone (at needs an every of whole days: 1d, 2d or 1w); {"door":"<ingest id>"} whose verified arrivals start it; or {"rule":true} so a rule may run it; {"tool":true}, {"command":true} or {"row":true} so its add-on\'s tool, command bar entry or row action may start it, handing the args, the answers or {row} as ctx.input, and returning {answer} to whoever started it. At least one (required)',
     egress: '["https://<host>"], each an origin written out in full with no path, port or placeholder; [] when it fetches nothing (required)',
     keys: '["<keychain label>"], the keys it sends, by label; [] for none. A key needs an egress to go to (required)',
     reads: '["<register>"], what ctx.record may read; [] for none (required)',

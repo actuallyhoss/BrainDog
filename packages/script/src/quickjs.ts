@@ -139,12 +139,14 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
   let done = false;
   /* THE ONE QUESTION A RUN MAY ASK (script-ask-47): `ask` on what its function returns, handed on unread. */
   let ask: unknown;
+  /* AND WHAT IT ANSWERS ITS CALLER, `answer` on what its function returns, for a run an add-on's tool started. */
+  let said: unknown;
 
   const answer = (refused: ScriptRefusal | null): ScriptAnswer => {
     done = true;
     usage.wall_ms = Math.round(clock() - started);
     usage.cpu_ms = Math.round(cpu);
-    return refused === null ? { writes, log, usage, ...(ask === undefined || ask === null ? {} : { ask }) } : { refused, log, usage };
+    return refused === null ? { writes, log, usage, ...(ask === undefined || ask === null ? {} : { ask }), ...(said === undefined || said === null ? {} : { answer: said }) } : { refused, log, usage };
   };
 
   const limits = checkDecl(decl);
@@ -593,6 +595,7 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
     const value: unknown = inVm(() => vm.dump(outcome.value));
     outcome.value.dispose();
     ask = value !== null && typeof value === 'object' ? (value as { ask?: unknown }).ask : undefined;
+    said = value !== null && typeof value === 'object' ? (value as { answer?: unknown }).answer : undefined;
     /* THE LAST CHECK, FOR TIME NO OTHER CHECK FELL INSIDE. `JSON.stringify` of two 3 MB strings is
        one native call in the engine: no interrupt during it, no host function after it, and the
        run answered clean at `cpu_ms: 111` against a limit of 5. */

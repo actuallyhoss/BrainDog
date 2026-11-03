@@ -62,6 +62,7 @@ import { ROUTES as doorSwitch } from './door-switch.ts';
 import { ROUTES as flowGrammar } from './flow-grammar.ts';
 import { ROUTES as PACKS_REMOVED } from './packs-removed.ts';
 import { ROUTES as ADDONS } from './addons.ts';
+import { ROUTES as ADDON_TOOLS } from './addon-tools.ts';
 import { ROUTES as PUSH_TEST } from './push-test.ts';
 import { ROUTES as HUES } from './hues.ts';
 import { ROUTES as DECIDER } from './decider.ts';
@@ -129,6 +130,7 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...flowGrammar,
   ...PACKS_REMOVED,
   ...ADDONS,
+  ...ADDON_TOOLS,
   ...PUSH_TEST,
   ...HUES,
   ...DECIDER,

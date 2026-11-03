@@ -591,6 +591,9 @@ const PACK = {
     adds: 'blocks laid on another add-on\'s page',
     widgets: 'Today cards: [{id, title, says, group, for, block, sizes, size, needs: {lists}, example}]. Installing adds them to the card sheet; the person, or an agent through propose body_kind widget, puts one on Today',
     skills: '[{name, trigger, what?, body}]: steps the person\'s agents follow, at most 8',
+    tools: '[{name, says, takes?: {<arg>: text|integer|json}, script, writes?: true}]: at most 8 tools the person\'s agents call as act {"call":"addon.<pack>.<name>","args":{...}}. The script says runs: {tool: true}, gets the args as ctx.input, and returns {answer} for the caller. It reads with the caller\'s own sight; writes: true when its script writes, and each write is made as the caller',
+    commands: '[{id, title, opens?: "page.<slug>", runs?: "<script>", asks?: [{id, label, type: text|integer|day}]}]: at most 12 entries in the app\'s command bar. One opens a page of its own; the other runs a script that says runs: {command: true}, handed the answers as ctx.input',
+    row_actions: '[{list: "register.<id>", title, script}]: at most 8 actions in a row\'s menu. The script says runs: {row: true}, gets {row} as ctx.input, and reads or writes the list (its own, or named in the script\'s reads or writes)',
     declarations: 'the parts it adds, each written with its kind as its first key',
   },
   declarations: {
@@ -610,6 +613,8 @@ const PACK = {
     'a script or automation': 'what runs while nobody is looking, with the script source shown whole',
     'a door': 'an address others can post to',
     skills: 'what it teaches the person\'s agents',
+    tools: 'a tool it gives the agents, by what it says, and whether it may change rows',
+    'commands and row actions': 'what it adds to the command bar and to a list\'s rows',
   },
   never: [
     'a key, token or password in the file: name a keychain label',
