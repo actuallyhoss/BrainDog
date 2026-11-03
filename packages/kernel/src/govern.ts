@@ -1122,7 +1122,7 @@ export function withdraw(sql: Sql, deps: Pick<GovernDeps, 'mint'>, id: string, b
 }
 
 /** Close an open question as `withdrawn`, signed by `by`, with the line history reads. No decision is written. */
-function takeBack(deps: Pick<GovernDeps, 'sql' | 'mint'>, id: string, by: string, at: string, note: string): void {
+export function takeBack(deps: Pick<GovernDeps, 'sql' | 'mint'>, id: string, by: string, at: string, note: string): void {
   deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'withdrawn' WHERE id = ? AND status = 'open'", id);
   event(deps, at, by, 'resolve', `suggestion:${id}`, 'suggestion', 'withdrawn', note);
 }
@@ -1255,6 +1255,8 @@ export const GONE_NOTE = 'Taken back: what it asked about is gone.';
 
 /** The line under a question whose rows already hold what it would write, so there is nothing left to answer. */
 export const DONE_NOTE = 'Taken back: it is already so, so there is nothing to answer.';
+/** The line under a question a rule asked about a row that no longer meets the rule: the mail was answered, the bill paid. */
+export const PASSED_NOTE = 'Taken back: it no longer needs you.';
 /** The line under a "same person?" question when one of the rows it names is deleted or merged already. */
 export const MERGED_NOTE = 'Taken back: one of them is already deleted or merged, so there is nothing left to merge.';
 

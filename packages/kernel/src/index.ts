@@ -159,6 +159,8 @@ import {
   sweepStale,
   settleAbout,
   settleOne,
+  takeBack,
+  PASSED_NOTE,
   apartIds,
   apartJson,
   NOT_APART,
@@ -211,7 +213,7 @@ import {
   type DigestDeps,
 } from './digest.ts';
 import { URGENT_NOTE, inQuietHours, quietEnds, quietOf } from './digest.ts';
-import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type FlowDecl, type RuleDecl, type RulesDeps } from './rules.ts';
+import { CREATE_CEILING, applyRule, dryRun, marker, runRules, stillMatches, type Applied as RuleApplied, type DryRun, type FlowDecl, type RuleDecl, type RulesDeps } from './rules.ts';
 import {
   advance as advanceRun,
   answerStep,
@@ -4729,8 +4731,33 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const prefix = registers.get(row.register)?.seq_prefix;
       const names = [row.id, ...(row.seq === null ? [] : [`${row.register}#${row.seq}`, ...(prefix && prefix !== '#' ? [`${prefix}${row.seq}`] : [])])];
       settleAbout(governDeps(), names, clock.now());
-    }
+    } else if (out.ok && ref !== null && !door.decided) settleRuleAsks(out.value);
     return out;
+  }
+
+  /**
+   * Take back each open question a rule asked about `entry` whose `when` the row no longer meets (`stillMatches`): the
+   * reply was sent, the bill was marked paid, the mail is no longer a receipt. Asked on every update of a row a rule
+   * asked about, with the line that says why. A rule taken out or one that cannot be read leaves its question alone.
+   */
+  function settleRuleAsks(entry: Entry): void {
+    if (entry.seq === null) return;
+    const open = sql.all<{ id: string; opened_by: string }>(
+      "SELECT id, opened_by FROM suggestion WHERE status = 'open' AND opened_by LIKE 'rule:%' AND body_kind = 'options' AND json_valid(body) AND json_extract(body, '$.about') IN (?, ?) LIMIT 20",
+      `${entry.register}#${entry.seq}`,
+      entry.id,
+    );
+    if (open.length === 0) return;
+    const schema = registers.has(entry.register) ? schemaOf(entry.register) : null;
+    if (!schema) return;
+    const deps = rulesDeps();
+    const installed = deps.rules(entry.register);
+    for (const q of open) {
+      const rule = installed.find((r) => r.rule === q.opened_by.slice('rule:'.length));
+      if (rule === undefined || rule.enabled === false || rule.when === undefined) continue;
+      if (stillMatches(deps, schema, rule, entry)) continue;
+      takeBack(governDeps(), q.id, 'system', instant(clock.now()), PASSED_NOTE);
+    }
   }
 
   function writing(register: string, ref: string | null, patch: Patch, w: WriteContext, door: Door = {}): Result<Entry> {
