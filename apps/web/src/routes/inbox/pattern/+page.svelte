@@ -470,7 +470,7 @@
                 summary={tried.fields.map((f) => words.fieldRead(labelOf(f.field), f.cells.filter((c) => c.ok).length, samples.length)).join('; ')}
               />
             {/if}
-            <p class="reading">{words.claimed(claimed, samples.length)}</p>
+            <!-- NO SENTENCE UNDER THE FIGURE: "It takes 3 of 4 messages." said the figure and the bar a third time (3 Nov). -->
           {:else if !tryFix}
             <Waiting rows={2} />
           {/if}
@@ -659,13 +659,6 @@
     font-weight: 500;
     line-height: 18px;
     letter-spacing: 0;
-  }
-
-  .reading {
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: 20px;
   }
 
   /* A FIELD IS A SOFT WELL: 40 tall, `--tile-2`, no border, radius 12, its label above it. */

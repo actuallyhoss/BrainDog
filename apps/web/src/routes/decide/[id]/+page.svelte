@@ -154,14 +154,19 @@
    * thing by its handle.
    */
   let aboutRow = $state.raw<{ title: string; href: string | null; line: string } | null>(null);
+  /* WHICH QUESTION'S ROW HAS BEEN READ, so the side holds the About part's room while it is out: it landed a beat after
+     the question and pushed the comments under it down 110px on a phone (3 Nov). */
+  let aboutDone = $state<string | null>(null);
   async function readAbout(id: string) {
     const named = aboutOf(live?.about?.body);
     if (!client || !named) {
       aboutRow = null;
+      aboutDone = id;
       return;
     }
     const got = await client.get(named.list, named.seq).catch(() => ({ ok: false as const }));
     if (String(page.params.id) !== id) return;
+    aboutDone = id;
     const fields = got.ok && got.value !== null && typeof got.value === 'object' ? ((got.value as { fields?: Record<string, unknown> }).fields ?? {}) : null;
     const held = fields ? fields[REGISTERS[named.list]?.title ?? 'title'] : undefined;
     const money = live?.question ? moneyRowOf(spoken(live.question.title)) : null;
@@ -1565,7 +1570,13 @@
     {#if aside}
     <Tile class="gate-aside">
       <!-- WHAT IT IS ABOUT, FIRST: the row by its title, a link to it, and its list, amount and how late under it. -->
-      {#if aboutRow}
+      {#if from === 'live' && aboutDone !== String(page.params.id) && aboutOf(about?.body) !== null}
+        <!-- ITS ROOM, HELD WHILE THE ROW IS READ: the heading and two quiet bars the height of its two lines. -->
+        <section class="aside-part" aria-hidden="true">
+          <h2 class="gate-h">{sideWords.about}</h2>
+          <p class="gate-about"><span class="about-held"></span><span class="about-held about-held-meta"></span></p>
+        </section>
+      {:else if aboutRow && aboutDone === String(page.params.id)}
         <section class="aside-part" aria-labelledby="gate-about-h">
           <h2 class="gate-h" id="gate-about-h">{sideWords.about}</h2>
           <p class="gate-about">
@@ -1800,6 +1811,26 @@
     font-size: var(--fs-body);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
+  }
+
+  .about-held {
+    display: block;
+    inline-size: 9rem;
+    block-size: calc(var(--fs-body) * var(--lh-body));
+    border-radius: var(--r-xs);
+    background: var(--tile-2);
+  }
+
+  .about-held-meta {
+    inline-size: 6rem;
+    block-size: calc(var(--fs-meta) * var(--lh-body));
+  }
+
+  /* THE LINK IS A THUMB TALL THERE, and so is the room held for it. */
+  @media (pointer: coarse) {
+    .about-held:not(.about-held-meta) {
+      block-size: var(--tap);
+    }
   }
 
   .gate-about-line {

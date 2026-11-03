@@ -824,6 +824,45 @@
     </div>
   {:else}
     <div class="inbox">
+      <!-- WHAT WAITS LEADS (3 Nov): it is what the page is for, and drawn under the ways in and the rules' figure it sat
+           below the first screen on a phone and was pushed 296px down at a desk when those two tiles landed. -->
+      <div class="main">
+        {#if view !== 'waiting'}
+          {@render settledSeries()}
+        {:else}
+          {#if patterns.length > 0}
+            <!-- PATTERNS FIRST: one accepted pattern files every arrival like its samples from then on, so it is worth
+                 more than any one arrival below it. Each opens its question on Decide, where it is accepted or not. -->
+            <Tile class="section" data-surface="tile" title={words.patterns} count={patterns.length || undefined}>
+              <div class="section-body">
+                <ul class="ledger ledger-lead">
+                  {#each patterns as p (p.id)}
+                    <li>
+                      <a class="line line-tall pattern" href={at(`/decide/${encodeURIComponent(p.id)}`)}>
+                        <IconWell name="decide" size="l" />
+                        <span class="line-main">
+                          <span class="line-title">{p.title}</span>
+                          <span class="line-detail">{words.patternWhy}</span>
+                        </span>
+                        <span class="pattern-go" aria-hidden="true"><Icon name="chevron" size="m" /></span>
+                      </a>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            </Tile>
+          {/if}
+          {#if refused}
+            <!-- THE ARRIVALS WERE REFUSED, the rest of the screen was not: the tiles above and the patterns still draw. -->
+            <Empty kind="error" title={words.refusedTitle} body={words.refusedBody + (ways || figure || panel || repeats.length > 0 || patterns.length > 0 ? words.refusedBelow : "")} detail={refused}>
+              {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
+            </Empty>
+          {:else}
+            {@render waitingSeries()}
+          {/if}
+        {/if}
+      </div>
+
       {#if ways || figure}
         <!-- THE TWO TILES THAT SAY HOW THINGS ARRIVE, side by side from a desk's width and stacked on a phone. -->
         <div class="top" data-pair={ways && figure ? '' : undefined}>
@@ -926,42 +965,6 @@
         </Tile>
       {/if}
 
-      <div class="main">
-        {#if view !== 'waiting'}
-          {@render settledSeries()}
-        {:else}
-          {#if patterns.length > 0}
-            <!-- PATTERNS FIRST: one accepted pattern files every arrival like its samples from then on, so it is worth
-                 more than any one arrival below it. Each opens its question on Decide, where it is accepted or not. -->
-            <Tile class="section" data-surface="tile" title={words.patterns} count={patterns.length || undefined}>
-              <div class="section-body">
-                <ul class="ledger ledger-lead">
-                  {#each patterns as p (p.id)}
-                    <li>
-                      <a class="line line-tall pattern" href={at(`/decide/${encodeURIComponent(p.id)}`)}>
-                        <IconWell name="decide" size="l" />
-                        <span class="line-main">
-                          <span class="line-title">{p.title}</span>
-                          <span class="line-detail">{words.patternWhy}</span>
-                        </span>
-                        <span class="pattern-go" aria-hidden="true"><Icon name="chevron" size="m" /></span>
-                      </a>
-                    </li>
-                  {/each}
-                </ul>
-              </div>
-            </Tile>
-          {/if}
-          {#if refused}
-            <!-- THE ARRIVALS WERE REFUSED, the rest of the screen was not: the tiles above and the patterns still draw. -->
-            <Empty kind="error" title={words.refusedTitle} body={words.refusedBody + (ways || figure || panel || repeats.length > 0 || patterns.length > 0 ? words.refusedBelow : "")} detail={refused}>
-              {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
-            </Empty>
-          {:else}
-            {@render waitingSeries()}
-          {/if}
-        {/if}
-      </div>
     </div>
   {/if}
 </div>
