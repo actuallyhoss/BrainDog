@@ -24,7 +24,7 @@
     roles: 'Roles',
     rolesLead: (mine: Level | null) => (mine ? `Your role is ${ROLES[mine].name}. Pick one for each person you invite.` : 'Pick one for each person you invite.'),
     shares: 'Sharing part of it',
-    sharesLead: 'One project, list or set of rows, for as long as you say. Nothing else here.',
+    sharesLead: 'One project or part of your things, for as long as you say. Nothing else here.',
     you: 'You',
     yes: 'Yes',
     no: 'No',

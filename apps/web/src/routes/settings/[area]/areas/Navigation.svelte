@@ -221,7 +221,7 @@
      sidebar's own (`penCount`), so where one is drawn the two agree. -->
 <Tile id="suggestions" icon="inbox" title={words.offers} count={waitingCount || undefined}>
   <!-- ONE LINE (ui pass, 3 Nov): two lines of how suggestions come stood under the switch. -->
-  <StateRow icon="learning" title={copy.suggestPages} line="When a list grows or a question repeats. Nothing is added until you keep it." action={suggestSwitch} />
+  <StateRow icon="learning" title={copy.suggestPages} line="When something grows or a question repeats. Nothing is added until you keep it." action={suggestSwitch} />
   <!-- FORGET WHAT IT LEARNED (widgets plan §6.4, Call 12): the widgets Slash suggests from use start again from today. -->
   {#if navPrefs.suggest}<StateRow icon="refresh" title="Forget what BrainDog learned from my use" line="Widget suggestions start again from today. Nothing you added changes." action={forgetUse} />{/if}
   {#if !navPrefs.suggest}

@@ -258,7 +258,7 @@
        opened this screen on a mail address and nothing said how a text gets here. */
     textsTitle: "Your bank's texts",
     textsLead: 'Money fills itself from the texts your bank sends. Paste one to see what it becomes.',
-    textsHow: 'Forward them on their own',
+    textsHow: 'Or forward them automatically',
     textsForward: 'Forward them as mail to the address above. On an iPhone, a Shortcuts automation can do it for each text from your bank; on Android, an app that forwards texts to mail can.',
     textsPaste: 'Or paste one below, and see what it becomes before anything is kept.',
   };
