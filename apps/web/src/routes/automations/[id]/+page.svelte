@@ -384,6 +384,7 @@
   /* WHAT IT DOES, WHOLE: the trigger and each step in order, each step said with no title to repeat, so its script is
      named (`sayStep` with no `own`). */
   const whole = $derived(wholeSentence(sayStart(flow.draft, listSaid, ruleNameOf), flow.draft.steps.map((n) => sayInWhole(n))));
+  const wholeInHead = $derived(said === null && !phone.current && !!whole);
   /* THE PLAN THE RUNNER NUMBERS STEPS BY, so "failed at step 3" counts the steps as the canvas draws them. */
   const places = $derived(row?.body ? planPlaces(row.body) : null);
   const durations = $derived(runDurations(runs));
@@ -741,7 +742,9 @@
     <!-- RENAME OPENS THE TRIGGER'S PANEL, WHOSE FIRST FIELD IS THE NAME, and the inspector puts the caret in the first
          field it holds. Offered once it is saved: a new draft's panel opens on its trigger anyway, and "Rename" over a
          draft with no name yet named nothing. The lifecycle sits in one "…" menu beside it, destructive last. -->
-    <PageHead icon="refresh" kicker={words.heading} back="/automations" {title} sentence={said?.text} needs={said?.needs || undefined}>
+    <!-- WITH NOTHING TO SAY OF ITS STATE, THE HEAD SAYS WHAT IT DOES: the whole sentence moves up beside Rename, where an
+         empty line stood over it. -->
+    <PageHead icon="refresh" kicker={words.heading} back="/automations" {title} sentence={said?.text ?? (wholeInHead ? whole : undefined)} needs={said?.needs || undefined}>
       {#snippet actions()}
         {#if row}
           <!-- ON A PHONE THE HEAD HOLDS ONLY THE "⋯", and Rename is its first line. -->
@@ -771,7 +774,7 @@
     <div class="page">
       <!-- THE SENTENCE FIRST: the whole automation in words, the script it runs named,
            over the tabs that take it apart. Said from the draft, so an edit on the canvas says itself here too. -->
-      {#if whole}<p class="whole">{whole}</p>{/if}
+      {#if whole && !wholeInHead}<p class="whole">{whole}</p>{/if}
       <Segmented class="tabs" role="group" aria-label={title}>
         <button type="button" class="segment" aria-pressed={tab === 'steps'} data-on={tab === 'steps' ? '' : undefined} onclick={() => (tab = 'steps')}>{words.steps}</button>
         {#if row}
@@ -1142,9 +1145,6 @@
     text-align: start;
     cursor: pointer;
     transition: box-shadow var(--d-state) var(--ease-out);
-  }
-
-  .trigger[data-selected] {
   }
 
   .trigger-main {

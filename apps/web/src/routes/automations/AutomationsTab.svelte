@@ -77,7 +77,7 @@
   let from = $state<'reading' | 'ready' | 'absent' | 'refused'>('reading');
   let rows = $state<AutomationRow[]>([]);
   let fix = $state('');
-  let source: Source | null = null;
+  let source = $state.raw<Source | null>(null);
   /* THE GROUP EACH ROW WAS READ IN, by id, so a press of its switch does not move it (the file's head says why). */
   let placed = $state.raw<ReadonlyMap<string, boolean>>(new Map());
 

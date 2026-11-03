@@ -714,6 +714,17 @@
     color: var(--ink-3);
   }
 
+  /* ON A PHONE WHO DRAFTED IT IS A LINE OF ITS OWN: wrapped, its dot led the second line on its own. */
+  @media (width < 640px) {
+    .slash-by {
+      flex-basis: 100%;
+    }
+
+    .slash-by::before {
+      content: none;
+    }
+  }
+
   .slash-suggestion[data-state='answered'] .slash-question {
     color: var(--ink-2);
   }

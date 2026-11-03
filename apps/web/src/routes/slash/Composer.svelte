@@ -59,7 +59,7 @@
     attach: 'Add a row as context',
     remove: (name: string) => `Take ${name} off`,
     recent: 'Changed lately',
-    found: 'Rows',
+    found: 'Matches',
     none: (q: string) => `Nothing called “${q}”`,
     full: `Up to ${ATTACH_MOST} rows`,
     keys: 'to ask',
