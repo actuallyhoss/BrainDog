@@ -31,6 +31,9 @@
  * string, `YYYY-MM-DD`, and never a `Date`. From a host that hands none, or anything that is not a day, it is the
  * first ten characters of the instant, the UTC day, which is what a script could read before this.
  *
+ * `ctx.notify`, `ctx.ask` AND `ctx.store` (add-ons phase 4) ARE THERE ONLY FROM A HOST THAT HANDS THEM, as `propose` is, and the
+ * runner refuses each for a script whose header does not say it may (`notifies`, `model`, `store`).
+ *
  * `ctx.propose(proposal)` IS THERE ONLY FROM A HOST THAT HANDS ONE, as `fold` and `cycle` are. It answers the record's
  * own words for the question, `{ ok, value }` or `{ ok: false, refusal }`, and files nothing until the run is applied.
  */
@@ -90,6 +93,18 @@ export const PRELUDE = `(function (host) {
         : {}),
       ...(typeof host.propose === 'function'
         ? { propose: (proposal) => host.propose(stringify(proposal === undefined ? null : proposal)).then(parse) }
+        : {}),
+      ...(typeof host.notify === 'function'
+        ? { notify: (said) => host.notify(stringify(said === undefined ? null : said)).then(parse) }
+        : {}),
+      ...(typeof host.ask === 'function' ? { ask: (prompt) => host.ask(String(prompt)).then(parse) } : {}),
+      ...(typeof host.storeGet === 'function'
+        ? {
+            store: freeze({
+              get: (key) => host.storeGet(String(key)).then(parse),
+              set: (key, value) => host.storeSet(String(key), stringify(value === undefined ? null : value)).then(parse),
+            }),
+          }
         : {}),
       record: freeze({
         list: (register, where, options) =>

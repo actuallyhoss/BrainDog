@@ -134,6 +134,8 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
   const usage: ScriptUsage = { fetches: 0, bytes: 0, wall_ms: 0, cpu_ms: 0 };
   const writes: ScriptWrite[] = [];
   let log = '';
+  /** How many times this run asked Slash's model, held to `model.most_per_run` (`ask` below). */
+  let asks = 0;
   let cpu = 0;
   let stop: ScriptRefusal | null = null;
   let done = false;
@@ -464,6 +466,69 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
             charge();
             const cycle = host.cycle!.bind(host);
             return deferred(async () => JSON.stringify(await cycle(on, read)));
+          },
+        }),
+
+    /* `ctx.notify`, `ctx.ask` AND `ctx.store`, ONLY FROM A HOST THAT HANDS THEM (add-ons phase 4). WHAT THE HEADER SAYS
+       IS HELD HERE, before the host is called: a script that never said `notifies: true`, `model:` or `store: true` is
+       refused `FORBIDDEN` and the run stops, as a read outside `reads` stops it, and the model's count a run is held to
+       `model.most_per_run` on this side too. The day's notices, the allowance and the store's size are the host's. */
+    ...(host.notify === undefined
+      ? {}
+      : {
+          notify: (said: QuickJSHandle) => {
+            charge();
+            if (decl.notifies !== true) throw refuse({ code: 'FORBIDDEN', why: `${decl.id} sent a notice, and its header does not say notifies: true.` });
+            let read: Json = null;
+            try {
+              read = json(said);
+            } catch {
+              read = null;
+            }
+            charge();
+            const notify = host.notify!.bind(host);
+            return deferred(async () => JSON.stringify(await notify(read)));
+          },
+        }),
+    ...(host.ask === undefined
+      ? {}
+      : {
+          ask: (prompt: QuickJSHandle) => {
+            charge();
+            const most = decl.model?.most_per_run;
+            if (most === undefined) throw refuse({ code: 'FORBIDDEN', why: `${decl.id} asked Slash's model, and its header does not say model: { most_per_run }.` });
+            asks += 1;
+            if (asks > most) throw refuse({ code: 'OUT_OF_BOUNDS', why: `${decl.id} asked Slash's model more than its ${most} ${most === 1 ? 'time' : 'times'} a run.` });
+            const words = text(prompt);
+            charge();
+            const ask = host.ask!.bind(host);
+            return deferred(async () => JSON.stringify(await ask(words)));
+          },
+        }),
+    ...(host.storeGet === undefined || host.storeSet === undefined
+      ? {}
+      : {
+          storeGet: (key: QuickJSHandle) => {
+            charge();
+            if (decl.store !== true) throw refuse({ code: 'FORBIDDEN', why: `${decl.id} read its store, and its header does not say store: true.` });
+            const name = text(key);
+            charge();
+            const get = host.storeGet!.bind(host);
+            return deferred(async () => JSON.stringify(await get(name)));
+          },
+          storeSet: (key: QuickJSHandle, value: QuickJSHandle) => {
+            charge();
+            if (decl.store !== true) throw refuse({ code: 'FORBIDDEN', why: `${decl.id} kept state, and its header does not say store: true.` });
+            const name = text(key);
+            let read: Json = null;
+            try {
+              read = json(value);
+            } catch {
+              read = null;
+            }
+            charge();
+            const set = host.storeSet!.bind(host);
+            return deferred(async () => JSON.stringify(await set(name, read)));
           },
         }),
 

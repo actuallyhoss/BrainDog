@@ -61,11 +61,30 @@ export type ScriptBody = {
   source: string;
   /** The pack that owns it, when no `pack` row does. Read by the record, as a register's `pack:` is. */
   pack?: string;
+  /**
+   * `true` when it may send the owner a notice (`ctx.notify`): at most `SCRIPT_NOTICES_PER_DAY` a day for its add-on, held by
+   * quiet hours, on the plan as a line the owner approves. Absent, `ctx.notify` stops the run.
+   */
+  notifies?: true;
+  /**
+   * How many times one run may ask Slash's model (`ctx.ask`), on the record's own allowance, at most
+   * `SCRIPT_MODEL_ASKS_MOST`. On the plan as a line the owner approves. Absent, `ctx.ask` stops the run.
+   */
+  model?: { most_per_run: number };
+  /** `true` when it keeps a little state of its own (`ctx.store`): per add-on, JSON values, `SCRIPT_STORE_BYTES` in all. */
+  store?: true;
 };
+
+/** The most notices one add-on's scripts send in a day (`ctx.notify`). Past it a notice is refused as a value the script reads. */
+export const SCRIPT_NOTICES_PER_DAY = 20;
+/** The most a script may ask Slash's model in one run (`model: { most_per_run }`). */
+export const SCRIPT_MODEL_ASKS_MOST = 10;
+/** What one add-on keeps in `ctx.store`, all keys and values together, as UTF-8 JSON. */
+export const SCRIPT_STORE_BYTES = 1024 * 1024;
 
 /* `pack` IS HERE BECAUSE THE RECORD READS IT. The seed installs first-party packs with no `pack` row, owned only by
    `pack:` in each body (`packStates`), and a script in one of them was refused as a key nothing reads. */
-const HEADER = ['script', 'title', 'runs', 'egress', 'keys', 'reads', 'writes', 'limits', 'source', 'pack'] as const;
+const HEADER = ['script', 'title', 'runs', 'egress', 'keys', 'reads', 'writes', 'limits', 'source', 'pack', 'notifies', 'model', 'store'] as const;
 const RUNS = ['every', 'at', 'door', 'rule'] as const;
 /** A day, in the milliseconds `intervalMs` answers: a time of day repeats only on whole ones. */
 const DAY_MS = 86_400_000;
@@ -191,6 +210,22 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
       if ((value as number) > most)
         return bad('OUT_OF_BOUNDS', `${id}'s limits.${name} is ${String(value)}; the most a script may ask for is ${most}.`, `limits.${name}`);
     }
+  }
+
+  /* WHAT IT MAY DO BEYOND ROWS, each a promise the host keeps and the plan prints as a line the owner approves. */
+  if (body.notifies !== undefined && body.notifies !== true)
+    return bad('DECLARATION_INVALID', `${id}'s notifies: is true when it may send you a notice, and absent when it may not.`, 'notifies');
+  if (body.store !== undefined && body.store !== true)
+    return bad('DECLARATION_INVALID', `${id}'s store: is true when it keeps a little state of its own, and absent when it keeps none.`, 'store');
+  if (body.model !== undefined) {
+    const model = body.model as Record<string, unknown> | null;
+    const most = model !== null && typeof model === 'object' && !Array.isArray(model) ? model.most_per_run : undefined;
+    const stray = model !== null && typeof model === 'object' && !Array.isArray(model) ? Object.keys(model).find((k) => k !== 'most_per_run') : undefined;
+    if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s model: says ${stray}, and it says most_per_run only.`, `model.${stray}`);
+    if (!Number.isInteger(most) || (most as number) < 1)
+      return bad('DECLARATION_INVALID', `${id}'s model: is { most_per_run: N }, how many times one run may ask Slash's model, a whole number from 1.`, 'model');
+    if ((most as number) > SCRIPT_MODEL_ASKS_MOST)
+      return bad('OUT_OF_BOUNDS', `${id}'s model.most_per_run is ${String(most)}; the most a script may ask in one run is ${SCRIPT_MODEL_ASKS_MOST}.`, 'model.most_per_run');
   }
 
   if (typeof body.source !== 'string' || body.source.trim() === '')
