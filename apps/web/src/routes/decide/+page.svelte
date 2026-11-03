@@ -827,6 +827,9 @@
     padding: 0;
     background: none;
     border-radius: 0;
+    /* AND ITS CARD EDGE WITH ITS FILL (cleanup, 3 Nov): a block tile wears one now, which drew a square outline round
+       every column of questions on a phone. */
+    box-shadow: none;
   }
 
   .body :global(.block-slot:not([data-arranging], [data-key^='decide-']):has(> .queue) > .block-bar) {

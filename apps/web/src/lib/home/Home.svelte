@@ -2998,11 +2998,15 @@
   .body[data-board] :global([data-board-key] > .block[data-kind='stat']:last-child .grid > .cell:last-child),
   .body[data-board] :global([data-board-key][data-size='small'] > .block[data-kind='stat'] .grid > .cell:first-child) {
     padding-block-end: 0;
+    /* A FIGURE THAT IS A DOOR (`a.cell`) BORROWS 8 OF MARGIN FOR ITS WASH, which with the padding gone pulled it 8 out
+       of its own box: Owed to you's "Coming in" was cut by the head (cleanup, 3 Nov). The margin goes with the padding. */
+    margin-block-end: 0;
   }
 
   /* AND A SMALL'S ONE FIGURE STARTS `--card-head-gap` UNDER ITS HEAD, not a row's 12 more below it. */
   .body[data-board] :global([data-board-key][data-size='small'] > .block[data-kind='stat'] .grid > .cell:first-child) {
     padding-block-start: 0;
+    margin-block-start: 0;
   }
 
   /* A LIST'S TITLE NEVER ASKS FOR MORE THAN ITS CARD HAS: the skin's `min(16ch, 100%)` floor is 141 at 14px, and beside a

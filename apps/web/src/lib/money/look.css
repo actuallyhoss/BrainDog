@@ -40,6 +40,9 @@
   gap: var(--sp-1);
   padding: var(--sp-2) 0 var(--sp-1);
   background: none;
+  /* NOR THE CARD'S EDGE: the lead tile wears one since the rhythm pass, and with the fill gone it drew an empty outline
+     round Money's sentence (cleanup, 3 Nov). */
+  box-shadow: none;
 }
 
 .hosted[data-money] .block-slot[data-lead]:has(> .block[data-kind='note'][data-form='lead']) .block p {
