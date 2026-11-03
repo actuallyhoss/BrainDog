@@ -3,27 +3,16 @@
    Sam: "i want the ui to look more like ops encore ui", then "i dont mean ops encore colors, i mean just the style".
    So nothing here writes a colour of its own: every new token is a mix of the palette `house.css` generates (the board,
    the tile, the ink, the accent fill), so a person's accent, dark and high contrast follow by themselves. What it adds
-   is the STYLE: one face, capsules and circles, a soft ambient ground, solid cards with a two-layer shadow, glass only
+   is the STYLE: capsules and circles, a soft ambient ground, solid cards with a two-layer shadow, glass only
    on floating chrome, translucent washes for hover, and the ops elevation tiers. The spec is
    `loop/plans/ops-look-2026-11-03/SPEC.md`.
 
    Imported by `routes/+layout.svelte` after every other sheet, so its values win a tie in each layer. App only: the
    marketing site keeps Look B. */
 
-@font-face {
-  font-family: 'Plus Jakarta Sans';
-  src: url('/fonts/jakarta.woff2?v=153f') format('woff2');
-  font-weight: 200 800;
-  font-display: swap;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
-    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
 @layer tokens {
   :root {
-    /* ONE FACE for every word, titles and figures too (ops: one family, 400/500/600). Geist Mono stays for code. */
-    --font-ui: 'Plus Jakarta Sans', 'Jakarta Fallback', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-display: var(--font-ui);
+    /* FACES: Geist for words and Lexend for titles, from tokens.css (Sam asked for the old fonts back, 3 Nov). */
 
     /* TYPE: dense desktop sizes. */
     --fs-cap: 12px;

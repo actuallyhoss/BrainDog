@@ -52,7 +52,8 @@
          `lib/fonts.test.ts` holds them equal. `crossorigin` because a font is always fetched in CORS mode, and a
          preload made without it is not the request the stylesheet makes. Geist Mono and Arabic stay unpreloaded:
          a page asks for them only when it draws one. -->
-    <link rel="preload" href="%sveltekit.assets%/fonts/jakarta.woff2?v=153f" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="%sveltekit.assets%/fonts/geist.woff2?v=494f" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="%sveltekit.assets%/fonts/lexend-600.woff2?v=7865" as="font" type="font/woff2" crossorigin />
 
     <!--
       THE FALLBACKS ARE SIZED TO THE FACES, SO NOTHING MOVES WHEN THEY ARRIVE. Until a webfont lands the text is drawn
@@ -71,44 +72,6 @@
       12 KB with less room left than these take.
     -->
     <style>
-      /* PLUS JAKARTA SANS, the one face since 3 Nov (`lib/ui/style.css`): Arial widened to its stance, ONE FACE PER WEIGHT
-         (ui-perfect, 3 Nov). With one regular face the fallback drew 500 and 600 at the regular's width, and a title at
-         600 narrowed 2.2% and rewrapped when Jakarta landed. Measured in Chromium over ten UI strings at 14px: Jakarta
-         400 is 105.2% of Arial, 500 is 106.2% of Arial, 600 is 100.3% of Arial Bold; ascent 1.04 and descent 0.22 em
-         over each scale. */
-      @font-face {
-        font-family: 'Jakarta Fallback';
-        src: local('Arial'), local('ArialMT');
-        font-weight: 100 450;
-        size-adjust: 105.2%;
-        ascent-override: 98.9%;
-        descent-override: 20.9%;
-        line-gap-override: 0%;
-        unicode-range: U+0000-00FF, U+2000-206F, U+20AC, U+2122, U+2212;
-      }
-
-      @font-face {
-        font-family: 'Jakarta Fallback';
-        src: local('Arial'), local('ArialMT');
-        font-weight: 451 550;
-        size-adjust: 106.2%;
-        ascent-override: 97.9%;
-        descent-override: 20.7%;
-        line-gap-override: 0%;
-        unicode-range: U+0000-00FF, U+2000-206F, U+20AC, U+2122, U+2212;
-      }
-
-      @font-face {
-        font-family: 'Jakarta Fallback';
-        src: local('Arial Bold'), local('Arial-BoldMT');
-        font-weight: 551 900;
-        size-adjust: 100.3%;
-        ascent-override: 103.7%;
-        descent-override: 21.9%;
-        line-gap-override: 0%;
-        unicode-range: U+0000-00FF, U+2000-206F, U+20AC, U+2122, U+2212;
-      }
-
       @font-face {
         font-family: 'Geist Fallback';
         src: local('Arial'), local('ArialMT');
