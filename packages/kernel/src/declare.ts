@@ -1218,7 +1218,7 @@ export function holdingParts(kind: DeclKind, body: Part): { at: string; part: Pa
 function holdsFault(decl: Declaration): Refusal | null {
   const body = decl.body as Part;
   if (decl.kind === 'rule' && isHolds(body.when))
-    return bad('DECLARATION_INVALID', `${decl.id}'s when is what it fires on, so a rule cannot wait for a list this way. Put it in an add-on that requires the list.`, 'when');
+    return bad('DECLARATION_INVALID', `${decl.id}'s when is what it fires on, so a rule cannot wait for a list this way. Put it in a plugin that requires the list.`, 'when');
   for (const { at, part } of holdingParts(decl.kind, body)) {
     const when = part.when;
     if (when === undefined) continue;
@@ -1261,7 +1261,7 @@ export function unplannedHolds(batch: readonly Declaration[]): Refusal | null {
       if (isHolds(part.when))
         return bad(
           'DECLARATION_INVALID',
-          `${at === '' ? decl.id : `${decl.id}.${at}`} waits for what this BrainDog holds, which is worked out when its add-on is planned. Install it as part of an add-on, or take the when out.`,
+          `${at === '' ? decl.id : `${decl.id}.${at}`} waits for what this BrainDog holds, which is worked out when its plugin is planned. Install it as part of a plugin, or take the when out.`,
           at === '' ? `${decl.id}.when` : `${decl.id}.${at}.when`,
         );
   return null;
@@ -4715,14 +4715,14 @@ function sameFault(id: string, body: Readonly<Record<string, unknown>>, fields: 
 function onceFault(id: string, fields: readonly (FieldLike & { derived?: boolean; derive?: unknown })[], once: unknown): Refusal | null {
   const mine = fields.filter((f) => !isDerived(f)).map((f) => f.id);
   if (!Array.isArray(once) || once.some((o) => typeof o !== 'string'))
-    return bad('DECLARATION_INVALID', `${id}'s once is a list of its own field ids, such as [name]: the fields an add-on plants and never changes after.`, 'once', mine);
+    return bad('DECLARATION_INVALID', `${id}'s once is a list of its own field ids, such as [name]: the fields a plugin plants and never changes after.`, 'once', mine);
   const at = (once as string[]).findIndex((o) => !mine.includes(o));
   if (at < 0) return null;
   const named = (once as string[])[at]!;
   return bad(
     'DECLARATION_INVALID',
     fields.some((f) => f.id === named)
-      ? `${id}'s once names ${named}, which BrainDog works out itself, so no add-on writes it. Take it out of once.`
+      ? `${id}'s once names ${named}, which BrainDog works out itself, so no plugin writes it. Take it out of once.`
       : `${id}'s once names ${named}, and ${id} has no such field.`,
     `once[${at}]`,
     mine,
@@ -7304,7 +7304,7 @@ export function readConfig(config: unknown): Result<Record<string, ConfigDecl>> 
       if (decl.type !== 'secret')
         return no('FIELD_UNKNOWN', `The setting ${key} is a ${decl.type}, and only a secret setting is optional.`, { at: `${at}.optional`, allowed: ['type', 'default', 'label', 'note'] });
       if (typeof said.optional !== 'boolean')
-        return no('VALUE_MALFORMED', `The setting ${key}'s optional is true when the add-on installs without that key, and false or absent when it needs it.`, { at: `${at}.optional` });
+        return no('VALUE_MALFORMED', `The setting ${key}'s optional is true when the plugin installs without that key, and false or absent when it needs it.`, { at: `${at}.optional` });
       if (said.optional) decl.optional = true;
     }
 

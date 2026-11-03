@@ -679,7 +679,7 @@ export function arranger(d: ArrangeDeps) {
       'DECLARATION_UNKNOWN',
       all.length === 0
         ? `This host offers no catalogue, so ${id} cannot be found by its id. Send the pack document as doc.`
-        : `There is no add-on called ${id} on offer here, and what is on offer is ${offered(all)}.`,
+        : `There is no plugin called ${id} on offer here, and what is on offer is ${offered(all)}.`,
       at,
     );
   };
@@ -1140,8 +1140,8 @@ export function arranger(d: ArrangeDeps) {
       for (const [key, value] of Object.entries(raw.values)) {
         const keeper = keeperOf(key);
         if (keeper !== null) byPack.set(keeper, { ...(byPack.get(keeper) ?? {}), [key]: value });
-        else if (by.own === true) skipped.push({ part: `setting:${key}`, why: `No add-on here keeps a setting called ${key}, so it was not set.` });
-        else return refuse('FIELD_UNKNOWN', `No add-on that is on or in this arrangement has a setting called ${key}. Name its add-on as pack, or leave it out.`, `${at}.values.${key}`);
+        else if (by.own === true) skipped.push({ part: `setting:${key}`, why: `No plugin here keeps a setting called ${key}, so it was not set.` });
+        else return refuse('FIELD_UNKNOWN', `No plugin that is on or in this arrangement has a setting called ${key}. Name its plugin as pack, or leave it out.`, `${at}.values.${key}`);
       }
       for (const [pack, values] of byPack) settings.push({ raw: { pack, values }, at });
     }
@@ -1397,7 +1397,7 @@ export function arranger(d: ArrangeDeps) {
       if (typeof body.publish === 'string') {
         if (body.to !== undefined && body.to !== 'store')
           return refuse('VALUE_MALFORMED', 'A question publishes to the store only. For GitHub, act publishAddon {"id","to":"github"} hands back the line the person runs.', 'body.to');
-        if (!d.publishable) return refuse('PULL_ORIGIN_REFUSED', 'This BrainDog cannot publish add-ons.', 'body.publish');
+        if (!d.publishable) return refuse('PULL_ORIGIN_REFUSED', 'This BrainDog cannot publish plugins.', 'body.publish');
         const can = await d.publishable(body.publish);
         if (!can.ok) return { ok: false, refusal: { ...(can as { refusal: Refusal }).refusal, at: 'body.publish' } };
         return ok({ publish: can.value.id, to: 'store', title: can.value.title, version: can.value.version, checksum: can.value.checksum });
@@ -1432,7 +1432,7 @@ export function arranger(d: ArrangeDeps) {
         if (!got.ok) return refuse('PULL_ORIGIN_REFUSED', got.fix, 'body.source.ref');
         const file = await readCatalogueFile(got.value.text, { kind: 'git', ref: got.value.pinned });
         if (!file.ok) {
-          const r = 'refusal' in file ? file.refusal : ({ code: 'PACK_MALFORMED', fix: 'This is not an add-on file.' } as Refusal);
+          const r = 'refusal' in file ? file.refusal : ({ code: 'PACK_MALFORMED', fix: 'This is not a plugin file.' } as Refusal);
           return { ok: false, refusal: { ...r, at: 'body.source.ref' } };
         }
         if (file.value.kind !== 'pack') return refuse('PACK_MALFORMED', `${repoSaid(at)} holds a use case there. Send it as {"file": <its text>} instead.`, 'body.source.ref');
@@ -1467,7 +1467,7 @@ export function arranger(d: ArrangeDeps) {
         if (!isMap(body.doc))
           return refuse(
             'VALUE_MALFORMED',
-            `${asked} was not installed from the store, so the store's add-on of that name is not its update. Propose its new file: {"install":"${asked}","doc":<the file>}.`,
+            `${asked} was not installed from the store, so the store's plugin of that name is not its update. Propose its new file: {"install":"${asked}","doc":<the file>}.`,
             'body.install',
           );
       }
@@ -2004,7 +2004,7 @@ export function arranger(d: ArrangeDeps) {
        only an add-on still at the version the question showed is answered, so the store has what was read. */
     if (kind === 'pack' && typeof body.publish === 'string') {
       const can = d.publishable ? await d.publishable(body.publish) : null;
-      if (can === null || !can.ok) return can ?? refuse('PULL_ORIGIN_REFUSED', 'This BrainDog cannot publish add-ons.', 'body.publish');
+      if (can === null || !can.ok) return can ?? refuse('PULL_ORIGIN_REFUSED', 'This BrainDog cannot publish plugins.', 'body.publish');
       if (can.value.version !== body.version || can.value.checksum !== body.checksum)
         return refuse('PLAN_STALE', `${can.value.title} is at ${can.value.version} now, not the ${String(body.version)} this asked about. Ask again to publish the version held now.`, 'body.version');
       return ok({ said: [`Sent ${can.value.title} ${can.value.version} to the store. BrainDog reviews it before it is listed.`], published: [{ id: can.value.id, version: can.value.version }] });

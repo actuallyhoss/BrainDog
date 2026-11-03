@@ -101,7 +101,7 @@ test('a key that asks for the value or stores it is refused beside derive', () =
 test('once and same naming a derived field are refused at install in one sentence', () => {
   const once = refused([COST], { once: ['cost'] });
   assert.equal(once?.code, 'DECLARATION_INVALID');
-  assert.equal(once?.fix, 'things\'s once names cost, which BrainDog works out itself, so no add-on writes it. Take it out of once.');
+  assert.equal(once?.fix, 'things\'s once names cost, which BrainDog works out itself, so no plugin writes it. Take it out of once.');
   const folded = { id: 'key', type: 'text', derive: { normalise: { of: 'name', how: 'lower' } } };
   const same = refused([folded], { same: { fields: ['key'], fold: 'text' } });
   assert.equal(same?.code, 'DECLARATION_INVALID');

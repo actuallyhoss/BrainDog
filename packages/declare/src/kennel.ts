@@ -415,7 +415,7 @@ export async function acceptSubmission(state: KennelState, text: string, identit
     if (!probePublisher(state.publishers, publisher))
       return no('PROVIDES_CONFLICT', `Ids that begin ${PROBE_PREFIX} are kept for the Kennel's own nightly probe. Give this one another id.`, { at: 'id' });
     if (file.kind !== 'pack' || doc.unlisted !== true)
-      return no('PACK_MALFORMED', `A probe publishes an add-on whose file says unlisted: true, so it is never listed. Add it and publish ${id} again.`, { at: 'unlisted' });
+      return no('PACK_MALFORMED', `A probe publishes a plugin whose file says unlisted: true, so it is never listed. Add it and publish ${id} again.`, { at: 'unlisted' });
   }
 
   const statements = await verifiedStatements(state.index.keys);
@@ -666,7 +666,7 @@ export async function yankIn(index: CatalogueIndex, request: YankRequest, now: D
   const { kind, id, version, reason, by } = request;
   const entry = index.entries.find((e) => e.kind === kind && e.id === id);
   const at = entry?.versions.find((v) => v.version === version);
-  if (!entry || !at) return no('VALUE_MALFORMED', `The Kennel lists no ${kind === 'pack' ? 'add-on' : 'use case'} ${id} at ${version}.`, { at: 'version' });
+  if (!entry || !at) return no('VALUE_MALFORMED', `The Kennel lists no ${kind === 'pack' ? 'plugin' : 'use case'} ${id} at ${version}.`, { at: 'version' });
   if (at.yanked) return no('ALREADY_KNOWN', `${entry.title} ${version} is already yanked.`, { at: 'version' });
   const owner = entry.publisher ?? null;
   if (by.kind === 'person' && !(owner?.kind === 'person' && owner.id === by.id))

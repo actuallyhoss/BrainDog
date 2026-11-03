@@ -543,7 +543,7 @@ export function methods(deps: RecordDeps) {
       for (const k of Object.keys(said))
         if (k !== 'group' && k !== 'q' && k !== 'board' && k !== 'addon') return no('VALUE_MALFORMED', `widgetGallery takes group, q, board and addon, and not ${k}.`, { at: k });
       if (said.addon !== undefined && (typeof said.addon !== 'string' || !/^[a-z][a-z0-9-]{0,62}$/u.test(said.addon)))
-        return no('VALUE_MALFORMED', 'addon is the id of one add-on, for the widgets it brings.', { at: 'addon' });
+        return no('VALUE_MALFORMED', 'addon is the id of one plugin, for the widgets it brings.', { at: 'addon' });
       if (said.group !== undefined && !(WIDGET_GROUPS as readonly unknown[]).includes(said.group))
         return no('VALUE_MALFORMED', `group is one of ${WIDGET_GROUPS.join(', ')}.`, { at: 'group', allowed: [...WIDGET_GROUPS] });
       if (said.q !== undefined && (typeof said.q !== 'string' || said.q.length > GALLERY_Q_MOST))
@@ -656,7 +656,7 @@ export function methods(deps: RecordDeps) {
       const cat = await catalogue();
       const named = a.from === undefined ? cat.byId(askedWidget(said, cat.all) ?? '') : undefined;
       if (named !== undefined && !needsMet(named, { lists, figures }) && named.needs.addon !== undefined && named.fills === undefined)
-        return no('PACK_REQUIRED', `${named.title} comes with ${cat.addonName(named.needs.addon)}. Add it from Add-ons, then ask again.`, { at: 'said' });
+        return no('PACK_REQUIRED', `${named.title} comes with ${cat.addonName(named.needs.addon)}. Add it from Plugins, then ask again.`, { at: 'said' });
 
       /* THE MODEL, an owner's in a browser, as Slash's drafting is. */
       const described = deps.slashDescribed;

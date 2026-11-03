@@ -65,11 +65,11 @@ export const scrubWords = {
   link: "This text holds a link, and the author's links stay in the record.",
   person: 'This names a person of the record, so it stays in the record.',
   row: 'Something kept in a list goes only when it is ticked.',
-  unknown: 'This is not something an add-on carries, so it stays in the record.',
+  unknown: 'This is not something a plugin carries, so it stays in the record.',
   settingNote: 'Filled in from the record it was made from. Change it to one of yours.',
   fillNote: 'Whoever installs it fills this in.',
   tooMany: (n: number): string =>
-    `This add-on would need ${n} settings, and an add-on holds at most ${SETTINGS_MOST}, so share fewer things at once.`,
+    `This plugin would need ${n} settings, and a plugin holds at most ${SETTINGS_MOST}, so share fewer things at once.`,
 } as const;
 
 /** The most settings a manifest may declare (`CONFIG_CEILING` in `@braindog/kernel`). */

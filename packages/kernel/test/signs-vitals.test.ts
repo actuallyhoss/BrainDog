@@ -159,7 +159,7 @@ test('WRITES AUTHORED: a change signed by BrainDog with nothing behind it is red
   const red = sign(r.sql, 'writes-authored');
   assert.equal(red.state, 'red');
   assert.equal(red.value, 1, 'one write, however many fields');
-  assert.ok(red.facts?.includes('1 write to Bills signed by BrainDog with no schedule, script or add-on behind it.'), JSON.stringify(red.facts));
+  assert.ok(red.facts?.includes('1 write to Bills signed by BrainDog with no schedule, script or plugin behind it.'), JSON.stringify(red.facts));
   r.sql.close();
 });
 

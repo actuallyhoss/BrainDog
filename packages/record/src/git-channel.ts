@@ -123,8 +123,8 @@ export async function gitLook(read: ReadAddress, held: { id: string; version: st
   if (!got.ok) return { id: held.id, offer: null, note: `${repoSaid(a)} ${best.tag} could not be read: ${got.fix}` };
   const pinned = gitAddress(a, best.sha);
   const file = await readCatalogueFile(got.text, { kind: 'git', ref: pinned });
-  if (!file.ok) return { id: held.id, offer: null, note: `${repoSaid(a)} ${best.tag} is not an add-on file that reads: ${'refusal' in file ? file.refusal.fix : 'it did not read'}` };
-  if (file.value.kind !== 'pack') return { id: held.id, offer: null, note: `${repoSaid(a)} ${best.tag} is a use case, not the add-on ${held.id}.` };
+  if (!file.ok) return { id: held.id, offer: null, note: `${repoSaid(a)} ${best.tag} is not a plugin file that reads: ${'refusal' in file ? file.refusal.fix : 'it did not read'}` };
+  if (file.value.kind !== 'pack') return { id: held.id, offer: null, note: `${repoSaid(a)} ${best.tag} is a use case, not the plugin ${held.id}.` };
   const f = file.value.file;
   if (f.pack.manifest.pack !== held.id)
     return { id: held.id, offer: null, note: `${repoSaid(a)} ${best.tag} holds ${f.pack.manifest.pack}, not ${held.id}, so it is not offered as its update.` };

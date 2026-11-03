@@ -51,13 +51,13 @@ const WHERE = 'An address goes in a link block, an embed of YouTube, Vimeo, Loom
 
 const remote = (at: string, address: string): Refusal => ({
   code: 'REMOTE_ASSET',
-  fix: `${at} holds the address ${shown(address)}. An add-on loads nothing from elsewhere, because whatever a page loads tells its host who opened the page. ${WHERE}`,
+  fix: `${at} holds the address ${shown(address)}. A plugin loads nothing from elsewhere, because whatever a page loads tells its host who opened the page. ${WHERE}`,
   at,
 });
 
 const carried = (at: string): Refusal => ({
   code: 'REMOTE_ASSET',
-  fix: `${at} holds a data: address, which is a file written into a string. An add-on carries no file, in any place.`,
+  fix: `${at} holds a data: address, which is a file written into a string. A plugin carries no file, in any place.`,
   at,
 });
 
@@ -261,10 +261,10 @@ export function addressFault(doc: unknown): Refusal | null {
 
 /** What a listing never says, and the sentence for each. The Kennel sells nothing and scores nothing. */
 const UNLISTED: Record<string, string> = {
-  price: 'The Kennel lists nothing for sale, and every add-on in it is free.',
-  paid: 'The Kennel lists nothing for sale, and every add-on in it is free.',
-  rating: 'The Kennel keeps no ratings, so an add-on is read for what it does.',
-  stars: 'The Kennel keeps no ratings, so an add-on is read for what it does.',
+  price: 'The Kennel lists nothing for sale, and every plugin in it is free.',
+  paid: 'The Kennel lists nothing for sale, and every plugin in it is free.',
+  rating: 'The Kennel keeps no ratings, so a plugin is read for what it does.',
+  stars: 'The Kennel keeps no ratings, so a plugin is read for what it does.',
 };
 
 /**

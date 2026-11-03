@@ -158,8 +158,8 @@ function readUses(doc: unknown): { uses: Use[]; filled: string[] } {
 export function usesSaid(doc: unknown): { ok: true; value: string[] | null } | { ok: false; refusal: Refusal } {
   if (!isMap(doc) || doc.uses === undefined) return { ok: true, value: null };
   const bad = (fix: string): { ok: false; refusal: Refusal } => ({ ok: false, refusal: { code: 'PACK_MALFORMED', fix, at: 'uses' } });
-  if (!Array.isArray(doc.uses)) return bad('uses is a list of the places of yours this add-on reads or changes, such as ["register.transactions", "metric.cash-now"].');
-  if (doc.uses.length > USES_MOST) return bad(`uses names ${doc.uses.length} places, and an add-on names at most ${USES_MOST}. Ask for fewer.`);
+  if (!Array.isArray(doc.uses)) return bad('uses is a list of the places of yours this plugin reads or changes, such as ["register.transactions", "metric.cash-now"].');
+  if (doc.uses.length > USES_MOST) return bad(`uses names ${doc.uses.length} places, and a plugin names at most ${USES_MOST}. Ask for fewer.`);
   const out: string[] = [];
   for (const u of doc.uses) {
     if (typeof u !== 'string' || !(REGISTER_ID.test(u) || METRIC_ID.test(u) || PAGE_ID.test(u) || VIEW_ID.test(u)))
@@ -184,7 +184,7 @@ export function usesFault(doc: unknown, strict = false): Refusal | null {
   if (from !== undefined)
     return {
       code: 'PACK_MALFORMED',
-      fix: `This add-on fills a ${from} from a setting, so nobody could be shown that place before installing it. Name the list, figure or view in the file and in uses.`,
+      fix: `This plugin fills a ${from} from a setting, so nobody could be shown that place before installing it. Name the list, figure or view in the file and in uses.`,
       at: 'uses',
     };
   const missing = read.uses.filter((u) => !named.has(u.id));
@@ -194,7 +194,7 @@ export function usesFault(doc: unknown, strict = false): Refusal | null {
   const more = ids.length > 3 ? ` and ${ids.length - 3} more` : '';
   return {
     code: 'PACK_MALFORMED',
-    fix: `This add-on uses ${first}${more} without asking. Name every place of yours it reads or changes in uses, so a person sees it before installing: "uses": ${JSON.stringify([...(said.value ?? []), ...ids])}.`,
+    fix: `This plugin uses ${first}${more} without asking. Name every place of yours it reads or changes in uses, so a person sees it before installing: "uses": ${JSON.stringify([...(said.value ?? []), ...ids])}.`,
     at: 'uses',
   };
 }

@@ -3833,7 +3833,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (held.some((h) => h.name === skill.name)) return false;
       const made = kernel.create(
         'skills',
-        { name: skill.name, trigger: skill.trigger, what: skill.what ?? `A skill the ${pack} add-on gives agents working here.`, kind: 'skill', body: skill.body, rev: 1, managed: true },
+        { name: skill.name, trigger: skill.trigger, what: skill.what ?? `A skill the ${pack} plugin gives agents working here.`, kind: 'skill', body: skill.body, rev: 1, managed: true },
         { actor: actorOf(ctx), cascade: false, pack: true } as never,
       );
       return made.ok;
@@ -13500,7 +13500,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND ADD-ONS FROM GITHUB, once a day: a newer tag is asked about, never put in (`gitPass`). */
       await gitPass(today).catch(() => undefined);
       /* AND WHAT THE STORE SAYS OF WHAT IS HELD, once an hour, whether Slash is on or not (`noticesTick`). */
-      updates.push(...(await noticesTick().catch(() => ["The store's word on the add-ons here could not be read, and is read again in an hour."])));
+      updates.push(...(await noticesTick().catch(() => ["The store's word on the plugins here could not be read, and is read again in an hour."])));
       const state = slashDailyState();
       if (!state.on) return { ran: false, why: 'off' };
       /* THE DAY'S LOOK BEGUN ON AN EARLIER TICK GOES ON FROM THE STEP IT KEPT. */
@@ -13851,10 +13851,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const extra = Object.keys(said).find((k) => !takes.includes(k));
       if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes ${takes.join(', ')}.`, { at: extra, allowed: takes });
       const id = typeof said.id === 'string' ? said.id.trim() : '';
-      if (id === '') return no('REQUIRED_MISSING', 'Which add-on? Send its id, as act addons {"installed":true} answers it.', { at: 'id' });
+      if (id === '') return no('REQUIRED_MISSING', 'Which plugin? Send its id, as act addons {"installed":true} answers it.', { at: 'id' });
       const to = said.to === undefined ? 'store' : said.to;
       if (to !== 'store' && to !== 'github') return no('VALUE_MALFORMED', 'to is store or github.', { at: 'to', allowed: ['store', 'github'] });
-      if (!readsEveryList(ctx)) return no('FORBIDDEN', 'An add-on is published by somebody who can read the whole BrainDog.', { at: 'id' });
+      if (!readsEveryList(ctx)) return no('FORBIDDEN', 'A plugin is published by somebody who can read the whole BrainDog.', { at: 'id' });
       const can = await publishable(id);
       if (!can.ok) return can;
       const { title, version } = can.value;
@@ -13876,7 +13876,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       if (ctx.principal.kind !== 'person' || ctx.pressedIn !== undefined || ctx.onWord !== undefined || ctx.ordered !== undefined)
         return no('NEEDS_BROWSER_SESSION', `Publishing to the store signs ${title} with the key the owner's browser keeps. Ask the owner: act publishAddon files the question on Decide.`, { at: 'principal' });
-      const owner = admin(ctx, 'publish an add-on');
+      const owner = admin(ctx, 'publish a plugin');
       if (owner) return { ok: false as const, refusal: owner };
       /* THE OWNER'S BROWSER READS THE FILE (`addon {file: true}`), checks it is this version, signs it and sends it. */
       return ok({ publish: id, to: 'store', title, version, checksum: can.value.checksum });
@@ -14807,7 +14807,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }
         const named = Array.isArray(uses) && uses.includes(`register.${list}`);
         if (Number(own) === 0 && !named && Array.isArray(uses))
-          return no('FORBIDDEN', `${list} is not one of this add-on's own lists and its uses line does not name it, so its view may not write there.`, { at: 'acts' });
+          return no('FORBIDDEN', `${list} is not one of this plugin's own lists and its uses line does not name it, so its view may not write there.`, { at: 'acts' });
       }
       if (args.create !== undefined) {
         if (args.create.fields === null || typeof args.create.fields !== 'object' || Array.isArray(args.create.fields)) return no('VALUE_MALFORMED', 'fields is the new row, field by field.', { at: 'create.fields' });
@@ -14953,7 +14953,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       } else if (value !== null && key === 'packs.known_keys') {
         const entries = typeof value === 'object' && !Array.isArray(value) ? Object.entries(value as Record<string, unknown>) : null;
         if (!entries || entries.length > 200 || !entries.every(([k, v]) => k.length > 0 && k.length <= 300 && texts(v, 8, (s) => /^[0-9a-f]{16}$/u.test(s))))
-          return no('VALUE_MALFORMED', 'packs.known_keys maps each add-on to the ids of at most 8 publisher keys seen for it, at most 200 add-ons, or null to take it away.', { at: 'value' });
+          return no('VALUE_MALFORMED', 'packs.known_keys maps each plugin to the ids of at most 8 publisher keys seen for it, at most 200 plugins, or null to take it away.', { at: 'value' });
         kept = Object.fromEntries(entries.map(([k, v]) => [k, [...new Set(v as string[])]]));
       }
       kernel.setPref(self, key, kept);
@@ -15930,16 +15930,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async addonCheck(args: { doc?: unknown } | undefined, ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
-      if (!readsEveryList(ctx)) return no('FORBIDDEN', 'An add-on is checked by somebody who can read the whole BrainDog.', { at: 'principal' });
+      if (!readsEveryList(ctx)) return no('FORBIDDEN', 'A plugin is checked by somebody who can read the whole BrainDog.', { at: 'principal' });
       const extra = stray((args ?? {}) as Record<string, unknown>, ['doc']);
       if (extra) return { ok: false as const, refusal: extra };
       let doc: unknown = args?.doc;
-      if (doc === undefined || doc === null) return no('REQUIRED_MISSING', 'Send the add-on file as doc: act addonNew starts one.', { at: 'doc' });
+      if (doc === undefined || doc === null) return no('REQUIRED_MISSING', 'Send the plugin file as doc: act addonNew starts one.', { at: 'doc' });
       if (typeof doc === 'string')
         try {
           doc = JSON.parse(doc);
         } catch {
-          return no('VALUE_MALFORMED', 'doc is the add-on file, as JSON or its text.', { at: 'doc' });
+          return no('VALUE_MALFORMED', 'doc is the plugin file, as JSON or its text.', { at: 'doc' });
         }
       const said = (r: Refusal) => ok({ ready: false, refusal: { code: r.code, fix: r.fix, ...(r.at === undefined ? {} : { at: r.at }) }, say: `Not yet: ${r.fix}${r.at === undefined ? '' : ` (at ${r.at})`}` });
       const pack = await normaliseChecked(doc, { kind: 'paste' });
@@ -15952,7 +15952,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* UNLESS IT IS ONE OF THEIR OWN HELD HERE (`updatesFromStore`): its new version is its author's, whatever the store holds. */
       const ownHere = storeHeld([{ id }]).length === 0;
       if (!ownHere && (listed !== null || shelved !== null))
-        return said({ code: 'PROVIDES_CONFLICT', fix: `${id} is an add-on in the store, so a file of your own takes another id.`, at: 'pack' });
+        return said({ code: 'PROVIDES_CONFLICT', fix: `${id} is a plugin in the store, so a file of your own takes another id.`, at: 'pack' });
       const diff = await plan(pack.value, installedState(ctx));
       const unheld = unresolvedFault(diff);
       if (unheld) return said(unheld);
@@ -17906,7 +17906,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          `KEY_ASKED`: the same `keys put` goes through once he says yes, and the CLI waits for it as it waits on a key set
          to ask first. A no, or a caller that cannot ask, is told where to add it. */
       if (!kernel.register(KEYS)) {
-        const absent = 'This BrainDog has no Keychain yet. Add Agents in the app (Add-ons), which holds it, then put the key again.';
+        const absent = 'This BrainDog has no Keychain yet. Add Agents in the app (Plugins), which holds it, then put the key again.';
         if (agent === null) return no('REGISTER_UNKNOWN', absent, { at: 'register' });
         const self = this as unknown as { propose: (a: Proposal, c: CallContext) => Promise<Result<{ id: string; answered?: unknown }>> };
         const asked = await self

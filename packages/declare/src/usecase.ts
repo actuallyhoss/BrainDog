@@ -440,7 +440,7 @@ export const labelKeyOf = (setting: string, title: unknown): string | null => {
  */
 function readOver(raw: unknown, modules: readonly string[], labels: Readonly<Record<string, string>>): Result<Record<string, Over>> {
   if (raw === undefined || raw === null) return ok({});
-  if (!isObject(raw)) return malformed('over says, for each add-on this use case stands on, its words, config and hide.', 'over');
+  if (!isObject(raw)) return malformed('over says, for each plugin this use case stands on, its words, config and hide.', 'over');
   const out: Record<string, Over> = {};
   const worded = new Set<string>();
   for (const [addon, entry] of Object.entries(raw)) {
@@ -473,17 +473,17 @@ function readOver(raw: unknown, modules: readonly string[], labels: Readonly<Rec
     }
 
     if (entry.config !== undefined) {
-      if (!isObject(entry.config)) return malformed('config is a value per setting of the add-on.', `${at}.config`);
+      if (!isObject(entry.config)) return malformed('config is a value per setting of the plugin.', `${at}.config`);
       for (const [key, value] of Object.entries(entry.config))
         if (!SETTING_NAME.test(key) || value === null || value === undefined)
-          return no('VALUE_MALFORMED', `${at}.config.${key} is a value for one of the add-on's settings, by the setting's name.`, { at: `${at}.config.${key}` });
+          return no('VALUE_MALFORMED', `${at}.config.${key} is a value for one of the plugin's settings, by the setting's name.`, { at: `${at}.config.${key}` });
       if (Object.keys(entry.config).length > 0) over.config = { ...entry.config };
     }
 
     if (entry.hide !== undefined) {
       const hide = entry.hide;
       if (!Array.isArray(hide) || hide.length > HIDE_CEILING || hide.some((p) => typeof p !== 'string' || !PAGE_ID.test(p)) || new Set(hide).size !== hide.length)
-        return no('VALUE_MALFORMED', `hide is up to ${HIDE_CEILING} of the add-on's pages, each by its id and said once, such as hide: [ledger].`, { at: `${at}.hide` });
+        return no('VALUE_MALFORMED', `hide is up to ${HIDE_CEILING} of the plugin's pages, each by its id and said once, such as hide: [ledger].`, { at: `${at}.hide` });
       if (hide.length > 0) over.hide = [...(hide as string[])];
     }
     out[addon] = over;
@@ -611,7 +611,7 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
   if (pack === null && Object.keys(labels).length > 0)
     return malformed('Labels are kept as the settings of the pack a use case carries, so a use case with labels carries a pack.', 'labels');
   if (pack === null && laid > 0)
-    return malformed('Words laid over an add-on are kept as the settings of the pack a use case carries, so a use case with them carries a pack.', 'over');
+    return malformed('Words laid over a plugin are kept as the settings of the pack a use case carries, so a use case with them carries a pack.', 'over');
 
   const links = doc.links ?? [];
   if (!Array.isArray(links) || links.length > LINKS_CEILING)

@@ -213,15 +213,15 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { usecase: 'text', said: 'text' } },
   { name: 'planUseCase', group: 'ADMIN', writes: false, what: 'What installing a shared use-case file would do, pack by pack. It writes nothing.',
     takes: { doc: 'json', text: 'text', source: 'json', modules: 'json' } },
-  { name: 'fetchShared', group: 'ADMIN', writes: false, what: 'The text of a shared use-case or add-on file at an https address or git:owner/repo@ref:path, read by the host with no credentials. It writes nothing.',
+  { name: 'fetchShared', group: 'ADMIN', writes: false, what: 'The text of a shared use-case or plugin file at an https address or git:owner/repo@ref:path, read by the host with no credentials. It writes nothing.',
     takes: { url: 'text' } },
-  { name: 'gitUpdates', group: 'ADMIN', writes: true, what: 'Add-ons installed from GitHub whose repository tags a newer version, each asked about on Decide; a tag moved to other bytes is refused.',
+  { name: 'gitUpdates', group: 'ADMIN', writes: true, what: 'Plugins installed from GitHub whose repository tags a newer version, each asked about on Decide; a tag moved to other bytes is refused.',
     takes: {} },
   { name: 'fetchUseCase', group: 'ADMIN', writes: false, what: 'The text of a shared use-case file at an https address, read by the host with no credentials. It writes nothing.',
     takes: { url: 'text' } },
   /* THE WHOLE FIRST RUN AS ONE CALL. The browser ran it as a script of a dozen calls, so a closed tab left a
      record part made. ADMIN as `installPack` is: it installs add-ons, and only the owner in a browser may. */
-  { name: 'setup', group: 'ADMIN', writes: true, what: 'Make this BrainDog from what its owner accepted, in one call: the add-ons in order, then their name, their words, the settings and what they asked to start with. It answers what was done and what was not, and asked with again it writes only what is missing.' },
+  { name: 'setup', group: 'ADMIN', writes: true, what: 'Make this BrainDog from what its owner accepted, in one call: the plugins in order, then their name, their words, the settings and what they asked to start with. It answers what was done and what was not, and asked with again it writes only what is missing.' },
   { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved, with the calls-out lines it asks for. In the app, or by your agents while they act without asking.' },
   { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay, or with data: true go to the bin until it is installed again.' },
   { name: 'disablePack', group: 'ADMIN', writes: true, what: 'Turn a pack off. It stays listed, its rows stay, and what leans on it is named first.' },

@@ -16,6 +16,6 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'packsRemoved', group: 'ADMIN', writes: false, what: 'The add-ons taken out that can still be put back, newest first: what each was called, which lists stayed and how many entries each still holds, and whether installing it again puts its settings and schedules back. It changes nothing.',
+  { name: 'packsRemoved', group: 'ADMIN', writes: false, what: 'The plugins taken out that can still be put back, newest first: what each was called, which lists stayed and how many entries each still holds, and whether installing it again puts its settings and schedules back. It changes nothing.',
     takes: {} },
 ];

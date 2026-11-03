@@ -524,10 +524,10 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
     try {
       offers = await deps.offers(on.map(({ id, version }) => ({ id, version, on: true })));
     } catch {
-      notes.push('The catalogue could not be read tonight, so whether an add-on is behind is not known.');
+      notes.push('The catalogue could not be read tonight, so whether a plugin is behind is not known.');
     }
     if (offers !== null && (kernel.prefsOf === undefined || kernel.setPref === undefined))
-      notes.push('This BrainDog keeps no prefs, so how long an add-on has been behind is not known.');
+      notes.push('This BrainDog keeps no prefs, so how long a plugin has been behind is not known.');
     else if (offers !== null) {
       const was = kernel.prefsOf!(ARRIVED_HOLDER)[ARRIVED_BEHIND];
       const kept = was !== null && typeof was === 'object' && !Array.isArray(was) ? (was as Record<string, { since?: unknown }>) : {};
@@ -539,14 +539,14 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
         behind[o.id] = { to: o.to, since };
         const name = titled.get(o.id) ?? addOnName(o.id, o.title);
         if (nightsBetween(since, tonight) >= ARRIVED_NIGHTS) {
-          if (!red.has(o.id)) red.set(o.id, { line: `${name} has had version ${o.to} waiting since ${daySaid(since)}. Updating it on Add-ons turns it on.`, who: name });
+          if (!red.has(o.id)) red.set(o.id, { line: `${name} has had version ${o.to} waiting since ${daySaid(since)}. Updating it on Plugins turns it on.`, who: name });
         } else {
           young++;
           notes.push(`${name} has had version ${o.to} waiting since ${daySaid(since)}.`);
         }
       }
       if (JSON.stringify(behind) !== JSON.stringify(kept)) kernel.setPref!(ARRIVED_HOLDER, ARRIVED_BEHIND, behind);
-      fine.push(young === 0 ? `${on.length === 1 ? 'the one add-on runs its' : `all ${on.length} add-ons run their`} newest version` : `${count(young, 'add-on')} ${young === 1 ? 'has' : 'have'} had a newer version waiting for under ${ARRIVED_NIGHTS} nights`);
+      fine.push(young === 0 ? `${on.length === 1 ? 'the one plugin runs its' : `all ${on.length} plugins run their`} newest version` : `${count(young, 'plugin')} ${young === 1 ? 'has' : 'have'} had a newer version waiting for under ${ARRIVED_NIGHTS} nights`);
     }
   }
 
@@ -602,7 +602,7 @@ export async function readArrivedSign(kernel: Partial<ArrivedKernel>, deps: Arri
       'none',
       null,
       addOns.length === 0 && deps.build === undefined
-        ? 'No add-on is installed and this host does not say which build it serves.'
+        ? 'No plugin is installed and this host does not say which build it serves.'
         : deps.build?.app && appDay === null
           ? 'This host runs a build from a checkout, so what shipped cannot be told from what runs.'
           : 'Nothing here says which build this host serves or what its catalogue offers.',

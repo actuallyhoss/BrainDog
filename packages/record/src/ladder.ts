@@ -163,7 +163,7 @@ const shareOf = (accepted: number, answered: number): KeptShare => ({ accepted, 
  */
 export function stampWords(key: string, listName: (id: string) => string): string {
   if (key === 'call') return 'choose between options';
-  if (key === 'addons') return 'change add-ons and settings';
+  if (key === 'addons') return 'change plugins and settings';
   if (key === 'automation') return 'set up what runs on its own';
   if (key.startsWith('shape:')) return `change the fields of ${listName(key.slice('shape:'.length)).toLowerCase()}`;
   const cut = key.indexOf(':');
@@ -877,7 +877,7 @@ const FLOOR_SAID: Record<string, string> = {
   sharing: 'It changes who can see something',
   identity: 'It changes who someone is',
   others: 'It changes something another person made',
-  addons: 'It changes an add-on',
+  addons: 'It changes a plugin',
   outside: 'It reaches outside BrainDog',
 };
 

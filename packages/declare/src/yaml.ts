@@ -71,7 +71,7 @@ export function parseYaml(text: string): Result<Json> {
 function toJson(node: Node | null, depth: number, where: (offset: number) => string): Result<Json> {
   if (node === null) return ok(null);
   const at = node.range ? where(node.range[0]) : '0:0';
-  if (depth > NESTED_MOST) return no('PACK_MALFORMED', `This file nests deeper than ${NESTED_MOST} levels, and no add-on does.`, { at });
+  if (depth > NESTED_MOST) return no('PACK_MALFORMED', `This file nests deeper than ${NESTED_MOST} levels, and no plugin does.`, { at });
   if (isAlias(node) || node.anchor)
     return no('PACK_MALFORMED', 'This file uses an anchor or an alias. Write the value out in full wherever it is used.', { at });
   if (node.tag) return no('PACK_MALFORMED', `This file carries the tag ${node.tag}, and a pack carries no tags. Take it out.`, { at });

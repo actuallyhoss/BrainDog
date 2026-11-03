@@ -179,7 +179,7 @@ test('THE IDS ARE THE ONES THE RECORD FILES: settings sent with an install are t
   assert.deepEqual(
     partsOf(body).map((p) => [p.id, p.name, p.needs]),
     [
-      ['install:work', 'the Work tools add-on', []],
+      ['install:work', 'the Work tools plugin', []],
       ['rows:obligations', 'the entries for Bills', ['install:work']],
     ],
   );

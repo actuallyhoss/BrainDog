@@ -391,7 +391,7 @@ export function scriptState(api: Pick<RecordApi, 'kernel'>): (s: Scripted) => Sc
         const one = noticeOf(said);
         if (!one.ok) return refused('refusal' in one ? one.refusal : { code: 'VALUE_MALFORMED', fix: 'It is not a notice.' });
         if (notices.length >= api.kernel.scriptNoticesLeft(owner))
-          return refused({ code: 'OUT_OF_BOUNDS', fix: `An add-on sends at most ${SCRIPT_NOTICES_PER_DAY} notices a day, and this one has sent them. It goes again tomorrow.`, at: 'notice' });
+          return refused({ code: 'OUT_OF_BOUNDS', fix: `A plugin sends at most ${SCRIPT_NOTICES_PER_DAY} notices a day, and this one has sent them. It goes again tomorrow.`, at: 'notice' });
         notices.push(one.value as unknown as Json);
         return { ok: true };
       },

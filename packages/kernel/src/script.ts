@@ -156,7 +156,7 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
     return bad('DECLARATION_INVALID', `${id}'s rule: is true when a rule may run it, and absent when none may.`, 'runs.rule');
   for (const by of ['tool', 'command', 'row'] as const)
     if (runs[by] !== undefined && runs[by] !== true)
-      return bad('DECLARATION_INVALID', `${id}'s ${by}: is true when its add-on's ${by === 'row' ? 'row action' : by} may start it, and absent when none may.`, `runs.${by}`);
+      return bad('DECLARATION_INVALID', `${id}'s ${by}: is true when its plugin's ${by === 'row' ? 'row action' : by} may start it, and absent when none may.`, `runs.${by}`);
 
   if (!strings(body.egress)) return bad('DECLARATION_INVALID', `${id}'s egress is a list of https:// origins, empty when it fetches nothing.`, 'egress');
   for (const [i, origin] of body.egress.entries()) {

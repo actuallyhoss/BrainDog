@@ -156,7 +156,7 @@ export function readPackSkills(raw: unknown): Result<PackSkill[]> {
     if (what !== undefined && (typeof what !== 'string' || what.trim() === '' || [...what].length > 200)) return bad('A skill says what it is in a line of at most 200 characters.', `${here}.what`);
     if (typeof body !== 'string' || body.trim() === '' || [...body].length > PACK_SKILL_BODY_MOST) return bad(`A skill's steps are text of at most ${PACK_SKILL_BODY_MOST} characters.`, `${here}.body`);
     if (`${trigger}\n${body}`.split(/\s+/u).some((w) => looksLikeCredential(w)))
-      return bad('A skill holds something that reads as a key, and a key never travels in an add-on. Take it out.', `${here}.body`);
+      return bad('A skill holds something that reads as a key, and a key never travels in a plugin. Take it out.', `${here}.body`);
     out.push({ name, trigger: trigger.trim(), ...(typeof what === 'string' ? { what: what.trim() } : {}), body });
   }
   return ok(out);
@@ -2527,7 +2527,7 @@ function settingsSent(pack: Pack, settings: PlanOptions['settings']): { values: 
     }
     const named = typeof setting?.label === 'string' && setting.label !== '' ? setting.label : key;
     if (!setting) {
-      warnings.push({ at: `config.${key}`, say: `This add-on has no setting called ${key}, so the value sent for it was not used.` });
+      warnings.push({ at: `config.${key}`, say: `This plugin has no setting called ${key}, so the value sent for it was not used.` });
       continue;
     }
     const fits = configValue(key, setting, raw, `config.${key}`);

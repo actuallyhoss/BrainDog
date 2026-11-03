@@ -71,7 +71,7 @@ const SLASH_MAY: ReadonlyMap<string, (what: SlashWrites | undefined) => boolean>
 /** What was declared, said by its kind for the refusal: "a page", "a rule", and "a look" for one that is not Slash's. */
 function declaredAs(what: SlashWrites | undefined): string {
   if (what === undefined || typeof what.kind !== 'string') return 'a declaration it did not name';
-  if (what.pack !== undefined && what.pack !== null) return `a ${what.kind} an add-on carries`;
+  if (what.pack !== undefined && what.pack !== null) return `a ${what.kind} a plugin carries`;
   return what.kind === 'look' ? 'a look that does not say it is its own' : `a ${what.kind}`;
 }
 
@@ -94,6 +94,6 @@ export function slashMayWrite(actor: string, kind: string, what?: SlashWrites): 
     );
   if (!may(what))
     throw new Error(
-      `slash wrote ${kind} of ${declaredAs(what)}. A model arranges a page with a look of its own; a page, a list, a rule, a script and an add-on are a person's to install (30 §3).`,
+      `slash wrote ${kind} of ${declaredAs(what)}. A model arranges a page with a look of its own; a page, a list, a rule, a script and a plugin are a person's to install (30 §3).`,
     );
 }

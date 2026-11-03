@@ -138,7 +138,7 @@ test('RED above two days, in a sentence naming the day, the age and what stopped
   const got = sign(three.sql);
   assert.equal(got.state, 'red');
   assert.equal(got.value, 3);
-  assert.equal(got.said, 'The newest rate is from 6 October, 3 days old. A move between two currencies is matched by itself only on a rate at most 2 days old. Turn on Keep rates current, on Money\'s add-on page, for a feed of rates once a day.');
+  assert.equal(got.said, 'The newest rate is from 6 October, 3 days old. A move between two currencies is matched by itself only on a rate at most 2 days old. Turn on Keep rates current, on Money\'s plugin page, for a feed of rates once a day.');
   assert.ok((got.facts ?? []).some((f) => f.includes('Ledger')), `no fact names the list: ${JSON.stringify(got.facts)}`);
   /* MENDED BY THE DAY'S RATE ARRIVING, with nothing else touched. */
   rate(three.k, AGO(0));

@@ -59,7 +59,7 @@ test('A FRESH RECORD WITH AGENTS ON is offered both skills the first night, in o
   assert.equal(asked.length, 1, JSON.stringify(night));
   assert.equal(
     api.kernel.question(asked[0]!.id),
-    'Give your agents the skills after-an-import and keep-a-record-current? The Agents add-on ships them, and Skills has neither yet.',
+    'Give your agents the skills after-an-import and keep-a-record-current? The Agents plugin ships them, and Skills has neither yet.',
   );
   assert.equal(skillsOf(sql).length, 0, 'filing wrote a skill');
 
@@ -96,7 +96,7 @@ test('A NEWER TEXT reaches a skill the record wrote and nobody changed, as its n
   assert.ok(night.ran, JSON.stringify(night));
   const asked = questions(sql).filter((q) => q.status === 'open');
   assert.equal(asked.length, 1, JSON.stringify(night));
-  assert.equal(next.kernel.question(asked[0]!.id), 'Take version 3 of the skill after-an-import? The Agents add-on ships a newer text, and yours is still version 2 as it came.');
+  assert.equal(next.kernel.question(asked[0]!.id), 'Take version 3 of the skill after-an-import? The Agents plugin ships a newer text, and yours is still version 2 as it came.');
   value(await next.decide({ id: asked[0]!.id, decide: { option: 'accept', reason: 'yes' } }, owner));
   const held = skillsOf(sql);
   assert.deepEqual(held.map((s) => [s.name, s.rev]), [['after-an-import', 3], ['keep-a-record-current', 1]]);
@@ -146,8 +146,8 @@ const AGENTS: Offered[] = [{ id: 'agents', kind: 'pack', title: 'Agents', module
 
 test('ONLY WHAT IS MISSING is offered, and a record that keeps no skills is offered none', () => {
   const one = noticeUsage(usage(['after-an-import']), AGENTS);
-  assert.equal(one.noticed.find((n) => n.kind === 'skills')?.text, 'The Agents add-on ships a skill for agents that you do not have in Skills yet: keep-a-record-current.');
-  assert.deepEqual(one.drafts.map((d) => d.question), ['Give your agents the skill keep-a-record-current? The Agents add-on ships it, and Skills has none by that name yet.']);
+  assert.equal(one.noticed.find((n) => n.kind === 'skills')?.text, 'The Agents plugin ships a skill for agents that you do not have in Skills yet: keep-a-record-current.');
+  assert.deepEqual(one.drafts.map((d) => d.question), ['Give your agents the skill keep-a-record-current? The Agents plugin ships it, and Skills has none by that name yet.']);
   assert.deepEqual((one.drafts[0]!.body.rows as { managed: boolean; rev: number }[]).map((r) => [r.managed, r.rev]), [[true, 1]]);
   assert.equal(noticeUsage(usage(['after-an-import', 'keep-a-record-current']), AGENTS).drafts.length, 0);
   assert.equal(noticeUsage({ ...usage([]), skills: null }, AGENTS).drafts.length, 0);

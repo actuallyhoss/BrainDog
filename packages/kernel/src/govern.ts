@@ -2028,7 +2028,7 @@ export const LADDER_RULE = 'rule:ladder';
 
 /** What the decision says when the ladder answered it. */
 const LADDER_REASON =
-  'Changes like this were kept unchanged often enough that they no longer ask. None is money, a key, sharing, a delete, who someone is, an add-on or somebody else\'s.';
+  'Changes like this were kept unchanged often enough that they no longer ask. None is money, a key, sharing, a delete, who someone is, a plugin or somebody else\'s.';
 
 /**
  * Why a question cannot be answered by the ladder, or `null` when it can. Checked at the gate whoever sends the verdict,
@@ -2820,7 +2820,7 @@ export function partsOf(body: Record<string, unknown>): ArrangePart[] {
   const packs = isMap(body.packs) ? body.packs : {};
   for (const verb of PART_VERBS)
     for (const id of textsOf(packs[verb]))
-      add(`${verb}:${id}`, verb, verb === 'install' ? `the ${pack(id)} add-on` : `turning ${verb === 'enable' ? 'on' : 'off'} ${pack(id)}`);
+      add(`${verb}:${id}`, verb, verb === 'install' ? `the ${pack(id)} plugin` : `turning ${verb === 'enable' ? 'on' : 'off'} ${pack(id)}`);
 
   const at = placesOf(body);
   for (const [i, p] of listOf(body.pages).entries()) {

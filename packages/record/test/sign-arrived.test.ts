@@ -51,7 +51,7 @@ test('THREE NIGHTS BEHIND IS RED, named, and the night after the update is green
   const one = await fileRecordSigns(api.kernel, d, clock.now());
   assert.deepEqual(one.refused, []);
   assert.equal(one.arrived.state, 'green', one.arrived.said);
-  assert.equal(one.arrived.said, '1 add-on has had a newer version waiting for under 2 nights.');
+  assert.equal(one.arrived.said, '1 plugin has had a newer version waiting for under 2 nights.');
   assert.deepEqual(one.arrived.facts, ['Money has had version 1.1.0 waiting since 6 October.']);
 
   clock.advance(DAY);
@@ -61,7 +61,7 @@ test('THREE NIGHTS BEHIND IS RED, named, and the night after the update is green
   const three = await fileRecordSigns(api.kernel, d, clock.now());
   assert.equal(three.arrived.state, 'red');
   assert.equal(three.arrived.value, 1);
-  assert.equal(three.arrived.said, 'Money has had version 1.1.0 waiting since 6 October. Updating it on Add-ons turns it on.');
+  assert.equal(three.arrived.said, 'Money has had version 1.1.0 waiting since 6 October. Updating it on Plugins turns it on.');
   assert.doesNotMatch(three.arrived.said, NO_ID);
   const filed = api.kernel.signs();
   assert.ok(filed.ok);
@@ -71,7 +71,7 @@ test('THREE NIGHTS BEHIND IS RED, named, and the night after the update is green
   clock.advance(DAY);
   const after = await fileRecordSigns(api.kernel, d, clock.now());
   assert.equal(after.arrived.state, 'green', after.arrived.said);
-  assert.equal(after.arrived.said, 'The one add-on runs its newest version.');
+  assert.equal(after.arrived.said, 'The one plugin runs its newest version.');
   assert.deepEqual(api.kernel.prefsOf(ARRIVED_HOLDER)[ARRIVED_BEHIND], {});
 });
 
@@ -84,7 +84,7 @@ test('A NEWER VERSION SEEN AGAIN keeps the night it was first seen behind, and a
   clock.advance(2 * DAY);
   const r = await readArrivedSign(api.kernel, { sql, offers: catalogue({ 'money-book': '1.2.0', people: '2.1.0' }) }, clock.now());
   assert.equal(r.state, 'red');
-  assert.equal(r.said, 'Money has had version 1.2.0 waiting since 6 October. Updating it on Add-ons turns it on.');
+  assert.equal(r.said, 'Money has had version 1.2.0 waiting since 6 October. Updating it on Plugins turns it on.');
   assert.ok(!r.facts!.some((f) => f.includes('People')), 'a switched-off add-on was read');
 });
 
@@ -140,7 +140,7 @@ test('NONE ON AN EMPTY RECORD, and two faults at once are counted and both kept'
   const { sql, clock, api } = await record();
   const empty = await readArrivedSign(api.kernel, { sql }, clock.now());
   assert.equal(empty.state, 'none');
-  assert.equal(empty.said, 'No add-on is installed and this host does not say which build it serves.');
+  assert.equal(empty.said, 'No plugin is installed and this host does not say which build it serves.');
   install(sql, 'money-book', '1.0.0', 'Money');
   await readArrivedSign(api.kernel, { sql, offers: catalogue({ 'money-book': '1.1.0' }) }, clock.now());
   clock.advance(2 * DAY);

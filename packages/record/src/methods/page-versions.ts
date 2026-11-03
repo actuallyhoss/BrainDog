@@ -283,7 +283,7 @@ export function methods(deps: RecordDeps) {
           version: r.version,
           at: r.created_at,
           live: r.superseded_at === null && r.retired === 0,
-          by: by ? whoOf(by.actor, ctx) : r.pack_id === null ? null : 'An add-on',
+          by: by ? whoOf(by.actor, ctx) : r.pack_id === null ? null : 'A plugin',
           body: shown.body,
           ...(shown.cut === 0 ? {} : { cut: shown.cut }),
         };

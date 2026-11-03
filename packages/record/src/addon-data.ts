@@ -133,10 +133,10 @@ export async function rehearseMove(r: MoveRehearsal, actor: string): Promise<Res
   const readable = new Set([...r.heldLists, ...newLists]);
   const outside = m.reads.find((l) => !readable.has(l));
   if (outside !== undefined)
-    return no('OUT_OF_BOUNDS', `${id}'s migrate reads ${outside}, which is not one of its own lists. A move of entries reads only the add-on's own lists.`, { at: 'migrate.reads' });
+    return no('OUT_OF_BOUNDS', `${id}'s migrate reads ${outside}, which is not one of its own lists. A move of entries reads only the plugin's own lists.`, { at: 'migrate.reads' });
   const notOwn = m.writes.find((l) => !newLists.includes(l));
   if (notOwn !== undefined)
-    return no('OUT_OF_BOUNDS', `${id}'s migrate writes ${notOwn}, which ${r.pack.manifest.version} does not declare. A move of entries writes only the add-on's own lists.`, { at: 'migrate.writes' });
+    return no('OUT_OF_BOUNDS', `${id}'s migrate writes ${notOwn}, which ${r.pack.manifest.version} does not declare. A move of entries writes only the plugin's own lists.`, { at: 'migrate.writes' });
   const body: Record<string, unknown> = {
     script: 'migrate',
     title: m.says,

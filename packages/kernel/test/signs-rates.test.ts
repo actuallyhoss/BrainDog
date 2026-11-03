@@ -89,7 +89,7 @@ test('OLD RATES READ RED, a day past the line, and say the cure in the words an 
   const old = read(await record(['EGP', 'USD'], [AGO(RATE_STALE_DAYS + 1)]));
   assert.equal(old.state, 'red');
   assert.equal(old.value, RATE_STALE_DAYS + 1);
-  assert.match(old.said, /8 days old\. Turn on Keep rates current, on Money's add-on page, for a feed of rates once a day\./u);
+  assert.match(old.said, /8 days old\. Turn on Keep rates current, on Money's plugin page, for a feed of rates once a day\./u);
   assert.ok(old.facts?.some((f) => f.includes('EGP and USD')), JSON.stringify(old.facts));
   for (const line of [old.said, ...(old.facts ?? [])]) assert.doesNotMatch(line, /—|\bfx\b|bills|rec_/u, line);
 });

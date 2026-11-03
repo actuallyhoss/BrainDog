@@ -257,7 +257,7 @@ export function readAdvise(body: unknown): Result<AdviseAsk> {
   if (!SEVERITIES.includes(severity as Severity)) return no('VALUE_MALFORMED', 'severity is low, high or critical.', { at: 'severity', allowed: [...SEVERITIES] });
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
   if (reason === '' || chars(reason) > ADVICE_REASON_MOST)
-    return no('VALUE_MALFORMED', `reason says why, in at most ${String(ADVICE_REASON_MOST)} characters. The person whose add-on it is reads it as written.`, { at: 'reason' });
+    return no('VALUE_MALFORMED', `reason says why, in at most ${String(ADVICE_REASON_MOST)} characters. The person whose plugin it is reads it as written.`, { at: 'reason' });
   return ok({ kind: body.kind, id: body.id, versions: versions as string[], severity: severity as Severity, action: body.action, reason });
 }
 
@@ -272,7 +272,7 @@ export function adviseIn(file: Advisories, indexes: readonly CatalogueIndex[], a
     if (left.length === file.advisories.length) return no('VALUE_MALFORMED', `There is no advisory on ${ask.id} to withdraw.`, { at: 'id' });
     return ok({ file: { ...file, advisories: left }, answer: { state: 'withdrawn', kind: ask.kind, id: ask.id } });
   }
-  if (entry === undefined) return no('REF_UNKNOWN', `Nothing is listed as ${ask.kind === 'pack' ? 'add-on' : 'use case'} ${ask.id}, so there is nothing to advise on.`, { at: 'id' });
+  if (entry === undefined) return no('REF_UNKNOWN', `Nothing is listed as ${ask.kind === 'pack' ? 'plugin' : 'use case'} ${ask.id}, so there is nothing to advise on.`, { at: 'id' });
   if (!entry.versions.some((v) => advisoryCovers(ask, v.version))) return no('VALUE_MALFORMED', `No listed version of ${entry.title} is in ${ask.versions.join(', ')}.`, { at: 'versions' });
   const at = now.toISOString();
   const advisory: Advisory = { kind: ask.kind, id: ask.id, versions: ask.versions, severity: ask.severity, action: ask.action, reason: ask.reason, at };
@@ -406,8 +406,8 @@ export type ReviewMarks = { flags?: string[]; added?: string[]; note?: { text: s
 
 /** The instructions the model reads. It writes one note; it is told it decides nothing. */
 export const PRE_REVIEW_INSTRUCTIONS = [
-  'You help a person review an add-on submitted to the BrainDog add-on store. You decide nothing; the reviewer does.',
-  'You are given what the add-on says about itself (title, summary, changes), what the store computed it reaches, and its code.',
+  'You help a person review a plugin submitted to the BrainDog plugin store. You decide nothing; the reviewer does.',
+  'You are given what the plugin says about itself (title, summary, changes), what the store computed it reaches, and its code.',
   'Write one short note in plain words, at most 120 words, in three parts:',
   '1. What it says it does. 2. What it actually reaches: lists, keys, addresses it calls, what it writes. 3. Anything that does not match, or anything a careful reviewer should read closely, naming the line or the script.',
   'If nothing looks wrong, say so in one line. Never repeat a secret if you see one; say a key-shaped value is in the file.',

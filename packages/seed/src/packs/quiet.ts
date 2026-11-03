@@ -368,7 +368,7 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
        only in a pref and on the Updates card, it was asked nowhere, and Slash's question for it waited behind its cap. */
     if (lose.length > 0) {
       if (await port.asking(a.id)) return { ...step, did: 'waiting', lose };
-      if ((await port.remembers?.(a.id)) !== true) return { ...step, did: 'refused', lose, why: `Updating it would ${lostSaid(lose)}, so it waits for you in Add-ons.` };
+      if ((await port.remembers?.(a.id)) !== true) return { ...step, did: 'refused', lose, why: `Updating it would ${lostSaid(lose)}, so it waits for you in Plugins.` };
       const asked = await port.propose(addonQuestion(a, lose));
       return asked.ok ? { ...step, did: 'asked', lose } : { ...step, did: 'refused', lose, why: fixOf(asked) };
     }

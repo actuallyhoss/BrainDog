@@ -123,7 +123,7 @@ export function methods(deps: RemovedDeps) {
       const stop = admin(ctx, 'read what was taken out of this BrainDog');
       if (stop) return { ok: false as const, refusal: stop };
       if (args !== undefined && args !== null && (typeof args !== 'object' || Array.isArray(args) || Object.keys(args).length > 0))
-        return no('FIELD_UNKNOWN', `This takes nothing: it reads every add-on taken out in the last ${REMOVED_WINDOW_DAYS} days.`, { at: Object.keys(args as object)[0] ?? 'args' });
+        return no('FIELD_UNKNOWN', `This takes nothing: it reads every plugin taken out in the last ${REMOVED_WINDOW_DAYS} days.`, { at: Object.keys(args as object)[0] ?? 'args' });
 
       const now = clock.now();
       const since = instant(now - REMOVED_WINDOW_DAYS * DAY);

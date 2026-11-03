@@ -39,7 +39,7 @@ function manifestShapes(): Record<string, Schema> {
   };
   return {
     $schema: text('The schema an editor reads this file with. BrainDog passes over it.'),
-    pack: { type: 'string', pattern: ID, description: 'The add-on id: lower-case letters, digits and dashes.' },
+    pack: { type: 'string', pattern: ID, description: 'The plugin id: lower-case letters, digits and dashes.' },
     version: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$', description: 'Its version, as 1.0.0. A version that takes a list, page or field away is a major.' },
     title: text('The name the store shows.'),
     summary: text('What it adds, in one sentence.'),
@@ -53,7 +53,7 @@ function manifestShapes(): Record<string, Schema> {
       properties: {
         format: { type: 'integer' },
         primitives: { type: 'integer' },
-        packs: { type: 'object', additionalProperties: { type: 'string' }, description: 'Other add-ons it needs, by id, with a version range such as >=1.0.0.' },
+        packs: { type: 'object', additionalProperties: { type: 'string' }, description: 'Other plugins it needs, by id, with a version range such as >=1.0.0.' },
       },
     },
     uses: { type: 'array', items: { type: 'string' }, description: 'The places of yours it reads or changes, such as register.ledger. Each is shown to the person before they install.' },
@@ -95,8 +95,8 @@ export function packSchema(): Schema {
   return {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $id: PACK_SCHEMA_URL,
-    title: 'BrainDog add-on',
-    description: 'An add-on file (.pack.json). Made from the lists BrainDog reads; the record\'s own check decides, run braindog addon check.',
+    title: 'BrainDog plugin',
+    description: 'A plugin file (.pack.json). Made from the lists BrainDog reads; the record\'s own check decides, run braindog addon check.',
     type: 'object',
     required: ['pack', 'version', 'summary', 'author', 'license'],
     additionalProperties: false,

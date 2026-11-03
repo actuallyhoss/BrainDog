@@ -352,7 +352,7 @@ export function useCases(d: UseCaseDeps) {
       }
       const offered = args.modules?.[m] ?? d.catalogue.find((e) => e.id === m)?.doc({ holds: holds(state), usecase: null }) ?? null;
       if (!isMap(offered))
-        return refuse('DECLARATION_UNKNOWN', `${u.title} builds on ${m}, which this host cannot offer by name. Install ${m} from Add-ons first, then plan this again.`, `modules`);
+        return refuse('DECLARATION_UNKNOWN', `${u.title} builds on ${m}, which this host cannot offer by name. Install ${m} from Plugins first, then plan this again.`, `modules`);
       const pack = await normaliseChecked(offered, { kind: 'local' });
       if (!pack.ok) return pack as Result<Body>;
       if (pack.value.manifest.pack !== m) return refuse('VALUE_MALFORMED', `The document sent for ${m} is the pack ${pack.value.manifest.pack}.`, `modules.${m}`);

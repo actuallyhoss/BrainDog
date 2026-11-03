@@ -1434,7 +1434,7 @@ const skillBody = (trigger: string, steps: readonly string[]): string =>
   `Use this skill ${trigger}.\n\n${steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}\n`;
 
 /** Who ships a skill, as a sentence says it: "the Agents add-on", or a use case by its title. */
-const shipper = (o: Offered): string => (o.kind === 'pack' ? `the ${o.title} add-on` : o.title);
+const shipper = (o: Offered): string => (o.kind === 'pack' ? `the ${o.title} plugin` : o.title);
 const capital = (said: string): string => said.charAt(0).toUpperCase() + said.slice(1);
 
 /** The version a shipped skill is at: its `rev`, or 1 when it says none. */

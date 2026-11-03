@@ -12,8 +12,8 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'addonActions', group: 'READ+', writes: false, what: 'What the add-ons that are on let you start: tools for agents, entries in the command bar and actions on rows, each with its add-on.',
+  { name: 'addonActions', group: 'READ+', writes: false, what: 'What the plugins that are on let you start: tools for agents, entries in the command bar and actions on rows, each with its plugin.',
     takes: { list: 'text' } },
-  { name: 'addonTool', group: 'READ+', writes: true, what: "Start one of an add-on's tools, commands or row actions: its script runs now with your own sight, and anything it changes is written as you.",
+  { name: 'addonTool', group: 'READ+', writes: true, what: "Start one of a plugin's tools, commands or row actions: its script runs now with your own sight, and anything it changes is written as you.",
     takes: { addon: 'text', tool: 'text', args: 'json', command: 'text', values: 'json', action: 'text', row: 'text' } },
 ];

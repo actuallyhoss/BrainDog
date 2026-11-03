@@ -131,7 +131,7 @@ test("STILL REFUSED: a module's list declared whole by another pack is still two
   assert.match(r.fix, /register\.things belongs to portfolio, and two packs cannot own one declaration/u);
   const file = refusal(await readPackFile(JSON.stringify(whole)));
   assert.equal(file.code, 'PROVIDES_CONFLICT');
-  assert.match(file.fix, /This add-on declares a list called things, which belongs to BrainDog's Portfolio module/u);
+  assert.match(file.fix, /This plugin declares a list called things, which belongs to BrainDog's Portfolio module/u);
   close();
 });
 

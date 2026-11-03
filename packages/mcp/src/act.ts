@@ -95,7 +95,7 @@ export const ASKS: Readonly<Record<string, (args: Record<string, unknown>) => As
      the commit and plans it (`arrange.ts` `prepare`), and the question says the repository and that nobody reviewed it. */
   installPack: (a) =>
     map(a.source)?.kind === 'git' && text(map(a.source)?.ref) !== null
-      ? ((ref) => ({ question: `Add the add-on from GitHub at ${ref}? Not reviewed by BrainDog.`, body_kind: 'pack' as const, body: { source: { kind: 'git', ref } }, cause: `act:installPack:git:${ref}` }))(
+      ? ((ref) => ({ question: `Add the plugin from GitHub at ${ref}? Not reviewed by BrainDog.`, body_kind: 'pack' as const, body: { source: { kind: 'git', ref } }, cause: `act:installPack:git:${ref}` }))(
           String(text(map(a.source)?.ref)).replace(/^git:/u, ''),
         )
       : ((id, doc) =>

@@ -846,7 +846,7 @@ export const TOOLS: readonly Tool[] = [
     /* AND THE ADD-ON STORE AND AN ADD-ON OF ITS OWN (`addons`, `addon`, `addonNew`, `addonCheck`, addons market plan of
        3 Nov): an agent asked for what BrainDog does not do reads here that it may build it. Paid for by `{batch}`, which
        every receipt says whole in the call that undoes it. */
-    description: 'Any app call, add-ons too; "calls" lists. Undo: undoOwn.',
+    description: 'Any app call, plugins too; "calls" lists. Undo: undoOwn.',
     input: obj({ call: { type: 'string' }, args: { type: 'object' } }, ['call']),
     writes: true,
     destructive: true,
@@ -1401,7 +1401,7 @@ const FIXED: readonly Resource[] = [
   resource('grammar/script', 'What a script declaration may contain, what its ctx can reach, its limits, and two that install.'),
   resource('grammar/automations', 'What an automation may say: its triggers, its steps, its limits, what does not run yet, and two that install.'),
   /* THE ADD-ON FILE WHOLE (`packages/record/src/grammar.ts` `PACK`): what an agent reads before it builds what BrainDog lacks. */
-  resource('grammar/pack', 'An add-on file whole: its manifest, its parts, what each asks the person, the loop through act (addons, addonNew, addonCheck, installPack), and one that installs.'),
+  resource('grammar/pack', 'A plugin file whole: its manifest, its parts, what each asks the person, the loop through act (addons, addonNew, addonCheck, installPack), and one that installs.'),
   resource('calls', 'Every call act makes, a line each: what the app does, by name, and how to make one.'),
 ];
 
@@ -3623,7 +3623,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         name: String(t.call),
         group: 'READ+',
         writes: t.writes === true,
-        what: `${String(t.says)} From the add-on ${String(t.addon_title ?? t.addon)}.${takes.length > 0 ? ` Takes ${takes.join(', ')}.` : ''}`,
+        what: `${String(t.says)} From the plugin ${String(t.addon_title ?? t.addon)}.${takes.length > 0 ? ` Takes ${takes.join(', ')}.` : ''}`,
       };
     });
   }

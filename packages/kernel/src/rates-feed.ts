@@ -16,7 +16,7 @@ import type { Sql } from '@braindog/ports';
 import { ratesRole, type RoleList } from './roles.ts';
 
 /** The words of Money's switch, as its page says them, and where it is. */
-export const KEEP_RATES_SAID = "Turn on Keep rates current, on Money's add-on page, for a feed of rates once a day.";
+export const KEEP_RATES_SAID = "Turn on Keep rates current, on Money's plugin page, for a feed of rates once a day.";
 
 /** A feed that fills the rates list: its declaration, whether its schedule is paused, and its last good fetch. */
 export type RatesFeed = { id: string; paused: boolean; lastGood: string | null };

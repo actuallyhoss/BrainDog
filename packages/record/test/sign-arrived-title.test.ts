@@ -37,7 +37,7 @@ test('AN ADD-ON WITH NO TITLE OF ITS OWN is named by the catalogue, as Add-ons n
   clock.advance(2 * DAY);
   const r = await readArrivedSign(api.kernel, { sql, offers }, clock.now());
   assert.equal(r.state, 'red');
-  assert.equal(r.said, 'Tern Bank alerts has had version 1.4.0 waiting since 3 November. Updating it on Add-ons turns it on.');
+  assert.equal(r.said, 'Tern Bank alerts has had version 1.4.0 waiting since 3 November. Updating it on Plugins turns it on.');
   assert.doesNotMatch(r.said, /tern ny/iu);
 });
 

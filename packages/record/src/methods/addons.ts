@@ -49,7 +49,7 @@ export type AddonLine = {
 };
 
 /** Words a search reads past, since every add-on's line holds them. */
-const STOP: ReadonlySet<string> = new Set(['the', 'and', 'for', 'with', 'what', 'that', 'this', 'from', 'your', 'you', 'into', 'about', 'want', 'need', 'track', 'list', 'keep', 'add-on', 'addon']);
+const STOP: ReadonlySet<string> = new Set(['the', 'and', 'for', 'with', 'what', 'that', 'this', 'from', 'your', 'you', 'into', 'about', 'want', 'need', 'track', 'list', 'keep', 'plugin', 'addon']);
 
 /** The most lines one `addons` answer holds, and its default. */
 const MOST = 30;
@@ -484,7 +484,7 @@ export function methods(deps: RecordDeps) {
       const extra = Object.keys(said).find((k) => !takes.includes(k));
       if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes ${takes.join(', ')}.`, { at: extra, allowed: takes });
       const id = text(said.id);
-      if (id === null) return no('REQUIRED_MISSING', 'Which add-on? Send its id, as act addons answers it.', { at: 'id' });
+      if (id === null) return no('REQUIRED_MISSING', 'Which plugin? Send its id, as act addons answers it.', { at: 'id' });
       const index = await indexOf();
       const held = heldNow();
       await loadShipped();
@@ -493,7 +493,7 @@ export function methods(deps: RecordDeps) {
       const entry = index === null || (own !== undefined && !updatesFromStore(own.source)) ? undefined : entryNamed(index, id);
       const h = held.get(entry === undefined ? id : heldId(entry));
       if (entry === undefined && h === undefined)
-        return no('DECLARATION_UNKNOWN', `No add-on called ${id} is on offer or here. act addons {"q":"<a word>"} searches the store.`, { at: 'id' });
+        return no('DECLARATION_UNKNOWN', `No plugin called ${id} is on offer or here. act addons {"q":"<a word>"} searches the store.`, { at: 'id' });
 
       const out: Body = { id: entry === undefined ? id : heldId(entry) };
       if (entry !== undefined) {
@@ -553,7 +553,7 @@ export function methods(deps: RecordDeps) {
         out.here = here;
       }
       if (said.file === true) {
-        if (!whole(ctx)) return no('FORBIDDEN', 'An add-on file is read by somebody who can read the whole BrainDog.', { at: 'file' });
+        if (!whole(ctx)) return no('FORBIDDEN', 'A plugin file is read by somebody who can read the whole BrainDog.', { at: 'file' });
         const fetched = entry !== undefined && deps.catalogueShelf ? await deps.catalogueShelf.fetch(heldId(entry)) : null;
         const doc = fetched !== null && fetched.ok ? fetched.value.doc : h !== undefined ? fileOf(String(out.id)) : null;
         if (doc !== null) out.file = doc;
@@ -599,7 +599,7 @@ export function methods(deps: RecordDeps) {
         value: {
           doc,
           next: [
-            'Change doc to do what the person asked: act arrangement {"grammar":"pack"} says every part an add-on may have.',
+            'Change doc to do what the person asked: act arrangement {"grammar":"pack"} says every part a plugin may have.',
             'act addonCheck {"doc":<doc>} says what is wrong, or what installing it adds and asks for.',
             'act installPack {"doc":<doc>} puts it to the person on Decide; nothing is installed until they say yes.',
           ],

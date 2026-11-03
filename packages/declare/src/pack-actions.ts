@@ -89,7 +89,7 @@ export function readPackActions(doc: Record<string, unknown>, decls: readonly De
         }
       }
       const s = scriptNamed(decls, t.script);
-      if (s === null) return bad(`${t.name} runs ${String(t.script)}, and a tool runs one of this add-on's own scripts, by its name.`, `${at}.script`);
+      if (s === null) return bad(`${t.name} runs ${String(t.script)}, and a tool runs one of this plugin's own scripts, by its name.`, `${at}.script`);
       if (s.runs.tool !== true) return bad(`${t.name} runs ${String(t.script)}, which does not say an agent may start it. Add tool: true to its runs.`, `${at}.script`);
       if (t.writes !== undefined && t.writes !== true && t.writes !== false) return bad('writes is true when the tool changes rows, and left out when it only reads.', `${at}.writes`);
       if (s.writes.length > 0 && t.writes !== true)
@@ -114,12 +114,12 @@ export function readPackActions(doc: Record<string, unknown>, decls: readonly De
       if ((c.opens === undefined) === (c.runs === undefined)) return bad('A command either opens one of its pages (opens: page.<slug>) or runs one of its scripts (runs: <script>).', at);
       if (c.opens !== undefined) {
         if (typeof c.opens !== 'string' || !decls.some((d) => d.kind === 'page' && d.id === c.opens))
-          return bad(`${c.id} opens ${String(c.opens)}, and a command opens a page this add-on declares, as page.<slug>.`, `${at}.opens`);
+          return bad(`${c.id} opens ${String(c.opens)}, and a command opens a page this plugin declares, as page.<slug>.`, `${at}.opens`);
         if (c.asks !== undefined) return bad('A command that opens a page asks nothing; asks goes with runs.', `${at}.asks`);
       }
       if (c.runs !== undefined) {
         const s = scriptNamed(decls, c.runs);
-        if (s === null) return bad(`${c.id} runs ${String(c.runs)}, and a command runs one of this add-on's own scripts, by its name.`, `${at}.runs`);
+        if (s === null) return bad(`${c.id} runs ${String(c.runs)}, and a command runs one of this plugin's own scripts, by its name.`, `${at}.runs`);
         if (s.runs.command !== true) return bad(`${c.id} runs ${String(c.runs)}, which does not say the command bar may start it. Add command: true to its runs.`, `${at}.runs`);
       }
       let asks: PackCommand['asks'];
@@ -154,7 +154,7 @@ export function readPackActions(doc: Record<string, unknown>, decls: readonly De
       const title = line(a.title, 40);
       if (title === null) return bad('A row action has a title of at most 40 characters, as the row menu shows it.', `${at}.title`);
       const s = scriptNamed(decls, a.script);
-      if (s === null) return bad(`${title} runs ${String(a.script)}, and a row action runs one of this add-on's own scripts, by its name.`, `${at}.script`);
+      if (s === null) return bad(`${title} runs ${String(a.script)}, and a row action runs one of this plugin's own scripts, by its name.`, `${at}.script`);
       if (s.runs.row !== true) return bad(`${title} runs ${String(a.script)}, which does not say a row may start it. Add row: true to its runs.`, `${at}.script`);
       const bare = m[1]!;
       const own = decls.some((d) => d.kind === 'register' && d.id === `register.${bare}`);

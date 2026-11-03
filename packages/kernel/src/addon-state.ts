@@ -98,7 +98,7 @@ export function applyNotices(
   if (tell === undefined) return no('NOT_IN_THIS_BUILD', 'This BrainDog sends no notices from a script.', { at: 'notices' });
   const left = noticesLeft(sql, scriptOwner(run), nowMs);
   if (list.length > left)
-    return no('OUT_OF_BOUNDS', `It sent ${list.length} notices, and its add-on may send ${SCRIPT_NOTICES_PER_DAY} a day, with ${left} left today.`, { at: 'notices' });
+    return no('OUT_OF_BOUNDS', `It sent ${list.length} notices, and its plugin may send ${SCRIPT_NOTICES_PER_DAY} a day, with ${left} left today.`, { at: 'notices' });
   for (const [i, n] of list.entries()) {
     const one = noticeOf(n);
     if (!one.ok) {
@@ -145,7 +145,7 @@ export function storeAfter(before: Readonly<Record<string, unknown>>, changes: r
   }
   const bytes = storeBytes(after);
   if (bytes > SCRIPT_STORE_BYTES)
-    return no('OUT_OF_BOUNDS', `An add-on keeps at most ${SCRIPT_STORE_BYTES / 1024 / 1024} MB in its store, and this would be ${Math.ceil(bytes / 1024)} KB. Take keys away with ctx.store.set(key, null).`, { at: 'store' });
+    return no('OUT_OF_BOUNDS', `A plugin keeps at most ${SCRIPT_STORE_BYTES / 1024 / 1024} MB in its store, and this would be ${Math.ceil(bytes / 1024)} KB. Take keys away with ctx.store.set(key, null).`, { at: 'store' });
   return ok(after);
 }
 

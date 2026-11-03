@@ -495,7 +495,7 @@ export function methods(deps: RecordDeps) {
         if ('refusal' in started && started.refusal.code === 'DECLARATION_UNKNOWN')
           return no(
             'DECLARATION_UNKNOWN',
-            `Claude on your machine needs the ${mayChange ? 'change files' : 'ask'} kind of job, which comes with the Jobs on your machine add-on. Install or update it from the store and approve it in Decide, then send again.`,
+            `Claude on your machine needs the ${mayChange ? 'change files' : 'ask'} kind of job, which comes with the Jobs on your machine plugin. Install or update it from the store and approve it in Decide, then send again.`,
             { at: 'target' },
           );
         return tail(started as Result<never>);

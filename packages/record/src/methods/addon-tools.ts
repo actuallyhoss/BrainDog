@@ -137,9 +137,9 @@ export function methods(deps: RecordDeps) {
       const extra = Object.keys(said).find((k) => !takes.includes(k));
       if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes ${takes.join(', ')}.`, { at: extra, allowed: takes });
       const addon = text(said.addon);
-      if (addon === null) return no('REQUIRED_MISSING', 'addon is the id of the add-on, as addonActions lists it.', { at: 'addon' });
+      if (addon === null) return no('REQUIRED_MISSING', 'addon is the id of the plugin, as addonActions lists it.', { at: 'addon' });
       const held = heldOn().find((h) => h.id === addon);
-      if (held === undefined) return no('NOT_FOUND', `No add-on called ${addon} is on here with a tool, a command or a row action. addonActions lists what is.`, { at: 'addon' });
+      if (held === undefined) return no('NOT_FOUND', `No plugin called ${addon} is on here with a tool, a command or a row action. addonActions lists what is.`, { at: 'addon' });
       const asked = [said.tool, said.command, said.action].filter((v) => v !== undefined).length;
       if (asked !== 1) return no('VALUE_MALFORMED', 'Say one of tool, command or action.', { at: 'tool' });
 
@@ -176,7 +176,7 @@ export function methods(deps: RecordDeps) {
         const spoken = text(said.row);
         if (spoken === null) return no('REQUIRED_MISSING', 'row is the spoken id of the row the action is on.', { at: 'row' });
         const bare = String(action.list).replace(/^register\./u, '');
-        if (!deps.scriptReadsAs) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot start an add-on yet.');
+        if (!deps.scriptReadsAs) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot start a plugin yet.');
         script = String(action.script);
         let row: unknown;
         try {
@@ -190,10 +190,10 @@ export function methods(deps: RecordDeps) {
       }
 
       const live = scriptOf(addon, script);
-      if (live === null) return no('NOT_FOUND', `${held.title}'s script ${script} is not installed here any more. Reinstall the add-on.`, { at: 'addon' });
+      if (live === null) return no('NOT_FOUND', `${held.title}'s script ${script} is not installed here any more. Reinstall the plugin.`, { at: 'addon' });
       if (sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'script' AND key = ?", script)?.state === 'paused')
         return no('PAUSED', `${held.title}'s ${script} is paused, so nothing ran. Resume it on the Scripts page.`, { at: 'addon' });
-      if (!deps.tryScript || !deps.scriptReadsAs || !deps.writeAs) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot start an add-on yet, so nothing ran.');
+      if (!deps.tryScript || !deps.scriptReadsAs || !deps.writeAs) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot start a plugin yet, so nothing ran.');
 
       const who = kernel.identity();
       const p = ctx.principal as { kind: string; id?: string; person?: string };
@@ -205,7 +205,7 @@ export function methods(deps: RecordDeps) {
         if (n >= AGENT_TOOL_RUNS_PER_DAY)
           return no(
             'RATE_LIMITED',
-            `Agents have started ${held.title}'s tools ${AGENT_TOOL_RUNS_PER_DAY} times today, which is as many as one add-on gets in a day, so nothing ran. They can again tomorrow. If something is calling it over and over, stop it.`,
+            `Agents have started ${held.title}'s tools ${AGENT_TOOL_RUNS_PER_DAY} times today, which is as many as one plugin gets in a day, so nothing ran. They can again tomorrow. If something is calling it over and over, stop it.`,
             { at: 'tool' },
           );
         kernel.setPref(TOOL_RUNS_HOLDER, addon, { day, n: n + 1 });

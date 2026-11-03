@@ -161,7 +161,7 @@ function readAuthored(sql: Sql, nowMs: number, lasts: SignLasts = () => undefine
   const nobody = tally(bare.filter(([, w]) => w.nobody).map(([, w]) => where(w.register)));
   const unbacked = tally(bare.filter(([, w]) => !w.nobody).map(([, w]) => where(w.register)));
   facts.push(...nobody.map(([name, n]) => `${count(n, 'write')} to ${name} signed by nobody.`));
-  facts.push(...unbacked.map(([name, n]) => `${count(n, 'write')} to ${name} signed by BrainDog with no schedule, script or add-on behind ${n === 1 ? 'it' : 'them'}.`));
+  facts.push(...unbacked.map(([name, n]) => `${count(n, 'write')} to ${name} signed by BrainDog with no schedule, script or plugin behind ${n === 1 ? 'it' : 'them'}.`));
   const at = tally(bare.map(([, w]) => where(w.register))).map(([name]) => name);
   return reading('red', bare.length, `${count(bare.length, 'write')} in the last ${AUTHORED_WINDOW_HOURS} hours ${bare.length === 1 ? 'has' : 'have'} no author: ${names(at)}.`, facts);
 }

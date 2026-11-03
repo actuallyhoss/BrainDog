@@ -332,38 +332,38 @@ export async function readPackFile(input: unknown, source: PackSource = { kind: 
     try {
       text = JSON.stringify(input) ?? '';
     } catch {
-      return no('PACK_MALFORMED', 'This is not an add-on file: it cannot be written down as JSON.', { at: 'file' });
+      return no('PACK_MALFORMED', 'This is not a plugin file: it cannot be written down as JSON.', { at: 'file' });
     }
   }
   const bytes = new TextEncoder().encode(text).length;
   if (bytes > PACK_FILE_MOST_BYTES)
-    return no('PACK_OVER_CAP', `This file is ${Math.ceil(bytes / 1024)} KB, and an add-on is at most ${PACK_FILE_MOST_BYTES / 1024} KB. Ship fewer example rows, or split it.`, { at: 'file' });
+    return no('PACK_OVER_CAP', `This file is ${Math.ceil(bytes / 1024)} KB, and a plugin is at most ${PACK_FILE_MOST_BYTES / 1024} KB. Ship fewer example rows, or split it.`, { at: 'file' });
   let doc: unknown = input;
   if (typeof input === 'string') {
     try {
       doc = JSON.parse(text);
     } catch {
-      return no('PACK_MALFORMED', 'This is not an add-on file: it is not JSON. An add-on is shared as a .pack.json file.', { at: 'file' });
+      return no('PACK_MALFORMED', 'This is not a plugin file: it is not JSON. A plugin is shared as a .pack.json file.', { at: 'file' });
     }
   }
   if (!isMap(doc) || typeof doc.pack !== 'string')
-    return no('PACK_MALFORMED', isMap(doc) && typeof doc.usecase === 'string' ? 'This is a use-case file, not an add-on. Publish it as a use case.' : 'This is not an add-on file: it has no pack in it.', { at: 'pack' });
-  if (nestedPast(doc as Json)) return no('PACK_MALFORMED', `This is not an add-on file: it nests deeper than ${NESTED_MOST} levels, and no add-on does.`, { at: 'file' });
+    return no('PACK_MALFORMED', isMap(doc) && typeof doc.usecase === 'string' ? 'This is a use-case file, not a plugin. Publish it as a use case.' : 'This is not a plugin file: it has no pack in it.', { at: 'pack' });
+  if (nestedPast(doc as Json)) return no('PACK_MALFORMED', `This is not a plugin file: it nests deeper than ${NESTED_MOST} levels, and no plugin does.`, { at: 'file' });
   const key = credentialKey(doc as Json);
-  if (key) return no('SECRET_IN_PACK', `This file carries a ${key}. An add-on never carries a credential; take it out and publish it again.`, { at: key });
+  if (key) return no('SECRET_IN_PACK', `This file carries a ${key}. A plugin never carries a credential; take it out and publish it again.`, { at: key });
   const shaped = credentialValue(doc as Json);
-  if (shaped) return no('SECRET_IN_PACK', `This file holds what looks like a credential at ${shaped}. An add-on never carries one; take it out and publish it again.`, { at: shaped });
+  if (shaped) return no('SECRET_IN_PACK', `This file holds what looks like a credential at ${shaped}. A plugin never carries one; take it out and publish it again.`, { at: shaped });
   if (reservedId(doc.pack))
-    return no('PROVIDES_CONFLICT', `${doc.pack} is a name BrainDog keeps for its own modules and use cases. Give this add-on another id.`, { at: 'pack' });
+    return no('PROVIDES_CONFLICT', `${doc.pack} is a name BrainDog keeps for its own modules and use cases. Give this plugin another id.`, { at: 'pack' });
   const pack = await normalise(doc, source);
   if (!pack.ok) return pack as Result<PackFile>;
   for (const decl of pack.value.declarations) {
     const list = decl.kind === 'register' ? decl.id.slice('register.'.length) : null;
     const owner = list === null ? undefined : FIRST_PARTY_LISTS.get(list);
     if (owner !== undefined)
-      return no('PROVIDES_CONFLICT', `This add-on declares a list called ${list}, which belongs to BrainDog's ${MODULE_LISTS[owner].name} module. Name the list something else.`, { at: decl.id });
+      return no('PROVIDES_CONFLICT', `This plugin declares a list called ${list}, which belongs to BrainDog's ${MODULE_LISTS[owner].name} module. Name the list something else.`, { at: decl.id });
     const fault = validateDeclaration({ id: decl.id, kind: decl.kind, body: decl.body });
-    if (fault?.code === 'KIND_UNKNOWN') return { ok: false, refusal: { ...fault, fix: kindUnknownSentence(fault.fix).replace('This setup', 'This add-on'), at: `${decl.id}${fault.at ? `.${fault.at}` : ''}` } };
+    if (fault?.code === 'KIND_UNKNOWN') return { ok: false, refusal: { ...fault, fix: kindUnknownSentence(fault.fix).replace('This setup', 'This plugin'), at: `${decl.id}${fault.at ? `.${fault.at}` : ''}` } };
     /* A PART THAT WAITS IS READ HERE, as the record will read it: a `when: { holds }` of a shape the plan cannot resolve,
        or on a field every entry must have, is refused at the door rather than at somebody's install. */
     if (fault !== null && /(^|\.)when$/u.test(fault.at ?? '') && /wait|holds/u.test(fault.fix)) return { ok: false, refusal: { ...fault, at: `${decl.id}.${fault.at}` } };
@@ -659,7 +659,7 @@ export function readCatalogue(doc: unknown): Result<CatalogueIndex> {
   const entries: CatalogueEntry[] = [];
   for (const [i, e] of doc.entries.entries()) {
     if (!isMap(e) || (e.kind !== 'usecase' && e.kind !== 'pack') || !ID.test(str(e.id)) || !Array.isArray(e.versions) || e.versions.length === 0)
-      return bad(`entries[${i}]`, `Entry ${i + 1} of this catalogue is not a use case or an add-on with an id and at least one version.`);
+      return bad(`entries[${i}]`, `Entry ${i + 1} of this catalogue is not a use case or a plugin with an id and at least one version.`);
     const versions: CatalogueVersion[] = [];
     for (const v of e.versions) {
       if (!isMap(v) || !VERSION.test(str(v.version)) || !/^[0-9a-f]{64}$/u.test(str(v.checksum)) || !isMap(v.reach))
@@ -808,7 +808,7 @@ export async function publishTo(
   const kind = file.kind;
   const s = subjectOf(file);
   const title = file.kind === 'usecase' ? file.shared.usecase.title : file.file.title;
-  const noun = kind === 'usecase' ? 'a use case' : 'an add-on';
+  const noun = kind === 'usecase' ? 'a use case' : 'a plugin';
   if (!ID.test(s.id)) return no('PACK_MALFORMED', `A catalogue lists ${noun} by an id of lower-case letters, digits and dashes, and ${s.id} is not one.`, { at: kind });
   if (!VERSION.test(s.version))
     return no('PACK_MALFORMED', `A catalogue lists versions as three numbers with no leading zero, as in 1.0.0, and ${s.version} is not one.`, { at: 'version' });

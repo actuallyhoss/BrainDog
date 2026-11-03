@@ -2236,7 +2236,7 @@ export function sumOfFault(value: SumOf, self: string, bodyOf: (id: string) => M
       (p.minus !== undefined && typeof p.minus !== 'boolean') ||
       (p.optional !== undefined && typeof p.optional !== 'boolean')
     )
-      return 'each part is { metric: <a figure> }, with minus: true when it is taken away and optional: true when an add-on may not be there';
+      return 'each part is { metric: <a figure> }, with minus: true when it is taken away and optional: true when a plugin may not be there';
     const { named } = partOf(p.metric);
     if (named === self) return `a sum adds other figures, and ${named} is this one`;
     const body = bodyOf(named);

@@ -74,7 +74,7 @@ test('THE GUARD TAKES THE THING WRITTEN, and a look that says it is Slash\'s is 
   assert.throws(() => slashMayWrite(SLASH, 'declare', { kind: 'look', body: { look: 'desk', basis: 'b1', by: 'owner' } }), /a look that does not say it is its own/);
   assert.throws(() => slashMayWrite(SLASH, 'declare', { kind: 'look', body: { look: 'desk', basis: 'b1', by: 'rule' } }), /a look that does not say it is its own/);
   assert.throws(() => slashMayWrite(SLASH, 'declare', { kind: 'look', body: 'not json' }), /slash wrote declare/);
-  assert.throws(() => slashMayWrite(SLASH, 'declare', { kind: 'look', body: { look: 'desk', basis: 'b1', by: 'slash' }, pack: 'caller' }), /an add-on carries/);
+  assert.throws(() => slashMayWrite(SLASH, 'declare', { kind: 'look', body: { look: 'desk', basis: 'b1', by: 'slash' }, pack: 'caller' }), /a plugin carries/);
 });
 
 test('THE TWO-ARGUMENT CALL STILL ANSWERS, and a declare with nothing named is refused', () => {

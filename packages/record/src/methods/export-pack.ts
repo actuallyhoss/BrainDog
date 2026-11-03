@@ -210,7 +210,7 @@ export function methods(deps: RecordDeps) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       /* EVERY LIST'S FIELDS AND EVERY PAGE OF THE RECORD'S OWN, so somebody who reads all of it, as a use case is shared. */
-      if (deps.readsEveryList?.(ctx) !== true) return no('FORBIDDEN', 'An add-on is made by somebody who can read the whole BrainDog.', { at: 'principal' });
+      if (deps.readsEveryList?.(ctx) !== true) return no('FORBIDDEN', 'A plugin is made by somebody who can read the whole BrainDog.', { at: 'principal' });
       const said = (args ?? {}) as Record<string, unknown>;
       const extra = Object.keys(said).find((k) => !(TAKES as readonly string[]).includes(k));
       if (extra !== undefined)
@@ -269,9 +269,9 @@ export function methods(deps: RecordDeps) {
       const first = own.get(ticks[0] as string)!;
       const title = typeof said.title === 'string' ? said.title.trim().replace(/\s+/gu, ' ') : titleOf(ticks[0] as string, first.body);
       const id = typeof said.id === 'string' ? said.id : packIdFrom(title);
-      if (!PACK_ID.test(id)) return no('VALUE_MALFORMED', `${id} is not an add-on id: lower-case letters, digits and hyphens.`, { at: 'id' });
+      if (!PACK_ID.test(id)) return no('VALUE_MALFORMED', `${id} is not a plugin id: lower-case letters, digits and hyphens.`, { at: 'id' });
       if (kernel.packStates().some((s) => s.id === id))
-        return no('VALUE_MALFORMED', `An add-on called ${id} is already installed here. Give this one another id.`, { at: 'id' });
+        return no('VALUE_MALFORMED', `A plugin called ${id} is already installed here. Give this one another id.`, { at: 'id' });
       const version = typeof said.version === 'string' ? said.version : '1.0.0';
       if (!SEMVER.test(version)) return no('VALUE_MALFORMED', `${version} is not a version. Write 1.0.0.`, { at: 'version' });
 
@@ -309,8 +309,8 @@ export function methods(deps: RecordDeps) {
       for (const [list, seqs] of Object.entries((rows ?? {}) as Record<string, number[]>)) {
         const decl = carried.get(`register.${list}`);
         if (decl === undefined)
-          return no('VALUE_MALFORMED', `${list} is not a list this add-on carries, so none of its rows can go as an example.`, { at: `rows.${list}` });
-        if (seqs.length > EXAMPLES_MOST) return no('OUT_OF_BOUNDS', `An add-on carries at most ${EXAMPLES_MOST} example rows a list.`, { at: `rows.${list}` });
+          return no('VALUE_MALFORMED', `${list} is not a list this plugin carries, so none of its rows can go as an example.`, { at: `rows.${list}` });
+        if (seqs.length > EXAMPLES_MOST) return no('OUT_OF_BOUNDS', `A plugin carries at most ${EXAMPLES_MOST} example rows a list.`, { at: `rows.${list}` });
         const denied = readable(ctx, list);
         if (denied) return { ok: false, refusal: denied };
         /* NOR A ROW OF A PERSONAL LIST: it is the owner's alone, and this file is for somebody else. */
@@ -362,7 +362,7 @@ export function methods(deps: RecordDeps) {
         pack: id,
         version,
         title,
-        summary: line ?? `${title}, made on one BrainDog and shared as an add-on.`,
+        summary: line ?? `${title}, made on one BrainDog and shared as a plugin.`,
         changes: note ?? (version === '1.0.0' ? 'The first version.' : 'A new version.'),
         author: 'a BrainDog owner',
         license: 'MIT',
@@ -373,7 +373,7 @@ export function methods(deps: RecordDeps) {
         ...(seeds.length > 0 ? { seeds } : {}),
       };
       const stray = Object.keys(doc).find((k) => !(MANIFEST_KEYS as readonly string[]).includes(k));
-      if (stray !== undefined) return no('PACK_MALFORMED', `An add-on file has no ${stray}.`, { at: stray });
+      if (stray !== undefined) return no('PACK_MALFORMED', `A plugin file has no ${stray}.`, { at: stray });
       /* READ BACK THROUGH THE DOOR IT COMES IN BY, so a file that would be refused on the second record is refused here. */
       const back = await normalise(doc, { kind: 'local' });
       if (!back.ok) return back as Result<never>;

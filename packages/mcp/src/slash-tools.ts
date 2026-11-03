@@ -145,7 +145,7 @@ const FLOOR_SAID: Readonly<Record<Floor, string>> = {
   sharing: 'It changes who can see it',
   identity: 'It changes who someone is',
   others: 'Someone else made that row',
-  addons: 'It changes an add-on',
+  addons: 'It changes a plugin',
   outside: 'It reaches outside BrainDog',
 };
 

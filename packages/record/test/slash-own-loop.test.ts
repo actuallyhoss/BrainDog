@@ -137,7 +137,7 @@ test('THREE RUNS THAT LEFT THE SAME STEPS FOR IT earn the skill, each step quote
   clock.set(T0 + 20 * DAY);
   const seen = value<Seen>(await api.slash({}, OWNER));
   const offer = seen.drafts.find((d) => d.body_kind === 'rowset' && d.question.includes('ledger-close'));
-  assert.equal(offer?.question, 'Give your agents the skill ledger-close? The Agents add-on names it for when a month ends, and its 2 steps are quoted from what your agents left when they handed off.');
+  assert.equal(offer?.question, 'Give your agents the skill ledger-close? The Agents plugin names it for when a month ends, and its 2 steps are quoted from what your agents left when they handed off.');
   const out = value<Filed>(await api.slashPropose({}, OWNER));
   const id = out.filed.find((f) => f.question.includes('ledger-close'))?.id;
   assert.ok(id, JSON.stringify(out));

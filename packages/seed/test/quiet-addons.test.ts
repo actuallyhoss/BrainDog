@@ -103,7 +103,7 @@ test('A QUESTION ALREADY OPEN IS NOT ASKED AGAIN, and a port that keeps no no le
     const [step] = await updateFirstParty(forgetful);
     assert.equal(forgetful.asked, 0);
     assert.equal(step?.did, 'refused');
-    assert.match(step?.why ?? '', /waits for you in Add-ons\.$/u);
+    assert.match(step?.why ?? '', /waits for you in Plugins\.$/u);
   }
 });
 

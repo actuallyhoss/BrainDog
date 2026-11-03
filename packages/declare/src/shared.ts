@@ -80,7 +80,7 @@ export async function readShared(input: unknown, source: PackSource = { kind: 'p
     }
   }
   if (!isMap(doc) || typeof doc.usecase !== 'string')
-    return no('PACK_MALFORMED', 'This is not a use-case file: it has no usecase in it. An add-on is installed from its own screen.', { at: 'usecase' });
+    return no('PACK_MALFORMED', 'This is not a use-case file: it has no usecase in it. A plugin is installed from its own screen.', { at: 'usecase' });
 
   if (nestedPast(doc))
     return no('PACK_MALFORMED', `This is not a use-case file: it nests deeper than ${NESTED_MOST} levels, and no use case does.`, { at: 'file' });

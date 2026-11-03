@@ -344,7 +344,7 @@ export function proposalOf(deps: Pick<ScriptRunDeps, 'registerOf'>, script: stri
   if (typeof kind !== 'string' || !(SCRIPT_PROPOSAL_KINDS as readonly string[]).includes(kind))
     return no(
       'ENUM_VALUE_UNKNOWN',
-      `A script asks about rows, with a rowset or options, and ${JSON.stringify(kind ?? null)} is neither. A change to this BrainDog's lists, automations or add-ons is a person's or an agent's to propose.`,
+      `A script asks about rows, with a rowset or options, and ${JSON.stringify(kind ?? null)} is neither. A change to this BrainDog's lists, automations or plugins is a person's or an agent's to propose.`,
       { at: 'body_kind', allowed: [...SCRIPT_PROPOSAL_KINDS] },
     );
   if (!isObject(p.body)) return no('REQUIRED_MISSING', `A ${kind} carries its body: ${kind === 'rowset' ? '{ register, rows }' : '{ options }'}.`, { at: 'body' });

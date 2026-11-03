@@ -253,7 +253,7 @@ test('A SETTING NAMED BY ITS KEY ALONE GOES TO THE ADD-ON THAT DECLARES IT: one 
   assert.equal(proposed.code, 'FIELD_UNKNOWN');
   assert.equal(proposed.at, 'body.settings[0].values.week_starts');
   const owned = value<{ skipped: { part: string; why: string }[]; settings: { pack: string }[] }>(await a.prepare('arrange', mixed, OWN));
-  assert.deepEqual(owned.skipped, [{ part: 'setting:week_starts', why: 'No add-on here keeps a setting called week_starts, so it was not set.' }]);
+  assert.deepEqual(owned.skipped, [{ part: 'setting:week_starts', why: 'No plugin here keeps a setting called week_starts, so it was not set.' }]);
   assert.deepEqual(owned.settings.map((s) => s.pack), ['money']);
   /* A value the add-on refuses is still refused, at the key. */
   assert.equal(refusal(await a.prepare('arrange', { why: ['x'], settings: [{ values: { home_currency: 7 } }] }, OWN)).at, 'body.settings[0].values.home_currency');

@@ -116,7 +116,7 @@ test('A FILE THAT DOES NOT MATCH ITS CHECKSUM IS REFUSED, and an id nothing offe
   const unknown = refusal(await a.prepare('arrange', { why: ['x'], packs: { install: ['bookkeeper'] } }));
   assert.equal(unknown.code, 'DECLARATION_UNKNOWN');
   assert.equal(unknown.at, 'body.packs.install[0]');
-  assert.equal(unknown.fix, 'There is no add-on called bookkeeper on offer here, and what is on offer is Ledgerline (by id: ledgerline).');
+  assert.equal(unknown.fix, 'There is no plugin called bookkeeper on offer here, and what is on offer is Ledgerline (by id: ledgerline).');
 
   /* ONE CHANGED WORD IN THE FILE, and the index still gives the old checksum. */
   const path = [...shelf.files.keys()][0]!;
