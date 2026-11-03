@@ -4,7 +4,7 @@ import SwiftUI
 import WidgetKit
 
 /// BrainDog's widgets (plan 3.10, M5), one extension for the iPhone and the Mac: Needs you (the count and the first
-/// questions), Today's key numbers (the Home figures), and Tell. All plain: the tile's colour, a Plus Jakarta Sans figure and
+/// questions), Today's key numbers (the Home figures), and Tell. All plain: the tile's colour, a Lexend figure, Geist
 /// words, red only for the count and a figure that misses its target. Each reads the glance the app kept in the App
 /// Group, and reads it again from the record itself when its timeline is asked for.
 @main

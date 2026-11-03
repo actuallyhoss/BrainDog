@@ -1,17 +1,20 @@
 import CoreText
 import SwiftUI
 
-/// BrainDog's type in SwiftUI, in the ops look (`loop/plans/ops-look-2026-11-03/SPEC.md`, 2 and 7): one family, Plus
-/// Jakarta Sans, at 400, 500 and 600 only, for every word from the page's name to a caption; Geist Mono for times and
-/// code. Dense sizes: a row 15, body 14, meta 12.5, a caption 12, the page's name 28 at 600 drawn tight (`tight`).
+/// BrainDog's type in SwiftUI: Geist at 400, 500 and 600 for every word, Lexend 600 for a page's name and its big
+/// figures, Geist Mono for times and code. The faces BrainDog had before the ops look (Sam asked for the old fonts back,
+/// 3 Nov); the ops look's dense sizes stay (`loop/plans/ops-look-2026-11-03/SPEC.md`, 2 and 7): a row 15, body 14,
+/// meta 12.5, a caption 12, the page's name 28 drawn tight (`tight`).
 ///
 /// EVERY SIZE SCALES WITH DYNAMIC TYPE. Each is `Font.custom(_:size:relativeTo:)` against the text style a person's
 /// setting moves, so 15 at Large is 15 and grows with it, as the system's own text does.
 ///
-/// THE FONTS ARE THE OFL TTFs, BUNDLED, because the web's woff2 files cannot be registered on iOS: Plus Jakarta Sans as
-/// one variable font (its weight axis gives 400, 500 and 600) and Geist Mono. `register()` runs once at launch.
+/// THE FONTS ARE THE OFL TTFs, BUNDLED, because the web's woff2 files cannot be registered on iOS: Geist as one variable
+/// font (its weight axis gives 400, 500 and 600, from Vercel's `geist` package), Lexend SemiBold (googlefonts/lexend),
+/// and Geist Mono. `register()` runs once at launch.
 public enum Typeface {
-    static let family = "Plus Jakarta Sans"
+    static let family = "Geist"
+    static let lexend = "Lexend-SemiBold"
     static let mono = "Geist Mono"
 
     /// Make the bundled faces available to this process. Idempotent; a face already registered is left as it is.
@@ -29,17 +32,18 @@ public enum Typeface {
     private static func face(_ size: CGFloat, _ weight: Font.Weight, _ style: Font.TextStyle) -> Font {
         .custom(family, size: size, relativeTo: style).weight(weight)
     }
+    private static func title(_ size: CGFloat, _ style: Font.TextStyle) -> Font { .custom(lexend, size: size, relativeTo: style) }
 
     /// How much tighter a title is drawn, in points at its size: -0.021em, as the ops titles are.
     public static func tight(_ size: CGFloat) -> CGFloat { -0.021 * size }
 
-    /// A page's one big number, 30 semibold.
-    public static let hero = face(30, .semibold, .largeTitle)
-    /// A page's name at full width, 28 semibold (draw it with `.tracking(Typeface.tight(28))`).
-    public static let page = face(28, .semibold, .title)
-    /// A page's name on a phone and in a nav bar, and a tile's figure, 22 semibold.
-    public static let figure = face(22, .semibold, .title2)
-    /// A sheet's title and a section's heading, 17 semibold.
+    /// A page's one big number, Lexend 30.
+    public static let hero = title(30, .largeTitle)
+    /// A page's name at full width, Lexend 28 (draw it with `.tracking(Typeface.tight(28))`).
+    public static let page = title(28, .title)
+    /// A page's name on a phone and in a nav bar, and a tile's figure, Lexend 22.
+    public static let figure = title(22, .title2)
+    /// A sheet's title and a section's heading, Geist 17 semibold.
     public static let heading = face(17, .semibold, .headline)
     /// A card's heading, 15 semibold.
     public static let tileHeading = face(15, .semibold, .subheadline)
@@ -57,7 +61,7 @@ public enum Typeface {
     #endif
     /// A segmented control's label, Geist 14 (its weight set by whether it is chosen).
     public static let segment = Font.custom(family, size: 13, relativeTo: .callout)
-    /// An initial in a face, at the face's own size.
+    /// An initial in a face, Geist semibold at the face's own size.
     public static func initial(_ size: CGFloat) -> Font { .custom(family, size: size).weight(.semibold) }
     /// Dates, ages, counts and helper text, 12.5.
     public static let meta = face(12.5, .regular, .footnote)
@@ -71,20 +75,16 @@ public enum Typeface {
     public static let codeEntry = Font.custom(mono, size: 22, relativeTo: .title2)
 
     #if canImport(UIKit)
-    /// The family at 22 semibold as a UIKit font, for the navigation bar's title, scaled as the title style is.
+    /// Lexend 600 at 22 as a UIKit font, for the navigation bar's title, scaled as the title style is.
     public static func navTitleFont(size: CGFloat = 22) -> UIFont {
-        let descriptor = UIFontDescriptor(fontAttributes: [
-            .family: family,
-            .traits: [UIFontDescriptor.TraitKey.weight: UIFont.Weight.semibold],
-        ])
-        let base = UIFont(descriptor: descriptor, size: size)
-        return UIFontMetrics(forTextStyle: .title2).scaledFont(for: base.familyName == family ? base : .systemFont(ofSize: size, weight: .semibold))
+        let base = UIFont(name: lexend, size: size) ?? .systemFont(ofSize: size, weight: .semibold)
+        return UIFontMetrics(forTextStyle: .title2).scaledFont(for: base)
     }
     #endif
 }
 
-/// HOW FAR APART WRAPPED LINES SIT, as the web's line-heights set them. Plus Jakarta Sans draws its lines 1.26 em apart
-/// by itself (ascent 1.038 + descent 0.222, no line gap), which is tight for reading: the web reads body at 1.5, a row's
+/// HOW FAR APART WRAPPED LINES SIT, as the web's line-heights set them. Geist draws its lines 1.30 em apart by itself
+/// (ascent 1.005 + descent 0.295, no line gap), which is tight for reading: the web reads body at 1.5, a row's
 /// words and meta at about 1.4. SwiftUI's `lineSpacing` adds the difference between lines (never above the first or under
 /// the last, so a one-line label keeps its height), scaled with Dynamic Type as the face is.
 ///
@@ -96,9 +96,9 @@ public enum Leading: Sendable {
 }
 
 private struct LeadingSpace: ViewModifier {
-    @ScaledMetric(relativeTo: .body) private var body14: CGFloat = 3.5
-    @ScaledMetric(relativeTo: .body) private var row15: CGFloat = 1.5
-    @ScaledMetric(relativeTo: .footnote) private var meta12: CGFloat = 2
+    @ScaledMetric(relativeTo: .body) private var body14: CGFloat = 2.8
+    @ScaledMetric(relativeTo: .body) private var row15: CGFloat = 0.9
+    @ScaledMetric(relativeTo: .footnote) private var meta12: CGFloat = 1.5
     let leading: Leading
 
     func body(content: Content) -> some View {

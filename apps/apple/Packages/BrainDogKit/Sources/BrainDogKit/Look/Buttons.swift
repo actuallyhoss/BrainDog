@@ -104,7 +104,7 @@ public enum Radius {
 }
 
 /// `--sp-1` to `--sp-8`, and the named steps of `loop/plans/spacing-2026-11-03/RHYTHM.md` a native screen uses. The
-/// web's line boxes are taller than SwiftUI's (Jakarta draws 1.26 em; the web sets 15/20, 12.5/18), so where the web pads
+/// web's line boxes are taller than SwiftUI's (Geist draws 1.30 em; the web sets 15/20, 12.5/18), so where the web pads
 /// a box 8 round its line boxes, a native row pads 10 round its glyphs and lands on the same height.
 public enum Space {
     public static let s1: CGFloat = 4

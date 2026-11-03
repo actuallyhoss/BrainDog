@@ -179,7 +179,7 @@ extension Links {
 #endif
 
 /// The navigation bar in the ops look: the system's own Liquid Glass, so the page runs under it and its buttons float as
-/// glass, with no hairline; only the title's face and the inks are BrainDog's (Plus Jakarta Sans 600 at 22).
+/// glass, with no hairline; only the title's face and the inks are BrainDog's (Lexend 600 at 22).
 enum Bars {
     static func dress() {
         let bar = UINavigationBarAppearance()
