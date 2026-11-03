@@ -1099,11 +1099,15 @@
   }
 
   /* DEFAULTS IS NOT AN AGENT: it stands under them across the tile, a hairline above it. */
+  /* THE TILE'S 16 GAP IS TAKEN BACK over the hairline, so the rule has the rows' own 12 on each side of it, as the rules
+     between the agents above it do: it stood 28 under the last agent and 12 over Defaults. */
   .agents-default {
+    margin-block-start: calc(-1 * var(--sp-4));
     border-block-start: 1px solid var(--rule);
   }
 
   .agents-default:first-child {
+    margin-block-start: 0;
     border-block-start: 0;
   }
 
