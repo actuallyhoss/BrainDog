@@ -156,6 +156,11 @@
     font-weight: 600;
   }
 
+  /* FIGURES THAT LINE UP ARE TABULAR (Jakarta's own run from 0.37 em for a 1 to 0.73 for a 0). */
+  :where(table) {
+    font-variant-numeric: tabular-nums;
+  }
+
   /**
    * THE APP'S STYLE, ON THE SITE (3 Nov). The app took the ops dashboard's style in its own colours; the site follows
    * so a visitor sees the same thing here as after they sign in. Colours stay Look B's: every value below is a mix of
