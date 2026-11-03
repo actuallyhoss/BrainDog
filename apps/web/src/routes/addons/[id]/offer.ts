@@ -38,7 +38,7 @@ export type OfferClient = ReturnType<typeof createClient>;
 
 /** A plan read and on the sheet: an add-on's or a module's `Diff`, or a use case's pack-by-pack plan. */
 export type Planned =
-  | { kind: 'pack'; doc: Record<string, unknown>; diff: unknown; planHash: string; approve: string[]; after?: After }
+  | { kind: 'pack'; doc: Record<string, unknown>; diff: unknown; planHash: string; approve: string[]; after?: After; source?: { kind: string; ref?: string } }
   | { kind: 'usecase'; plan: SharedPlan };
 
 /** An update that waits, and where its file is from: the one planned, or another it may go in after. */
@@ -128,7 +128,8 @@ export function waitsOf(p: Planned, nameOf: (id: string) => string): string[] {
 export async function planFor(
   client: OfferClient,
   listing: Pick<Listing, 'kind' | 'id' | 'source'> & { title?: string },
-  file: { doc: Record<string, unknown> | null; text: string | null },
+  /** `source` is where a file came from when it is not this host's: a GitHub file pinned to its commit (`fetchShared`). */
+  file: { doc: Record<string, unknown> | null; text: string | null; source?: { kind: string; ref?: string } },
   states: readonly PackState[],
   fallback: string,
   /** What else waits, asked for only when this plan has something to wait for. Left out, the plan is the record's as it stands. */
@@ -143,7 +144,8 @@ export async function planFor(
      out, and it carries no example rows. */
   const doc = file.doc ?? (listing.kind === 'module' ? await packDocument(listing.id, states) : null);
   if (!doc) return { ok: false, fix: fallback, code: null };
-  const planned = await client.planPack({ doc, source: { kind: 'local' } });
+  const source = file.source ?? { kind: 'local' };
+  const planned = await client.planPack({ doc, source });
   if (!planned.ok) return refusedOf(planned, fallback);
   const read = isMap(planned.value) && isMap(planned.value.diff) ? planned.value.diff : null;
   const planHash = typeof read?.planHash === 'string' ? read.planHash : '';
@@ -153,7 +155,7 @@ export async function planFor(
   const keys = isMap(planned.value) && Array.isArray(planned.value.keys) ? planned.value.keys.filter(isMap) : [];
   const diff = keys.length > 0 ? { ...read, keys_missing: keys } : read;
   const approve = Array.isArray(diff.approve) ? diff.approve.filter((l): l is string => typeof l === 'string') : [];
-  const own: Planned = { kind: 'pack', doc, diff, planHash, approve };
+  const own: Planned = { kind: 'pack', doc, diff, planHash, approve, ...(file.source === undefined ? {} : { source: file.source }) };
   if (!waiting || !Array.isArray(diff.conflicts) || diff.conflicts.length === 0) return { ok: true, planned: own };
   const self: Offered = { key: `${listing.kind}:${listing.id}`, kind: listing.kind, id: listing.id, title: listing.title ?? '', source: listing.source, file };
   return { ok: true, planned: await afterOthers(own, self, await waiting(), (u) => planFor(client, u, u.file, states, fallback)) };
@@ -275,7 +277,7 @@ export async function install(
     const removals = (planned.diff as { removals?: unknown } | null)?.removals;
     const out = await client.installPack({
       doc: planned.doc,
-      source: { kind: 'local' },
+      source: planned.source ?? { kind: 'local' },
       planHash: planned.planHash,
       ...(planned.approve.length > 0 ? { approve: planned.approve } : {}),
       ...(Array.isArray(removals) && removals.length > 0 ? { retireWithRows: true } : {}),

@@ -25,6 +25,7 @@
   import type { IconName } from '../ui/icons.ts';
   import { sheetOf, words } from './plan.ts';
   import { REGISTERS } from '../record/held.ts';
+  import { asksWords } from './asks.ts';
 
   let {
     diff,
@@ -38,6 +39,7 @@
     onrecheck,
     onkey,
     uses,
+    github,
   }: {
     /** The record's `Diff`, a use case's `SharedPlan`, or an array of either for "Update all". */
     diff: unknown;
@@ -68,6 +70,11 @@
      * its own. Approving the plan is agreeing to these; it can reach nothing else. Left out or empty, nothing is drawn.
      */
     uses?: readonly string[] | undefined;
+    /**
+     * WHERE IT COMES FROM, FOR A FILE FROM GITHUB (`asks.ts` `githubOf`): the repository and the commit it is pinned to,
+     * and the one plain warning that nobody reviewed it. Left out for the store's add-ons and files made here.
+     */
+    github?: { repo: string; commit: string } | null | undefined;
   } = $props();
 
   /* WHAT IS TYPED FOR EACH MISSING KEY, never kept past the sheet: emptied as it is sent, whatever comes back (RF4), as
@@ -198,6 +205,13 @@
               </li>
             {/each}
           </ul>
+        </section>
+      {/if}
+
+      {#if github}
+        <section class="plan-group" aria-labelledby="plan-github-h">
+          <h3 class="plan-h" id="plan-github-h"><IconWell name="code" /><span class="plan-title">{asksWords.github(github.repo, github.commit)}</span></h3>
+          <p class="plan-note">{asksWords.unreviewed}</p>
         </section>
       {/if}
 

@@ -57,6 +57,8 @@
   import { addonHref } from './share/addon-from.ts';
   import Swap from '$lib/motion/Swap.svelte';
   import { cardsIn } from './cards-in.ts';
+  import { asksWords } from '$lib/market/asks.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
 
   const store = words.store;
 
@@ -220,6 +222,15 @@
         questions = rows.flatMap((r) => (typeof r.question === 'string' ? [r.question] : []));
       }),
     ]);
+    /* ADD-ONS FROM GITHUB ARE LOOKED AT AS THE STORE OPENS (`gitUpdates`): a newer tag on the repository each came from
+       is asked about on Decide, and said here once. Not awaited, since GitHub is slower than the screen; refused for
+       anybody but the owner in a browser, which says nothing. */
+    void client.gitUpdates().then((out) => {
+      const asked = out.ok && Array.isArray((out.value as { asked?: unknown })?.asked) ? (out.value as { asked: unknown[] }).asked.length : 0;
+      const refused = out.ok && Array.isArray((out.value as { refused?: unknown })?.refused) ? (out.value as { refused: { fix?: unknown }[] }).refused : [];
+      if (asked > 0) untrack(() => toasts.push(asksWords.gitAsked(asked), { intent: 'good' }));
+      for (const r of refused) if (typeof r.fix === 'string') untrack(() => toasts.push(r.fix as string, { intent: 'bad' }));
+    });
     return true;
   }
   $effect(() => drew('ready'));
