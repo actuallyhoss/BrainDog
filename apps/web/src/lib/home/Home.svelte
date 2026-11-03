@@ -2043,7 +2043,6 @@
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > a.queue-more) {
       display: flex;
       max-inline-size: none;
-      border-block-start: 1px solid var(--rule);
     }
   }
 
@@ -2261,7 +2260,7 @@
   }
 
   .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(3)) {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 0;
   }
 
   /* ITS LINE IS THE LARGE CASH'S: in a wide frame the cash now, how long it lasts, and the two beside it. */
@@ -2748,6 +2747,192 @@
     .body :global(.queue > .qa:first-child .queue-question) {
       font-size: var(--fs-head);
       line-height: var(--lh-head, 24px);
+    }
+  }
+  /* ── the ops look on Today (3 Nov) ─────────────────────────────────────
+     Today takes the style of the ops dashboard's Home and its stat tiles, in BrainDog's own colours: a card's head is
+     its name at 15/600 with a quiet count, the glyph bare beside it rather than in a square well (circles and capsules,
+     never rounded squares), a figure at the stat numeral's 28/30 and no bigger, and answers drawn as capsules the size
+     of their words. On a phone the same, a step smaller, so a card is as tall as what it says. */
+
+  /* THE GREETING IS A SECTION HEADING (17/600) UNDER THE PAGE'S OWN TITLE, which the bar already says at 28. */
+  .today-hi {
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+    line-height: 22px;
+    letter-spacing: -0.01em;
+  }
+
+  .body[data-board] :global(:is(.block-bar, .tile-head)) {
+    gap: var(--sp-2);
+    min-block-size: 20px;
+  }
+
+  .body[data-board] :global(.block-bar:not([data-quiet])) {
+    margin-block-end: var(--sp-3);
+  }
+
+  .body[data-board] :global(.tile) {
+    gap: var(--sp-3);
+  }
+
+  .body[data-board] :global(:is(.block-bar > .well, .tile-head > .well, .p-title-row > .well)) {
+    inline-size: 18px;
+    block-size: 18px;
+    border-radius: 0;
+    background: none;
+    color: var(--ink-3);
+  }
+
+  .body[data-board] :global(:is(.block-bar > .well, .tile-head > .well, .p-title-row > .well) .icon[data-size]) {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+  }
+
+  .body[data-board] :global(:is(.block-bar > .block-name, .tile-head .tile-title)) {
+    max-inline-size: calc(100% - 18px - var(--sp-2));
+    font-size: var(--fs-body);
+    line-height: 20px;
+    letter-spacing: -0.005em;
+  }
+
+  .body[data-board] :global(.tile-head .tile-title) {
+    gap: 6px;
+  }
+
+  .body[data-board] :global(.block-bar .block-count) {
+    margin-inline-start: 6px;
+  }
+
+  .body[data-board] :global(:is(.block-bar .block-count, .tile-head .tile-count)) {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+  }
+
+  /* NEEDS YOU'S COUNT STAYS THE ONE RED IN A HEAD, at the same quiet size as the rest. */
+  .body[data-board] :global(.block-slot[data-key='needs-you'] > .block-bar .block-count) {
+    color: var(--red);
+    font-weight: var(--fw-medium);
+  }
+
+  /* CASH NOW AT THE STAT NUMERAL (28/30, 600, a hair tight), in the UI face; coming in and going out at a row's 15/600. */
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child .cell-figure) {
+    font-family: var(--font-ui);
+    font-size: var(--fs-page);
+    font-weight: var(--fw-semi);
+    line-height: 30px;
+    letter-spacing: -0.02em;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:nth-child(n + 2) .cell-figure) {
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .cell-label) {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  .body[data-board] :global(.p-title-row) {
+    gap: var(--sp-2);
+  }
+
+  .body[data-board] :global(.p-title-row > .p-count) {
+    margin-inline-start: -2px;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+  }
+
+  /* A FRAME ENDS AT ITS PADDING: a block's own step under it (24, for a page of blocks) stood as air at a card's foot. */
+  .body[data-board] :global([data-board-key] > .block) {
+    margin-block-end: 0;
+  }
+
+  /* NO HAIRLINES INSIDE A CARD (the ops look's rows): Your work's rows, cash coming in and going out, and the rule under a
+     list's head are told apart by their air, not by a line. */
+  .body[data-board] :global([data-board-key] .list > .item) {
+    border-block-end: 0;
+    background-image: none;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell + .cell) {
+    border-block-start: 0;
+  }
+
+  .body[data-board] :global(.block-slot.block-slot.block-slot > .block-bar) {
+    padding-block-end: 0;
+    border-block-end: 0;
+  }
+
+  /* A PROJECT'S MARK AND A QUESTION'S GLYPH ARE CIRCLES, as every face on Today is. */
+  .body[data-board] :global(.pcard .pc-a > .well) {
+    border-radius: var(--r-round);
+  }
+
+  /* A QUESTION'S GLYPH IS A CIRCLE, as every face on Today is. */
+  .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-row .dr-well .well) {
+    border-radius: var(--r-round);
+  }
+
+  /* THE ANSWERS ARE CAPSULES AS WIDE AS THEIR WORDS, never two slabs across the card. */
+  .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-btn:not([data-weight='bare'])) {
+    border-radius: var(--r-round);
+  }
+
+  @media (width < 640px) {
+    .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child .cell-figure) {
+      font-size: 24px;
+      line-height: 28px;
+    }
+
+    /* ONE QUESTION IN THREE LINES AT MOST, and the question is the door to the rest: no "Read all" under it on Today. */
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > .qa:first-child .queue-question) {
+      line-clamp: 3;
+      -webkit-line-clamp: 3;
+    }
+
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-read) {
+      display: none;
+    }
+
+    /* A FIGURE AS ROWS STARTS UNDER ITS HEAD, not a row's padding below it, and a list of names likewise. */
+    .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:first-child) {
+      padding-block-start: 0;
+    }
+
+    .body[data-board] :global([data-board-key] .cards-grid > .cards-item:first-child) {
+      padding-block-start: var(--sp-2);
+    }
+
+    .body[data-board] :global([data-board-key] .cards-grid > .cards-item:last-child) {
+      padding-block-end: 0;
+    }
+  }
+
+  @media (width < 600px) {
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-actions[data-inline] > .dc-btn:not([data-weight='bare'])),
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-actions > .dc-btn:not([data-weight='bare'])) {
+      flex: 0 0 auto;
+      min-inline-size: 0;
+      min-block-size: 36px;
+      padding: 0 var(--sp-4);
+      text-align: center;
+    }
+  }
+
+  /* UNDER A THUMB A CAPSULE IS DRAWN 36 TALL, and its 44 target is the air round it. */
+  @media (pointer: coarse) {
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-actions > .dc-btn) {
+      position: relative;
+      min-block-size: 36px;
+    }
+
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-actions > .dc-btn::after) {
+      content: '';
+      position: absolute;
+      inset: -4px 0;
     }
   }
 </style>

@@ -170,8 +170,9 @@
     padding-block: var(--sp-2);
   }
 
+  /* NO HAIRLINE BETWEEN ROWS (ops look, 3 Nov): the step of air between them says where one ends. */
   .hl + .hl {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 0;
   }
 
   .hl-mark {
@@ -343,8 +344,9 @@
     padding-block-start: 0;
   }
 
+  /* NO HAIRLINE BETWEEN ROWS (ops look, 3 Nov): the step of air between them says where one ends. */
   .hd + .hd {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 0;
   }
 
   /* THE DAY (Today polish 6): 44 wide and 40 tall, so "Today" clears its ring, at the control's corner on the second surface, the weekday at 11 in the quiet ink
@@ -442,7 +444,29 @@
   /* TWO ITEMS ON ONE DATE ARE TWO ITEMS: a rule and a step of air between them, each held to two lines. */
   .hd-line + .hd-line {
     margin-block-start: var(--sp-2);
-    padding-block-start: var(--sp-2);
-    border-block-start: 1px solid var(--rule);
+  }
+
+  /* THE DATE AS A STACK, NOT A BOX (ops look, 3 Nov): the weekday small and capped over the day's number, on the tile
+     itself, so a list of days reads as dates rather than as a column of grey buttons. Today keeps its ring. */
+  .hd-chip:not([data-today]) {
+    background: none;
+  }
+
+  .hd-week {
+    font-size: 10.5px;
+    font-weight: var(--fw-semi);
+    line-height: 14px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .hd-chip[data-today] .hd-week {
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .hd-chip:not([data-today]) .hd-date {
+    font-size: 19px;
+    line-height: 20px;
   }
 </style>
