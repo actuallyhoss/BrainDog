@@ -232,3 +232,29 @@ test('HEADER: model over the ceiling and notifies that is not true are refused a
     await s.close();
   }
 });
+
+test('IN A TRY, NOTIFY AND ASK ARE DRY: checked, answered dry, nothing told, nothing asked, nothing kept', async () => {
+  const s = await selfhost([], () => 'Dune');
+  try {
+    const owner = s.running.sql.one<{ person_id: string }>("SELECT person_id FROM member WHERE level = 'owner'")!.person_id;
+    const body = {
+      script: 'dry',
+      runs: { every: '1d' },
+      egress: [],
+      keys: [],
+      reads: [],
+      writes: [],
+      notifies: true,
+      model: { most_per_run: 1 },
+      store: true,
+      source: "export default async (ctx) => { const n = await ctx.notify({ title: 'hi' }); const a = await ctx.ask('pick'); const k = await ctx.store.set('x', 1); ctx.log(JSON.stringify([n, a, k])); }",
+    };
+    const tried = said<{ log?: string; writes?: unknown[] }>(await s.running.api.scriptTry({ body } as never, { principal: { kind: 'person', id: owner, level: 'owner' } } as never));
+    assert.match(String(tried.log), /\{"ok":true,"dry":true\},\{"ok":true,"dry":true,"text":""\},\{"ok":true\}/u);
+    assert.deepEqual(s.notes('dry'), []);
+    assert.equal(s.asked.length, 0, 'a try asked the model');
+    assert.deepEqual(s.k.scriptStore('script:dry'), {});
+  } finally {
+    await s.close();
+  }
+});
