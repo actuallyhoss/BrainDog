@@ -23,7 +23,7 @@
          opened from the Home Screen draws its status bar in it (`default`, dark letters on light and light on dark),
          and BrainDog is the app's name under its icon. -->
     <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#2E0C18" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#0B0B0B" media="(prefers-color-scheme: dark)" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -52,8 +52,7 @@
          `lib/fonts.test.ts` holds them equal. `crossorigin` because a font is always fetched in CORS mode, and a
          preload made without it is not the request the stylesheet makes. Geist Mono and Arabic stay unpreloaded:
          a page asks for them only when it draws one. -->
-    <link rel="preload" href="%sveltekit.assets%/fonts/geist.woff2?v=494f" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="%sveltekit.assets%/fonts/lexend-600.woff2?v=7865" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="%sveltekit.assets%/fonts/jakarta.woff2?v=153f" as="font" type="font/woff2" crossorigin />
 
     <!--
       THE FALLBACKS ARE SIZED TO THE FACES, SO NOTHING MOVES WHEN THEY ARRIVE. Until a webfont lands the text is drawn
@@ -72,6 +71,17 @@
       12 KB with less room left than these take.
     -->
     <style>
+      /* PLUS JAKARTA SANS, the one face since 3 Nov (`lib/ui/style.css`): Arial widened to its stance. */
+      @font-face {
+        font-family: 'Jakarta Fallback';
+        src: local('Arial'), local('ArialMT');
+        size-adjust: 105%;
+        ascent-override: 98%;
+        descent-override: 21%;
+        line-gap-override: 0%;
+        unicode-range: U+0000-00FF, U+2000-206F, U+20AC, U+2122, U+2212;
+      }
+
       @font-face {
         font-family: 'Geist Fallback';
         src: local('Arial'), local('ArialMT');

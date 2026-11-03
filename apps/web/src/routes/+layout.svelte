@@ -34,6 +34,8 @@
   /* THE UI PASS OF 1 NOV: the head row every page shares, and the motion every shared control gets for free. */
   import '$lib/ui/head-row.css';
   import '$lib/motion/motion.css';
+  /* THE STYLE LAYER (3 Nov): the ops dashboard's style in BrainDog's colours. Last, so its values win a tie. */
+  import '$lib/ui/style.css';
   import { onMount } from 'svelte';
 
   let { data, children } = $props();

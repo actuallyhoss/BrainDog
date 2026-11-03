@@ -1,0 +1,469 @@
+/* THE STYLE LAYER (3 Nov 2026): BrainDog in the ops dashboard's style, in BrainDog's own colours.
+
+   Sam: "i want the ui to look more like ops encore ui", then "i dont mean ops encore colors, i mean just the style".
+   So nothing here writes a colour of its own: every new token is a mix of the palette `house.css` generates (the board,
+   the tile, the ink, the accent fill), so a person's accent, dark and high contrast follow by themselves. What it adds
+   is the STYLE: one face, capsules and circles, a soft ambient ground, solid cards with a two-layer shadow, glass only
+   on floating chrome, translucent washes for hover, and the ops elevation tiers. The spec is
+   `loop/plans/ops-look-2026-11-03/SPEC.md`.
+
+   Imported by `routes/+layout.svelte` after every other sheet, so its values win a tie in each layer. App only: the
+   marketing site keeps Look B. */
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/fonts/jakarta.woff2?v=153f') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@layer tokens {
+  :root {
+    /* ONE FACE for every word, titles and figures too (ops: one family, 400/500/600). Geist Mono stays for code. */
+    --font-ui: 'Plus Jakarta Sans', 'Jakarta Fallback', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: var(--font-ui);
+
+    /* TYPE: dense desktop sizes. */
+    --fs-cap: 12px;
+    --fs-meta: 12.5px;
+    --fs-ctl: 13px;
+    --fs-body: 14px;
+    --fs-row: 15px;
+    --fs-head: 17px;
+    --fs-figure: 22px;
+    --fs-page: 28px;
+    --fs-hero: 30px;
+    --fs-caps: 11px;
+    --lh-body: 1.5;
+    --track-page: -0.021em;
+    --track-figure: -0.02em;
+
+    /* SHAPES: circles and capsules for controls, concentric radii for surfaces. */
+    --r-xs: 6px;
+    --r-ctl: 10px;
+    --r-pill: 999px;
+    --r-field: 12px;
+    --r-pop: 12px;
+    --r-tip: 14px;
+    --r-tile: 16px;
+    --r-chrome: 20px;
+    --r-sheet: 22px;
+    --r-panel: 24px;
+    --r-menu-row: 8px;
+
+    /* SIZES: page controls are 36, panel and row controls 28. */
+    --ctl-h: 36px;
+    --btn-h: 36px;
+    --btn-h-sm: 28px;
+    --ctl-page: 36px;
+    --ctl-panel: 28px;
+    --table-row-h: 44px;
+    --title-inset: 12px;
+    --toolbar-gap: 6px;
+    --window-inset: 12px;
+    --tile-gap: 16px;
+    --rail: 220px;
+
+    /* MOTION: the ops springs, beside the house's eases. */
+    --spring-press: linear(0, 0.158, 0.438, 0.683, 0.852, 0.949, 0.995, 1.013, 1.015, 1.012, 1.008, 1);
+    --spring-pop: linear(0, 0.089, 0.266, 0.449, 0.607, 0.731, 0.822, 0.885, 0.928, 0.956, 0.974, 0.985, 0.992, 1);
+    --d-press-out: 190ms;
+  }
+
+  /* LIGHT (the default, and a page that says light). `--sh` is the shadow colour: the ink, so a shadow is never a
+     foreign blue-black on a warm palette. */
+  :root {
+    --sh: var(--ink);
+    --sep: color-mix(in oklab, var(--ink) 8%, transparent);
+    --row-wash: color-mix(in oklab, var(--ink) 5%, transparent);
+    --row-wash-press: color-mix(in oklab, var(--ink) 8.5%, transparent);
+    --menu-row-fill: color-mix(in oklab, var(--ink) 7%, transparent);
+    --focus-ring: color-mix(in oklab, var(--focus) 70%, transparent);
+
+    --card-edge: color-mix(in oklab, var(--tile) 80%, transparent);
+    --shadow-card:
+      inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px color-mix(in oklab, var(--sh) 4%, transparent),
+      0 12px 30px -12px color-mix(in oklab, var(--sh) 14%, transparent);
+    --shadow-card-hover:
+      inset 0 1px 0 rgb(255 255 255 / 0.9), 0 2px 4px color-mix(in oklab, var(--sh) 5%, transparent),
+      0 18px 36px -12px color-mix(in oklab, var(--sh) 20%, transparent);
+    --shadow-raised:
+      0 1px 1px color-mix(in oklab, var(--sh) 4%, transparent), 0 2px 4px color-mix(in oklab, var(--sh) 4%, transparent),
+      0 6px 12px color-mix(in oklab, var(--sh) 5%, transparent);
+    --elev-chrome:
+      0 1px 2px -1px color-mix(in oklab, var(--sh) 8%, transparent),
+      0 6px 18px -8px color-mix(in oklab, var(--sh) 16%, transparent);
+    --elev-popover:
+      0 1px 2px color-mix(in oklab, var(--sh) 8%, transparent),
+      0 8px 24px -6px color-mix(in oklab, var(--sh) 18%, transparent),
+      0 24px 48px -16px color-mix(in oklab, var(--sh) 16%, transparent);
+    --elev-modal:
+      0 1px 2px color-mix(in oklab, var(--sh) 10%, transparent),
+      0 12px 28px -8px color-mix(in oklab, var(--sh) 28%, transparent),
+      0 32px 64px -24px color-mix(in oklab, var(--sh) 32%, transparent);
+    --shadow-panel:
+      0 0 0 0.5px color-mix(in oklab, var(--sh) 10%, transparent), 0 1px 2px color-mix(in oklab, var(--sh) 5%, transparent),
+      0 10px 28px -10px color-mix(in oklab, var(--sh) 14%, transparent),
+      0 32px 72px -28px color-mix(in oklab, var(--sh) 20%, transparent);
+
+    --glass-filter: blur(24px) saturate(130%) brightness(1.04);
+    --glass-regular: color-mix(in oklab, var(--tile) 84%, transparent);
+    --glass-chrome: color-mix(in oklab, var(--tile) 62%, transparent);
+    --glass-clear: color-mix(in oklab, var(--tile) 52%, transparent);
+    --glass-edge: inset 0 1px 0 0 rgb(255 255 255 / 0.9), inset 0 0 0 0.5px color-mix(in oklab, var(--ink) 6%, transparent);
+
+    --g-fill: color-mix(in oklab, var(--tile) 55%, transparent);
+    --g-fill-hover: color-mix(in oklab, var(--tile) 78%, transparent);
+    --g-bf: blur(12px) saturate(1.1);
+    --g-line: color-mix(in oklab, var(--ink) 7%, transparent);
+    --g-on: color-mix(in oklab, var(--ink) 6%, transparent);
+    --g-sel: color-mix(in oklab, var(--tile) 98%, transparent);
+    --g-sel-line: color-mix(in oklab, var(--ink) 12%, transparent);
+    --soft-fill: color-mix(in oklab, var(--ink) 5%, transparent);
+    --soft-fill-hover: color-mix(in oklab, var(--ink) 9%, transparent);
+
+    /* THE AMBIENT GROUND: the ops page's three soft lights, struck from BrainDog's own hues (the accent, the violet and
+       the sky slots), over the board. Fixed behind the page; nothing scrolls it, nothing blurs it. */
+    --ambient:
+      radial-gradient(70vw 60vh at 0% 6%, color-mix(in oklab, var(--red-fill) 8%, transparent), transparent 70%),
+      radial-gradient(60vw 55vh at 100% 2%, color-mix(in oklab, var(--cat-violet) 8%, transparent), transparent 70%),
+      radial-gradient(80vw 60vh at 60% 100%, color-mix(in oklab, var(--cat-sky) 8%, transparent), transparent 70%),
+      var(--board);
+  }
+
+  /* DARK, both ways a page gets it: the reader's scheme when nothing is chosen, and a chosen dark. */
+  @media (prefers-color-scheme: dark) {
+    html:not([data-scheme]) {
+      --sh: #000;
+      --sep: color-mix(in oklab, var(--ink) 8%, transparent);
+      --row-wash: color-mix(in oklab, var(--ink) 5%, transparent);
+      --row-wash-press: color-mix(in oklab, var(--ink) 8%, transparent);
+      --menu-row-fill: color-mix(in oklab, var(--ink) 8%, transparent);
+      --card-edge: color-mix(in oklab, var(--ink) 8%, transparent);
+      --shadow-card: none;
+      --shadow-card-hover: none;
+      --shadow-raised: 0 1px 1px rgb(0 0 0 / 0.3), 0 2px 4px rgb(0 0 0 / 0.24), 0 6px 12px rgb(0 0 0 / 0.28);
+      --elev-chrome: 0 6px 18px -8px rgb(0 0 0 / 0.42);
+      --elev-popover: 0 1px 2px rgb(0 0 0 / 0.45), 0 10px 28px -8px rgb(0 0 0 / 0.55), 0 28px 56px -20px rgb(0 0 0 / 0.55);
+      --elev-modal: 0 1px 2px rgb(0 0 0 / 0.5), 0 14px 32px -10px rgb(0 0 0 / 0.6), 0 40px 72px -28px rgb(0 0 0 / 0.7);
+      --shadow-panel:
+        0 0 0 0.5px rgb(0 0 0 / 0.6), 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px -8px rgb(0 0 0 / 0.38),
+        0 32px 72px -24px rgb(0 0 0 / 0.6);
+      --glass-filter: blur(24px) saturate(170%) brightness(1.22);
+      --glass-regular: color-mix(in oklab, var(--tile) 74%, transparent);
+      --glass-chrome: color-mix(in oklab, var(--ink) 4.5%, transparent);
+      --glass-clear: color-mix(in oklab, var(--tile) 50%, transparent);
+      --glass-edge: inset 0 1px 0 0 rgb(255 255 255 / 0.08), inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
+      --g-fill: color-mix(in oklab, var(--ink) 7%, transparent);
+      --g-fill-hover: color-mix(in oklab, var(--ink) 11%, transparent);
+      --g-line: color-mix(in oklab, var(--ink) 7%, transparent);
+      --g-on: color-mix(in oklab, var(--ink) 7%, transparent);
+      --g-sel: color-mix(in oklab, var(--ink) 16%, transparent);
+      --g-sel-line: color-mix(in oklab, var(--ink) 6%, transparent);
+      --soft-fill: color-mix(in oklab, var(--ink) 8%, transparent);
+      --soft-fill-hover: color-mix(in oklab, var(--ink) 13%, transparent);
+      --ambient:
+        radial-gradient(60rem 40rem at 50% -12%, color-mix(in oklab, var(--red-fill) 9%, transparent), transparent 70%),
+        radial-gradient(40rem 30rem at 12% 106%, color-mix(in oklab, var(--info) 6%, transparent), transparent 70%),
+        radial-gradient(35rem 28rem at 92% 78%, color-mix(in oklab, var(--cat-violet) 5%, transparent), transparent 70%),
+        var(--board);
+    }
+  }
+  html[data-scheme='dark'] {
+    --sh: #000;
+    --sep: color-mix(in oklab, var(--ink) 8%, transparent);
+    --row-wash: color-mix(in oklab, var(--ink) 5%, transparent);
+    --row-wash-press: color-mix(in oklab, var(--ink) 8%, transparent);
+    --menu-row-fill: color-mix(in oklab, var(--ink) 8%, transparent);
+    --card-edge: color-mix(in oklab, var(--ink) 8%, transparent);
+    --shadow-card: none;
+    --shadow-card-hover: none;
+    --shadow-raised: 0 1px 1px rgb(0 0 0 / 0.3), 0 2px 4px rgb(0 0 0 / 0.24), 0 6px 12px rgb(0 0 0 / 0.28);
+    --elev-chrome: 0 6px 18px -8px rgb(0 0 0 / 0.42);
+    --elev-popover: 0 1px 2px rgb(0 0 0 / 0.45), 0 10px 28px -8px rgb(0 0 0 / 0.55), 0 28px 56px -20px rgb(0 0 0 / 0.55);
+    --elev-modal: 0 1px 2px rgb(0 0 0 / 0.5), 0 14px 32px -10px rgb(0 0 0 / 0.6), 0 40px 72px -28px rgb(0 0 0 / 0.7);
+    --shadow-panel:
+      0 0 0 0.5px rgb(0 0 0 / 0.6), 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px -8px rgb(0 0 0 / 0.38),
+      0 32px 72px -24px rgb(0 0 0 / 0.6);
+    --glass-filter: blur(24px) saturate(170%) brightness(1.22);
+    --glass-regular: color-mix(in oklab, var(--tile) 74%, transparent);
+    --glass-chrome: color-mix(in oklab, var(--ink) 4.5%, transparent);
+    --glass-clear: color-mix(in oklab, var(--tile) 50%, transparent);
+    --glass-edge: inset 0 1px 0 0 rgb(255 255 255 / 0.08), inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
+    --g-fill: color-mix(in oklab, var(--ink) 7%, transparent);
+    --g-fill-hover: color-mix(in oklab, var(--ink) 11%, transparent);
+    --g-line: color-mix(in oklab, var(--ink) 7%, transparent);
+    --g-on: color-mix(in oklab, var(--ink) 7%, transparent);
+    --g-sel: color-mix(in oklab, var(--ink) 16%, transparent);
+    --g-sel-line: color-mix(in oklab, var(--ink) 6%, transparent);
+    --soft-fill: color-mix(in oklab, var(--ink) 8%, transparent);
+    --soft-fill-hover: color-mix(in oklab, var(--ink) 13%, transparent);
+    --ambient:
+      radial-gradient(60rem 40rem at 50% -12%, color-mix(in oklab, var(--red-fill) 9%, transparent), transparent 70%),
+      radial-gradient(40rem 30rem at 12% 106%, color-mix(in oklab, var(--info) 6%, transparent), transparent 70%),
+      radial-gradient(35rem 28rem at 92% 78%, color-mix(in oklab, var(--cat-violet) 5%, transparent), transparent 70%),
+      var(--board);
+  }
+
+  /* HIGH CONTRAST AND LESS TRANSPARENCY: no glass to read through. Every glass film turns near-solid, and the ambient
+     light goes so the board is one flat colour under the words. */
+  html[data-theme='hc'] {
+    --glass-regular: var(--tile);
+    --glass-chrome: var(--tile);
+    --glass-clear: var(--tile);
+    --g-fill: var(--tile);
+    --g-fill-hover: var(--hover);
+    --g-line: var(--ink);
+    --card-edge: var(--rule-strong);
+    --ambient: var(--board);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    :root {
+      --glass-regular: color-mix(in oklab, var(--tile) 97%, transparent);
+      --glass-chrome: color-mix(in oklab, var(--tile) 97%, transparent);
+      --glass-clear: color-mix(in oklab, var(--tile) 97%, transparent);
+      --g-fill: color-mix(in oklab, var(--tile) 94%, transparent);
+    }
+  }
+
+  html[data-text='sm'] { --fs-body: 13px; }
+  html[data-text='md'] { --fs-body: 16px; }
+  html[data-density='compact'] { --row-h: 40px; }
+}
+
+@layer components {
+  /* THE GROUND: the ambient light on the window. `body` is the window here (the shell's `.body` is the scroller). */
+  body {
+    background: var(--ambient);
+    background-color: var(--board);
+    letter-spacing: 0;
+    font-feature-settings: 'cv11' on;
+  }
+
+  :where(h1, h2, h3, h4) {
+    font-family: var(--font-display);
+    font-weight: var(--fw-semi);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* A CARD: the one surface for content. Solid, a 1px edge in its own colour, the soft two-layer shadow in light. */
+  .card {
+    background: var(--tile);
+    border: 1px solid var(--card-edge);
+    border-radius: var(--r-tile);
+    box-shadow: var(--shadow-card);
+  }
+  .card.is-link {
+    transition: box-shadow 150ms var(--ease-standard), border-color 150ms var(--ease-standard);
+  }
+  .card.is-link:hover {
+    box-shadow: var(--shadow-card-hover);
+    border-color: var(--rule-strong);
+  }
+
+  /* GLASS: a floating surface people read on (menus, tooltips, toasts). Never content. */
+  .glass {
+    background: var(--glass-regular);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    box-shadow: var(--glass-edge), var(--elev-popover);
+  }
+  .glass-chrome {
+    background: var(--glass-chrome);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    box-shadow: var(--glass-edge), var(--elev-chrome);
+  }
+
+  /* A GLASS CONTROL: a circle (one glyph) or a capsule (`.cap`, words), 36 on a page and 28 (`.sm`) in a panel or row. */
+  .gctl {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+    inline-size: var(--ctl-page);
+    block-size: var(--ctl-page);
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-pill);
+    background: var(--g-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
+    color: var(--ink);
+    font: var(--fw-medium) var(--fs-ctl) / 1 var(--font-ui);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 120ms var(--ease-standard),
+      scale var(--d-press-out) var(--spring-press);
+  }
+  .gctl.cap {
+    inline-size: auto;
+    padding-inline: 14px;
+  }
+  .gctl.sm {
+    inline-size: var(--ctl-panel);
+    block-size: var(--ctl-panel);
+    font-size: 12px;
+  }
+  .gctl.sm.cap {
+    inline-size: auto;
+    padding-inline: 12px;
+  }
+  .gctl:hover {
+    background-color: var(--g-fill-hover);
+  }
+  .gctl[aria-expanded='true'],
+  .gctl[data-open] {
+    background-image: linear-gradient(var(--g-on), var(--g-on));
+  }
+  .gctl[aria-pressed='true'] {
+    background: color-mix(in oklab, var(--red-fill) 12%, transparent);
+    color: var(--link);
+  }
+  .gctl:active {
+    scale: 0.97;
+    transition-duration: 120ms, 70ms;
+  }
+  .gctl:is(:disabled, [aria-disabled='true']) {
+    color: var(--ink-3);
+    cursor: default;
+  }
+  .gctl svg {
+    inline-size: 18px;
+    block-size: 18px;
+  }
+  .gctl.sm svg {
+    inline-size: 16px;
+    block-size: 16px;
+  }
+
+  /* THE ONE ADD: the accent fill as a circle, last in a control line. */
+  .gctl.add {
+    background: var(--red-fill);
+    color: var(--on-red);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .gctl.add:hover {
+    background: var(--red-fill-hover);
+  }
+
+  /* THE CONTROL LINE: controls side by side in any top bar, 6 apart. */
+  .ctl-line {
+    display: flex;
+    align-items: center;
+    gap: var(--toolbar-gap);
+    flex-shrink: 0;
+  }
+
+  /* A BADGE: the one static status mark, a capsule. Tones from the palette's tints. */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    block-size: 22px;
+    padding-inline: 8px;
+    border-radius: var(--r-pill);
+    background: var(--soft-fill);
+    color: var(--ink-2);
+    font-size: 11.5px;
+    font-weight: var(--fw-semi);
+    white-space: nowrap;
+  }
+  .badge[data-tone='good'] { background: var(--good-tint); color: var(--good); }
+  .badge[data-tone='warn'] { background: var(--warn-tint); color: var(--warn); }
+  .badge[data-tone='bad'] { background: var(--red-tint); color: var(--red); }
+  .badge[data-tone='info'] { background: var(--info-tint); color: var(--info); }
+
+  /* A CAPS LABEL: the tiny group header (menus, the palette, a table's head). Never a title. */
+  .caps {
+    font-size: var(--fs-caps);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* A MENU ROW: 32 tall, the fill inset 1px so two lit rows never touch. */
+  .menu-row {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    inline-size: 100%;
+    min-block-size: 32px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-menu-row);
+    background: none;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 13px;
+    text-align: start;
+  }
+  .menu-row::before {
+    content: '';
+    position: absolute;
+    inset: 1px 0;
+    z-index: -1;
+    border-radius: 7px;
+    pointer-events: none;
+  }
+  .menu-row:hover::before,
+  .menu-row:focus-visible::before,
+  .menu-row[data-active='true']::before {
+    background: var(--menu-row-fill);
+  }
+
+  /* AN INSET GROUPED LIST (settings, a panel's facts): a soft group, rows with separators from the text edge. */
+  .group-list {
+    display: flex;
+    flex-direction: column;
+    padding-block: 3px;
+    border-radius: var(--r-tile);
+    background: var(--tile);
+    box-shadow: var(--shadow-card);
+    border: 1px solid var(--card-edge);
+  }
+  .group-list > * + * {
+    box-shadow: inset 0 0.5px 0 var(--sep);
+  }
+
+  /* THE HOVER WASH on a row: an inset rounded fill, never edge to edge. */
+  .row-wash {
+    position: relative;
+    isolation: isolate;
+  }
+  .row-wash::after {
+    content: '';
+    position: absolute;
+    inset: 3px 6px;
+    z-index: -1;
+    border-radius: var(--r-ctl);
+    pointer-events: none;
+    transition: background-color 150ms ease;
+  }
+  .row-wash:hover::after {
+    background: var(--row-wash);
+  }
+  .row-wash:active::after {
+    background: var(--row-wash-press);
+  }
+
+  /* THE SCROLLBAR: thin, a wash of the ink. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--ink) 24%, transparent) transparent;
+  }
+}
