@@ -15,7 +15,8 @@ test('Appearance says the look is kept per record, and where it waits when the r
   const src = area('Appearance');
   const words = src.slice(src.indexOf('const words = {'), src.indexOf('};', src.indexOf('const words = {')));
   assert.doesNotMatch(words, /every device you sign in on/u, 'the hint still promises one look across every record');
-  assert.match(words, /Kept in \$\{record\}, on all your devices\./u);
+  /* SAID AT THE CARD HEAD'S END SINCE 3 NOV (settings lane), in the record whose settings these are. */
+  assert.match(words, /hint: 'On all your devices'/u);
   assert.match(words, /hintPending:/u);
   /* THE SHELL'S SLUG IS HANDED OVER, so Settings opened first names the same person and record the layout does. */
   assert.match(src, /follow\(untrack\(\(\) => \(\{ me: props\.shell\.me, record: \{ slug: props\.shell\.index\.slug \} \}\)\)\)/u);

@@ -135,17 +135,20 @@ test('THE FOLD NAMES ONLY WHAT IT HOLDS, and is not drawn over nothing', () => {
     assert.doesNotMatch(line, /\b(rows?|lists?|items?|entit(y|ies))\b/iu, line);
 });
 
-test('THE SCREEN AT REST: the Ask tile and one list, with everything else in one fold that a press opens', async () => {
+test('THE SCREEN AT REST: the conversation, and Past suggestions as one list with everything else in one fold that a press opens', async () => {
   const { readFileSync } = await import('node:fs');
   const screen = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   const markup = screen.slice(screen.indexOf('</svelte:head>'), screen.indexOf('<style>'));
+  /* SLASH IS A CONVERSATION ON ITS OWN PAGE SINCE 3 NOV (tools lane): at rest it is the composer and the threads, and the
+     suggestions are their own page (`?history`), whose own ask field went, so the composer is the one place to ask. */
+  assert.match(markup, /\{#if !history\}\s*<SlashThreads \/>/u, 'the page at rest is not the conversation');
   const fold = markup.indexOf('<details class="more"');
   assert.ok(fold > 0, 'no fold');
   assert.equal((markup.match(/<details class="more"/gu) ?? []).length, 1, 'one fold, not several');
   const rest = markup.slice(0, fold);
   const inside = markup.slice(fold);
-  /* At rest: the Ask tile and the list's section, and no other tile. */
-  assert.equal((rest.match(/<(Tile|Section|SlashDaily)\b/gu) ?? []).length, 2, 'more than the Ask tile and one list at rest');
+  /* At rest on Past suggestions: the list's tile alone, and no other tile. */
+  assert.equal((rest.match(/<(Tile|Section|SlashDaily)\b/gu) ?? []).length, 1, 'more than the one list at rest');
   for (const part of ['<SlashDaily', 'words.noticed', 'pageWords.answeredTitle', 'askWords.lately', 'tally.reading', '<AskPage']) {
     assert.ok(!rest.includes(part), `${part} is drawn at rest`);
     assert.ok(inside.includes(part), `${part} is lost`);

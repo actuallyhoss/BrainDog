@@ -276,7 +276,7 @@ export const COMMANDS: readonly Command[] = [
   { id: 'c-decide', title: copy.decide, href: '/decide', group: copy.destinations, icon: 'decide', aliases: ['questions', 'approve', 'approvals', 'pending'] },
   { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox', aliases: ['mail', 'messages', 'email', 'incoming'] },
   { id: 'c-keychain', title: copy.keychain, href: '/keychain', group: copy.destinations, icon: 'vault', aliases: ['vault', 'keys', 'secrets', 'passwords', 'tokens'] },
-  { id: 'c-packs', title: copy.packs, href: '/settings/plugins', group: copy.destinations, icon: 'plug', aliases: ['packs', 'extensions', 'plugins', 'add-ons', 'addons', 'install', 'store'] },
+  { id: 'c-packs', title: copy.packs, href: '/settings/plugins', group: copy.destinations, icon: 'plug', aliases: ['packs', 'extensions', 'add ons', 'addons', 'install', 'store'] },
   /* SLASH'S CONVERSATIONS, the bare `/slash`: each one press from going on with it in Ask. */
   { id: 'c-slash-threads', title: 'Slash conversations', href: '/slash', group: copy.destinations, icon: 'slash', aliases: ['threads', 'chats'] },
   /* SLASH'S HISTORY, what it noticed, suggested and was asked: the old page, kept at `?history`. */

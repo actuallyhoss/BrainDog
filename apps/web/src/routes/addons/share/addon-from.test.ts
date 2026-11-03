@@ -114,7 +114,7 @@ test('the preview says names, never ids, and each thing once', () => {
 });
 
 test('a host without exportPack says one quiet line', () => {
-  assert.equal(quietOf({ code: 'ROUTE_UNKNOWN' }), 'This BrainDog cannot make an add-on yet.');
+  assert.equal(quietOf({ code: 'ROUTE_UNKNOWN' }), 'This BrainDog cannot make a plugin yet.');
   assert.equal(quietOf({ code: 'NOT_IN_THIS_BUILD' }), words.cannot);
   assert.equal(quietOf({ code: 'VALUE_MALFORMED' }), null);
   assert.equal(quietOf(null), null);

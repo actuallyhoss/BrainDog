@@ -81,7 +81,8 @@
     --tw-cmd: #f5f6f8;
     --tw-out: #b9bec7;
     --tw-dim: #7d838d;
-    --tw-accent: #ea645b;
+    /* THE ONE RED IS BRAINDOG'S (`--red`, SPEC 1.1), here and on the close dot. */
+    --tw-accent: var(--red);
     --tw-ok: #5fd08f;
     --tw-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 
@@ -113,7 +114,7 @@
     inline-size: 11px;
     block-size: 11px;
     border-radius: 50%;
-    background: #ff5f57;
+    background: var(--red);
   }
 
   .dots i:nth-child(2) {

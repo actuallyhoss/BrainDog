@@ -32,6 +32,7 @@ test('the screen is drawn only once a part has answered, and says nothing to tid
   assert.match(health, /\{#if !any && !heard && !quick && !late\}/u, 'the reading line stays up until the walk ends');
   assert.match(health, /\{:else if !any && !heard && !quick\}\s*<Empty kind="error" title=\{words\.slow\} body=\{words\.lateBody\} \/>/u, 'a late read stays on Reading');
   assert.match(health, /late = true;\s*\}, 8_000\)/u);
-  assert.match(health, /\{:else if !any && !heard\}\s*<!--[^>]*-->\s*<Empty kind="cleared" title=\{words\.clear\} body=\{words\.clearBodyUnchecked\} \/>/u);
+  /* A CARD AS WIDE AS THE OTHERS SINCE 3 NOV (settings lane): the calm line in a Tile with the check, not a centred Empty. */
+  assert.match(health, /\{:else if !any && !heard\}\s*(?:<!--[^>]*-->\s*)+<Tile icon="check" title=\{words\.clear\}><p class="health-said">\{words\.clearBodyUnchecked\}<\/p><\/Tile>/u);
   assert.match(health, /words\.readingPages/u);
 });

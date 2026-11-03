@@ -90,9 +90,9 @@ test('a module this build ships comes back here, at the version it ships', () =>
 });
 
 test('anything else opens its own page, with the newest version the screen can get', () => {
-  assert.deepEqual(wayBack({ id: 'orchard', version: '1.2.0' }, new Map(), kennel), { kind: 'page', href: '/addons/orchard?kind=pack', newest: '1.3.0' });
-  assert.deepEqual(wayBack({ id: 'usecase-beekeeper', version: '2.0.0' }, new Map(), kennel), { kind: 'page', href: '/addons/beekeeper', newest: '2.0.0' });
-  assert.deepEqual(wayBack({ id: 'orchard', version: '1.2.0' }, new Map(), null), { kind: 'page', href: '/addons/orchard?kind=pack', newest: null });
+  assert.deepEqual(wayBack({ id: 'orchard', version: '1.2.0' }, new Map(), kennel), { kind: 'page', href: '/plugins/orchard?kind=pack', newest: '1.3.0' });
+  assert.deepEqual(wayBack({ id: 'usecase-beekeeper', version: '2.0.0' }, new Map(), kennel), { kind: 'page', href: '/plugins/beekeeper', newest: '2.0.0' });
+  assert.deepEqual(wayBack({ id: 'orchard', version: '1.2.0' }, new Map(), null), { kind: 'page', href: '/plugins/orchard?kind=pack', newest: null });
 });
 
 test('a version that is gone is said in one line', () => {

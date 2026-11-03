@@ -17,18 +17,18 @@ import { readFileSync } from 'node:fs';
 import { words } from './words.ts';
 
 test('three updates where the second is already in: two are counted and the third is named', () => {
-  assert.equal(words.updatedAll(2, ['Invoices']), '2 add-ons are updated. Invoices was already in.');
+  assert.equal(words.updatedAll(2, ['Invoices']), '2 plugins are updated. Invoices was already in.');
 });
 
 test('one update and one passed over still says so', () => {
-  assert.equal(words.updatedAll(1, ['Invoices']), '1 add-on is updated. Invoices was already in.');
+  assert.equal(words.updatedAll(1, ['Invoices']), '1 plugin is updated. Invoices was already in.');
 });
 
 test('several passed over are each named, in the order they were met', () => {
-  assert.equal(words.updatedAll(1, ['Invoices', 'Clients']), '1 add-on is updated. Invoices and Clients were already in.');
+  assert.equal(words.updatedAll(1, ['Invoices', 'Clients']), '1 plugin is updated. Invoices and Clients were already in.');
   assert.equal(
     words.updatedAll(2, ['Invoices', 'Clients', 'Stock']),
-    '2 add-ons are updated. Invoices, Clients and Stock were already in.',
+    '2 plugins are updated. Invoices, Clients and Stock were already in.',
   );
 });
 
@@ -38,7 +38,7 @@ test('a single update with nothing passed over stays quiet, and so does a run th
 });
 
 test('two or more with nothing passed over read as they did', () => {
-  assert.equal(words.updatedAll(2, []), '2 add-ons are updated.');
+  assert.equal(words.updatedAll(2, []), '2 plugins are updated.');
   assert.equal(words.updatedAll(3, []), words.updated(3));
 });
 

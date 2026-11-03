@@ -96,7 +96,7 @@ test('THE CARD DRAWS EACH ONE AS A PERSON HEARS IT: colours unsaid, a figure rea
   const figure = body.match(/<span class="queue-visual" data-shows="figure"[^>]*>\s*<span class="queue-figure num"[^>]*>\{way\.shows\.figure\}<\/span>\s*<\/span>/u)?.[0] ?? '';
   assert.notEqual(figure, '', 'the figure is not drawn');
   assert.doesNotMatch(figure, /aria-hidden|hidden/u, 'a figure is hidden from a screen reader');
-  const name = body.indexOf('<span class="queue-label dc-choice-name" dir="auto">{way.label}</span>');
+  const name = body.indexOf('<span class="queue-label dc-choice-name own-dir">{way.label}</span>');
   assert.ok(name > body.indexOf(figure), 'the figure has no name after it in the same choice');
 
   /* A PICTURE IS BESIDE ITS NAME AND SAYS NOTHING ITSELF: one image, from the address `visualOf` passed, `alt=""`. */

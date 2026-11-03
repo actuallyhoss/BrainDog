@@ -15,6 +15,6 @@ test('SHARE THIS SETUP IN TWO STEPS: numbered, the skills behind one counted lin
     assert.doesNotMatch(said, /Kennel/u, said);
 
   /* THE SKILLS ARE SHUT UNTIL OPENED: a list of thirty-five made the page 3,206 tall. */
-  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../../plugins/share/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /<details class="skills-pick">\s*<summary[^>]*>\{words\.skillsPicked\(/u);
 });

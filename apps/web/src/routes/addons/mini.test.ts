@@ -45,7 +45,7 @@ test('ONE WORD FOR A STARTER EVERYWHERE, and the menu is never "Rail"', () => {
   assert.equal(words.kinds.usecase, 'Starter');
   assert.equal(words.store.starters, 'Starters');
   assert.equal(words.categories['ways-of-working'], 'Starters');
-  assert.equal(copy.browseAll, 'All starters and add-ons');
+  assert.equal(copy.browseAll, 'All starters and plugins');
   assert.equal(copy.browseRail, 'Menu');
   for (const w of [copy.browseAll, copy.browseRail, copy.browseNoRail, words.kinds.usecase]) assert.doesNotMatch(w, /use case|rail/iu, w);
 });

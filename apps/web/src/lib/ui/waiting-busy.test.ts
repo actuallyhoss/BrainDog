@@ -13,30 +13,39 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { copy } from '../copy.ts';
 
-const SOURCE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'Waiting.svelte'), 'utf8');
-const cut = /<\/script>\n([\s\S]*?)\n<style>/.exec(SOURCE);
-assert.ok(cut, 'Waiting.svelte keeps its markup between its script and its style');
-const MARKUP = cut[1]!;
+const read = (name: string): string => readFileSync(join(dirname(fileURLToPath(import.meta.url)), name), 'utf8');
+/** A component's markup: the lines between its script and its style, comments out, which are the lines that ship. */
+const markupOf = (source: string, name: string): string => {
+  const cut = /<\/script>\n([\s\S]*?)\n<style>/.exec(source);
+  assert.ok(cut, `${name} keeps its markup between its script and its style`);
+  return cut[1]!.replaceAll(/<!--[\s\S]*?-->/gu, '');
+};
+/* SINCE 3 NOV `Waiting` DRAWS THE ONE SKELETON EVERY CARD DRAWS (`Skeleton.svelte`, ui-perfect): the status, busy and its
+   word are the skeleton's, and `Waiting` hands it the word. */
+const MARKUP = markupOf(read('Waiting.svelte'), 'Waiting.svelte');
+const SKELETON = markupOf(read('Skeleton.svelte'), 'Skeleton.svelte');
 
-/** The skeleton's own opening tag: the first tag of the markup. */
-const ROOT = /^\s*<div\b[^>]*>/.exec(MARKUP)?.[0] ?? '';
+/** The skeleton's own opening tag: the first tag of its markup. */
+const ROOT = /^\s*<div\b[^>]*>/.exec(SKELETON)?.[0] ?? '';
 
 test('the skeleton is one block, and it is a status', () => {
-  assert.match(ROOT, /class="waiting"/);
+  assert.match(MARKUP, /^\s*<div class="waiting"/);
+  assert.match(MARKUP, /<Skeleton kind="rows" count=\{rows\} label=\{copy\.waiting\} \/>/u);
   assert.match(ROOT, /\brole="status"/);
 });
 
 test('the skeleton is marked busy, always, and not by a condition', () => {
   assert.match(ROOT, /\baria-busy="true"/);
-  assert.equal(MARKUP.match(/aria-busy/g)?.length, 1, 'busy is said once, on the skeleton itself');
+  assert.equal(SKELETON.match(/aria-busy/g)?.length, 1, 'busy is said once, on the skeleton itself');
+  assert.doesNotMatch(MARKUP, /aria-busy/u, 'Waiting says busy a second time');
 });
 
 test('the spoken word is kept: one word from the copy, read and not hidden', () => {
-  const said = /<span class="said"([^>]*)>([^<]*)<\/span>/.exec(MARKUP);
+  const said = /<span class="sk-said"([^>]*)>([^<]*)<\/span>/.exec(SKELETON);
   assert.ok(said, 'the skeleton keeps its spoken word');
-  assert.equal(said[2], '{copy.waiting}');
+  assert.equal(said[2], '{label}');
   assert.doesNotMatch(said[1]!, /aria-hidden/);
-  assert.ok(MARKUP.indexOf(said[0]) > MARKUP.indexOf(ROOT), 'the word sits inside the skeleton');
+  assert.ok(SKELETON.indexOf(said[0]) > SKELETON.indexOf(ROOT), 'the word sits inside the skeleton');
 });
 
 test('the word is a real one', () => {
@@ -46,7 +55,10 @@ test('the word is a real one', () => {
 });
 
 test('every bar is a shape a screen reader skips', () => {
-  const shapes = MARKUP.match(/<span class="(?:bar title|row)"[^>]*>/g) ?? [];
-  assert.equal(shapes.length, 2, 'the title bar and the repeated line');
-  for (const shape of shapes) assert.match(shape, /aria-hidden="true"/);
+  const title = MARKUP.match(/<span class="bar title"[^>]*>/g) ?? [];
+  assert.equal(title.length, 1, 'the title bar');
+  for (const shape of title) assert.match(shape, /aria-hidden="true"/);
+  const rows = SKELETON.match(/<span class="sk-(?:row|line|fig|chips|table)"[^>]*>/g) ?? [];
+  assert.ok(rows.length > 0, 'the skeleton draws its shapes');
+  for (const shape of rows) assert.match(shape, /aria-hidden="true"/);
 });

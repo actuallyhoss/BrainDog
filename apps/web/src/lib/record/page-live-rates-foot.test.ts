@@ -50,7 +50,7 @@ test('out of date rates are said once, at the foot, with the way to keep them cu
   assert.equal(foot.drawn, true);
   assert.equal(foot.body, footWords.ratesStale('28 Sep 2026', 'none', 15), 'the oldest day is the one named');
   assert.match(foot.body ?? '', /out of date/u);
-  assert.match(foot.body ?? '', /\[Keep rates current\]\(\/addons\/money-core#keep-rates\)/u);
+  assert.match(foot.body ?? '', /\[Keep rates current\]\(\/plugins\/money-core#keep-rates\)/u);
   assert.doesNotMatch(foot.body ?? '', /—/u);
   const notes = blocks.slice(0, 2).flatMap((b) => (b.metrics ?? []).map((m) => m.note));
   assert.equal(notes.length, 3);
@@ -144,7 +144,7 @@ test('the foot says it is not one of the blocks the page declares', () => {
 test('a record with no rates action is offered one', () => {
   for (const actions of [[], [{ ingest: 'site-stats' }]]) {
     const body = pageWith(actions, tiles(reading({ fx: fx() })))[1]!.body ?? '';
-    assert.match(body, /\[Keep rates current\]\(\/addons\/money-core#keep-rates\)$/u);
+    assert.match(body, /\[Keep rates current\]\(\/plugins\/money-core#keep-rates\)$/u);
   }
 });
 

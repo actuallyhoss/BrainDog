@@ -255,13 +255,13 @@ test('browse is Add-ons, starters first, and /packs names a catalogue entry by i
   const at = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
   /* ONE PLACE, ONE NAME (agents F9): browse is the other half of Add-ons, and its sections
      name the kinds. */
-  assert.equal(copy.packs, 'Add-ons');
+  assert.equal(copy.packs, 'Plugins');
   /* STARTERS FIRST, THEN SHELVES BY PURPOSE, and never where a thing came from. */
   assert.equal(market.store.starters, 'Starters');
   assert.doesNotMatch(JSON.stringify(market), /From others|"Doors"/u);
   assert.match(copy.browseAll, /starters/iu);
-  assert.match(copy.browseAll, /add-ons/iu);
-  assert.match(at('./+page.svelte'), /title=\{copy\.packs\}/u);
+  assert.match(copy.browseAll, /plugins/iu);
+  assert.match(at('../plugins/+page.svelte'), /title=\{words\.plugins\}/u);
   assert.match(at('./[id]/Listing.svelte'), /\{copy\.browseAll\}/u);
   assert.doesNotMatch(at('./[id]/Listing.svelte'), /copy\.useCase(s|All)\b/u);
 
@@ -564,7 +564,7 @@ test('the line under an add-on\'s name names its publisher, never a key, in one 
   const store = memoryStore();
 
   const first = await trustFor(store, 'Halden', signature);
-  assert.deepEqual(trustLine(first, 'Halden Press'), { text: 'First add-on you have seen from Halden Press', loud: false });
+  assert.deepEqual(trustLine(first, 'Halden Press'), { text: 'First plugin you have seen from Halden Press', loud: false });
   assert.equal(withheld(first), false);
   await keepFirstKey(store, 'Halden', first);
   const known = await trustFor(store, 'Halden', signature);

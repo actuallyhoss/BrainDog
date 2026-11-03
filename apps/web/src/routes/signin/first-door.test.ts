@@ -146,7 +146,9 @@ test("a host whose mail is down offers no link and the screen says so", () => {
   const down: Methods = { ...LIVE, firstRun: false, magic: 'down' };
   assert.equal(stateOf(seen(down)).name, 'signed-out');
   assert.deepEqual(waysFor(down), { passkey: true, magic: false, key: false, lead: 'passkey', keyOpen: false });
-  assert.match(PAGE, /host\?\.magic === 'down'[^}]*\}<p class="status" role="status">\{noMail \? copy\.firstDoorMailDown : copy\.mailDown\}/);
+  /* ONE NOTICE FOR EVERY SIGN-IN STATUS SINCE 3 NOV (entry lane): the mail-down line is a warn Notice, and it names the
+     ways that still work when there are any. */
+  assert.match(PAGE, /host\?\.magic === 'down'[^}]*\}\s*<Notice tone="warn" icon="mail">\{noMail \? copy\.firstDoorMailDown : [^}]*copy\.mailDown\}<\/Notice>/);
   assert.equal(mailHeld(down, actable(waysFor(down)), null), false, 'a passkey exists, so the shared line is right');
 });
 

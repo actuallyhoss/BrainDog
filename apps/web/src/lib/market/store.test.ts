@@ -109,7 +109,7 @@ test('A QUESTION THAT NAMES A MONEY CONNECTOR SUGGESTS IT, while it is not added
   const got = ask('What is the balance on Acme Bank today?');
   assert.equal(got.length, 1);
   assert.match(got[0]!.why, /Acme Bank/u);
-  assert.equal(got[0]!.href, '/addons/acme?kind=pack');
+  assert.equal(got[0]!.href, '/plugins/acme?kind=pack');
   assert.equal(ask('What is the balance on Acme Bank today?', [state('acme')]).length, 0);
   assert.equal(ask('Is the Acme Banks report in?').length, 0);
   assert.equal(suggestionsOf({ signs: [], questions: ['Acme Bank?'], listings: [feed], states: null, moneyOn: true, href: listingHref }).length, 0);

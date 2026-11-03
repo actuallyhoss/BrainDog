@@ -81,7 +81,7 @@ test('A MALFORMED DAY DRAWS NOTHING', () => {
 
 test('THE CARD DRAWS THE LINE UNDER WHY, quiet, at the body size, with its style in the component', () => {
   const svelte = readFileSync(new URL('./DecisionCard.svelte', import.meta.url), 'utf8');
-  assert.match(svelte, /\{#if card\.lapses\}<p class="dc-lapses" dir="auto">\{card\.lapses\}<\/p>\{\/if\}/u);
+  assert.match(svelte, /\{#if card\.lapses\}<p class="dc-lapses own-dir">\{card\.lapses\}<\/p>\{\/if\}/u);
   const rule = /\.dc-lapses \{([^}]*)\}/u.exec(svelte)?.[1] ?? '';
   assert.match(rule, /color: var\(--ink-3\)/u);
   assert.match(rule, /font-size: var\(--fs-body\)/u, '15px, the body size');

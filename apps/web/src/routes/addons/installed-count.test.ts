@@ -16,7 +16,7 @@ test('Browse and Installed say one count of the add-ons in this BrainDog', () =>
   assert.equal(typeof installedCount, 'function', 'the two tabs still count apart');
   assert.equal(installedCount!(Array.from({ length: 9 }, (_, n) => ({ id: `p${n}` }))), 9);
   assert.equal(installedCount!(null), null);
-  const browse = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  const browse = readFileSync(new URL('../plugins/+page.svelte', import.meta.url), 'utf8');
   const installed = readFileSync(new URL('./Installed.svelte', import.meta.url), 'utf8');
   assert.doesNotMatch(browse, /words\.sentence\(|states\.length|\.filter\([^)]*installed/u, 'the store counts what the record holds its own way');
   /* AND THE HEADLINE COUNTS THE ADD-ONS ITS LIST SHOWS (`addons`), the built-ins and the starter left out, once the record

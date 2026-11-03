@@ -17,8 +17,9 @@ const page = strip(readFileSync(new URL('./[area]/+page.svelte', import.meta.url
 
 test('Navigation says where its choices are kept once, and no footer under it says otherwise', () => {
   const nav = markup('Navigation');
-  assert.equal(nav.match(/copy\.perPerson/gu)?.length, 1, 'perPerson is said more than once');
-  assert.equal(nav.match(/copy\.perDevice/gu)?.length, 1, 'perDevice is said more than once');
+  /* SAID ONLY WHEN IT IS NEWS (settings lane, 3 Nov): kept for the person is what a page is, so only "this device" is said. */
+  assert.equal(nav.match(/copy\.perPerson/gu)?.length ?? 0, 0, 'perPerson is said where nothing is unusual');
+  assert.match(nav, /\{#if !navPrefs\.kept\}<p class="kept">\{copy\.perDevice\}<\/p>\{\/if\}/u, 'perDevice is not said once, and only on this device');
   assert.match(page, /const KEEPS = new Set\(\['keyboard'\]\)/u);
 });
 
@@ -29,8 +30,9 @@ test('the two sentences about where a look is kept agree with the code, which ke
   for (const key of ['scheme', 'text', 'density', 'contrast', 'theme']) assert.match(pref, new RegExp(`${key}: 'look\\.`, 'u'), `${key} is not a key the record keeps`);
   assert.match(pref, /!follows\(\) \? 'device' : Object\.keys\(unsent\(\)\)\.length > 0 \? 'pending' : 'record'/u);
   const look = area('Appearance');
-  assert.match(look, /kept === 'record' \? words\.hint\(props\.shell\.index\.name\) : kept === 'pending' \? words\.hintPending : words\.hintDevice/u);
-  assert.match(look, /on all your devices\./u);
+  /* AT THE CARD HEAD'S END SINCE 3 NOV (settings lane), in the record a person opens. */
+  assert.match(look, /meta=\{kept === 'record' \? words\.hint : kept === 'pending' \? words\.hintPending : words\.hintDevice\}/u);
+  assert.match(look, /hint: 'On all your devices'/u);
   /* NO FOOTER UNDER APPEARANCE SAYS OTHERWISE. Keyboard's switch is a cookie and is sent nowhere, so it keeps the line. */
   assert.doesNotMatch(/const KEEPS = new Set\(\[([^\]]*)\]\)/u.exec(page)?.[1] ?? "'appearance'", /appearance/u);
   assert.match(area('Keyboard'), /pref\.write\(\{ chars \}\)/u);
@@ -70,9 +72,10 @@ test("the Agents area's ways in read as titles until one is chosen, and the chos
   assert.match(markup('Agents'), /<ConnectSheet\b/u);
   const sheet = strip(readFileSync(new URL('../../lib/agents/ConnectSheet.svelte', import.meta.url), 'utf8'));
   const drawn = sheet.slice(sheet.indexOf('</script>'));
-  assert.match(drawn, /\{#if on\}\s*<div class="way-body"[^>]*>\s*<p class="hint">\{t\.hint\}<\/p>/u);
-  /* THE INBOX SWITCH'S SENTENCE IS ITS VISIBLE LABEL, inside a `.setting-row`, so it is never one of the hints hidden. */
-  assert.match(drawn, /<div class="setting-row">\s*<p class="hint">\{copy\.connectInboxHint\}<\/p>/u);
+  /* A WAY WITH STEPS NUMBERS THEM, AND ITS HINT IS SAID ONLY WHERE THERE ARE NONE (UI pass, 3 Nov). */
+  assert.match(drawn, /<div class="way-body"[^>]*>[\s\S]*?\{#if stepped\.length === 0 && !t\.key\}<p class="hint">\{t\.hint\}<\/p>\{\/if\}/u);
+  /* THE INBOX SWITCH HAS A TITLE AND ONE LINE, both seen, so it is never one of the hints hidden. */
+  assert.match(drawn, /<span class="inbox-title">\{copy\.connectInbox\}<\/span>\s*<span class="inbox-line">\{connectWords\.inboxLine\}<\/span>/u);
 });
 
 test('Export and What comes in name the things a person keeps, not rows', () => {

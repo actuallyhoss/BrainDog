@@ -264,7 +264,8 @@ test('NOT CHECKED YET IS SAID IN HEALTH, and the calm line then vouches for noth
   const raw = readFileSync(new URL('../../routes/settings/[area]/areas/Health.svelte', import.meta.url), 'utf8');
   assert.match(raw, /notYet: 'Not checked yet, it runs at night\.'/u);
   assert.match(health, /\{#if unchecked\}[\s\S]*?\{words\.notYet\}[\s\S]*?\{\/if\}/u);
-  assert.match(health, /body=\{unchecked \? words\.clearBodyUnchecked : words\.clearBody\}/u);
+  /* THE CALM CARD IS A TILE WITH ITS LINE SINCE 3 NOV (settings lane), still the one line for what was not read. */
+  assert.match(health, /\{unchecked \? words\.clearBodyUnchecked : words\.clearBody\}/u);
   assert.doesNotMatch(/clearBodyUnchecked: '([^']*)'/u.exec(raw)?.[1] ?? 'missing', /page|note/iu);
 });
 

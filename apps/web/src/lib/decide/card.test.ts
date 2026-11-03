@@ -380,7 +380,7 @@ test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a li
 test('EVERY CARD STARTS WITH ITS SENTENCE: who asked is one line under the question, and the side is drawn only with something in it', () => {
   const card = src('./DecisionCard.svelte');
   /* CUT AT TWO LINES UNTIL "READ ALL", so the heading carries its clamp and its measure. */
-  assert.match(card, /<div class="dc-main">\n(\s+<!--[^]*?-->\n)?\s+<svelte:element this=\{questionLevel\} class="queue-question" dir="auto" data-clamp=\{readAll \? undefined : ''\} bind:this=\{titleEl\}>/u, 'a card starts with who asked, not its sentence (U-A7)');
+  assert.match(card, /<div class="dc-main">\n(\s+<!--[^]*?-->\n)?\s+<svelte:element this=\{questionLevel\} class="queue-question own-dir" data-clamp=\{readAll \? undefined : ''\} bind:this=\{titleEl\}>/u, 'a card starts with who asked, not its sentence (U-A7)');
   assert.match(card, /\{#if !compact\}\n(\s+<!--[^]*?-->\n)?\s+<p class="queue-by">\n\s+<span class="dc-sr">\{cardWords\.askedBy\}<\/span>/u);
   const article = card.indexOf('<div class="dc-main">');
   assert.ok(card.indexOf('class="queue-question"', article) < card.indexOf('<p class="queue-by">', article), 'who asked leads the question');

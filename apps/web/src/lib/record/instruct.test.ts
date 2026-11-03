@@ -325,7 +325,8 @@ test('WHO IS OPEN NOW: the runs that did something, the ones that wrote nothing 
   const look = run({ run: 'S15', wrote: 0, looks: true });
   const old = run({ run: 'S16', state: 'waiting', quiet_s: 30 * 60 });
   const o = openNow([waits, asks, idle, pc, pc2, look, old, HELPER]);
-  assert.deepEqual(o.shown.map((r) => r.run), ['S10', 'S12', 'S16'], 'at work first; a host that counts no writes says it wrote');
+  /* A STILL ORDER SINCE 3 NOV ("things blinking"): the newest run first, kept until it starts or ends; the dot says who is at work. */
+  assert.deepEqual(o.shown.map((r) => r.run), ['S16', 'S12', 'S10'], 'newest run first; a host that counts no writes says it wrote');
   assert.deepEqual(o.idle.map((r) => r.run), ['S11']);
   assert.deepEqual(o.looks.map((r) => r.run), ['S15']);
   assert.deepEqual(o.quiet.map((q) => [q.said, q.runs.map((r) => r.run)]), [['Windows PC', ['S13', 'S14']]]);

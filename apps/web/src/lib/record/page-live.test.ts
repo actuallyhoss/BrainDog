@@ -773,7 +773,7 @@ test('a live feed names its reader as You, anybody else without an id, a pack or
       ['', 'TALLYARD categorised'],
       ['', 'The balance of Tax reserve was last set 9 days ago.'],
       ['BrainDog', 'installed the Team board starter'],
-      ['BrainDog', 'installed the polish-log add-on'],
+      ['BrainDog', 'installed the polish-log plugin'],
     ],
   );
 });

@@ -52,7 +52,7 @@ test('the add-ons screens draw the record’s packs or its refusal, with no samp
   for (const path of [
     '../../routes/addons/Installed.svelte',
     '../../routes/addons/[id]/Installed.svelte',
-    '../../routes/addons/share/+page.svelte',
+    '../../routes/plugins/share/+page.svelte',
     '../../routes/addons/InstallShared.svelte',
   ]) {
     const screen = code(path);

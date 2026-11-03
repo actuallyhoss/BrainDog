@@ -12,7 +12,7 @@ import { chordOf, gotoOf, hrefOf, sayGoto, type Goto } from './goto.ts';
 /** Where a letter goes in a list already read. */
 const to = (list: readonly Goto[], key: string) => list.find((l) => l.key === key)?.href;
 
-const LEARNT = { h: '/', d: '/decide', i: '/inbox', s: '/search', k: '/keychain', p: '/settings/addons', ',': '/settings/appearance' };
+const LEARNT = { h: '/', d: '/decide', i: '/inbox', s: '/search', k: '/keychain', p: '/settings/plugins', ',': '/settings/appearance' };
 
 test('the seven somebody learnt keep their letters, with or without the rail drawing them', () => {
   for (const rows of [[], [{ href: '/p/projects', name: 'Projects' }, { href: '/', name: 'Today' }]]) {

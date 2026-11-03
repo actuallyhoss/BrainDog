@@ -38,7 +38,7 @@ test('"WHAT IT CHANGES" IS A HEADING ONLY OVER A LINE; the link to the whole cha
   assert.equal(saysChanges(cardOf(ask({ changes: [{ field: 'keys', before: [], after: null }] }), { now })), false, 'nothing to nothing is no line');
 
   const card = source('./DecisionCard.svelte');
-  assert.match(card, /\{#if changesSaid\}\s*<div class="dc-part dc-part-changes" role="group"[^>]*>\s*<h4 class="dc-h"[^>]*>(?:\{#if card\.list\}\{cardWords\.changesIn\(card\.list\)\}\{:else\})?\{cardWords\.changes\}(?:\{\/if\})?<\/h4>/u, 'the heading is not under the test of a line');
+  assert.match(card, /\{#if changesSaid\}\s*<div class="dc-part dc-part-changes" role="group"[^>]*>\s*<h4 class="dc-h(?: own-dir)?"[^>]*>(?:\{#if card\.list\}\{cardWords\.changesIn\(card\.list\)\}\{:else\})?\{cardWords\.changes\}(?:\{\/if\})?<\/h4>/u, 'the heading is not under the test of a line');
   /* THE LINK IS LEFT OUT WHERE THE CARD ALREADY DRAWS THE WHOLE CHANGE, so it reads `seeLink`. */
   const alone = card.match(/\{:else if seeLink\}([\s\S]*?)\{\/if\}/u)?.[1] ?? '';
   assert.match(alone, /\{queueWords\.seeWhole\}/u, 'the link alone is not drawn');
