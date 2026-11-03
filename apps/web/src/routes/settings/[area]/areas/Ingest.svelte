@@ -31,6 +31,7 @@
   import GoogleConnect from '$lib/google/GoogleConnect.svelte';
   import PasteBank from '$lib/tell/PasteBank.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import { doorState, doorsLine, doorWords } from '../../billing.ts';
   import Actions from '$lib/page/panels/Actions.svelte';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
@@ -256,7 +257,8 @@
     /* A BANK'S TEXTS HAVE THEIR OWN STEPS AND A PASTE BOX (first-hour audit AH10): Today's "Forward your bank's texts"
        opened this screen on a mail address and nothing said how a text gets here. */
     textsTitle: "Your bank's texts",
-    textsLead: 'Money fills itself from the texts your bank sends when your card is used. Two ways in:',
+    textsLead: 'Money fills itself from the texts your bank sends. Paste one to see what it becomes.',
+    textsHow: 'Forward them on their own',
     textsForward: 'Forward them as mail to the address above. On an iPhone, a Shortcuts automation can do it for each text from your bank; on Android, an app that forwards texts to mail can.',
     textsPaste: 'Or paste one below, and see what it becomes before anything is kept.',
   };
@@ -320,7 +322,8 @@
     <!-- `25 §9`'s own blockquote, and it outranks the screen: "every chart fed by a stale series
          shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if
          it were today's is the failure that actually costs somebody money." -->
-    <p class="hint">{copy.staleShows}</p>
+    <!-- NOT SAID HERE (ui pass, 3 Nov): how a stale source is drawn is the chart's to show, and the line was one more grey
+         sentence under three empty rows. -->
   <!-- THERE WAS NO WAY TO ADD ONE, and inventing a button would be worse: `25 §9` draws this
        screen without one, because a source is a declaration and arrives the way every
        declaration does (`04 §1`: `ingest` is one of the kinds an add-on carries). So the screen
@@ -479,11 +482,13 @@
 <!-- A BANK'S TEXTS: how they get here, and a box to paste one into (AH10). Today's next step opens here, at `#texts`. -->
 <Tile icon="money" class="section" data-surface="tile" title={words.textsTitle} id="texts">
   <div class="section-body texts-body">
+    <!-- ONE LINE, AND FORWARDING UNDER "HOW" (ui pass, 3 Nov): a numbered list of two ways stood over the paste box,
+         the second of which is the box itself. -->
     <p class="hint">{words.textsLead}</p>
-    <ol class="texts-ways">
-      <li class="hint">{words.textsForward}</li>
-      <li class="hint">{words.textsPaste}</li>
-    </ol>
+    <details class="how">
+      <summary class="how-head tap"><Icon name="chevron" size="s" />{words.textsHow}</summary>
+      <p>{words.textsForward}</p>
+    </details>
     <PasteBank {shell} />
   </div>
 </Tile>
@@ -764,15 +769,4 @@
     border-radius: 0;
   }
 
-  /* THE TWO WAYS ONE STEP APART, whatever margin a hint brings. */
-  .texts-ways > li {
-    margin: 0;
-  }
-
-  .texts-ways {
-    display: grid;
-    gap: var(--sp-2);
-    margin: 0;
-    padding-inline-start: var(--sp-5);
-  }
 </style>

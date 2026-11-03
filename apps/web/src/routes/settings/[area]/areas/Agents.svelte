@@ -757,9 +757,10 @@
           </ul>
         </div>
         {#if defaults}<div class="agents-default">{@render agentLine(defaults)}</div>{/if}
-        {#if legend.length > 0 || atWorkNow > 0}
+        <!-- NO "2 AT WORK NOW" UNDER THE LIST (ui pass, 3 Nov): each row already says "Working now" beside its face, and
+             Agent runs is a row of the sidebar. -->
+        {#if legend.length > 0}
           <div class="agents-foot">
-            {#if atWorkNow > 0}<p class="reading">{words.atWorkNow(atWorkNow)} <a class="run tap" href={at('/r/session')}>{words.seeThem}</a></p>{/if}
             {#if legend.length > 0}
               <p class="legend">{#each legend as l, i (l.word)}{#if i > 0}<span class="sep" aria-hidden="true">{' · '}</span>{/if}<span class="legend-word">{l.word}</span> {l.line}{/each}</p>
             {/if}
