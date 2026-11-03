@@ -2043,7 +2043,6 @@
     .body[data-board] :global(.block-slot[data-key='needs-you'] .queue[data-compact] > a.queue-more) {
       display: flex;
       max-inline-size: none;
-      border-block-start: 1px solid var(--rule);
     }
   }
 
@@ -2261,7 +2260,7 @@
   }
 
   .body[data-board] :global(.block-slot[data-key='cash'][data-size='wide'] .grid > .cell:nth-child(3)) {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 0;
   }
 
   /* ITS LINE IS THE LARGE CASH'S: in a wide frame the cash now, how long it lasts, and the two beside it. */
@@ -2848,6 +2847,22 @@
   /* A FRAME ENDS AT ITS PADDING: a block's own step under it (24, for a page of blocks) stood as air at a card's foot. */
   .body[data-board] :global([data-board-key] > .block) {
     margin-block-end: 0;
+  }
+
+  /* NO HAIRLINES INSIDE A CARD (the ops look's rows): Your work's rows, cash coming in and going out, and the rule under a
+     list's head are told apart by their air, not by a line. */
+  .body[data-board] :global([data-board-key] .list > .item) {
+    border-block-end: 0;
+    background-image: none;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell + .cell) {
+    border-block-start: 0;
+  }
+
+  .body[data-board] :global(.block-slot.block-slot.block-slot > .block-bar) {
+    padding-block-end: 0;
+    border-block-end: 0;
   }
 
   /* A PROJECT'S MARK AND A QUESTION'S GLYPH ARE CIRCLES, as every face on Today is. */

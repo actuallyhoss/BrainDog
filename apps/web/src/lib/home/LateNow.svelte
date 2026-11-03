@@ -223,8 +223,9 @@
     padding-block-end: 0;
   }
 
+  /* NO HAIRLINE BETWEEN ROWS (ops look, 3 Nov): the step of air between them says where one ends. */
   .ln + .ln {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 0;
   }
 
   /* A LINE WITH NO TICK STARTS ON THE TILE'S EDGE (leftovers 4): a bill has no tick, and the empty column's gap stood its

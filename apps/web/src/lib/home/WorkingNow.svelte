@@ -199,8 +199,9 @@
     padding-block-end: 0;
   }
 
+  /* NO HAIRLINE BETWEEN ROWS (ops look, 3 Nov): the step of air between them says where one ends. */
   .run + .run {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 0;
   }
 
   .r-face {
