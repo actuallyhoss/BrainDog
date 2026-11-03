@@ -38,12 +38,10 @@ const DUE: Record<string, unknown> = {
 
 /**
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: Money is a section with a page per job, and this is what comes next.
- * The line, what falls due in one table by stretch (late first), the bills to tick off as paid, what repeats a month, and
- * what is paused folded at the foot.
+ * What falls due in one table by stretch (late first), the next 30 days in two figures, what repeats a month, and what
+ * is paused folded at the foot.
  *
- * MARK PAID IS THE TICK ON A BILL. The bills are a `todo` over the list, so a tick marks one paid where it is read,
- * with its Undo, as a task is finished on Work; every row of the weeks opens its own page, where a bill's one press is
- * Mark paid too.
+ * MARK PAID IS ON THE BILL'S PAGE: every row of the stretches opens its own page, where a bill's one press is Mark paid.
  */
 export const MONEY_COMING_PAGE: SeedPage = {
   page: 'money-coming',
@@ -62,35 +60,31 @@ export const MONEY_COMING_PAGE: SeedPage = {
       when: { all: [{ metric: 'bills-held', is: 0 }, { metric: 'repeating-held', is: 0 }] },
       body: 'Bills, invoices and payments that repeat are listed here by the day each falls due. [Add a bill](/r/obligations).',
     },
-    {
-      /* THE LINE, FROM THE WALK'S OWN FIGURES: what comes in and goes out in the next thirty days, as Cash ahead counts it. */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      /* AND WHAT THE OUT HOLDS (live check of 30 October, 9): bills and the usual spending, never the repeating bills below. */
-      body: 'Next 30 days: {{arriving-30d}} to come in, {{leaving-30d}} out in bills and usual spending.',
-    },
     /* WHAT IS ALREADY LATE, ONCE AND AT THE TOP, BEFORE money-core 3.33.0 SHIPPED (design pass of 1 November, M25): the
        late bills were listed twice, in Bills and invoices and again in Late. Now Late is the first list under the line,
        in the late red, drawn only while something is, and Bills and invoices holds what falls due from today. A late
        row opens its own page, where a bill's one press is Mark paid. SINCE money-core 3.34.0 Late is the first stretch
        of the one table of what falls due (`DUE`). */
     DUE,
+    /* NO SECOND LIST OF THE BILLS, SINCE money-core 3.38.4 (moneyseed, 3 Nov): "Bills and invoices" listed every open bill
+       and invoice again under What falls due, the same names, days and amounts, with pence in one list and not the other.
+       What falls due is the one list; each row opens its page, where a bill's one press is Mark paid. */
     {
-      /* THE BILLS AND INVOICES STILL OPEN FROM TODAY TO SIXTY DAYS ON: a `todo`, so a tick marks one paid where it is
-         read. What is already late is the first stretch above, and not listed here again. */
-      kind: 'todo',
-      heading: 'Bills and invoices',
-      icon: 'receipt',
+      /* THE NEXT 30 DAYS AS FIGURES, SINCE money-core 3.38.4 (moneyseed, 3 Nov): it was the page's line, "Next 30 days:
+         £11,490 to come in, £43,047 out in bills and usual spending.", two amounts in a sentence. What comes in and goes out
+         in the next thirty days, as Cash ahead counts it; the out is bills and the usual spending (live check of 30
+         October, 9), never the repeating bills under it. UNDER
+         THE LIST, BESIDE WHAT REPEATS: the page's look leads with what is late (`composeLook` in the kernel), so a tile
+         above the list stood over it on a calm day and under it on a late one; at the foot it is in one place. */
+      kind: 'stat',
+      heading: 'Next 30 days',
+      icon: 'calendar-range',
       span: 12,
-      source: 'register.obligations',
-      where: 'state is open or part, due after -1d, due before +61d',
-      /* SIGNED BY THE WAY IT GOES (30 October), as every money line in the Money look: a bill you pay is "−", an invoice
-         you are owed "+". */
-      columns: [{ field: 'what' }, { field: 'amount', sign: { field: 'direction', minus: 'owed_by_me' } }, { field: 'due' }, { field: 'party' }],
-      order: [{ field: 'due', dir: 'asc' }],
-      limit: 12,
-      empty: 'Nothing due in 60 days.',
+      cells: [
+        { metric: 'arriving-30d', label: 'To come in' },
+        { metric: 'leaving-30d', label: 'To go out', note: 'Bills and usual spending' },
+      ],
+      when: { any: [{ metric: 'bills-held', gt: 0 }, { metric: 'repeating-held', gt: 0 }] },
     },
     {
       /* WHAT REPEATS AT ITS MONTHLY SHARE, in, out and what is left, AT THE FOOT SINCE money-core 3.34.0 (next-money,

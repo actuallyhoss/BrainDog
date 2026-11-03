@@ -24,10 +24,10 @@ const ACCOUNTS_SAID = 'Kept in {{books-held}} books.';
 const LATE_PART = '{{installments-late.first}} is {{bad:late}}: [{{installments-late.first_amount}}](/r/installments?f=state:is:open&f=direction:is:out&f=due:before:today), due {{ago:installments-late.first_due}}.';
 
 /**
- * AND WHAT IS TO PAY ON THE CARD, SINCE money-core 3.20.0 (B8 of 24 October): a card is not cash, so it is on no tile, and the
- * page is at its ceiling of blocks, so the sentence is the line's. No card that says it, and the sentence goes whole.
+ * NO "TO PAY ON THE CARD" CLAUSE, SINCE money-core 3.38.4 (moneyseed, 3 Nov): from 3.20.0 the line ended "£1,240 to pay on
+ * the card, as of 1 Sep.", a third figure in a sentence, while the Accounts tile under the hero lists the card with the
+ * same amount. The line is only what is late or the low point now, so it stays short.
  */
-const CARD_OWES = ' {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
 
 /**
  * MONEY LEADS WITH WHAT HURTS MOST, SINCE money-core 3.33.0 (audit of 31 October f, AF4): the line opened on "£1,240 to
@@ -59,28 +59,41 @@ const GOES_UNDER = { all: [{ metric: 'cash-now', gt: 0 }, { metric: 'runway-days
 const SOME_DUE = { any: [{ metric: 'bills-open', gt: 0 }, { metric: 'repeating-held', gt: 0 }] };
 const NOTHING_DUE = [{ metric: 'bills-open', lt: 1 }, { metric: 'repeating-held', lt: 1 }];
 
-/** The line's sentences, worst first, each with `between` (what the line says of the accounts or the year) before the card. */
-const says = (between: string): Record<string, unknown>[] => [
-  /* SIX SENTENCES AT MOST (`SAYS_MOST`), so the part of a plan rides in each sentence about what is late: on a record
-     with no part late its figures do not read and its sentence goes whole (`leadOf`), as it always has. What is late
-     going out comes first, then what is late coming in. */
-  { when: { all: [BILL_LATE, INVOICE_LATE] }, body: `${LATE_PART} ${BILLS_LATE} ${INVOICES_LATE}${between}${CARD_OWES}` },
-  { when: BILL_LATE, body: `${LATE_PART} ${BILLS_LATE}${between}${CARD_OWES}` },
-  { when: INVOICE_LATE, body: `${LATE_PART} ${INVOICES_LATE}${between}${CARD_OWES}` },
-  { when: PART_LATE, body: `${LATE_PART}${between}${CARD_OWES}` },
-  { when: GOES_UNDER, body: `${LOW_POINT}${between}${CARD_OWES}` },
-  { body: `${between}${CARD_OWES}`.trim() },
-];
+/**
+ * Something is late either way, a part of a plan is, or the walk goes under inside the twelve weeks: what the line is
+ * said for. The walk's half is `GOES_UNDER` without its Cash now leaf, since a `when` is two levels deep at most; a
+ * record already under nought is told its low point too.
+ */
+const LATE_OR_UNDER = { any: [BILL_LATE, INVOICE_LATE, PART_LATE, { metric: 'runway-days', lte: 84 }] };
+
+/**
+ * The line's sentences, worst first, each with `between` (what the line says of the books or the year) after it. WITH
+ * NOTHING FOR `between` TO SAY THE LOW POINT IS THE LAST SENTENCE, with no `when` of its own (`noteSaysFault`), and the
+ * block is drawn only while `LATE_OR_UNDER` holds, so a record with nothing late and no low point reads no line.
+ */
+const says = (between: string): Record<string, unknown>[] => {
+  const lines: Record<string, unknown>[] = [
+    /* SIX SENTENCES AT MOST (`SAYS_MOST`), so the part of a plan rides in each sentence about what is late: on a record
+       with no part late its figures do not read and its sentence goes whole (`leadOf`), as it always has. What is late
+       going out comes first, then what is late coming in. */
+    { when: { all: [BILL_LATE, INVOICE_LATE] }, body: `${LATE_PART} ${BILLS_LATE} ${INVOICES_LATE}${between}` },
+    { when: BILL_LATE, body: `${LATE_PART} ${BILLS_LATE}${between}` },
+    { when: INVOICE_LATE, body: `${LATE_PART} ${INVOICES_LATE}${between}` },
+    { when: PART_LATE, body: `${LATE_PART}${between}` },
+  ];
+  if (between.trim() === '') return [...lines, { body: LOW_POINT }];
+  return [...lines, { when: GOES_UNDER, body: `${LOW_POINT}${between}` }, { body: between.trim() }];
+};
 
 export const HEADLINE: Record<string, unknown>[] = [
   {
-    /* THE PAGE'S LINE: what is late, or the low point, then what is to pay on the card. A clause whose figure has no
+    /* THE PAGE'S LINE: what is late, or the low point. A clause whose figure has no
        value is left out by the writer (`leadOf`), so a record with no account yet reads no sentence at all. How much
        there is, how it moved in a month and when it runs out are the hero's (`hero.ts`), drawn under the line. */
     kind: 'note',
     lead: true,
     span: 12,
-    when: ONE_BOOK,
+    when: { all: [ONE_BOOK, LATE_OR_UNDER] },
     says: says(''),
   },
   {
@@ -103,7 +116,7 @@ export const HEADLINE: Record<string, unknown>[] = [
 export const HEADLINE_LASTS: Record<string, unknown>[] = [
   {
     ...HEADLINE[0],
-    when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: false }] },
+    when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: false }, LATE_OR_UNDER] },
   },
   {
     /* THAT IT LASTS THE YEAR IS THE LINE'S, BECAUSE NO TILE SAYS IT. The tile of when it runs out is drawn only while

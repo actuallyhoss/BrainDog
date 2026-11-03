@@ -66,8 +66,8 @@ export const LEDGER_PAGE_LINES = 200;
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: Money is a section with a page per job, and this one holds every line.
  *
  * WHAT IS NOT FILED COMES FIRST. A line with no category is spending nobody can see in a budget or a report, and a month
- * with a third of its money unfiled reads as a month that spent less. So the page says how many there are in its first
- * sentence, draws them in a list of their own above everything else, and keeps "Not filed yet" as the first of its chips.
+ * with a third of its money unfiled reads as a month that spent less. So the page draws them in a list of their own,
+ * with their count on its head, above everything else, and keeps "Not filed yet" as the first of its chips.
  * Each line opens its entry, where its category is picked; the rules that file the next one like it are a page of
  * their own (Filing rules).
  *
@@ -84,14 +84,8 @@ export const MONEY_LEDGER_PAGE: SeedPage = {
   header: { search: { param: 'q' } },
   filters: [{ field: 'account', control: 'chips' }, { field: 'category', control: 'chips' }, MONTH_FILTER, SHOW_FILTER],
   blocks: [
-    {
-      /* THE FIRST SENTENCE SAYS WHAT IS LEFT TO FILE, while anything is, and otherwise nothing: the page is its lines. */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      when: { metric: 'txn-uncategorised', gt: 0 },
-      body: '{{txn-uncategorised}} line(s) to file.',
-    },
+    /* NO "7 LINES TO FILE." OVER THE PAGE, SINCE money-core 3.38.4 (moneyseed, 3 Nov): the count stood in the first line,
+       on the Not filed yet chip and on the Not filed yet list's head, three times on one screen. The list says it. */
     {
       /* A LEDGER WITH NO LINES SAYS WHAT WILL BE HERE AND HOW IT FILLS, SINCE money-core 3.36.0 (empty states, 2 Nov): it
          said "Nothing in Ledger yet. What you add or mention lands here." under a search over nothing. */

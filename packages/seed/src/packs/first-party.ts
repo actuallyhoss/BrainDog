@@ -983,12 +983,18 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   only, but a field's label is what a list's column and a task's form say, so a minor step.
  * - work 1.26.0 (pages polish, second pass, 2 Nov): the Board's line says what needs somebody first and what is kept for
  *   later last, without "tasks" (`page.work-board`). Words only, a minor step as 1.25.0 was.
+ * - money-core 3.38.4 (moneyseed, 3 Nov): Money's pages say each thing once and let tiles carry the figures. Coming up
+ *   has one list of what falls due (no second "Bills and invoices") and its next 30 days as a tile; Accounts loses its
+ *   line and its tile of ages over cards that say both; Reports' totals and what is promised each month are tiles, not
+ *   sentences; Money's line drops the card, which its Accounts tile shows; the Ledger drops "7 lines to file." over the
+ *   list that counts them (`page.money-coming`, `page.money-accounts`, `page.money-reports`, `page.money`,
+ *   `page.money-ledger`). No id added or taken away, so a patch.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.0',
   portfolio: '1.31.0',
   people: '4.6.0',
-  'money-core': '3.38.3',
+  'money-core': '3.38.4',
   estate: '2.8.0',
   work: '1.26.0',
 };

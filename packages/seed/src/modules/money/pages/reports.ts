@@ -22,11 +22,8 @@ const MONTH_PICKER = {
   ],
 };
 
-/** What every figure here leaves out and the Ledger lists, said after the line's figures (finish F55). */
-const MOVES_APART = 'Moves between your own accounts are left out.';
-
-/** A range where nothing came in: its money in read nothing, or nought. */
-const NOTHING_IN = (metric: string) => ({ any: [{ metric, empty: true }, { metric, lte: 0 }] });
+/** What every figure here leaves out and the Ledger lists, said under the money out (finish F55). */
+const MOVES_APART = 'Moves between your accounts left out';
 
 /** The most a block over the Ledger reads, with no month picked: the thirteen the chart of months reads. */
 const BACK = 'on after -13m, on before +1d';
@@ -44,6 +41,35 @@ const LASTS_CELL = { metric: 'lasts-no-income', label: 'Lasts with no income' };
 const HEALTH_CELLS = [KEPT, LASTS_CELL];
 const KEPT_BELOW_NOUGHT = { metric: 'kept-share-90d', lt: 0 };
 const KEPT_NOUGHT_OR_MORE = { any: [{ metric: 'kept-share-90d', gte: 0 }, { metric: 'kept-share-90d', empty: true }] };
+
+/**
+ * THE MONTHS PICKED IN THREE FIGURES, SINCE money-core 3.38.4 (moneyseed, 3 Nov): the page opened on a sentence of them
+ * ("Since 8 Jun: £10,966 in, £18,605 out, £7,639 more out than in. Moves between your own accounts are left out."). Now
+ * a tile: In, Out, and Left, or More out than in when more went out (3.37.0's words, so no minus to work out). The strip
+ * above names the months picked, so the tile does not say them again; with none picked the In cell says the day the lines
+ * start (`moved-since`, finish F55). Each range's figures are `REPORT_RANGES`' (`figures/health.ts`). A range with
+ * nothing in drops its "£0" cell on its own (`noughtOverNone`). Ten tiles, one drawn: a range and which way it went.
+ */
+const RANGES = [
+  { picked: 'this', inn: 'received-month', out: 'spent-by-category-month', left: 'left-month', over: 'over-month' },
+  { picked: 'last', inn: 'received-last', out: 'spent-last', left: 'left-last', over: 'over-last' },
+  { picked: '', inn: 'received-all', out: 'spent-all', left: 'left-all', over: 'over-all', since: true },
+  { picked: 'three', inn: 'received-three', out: 'spent-three', left: 'left-three', over: 'over-three' },
+  { picked: 'year', inn: 'received-year', out: 'spent-year', left: 'left-year', over: 'over-year' },
+] as const;
+
+const RANGE_TOTALS: Record<string, unknown>[] = RANGES.flatMap((r) => {
+  const picked = { picked: 'months', is: r.picked === '' ? [''] : r.picked };
+  const cells = [
+    { metric: r.inn, label: 'In', ...('since' in r ? { note: 'Since {{moved-since}}' } : {}) },
+    { metric: r.out, label: 'Out', note: MOVES_APART },
+  ];
+  const tile = { kind: 'stat', heading: 'Totals', icon: 'coins', span: 12 };
+  return [
+    { ...tile, cells: [...cells, { metric: r.left, label: 'Left' }], when: { all: [{ metric: 'out-by-month', gt: 0 }, picked, { any: [{ metric: r.left, gte: 0 }, { metric: r.left, empty: true }] }] } },
+    { ...tile, cells: [...cells, { metric: r.over, label: 'More out than in' }], when: { all: [{ metric: 'out-by-month', gt: 0 }, picked, { metric: r.left, lt: 0 }] } },
+  ];
+});
 
 /**
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: where the money came from and where it went.
@@ -68,60 +94,7 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
   pack: 'money-core',
   filters: [MONTH_PICKER],
   blocks: [
-    {
-      /* THE MONTHS PICKED, EACH WAY, AND WHAT IS LEFT OF THEM (live check of 30 October, 20): the line said "This month"
-         over a year's donut with All picked, so it says the months the strip picked, All being the thirteen every block
-         reads with none picked (`BACK`). Each range's figures are `REPORT_RANGES`' (`figures/health.ts`). */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      /* THREE NOTES, ONE FOR THE MONTHS AT HAND, ONE FOR NONE PICKED AND ONE FOR THE LONGER RANGES, SINCE money-core 3.37.0
-         (3.37.1 split the third out): each range says it plainly when more went out than came in, and a note holds six
-         sentences at most (`SAYS_MOST`). */
-      when: { all: [{ metric: 'out-by-month', gt: 0 }, { picked: 'months', is: ['this', 'last'] }] },
-      /* A RANGE THAT SPENT MORE THAN CAME IN SAYS BY HOW MUCH, SINCE money-core 3.37.0 (verify3, 2 Nov): "−$12,536 left" was
-         a minus to work out; it is "$12,536 more out than in" (`over-` in `figures/health.ts`). AND A RANGE WITH NOTHING IN
-         SAYS SO, SINCE money-core 3.37.1 (leftovers6, 2 Nov): "$2,586 out, $2,586 more out than in" said one amount twice;
-         with nothing in it is "$2,586 out, nothing in yet", "yet" only for the month still going. */
-      says: [
-        { when: { all: [{ picked: 'months', is: 'this' }, { metric: 'left-month', lt: 0 }, NOTHING_IN('received-month')] }, body: `This month: {{spent-by-category-month}} out, nothing in yet. ${MOVES_APART}` },
-        { when: { all: [{ picked: 'months', is: 'this' }, { metric: 'left-month', lt: 0 }] }, body: `This month: {{received-month}} in, {{spent-by-category-month}} out, {{over-month}} more out than in. ${MOVES_APART}` },
-        { when: { picked: 'months', is: 'this' }, body: `This month: {{received-month}} in, {{spent-by-category-month}} out, {{left-month}} left. ${MOVES_APART}` },
-        { when: { all: [{ metric: 'left-last', lt: 0 }, NOTHING_IN('received-last')] }, body: `Last month: {{spent-last}} out, nothing in. ${MOVES_APART}` },
-        { when: { metric: 'left-last', lt: 0 }, body: `Last month: {{received-last}} in, {{spent-last}} out, {{over-last}} more out than in. ${MOVES_APART}` },
-        { body: `Last month: {{received-last}} in, {{spent-last}} out, {{left-last}} left. ${MOVES_APART}` },
-      ],
-    },
-    {
-      /* WITH NONE PICKED, FROM THE DAY THE LINES START (finish F55): "The last 13 months" stood over three months of
-         lines, so the line says the first day money moved inside the thirteen (`moved-since`). AND THAT MOVES BETWEEN HIS
-         OWN ACCOUNTS ARE LEFT OUT, as every figure here leaves them: the strip's "Last month 9" stood beside the Ledger's
-         "Last month 12", which lists them, and neither said why. */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      when: { all: [{ metric: 'out-by-month', gt: 0 }, { picked: 'months', is: [''] }] },
-      says: [
-        { when: { all: [{ metric: 'left-all', lt: 0 }, NOTHING_IN('received-all')] }, body: `Since {{moved-since}}: {{spent-all}} out, nothing in. ${MOVES_APART}` },
-        { when: { metric: 'left-all', lt: 0 }, body: `Since {{moved-since}}: {{received-all}} in, {{spent-all}} out, {{over-all}} more out than in. ${MOVES_APART}` },
-        { body: `Since {{moved-since}}: {{received-all}} in, {{spent-all}} out, {{left-all}} left. ${MOVES_APART}` },
-      ],
-    },
-    {
-      /* THE LONGER RANGES, 3 AND 12 MONTHS, SAID THE SAME WAY. */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      when: { all: [{ metric: 'out-by-month', gt: 0 }, { picked: 'months', is: ['three', 'year'] }] },
-      says: [
-        { when: { all: [{ picked: 'months', is: 'three' }, { metric: 'left-three', lt: 0 }, NOTHING_IN('received-three')] }, body: `The last 3 months: {{spent-three}} out, nothing in. ${MOVES_APART}` },
-        { when: { all: [{ picked: 'months', is: 'three' }, { metric: 'left-three', lt: 0 }] }, body: `The last 3 months: {{received-three}} in, {{spent-three}} out, {{over-three}} more out than in. ${MOVES_APART}` },
-        { when: { picked: 'months', is: 'three' }, body: `The last 3 months: {{received-three}} in, {{spent-three}} out, {{left-three}} left. ${MOVES_APART}` },
-        { when: { all: [{ metric: 'left-year', lt: 0 }, NOTHING_IN('received-year')] }, body: `The last 12 months: {{spent-year}} out, nothing in. ${MOVES_APART}` },
-        { when: { metric: 'left-year', lt: 0 }, body: `The last 12 months: {{received-year}} in, {{spent-year}} out, {{over-year}} more out than in. ${MOVES_APART}` },
-        { body: `The last 12 months: {{received-year}} in, {{spent-year}} out, {{left-year}} left. ${MOVES_APART}` },
-      ],
-    },
+    ...RANGE_TOTALS,
     {
       /* NOTHING MOVED YET: what the page will hold, in place of noughts. */
       kind: 'note',
@@ -173,26 +146,20 @@ export const MONEY_REPORTS_PAGE: SeedPage = {
       when: { all: [{ metric: 'out-by-month', gt: 0 }, { any: [{ metric: 'cash-foreign-share', lte: 0 }, { metric: 'cash-foreign-share', empty: true }] }, KEPT_NOUGHT_OR_MORE] },
     },
     {
-      /* WHAT IS ALREADY PROMISED, IN ONE PLAIN LINE UNDER HEALTH (round 1030): repeating bills and instalments as a share
-         of what comes in each month, with what it means past half, where one missed pay day leaves a month short. EACH PART
-         NAMED, SINCE money-core 3.32.0 (recheck of 30 October, N7): the sum read £11,317 beside Coming up's repeating out
-         of £10,692, which is the bills alone, with nothing saying the instalments were the difference. */
-      kind: 'note',
+      /* WHAT IS ALREADY PROMISED A MONTH, AS FIGURES, SINCE money-core 3.38.4 (moneyseed, 3 Nov): it was a sentence of four
+         amounts under Health ("Repeating bills (£10,692) and instalments (£625) come to £11,317 a month, more than the
+         £3,655 a month that came in"). Now a tile: what repeating bills and instalments take a month together, what came in
+         a month over the last three, and the share, amber past half (`spoken-for-share`'s mark). NOT SAID UNTIL THE THREE
+         MONTHS ARE THERE (`received-three-months-back`), so a new Ledger is not told a share of one month read as three. */
+      kind: 'stat',
+      heading: 'Promised each month',
+      icon: 'calendar-clock',
       span: 12,
-      says: [
-        {
-          /* PAST ALL OF IT THE TWO AMOUNTS SAY IT, and not a share past a hundred. */
-          when: { metric: 'spoken-for-share', gt: 1 },
-          body: 'Repeating bills ({{every-month-out}}) and instalments ({{installments-a-month}}) come to {{spoken-for-month}} a month, more than the {{received-a-month}} a month that came in over the last three months.',
-        },
-        {
-          when: { metric: 'spoken-for-share', gt: 0.5 },
-          body: 'Repeating bills and instalments take {{spoken-for-share}} of what comes in each month, more than half, so one missed pay day leaves a month short.',
-        },
-        { body: 'Repeating bills and instalments take {{spoken-for-share}} of what comes in each month.' },
+      cells: [
+        { metric: 'spoken-for-month', label: 'Bills and instalments', note: 'Repeating, a month' },
+        { metric: 'received-a-month', label: 'Came in', note: 'A month, over the last 3' },
+        { metric: 'spoken-for-share', label: 'Share of what comes in', note: 'Half or less is safe' },
       ],
-      /* NOT SAID UNTIL THE THREE MONTHS ARE THERE (`received-three-months-back`), so a new Ledger is not told a share of
-         one month read as three. */
       when: { all: [{ metric: 'spoken-for-share', gt: 0 }, { metric: 'received-three-months-back', gt: 0 }] },
     },
     {

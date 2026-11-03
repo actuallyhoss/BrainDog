@@ -24,11 +24,8 @@ const ACCOUNT_CARD = [
  * ONE PAGE UNDER MONEY, SINCE money-core 3.29.0: Money is a section with a page per job, and this one is where an account
  * is found, opened and kept current.
  *
- * WHAT IT SAYS, TOP TO BOTTOM: one sentence of what the accounts hold together, each currency apart; the four numbers
- * that say whether the balances can be trusted (Cash now, what is on the card, the oldest balance and how many are past a
- * week); what each account holds by the bank's newest word, its own page setting that against what its lines add up
- * to; then every account as a card, grouped Bank, Cash and
- * Card, each opening its page, with the day its balance was last confirmed and the out-of-date mark past a week.
+ * WHAT IT SAYS, TOP TO BOTTOM: every account as a card, grouped Bank, Cash and Card, each opening its page, with what it
+ * holds, the day its balance was last confirmed and the out-of-date mark past a week.
  *
  * NO BALANCE ON THE CARDS. A card's money column is the balance somebody typed, while its day is the bank's newest word
  * (`CONFIRMED_STALE`), so an account the bank had printed a newer balance for read the old amount beside the new day.
@@ -46,16 +43,9 @@ export const accountsPage = (_declared: (figure: string) => boolean): SeedPage =
     requires: ['register.accounts', 'register.balances', 'register.transactions'],
     pack: 'money-core',
     blocks: [
-      {
-        /* THE ACCOUNTS IN ONE SENTENCE: how many are open, counted as the cards below are, and what the ones that count
-           as cash hold. It said "in 6 accounts" over 13 cards, the 6 being Cash now's parts (audit of 30 October, 20). */
-        kind: 'note',
-        lead: true,
-        span: 12,
-        /* AND WHAT IS TO PAY ON THE CARD, SINCE money-core 3.34.0 (next-money, M13): it was a cell of a stat drawn on every
-           record, beside "Out of date 0". The clause goes whole while no card says it (`leadOf`). */
-        body: '{{accounts-open}} open account(s), with {{cash-now.apart}} in cash. {{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.',
-      },
+      /* NO LINE OVER THE CARDS, SINCE money-core 3.38.4 (moneyseed, 3 Nov): it said "3 open accounts, with £33,850 in
+         cash. £1,240 to pay on the card, as of 1 Sep.", figures in a sentence over cards that each say their balance, the
+         card's too. Cash now is Money's hero. */
       {
         /* A STRIPE BALANCE BELOW ZERO, SAID (audit Z18): what it is and what happens to it, one line, only while one is. */
         kind: 'note',
@@ -65,22 +55,8 @@ export const accountsPage = (_declared: (figure: string) => boolean): SeedPage =
         when: { metric: 'stripe-below-zero-count', gt: 0 },
         body: 'Stripe is below zero: fees or refunds Stripe took with no payments in to cover them. If it stays there, Stripe takes it from your bank.',
       },
-      {
-        /* WHETHER THE BALANCES CAN BE TRUSTED, IN THREE NUMBERS: what the card asks, the oldest balance among them and
-           how many are older than a week. What they hold is the line above, so it is not said twice. */
-        kind: 'stat',
-        heading: 'All accounts',
-        icon: 'landmark',
-        span: 12,
-        /* ONLY WHILE A BALANCE IS OUT OF DATE, SINCE money-core 3.34.0 (next-money, M13): with every balance current it
-           was a grid saying "Out of date 0", and the card's amount is the line's. Amber, as a thing to look at. */
-        tone: 'warn',
-        cells: [
-          { metric: 'balances-stale', label: 'Out of date', note: 'Balances older than a week' },
-          { metric: 'cash-as-of', label: 'Oldest balance' },
-        ],
-        when: { metric: 'balances-stale', gt: 0 },
-      },
+      /* NO "ALL ACCOUNTS" TILE OF AGES, SINCE money-core 3.38.4 (moneyseed, 3 Nov): "Out of date 1" and "Oldest balance
+         25 Aug" at figure size said again what the cards below say, each with its day and the out-of-date mark. */
       /* NO "BALANCE" BAR, SINCE money-core 3.34.0 (next-money, M12): each account's card says what it holds. */
       {
         /* EVERY OPEN ACCOUNT, BY KIND: Bank, Cash and Card, each card opening the account's own page. */

@@ -212,6 +212,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    {
+      version: '3.38.4',
+      notes:
+        'Money says each thing once and shows figures as figures. Coming up is one list of what falls due, with the next 30 days as two figures over it. Accounts opens on its cards, each with its balance and how old it is. Reports shows what came in, went out and was left as figures, and what repeating bills and instalments take each month as a tile. Money\'s first line is what is late, and the Ledger no longer counts the lines to file twice.',
+    },
     { version: '3.38.2', notes: 'Reports draws the six largest categories and everything else, where it drew five.' },
     { version: '3.38.1', notes: 'The Ledger table opens on date, payee, account, category and amount.' },
     { version: '3.38.0', notes: 'Forecast says what is left on one plan as a figure, not a chart of one bar. A bill says which way it is owed, a book asks when its money runs out, and Reports draws the six largest categories and everything else.' },
