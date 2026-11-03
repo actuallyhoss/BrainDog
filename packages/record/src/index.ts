@@ -8528,6 +8528,59 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * frozen with the row and never worked out again; a hue the caller sent stands, `null` too. Rows made before keep the hue drawn
    * from their id until somebody gives them one.
    */
+  /**
+   * THE OBVIOUS SPELLING AN AGENT SENDS, TAKEN AS MEANT (3 November): the calls agents kept getting refused for, where the
+   * meaning was plain. Each is mended only where nothing else could be meant, and anything else is left for the write
+   * path to refuse in its own words.
+   *
+   *   - `title`, on a list whose title field is another (`what` on tasks), is that field, when the call left it empty.
+   *   - A field named by its label (`known_by` for "Known by") is that field.
+   *   - A link given by its name (`thing: "Koala"`) is the one live row of that list with that title, by its handle.
+   *   - A bare address in a person's keys (`ana@x.com`) is the key `email:ana@x.com`.
+   */
+  const plainFields = (register: string, fields: Patch): Patch => {
+    if (fields === null || typeof fields !== 'object' || Array.isArray(fields)) return fields;
+    const decl = kernel.register(register);
+    if (!decl) return fields;
+    const out: Record<string, unknown> = { ...(fields as Record<string, unknown>) };
+    const has = (id: string): boolean => decl.fields.some((f) => f.id === id && !f.retired);
+    const snake = (label: string): string => label.trim().toLowerCase().replace(/[^a-z0-9]+/gu, '_').replace(/^_+|_+$/gu, '');
+    const title = typeof decl.title === 'string' ? decl.title : undefined;
+    if (Object.hasOwn(out, 'title') && !has('title') && title !== undefined && title !== 'title' && (out[title] === undefined || out[title] === '')) {
+      out[title] = out.title;
+      delete out.title;
+    }
+    for (const key of Object.keys(out)) {
+      if (has(key) || key === 'tags') continue;
+      const named = decl.fields.filter((f) => !f.retired && typeof f.label === 'string' && snake(f.label) === key);
+      if (named.length === 1 && !Object.hasOwn(out, named[0]!.id)) {
+        out[named[0]!.id] = out[key];
+        delete out[key];
+      }
+    }
+    const SPOKEN = /^(?:[a-z][a-z0-9_]{0,31}#\d+|[A-Z]{1,4}\d+|[0-9A-HJKMNP-TV-Z]{26})$/u;
+    for (const f of decl.fields) {
+      if (f.retired || f.type !== 'ref' || typeof f.to !== 'string') continue;
+      const v = out[f.id];
+      if (typeof v !== 'string' || v.trim() === '' || SPOKEN.test(v.trim())) continue;
+      const to = kernel.register(f.to);
+      const field = typeof to?.title === 'string' ? to.title : undefined;
+      if (!to || field === undefined || !/^[a-z][a-z0-9_]{0,31}$/u.test(field)) continue;
+      const rows = sql.all<{ seq: number | null }>(
+        'SELECT seq FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, ?))) = lower(trim(?)) LIMIT 2',
+        f.to,
+        `$.${field}`,
+        v,
+      );
+      if (rows.length === 1 && rows[0]!.seq !== null) out[f.id] = `${f.to}#${rows[0]!.seq}`;
+    }
+    const meets = kernel.meetsList();
+    const keys = meets?.register === register ? (meets.fields as { keys?: string }).keys : undefined;
+    if (keys !== undefined && Array.isArray(out[keys]))
+      out[keys] = (out[keys] as unknown[]).map((k) => (typeof k === 'string' && /^[^\s:@]+@[^\s@]+\.[^\s@]+$/u.test(k.trim()) ? `email:${k.trim().toLowerCase()}` : k));
+    return out as Patch;
+  };
+
   const huedOf = (register: string, fields: Patch): Patch => {
     const decl = kernel.register(register) as (RegisterDecl & { identity?: { accent?: unknown } }) | undefined;
     const accent = decl?.identity?.accent;
@@ -13049,6 +13102,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async create(args: { register: string; fields: Patch; note?: string; op_id?: string; said?: string }, ctx: CallContext): Promise<Result<Entry | Asked>> {
       const missing = named(args);
       if (missing) return { ok: false, refusal: missing };
+      args = { ...args, fields: plainFields(args.register, args.fields) };
       const stop = guard(ctx, 'append', args.register);
       if (stop) return { ok: false, refusal: stop };
       /* `deleted_at` IS THE RECORD'S, and a row does not arrive deleted. No register declares it, and
@@ -13195,6 +13249,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     ): Promise<Result<Entry | Asked>> {
       const missing = named(args, true);
       if (missing) return { ok: false, refusal: missing };
+      args = { ...args, patch: plainFields(args.register, args.patch) };
       const stop = guard(ctx, 'write', args.register);
       if (stop) return { ok: false, refusal: stop };
       /* A ROW SHE MAY NOT WRITE IS ONE THAT IS NOT THERE (`sight.ts`): every check below reads it as missing, and
