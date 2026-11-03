@@ -57,7 +57,7 @@ struct SettingsRoot: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Space.s3) {
+            VStack(alignment: .leading, spacing: Space.cardGap) {
                 ForEach(groups) { group in
                     /* WHAT ONLY THIS PHONE HOLDS sits under You, beside Notifications, whose kinds it rings for. */
                     if group.title != groups.first?.title, groups.dropFirst().first?.title == group.title { PhoneTile() }
@@ -74,7 +74,7 @@ struct SettingsRoot: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
-                                if index < group.areas.count - 1 { Hairline() }
+                                if index < group.areas.count - 1 { Hairline(leading: 32 + Space.s3) }
                             }
                         }
                     }
@@ -90,7 +90,7 @@ struct SettingsRoot: View {
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, Space.s3)
         }
-        .background(Palette.board)
+        .background(Ground())
         .navigationTitle(Words.settings)
         .modifier(ScreenBar(root: false, title: Words.settings))
     }
@@ -124,9 +124,9 @@ struct PhoneTile: View {
                         .buttonStyle(BDButtonStyle(.quiet, onTile: true, full: false))
                     }
                 }
-                Hairline()
+                Hairline(leading: 32 + Space.s3)
                 toggle(Words.saysWhat, line: Words.saysWhatLine, glyph: .eye, isOn: Binding(get: { says }, set: { says = $0; Push.saysWhat = $0 }))
-                Hairline()
+                Hairline(leading: 32 + Space.s3)
                 toggle(Words.faceLock, line: lockSaid ?? Words.faceLockLine, glyph: .lock, isOn: Binding(get: { lock.on }, set: { wanted in
                     Task {
                         let done = await lock.turn(wanted)

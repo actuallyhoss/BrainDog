@@ -42,7 +42,7 @@ struct SearchView: View {
             } else if hits.isEmpty && asked == typed && !reading {
                 EmptyState(.search, title: Words.nothingFound(typed), line: Words.nothingFoundNext)
                     .padding(Space.s4)
-                    .background(Palette.tile, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+                    .card()
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: Space.s3, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
@@ -60,7 +60,7 @@ struct SearchView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Palette.board)
+        .background(Ground())
         .scrollDismissesKeyboard(.immediately)
         .searchable(text: $app.searchText, prompt: Text(Words.searchPrompt))
         .task(id: typed) { await find(typed) }
@@ -166,7 +166,7 @@ struct SearchView: View {
         }
         .padding(.top, Space.s3)
         .padding(.bottom, Space.s1)
-        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
+        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter))
         .accessibilityAddTraits(.isHeader)
     }
 
@@ -188,12 +188,12 @@ struct SearchView: View {
             } label: {
                 VStack(spacing: 0) {
                     row(item)
-                    if !last { Hairline() }
+                    if !last { Hairline(leading: 32 + Space.s3) }
                 }
             }
             .buttonStyle(.plain)
             .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s4, bottom: 0, trailing: Space.gutter + Space.s4))
+            .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter + Space.s3))
             .listRowBackground(
                 UnevenRoundedRectangle(
                     topLeadingRadius: first ? Radius.tile : 0, bottomLeadingRadius: last ? Radius.tile : 0,

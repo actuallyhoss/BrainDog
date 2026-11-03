@@ -41,7 +41,7 @@ public struct Row: View {
     }
 }
 
-/// Rows of one list on a tile, with a `--rule` hairline between them and none under the last.
+/// Rows of one list on a card, with a hairline between them that starts at the text edge and none under the last.
 public struct Rows<Item: Identifiable, Content: View>: View {
     let items: [Item]
     let content: (Item) -> Content
@@ -61,11 +61,13 @@ public struct Rows<Item: Identifiable, Content: View>: View {
     }
 }
 
-/// One `--rule` hairline, a pixel at any scale.
+/// One `--rule` hairline, a pixel at any scale, with round ends. `leading` sets it in from the row's edge to where the
+/// words start (a row with a 32 well: 44), so the line never runs under a glyph.
 public struct Hairline: View {
     @Environment(\.displayScale) private var scale
-    public init() {}
+    let leading: CGFloat
+    public init(leading: CGFloat = 0) { self.leading = leading }
     public var body: some View {
-        Rectangle().fill(Palette.rule).frame(height: 1 / max(scale, 1)).accessibilityHidden(true)
+        Capsule().fill(Palette.rule).frame(height: 1 / max(scale, 1)).padding(.leading, leading).accessibilityHidden(true)
     }
 }

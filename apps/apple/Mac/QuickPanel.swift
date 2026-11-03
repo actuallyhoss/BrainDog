@@ -68,7 +68,10 @@ final class QuickPanel: NSObject, NSWindowDelegate {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.becomesKeyOnlyIfNeeded = false
-        panel.backgroundColor = PlatformPalette.tile
+        /* GLASS, as the ops palette is: the window is clear and the view draws the material at radius 22. */
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
         panel.animationBehavior = .utilityWindow
         panel.title = "Quick panel"
         panel.delegate = self
@@ -258,7 +261,9 @@ struct QuickPanelView: View {
                 .padding(.vertical, Space.s2)
         }
         .frame(width: QuickModel.width)
-        .background(Palette.tile)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous).strokeBorder(Palette.rule.opacity(0.7), lineWidth: 0.5).accessibilityHidden(true))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.panel, style: .continuous))
         .environment(\.font, Typeface.body)
         .onAppear { typing = true }
         .onChange(of: model.opens) { _, _ in typing = true }
@@ -407,7 +412,7 @@ struct QuickPanelView: View {
                         }
                         .padding(.horizontal, Space.s2)
                         .padding(.vertical, 6)
-                        .background(i == model.selected ? Palette.hover : Color.clear, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                        .background(i == model.selected ? Wash.menuRow : Color.clear, in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

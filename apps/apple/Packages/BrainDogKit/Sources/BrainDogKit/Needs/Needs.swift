@@ -155,7 +155,7 @@ public struct NeedsView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Palette.board)
+        .background(Ground())
         .environment(\.defaultMinListRowHeight, Space.tap)
         .refreshable {
             Haptic.select.play()
@@ -178,7 +178,7 @@ public struct NeedsView: View {
         }
         .padding(.top, Space.s3)
         .padding(.bottom, Space.s1)
-        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
+        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
@@ -201,7 +201,7 @@ public struct NeedsView: View {
             }
         }
         .padding(Space.s4)
-        .background(Palette.tile, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+        .card()
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: Space.s3, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
@@ -232,7 +232,7 @@ public struct NeedsView: View {
                     }
                 }
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s4, bottom: 0, trailing: Space.gutter + Space.s4))
+                .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter + Space.s3))
                 .listRowBackground(
                     UnevenRoundedRectangle(
                         topLeadingRadius: first ? Radius.tile : 0, bottomLeadingRadius: last ? Radius.tile : 0,
@@ -255,7 +255,7 @@ struct NeedsRow: View {
             HStack(alignment: .center, spacing: Space.s3) {
                 IconWell(glyph, size: .l, tone: question.cost == "undo" ? .warn : .neutral)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(question.question).font(Typeface.bodyMedium).foregroundStyle(Palette.ink).lineLimit(2)
+                    Text(question.question).font(Typeface.row).foregroundStyle(Palette.ink).lineLimit(2)
                     if let detail { Text(detail).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(1) }
                 }
                 Spacer(minLength: Space.s2)
@@ -265,7 +265,7 @@ struct NeedsRow: View {
             }
             .frame(minHeight: Space.tap)
             .padding(.vertical, Space.s3)
-            if !last { Hairline() }
+            if !last { Hairline(leading: 32 + Space.s3) }
         }
         .accessibilityElement(children: .combine)
     }
@@ -343,8 +343,6 @@ struct LaterSheet: View {
         .padding(Space.gutter)
         .padding(.top, Space.s2)
         .presentationDetents([.height(340)])
-        .presentationBackground(Palette.tile)
-        .presentationCornerRadius(Radius.tile)
         .presentationDragIndicator(.visible)
         .onAppear { typing = true }
     }

@@ -178,14 +178,13 @@ extension Links {
 }
 #endif
 
-/// The navigation bar as Look B draws it (plan 3.3): opaque `--nav`, a `--rule` hairline, no scroll-edge blur, the title
-/// in Lexend 600 at 22, and no glass on its buttons.
+/// The navigation bar in the ops look: the system's own Liquid Glass, so the page runs under it and its buttons float as
+/// glass, with no hairline; only the title's face and the inks are BrainDog's (Plus Jakarta Sans 600 at 22).
 enum Bars {
     static func dress() {
         let bar = UINavigationBarAppearance()
-        bar.configureWithOpaqueBackground()
-        bar.backgroundColor = PlatformPalette.nav
-        bar.shadowColor = PlatformPalette.rule
+        bar.configureWithDefaultBackground()
+        bar.shadowColor = .clear
         bar.titleTextAttributes = [.font: Typeface.navTitleFont(), .foregroundColor: PlatformPalette.ink]
         bar.largeTitleTextAttributes = [.font: Typeface.navTitleFont(), .foregroundColor: PlatformPalette.ink]
         let back = UIBarButtonItemAppearance()
@@ -193,7 +192,13 @@ enum Bars {
         bar.backButtonAppearance = back
         let nav = UINavigationBar.appearance()
         nav.standardAppearance = bar
-        nav.scrollEdgeAppearance = bar
+        let edge = bar.copy()
+        edge.configureWithTransparentBackground()
+        edge.shadowColor = .clear
+        edge.titleTextAttributes = bar.titleTextAttributes
+        edge.largeTitleTextAttributes = bar.largeTitleTextAttributes
+        edge.backButtonAppearance = back
+        nav.scrollEdgeAppearance = edge
         nav.compactAppearance = bar
         nav.compactScrollEdgeAppearance = bar
         nav.tintColor = PlatformPalette.ink2

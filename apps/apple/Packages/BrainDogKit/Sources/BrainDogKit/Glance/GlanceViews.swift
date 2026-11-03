@@ -20,7 +20,7 @@ public enum GlanceLink {
     public static let today = open("/")
 }
 
-/// The small heading a glance starts with: its glyph and its name, quiet.
+/// The small heading a glance starts with: its glyph and its name in the ops caps label (11, 500, +0.3), quiet.
 struct GlanceHead: View {
     let glyph: Glyph
     let title: String
@@ -29,7 +29,7 @@ struct GlanceHead: View {
     var body: some View {
         HStack(spacing: Space.s1 + 2) {
             glyph.image.resizable().scaledToFit().frame(width: 14, height: 14).foregroundStyle(Palette.ink3)
-            Text(title).font(Typeface.caption).foregroundStyle(Palette.ink3).lineLimit(1)
+            Text(title).font(Typeface.caps).textCase(.uppercase).tracking(0.3).foregroundStyle(Palette.ink3).lineLimit(1)
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
@@ -61,6 +61,7 @@ public struct NeedsGlance: View {
     private var countText: some View {
         Text(count.formatted())
             .font(Typeface.hero)
+            .tracking(Typeface.tight(30))
             .foregroundStyle(count > 0 ? Palette.red : Palette.ink)
             .monospacedDigit()
             .contentTransition(.numericText())

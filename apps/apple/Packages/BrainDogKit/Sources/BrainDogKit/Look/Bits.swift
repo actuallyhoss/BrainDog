@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// An empty state (`loop/DESIGN-SYSTEM.md`, Empty): what will be here and how it gets there, with one action. A 40
-/// neutral well, a 17/600 title, one line in ink-2. Never "Nothing here yet" alone.
+/// An empty state: what will be here and how it gets there, with one action. A 40 neutral circle, a 17/600 title, one
+/// line in ink-2. Never "Nothing here yet" alone.
 public struct EmptyState<Action: View>: View {
     let glyph: Glyph
     let title: String
@@ -28,10 +28,13 @@ public struct EmptyState<Action: View>: View {
     }
 }
 
-/// A row of choices in a tile-2 track, the chosen one on `--segment-on` (Segmented). Radius 8; a change is felt as `select`.
+/// The one tab bar inside a screen: a capsule track in tile-2, 3px in, the chosen segment a raised `--segment-on`
+/// capsule with its label going from 500 to 600. 36 tall on a phone (the page tier), 30 inside. A change is felt as
+/// `select` and the thumb slides.
 public struct Segmented<Value: Hashable>: View {
     let choices: [(Value, String)]
     @Binding var chosen: Value
+    @Namespace private var thumb
 
     public init(_ choices: [(Value, String)], chosen: Binding<Value>) {
         self.choices = choices
@@ -39,31 +42,39 @@ public struct Segmented<Value: Hashable>: View {
     }
 
     public var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 0) {
             ForEach(choices, id: \.0) { value, label in
+                let on = chosen == value
                 Button {
                     guard chosen != value else { return }
                     Haptic.select.play()
-                    withAnimation(.easeOut(duration: 0.12)) { chosen = value }
+                    withAnimation(.snappy(duration: 0.22)) { chosen = value }
                 } label: {
                     Text(label)
-                        .font(Typeface.control)
-                        .foregroundStyle(chosen == value ? Palette.ink : Palette.ink2)
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                        .background(chosen == value ? Palette.segmentOn : .clear, in: RoundedRectangle(cornerRadius: Radius.control - 2, style: .continuous))
-                        .contentShape(Rectangle())
+                        .font(Typeface.segment.weight(on ? .semibold : .medium))
+                        .foregroundStyle(on ? Palette.ink : Palette.ink2)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, minHeight: Space.control - 8)
+                        .background {
+                            if on {
+                                Capsule(style: .continuous).fill(Palette.segmentOn)
+                                    .elevation(.raised)
+                                    .matchedGeometryEffect(id: "thumb", in: thumb)
+                            }
+                        }
+                        .contentShape(Capsule(style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .accessibilityAddTraits(chosen == value ? .isSelected : [])
+                .accessibilityAddTraits(on ? .isSelected : [])
             }
         }
-        .padding(2)
-        .background(Palette.tile2, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        .padding(3)
+        .background(Palette.tile2, in: Capsule(style: .continuous))
     }
 }
 
-/// What one press did, said at the foot of the screen for a few seconds, with Undo where it can be taken back
-/// (`--toast`, radius 8, the web's toast). One at a time: a new one replaces the last.
+/// What one press did, said at the foot of the screen for a few seconds, with Undo where it can be taken back. Floating
+/// chrome, so it is glass (the regular material, radius 20, the popover shadow). One at a time: a new one replaces the last.
 @Observable
 public final class Toasts {
     public struct Toast: Identifiable, Equatable {
@@ -106,20 +117,23 @@ public struct ToastView: View {
             HStack(spacing: Space.s3) {
                 Text(toast.text)
                     .font(Typeface.body)
-                    .foregroundStyle(Palette.onToast)
+                    .foregroundStyle(Palette.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 if toast.undo {
                     Button(Words.undo) { toasts.pressUndo() }
+                        .buttonStyle(.plain)
                         .font(Typeface.control)
-                        .foregroundStyle(Palette.onToast)
+                        .foregroundStyle(Palette.link)
                         .frame(minWidth: Space.tap, minHeight: Space.tap)
                 }
             }
             .padding(.horizontal, Space.s4)
             .padding(.vertical, Space.s1)
             .frame(minHeight: 48)
-            .background(Palette.toast, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.toast, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Radius.toast, style: .continuous).strokeBorder(Palette.rule.opacity(0.6), lineWidth: 0.5).accessibilityHidden(true))
+            .elevation(.popover)
             .padding(.horizontal, Space.gutter)
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .accessibilityElement(children: .contain)
