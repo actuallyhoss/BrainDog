@@ -3904,21 +3904,22 @@
     white-space: nowrap;
   }
 
-  /* THE TOOLBAR'S "⋯": a 36px square in the quiet fill, the toolbar's height, its glyph in the second ink. */
+  /* THE TOOLBAR'S "⋯": a 36px circle in the soft fill (ops look), the toolbar's height, its glyph in the second ink. */
   .tool-more {
     display: inline-grid;
     place-items: center;
-    inline-size: 36px;
-    block-size: 36px;
-    background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    inline-size: var(--ctl-page, 36px);
+    block-size: var(--ctl-page, 36px);
+    background: var(--soft-fill, var(--tile-2));
+    border-radius: var(--r-pill, 999px);
+    box-shadow: inset 0 0 0 0.5px var(--g-line, transparent);
     color: var(--ink-2);
     transition: background var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
     :global(.menu-trigger):hover > .tool-more {
-      background: var(--hover);
+      background: var(--soft-fill-hover, var(--hover));
       color: var(--ink);
     }
   }
