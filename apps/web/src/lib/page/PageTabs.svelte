@@ -122,9 +122,9 @@
   .tab-row {
     display: flex;
     flex: 0 1 auto;
-    gap: 2px;
+    gap: var(--sp-0);
     min-inline-size: 0;
-    padding: 2px;
+    padding: var(--sp-0);
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-inline: contain;
@@ -177,7 +177,8 @@
     }
   }
 
-  /* A SEGMENT: the track's 3px comes off it, so the whole control is `--ctl-h`, and under a thumb `--ctl-h` is 44
+  /* A SEGMENT: the track's 2px each side comes off it, so the whole control is `--ctl-h` (it was 34, the segment taken
+     6 short for a 2px inset), and under a thumb `--ctl-h` is 44
      already, the target `.tap` exists to reach. No `.tap`: its pseudo-element reaching past the tab counts as overflow
      in a box that scrolls on one axis. */
   .tab {
@@ -185,7 +186,7 @@
     flex: 0 0 auto;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: calc(var(--ctl-h) - 6px);
+    min-block-size: calc(var(--ctl-h) - 2 * var(--sp-0));
     padding-inline: var(--sp-3);
     border-radius: var(--r-pill, calc(var(--r-ctl, 8px) - 2px));
     color: var(--ink-2);
@@ -228,7 +229,7 @@
   /* MORE IS ITS OWN SMALL TRACK BESIDE THE STRIP, the same rectangle. */
   .tab-more {
     flex: 0 0 auto;
-    padding: 2px;
+    padding: var(--sp-0);
     background: var(--soft-fill, var(--tile-2));
     border-radius: var(--r-pill, var(--r-ctl, 8px));
   }

@@ -154,7 +154,7 @@
     margin: 0 0 var(--sp-2);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 1.55;
+    line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
 
@@ -214,8 +214,8 @@
   }
 
   .names li {
-    padding: 2px var(--sp-2);
-    border-radius: 6px;
+    padding: var(--sp-0) var(--sp-2);
+    border-radius: var(--r-xs);
     background: var(--tile-2);
     color: var(--ink);
     font-size: var(--fs-meta);
@@ -234,7 +234,7 @@
   .money li {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2px var(--sp-3);
+    gap: var(--sp-1) var(--sp-3);
     align-items: baseline;
   }
 
@@ -252,7 +252,7 @@
   .bar {
     grid-column: 1 / -1;
     block-size: 6px;
-    border-radius: 3px;
+    border-radius: var(--r-pill);
     background: var(--tile-2);
     overflow: hidden;
   }
@@ -260,7 +260,7 @@
   .bar-fill {
     display: block;
     block-size: 100%;
-    border-radius: 3px;
+    border-radius: var(--r-pill);
     background: var(--ink);
   }
 
@@ -318,16 +318,16 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-items: center;
-    min-block-size: 44px;
-    padding: 6px var(--sp-2);
-    border-radius: 8px;
+    min-block-size: var(--row-h);
+    padding: var(--row-pad-y) var(--sp-2);
+    border-radius: var(--r-ctl);
     color: inherit;
     text-decoration: none;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .item-link:hover {
-      background: var(--tile-2);
+      background: var(--row-wash, var(--tile-2));
     }
   }
 
@@ -341,14 +341,14 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 22px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
   }
 
   .item-detail {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 </style>

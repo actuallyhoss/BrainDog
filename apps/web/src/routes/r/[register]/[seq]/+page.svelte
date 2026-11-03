@@ -1912,12 +1912,12 @@
 {/if}
 
 <style>
-  /* THE PAGE: the board, full width inside the gutters, its tiles 12 apart. */
+  /* THE PAGE: the board, full width inside the gutters, its tiles a tile gap apart (16 at a desk, 12 on a phone). */
   .page {
     display: flex;
     flex-direction: column;
-    gap: var(--inset);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    gap: var(--tile-gap);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* ── the board ─────────────────────────────────────────────────────── */
@@ -1927,7 +1927,7 @@
   .board {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: var(--inset);
+    gap: var(--tile-gap);
     align-items: start;
   }
 
@@ -1943,7 +1943,7 @@
   .side {
     display: flex;
     flex-direction: column;
-    gap: var(--inset);
+    gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
@@ -1962,7 +1962,7 @@
   .tiles {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-    gap: var(--inset);
+    gap: var(--tile-gap);
     align-items: stretch;
   }
 
@@ -2113,7 +2113,7 @@
     gap: var(--sp-2);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 1.55;
+    line-height: var(--lh-body);
   }
 
   .about > :global(:first-child) {
@@ -2123,7 +2123,7 @@
 
   /* THE PENCIL TAKES NO HEIGHT OF ITS OWN: its 32px box sits on the note's first line, so a one-line note is a line tall. */
   .about-pencil {
-    margin-block: calc((1.55em - 32px) / 2);
+    margin-block: calc((var(--lh-body) * 1em - 32px) / 2);
   }
 
   .self-line {
@@ -2164,8 +2164,8 @@
     color: var(--ink);
     font-size: var(--fs-page);
     font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
+    letter-spacing: var(--track-page, -0.02em);
+    line-height: var(--lead-page);
     white-space: nowrap;
   }
 
@@ -2226,10 +2226,12 @@
     container-type: inline-size;
   }
 
+  /* THE FACTS START ON THE TILE'S PADDING (rhythm pass, 3 Nov): each fact's own 8 above and below is the room between
+     two of them, and at the list's ends it stood 8 more inside the tile than any heading does. */
   .facts {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    margin: 0;
+    margin: calc(-1 * var(--row-pad-y)) 0;
   }
 
   .fact {
@@ -2244,8 +2246,9 @@
        the middle and its value to the foot, six lines apart. */
     align-self: start;
     align-content: start;
-    min-block-size: 40px;
-    padding-block: 6px;
+    min-block-size: var(--row-h);
+    padding-block: var(--row-pad-y);
+    box-sizing: border-box;
   }
 
   .fact-label {
@@ -2267,7 +2270,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 1.55;
+    line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
 
@@ -2448,7 +2451,7 @@
   .add-field {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-1);
     min-block-size: var(--ctl-panel, 28px);
     padding: 0 var(--sp-3);
     background: var(--soft-fill, var(--tile-2));
@@ -2566,7 +2569,7 @@
   .edit-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--toolbar-gap);
   }
 
   /* WHAT THE RECORD SAID, under the box it was typed in, with the words still in it. */
@@ -2574,6 +2577,7 @@
     margin: var(--sp-1) 0 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* AN ARCHIVED ROW SAYS SO, in one quiet line with the archive glyph, and nothing about it is red. */
@@ -2613,8 +2617,8 @@
     color: var(--ink);
     font-size: var(--fs-figure);
     font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
+    letter-spacing: var(--track-figure);
+    line-height: var(--lead-figure);
     white-space: nowrap;
   }
 
@@ -2634,7 +2638,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 1.55;
+    line-height: var(--lh-body);
   }
 
   /* ── the body ──────────────────────────────────────────────────────── */
@@ -2644,7 +2648,7 @@
   .document-slot {
     max-inline-size: var(--measure);
     font-size: var(--fs-body);
-    line-height: 1.55;
+    line-height: var(--lh-body);
   }
 
   .document-slot :global(.document > h1) {
@@ -2681,8 +2685,8 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--sp-3);
-    min-block-size: 44px;
-    padding: 6px var(--sp-2);
+    min-block-size: var(--row-h);
+    padding: var(--row-pad-y) var(--sp-2);
     border-radius: var(--r-ctl);
     color: inherit;
     text-decoration: none;
@@ -2718,7 +2722,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 22px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
   }
 
@@ -2760,7 +2764,7 @@
   .item-stands {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-2);
     color: var(--ink-2);
   }
 
@@ -2784,7 +2788,8 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    letter-spacing: var(--track-head);
+    line-height: var(--lead-head);
     overflow-wrap: anywhere;
   }
 
@@ -2799,6 +2804,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
+    line-height: var(--lead-meta);
   }
 
   .handoff-lines {
@@ -2809,7 +2815,7 @@
     padding-inline-start: var(--sp-5);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 1.55;
+    line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
 
@@ -2862,7 +2868,7 @@
 
   @media (width < 900px) {
     .page {
-      padding: var(--sp-3) var(--gutter) var(--sp-8);
+      padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
     }
 
     /* THE NAME ON ITS OWN ROW, THREE LINES AT MOST, the "…" at its end and level with its first line. */

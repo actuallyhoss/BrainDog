@@ -465,8 +465,10 @@
     min-inline-size: 0;
   }
 
+  /* A TILE GAP UNDER THE CARD ABOVE IT (rhythm pass, 3 Nov): at 12 it stood closer to the banner than the tiles stand to
+     each other; and the page's foot is the page's own, which clears the phone's tab bar. */
   .shaped-body {
-    padding: var(--sp-3) var(--gutter) var(--sp-9);
+    padding: var(--tile-gap) var(--gutter) var(--page-bottom);
   }
 
   /* WHAT EVERY AGENT IS TOLD IS THE PAGE'S LAST TILE, one tile gap under the blocks: the page's end space moves under
@@ -476,16 +478,10 @@
   }
 
   .read :global(.page-offer:has(> [data-lessons])) {
-    padding-block-end: var(--sp-9);
+    padding-block-end: var(--page-bottom);
   }
 
   .read :global([data-lessons] + *) {
     margin-block-start: var(--tile-gap);
-  }
-
-  @media (width < 640px) {
-    .read :global(.page-offer:has(> [data-lessons])) {
-      padding-block-end: var(--sp-8);
-    }
   }
 </style>

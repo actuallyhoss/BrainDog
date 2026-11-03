@@ -67,7 +67,8 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
-    padding: 6px 6px 6px var(--sp-4);
+    /* 4 ROUND ITS 36PX CONTROLS (rhythm pass, 3 Nov): 6 was off the grid, and at 4 the capsules sit concentric in it. */
+    padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-4);
     background: var(--glass-regular, var(--tile));
     -webkit-backdrop-filter: var(--glass-filter, none);
     backdrop-filter: var(--glass-filter, none);

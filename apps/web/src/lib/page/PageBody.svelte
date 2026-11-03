@@ -1554,7 +1554,9 @@
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: var(--tile-gap);
-    padding: var(--sp-3) var(--gutter) var(--sp-9);
+    /* A TILE GAP UNDER WHAT STANDS ABOVE (rhythm pass, 3 Nov): 12 put the first tile closer to a banner over it than the
+       tiles stand to each other at a desk; the foot is the page's own step, which clears the phone's tab bar. */
+    padding: var(--tile-gap) var(--gutter) var(--page-bottom);
   }
 
   /* THE ROW CURSOR'S RING, drawn only once a key has moved it: the focus ink, round the row, never the brand's red. */
@@ -1687,6 +1689,9 @@
     padding: var(--slot-pad);
     background: var(--tile);
     border-radius: var(--r-tile);
+    /* ITS EDGE AND LIFT, AS EVERY TILE HAS (rhythm pass, 3 Nov): a block's tile had the fill alone, so in dark it stood
+       flatter than the `Tile` cards beside it. */
+    box-shadow: var(--card);
     /* `#b-4` must not scroll underneath the sticky header. Paid once, per anchor. */
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
@@ -1702,6 +1707,7 @@
     padding: var(--slot-pad);
     background: var(--tile);
     border-radius: var(--r-tile);
+    box-shadow: var(--card);
   }
 
   .area[data-area='rail'] .box {
@@ -1756,7 +1762,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 400;
-    line-height: 1.45;
+    line-height: var(--lh-body);
     letter-spacing: 0;
     text-wrap: pretty;
   }
@@ -1778,14 +1784,15 @@
     padding: var(--tile-pad-lead);
     background: var(--tile);
     border-radius: var(--r-tile);
+    box-shadow: var(--card);
   }
 
   .block-slot[data-lead]:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(.block p) {
     max-inline-size: 24em;
     font-size: var(--fs-hero);
     font-weight: var(--fw-semi);
-    line-height: 40px;
-    letter-spacing: -0.02em;
+    line-height: var(--lead-hero);
+    letter-spacing: var(--track-figure);
     text-wrap: balance;
   }
 
@@ -1889,7 +1896,7 @@
   @media (width < 640px) {
     .block-slot[data-lead]:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(.block p) {
       font-size: var(--fs-hero-phone);
-      line-height: 34px;
+      line-height: var(--lead-page);
     }
   }
 
@@ -1949,6 +1956,7 @@
   .block-slot:not([data-arranging]):has(:global(.block[data-kind='note'] p > a + a)) {
     padding-block: 0;
     background: transparent;
+    box-shadow: none;
   }
 
   .block-slot :global(.block[data-kind='note'] p:has(> a + a):not(:has(> :not(a)))) {
@@ -2112,7 +2120,7 @@
   @media (width < 900px) {
     .page {
       grid-template-columns: minmax(0, 1fr);
-      padding: var(--sp-3) var(--gutter) var(--sp-8);
+      padding: var(--tile-gap) var(--gutter) var(--page-bottom);
     }
 
     .area,

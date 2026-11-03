@@ -285,7 +285,7 @@
     grid-auto-flow: column;
     grid-template-columns: var(--lanes, none);
     grid-auto-columns: minmax(264px, 1fr);
-    gap: var(--sp-3);
+    gap: var(--tile-gap);
     align-items: start;
     margin-inline: calc(-1 * var(--sp-1));
     padding: var(--sp-1) var(--sp-1) var(--sp-3);
@@ -325,7 +325,8 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    letter-spacing: var(--track-head);
+    line-height: var(--lead-head);
   }
 
   .lane-name {
@@ -347,12 +348,13 @@
     padding: var(--sp-3) var(--sp-1);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .lane-cards,
   .bgrid {
     display: grid;
-    gap: var(--sp-2);
+    gap: var(--sp-3);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -377,7 +379,8 @@
     font-family: var(--font-display);
     font-size: calc(var(--fs-figure) - 2px);
     font-weight: var(--fw-semi);
-    line-height: 28px;
+    letter-spacing: var(--track-figure, -0.02em);
+    line-height: var(--lead-figure);
   }
 
   .bcard[data-mode='cards'] .bcard-meta {
@@ -454,6 +457,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
+    line-height: var(--lead-row);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -465,7 +469,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     font-variant-numeric: tabular-nums;
     text-overflow: ellipsis;
     white-space: nowrap;
