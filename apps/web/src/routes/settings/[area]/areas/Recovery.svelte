@@ -192,10 +192,9 @@
     {#if hostAuth?.magic}
       <StateRow icon="link" title={copy.magicLink} line={copy.magicHow} />
     {/if}
-    {#if part === 'back'}
-      <!-- ONE FACT, ONE LINE (G4): it was a tile of its own with a heading, a row and a title over one sentence. -->
-      <p class="lockout-line">{copy.lockoutHow}</p>
-    {:else}
+    <!-- NOT IN THE YOU CARD (ui pass, 3 Nov): how many tries lock sign-in is nothing anybody acts on, and there it was a
+         loose grey line between the facts and where you are signed in. -->
+    {#if part !== 'back'}
       <StateRow icon="clock" title={copy.lockout} line={copy.lockoutHow} />
     {/if}
 {/snippet}
@@ -254,12 +253,5 @@
       justify-content: center;
       min-block-size: 44px;
     }
-  }
-
-  .lockout-line {
-    margin: var(--sp-2) 0 0;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta);
   }
 </style>

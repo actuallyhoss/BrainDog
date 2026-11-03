@@ -1,9 +1,8 @@
 <!--
   Settings > Who can do what (collab pass, 2 Nov).
 
-  THE ROLES SIDE BY SIDE, IN THE WORDS EVERY INVITE AND SHARE USES (`lib/sharing/roles.ts`): one card a role with what it
-  lets somebody do and what it does not, then the grid of the things a person does here against the five roles, then
-  the four rungs a share gives on part of the BrainDog. It reads nothing from the record and changes nothing, so every
+  THE ROLES SIDE BY SIDE, IN THE WORDS EVERY INVITE AND SHARE USES (`lib/sharing/roles.ts`): the grid of the things a person
+  does here against the five roles, the reader's own column marked, then the four rungs a share gives on part of the BrainDog. It reads nothing from the record and changes nothing, so every
   person may open it: a colleague reads what their own role is beside the others, marked "You".
 
   A TABLE ON A DESK, A LIST ON A PHONE. Five columns and thirteen rows do not fit 390px, so below 720px each thing is a
@@ -18,18 +17,15 @@
 
   let { shell }: AreaProps = $props();
 
-  /* THE READER'S OWN ROLE, marked on its card and its column; somebody holding only some lists has none to mark. */
+  /* THE READER'S OWN ROLE, marked on its column; somebody holding only some lists has none to mark. */
   const mine = $derived<Level | null>(shell.me.lists === null && Object.hasOwn(ROLES, shell.me.level) ? (shell.me.level as Level) : null);
 
   const words = {
     roles: 'Roles',
-    rolesLead: 'A role is what somebody can do across all of this BrainDog. You pick one when you invite them, and change it in People and sharing.',
-    grid: 'Side by side',
+    rolesLead: (mine: Level | null) => (mine ? `Your role is ${ROLES[mine].name}. Pick one for each person you invite.` : 'Pick one for each person you invite.'),
     shares: 'Sharing part of it',
-    sharesLead: 'A share gives somebody one project, one list or some rows, for as long as you say. They see nothing else here.',
+    sharesLead: 'One project, list or set of rows, for as long as you say. Nothing else here.',
     you: 'You',
-    can: 'Can',
-    cant: "Can't",
     yes: 'Yes',
     no: 'No',
     whoMay: (who: string[]) => (who.length === 0 ? 'Nobody' : who.join(', ')),
@@ -45,31 +41,21 @@
       : ROLE_ORDER.filter((l) => holds[l] !== false).map((l) => (typeof holds[l] === 'string' ? `${ROLES[l].name} (${(holds[l] as string).toLowerCase()})` : ROLES[l].name));
 </script>
 
+<!-- ONE TABLE, NOT CARDS AND A TABLE (ui pass, 3 Nov): five cards said in sentences what each role can and can't do,
+     and the table under them said the same thing again as ticks. The table stays; the reader's own column is marked
+     "You" in its head, and the line over it says which role that is. -->
 <Tile icon="user-check" title={words.roles}>
-  <p class="lead">{words.rolesLead}</p>
-  <ul class="cards">
-    {#each ROLE_ORDER as level (level)}
-      <li class="card" data-mine={mine === level ? '' : undefined}>
-        <p class="card-head">
-          <span class="card-name">{ROLES[level].name}</span>
-          {#if mine === level}<span class="card-you">{words.you}</span>{/if}
-        </p>
-        <p class="card-line"><Icon name="check" size="s" /><span><span class="sr">{words.can}: </span>{ROLES[level].can}</span></p>
-        <p class="card-line cant"><Icon name="ban" size="s" /><span><span class="sr">{words.cant}: </span>{ROLES[level].cant}</span></p>
-      </li>
-    {/each}
-  </ul>
-</Tile>
-
-<Tile icon="grid" title={words.grid}>
+  <p class="lead">{words.rolesLead(mine)}</p>
   <!-- A NARROW DESK MAY STILL SCROLL IT SIDEWAYS, so the box takes the keyboard and says what it holds. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <div class="matrix-wrap" role="region" aria-label={words.grid} tabindex="0">
+  <div class="matrix-wrap" role="region" aria-label={words.roles} tabindex="0">
     <table class="matrix">
       <thead>
         <tr>
           <td></td>
-          {#each ROLE_ORDER as level (level)}<th scope="col" data-mine={mine === level ? '' : undefined}>{ROLES[level].name}</th>{/each}
+          {#each ROLE_ORDER as level (level)}<th scope="col" data-mine={mine === level ? '' : undefined}
+              >{ROLES[level].name}{#if mine === level}<span class="you">{words.you}</span>{/if}</th
+            >{/each}
         </tr>
       </thead>
       <tbody>
@@ -110,64 +96,11 @@
 <style>
   .lead {
     margin: 0 0 var(--sp-4);
-    color: var(--ink-2);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     max-inline-size: var(--measure);
     text-wrap: pretty;
-  }
-  .cards {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-    gap: var(--sp-3);
-  }
-  .card {
-    display: grid;
-    align-content: start;
-    gap: var(--sp-2);
-    padding: var(--sp-4);
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
-  }
-  .card[data-mine] {
-    background: var(--tile);
-    box-shadow: inset 0 0 0 1.5px var(--ink);
-  }
-  .card p {
-    margin: 0;
-  }
-  .card-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-2);
-  }
-  .card-name {
-    font-weight: var(--fw-semi);
-    color: var(--ink);
-  }
-  .card-you {
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta);
-    color: var(--ink-2);
-  }
-  .card-line {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--sp-2);
-    align-items: start;
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta);
-    color: var(--ink-2);
-    text-wrap: pretty;
-  }
-  .card-line :global(svg) {
-    margin-block-start: 2px;
-    color: var(--good);
-  }
-  .card-line.cant :global(svg) {
-    color: var(--ink-3);
   }
   .sr {
     position: absolute;
@@ -189,17 +122,39 @@
   }
   .matrix th,
   .matrix td {
-    padding: var(--sp-2) var(--sp-2);
-    border-block-end: 1px solid var(--rule);
+    block-size: var(--table-row-h, 44px);
+    padding: 0 var(--sp-2);
     text-align: center;
     vertical-align: middle;
   }
+  /* THE TABLE RULE (ops 6): an 11px caps head over one hairline, rows told apart by air and the hover wash. */
   .matrix thead th {
-    font-weight: var(--fw-semi);
-    color: var(--ink);
+    block-size: auto;
+    padding-block: 0 var(--sp-2);
+    font: var(--t-caps, 500 11px/16px var(--font-ui));
+    letter-spacing: var(--track-caps, 0.025em);
+    text-transform: uppercase;
+    color: var(--ink-3);
     white-space: nowrap;
+    border-block-end: 1px solid var(--sep, var(--rule));
+  }
+  .matrix thead td {
+    border-block-end: 1px solid var(--sep, var(--rule));
+  }
+  .matrix thead th[data-mine] {
+    color: var(--ink);
+  }
+  .you {
+    display: block;
+    margin-block-start: 2px;
+    font-size: var(--fs-cap);
+    line-height: var(--lead-cap);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-2);
   }
   .matrix tbody th {
+    padding-inline-start: var(--title-inset, 12px);
     text-align: start;
     font-weight: var(--fw-regular);
     color: var(--ink);
@@ -207,9 +162,18 @@
     min-inline-size: 11rem;
     text-wrap: pretty;
   }
-  .matrix tbody tr:last-child th,
-  .matrix tbody tr:last-child td {
-    border-block-end: 0;
+  @media (hover: hover) and (pointer: fine) {
+    .matrix tbody tr:hover > * {
+      background: var(--row-wash);
+    }
+    .matrix tbody tr:hover > :first-child {
+      border-start-start-radius: var(--r-ctl);
+      border-end-start-radius: var(--r-ctl);
+    }
+    .matrix tbody tr:hover > :last-child {
+      border-start-end-radius: var(--r-ctl);
+      border-end-end-radius: var(--r-ctl);
+    }
   }
   .matrix [data-mine] {
     background: var(--tile-2);
@@ -244,12 +208,8 @@
   }
   .phone li {
     display: grid;
-    gap: 2px;
-    padding-block: var(--sp-3);
-    border-block-end: 1px solid var(--rule);
-  }
-  .phone li:last-child {
-    border-block-end: 0;
+    gap: var(--row-stack, 2px);
+    padding-block: var(--sp-2);
   }
   .phone-thing {
     color: var(--ink);

@@ -12,6 +12,8 @@
   import { createClient } from '@braindog/client';
   import type { TransitionConfig } from 'svelte/transition';
 
+  import { page } from '$app/state';
+
   import { apiBase } from '$lib/at.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { wrote } from '$lib/record/settings-write.ts';
@@ -28,7 +30,10 @@
   let busy = $state(false);
   let fault = $state('');
   let field = $state<HTMLInputElement | null>(null);
-  const shown = $derived(!done && nameAskDue(shell, apiBase()));
+  /* NOT ON SIGNING IN (ui pass, 3 Nov): that page's You card is where the name is typed, and the banner over it asked
+     the same thing a second time. */
+  const home = $derived(/\/settings\/(?:signing-in|identity)\/?$/u.test(page.url.pathname));
+  const shown = $derived(!done && !home && nameAskDue(shell, apiBase()));
   /* IT FOLDS AWAY ONLY ONCE IT IS ANSWERED OR SKIPPED. Taken away while still asking, it is this copy being handed on: on
      a phone the frame's copy goes when the page's head draws the banners under its bar, and with the fold both stood at
      once and the page slid up 162px a beat after it arrived (jumps, 2 Nov: CLS 0.17 on Numbers and Marlow & Co). */
@@ -108,13 +113,16 @@
     border-radius: var(--r-pill);
     padding-inline: var(--sp-4);
   }
+  /* ON A PHONE THE FIELD AND ITS TWO PRESSES SHARE ONE ROW under the question, the field taking what is left: it was
+     three rows (question, field, presses) and stood 150px over every screen. */
   @media (width < 640px) {
     .ask {
-      flex-wrap: wrap;
       inline-size: 100%;
     }
     .ask-field {
-      flex: 1 1 100%;
+      flex: 1 1 0;
+      min-inline-size: 0;
+      padding-inline: var(--sp-3);
     }
   }
   .ask-presses {

@@ -11,6 +11,7 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
+  import { ROLES } from '$lib/sharing/roles.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { isProof, NOT_CONFIRMED, provingFetch } from '$lib/reauth/ask.ts';
   import { forgetOwn, renamePasskey, signOut, type PasskeyInfo } from '$lib/auth.ts';
@@ -507,7 +508,6 @@
       <li><IconWell name="rows" /><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{me.lists && me.lists.length > 0 ? namesOf(me.lists) : (copy.levelMeans[me.level] ?? me.level)}</span></li>
     </ul>
     {#if keySaid}<p class="hint" role="status">{keySaid}</p>{/if}
-    <p class="hint">{copy.identityOutside}</p>
     {#if moving}<p class="hint" role="status">{copy.identityEmailMoving}</p>{/if}
     {#if movedSaid}<p class="hint" role="status">{movedSaid}</p>{/if}
     {#if moveRefusal}
@@ -607,7 +607,9 @@
               <!-- "YOU ARE HERE" BESIDE THE NAME, not at the row's end, where on a phone it squeezed the line under the
                    name to two lines and left "people" alone on the second. -->
               <span class="line-title">{r.name}{#if here}<span class="here">{copy.thisOne}</span>{/if}</span>
-              <span class="line-detail">{r.level === null ? levelWord(r) : (copy.levelMeans[r.level] ?? r.level)}</span>
+              <!-- THE ROLE'S NAME, NOT ITS SENTENCE (ui pass, 3 Nov): the You card above already says in full what this
+                   BrainDog lets you do, and this row said it again word for word. -->
+              <span class="line-detail">{r.level === null ? levelWord(r) : (ROLES[r.level as keyof typeof ROLES]?.name ?? copy.levelMeans[r.level] ?? r.level)}</span>
             </span>
             <span class="line-amount"></span>
             <span class="line-when">{#if !here}<span class="go" aria-hidden="true"><Icon name="chevron" size="s" /></span>{/if}</span>
@@ -778,6 +780,12 @@
     display: flex;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
+  }
+
+  /* NOTHING TO PRESS, NO ROOM: inside Signing in the way in is the Passkeys card's, and the empty row stood 12px of air
+     between the facts and where you are signed in. */
+  .row-actions:empty {
+    display: none;
   }
 
   /* THE PERSON FIRST: their face, the name at the group size as the line a reader looks for, and the address
