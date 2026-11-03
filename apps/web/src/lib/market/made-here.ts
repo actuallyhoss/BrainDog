@@ -5,9 +5,8 @@
  * THE RECORD SAYS WHERE IT CAME FROM, NEVER THE FILE. Trust is the record's word (`made-here`, `from-a-link`, `reviewed`,
  * ...), worked out from the catalogue and the pack's source. A file can call itself anything; this reads none of that.
  *
- * BRAINDOG'S OWN PARTS ARE NOT MADE BY YOU. The record holds its modules (Work, People, Money core) from the seed, with
- * no catalogue entry, so `addons {installed: true}` answers them as made here too. They are named by BrainDog as their
- * author and are left off the shelf.
+ * BRAINDOG'S OWN PARTS ARE NOT MADE BY YOU. The record holds its modules (Work, People, Money core) from the seed with
+ * no catalogue entry, and answers them as `braindog` by the ids this build ships, so they never reach the shelf.
  *
  * PLAIN NODE LOADS THIS FILE: no import.
  */
@@ -96,24 +95,11 @@ export const madeWords = {
   calls: (hosts: readonly string[]): string => `It may call ${hosts.join(', ')}.`,
 } as const;
 
-/**
- * The trust as this screen says it: a part BrainDog wrote, held from the seed with no catalogue entry, is answered as made
- * here by the record (its source is local), and is BrainDog's.
- */
-export function plainTrust(a: AddonAnswer, ours: ReadonlySet<string> = new Set()): AddonAnswer {
-  return a.trust === 'made-here' && (a.by === 'BrainDog' || ours.has(a.id)) ? { ...a, trust: 'braindog' } : a;
-}
-
-/** Is this held add-on one the person or their agents made, and not BrainDog's own part held from the seed? */
-export function isMadeHere(line: AddonLine, ours: ReadonlySet<string>): boolean {
-  return line.trust === 'made-here' && !ours.has(line.id) && line.by !== 'BrainDog' && !line.id.startsWith('usecase-');
-}
-
 /** The made-here add-ons and the ones from a link, each in the record's order. */
-export function heldMine(lines: readonly AddonLine[], ours: ReadonlySet<string>): { made: AddonLine[]; linked: AddonLine[] } {
+export function heldMine(lines: readonly AddonLine[]): { made: AddonLine[]; linked: AddonLine[] } {
   return {
-    made: lines.filter((l) => isMadeHere(l, ours)),
-    linked: lines.filter((l) => l.trust === 'from-a-link' && !ours.has(l.id)),
+    made: lines.filter((l) => l.trust === 'made-here'),
+    linked: lines.filter((l) => l.trust === 'from-a-link'),
   };
 }
 

@@ -712,7 +712,7 @@
 
     <div class="wide-cell stack">
     <!-- WHERE IT CAME FROM, WHAT IT MAY DO HERE, AND SHARE (store lane E): the record's word on each. -->
-    <Origin {id} ours={new Set(firstPartyModules().map((m) => m.id))} onsummary={(s) => (ownSummary = s)} />
+    <Origin {id} onsummary={(s) => (ownSummary = s)} />
     {#if googleFor === 'calendar' && installed}
       <!-- TWO WAYS IN, SAID ONCE (Calendar 2.1.1): Install asks for no key, so the page says both here. -->
       <p class="ways">Connect Google, or paste your calendar's private link.</p>

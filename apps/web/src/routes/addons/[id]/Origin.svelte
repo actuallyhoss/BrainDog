@@ -18,9 +18,9 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { kennelFetch, publishedSaid, submitToKennel } from '$lib/market/publish.ts';
-  import { fileName, madeWords, makerOf, originOf, plainTrust, type AddonAnswer, type AskedRow } from '$lib/market/made-here.ts';
+  import { fileName, madeWords, makerOf, originOf, type AddonAnswer, type AskedRow } from '$lib/market/made-here.ts';
 
-  let { id, ours = new Set<string>(), onsummary }: { id: string; ours?: ReadonlySet<string>; onsummary?: (summary: string) => void } = $props();
+  let { id, onsummary }: { id: string; onsummary?: (summary: string) => void } = $props();
 
   let answer = $state.raw<AddonAnswer | null>(null);
   let maker = $state<string | null>(null);
@@ -33,7 +33,7 @@
   onMount(() => {
     void client.call<AddonAnswer>('addon', { id }).then((out) => {
       if (!out.ok || out.value === null || typeof out.value !== 'object') return;
-      answer = plainTrust(out.value, ours);
+      answer = out.value;
       if (out.value.summary) onsummary?.(out.value.summary);
       if (answer.trust === 'made-here')
         void client.governance({ register: 'suggestion', status: 'resolved', limit: 100 }).then((rows) => {

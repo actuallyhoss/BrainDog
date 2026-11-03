@@ -250,8 +250,20 @@ export function methods(deps: RecordDeps) {
   const entryNamed = (index: CatalogueIndex, id: string): IndexEntry | undefined =>
     index.entries.find((e) => heldId(e) === id) ?? index.entries.find((e) => e.kind === 'usecase' && e.id === id);
 
-  /** A made-here or linked add-on's trust, from where it came: a pasted or local file was made here, a link was not. */
-  const trustOfSource = (source: string | null): AddonTrust => (source === 'url' || source === 'git' || source === 'kennel' ? 'from-a-link' : 'made-here');
+  /**
+   * A made-here or linked add-on's trust, from where it came: a pasted or local file was made here, a link was not.
+   * BRAINDOG'S OWN PARTS ARE BRAINDOG'S: the seed holds its modules (Work, People, Money core, the agents pack, a use
+   * case's pack) as `local` or with no `pack` row, and none has a catalogue entry, so they were answered as made here. An
+   * id this build ships (`shippedVersion`) held from that source is BrainDog's. One the person pasted under the same id is
+   * `paste`, so it stays theirs.
+   */
+  let shipped: ((id: string) => string | undefined) | null = null;
+  const loadShipped = async (): Promise<void> => {
+    if (shipped === null) shipped = (await import('@braindog/seed/packs/quiet')).shippedVersion;
+  };
+  const ownPart = (id: string, source: string | null): boolean => (source === null || source === 'local') && shipped !== null && shipped(id) !== undefined;
+  const trustOfSource = (id: string, source: string | null): AddonTrust =>
+    ownPart(id, source) ? 'braindog' : source === 'url' || source === 'git' || source === 'kennel' ? 'from-a-link' : 'made-here';
 
   /** The live declarations an installed add-on put in this record, each by id, kind and body. */
   const liveOf = (pack: string): { id: string; kind: string; body: Body }[] =>
@@ -358,6 +370,7 @@ export function methods(deps: RecordDeps) {
       const shelf = text(said.shelf);
       const index = await indexOf();
       const held = heldNow();
+      await loadShipped();
 
       const lineOf = (e: IndexEntry): AddonLine => {
         const latest = offeredVersion(e);
@@ -391,8 +404,8 @@ export function methods(deps: RecordDeps) {
               id,
               title: h.title ?? id.replace(/-/gu, ' ').replace(/^./u, (c) => c.toUpperCase()),
               summary: h.summary ?? '',
-              by: h.author ?? '',
-              trust: trustOfSource(h.source),
+              by: ownPart(id, h.source) ? 'BrainDog' : (h.author ?? ''),
+              trust: trustOfSource(id, h.source),
               latest: null,
               here: { version: h.version, on: h.on },
             });
@@ -474,6 +487,7 @@ export function methods(deps: RecordDeps) {
       if (id === null) return no('REQUIRED_MISSING', 'Which add-on? Send its id, as act addons answers it.', { at: 'id' });
       const index = await indexOf();
       const held = heldNow();
+      await loadShipped();
       /* ONE HELD HERE THAT DID NOT COME FROM THE STORE IS SAID AS ITSELF, never as the store's add-on of the same id. */
       const own = held.get(id);
       const entry = index === null || (own !== undefined && !updatesFromStore(own.source)) ? undefined : entryNamed(index, id);
@@ -511,11 +525,11 @@ export function methods(deps: RecordDeps) {
             })),
         });
       } else {
-        const trust = trustOfSource(h!.source);
+        const trust = trustOfSource(id, h!.source);
         Object.assign(out, {
           ...(h!.title === null ? {} : { title: h!.title }),
           ...(h!.summary === null ? {} : { summary: h!.summary }),
-          ...(h!.author === null ? {} : { by: h!.author }),
+          ...(ownPart(id, h!.source) ? { by: 'BrainDog' } : h!.author === null ? {} : { by: h!.author }),
           trust,
           trust_said: TRUST_SAID[trust],
           ...(h!.source_ref === null ? {} : { from: h!.source_ref }),

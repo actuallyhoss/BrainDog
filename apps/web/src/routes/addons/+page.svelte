@@ -59,7 +59,6 @@
   import { cardsIn } from './cards-in.ts';
   import { asksWords } from '$lib/market/asks.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { CORE_PACK } from '@braindog/declare';
   import { heldMine, madeWords, waitingOf, type AddonLine, type OpenRow } from '$lib/market/made-here.ts';
 
   const store = words.store;
@@ -92,12 +91,11 @@
   const chip = $derived(picked !== null && chips.some((c) => c.id === picked) ? picked : null);
   const total = $derived(chips.reduce((n, c) => n + c.count, 0));
   /* MADE BY YOU, FIRST: what the person or their agents made here, then what came from a link, each found by the words
-     typed as the store's own cards are. BrainDog's own parts the seed holds are never theirs. */
-  const OURS = new Set<string>([CORE_PACK, ...MODULES, ...firstPartyModules().map((m) => m.id)]);
+     typed as the store's own cards are. BrainDog's own parts the seed holds the record answers as BrainDog's. */
   const held = $derived.by(() => {
     const q = query.trim().toLowerCase();
     const found = (mine ?? []).filter((l) => q === '' || `${l.title} ${l.summary}`.toLowerCase().includes(q));
-    return chip === null ? heldMine(found, OURS) : { made: [], linked: [] };
+    return chip === null ? heldMine(found) : { made: [], linked: [] };
   });
   const waiting = $derived(chip === null && query.trim() === '' ? waitingOf(openRows, new Set((mine ?? []).map((l) => l.id))) : []);
 
