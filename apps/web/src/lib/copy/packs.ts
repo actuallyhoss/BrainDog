@@ -114,6 +114,8 @@ export const packs = {
      is what they quote to somebody who can look it up. */
   refusalCode: (code: string) => `Reference: ${code}`,
   useCaseFor: 'What it is for',
+  /* A PLUGIN'S SECOND WAY IN, folded under the Google card while Connect Google is offered. */
+  connectOther: 'Or set it up by hand instead',
   /* THE KENNEL'S TRUST LINES (`routes/packs/browse/catalogue.ts`), said the same on browse and on /packs. */
   catalogueSigned: (keyId: string) => `Signed by key ${keyId}`,
   catalogueUnsigned: 'Not checked',

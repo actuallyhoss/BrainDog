@@ -69,7 +69,19 @@
 </script>
 
 <Tile icon="plug" class="section" data-surface="tile" title={recipe.title}>
-  <div class="section-body connect">
+  <!-- THE OTHER WAY IN, FOLDED, while the page offers Connect Google as its main one (3 Nov): four steps of a script
+       stood open under the card that already does it. An address being made or shown keeps it open. -->
+  {#if quiet && !address && !asking}
+    <details class="section-body alt">
+      <summary class="tap">{copy.connectOther}</summary>
+      <div class="connect">{@render body()}</div>
+    </details>
+  {:else}
+    <div class="section-body connect">{@render body()}</div>
+  {/if}
+</Tile>
+
+{#snippet body()}
     {#if recipe.says}<p class="hint">{recipe.says}</p>{/if}
     {#if recipe.steps.length}
       <ol class="steps">
@@ -112,13 +124,25 @@
         <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
       </div>
     {/if}
-  </div>
-</Tile>
+{/snippet}
 
 <style>
   .connect {
     display: grid;
     gap: var(--sp-3);
+  }
+
+  .alt > summary {
+    inline-size: fit-content;
+    cursor: pointer;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: var(--lead-meta);
+  }
+
+  .alt[open] > summary {
+    margin-block-end: var(--sp-3);
   }
   .steps {
     margin: 0;
