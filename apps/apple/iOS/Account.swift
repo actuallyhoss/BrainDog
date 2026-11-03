@@ -25,7 +25,7 @@ struct AccountSheet: View {
 
                 VStack(alignment: .leading, spacing: Space.s2) {
                     Text(Words.yourBrainDogs).font(Typeface.caps).textCase(.uppercase).tracking(0.3).foregroundStyle(Palette.ink3)
-                        .padding(.leading, Space.s3)
+                        .padding(.leading, Space.tilePad)
                         .accessibilityAddTraits(.isHeader)
                     VStack(spacing: 0) {
                         ForEach(Array(shown.enumerated()), id: \.element.id) { index, row in
@@ -44,8 +44,8 @@ struct AccountSheet: View {
                                             .accessibilityLabel(Words.signedInHere)
                                     }
                                 }
+                                .padding(.vertical, Space.rowY)
                                 .frame(minHeight: Space.tap)
-                                .padding(.vertical, Space.s2)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -53,10 +53,10 @@ struct AccountSheet: View {
                             if index < shown.count - 1 { Hairline(leading: 32 + Space.s3) }
                         }
                     }
-                    .padding(.horizontal, Space.s3)
+                    .padding(.horizontal, Space.tilePad)
                     .background(Palette.tile, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
                     if let said {
-                        Text(said).font(Typeface.meta).foregroundStyle(Palette.red).fixedSize(horizontal: false, vertical: true)
+                        Text(said).font(Typeface.meta).foregroundStyle(Palette.red).leading(.meta).fixedSize(horizontal: false, vertical: true)
                     }
                 }
 

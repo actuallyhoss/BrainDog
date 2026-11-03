@@ -141,22 +141,24 @@ public struct NeedsView: View {
                 Section {
                     rows(model.needs.open, later: false)
                 } header: {
-                    header(Words.waitingOnYou, count: model.needs.waiting)
+                    header(Words.waitingOnYou, count: model.needs.waiting, first: true)
                 }
             }
             if !model.needs.later.isEmpty {
                 Section {
                     rows(model.needs.later, later: true)
                 } header: {
-                    header(Words.later, count: model.needs.later.count)
+                    header(Words.later, count: model.needs.later.count, first: model.needs.open.isEmpty && !model.known)
                 }
             }
-            Color.clear.frame(height: Space.s7).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            Color.clear.frame(height: Space.foot).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Ground())
         .environment(\.defaultMinListRowHeight, Space.tap)
+        /* A HEADING IS AS TALL AS ITS WORDS AND ITS OWN PADDING, so the section rhythm below is the whole of it. */
+        .environment(\.defaultMinListHeaderHeight, 0)
         .refreshable {
             Haptic.select.play()
             await model.read()
@@ -170,15 +172,17 @@ public struct NeedsView: View {
 
     // MARK: parts
 
-    private func header(_ title: String, count: Int) -> some View {
+    /// A section's heading: 12 under the bar when it comes first, 32 under the card before it otherwise, and 12 over its
+    /// own card, on the card's text edge.
+    private func header(_ title: String, count: Int, first: Bool) -> some View {
         HStack(spacing: Space.s2) {
             Text(title).font(Typeface.tileHeading).foregroundStyle(Palette.ink)
             Text(count, format: .number).font(Typeface.meta).monospacedDigit().foregroundStyle(Palette.ink3)
             Spacer(minLength: 0)
         }
-        .padding(.top, Space.s3)
-        .padding(.bottom, Space.s1)
-        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter))
+        .padding(.top, first ? Space.pageTop : Space.sectionGap)
+        .padding(.bottom, Space.sectionHeadGap)
+        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.tilePad, bottom: 0, trailing: Space.gutter))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
@@ -186,7 +190,7 @@ public struct NeedsView: View {
     private func note(_ text: String, glyph: Glyph) -> some View {
         HStack(spacing: Space.s2) {
             glyph.image.resizable().frame(width: 16, height: 16).foregroundStyle(Palette.ink3).accessibilityHidden(true)
-            Text(text).font(Typeface.meta).foregroundStyle(Palette.ink2).fixedSize(horizontal: false, vertical: true)
+            Text(text).font(Typeface.meta).foregroundStyle(Palette.ink2).leading(.meta).fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, Space.s1)
         .listRowBackground(Color.clear)
@@ -204,7 +208,7 @@ public struct NeedsView: View {
         .card()
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: Space.s3, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
+        .listRowInsets(EdgeInsets(top: Space.pageTop, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
     }
 
     @ViewBuilder private func rows(_ questions: [Question], later: Bool) -> some View {
@@ -232,7 +236,7 @@ public struct NeedsView: View {
                     }
                 }
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter + Space.s3))
+                .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.tilePad, bottom: 0, trailing: Space.gutter + Space.tilePad))
                 .listRowBackground(
                     UnevenRoundedRectangle(
                         topLeadingRadius: first ? Radius.tile : 0, bottomLeadingRadius: last ? Radius.tile : 0,
@@ -255,7 +259,7 @@ struct NeedsRow: View {
             HStack(alignment: .center, spacing: Space.s3) {
                 IconWell(glyph, size: .l, tone: question.cost == "undo" ? .warn : .neutral)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(question.question).font(Typeface.row).foregroundStyle(Palette.ink).lineLimit(2)
+                    Text(question.question).font(Typeface.row).foregroundStyle(Palette.ink).lineLimit(2).leading(.row)
                     if let detail { Text(detail).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(1) }
                 }
                 Spacer(minLength: Space.s2)
@@ -263,8 +267,8 @@ struct NeedsRow: View {
                     Text(when).font(Typeface.meta).monospacedDigit().foregroundStyle(Palette.ink3)
                 }
             }
+            .padding(.vertical, Space.rowY)
             .frame(minHeight: Space.tap)
-            .padding(.vertical, Space.s3)
             if !last { Hairline(leading: 32 + Space.s3) }
         }
         .accessibilityElement(children: .combine)
@@ -317,7 +321,7 @@ struct LaterSheet: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             VStack(alignment: .leading, spacing: Space.s1) {
                 Text(Words.laterTitle).font(Typeface.heading).foregroundStyle(Palette.ink)
-                Text(question.question).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(2)
+                Text(question.question).font(Typeface.meta).foregroundStyle(Palette.ink3).lineLimit(2).leading(.meta)
             }
             Segmented([(Until.tomorrow, Words.tomorrow), (.week, Words.nextWeek), (.fortnight, Words.twoWeeks)], chosen: $until)
             Field(Words.whyItWaits) {
@@ -329,7 +333,7 @@ struct LaterSheet: View {
                     .onSubmit { Task { await send() } }
             }
             if let said {
-                Text(said).font(Typeface.meta).foregroundStyle(Palette.red).fixedSize(horizontal: false, vertical: true)
+                Text(said).font(Typeface.meta).foregroundStyle(Palette.red).leading(.meta).fixedSize(horizontal: false, vertical: true)
             }
             Button {
                 Haptic.press.play()

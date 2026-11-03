@@ -111,7 +111,9 @@ public struct NeedsGlance: View {
                                 Text(q.question).font(Typeface.meta).foregroundStyle(Palette.ink).lineLimit(2)
                                     .multilineTextAlignment(.leading)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 6)
+                                    /* THE FIRST LINE STARTS ON THE HEADING'S LINE, so the two columns share a top. */
+                                    .padding(.top, i == 0 ? 0 : 6)
+                                    .padding(.bottom, 6)
                             }
                             if i < min(3, glance.questions.count) - 1 { Hairline() }
                         }
@@ -265,6 +267,7 @@ public struct DueGlance: View {
                                     .font(index == 0 ? Typeface.bodyMedium : Typeface.meta)
                                     .foregroundStyle(index == 0 ? Palette.ink : Palette.ink2)
                                     .lineLimit(2)
+                                    .leading(index == 0 ? .row : .meta)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }

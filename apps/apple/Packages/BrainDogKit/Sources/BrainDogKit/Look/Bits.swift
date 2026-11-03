@@ -20,7 +20,7 @@ public struct EmptyState<Action: View>: View {
             IconWell(glyph, size: .card)
             VStack(alignment: .leading, spacing: Space.s1) {
                 Text(title).font(Typeface.heading).foregroundStyle(Palette.ink).accessibilityAddTraits(.isHeader)
-                Text(line).font(Typeface.body).foregroundStyle(Palette.ink2).fixedSize(horizontal: false, vertical: true)
+                Text(line).font(Typeface.body).foregroundStyle(Palette.ink2).leading(.body).fixedSize(horizontal: false, vertical: true)
             }
             action
         }
@@ -29,12 +29,21 @@ public struct EmptyState<Action: View>: View {
 }
 
 /// The one tab bar inside a screen: a capsule track in tile-2, 3px in, the chosen segment a raised `--segment-on`
-/// capsule with its label going from 500 to 600. 36 tall on a phone (the page tier), 30 inside. A change is felt as
-/// `select` and the thumb slides.
+/// capsule with its label going from 500 to 600. The page tier on every device (ops 4.7): the track 36 tall, each segment
+/// 30. Under a thumb each segment still takes a 44 press (4 past the track above and below), without drawing taller. A
+/// change is felt as `select` and the thumb slides.
 public struct Segmented<Value: Hashable>: View {
     let choices: [(Value, String)]
     @Binding var chosen: Value
     @Namespace private var thumb
+    /// The track's inset round the segments.
+    private let inset: CGFloat = 3
+    /// How far a segment's press reaches past what is drawn, up and down, to make 44 under a thumb.
+    #if os(macOS)
+    private let reach: CGFloat = 0
+    #else
+    private let reach: CGFloat = (Space.tap - Space.segment) / 2
+    #endif
 
     public init(_ choices: [(Value, String)], chosen: Binding<Value>) {
         self.choices = choices
@@ -54,7 +63,7 @@ public struct Segmented<Value: Hashable>: View {
                         .font(Typeface.segment.weight(on ? .semibold : .medium))
                         .foregroundStyle(on ? Palette.ink : Palette.ink2)
                         .lineLimit(1)
-                        .frame(maxWidth: .infinity, minHeight: Space.control - 8)
+                        .frame(maxWidth: .infinity, minHeight: Space.segment - 2 * inset)
                         .background {
                             if on {
                                 Capsule(style: .continuous).fill(Palette.segmentOn)
@@ -62,13 +71,15 @@ public struct Segmented<Value: Hashable>: View {
                                     .matchedGeometryEffect(id: "thumb", in: thumb)
                             }
                         }
-                        .contentShape(Capsule(style: .continuous))
+                        .padding(.vertical, reach)
+                        .contentShape(Rectangle())
+                        .padding(.vertical, -reach)
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(on ? .isSelected : [])
             }
         }
-        .padding(3)
+        .padding(inset)
         .background(Palette.tile2, in: Capsule(style: .continuous))
     }
 }
@@ -117,6 +128,7 @@ public struct ToastView: View {
             HStack(spacing: Space.s3) {
                 Text(toast.text)
                     .font(Typeface.body)
+                    .leading(.body)
                     .foregroundStyle(Palette.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)

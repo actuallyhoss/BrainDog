@@ -103,7 +103,9 @@ public enum Radius {
     public static let panel: CGFloat = 22
 }
 
-/// `--sp-1` to `--sp-8`.
+/// `--sp-1` to `--sp-8`, and the named steps of `loop/plans/spacing-2026-11-03/RHYTHM.md` a native screen uses. The
+/// web's line boxes are taller than SwiftUI's (Jakarta draws 1.26 em; the web sets 15/20, 12.5/18), so where the web pads
+/// a box 8 round its line boxes, a native row pads 10 round its glyphs and lands on the same height.
 public enum Space {
     public static let s1: CGFloat = 4
     public static let s2: CGFloat = 8
@@ -119,10 +121,30 @@ public enum Space {
     public static let textInset: CGFloat = 12
     /// Between controls side by side in a bar.
     public static let toolbarGap: CGFloat = 6
-    /// Between cards.
+    /// Between cards (`--tile-gap`): 12 on a phone, 16 on a desk.
+    #if os(macOS)
     public static let cardGap: CGFloat = 16
-    /// A target under a thumb.
+    #else
+    public static let cardGap: CGFloat = 12
+    #endif
+    /// A card's padding on a phone (`--tile-pad`), and where a card's rows set their words: a row's 12 text edge plus the
+    /// web's 4 `--card-list-pad`, so a row's words, its well and the card's heading share one edge.
+    public static let tilePad: CGFloat = 16
+    /// Above a screen's first thing, under the bar (`--page-top`).
+    public static let pageTop: CGFloat = 12
+    /// Between sections of a screen on a phone (`--section-gap`).
+    public static let sectionGap: CGFloat = 32
+    /// A section's heading to its cards (`--section-head-gap`).
+    public static let sectionHeadGap: CGFloat = 12
+    /// A target under a thumb, and a row's least height.
     public static let tap: CGFloat = 44
+    /// A row's block padding: 10 above and below its words or its well, and the row is `tap` tall at least, so a subject
+    /// with a meta line is 56 (`--row-h-2`), a one-line row with a 32 well 52, a bare line 44; never 44 plus padding.
+    public static let rowY: CGFloat = 10
+    /// A segmented control's track in the page tier: 36 tall, its segments 30, 3 in (ops 4.7). A thumb still gets 44.
+    public static let segment: CGFloat = 36
+    /// Under the last thing on a scrolling screen, so it clears the tab bar's accessory and a toast.
+    public static let foot: CGFloat = 48
     /// A control's drawn height: 44 under a thumb, 36 under a pointer.
     #if os(macOS)
     public static let control: CGFloat = 36

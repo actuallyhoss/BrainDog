@@ -145,7 +145,7 @@ public struct SignInView: View {
                         .foregroundStyle(Palette.ink)
                         .accessibilityAddTraits(.isHeader)
                     if case .ask = flow.step {
-                        Text(Words.signInLede).font(Typeface.body).foregroundStyle(Palette.ink2)
+                        Text(Words.signInLede).font(Typeface.body).foregroundStyle(Palette.ink2).leading(.body)
                     }
                 }
 
@@ -157,6 +157,7 @@ public struct SignInView: View {
                 Text(Words.privacy)
                     .font(Typeface.meta)
                     .foregroundStyle(Palette.ink3)
+                    .leading(.meta)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, Space.gutter)
@@ -235,6 +236,7 @@ public struct SignInView: View {
                         Text(Words.linkSentBody(email))
                             .font(Typeface.body)
                             .foregroundStyle(Palette.ink2)
+                            .leading(.body)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -281,6 +283,7 @@ public struct SignInView: View {
             Text(text)
                 .font(Typeface.meta)
                 .foregroundStyle(flow.saidIsRefusal ? Palette.red : Palette.ink2)
+                .leading(.meta)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.updatesFrequently)
         }
