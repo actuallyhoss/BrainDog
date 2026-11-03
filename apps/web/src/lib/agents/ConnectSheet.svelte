@@ -26,7 +26,7 @@
   import Segmented from '$lib/ui/Segmented.svelte';
   import { markOf, type AppMark, type MarkedAgent } from '@braindog/skin/agent-marks.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
-  import { CONNECT_TILES, connectWords, copyOf, heardOf, lineOf, liveRow, poll, type Heard, type KeyHeard, type TileId } from './connect.ts';
+  import { CONNECT_TILES, connectWords, copyOf, heardOf, lineOf, liveRow, poll, type Heard, type KeyHeard, type LineId, type TileId } from './connect.ts';
 
   let {
     open = $bindable(false),
@@ -154,12 +154,28 @@
   });
 </script>
 
-<!-- A LINE TO COPY: the text in the code face, breaking anywhere so a long line never pushes the sheet sideways. -->
+<!-- A LINE TO COPY: the text in the code face, breaking anywhere so a long line never pushes the sheet sideways, and its
+     Copy a glyph in the box's corner (UI pass, 3 Nov). "Copy the command" beside every box took a third of the sheet's
+     width, so the commands broke mid-word ("install.\nsh"), and on a phone each box had a capsule under it. -->
 {#snippet copyable(line: string, button: string, said: string)}
   <div class="copy-line">
     <code class="mono">{line}</code>
-    <Button onclick={() => put(line, said)}>{button}</Button>
+    <button type="button" class="copy-btn tap" aria-label={button} title={button} onclick={() => put(line, said)}><Icon name="copy" size="m" /></button>
   </div>
+{/snippet}
+
+<!-- ONE LINE OF A WAY IN: its step (numbered where the way has steps) and the line to copy, with the six digits under
+     the setup line. -->
+{#snippet lineOfWay(id: LineId)}
+  {#if id === 'install'}
+    <Segmented role="group" aria-label={copy.doorOs}>
+      {#each OSES as o (o)}
+        <button type="button" class="segment" aria-pressed={os === o} data-on={os === o ? '' : undefined} onclick={() => (os = o)}>{copy.osNames[o]}</button>
+      {/each}
+    </Segmented>
+  {/if}
+  {@render copyable(lineOf(id, lines, os), copyOf(id), copy.lineCopied)}
+  {#if id === 'setup' && code}{@render code()}{/if}
 {/snippet}
 
 <Sheet bind:open title={connectWords.sheetTitle} subtitle={connectWords.sheetSub}>
@@ -177,22 +193,38 @@
           >
         </h3>
         {#if on}
+          {@const stepped = t.lines.filter((l) => l === 'install' || l === 'setup')}
+          {@const byHand = stepped.length > 0 ? t.lines.filter((l) => l !== 'install' && l !== 'setup') : []}
+          {@const plain = stepped.length > 0 ? [] : t.lines}
           <div class="way-body" id="way-{t.id}">
-            <p class="hint">{t.hint}</p>
-            {#each t.lines as id (id)}
-              <p class="step">{connectWords.step[id]}</p>
-              {#if id === 'install'}
-                <Segmented role="group" aria-label={copy.doorOs}>
-                  {#each OSES as o (o)}
-                    <button type="button" class="segment" aria-pressed={os === o} data-on={os === o ? '' : undefined} onclick={() => (os = o)}>{copy.osNames[o]}</button>
-                  {/each}
-                </Segmented>
-              {/if}
-              {@render copyable(lineOf(id, lines, os), copyOf(id), copy.lineCopied)}
-              {#if id === 'setup' && code}{@render code()}{/if}
+            <!-- WHAT TO DO, SAID ONCE (UI pass, 3 Nov): a way with steps numbers them, and its hint ("Install the command,
+                 then set it up") said the same two steps again above them; a script's two hints are one. -->
+            {#if stepped.length === 0 && !t.key}<p class="hint">{t.hint}</p>{/if}
+            {#if stepped.length > 0}
+              <ol class="steps">
+                {#each stepped as id (id)}
+                  <li class="step-item">
+                    <p class="step">{connectWords.step[id]}</p>
+                    {@render lineOfWay(id)}
+                  </li>
+                {/each}
+              </ol>
+            {/if}
+            <!-- A WAY WITH ONE LINE: the hint above says what it is, so the line needs no label of its own. -->
+            {#each plain as id (id)}
+              {@render lineOfWay(id)}
             {/each}
+            <!-- THE WAY BY HAND, ONE PRESS AWAY: the rare path, which stood open under every setup. -->
+            {#if byHand.length > 0}
+              <details class="by-hand">
+                <summary class="tap">{connectWords.step[byHand[0]!]}</summary>
+                <div class="by-hand-body">
+                  {#each byHand as id (id)}{@render lineOfWay(id)}{/each}
+                </div>
+              </details>
+            {/if}
             {#if t.key}
-              <!-- HOW LONG A KEY LASTS AND WHAT IT CAN DO, under the sentence that says what a key is for. -->
+              <!-- HOW LONG A KEY LASTS AND WHAT IT CAN DO: the one sentence on what a key is for. -->
               {#if !minted}<p class="hint">{copy.doorKeyHint}</p>{/if}
               {#if minted}
                 {@const bearer = minted.bearer}
@@ -214,9 +246,13 @@
                     </div>
                     <Button weight="primary" type="submit" disabled={minting || mintLabel.trim() === ''}>{copy.doorKeyGo}</Button>
                   </div>
-                  <!-- THE INBOX IS ONE THING ON OR OFF, the switch the rest of Settings uses, and it starts off. -->
-                  <div class="setting-row">
-                    <p class="hint">{copy.connectInboxHint}</p>
+                  <!-- THE INBOX IS ONE THING ON OR OFF, the switch the rest of Settings uses, and it starts off: a title and
+                       one short line, where a paragraph was the switch's only label. -->
+                  <div class="inbox-row">
+                    <span class="inbox-words">
+                      <span class="inbox-title">{copy.connectInbox}</span>
+                      <span class="inbox-line">{connectWords.inboxLine}</span>
+                    </span>
                     <button
                       type="button"
                       class="switch"
@@ -286,8 +322,9 @@
     cursor: pointer;
   }
 
-  .way[data-on] .way-pick {
-    color: var(--red);
+  /* THE OPEN WAY IS SAID BY ITS TURNED CHEVRON AND ITS BODY, its name in ink: red words read as a fault. */
+  .way[data-on] .way-title {
+    font-weight: 600;
   }
 
   /* THE APP'S MARK IN A 28 WELL OF THE SHEET'S OWN SURFACE, then the name, then the chevron that turns as it opens. */
@@ -364,26 +401,151 @@
   }
 
   .step {
-    margin: var(--sp-1) 0 0;
-    color: var(--ink-2);
+    margin: 0;
+    color: var(--ink);
     font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: var(--lead-ui);
   }
 
-  /* A LINE AND ITS COPY on one row where both fit, the button under the line where they do not. */
-  .copy-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+  /* THE STEPS, NUMBERED: a small figure in a 20 circle on the step's line, the step's parts under its words. */
+  .steps {
+    display: grid;
+    gap: var(--sp-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: way-step;
+  }
+
+  .step-item {
+    position: relative;
+    display: grid;
     gap: var(--sp-2);
+    padding-inline-start: calc(20px + var(--sp-2));
+    counter-increment: way-step;
+  }
+
+  .step-item::before {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    display: grid;
+    place-items: center;
+    inline-size: 20px;
+    block-size: 20px;
+    background: var(--tile);
+    border-radius: var(--r-pill);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    color: var(--ink-2);
+    content: counter(way-step);
+    font-size: var(--fs-cap);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  /* THE WAY BY HAND: a quiet disclosure under the steps, its caret turning as it opens. */
+  .by-hand > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+    line-height: var(--lead-meta);
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .by-hand > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .by-hand > summary::after {
+    inline-size: 6px;
+    block-size: 6px;
+    border-block-end: 1.5px solid currentColor;
+    border-inline-end: 1.5px solid currentColor;
+    content: '';
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .by-hand[open] > summary::after {
+    transform: translateY(1px) rotate(-135deg);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .by-hand > summary:hover {
+      color: var(--ink);
+    }
+  }
+
+  .by-hand > summary:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--r-xs);
+  }
+
+  .by-hand-body {
+    display: grid;
+    gap: var(--sp-2);
+    padding-block-start: var(--sp-2);
+  }
+
+  /* A LINE AND ITS COPY: the line in its box the whole width, the copy glyph in the box's top corner. */
+  .copy-line {
+    position: relative;
+    display: flex;
+    min-inline-size: 0;
+  }
+
+  .copy-btn {
+    position: absolute;
+    inset-block-start: var(--sp-1);
+    inset-inline-end: var(--sp-1);
+    display: grid;
+    place-items: center;
+    inline-size: var(--ctl-panel);
+    block-size: var(--ctl-panel);
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-pill);
+    background: none;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      transform 70ms var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .copy-btn:hover {
+      background: var(--row-wash);
+      color: var(--ink);
+    }
+  }
+
+  .copy-btn:active {
+    background: var(--row-wash-press);
+    transform: scale(0.97);
+  }
+
+  .copy-btn:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 0;
   }
 
   /* THE ONE PLACE A MONOSPACE FACE IS RIGHT: a command or a key is compared character by character, and breaks anywhere
      so a 43-character key never pushes the sheet sideways. On the tile's own surface, inside the board-coloured tile. */
   .mono {
-    flex: 1 1 24ch;
+    flex: 1 1 auto;
     min-inline-size: 0;
+    min-block-size: var(--ctl-page);
+    box-sizing: border-box;
     padding-block: var(--sp-2);
-    padding-inline: var(--sp-3);
+    padding-inline: var(--sp-3) calc(var(--ctl-panel) + var(--sp-2));
     background: var(--tile);
     border-radius: var(--r-pop);
     color: var(--ink);
@@ -409,6 +571,37 @@
     margin: 0;
     color: var(--tone, var(--ink-2));
     font-size: var(--fs-meta);
+  }
+
+  .said:empty {
+    display: none;
+  }
+
+  /* MAY READ THE INBOX: its title and one line, then the switch on the title's line. */
+  .inbox-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: var(--sp-4);
+  }
+
+  .inbox-words {
+    display: grid;
+    gap: var(--row-stack);
+    min-inline-size: 0;
+  }
+
+  .inbox-title {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: var(--lead-ui);
+  }
+
+  .inbox-line {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* THE LIVE ROW: a mark and its sentence, the mark in the accent once it is connected; the words carry it either way. */

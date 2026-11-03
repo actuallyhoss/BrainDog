@@ -69,6 +69,8 @@ export const connectWords = {
   justNow: 'just now',
   seconds: (n: number) => (n === 1 ? '1 second ago' : `${String(n)} seconds ago`),
   aScript: 'Your script',
+  /* UNDER "MAY READ THE INBOX" in the script's key form: what it reads, and that it only reads. */
+  inboxLine: 'Unfiled arrivals, like bank texts. Read only.',
 } as const;
 
 /**
