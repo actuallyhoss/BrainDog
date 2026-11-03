@@ -57,7 +57,7 @@ struct SettingsRoot: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Space.s3) {
+            VStack(alignment: .leading, spacing: Space.cardGap) {
                 ForEach(groups) { group in
                     /* WHAT ONLY THIS PHONE HOLDS sits under You, beside Notifications, whose kinds it rings for. */
                     if group.title != groups.first?.title, groups.dropFirst().first?.title == group.title { PhoneTile() }

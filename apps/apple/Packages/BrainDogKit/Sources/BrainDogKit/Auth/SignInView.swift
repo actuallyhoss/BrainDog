@@ -165,7 +165,7 @@ public struct SignInView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Palette.board.ignoresSafeArea())
+        .background(Ground())
         .animation(.easeOut(duration: 0.18), value: flow.step)
         .task { await flow.offerAutofill() }
     }

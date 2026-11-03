@@ -60,7 +60,7 @@ struct SearchView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Palette.board)
+        .background(Ground())
         .scrollDismissesKeyboard(.immediately)
         .searchable(text: $app.searchText, prompt: Text(Words.searchPrompt))
         .task(id: typed) { await find(typed) }
@@ -166,7 +166,7 @@ struct SearchView: View {
         }
         .padding(.top, Space.s3)
         .padding(.bottom, Space.s1)
-        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
+        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter))
         .accessibilityAddTraits(.isHeader)
     }
 
@@ -193,7 +193,7 @@ struct SearchView: View {
             }
             .buttonStyle(.plain)
             .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s4, bottom: 0, trailing: Space.gutter + Space.s4))
+            .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter + Space.s3))
             .listRowBackground(
                 UnevenRoundedRectangle(
                     topLeadingRadius: first ? Radius.tile : 0, bottomLeadingRadius: last ? Radius.tile : 0,

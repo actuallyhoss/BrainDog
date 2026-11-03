@@ -43,10 +43,15 @@ private struct Elevated: ViewModifier {
     func body(content: Content) -> some View {
         let layers = tier.layers(dark: scheme == .dark)
         let shade = Color(red: 15 / 255, green: 23 / 255, blue: 42 / 255)
-        content
+        /* NO LAYERS, NO SHADOW MODIFIER: even a clear shadow puts the view in its own layer and can nick a capsule's edge. */
+        if layers.isEmpty {
+            content
+        } else {
+            content
             .shadow(color: layers.first.map { shade.opacity($0.opacity) } ?? .clear, radius: layers.first?.radius ?? 0, y: layers.first?.y ?? 0)
             .shadow(color: layers.dropFirst().first.map { shade.opacity($0.opacity) } ?? .clear, radius: layers.dropFirst().first?.radius ?? 0,
                     y: layers.dropFirst().first?.y ?? 0)
+        }
     }
 }
 
@@ -84,10 +89,41 @@ public extension View {
     }
 }
 
-/// The board a screen sits on: the one ground colour, edge to edge. Cards are solid on it and the bars float over it.
+/// The board a screen sits on, with the web's ambient light (`--ambient`): three soft glows in BrainDog's own hues,
+/// fixed behind the page. Light: the accent at the top left, violet at the top right, sky at the foot. Dark: info at the
+/// top, sky at the bottom left, violet on the right, and no red, so dark reads grey. Cards are solid on it and the bars
+/// float over it. Under Reduce Transparency or Increase Contrast it is the board alone.
 public struct Ground: View {
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceTransparency) private var plain
+    @Environment(\.colorSchemeContrast) private var contrast
     public init() {}
-    public var body: some View { Palette.board.ignoresSafeArea() }
+
+    public var body: some View {
+        GeometryReader { box in
+            let w = max(box.size.width, 1), h = max(box.size.height, 1)
+            ZStack {
+                Palette.board
+                if !plain && contrast != .increased {
+                    if scheme == .dark {
+                        glow(Palette.info, 0.08, at: UnitPoint(x: 0.5, y: -0.1), radius: max(w, h) * 0.7)
+                        glow(Palette.catSky, 0.05, at: UnitPoint(x: 0.1, y: 1.05), radius: max(w, h) * 0.5)
+                        glow(Palette.catViolet, 0.05, at: UnitPoint(x: 0.95, y: 0.75), radius: max(w, h) * 0.45)
+                    } else {
+                        glow(Palette.redFill, 0.07, at: UnitPoint(x: 0, y: 0.08), radius: max(w * 0.7, h * 0.6))
+                        glow(Palette.catViolet, 0.06, at: UnitPoint(x: 1, y: 0.04), radius: max(w * 0.6, h * 0.55))
+                        glow(Palette.catSky, 0.06, at: UnitPoint(x: 0.6, y: 1), radius: max(w * 0.8, h * 0.6))
+                    }
+                }
+            }
+        }
+        .ignoresSafeArea()
+        .accessibilityHidden(true)
+    }
+
+    private func glow(_ hue: Color, _ strength: Double, at: UnitPoint, radius: CGFloat) -> some View {
+        RadialGradient(colors: [hue.opacity(strength), hue.opacity(0)], center: at, startRadius: 0, endRadius: radius)
+    }
 }
 
 /// The washes the ops look draws for hover, press and a row chosen by the keys: the ink at a few per cent, so they

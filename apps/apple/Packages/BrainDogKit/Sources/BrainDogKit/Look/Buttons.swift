@@ -42,9 +42,12 @@ public struct BDButtonStyle: ButtonStyle {
                 .lineLimit(1)
                 .padding(.horizontal, weight == .bare ? Space.s3 : Space.s4)
                 .frame(maxWidth: full ? .infinity : nil, minHeight: Space.control)
-                .background(fill(down), in: Capsule(style: .continuous))
-                .overlay {
-                    if weight == .quiet && !onTile { Capsule(style: .continuous).strokeBorder(Palette.rule, lineWidth: 1).accessibilityHidden(true) }
+                .background {
+                    ZStack {
+                        Capsule(style: .continuous).fill(fill(down))
+                        if weight == .quiet && !onTile { Capsule(style: .continuous).inset(by: 0.5).stroke(Palette.rule, lineWidth: 1) }
+                    }
+                    .accessibilityHidden(true)
                 }
                 .elevation(weight == .primary && enabled ? .raised : .flat)
                 .contentShape(Capsule(style: .continuous))
@@ -112,6 +115,12 @@ public enum Space {
     public static let s8: CGFloat = 64
     /// The page's gutter on a phone.
     public static let gutter: CGFloat = 16
+    /// The one text edge: rows pad their words 12 in, and headings and captions sit on the same line.
+    public static let textInset: CGFloat = 12
+    /// Between controls side by side in a bar.
+    public static let toolbarGap: CGFloat = 6
+    /// Between cards.
+    public static let cardGap: CGFloat = 16
     /// A target under a thumb.
     public static let tap: CGFloat = 44
     /// A control's drawn height: 44 under a thumb, 36 under a pointer.

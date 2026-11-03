@@ -155,7 +155,7 @@ public struct NeedsView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Palette.board)
+        .background(Ground())
         .environment(\.defaultMinListRowHeight, Space.tap)
         .refreshable {
             Haptic.select.play()
@@ -178,7 +178,7 @@ public struct NeedsView: View {
         }
         .padding(.top, Space.s3)
         .padding(.bottom, Space.s1)
-        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
+        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
@@ -232,7 +232,7 @@ public struct NeedsView: View {
                     }
                 }
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s4, bottom: 0, trailing: Space.gutter + Space.s4))
+                .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter + Space.s3))
                 .listRowBackground(
                     UnevenRoundedRectangle(
                         topLeadingRadius: first ? Radius.tile : 0, bottomLeadingRadius: last ? Radius.tile : 0,

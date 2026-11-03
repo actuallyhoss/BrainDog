@@ -122,6 +122,7 @@ public struct ToastView: View {
                 Spacer(minLength: 0)
                 if toast.undo {
                     Button(Words.undo) { toasts.pressUndo() }
+                        .buttonStyle(.plain)
                         .font(Typeface.control)
                         .foregroundStyle(Palette.link)
                         .frame(minWidth: Space.tap, minHeight: Space.tap)
