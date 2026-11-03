@@ -1,6 +1,6 @@
 # Welcome to BrainDog
 
-BrainDog keeps where your projects stand, what you decided and what money is moving, in one place that you and your agents share. Agents read it before they start and leave a handoff when they stop, and every change says who made it.
+Your agents keep track, and you make the calls. BrainDog is one place for your projects, decisions and money that you and your agents share. Every agent reads it before it starts and writes down what it did. Money, keys and deletes wait for your yes.
 
 ## What your BrainDog holds
 

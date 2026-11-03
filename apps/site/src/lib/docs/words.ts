@@ -5,7 +5,7 @@
  * one belongs to `lib/docs/`). The pages themselves are dialect text in `src/docs/`, so
  * nothing here describes the product beyond what a section of the docs is about.
  */
-import { APPS_AND, APPS_OR } from '../agents.ts';
+import { APPS_OR } from '../agents.ts';
 import { LAUNCH } from '../launch.ts';
 import type { IconName } from '../icons.ts';
 import type { Section } from './pages.ts';
@@ -81,9 +81,9 @@ export const docsWords = {
     title: 'BrainDog',
     /* The home page's sentence (`meta.home` in `lib/copy/shell.ts`), said in the third person for a reader who is not the owner. */
     summary:
-      "BrainDog is a shared record of a person's or a small team's projects, decisions and money. " +
-      `${APPS_AND} read it over MCP before they start and leave a handoff when they stop. Agents ask before touching ` +
-      'money, keys or deletes, and the person answers in one list.',
+      "BrainDog is one place for a person's or a small team's projects, decisions and money, kept current by their agents. " +
+      'Their agents read it over MCP before they start and write down what they did when they stop. Money, keys and ' +
+      "deletes wait for the person's yes, asked in one list.",
     /* THE FACTS AN AI SEARCH TOOL QUOTES, one line each, plain and true on the day the site ships: how agents reach it,
        what they start with, how they earn trust, what is in the app, what it costs and who runs it. */
     factsTitle: 'What it is',

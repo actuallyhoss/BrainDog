@@ -10,13 +10,13 @@ export const shell = {
   /** The search result and the shared card, about 150 characters each. */
   meta: {
     home: {
-      title: 'BrainDog · Every AI agent starts where the last one stopped',
-      description: 'One record of your projects, decisions and money. Your agents read it before they start, leave a handoff when they stop, and ask before touching money or keys.',
+      title: 'BrainDog · Your agents keep track. You make the calls.',
+      description: 'One place for your projects, decisions and money. Every agent reads it before it starts and writes down what it did. Money and keys wait for your yes.',
     },
     slash: {
       title: 'Slash, the assistant built into BrainDog',
       description:
-        'Press ⌘J and ask in plain words. Slash answers from your own numbers, shows what it read, and makes changes with an undo.',
+        'Press ⌘J and ask in plain words. Slash answers from your own numbers and makes the changes you ask for, with an undo.',
     },
     pricing: {
       title: 'Pricing: free in early access · BrainDog',
@@ -28,7 +28,7 @@ export const shell = {
     agents: {
       title: 'Connect your agents · BrainDog',
       description:
-        'One address and one approval per agent. Every session then starts with where things stand and ends with a handoff.',
+        'One address and one approval per agent. Then each one starts with where things stand and writes down what it did.',
     },
     notFound: {
       title: 'Page not found · BrainDog',

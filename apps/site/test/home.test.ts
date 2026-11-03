@@ -34,36 +34,33 @@ function strings(value: unknown, path = 'home'): [string, string][] {
 const NEVER = /\b(rows?|list items?|entit(?:y|ies)|register|schemas?|slugs?|MCP|packs?|credentials?|snapshots?)\b/i;
 
 test('home.ts holds the words of the site story at the key paths the ledger reads', () => {
-  assert.equal(home.hero.title, 'Stop re-explaining your work.');
+  assert.equal(home.hero.title, 'Your agents keep track. You make the calls.');
   assert.equal(
     home.hero.sub,
-    'One record of your projects, decisions and money. Your agents read it first, so each picks up where the last one stopped. They ask before touching money, keys or deletes.',
+    'One place for your projects, decisions and money. Every agent reads it before it starts and writes down what it did. Money, keys and deletes wait for your yes.',
   );
   assert.equal(home.hero.secondary, 'Connect your agents');
-  assert.equal(home.hero.works, 'Works with');
-  assert.deepEqual(
-    home.hero.makers.map((m) => m.name),
-    APP_NAMES,
-  );
+  /* No makers' row (4 November, Sam: "just say agents"). */
+  assert.ok(!('makers' in home.hero) && !('works' in home.hero));
   assert.equal(home.who.title, 'How it works');
   assert.deepEqual(
     [home.who.small.title, home.who.build.title, home.who.life.title],
-    ['Connect your agents', 'Each session starts caught up', 'You answer what needs you'],
+    ['Connect your agents', 'They keep track', 'You make the calls'],
   );
   assert.deepEqual([home.who.small.href, home.who.build.href, home.who.life.href], ['/agents', '/agents', '/docs/use/decide']);
   assert.equal(home.chores.title, "Agents ask until they've earned your trust.");
   assert.equal(
     home.chores.say,
-    'A new agent asks before every change to your work. Keep ten of its changes of one kind, and BrainDog offers to let it make that kind alone. One undo puts it back to asking.',
+    'A new agent asks before every change to your work. Keep ten of its changes of one kind and BrainDog offers to let it do that kind alone. One undo puts it back to asking.',
   );
   assert.equal(
     home.chores.floor,
-    'Deletes, money, keys and sharing ask every time. You can let your own agents skip that, but reading a key, giving BrainDog away and deleting it stay yours.',
+    'Deletes, money, keys and sharing always ask. You can let your own agents skip that, but reading a key, giving BrainDog away and deleting it stay yours.',
   );
-  assert.equal(home.tools.title, 'Nothing gets explained twice.');
+  assert.equal(home.tools.title, 'Every agent knows what the others did.');
   assert.equal(
     home.tools.say,
-    'Every agent reads the same page: the next step, what was decided and why, the dead ends, and the keys it may use. What one agent learns on Monday, the next one knows on Tuesday.',
+    'They all read the same page: the next step, what was decided and why, and the dead ends. What one agent learns on Monday, the next one knows on Tuesday.',
   );
   assert.equal(home.slash.title, 'Or just ask BrainDog.');
   assert.equal(home.yours.title, 'It stays yours.');

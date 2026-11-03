@@ -1,12 +1,12 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/media/banner-dark.svg">
-  <img src=".github/media/banner-light.svg" width="830" alt="BrainDog: Stop re-explaining your work.">
+  <img src=".github/media/banner-light.svg" width="830" alt="BrainDog: Your agents keep track. You make the calls.">
 </picture>
 
-# Stop re-explaining your work.
+# Your agents keep track. You make the calls.
 
-One record of your projects, decisions and money. Your agents read it first, so each picks up where the last one
-stopped. They ask before touching money, keys or deletes.
+One place for your projects, decisions and money. Every agent reads it before it starts and writes down what it did.
+Money, keys and deletes wait for your yes.
 
 BrainDog is open source. Use it hosted at [brain.dog](https://brain.dog), or run it on your own machine.
 
@@ -23,7 +23,7 @@ BrainDog is open source. Use it hosted at [brain.dog](https://brain.dog), or run
 ## What it does
 
 - **Work.** Projects and tasks. Each project shows where it stands and the next step.
-- **Agents.** Each agent you connect starts from where the last one stopped and writes the next step down when it
+- **Agents.** Each agent you connect starts by reading where the project stands and writes the next step down when it
   ends. Every agent signs in with your yes and puts its name on what it writes. You see who is working on what.
 - **Needs you.** Questions from agents wait in one list, each with what would happen and why. Your answer is kept,
   with its reason.

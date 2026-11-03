@@ -104,15 +104,15 @@ export const forPages = {
         nav: 'For founders',
         title: 'For founders · BrainDog',
         description:
-          'For founders running several projects with AI agents: every agent starts caught up, one list holds what ' +
-          'waits on you, and the money is in the same place.',
+          'For founders running several projects with agents: the agents keep each project current, one list holds ' +
+          'what needs you, and the money sits beside the work.',
         tag: 'For founders',
         said: "Four projects, three agents, and I'm the only one who knows where everything stands.",
         /* Money's own rule `invoice-late` (`packages/seed/src/modules/money/rules.ts`) puts a late invoice to you;
            the floor in `packages/kernel/src/change-kind.ts` holds anything that moves money for a yes. */
         sub:
-          'Each project\'s next step, decisions and money in one place your agents read first. Late invoices come to ' +
-          'you to chase, and anything that moves money waits for your yes.',
+          'Each project\'s next step, decisions and money in one place your agents read first and keep current. Late ' +
+          'invoices come to you to chase, and anything that moves money waits for your yes.',
         rows: [
           {
             head: 'Your agents, where you can see them',

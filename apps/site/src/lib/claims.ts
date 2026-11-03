@@ -41,16 +41,19 @@ export type Claim = {
 export const CLAIMS: readonly Claim[] = [
   /* The home page (`copy/home.ts`, spread into `site`, so `hero.sub` is its `home.hero.sub`). The site story of 3
      November: each is checked against the code in `loop/plans/site-story-2026-11-03/COPY.md` ("Claims"). */
-  { id: 'picks-up-where-stopped', said: 'so each picks up where the last one stopped', where: 'hero.sub', state: 'true' },
-  { id: 'asks-before-money-keys-deletes', said: 'They ask before touching money, keys or deletes.', where: 'hero.sub', state: 'true' },
-  { id: 'connect-no-key-copied', said: 'You approve each once, and no key is copied anywhere.', where: 'who.small.say', state: 'true' },
+  /* The hero of 4 November (`loop/plans/finish-2026-11-03/copy1104`): the briefing an agent reads first and the handoff
+     it writes (`context` and `handoff` in `packages/mcp/src/index.ts`, the start and end hooks), and the floor in
+     `packages/kernel/src/change-kind.ts`, which the owner's switch can lift for his own agents (said under it, `chores.floor`). */
+  { id: 'reads-before-starts', said: 'Every agent reads it before it starts and writes down what it did.', where: 'hero.sub', state: 'true' },
+  { id: 'asks-before-money-keys-deletes', said: 'Money, keys and deletes wait for your yes.', where: 'hero.sub', state: 'true' },
+  { id: 'connect-no-key-copied', said: 'You approve each agent once, and no key is copied anywhere.', where: 'who.small.say', state: 'true' },
   { id: 'briefing-who-else', said: 'who else is working', where: 'who.build.say', state: 'true' },
   { id: 'session-writes-next-step', said: 'When it stops, it writes the next step down.', where: 'who.build.say', state: 'true' },
   { id: 'learns-monday-knows-tuesday', said: 'What one agent learns on Monday, the next one knows on Tuesday.', where: 'tools.say', state: 'true' },
   { id: 'new-agent-asks', said: 'A new agent asks before every change to your work.', where: 'chores.say', state: 'true' },
-  { id: 'ladder-offer-ten', said: 'Keep ten of its changes of one kind, and BrainDog offers to let it make that kind alone.', where: 'chores.say', state: 'true' },
+  { id: 'ladder-offer-ten', said: 'Keep ten of its changes of one kind and BrainDog offers to let it do that kind alone.', where: 'chores.say', state: 'true' },
   { id: 'ladder-undo-drops', said: 'One undo puts it back to asking.', where: 'chores.say', state: 'true' },
-  { id: 'floor-waits', said: 'Deletes, money, keys and sharing ask every time.', where: 'chores.floor', state: 'true' },
+  { id: 'floor-waits', said: 'Deletes, money, keys and sharing always ask.', where: 'chores.floor', state: 'true' },
   { id: 'floor-switch', said: 'You can let your own agents skip that, but reading a key, giving BrainDog away and deleting it stay yours.', where: 'chores.floor', state: 'true' },
   { id: 'undo-any-change', said: 'Every change carries a name, person or agent, and an undo.', where: 'yours.points.0.text', state: 'true' },
   { id: 'stop-from-browser', said: 'See which agents are working, and pause or stop one from any browser.', where: 'yours.points.1.text', state: 'true' },
@@ -104,11 +107,11 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'text-before-signup', said: 'This text is published here before sign-up opens.', where: 'legal.pending', state: 'not-yet' },
   { id: 'terms-meta', said: 'and its Terms of Service and Privacy Policy', where: 'meta.legal.description', state: 'true', flag: 'legal' },
   { id: 'support-before-signup', said: 'The support address is published here before sign-up opens.', where: 'support.mail.pending', state: 'not-yet' },
-  { id: 'issues-on-github', said: 'Report a fault as an issue, or ask a question in Discussions', where: 'support.github.body', state: 'flag', flag: 'repo' },
-  { id: 'no-shared-table', said: "apart from every other customer's", where: 'security.kept.facts.0.text', state: 'true' },
-  { id: 'sealed-copies', said: 'Every night a copy is sealed to a key kept outside Cloudflare', where: 'security.kept.facts.2.text', state: 'true' },
+  { id: 'issues-on-github', said: 'Report a fault as an issue, or ask in Discussions', where: 'support.github.body', state: 'flag', flag: 'repo' },
+  { id: 'no-shared-table', said: "apart from everyone else's", where: 'security.kept.facts.0.text', state: 'true' },
+  { id: 'sealed-copies', said: 'Every night a copy is sealed to a key kept elsewhere', where: 'security.kept.facts.2.text', state: 'true' },
   { id: 'no-password', said: 'There is no password to steal.', where: 'security.kept.facts.3.text', state: 'true' },
-  { id: 'token-reach', said: 'Reading a key, handing BrainDog over or deleting it needs you, signed in, even when you let your own agents do everything else.', where: 'security.kept.facts.4.text', state: 'true' },
+  { id: 'token-reach', said: 'Reading a key, handing BrainDog over or deleting it always needs you, signed in.', where: 'security.kept.facts.4.text', state: 'true' },
   { id: 'report-before-signup', said: 'The address for reporting a weakness is published here before sign-up opens.', where: 'security.report.pending', state: 'not-yet' },
 
   /* The packs pages (`copy/packs.ts`). */

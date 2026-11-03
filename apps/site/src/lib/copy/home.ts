@@ -1,16 +1,16 @@
 /**
- * The home page's words, band by band: the hero, how it works, nothing gets explained twice, the trust agents earn,
+ * The home page's words, band by band: the hero, how it works, every agent knows what the others did, the trust agents earn,
  * the business side, your team, Slash, free, and the questions.
  *
- * THE STORY (3 November, `loop/plans/site-story-2026-11-03`): you stop re-explaining your work; here is how; every
- * agent stays caught up; you can let them work because they earn it; and they know the business side too. One product
+ * THE STORY (4 November, `loop/plans/finish-2026-11-03/copy1104/HEADLINES.md`): your agents keep track and you make
+ * the calls; here is how; every agent knows what the others did; you can let them work because they earn it; and the
+ * money sits beside the work. One product
  * picture, the desk, then full-bleed bands that each say one new thing, and no recap close. The claims ledger
  * (`lib/claims.ts`) reads these key paths, so a key that moves moves there too.
  *
  * THE DRAWINGS' NAMES AND FIGURES ARE NOT HERE. Maya Okafor's record is one file, `lib/demo/maya.ts`, and every band
  * draws from it. The early access figures are `lib/plans.ts`, read by the page and never typed.
  */
-import { listed } from '../agents.ts';
 import { DOCS, SECURITY, SUPPORT_EMAIL } from '../links.ts';
 import { LAUNCH } from '../launch.ts';
 
@@ -19,24 +19,14 @@ const CONNECT_DOCS = `${DOCS}/agents/connect`;
 
 export const home = {
   hero: {
-    /* THE HEADLINE (3 November, the site story): the buyer's own complaint, said as the promise. His slogan, "Give your
-       business a memory.", left the hero because memory is free in every assistant now and four competitors' headline. */
-    title: 'Stop re-explaining your work.',
+    /* THE HEADLINE (4 November, copy1104): both reasons to buy in one breath, the agents keep the work current and you
+       keep the decisions. "Every AI agent starts where the last one stopped" and "Stop re-explaining your work." sold the
+       relay between sessions, and he called the first one shitty. HEADLINES.md has the seven tried. */
+    title: 'Your agents keep track. You make the calls.',
     /* No mechanism in the promise: no event, log, row or ledger (`test/content.test.ts`). */
-    /* No product names in the promise (3 November, Sam): "your agents", and the makers row under the buttons says which. */
-    sub: 'One record of your projects, decisions and money. Your agents read it first, so each picks up where the last one stopped. They ask before touching money, keys or deletes.',
+    /* No product names anywhere on the home page (3 and 4 November, Sam: "just say agents"), so no makers' row. */
+    sub: 'One place for your projects, decisions and money. Every agent reads it before it starts and writes down what it did. Money, keys and deletes wait for your yes.',
     secondary: 'Connect your agents',
-    works: 'Works with',
-    /* The makers, once each: Claude, not "Claude Code" (§47 his notes). Their marks are `@braindog/skin/agent-marks.ts`. */
-    makers: (
-      [
-        { id: 'claude', name: 'Claude' },
-        { id: 'chatgpt', name: 'ChatGPT' },
-        { id: 'codex', name: 'Codex' },
-        { id: 'cursor', name: 'Cursor' },
-        { id: 'vscode', name: 'VS Code' },
-      ] as const
-    ).filter((maker) => listed(maker.name)),
   },
 
   /* HOW IT WORKS (3 November): three steps, each a tile with its own icon and drawing. The keys are the old three
@@ -45,15 +35,15 @@ export const home = {
     title: 'How it works',
     small: {
       title: 'Connect your agents',
-      say: 'Paste one address, or run one command. You approve each once, and no key is copied anywhere.',
+      say: 'Paste one address or run one command. You approve each agent once, and no key is copied anywhere.',
       figure: '1 address',
       figureSay: 'for every agent you use',
       link: 'Connect your agents',
       href: '/agents',
     },
     build: {
-      title: 'Each session starts caught up',
-      say: 'Your agent opens on where the project stands, the next step and who else is working. When it stops, it writes the next step down.',
+      title: 'They keep track',
+      say: 'Each agent starts by reading where the project stands, the next step and who else is working. When it stops, it writes the next step down.',
       /* THE TERMINAL IN THE TILE (`lib/site/TermWindow.svelte`): a real command and its short answer, on Maya's record. */
       term: {
         title: 'zsh: ~/code/tidepool',
@@ -71,8 +61,8 @@ export const home = {
     },
     /* The drawing is the first of Maya's questions (`NEEDS[0]`), as Needs you draws it. */
     life: {
-      title: 'You answer what needs you',
-      say: 'Agents ask before they change things. Their questions wait in one list, each with what would happen and why. Say yes, or not now.',
+      title: 'You make the calls',
+      say: 'Questions from every agent wait in one list, each with what would happen and why. Say yes, or not now.',
       link: 'How approvals work',
       href: `${DOCS}/use/decide`,
     },
@@ -81,8 +71,8 @@ export const home = {
   /* THE BUSINESS SIDE (3 November): money as a reason to stay, said for the founder. The plugin names are the
      catalogue's own (`packs/`); Stripe and Mercury read balances and payouts only, so nothing here says revenue. */
   money: {
-    title: 'The business side, where your agents can see it.',
-    say: "Cash ahead, who owes you and what's due, from your bank statements, Stripe and Mercury. Ask an agent what to chase this week and it answers with your numbers.",
+    title: 'Your money, next to the work.',
+    say: "Cash ahead, who owes you and what's due, from your bank statements, Stripe and Mercury. Ask an agent what to chase this week and it answers with real numbers.",
     worth: 'Net worth',
     accounts: 'Accounts',
     budgets: 'Budgets',
@@ -90,17 +80,17 @@ export const home = {
     left: (left: string) => `${left} left`,
     over: (over: string) => `${over} over`,
     of: (spent: string, of: string, period: string) => `${spent} of ${of} ${period}`,
-    addons: "Import any bank's statement as a CSV and each line is filed. Your choices become rules for the next one. Stripe and Mercury connect read only.",
+    addons: "Import any bank's statement as a CSV and each line is filed. Stripe and Mercury connect read only.",
   },
 
   /* TRUST THEY EARN (3 November): the ladder in `packages/record/src/ladder.ts`, said plainly. Its own handoffs and
      lessons are written freely, which is why the sentence says "your work". */
   chores: {
     title: "Agents ask until they've earned your trust.",
-    say: 'A new agent asks before every change to your work. Keep ten of its changes of one kind, and BrainDog offers to let it make that kind alone. One undo puts it back to asking.',
+    say: 'A new agent asks before every change to your work. Keep ten of its changes of one kind and BrainDog offers to let it do that kind alone. One undo puts it back to asking.',
     waits: 'Waiting on you',
     done: 'Done on its own',
-    floor: 'Deletes, money, keys and sharing ask every time. You can let your own agents skip that, but reading a key, giving BrainDog away and deleting it stay yours.',
+    floor: 'Deletes, money, keys and sharing always ask. You can let your own agents skip that, but reading a key, giving BrainDog away and deleting it stay yours.',
     /* The figures beside the two headings, and the line the drawing says once nothing waits. */
     today: (n: number) => `${n} today`,
     empty: 'Nothing is waiting on you.',
@@ -118,7 +108,7 @@ export const home = {
      (`docs/02-use/09-sharing.md`). A second person joins on any plan while billing is off (`teamsStop` in the worker). */
   together: {
     title: 'Bring your team, and their agents.',
-    say: 'Invite people by email and choose what each can see and change. Their agents get the same access, no more. Every change says who made it.',
+    say: 'Invite people by email and choose what each can see and change. Their agents get the same access, no more.',
     roles: {
       title: 'Access in plain words',
       say: 'Can view, add, edit or decide, on everything or only the projects you pick. Money can stay yours.',
@@ -140,8 +130,8 @@ export const home = {
 
   /* THE CORE PROMISE, on the night ground: every agent reads the same page and leaves the next step on it. */
   tools: {
-    title: 'Nothing gets explained twice.',
-    say: 'Every agent reads the same page: the next step, what was decided and why, the dead ends, and the keys it may use. What one agent learns on Monday, the next one knows on Tuesday.',
+    title: 'Every agent knows what the others did.',
+    say: 'They all read the same page: the next step, what was decided and why, and the dead ends. What one agent learns on Monday, the next one knows on Tuesday.',
     notes: 'What your agents left on Tidepool',
     connect: 'Connect yours',
     /* The one place home names the protocol, for the developer who came for it. */
@@ -153,7 +143,7 @@ export const home = {
     name: 'Slash',
     /* ⌘J IS ASK, as the app's bar shows it; / is find (audit E18). */
     title: 'Or just ask BrainDog.',
-    say: 'The assistant inside BrainDog answers from your own numbers and shows what it read. Ask for a change and it makes it, with an undo. Press ⌘J on any page, or Ctrl J on Windows.',
+    say: 'Slash, the assistant inside BrainDog, answers from your own numbers and shows what it read. Ask for a change and it makes it, with an undo. Press ⌘J on any page.',
     tries: 'Try',
     more: 'How Slash works',
   },
@@ -172,7 +162,7 @@ export const home = {
 
   free: {
     title: 'Free while in early access.',
-    say: "BrainDog is invite only for now. Ask for an invite and we'll email you when your place is ready.",
+    say: "BrainDog is invite only for now. Ask, and we'll email you when your place is ready.",
     /* The figures are `TABLE.free`'s, said in ONE SENTENCE, NOT A ROW OF STATS (the site's own rule, §47). */
     /* "built\u2011in" with a hyphen that never breaks, so a phone does not leave "in assistant." alone on a line. */
     figures: (tools: number, questions: number): string =>
@@ -188,7 +178,7 @@ export const home = {
     questions: [
       {
         q: 'How is this different from the memory in my AI app?',
-        a: 'That memory stays inside one app and holds facts about you. BrainDog is one record every agent you use reads, and it holds the work itself: next steps, decisions, money, and who changed what.',
+        a: 'That memory stays inside one app and holds facts about you. BrainDog is read by every agent you use, and it holds the work itself: next steps, decisions, money, and who changed what.',
       },
       {
         q: "Isn't a notes file in my repo enough?",
@@ -196,7 +186,7 @@ export const home = {
       },
       {
         q: 'Do I need to be technical?',
-        a: 'No. Most agents connect with one address in their settings, and BrainDog works in any browser. The command line is there if you want it.',
+        a: 'No. Most agents connect with one address in their settings, and BrainDog works in any browser.',
         link: { label: 'How to connect', href: CONNECT_DOCS },
       },
       {

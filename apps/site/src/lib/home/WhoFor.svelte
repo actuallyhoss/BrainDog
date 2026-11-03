@@ -5,14 +5,13 @@
   that starts caught up, blue for what waits on you, each in its well. The words are `copy/home.ts`; the names in the
   drawings are Maya's (`demo/maya.ts`).
 
-  The first step draws the makers it connects, the second `braindog context` in a terminal window (`lib/site/TermWindow.svelte`), the third the first of Maya's
+  The first step draws its one figure (one address for every agent, no makers' marks: "just say agents"), the second `braindog context` in a terminal window (`lib/site/TermWindow.svelte`), the third the first of Maya's
   questions as Needs you draws it, with its two answers (drawn, not pressable: the desk above is where they work).
 
   ON A PHONE, THREE SHORT TILES: each is its icon, the step's title and its way on under it. The cards and their
   sentences were most of a screen at 390.
 -->
 <script lang="ts">
-  import AgentMark from '$lib/AgentMark.svelte';
   import Icon from '$lib/Icon.svelte';
   import { home } from '$lib/copy/home.ts';
   import { NEEDS } from '$lib/demo/maya.ts';
@@ -31,9 +30,6 @@
         <h3>{w.small.title}</h3>
         <p class="say">{w.small.say}</p>
         <div class="draw">
-          <p class="marks" aria-hidden="true">
-            {#each home.hero.makers as maker (maker.id)}<span class="mk"><AgentMark id={maker.id} size={20} /></span>{/each}
-          </p>
           <p class="fig"><b>{w.small.figure}</b> <span>{w.small.figureSay}</span></p>
         </div>
         <a class="onward" href={w.small.href}>{w.small.link}<Icon name="arrow-right" size="s" /></a>
@@ -131,21 +127,6 @@
 
   .draw p {
     margin: 0;
-  }
-
-  /* THE MAKERS IT CONNECTS, each mark in a small round chip, in the hero's order. */
-  .marks {
-    display: flex;
-    gap: 8px;
-  }
-
-  .mk {
-    display: grid;
-    place-items: center;
-    inline-size: 36px;
-    block-size: 36px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--ink) 5%, transparent);
   }
 
   .fig {

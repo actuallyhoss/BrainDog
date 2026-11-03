@@ -12,11 +12,11 @@ import { DOCS } from '../links.ts';
 export const agents = {
   agents: {
     title: 'Connect your agents in one line.',
-    lead: 'Every agent connects to one address. You approve each once, and no key is copied anywhere. From then on, every session starts caught up.',
+    lead: 'One address for every agent. You approve each once, and no key is copied anywhere.',
     /* THE BRIEFING FIRST (3 November story, S5): the terminal explains it faster than the list, so it leads. */
     brief: {
       title: 'Every session starts with a briefing.',
-      say: "Before you type a word, your agent sees where the project stands, the next step and what's waiting on you. When it stops, it leaves a handoff for the next one. The command line prints the same briefing for you.",
+      say: "Before you type a word, your agent sees where the project stands, the next step and what's waiting on you. When it stops, it leaves a handoff for the next one. Run braindog context to see the same briefing.",
     },
     gets: {
       title: 'What every session starts with',
@@ -46,7 +46,7 @@ export const agents = {
        other agent at its next call to BrainDog. The drawn rows are Maya's `TODAY.working`. */
     watch: {
       title: 'Watch them, and stop them',
-      say: 'The Agents page shows every agent working now, on which project, since when. Tell one something, pause it, redirect it or stop it. It hears you at its next step.',
+      say: 'The Agents page shows every agent working now and on which project. Tell one something, pause it or stop it. It hears you at its next step.',
       head: 'Working now',
       pause: 'Pause',
       resume: 'Resume',
