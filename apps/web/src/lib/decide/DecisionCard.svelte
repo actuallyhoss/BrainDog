@@ -1553,6 +1553,8 @@
      The well over two lines, what it is with the amount at the end, how late in red under it, the answers under that,
      and who asked at the foot. Every part names its own cell, so the skin's "every part across the card" does not hold. */
   .dc-row {
+    /* The row spans its card, so the amount sits at the card's right edge, not at the end of a reading measure. */
+    max-inline-size: none;
     grid-template-columns: 32px minmax(0, 1fr) auto;
     column-gap: var(--sp-3);
     row-gap: var(--sp-1);

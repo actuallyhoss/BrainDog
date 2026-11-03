@@ -725,23 +725,16 @@
     padding: 0;
   }
 
-  /* THE LEAD READS AT THE MEASURE (T17): across the page its amount stood 900px from its title. The tile still spans the
-     row; what is in it stops at 72ch, so the amount is read with the question it belongs to. */
+  /* THE LEAD CARD STOPS AT A READING WIDTH (T17, ops look 3 Nov): across the page its amount stood 900px from its
+     title. Now the card itself ends at the measure, and the amount sits at the card's right edge, as an ops row's
+     value does, a short reach from its title. */
+  .body :global(.block-slot[data-key='decide-lead']) {
+    max-inline-size: calc(var(--measure, 72ch) + 2 * var(--sp-5, 24px));
+  }
+
   .body :global(.block-slot[data-key='decide-lead'] .dc-row) {
-    max-inline-size: var(--measure, 72ch);
+    max-inline-size: none;
   }
-
-  /* AND THE AMOUNT STANDS BESIDE ITS TITLE, not at the end of a 72ch row it does not fill (2 Nov): "£4,800" floated in
-     the middle of the tile, half a page from "Invoice 2026-041" and over nothing. */
-  .body :global(.block-slot[data-key='decide-lead'] .dc-row) {
-    grid-template-columns: 32px minmax(0, max-content) auto;
-    justify-content: start;
-  }
-
-  .body :global(.block-slot[data-key='decide-lead'] .dc-row > .dr-amount) {
-    margin-inline-start: var(--sp-3);
-  }
-
 
   /* A MONEY QUESTION'S TITLE IS A QUESTION'S SIZE HERE (T18): 15 beside Quick's 17. Today's tile keeps its 15. */
   .body :global(.dc-row > .dr-title) {
