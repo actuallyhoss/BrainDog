@@ -526,7 +526,7 @@ export function keySaid(key: string): Known | null {
   const value = kind === 'remote' || kind === 'folder' ? repoOf(raw) : Object.hasOwn(KEY_LABELS, kind) ? raw : plain(raw, IDS);
   if (!value) return null;
   const label = Object.hasOwn(KEY_LABELS, kind) ? KEY_LABELS[kind]! : kind ? kind.charAt(0).toUpperCase() + kind.slice(1) : seenWords.handle;
-  return kind ? { label, value, kind } : { label, value };
+  return Object.hasOwn(KEY_LABELS, kind) ? { label, value, kind } : { label, value };
 }
 
 /**
