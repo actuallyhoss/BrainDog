@@ -316,7 +316,7 @@ export function cardOf(
 
 /**
  * Look B's tokens, taken from `@braindog/theme` as a string because a sandboxed widget can import no stylesheet. The
- * system faces stand in for Lexend and Geist because it may load no font file. Only the mark's lightness and chroma are
+ * system faces stand in for the app's because it may load no font file. Only the mark's lightness and chroma are
  * set here, and they are numbers.
  */
 const CSS = `${LOOK_B_CSS}

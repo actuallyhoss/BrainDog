@@ -9,7 +9,7 @@
   FIVE ROWS, each drawn only when it has something to say:
     A  the mark in its 40 well, the name (Geist 17/600) with its lane and how it is going under it, and "3 late" at the
        end (a red dot and the word, never a pill);
-    B  its figure at 28 in Lexend with its label, and its line at the right from three points. THE FIGURE IS THE
+    B  its figure at 28 at 600 with its label, and its line at the right from three points. THE FIGURE IS THE
        PROJECT'S LEAD KEY NUMBER where it keeps one (`card.kpi`, the KPI plan of 21 October, 2.5): its name small, the
        figure, how it moved under them ("Up 36% on Aug", or "Not updated since 3 Oct" in the warn colour, never red),
        and its own line, never tasks done by week. With no key number it is the money figure as before, and a project

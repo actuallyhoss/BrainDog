@@ -7,7 +7,7 @@
   page, so its headings sit under the page's own title and a `#` title in the file is not drawn twice.
 
   THE NIGHT HEAD, THEN ONE SHEET (Look B): the text's name and its one line in `PageHead`, then the
-  words on one flat paper tile at a 68ch reading measure, its sections headed in Lexend like every title on the site.
+  words on one flat paper tile at a 68ch reading measure, its sections headed at 600 like every title on the site.
 
   A CONTENTS LIST AT ITS TOP (plan F26): the Terms run to ten screens at 1512 and sixteen on a phone, so each section is
   a link from the top, two columns on a desk, and a section's heading is a step smaller on a phone so it keeps to one or
@@ -87,7 +87,7 @@
   }
 
   /* ONE SHEET: a legal text is read line by line, so the whole of it keeps the 68ch measure at 16/26 on one flat tile,
-     radius 16, no edge and no shadow; its sections headed in Lexend at the feature step, their parts at the card step. */
+     radius 16, no edge and no shadow; its sections headed at the feature step, their parts at the card step. */
   .sheet {
     --sheet-pad: clamp(24px, 2.5vw + 12px, 48px);
     display: flex;

@@ -40,7 +40,7 @@ FEATURES = ['kern', 'mark', 'mkmk', 'ccmp', 'locl', 'liga', 'calt', 'tnum', 'pnu
 
 def patched():
     raw = subprocess.check_output(['git', 'show', f'{UPSTREAM}:{TTF}'], cwd=ROOT)
-    font = TTFont(io.BytesIO(raw))
+    font = TTFont(io.BytesIO(raw), recalcTimestamp=False)  # the same bytes every run
     font['hhea'].ascent, font['hhea'].descent = ASCENT, -DESCENT
     font['OS/2'].sTypoAscender, font['OS/2'].sTypoDescender = ASCENT, -DESCENT
     for code in (0x20, 0xA0):

@@ -184,6 +184,7 @@
   }
 
   :root {
+    /* The app and the site set both of these to Plus Jakarta Sans (`apps/web/src/lib/ui/style.css`, `apps/site/src/app.css`). */
     --font-ui: 'Geist', 'Geist Fallback', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-display: 'Lexend', 'Lexend Fallback', 'Geist', 'Geist Fallback', 'Plex', system-ui, sans-serif;
     /* GEIST MONO for ids people type, times in a feed, key caps and code (SPEC 1.4): `geist-mono.woff2` in both apps'

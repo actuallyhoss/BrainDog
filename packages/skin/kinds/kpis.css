@@ -2,7 +2,7 @@
  * `kpis`: a project's numbers and Today's (`packages/render/svelte/Kpis.svelte`, planned by `src/kpis.ts`).
  *
  * THE TILE IS THE BOX. The lead KPI sits at the top, its chart across the rest of the tile; the others are a grid
- * under one hairline, with no box of their own, separated by space as a strip of stats is. Figures are Lexend 600
+ * under one hairline, with no box of their own, separated by space as a strip of stats is. Figures are 600
  * (34 on the lead, 28 in the grid, 22 on a Today row), tabular, in ink; a code or a unit beside one is the meta step.
  *
  * COLOUR SAYS ONE THING EACH. The chart is `--chart-1`, the project's colour inside a project (the page sets it) or the

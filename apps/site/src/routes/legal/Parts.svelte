@@ -3,7 +3,7 @@
 
   THE HEAD IS `PageHead`: the page's name and its one line on the night ground, as every page of the
   site opens. Under it is one flat board (Look B), and every part is a tile on it: flat and opaque, radius 16, no edge
-  and no shadow, headed by its glyph and its title in Lexend.
+  and no shadow, headed by its glyph and its title.
 
   ONE FILE FOR THE TRUST PAGES, because they are read and never sold, and a reader arriving from the footer's Trust
   group should meet the same page each time. Each page builds its list of parts from its copy and the launch flags, so

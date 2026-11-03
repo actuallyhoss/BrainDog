@@ -21,7 +21,7 @@
  */
 @font-face {
   font-family: 'Plus Jakarta Sans';
-  src: url('/fonts/jakarta.woff2?v=817f') format('woff2');
+  src: url('/fonts/jakarta.woff2?v=a49d') format('woff2');
   font-weight: 200 800;
   font-display: swap;
   unicode-range: U+0000-017F, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
@@ -110,7 +110,7 @@
     /**
      * THE PAGE'S TYPE ROLES (polish, 2 November). Every page used to set its own heading: a band's title was 54 on the
      * home page, 51 on Slash and 48 on the pages for one kind of person, a tile's title 21, 22 or 24, and in Geist on
-     * the docs where every other title is Lexend. One role, one size, on every page; the steps above stay for the
+     * the docs where every other title is the display step. One role, one size, on every page; the steps above stay for the
      * drawings of the app, which keep the app's own scale.
      *
      *   display   the home page's slogan, 48 on a phone to 92 at a desk

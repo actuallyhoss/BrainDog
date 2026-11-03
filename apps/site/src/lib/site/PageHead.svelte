@@ -30,7 +30,7 @@
   h1 {
     max-inline-size: 14ch;
     font-size: var(--t-page);
-    line-height: 0.95;
+    line-height: 1.04;
     letter-spacing: -0.021em;
     text-wrap: balance;
     overflow-wrap: break-word;

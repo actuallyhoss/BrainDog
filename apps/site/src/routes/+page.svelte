@@ -106,7 +106,7 @@
   h1 {
     max-inline-size: 18ch;
     font-size: var(--t-display);
-    line-height: 0.98;
+    line-height: 1.04;
     letter-spacing: -0.021em;
     text-wrap: balance;
   }
