@@ -58,6 +58,7 @@
   } from './side.ts';
   import { keepWeek, keptRead, keptWeek, readFolk, readOpenWork, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
   import { keptPerson } from './side-copy.ts';
+  import { settle } from '../ui/same.ts';
 
   let {
     base,
@@ -72,6 +73,7 @@
     pen = null,
     placed = true,
     onwidth,
+    tabbed = [],
     ontoggle,
   }: {
     /** Where the record answers. */
@@ -102,9 +104,14 @@
     onwidth?: ((n: number, done: boolean) => void) | undefined;
     /** Hide or show the full column (`[` does the same). */
     ontoggle?: (() => void) | undefined;
+    /** On the phone's Menu: the places the tab bar already carries, by address. */
+    tabbed?: readonly string[];
   } = $props();
 
   const phone = $derived(mode === 'phone');
+  /* THE PHONE'S MENU LISTS WHAT THE TAB BAR DOES NOT (ui-perfect, 3 Nov): Today and Needs you stood in the Menu right above
+     their own tabs. A tab's place that has places under it (Money's lists) stays, as the way to them. */
+  const menuPlaces = $derived(phone ? model.places.filter((p) => !(tabbed.includes(p.href) && p.kids.length === 0)) : model.places);
   /** What in the rail moves to make room for a place arriving: each row, the head of Projects, and the rule. */
   const ROWS = '.s-list, li, .s-head, .s-rule, .s-tile';
 
@@ -192,7 +199,8 @@
       void Promise.all(counted.map(async ([key, list, folk]) => [key, folk ? await readFolk(b, list) : await readOpenWork(b, list)] as const)).then((got) => {
         if (n !== countAsk) return;
         const now = Object.fromEntries(got.filter((g): g is readonly [string, number] => g[1] !== null));
-        counts = { ...counts, ...now };
+        /* THE SAME COUNTS ARE NOT DRAWN AGAIN (`same.ts`): every move of the record asked them, and each answer redrew the rows. */
+        counts = settle(counts, { ...counts, ...now });
         keepCounts(b, now);
       });
     }, 0);
@@ -217,7 +225,8 @@
       void readSide(b, l)
         .then(async (got) => {
           if (n !== asked) return;
-          read = got;
+          /* AN ANSWER THAT SAYS WHAT THE DRAWN ONE SAYS LEAVES IT DRAWN (`same.ts`), so a poll redraws no project row. */
+          read = settle(read, got);
           answered = true;
           if (got === null) return;
           /* EACH PROJECT'S PAGE CAN NOW OPEN IN ITS OWN SHAPE (`known-project.ts`), its way back the Projects place. */
@@ -229,7 +238,7 @@
           if (n !== asked) return;
           const w = await readWeek(b, got.list, play, Date.now(), untrack(() => week), untrack(() => lists.some((x) => x.id === 'transactions')));
           if (n !== asked) return;
-          week = w;
+          week = settle(week, w);
           keepWeek(b, w);
         })
         /* NOT ANSWERED AFTER ITS TRIES (`readSide`): what is drawn stays, and the next move of the record asks again. */
@@ -480,14 +489,14 @@
     <a class="s-row s-proj tap" href={at(p.href)} aria-current={here ? 'page' : undefined} aria-keyshortcuts={phone ? undefined : 'ArrowRight'} onkeydown={phone ? undefined : toPin}>
       {@render mark(p)}
       {#if phone}
-        <!-- ITS STATE ONLY ON THE PHONE (plan F8): "1 late", "Money in this month". The next step, cut to "Settle how Kiln
+        <!-- ITS STATE ONLY ON THE PHONE (plan F8): "1 late", "Paid this month". The next step, cut to "Settle how Kiln
              is licensed, …" under the name, lives on the project's own page. -->
         {@const f = factOf(p)}
-        <span class="s-name" dir="auto">{name}</span>
+        <span class="s-name">{name}</span>
         {#if f}<span class="s-fact" data-tone={f.tone}>{f.text}</span>{/if}
         {#if p.working && f?.tone !== 'live'}<span class="s-dot" title={words.working}><span class="sr-only">{words.working}</span></span>{/if}
       {:else}
-        <span class="s-name" dir="auto">{name}</span>
+        <span class="s-name">{name}</span>
         <!-- HOW MANY ARE LATE, "1 late" (AG19): a bare "late" beside the name read as the project being late. -->
         {#if p.late > 0}<span class="s-late">{p.late.toLocaleString('en-GB')} {words.late}</span>{/if}
         {#if p.working}<span class="s-dot" title={words.working}><span class="sr-only">{words.working}</span></span>{/if}
@@ -533,7 +542,7 @@
 {#snippet link(l: SideLink, nested: boolean)}
   <li in:placeIn={{ hold: settling() }}>
     <a class="s-row s-link tap" data-nested={nested ? '' : undefined} href={at(l.href)} aria-current={isLit(l.href) ? 'page' : undefined}>
-      {#if !nested}<Icon name={l.icon as IconName} size="m" />{/if}<span class="s-name" dir="auto">{l.label}</span>
+      {#if !nested}<Icon name={l.icon as IconName} size="m" />{/if}<span class="s-name">{l.label}</span>
       {#if l.count}<span class="s-count num">{l.count.toLocaleString('en-GB')}</span>{/if}
     </a>
   </li>
@@ -668,11 +677,13 @@
   <!-- THE PAGE'S NAME FOR A SCREEN READER: the bar says it for the eye. -->
   <h1 class="sr-only" tabindex="-1">{words.menu}</h1>
   <div class="s-phone" bind:this={rows}>
-    <nav class="s-tile" aria-label={words.nav}>
-      <ul class="s-list">
-        {#each model.places as p (p.key)}{@render place(p)}{/each}
-      </ul>
-    </nav>
+    {#if menuPlaces.length > 0}
+      <nav class="s-tile" aria-label={words.nav}>
+        <ul class="s-list">
+          {#each menuPlaces as p (p.key)}{@render place(p)}{/each}
+        </ul>
+      </nav>
+    {/if}
     {#if showProjects && model.projects}
       <div class="s-tile">
         {@render projectsPart()}
@@ -987,12 +998,15 @@
     color: var(--ink);
   }
 
+  /* A NAME SOMEBODY TYPED takes its direction from its own first letter, as `dir="auto"` did, but from the sheet: the
+     attribute made Svelte write `dir` again on every redraw of the row (ui-perfect, 3 Nov: a write per row per poll). */
   .s-name {
     flex: 1;
     min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    unicode-bidi: plaintext;
   }
 
   /* A ROW UNDER ITS PLACE: in under the place's name, a step smaller, no glyph. */

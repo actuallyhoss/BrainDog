@@ -8,11 +8,7 @@
   So the palette becomes the shortcut teacher, the slow path and the fast path are the same list,
   and there is no cheat sheet to keep in sync (19 §4).
 -->
-<script lang="ts">
-  import { onMount } from 'svelte';
-
-  let { keys }: { keys: string } = $props();
-
+<script lang="ts" module>
   /**
    * THE KEY THE READER ACTUALLY HAS.
    *
@@ -26,18 +22,24 @@
    *
    * `navigator.platform` IS DEPRECATED AND STILL THE ONE THAT ANSWERS. `userAgentData` is
    * Chromium-only, so it is tried first and the old property is the fallback rather than the
-   * source — and neither exists during prerender, where the answer is the ordinary one.
+   * source. AN EMPTY `userAgentData.platform`, which Chrome gives where it will not say, falls through to
+   * `navigator.platform`: with `??` it stopped at the empty answer, and a Mac read Ctrl.
    *
-   * ASKED ONCE THE PAGE IS UP, NOT WHILE IT IS BUILT: a page drawn on the server said Ctrl+J and a page drawn in the
-   * browser said ⌘J, and hydration kept whichever came first, so the hint flipped from load to load (audit
-   * 2026-10-30, 30). Now every load starts from the ordinary answer and corrects it in the browser. AND AN EMPTY
-   * `userAgentData.platform`, which Chrome gives where it will not say, falls through to `navigator.platform`: with `??`
-   * it stopped at the empty answer, and a Mac read Ctrl.
+   * DECIDED ONCE, AS THE MODULE LOADS, AND NEVER WRITTEN AGAIN (ui-perfect, 3 Nov). It was asked in `onMount`, so every
+   * hint drew "Ctrl+K" first and was rewritten to "⌘K" a frame later: the top bar's search hint changed under the eye on
+   * every load on a Mac, and the shortcut sheet rewrote some thirty caps each time it was drawn. The app is drawn in the
+   * browser only (`ssr = false` at the root), so there is no server answer to agree with, and the first draw can be the
+   * right one. Outside a browser (a script that renders a part) it is the ordinary answer.
    */
-  let mac = $state(false);
-  onMount(() => {
-    mac = /mac/i.test((navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || '');
-  });
+  const MAC: boolean =
+    typeof navigator !== 'undefined' &&
+    /mac|iphone|ipad|ipod/i.test((navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || '');
+</script>
+
+<script lang="ts">
+  let { keys }: { keys: string } = $props();
+
+  const mac = MAC;
 
   /** `⌘` is Ctrl, `⌥` is Alt, and a modifier joins its key with a plus, which is the convention. */
   const said = (part: string): string =>

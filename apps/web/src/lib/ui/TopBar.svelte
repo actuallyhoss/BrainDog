@@ -48,9 +48,9 @@
         <li>
           {#if i > 0}<span class="crumb-sep" aria-hidden="true"><Icon name="chevron" size="s" /></span>{/if}
           {#if step.href}
-            <a class="crumb-up" href={at(step.href)} dir="auto">{step.label}</a>
+            <a class="crumb-up" href={at(step.href)}>{step.label}</a>
           {:else}
-            <span class="crumb-here" aria-current="page" dir="auto">{step.label}</span>{#if i === crumb.length - 1 && frame.figure}<span class="crumb-figure num">{frame.figure}</span>{/if}
+            <span class="crumb-here" aria-current="page">{step.label}</span>{#if i === crumb.length - 1 && frame.figure}<span class="crumb-figure num">{frame.figure}</span>{/if}
           {/if}
         </li>
       {/each}
@@ -124,6 +124,13 @@
 
   .crumb li:last-child > .crumb-sep {
     margin-inline-end: var(--sp-1);
+  }
+
+  /* EACH STEP TAKES ITS DIRECTION FROM ITS OWN FIRST LETTER (a name somebody typed), from the sheet and not `dir="auto"`,
+     which Svelte wrote again on every redraw of the crumb. */
+  .crumb-up,
+  .crumb-here {
+    unicode-bidi: plaintext;
   }
 
   .crumb-up {
