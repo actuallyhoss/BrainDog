@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import { exportUseCase } from '@braindog/declare';
 import { fileChecksum, verifySignature } from '@braindog/declare/catalogue';
 import { emptyCatalogue, type CatalogueIndex } from '@braindog/declare/catalogue';
-import { acceptSubmission, emptyPublishers, emptyReview, publisherKey, readSubmission, type Change, type Identity, type Review } from '@braindog/declare/kennel';
+import { acceptSubmission, emptyPublishers, emptyReview, publisherKey, readSubmission, reviewVerdict, type Change, type Identity, type Review } from '@braindog/declare/kennel';
 
 import { memoryStore, signatureFor } from './author-key.ts';
 import { publishedSaid, publishWords, submitToKennel, type Signer } from './publish.ts';
@@ -168,7 +168,15 @@ function realKennel(person: string, trustPerson = false) {
     if (change.move) files.set(change.move.to, files.get(change.move.from) ?? '');
     return Response.json({ ok: true, value: out.value.answer });
   };
-  return { fetcher, bodies, index: () => index, review: () => review };
+  /* THE OPERATOR LISTS A WAITING VERSION (`reviewVerdict`), as `braindog kennel review` does. */
+  const list = (kind: 'usecase' | 'pack', id: string, version: string): void => {
+    const out = reviewVerdict({ index, review }, { kind, id, version, verdict: 'list', reason: '' }, new Date('2026-10-15T10:00:00Z'));
+    assert.ok(out.ok, JSON.stringify(out));
+    if (out.value.index) index = out.value.index;
+    if (out.value.review) review = out.value.review(review);
+    if (out.value.move) files.set(out.value.move.to, files.get(out.value.move.from) ?? '');
+  };
+  return { fetcher, bodies, index: () => index, review: () => review, list };
 }
 
 test('the Kennel itself takes both, signed, as the key that signed them', async () => {
@@ -185,10 +193,12 @@ test('the Kennel itself takes both, signed, as the key that signed them', async 
 });
 
 test('an id this person published unsigned is published unsigned again, and the Kennel still holds it as theirs', async () => {
-  /* Trusted by the operator, so the first version is listed at once and the next is not held behind its review. */
+  /* Trusted by the operator. A first version still waits for review (lane H: it reaches everything new), so the operator
+     lists it, and the next is not held behind its review. */
   const k = realKennel('p_person_juniper', true);
   const first = await submitToKennel(k.fetcher, garden('1.0.0'), async () => null);
   assert.ok(first.ok && first.value.unsigned === 'browser', JSON.stringify(first));
+  k.list(first.value.kind, first.value.id, first.value.version);
   const next = await submitToKennel(k.fetcher, garden('1.0.1'), signer());
   assert.ok(next.ok, JSON.stringify(next));
   assert.equal(next.value.unsigned, 'earlier');
