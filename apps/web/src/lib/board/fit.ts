@@ -37,7 +37,16 @@ const CHART = '.series, [role="img"], svg';
  */
 const HEAD_COUNT = '.project-cards';
 
-export function fitBoard(board: HTMLElement): void {
+/**
+ * FITS EVERY FRAME, AND HANDS BACK THE ARRIVALS STILL PLAYING (blink fix, 3 Nov). Sam saw Today blink: the fit measured a
+ * frame with its own last answer still drawn in it (the "1 more" line in the flow, a grown height, a quiet foot's room), so
+ * Your work this week measured short with the line, cut nothing and took the line away, measured long without it and put
+ * it back, and each link it added or took away was a change the board's watch fitted again, about 120 times a second. Now
+ * the measure is of the board with nothing this file wrote taking room (`data-fit-measure`, `Board.svelte`), so the same
+ * board always fits the same way, and then only what changed is written. A frame still rising into place (a transform)
+ * is measured again once it lands: the caller fits again when those animations finish.
+ */
+export function fitBoard(board: HTMLElement): Animation[] {
   const frames = [...board.querySelectorAll<HTMLElement>('[data-board-key]')].filter((f) => f.dataset.lifted === undefined);
   /* EACH FRAME'S ROWS AS LAID (T5): a laptop's frame at rest is as tall as what it draws, the rows it was laid across at
      most, and the packer may lay a frame across more rows than its size (`filled` in `pack.ts`). Read from its own
@@ -62,21 +71,19 @@ export function fitBoard(board: HTMLElement): void {
       else frame.style.setProperty('--bar', said);
     }
   });
-  /* MEASURED WHOLE: every row put back first, in the same task, so nothing is painted between and the measure is of the
-     widget as it would draw with room. */
-  for (const frame of frames) {
-    if (frame.dataset.grown !== undefined) {
-      frame.style.maxBlockSize = '';
-      delete frame.dataset.grown;
-    }
-    for (const row of frame.querySelectorAll<HTMLElement>('[data-cut]')) delete row.dataset.cut;
-    for (const foot of frame.querySelectorAll<HTMLElement>('[data-more-before]')) delete foot.dataset.moreBefore;
-  }
-  const marks: [HTMLElement, number][] = [];
-  const grows: [HTMLElement, number][] = [];
-  const before: [HTMLElement, string][] = [];
+  /* MEASURED WHOLE, AND FROM NOTHING THIS FILE WROTE: every cut row drawn again, no "N more" of this file's in the flow,
+     no grown height and no quiet foot's room, by one mark on the board the stylesheet reads, put on and taken off in this
+     task so nothing is painted between. Nothing is taken off a row or a frame to measure it, so a fit that comes to the
+     same answer writes nothing at all. */
+  board.dataset.fitMeasure = '';
+  const cut = new Set<HTMLElement>();
+  const grows = new Map<HTMLElement, number>();
+  const more = new Map<HTMLElement, string>();
+  const before = new Map<HTMLElement, string>();
   const recounts: [HTMLElement, number][] = [];
+  const moving: Animation[] = [];
   for (const frame of frames) {
+    for (const a of frame.getAnimations()) if (a.playState !== 'finished') moving.push(a);
     const box = frame.getBoundingClientRect();
     const pad = parseFloat(getComputedStyle(frame).paddingBlockEnd) || 0;
     const room = box.bottom - pad;
@@ -134,7 +141,7 @@ export function fitBoard(board: HTMLElement): void {
     if (!p.shown && rects.some((r) => r.height > 0) && quiet.length > 0) {
       kept = feet.filter((f) => !quiet.includes(f));
       p = plan(kept);
-      for (const f of quiet) marks.push([f.el, 1]);
+      for (const f of quiet) cut.add(f.el);
     }
     const { says, cutAt } = p;
     /* ONE ROW AT LEAST, WHEN THERE ARE ROWS (live check of 30 October, 7): Arrivals drew its title, "3 more" and nothing,
@@ -161,10 +168,10 @@ export function fitBoard(board: HTMLElement): void {
         end += (Number.isFinite(above) ? Math.max(0, top - above) : 8) + (kept.at(-1)!.bottom - top);
       }
       const need = Math.ceil(end - box.top + tail);
-      if (need > box.height + 1) grows.push([frame, need]);
+      if (need > box.height + 1) grows.set(frame, need);
     }
     const cutOf = (i: number): boolean => !line.includes(i) && rects[i]!.height > 0 && rects[i]!.bottom > cutAt + 1;
-    rows.forEach((row, i) => marks.push([row, cutOf(i) ? 1 : 0]));
+    rows.forEach((row, i) => cutOf(i) && cut.add(row));
     /* A FOOT THAT COUNTS WHAT IT LEAVES OUT COUNTS WHAT THE FRAME CUT TOO (live check of 30 October, 5): Needs you held 4,
        drew two, had its second cut by the frame, and said "2 more" over one question where the phone said "3 more". */
     const counted = [...frame.querySelectorAll<HTMLElement>(FOOT)].find((f) => MORE_COUNT.test(ownText(f)));
@@ -174,21 +181,34 @@ export function fitBoard(board: HTMLElement): void {
        into the count's room, the frame says nothing more; the row's own clip says there is more. */
     const keptOver = !inHead && keepFirst && rects[first]!.bottom > Math.min(room, over) - MORE_PX;
     const left = says && !keptOver ? past(cutAt) - line.filter((i) => rects[i]!.bottom > cutAt + 1).length : 0;
-    if (left > 0 && kept.length > 0 && !inHead) {
-      delete frame.dataset.more;
-      before.push([kept[0]!.el, `${left} more`]);
-    } else if (left > 0) frame.dataset.more = `${left} more`;
-    else delete frame.dataset.more;
+    if (left > 0 && kept.length > 0 && !inHead) before.set(kept[0]!.el, `${left} more`);
+    else if (left > 0) more.set(frame, `${left} more`);
   }
-  for (const [frame, need] of grows) {
-    frame.style.maxBlockSize = `${need}px`;
-    frame.dataset.grown = '';
+  delete board.dataset.fitMeasure;
+  /* THEN WRITTEN, ONLY WHERE IT CHANGED: a mark put back that was already there is still a change to a watch, and every
+     row and frame written again each fit was the blinking's fuel. */
+  for (const frame of frames) {
+    for (const el of frame.querySelectorAll<HTMLElement>('[data-cut]')) if (!cut.has(el)) delete el.dataset.cut;
+    for (const el of frame.querySelectorAll<HTMLElement>('[data-more-before]')) if (!before.has(el)) delete el.dataset.moreBefore;
+    const need = grows.get(frame);
+    if (need === undefined) {
+      if (frame.dataset.grown !== undefined) delete frame.dataset.grown;
+      if (frame.style.getPropertyValue('--grown') !== '') frame.style.removeProperty('--grown');
+    } else {
+      if (frame.style.getPropertyValue('--grown') !== `${need}px`) frame.style.setProperty('--grown', `${need}px`);
+      if (frame.dataset.grown === undefined) frame.dataset.grown = '';
+    }
+    const said = more.get(frame);
+    if (said === undefined) {
+      if (frame.dataset.more !== undefined) delete frame.dataset.more;
+    } else if (frame.dataset.more !== said) frame.dataset.more = said;
   }
-  for (const [row, cut] of marks) if (cut) row.dataset.cut = '';
-  for (const [foot, said] of before) foot.dataset.moreBefore = said;
-  for (const [foot, cut] of recounts) recount(foot, cut);
+  for (const el of cut) if (el.dataset.cut === undefined) el.dataset.cut = '';
+  for (const [foot, said] of before) if (foot.dataset.moreBefore !== said) foot.dataset.moreBefore = said;
+  for (const [foot, n] of recounts) recount(foot, n);
   moreLinks(frames);
   closeUp(board, frames);
+  return moving;
 }
 
 /**
@@ -201,38 +221,44 @@ export function fitBoard(board: HTMLElement): void {
  */
 function closeUp(board: HTMLElement, frames: readonly HTMLElement[]): void {
   const resting = board.dataset.cols !== '2' && !board.closest('[data-editing]');
-  for (const f of frames) f.style.translate = '';
-  board.style.marginBlockEnd = '';
-  if (!resting || frames.length === 0) return;
-  const gap = parseFloat(getComputedStyle(board).rowGap) || 0;
-  const laid = frames
-    .map((f) => {
-      const css = getComputedStyle(f);
-      const r = f.getBoundingClientRect();
-      const from = parseInt(css.gridColumnStart, 10);
-      const to = parseInt(css.gridColumnEnd, 10);
-      return { f, row: parseInt(css.gridRowStart, 10) || 0, from, to, top: r.top, bottom: r.bottom, height: r.height };
-    })
-    .filter((l) => Number.isFinite(l.from) && Number.isFinite(l.to) && l.to > l.from && l.height > 0)
-    .sort((a, b) => a.row - b.row || a.from - b.from);
-  const floor = new Map<number, number>();
-  const moves: [HTMLElement, number][] = [];
-  let lowest = -Infinity;
-  for (const l of laid) {
-    let above = -Infinity;
-    for (let c = l.from; c < l.to; c += 1) above = Math.max(above, floor.get(c) ?? -Infinity);
-    const want = Number.isFinite(above) ? Math.min(l.top, above + gap) : l.top;
-    const up = l.top - want >= 1 ? Math.round(l.top - want) : 0;
-    const bottom = l.bottom - up;
-    for (let c = l.from; c < l.to; c += 1) floor.set(c, bottom);
-    lowest = Math.max(lowest, bottom);
-    if (up > 0) moves.push([l.f, up]);
+  const moves = new Map<HTMLElement, number>();
+  let margin = '';
+  if (resting && frames.length > 0) {
+    const gap = parseFloat(getComputedStyle(board).rowGap) || 0;
+    /* READ AS LAID, NOT AS DRAWN (blink fix, 3 Nov): a frame's offsets are the layout's own, which neither the move this
+       made last time nor a widget's arrival (both transforms) shifts, so nothing is taken off to be read and a fit that
+       lands where it stood writes nothing. */
+    const laid = frames
+      .map((f) => {
+        const css = getComputedStyle(f);
+        const from = parseInt(css.gridColumnStart, 10);
+        const to = parseInt(css.gridColumnEnd, 10);
+        return { f, row: parseInt(css.gridRowStart, 10) || 0, from, to, top: f.offsetTop, bottom: f.offsetTop + f.offsetHeight, height: f.offsetHeight };
+      })
+      .filter((l) => Number.isFinite(l.from) && Number.isFinite(l.to) && l.to > l.from && l.height > 0)
+      .sort((a, b) => a.row - b.row || a.from - b.from);
+    const floor = new Map<number, number>();
+    let lowest = -Infinity;
+    for (const l of laid) {
+      let above = -Infinity;
+      for (let c = l.from; c < l.to; c += 1) above = Math.max(above, floor.get(c) ?? -Infinity);
+      const want = Number.isFinite(above) ? Math.min(l.top, above + gap) : l.top;
+      const up = l.top - want >= 1 ? Math.round(l.top - want) : 0;
+      const bottom = l.bottom - up;
+      for (let c = l.from; c < l.to; c += 1) floor.set(c, bottom);
+      lowest = Math.max(lowest, bottom);
+      if (up > 0) moves.set(l.f, up);
+    }
+    /* THE BOARD GIVES BACK WHAT ITS FOOT NO LONGER HOLDS, by its own laid height (a margin never moves it). */
+    const slack = Math.round(board.offsetHeight - lowest);
+    if (moves.size > 0 && slack > 0) margin = `${-slack}px`;
   }
-  /* THE BOARD'S FOOT READ BEFORE ANY TILE MOVES: a move is a transform and leaves it where it was, and read after the
-     writes it made the browser work out the page's style again for one number. */
-  const slack = Math.round(board.getBoundingClientRect().bottom - lowest);
-  for (const [f, up] of moves) f.style.translate = `0 ${-up}px`;
-  if (moves.length > 0 && slack > 0) board.style.marginBlockEnd = `${-slack}px`;
+  for (const f of frames) {
+    const up = moves.get(f);
+    const want = up === undefined ? '' : `0px ${-up}px`;
+    if (f.style.translate !== want) f.style.translate = want;
+  }
+  if (board.style.marginBlockEnd !== margin) board.style.marginBlockEnd = margin;
 }
 
 /** Where a widget's whole list is: its head's link to its source, or its own door ("All agents", "All numbers"). */
@@ -310,8 +336,8 @@ function recount(foot: HTMLElement, cut: number): void {
   const n = Number(/\d[\d,]*/u.exec(own)?.[0]?.replace(/,/gu, '') ?? Number.NaN);
   if (!Number.isFinite(n)) return;
   const said = own.replace(/\d[\d,]*/u, (n + cut).toLocaleString('en-GB'));
-  foot.dataset.moreOwn = own;
-  foot.dataset.moreWrote = said;
+  if (foot.dataset.moreOwn !== own) foot.dataset.moreOwn = own;
+  if (foot.dataset.moreWrote !== said) foot.dataset.moreWrote = said;
   if (node.data !== said) node.data = said;
 }
 

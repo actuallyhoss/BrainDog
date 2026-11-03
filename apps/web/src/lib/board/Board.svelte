@@ -133,30 +133,55 @@
     model.el = el;
   });
 
-  /* EVERY WIDGET'S CONTENT FITS ITS FRAME (`fit.ts`): measured once a frame after the board or its content changes. */
+  /* EVERY WIDGET'S CONTENT FITS ITS FRAME (`fit.ts`): measured once a frame after the board or its content changes.
+     ONLY A CHANGE FROM OUTSIDE THE FIT FITS IT AGAIN (blink fix, 3 Nov): Today was fitted about 120 times a second at
+     rest, because the links and counts a fit wrote were changes to this watch, and the height its cuts gave the board
+     was a resize. What the fit writes is taken off the watch's queue before it is delivered; a size the board has because
+     of the last fit is not a resize; and a new height alone (the content's own, fonts and pictures) is fitted twice at
+     most before something else changes. */
+  let refit: ((outside: boolean) => void) | null = null;
   $effect(() => {
     const node = el;
     if (!node) return;
     let frame = 0;
-    const fit = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        fitBoard(node);
-      });
+    let passes = 0;
+    let last = 0;
+    let left = { w: -1, h: -1 };
+    const run = () => {
+      frame = 0;
+      passes += 1;
+      last = performance.now();
+      const moving = fitBoard(node);
+      changed.takeRecords();
+      left = { w: node.offsetWidth, h: node.offsetHeight };
+      /* A WIDGET STILL RISING INTO PLACE is fitted again where it lands. */
+      if (moving.length > 0) void Promise.allSettled(moving.map((a) => a.finished)).then(() => fit(true));
     };
-    const sized = new ResizeObserver(fit);
+    const fit = (outside: boolean) => {
+      if (outside || performance.now() - last > 400) passes = 0;
+      if (frame || passes >= 2) return;
+      frame = requestAnimationFrame(run);
+    };
+    const sized = new ResizeObserver(() => {
+      const w = node.offsetWidth;
+      const h = node.offsetHeight;
+      if (w === left.w && h === left.h) return;
+      fit(w !== left.w);
+    });
     sized.observe(node);
     /* NOT FOR A FIGURE ON ITS WAY (speed6, 2 Nov): a count writes its text every frame for about 400 ms, and each write
        fitted the board again, two layouts of the whole page a frame on a cold phone. Its last write, the figure it stays
        at, still fits it. */
     const changed = new MutationObserver((said) => {
       if (said.every((m) => m.type === 'characterData' && counting(m.target))) return;
-      fit();
+      fit(true);
     });
     changed.observe(node, { childList: true, subtree: true, characterData: true });
-    fit();
+    void document.fonts?.ready.then(() => fit(true));
+    refit = fit;
+    fit(true);
     return () => {
+      refit = null;
       sized.disconnect();
       changed.disconnect();
       if (frame) cancelAnimationFrame(frame);
@@ -164,7 +189,7 @@
   });
   $effect(() => {
     void model.packed;
-    if (el) requestAnimationFrame(() => el && fitBoard(el));
+    untrack(() => refit?.(true));
   });
 
   let sheetOpen = $state(false);
@@ -577,8 +602,24 @@
     padding-block-start: 0;
   }
 
-  .board-root:not([data-editing]) .board :global([data-board-key][data-more] > .desk-part > .tile) {
+  .board-root:not([data-editing]) .board:not([data-fit-measure]) :global([data-board-key][data-more] > .desk-part > .tile) {
     padding-block-end: calc(var(--sp-4) + 24px);
+  }
+
+  /* WHILE `fit.ts` MEASURES, NOTHING IT WROTE TAKES ROOM (blink fix, 3 Nov): its "N more" in the flow, a grown height and
+     a quiet foot's room all changed the box it was measuring, so each fit undid the last. Put on and taken off in one task,
+     never painted. */
+  .board[data-fit-measure] :global(a[data-fit-more]) {
+    display: none !important;
+  }
+
+  .board[data-fit-measure] :global([data-board-key][data-more]::after) {
+    content: none !important;
+  }
+
+  /* A FRAME LET TALLER FOR ITS FIRST LINE (`fit.ts` `grows`), at rest and never while it is measured. */
+  .board:not([data-fit-measure]) :global([data-board-key][data-grown]) {
+    max-block-size: var(--grown) !important;
   }
 
   /* A CELL HELD WHILE TODAY LOADS KEEPS ITS SIZE'S HEIGHT, having nothing in it to be as tall as. */
@@ -672,12 +713,12 @@
   }
 
   /* AND WHERE THE WIDGET HAS A QUIET FOOT, the count sits just above it, in the room `fit.ts` kept for it. */
-  .board :global([data-board-key] [data-more-before]) {
+  .board:not([data-fit-measure]) :global([data-board-key] [data-more-before]) {
     position: relative;
     margin-block-start: 24px !important;
   }
 
-  .board :global([data-board-key] [data-more-before]::before) {
+  .board:not([data-fit-measure]) :global([data-board-key] [data-more-before]::before) {
     content: attr(data-more-before);
     position: absolute;
     inset-inline-start: 0;
@@ -739,7 +780,7 @@
   }
 
   /* A ROW ITS FRAME CANNOT HOLD WHOLE IS NOT DRAWN (`fit.ts`), and the frame's foot rises to meet what is. */
-  .board :global([data-board-key] [data-cut]) {
+  .board:not([data-fit-measure]) :global([data-board-key] [data-cut]) {
     display: none;
   }
 
