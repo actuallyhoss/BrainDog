@@ -494,7 +494,7 @@
     z-index: var(--z-sheet);
     box-sizing: border-box;
     /* The Mac app's title bar sits above the head; --shell-inset is 0 in a browser. */
-    padding: calc(20px + var(--shell-inset, 0px)) var(--gutter) 0;
+    padding: calc(var(--page-top) + var(--shell-inset, 0px)) var(--gutter) 0;
     /* And in the Mac app, a head drawn with no frame round it starts after the traffic lights (`--shell-lead`). */
     padding-inline-start: max(var(--gutter), var(--shell-lead, 0px));
   }
@@ -513,7 +513,9 @@
 
   /* A kicker already stands between the row and the top of the work. A titled head draws no kicker (the bar holds the
      way), so it keeps the full gap (AH34: Today's first line sat 4 under the bar's rule). */
-  .page-head[data-kicked] {
+  /* ONLY UNDER A KICKER THAT IS DRAWN (rhythm, 3 Nov): a question's head kept the kicker's short gap with no kicker
+     over it (the bar's crumb had taken it), and its name sat 4 under the banner where every other page's sits 24. */
+  .kicker + .page-head[data-kicked] {
     padding-block-start: calc(var(--sp-1) + var(--shell-inset, 0px));
   }
 
@@ -563,8 +565,8 @@
     font-family: var(--font-display);
     font-size: var(--fs-page);
     font-weight: var(--fw-semi);
-    line-height: calc(34 / 28);
-    letter-spacing: -0.02em;
+    line-height: var(--lead-page);
+    letter-spacing: var(--track-page);
     text-wrap: balance;
     /* Coming back, it waits for the compact title to go. */
     transition: opacity var(--swap-out) var(--ease-out) var(--swap-out);
@@ -1006,10 +1008,10 @@
     .page-head {
       position: static;
       z-index: auto;
-      padding: var(--sp-3) var(--gutter) 0;
+      padding: var(--page-top) var(--gutter) 0;
     }
 
-    .page-head[data-kicked] {
+    p.kicker + .page-head[data-kicked] {
       padding-block-start: var(--sp-1);
     }
 
@@ -1031,8 +1033,8 @@
       grid-template-columns: minmax(0, 1fr);
       align-items: start;
       font-size: var(--fs-page-phone);
-      line-height: calc(28 / 22);
-      letter-spacing: -0.015em;
+      line-height: var(--lead-figure);
+      letter-spacing: var(--track-figure);
     }
 
     .page-name:has(> :is(.name-icon, .name-well)) {

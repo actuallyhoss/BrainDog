@@ -184,7 +184,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: 22px;
+    line-height: var(--lead-ui);
   }
 
   .tile-name {
@@ -198,6 +198,7 @@
     flex: none;
     color: var(--ink-3);
     font-weight: var(--fw-medium);
+    line-height: var(--lead-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -221,6 +222,7 @@
     min-inline-size: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-variant-numeric: tabular-nums;
     overflow-wrap: break-word;
     text-wrap: pretty;
