@@ -586,6 +586,13 @@
     background: var(--row-wash-press);
   }
 
+  /* TEXT SOMEBODY TYPED, IN ITS OWN DIRECTION (ui-perfect, 3 Nov): `class="own-dir"` in place of `dir="auto"` on an
+     element whose text is drawn from data. Svelte writes `dir` again on every redraw of such an element (a Chrome
+     workaround), which is an attribute write per row per poll; the sheet gives the same reading direction with none. */
+  .own-dir {
+    unicode-bidi: plaintext;
+  }
+
   /* A LIST'S ROWS ARE TOLD APART BY AIR, NOT RULES (ops 4.13: no dividers between rows), on the desk and on a phone. */
   .list > .item,
   .list > .item:last-child {

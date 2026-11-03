@@ -163,11 +163,14 @@
      drew the banners with neither the room nor the banner, and the banner came 118 ms later, 162px tall (widgets-empty,
      2 Nov). A plain `{#if}` draws the room in the same frame as the head, wherever the banners are drawn. */
   let NameAsk = $state<typeof NameAskView | null>(null);
-  const asking = $derived(nameAskDue(data, apiBase()));
+  /* NOT ON SIGNING IN (settings lane, 3 Nov): that page asks for the name in its own form, and the room held for the
+     banner there stood empty until the banner's code came and then went, a jump on every cold open. */
+  const askHere = $derived(here(page.url.pathname) !== '/settings/signing-in');
+  const asking = $derived(askHere && nameAskDue(data, apiBase()));
   /* AND ITS ROOM WHILE THE SCREEN IS DRAWN FROM THE LOCAL COPY (sweep10, 2 Nov): the ask waits for the live shell, so a
      settings area drawn from the copy stood 76px higher and was pushed down when `boot` answered (0.09 on every area).
      The copy names the same person, so the room is held from the first frame and the banner lands in it. */
-  const roomFor = $derived(asking || (data.stale === true && nameAskDue({ ...data, stale: undefined }, apiBase())));
+  const roomFor = $derived(asking || (askHere && data.stale === true && nameAskDue({ ...data, stale: undefined }, apiBase())));
   $effect(() => {
     if (asking && NameAsk === null) void import('$lib/sharing/NameAsk.svelte').then((m) => (NameAsk = m.default), () => undefined);
   });
@@ -2330,12 +2333,14 @@
   }
 
   /* A PRESS HELD WHILE THE SAVED COPY IS DRAWN (`held.svelte.ts`): the same box, quiet, and nothing presses it. Quiet
-     only once it has been held a moment, so a page this tab kept, whose answer lands at once, does not flicker; and
-     back at once when the answer lands, since the transition is only the held state's. */
+     only once it has been held a while, and then by a slow fade, so a page this tab kept, whose answer lands in a second,
+     never dims at all; back at once when the answer lands, since the transition is only the held state's. It waited
+     0.3s, so on the live app every button on a kept page went pale and came back on most opens (ui-perfect, 3 Nov: the
+     blinking). A press in that second is still turned away, and says so. */
   :global(#main[data-held] [data-held-press]) {
     cursor: default;
     opacity: 0.6;
-    transition: opacity 0s 0.3s;
+    transition: opacity 240ms var(--ease-out) 1.5s;
   }
 
   /* THE TOASTS' HOLDER DRAWS NOTHING: it only hands the stack where the sidebar ends. */

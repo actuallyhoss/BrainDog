@@ -328,8 +328,8 @@
   {/if}
   <div class="bar-lead" data-greets={shortGreeting(where) !== null ? '' : undefined}>
     <!-- WHERE YOU ARE, the same words the desk's crumb ends on, and over it the page's name once it has scrolled away. -->
-    <p class="bar-where" dir="auto" data-word={!cut && /\s/u.test(whereShown.trim()) ? undefined : ''} bind:this={whereEl}>{whereShown}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
-    <p class="bar-title" dir="auto" data-word={!cut && /\s/u.test(title.trim()) ? undefined : ''} aria-hidden="true">{title}</p>
+    <p class="bar-where" data-word={!cut && /\s/u.test(whereShown.trim()) ? undefined : ''} bind:this={whereEl}>{whereShown}{#if titled && figure}<span class="bar-figure num">{figure}</span>{/if}</p>
+    <p class="bar-title" data-word={!cut && /\s/u.test(title.trim()) ? undefined : ''} aria-hidden="true">{title}</p>
   </div>
   <span class="bar-end">
     {#if barred && actions}<span class="head-actions bar-actions">{@render actions()}</span>{/if}
@@ -340,7 +340,9 @@
     {/if}
     <HereFaces />
     <Bell phone />
-    <YouMenu phone />
+    <!-- THE FACE ONLY WHERE THERE IS NO WAY BACK (ui-perfect, 3 Nov): on a page under another, Share, More, Search, the
+         bell and the face left "Northbound" four letters; the account is one tap away on Today and the Menu. -->
+    {#if !wayBack}<YouMenu phone />{/if}
   </span>
 </div>
 {/if}
@@ -368,7 +370,7 @@
     {:else if titled}
       <!-- THE NAME IS THE BAR'S: the `h1` is here for a screen reader and the focus a move lands, and the sentence stands
            in the name's row. -->
-      <h1 class="name-unseen" tabindex="-1" dir="auto">{title}</h1>
+      <h1 class="name-unseen" tabindex="-1">{title}</h1>
       {#if sentence}
         <p class="page-said head-said">{@render said()}</p>
       {:else if held}
@@ -397,7 +399,7 @@
         {/if}
         <!-- THE COMPACT TITLE, over the name's place once the page has scrolled under the row: a separate line, so the
              name never changes size. Hidden from a screen reader, which has met the `h1`. -->
-        <p class="head-title" dir="auto" aria-hidden="true">{title}{#if counted}<span class="head-title-count num">{(count ?? 0).toLocaleString('en')}</span>{/if}</p>
+        <p class="head-title" aria-hidden="true">{title}{#if counted}<span class="head-title-count num">{(count ?? 0).toLocaleString('en')}</span>{/if}</p>
       </div>
     {/if}
     {#if actions}<div class="head-actions">{@render actions()}</div>{/if}
@@ -623,6 +625,13 @@
   }
 
   /* THE COMPACT TITLE: one line at 17/600 over the name's place, invisible until the page scrolls under the row. */
+  /* A NAME SOMEBODY TYPED TAKES ITS DIRECTION FROM ITS FIRST LETTER, from the sheet (not `dir="auto"`, rewritten on
+     every redraw). */
+  .head-title,
+  .name-unseen {
+    unicode-bidi: plaintext;
+  }
+
   .head-title {
     position: absolute;
     inset-block-start: 50%;
@@ -948,6 +957,9 @@
     .bar-title {
       display: -webkit-box;
       margin: 0;
+      /* ITS DIRECTION FROM ITS OWN FIRST LETTER (a name somebody typed), from the sheet: `dir="auto"` was written again
+         on every redraw of the bar. */
+      unicode-bidi: plaintext;
       overflow: hidden;
       color: var(--ink);
       font-family: var(--font-display);
