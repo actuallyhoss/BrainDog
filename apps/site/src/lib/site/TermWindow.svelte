@@ -131,7 +131,7 @@
     inset-inline: 72px;
     overflow: hidden;
     color: var(--tw-dim);
-    font: 500 12px/1 var(--tw-mono);
+    font: 500 12px/1.4 var(--tw-mono);
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;

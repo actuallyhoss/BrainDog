@@ -133,6 +133,9 @@
   .crumb li:last-child {
     flex: 0 1 auto;
     gap: 0;
+    /* The title's own room for a tail or an accent (`.crumb-here`), past this box's cut too. */
+    margin-block: -4px;
+    padding-block: 4px;
     overflow: hidden;
   }
 
@@ -155,6 +158,9 @@
 
   /* THE PAGE'S TITLE: 17 at 600 in the display face, as the page names wear it, on one line and cut at its end. */
   .crumb-here {
+    /* ROOM FOR A TAIL AND AN ACCENT: the cut is at the padding box, and 32 is under Jakarta's 1.26 em at 28. */
+    margin-block: -4px;
+    padding-block: 4px;
     overflow: hidden;
     color: var(--ink);
     font-family: var(--font-display);

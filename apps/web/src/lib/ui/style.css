@@ -352,8 +352,14 @@
   body {
     background: var(--ambient);
     background-color: var(--board);
-    /* TABULAR EVERYWHERE, as the site is. Jakarta's own figures are far apart in width (a 0 is 0.73 em, a 1 is 0.37), so
-       a date in a line reads uneven and a column does not align; its tabular set is 0.60 em each. */
+    /* NO TRACKING ON WORDS: the sheet's -0.006em was Geist's. Jakarta's word space is the file's (`tools/fonts/jakarta.py`). */
+    letter-spacing: 0;
+  }
+
+  /* FIGURES THAT LINE UP ARE TABULAR (Jakarta's own run from 0.37 em for a 1 to 0.73 for a 0, its tabular set is 0.60
+     each); a number in a sentence keeps the proportional set, whose 1 has no foot and reads as a word's. `.num` is the
+     skin's own. */
+  :where(table, .kpi-row, .r-num, .cards-figure) {
     font-variant-numeric: tabular-nums;
   }
 

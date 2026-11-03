@@ -32,9 +32,9 @@
   font-family: 'Jakarta Fallback';
   src: local('Arial'), local('ArialMT');
   font-weight: 100 450;
-  size-adjust: 106.2%;
-  ascent-override: 94.16%;
-  descent-override: 24.48%;
+  size-adjust: 106.8%;
+  ascent-override: 93.63%;
+  descent-override: 24.34%;
   line-gap-override: 0%;
   unicode-range: U+0000-017F, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212;
 }
@@ -43,9 +43,9 @@
   font-family: 'Jakarta Fallback';
   src: local('Arial'), local('ArialMT');
   font-weight: 451 550;
-  size-adjust: 107.3%;
-  ascent-override: 93.2%;
-  descent-override: 24.23%;
+  size-adjust: 107.9%;
+  ascent-override: 92.68%;
+  descent-override: 24.1%;
   line-gap-override: 0%;
   unicode-range: U+0000-017F, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212;
 }
@@ -54,9 +54,9 @@
   font-family: 'Jakarta Fallback';
   src: local('Arial Bold'), local('Arial-BoldMT');
   font-weight: 551 900;
-  size-adjust: 102%;
-  ascent-override: 98.04%;
-  descent-override: 25.49%;
+  size-adjust: 102.5%;
+  ascent-override: 97.56%;
+  descent-override: 25.37%;
   line-gap-override: 0%;
   unicode-range: U+0000-017F, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212;
 }
@@ -147,6 +147,11 @@
     --first-pad: clamp(32px, 2.8vw + 24px, 64px);
     --head-gap: clamp(24px, 1.5vw + 18px, 40px);
     --site-tile-pad: clamp(20px, 1.2vw + 15px, 32px);
+  }
+
+  /* THE THREE WEIGHTS: a browser's `b` and `strong` ask for 700. */
+  :where(b, strong) {
+    font-weight: 600;
   }
 
   /**
@@ -298,7 +303,9 @@
     color: var(--ink);
     font-family: var(--ui);
     font-size: var(--t-site-body);
-    font-variant-numeric: tabular-nums;
+    /* No tracking on words (the sheet's -0.006em was Geist's) and proportional figures in a sentence; `.num` and the
+       figures below stay tabular. */
+    letter-spacing: 0;
     /**
      * NOTHING ON THE SITE IS SET UNDER 14PX, and this is where that holds. The app's two
      * smallest steps are 12 and 13, sized for a dense record read at a desk; raising them here lifts every label on a

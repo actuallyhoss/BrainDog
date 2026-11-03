@@ -523,6 +523,8 @@
 
   .pt-w {
     max-inline-size: 100%;
+    margin-block: -0.12em;
+    padding-block: 0.12em;
     overflow: hidden;
     font: 500 11px/1.1 var(--ui);
     text-overflow: ellipsis;

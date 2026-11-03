@@ -980,7 +980,9 @@
     .bar-where,
     .bar-title {
       display: -webkit-box;
-      margin: 0;
+      /* ROOM FOR A TAIL AND AN ACCENT: the clamp clips at the padding box, and 1.2 is under Jakarta's 1.26 em. */
+      margin: -0.12em 0;
+      padding-block: 0.12em;
       /* ITS DIRECTION FROM ITS OWN FIRST LETTER (a name somebody typed), from the sheet: `dir="auto"` was written again
          on every redraw of the bar. */
       unicode-bidi: plaintext;
