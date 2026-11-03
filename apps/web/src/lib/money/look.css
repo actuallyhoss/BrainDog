@@ -2000,9 +2000,11 @@
   font-weight: var(--fw-regular);
 }
 
-/* HAIRLINES BETWEEN ROWS IN THE SEPARATOR INK, the tile's own rules untouched. */
-[data-money] :is(.list[data-kind='todo'] > .item, .prop > .prop-row + .prop-row, .progress-row + .progress-row, .forecast-next-item, tr, .tr) {
-  border-color: var(--mo-sep);
+/* HAIRLINES BETWEEN ROWS IN THE SEPARATOR INK, the tile's own rules untouched. The rule is renamed inside the row
+   kinds rather than each border recoloured, so the kinds' own cascade (no line under a group's head, none beside a row
+   under the pointer) stays as it is. */
+[data-money] :is(.table, .table-cards, .list[data-kind='todo'], .prop, .progress, .forecast-next) {
+  --rule: var(--mo-sep);
 }
 
 /* ── bars and progress: 4px on a quiet track (ops 4.18) ── */
