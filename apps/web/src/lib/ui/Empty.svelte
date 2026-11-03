@@ -254,7 +254,7 @@
     margin-inline: 0;
     text-align: start;
     max-inline-size: 56ch;
-    padding: var(--sp-2) 0;
+    padding: 0;
     background: none;
     border: 0;
     box-shadow: none;
@@ -322,7 +322,9 @@
     flex-wrap: wrap;
     gap: var(--sp-2);
     max-inline-size: none;
-    padding: var(--sp-2) 0;
+    /* NO PADDING OF ITS OWN IN A CARD (rhythm, 3 Nov): the card's head gap places it, so the line sits 12 under the
+       heading as any first row does. It added 8 above and below. */
+    padding: 0;
     background: none;
     border: 0;
     border-radius: 0;

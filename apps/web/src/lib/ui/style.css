@@ -307,6 +307,7 @@
      (`.tap`, a11y.css). The skin's own coarse block made them 44 and 40 drawn; this one comes later and wins. */
   @media (pointer: coarse) {
     :root {
+      --field-h: var(--tap);
       --ctl-h: 36px;
       --btn-h: 36px;
       --btn-h-sm: 28px;
