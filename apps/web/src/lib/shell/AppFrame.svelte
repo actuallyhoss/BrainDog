@@ -350,7 +350,7 @@
   const foot = $derived<SideLink[]>([
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' }] : []),
     /* ADD-ONS AND USAGE ARE THE OWNER'S (collab pass, 2 Nov): a colleague can install nothing and pays for nothing. */
-    ...(data.me.owner ? [{ href: '/packs', label: copy.packs, icon: 'packs' } as SideLink, { href: '/usage', label: USAGE, icon: 'observe' } as SideLink] : []),
+    ...(data.me.owner ? [{ href: '/packs', label: copy.packs, icon: 'plug' } as SideLink, { href: '/usage', label: USAGE, icon: 'observe' } as SideLink] : []),
     { href: '/settings', label: copy.settings, icon: 'settings' },
   ]);
 
@@ -1750,7 +1750,7 @@
       {#if !(narrow && frame.heads > 0)}{@render shellBanners()}{/if}
       {#if phoneMenu}
         <!-- ON A PHONE THE MENU TAB IS THE SIDEBAR AS A PAGE: every place, the projects, every list and Settings. -->
-        {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} lit={sideLit} working={workingOn} version={live.version} pen={sidePen} placed={listsPlaced} />{/if}
+        {#if SideBar}<SideBar mode="phone" base={apiBase(page.url)} lists={data.lists} {model} lit={sideLit} working={workingOn} version={live.version} pen={sidePen} placed={listsPlaced} tabbed={phoneTabs.map((t) => t.href)} />{/if}
       {:else if appendOnly}
         <!-- SOMEBODY WHO MAY ONLY ADD IS REFUSED `boot`, and every page under it then asked the record for what she cannot
              read (collab pass 3: Today, each project, Activity, Search, People; a 403 each). The record's sentence and

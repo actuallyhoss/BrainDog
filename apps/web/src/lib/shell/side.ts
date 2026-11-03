@@ -126,7 +126,7 @@ const digits = (n: number): string => n.toLocaleString('en-GB');
 export function factOf(p: Pick<SideProject, 'late' | 'working' | 'moved'>): { text: string; tone: 'late' | 'live' | 'quiet' } | null {
   if (p.late > 0) return { text: `${digits(p.late)} late`, tone: 'late' };
   if (p.working) return { text: 'An agent is on it', tone: 'live' };
-  if (p.moved) return { text: 'Money in this month', tone: 'quiet' };
+  if (p.moved) return { text: 'Paid this month', tone: 'quiet' };
   return null;
 }
 
