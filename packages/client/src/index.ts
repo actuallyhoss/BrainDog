@@ -3340,12 +3340,13 @@ export function createClient(options: ClientOptions) {
      * Keep one file's bytes at the address their hash makes (`PUT /api/files/<sha256>`), with this client's bearer.
      * The host hashes them again and refuses bytes that are not at their own hash.
      */
-    putFile: async (bytes: Uint8Array): Promise<Result<{ sha256: string; mime: string; bytes: number }>> => {
+    /* `name` MAKES IT AN ATTACHMENT (`?name=`): any type, up to 25 MB, typed by its bytes and that name. */
+    putFile: async (bytes: Uint8Array, name?: string): Promise<Result<{ sha256: string; mime: string; bytes: number }>> => {
       const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', Uint8Array.from(bytes)));
       const sha256 = Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
       let res: Response;
       try {
-        res = await doFetch(`${base}/api/files/${sha256}`, {
+        res = await doFetch(`${base}/api/files/${sha256}${name === undefined ? '' : `?name=${encodeURIComponent(name)}`}`, {
           method: 'PUT',
           headers: options.token ? { authorization: `Bearer ${options.token}` } : {},
           body: Uint8Array.from(bytes),
