@@ -1,4 +1,5 @@
 import BrainDogKit
+import QuickLook
 import SwiftUI
 
 /// BrainDog for Mac (plan 3.4, M6), in the Tauri shell's place: one native window with native Sign in, then the web desk
@@ -108,6 +109,7 @@ struct MainWindow: View {
         .background(Palette.board)
         .background(WindowReader { chrome.take($0) })
         .animation(.easeOut(duration: 0.2), value: session.signedIn)
+        .quickLookPreview($model.previewing)
         .onAppear {
             model.openWindow = { id in openWindow(id: id) }
             model.openSettings = { openSettings() }

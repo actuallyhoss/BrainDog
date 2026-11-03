@@ -1,4 +1,5 @@
 import BrainDogKit
+import QuickLook
 import SafariServices
 import SwiftUI
 
@@ -38,6 +39,8 @@ struct Shell: View {
         .sheet(item: $app.sharing) { sharing in
             ShareSheet(items: sharing.items).presentationDetents([.medium, .large]).ignoresSafeArea()
         }
+        /* AN ATTACHED PDF OPENED FULL SCREEN from its viewer (`WebScreen.onPreview`): every page, with Share and Markup. */
+        .quickLookPreview($app.previewing)
         .fullScreenCover(item: $app.outside) { outside in
             Browser(url: outside.url).ignoresSafeArea()
         }

@@ -38,13 +38,19 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     public private(set) var asleep = false
     /// Asks the screen does not answer itself: share, tell, ask, notify, badge, visit, pushAsk.
     @ObservationIgnored public var onAsk: ((ShellAsk) -> Void)?
-    /// A file the page handed over (an export, a backup), saved where the app can share it.
+    /// A file the page handed over (an export, a backup, an attachment's Download), saved where the app can share it.
     @ObservationIgnored public var onFile: ((URL) -> Void)?
+    /// A file the page opened to be looked at (an attached PDF's "Open full screen"): shown natively, in Quick Look.
+    @ObservationIgnored public var onPreview: ((URL) -> Void)?
 
     /// The address this screen shows, kept current as the page moves in place.
     public private(set) var path: String
     private var loaded = false
     @ObservationIgnored private var saving: [ObjectIdentifier: URL] = [:]
+    /// Windows a page opened on a `blob:` of its own (an attached PDF), each held until its file is saved.
+    @ObservationIgnored private var popups: [ObjectIdentifier: WKWebView] = [:]
+    /// The downloads those windows became, which open in Quick Look rather than going to the share sheet.
+    @ObservationIgnored private var previews: Set<ObjectIdentifier> = []
 
     public init(kind: ShellKind, path: String = "/") {
         self.kind = kind
@@ -275,6 +281,8 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     }
 
     public func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse) async -> WKNavigationResponsePolicy {
+        /* AN ATTACHED PDF OPENED FULL SCREEN is saved and shown by Quick Look, which shows every page and can share it. */
+        if popups[ObjectIdentifier(webView)] != nil { return .download }
         /* A FILE THE PAGE CANNOT SHOW (an export, a backup) IS SAVED, never drawn as text over the screen. */
         if let http = response.response as? HTTPURLResponse,
            http.value(forHTTPHeaderField: "content-disposition")?.lowercased().hasPrefix("attachment") == true {
@@ -289,24 +297,38 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
 
     public func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
         download.delegate = self
+        if popups[ObjectIdentifier(webView)] != nil { previews.insert(ObjectIdentifier(download)) }
     }
 
     public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String) async -> URL? {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let name = suggestedFilename.isEmpty ? "BrainDog" : suggestedFilename
+        var name = suggestedFilename.isEmpty ? "BrainDog" : suggestedFilename
+        /* A `blob:` HAS NO NAME OF ITS OWN (WebKit offers its id): a PDF is named as one, so Quick Look and Files know it. */
+        if response.mimeType == "application/pdf", (name as NSString).pathExtension.lowercased() != "pdf" {
+            name = (title?.isEmpty == false ? title! : "Attachment") + ".pdf"
+            name = name.replacingOccurrences(of: "/", with: " ").replacingOccurrences(of: ":", with: " ")
+        }
         let file = folder.appendingPathComponent(name)
         saving[ObjectIdentifier(download)] = file
         return file
     }
 
     public func downloadDidFinish(_ download: WKDownload) {
-        guard let file = saving.removeValue(forKey: ObjectIdentifier(download)) else { return }
+        let key = ObjectIdentifier(download)
+        if let popup = download.webView { popups.removeValue(forKey: ObjectIdentifier(popup)) }
+        guard let file = saving.removeValue(forKey: key) else { return }
+        if previews.remove(key) != nil, let onPreview {
+            onPreview(file)
+            return
+        }
         onFile?(file)
         emit("saved", file.lastPathComponent)
     }
 
     public func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        if let popup = download.webView { popups.removeValue(forKey: ObjectIdentifier(popup)) }
+        previews.remove(ObjectIdentifier(download))
         let file = saving.removeValue(forKey: ObjectIdentifier(download))
         emit("unsaved", file?.lastPathComponent ?? "")
     }
@@ -324,6 +346,17 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
     }
 
     public func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        /* A `blob:` THE APP'S OWN PAGE MADE (an attached PDF's "Open full screen", `AttachmentViewer.svelte`) can only be
+           read in the page's own process, so it opens in a window made with the configuration WebKit hands over. That
+           window is never shown: what it loads is saved (`decidePolicyFor response`) and opened in Quick Look. A blob
+           from anywhere else (a frame's opaque origin) is not opened at all. */
+        if let url = action.request.url, url.scheme == "blob" {
+            guard url.absoluteString.hasPrefix("blob:\(Server.originText)/") else { return nil }
+            let popup = WKWebView(frame: .zero, configuration: configuration)
+            popup.navigationDelegate = self
+            popups[ObjectIdentifier(popup)] = popup
+            return popup
+        }
         if let url = action.request.url {
             if ours(url) {
                 let path = url.path + (url.query.map { "?\($0)" } ?? "")

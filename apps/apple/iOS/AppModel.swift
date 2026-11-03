@@ -94,6 +94,8 @@ final class AppModel {
     var accountOpen = false
     /// A link or a file the page handed to the share sheet.
     var sharing: Sharing?
+    /// A file the page opened to be looked at, in Quick Look.
+    var previewing: URL?
     /// An address outside BrainDog, opened in the in-app browser.
     var outside: Outside?
     /// An address that arrived before sign-in finished, opened once it has.
@@ -170,6 +172,7 @@ final class AppModel {
     func bind(_ screen: WebScreen, in stack: Stack) {
         screen.onAsk = { [weak self, weak stack, weak screen] ask in self?.heard(ask, in: stack, from: screen) }
         screen.onFile = { [weak self] file in self?.sharing = Sharing(items: [file]) }
+        screen.onPreview = { [weak self] file in self?.previewing = file }
     }
 
     private func heard(_ ask: ShellAsk, in stack: Stack?, from screen: WebScreen?) {
