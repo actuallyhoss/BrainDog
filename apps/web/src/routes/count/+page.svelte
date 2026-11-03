@@ -345,7 +345,7 @@
 
 <style>
   .cc-page {
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap, 24px) var(--gutter) var(--page-bottom, 64px);
     max-inline-size: var(--page-max);
   }
 
@@ -529,7 +529,7 @@
   .cc-sum dl > div {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--row-stack, 2px);
   }
 
   .cc-sum dt {
@@ -548,7 +548,7 @@
   .cc-sum .big dd {
     font-family: var(--font-display);
     font-size: var(--fs-figure);
-    letter-spacing: -0.02em;
+    letter-spacing: var(--track-figure, -0.02em);
   }
 
   .cc-sum dd.late {

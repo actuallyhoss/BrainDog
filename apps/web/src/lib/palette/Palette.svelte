@@ -2120,14 +2120,16 @@
     }
   }
 
-  /* THE FIELD: 56 tall, the glyph, the query. The hairline under it is the one rule in the panel. */
+  /* THE FIELD: 56 tall, the glyph, the query. The hairline under it is the one rule in the panel. Its glyph stands on the
+     rows' glyph edge, 20 in (the list's 8, a row's 8 and 4 into the 24px slot), and the query on their titles' edge. */
   .p-head {
+    --p-glyph-edge: calc(var(--sp-4) + var(--sp-1));
     display: flex;
     align-items: center;
     gap: var(--sp-3);
     min-block-size: 56px;
     padding-block: 0;
-    padding-inline: calc(var(--sp-4) + 2px) var(--sp-3);
+    padding-inline: var(--p-glyph-edge) var(--sp-3);
     border-block-end: 1px solid var(--sep, var(--rule));
     color: var(--ink-3);
     transition: border-color var(--d-state) var(--ease-out);
@@ -2145,7 +2147,7 @@
     display: flex;
     flex: 1;
     align-items: center;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
     min-inline-size: 0;
   }
 
@@ -2154,11 +2156,13 @@
     flex: 1;
     min-block-size: var(--ctl-h);
     min-inline-size: 0;
+    padding-inline: 0;
     border: 0;
     border-radius: var(--r-xs);
     background: none;
     color: var(--ink);
     font-size: var(--fs-row, 15px);
+    line-height: var(--lead-row, 20px);
     letter-spacing: -0.005em;
   }
 
@@ -2179,8 +2183,8 @@
   .p-shared {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-4);
+    gap: var(--sp-3);
+    padding: var(--sp-2) calc(var(--sp-4) + var(--sp-1));
   }
 
   .p-shared-img {
@@ -2197,7 +2201,7 @@
     min-inline-size: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta, 18px);
   }
 
   .p-shared-x {
@@ -2217,7 +2221,7 @@
     flex-wrap: wrap;
     gap: var(--sp-2);
     margin: 0;
-    padding: var(--sp-2) var(--sp-4);
+    padding: var(--sp-2) calc(var(--sp-4) + var(--sp-1));
     list-style: none;
   }
 
@@ -2227,6 +2231,7 @@
     background: var(--row-wash-press, var(--board));
     color: var(--ink);
     font-size: var(--fs-body);
+    line-height: var(--lead-ui, 20px);
   }
 
   /**
@@ -2262,9 +2267,8 @@
     margin: 0;
     padding: var(--sp-3) var(--sp-3) var(--sp-1);
     color: var(--ink-3);
-    font-size: var(--fs-caps, 11px);
-    font-weight: var(--fw-medium);
-    letter-spacing: 0.025em;
+    font: var(--t-caps, 500 11px / 16px var(--font-ui));
+    letter-spacing: var(--track-caps, 0.025em);
     text-transform: uppercase;
   }
 
@@ -2296,9 +2300,12 @@
     }
   }
 
+  /* ON A PHONE A ONE-LINE ROW IS A LIST ROW (44) AND A TWO-LINE ONE COMES TO 56 BY ITS OWN PADDING: 8 + 20 + 2 + 18 + 8.
+     Every row was 56, so "Go to"'s single words floated in the middle of a two-line box. */
   @media (width < 640px) {
     .p-row {
-      min-block-size: var(--row-h-2);
+      min-block-size: var(--row-h, 44px);
+      padding-block: var(--row-pad-y, 8px);
     }
   }
 
@@ -2333,12 +2340,14 @@
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
     color: var(--ink-3);
+    line-height: var(--lead-ui, 20px);
   }
 
   .p-none {
     margin: 0;
     padding: var(--sp-5) var(--sp-3);
     color: var(--ink-3);
+    line-height: var(--lh-body);
   }
 
   /* ASKING NEEDS A MODEL, over the hits a sentence also matched: one quiet line, its link the way on. */
@@ -2346,6 +2355,7 @@
     margin: 0;
     padding: var(--sp-3) var(--sp-3) 0;
     color: var(--ink-3);
+    line-height: var(--lh-body);
   }
 
   /* ASK'S MARK IN THE FIELD, where Find has its magnifier: Slash's own glyph, so the mode is seen before anything is read. */
@@ -2523,10 +2533,11 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-1) var(--sp-2);
-    padding: var(--sp-2) var(--sp-4);
+    padding: var(--sp-2) var(--sp-3) var(--sp-2) calc(var(--sp-4) + var(--sp-1));
     border-block-start: 1px solid var(--sep, var(--rule));
     color: var(--ink-3);
     font-size: var(--fs-cap);
+    line-height: var(--lead-cap, 16px);
   }
 
   /**
@@ -2576,8 +2587,9 @@
     }
 
     /* THE FIELD IS A WELL: the glyph and the query inside a 44px fill, radius 12. */
+    /* THE QUERY ON THE ROWS' TITLE EDGE (52): the well at 12, its glyph 12 into it, and 12 to the words. */
     .p-field {
-      gap: var(--sp-2);
+      gap: var(--sp-3);
       min-block-size: var(--tap);
       padding-inline: var(--sp-3);
       background: var(--row-wash, var(--tile-2));
