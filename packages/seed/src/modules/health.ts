@@ -63,35 +63,8 @@ export const HEALTH_PAGES: Record<string, SeedPage> = {
     icon: 'heart-pulse',
     pack: 'core',
     blocks: [
-      /* THE PAGE'S ONE LINE, from `signs-red`. Three notes on the one figure, so exactly one of them draws, and the count
-         reads as a person says it: "One thing ... needs", "3 things ... need". `signs-red` reads nothing at all while no
-         sign has anything to judge by, so a record nobody has read yet opens on no line rather than on "alive".
-
-         NOUGHT IS "NOTHING NEEDS A LOOK", NEVER "ALIVE". `signs-red` reads 0 once one sign is green, however many of the
-         rest are still `none` (`readVitals`, `built-in-figures.ts`), so "Everything on this record is alive." was said of
-         a record with one sign read. What nought proves is that no sign read red, and the line says that and no more.
-         HOW MANY ARE UNREAD IS THE "Not checked yet" GROUP BELOW, so nought red is never read as all of it. */
-      {
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { metric: 'signs-red', is: 0 },
-        body: 'Nothing needs a look.',
-      },
-      {
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { metric: 'signs-red', is: 1 },
-        body: 'One thing needs a look.',
-      },
-      {
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { metric: 'signs-red', gt: 1 },
-        body: '{{signs-red}} things need a look.',
-      },
+      /* NO LINE OVER THE PAGE, SINCE core 1.3.1 (3 Nov, "i dont like those briefs at all, remove them"): "3 things need a
+         look." counted Needs a look under it, which names each one. From core 1.0.0 three notes on `signs-red` said it. */
       /* HOW MUCH THE LINE HAS NOT SEEN IS THE "Not checked yet" GROUP'S, AND SAID ONCE (31 October, AG25): "12 checks
          have not run yet." stood over that group, which names every one of them again. */
       /* AND WHERE THE TIDYING IS DONE: what went stale and what is here twice is counted in Settings, Tidy up, which

@@ -293,7 +293,8 @@ export const BASE_PAGES: Record<string, SeedPage> = {
     icon: 'calendar',
     pack: 'core',
     blocks: [
-      { kind: 'note', lead: true, span: 12, body: 'Everything with a day it is due, this month and the next two.' },
+      /* NO LINE, SINCE core 1.3.1 (3 Nov): "Everything with a day it is due, this month and the next two." said what the
+         calendar under it shows. */
       {
         kind: 'calendar',
         span: 12,
@@ -320,7 +321,7 @@ export const BASE_PAGES: Record<string, SeedPage> = {
       { field: 'list', control: 'chips' },
     ],
     blocks: [
-      { kind: 'note', lead: true, key: 'line', span: 12, body: 'Everything that changed, a day at a time, newest first.' },
+      /* NO LINE, SINCE core 1.3.1 (3 Nov): "Everything that changed, a day at a time, newest first." said what the feed is. */
       { kind: 'feed', key: 'feed', span: 12, source: 'activity', group: 'day', fold: 'run', since: 'seen', first: 50, empty: 'Nothing has changed yet.' },
       { kind: 'split', key: 'who-worked', heading: 'Who worked', icon: 'people', span: 12, area: 'rail', source: 'metric.activity-by-who' },
       { kind: 'bar', key: 'what-changed', heading: 'What changed', icon: 'activity', span: 12, area: 'rail', source: 'metric.activity-by-kind' },

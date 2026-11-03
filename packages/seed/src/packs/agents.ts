@@ -479,29 +479,8 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
 
          EVERY NUMBER IS THE RECORD'S OWN, by the one clock the rail's count is (`runs-working`), and the steps are
          `handoffs-open`, the ones Up next draws, so the line and the rows cannot say two numbers. Exactly one is drawn. */
-      {
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { metric: 'runs-working', gt: 0 },
-        body: '{{runs-working}} working, {{runs-waiting}} open and quiet, {{handoffs-open}} step(s) up next',
-      },
-      /* THE LINE COUNTS WHAT OPEN NOW DRAWS (Q4 of 29 October): "Nobody working right now" stood over two runs heard
-         just now, and the laptop said "1 at work" over the same two. The quiet ones are counted as what they are. */
-      {
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { all: [{ metric: 'runs-working', is: 0 }, { metric: 'runs-waiting', gt: 0 }] },
-        body: 'Nobody working right now, {{runs-waiting}} open and quiet, {{handoffs-open}} step(s) up next',
-      },
-      {
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { all: [{ metric: 'runs-working', is: 0 }, { metric: 'runs-waiting', is: 0 }] },
-        body: 'Nobody working right now. {{handoffs-open}} step(s) up next',
-      },
+      /* AND NO LINE AT ALL SINCE 1.34.0 (3 Nov, "i dont like those briefs at all, remove them"): "1 working, 2 open and
+         quiet, 5 steps up next" counted At work and Up next under it, which count themselves. */
       /* THE CONTROL ROOM'S BOX (agents and MCP plan §2.1, §7.1): one field to tell an agent, to a named run, a kind of
          agent or whoever is next, on a project, now or at its next start, with what happens next said in words; and
          beside it what he told agents, each with its live state, the agent's reply and Undo all on what its run changed.
@@ -699,22 +678,8 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
     icon: 'learning',
     requires: ['register.learnings'],
     blocks: [
-      {
-        kind: 'note',
-        key: 'line',
-        lead: true,
-        span: 12,
-        when: { metric: 'learnings-arrived', gt: 0 },
-        body: '{{learnings-arrived}} learning(s) arrived this month, {{learnings-active}} in use in all, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
-      },
-      {
-        kind: 'note',
-        key: 'line-quiet',
-        lead: true,
-        span: 12,
-        when: { metric: 'learnings-arrived', is: 0 },
-        body: 'Nothing new this month, {{learnings-active}} learning(s) in use in all, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
-      },
+      /* NO LINE OF COUNTS SINCE 1.34.0 (3 Nov): "2 learnings arrived this month, 5 in use in all, 1 skill changed" said
+         what the chart and the lists under it count. */
       {
         kind: 'series',
         key: 'by-week',
@@ -883,8 +848,11 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      holds Projects the document is as 1.31.0's; on one that does not, the field goes with what reads it (`LINKS`).
      1.33.0 IS WORDS AND A HEADING, SO IT IS MINOR (pages pass, 2 Nov): a skill's page says its trigger under When to use
      it at the body size, where it was the page's hero line, and its versions block is headed Its text. No list, field
-     or figure goes. */
-  manifest: { id: 'agents', version: '1.33.0', requires: [] },
+     or figure goes.
+     1.34.0 TAKES BLOCKS OFF TWO PAGES, SO IT IS MINOR as 1.31.0 was (no briefs, 3 Nov): Agents drops its line of counts
+     ("1 working, 2 open and quiet, 5 steps up next") over At work and Up next, and What changed its line counting the
+     learnings and skills its chart and lists count. No list, field or figure goes. */
+  manifest: { id: 'agents', version: '1.34.0', requires: [] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

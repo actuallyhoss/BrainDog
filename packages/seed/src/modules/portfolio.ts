@@ -1336,11 +1336,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         /* WHAT WILL BE HERE WHILE NOTHING IS, SINCE portfolio 1.31.0 (empty states, 2 Nov): a new Numbers said "What your
-           projects report, newest first." over no number and a link to an empty table. */
-        says: [
-          { when: { metric: 'readings-held', is: 0 }, body: 'No project has reported a number yet. [Add a key number](/r/kpis).' },
-          { body: 'What your projects report, newest first.' },
-        ],
+           projects report, newest first." over no number and a link to an empty table. AND ONLY THEN, SINCE portfolio
+            1.31.1 (3 Nov): that line said what the cards under it show. */
+        when: { metric: 'readings-held', is: 0 },
+        body: 'No project has reported a number yet. [Add a key number](/r/kpis).',
       },
       {
         key: 'numbers-by-project',

@@ -32,9 +32,7 @@ export const SCRIPTS_PAGES: Record<string, SeedPage> = {
     icon: 'code',
     pack: 'core',
     blocks: [
-      /* THE PAGE'S LINE, as every page opens on one (`calm-pages.test.ts`). `/scripts` says its own over it, from the rows:
-         how many, how much they ran this month, and what has stopped (`routes/scripts/reading.ts`). */
-      { kind: 'note', lead: true, span: 12, body: 'Every script you have, and where it stands.' },
+      /* NO LINE, SINCE core 1.3.1 (3 Nov): "Every script you have, and where it stands." said what the table is. */
       {
         kind: 'table',
         key: 'scripts',

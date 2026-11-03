@@ -404,11 +404,15 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
 
            AND IT OPENS ON WHAT WAITS ON YOU, SINCE estate 2.2.0: how many open questions are about a service
            (`questions-open-in:services`), the clause the writer leaves out at nought, so the line and Waiting on you
-           under it count the same questions and the page never sounds quiet while one is asked. */
+           under it count the same questions and the page never sounds quiet while one is asked.
+
+           ONLY THE MONTH AGAIN, SINCE estate 2.8.1 (3 Nov, "i dont like those briefs at all, remove them"): Waiting on you
+           under it counts its own questions. What it costs a month stays, since no tile says the whole of it: Each month,
+           by type, says only its parts. */
         kind: 'note',
         lead: true,
         span: 12,
-        body: '{{questions-open-in:services}} question(s) for you, {{estate-month}} a month to keep everything running.',
+        body: '{{estate-month}} a month to keep everything running.',
       },
       {
         /* WHAT A FRESH RECORD READS, SINCE estate 2.1.0, in place of every tile under it: each is drawn only while there is

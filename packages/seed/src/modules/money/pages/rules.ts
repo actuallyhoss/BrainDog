@@ -6,9 +6,6 @@ import { LEDGER_LINE_COLUMNS } from './ledger.ts';
 /** Drawn only once a rule has filed something, ever. */
 const HAS_FILED = { metric: 'rule-filed', gte: 1 };
 
-/** Drawn only once there is a rule, on or off. */
-const HAS_RULES = { metric: 'filing-rules', gte: 1 };
-
 /** The box that writes a new rule: the list's own form, opened by the address (`?new=1`). */
 const ADD_RULE = '/r/filing_rules?new=1';
 
@@ -52,30 +49,9 @@ export const MONEY_RULES_PAGE: SeedPage = {
       when: { metric: 'filing-rules', lt: 1 },
       body: `No filing rules yet. A rule puts a line under a category as it comes in. [Add a rule](${ADD_RULE})`,
     },
-    {
-      /* RULES, AND NONE HAS FILED A LINE: said, never "0 rules filed 0". */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      when: { all: [HAS_RULES, { metric: 'rule-filed', lt: 1 }] },
-      body: 'No rule has filed a line yet.',
-    },
-    {
-      /* WHAT THE RULES DID THIS MONTH, as one line: how many rules, and how many entries between them. */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      when: { metric: 'filed-by-rule-30d', gte: 1 },
-      body: '{{rules-filing-30d}} rule(s) filed {{filed-by-rule-30d}} line(s) in 30 days.',
-    },
-    {
-      /* RULES THAT FILED BEFORE AND NOTHING LATELY: said in words, and never "0 rules filed 0". */
-      kind: 'note',
-      lead: true,
-      span: 12,
-      when: { all: [HAS_FILED, { metric: 'filed-by-rule-30d', lt: 1 }] },
-      body: 'Nothing filed in 30 days. {{rule-filed}} before that.',
-    },
+    /* NO LINE OF WHAT THE RULES FILED, SINCE money-core 3.38.5 (3 Nov, "i dont like those briefs at all, remove them"):
+       "2 rules filed 9 lines in 30 days", "No rule has filed a line yet" and "Nothing filed in 30 days" counted what the
+       rules under them say each of themselves. The line for no rule at all stays, with the way to add one. */
     {
       /* FILE OLD ENTRIES, SINCE money-core 3.20.0 (B24 of 24 October): a rule files what is written after it, and the
          entries already there with no category wait for a rule made later. The link opens the filing rule's Run again,

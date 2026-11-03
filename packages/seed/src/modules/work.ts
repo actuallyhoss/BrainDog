@@ -944,41 +944,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
            the next step, and two sentences at the headline's size took four lines on a phone. */
         body: 'Nothing is open right now',
       },
-      {
-        /* THE PAGE'S ONE LINE, drawn in the title's tile. A clause whose figure is nought is left out by the writer
-           (`leadOf`), so a quiet week says only what there is; a record with nothing open says nothing at all. Late is
-           yours (`tasks-late-yours`), the count of the Late band under it, so the line and the band never disagree; an
-           agent's late task is counted where it is drawn, with the agent or waiting on you.
-
-           COUNTS AND NOT A TASK, SINCE work 1.15.0 (the design review's fix 8): "1 late, 3 waiting on you". From 1.13.0
-           it named the task late longest ("Turn auto-renew back on for kilnfonts.example is late"), which read like a
-           task and not like the page's line; the task is the first of the Late strip under it. With nothing late the
-           line says so in as many words, so the two lines read alike. */
-        kind: 'note',
-        lead: true,
-        span: 12,
-        when: { metric: 'tasks-late-yours', gt: 0 },
-        /* AND FIRST, THE QUESTIONS ABOUT TASKS, SINCE work 1.19.0: "2 questions for you, 1 late". Decide's
-           badge counted them while this line said only the tasks, so the page read quiet with calls waiting on its own
-           work. `questions-open-in:tasks` counts what Questions for you below draws, and at nought the clause goes. Not
-           "wait on you", which would read beside the tasks waiting on you as the same thing said twice. */
-        body: '{{questions-open-in:tasks}} question(s) for you, {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you',
-      },
-      {
-        /* NOTHING LATE AND NOT HOW MANY ARE OPEN, SINCE work 1.15.0: Open is the first figure of the strip under the
-           capture line, and a tile does not say again what the line says. */
-        kind: 'note',
-        lead: true,
-        span: 12,
-        /* AND ONLY WHILE SOMETHING IS OPEN, SINCE work 1.24.0 (empty states, 2 Nov): a new Work said "Nothing is open right
-           now" and then "None of your tasks is late" under it, of tasks that did not exist. The first line says it all. */
-        when: { all: [{ metric: 'tasks-late-yours', is: 0 }, { metric: 'open-tasks', gt: 0 }] },
-        /* THE QUESTIONS SECOND HERE, SINCE work 1.19.0: first they would put "Nothing" in the middle of the line, and
-           the writer leaves a clause at nought out and never mends a capital. */
-        /* SAID OF WHAT IT COUNTS (Q6 of 29 October): "Nothing late" stood beside Today's "Late and urgent 6", which
-           counts an agent's late work and late money too. This line counts your own tasks, and says so. */
-        body: 'None of your tasks is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you',
-      },
+      /* NO LINE OF COUNTS OVER THE PAGE, SINCE work 1.26.1 (3 Nov, "i dont like those briefs at all, remove them"): it
+         read "2 questions for you, 1 late, 3 waiting on you" over Questions for you, Late and Waiting on you, each of
+         which counts itself. The line for nothing open stays, since it is the one thing such a page has to say. */
       {
         /* CAPTURE FIRST, before any figure, because a task that is not written down the moment it comes to mind is the
            one carried in your head. The heading is the field's prompt (`render/src/capture.ts`), and a task added here
@@ -1242,17 +1210,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'open-tasks', is: 0 },
         body: 'Nothing is open right now',
       },
-      {
-        /* THE BOARD'S ONE LINE, since work 1.10.0: how much is on it, and the two columns that need somebody. WHAT IS
-           KEPT FOR LATER IS SAID TOO: Later is a column of this board, and the line
-           counted only Open, so the columns that are not Done added up to more than it said. */
-        kind: 'note',
-        lead: true,
-        span: 12,
-        /* WHAT NEEDS SOMEBODY FIRST AND LATER LAST, AND NO "tasks", SINCE work 1.26.0 (pages polish, 2 Nov): the line ran to
-           two lines at the headline's size, and the board under it says what it counts. Every count is still said. */
-        body: '{{open-tasks}} open, {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent, {{tasks-later}} for later',
-      },
+      /* NO LINE OF COUNTS, SINCE work 1.26.1 (3 Nov): "8 open, 3 to check or blocked, 2 with an agent, 4 for later" said
+         again what the board's columns count under it. */
       {
         /* ADD IN PLACE, SINCE work 1.19.0: the same line as Work's, first after the sentence and before the board, so a
            task thought of while moving cards is written where the cards are. It is To do with no day, so it lands in
@@ -1304,17 +1263,14 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     pack: 'work',
     blocks: [
       {
-        /* THE PAGE'S LINE IS WHAT IS LATE AND WHAT IS NEAR on the axis under it, not what the page is for. A clause whose
-           figure is nought is left out (`leadOf`), so a quiet axis says only what there is. */
+        /* ONLY THE LINE FOR AN EMPTY AXIS, SINCE work 1.26.1 (3 Nov): "2 past their date, 3 due in 7 days" counted what the
+           axis under it draws, its past dates in red. With no dated task the page says what will stand here, as it has
+           since work 1.24.0 (empty states, 2 Nov). */
         kind: 'note',
         lead: true,
         span: 12,
-        /* AND WHAT WILL STAND HERE WHILE NOTHING DOES, SINCE work 1.24.0 (empty states, 2 Nov): with no dated task both
-           clauses are left out, and the page said "Nothing in Timeline yet. What you add or mention lands here." */
-        says: [
-          { when: { metric: 'tasks-dated', is: 0 }, body: 'No task has a due day yet. Give one a day on [Work](/p/work).' },
-          { body: '{{tasks-overdue}} past their date, {{tasks-due-7d}} due in 7 days' },
-        ],
+        when: { metric: 'tasks-dated', is: 0 },
+        body: 'No task has a due day yet. Give one a day on [Work](/p/work).',
       },
       {
         /* TASKS BY DUE DAY, NOT IN PLAY (finish F52): "In play 15" counted tasks where in play means projects everywhere

@@ -1,6 +1,6 @@
 /**
  * EVERY DECLARED PAGE IS CALM (since October 2nd: not a busy-looking UI, but one tailored, to the point and easy to
- * read): a page opens on one line, holds at most six tiles before the rest is
+ * read): a page holds at most six tiles before the rest is
  * folded shut, wears a glyph on every heading, and says none of its line's figures again in a tile beside it.
  *
  * READ OFF THE DECLARATIONS AND NOT A DRAWN PAGE, because what a record draws depends on its rows and these hold the
@@ -71,13 +71,8 @@ test('EVERY HEADING WEARS A GLYPH', () => {
       if (typeof b.heading === 'string') assert.match(String(b.icon), /^[a-z][a-z0-9-]*$/u, `${slug}: ${b.heading} wears no glyph`);
 });
 
-test('EVERY PAGE THAT IS NOT ABOUT ONE ROW OPENS ON ITS LINE', () => {
-  for (const [slug, page] of pages) {
-    if (page.for !== undefined) continue;
-    const first = page.blocks[0]!;
-    assert.deepEqual([first.kind, first.lead], ['note', true], `${slug} opens on a ${first.kind} and not on its line`);
-  }
-});
+/* NO PAGE HAS TO OPEN ON A LINE ANY MORE (3 Nov, "i dont like those briefs at all, remove them"): a line that only
+   counted what the page under it shows went, so the sweep no longer asks every page for one. */
 
 test(`NO PAGE SHOWS MORE THAN ${ABOVE_THE_FOLD} TILES BEFORE THE REST IS FOLDED SHUT`, () => {
   for (const [slug, page] of pages) {

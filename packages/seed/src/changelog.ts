@@ -20,6 +20,7 @@ export type ModuleChange = { version: string; notes: string };
 
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
+    { version: '1.31.1', notes: 'Numbers no longer opens on a line saying what it lists. It still says how to add a key number while it has none.' },
     { version: '1.31.0', notes: 'Numbers with no reading yet says what it will list and how to add a key number, rather than a line about readings over none.' },
     {
       version: '1.30.2',
@@ -138,6 +139,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   core: [
+    { version: '1.3.1', notes: 'Health, Scripts, Calendar and Activity open straight on what they hold, without a line over it saying how many need a look or what the page is.' },
     { version: '1.3.0', notes: 'Health folds the checks not run yet at six, as All good does, and the checks nothing was filed for are one card titled by how many, naming them in its line.' },
     { version: '1.2.1', notes: 'Health shows every check that has not run yet, so the cards add up to the count above them.' },
     { version: '1.2.0', notes: 'Health says what it found more plainly and links to Tidy up.' },
@@ -212,6 +214,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.38.5', notes: 'Filing rules no longer opens on a count of what the rules filed in 30 days. Each rule still says it.' },
     {
       version: '3.38.4',
       notes:
@@ -384,6 +387,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
+    { version: '2.8.1', notes: 'Services opens on what it costs a month, without counting the questions Waiting on you shows.' },
     { version: '2.8.0', notes: 'Services says what it holds in plainer words, without naming a month.' },
     { version: '2.7.0', notes: 'Services names each domain that points at nothing, with who it is with, when it renews and what it costs, and Next ninety days says what each renewal costs where it said the name twice. A service\'s own page leads with what its next renewal takes, and one with no cost written shows no empty figure.' },
     { version: '2.6.1', notes: 'A service that costs nothing is no longer asked about before it renews, and the answers to that question say what each one does.' },
@@ -408,6 +412,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    { version: '1.26.1', notes: 'Work, the Board and the Timeline no longer open on a line of counts. What is late, waiting on you or due soon is in the lists under them, as before.' },
     { version: '1.26.0', notes: 'The Board\'s first line says what is to check or blocked and what is with an agent before what is kept for later.' },
     { version: '1.25.0', notes: 'A list of tasks heads its names Task, not Description.' },
     { version: '1.24.0', notes: 'Work says nothing of late tasks while none is open, and the Timeline says what will stand on it while no task has a due day.' },
@@ -472,6 +477,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    { version: '1.34.0', notes: 'Agents and What changed no longer open on a line of counts. Who is at work, what is up next and what changed are in the lists under them, as before.' },
     {
       version: '1.33.0',
       notes: "A skill's page says when to use it at the size of the rest of the page, and shows the skill's text even while it has only one version.",

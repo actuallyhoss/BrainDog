@@ -989,14 +989,24 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   sentences; Money's line drops the card, which its Accounts tile shows; the Ledger drops "7 lines to file." over the
  *   list that counts them (`page.money-coming`, `page.money-accounts`, `page.money-reports`, `page.money`,
  *   `page.money-ledger`). No id added or taken away, so a patch.
+ * - no briefs (fin-people1104, 3 Nov, "i dont like those briefs at all, remove them"): five packs drop the line over a
+ *   page that only counted what the page under it shows, each a patch as money-core 3.38.4 was (no id added or taken
+ *   away). work 1.26.1: Work's "2 questions for you, 1 late, 3 waiting on you", the Board's line of counts and the
+ *   Timeline's "past their date, due in 7 days" go, the lines for nothing open and no dated task stay (`page.work`,
+ *   `page.work-board`, `page.roadmap`). core 1.3.1: Health's "3 things need a look", and the lines over Scripts,
+ *   Calendar and Activity that said what each page is (`page.health`, `page.scripts`, `page.calendar`,
+ *   `page.activity`). portfolio 1.31.1: Numbers' "What your projects report, newest first." goes, its empty line stays
+ *   (`page.all-numbers`). estate 2.8.1: Services says only what it costs a month, which no tile says whole, and not the
+ *   questions Waiting on you counts (`page.estate`). money-core 3.38.5: Filing rules drops what the rules filed in 30
+ *   days, said by each rule under it (`page.money-rules`).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  core: '1.3.0',
-  portfolio: '1.31.0',
+  core: '1.3.1',
+  portfolio: '1.31.1',
   people: '4.6.0',
-  'money-core': '3.38.4',
-  estate: '2.8.0',
-  work: '1.26.0',
+  'money-core': '3.38.5',
+  estate: '2.8.1',
+  work: '1.26.1',
 };
 
 type Body = Record<string, unknown>;
