@@ -3527,8 +3527,18 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       /* `calls` IS THIS DOOR'S OWN, the list a client that reads no resources never saw (`callsFound`). */
       if (name === 'calls' && !rows.some((r) => r.name === 'calls')) {
         const q = typeof sent.q === 'string' ? sent.q : '';
-        const found = callsFound(rows, q);
+        /* AND THE TOOLS INSTALLED ADD-ONS GIVE, each `addon.<id>.<tool>` with what it says (`addonTools`). */
+        const found = callsFound([...rows, ...(await addonTools(ctx))], q);
         return { result: { ok: true, value: { calls: found.split('\n') } }, say: () => found };
+      }
+      /* AN ADD-ON'S OWN TOOL, `addon.<id>.<tool>`, started through the record's `addonTool` with the arguments as sent. */
+      const tool = /^addon\.([a-z][a-z0-9-]{0,62})\.([a-z][a-z0-9_-]{0,31})$/u.exec(name);
+      if (tool !== null && rows.some((r) => r.name === 'addonTool')) {
+        const ran = await surface.call('addonTool', { addon: tool[1], tool: tool[2], args: sent }, ctx);
+        if (!ran.ok) return { result: await failed(ran, ctx, turn) };
+        const value = bare(ran.value);
+        const said = isObject(value) && typeof value.say === 'string' ? value.say : null;
+        return { result: { ok: true, value }, ...(said === null ? {} : { say: () => said }) };
       }
       const row = rows.find((r) => r.name === name);
       if (row === undefined || !doorTakes(row)) return { result: { ok: false, refusal: notADoor(name, rows) } };
@@ -3598,6 +3608,25 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       return { result: { ok: true, value }, say: (look) => triagedBrief(value, entry as Shaped, filed.register, look) };
     },
   };
+
+  /**
+   * The tools the add-ons that are on give, as rows of the call table (`addon.<id>.<tool>` with what each says), so
+   * `act calls` finds them beside the app's own. Nothing when the record has no `addonActions` or refuses the caller.
+   */
+  async function addonTools(ctx: C): Promise<CallRow[]> {
+    if (!surface.call || !surface.calls || !surface.calls().some((r) => r.name === 'addonActions')) return [];
+    const out = await surface.call('addonActions', {}, ctx);
+    if (!out.ok || !isObject(out.value) || !Array.isArray(out.value.tools)) return [];
+    return out.value.tools.filter(isObject).map((t) => {
+      const takes = isObject(t.takes) ? Object.keys(t.takes) : [];
+      return {
+        name: String(t.call),
+        group: 'READ+',
+        writes: t.writes === true,
+        what: `${String(t.says)} From the add-on ${String(t.addon_title ?? t.addon)}.${takes.length > 0 ? ` Takes ${takes.join(', ')}.` : ''}`,
+      };
+    });
+  }
 
   /** One note of at most `NOTE_MOST`, on the row `spoken` names or on the caller's own run: what `log` writes, once a part. */
   async function logOne(args: Args, note: string, ctx: C, turn: Turn): Promise<Done> {

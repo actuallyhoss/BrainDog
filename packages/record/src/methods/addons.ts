@@ -89,6 +89,9 @@ export function reachLines(reach: Reach | undefined): string[] {
   for (const line of reach.may ?? []) out.push(line);
   if (reach.skills.length > 0) out.push(`Teaches your agents: ${reach.skills.join(', ')}.`);
   if ((reach.widgets ?? []).length > 0) out.push(`Today cards to add: ${(reach.widgets ?? []).join(', ')}.`);
+  for (const t of reach.tools ?? []) out.push(`Gives your agents a tool: ${t.says.replace(/\.$/u, '')}${t.writes ? ', and it may change rows' : ''}.`);
+  if ((reach.commands ?? []).length > 0) out.push(`Adds to the command bar: ${(reach.commands ?? []).join(', ')}.`);
+  for (const a of reach.row_actions ?? []) out.push(`Adds an action on ${a.list.replace(/^register\./u, '').replace(/[_-]+/gu, ' ')} rows: ${a.title}.`);
   if ((reach.waits ?? []).length > 0) out.push(`Some parts wait until you hold: ${(reach.waits ?? []).join(', ')}.`);
   if (reach.examples > 0) out.push(`Starts with ${reach.examples} example ${reach.examples === 1 ? 'entry' : 'entries'}.`);
   return out;
@@ -106,6 +109,8 @@ function reachShort(reach: Reach | undefined): string | undefined {
   const hosts = [...new Set(reach.calls_out.map((c) => c.host).filter((h): h is string => h !== null))];
   if (hosts.length > 0) parts.push(`calls ${hosts.join(', ')}`);
   if ((reach.widgets ?? []).length > 0) parts.push('Today cards');
+  if ((reach.tools ?? []).length > 0) parts.push('agent tools');
+  if ((reach.commands ?? []).length > 0 || (reach.row_actions ?? []).length > 0) parts.push('commands');
   if (reach.skills.length > 0) parts.push('agent skills');
   return parts.length === 0 ? undefined : parts.join(', ');
 }
@@ -280,7 +285,7 @@ export function methods(deps: RecordDeps) {
       const egress = Array.isArray(s.body.egress) ? s.body.egress.filter((e): e is string => typeof e === 'string') : [];
       const keys = Array.isArray(s.body.keys) ? s.body.keys.filter((e): e is string => typeof e === 'string') : [];
       const runs = isMap(s.body.runs) ? s.body.runs : {};
-      const when = typeof runs.every === 'string' ? `every ${runs.every}` : typeof runs.door === 'string' ? `when ${runs.door} is called` : runs.rule === true ? 'when an automation starts it' : 'when started';
+      const when = typeof runs.every === 'string' ? `every ${runs.every}` : typeof runs.door === 'string' ? `when ${runs.door} is called` : runs.rule === true ? 'when an automation starts it' : runs.tool === true ? 'when an agent calls its tool' : runs.command === true ? 'from the command bar' : runs.row === true ? "from a row's menu" : 'when started';
       out.push(
         `Script ${text(s.body.title) ?? s.id}: runs ${when}${egress.length > 0 ? `, may call ${egress.join(', ')}` : ', calls nothing outside'}${keys.length > 0 ? ` with the key ${keys.join(', ')}` : ''}.`,
       );
@@ -298,6 +303,19 @@ export function methods(deps: RecordDeps) {
     /* AND WHAT IT MAY DO BEYOND THAT (phase 4): notices, the model, a view that writes, in the plan's own words. */
     for (const d of live) for (const line of mayLinesOfDecl(d)) out.push(line);
     if (of('script').some((d) => d.body.store === true)) out.push('Keeps a little state of its own, at most 1 MB, which goes with it when it is removed with its data.');
+    /* WHO MAY START ITS SCRIPTS, read off the manifest this record stores (`addon-tools.ts`). */
+    let m: Body = {};
+    try {
+      const read = JSON.parse(sql.one<{ manifest: string }>('SELECT manifest FROM pack WHERE id = ?', pack)?.manifest ?? '{}') as unknown;
+      if (isMap(read)) m = read;
+    } catch {
+      m = {};
+    }
+    const listOf = (key: string): Body[] => (Array.isArray(m[key]) ? (m[key] as unknown[]).filter(isMap) : []);
+    for (const t of listOf('tools')) out.push(`A tool for your agents, addon.${pack}.${String(t.name)}: ${String(t.says)}${t.writes === true ? ' It may change rows, as whoever calls it.' : ''}`);
+    const commands = listOf('commands').map((c) => String(c.title ?? c.id));
+    if (commands.length > 0) out.push(`In the command bar: ${commands.join(', ')}.`);
+    for (const a of listOf('row_actions')) out.push(`An action on ${String(a.list).replace(/^register\./u, '').replace(/[_-]+/gu, ' ')} rows: ${String(a.title)}.`);
     return out;
   };
 

@@ -266,6 +266,12 @@ export type Manifest = {
    * that names a place it did not list here is refused. In the checksum, because it is what a person is asked.
    */
   uses?: string[];
+  /** The tools it gives the record's agents (`pack-actions.ts`). In the checksum: a tool is what an agent may start. */
+  tools?: PackTool[];
+  /** What it puts in the app's command bar. In the checksum. */
+  commands?: PackCommand[];
+  /** The actions it puts on a list's rows. In the checksum. */
+  row_actions?: PackRowAction[];
 };
 
 /**
@@ -284,6 +290,8 @@ export type PageAddition = { page: string; block: Record<string, Json>; after?: 
 export { ADD_COLUMNS_MOST, columnsFault, readAddColumn, type PageColumnAddition } from './add-column.ts';
 import type { PackWidget } from './pack-widgets.ts';
 import { readPackWidgets } from './pack-widgets.ts';
+import { readPackActions, type PackCommand, type PackRowAction, type PackTool } from './pack-actions.ts';
+export { COMMAND_ASK_TYPES, PACK_COMMANDS_MOST, PACK_ROW_ACTIONS_MOST, PACK_TOOLS_MOST, readPackActions, TOOL_ARG_TYPES, type PackActions, type PackCommand, type PackRowAction, type PackTool } from './pack-actions.ts';
 export { PACK_WIDGET_FOR, PACK_WIDGET_GROUPS, PACK_WIDGET_SIZES, PACK_WIDGETS_MOST, readPackWidgets, type PackWidget, type PackWidgetBlank } from './pack-widgets.ts';
 
 /* WHO HOLDS A LIST'S ROWS is `hand.ts`'s, so a page that reads it does not carry the planner. */
@@ -598,6 +606,12 @@ export type Diff = {
    * add. Absent when it ships none. Nothing is placed: a widget goes on Today only when somebody adds it.
    */
   widgets?: { id: string; title: string }[];
+  /** The tools it gives the record's agents, by name, with what each says and whether it may change rows. Absent when none. */
+  tools?: { name: string; says: string; writes: boolean }[];
+  /** What it puts in the command bar, by title. Absent when nothing. */
+  commands?: { id: string; title: string }[];
+  /** The actions it puts on rows, by list and title. Absent when none. */
+  row_actions?: { list: string; title: string }[];
   /** Every rule that would generate rows, with the ceiling it declares. */
   spawns: { rule: string; register: string; bound: number; when: string }[];
   /**
@@ -1099,6 +1113,11 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   }
   if (declarations.length === 0 && manifest.extends === undefined && manifest.adds === undefined && manifest.hands === undefined && manifest.widgets === undefined)
     return malformed(`${id} declares nothing, so installing it would change nothing.`, 'declarations');
+
+  /* WHO MAY START ITS SCRIPTS, read once the scripts are known: each tool, command and row action names one of them. */
+  const actions = readPackActions(doc, declarations);
+  if (!actions.ok) return actions as Result<Pack>;
+  Object.assign(manifest, actions.value);
 
   /**
    * EVERY PLACEHOLDER NAMES A SETTING THIS PACK DECLARES, AND THAT SETTING HAS A DEFAULT. The first
@@ -2284,6 +2303,9 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     seeds: { count: seedsFor(pack, adds).length, registers: seedRows(seedsFor(pack, adds)) },
     ...(pack.manifest.skills === undefined ? {} : { skills: pack.manifest.skills.map((s) => ({ name: s.name, trigger: s.trigger, what: s.what ?? null })) }),
     ...(pack.manifest.widgets === undefined ? {} : { widgets: pack.manifest.widgets.map((w) => ({ id: w.id, title: w.title })) }),
+    ...(pack.manifest.tools === undefined ? {} : { tools: pack.manifest.tools.map((t) => ({ name: t.name, says: t.says, writes: t.writes === true })) }),
+    ...(pack.manifest.commands === undefined ? {} : { commands: pack.manifest.commands.map((c) => ({ id: c.id, title: c.title })) }),
+    ...(pack.manifest.row_actions === undefined ? {} : { row_actions: pack.manifest.row_actions.map((a) => ({ list: a.list, title: a.title })) }),
     spawns: spawnsOf(pack),
     calls_out: calls,
     scripts,

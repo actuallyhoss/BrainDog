@@ -569,19 +569,21 @@ export default class extends WorkerEntrypoint {
     if (typeof source.default !== 'function') return { invalid: true, log: '' };
     const ctx = withConfig(prelude(host)(meta), meta.config);
     let ask;
+    let answer;
     try {
       const value = await source.default(ctx);
       if (value !== null && typeof value === 'object' && value.ask !== undefined && value.ask !== null) ask = JSON.stringify(value.ask);
+      if (value !== null && typeof value === 'object' && value.answer !== undefined && value.answer !== null) answer = JSON.stringify(value.answer);
     } catch (e) {
       return { threw: e instanceof Error ? e.message : String(e), log: lines.join('\\n') };
     }
-    return { writes, log: lines.join('\\n'), ask };
+    return { writes, log: lines.join('\\n'), ask, answer };
   }
 }
 `;
 
 /** What the loaded module's `run` answers, before anything here has believed it. */
-type Handed = { writes?: unknown; log?: unknown; threw?: unknown; invalid?: unknown; ask?: unknown };
+type Handed = { writes?: unknown; log?: unknown; threw?: unknown; invalid?: unknown; ask?: unknown; answer?: unknown };
 
 /* ── one run ────────────────────────────────────────────────────────────────────────────────────── */
 
@@ -773,9 +775,11 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     if (!Array.isArray(writes)) return { refused: writes, log, usage: spent };
     /* AND THE ONE QUESTION IT MAY END BY ASKING, carried as it came and checked by `finishScript`, which files it. */
     const ask = askOf(handed.ask);
+    /* AND WHAT IT ANSWERS ITS CALLER, for a run an add-on's tool started, read back from JSON as `ask` is. */
+    const answer = askOf(handed.answer);
     /* AND WHAT IT PROPOSED, queued in this object as it asked (`scriptProposals`), for `finishScript` to file. */
     const queued = turn?.propose?.queued() ?? [];
-    return { writes, log, usage: spent, ...(ask === undefined ? {} : { ask }), ...(queued.length === 0 ? {} : { proposals: queued }) };
+    return { writes, log, usage: spent, ...(ask === undefined ? {} : { ask }), ...(answer === undefined ? {} : { answer }), ...(queued.length === 0 ? {} : { proposals: queued }) };
   } finally {
     if (timer !== undefined) clearTimeout(timer);
     wiring.runs.close(run);

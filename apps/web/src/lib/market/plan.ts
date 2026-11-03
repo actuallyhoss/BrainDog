@@ -99,6 +99,11 @@ export const words = {
      the record already has by that name is left as it is. */
   skills: 'Skills it gives your agents',
   skillLine: (trigger: string, what: string) => [what, trigger === '' ? '' : `For: ${trigger}`].filter((x) => x !== '').join(' ') || 'A skill your agents can use',
+  tools: 'Tools it gives your agents',
+  toolLine: (says: string, writes: boolean) => `${says || 'A tool your agents can call'}${writes ? ' It may change rows, as whoever calls it.' : ''}`,
+  commandsAdded: 'In the command bar',
+  rowActions: 'Actions on rows',
+  rowActionOn: (list: string) => `On ${list} rows`,
   spawns: 'Rules that add things',
   spawnLine: (register: string, bound: number, when: string) => `adds to ${register}, at most ${bound.toLocaleString('en-GB')} ${when}`.trim(),
   interrupts: 'Rules that interrupt you',
@@ -148,6 +153,9 @@ export type SectionKey =
   | 'settings'
   | 'examples'
   | 'teaches'
+  | 'tools'
+  | 'commands'
+  | 'row-actions'
   | 'spawns'
   | 'interrupts'
   | 'worth';
@@ -426,6 +434,9 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
       })),
       ...section('examples', words.examples, count(seeds.count) === 0 ? [] : [row(words.examplesLine(count(seeds.count)), seedRows.map((r) => `${name(`register.${text(r.register)}`)} ${words.examplesIn(count(r.rows))}`).join(', ') || null)]),
       ...section('teaches', words.skills, list(d.skills).map((s) => row(text(s.name).replace(/-/gu, ' '), words.skillLine(text(s.trigger), text(s.what))))),
+      ...section('tools', words.tools, list(d.tools).map((t) => row(text(t.name).replace(/[-_]/gu, ' '), words.toolLine(text(t.says), t.writes === true)))),
+      ...section('commands', words.commandsAdded, list(d.commands).map((c) => row(text(c.title)))),
+      ...section('row-actions', words.rowActions, list(d.row_actions).map((a) => row(text(a.title), words.rowActionOn(name(text(a.list)))))),
       ...section('spawns', words.spawns, list(d.spawns).map((s) => row(name(`rule.${text(s.rule)}`), words.spawnLine(name(`register.${text(s.register)}`), count(s.bound), text(s.when))))),
       ...section('interrupts', words.interrupts, strings(d.interrupts).map((r) => row(name(`rule.${r}`)))),
       ...section('worth', words.worth, worth),

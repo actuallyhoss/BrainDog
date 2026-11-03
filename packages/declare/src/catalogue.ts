@@ -141,6 +141,12 @@ export type Reach = {
   uses?: { id: string; writes: boolean }[];
   /** What it may do beyond lists and calls out (phase 4): send notices, ask Slash's model, a view that writes. */
   may?: string[];
+  /** The tools it gives agents, by what each says, with whether it may change rows. Absent when none. */
+  tools?: { says: string; writes: boolean }[];
+  /** What it puts in the command bar, by title. Absent when nothing. */
+  commands?: string[];
+  /** The actions it puts on rows: the list's id and the action's title. Absent when none. */
+  row_actions?: { list: string; title: string }[];
 };
 
 export type Bump = 'major' | 'minor' | 'patch';
@@ -229,7 +235,7 @@ export type CatalogueEntry = {
  * stays lenient and reads what it knows. `unlisted` flags a pack named for one person or one bank. `$schema` is the
  * editor's (`pack-schema.ts`): `braindog addon new` writes it, and `normalise` passes over it.
  */
-export const MANIFEST_KEYS = ['$schema', 'pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills', 'icon', 'widgets', 'uses', 'migrate'] as const;
+export const MANIFEST_KEYS = ['$schema', 'pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills', 'icon', 'widgets', 'uses', 'migrate', 'tools', 'commands', 'row_actions'] as const;
 
 export const PREVIEW_FORMAT = 1;
 
@@ -455,6 +461,9 @@ export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
       const may = mayLinesOf(decls, []).map((m) => m.line);
       return may.length === 0 ? {} : { may };
     })(),
+    ...(s.pack?.manifest.tools?.length ? { tools: s.pack.manifest.tools.map((t) => ({ says: t.says, writes: t.writes === true })) } : {}),
+    ...(s.pack?.manifest.commands?.length ? { commands: s.pack.manifest.commands.map((c) => c.title) } : {}),
+    ...(s.pack?.manifest.row_actions?.length ? { row_actions: s.pack.manifest.row_actions.map((a) => ({ list: a.list, title: a.title })) } : {}),
   };
 }
 

@@ -68,8 +68,8 @@ export type ScriptUsage = { fetches: number; bytes: number; wall_ms: number; cpu
  * the sandbox started. `held` is the host's to say because the allowance is the Directory's, exactly as for a `call`.
  */
 export type ScriptAnswer =
-  /* `notices` AND `stored` ARE WHAT `ctx.notify` AND `ctx.store.set` QUEUED (`addon-state.ts`), applied with the writes. */
-  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage; ask?: unknown; proposals?: unknown; notices?: unknown; stored?: unknown }
+  /* `notices` AND `stored` ARE WHAT `ctx.notify` AND `ctx.store.set` QUEUED (`addon-state.ts`), applied with the writes. `answer` is what a tool's script hands its caller. */
+  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage; ask?: unknown; proposals?: unknown; notices?: unknown; stored?: unknown; answer?: unknown }
   | { refused: { code: string | null; why: string }; log: string; usage: ScriptUsage }
   | { held: { until: number; say: string } };
 
