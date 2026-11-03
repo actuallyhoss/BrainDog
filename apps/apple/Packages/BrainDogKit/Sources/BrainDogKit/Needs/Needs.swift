@@ -141,14 +141,14 @@ public struct NeedsView: View {
                 Section {
                     rows(model.needs.open, later: false)
                 } header: {
-                    header(Words.waitingOnYou, count: model.needs.waiting)
+                    header(Words.waitingOnYou, count: model.needs.waiting, first: true)
                 }
             }
             if !model.needs.later.isEmpty {
                 Section {
                     rows(model.needs.later, later: true)
                 } header: {
-                    header(Words.later, count: model.needs.later.count)
+                    header(Words.later, count: model.needs.later.count, first: model.needs.open.isEmpty && !model.known)
                 }
             }
             Color.clear.frame(height: Space.foot).listRowBackground(Color.clear).listRowSeparator(.hidden)
@@ -157,6 +157,8 @@ public struct NeedsView: View {
         .scrollContentBackground(.hidden)
         .background(Ground())
         .environment(\.defaultMinListRowHeight, Space.tap)
+        /* A HEADING IS AS TALL AS ITS WORDS AND ITS OWN PADDING, so the section rhythm below is the whole of it. */
+        .environment(\.defaultMinListHeaderHeight, 0)
         .refreshable {
             Haptic.select.play()
             await model.read()
@@ -170,15 +172,17 @@ public struct NeedsView: View {
 
     // MARK: parts
 
-    private func header(_ title: String, count: Int) -> some View {
+    /// A section's heading: 12 under the bar when it comes first, 32 under the card before it otherwise, and 12 over its
+    /// own card, on the card's text edge.
+    private func header(_ title: String, count: Int, first: Bool) -> some View {
         HStack(spacing: Space.s2) {
             Text(title).font(Typeface.tileHeading).foregroundStyle(Palette.ink)
             Text(count, format: .number).font(Typeface.meta).monospacedDigit().foregroundStyle(Palette.ink3)
             Spacer(minLength: 0)
         }
-        .padding(.top, Space.s3)
-        .padding(.bottom, Space.s1)
-        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter))
+        .padding(.top, first ? Space.pageTop : Space.sectionGap)
+        .padding(.bottom, Space.sectionHeadGap)
+        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.tilePad, bottom: 0, trailing: Space.gutter))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
@@ -204,7 +208,7 @@ public struct NeedsView: View {
         .card()
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: Space.s3, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
+        .listRowInsets(EdgeInsets(top: Space.pageTop, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
     }
 
     @ViewBuilder private func rows(_ questions: [Question], later: Bool) -> some View {
@@ -232,7 +236,7 @@ public struct NeedsView: View {
                     }
                 }
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter + Space.s3))
+                .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.tilePad, bottom: 0, trailing: Space.gutter + Space.tilePad))
                 .listRowBackground(
                     UnevenRoundedRectangle(
                         topLeadingRadius: first ? Radius.tile : 0, bottomLeadingRadius: last ? Radius.tile : 0,

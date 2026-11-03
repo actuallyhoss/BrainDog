@@ -45,15 +45,15 @@ struct SearchView: View {
                     .card()
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: Space.s3, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
+                    .listRowInsets(EdgeInsets(top: Space.pageTop, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
             } else {
-                ForEach(groups, id: \.name) { group in
+                ForEach(Array(groups.enumerated()), id: \.element.name) { index, group in
                     Section {
                         tiled(group.hits) { hit in
                             Row(hit.title, glyph: Glyph.named(group.icon))
                         } open: { hit in app.push(hit.path, on: app.search) }
                     } header: {
-                        heading(group.name, count: group.hits.count)
+                        heading(group.name, count: group.hits.count, first: index == 0)
                     }
                 }
             }
@@ -62,6 +62,7 @@ struct SearchView: View {
         .scrollContentBackground(.hidden)
         .background(Ground())
         .scrollDismissesKeyboard(.immediately)
+        .environment(\.defaultMinListHeaderHeight, 0)
         .searchable(text: $app.searchText, prompt: Text(Words.searchPrompt))
         .task(id: typed) { await find(typed) }
     }
@@ -102,20 +103,23 @@ struct SearchView: View {
     }
 
     @ViewBuilder private var placesList: some View {
-        ForEach(sections, id: \.name) { section in
+        ForEach(Array(sections.enumerated()), id: \.element.name) { index, section in
             Section {
                 tiled(section.spots) { spot in Row(spot.label, glyph: Glyph.named(spot.icon)) } open: { app.push($0.id, on: app.search) }
-            } header: { heading(section.name, count: nil) }
+            } header: { heading(section.name, count: nil, first: index == 0) }
         }
         if !lists.isEmpty {
             Section {
                 tiled(lists) { spot in Row(spot.label, when: spot.detail, glyph: Glyph.named(spot.icon)) } open: { app.push($0.id, on: app.search) }
-            } header: { heading(Words.lists, count: lists.count) }
+            } header: { heading(Words.lists, count: lists.count, first: false) }
         }
         Section {
             tiled([Spot(id: "settings", label: Words.settings, icon: "settings", detail: nil)]) { spot in
                 Row(spot.label, glyph: .settings)
             } open: { _ in app.search.path.append(.settings) }
+        } header: {
+            /* NO HEADING, THE SAME AIR: Settings stands a section's distance under the card before it. */
+            Color.clear.frame(height: Space.sectionGap).listRowInsets(EdgeInsets()).accessibilityHidden(true)
         }
         Color.clear.frame(height: Space.foot).listRowBackground(Color.clear).listRowSeparator(.hidden)
     }
@@ -158,15 +162,17 @@ struct SearchView: View {
 
     // MARK: parts
 
-    private func heading(_ title: String, count: Int?) -> some View {
+    /// A section's heading: 12 under the bar when it comes first, 32 under the card before it otherwise, and 12 over its
+    /// own card, on the card's text edge.
+    private func heading(_ title: String, count: Int?, first: Bool) -> some View {
         HStack(spacing: Space.s2) {
             Text(title).font(Typeface.tileHeading).foregroundStyle(Palette.ink)
             if let count { Text(count, format: .number).font(Typeface.meta).monospacedDigit().foregroundStyle(Palette.ink3) }
             Spacer(minLength: 0)
         }
-        .padding(.top, Space.s3)
-        .padding(.bottom, Space.s1)
-        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter))
+        .padding(.top, first ? Space.pageTop : Space.sectionGap)
+        .padding(.bottom, Space.sectionHeadGap)
+        .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.tilePad, bottom: 0, trailing: Space.gutter))
         .accessibilityAddTraits(.isHeader)
     }
 
@@ -174,7 +180,7 @@ struct SearchView: View {
         Text(text).font(Typeface.meta).foregroundStyle(Palette.ink2).leading(.meta)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: Space.s3, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
+            .listRowInsets(EdgeInsets(top: Space.pageTop, leading: Space.gutter, bottom: 0, trailing: Space.gutter))
     }
 
     /// Rows of one list on one tile: hairlines between, none under the last, the tile's corners on the first and last.
@@ -193,7 +199,7 @@ struct SearchView: View {
             }
             .buttonStyle(.plain)
             .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.s3, bottom: 0, trailing: Space.gutter + Space.s3))
+            .listRowInsets(EdgeInsets(top: 0, leading: Space.gutter + Space.tilePad, bottom: 0, trailing: Space.gutter + Space.tilePad))
             .listRowBackground(
                 UnevenRoundedRectangle(
                     topLeadingRadius: first ? Radius.tile : 0, bottomLeadingRadius: last ? Radius.tile : 0,

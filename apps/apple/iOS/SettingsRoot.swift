@@ -88,7 +88,7 @@ struct SettingsRoot: View {
                 }
             }
             .padding(.horizontal, Space.gutter)
-            .padding(.top, Space.s3)
+            .padding(.top, Space.pageTop)
             .padding(.bottom, Space.foot)
         }
         .background(Ground())

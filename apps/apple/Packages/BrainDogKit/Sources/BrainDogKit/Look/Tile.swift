@@ -4,10 +4,9 @@ import SwiftUI
 /// edged by a 1px rule in dark (`card()`). A heading row is a neutral 28 circle with an 18 glyph, the title at 15/600,
 /// an optional count in ink-3, and one thing at the far end.
 ///
-/// A TILE OF ROWS (`rows: true`) keeps the one text edge and no orphan gap: its sides are 12 (the rows' words and the
-/// heading's circle start where a list's do), its top 16, and its foot 4, because the last row already pads its words 12
-/// from its own foot, so the last words sit 16 from the card's edge as the heading does from the top. The heading stands
-/// 4 above the first row, whose own 12 makes the 16.
+/// A TILE OF ROWS (`rows: true`) leaves no orphan gap: its foot is 16 less the last row's own 10, so the last row's well
+/// sits 16 from the card's foot as the heading does from its top, and the heading stands 2 above the first row, whose own
+/// 10 makes the 12 a card's heading keeps from its content (`--card-head-gap`).
 public struct Tile<Content: View, Trailing: View>: View {
     let title: String?
     let glyph: Glyph?
@@ -23,9 +22,9 @@ public struct Tile<Content: View, Trailing: View>: View {
         self.glyph = glyph
         self.count = count
         self.insets = rows
-            ? EdgeInsets(top: Space.s4, leading: Space.textInset, bottom: Space.s4 - Space.rowY, trailing: Space.textInset)
+            ? EdgeInsets(top: Space.tilePad, leading: Space.tilePad, bottom: Space.tilePad - Space.rowY, trailing: Space.tilePad)
             : EdgeInsets(top: padding, leading: padding, bottom: padding, trailing: padding)
-        self.gap = rows ? Space.s4 - Space.rowY : Space.s3
+        self.gap = rows ? Space.s3 - Space.rowY : Space.s3
         self.content = content()
         self.trailing = trailing()
     }
