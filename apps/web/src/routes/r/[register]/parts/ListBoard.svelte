@@ -391,14 +391,20 @@
 
   /* ── a card: a tile on the board, flat, told from the board by its fill ── */
 
+  /* A CARD (ops look): solid, its 1px edge in its own colour and the card's soft two-layer shadow, radius 16. Under a
+     pointer the shadow deepens and the edge steps up; it never moves. */
   .bcard {
     position: relative;
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
     background: var(--tile);
-    border-radius: var(--r-pop);
-    transition: box-shadow var(--d-state) var(--ease-out);
+    border: 1px solid var(--card-edge, transparent);
+    border-radius: var(--r-tile);
+    box-shadow: var(--shadow-card, none);
+    transition:
+      box-shadow var(--d-state) var(--ease-out),
+      border-color var(--d-state) var(--ease-out);
   }
 
   .bcard[draggable='true'] {
@@ -516,7 +522,7 @@
     padding: 0;
     background: none;
     border: 0;
-    border-radius: calc(var(--r-ctl) - 2px);
+    border-radius: var(--r-pill, calc(var(--r-ctl) - 2px));
     color: var(--ink-2);
     cursor: pointer;
     transition:
@@ -538,7 +544,7 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: calc(var(--r-ctl) - 2px);
+    border-radius: var(--r-pill, calc(var(--r-ctl) - 2px));
     color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-meta);
@@ -560,7 +566,7 @@
   /* THE CARET'S RING ONLY WHILE THE KEYBOARD IS ON THE BOARD. At rest it sat round the first card, which nobody chose,
      and read as a card already picked. */
   :is(.board, .bgrid):not(:focus-within) .bcard[data-cursor]:not([data-picked], :hover) {
-    box-shadow: none;
+    box-shadow: var(--shadow-card, none);
   }
 
   /* A CARD THAT ARRIVED WHILE THE READER LOOKED: the arrival's tint, fading over a second and a half. */
@@ -581,12 +587,13 @@
     }
 
     .bcard:not([data-picked], [data-cursor]):hover {
-      box-shadow: 0 0 0 1px var(--rule);
+      border-color: var(--rule-strong);
+      box-shadow: var(--shadow-card-hover, 0 0 0 1px var(--rule));
     }
 
     .bcard-more:hover,
     .bcard-undo:hover {
-      background: var(--tile-2);
+      background: var(--soft-fill, var(--tile-2));
       color: var(--ink);
     }
   }

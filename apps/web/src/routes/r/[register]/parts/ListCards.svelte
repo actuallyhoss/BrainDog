@@ -183,7 +183,7 @@
       padding: 0;
       background: none;
       border: 0;
-      border-radius: var(--r-ctl);
+      border-radius: var(--r-pill, var(--r-ctl));
       color: var(--ink-3);
       cursor: pointer;
     }
@@ -192,7 +192,7 @@
        hover-only and nothing stuck on hover). */
     @media (hover: hover) and (pointer: fine) {
       .card-more:hover {
-        background: var(--hover);
+        background: var(--soft-fill, var(--hover));
         color: var(--ink);
       }
     }
