@@ -1435,8 +1435,8 @@
     min-block-size: var(--ctl-h);
     margin-block-start: var(--sp-3);
     padding: 0 var(--sp-4);
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
+    border-radius: var(--r-pill, var(--r-ctl));
+    background: var(--soft-fill, var(--tile-2));
     color: var(--ink);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
@@ -1445,7 +1445,7 @@
   }
 
   .block-more[data-long]:hover {
-    background: var(--hover);
+    background: var(--soft-fill-hover, var(--hover));
   }
 
   .block-more[data-long]:active {

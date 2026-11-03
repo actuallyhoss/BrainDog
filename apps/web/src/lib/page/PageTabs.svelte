@@ -129,8 +129,8 @@
     overflow-y: hidden;
     overscroll-behavior-inline: contain;
     scrollbar-width: none;
-    background: var(--tile-2);
-    border-radius: var(--r-ctl, 8px);
+    background: var(--soft-fill, var(--tile-2));
+    border-radius: var(--r-pill, var(--r-ctl, 8px));
   }
 
   /* AND THE EDGE WHERE IT IS CUT FADES, because its scrollbar is hidden and a tab sliced at the track's edge said
@@ -187,7 +187,7 @@
     gap: var(--sp-2);
     min-block-size: calc(var(--ctl-h) - 6px);
     padding-inline: var(--sp-3);
-    border-radius: calc(var(--r-ctl, 8px) - 2px);
+    border-radius: var(--r-pill, calc(var(--r-ctl, 8px) - 2px));
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
@@ -215,21 +215,22 @@
     }
   }
 
-  /* Where you are: the tile's own fill with a hairline ring, so it is a shape on the track in light and in dark, and
-     no shadow (SPEC 1.9). Ink, and no weight change. */
+  /* Where you are: the ops segmented thumb, the segment-on fill with the raised lift and a hairline ring, in ink at
+     600 (ops look, 3 Nov). */
   .tab[aria-current='page'],
   .tab-more[data-here] .tab {
-    background: var(--tile);
-    box-shadow: 0 0 0 0.5px var(--rule);
+    background: var(--segment-on, var(--tile));
+    box-shadow: 0 0 0 0.5px var(--g-sel-line, var(--rule)), var(--shadow-raised, none);
     color: var(--ink);
+    font-weight: var(--fw-semi, 600);
   }
 
   /* MORE IS ITS OWN SMALL TRACK BESIDE THE STRIP, the same rectangle. */
   .tab-more {
     flex: 0 0 auto;
     padding: 2px;
-    background: var(--tile-2);
-    border-radius: var(--r-ctl, 8px);
+    background: var(--soft-fill, var(--tile-2));
+    border-radius: var(--r-pill, var(--r-ctl, 8px));
   }
 
   .tally {
