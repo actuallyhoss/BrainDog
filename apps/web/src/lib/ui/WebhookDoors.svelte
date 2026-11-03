@@ -167,7 +167,8 @@
      its own on a phone, above the sentence that says what it makes. -->
 <Tile icon="link" class="section" data-surface="tile" title={copy.doorsTitle}>
   <div class="section-body">
-    <p class="hint">{copy.doorsHow}</p>
+    <!-- WHAT THEY ARE, ONCE: over the list, or as the empty state's own line when there are none (ui-perfect, 3 Nov). -->
+    {#if !(owner && listed?.kind === 'doors' && doors.length === 0)}<p class="hint">{copy.doorsHow}</p>{/if}
     <!-- THE BUTTON OVER A LIST THAT HAS ROWS; an empty one carries it in its own state (G17), under what will be here. -->
     {#if owner && !(listed?.kind === 'doors' && doors.length === 0)}<div class="row-actions"><Button weight="quiet" onclick={() => (making = true)}>{actionWords.newDoor}</Button></div>{/if}
     {#if !owner}
@@ -183,7 +184,8 @@
       {/if}
     {:else if doors.length === 0}
       {#snippet newDoor()}<Button weight="quiet" onclick={() => (making = true)}>{actionWords.newDoor}</Button>{/snippet}
-      <Empty kind="no-data-yet" compact title={copy.doorsEmpty} body={copy.doorsNoneWhy} agentPrompt={copy.doorsPrompt} actions={newDoor} />
+      <!-- ITS STATE, THEN WHAT ONE IS (settings lane, 3 Nov): "Each address you make is listed here" described the list. -->
+      <Empty kind="no-data-yet" compact title="No web addresses yet." body={copy.doorsHow} agentPrompt={copy.doorsPrompt} actions={newDoor} />
     {:else}
       <p class="hint">{copy.doorsUnknown}</p>
       <ul class="doors">

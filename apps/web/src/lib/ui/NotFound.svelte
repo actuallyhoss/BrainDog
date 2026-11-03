@@ -19,6 +19,7 @@
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import { openPalette } from '../palette/open.svelte.ts';
+  import { frame } from '../shell/frame.svelte.ts';
 
   import Button from './Button.svelte';
   import Empty from './Empty.svelte';
@@ -29,6 +30,9 @@
   /* This screen's own words, in a `words` object in the module that draws them. */
   const words = {
     title: copy.errorPage.missing,
+    /* THE CARD'S LINE WHEN THE BAR ALREADY SAYS THE PAGE'S NAME (ui-perfect, 3 Nov): "No page called xyz" stood in the
+       bar and again in the card under it. */
+    here: 'Nothing at this address',
     search: 'Search',
     signIn: 'Sign in',
   } as const;
@@ -48,9 +52,11 @@
 
   /* SIGNED OUT is a record that refused who is asking: there is no Today to go to and no record to search. */
   const out = $derived((page.data as { refused?: { code?: string } } | undefined)?.refused?.code === 'UNAUTHORIZED');
+  /* SAID ONCE: the bar says the name, so the card says what it means. */
+  const shown = $derived(frame.here !== '' && frame.here === title && title !== words.here ? words.here : title);
 </script>
 
-<Empty kind="no-results" heading glyph="globe" {title} {body}>
+<Empty kind="no-results" heading glyph="globe" title={shown} {body}>
   {#snippet actions()}
     {#if out}
       <Button weight="primary" href="/signin">{words.signIn}</Button>
