@@ -170,7 +170,10 @@ test('THE TRIP PAGE: total, money back and lines filed, by category and by accou
 
   const list = said<{ blocks: Block[] }>(await api.page({ slug: 'trips' }, owner));
   for (const b of list.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
-  assert.equal(list.blocks[0]!.kind, 'note');
+  /* THE LIST OF TRIPS OPENS ON ITS CHART SINCE 2.1.1 (3 Nov, "i dont like those briefs at all, remove them"): "3 trips."
+     counted what the chart and the list under it show. */
+  assert.equal(list.blocks[0]!.kind, 'bar');
+  assert.equal(list.blocks.some((b) => (b as { lead?: boolean }).lead === true), false, 'Trips still opens on a line');
   close();
 });
 

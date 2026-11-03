@@ -32,7 +32,10 @@ test('STUDIES READS THROUGH THE ADD-ON DOOR AND INSTALLS IN A SCRATCH RECORD wit
 test('IT HOLDS FOUR LISTS AND ONE PAGE, AND THE PAGE LEADS WITH WHAT IS DUE THIS WEEK', () => {
   assert.deepEqual(FILE.declarations.filter((d) => d.register && !d.rule).map((d) => d.register), ['courses', 'assignments', 'course_reads', 'study_sessions']);
   const page = FILE.declarations.find((d) => d.page === 'studies');
-  assert.equal(page?.blocks?.[1]?.heading, 'Due this week');
+  /* WITH NO LINE OVER IT SINCE 1.0.4 (3 Nov, "i dont like those briefs at all, remove them"): "2 due this week, 1 late."
+     said what Due this week and Late show, so the page opens on the first of them. */
+  assert.equal(page?.blocks?.[0]?.heading, 'Due this week');
+  assert.equal(page?.blocks?.some((b) => (b as { lead?: boolean }).lead === true), false, 'the page still opens on a line');
 });
 
 test('A COURSE DRAWS THE TREND OF ITS MARKS, from a figure that averages the mark by month', () => {

@@ -63,12 +63,12 @@ test('EACH USE CASE BUILDS WITH NO CLAUSE OF ITS OWN for who is working', async 
   }
 });
 
-test("THE FOUNDER'S LINE SAYS HOW MANY AGENTS WORK NOW, from the record's own count", () => {
+test("THE FOUNDER'S HOME SAYS NO LINE OF HOW MANY AGENTS WORK NOW SINCE Founder 3.10.0: the table of them is the count", () => {
+  /* "2 agent(s) are working now." went on 3 Nov ("i dont like those briefs at all, remove them"): it counted what the
+     rail, the Agents page and Working now under it count. The table and its fold are held above. */
   const doc = carriedDocument(useCase('founder')!, TODAY, null, { examples: true });
-  const line = blocksOf(doc).find((b) => b.kind === 'note' && /working now/u.test(b.body ?? ''));
-  assert.ok(line, 'the founder has no line for the agents working now');
-  assert.equal(line.when?.metric, 'runs-working');
-  assert.match(line.body!, /^\{\{runs-working\}\} agent\(s\) are working now\.$/u);
+  assert.equal(blocksOf(doc).find((b) => b.kind === 'note' && /working now/u.test(b.body ?? '')), undefined, 'the founder still has a line for the agents working now');
+  assert.equal(blocksOf(doc).some((b) => /\{\{runs-working\}\}/u.test(b.body ?? '')), false);
 });
 
 /* ── on a record ─────────────────────────────────────────────────────────── */

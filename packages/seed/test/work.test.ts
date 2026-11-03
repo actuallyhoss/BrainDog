@@ -482,7 +482,7 @@ test('WORK NARROWS TO YOURS OR THE AGENTS’, AND FOLDS WHAT HAS NOT MOVED IN TH
  * read ran out inside Open: the line said 36 open while the columns held 34 of them. And the page drew every open task
  * a second time under the board, as Everything open.
  */
-test('THE BOARD HOLDS EVERY TASK IN PLAY BEFORE ANY DONE ONE, its line counts Later too, and no list repeats it', async () => {
+test('THE BOARD HOLDS EVERY TASK IN PLAY BEFORE ANY DONE ONE, Later among them, with no line of counts over it and no list repeating it', async () => {
   const k = await seeded();
   const person = { actor: 'p_1' };
   /* SIXTY URGENT TASKS FINISHED, INVENTED: each would be read before an open task of a lower tier. */
@@ -498,8 +498,8 @@ test('THE BOARD HOLDS EVERY TASK IN PLAY BEFORE ANY DONE ONE, its line counts La
   const inPlay = board.rows.filter((r) => r.fields.state !== 'done').length;
   assert.equal(inPlay, read('open-tasks') + read('tasks-later'), 'a task in play is missing from the board');
   assert.ok(board.rows.some((r) => r.fields.state === 'done'), 'the board keeps a Done column to drop a card on');
-  /* THE LINE NAMES WHAT IS KEPT FOR LATER, so open and later add up to the columns that are not Done. */
-  const line = page.blocks.map((b) => String((b as { body?: string }).body ?? '')).find((b) => b.includes('{{open-tasks}}'));
-  assert.match(line ?? '', /\{\{tasks-later\}\} for later/u);
+  /* NO LINE COUNTS THE COLUMNS SINCE work 1.26.1 (3 Nov, "i dont like those briefs at all, remove them"): "12 open, 3 for
+     later" said what the columns count themselves. */
+  assert.equal(page.blocks.find((b) => /\{\{(open-tasks|tasks-later)\}\}/u.test(String((b as { body?: string }).body ?? ''))), undefined, 'the board still opens on a line of counts');
   assert.ok(!page.blocks.some((b) => b.kind === 'table'), 'the board page lists its tasks a second time');
 });

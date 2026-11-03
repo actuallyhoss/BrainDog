@@ -1,5 +1,5 @@
 /**
- * Calendar (PGS-B14 job e): one declared page, its line and one `calendar` block over the computed deadlines, on a real record.
+ * Calendar (PGS-B14 job e): one declared page, one `calendar` block (and no line over it since core 1.3.1) over the computed deadlines, on a real record.
  *
  * READ AS THE RECORD READS ITS OWN PAGE (`k.page`), over a record that holds the lists and no row until the test writes one, so
  * what is asserted is what a screen draws: the three months, and each row on the day its own list calls its deadline.
@@ -20,7 +20,7 @@ import { BASE_PAGES, CALENDAR_SOURCE } from '../src/modules/base.ts';
 const OWNER = { actor: 'p_1' };
 const PAGE = BASE_PAGES.calendar!;
 const ALL = PAGE.blocks as Record<string, unknown>[];
-/* THE PAGE'S LINE COMES FIRST (every page opens on one); what is read below is the calendar under it. */
+/* NO LINE OVER THE CALENDAR SINCE core 1.3.1 (3 Nov, "i dont like those briefs at all, remove them"): the calendar is the page. */
 const BLOCKS = ALL.filter((b) => b.kind === 'calendar');
 const DECL: Declaration = { id: 'page.calendar', kind: 'page', body: PAGE as never, pack: 'core' };
 
@@ -37,8 +37,8 @@ async function fresh(): Promise<Kernel> {
 function months(k: Kernel): BlockResult {
   const out = k.page('calendar') as { ok: boolean; value: { blocks: BlockResult[] } };
   assert.ok(out.ok, JSON.stringify(out));
-  assert.deepEqual(out.value.blocks.map((b) => b.kind), ['note', 'calendar']);
-  return out.value.blocks[1]!;
+  assert.deepEqual(out.value.blocks.map((b) => b.kind), ['calendar']);
+  return out.value.blocks[0]!;
 }
 
 /**
@@ -59,10 +59,11 @@ const cells = (b: BlockResult): unknown[][] => (b.rows ?? []).map((r) => Object.
 const on = (b: BlockResult, title: string): boolean => cells(b).some((c) => c.includes(title));
 const onDay = (b: BlockResult, title: string, iso: string): boolean => cells(b).some((c) => c.includes(title) && c.includes(iso));
 
-test('CALENDAR IS ONE PAGE WITH ONE CALENDAR UNDER ITS LINE: the computed deadlines, this month and the two after it', () => {
+test('CALENDAR IS ONE PAGE WITH ONE CALENDAR AND NO LINE OVER IT: the computed deadlines, this month and the two after it', () => {
   assert.equal(PAGE.page, 'calendar');
   assert.equal(PAGE.title, 'Calendar');
-  assert.deepEqual(ALL.map((b) => [b.kind, b.lead]), [['note', true], ['calendar', undefined]]);
+  /* "Everything with a day it is due, this month and the next two." went in core 1.3.1: it said what the calendar shows. */
+  assert.deepEqual(ALL.map((b) => [b.kind, b.lead]), [['calendar', undefined]]);
   assert.equal(BLOCKS.length, 1);
   const { kind, source, back, ahead } = BLOCKS[0]!;
   assert.deepEqual([kind, source, back, ahead], ['calendar', CALENDAR_SOURCE, 0, 2]);

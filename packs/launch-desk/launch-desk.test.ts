@@ -241,46 +241,44 @@ test('THE DESK ANSWERS EVERY BLOCK WITH NO REFUSAL, laid out as a main column an
   sql.close();
 });
 
-test('THE DESK OPENS ON A SENTENCE FROM ITS OWN FIGURES, and a different one when nothing essential is written or all of it is done', desking, async () => {
+test('THE DESK OPENS ON A SENTENCE ONLY WHILE NOTHING ESSENTIAL IS WRITTEN, since 3.0.2: no count of the steps done, half or all of them', desking, async () => {
   const { api, sql } = await desked();
   assert.deepEqual(leads(await pageOf(api, 'desk')), ['Nothing essential is written down yet. Add the steps this launch cannot go without, and mark them essential.']);
 
+  /* NO COUNT OF THE ESSENTIAL STEPS DONE SINCE 3.0.2 (3 Nov, "i dont like those briefs at all, remove them"): "2 of the
+     4 essential steps are done." and "All 4 essential steps are done." said what the path under them shows. The line
+     that asks for the first essential step stays, above. */
   await launch(api);
-  const page = await pageOf(api, 'desk');
-  assert.deepEqual(leads(page), ['{{essentials-done}} of the {{essentials}} essential step(s) are done.']);
-  const lead = page.blocks.find((b) => (b as Decl).lead === true && b.drawn !== false)!;
-  assert.deepEqual(lead.values, { 'essentials-done': 2, essentials: 4 });
+  assert.deepEqual(leads(await pageOf(api, 'desk')), []);
 
-  /* EVERY ESSENTIAL STEP TICKED, and the sentence changes rather than reading "4 of the 4". A `when:` reads one figure,
-     and the first try held the last two sentences to a count of open essential steps, `gt: 0` and `is: 0`: measured,
-     a desk with no essential step at all then said "Nothing essential is written down yet" AND "All 0 essential steps
-     are done", since none open is also zero. The share done, an average of a yes or no (`done` defaults to no), is
-     three answers in one figure: none when there is nothing to average, below one, and one. */
+  /* EVERY ESSENTIAL STEP TICKED, and still no line. */
   const open = said<{ rows: Row[] }>(api.kernel.list({ register: 'steps', where: 'priority is essential, done is not true' } as never)).rows;
   assert.equal(open.length, 2);
   for (const step of open) said(api.kernel.update('steps', step.id, { done: true } as never, { actor: 'p_1', version: step.version }));
-  assert.deepEqual(leads(await pageOf(api, 'desk')), ['All {{essentials}} essential step(s) are done.']);
+  assert.deepEqual(leads(await pageOf(api, 'desk')), []);
+  assert.equal(TEXT.includes('{{essentials-done}}'), false, 'the file still says how many essential steps are done');
   sql.close();
 });
 
-test('THE LINE COMES FIRST AND A CALL IS DRAWN ONLY WHILE ONE IS ASKED, since 2.1.0: no box over nothing to decide', desking, async () => {
+test('A CALL COMES FIRST AND IS DRAWN ONLY WHILE ONE IS ASKED, since 2.1.0: no box over nothing to decide, and no line over it since 3.0.2', desking, async () => {
   /* THE DESK OPENED ON THE HEADING OF ITS FIRST BOX, so its line sat inside a tile rather than under the title, and
      both queues drew "No call is waiting on you." on a desk that had nothing to decide. */
   const { api, sql } = await desked();
   await launch(api);
   const calm = await pageOf(api, 'desk');
+  /* NO LINE SINCE 3.0.2 on a desk with essential steps written, so the first block drawn is the page's first box. */
   const first = calm.blocks.find((b) => b.drawn !== false)!;
-  assert.deepEqual([first.kind, (first as Decl).lead], ['note', true]);
+  assert.notEqual((first as Decl).lead, true, 'the desk still opens on a line');
   const queues = (page: Page) => page.blocks.filter((b) => b.kind === 'queue').map((b) => [b.heading, b.drawn !== false]);
   assert.deepEqual(queues(calm), [['Calls waiting on you', false]]);
 
   said(api.kernel.propose({ question: 'Which card stock for the box?', body_kind: 'options', body: { about: 'The box', options: [{ id: 'kraft', label: 'Brown kraft', because: 'Costs least' }, { id: 'white', label: 'Bright white', because: 'Prints sharpest' }] } } as never, 'slash'));
   const asked = await pageOf(api, 'desk');
   assert.deepEqual(queues(asked), [['Calls waiting on you', true]]);
-  /* AND STRAIGHT UNDER THE LINE, SINCE 2.2.0: a call is what needs the person, and it was asked twice on one desk, once
-     in a third of the box and once under the calendar. */
+  /* AND FIRST, SINCE 2.2.0 STRAIGHT UNDER THE LINE AND SINCE 3.0.2 WITH NO LINE OVER IT: a call is what needs the person,
+     and it was asked twice on one desk, once in a third of the box and once under the calendar. */
   const drawn = asked.blocks.filter((b) => b.drawn !== false);
-  assert.deepEqual([drawn[0]!.kind, drawn[1]!.heading], ['note', 'Calls waiting on you']);
+  assert.equal(drawn[0]!.heading, 'Calls waiting on you');
   sql.close();
 });
 

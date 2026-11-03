@@ -86,21 +86,13 @@ test('THE AGENTS PAGE LINKS TO IT FROM ITS FOOT, first of the doors and always d
   assert.ok(!blocks.some((b) => b.fold === true), 'a part of the Agents page is folded');
 });
 
-test('IT OPENS ON ONE LINE SAID FROM FIGURES, and a clause at nought is left out', () => {
-  const leads = PAGE.blocks.filter((b) => b.lead);
-  assert.deepEqual([PAGE.blocks[0]!.kind, PAGE.blocks[0]!.lead], ['note', true]);
-  /* TWO NOTES ON ONE FIGURE, so exactly one draws, as the Agents page's line does. */
-  assert.deepEqual(leads.map((b) => b.when), [{ metric: 'learnings-arrived', gt: 0 }, { metric: 'learnings-arrived', is: 0 }]);
-  assert.equal(leads[0]!.body, '{{learnings-arrived}} learning(s) arrived this month, {{learnings-active}} in use in all, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded');
-  assert.equal(leads[1]!.body, 'Nothing new this month, {{learnings-active}} learning(s) in use in all, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded');
-  /* THE WRITER SPLITS A LINE AT ITS COMMAS and drops a clause whose every figure is nought (`leadOf` in the web's
-     `record/metrics.ts`), so each figure is alone in its clause. */
-  for (const lead of leads) {
-    const clauses = String(lead.body).split(/,\s+/u);
-    assert.equal(clauses.length, 4);
-    assert.equal(clauses.filter((c) => c.includes('{{learnings-faded}}')).length, 1);
-    for (const c of clauses) assert.ok((c.match(/\{\{/gu) ?? []).length <= 1, `two figures share a clause: ${c}`);
-  }
+test('IT OPENS ON NO LINE OF COUNTS SINCE 1.34.0, the chart and the lists under it counting themselves', () => {
+  /* "2 learnings arrived this month, 5 in use in all, 1 skill changed" went on 3 Nov ("i dont like those briefs at all,
+     remove them"): the chart by week is the first block, and no note leads. */
+  assert.deepEqual(PAGE.blocks.filter((b) => b.lead), []);
+  assert.equal(PAGE.blocks[0]!.kind, 'series');
+  assert.equal(PAGE.blocks.find((b) => b.key === 'line' || b.key === 'line-quiet'), undefined);
+  assert.equal(PAGE.blocks.find((b) => String(b.body ?? '').includes('{{learnings-arrived}}')), undefined);
 });
 
 test('THE BLOCKS: a chart by week drawn only from three points, What changed newest first with the failure, and Faded with its count', () => {

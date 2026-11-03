@@ -174,8 +174,11 @@ test('THE PAGE READS ITS TOTALS AND ONE CARD A CERTIFICATE, with no refusal, and
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
   const live = page.blocks.find((b) => b.heading === 'Your certificates')!;
   assert.deepEqual(live.rows!.map((r) => r.fields.bank), ['Harbour Bank']);
-  const lead = page.blocks[0]!;
-  assert.notEqual((lead as { drawn?: boolean }).drawn, false, 'the line over the page is not drawn');
+  /* NO LINE OVER THE PAGE SINCE 2.0.4 (3 Nov, "i dont like those briefs at all, remove them"): "Next payout 20 Nov." said
+     what the table shows for each one. The line for no certificate is left out, since there are two. */
+  const leads = page.blocks.filter((b) => (b as { lead?: boolean; drawn?: boolean }).lead === true && (b as { drawn?: boolean }).drawn !== false);
+  assert.deepEqual(leads.map((b) => b.body), [], 'the page still opens on a line');
+  assert.equal(page.blocks.some((b) => String(b.body ?? '').includes('certificates-next-payout')), false, 'the page still says the next payout over the table');
   close();
 });
 

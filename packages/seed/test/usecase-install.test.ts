@@ -160,10 +160,12 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
   const student = await made('student');
   const home = value<{ blocks: Drawn[] }>(student.k.page(homePageOf('usecase-student'))).blocks;
   /* THE CAPTURE FIRST, SINCE STUDENT 1.3.0, and no example row under anything. */
-  /* THE LINE FIRST SINCE STUDENT 1.5.0, which says nothing on a new record, and the capture under it. */
-  assert.deepEqual(home.map((b) => b.heading), [undefined, 'Add homework', 'Due this week', 'This week', 'Study done', 'Coming up']);
+  /* THE LINE FIRST FROM STUDENT 1.5.0 TO 1.8.0 (3 Nov, "i dont like those briefs at all, remove them"): the capture
+     opens Home again, and no line counts the work to hand in over the lists that show it. */
+  assert.deepEqual(home.map((b) => b.heading), ['Add homework', 'Due this week', 'This week', 'Study done', 'Coming up']);
+  assert.equal(home.some((b) => (b as { lead?: boolean }).lead === true), false, "a student's Home still opens on a line");
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.equal(home[2]!.rows?.length ?? 0, 0, 'a new student record has nothing due');
+  assert.equal(home[1]!.rows?.length ?? 0, 0, 'a new student record has nothing due');
   student.sql.close();
 
   const founder = await made('founder');
@@ -195,10 +197,12 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
 test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six milestones', async () => {
   const team = await made('team');
   const board = value<{ blocks: Drawn[] }>(team.k.page(homePageOf('team'))).blocks;
-  /* THE LINE FIRST AND HOW THE CYCLE IS GOING FOLDED UNDER THE REST, SINCE TEAM 2.10.0. And Gone quiet under the line,
-     inside 2.21.0 (batch 88), declared here and drawn only while something is quiet. */
+  /* HOW THE CYCLE IS GOING FOLDED UNDER THE REST, SINCE TEAM 2.10.0. And Gone quiet first, inside 2.21.0 (batch 88),
+     declared here and drawn only while something is quiet. NO LINE OVER IT SINCE TEAM 2.31.0 (3 Nov): it counted the
+     tickets the lists under it show. */
+  assert.equal(board.some((b) => (b as { lead?: boolean }).lead === true), false, "the team's Home still opens on a line");
   assert.deepEqual(board.map((b) => b.heading), [
-    undefined, 'Gone quiet', 'Agents suggest', 'In flight', 'Blocked', 'Due this week', 'Bring the team in', 'How the sprint is going', 'This sprint', 'Open tickets, each morning',
+    'Gone quiet', 'Agents suggest', 'In flight', 'Blocked', 'Due this week', 'Bring the team in', 'How the sprint is going', 'This sprint', 'Open tickets, each morning',
   ]);
   for (const b of board) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const under = (heading: string) => board.find((b) => b.heading === heading)!;
@@ -209,7 +213,7 @@ test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six 
      had already drawn, so this count was the double count. */
   assert.equal(under('Due this week').rows?.length, 1, 'what is due that the two headings above have not drawn');
   const agentWork = value<{ blocks: Drawn[] }>(team.k.page('agent-work')).blocks;
-  assert.deepEqual(agentWork.map((b) => b.kind), ['note', 'cards', 'table', 'agents', 'table']);
+  assert.deepEqual(agentWork.map((b) => b.kind), ['cards', 'table', 'agents', 'table']);
   for (const b of agentWork) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   team.sql.close();
 
@@ -219,10 +223,11 @@ test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six 
   assert.equal(guide.k.count('steps'), 3);
   const home = value<{ blocks: Drawn[] }>(guide.k.page(homePageOf('guide'))).blocks;
   /* BLOCKED APPEARS WHEN A STEP IS (`when:`), so a new guide's Home is every other block. */
-  /* AND SINCE GUIDE 1.5.0 THE LINE LEADS, and a decision is drawn only while one is asked. */
-  assert.deepEqual(home.filter((b) => (b as { drawn?: boolean }).drawn !== false).map((b) => b.heading), [undefined, 'Where you are', 'Next three steps', 'Waiting on you', 'Resources']);
+  /* AND SINCE GUIDE 1.5.0 a decision is drawn only while one is asked. THE LINE LED FROM 1.5.0 TO 1.8.0 (3 Nov), and the
+     path opens Home now. */
+  assert.deepEqual(home.filter((b) => (b as { drawn?: boolean }).drawn !== false).map((b) => b.heading), ['Where you are', 'Next three steps', 'Waiting on you', 'Resources']);
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.equal(home[1]!.rows?.length, 6, 'the path draws the six milestones');
+  assert.equal(home[0]!.rows?.length, 6, 'the path draws the six milestones');
   guide.sql.close();
 });
 

@@ -183,8 +183,9 @@ test('A BOAT FORMS THE GENERAL PLAN: six milestones, the first underway, three f
   /* AND THE GUIDE'S HOME DRAWS THE PATH, the next steps and what helps, as it does for a known kind. */
   const home = pageOf(k, 'home-guide');
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.deepEqual(home.filter((b) => b.drawn !== false).map((b) => b.heading), [undefined, 'Where you are', 'Next three steps', 'Waiting on you', 'Resources']);
-  assert.equal(home[1]!.rows?.length, 6, 'the path draws the six milestones');
+  /* NO LINE OVER THE PATH SINCE guide 1.8.0 (3 Nov): it counted the milestones, steps and choices the lists show. */
+  assert.deepEqual(home.filter((b) => b.drawn !== false).map((b) => b.heading), ['Where you are', 'Next three steps', 'Waiting on you', 'Resources']);
+  assert.equal(home[0]!.rows?.length, 6, 'the path draws the six milestones');
 
   /* A KNOWN KIND STILL FORMS ITS OWN, never the general plan. */
   const shop = await guideFor('opening an Etsy shop for handmade candles');
@@ -204,8 +205,10 @@ test('THE GUIDE SAYS WHERE YOU ARE AND WHAT IS NEXT, and says nothing about what
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused: ${JSON.stringify(b.refusals)}`);
   const hidden = blocks.filter((b) => b.drawn === false).map((b) => b.heading);
   assert.deepEqual(hidden, ['Blocked', 'Steps done, by week', 'Taken by agents', 'Choices made', 'Done lately']);
-  /* SO FAR IS THE PAGE'S LINE SINCE guide 1.5.0, said from the figures the tile of four drew. */
-  assert.deepEqual(blocks[0]!.kind, 'note');
+  /* SO FAR WAS THE PAGE'S LINE FROM guide 1.5.0 TO 1.8.0 (3 Nov, "i dont like those briefs at all, remove them"): the
+     page opens on Where you are now, and the figures it said are still the record's. */
+  assert.deepEqual(blocks[0]!.kind, 'table');
+  assert.equal(blocks.some((b) => (b as { lead?: boolean }).lead === true), false, 'the guide still opens on a line');
   assert.deepEqual(['guide-milestones-reached', 'guide-steps-open', 'guide-steps-done-7d', 'guide-choices-open'].map((m) => figure(k, m)), [0, 5, 0, 2]);
   assert.equal(block(blocks, 'Where you are').rows?.length, 1);
   assert.equal(block(blocks, 'Your next steps').rows?.length, 5);

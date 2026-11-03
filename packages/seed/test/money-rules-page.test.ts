@@ -101,6 +101,13 @@ function leadOf(blocks: Block[]): Block {
   assert.deepEqual(lead[0]!.unnamed ?? [], [], 'every figure the sentence asks for is one the record has');
   return lead[0]!;
 }
+/**
+ * NO LINE OF WHAT THE RULES FILED, SINCE money-core 3.38.5 (3 Nov, "i dont like those briefs at all, remove them"): while
+ * there is a rule, no block leads; the rules and what they filed say it themselves. Only the line for no rule stays.
+ */
+function noLead(blocks: Block[]): void {
+  assert.deepEqual(drawn(blocks).filter((b) => b.lead === true).map((b) => b.body), [], 'the page still opens on a line of counts');
+}
 /** A figure read through the kernel as a page reads it. */
 const figure = (k: Kernel, id: string): Reading => value<Reading>(k.metric(FILING_FIGURES[id] as never));
 
@@ -171,10 +178,7 @@ test('ON A FRESH RECORD WITH TWO RULES AND FIVE FILED ENTRIES, the figures read 
   assert.equal(figure(k, 'rules-filing-30d').value, 2);
 
   const { blocks } = pageOf(k);
-  const lead = leadOf(blocks);
-  assert.match(lead.body!, /rule\(s\) filed/u);
-  assert.equal(lead.values?.['rules-filing-30d'], 2);
-  assert.equal(lead.values?.['filed-by-rule-30d'], 5);
+  noLead(blocks);
 
   /* A CARD A RULE, ITS TEXT AND WHERE IT FILES, SINCE money-core 3.34.0: "Lines filed 0" stood on every card under a
      line that says what the rules filed, and how a rule matches is on its own page. What each filed is the figure's
@@ -199,22 +203,25 @@ test('A RULE SWITCHED OFF KEEPS ITS COUNT, and is listed apart from the rules th
   [1, 2].forEach((n) => paid(k, card, 'TALABAT CAIRO', n));
   value(k.update('filing_rules', talabat.id, { state: 'off' }, OWNER));
   assert.equal(figure(k, 'rule-filed').value, 2);
+  assert.equal(figure(k, 'filed-by-rule-30d').value, 2);
   const { blocks } = pageOf(k);
-  assert.equal(leadOf(blocks).values?.['filed-by-rule-30d'], 2);
+  noLead(blocks);
   assert.equal(drawn(blocks).find((b) => b.heading === 'Rules'), undefined, 'no rule is on, so no card is drawn');
   assert.deepEqual(drawn(blocks).find((b) => b.heading === 'Switched off')!.rows!.map((r) => r.fields.match), ['Talabat']);
 });
 
-test('RULES THAT FILED BEFORE AND NOTHING LATELY SAY SO IN WORDS, never "0 rules filed 0"', async () => {
+test('RULES THAT FILED BEFORE AND NOTHING LATELY KEEP THEIR COUNT, and nothing says "0 rules filed 0"', async () => {
   const { k, clock, food, card } = await fresh();
   rule(k, { match: 'Talabat', match_by: 'starts', direction: 'out', category: food.id });
   [1, 2, 3].forEach((n) => paid(k, card, 'TALABAT CAIRO', n));
   /* FORTY DAYS ON: the three were made before the window, and still filed by the rule. */
   clock.advance(40 * 86_400_000);
   assert.equal(figure(k, 'filed-by-rule-30d').value, 0);
-  const lead = leadOf(pageOf(k).blocks);
-  assert.match(lead.body!, /^Nothing filed in 30 days\./u);
-  assert.deepEqual([lead.values?.['rule-filed']], [3]);
+  assert.equal(figure(k, 'rule-filed').value, 3);
+  /* AND NO LINE SAYS IT SINCE money-core 3.38.5, so nothing on the page reads "0 rules filed 0" either. */
+  const { blocks } = pageOf(k);
+  noLead(blocks);
+  for (const b of drawn(blocks)) assert.doesNotMatch(String(b.body ?? ''), /\b0 rules? filed\b/u);
 });
 
 test('WITH NO RULE, THE LEAD SAYS SO AND OFFERS ONE, and nothing else counts', async () => {
@@ -227,11 +234,11 @@ test('WITH NO RULE, THE LEAD SAYS SO AND OFFERS ONE, and nothing else counts', a
   assert.ok(drawn(blocks).length <= 7, 'six tiles or fewer beside the line');
 });
 
-test("A RULE THAT HAS FILED NOTHING SAYS SO, with its card, and the head's button adds another", async () => {
+test("A RULE THAT HAS FILED NOTHING HAS ITS CARD AND NO LINE, and the head's button adds another", async () => {
   const { k, food } = await fresh();
   rule(k, { match: 'Talabat', match_by: 'starts', direction: 'out', category: food.id });
   const { blocks } = pageOf(k);
-  assert.equal(leadOf(blocks).body, 'No rule has filed a line yet.');
+  noLead(blocks);
   const rules = drawn(blocks).find((b) => b.heading === 'Rules')!;
   assert.deepEqual(rules.rows!.map((r) => r.fields.match), ['Talabat']);
   /* ADD A RULE IS THE HEAD'S ONE BUTTON SINCE money-core 3.34.0, and no tile of its own under the rules. */

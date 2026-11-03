@@ -63,6 +63,14 @@ const LISTED = new Set(['cards', 'table', 'todo', 'timeline', 'params']);
    of them the head's own count, and the line says what is late and what waits on you. */
 const NO_FIGURES_TILE: ReadonlySet<string> = new Set(['people', 'portfolio', 'work']);
 
+/**
+ * THE PAGES THAT OPEN ON NO LINE OF COUNTS, SINCE 3 NOV ("i dont like those briefs at all, remove them"). People 4.7.0
+ * has no line at all; Work 1.26.1 keeps only its line for an empty list, so a record with work open draws none. The
+ * other parts are held as before, and Services keeps its line, what it costs a month, which no tile says whole.
+ */
+const NO_LINE: ReadonlySet<string> = new Set(['people']);
+const LINE_ONLY_EMPTY: ReadonlySet<string> = new Set(['work']);
+
 /** The five parts, each as the test on one block that says it is that part. */
 const PARTS: Record<string, (b: Block, list: string) => boolean> = {
   lead: (b) => b.kind === 'note' && b.lead === true,
@@ -127,9 +135,13 @@ test('EACH MODULE PAGE DECLARES THE FIVE PARTS: its line, one queue over its own
   for (const slug of SLUGS) {
     const list = PAGE_LIST[slug];
     const blocks = blocksOf(slug);
-    assert.ok(PARTS.lead!(blocks[0]!, list), `${slug} does not open on its line`);
+    if (NO_LINE.has(slug)) assert.deepEqual(blocks.filter((b) => b.lead), [], `${slug} still opens on a line`);
+    else assert.ok(PARTS.lead!(blocks[0]!, list), `${slug} does not open on its line`);
+    /* WORK'S ONE LINE IS FOR AN EMPTY LIST, drawn only while nothing is open. */
+    if (LINE_ONLY_EMPTY.has(slug)) assert.deepEqual(blocks.filter((b) => b.lead).map((b) => b.when), [{ metric: 'open-tasks', is: 0 }]);
     for (const [part, is] of Object.entries(PARTS)) {
       if (part === 'figures' && NO_FIGURES_TILE.has(slug)) continue;
+      if (part === 'lead' && NO_LINE.has(slug)) continue;
       assert.ok(blocks.some((b) => is(b, list)), `${slug} carries no ${part}`);
     }
     assert.equal(blocks.filter((b) => b.kind === 'queue').length, 1, `${slug} carries one queue`);
@@ -173,7 +185,8 @@ test('ON A FRESH RECORD EVERY PAGE READS, opens on its line, and stands at most 
   for (const slug of SLUGS) {
     const blocks = answered(k, slug);
     for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${slug}: ${b.heading ?? b.kind}`);
-    assert.ok(sentenceOf(blocks), `${slug} opens on no sentence`);
+    if (NO_LINE.has(slug)) assert.equal(sentenceOf(blocks), undefined, `${slug} still opens on a sentence`);
+    else assert.ok(sentenceOf(blocks), `${slug} opens on no sentence`);
     assert.ok(aboveTheFold(blocks, true).length <= 6, `${slug}: ${aboveTheFold(blocks, true).join(', ')}`);
     /* NOTHING ASKED AND NO AGENT AT WORK, so neither is drawn: no band saying nothing waits. */
     for (const b of blocks.filter((x) => x.kind === 'queue' || x.kind === 'agents')) assert.equal(b.drawn, false, `${slug} draws ${b.heading} on a fresh record`);
@@ -224,9 +237,12 @@ test('ON A RECORD AT WORK EVERY PAGE DRAWS ALL FIVE: one sentence, its queue, it
     const blocks = answered(k, slug);
     for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${slug}: ${b.heading ?? b.kind}`);
     const shown = blocks.filter((b) => b.drawn !== false);
-    assert.ok(sentenceOf(blocks), `${slug} opens on no sentence`);
+    const lineless = NO_LINE.has(slug) || LINE_ONLY_EMPTY.has(slug);
+    if (lineless) assert.equal(sentenceOf(blocks), undefined, `${slug} still opens on a line of counts`);
+    else assert.ok(sentenceOf(blocks), `${slug} opens on no sentence`);
     for (const [part, is] of Object.entries(PARTS)) {
       if (part === 'figures' && NO_FIGURES_TILE.has(slug)) continue;
+      if (part === 'lead' && lineless) continue;
       /* THE BOARD IS PROJECTS' LEAD, held by `sentenceOf` above. */
       if (part === 'lead' && sentenceOf(blocks)?.kind === 'cards') continue;
       assert.ok(shown.some((b) => is(b, list)), `${slug} draws no ${part}`);

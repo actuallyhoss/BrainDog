@@ -504,7 +504,7 @@ test('WORKING NOW IS THE RUNS HEARD FROM IN THE LAST FIFTEEN MINUTES, and the li
   sql.close();
 });
 
-test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: At work is the record\'s `presence` and the line the record\'s counts', () => {
+test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: At work is the record\'s `presence`, and no line counts over it', () => {
   assert.deepEqual(Object.keys(AGENTS_MODULE).filter((name) => /WORKING/u.test(name)), [], 'the pack still exports its own clause for working');
   assert.equal(JSON.stringify(agentsPackDocument()).includes('agents-working'), false, 'the pack still declares or reads its own working figure');
   const blocks = AGENTS_PAGES.agents!.blocks as { kind: string; heading?: string; source?: string; where?: unknown; when?: { metric?: string }; lead?: boolean; body?: string }[];
@@ -512,18 +512,10 @@ test('THE ADD-ON HOLDS NO CLOCK OF ITS OWN: At work is the record\'s `presence` 
   assert.deepEqual([working?.kind, working?.panel, working?.source], ['section', 'presence', undefined], 'At work is not the runs open now');
   assert.equal(working?.where, undefined, 'the working source takes no clause');
   assert.equal(working?.when, undefined, 'a section\'s when: would hide the steps under it');
-  const lines = blocks.filter((b) => b.kind === 'note' && b.lead === true);
-  /* THREE SINCE 1.25.0, ON THE RUNS AT WORK AND THE ONES OPEN AND QUIET, so exactly one is drawn. */
-  assert.equal(lines.length, 3);
-  assert.deepEqual(lines.map((l) => l.when), [
-    { metric: 'runs-working', gt: 0 },
-    { all: [{ metric: 'runs-working', is: 0 }, { metric: 'runs-waiting', gt: 0 }] },
-    { all: [{ metric: 'runs-working', is: 0 }, { metric: 'runs-waiting', is: 0 }] },
-  ]);
-  /* EVERY NUMBER THE RECORD'S: at work by the rail's clock, and up next the steps nobody has taken. NO NAME SINCE 1.17.0:
-     "Claude on BrainDog and Claude are at work" said Claude twice, and the rows say who. */
-  assert.deepEqual(lines.map((l) => l.body), LINES);
-  for (const l of lines) assert.doesNotMatch(String(l.body), /\.names\}\}|run\(s\)/u, 'the line names agents or counts runs waiting');
+  /* NO LINE OF COUNTS SINCE 1.34.0 (3 Nov, "i dont like those briefs at all, remove them"): the three lines 1.25.0
+     drew over At work and Up next counted what those count themselves, so no note leads the page. */
+  assert.deepEqual(blocks.filter((b) => b.kind === 'note' && b.lead === true), []);
+  for (const l of LINES) assert.equal(blocks.some((b) => b.body === l), false, `the page still says ${l}`);
 });
 
 /**
@@ -584,7 +576,7 @@ test('THE STEPS A RUN LEFT ARE DRAWN AND COUNTED AS ONE: the step first, who lef
   const steps = () =>
     k.block({ kind: 'cards', source: 'handoffs.open', columns: [{ field: 'next', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'left_at', as: 'when' }, { field: 'mark' }], limit: 50 } as never) as unknown as Line;
 
-  /* NOTHING LEFT: no step, and the line that is drawn reads nought, which the host leaves out of the sentence. */
+  /* NOTHING LEFT: no step, and the figure reads nought. */
   assert.equal(steps().rows.length, 0, 'a step is read where none was left');
   assert.equal(reading(k, 'handoffs-open'), 0);
 
@@ -614,15 +606,10 @@ test('THE STEPS A RUN LEFT ARE DRAWN AND COUNTED AS ONE: the step first, who lef
     assert.doesNotMatch(String(r.fields.agent), /^S\d+$|^[0-9A-HJKMNP-TV-Z]{26}$/u, 'who left a step is said as a handle');
     assert.ok(typeof r.fields.left_at === 'string' && r.fields.left_at !== '');
   }
-  /* THE LINE AND THE STEPS AGREE: one figure, the record's, and nobody is at work, so the quiet line is the one drawn. */
+  /* THE FIGURE AND THE STEPS AGREE: one figure, the record's. NO LINE SAYS IT SINCE 1.34.0: Up next counts itself. */
   assert.equal(reading(k, 'handoffs-open'), 2);
   assert.equal(drawn.matched, 2);
-  const [working, open, quiet] = lines();
-  assert.equal(working!.drawn, false);
-  assert.equal(open!.drawn, false, 'every run ended, so none is open and quiet');
-  assert.notEqual(quiet!.drawn, false);
-  assert.equal(quiet!.body, LINES[2]);
-  assert.equal(quiet!.values?.['handoffs-open'], 2);
+  assert.deepEqual(lines(), [], 'the page still opens on a line of counts');
   sql.close();
 });
 
@@ -1438,7 +1425,7 @@ test('A LEARNING BROUGHT IN THIS MONTH WITH AN OLD DAY OF ITS OWN DID NOT ARRIVE
 /* THE SKILLS THAT CHANGED, SINCE 1.13.0 (AGT-C17 job c): two figures over the record's log, each skill that took a
    version counted once, said in the line of How the brain changed as a clause of its own and drawn as the chart's
    second series, on the learnings' weeks. A version is taken only by an accepted proposal, so that is how this takes one. */
-test('A SKILL THAT TOOK A VERSION IS COUNTED IN THE LINE AND DRAWN BESIDE THE LEARNINGS, BY WEEK', async () => {
+test('A SKILL THAT TOOK A VERSION IS COUNTED AND DRAWN BESIDE THE LEARNINGS, BY WEEK, with no line saying it', async () => {
   const figures = AGENTS_MODULE.AGENTS_METRICS;
   const CHANGED = { source: 'events.skills', value: { count: 'changed', field: 'rev' }, format: 'int', target: { gte: 0 }, compare: 'none' };
   assert.deepEqual(figures['skills-changed'], { metric: 'skills-changed', name: 'Skills that changed, last 30 days', ...CHANGED, window: '30d' });
@@ -1456,9 +1443,8 @@ test('A SKILL THAT TOOK A VERSION IS COUNTED IN THE LINE AND DRAWN BESIDE THE LE
     { metric: 'learnings-by-week', label: 'Learnings' },
     { metric: 'skills-changed-by-week', label: 'Skills changed' },
   ]);
-  /* A CLAUSE OF ITS OWN IN BOTH LINES, so the writer leaves it out at nought (`leadOf`). */
-  for (const key of ['line', 'line-quiet'])
-    assert.ok(String(page.find((b) => b.key === key)!.body).split(/,\s+/u).includes('{{skills-changed}} skill(s) changed'), `${key} does not say the skills`);
+  /* NO LINE SAYS IT SINCE 1.34.0: the chart's second series counts the skills, and the page opens on no line. */
+  for (const key of ['line', 'line-quiet']) assert.equal(page.find((b) => b.key === key), undefined, `the page still has its ${key}`);
 
   const { k, sql } = await seeded();
   assert.equal(reading(k, 'skills-changed'), 0, 'a seeded skill took no version');

@@ -90,12 +90,14 @@ const keyed = (blocks: Drawn[], key: string): Drawn | undefined => blocks.find((
 const WAITS = 'pages.ts still refuses a bar over a figure of the log, which is cut by `activity:` and has no group_by';
 const refusedForParts = (b: Drawn): boolean => (b.refusals ?? []).length === 1 && b.refusals![0]!.code === 'DECLARATION_INVALID' && /groups by a word/u.test(b.refusals![0]!.fix);
 
-test('ACTIVITY OPENS ON ONE LINE, AND ITS MAIN COLUMN IS ONE FEED: the log, a heading a day, one line a run, marked from where the reader last looked', () => {
+test('ACTIVITY OPENS ON ITS FEED, NO LINE OVER IT SINCE core 1.3.1, AND ITS MAIN COLUMN IS ONE FEED: the log, a heading a day, one line a run, marked from where the reader last looked', () => {
   assert.equal(PAGE.page, 'activity');
   assert.equal(PAGE.title, 'Activity');
-  assert.deepEqual(MAIN.map((b) => [b.kind, b.lead]), [['note', true], ['feed', undefined]]);
-  assert.equal(ALL.indexOf(MAIN[0]!), 0, 'the line is not the first block');
-  const { source, group, fold, since, where } = MAIN[1]!;
+  /* "Everything that changed, a day at a time, newest first." went on 3 Nov: it said what the feed is. */
+  assert.deepEqual(MAIN.map((b) => [b.kind, b.lead]), [['feed', undefined]]);
+  assert.equal(ALL.indexOf(MAIN[0]!), 0, 'the feed is not the first block');
+  assert.equal(ALL.some((b) => b.lead === true), false, 'a line still leads the page');
+  const { source, group, fold, since, where } = MAIN[0]!;
   assert.deepEqual([source, group, fold, since, where], ['activity', 'day', 'run', 'seen', undefined]);
 });
 
@@ -145,7 +147,7 @@ test('NOTHING THE GRAMMAR REFUSES: the page installs as a declaration', () => {
 
 test('WHAT A PERSON READS ON IT IS PLAIN: no id, no dash, no word for the machine, a glyph on every heading', () => {
   const said = [PAGE.title, ...ALL.flatMap((b) => [b.heading, b.empty, b.body])].filter((s): s is string => typeof s === 'string');
-  assert.ok(said.length >= 7);
+  assert.ok(said.length >= 6);
   for (const s of said) {
     assert.doesNotMatch(s, /—|–/u, s);
     assert.doesNotMatch(s, /\b(row|rows|entity|register|item|event|events|log)\b/iu, s);
@@ -161,7 +163,7 @@ test('A FRESH RECORD HAS THE PAGE, and with nothing written it reads clean and d
   const feed = keyed(blocks, 'feed')!;
   assert.deepEqual(feed.refusals ?? [], []);
   assert.deepEqual(feed.feed ?? [], []);
-  assert.equal(keyed(blocks, 'line')?.kind, 'note');
+  assert.equal(keyed(blocks, 'line'), undefined, 'the page still draws its line of counts');
   /* NOTHING IS ASKED, so the record says the queue is not drawn: no band saying nothing waits. */
   assert.equal((keyed(blocks, 'agents-asked') as { drawn?: boolean } | undefined)?.drawn, false);
 });

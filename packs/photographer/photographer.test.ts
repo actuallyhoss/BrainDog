@@ -242,7 +242,7 @@ test('A SHOOT MOVES ONLY AS THE STATES ALLOW: an enquiry cannot be paid, and a b
   sql.close();
 });
 
-test('THE SHOOTS PAGE says the month in one line and draws at most six tiles, none of them refused', async () => {
+test('THE SHOOTS PAGE draws at most six tiles, none of them refused, and no line of the month over them', async () => {
   const { api, sql } = await record();
   month(api);
   const page = await pageOf(api, 'shoots');
@@ -250,9 +250,10 @@ test('THE SHOOTS PAGE says the month in one line and draws at most six tiles, no
   const drawn = page.blocks.filter((b) => b.why !== 'when');
   assert.ok(drawn.length <= 6, `${drawn.length} tiles`);
   for (const b of page.blocks) assert.equal(b.refusal, undefined, `${b.kind} ${b.heading ?? ''} was refused: ${b.refusal?.fix}`);
-  const lead = drawn.find((b) => b.kind === 'note') as Block & { body?: string; values?: Body };
-  assert.ok(lead, 'the page opens with its sentence');
-  assert.match(String(lead.body), /booked this month/);
+  /* NO LINE OF THE MONTH SINCE 1.0.4 (3 Nov, "i dont like those briefs at all, remove them"): "3 shoots booked this
+     month, 1 deliverable late" said what the figures under it show. The line for no shoot is left out, since there are. */
+  assert.equal(drawn.find((b) => b.kind === 'note'), undefined, 'the page still opens with a sentence');
+  assert.equal(page.blocks.some((b) => /booked this month/u.test(String((b as { body?: string }).body ?? ''))), false);
   sql.close();
 });
 

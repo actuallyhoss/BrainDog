@@ -232,10 +232,10 @@ test('LETTINGS ANSWERS MONDAY: the month\'s rent due and received, who has not p
   assert.equal(page.title, 'Lettings');
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
 
-  /* THE HEADLINE SENTENCE: the two numbers a landlord opens the page for. */
-  const lead = page.blocks.find((b) => b.kind === 'note' && b.why !== 'when')!;
-  assert.match(lead.body!, /rent due this month, and .* received so far/u);
-  assert.equal(pence(lead.values?.['rent-roll'] as never) ?? (lead.values?.['rent-roll'] as { amount?: number })?.amount, DUE);
+  /* NO HEADLINE SENTENCE SINCE 1.0.4 (3 Nov, "i dont like those briefs at all, remove them"): "rent due this month, and
+     ... received so far" said the two numbers This month shows, and the tiles answer them below. */
+  assert.equal(page.blocks.find((b) => b.kind === 'note' && b.why !== 'when'), undefined, 'Lettings still opens on a line');
+  assert.equal(page.blocks.some((b) => /rent due this month/u.test(b.body ?? '')), false);
 
   const tiles = under(page, 'This month');
   assert.equal(pence(cell(tiles, 'rent-roll')), DUE);

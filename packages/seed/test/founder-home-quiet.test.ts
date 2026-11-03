@@ -155,7 +155,7 @@ test('THE PAGE STAYS INSIDE THE BLOCK CEILING, and no block was taken off for th
  * a seventh. The table of which agents work is folded shut under Agents at work; the line saying how many stays above
  * the fold, and the fold is gone with its table while no agent works.
  */
-test('GONE QUIET IS ABOVE THE FOLD AND WORKING NOW GAVE WAY TO IT, folded under the line that counts the agents', () => {
+test('GONE QUIET IS ABOVE THE FOLD AND WORKING NOW GAVE WAY TO IT, folded with no line counting the agents over it', () => {
   const blocks = declared() as (Declared & { fold?: boolean; body?: string })[];
   const fold = blocks.findIndex((b) => b.kind === 'section' && b.fold === true);
   assert.ok(fold >= 0, 'home-founder has no fold');
@@ -164,8 +164,10 @@ test('GONE QUIET IS ABOVE THE FOLD AND WORKING NOW GAVE WAY TO IT, folded under 
   assert.deepEqual(blocks[fold]!.when, { metric: 'runs-working', gt: 0 });
   assert.ok(blocks.findIndex((b) => b.source === 'exceptions') < fold, 'what went quiet is read before anything is opened');
   assert.deepEqual(blocks.slice(fold + 1).map((b) => b.heading), ['Working now'], 'only the table of which agents is under it');
-  const line = blocks[fold - 1]!;
-  assert.deepEqual([line.kind, line.lead, line.body], ['note', true, '{{runs-working}} agent(s) are working now.'], 'the count stays above the fold');
+  /* NO COUNT OVER THE FOLD SINCE Founder 3.10.0 (3 Nov, "i dont like those briefs at all, remove them"): "2 agent(s) are
+     working now." counted the table of them under it. */
+  assert.notEqual(blocks[fold - 1]!.lead, true, 'a line still stands over the fold');
+  assert.equal(blocks.some((b) => String(b.body ?? '').includes('{{runs-working}}')), false, 'a line still counts the agents at work');
 });
 
 test('NUMBERS CAME EVERY DAY FOR A WEEK AND STOPPED TEN DAYS AGO: Home says so in one table, by name', async () => {

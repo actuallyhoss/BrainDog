@@ -94,13 +94,14 @@ test('NOTHING THE GRAMMAR REFUSES: the page installs as a declaration', () => {
   }
 });
 
-test('THE LINE IS SAID FROM signs-red, exactly one of three, and none at all while nothing has been read', () => {
-  assert.deepEqual(leads(read([GREEN], { 'signs-red': 0 })), ['Nothing needs a look.']);
-  assert.deepEqual(leads(read([RED, GREEN], { 'signs-red': 1 })), ['One thing needs a look.']);
-  const three = leads(read([RED, RED, RED], { 'signs-red': 3 }));
-  assert.equal(three.length, 1);
-  assert.match(three[0]!, /^\{\{signs-red\}\} things need a look\.$|^3 things need a look\.$/u);
+test('NO LINE IS SAID FROM signs-red SINCE core 1.3.1, whatever it reads: Needs a look names each one', () => {
+  /* "3 things need a look." went on 3 Nov ("i dont like those briefs at all, remove them"): it counted the group under it. */
+  assert.deepEqual(leads(read([GREEN], { 'signs-red': 0 })), []);
+  assert.deepEqual(leads(read([RED, GREEN], { 'signs-red': 1 })), []);
+  assert.deepEqual(leads(read([RED, RED, RED], { 'signs-red': 3 })), []);
   assert.deepEqual(leads(read([NONE], { 'signs-red': null })), [], 'a record nobody has read is not told it is alive');
+  assert.equal(BLOCKS.some((b) => b.lead === true), false, 'the page still declares a line');
+  assert.deepEqual(under(read([RED, RED, RED], { 'signs-red': 3 }), 'Needs a look').length, 3);
 });
 
 test('ONE GREEN AND THE REST UNREAD IS NEVER CALLED ALIVE: the line says only that nothing needs a look', () => {
