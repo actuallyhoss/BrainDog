@@ -54,7 +54,7 @@
      step's title, as every list item's does. */
   .list[data-kind='steps'][data-form='path'] > .item {
     position: relative;
-    grid-template-columns: 3.5rem minmax(min(16ch, 100%), 1fr) auto;
+    grid-template-columns: 3.5rem minmax(0, 1fr) auto;
     border-block-end: 0;
     counter-increment: none;
   }

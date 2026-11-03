@@ -97,7 +97,7 @@
     gap: var(--sp-2);
     box-sizing: border-box;
     min-block-size: var(--ctl-h);
-    padding: 0 14px;
+    padding: 0 var(--ctl-pad);
     background: var(--btn-fill);
     -webkit-backdrop-filter: var(--g-bf);
     backdrop-filter: var(--g-bf);
@@ -131,7 +131,7 @@
 
   .btn[data-size='sm'] {
     min-block-size: var(--btn-h-sm);
-    padding: 0 12px;
+    padding: 0 var(--ctl-pad-sm);
   }
 
   /* THE ONE ADD (ops 4.2): the accent circle, white plus, last in a head's controls. No shadow, no glow. */

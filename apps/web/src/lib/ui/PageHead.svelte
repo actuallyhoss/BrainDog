@@ -916,6 +916,12 @@
       text-decoration: none;
     }
 
+    /* THE MARK ON THE GUTTER (rhythm, 3 Nov): its 28px drawing sits 8 inside the 44 tap, so the tap starts 4 in and
+       the mark's left edge lands on the content's 16, as the face's right edge does at the other end. It was 12. */
+    .bar-mark {
+      margin-inline-start: calc(-1 * var(--sp-1));
+    }
+
     /* A NAME TOO LONG FOR ONE LINE TAKES TWO (skills pass follow-up, 2 Nov): "Defaults for new agents" was cut to
        "Defaults for new ag…" at 390, and on a phone the bar is the only place the page's name is drawn. Two lines at 17
        on a 1.2 line are 41 of the bar's 56; past two it is cut, which no page name in the app reaches. */
