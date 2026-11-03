@@ -90,7 +90,7 @@
   .one-control {
     display: flex;
     flex-direction: column;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-field);
   }
 
   /* THE DANGER EDGE, round the control's own corners and just outside it, so the focus ring (2px further out) still

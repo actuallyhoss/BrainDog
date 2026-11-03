@@ -115,6 +115,8 @@
     --glass-regular: color-mix(in oklab, var(--tile) 84%, transparent);
     --glass-chrome: color-mix(in oklab, var(--tile) 62%, transparent);
     --glass-clear: color-mix(in oklab, var(--tile) 52%, transparent);
+    /* OVERLAYS ON A BUSY PAGE (the palette, a sheet over glass): thick enough that colour behind never reads through. */
+    --glass-sheet: color-mix(in oklab, var(--tile) 84%, transparent);
     --glass-edge: inset 0 1px 0 0 rgb(255 255 255 / 0.9), inset 0 0 0 0.5px color-mix(in oklab, var(--ink) 6%, transparent);
 
     --g-fill: color-mix(in oklab, var(--tile) 55%, transparent);
@@ -158,6 +160,7 @@
       --glass-regular: color-mix(in oklab, var(--tile) 74%, transparent);
       --glass-chrome: color-mix(in oklab, var(--ink) 4.5%, transparent);
       --glass-clear: color-mix(in oklab, var(--tile) 50%, transparent);
+    --glass-sheet: color-mix(in oklab, var(--tile) 80%, transparent);
       --glass-edge: inset 0 1px 0 0 rgb(255 255 255 / 0.08), inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
       --g-fill: color-mix(in oklab, var(--ink) 7%, transparent);
       --g-fill-hover: color-mix(in oklab, var(--ink) 11%, transparent);
@@ -194,6 +197,7 @@
     --glass-regular: color-mix(in oklab, var(--tile) 74%, transparent);
     --glass-chrome: color-mix(in oklab, var(--ink) 4.5%, transparent);
     --glass-clear: color-mix(in oklab, var(--tile) 50%, transparent);
+    --glass-sheet: color-mix(in oklab, var(--tile) 80%, transparent);
     --glass-edge: inset 0 1px 0 0 rgb(255 255 255 / 0.08), inset 0 0 0 0.5px rgb(255 255 255 / 0.06);
     --g-fill: color-mix(in oklab, var(--ink) 7%, transparent);
     --g-fill-hover: color-mix(in oklab, var(--ink) 11%, transparent);
@@ -216,6 +220,7 @@
     --glass-regular: var(--tile);
     --glass-chrome: var(--tile);
     --glass-clear: var(--tile);
+    --glass-sheet: var(--tile);
     --g-fill: var(--tile);
     --g-fill-hover: var(--hover);
     --g-line: var(--ink);
@@ -227,7 +232,18 @@
       --glass-regular: color-mix(in oklab, var(--tile) 97%, transparent);
       --glass-chrome: color-mix(in oklab, var(--tile) 97%, transparent);
       --glass-clear: color-mix(in oklab, var(--tile) 97%, transparent);
+      --glass-sheet: color-mix(in oklab, var(--tile) 97%, transparent);
       --g-fill: color-mix(in oklab, var(--tile) 94%, transparent);
+    }
+  }
+
+  /* UNDER A THUMB A CONTROL KEEPS ITS DRAWN SIZE (36 on a page, 28 small) and its hit area grows to 44 invisibly
+     (`.tap`, a11y.css). The skin's own coarse block made them 44 and 40 drawn; this one comes later and wins. */
+  @media (pointer: coarse) {
+    :root {
+      --ctl-h: 36px;
+      --btn-h: 36px;
+      --btn-h-sm: 28px;
     }
   }
 
@@ -241,8 +257,9 @@
   body {
     background: var(--ambient);
     background-color: var(--board);
-    letter-spacing: 0;
-    font-feature-settings: 'cv11' on;
+    /* JAKARTA SETS TIGHT AT TEXT SIZES: a hair of air at 13 to 15 (the Money lane's read, 3 Nov). Titles and figures
+       set their own negative tracking. */
+    letter-spacing: 0.005em;
   }
 
   :where(h1, h2, h3, h4) {
@@ -465,11 +482,99 @@
     pointer-events: none;
     transition: background-color 150ms ease;
   }
-  .row-wash:hover::after {
-    background: var(--row-wash);
+  @media (hover: hover) and (pointer: fine) {
+    .row-wash:hover::after {
+      background: var(--row-wash);
+    }
   }
   .row-wash:active::after {
     background: var(--row-wash-press);
+  }
+
+  /* A LIST'S ROWS ARE TOLD APART BY AIR, NOT RULES (ops 4.13: no dividers between rows), on the desk and on a phone. */
+  .list > .item,
+  .list > .item:last-child {
+    border-block-end: 0;
+    background-image: none;
+  }
+
+  /* NO LINE UNDER A LIST'S OWN HEADING either (blocks.css's `.block-rows > .block-head`). */
+  .block-rows > .block-head {
+    border-block-end: 0;
+  }
+
+  /* THE OPS TABLE AND LIST ROWS (4.29, 4.15): no rule between rows, one hairline under a small caps header, and the
+     hover a rounded translucent wash, never a solid grey. */
+  .tr,
+  .rows > .row,
+  .rows > .row:last-child {
+    border-block-end: 0;
+    background-image: none;
+  }
+  /* The header's one hairline, drawn as a strip that stops 12px short of each end, as every ops separator does. */
+  .th-row {
+    border-block-end: 0;
+    background-image: linear-gradient(var(--sep), var(--sep));
+    background-repeat: no-repeat;
+    background-position: center bottom;
+    background-size: calc(100% - 2 * var(--title-inset)) 1px;
+  }
+  .rowgroup .tr:has(+ .tr-group:hover) {
+    border-block-end-color: transparent;
+  }
+
+  /* A TOGGLE BESIDE A VIEWS SWITCH (Forecast's "If income stopped") is a glass capsule of the same height. */
+  .segmented ~ .switch,
+  .switch:has(~ .segmented),
+  :is(.head-actions, .head-below, .ctl-line) .switch {
+    min-block-size: var(--ctl-page);
+    padding-inline: 12px;
+    border-radius: var(--r-pill);
+    background: var(--g-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
+  }
+  .th {
+    font-size: var(--fs-caps);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+  }
+  :is(.rowgroup .tr, .rows > .row, .list > .item):hover {
+    background: var(--row-wash);
+  }
+  .tr[data-focused],
+  .list > .item[data-focused] {
+    background: var(--row-wash-press);
+  }
+
+  /* EVERY SEARCH FIELD IS A CAPSULE (ops 4.23): a list's toolbar, a page head's, a picker's. */
+  .field:has(> .field-input[type='search']),
+  .field:has(> input[type='search']) {
+    border-radius: var(--r-pill);
+    padding-inline: 14px;
+  }
+  .field-input.head-search {
+    padding-inline: 14px;
+    border-radius: var(--r-pill);
+    background: var(--g-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
+  }
+
+  /* A SWITCH OF VIEWS IN A PAGE'S HEAD OR BAR STANDS ON THE GROUND, SO IT IS GLASS (ops 4.7): the glass platter and the
+     glass thumb. Inside a card it keeps the soft track (`controls.css`). */
+  :is(.head-actions, .topbar, .ctl-line, .head-bar) .segmented {
+    background: var(--g-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
+  }
+  :is(.head-actions, .topbar, .ctl-line, .head-bar) .segment[data-on] {
+    background: var(--g-sel);
+    box-shadow: inset 0 0 0 0.5px var(--g-sel-line), var(--shadow-raised);
   }
 
   /* THE SCROLLBAR: thin, a wash of the ink. */

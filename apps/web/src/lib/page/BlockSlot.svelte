@@ -1205,9 +1205,23 @@
   .block-bar {
     display: flex;
     align-items: center;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
     min-block-size: var(--well);
     margin-block-end: var(--sp-4);
+  }
+
+  /* THE HEADING'S GLYPH IS BARE (ops style, 3 Nov), as `Tile`'s is: 18px of quiet ink, no well behind it. */
+  .block-bar > :global(.well) {
+    inline-size: 18px;
+    block-size: 18px;
+    border-radius: 0;
+    background: none;
+    color: var(--ink-3);
+  }
+
+  .block-bar > :global(.well .icon[data-size]) {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
   }
 
   /* ONE HEAD FOR EVERY TILE OF ROWS (Money's tiles): the name at the left, the total or the door to the list at the right,
@@ -1219,7 +1233,8 @@
   :global(.block-slot:has(> .block > .list[data-kind='timeline']):not(:has(> .block > .list > .item[data-rich])) > .block-bar) {
     padding-block-end: var(--sp-3);
     margin-block-end: var(--sp-2);
-    border-block-end: 1px solid var(--rule);
+    /* NO LINE UNDER A CARD'S HEAD (ops style, 3 Nov): the head is told from its rows by its weight and the air. */
+    border-block-end: 0;
   }
 
   /* IT NEVER GIVES WAY TO WHAT IS BESIDE IT, ONLY TO THE ROW ITSELF: shrunk with the door by a fraction of a pixel,

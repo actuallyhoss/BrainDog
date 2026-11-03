@@ -46,8 +46,8 @@
     box-sizing: border-box;
     min-block-size: 48px;
     margin: var(--inset) var(--gutter) 0;
-    padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-pop);
+    padding: 10px 10px 10px var(--sp-4);
+    border-radius: var(--r-tile);
     color: var(--ink);
   }
 
@@ -63,10 +63,13 @@
     background: var(--warn-tint);
   }
 
+  /* A NOTE IS A CARD (ops 2.7.2): the tile, its edge and its soft shadow. */
   .banner[data-tone='note'] {
     --banner-glyph: var(--ink-2);
 
     background: var(--tile);
+    border: 1px solid var(--card-edge);
+    box-shadow: var(--shadow-card);
   }
 
   .banner-text {
@@ -106,7 +109,7 @@
 
   /* ON THE TILE'S OWN FILL, a step under it, as on any tile. */
   .banner[data-tone='note'] .banner-actions :global(.btn[data-weight='quiet']) {
-    --btn-fill: var(--tile-2);
+    --btn-fill: var(--soft-fill);
   }
 
   /* ON A PHONE THE ACTIONS ARE FULL-WIDTH ROWS UNDER THE WORDS, at the touch height, so neither is a narrow button

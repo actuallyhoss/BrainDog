@@ -134,7 +134,7 @@
     overflow: hidden;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: 26px;
+    font-size: var(--fs-page);
     font-weight: var(--fw-semi);
     line-height: 32px;
     letter-spacing: var(--track-page);

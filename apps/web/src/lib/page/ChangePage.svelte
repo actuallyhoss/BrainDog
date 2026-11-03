@@ -448,7 +448,12 @@
     justify-content: center;
     inline-size: var(--ctl-h);
     min-block-size: var(--ctl-h);
-    border-radius: var(--r-ctl);
+    /* A GLASS CIRCLE (ops 4.1, 3 Nov). */
+    background: var(--g-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
+    border-radius: var(--r-pill);
     color: var(--ink-2);
     transition:
       background var(--d-state) var(--ease-out),
@@ -457,13 +462,13 @@
 
   @media (hover: hover) and (pointer: fine) {
     .page-more :global(.menu-trigger:hover > .change-more) {
-      background: var(--hover);
+      background: var(--g-fill-hover);
       color: var(--ink);
     }
   }
 
   .page-more :global(.menu-trigger[aria-expanded='true'] > .change-more) {
-    background: var(--hover);
+    background: var(--g-fill-hover);
     color: var(--ink);
   }
 

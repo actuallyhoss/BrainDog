@@ -384,9 +384,10 @@
     min-inline-size: 0;
     min-block-size: 40px;
     padding-inline: var(--sp-3);
-    background: var(--tile-2);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-pop);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    border-radius: var(--r-field);
     color: var(--ink);
     font: inherit;
   }

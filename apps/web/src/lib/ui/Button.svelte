@@ -46,7 +46,7 @@
     children,
     ...rest
   }: {
-    weight?: 'primary' | 'ink' | 'quiet' | 'bare' | 'glass' | undefined;
+    weight?: 'primary' | 'ink' | 'quiet' | 'bare' | 'glass' | 'add' | undefined;
     href?: string | undefined;
     type?: 'button' | 'submit' | undefined;
     tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;
@@ -134,6 +134,19 @@
     padding: 0 12px;
   }
 
+  /* THE ONE ADD (ops 4.2): the accent circle, white plus, last in a head's controls. No shadow, no glow. */
+  .btn[data-weight='add'] {
+    --btn-fill: var(--red-fill);
+
+    inline-size: var(--ctl-h);
+    padding: 0;
+    background: var(--btn-fill);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+    color: var(--on-red);
+  }
+
   /* A KEY CAP ASKS FOR A LITTLE LESS ROOM AT ITS END, so the cap sits in the corner the way the label sits in the other. */
   .btn:is(:hover, :focus-visible):has(.btn-kbd) {
     padding-inline-end: var(--sp-2);
@@ -214,7 +227,7 @@
       background-color: var(--soft-fill-hover);
     }
 
-    .btn[data-weight='primary']:hover:not(:disabled):not(:active) {
+    .btn:is([data-weight='primary'], [data-weight='add']):hover:not(:disabled):not(:active) {
       background: var(--red-fill-hover);
     }
 

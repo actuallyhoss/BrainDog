@@ -705,8 +705,12 @@
     place-items: center;
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
-    background: var(--tile);
-    border-radius: var(--r-ctl);
+    /* A GLASS CIRCLE (ops 4.1, 3 Nov). */
+    background: var(--g-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
+    border-radius: var(--r-pill);
     color: var(--ink-2);
     opacity: 1;
     visibility: visible;
@@ -986,7 +990,7 @@
       padding: 0;
       background: none;
       border: 0;
-      border-radius: var(--r-ctl);
+      border-radius: var(--r-pill);
       color: var(--ink);
       cursor: pointer;
     }
@@ -1073,16 +1077,18 @@
     }
 
     .head-actions :global(.btn) {
-      min-block-size: var(--tap);
+      min-block-size: var(--ctl-h);
     }
 
     /* THE PAGE'S "+" IS A STEP SMALLER THAN THE BAR'S SQUARES: 36 with its 16px glyph, its
        hit box still the 44 of `.tap`. A red 44 square beside the title was the loudest thing on the phone's first
        screen, louder than the sentence that says what the page holds. */
-    .head-actions :global(.btn[data-weight='primary']:has(.icon):not(dialog *)) {
+    .head-actions :global(.btn:is([data-weight='primary'], [data-weight='add']):has(.icon):not(dialog *)) {
       inline-size: 36px;
       min-inline-size: 36px;
       min-block-size: 36px;
+      padding: 0;
+      border-radius: var(--r-pill);
     }
 
     .head-actions :global(.btn[data-weight='primary']:has(.icon):not(dialog *) .icon[data-size]) {
@@ -1097,21 +1103,30 @@
 
     /* A QUIET GLYPH AND THE PAGE'S "⋯" ARE ONE PAIR, drawn as the bar's search button is: a bare 44 square, a 20px
        glyph in the ink, no fill. Share was a white tile with a 16px glyph beside a bare 32px "⋯" (Kiln at 390). */
+    /* AND THE OPS STYLE (3 Nov) MAKES THEM GLASS CIRCLES on the ground, 36 drawn in a 44 target. */
     .head-actions :global(.btn:has(.icon):is([data-weight='quiet'], [data-weight='glass']):not(dialog *)),
     .head-actions :global(.head-more) {
-      background: none;
+      inline-size: 36px;
+      min-inline-size: 36px;
+      block-size: 36px;
+      min-block-size: 36px;
+      padding: 0;
+      border-radius: var(--r-pill);
+      background: var(--g-fill);
+      box-shadow: inset 0 0 0 0.5px var(--g-line);
       color: var(--ink);
     }
 
     .head-actions :global(.change-more) {
-      inline-size: var(--tap);
-      min-block-size: var(--tap);
+      inline-size: 36px;
+      min-block-size: 36px;
+      border-radius: var(--r-pill);
       color: var(--ink);
     }
 
     .head-actions :global(:is(.btn[data-weight='quiet'], .btn[data-weight='glass'], .change-more, .head-more) .icon[data-size]) {
-      inline-size: var(--icon-l);
-      block-size: var(--icon-l);
+      inline-size: 18px;
+      block-size: 18px;
     }
 
     /* IN THE BAR, 4 apart, as search and the face are. */

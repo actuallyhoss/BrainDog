@@ -88,8 +88,8 @@
     --sb-h: var(--ctl-h);
   }
 
-  :global(:is(.tile, .sheet, dialog, .menu, [data-surface='tile'], .block-slot)) .sb {
-    --sb-fill: var(--tile-2);
+  :global(:is(.tile, .surface-card, .sheet, dialog, .menu, [data-surface='tile'], .block-slot)) .sb {
+    --sb-fill: var(--soft-fill);
   }
 
   .sb[data-size='sm'] {
@@ -116,14 +116,15 @@
 
   .sb-main {
     padding-inline: var(--sp-3) var(--sp-2);
-    border-start-start-radius: var(--r-ctl);
-    border-end-start-radius: var(--r-ctl);
+    /* ONE CAPSULE IN TWO HALVES (ops 4.8, 3 Nov). */
+    border-start-start-radius: var(--r-pill);
+    border-end-start-radius: var(--r-pill);
   }
 
   .sb-more {
-    padding-inline: var(--sp-2);
-    border-start-end-radius: var(--r-ctl);
-    border-end-end-radius: var(--r-ctl);
+    padding-inline: var(--sp-2) 10px;
+    border-start-end-radius: var(--r-pill);
+    border-end-end-radius: var(--r-pill);
     color: var(--ink-2);
   }
 

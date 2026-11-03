@@ -146,6 +146,25 @@
 
   /* A HEADING WITH NOTHING BESIDE IT KEEPS ITS NAME BY ITS WELL: in a narrow tile (two to a row on a phone) "Quiet
      numbers" dropped under its well as a second line. The name wraps beside the well instead, never cut. */
+  /* THE HEADING'S GLYPH IS BARE (ops style, 3 Nov): 18px of quiet ink beside the name, no well behind it, so a card's
+     head is its name and nothing boxed. A project's well keeps its slot colour as the glyph's ink. */
+  .tile-head > :global(.well) {
+    inline-size: 18px;
+    block-size: 18px;
+    border-radius: 0;
+    background: none;
+    color: var(--ink-3);
+  }
+
+  .tile-head > :global(.well[data-slot]) {
+    color: var(--ph, var(--ink-3));
+  }
+
+  .tile-head > :global(.well .icon[data-size]) {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+  }
+
   .tile-head:not(:has(> .tile-aside)) {
     flex-wrap: nowrap;
   }

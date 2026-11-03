@@ -343,9 +343,13 @@
     gap: var(--sp-2);
     box-sizing: border-box;
     min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-3);
-    background: var(--tile);
-    border-radius: var(--r-ctl);
+    padding: 0 14px;
+    /* A GLASS CAPSULE (ops 4.1, 3 Nov), as every control beside a page's name. */
+    background: var(--g-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
+    border-radius: var(--r-pill);
     color: var(--ink);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);

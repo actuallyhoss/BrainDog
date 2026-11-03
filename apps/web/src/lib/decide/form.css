@@ -467,9 +467,16 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
     min-block-size: var(--tap);
   }
 
+  /* DRAWN AT ITS OWN SIZE UNDER A THUMB TOO (ops style, 3 Nov): 36 tall, with an invisible 44px hit area round it, as
+     `.tap` gives every other control. */
   .dc-btn {
-    min-block-size: var(--tap);
-    font-size: var(--fs-body);
+    position: relative;
+  }
+
+  .dc-btn::after {
+    content: '';
+    position: absolute;
+    inset: min(0px, calc((100% - var(--tap)) / 2));
   }
 
   /* AND ON THE ANSWER BUTTONS (domains lane, 2 Nov): "1 Keep it", "2 Cancel it" drew a number key on a phone, which

@@ -45,6 +45,8 @@
   /* THE HAIRLINE BETWEEN TWO ROWS OF ONE GROUP. Drawn as `::after` rather than a border, because a border on a
      rounded row curves at its corners, and inset by the row's own padding so it runs under the words and not under
      the wash's curve. `::after` and never `::before`: `.tap` and the layout gate both own `::before`. */
+  /* THE OPS STYLE (3 Nov) DRAWS NO LINE BETWEEN ROWS: the rule is transparent, kept as a box so the hover rules that
+     hide it still have something to hide and nothing else shifts. */
   .ledger > li + li > .line::after,
   .ledger > .line + .line::after {
     content: '';
@@ -52,7 +54,7 @@
     inset-block-start: 0;
     inset-inline: var(--sp-3);
     block-size: 1px;
-    background: var(--rule);
+    background: transparent;
     pointer-events: none;
     transition: opacity var(--d-state) var(--ease-out);
   }

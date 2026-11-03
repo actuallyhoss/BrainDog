@@ -94,15 +94,28 @@
 {/if}
 
 <style>
+  /* ONE LINE ON A DESK (ops style, 3 Nov): a capsule field as wide as a name needs, then Save and Skip. */
   .ask {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: var(--sp-2) var(--sp-3);
-    inline-size: 100%;
+    gap: var(--sp-2);
   }
   .ask-field {
-    flex: 1 1 12rem;
+    flex: 0 1 16rem;
+    min-inline-size: 10rem;
+    min-block-size: var(--ctl-page);
+    border-radius: var(--r-pill);
+    padding-inline: var(--sp-4);
+  }
+  @media (width < 640px) {
+    .ask {
+      flex-wrap: wrap;
+      inline-size: 100%;
+    }
+    .ask-field {
+      flex: 1 1 100%;
+    }
   }
   .ask-presses {
     display: flex;

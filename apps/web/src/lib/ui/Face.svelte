@@ -88,6 +88,8 @@
     block-size: 24px;
     background: var(--tile-2);
     border-radius: var(--r-round);
+    /* A 1px RING OF THE INK AT 8% (ops 4.25), so a face reads as a disc on white and on the ground. */
+    box-shadow: inset 0 0 0 1px var(--sep);
     color: var(--ink-2);
     font-size: var(--fs-cap);
     font-weight: var(--fw-semi);

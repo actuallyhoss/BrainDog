@@ -764,7 +764,7 @@
       <span class="add-phone" style:visibility={acts && index.kind === 'held' ? undefined : 'hidden'} aria-hidden={acts && index.kind === 'held' ? undefined : 'true'}>
         <!-- INK, NEVER THE RED (live check, 1 Nov): with Unlock, an empty list's Add a key or a request's Allow once on the
              screen, the circle made two red buttons on a phone. The screen's one red is the one that needs him. -->
-        <Button weight={waiting.length ? 'glass' : 'ink'} aria-label={tileWords.addKey} title={tileWords.addKey} onclick={openAdd}>
+        <Button weight={waiting.length ? 'glass' : 'add'} aria-label={tileWords.addKey} title={tileWords.addKey} onclick={openAdd}>
           <Icon name="plus" size="l" />
         </Button>
       </span>

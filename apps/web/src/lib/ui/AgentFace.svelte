@@ -96,7 +96,9 @@
     block-size: 28px;
     background: var(--tile-2);
     border-radius: var(--r-round);
+    box-shadow: inset 0 0 0 1px var(--sep);
     color: var(--ink);
+    font-weight: var(--fw-semi);
     text-decoration: none;
     transition: opacity var(--d-state) var(--ease-out);
   }
