@@ -346,10 +346,13 @@
     line-height: var(--lh-body);
   }
 
+  /* THE LIST'S TALLY ON ITS OWN (ops look): a quiet line at the row size in the second ink, tabular, as the ops Home's
+     tally reads beside its title. */
   .reading[data-alone] {
-    color: var(--ink);
-    font-size: var(--fs-head);
-    line-height: var(--lh-head);
+    color: var(--ink-2);
+    font-size: var(--fs-row, var(--fs-head));
+    line-height: 22px;
+    font-variant-numeric: tabular-nums;
   }
 
   /**
