@@ -4,7 +4,7 @@
 
   FIVE CARDS, EACH ONE JOB. Applications to invite or decline; the plugins waiting for review, to approve or decline
   with a reason, and what people reported; inviting anyone by email; the sign-up codes already out, to end; and the
-  last eight weeks of the way in. The head's line says what waits, so no card repeats it.
+  last eight weeks of the way in. Each card says its own count; the head has no count line (Sam, 3 Nov: no briefs).
 
   EACH CARD READS ON ITS OWN (`Tile`'s `ready`), so a slow funnel never holds the applications back, and a card whose
   door failed says so inside itself with Retry, never as a page of its own.
@@ -157,19 +157,11 @@
     void loadFunnel();
   });
 
-  /* ── what waits, said once in the head ────────────────────────────────────── */
+  /* ── what waits (each card says its own count) ────────────────────────────────────── */
 
   const waitingApps = $derived(applications.at === 'done' ? applications.value.filter((a) => a.state === 'waiting') : []);
   const decidedApps = $derived(applications.at === 'done' ? applications.value.filter((a) => a.state !== 'waiting') : []);
   const pending = $derived(review.at === 'done' ? review.value.pending : []);
-  const sentence = $derived.by(() => {
-    if (applications.at === 'waiting' || review.at === 'waiting') return undefined;
-    const parts = [
-      ...(waitingApps.length > 0 ? [`${plural(waitingApps.length, 'application', 'applications')} waiting`] : []),
-      ...(pending.length > 0 ? [`${plural(pending.length, 'plugin', 'plugins')} to review`] : []),
-    ];
-    return parts.length === 0 ? words.nothing : `${parts.join(', ')}.`;
-  });
 
   /* ── applications ─────────────────────────────────────────────────────────── */
 
@@ -325,7 +317,7 @@
 
 <svelte:head><title>{titleOf(words.title)}</title></svelte:head>
 
-<PageHead icon="lock" title={words.title} {sentence} heldLines={1} />
+<PageHead icon="lock" title={words.title} />
 
 {#snippet failed(fix: string, retry: () => void)}
   <div class="a-failed" role="status">
