@@ -1554,7 +1554,9 @@
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: var(--tile-gap);
-    padding: var(--sp-3) var(--gutter) var(--sp-9);
+    /* A TILE GAP UNDER WHAT STANDS ABOVE (rhythm pass, 3 Nov): 12 put the first tile closer to a banner over it than the
+       tiles stand to each other at a desk; the foot is the page's own step, which clears the phone's tab bar. */
+    padding: var(--tile-gap) var(--gutter) var(--page-bottom);
   }
 
   /* THE ROW CURSOR'S RING, drawn only once a key has moved it: the focus ink, round the row, never the brand's red. */
@@ -2112,7 +2114,7 @@
   @media (width < 900px) {
     .page {
       grid-template-columns: minmax(0, 1fr);
-      padding: var(--sp-3) var(--gutter) var(--sp-8);
+      padding: var(--tile-gap) var(--gutter) var(--page-bottom);
     }
 
     .area,
