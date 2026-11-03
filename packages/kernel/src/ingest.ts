@@ -925,19 +925,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
      * pattern already written against it. They are the header read once (`senderOf`), so a reader meeting the sender
      * is handed an address and a domain, never `"Sara Ali" <sara@…>` to take apart again.
      */
-    const sender = senderOf(headers.from);
-    const fields: Record<string, unknown> = {
-      channel: arrival.channel,
-      from: headers.from ?? '',
-      from_name: sender.name,
-      from_address: sender.address,
-      from_domain: sender.domain,
-      to: headers.to ?? '',
-      subject: headers.subject ?? '',
-      body,
-      state: 'untriaged',
-      ts: stored?.ts ?? at,
-    };
+    const fields = arrivalFields(arrival.channel, headers, body, stored?.ts ?? at);
 
     /**
      * `12 §3`: AN UNVERIFIED PAYLOAD IS STORED AND NEVER MATCHED, and the declarations are not even
@@ -4975,6 +4963,69 @@ export function day(text: string, format: string): string | null {
 
 const lower = (headers: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+
+/** The arrival a `match:` is a question about, as `runArrival` offers it, before anything is stored. */
+function arrivalFields(channel: Channel, headers: Record<string, string>, body: string, ts: string): Record<string, unknown> {
+  const sender = senderOf(headers.from);
+  return {
+    channel,
+    from: headers.from ?? '',
+    from_name: sender.name,
+    from_address: sender.address,
+    from_domain: sender.domain,
+    to: headers.to ?? '',
+    subject: headers.subject ?? '',
+    body,
+    state: 'untriaged',
+    ts,
+  };
+}
+
+/** The fields a mail's words are in, where a pattern's literal says what it looks for. */
+const WORDED = new Set(['body', 'subject', 'from', 'from_name', 'from_address', 'from_domain']);
+
+/**
+ * What a record's mail patterns look for, for a door that reads mail somewhere other than the forwarding address
+ * (Connect Google reads it in Gmail): `hints`, the words a mail one of them reads would carry, so the whole of a mail is
+ * fetched only when its sender, subject or first lines carry one; and `take`, the pattern that would take a mail, read
+ * by the same `match:` and the same fields `runArrival` offers it, so only a mail a pattern reads is handed to the mail
+ * door, which then reads it as a forwarded one, by name.
+ *
+ * A HINT IS A LITERAL THE PATTERN WANTS, never one it rules out (`none:`), and each word of four letters or more of the
+ * pack that declares it (`hsbc` of `bank-hsbc-eg`), which a bank's sending domain carries. A PATTERN WITH NO `match:`
+ * READS ANY MAIL, so it says nothing about which mail is a pattern's, and is left out of both: Connect Google would
+ * otherwise hand every mail it reads to the mail door, and the door would read each for who and what.
+ */
+export function mailPatterns(ingests: readonly IngestDecl[], ts: string): { hints: string[]; take: (mail: { headers: Record<string, string>; body: string }) => string | null } {
+  const mail = ingests.filter((i) => i.channel === 'email' && i.match !== undefined);
+  const hints = new Set<string>();
+  const walk = (node: unknown): void => {
+    if (node === null || typeof node !== 'object') return;
+    if (Array.isArray(node)) return void node.forEach(walk);
+    const n = node as Record<string, unknown>;
+    for (const [key, value] of Object.entries(n)) {
+      if (key === 'none' || key === 'not') continue;
+      if (key === 'all' || key === 'any') walk(value);
+    }
+    if (typeof n.field === 'string' && WORDED.has(n.field))
+      for (const op of ['contains', 'starts', 'ends', 'is'] as const) {
+        const said = n[op];
+        if (typeof said === 'string' && said.trim().length >= 4) hints.add(said.trim().toLowerCase());
+      }
+  };
+  for (const i of mail) {
+    walk(i.match);
+    const pack = (i as { pack?: unknown }).pack;
+    if (typeof pack === 'string') for (const word of pack.toLowerCase().split(/[^a-z0-9]+/)) if (word.length >= 4) hints.add(word);
+  }
+  return {
+    hints: [...hints],
+    take: (m) => {
+      const fields = arrivalFields('email', lower(m.headers), m.body, ts);
+      return mail.find((i) => evaluate(i.match!, fields, INBOX_RAW))?.ingest ?? null;
+    },
+  };
+}
 
 /**
  * Who a message says it is from, in three parts: the name a person reads, the address, and the address's domain.

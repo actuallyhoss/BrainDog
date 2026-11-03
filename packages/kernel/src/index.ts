@@ -239,7 +239,7 @@ import { REST_DAYS_SETTING, runway, type Horizon, type Leg, type Runway } from '
 import { WALK_SOURCE } from './money-figures.ts';
 import { referencedBy } from './referenced.ts';
 import { createJob, sweepJobs } from './jobs.ts';
-import { openRowset, unfile } from './ingest.ts';
+import { mailPatterns, openRowset, unfile } from './ingest.ts';
 import { answerAsked, arrive, day, exponentOf, fileAsSecond, offerAgain, patternReport, propose, rerunHeld, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders, type PatternReport } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
@@ -11058,6 +11058,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         undefined,
         into,
       ),
+
+    /**
+     * The record's mail patterns, for a door that reads mail somewhere other than the forwarding address (`ingest.ts`
+     * `mailPatterns`): the words they look for, and which of them would take a mail. A read; nothing is stored.
+     */
+    mailPatterns: () => mailPatterns(ingestDeps().ingests(), instant(clock.now())),
 
     /**
      * A payload arrives, and the record fills itself.

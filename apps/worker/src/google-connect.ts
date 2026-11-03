@@ -18,6 +18,8 @@
  *
  * WHAT IT WRITES IS WHAT THE ADD-ONS ALREADY TAKE. Mail goes through the Gmail add-on's own door (`gmail_in`), as the
  * same lines its Apps Script posts, so its list, pages, questions, Today widgets and people-meeting see nothing new.
+ * AND A MAIL ONE OF THE RECORD'S MAIL PATTERNS READS (a bank's alert) is also read whole and handed to the mail door, by
+ * that pattern's name, as a mail forwarded to the record's address would be, so it is filed where a forwarded one is.
  * Events go into the Calendar add-on's list under the very key its ICS reader uses (the event's iCalendar id, and the
  * day for one time of a repeating event), so the two never write the same event twice.
  *
@@ -31,7 +33,7 @@
 
 import { grantKey, openSealed, seal } from '@braindog/host';
 import { appNext } from '@braindog/host/auth';
-import { keyOf } from '@braindog/kernel';
+import { keyOf, parseFrom, registrable } from '@braindog/kernel';
 import type { CallContext, RecordApi } from '@braindog/record';
 
 import { unwrap, type KeyStore } from './keys.ts';
@@ -298,7 +300,8 @@ export type Connection = {
   /** Set when Google stopped honouring the token: the one line the page says, and no sync runs until he connects again. */
   broken?: string | undefined;
   last?: { at: number; said: string; ok: boolean } | undefined;
-  gmail?: { history?: string | undefined; open?: Record<string, string> | undefined; pending?: string[] | undefined } | undefined;
+  /** `whole` holds the ids of the last mails handed whole to the mail door, so one is fetched whole once. */
+  gmail?: { history?: string | undefined; open?: Record<string, string> | undefined; pending?: string[] | undefined; whole?: string[] | undefined } | undefined;
   calendar?: { sync?: string | undefined; full?: number | undefined; name?: string | undefined } | undefined;
   /** `full` is when the whole book was last read, and `whole` is set while one is read a page at a time. */
   contacts?: { sync?: string | undefined; page?: string | undefined; full?: number | undefined; whole?: boolean | undefined } | undefined;
@@ -419,7 +422,8 @@ function parseAddress(raw: string): { name: string; address: string } {
   return { name: '', address: s.toLowerCase() };
 }
 
-const decode = (s: string): string => s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const decode = (s: string): string =>
+  s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/gi, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 
 /** One line, at most n characters, and none of the words the door reads the lines by. */
 function clean(s: string, n: number): string {
@@ -540,6 +544,83 @@ async function answered(get: Get, thread: string, id: string, me: string): Promi
   return false;
 }
 
+/* ── a mail read whole, for the record's mail patterns ───────────────────── */
+
+/** The most of a mail's text handed on, as a forwarded mail's text is read. */
+const TEXT_MOST = 100_000;
+/** The most mail ids remembered as handed whole. */
+const WHOLE_MOST = 200;
+
+type Part = { mimeType?: unknown; filename?: unknown; body?: { data?: unknown } | undefined; parts?: unknown; headers?: unknown };
+
+/** The text of every part of one type, attachments left out, nesting followed as far as a mail goes. */
+function partsOf(top: Part, type: string): string[] {
+  const out: string[] = [];
+  const walk = (p: Part, depth: number): void => {
+    if (depth > 8) return;
+    if (str(p.mimeType).toLowerCase() === type && str(p.filename) === '') {
+      const data = str(p.body?.data);
+      if (data !== '') out.push(textOf(data));
+    }
+    for (const c of arr(p.parts)) walk(c as Part, depth + 1);
+  };
+  walk(top, 0);
+  return out;
+}
+
+/** An HTML part as the words a person reads, a line where a block ends. */
+const htmlText = (html: string): string =>
+  decode(
+    html
+      .replace(/<(script|style)\b[\s\S]*?<\/\1>/giu, ' ')
+      .replace(/<br\s*\/?>|<\/(?:p|div|tr|li|h[1-6]|table)>/giu, '\n')
+      .replace(/<[^>]*>/gu, ' '),
+  )
+    .replace(/[ \t\u00a0]+/gu, ' ')
+    .replace(/ *\n[ \n]*/gu, '\n')
+    .trim();
+
+/** A mail's text: its plain parts, or, with none, its HTML read as words. */
+function wholeText(top: Part): string {
+  const plain = partsOf(top, 'text/plain');
+  const text = plain.length > 0 ? plain.join('\n') : partsOf(top, 'text/html').map(htmlText).join('\n');
+  return text.replace(/\r\n?/gu, '\n').slice(0, TEXT_MOST);
+}
+
+/**
+ * Whether Gmail found a mail to be from the domain its From names: `dmarc=pass` for that domain, or a DKIM signature that
+ * passed for it. READ ONLY FROM THE TOPMOST `Authentication-Results`, and only when Gmail's own servers wrote it: Gmail
+ * puts its verdict on top, and any further down is a line the sender could have written.
+ */
+export function gmailVerdict(results: readonly string[], from: string): { verified: boolean; signer: string } {
+  const top = results[0] ?? '';
+  const domain = registrable(parseFrom(from)?.domain ?? '');
+  if (domain === null || !/^\s*mx\.google\.com\s*;/iu.test(top)) return { verified: false, signer: '' };
+  const said = /\bdmarc=pass\b[^;]*?header\.from=([a-z0-9.-]+)/iu.exec(top);
+  if (said && registrable(said[1] ?? '') === domain) return { verified: true, signer: domain };
+  for (const m of top.matchAll(/\bdkim=pass\b[^;]*?header\.(?:d|i)=@?([a-z0-9.-]+)/giu)) if (registrable(m[1] ?? '') === domain) return { verified: true, signer: domain };
+  return { verified: false, signer: '' };
+}
+
+/** One mail read whole: its head, its text, and Gmail's verdict on its sender. */
+async function readWhole(get: Get, id: string): Promise<WholeMail> {
+  const m = await get(`${GMAIL}/messages/${encodeURIComponent(id)}?format=full`);
+  const top = (m.payload ?? {}) as Part;
+  const heads = arr(top.headers).map((x) => [str(x.name).toLowerCase(), str(x.value)] as const);
+  const one = (name: string): string => heads.find(([k]) => k === name)?.[1] ?? '';
+  const verdict = gmailVerdict(
+    heads.filter(([k]) => k === 'authentication-results').map(([, v]) => v),
+    one('from'),
+  );
+  return { id, from: one('from'), to: one('to'), subject: one('subject'), date: one('date'), messageId: one('message-id'), text: wholeText(top), ...verdict };
+}
+
+/** Whether a mail's sender, subject or first lines carry a word one of the record's mail patterns looks for. */
+const hinted = (m: Mail, hints: readonly string[]): boolean => {
+  const said = `${m.address} ${m.subject} ${m.snippet}`.toLowerCase();
+  return hints.some((h) => said.includes(h));
+};
+
 export type Writer = {
   zone: string;
   /** The Gmail add-on is on: mail goes through its door. */
@@ -558,7 +639,17 @@ export type Writer = {
    * kept, added when they are of use, or left out. Says which.
    */
   contact(said: ContactSaid): Promise<ContactDid>;
+  /** The words the record's mail patterns look for (`mailPatterns` in the kernel); none, and no mail is read whole. */
+  hints: readonly string[];
+  /**
+   * A whole mail, handed to the mail door as a forwarded one when one of the record's mail patterns reads it, by that
+   * pattern's name and under its Gmail id, so reading it again is the same arrival. `true` when a pattern read it.
+   */
+  arriveWhole(mail: WholeMail): Promise<boolean>;
 };
+
+/** A mail as Gmail holds it whole: its head, its text as a person reads it, and whether Gmail found it to be from its sender's domain. */
+export type WholeMail = { id: string; from: string; to: string; subject: string; date: string; messageId: string; text: string; verified: boolean; signer: string };
 
 /** A card as the Contacts pass hands it on, with what the passes saw of the two of them. */
 export type ContactSaid = { name?: string; emails: string[]; phones: string[]; own: string[]; use?: 'mail' | 'event'; day?: string };
@@ -686,7 +777,9 @@ async function gmailPass(get: Get, conn: Connection, w: Writer, now: number): Pr
 
   const queue = [...want];
   const later = queue.slice(MAIL_MOST);
+  const handed = new Set(st.whole ?? []);
   let told = 0;
+  let read = 0;
   const since = now - LOOK_BACK_DAYS * 86_400_000;
   for (const id of queue.slice(0, MAIL_MOST)) {
     let mail: Mail | null;
@@ -704,6 +797,17 @@ async function gmailPass(get: Get, conn: Connection, w: Writer, now: number): Pr
     /* OLDER THAN THE WINDOW AND NOT ONE STILL WAITING: left alone, as the Apps Script leaves it. */
     if (mail.at < since && !Object.hasOwn(open, id)) continue;
     if (mail.at >= since) conn.touch = touchMail(conn.touch ?? {}, mail, wallIn(mail.at, w.zone).day);
+    /* A MAIL ONE OF THE RECORD'S MAIL PATTERNS MAY READ is read whole once, and handed to the mail door if one does. */
+    if (!mail.out && mail.at >= since && !handed.has(id) && w.hints.length > 0 && hinted(mail, w.hints)) {
+      let whole: WholeMail | null = null;
+      try {
+        whole = await readWhole(get, id);
+      } catch (e) {
+        if (!(e instanceof Fault) || (e.status !== 404 && e.status !== 400)) throw e;
+      }
+      if (whole !== null && (await w.arriveWhole(whole))) read += 1;
+      handed.add(id);
+    }
     if (!(await w.arrive(mailBody(mail, w.zone)))) {
       later.push(id);
       continue;
@@ -713,8 +817,9 @@ async function gmailPass(get: Get, conn: Connection, w: Writer, now: number): Pr
     else delete open[id];
   }
   const kept = Object.entries(open).slice(-OPEN_MOST);
-  conn.gmail = { history, open: Object.fromEntries(kept), pending: later.slice(0, PENDING_MOST) };
-  return told === 0 ? 'no new mail' : `${String(told)} ${told === 1 ? 'mail' : 'mails'}`;
+  conn.gmail = { history, open: Object.fromEntries(kept), pending: later.slice(0, PENDING_MOST), whole: [...handed].slice(-WHOLE_MOST) };
+  const patterned = read === 0 ? '' : `, ${String(read)} also read by ${read === 1 ? 'a pattern' : 'patterns'}`;
+  return told === 0 ? `no new mail${patterned}` : `${String(told)} ${told === 1 ? 'mail' : 'mails'}${patterned}`;
 }
 
 /* ── Calendar ────────────────────────────────────────────────────────────── */
@@ -993,15 +1098,15 @@ export function googleWriter(api: RecordApi): Writer {
   const sys: CallContext = { principal: { kind: 'system', id: 'google' } };
   const events = api.kernel.register('events');
   const hasField = (id: string): boolean => events?.fields.some((f) => f.id === id) === true;
+  const hex = async (text: string): Promise<string> =>
+    [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, '0')).join('');
   return {
     zone: api.kernel.identity()?.tz ?? 'UTC',
     mail: api.kernel.register('gmail_mail') !== undefined,
     events: hasField('key'),
     invites: hasField('response') && hasField('organiser'),
     arrive: async (body) => {
-      const bytes = new TextEncoder().encode(body);
-      const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
-      const out = await api.arrive({ channel: 'webhook', headers: { 'content-type': 'text/plain; charset=utf-8' }, body, sha256, verified: true, ingest: 'gmail_in' });
+      const out = await api.arrive({ channel: 'webhook', headers: { 'content-type': 'text/plain; charset=utf-8' }, body, sha256: await hex(body), verified: true, ingest: 'gmail_in' });
       return out.ok;
     },
     heldEvents: async (fromDay) => {
@@ -1026,5 +1131,28 @@ export function googleWriter(api: RecordApi): Writer {
       const out = await api.meetContact({ ...said, skip: [...OWN_LISTS], source: 'Google Contacts' }, sys);
       return out.ok ? out.value.did : 'skipped';
     },
+    hints: api.kernel.mailPatterns().hints,
+    /* AS THE MAIL DOOR WOULD HAVE IT: its head and its text, the verdict on top in this host's name (`AUTHSERV`), the
+       pattern that reads it named so nothing else at the door reads it for who and what, and its hash its Gmail id's. A
+       copy he also forwarded by hand is other bytes, and the pattern's own repeat rule keeps it from being filed twice. */
+    arriveWhole: async (m) => {
+      const headers: Record<string, string> = {
+        'authentication-results': m.verified ? `${AUTHSERV}; dkim=pass header.d=${m.signer} (Gmail's own verdict, read by Connect Google)` : `${AUTHSERV}; dkim=none (Gmail did not find it from its sender)`,
+        from: m.from,
+        to: m.to,
+        subject: m.subject,
+        date: m.date,
+        ...(m.messageId === '' ? {} : { 'message-id': m.messageId }),
+      };
+      const head = [['From', m.from], ['To', m.to], ['Subject', m.subject], ['Date', m.date], ['Message-ID', m.messageId]].filter(([, v]) => v !== '').map(([k, v]) => `${k}: ${v}`);
+      const body = `${head.join('\r\n')}\r\n\r\n${m.text}`;
+      const ingest = api.kernel.mailPatterns().take({ headers, body });
+      if (ingest === null) return false;
+      const out = await api.arrive({ channel: 'email', headers, body, sha256: await hex(`gmail:${m.id}`), verified: m.verified, ingest });
+      return out.ok && out.value.state !== 'untriaged';
+    },
   };
 }
+
+/** The name this host signs its own verdict on a mail with, as the mail door does (`@braindog/host`'s `AUTHSERV`). */
+const AUTHSERV = 'braindog';
