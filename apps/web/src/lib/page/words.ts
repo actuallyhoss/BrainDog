@@ -47,7 +47,7 @@ export const words = {
   /* ANSWERING SEVERAL QUESTIONS AT ONCE: the box each card leads with, said with its question. */
   pick: (question: string) => `Choose “${question}” to answer with others`,
   /* THE PAGE'S LOOK (`look.ts`): a pin that keeps it as it is, and what Slash arranged, offered back and then kept. */
-  pin: 'Pin this',
+  pin: 'Keep this layout',
   unpin: 'Unpin',
   pinned: (title: string) => `Pinned ${title}. It stays as it is until you unpin it.`,
   unpinned: (title: string) => `Unpinned ${title}. Slash may arrange it again.`,
