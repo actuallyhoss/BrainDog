@@ -839,7 +839,10 @@ export const TOOLS: readonly Tool[] = [
        calls as a resource, so the list pays for one tool. It took `undo`'s place, and `undo` is folded into it: its
        receipt's batch is `act undoOwn`. Destructive in the spec's sense, as `undo` was: a call may delete. Who may make
        which call is the record's to say, with the caller's own grant, so nothing here widens what an agent reaches. */
-    description: 'Any app call; call "calls" lists them. Undo: undoOwn {batch}.',
+    /* AND THE ADD-ON STORE AND AN ADD-ON OF ITS OWN (`addons`, `addon`, `addonNew`, `addonCheck`, addons market plan of
+       3 Nov): an agent asked for what BrainDog does not do reads here that it may build it. Paid for by `{batch}`, which
+       every receipt says whole in the call that undoes it. */
+    description: 'Any app call, add-ons too; "calls" lists. Undo: undoOwn.',
     input: obj({ call: { type: 'string' }, args: { type: 'object' } }, ['call']),
     writes: true,
     destructive: true,
@@ -1388,6 +1391,8 @@ const FIXED: readonly Resource[] = [
   resource('grammar/kinds', 'Every kind of block a page draws, a line each, and what to reach for. grammar/kind/<name> says one whole.'),
   resource('grammar/script', 'What a script declaration may contain, what its ctx can reach, its limits, and two that install.'),
   resource('grammar/automations', 'What an automation may say: its triggers, its steps, its limits, what does not run yet, and two that install.'),
+  /* THE ADD-ON FILE WHOLE (`packages/record/src/grammar.ts` `PACK`): what an agent reads before it builds what BrainDog lacks. */
+  resource('grammar/pack', 'An add-on file whole: its manifest, its parts, what each asks the person, the loop through act (addons, addonNew, addonCheck, installPack), and one that installs.'),
   resource('calls', 'Every call act makes, a line each: what the app does, by name, and how to make one.'),
 ];
 
@@ -1399,7 +1404,7 @@ const FIXED: readonly Resource[] = [
 export const OFFERED_DECIDES: ReadonlySet<string> = new Set([
   'whoami', 'boot', 'context', 'understand', 'handoffs', 'briefing', 'widgets', 'exceptions', 'stale', 'learnings', 'sessions/live', 'digest/today', 'decisions', 'inbox', 'inbox/patterns',
   'actions', 'automations', 'arrangement', 'grammar/page', 'grammar/register', 'grammar/metric', 'grammar/proposals',
-  'grammar/ingest', 'grammar/kinds', 'grammar/script', 'grammar/automations',
+  'grammar/ingest', 'grammar/kinds', 'grammar/script', 'grammar/automations', 'grammar/pack',
 ]);
 
 /**
@@ -1428,6 +1433,7 @@ const SERVED_BY: Readonly<Record<string, keyof McpSurface<unknown>>> = {
   'grammar/proposals': 'arrangement',
   'grammar/ingest': 'arrangement',
   'grammar/kinds': 'arrangement',
+  'grammar/pack': 'arrangement',
 };
 
 /** What `offered` answered, held to its shape, because over the command line it came off the wire. `null` is no answer to use. */
@@ -4443,7 +4449,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
          `grammar/automations` above, this package's text, and a second rule grammar here would be two to keep in step. */
       if (
         head === 'grammar' &&
-        (rest === 'page' || rest === 'register' || rest === 'metric' || rest === 'proposals' || rest === 'ingest' || rest === 'kinds' || /^kind\/[a-z_]+$/u.test(rest))
+        (rest === 'page' || rest === 'register' || rest === 'metric' || rest === 'proposals' || rest === 'ingest' || rest === 'kinds' || rest === 'pack' || /^kind\/[a-z_]+$/u.test(rest))
       )
         return arranged({ grammar: rest }, ctx);
       if (head === 'declaration' && NAMED.test(rest)) return arranged({ page: rest }, ctx);

@@ -294,6 +294,11 @@ export type ShelfFetched = ShelfEntry & { doc: Record<string, unknown> };
 export type CatalogueShelf = {
   listed: () => Promise<readonly ShelfEntry[]>;
   fetch: (id: string) => Promise<Result<ShelfFetched> | null>;
+  /**
+   * The catalogue's whole index, as the store reads it: every entry with who published it, its versions and what each
+   * reaches. What `addons` and `addon` answer an agent from. Absent on a shelf made before it, which offers no listing.
+   */
+  index?: () => Promise<import('@braindog/declare/catalogue').CatalogueIndex | null>;
 };
 
 export type ArrangeDeps = {

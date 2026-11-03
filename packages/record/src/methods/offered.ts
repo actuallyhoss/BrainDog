@@ -91,6 +91,7 @@ const FIXED: readonly (readonly [string, Asks])[] = [
   ['grammar/kinds', 'record'],
   ['grammar/script', 'record'],
   ['grammar/automations', 'record'],
+  ['grammar/pack', 'record'],
 ];
 
 /** The addresses `offered` decides, for a door to hold its own list against: one it lists and this does not name is read as before. */

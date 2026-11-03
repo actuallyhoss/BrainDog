@@ -56,6 +56,14 @@ export const PROMPTS: readonly Prompt[] = [
     description: 'Lay out a decision with options for the person to make in BrainDog.',
     arguments: [{ name: 'about', description: 'What needs deciding, in a few words.' }],
   },
+  /* WHAT BRAINDOG LACKS, BUILT AS AN ADD-ON (addons market plan, 3 Nov): the store first, then a file of the agent's own,
+     checked until it reads, then asked. A prompt costs the tool list nothing, and a client shows it as a command. */
+  {
+    name: 'addon',
+    title: 'Build an add-on',
+    description: 'Find an add-on for what BrainDog lacks, or make one, check it, and ask the person to install it.',
+    arguments: [{ name: 'want', description: 'What the person wants BrainDog to do, in a few words.' }],
+  },
 ];
 
 /** What each prompt says, as one message from the person: the calls in order. */
@@ -73,6 +81,15 @@ const PROMPT_TEXT: Readonly<Record<string, (args: Record<string, string>) => str
       '1. If you took an instruction, answer it: instructions {reply:"<its id>", said:"<what you did, one line>", state:"done"}, or needs_you or declined with why.',
       '2. Call handoff with {next:"<the one next step>"}, and tried for each dead end. If you finished a task, handoff {done:"<task>", note:"<how>"}.',
       '3. If you fixed a surprise or hit a dead end a later session would repeat, create a learning with topic, the skill it bears on, and the failure in because.',
+    ].join('\n'),
+  addon: (a) =>
+    [
+      `Make BrainDog do what it lacks, as an add-on${a.want ? `: ${a.want}` : ''}.`,
+      '1. Look in the store first: act, call "addons", args q set to a few words. If one fits, act, call "addon", args id, says who made it and what it asks of theirs; act, call "installPack", args id, then asks them.',
+      '2. Otherwise read braindog:grammar/pack (or act, call "arrangement", args grammar "pack"), then act, call "addonNew", args id, title and fields, for a file that installs.',
+      '3. Change the file to do what they asked, then act, call "addonCheck", args doc. Fix each refusal it names and check again until it says Ready.',
+      '4. act, call "installPack", args doc: it asks the person on Decide, showing every list, page, host and key it would reach. Nothing installs until they say yes.',
+      '5. To change it later: act, call "addon", args id and file true; edit it, raise its version, check it, and call installPack again.',
     ].join('\n'),
   ask: (a) =>
     [

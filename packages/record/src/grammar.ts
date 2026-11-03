@@ -27,6 +27,7 @@ import { LOOK_B_CSS } from '@braindog/theme/look-b.ts';
 import { SCALE_CSS } from '@braindog/theme/scale.ts';
 
 import { REACHES_OUT } from './slash.ts';
+import { starterAddon } from './methods/addons.ts';
 
 /**
  * A registry a package exports, or `undefined` while it does not. THE SOURCES AND THE GLYPH GROUPS ARE READ FROM THE
@@ -122,7 +123,7 @@ export const GLYPHS: Readonly<Record<string, string>> | undefined =
  * `kinds` IS LAST, and it is the kinds of block a page draws, each with its line (`KINDS_SHORT`). One kind whole is
  * `kind/<name>`, which is asked by name and so is no entry here: the refusal names it in words.
  */
-export const GRAMMARS = ['page', 'register', 'metric', 'rule', 'proposals', 'ingest', 'kinds'] as const;
+export const GRAMMARS = ['page', 'register', 'metric', 'rule', 'proposals', 'ingest', 'kinds', 'pack'] as const;
 
 const PAGE = {
   declaration: { id: 'page.<slug>', kind: 'page', body: 'the page body below' },
@@ -554,6 +555,72 @@ export function kindWhole(kind: Kind): Record<string, unknown> {
   };
 }
 
+/**
+ * An add-on file whole: the SDK an agent reads before it writes one for a feature this BrainDog lacks.
+ *
+ * THE OTHER GRAMMARS SAY ONE DECLARATION EACH, AND NOTHING SAID THE FILE AROUND THEM. An agent could read how a list or
+ * a page is written and still not know that an add-on is a manifest and a list of declarations, that it must name every
+ * place of the person's it reads, that a Today card is a `widgets` entry and never a placement, or that the way in is a
+ * question the person answers. This says the file, what each part asks the person to approve, the loop through `act`,
+ * and one that installs, which `addonNew` answers too. Held to what `normalise` and the Kennel take
+ * (`MANIFEST_KEYS`), and a reference like the rest: the record's check decides.
+ */
+const PACK = {
+  what: 'An add-on is one JSON file: a manifest, then declarations. It is data the record checks and the person approves, never code BrainDog runs as itself.',
+  loop: [
+    'act addons {"q":"<words>"}: is there one already? act addon {"id"} reads it, with what it asks of yours.',
+    'act addonNew {"id","title","fields"?}: a file that installs, to change.',
+    'act addonCheck {"doc"}: every refusal with its fix, or what installing it adds and asks the person to approve. Repeat until ready.',
+    'act installPack {"doc"}: asks the person on Decide. Nothing installs until they say yes, unless they let agents act without asking.',
+    'To change it later: act addon {"id","file":true}, edit, raise version, check, installPack again. The person approves the update the same way.',
+  ],
+  manifest: {
+    pack: 'the id, lower-case letters, digits and dashes; not one the store already holds',
+    version: 'three numbers. A change is a new version: major when a list, page or field type goes; minor when something is added; patch otherwise',
+    title: 'what the person calls it',
+    summary: 'one line on what it does for them',
+    changes: 'what this version changed, at most 500 characters',
+    author: 'who made it',
+    license: 'an SPDX id such as MIT',
+    icon: 'one icon name from the app set, optional',
+    requires: '{format: 1, primitives: 1, packs: {"<add-on>": ">=1.0.0 <2.0.0"}}: the add-ons it needs first',
+    uses: '["register.<id>", "metric.<id>", "page.<slug>"]: every place of the person\'s it reads or changes that it does not declare itself. It reaches nothing it does not name, and the person sees each one before saying yes',
+    config: '{<key>: {type: text|enum|bool|money|day|duration|number|list|secret, label, default?, values?}}: settings on its page; {{config:<key>}} reads one, a script reads ctx.config. A secret is a key label, never a value',
+    seeds: '[{register, fields}]: example rows, at most 8 a list',
+    extends: '{"register.<theirs>": {fields: [optional fields], values: {<enum field>: [new values]}}}: lays on another list without taking anything',
+    adds: 'blocks laid on another add-on\'s page',
+    widgets: 'Today cards: [{id, title, says, group, for, block, sizes, size, needs: {lists}, example}]. Installing adds them to the card sheet; the person, or an agent through propose body_kind widget, puts one on Today',
+    skills: '[{name, trigger, what?, body}]: steps the person\'s agents follow, at most 8',
+    declarations: 'the parts it adds, each written with its kind as its first key',
+  },
+  declarations: {
+    register: 'a list: grammar register',
+    page: 'a page with blocks: grammar page, and grammar kinds for every block. A drawn block is your own HTML and script in a sandboxed frame that reads the rows it is given and reaches no network',
+    metric: 'a figure: grammar metric',
+    rule: 'an automation, with triggers and steps: braindog:grammar/automations',
+    script: 'JavaScript run in a sandbox on a clock, at a door or from a rule, with egress hosts and keys named: braindog:grammar/script',
+    ingest: 'a door others post to, or a call or poll out on a clock: grammar ingest',
+    digest: 'a message on a schedule, in the app, by mail or push',
+    theme: 'colours, the only kind a colour may be written in',
+  },
+  asks: {
+    'its own lists and pages': 'shown as what it adds',
+    uses: 'each place of yours it reads or changes, by name',
+    'a host it calls': 'a CALLS OUT line the person approves on its own; a key goes only to the host its keychain entry opens',
+    'a script or automation': 'what runs while nobody is looking, with the script source shown whole',
+    'a door': 'an address others can post to',
+    skills: 'what it teaches the person\'s agents',
+  },
+  never: [
+    'a key, token or password in the file: name a keychain label',
+    'a colour outside a theme',
+    'a host computed at run time, or plain http',
+    'anything of the person\'s it does not name in uses',
+    'reading another BrainDog, the keychain\'s values, or giving the BrainDog away',
+  ],
+  example: starterAddon({ id: 'watch-list', title: 'Watch list', summary: 'Films and shows to watch, and a card on Today with what is next.', fields: [{ id: 'kind', type: 'enum', values: ['film', 'show'] }] }),
+};
+
 const SERVED: Readonly<Record<(typeof GRAMMARS)[number], unknown>> = {
   page: PAGE,
   register: REGISTER,
@@ -562,6 +629,7 @@ const SERVED: Readonly<Record<(typeof GRAMMARS)[number], unknown>> = {
   proposals: PROPOSALS,
   ingest: INGEST,
   kinds: KINDS_SHORT,
+  pack: PACK,
 };
 
 export function grammarOf(name: string): Result<unknown> {

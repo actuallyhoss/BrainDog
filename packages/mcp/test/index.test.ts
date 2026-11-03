@@ -184,6 +184,8 @@ test('AND THE RESOURCES GO THE SAME WAY, more quietly, which is the half of this
     'braindog:grammar/proposals',
     'braindog:grammar/ingest',
     'braindog:grammar/kinds',
+    /* AN ADD-ON FILE WHOLE (addons market plan, 3 Nov), the record's `arrangement` grammar as the others above are. */
+    'braindog:grammar/pack',
   ]);
   sql.close();
 });

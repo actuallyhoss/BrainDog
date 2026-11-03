@@ -192,6 +192,8 @@ const READS: Record<string, (api: Api, ctx: CallContext) => Promise<{ ok: boolea
   /* The two grammars the agent door keeps as its own text are asked of `version` before they are answered. */
   'grammar/script': (api, ctx) => api.version(ctx),
   'grammar/automations': (api, ctx) => api.version(ctx),
+  /* AN ADD-ON FILE WHOLE (addons market plan, 3 Nov), the record's own grammar as the six above. */
+  'grammar/pack': grammar('pack'),
 };
 
 test('ONE READ ANSWERS ALL FIVE: the fixed addresses, the lists, the pages, the figures and the skills', async () => {

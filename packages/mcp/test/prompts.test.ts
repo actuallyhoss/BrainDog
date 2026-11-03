@@ -23,11 +23,11 @@ const textOf = (r: Reply): string => {
   return (r.result as { messages: { content: { text: string } }[] }).messages.map((m) => m.content.text).join('\n');
 };
 
-test('THREE PROMPTS, listed and read without a call to the record', async () => {
+test('FOUR PROMPTS, listed and read without a call to the record', async () => {
   const { surface, calls } = stub();
   const listed = (await handle({ jsonrpc: '2.0', id: 1, method: 'prompts/list' }, surface, ctx)) as Reply;
   assert.ok('result' in listed);
-  assert.deepEqual((listed.result as { prompts: { name: string }[] }).prompts.map((p) => p.name), ['start', 'wrap', 'ask']);
+  assert.deepEqual((listed.result as { prompts: { name: string }[] }).prompts.map((p) => p.name), ['start', 'wrap', 'ask', 'addon']);
   for (const p of PROMPTS) assert.ok((await handle({ jsonrpc: '2.0', id: 2, method: 'prompts/get', params: { name: p.name } }, surface, ctx)) !== null);
   assert.equal(calls.length, 0);
 });
@@ -61,5 +61,5 @@ test('A PROMPT THERE IS NONE OF IS -32602, naming the ones there are', async () 
   const r = await ask('prompts/get', { name: 'deploy' });
   assert.ok('error' in r);
   assert.equal(r.error.code, -32602);
-  assert.deepEqual((r.error.data as { allowed: string[] }).allowed, ['start', 'wrap', 'ask']);
+  assert.deepEqual((r.error.data as { allowed: string[] }).allowed, ['start', 'wrap', 'ask', 'addon']);
 });
