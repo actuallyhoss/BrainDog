@@ -1051,6 +1051,11 @@
     order: 2;
   }
 
+  /* ASK SLASH AND HAND IT OFF COME LAST, after the answers and what they change: they are the card's other ways on. */
+  .dc-main > .dc-ask {
+    order: 3;
+  }
+
   /* THE BULK BOX SITS AT THE END OF THE QUESTION'S FIRST LINE, since the question leads the card; it sat at the end
      of the by-line while the by-line was the card's first. */
   .dc:has(> .qa-select) > .dc-main > .queue-question {

@@ -54,6 +54,7 @@
   import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import { bodyText, senderName } from './said.ts';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -684,7 +685,15 @@
   }
 
   /** The first words of what was said, for the row's detail line. */
-  const firstWords = (body: string) => body.replace(/\s+/gu, ' ').trim();
+  const firstWords = (body: string) => bodyText(body).replace(/\s+/gu, ' ').trim();
+  /* WHO SENT IT, ONCE: the record's line for it ("From Mara Okafor", "Payment, EGP 420, Quietcart") where it has one, and
+     the sender's name where it has none, at the head of the one line under the subject. The record's line came a beat
+     after the row and stood as a line of its own over "Mara Okafor <mara@…>", the same person twice, and moved every row
+     under it down as it landed. */
+  const whoSaid = (item: { id: string; from: string }): string => {
+    const hint = hintLines.get(item.id);
+    return hint ? hint.replace(/^From /u, '') : senderName(item.from);
+  };
 
   /**
    * THE READ ABOVE IS BRACKETED WITH `opened()` AND `closed()`, and a call still out takes the
@@ -782,8 +791,6 @@
 <PageHead
   icon="mail"
   title={said('inbox')}
-  count={answered && !unrouted && !refused ? INBOX.length : undefined}
-  atLeast={live !== null && live.cursor !== null}
   sentence={sentence?.text}
   needs={sentence?.needs}
   actions={toolbar}
@@ -850,7 +857,8 @@
             <!-- THE FIGURE, said at none too, and the whole as one bar once there is a whole to split. -->
             <Tile icon="refresh" title={words.rulesWeek} href="/automations" hrefLabel={words.seeRules}>
               <p class="figure num">{figure.figure.toLocaleString('en-GB')}<span class="figure-unit">{figure.unit}</span></p>
-              {#if whoFiled}<Stacked parts={whoFiled.parts} subject={words.whoFiled} />{/if}
+              <!-- A BAR ONLY WHERE IT SPLITS SOMETHING: with every arrival in one part it was a solid black band. -->
+              {#if whoFiled && whoFiled.parts.filter((p) => p.value > 0).length > 1}<Stacked parts={whoFiled.parts} subject={words.whoFiled} />{/if}
               <p class="reading">{figure.reading}</p>
             </Tile>
           {/if}
@@ -1106,7 +1114,8 @@
     {/if}
 
     <!-- ONE TILE FOR ALL THAT WAITS (today F14), each day a quiet subhead over its rows and no rule above it. -->
-    <Tile class="section" data-surface="tile" title={words.waiting} count={INBOX.length || undefined}>
+    <!-- ITS NAME AND COUNT ARE THE SWITCH'S ("Waiting 3"), so the tile's own head is said to a screen reader only. -->
+    <Tile class="section waiting-list" data-surface="tile" title={words.waiting} count={INBOX.length || undefined}>
       <div class="section-body">
         {#each days as d (d.day)}
           <h3 class="day-h">{d.label}</h3>
@@ -1139,8 +1148,8 @@
                   >
                     <span class="line-main">
                       <span class="line-title">{item.subject}</span>
-                      {#if hintLines.get(item.id)}<span class="hint">{hintLines.get(item.id)}</span>{/if}
-                      <span class="line-detail"><span class="from">{item.from}</span>{#if open !== item.id && item.body}<span class="gist">{firstWords(item.body)}</span>{/if}</span>
+                      <!-- OPEN, THE SENDER WHOLE (name and address), where the message is read; shut, the name and its first words. -->
+                      <span class="line-detail"><span class="from">{open === item.id ? item.from : whoSaid(item)}</span>{#if open !== item.id && item.body}<span class="gist">{firstWords(item.body)}</span>{/if}</span>
                     </span>
                     <span class="line-when">{since(item.arrived, clock)}</span>
                   </button>
@@ -1155,7 +1164,7 @@
                   {#if open === item.id}
                     <div class="body">
                       <!-- Plain text. Never the renderer, never {@html}, never a link the record made. -->
-                      <p class="raw">{item.body}</p>
+                      <p class="raw">{bodyText(item.body)}</p>
 
                       <!-- FILING IS THE PRIMARY, and archiving follows it in words. -->
                       <div class="actions">
@@ -1729,12 +1738,15 @@
   }
 
   /* WHAT THE RECORD READ IT AS, under the subject: muted, at the body's size, one line. */
-  .hint {
+  /* THE WAITING LIST'S HEAD IS THE SWITCH'S WORDS, so it is kept for a screen reader and not drawn. */
+  .inbox :global(.tile.waiting-list > .tile-head) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: 0;
+    padding: 0;
     overflow: hidden;
-    color: var(--ink-3);
-    font-size: var(--fs-body);
-    line-height: var(--lead-ui);
-    text-overflow: ellipsis;
+    clip-path: inset(50%);
     white-space: nowrap;
   }
 
@@ -1909,10 +1921,11 @@
       align-self: start;
     }
 
-    /* AN OPEN ROW'S BODY AND BUTTONS TAKE THE CARD'S WIDTH ON A PHONE, under the time as well. */
+    /* AN OPEN ROW'S BODY AND BUTTONS TAKE THE CARD'S WIDTH ON A PHONE, under the time as well, on the subject's own
+       text edge (3 Nov: they stood 12px left of it). */
     .body {
       grid-column: 1 / -1;
-      padding-inline-start: 0;
+      padding-inline: var(--sp-3);
     }
 
     .arrival .line-detail {
