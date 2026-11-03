@@ -17,7 +17,7 @@ struct BrainDogMac: App {
 
     var body: some Scene {
         Window("BrainDog", id: "main") {
-            MainWindow().modifier(MacHandoff())
+            MainWindow().modifier(MacHandoff()).modifier(FollowLook())
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1440, height: 900)
@@ -25,6 +25,7 @@ struct BrainDogMac: App {
 
         Window(Words.tellTitle, id: "tell") {
             TellWindow()
+                .modifier(FollowLook())
         }
         .windowResizability(.contentSize)
         .defaultPosition(.top)
