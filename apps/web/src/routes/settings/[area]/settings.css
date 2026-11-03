@@ -450,3 +450,58 @@
 .settings-place .tile > .section-body > :nth-last-child(1 of :not(dialog, template, [hidden])) {
   margin-block-end: 0;
 }
+
+/* "HOW", THE ONE DISCLOSURE FOR RARE INSTRUCTIONS (ui pass, 3 Nov): a paragraph and a shell command on every visit read
+   as a wall, though they are needed once. The head is a 13px line with a turning chevron, as Keychain's "How it works";
+   what it opens sits 8 under it. */
+.settings-place .how {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.settings-place .how-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  inline-size: fit-content;
+  min-block-size: var(--ctl-panel, 28px);
+  color: var(--ink-2);
+  font-size: var(--fs-meta);
+  line-height: var(--lead-meta);
+  font-weight: 500;
+  list-style: none;
+  cursor: pointer;
+}
+
+.settings-place .how-head::-webkit-details-marker {
+  display: none;
+}
+
+.settings-place .how-head .icon {
+  color: var(--ink-3);
+  transition: rotate var(--d-state) var(--ease-out);
+}
+
+.settings-place .how[open] > .how-head .icon {
+  rotate: 90deg;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-place .how-head:hover {
+    color: var(--ink);
+  }
+}
+
+.settings-place .how > :not(summary) {
+  margin: 0;
+  max-inline-size: var(--measure);
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+  line-height: var(--lead-meta);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-place .how-head .icon {
+    transition: none;
+  }
+}

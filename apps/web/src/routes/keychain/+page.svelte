@@ -169,14 +169,14 @@
    * as its red phrase. The machines clause only for a reader the record let list them.
    */
   /** Words of the usual length for the line under the title, set unseen while it is on its way so it holds their room. */
-  const HELD_LIKE = '6 keys. 3 have no value yet.';
+  const HELD_LIKE = '3 have no value yet.';
   let asksRead = $state(false);
   /* A RECORD THE SHELL SAYS HOLDS NO KEYS HOLDS NO LINE FOR A SENTENCE (nojump, 2 Nov): it says nothing once read, and the
      held line gave its 32px back then, lifting the page on a phone. The shell lists a list only once it holds a row. */
   const noKeys = $derived(((page.data as { index?: { registers?: { id: string; count: number }[] } } | undefined)?.index?.registers ?? []).every((r) => r.id !== 'credentials' || r.count === 0));
   const sentence = $derived(
     from === 'live'
-      ? sentenceOf({ keys, listed: index.kind === 'held', counts, asking: waiting.length, seesMachines: devices.kind === 'held', retired })
+      ? sentenceOf({ keys, listed: index.kind === 'held', counts, asking: waiting.length, seesMachines: devices.kind === 'held', retired, titled: true })
       : null,
   );
   /** "Opens by key": the one figure on this screen, or nothing where no count came back. */
@@ -752,7 +752,7 @@
 
 <!-- THE SENTENCE ON ITS WAY HOLDS THE ROOM A USUAL ONE TAKES (`HELD_LIKE`): held empty, the line took no width, Add a key
      stood beside it on a phone, and the page dropped 32px when the words came and pushed the buttons under them. -->
-<PageHead icon="vault" title={copy.keychain} count={index.kind === 'held' ? keys.length : undefined} sentence={sentence?.text ?? (noKeys ? '' : undefined)} needs={sentence?.needs} heldLines={1} heldText={HELD_LIKE}>
+<PageHead icon="vault" title={copy.keychain} count={index.kind === 'held' ? keys.length : undefined} sentence={sentence?.text ?? (noKeys || from === 'live' ? '' : undefined)} needs={sentence?.needs} heldLines={1} heldText={HELD_LIKE}>
   {#snippet actions()}
     <!-- ONE KEYS PLACE (AG16): the list of the same rows is this place's Table view. -->
     <KeyViews on="keys" />

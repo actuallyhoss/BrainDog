@@ -77,14 +77,19 @@ export type Sentence = { text: string; needs: string | undefined };
  * `asking` is counted only for a reader who may see the machines: a reader refused them passes `seesMachines: false`
  * and the clause is not drawn, because a count they were refused is not theirs to read in a sentence either.
  */
-export function sentenceOf(o: { keys: readonly KeyRow[]; listed: boolean; counts: boolean; asking: number; seesMachines: boolean; retired?: number }): Sentence | null {
+export function sentenceOf(o: { keys: readonly KeyRow[]; listed: boolean; counts: boolean; asking: number; seesMachines: boolean; retired?: number; titled?: boolean }): Sentence | null {
   const parts: string[] = [];
   if (o.listed && o.keys.length > 0) {
     /* "6 keys. 2 have no value yet.": the keys with a value nowhere are the ones to see to, counted as Agents counts
        them (`keys-nowhere`), and "sealed" is not a word on screen. */
     const sealed = o.keys.filter((k) => k.sealed);
     const total = sealed.reduce((sum, k) => sum + k.opened, 0);
-    parts.push(o.counts && sealed.length > 0 ? `${keysSaid(o.keys.length)}, ${total === 0 ? 'none opened yet' : keychain.opened(total)}.` : `${keysSaid(o.keys.length)}.`);
+    /* THE COUNT ONCE (ui pass, 3 Nov): where the title already carries it ("Keychain 6", `titled`), the line starts with
+       what the number does not say, and "6 keys." under "Keychain 6" is not said. */
+    const opens = total === 0 ? 'none opened yet' : keychain.opened(total);
+    if (o.titled) {
+      if (o.counts && sealed.length > 0) parts.push(`${opens.charAt(0).toUpperCase()}${opens.slice(1)}.`);
+    } else parts.push(o.counts && sealed.length > 0 ? `${keysSaid(o.keys.length)}, ${opens}.` : `${keysSaid(o.keys.length)}.`);
     const none = o.keys.filter(missing).length;
     if (none > 0) parts.push(`${none === 1 ? '1 has' : `${none} have`} no value yet.`);
     /* THE RETIRED ONES ARE COUNTED BESIDE THEM: Search's Keys counts every row, so "83 keys" here and "176" there

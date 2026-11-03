@@ -59,6 +59,8 @@
     void methods().then((m) => (mailOff = m.ok && m.value.magic !== true)).catch(() => {});
   });
   const inviteHow = $derived(mailOff ? copy.inviteHowNoMail : copy.inviteHowMail);
+  /* THIS AREA'S OWN WORDS (ui pass, 3 Nov). */
+  const peopleWords = { noMail: "This server can't send mail. How to invite" } as const;
   const me = $derived(shell.me);
   const anOwner = $derived(s.anOwner);
   /* TEAMS HELD: the Cloud says so in `/account/billing` (`teams_held`), and the invite form gives way to the sentence. */
@@ -558,9 +560,13 @@
 {:else if alone}
   <!-- ONE PERSON IS THE TILE'S SENTENCE AND NOTHING ELSE: there is nobody to list and nobody to compare. Its glyph is the
        tile's own in every state, so the two faces stay Groups' alone. -->
-  <Tile icon="user-check" title={copy.whoCanSee}>
-    <p class="reading">{copy.onlyPerson}</p>
-  </Tile>
+  <!-- AND NO TILE AT ALL WHERE THE INVITE TILE IS DRAWN (ui pass, 3 Nov): a card holding "Only you, for now." over a card
+       inviting somebody was two cards for one fact; the invite card says it as its line. -->
+  {#if !mayInvite || teamsHeld}
+    <Tile icon="user-check" title={copy.whoCanSee}>
+      <p class="reading">{copy.onlyPerson}</p>
+    </Tile>
+  {/if}
 {:else}
   <Tile icon="user-check" class="section" data-surface="tile" title={copy.whoCanSee} count={people.length || undefined}>
     <div class="section-body">
@@ -855,10 +861,18 @@
 {/snippet}
 <Tile icon="user-plus" class="section" data-surface="tile" title={copy.inviteTitle} actions={inviteAction} count={waitingInvites.length || undefined}>
   <div class="section-body">
+    {#if alone}<p class="reading">{copy.onlyPerson}</p>{/if}
     <!-- NO MAIL LEAVES THIS HOST, and the line says so beside the control rather than after the press: the owner sends
-         the link themselves, and somebody expecting an email would wait for one that never comes. -->
-    <p class="hint">{inviteHow}</p>
-    {#if mailOff}<code class="invite-command">{copy.inviteCommand}</code>{/if}
+         the link themselves, and somebody expecting an email would wait for one that never comes. ONE LINE, THE REST
+         UNDER "HOW" (ui pass, 3 Nov): three lines of grey and a shell command stood here on every visit, and the sheet
+         the button opens says the rules of a link again. With mail, the sheet's line is the whole of it. -->
+    {#if mailOff}
+      <details class="how">
+        <summary class="how-head tap"><Icon name="chevron" size="s" />{peopleWords.noMail}</summary>
+        <p>{copy.inviteHowNoMail}</p>
+        <code class="invite-command">{copy.inviteCommand}</code>
+      </details>
+    {/if}
     <Sheet bind:open={inviteOpen} title={copy.invitePerson} subtitle={mailOff ? copy.inviteHowNoMailShort : inviteHow}>
     <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
          row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->

@@ -57,7 +57,8 @@
     /* NOT "LOCK" (AF14): the screen's own Lock now and Lock after stood above a line saying the keys had no lock. The
        password is asked before a key opens; the lock is the screen putting every value away. */
     unasked: 'Ask for a password before any key is opened.',
-    set: 'Set a keychain password',
+    /* "SET UP", NOT "SET A KEYCHAIN PASSWORD" (ui pass, 3 Nov): the row's own title, Keychain password, is right beside it. */
+    set: 'Set up',
   } as const;
 
   const on = $derived(lock.state === 'on');

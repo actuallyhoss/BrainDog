@@ -332,7 +332,9 @@
       <Button weight="quiet" size="sm" onclick={() => askSheet()}><Icon name="plus" size="s" />{copy.sharingShare}</Button>
     {/snippet}
     {#if sections.shared.length === 0 && linkCount === 0}
-      <Empty kind="no-data-yet" compact title={copy.sharingNothing} />
+      <!-- THE STATE, NOT A DESCRIPTION OF THE LIST (ui pass, 3 Nov): "What you share ... is listed here" under a heading
+           "Shared" and a "Share something" button said what the card is for three times. -->
+      <Empty kind="no-data-yet" compact title="Nothing shared yet." />
     {:else if sections.shared.length > 0}
       <ul class="bunches">{#each sections.shared as b (b.key)}{@render bunchOf(b, false)}{/each}</ul>
     {/if}
