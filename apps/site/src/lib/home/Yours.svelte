@@ -54,7 +54,7 @@
   }
 
   .say {
-    max-inline-size: 60ch;
+    max-inline-size: 44em;
     margin: 12px 0 0;
     color: var(--on-night-2);
     font-size: var(--t-text);

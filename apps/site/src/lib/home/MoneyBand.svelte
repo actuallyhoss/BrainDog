@@ -325,7 +325,7 @@
 
   /* THE LINE UNDER THE DRAWING, at the text step and a tile's gap below it. */
   .addons {
-    max-inline-size: 60ch;
+    max-inline-size: 44em;
     margin-block-start: 20px;
     color: var(--ink2);
     font-size: var(--t-text);

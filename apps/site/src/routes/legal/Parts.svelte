@@ -163,7 +163,7 @@
   }
 
   .part-body {
-    max-inline-size: 68ch;
+    max-inline-size: 42em;
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-text);

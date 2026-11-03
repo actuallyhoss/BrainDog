@@ -28,7 +28,7 @@
   }
 
   h1 {
-    max-inline-size: 14ch;
+    max-inline-size: 10em;
     font-size: var(--t-page);
     line-height: 1.04;
     letter-spacing: -0.021em;

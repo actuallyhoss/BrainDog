@@ -122,6 +122,8 @@
      *   say       the line under a section's title, 16 to 18
      *   text      words in a tile, 16;  label  a tile's small heading, a way on, 15;  meta  14
      */
+    /* WIDTHS IN EM, NOT CH: `ch` is the 0's width, and Jakarta's 0 is 0.73 em where Arial's is 0.56, so a measure in ch
+       narrowed and rewrapped the hero until the face landed. */
     --t-display: clamp(48px, 6.4vw, 92px);
     --t-page: clamp(44px, 5.6vw, 80px);
     --t-section: clamp(34px, 2.5vw + 16px, 52px);
@@ -561,7 +563,7 @@
   /* Text for reading: 17/28 in the second ink. */
   .lede {
     margin: 0;
-    max-inline-size: 60ch;
+    max-inline-size: 44em;
     color: var(--ink2);
     font-size: var(--t-site-body);
     line-height: var(--lh-site-body);
@@ -893,7 +895,7 @@
 
   /* A CARD'S TITLE IS A SECTION'S: each card on an inner page is one thing the page shows, said at the section step. */
   .card h2 {
-    max-inline-size: 14ch;
+    max-inline-size: 10em;
     font-size: var(--t-section);
     line-height: 1.02;
     letter-spacing: -0.028em;
@@ -901,7 +903,7 @@
   }
 
   .card.dark h2 {
-    max-inline-size: 15ch;
+    max-inline-size: 10.75em;
   }
 
   /* A CARD'S ONE LINE under its title. */
@@ -1003,7 +1005,7 @@
 
   .faq p {
     margin: 0;
-    max-inline-size: 60ch;
+    max-inline-size: 44em;
     color: var(--ink2);
     font-size: var(--t-text);
     line-height: 1.55;
@@ -1106,7 +1108,7 @@
      under it at the say step. */
   .band-h2 {
     margin: 0;
-    max-inline-size: 17ch;
+    max-inline-size: 12.2em;
     font: 600 var(--t-section) / 1.02 var(--head);
     letter-spacing: -0.028em;
     text-wrap: balance;

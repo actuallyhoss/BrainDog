@@ -9,7 +9,7 @@
   in `apps/site/legal/`. Until `LAUNCH.legal` says they are in force, this page says so in one sentence
   and links none of them; after it, it lists the three, each at `/legal/<name>`.
 
-  The page is the night head and a board of two tiles, the licence beside the terms, with the prose at a 68ch
+  The page is the night head and a board of two tiles, the licence beside the terms, with the prose at a 42em
   reading measure inside them (`Parts.svelte`).
 -->
 <script lang="ts">

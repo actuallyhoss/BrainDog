@@ -7,7 +7,7 @@
   reading, where Page lays blocks on twelve, and its `##` headings need anchors for the contents list, which the
   renderer's prose does not give. So `partsOf` cuts the headings out of the prose and this file draws them with ids.
 
-  ONE SHEET ON --tile, read at 68ch (LAUNCH 103 job 7; the tile's white since 2 November, as the trust pages' tiles on
+  ONE SHEET ON --tile, read at 42em (LAUNCH 103 job 7; the tile's white since 2 November, as the trust pages' tiles on
   their board: the paper grey on the board's grey was an edge nobody could see): `head` first, which the page fills with the
   ways to take it as text, then the opening and each `##` part in turn, a heading with its anchor and no tile round it.
 
@@ -129,7 +129,7 @@
 
   /* THE SITE'S READING TEXT, 16/26 in the second ink as the legal texts are, at a measure a line can be read in. */
   .doc-text {
-    max-inline-size: 68ch;
+    max-inline-size: 42em;
     min-inline-size: 0;
     color: var(--ink2);
     font-size: var(--t-text);
@@ -147,7 +147,7 @@
 
   /* A part's heading at 600, set tight; a heading a reader jumps to keeps a little air above it. */
   .doc-h {
-    max-inline-size: 34ch;
+    max-inline-size: 24.5em;
     margin: 0;
     color: var(--ink);
     font-size: var(--t-feature);

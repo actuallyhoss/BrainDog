@@ -135,13 +135,13 @@ test('the docs draw no tile, well, glass or old palette, and their buttons are q
   assert.match(source('lib/docs/CopyText.svelte'), /class="btn quiet sm"/);
 });
 
-test('a doc page puts its title on a night strip and its text on one sheet at 68ch', () => {
+test('a doc page puts its title on a night strip and its text on one sheet at 42em', () => {
   const page = source('routes/docs/[section]/[slug]/+page.svelte');
   assert.match(page, /<header class="night strip">[\s\S]*<h1 class="doc-title"/, 'the title is not on the night strip');
   assert.match(page, /\.board \{[^}]*background: var\(--board\)/, 'the nav and contents are not on the board');
   const body = source('lib/docs/Body.svelte');
   assert.match(body, /\.doc-body \{[^}]*background: var\(--tile\)/, 'the page is not on its sheet');
-  assert.match(body, /max-inline-size: 68ch/, 'the reading measure is not 68ch');
+  assert.match(body, /max-inline-size: 42em/, 'the reading measure is not 42em');
 });
 
 /**

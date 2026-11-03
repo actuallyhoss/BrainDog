@@ -252,7 +252,7 @@
 
   .install-note {
     margin: 0;
-    max-inline-size: 36ch;
+    max-inline-size: 26em;
     color: var(--on-night-2);
     font-size: var(--t-site-15);
     line-height: 1.5;

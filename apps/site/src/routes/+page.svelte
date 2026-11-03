@@ -104,7 +104,7 @@
 
   /* Two lines at 1440, three at 390. */
   h1 {
-    max-inline-size: 18ch;
+    max-inline-size: 13em;
     font-size: var(--t-display);
     line-height: 1.04;
     letter-spacing: -0.021em;

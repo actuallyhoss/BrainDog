@@ -3,7 +3,7 @@
   product's renderer, and the list of its parts.
 
   THE LOOK IS LOOK B'S (LAUNCH 103 job 7): the strip carries on from the header's night, then the board.
-  The page is one sheet read at 68ch (`Body`); the nav and "On this page" are flat on the board with no tile
+  The page is one sheet read at 42em (`Body`); the nav and "On this page" are flat on the board with no tile
   round them, and stay in view as the page scrolls. From 900px the nav and the page; below 900px the nav is a closed
   disclosure at the top and the list of parts is not drawn, because on a phone the page itself is the list; there the
   part in view is named in one line that stays at the top as the page scrolls (plan F24), and on a desk the list marks
@@ -176,7 +176,7 @@
 
   /* A DOC'S NAME AT THE SECTION STEP: the strip is slimmer than a page's head, so its title is a step under a page's. */
   .doc-title {
-    max-inline-size: 22ch;
+    max-inline-size: 15.75em;
     margin: 0;
     font-size: var(--t-section);
     line-height: 1.02;
