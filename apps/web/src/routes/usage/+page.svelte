@@ -41,6 +41,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import Empty from '$lib/ui/Empty.svelte';
@@ -171,8 +172,8 @@
     idle: 'Each run of an automation or an agent counts here.',
     idleRules: 'Automations count here each time they run.',
     connect: 'Connect an agent',
-    moreActions: (n: number) => `${n} more`,
-    fewer: 'Show the top five',
+    moreActions: (n: number) => `Show ${n} more`,
+    fewer: 'Show fewer',
   } as const;
 
   const said = {
@@ -331,9 +332,11 @@
                   </li>
                 {/each}
               </ul>
-              {#if r.waiting && r.binding}
+              <!-- THE HEAD'S SENTENCE READS THE FIRST RECORD'S BINDING METER, so its tile does not say it again; a second
+                   record's tile keeps its own line, which no sentence above says. -->
+              {#if view.records.length > 1 && r.waiting && r.binding}
                 <p class="reading">{words.waitingUntil(r.resets, r.binding)}</p>
-              {:else if bound}
+              {:else if view.records.length > 1 && bound}
                 <p class="reading">{bound.name}: {bound.said}</p>
               {/if}
             {:else}
@@ -430,7 +433,7 @@
             </ul>
           </div>
         </Tile>{/if}
-        <Tile class="section" data-surface="tile" icon="play" title={words.byAction} count={actionRows.length || undefined}>
+        <Tile class="section" data-surface="tile" icon="rows" title={words.byAction} count={actionRows.length || undefined}>
           <div class="section-body">
             <ul class="ledger use-list use-bars">
               {#each actionsShown as a, i (`${a.project} ${a.name} ${i}`)}
@@ -445,7 +448,7 @@
             </ul>
             {#if actionRows.length > TOP}
               <button type="button" class="use-more tap" aria-expanded={allActions} onclick={() => (allActions = !allActions)}
-                >{allActions ? usageWords.fewer : usageWords.moreActions(actionRows.length - TOP)}</button
+                ><Icon name="chevronDown" size="s" />{allActions ? usageWords.fewer : usageWords.moreActions(actionRows.length - TOP)}</button
               >
             {/if}
           </div>
@@ -790,22 +793,39 @@
     background: var(--ink-3);
   }
 
+  /* THE REST OF THE LIST BEHIND ONE PRESS: a 28 capsule on the rows' text edge, its chevron turning once they show. It was
+     "8 more" in the meta size, 18px tall, read as a stray caption under the bars. */
   .use-more {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--sp-1);
+    min-block-size: var(--ctl-panel);
     margin-block-start: var(--sp-2);
-    margin-inline-start: calc(var(--head-glyph) + var(--sp-3));
-    padding: 0;
-    background: none;
+    margin-inline-start: calc(var(--head-glyph) + var(--sp-3) - var(--title-inset, 12px));
+    padding-inline: var(--sp-3);
+    background: var(--soft-fill);
     border: 0;
+    border-radius: var(--r-pill);
     color: var(--ink-2);
     font: inherit;
-    font-size: var(--fs-meta);
+    font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
-    line-height: var(--lead-meta, 18px);
+    line-height: var(--lead-ctl, 20px);
     cursor: pointer;
+  }
+
+  .use-more :global(svg) {
+    transition: rotate var(--d-state, 120ms) var(--ease-out, ease-out);
+  }
+
+  .use-more[aria-expanded='true'] :global(svg) {
+    rotate: 180deg;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .use-more:hover {
+      background: var(--soft-fill-hover);
       color: var(--ink);
     }
   }

@@ -218,6 +218,12 @@
 
   /* ── Run a job ── */
 
+  /* THE SHEET'S EMPTY STATE IN TWO SHORT LINES (ui pass, 3 Nov), where `words.noKinds` was one long one. */
+  const sheetWords = {
+    none: 'Nothing to run yet',
+    noneWhy: 'A job runs once you approve its kind in Needs you. An agent can propose one, or you can write it.',
+  } as const;
+
   let starting = $state(false);
   let kinds = $state.raw<Answer<JobKind[]> | null>(null);
   let chosen = $state<string | null>(null);
@@ -297,7 +303,7 @@
   {:else if jobs.state === 'empty'}
     <!-- NO RUN YET: what a job is, in three steps, and the machines that could take one, side by side. -->
     <div class="first" data-pair={devices ? '' : undefined}>
-      <Tile icon="play" title={said.whatTitle}>
+      <Tile icon="info" title={said.whatTitle}>
         <ol class="steps">
           {#each said.whatSteps as step, i (i)}<li><span class="step-n num" aria-hidden="true">{i + 1}</span><span>{step}</span></li>{/each}
         </ol>
@@ -398,14 +404,20 @@
   </Tile>
 {/snippet}
 
-<Sheet bind:open={starting} title={words.run}>
+<Sheet bind:open={starting} title={words.run} footer={kinds?.ok && offered.length > 0 ? runFoot : undefined}>
   {#if kinds === null}
     <!-- ONLY WHILE THE SHEET IS OPEN: a closed sheet holding a busy block said the whole page was still loading. -->
     {#if starting}<Waiting rows={2} />{/if}
   {:else if !kinds.ok}
     <p class="sheet-note" role="status">{'refusal' in kinds ? kinds.refusal.fix : copy.readRefused}</p>
   {:else if offered.length === 0}
-    <p class="sheet-note">{words.noKinds}</p>
+    <!-- NOTHING TO RUN YET: one line of why, and the one way in. It was a paragraph, a red underlined link under it and a
+         greyed Run in the footer that could never be pressed. -->
+    <div class="sheet-empty">
+      <p class="sheet-empty-title">{sheetWords.none}</p>
+      <p class="sheet-note">{sheetWords.noneWhy}</p>
+      <div class="sheet-empty-do"><Button weight="primary" href={at('/agents/new-kind')}><Icon name="plus" size="s" />{kindWords.open}</Button></div>
+    </div>
   {:else}
     <!-- EACH KIND IS A 56PX ROW: its name, where it works and whether it changes files, and a check at the end on the one
          picked. -->
@@ -445,12 +457,15 @@
     {#if fix}<p class="sheet-fix" role="status">{fix}</p>{/if}
     <!-- NO MACHINE LISTENING IS SAID BEFORE START, which still starts it: the job waits for a machine. -->
     {#if nobodyListening}<p class="sheet-note" role="status">{words.nobodyListening}</p>{/if}
+    <!-- A KIND NOT LISTED IS WRITTEN, a quiet way in under the ones there are. -->
+    <div class="sheet-new"><Button weight="quiet" size="sm" href={at('/agents/new-kind')}><Icon name="plus" size="s" />{kindWords.open}</Button></div>
   {/if}
-  <a class="link" href={at('/agents/new-kind')}>{kindWords.open}</a>
-  {#snippet footer()}
-    <Button weight="primary" disabled={busy || kind === null} onclick={() => void start()}>{kind ? words.start(kind.title) : words.startAny}</Button>
-  {/snippet}
 </Sheet>
+
+<!-- THE FOOTER ONLY WHERE THERE IS A KIND TO RUN: a Run that can never be pressed is not offered. -->
+{#snippet runFoot()}
+  <Button weight="primary" disabled={busy || kind === null} onclick={() => void start()}>{kind ? words.start(kind.title) : words.startAny}</Button>
+{/snippet}
 
 <style>
   /* THE PAGE IS A CONTAINER, so the list and its tiles decide their columns by the room the page has (the rail and a
@@ -736,6 +751,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
+    line-height: var(--lh-body);
     max-inline-size: var(--measure);
   }
 
@@ -784,17 +800,29 @@
     font-weight: 500;
   }
 
-  .link {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: var(--ctl-h);
-    margin-block-start: var(--sp-3);
-    color: var(--red);
+  /* NOTHING TO RUN: a heading-sized line, one line of why, and the way in as the sheet's one primary. */
+  .sheet-empty {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
   }
-  @media (pointer: coarse) {
-    .link {
-      min-block-size: var(--tap);
-    }
+
+  .sheet-empty-title {
+    margin: 0;
+    color: var(--ink);
+    font: var(--t-head, 600 var(--fs-head) / var(--lead-head, 22px) var(--font-ui));
+    letter-spacing: var(--track-head, -0.01em);
+  }
+
+  .sheet-empty-do {
+    display: flex;
+    margin-block-start: var(--sp-2);
+  }
+
+  /* WRITING A NEW KIND, under the kinds there are, on the rows' text edge. */
+  .sheet-new {
+    display: flex;
+    margin-block-start: var(--sp-1);
   }
   .arg {
     display: flex;

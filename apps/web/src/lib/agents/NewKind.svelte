@@ -221,11 +221,12 @@
 </div>
 
 <style>
+  /* ONE READING COLUMN, as its own note says (720): at 1080 the title field ran a thousand pixels for a few words. */
   .form {
     display: grid;
     gap: var(--sp-6);
     min-inline-size: 0;
-    max-inline-size: 1080px;
+    max-inline-size: 45rem;
   }
 
   /* THE THREE WAYS TO START: one a row, its name and what it does, the picked one on the tile's ink edge. */
@@ -234,39 +235,55 @@
     gap: var(--sp-2);
   }
 
+  /* A WAY TO START IS A ROW ON THE SOFT FILL; the picked one takes the chosen wash, its radio says which. A 1.5px ink
+     outline round a grey card was the heaviest line on the page, for a choice the radio already showed. */
   .preset {
     display: flex;
     align-items: flex-start;
     gap: var(--sp-3);
     padding: var(--sp-3);
-    background: var(--tile-2);
-    border-radius: var(--r-pop);
+    background: var(--soft-fill);
+    border-radius: var(--r-field);
     cursor: pointer;
+    transition: background-color var(--d-state, 120ms) var(--ease-out, ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .preset:not([data-on]):hover {
+      background: var(--soft-fill-hover);
+    }
   }
 
   .preset[data-on] {
-    outline: 1.5px solid var(--ink);
-    outline-offset: -1.5px;
+    background: var(--chosen);
+  }
+
+  .preset:has(input:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 0;
   }
 
   .preset input {
-    margin-block-start: 3px;
+    flex: none;
+    margin: 2px 0 0;
   }
 
   .preset-words {
     display: grid;
-    gap: 2px;
+    gap: var(--row-stack, 2px);
   }
 
   .preset-name {
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
+    line-height: var(--lead-ui, 20px);
   }
 
   .preset-said {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
   }
 
   .more-head {
@@ -278,24 +295,38 @@
     list-style: none;
   }
 
+  .more-head::-webkit-details-marker {
+    display: none;
+  }
+
+  /* THE CHEVRON TURNS DOWN WHEN MORE IS OPEN, so the row says which way it went. */
+  .more-head :global(svg) {
+    transition: rotate var(--d-state, 120ms) var(--ease-out, ease-out);
+  }
+
+  .more[open] > .more-head :global(svg) {
+    rotate: 90deg;
+  }
+
   .more > .column {
     margin-block-start: var(--sp-3);
   }
 
+  /* FIELDS 16 APART, A LABEL 4 OVER ITS FIELD (rhythm, 3 Nov). They were 24 and 8. */
   .fields {
-    gap: var(--sp-5);
+    gap: var(--sp-4);
   }
 
   .column {
     display: grid;
     align-content: start;
-    gap: var(--sp-5);
+    gap: var(--sp-4);
     min-inline-size: 0;
   }
 
   .item {
     display: grid;
-    gap: var(--sp-2);
+    gap: var(--sp-1);
     min-inline-size: 0;
     margin: 0;
     padding: 0;
@@ -319,9 +350,9 @@
 
   .help {
     margin: 0;
-    margin-block-start: calc(var(--sp-1) - var(--sp-2));
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
   }
 
   .help.wrong {
@@ -334,15 +365,17 @@
     box-shadow: inset 0 0 0 1.5px var(--red);
   }
 
-  /* A FIELD IS THE INNER FILL WITH NO BORDER, as on every other form. */
+  /* A FIELD OF LINES IS DRAWN AS THE ONE-LINE FIELD ABOVE IT (`.field`, ops style): the tile's fill, a 1px edge,
+     radius 12. It was a grey well with no edge under a white bordered title field, two kinds of field on one form. */
   .lines {
     box-sizing: border-box;
     inline-size: 100%;
     min-inline-size: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--tile-2);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-pop);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    border-radius: var(--r-field);
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--fs-body);
@@ -369,8 +402,8 @@
   }
 
   .lines:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 2px;
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 0;
   }
 
   .pick {
