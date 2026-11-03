@@ -860,6 +860,12 @@
     padding: var(--sp-3) var(--gutter) 0;
   }
 
+  /* NOTHING UNDER THE SENTENCE, NO STEP FOR IT: an empty row still took its 12, so Add-ons' search stood 36 under the
+     head where every screen's first content stands 24 (cleanup, 3 Nov). */
+  .head-below:not(:has(*)) {
+    display: none;
+  }
+
   @media (width < 900px) {
     /**
      * THE BAR: its own row, 56 under the notch, sticky, and nothing sticky on a phone is taller. The notch is paid here,

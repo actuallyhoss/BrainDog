@@ -855,7 +855,8 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--page-head-gap);
-    padding-block: var(--page-top) var(--page-bottom);
+    /* UNDER THE PAGE'S HEAD, the head's gap, as every screen with a head pads (cleanup, 3 Nov). */
+    padding-block: var(--page-head-gap) var(--page-bottom);
     padding-inline: var(--gutter);
   }
 

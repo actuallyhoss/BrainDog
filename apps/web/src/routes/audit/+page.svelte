@@ -972,6 +972,12 @@
     gap: var(--tile-gap);
   }
 
+  /* WITHOUT THE SIDE TILES (a phone lays them inside the stream) THE EMPTY ROW GOES, and its gap with it: the stream
+     stood 28 under the head where every page's first tile stands 16 (cleanup, 3 Nov). */
+  .board:not(:has(> .side)) {
+    grid-template-areas: 'feed';
+  }
+
   .side {
     grid-area: side;
     display: grid;

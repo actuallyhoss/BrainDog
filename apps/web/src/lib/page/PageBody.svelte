@@ -1824,12 +1824,14 @@
     --btn-fill: var(--tile);
   }
 
-  /* Where the name's row stood: the head draws no room of its own now, so the row keeps the head's step under the bar. */
+  /* Where the name's row stood: the head draws no room of its own now, so the row stands on the page's top step, which
+     the page's own padding already gives (cleanup, 3 Nov: a 16 of its own put Agents' Share 40 under the bar where
+     Settings' ⋯ stands 24). */
   .block-slot:not([data-arranging]):has(> :global(.lead-end + .block[data-kind='note'][data-form='lead'])) {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     row-gap: var(--sp-2);
-    margin-block-start: var(--sp-4);
+    margin-block-start: 0;
   }
 
   @media (width >= 640px) {
