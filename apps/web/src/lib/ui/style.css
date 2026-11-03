@@ -61,13 +61,74 @@
     --ctl-panel: 28px;
     --table-row-h: 44px;
     --title-inset: 12px;
-    --toolbar-gap: 6px;
+    --toolbar-gap: 8px;
     --window-inset: 12px;
     --tile-gap: 16px;
     --rail: 220px;
     /* THE PHONE BAR FLOATS: 60 tall, 8 over the home indicator. */
     --tab-h: 60px;
     --tabbar: calc(var(--tab-h) + 8px + env(safe-area-inset-bottom));
+
+    /* THE RHYTHM (3 Nov, "revise all spacing, line spacing, padding ... ALL"): the rules are
+       `loop/plans/spacing-2026-11-03/RHYTHM.md`. Space is a multiple of 4; 2 only inside a control. */
+    --sp-0: 2px;
+    /* Line boxes per size, in px, so a line sits on the 2px sub-grid. `--lh-*` stay ratios for running text. */
+    --lead-caps: 16px;
+    --lead-cap: 16px;
+    --lead-meta: 18px;
+    --lead-ctl: 20px;
+    --lead-ui: calc(var(--fs-body) + 6px);
+    --lead-row: 20px;
+    --lead-head: 22px;
+    --lead-figure: 26px;
+    --lead-page: 32px;
+    --lead-hero: 34px;
+    --lh-head: 1.3;
+    --lh-figure: 1.18;
+    --lh-tight: 1.25;
+    --track-caps: 0.025em;
+    --track-head: -0.01em;
+    --track-body: 0.005em;
+    /* The type pairs as one shorthand each: `font: var(--t-row)`. */
+    --t-caps: var(--fw-medium) var(--fs-caps) / var(--lead-caps) var(--font-ui);
+    --t-cap: var(--fw-regular) var(--fs-cap) / var(--lead-cap) var(--font-ui);
+    --t-meta: var(--fw-regular) var(--fs-meta) / var(--lead-meta) var(--font-ui);
+    --t-ctl: var(--fw-medium) var(--fs-ctl) / var(--lead-ctl) var(--font-ui);
+    --t-body: var(--fw-regular) var(--fs-body) / var(--lh-body) var(--font-ui);
+    --t-ui: var(--fw-regular) var(--fs-body) / var(--lead-ui) var(--font-ui);
+    --t-row: var(--fw-regular) var(--fs-row) / var(--lead-row) var(--font-ui);
+    --t-head: var(--fw-semi) var(--fs-head) / var(--lead-head) var(--font-display);
+    --t-figure: var(--fw-semi) var(--fs-figure) / var(--lead-figure) var(--font-display);
+    --t-page: var(--fw-semi) var(--fs-page) / var(--lead-page) var(--font-display);
+    --t-hero: var(--fw-semi) var(--fs-hero) / var(--lead-hero) var(--font-display);
+
+    /* Controls. */
+    --field-h: 36px;
+    --menu-row-h: 32px;
+    --badge-h: 20px;
+    --ctl-pad: 16px;
+    --ctl-pad-sm: 12px;
+    --gap-glyph: 8px;
+
+    /* Rows. */
+    --row-pad-y: 8px;
+    --row-pad-x: var(--title-inset);
+    --row-gap: 12px;
+    --row-stack: 2px;
+
+    /* Cards, sections and the page: desk values here, tablet and phone below. */
+    --tile-pad: 20px;
+    --tile-pad-lead: 24px;
+    --card-list-pad: calc(var(--tile-pad) - var(--title-inset));
+    --card-head-gap: 12px;
+    --divider-space: 12px;
+    --gutter: 32px;
+    --page-top: 24px;
+    --page-head-gap: 24px;
+    --section-gap: 48px;
+    --section-head-gap: 16px;
+    --page-bottom: 64px;
+    --title-gap: 16px;
 
     /* MOTION: the ops springs, beside the house's eases. */
     --spring-press: linear(0, 0.158, 0.438, 0.683, 0.852, 0.949, 0.995, 1.013, 1.015, 1.012, 1.008, 1);
@@ -245,6 +306,31 @@
       --btn-h: 36px;
       --btn-h-sm: 28px;
     }
+  }
+
+  /* THE RHYTHM BY WIDTH: tablet 640 to 1199, phone under 640, and a wider gutter from 1600. */
+  @media (width < 1200px) {
+    :root {
+      --gutter: 24px;
+      --section-gap: 40px;
+      --page-bottom: 48px;
+    }
+  }
+  @media (width < 640px) {
+    :root {
+      --tile-pad: 16px;
+      --tile-pad-lead: 16px;
+      --tile-gap: 12px;
+      --gutter: 16px;
+      --page-top: 12px;
+      --page-head-gap: 16px;
+      --section-gap: 32px;
+      --section-head-gap: 12px;
+      --page-bottom: calc(var(--tabbar) + 24px);
+    }
+  }
+  @media (width >= 1600px) {
+    :root { --gutter: 40px; }
   }
 
   html[data-text='sm'] { --fs-body: 13px; }
