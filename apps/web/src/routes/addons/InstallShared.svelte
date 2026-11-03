@@ -216,10 +216,9 @@
   >
     <label class="field-label" for="from-address">{words.address}</label>
     <div class="from-line">
-      <div class="field from-field"><input id="from-address" class="field-input" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" aria-describedby="from-address-hint" bind:value={address} /></div>
+      <div class="field from-field"><input id="from-address" class="field-input" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" bind:value={address} /></div>
       <Button type="submit" disabled={busy || !client || address.trim() === ''}>{busy ? words.reading : words.read}</Button>
     </div>
-    <p class="from-hint" id="from-address-hint">{words.addressHint}</p>
   </form>
   <form
     class="from-paste"
@@ -331,13 +330,6 @@
     font-size: var(--fs-meta);
     line-height: var(--lead-meta);
     resize: vertical;
-  }
-
-  .from-hint {
-    margin: 0;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta);
   }
 
   .from-said {
