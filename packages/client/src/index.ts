@@ -664,7 +664,8 @@ export type BriefingCard = { h: string; line: string; row: string | null; cause:
 export type Briefing = { cards: BriefingCard[]; at: string; basis: string; said?: string | null };
 
 /** `packs`: one pack, on or off. `version` is `null` for a pack the seed owns by its bodies. See `PackState` in `@braindog/kernel`. */
-export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
+/** `source` is said only for one the store does not keep current: made here (`paste`), from a link (`url`) or GitHub (`git`). */
+export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[]; source?: string | null };
 
 /** `disablePack` and `enablePack`: the packs that turned, and the declarations that went or came back. */
 export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: boolean; packs: string[]; declarations: string[]; said: string };

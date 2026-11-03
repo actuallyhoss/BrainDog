@@ -36,7 +36,7 @@ import type { CatalogueOffer } from './slash.ts';
 
 export type CatalogueReader = (path: string) => string | null | Promise<string | null>;
 
-export function offersFromCatalogue(read: CatalogueReader): (held: readonly { id: string; version: string; on: boolean }[]) => Promise<CatalogueOffer[]> {
+export function offersFromCatalogue(read: CatalogueReader): (held: readonly { id: string; version: string; on: boolean; source?: string | null }[]) => Promise<CatalogueOffer[]> {
   return async (held) => {
     let doc: unknown;
     try {
@@ -48,7 +48,7 @@ export function offersFromCatalogue(read: CatalogueReader): (held: readonly { id
     }
     const index = readCatalogue(doc);
     if (!index.ok) return [];
-    const { updates } = await catalogueUpdates(index.value, held.map((h) => ({ id: h.id, version: h.version, disabled_at: h.on ? null : 'off' })), read);
+    const { updates } = await catalogueUpdates(index.value, held.map((h) => ({ id: h.id, version: h.version, disabled_at: h.on ? null : 'off', source: h.source ?? null })), read);
     const statements = await verifiedStatements(index.value.keys);
     const offers: CatalogueOffer[] = [];
     for (const u of updates) {

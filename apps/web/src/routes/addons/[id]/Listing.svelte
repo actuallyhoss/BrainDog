@@ -628,7 +628,9 @@
           ? words.turnOn(listing?.title ?? '')
           : action?.kind === 'installed'
             ? words.installed
-            : words.install(listing?.title ?? ''),
+            : action?.kind === 'taken'
+              ? words.taken
+              : words.install(listing?.title ?? ''),
   );
   /* ONCE IT IS IN, ITS FIRST PAGE, so one press lands on what it brought (`offer.ts` `firstPageOf`). */
   const opens = $derived(adds ? firstPageOf(adds.pages, declared) : null);
@@ -636,7 +638,7 @@
      said "Installed" and nothing about where an alert goes. What comes in, Texts, takes a bank text pasted in. */
   const pastes = $derived(opens === null && (adds?.reads.includes('texts') ?? false));
   /* SOMETHING TO PRESS: the phone's bar is drawn only then, and never to say "Installed" over the last tile. */
-  const doable = $derived(listing !== null && listing !== undefined && filed === null && (action?.kind !== 'installed' || opens !== null || pastes) && (trust?.kind === 'changed' || !untrusted));
+  const doable = $derived(listing !== null && listing !== undefined && filed === null && ((action?.kind !== 'installed' && action?.kind !== 'taken') || opens !== null || pastes) && (trust?.kind === 'changed' || !untrusted));
 
   const publisherWords = $derived(
     !listing
@@ -677,7 +679,7 @@
     <Button weight="primary" href={at(`/p/${opens.id}`)}>{words.open(opens.title)}</Button>
   {:else if action?.kind === 'installed' && pastes}
     <Button weight="primary" href={at('/settings/ingest#texts')}>{words.pasteText}</Button>
-  {:else if action?.kind === 'installed'}
+  {:else if action?.kind === 'installed' || action?.kind === 'taken'}
     <Button weight="primary" disabled>{label}</Button>
   {:else if trust?.kind === 'changed'}
     <Button disabled={trusting} onclick={() => void trustKey()}>Trust this key</Button>

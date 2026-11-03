@@ -84,7 +84,9 @@
       title: f.kind === 'usecase' ? f.shared.usecase.title : f.file.title,
       version: f.kind === 'usecase' ? f.shared.usecase.version : f.file.pack.manifest.version,
     };
-    const out = await planFor(client, { kind: f.kind, id, source: 'file' }, { doc: f.kind === 'pack' ? f.file.doc : null, text }, installed, copy.writeRaced);
+    /* NOT THE STORE'S, WHATEVER ITS ID: a file from this device or pasted is made here, a link is its link. */
+    const from = source === 'url' && ref !== null ? (ref.startsWith('git:') ? { kind: 'git' as const, ref } : { kind: 'url' as const, ref }) : { kind: 'paste' as const };
+    const out = await planFor(client, { kind: f.kind, id, source: 'file' }, { doc: f.kind === 'pack' ? f.file.doc : null, text, from }, installed, copy.writeRaced);
     if (!out.ok) {
       said = { fix: out.fix, code: out.code };
       return;

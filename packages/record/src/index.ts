@@ -36,6 +36,7 @@ import {
   type Installed,
   type PackSource,
   unresolvedFault,
+  updatesFromStore,
 } from '@braindog/declare';
 import { isDuplicate, matchLiterals, normalise as normaliseText, parseDate, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
 import { fixOf, no, ok } from '@braindog/ports';
@@ -2729,6 +2730,26 @@ export async function createRecordApi(deps: RecordDeps) {
 function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'kept' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed' | 'visuals'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /**
+   * WHAT IS HELD THAT THE STORE KEEPS CURRENT (`updatesFromStore`): every pack but one made here, from a link or from
+   * GitHub, whose id the store may one day hold for an add-on of its own. Every pass that matches what is held against
+   * the store by id reads it through this, so the store's file never replaces somebody's own.
+   */
+  const storeHeld = <T extends { id: string }>(held: readonly T[]): T[] => {
+    const from = new Map(sql.all<{ id: string; source: string }>('SELECT id, source FROM pack').map((r) => [r.id, r.source]));
+    return held.filter((p) => updatesFromStore(from.get(p.id)));
+  };
+  /**
+   * WHERE A REINSTALL SAYS NOTHING, WHERE IT CAME FROM IS KEPT. `local` is what every put-in-again sends that does not
+   * know (a setting planned again, a part that waited, links laid back), and the `pack` row took it over whatever was
+   * there, so an add-on made here became the store's at its first change of settings. Only a claim, `kennel`, `url`,
+   * `git` or `paste`, moves it.
+   */
+  const keptSource = <R extends { id: string; source: string; ref: string | null }>(row: R): R => {
+    if (row.source !== 'local') return row;
+    const was = sql.one<{ source: string; source_ref: string | null }>('SELECT source, source_ref FROM pack WHERE id = ?', row.id);
+    return was === undefined || updatesFromStore(was.source) ? row : { ...row, source: was.source, ref: was.source_ref };
+  };
+  /**
    * The visual pages whose text names whoever an erasure is for, by their SHA-256. A page is kept outside the file, so
    * the kernel's scan of every column never reads it; it is read here, before the erasure's transaction, as the
    * subjects' hashes are. A host with no page store has no pages to read.
@@ -3818,7 +3839,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* THE RECORD'S OWN CLOCK AND ZONE, so a seed's `{ day }` counts from the day this record reads and not the machine's,
        nor Greenwich's (AH22): a Guide made at 01:00 in Cairo dated its steps from the day before. */
     today: () => localDays(readableZone(kernel.identity()?.tz))(clock.now()),
-    remember: (row) => kernel.rememberPack({ ...row, by: actorOf(ctx) }),
+    remember: (row) => kernel.rememberPack({ ...keptSource(row), by: actorOf(ctx) }),
     /* AND ITS FILE, kept while a part of it waited (`installHeld`), goes with it. */
     forget: (id) => {
       kernel.forgetPack(id);
@@ -3847,7 +3868,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const { useCase } = await import('@braindog/seed/usecases');
       /* THE RE-PUT IS THE RECORD'S OWN, signed `system` whoever's press set it off, so a same-version one that changed
          nothing stays out of the feed while a person's own reinstall is signed by them (review i, RI1). */
-      const host: Host = { ...packHost(ctx), remember: (row) => kernel.rememberPack({ ...row, by: 'system' }) };
+      const host: Host = { ...packHost(ctx), remember: (row) => kernel.rememberPack({ ...keptSource(row), by: 'system' }) };
       const speaking = speakingNow(kernel);
       const u = speaking === null ? undefined : useCase(speaking.replace(/^usecase-/u, ''));
       const planned = async (doc: Record<string, unknown>) => {
@@ -3858,7 +3879,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return unheld ? ({ ok: false as const, refusal: unheld }) : ok({ pack: pack.value, diff });
       };
       return await relegFirstParty({
-        held: () => kernel.packStates().map((p) => ({ id: p.id, version: p.version, on: p.disabled_at === null })),
+        held: () => storeHeld(kernel.packStates()).map((p) => ({ id: p.id, version: p.version, on: p.disabled_at === null })),
         document: (id) => {
           const own = firstPartyManifest(id as Parameters<typeof firstPartyManifest>[0]).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice('register.'.length));
           const doc = moduleDocument(u ?? null, id, { today: dayOf(clock.now()), holds: new Set([...[...kernel.registers()].map(([list]) => list), ...own]) });
@@ -3897,6 +3918,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     installed: () => installedState(),
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
     shelf: deps.catalogueShelf,
+    sourceOf: (id) => sql.one<{ source: string }>('SELECT source FROM pack WHERE id = ?', id)?.source ?? null,
     kept: (pack, diff, packSaid) => {
       try {
         keptAsk(pack, diff, packSaid);
@@ -4173,7 +4195,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       try {
         const on = new Map(r.usage.packs.map((p) => [p.id, p.on]));
         /* NOT ONE THE RECORD'S OWN PASS KEEPS CURRENT (`nightKeeps`): it is put in or asked about there, once. */
-        drafts = [...drafts, ...catalogueDrafts((await deps.catalogueOffers(kernel.packs().map((p) => ({ ...p, on: on.get(p.id) ?? true })))).filter((o) => !nightKeeps(o)))];
+        drafts = [...drafts, ...catalogueDrafts((await deps.catalogueOffers(storeHeld(kernel.packs()).map((p) => ({ ...p, on: on.get(p.id) ?? true })))).filter((o) => !nightKeeps(o)))];
       } catch {
         dropped.push('The catalogue could not be read, so no update from it was asked about.');
       }
@@ -4984,8 +5006,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     try {
       steps = await updateFirstParty({
         held: () =>
-          kernel
-            .packStates()
+          storeHeld(kernel.packStates())
             .filter((p) => declined[p.id] === undefined || declined[p.id] !== shippedVersion(p.id))
             .map((p) => ({ id: p.id, version: p.version, on: p.disabled_at === null })),
         document: (id) => {
@@ -5049,7 +5070,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            a statement, waits for the person. Never a module or use case the night already keeps, and never one declined. */
         addons: async () => {
           if (!deps.catalogueOffers) return [];
-          const offers = await deps.catalogueOffers(kernel.packStates().map((p) => ({ id: p.id, version: p.version ?? '0.0.0', on: p.disabled_at === null })));
+          const offers = await deps.catalogueOffers(storeHeld(kernel.packStates()).map((p) => ({ id: p.id, version: p.version ?? '0.0.0', on: p.disabled_at === null })));
           return offers.flatMap((o) => {
             const doc = (o.body as { doc?: unknown }).doc;
             if (!nightKeeps(o) || shippedVersion(o.id) !== undefined || declined[o.id] === o.to) return [];
@@ -15578,7 +15599,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          from the store would one day replace it. Said here, before the person is asked. */
       const listed = (deps.catalogue ?? []).find((e) => e.id === id) ?? null;
       const shelved = listed === null && deps.catalogueShelf ? await deps.catalogueShelf.fetch(id) : null;
-      if (listed !== null || shelved !== null)
+      /* UNLESS IT IS ONE OF THEIR OWN HELD HERE (`updatesFromStore`): its new version is its author's, whatever the store holds. */
+      const ownHere = storeHeld([{ id }]).length === 0;
+      if (!ownHere && (listed !== null || shelved !== null))
         return said({ code: 'PROVIDES_CONFLICT', fix: `${id} is an add-on in the store, so a file of your own takes another id.`, at: 'pack' });
       const diff = await plan(pack.value, installedState(ctx));
       const unheld = unresolvedFault(diff);
@@ -16052,7 +16075,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async packs(ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
-      return ok(kernel.packStates());
+      /* WHERE ONE CAME FROM, WHEN IT IS NOT THE STORE (`updatesFromStore`), so the store page never offers the store's
+         add-on of the same id as its update. One the store keeps current reads as before. */
+      const from = new Map(sql.all<{ id: string; source: string }>('SELECT id, source FROM pack').map((r) => [r.id, r.source]));
+      return ok(kernel.packStates().map((p) => (updatesFromStore(from.get(p.id)) ? p : { ...p, source: from.get(p.id) as string })));
     },
 
     /**

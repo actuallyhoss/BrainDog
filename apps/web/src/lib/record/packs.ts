@@ -24,7 +24,11 @@ export type Refusal = { code: string; fix: string; at?: string | undefined; allo
 export type Answer<T> = { ok: true; value: T } | { ok: false; refusal: Refusal };
 
 /** One pack, on or off, as `packs` answers. `version` is `null` for a pack the seed owns by its bodies. */
-export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
+/**
+ * `source` is where it came from, said only when the store does not keep it current (`paste`, `url`, `git`): the record
+ * leaves it out for everything the store updates, so its absence reads as the store's.
+ */
+export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[]; source?: string | null };
 
 /** What `disablePack` and `enablePack` answer. */
 export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: boolean; packs: string[]; declarations: string[]; said: string };

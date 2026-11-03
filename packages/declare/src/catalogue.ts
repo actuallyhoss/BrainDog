@@ -34,7 +34,7 @@ import { no, ok } from '@braindog/ports';
 import { digest, fillConfig, glyphFault, jcs, readConfig, validateDeclaration, type Json, type PageResult } from '@braindog/kernel';
 
 import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
-import { egressOf, FIRST_PARTY_LISTS, normalise, type Pack, type PackDeclaration, type PackSource } from './index.ts';
+import { egressOf, FIRST_PARTY_LISTS, normalise, updatesFromStore, type Pack, type PackDeclaration, type PackSource } from './index.ts';
 import { CHANGES_MOST, kindUnknownSentence, readChanges, readShared, SHARED_MOST_BYTES, type Shared } from './shared.ts';
 import { MODULE_LISTS, MODULES } from './usecase.ts';
 import { holdsOf, resolveWhen } from './when.ts';
@@ -930,7 +930,7 @@ export type CatalogueUpdate = {
  */
 export async function catalogueUpdates(
   index: CatalogueIndex,
-  held: readonly { id: string; version: string | null; disabled_at?: string | null }[],
+  held: readonly { id: string; version: string | null; disabled_at?: string | null; source?: string | null }[],
   read: (path: string) => string | null | Promise<string | null>,
 ): Promise<{ updates: CatalogueUpdate[]; refused: { entry: CatalogueEntry; fix: string }[] }> {
   const updates: CatalogueUpdate[] = [];
@@ -938,7 +938,9 @@ export async function catalogueUpdates(
   const statements = await verifiedStatements(index.keys);
   for (const entry of index.entries) {
     const installed = installedIdOf(entry);
-    const state = held.find((h) => h.id === installed);
+    /* ONLY WHAT CAME FROM THE STORE UPDATES FROM IT (`updateChannel`): one made here, from a link or from GitHub that
+       shares the id is someone else's add-on, and the store's file never replaces it. */
+    const state = held.find((h) => h.id === installed && updatesFromStore(h.source));
     const latest = offeredVersion(entry);
     if (!state || !latest || state.version === null || (state.disabled_at ?? null) !== null || compareVersions(state.version, latest.version) >= 0) continue;
     const text = await read(catalogueFile(entry.id, latest.version, entry.kind));
