@@ -1821,8 +1821,66 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.1",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "8113818a1137af2afab9a6645e443286fe9a6f498b436eada3780286670323b9",
+          "bytes": 93751,
+          "published_at": "2026-11-03T20:43:45.956Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Mail"
+            ],
+            "pages": [
+              "Mail"
+            ],
+            "rules": [
+              "Ask about a mail a person is waiting on your reply to",
+              "Ask about a mail that looks like a bill",
+              "Ask about a mail that looks like a receipt",
+              "Ask about a mail from a person with a date in it",
+              "Ask once about many mails at a time",
+              "Take a mail you replied to off Waiting on your reply",
+              "Take a mail that needs no reply off Waiting on your reply",
+              "Clear a mail you said is not a bill",
+              "Clear a mail you said is not a receipt",
+              "Add a receipt you said to add to Money",
+              "Leave the mails you said to leave"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Mail",
+              "Waiting on your reply"
+            ],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": true
+              },
+              {
+                "id": "register.organisations",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.accounts",
+                "writes": false
+              }
+            ]
+          },
+          "notes": "Settles more on its own. A reply you send in Gmail closes the question it answers. A receipt or a bill already on your Ledger is kept with that line and asks nothing, and a receipt for a bill closes the bill's question. Add it to Money adds the line. Not a receipt is remembered for that sender or account. Deleting a person no longer waits on their mail.",
+          "preview": true
+        },
         {
           "version": "1.2.1",
           "checksum": "3338a09d8967437f3c903078194f3f89aaf5ae6f5296c5435eb585445b85620b",

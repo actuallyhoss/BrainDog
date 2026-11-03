@@ -158,7 +158,7 @@ test('THE UPDATE FROM 1.1.1 LOSES NOTHING AND REACHES NOTHING NEW, so the night 
   assert.deepEqual(reachesNew(diff as never), [], 'the update would run something new');
   assert.deepEqual((diff as unknown as { conflicts: unknown[] }).conflicts, []);
   await put(api, SHIPPED());
-  assert.equal(sql.one<{ version: string }>("SELECT version FROM pack WHERE id = 'gmail'")?.version, '1.2.1');
+  assert.equal(sql.one<{ version: string }>("SELECT version FROM pack WHERE id = 'gmail'")?.version, '1.3.0');
   /* A BILL KEPT BEFORE 1.2.0 SAID WHAT IT ASKS IS STILL COUNTED: it holds no ask at all. */
   sql.exec("UPDATE entry SET fields = json_set(fields, '$.kind', 'bill') WHERE register = 'gmail_mail'");
   assert.equal(await figure(api, 'gmail-to-look'), 1);

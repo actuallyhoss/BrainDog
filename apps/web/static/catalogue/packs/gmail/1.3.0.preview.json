@@ -1,0 +1,484 @@
+{
+  "format": 1,
+  "made_at": "2026-11-03T20:43:45.956Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Open Plugins, then Gmail, and press Make the address. It shows a short script with your address already in it and four steps to paste it into Google. Your mail arrives within a minute after that.",
+          "heading": "Not connected yet",
+          "icon": "mail",
+          "kind": "note",
+          "span": 12,
+          "when": {
+            "lt": 1,
+            "metric": "gmail-mail"
+          },
+          "key": "k0td68n9",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "{{gmail-needs-reply}} waiting on your reply and {{gmail-unread}} unread in the last two weeks.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "gmail-mail"
+              },
+              {
+                "gt": 0,
+                "metric": "gmail-needs-reply"
+              }
+            ]
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "values": {
+            "gmail-needs-reply": 2,
+            "gmail-unread": 2
+          },
+          "read_as": {
+            "gmail-needs-reply": "figure",
+            "gmail-unread": "figure"
+          },
+          "figures": {
+            "gmail-needs-reply": {
+              "name": "Mail waiting on your reply",
+              "source": "register.gmail_mail",
+              "where": "wants is true, needs_reply is true, direction is received, answered is not true",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "lte": 0
+              }
+            },
+            "gmail-unread": {
+              "name": "Unread mail",
+              "source": "register.gmail_mail",
+              "where": "unread is true, direction is received",
+              "value": {
+                "count": "id"
+              },
+              "format": "int",
+              "target": {
+                "gte": 0
+              }
+            }
+          }
+        },
+        {
+          "body": "Nothing is waiting on your reply. {{gmail-unread}} unread in the last two weeks.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "gt": 0,
+                "metric": "gmail-mail"
+              },
+              {
+                "lt": 1,
+                "metric": "gmail-needs-reply"
+              }
+            ]
+          },
+          "key": "k08lez9h-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "subject"
+            },
+            {
+              "field": "link"
+            },
+            {
+              "field": "name"
+            }
+          ],
+          "empty": "Nothing is waiting on your reply.",
+          "heading": "Waiting on your reply",
+          "icon": "mail",
+          "kind": "link",
+          "limit": 15,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "at"
+            }
+          ],
+          "source": "register.gmail_mail",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "gmail-needs-reply"
+          },
+          "where": "wants is true, needs_reply is true, direction is received, answered is not true",
+          "key": "k0m9vnjr",
+          "rows": [
+            {
+              "id": "01M6HJEMX4BY80GC3NZB0S7KTW",
+              "register": "gmail_mail",
+              "seq": 1,
+              "fields": {
+                "hint": "none",
+                "answered": false,
+                "skip": false,
+                "add": false,
+                "subject": "Quote for the studio shoot",
+                "name": "Lena Park",
+                "address": "lena@marlow-studio.example",
+                "direction": "received",
+                "day": "2026-11-02",
+                "at": "2026-11-02T09:12:00.000Z",
+                "unread": true,
+                "needs_reply": true,
+                "person": true,
+                "kind": "none",
+                "snippet": "Hi, here is the quote for Friday. Could you let me know if it works?",
+                "message": "a1",
+                "thread": "a1",
+                "met": true,
+                "ask": "reply",
+                "wants": true
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T20:43:45.956Z",
+              "updated_at": "2026-11-03T20:43:45.956Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HJEMX4BY80GC3NZV18R6JZ",
+              "register": "gmail_mail",
+              "seq": 3,
+              "fields": {
+                "hint": "none",
+                "answered": false,
+                "skip": false,
+                "add": false,
+                "subject": "Contract draft",
+                "name": "Omar Haddad",
+                "address": "omar@haddad-legal.example",
+                "direction": "received",
+                "day": "2026-11-01",
+                "at": "2026-11-01T15:02:00.000Z",
+                "unread": false,
+                "needs_reply": true,
+                "person": true,
+                "kind": "none",
+                "snippet": "Attached is the draft we talked about. Could you look before Thursday?",
+                "message": "a3",
+                "thread": "a3",
+                "met": true,
+                "ask": "reply",
+                "wants": true
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T20:43:45.956Z",
+              "updated_at": "2026-11-03T20:43:45.956Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "subject",
+              "label": "Subject",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "12ch"
+            },
+            {
+              "field": "name",
+              "label": "From",
+              "width": "minmax(10ch,1fr)"
+            },
+            {
+              "field": "kind",
+              "label": "Looks like",
+              "width": "10ch"
+            },
+            {
+              "field": "day",
+              "label": "Day",
+              "width": "12ch"
+            }
+          ],
+          "empty": "No bills, receipts or dates in your mail.",
+          "heading": "Bills, receipts and dates",
+          "icon": "receipt",
+          "kind": "table",
+          "limit": 20,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "at"
+            }
+          ],
+          "source": "register.gmail_mail",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "gmail-to-look"
+          },
+          "where": "kind is not none, direction is received, ask is not joined",
+          "key": "k1uiwbtf",
+          "rows": [
+            {
+              "id": "01M6HJEMX4BY80GC3NZHKGJNDM",
+              "register": "gmail_mail",
+              "seq": 2,
+              "fields": {
+                "hint": "none",
+                "answered": false,
+                "wants": false,
+                "skip": false,
+                "add": false,
+                "subject": "Your invoice for October",
+                "name": "Northwind Hosting",
+                "address": "billing@northwind.example",
+                "direction": "received",
+                "day": "2026-11-01",
+                "at": "2026-11-01T07:40:00.000Z",
+                "unread": true,
+                "needs_reply": false,
+                "person": false,
+                "kind": "bill",
+                "snippet": "Your invoice is ready. Amount due: $49.00 by 15 November.",
+                "message": "a2",
+                "thread": "a2",
+                "met": true,
+                "ask": "bill",
+                "amount": "$49.00",
+                "says": "$49.00 bill from Northwind Hosting"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T20:43:45.956Z",
+              "updated_at": "2026-11-03T20:43:45.956Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 1,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "subject",
+              "label": "Subject",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "name",
+              "label": "From",
+              "width": "minmax(10ch,1fr)"
+            },
+            {
+              "field": "day",
+              "label": "Day",
+              "width": "12ch"
+            }
+          ],
+          "empty": "No mail yet.",
+          "heading": "Recent mail",
+          "icon": "list",
+          "kind": "table",
+          "limit": 40,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "at"
+            }
+          ],
+          "source": "register.gmail_mail",
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "gmail-mail"
+          },
+          "where": "direction is received",
+          "key": "k1odsl3q",
+          "rows": [
+            {
+              "id": "01M6HJEMX4BY80GC3NZB0S7KTW",
+              "register": "gmail_mail",
+              "seq": 1,
+              "fields": {
+                "hint": "none",
+                "answered": false,
+                "skip": false,
+                "add": false,
+                "subject": "Quote for the studio shoot",
+                "name": "Lena Park",
+                "address": "lena@marlow-studio.example",
+                "direction": "received",
+                "day": "2026-11-02",
+                "at": "2026-11-02T09:12:00.000Z",
+                "unread": true,
+                "needs_reply": true,
+                "person": true,
+                "kind": "none",
+                "snippet": "Hi, here is the quote for Friday. Could you let me know if it works?",
+                "message": "a1",
+                "thread": "a1",
+                "met": true,
+                "ask": "reply",
+                "wants": true
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T20:43:45.956Z",
+              "updated_at": "2026-11-03T20:43:45.956Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HJEMX4BY80GC3NZV18R6JZ",
+              "register": "gmail_mail",
+              "seq": 3,
+              "fields": {
+                "hint": "none",
+                "answered": false,
+                "skip": false,
+                "add": false,
+                "subject": "Contract draft",
+                "name": "Omar Haddad",
+                "address": "omar@haddad-legal.example",
+                "direction": "received",
+                "day": "2026-11-01",
+                "at": "2026-11-01T15:02:00.000Z",
+                "unread": false,
+                "needs_reply": true,
+                "person": true,
+                "kind": "none",
+                "snippet": "Attached is the draft we talked about. Could you look before Thursday?",
+                "message": "a3",
+                "thread": "a3",
+                "met": true,
+                "ask": "reply",
+                "wants": true
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T20:43:45.956Z",
+              "updated_at": "2026-11-03T20:43:45.956Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HJEMX4BY80GC3NZHKGJNDM",
+              "register": "gmail_mail",
+              "seq": 2,
+              "fields": {
+                "hint": "none",
+                "answered": false,
+                "wants": false,
+                "skip": false,
+                "add": false,
+                "subject": "Your invoice for October",
+                "name": "Northwind Hosting",
+                "address": "billing@northwind.example",
+                "direction": "received",
+                "day": "2026-11-01",
+                "at": "2026-11-01T07:40:00.000Z",
+                "unread": true,
+                "needs_reply": false,
+                "person": false,
+                "kind": "bill",
+                "snippet": "Your invoice is ready. Amount due: $49.00 by 15 November.",
+                "message": "a2",
+                "thread": "a2",
+                "met": true,
+                "ask": "bill",
+                "amount": "$49.00",
+                "says": "$49.00 bill from Northwind Hosting"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T20:43:45.956Z",
+              "updated_at": "2026-11-03T20:43:45.956Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6HJEMX4BY80GC3P04NXDBC8",
+              "register": "gmail_mail",
+              "seq": 4,
+              "fields": {
+                "answered": false,
+                "wants": false,
+                "skip": false,
+                "add": false,
+                "subject": "Invitation: Studio walk-through, Thu 6 Nov",
+                "name": "Lena Park",
+                "address": "lena@marlow-studio.example",
+                "direction": "received",
+                "day": "2026-10-31",
+                "at": "2026-10-31T11:20:00.000Z",
+                "unread": false,
+                "needs_reply": false,
+                "person": true,
+                "kind": "none",
+                "hint": "event",
+                "snippet": "You have been invited to Studio walk-through.",
+                "message": "a4",
+                "thread": "a4",
+                "met": true,
+                "ask": "none"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-03T20:43:45.956Z",
+              "updated_at": "2026-11-03T20:43:45.956Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 4,
+          "refusals": []
+        }
+      ],
+      "icon": "mail",
+      "nav": {
+        "order": 30,
+        "section": "People"
+      },
+      "pack": "gmail",
+      "page": "mail",
+      "requires": [
+        "register.gmail_mail"
+      ],
+      "title": "Mail",
+      "read_at": "2026-11-03T20:43:45.956Z",
+      "zone": "UTC",
+      "look": {
+        "look": "mail",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

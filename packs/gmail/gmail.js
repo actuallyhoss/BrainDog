@@ -3,7 +3,8 @@
  * reads only this BrainDog.
  *
  * WHAT IT READS. The mails the Gmail door wrote into Mail since it last looked, the other mails of their threads, the
- * mail you sent and the bills and receipts of the last two weeks, and your People and Organisations.
+ * mail you sent and the bills and receipts of the last two weeks, your People and Organisations, and where you keep
+ * Money, your Ledger lines of the last few weeks and your accounts.
  *
  * WHO IS MET (1.2.0). Nobody is added to People for being in your mail, as Connect Google adds nobody for being in your
  * contacts (`meetContact` in `packages/kernel/src/people.ts`, the same rule):
@@ -39,6 +40,16 @@
  * What a mail looks like (a bill, a receipt, a date) is said here too: a bill needs "invoice" in its subject, or bill
  * words with an amount or a sender known to send bills; a receipt needs receipt or order words with the same; a
  * newsletter is never any of them. Gmail updating a mail later never changes it, and "Not a bill" clears it.
+ *
+ * WHAT IT SETTLES ITSELF (1.3.0):
+ *   - A REPLY YOU SENT in a thread after the mail asking takes that mail off Waiting on your reply, and its question
+ *     closes itself.
+ *   - A BILL OR A RECEIPT ALREADY ON YOUR LEDGER (a card charge your bank's texts put there) is kept with that line and
+ *     asks nothing: within three days, the same amount to within one percent, or in another currency the seller's name
+ *     on the line. A receipt for a bill still asked about says it is paid, and the bill's question closes.
+ *   - "ADD IT TO MONEY" ADDS THE LINE, with the amount and the seller the mail names, on the account that paid that
+ *     seller last or the one account kept in that currency; "Not a receipt" or "Not a bill" is remembered for that
+ *     account (an ad account's number) or that sender, and never asked again.
  *
  * IT NEVER TOUCHES GMAIL, and it never answers, files or deletes a mail. Only you act on what it asks.
  */
@@ -277,6 +288,77 @@ export function refOf(text) {
   return null;
 }
 
+/** Your Ledger lines of the last few weeks, or none where this record keeps no Money (the list cannot be read). */
+async function ledgerFrom(ctx, today) {
+  try {
+    return await every(ctx, 'transactions', { field: 'on', gte: dayBefore(today, WINDOW_DAYS + SAME_ORDER_DAYS) }, 3000);
+  } catch {
+    return [];
+  }
+}
+
+/* CURRENCIES COUNTED IN WHOLE UNITS, so an amount is kept in the smallest unit the record keeps money in. */
+const WHOLE_UNITS = new Set(['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'UGX', 'XOF', 'XAF']);
+
+/** A mail's amount as the record keeps money, `{ amount, currency }` in the smallest unit, or `null`. */
+export function moneyOf(amount) {
+  if (!amount) return null;
+  const [code, figure] = String(amount.key).split(' ');
+  const n = Number(figure);
+  if (!/^[A-Z]{3}$/u.test(code ?? '') || !Number.isFinite(n) || n <= 0) return null;
+  return { amount: Math.round(n * (WHOLE_UNITS.has(code) ? 1 : 100)), currency: code };
+}
+
+const letters = (t) => lower(t).replace(/[^\p{L}\p{N}]/gu, '');
+
+/**
+ * Whether a Ledger line's words name the seller of a mail: the seller's name or the first part of its domain, four
+ * letters or more, found in the line's words with its last letter allowed to fall off (`Top.gg` in `MasaryP*Top G`).
+ */
+export function sameSeller(name, address, words) {
+  const said = letters(words);
+  const cores = [letters(name), letters((registrable(address) ?? '').split('.')[0])].filter((c) => c.length >= 4);
+  return cores.some((c) => said.includes(c.slice(0, Math.max(4, c.length - 1))));
+}
+
+/* HOW FAR APART A RECEIPT AND ITS LEDGER LINE MAY BE: days, and the share an amount may differ by in one currency. */
+const LINE_DAYS = 3;
+const LINE_SHARE = 0.01;
+
+/**
+ * The Ledger line a bill or a receipt already is, or `null`: money out, not void, within three days of the mail. In
+ * one currency the amount agrees to within one percent; in another (a card charged in pounds for a dollar receipt) the
+ * seller's name has to be on the line instead. Exactly one line is the line; two or more are none, and the mail asks.
+ */
+export function lineFor(mail, lines) {
+  const money = moneyOf(amountOf(`${mail.subject ?? ''} ${mail.snippet ?? ''} ${mail.amount ?? ''}`));
+  if (money === null) return null;
+  const day = dayOf(mail);
+  const near = lines.filter((l) => {
+    const f = l.fields;
+    const a = f.amount;
+    return f.direction === 'out' && f.state !== 'void' && typeof f.on === 'string' && daysApart(f.on.slice(0, 10), day) <= LINE_DAYS && a && typeof a.amount === 'number';
+  });
+  const words = (l) => `${l.fields.what ?? ''} ${l.fields.payee ?? ''} ${l.fields.counterparty_text ?? ''}`;
+  const seller = (l) => sameSeller(mail.name, mail.address, words(l));
+  const sameAmount = (l) => l.fields.amount.currency === money.currency && Math.abs(Math.abs(l.fields.amount.amount) - money.amount) <= Math.max(1, money.amount * LINE_SHARE);
+  for (const pick of [(l) => sameAmount(l) && seller(l), sameAmount, (l) => l.fields.amount.currency !== money.currency && seller(l)]) {
+    const found = near.filter(pick);
+    if (found.length === 1) return found[0];
+    if (found.length > 1) return null;
+  }
+  return null;
+}
+
+/**
+ * What "Not a receipt" or "Not a bill" is remembered by: the account a mail names (an ad account's long number), else
+ * its sender. A sender who sends for several accounts is asked about the others still.
+ */
+export function moneyKey(subject, snippet, address) {
+  const account = /\b(?:account|acct|act)\b[^0-9]{0,24}(\d{6,})/iu.exec(`${subject ?? ''} ${snippet ?? ''}`) ?? /\b(\d{12,})\b/u.exec(`${subject ?? ''} ${snippet ?? ''}`);
+  return account ? `account:${account[1]}` : `from:${lower(address)}`;
+}
+
 /*
  * WHAT A PERSON WROTE THEMSELVES, before the mail they reply to or forward: Gmail's snippet is the start of the text, so
  * a reply's own words come before "On … wrote:" and a forward's before "Forwarded message".
@@ -395,9 +477,54 @@ export default async function run(ctx) {
     ctx.update(spoken('gmail_mail', many), { batch: null, wants: false });
   }
 
+  /* "ADD IT TO MONEY" ADDS THE LINE (1.3.0), with the amount and the seller the mail names, on the account that paid
+     that seller last, else the one account kept in that currency. With none to say, the mail keeps waiting and the
+     log says why: a line on a guessed account would be a wrong line. */
+  const adding = await every(ctx, 'gmail_mail', { field: 'add', is: true }, 50);
+  const ledgerNow = adding.length > 0 ? await ledgerFrom(ctx, today) : [];
+  let accounts = [];
+  if (adding.length > 0)
+    try {
+      accounts = await every(ctx, 'accounts', null, 200);
+    } catch {
+      accounts = [];
+    }
+  let added = 0;
+  for (const row of adding) {
+    const f = row.fields;
+    if (typeof f.line === 'string' && f.line !== '') {
+      ctx.update(spoken('gmail_mail', row), { add: false });
+      continue;
+    }
+    const money = moneyOf(amountOf(`${f.amount ?? ''} ${f.subject ?? ''} ${f.snippet ?? ''}`));
+    if (money === null) continue;
+    const already = lineFor(f, ledgerNow);
+    if (already !== null) {
+      ctx.update(spoken('gmail_mail', row), { add: false, line: spoken('transactions', already) });
+      continue;
+    }
+    const who = (nameIn(f.name) ?? (registrable(f.address) ? orgName(registrable(f.address)) : lower(f.address))).slice(0, 120);
+    const inCurrency = accounts.filter((a) => a.fields.balance && a.fields.balance.currency === money.currency && a.fields.closed !== true);
+    const paidBefore = ledgerNow
+      .filter((l) => sameSeller(f.name, f.address, `${l.fields.what ?? ''} ${l.fields.payee ?? ''}`) && l.fields.amount?.currency === money.currency)
+      .map((l) => l.fields.account)
+      .find((id) => inCurrency.some((a) => a.id === id));
+    const account = paidBefore ?? (inCurrency.length === 1 ? inCurrency[0].id : null);
+    if (account === null) {
+      ctx.log(`Waiting to add ${money.currency} from ${who}: no account in ${money.currency} to put it on, or more than one. Add it in Money.`);
+      continue;
+    }
+    ctx.write('transactions', { what: who, payee: who, on: dayOf(f), direction: 'out', amount: money, account, state: 'cleared', note: `From the mail ${String(f.subject ?? '').slice(0, 120)}` });
+    ctx.update(spoken('gmail_mail', row), { add: false, line: 'Added from this mail' });
+    added++;
+  }
+
   const mail = await every(ctx, 'gmail_mail', { none: [{ field: 'met', is: true }] }, MOST);
   /* NO NEW MAIL IS NOTHING TO DO, and says nothing, so an hour with no mail leaves no line. */
-  if (mail.length === 0) return left > 0 ? { looked: 0, left } : { looked: 0 };
+  if (mail.length === 0) {
+    if (added > 0) ctx.log(`Added ${added} to Money.`);
+    return { looked: 0, ...(left > 0 ? { left } : {}), ...(added > 0 ? { added } : {}) };
+  }
   mail.sort((a, b) => (atOf(a.fields) < atOf(b.fields) ? -1 : atOf(a.fields) > atOf(b.fields) ? 1 : a.seq - b.seq));
   const fresh = new Set(mail.map((r) => r.id));
 
@@ -601,6 +728,24 @@ export default async function run(ctx) {
     }
   }
 
+  /* A REPLY YOU SENT ANSWERS THE QUESTION ITS THREAD HOLDS (1.3.0): a mail of yours that came in after the one asking
+     takes it off Waiting on your reply, and its question closes itself, so a reply sent in Gmail is never asked about. */
+  let replied = 0;
+  for (const sent of mail.filter((r) => r.fields.direction === 'sent')) {
+    for (const r of threadOf(sent)) {
+      const f = r.fields;
+      if (r.id === sent.id || f.direction === 'sent' || f.needs_reply !== true || f.answered === true || atOf(f) >= atOf(sent.fields)) continue;
+      if (fresh.has(r.id)) Object.assign(patches.get(r.id), { needs_reply: false, wants: false });
+      else ctx.update(spoken('gmail_mail', r), { needs_reply: false, wants: false });
+      replied++;
+    }
+  }
+
+  /* THE SENDERS AND ACCOUNTS YOU SAID ARE NOT YOURS ("Not a receipt", "Not a bill"), asked about never again (1.3.0). */
+  const notMine = new Set((await every(ctx, 'gmail_mail', { field: 'skip', is: true }, 2000)).map((r) => moneyKey(r.fields.subject, r.fields.snippet, r.fields.address)));
+  /* YOUR LEDGER NEAR THESE DAYS, read only when a mail is money or waits to be added, and only where Money is kept. */
+  const ledger = [...kinds.values()].some((k) => k === 'bill' || k === 'receipt') ? await ledgerFrom(ctx, today) : [];
+
   /* BILLS AND RECEIPTS, ONE AN ORDER: the same number, or the same amount within days from one sender or a payer. */
   const purchases = [...money];
   for (const row of mail) {
@@ -613,6 +758,18 @@ export default async function run(ctx) {
     const patch = patches.get(row.id);
     if (amount) patch.amount = amount.said;
     if (ref) patch.ref = ref;
+    /* ONE YOU SAID IS NOT YOURS, BY ITS ACCOUNT OR ITS SENDER, IS NOT MONEY OF YOURS. */
+    if (notMine.has(moneyKey(f.subject, f.snippet, f.address))) {
+      Object.assign(patch, { kind: 'none' });
+      continue;
+    }
+    /* ALREADY A LEDGER LINE (a card charge from your bank's texts): kept with it quietly, and nothing is asked. */
+    const onLedger = lineFor({ ...f, ...patch }, ledger);
+    if (onLedger !== null) {
+      set(row, 'none', { line: spoken('transactions', onLedger) });
+      purchases.push(row);
+      continue;
+    }
     const domain = registrable(f.address) ?? lower(f.address).split('@')[1] ?? '';
     const day = dayOf(f);
     const same = purchases.find((p) => {
@@ -626,7 +783,16 @@ export default async function run(ctx) {
       return Boolean(amount && theirs && theirs.key === amount.key && daysApart(dayOf(pf), day) <= SAME_ORDER_DAYS && linked);
     });
     purchases.push(row);
-    if (same !== undefined) {
+    /* A RECEIPT FOR A BILL STILL ASKED ABOUT SAYS IT IS PAID (1.3.0): the bill joins it, its question closes itself,
+       and the one question left is the receipt's, whether to add it to Money. */
+    const theirs = same === undefined ? undefined : patches.get(same.id);
+    const paid = same !== undefined && kind === 'receipt' && (theirs?.ask ?? same.fields.ask) === 'bill' && same.fields.answered !== true;
+    if (paid) {
+      if (theirs) {
+        theirs.ask = 'joined';
+        asks.delete(same.id);
+      } else ctx.update(spoken('gmail_mail', same), { ask: 'joined' });
+    } else if (same !== undefined) {
       set(row, 'joined');
       continue;
     }
@@ -678,7 +844,7 @@ export default async function run(ctx) {
 
   const said = asks.size === 0 ? 'asked nothing' : grouped > 0 ? `asked about ${grouped} mails as one question` : `asked about ${asks.size} ${asks.size === 1 ? 'mail' : 'mails'}`;
   ctx.log(
-    `Looked at ${mail.length} mails: met ${met} people and ${orgsMet} organisations, linked ${linked} mails, left out ${skipped} not of use, ${said}${waiting > 0 ? `, ${waiting} wait for their person to be kept` : ''}${left > 0 ? `, left ${left}` : ''}.`,
+    `Looked at ${mail.length} mails: met ${met} people and ${orgsMet} organisations, linked ${linked} mails, left out ${skipped} not of use, ${said}${waiting > 0 ? `, ${waiting} wait for their person to be kept` : ''}${left > 0 ? `, left ${left}` : ''}${replied > 0 ? `, ${replied} answered by your reply` : ''}${added > 0 ? `, added ${added} to Money` : ''}.`,
   );
-  return { looked: mail.length, met, orgs: orgsMet, linked, skipped, asked: asks.size, grouped };
+  return { looked: mail.length, met, orgs: orgsMet, linked, skipped, asked: asks.size, grouped, replied, added };
 }

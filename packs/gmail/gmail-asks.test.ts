@@ -209,8 +209,9 @@ test('ONE QUESTION AN ORDER: Order Received and Order Finished, and a PayPal rec
   assert.deepEqual([row(l, received).ask, row(l, finished).ask], ['receipt', 'joined'], 'one order asked twice');
   assert.equal(row(l, received).says, 'EGP 450.00 receipt from Corner Shop');
   assert.equal(row(l, received).ref, '1042');
-  assert.deepEqual([row(l, invoice).ask, row(l, paid).ask], ['bill', 'joined'], 'a receipt and the invoice it pays asked twice');
-  assert.equal(row(l, invoice).says, '$49.00 bill from Northwind Hosting');
+  /* PAID ALREADY: the invoice joins the receipt, and the one question is whether to add it to Money (1.3.0). */
+  assert.deepEqual([row(l, invoice).ask, row(l, paid).ask], ['joined', 'receipt'], 'a receipt and the invoice it pays asked twice');
+  assert.equal(row(l, paid).says, '$49.00 receipt from PayPal');
   assert.equal(asked(l).length, 2);
 
   /* AN HOUR LATER THE SAME ORDER'S NEXT MAIL STILL JOINS, read from what was kept. */
