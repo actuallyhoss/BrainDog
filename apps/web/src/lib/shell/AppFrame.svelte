@@ -102,6 +102,7 @@
   import { heard, quietFocus } from '$lib/ui/quiet-focus.ts';
   import { hush } from '$lib/motion/index.ts';
   import { PRODUCT } from '$lib/title.ts';
+  import { ADMIN, ADMIN_ENTRY as adminEntry, operator } from '$lib/admin/operator.svelte.ts';
   import { navigating, page } from '$app/state';
   /* The Mac app's Go menu, a notification's click and braindog://goto: only an address of the app moves the window
      (`appPath`), and it stays in the BrainDog on screen (`at`), as the `g` chords do. */
@@ -350,7 +351,10 @@
   /* THE SIDEBAR'S FOOT: what the record is run with, then Settings, the one door to it. USAGE'S WORD IS WRITTEN OUT
      rather than read from `record/actions.ts`, which would carry the usage reader into the entry chunk for one word. */
   const USAGE = 'Usage';
+  /* ADMIN, THE OPERATOR'S ALONE, AT THE FOOT ABOVE INBOX (`lib/admin/operator.svelte.ts`): asked of the Cloud once a tab. */
+  $effect(() => operator.ask(data.me.person, data.host === 'cloud'));
   const foot = $derived<SideLink[]>([
+    ...(operator.yes ? [{ ...ADMIN } as SideLink] : []),
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' }] : []),
     /* ADD-ONS AND USAGE ARE THE OWNER'S (collab pass, 2 Nov): a colleague can install nothing and pays for nothing. */
     ...(data.me.owner ? [{ href: '/plugins', label: copy.packs, icon: 'plug' } as SideLink, { href: '/usage', label: USAGE, icon: 'observe' } as SideLink] : []),
@@ -1797,7 +1801,7 @@
     </button>
   {/if}
 
-  {#if Palette}<Palette bind:open={palette.open} nav={data.nav} places={goPlaces} />{/if}
+  {#if Palette}<Palette bind:open={palette.open} nav={operator.yes ? [...data.nav, adminEntry] : data.nav} places={goPlaces} />{/if}
 {/if}
 
 <!--
