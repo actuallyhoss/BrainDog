@@ -365,6 +365,7 @@ export {
   drawnHeight,
   drawnTheme,
   type DrawnAsk,
+  type DrawnAct,
   type DrawnTheme,
 } from './drawn.ts';
 export { DRAWN_ROWS_MOST, drawnData, type DrawnData, type DrawnRow, type DrawnValue } from './drawn-data.ts';

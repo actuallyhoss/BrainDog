@@ -59,6 +59,24 @@ import {
   verifyYank,
   waitingFile,
   yankIn,
+  ADVISORIES_FILE,
+  REPORTS_FILE,
+  PRE_REVIEW_INSTRUCTIONS,
+  adviseIn,
+  emptyAdvisories,
+  emptyReports,
+  keyStatementIn,
+  mergeAdvisories,
+  noteOf,
+  preReviewInput,
+  readAdvise,
+  readAdvisories,
+  readKeyStatement,
+  readReport,
+  readReports,
+  reportIn,
+  withNote,
+  type Advisories,
   type Change,
   type Identity,
   type Publishers,
@@ -105,6 +123,11 @@ export type KennelDeps = {
    * (`kennel-scratch.ts`). Left out, the door answers as it did and says once in its log that no scratch ran.
    */
   scratch?: ScratchDeps | undefined;
+  /**
+   * The model the pre-review note is asked of (`PRE_REVIEW_INSTRUCTIONS`): the included model, or none, when no note is
+   * written. It answers the model's JSON; a throw is no note. The note is shown to the operator and never decides.
+   */
+  preReview?: ((instructions: string, input: unknown) => Promise<unknown>) | undefined;
   now?: () => Date;
 };
 
@@ -222,6 +245,14 @@ export async function serveKennel(request: Request, deps: KennelDeps): Promise<R
       case 'verdict':
       case 'publisher':
         return await operated(request, deps, asked.ask, now);
+      case 'advisories':
+        return answer(200, JSON.stringify(await advisoriesOf(deps)), { head });
+      case 'advise':
+        return await advise(request, deps, now);
+      case 'key':
+        return await keyStatement(request, deps);
+      case 'report':
+        return await report(request, deps, now);
     }
   } catch (e) {
     op({ op: 'kennel', ask: asked.ask, ok: false, error: e instanceof Error ? e.message : String(e) }, 'error');
@@ -384,6 +415,8 @@ export type KennelReader = {
    * `yanked` reason, for the caller to offer or refuse.
    */
   version(kind: EntryKind, id: string, version: string): Promise<Result<KennelFound>>;
+  /** Every advisory a record is told, the bundled folder's and the Kennel's (`advisoriesOf`). */
+  advisories(): Promise<Advisories>;
 };
 
 /**
@@ -398,6 +431,7 @@ export function kennelReader(deps: Pick<KennelDeps, 'blobs' | 'assets'>): Kennel
   return {
     index,
     file,
+    advisories: () => advisoriesOf(deps),
     async version(kind, id, version) {
       const entry = (await index()).entries.find((e) => e.kind === kind && e.id === id);
       const said = kind === 'pack' ? 'add-on' : 'use case';
@@ -808,7 +842,36 @@ async function submit(request: Request, deps: KennelDeps, now: () => Date): Prom
     return scratch.refused === null ? took : { ok: false, refusal: scratch.refused };
   });
   if (scratch.refused !== null) return withCookie(refusedWith(422, scratch.refused), cookie);
+  if (out.ok && out.value.state === 'review') await noted(blobs, deps, text, out.value, now);
   return withCookie(settled(out), cookie);
+}
+
+/** The longest the pre-review note may hold the submitter's answer up. Past it the submission waits with no note. */
+const NOTE_WAIT_MS = 20_000;
+
+/**
+ * THE PRE-REVIEW NOTE, once a submission waits: the model reads the file's own words, the reach the Kennel computed and
+ * the code, and writes the operator one note. Written beside the waiting entry after the commit, so a model that is
+ * slow, down or wrong never refuses or delays a submission past `NOTE_WAIT_MS`, and never lists one: it is a line in
+ * the queue, nothing more.
+ */
+async function noted(blobs: KennelBucket, deps: KennelDeps, text: string, which: { kind: EntryKind; id: string; version: string }, now: () => Date): Promise<void> {
+  const ask = deps.preReview;
+  if (ask === undefined) return;
+  try {
+    const review = (await stored(blobs, REVIEW, readReview, emptyReview)).value;
+    const pending = review.pending.find((p) => p.entry.kind === which.kind && p.entry.id === which.id && p.version.version === which.version);
+    if (pending === undefined) return;
+    const input = preReviewInput(JSON.parse(text) as unknown, pending.version.reach);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const late = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), NOTE_WAIT_MS)));
+    const said = await Promise.race([ask(PRE_REVIEW_INSTRUCTIONS, input).then(noteOf), late]).finally(() => { if (timer !== null) clearTimeout(timer); });
+    if (said === null) return;
+    const note = { text: input.cut ? `${said} (Read only the start of its code.)` : said, by: 'model', at: now().toISOString() };
+    await patched(blobs, (was) => withNote(was, which, note));
+  } catch (e) {
+    op({ op: 'kennel', ask: 'submit', note: 'none', error: e instanceof Error ? e.message : String(e) }, 'error');
+  }
 }
 
 /** Whether this isolate has said that its Kennel lists with no scratch install. Said once, not on every submission. */
@@ -921,7 +984,7 @@ async function operated(request: Request, deps: KennelDeps, ask: 'review' | 'ver
     const q = new URL(request.url).searchParams;
     const [kind, id, version] = [q.get('kind'), q.get('id'), q.get('version')];
     if (kind === null && id === null && version === null)
-      return answer(200, JSON.stringify({ ok: true, value: { pending: review.pending, refused: review.refused } }), { head });
+      return answer(200, JSON.stringify({ ok: true, value: { pending: review.pending, refused: review.refused, reports: (await reportsOf(blobs)).value.reports.slice(-100).reverse(), advisories: (await advisoriesOf(deps)).advisories } }), { head });
     /* ONE WAITING FILE, WHOLE, so the operator reads what a submission would install, its scripts' source included. */
     if (kind === null || id === null || version === null)
       return settled(no('VALUE_MALFORMED', 'A waiting file is asked for by kind, id and version together, as the review list names it.', { at: 'query' }));
@@ -951,4 +1014,93 @@ async function operated(request: Request, deps: KennelDeps, ask: 'review' | 'ver
     if (await put(blobs, PUBLISHERS, trustIn(at.value, trust.value, now()), at.etag)) return settled(ok(trust.value));
   }
   return settled(no('RATE_LIMITED', `Other changes to the trusted publishers landed while this one was being written, ${KENNEL_TRIES} times over. Send it again in a moment.`, { retry_after: 5 }));
+}
+
+/* ── advisories, key statements and reports ─────────────────────────────── */
+
+const advisoriesIn = (doc: unknown): Advisories | null => readAdvisories(doc);
+
+/**
+ * Every advisory a reader is told: the bundled folder's (BrainDog's own word on its own add-ons, shipped with the
+ * build) and the Kennel's, merged. A Kennel file that does not read is the bundled one alone, as the index is served.
+ */
+async function advisoriesOf(deps: Pick<KennelDeps, 'blobs' | 'assets'>): Promise<Advisories> {
+  const bundledText = await bundledFile(deps.assets, ADVISORIES_FILE);
+  let bundled: Advisories | null = null;
+  try {
+    bundled = bundledText === null ? null : readAdvisories(JSON.parse(bundledText));
+  } catch {
+    bundled = null;
+  }
+  let kept: Advisories | null = null;
+  if (deps.blobs !== undefined)
+    try {
+      kept = (await stored(deps.blobs, ADVISORIES_FILE, advisoriesIn, emptyAdvisories)).value;
+    } catch (e) {
+      op({ op: 'kennel', ask: 'advisories', ok: false, error: e instanceof Error ? e.message : String(e) }, 'error');
+    }
+  return mergeAdvisories(bundled, kept);
+}
+
+/** The operator's advisory on a listed add-on, or its withdrawal. Records act on it the next time they read the index. */
+async function advise(request: Request, deps: KennelDeps, now: () => Date): Promise<Response> {
+  if (deps.operator === undefined || deps.operator === '') return refusedWith(501, NO_OPERATOR);
+  if (!(await isOperator(request, deps.operator))) return refusedWith(401, OPERATOR);
+  const blobs = deps.blobs;
+  if (blobs === undefined) return refusedWith(501, NO_BUCKET);
+  const body = await bodyOf(request, SMALL_BODY_MOST, 'advise');
+  if (!body.ok) return settled(body);
+  const asked = readAdvise(body.value);
+  if (!asked.ok) return settled(asked);
+  const bundled = (await bundledIndex(deps.assets, false)) ?? emptyCatalogue('BrainDog');
+  for (let tries = 0; tries < KENNEL_TRIES; tries += 1) {
+    const [file, index] = await Promise.all([stored(blobs, ADVISORIES_FILE, advisoriesIn, emptyAdvisories), stored(blobs, INDEX, catalogueOf, () => emptyCatalogue('BrainDog Kennel'))]);
+    const out = adviseIn(file.value, [index.value, bundled], asked.value, now());
+    if (!out.ok) return settled(out);
+    if (await put(blobs, ADVISORIES_FILE, out.value.file, file.etag)) return settled(ok(out.value.answer));
+  }
+  return settled(no('RATE_LIMITED', `Other changes to the advisories landed while this one was being written, ${String(KENNEL_TRIES)} times over. Send it again in a moment.`, { retry_after: 5 }));
+}
+
+/**
+ * An author's signed rotation or revocation, into the index's `keys` for every record to read. NO SIGN-IN: the statement
+ * is signed by the key it speaks for, which is the whole of who is asking, and the key must have signed something listed.
+ */
+async function keyStatement(request: Request, deps: KennelDeps): Promise<Response> {
+  const blobs = deps.blobs;
+  if (blobs === undefined) return refusedWith(501, NO_BUCKET);
+  const body = await bodyOf(request, SMALL_BODY_MOST, 'key');
+  if (!body.ok) return settled(body);
+  const asked = readKeyStatement(body.value);
+  if (!asked.ok) return settled(asked);
+  return settled(
+    await changed(blobs, async (state) => {
+      const out = await keyStatementIn(state.index, asked.value.statement);
+      return out.ok ? ok({ answer: out.value.answer, index: out.value.index, review: null, files: [], move: null, drop: [] }) : (out as Result<never>);
+    }),
+  );
+}
+
+async function reportsOf(blobs: KennelBucket) {
+  return stored(blobs, REPORTS_FILE, readReports, emptyReports);
+}
+
+/** A signed-in person's word that a listed add-on is wrong, for the operator to read beside the review list. */
+async function report(request: Request, deps: KennelDeps, now: () => Date): Promise<Response> {
+  const blobs = deps.blobs;
+  if (blobs === undefined) return refusedWith(501, NO_BUCKET);
+  const body = await bodyOf(request, SMALL_BODY_MOST, 'report');
+  if (!body.ok) return settled(body);
+  const asked = readReport(body.value);
+  if (!asked.ok) return settled(asked);
+  const who = await personOf(request, deps);
+  if ('refused' in who) return who.refused;
+  const bundled = (await bundledIndex(deps.assets, false)) ?? emptyCatalogue('BrainDog');
+  for (let tries = 0; tries < KENNEL_TRIES; tries += 1) {
+    const [file, index] = await Promise.all([reportsOf(blobs), stored(blobs, INDEX, catalogueOf, () => emptyCatalogue('BrainDog Kennel'))]);
+    const out = reportIn(file.value, [index.value, bundled], asked.value, `person:${who.person}`, now());
+    if (!out.ok) return withCookie(settled(out), who.cookie);
+    if (await put(blobs, REPORTS_FILE, out.value.file, file.etag)) return withCookie(settled(ok(out.value.answer)), who.cookie);
+  }
+  return withCookie(settled(no('RATE_LIMITED', 'Other reports landed while this one was being written. Send it again in a moment.', { retry_after: 5 })), who.cookie);
 }

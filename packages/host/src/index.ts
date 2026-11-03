@@ -342,6 +342,8 @@ export type RecordSurface = {
   digestToday(args: never, ctx: never): Promise<Result<unknown>>;
   markRead(args: { upTo?: number | string } | undefined, ctx: never): Promise<Result<unknown>>;
   setPref(args: never, ctx: never): Promise<Result<unknown>>;
+  /** OPTIONAL as `scriptTry` is: a drawn view's write, checked against its block's acts (add-ons phase 4). */
+  drawnAct?(args: never, ctx: never): Promise<Result<unknown>>;
   subscribePush(args: never, ctx: never): Promise<Result<unknown>>;
   unsubscribePush(args: never, ctx: never): Promise<Result<unknown>>;
   log(args: never, ctx: never): Promise<Result<unknown>>;
@@ -353,6 +355,7 @@ export type RecordSurface = {
   planUseCase(args: never, ctx: never): Promise<Result<unknown>>;
   fetchShared(args: never, ctx: never): Promise<Result<unknown>>;
   fetchUseCase(args: never, ctx: never): Promise<Result<unknown>>;
+  gitUpdates(args: never, ctx: never): Promise<Result<unknown>>;
   exportUseCase(args: never, ctx: never): Promise<Result<unknown>>;
   /** OPTIONAL as `countBy` is: the route lands in the same wave as the record's method, and both hosts compile either way. */
   setup?(args: never, ctx: never): Promise<Result<unknown>>;
@@ -467,6 +470,8 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     digestToday: (a, ctx) => api.digestToday(a as never, ctx as never),
     markRead: (a, ctx) => api.markRead(a as { upTo?: number | string } | undefined, ctx as never),
     setPref: (a, ctx) => api.setPref(a as never, ctx as never),
+    drawnAct: async (a, ctx) =>
+      api.drawnAct ? api.drawnAct(a as never, ctx as never) : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot write from a drawn view yet.' } },
     subscribePush: (a, ctx) => api.subscribePush(a as never, ctx as never),
     unsubscribePush: (a, ctx) => api.unsubscribePush(a as never, ctx as never),
     log: (a, ctx) => api.log(a as never, ctx as never),
@@ -478,6 +483,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     planUseCase: (a, ctx) => api.planUseCase(a as never, ctx as never),
     fetchShared: (a, ctx) => api.fetchShared(a as never, ctx as never),
     fetchUseCase: (a, ctx) => api.fetchUseCase(a as never, ctx as never),
+    gitUpdates: (a, ctx) => api.gitUpdates(a as never, ctx as never),
     exportUseCase: (a, ctx) => api.exportUseCase(a as never, ctx as never),
     /* `at: 'setup'` IS HOW A CLIENT TELLS THIS FROM THE RECORD'S OWN `NOT_IN_THIS_BUILD` (no backups here, no sign-in
        here), which is an answer about the record and no reason to fall back to the old way. */

@@ -29,7 +29,7 @@ export const SCRIPT_GRAMMAR = {
   body: {
     script: 'the name, the same as in the id: lower-case letters, digits, - and _, starting with a letter, at most 32 (required)',
     title: 'text',
-    runs: '{"every":"1h"}, no more often than every 15m; {"every":"1d","at":"09:00"} every day at that time in the record\'s time zone (at needs an every of whole days: 1d, 2d or 1w); {"door":"<ingest id>"} whose verified arrivals start it; or {"rule":true} so a rule may run it. At least one of every, door and rule (required)',
+    runs: '{"every":"1h"}, no more often than every 15m; {"every":"1d","at":"09:00"} every day at that time in the record\'s time zone (at needs an every of whole days: 1d, 2d or 1w); {"door":"<ingest id>"} whose verified arrivals start it; or {"rule":true} so a rule may run it; {"tool":true}, {"command":true} or {"row":true} so its add-on\'s tool, command bar entry or row action may start it, handing the args, the answers or {row} as ctx.input, and returning {answer} to whoever started it. At least one (required)',
     egress: '["https://<host>"], each an origin written out in full with no path, port or placeholder; [] when it fetches nothing (required)',
     keys: '["<keychain label>"], the keys it sends, by label; [] for none. A key needs an egress to go to (required)',
     reads: '["<register>"], what ctx.record may read; [] for none (required)',
@@ -37,6 +37,9 @@ export const SCRIPT_GRAMMAR = {
     limits: '{"cpu_ms","fetches","wall_ms","writes"}, whole numbers above 0; see limits for the defaults and the most it may ask',
     source: 'JavaScript whose default export is async function run(ctx) (required)',
     pack: 'the pack that owns it',
+    notifies: 'true when it may send the owner a notice with ctx.notify, at most 20 a day for its add-on; the plan asks the owner to approve it',
+    model: '{"most_per_run": 1 to 10}: how many times one run may ask Slash\'s model with ctx.ask, on the record\'s own allowance; the plan asks the owner to approve it',
+    store: 'true when it keeps a little state of its own with ctx.store, per add-on, JSON values, 1 MB in all, removed with the add-on\'s data',
   },
   ctx: {
     'fetch(url, {method?, headers?, body?, key?})': 'one request, to an origin in egress; key is a label from keys, and the host adds it, so the script never holds its bytes. Answers {status, ok, headers, text(), json()}',
@@ -49,6 +52,11 @@ export const SCRIPT_GRAMMAR = {
     'now()': "the run's instant, from the host clock",
     tz: "the record's timezone",
     'log(...parts)': 'kept on the run, cut at 8 KB',
+    'notify({title, body?})': 'with notifies: true, one notice to the owner: a title up to 80 characters and a line up to 200. Sent with the run\'s writes, held in quiet hours, at most one push an hour. Answers {ok} or {ok: false, refusal}, the 21st of a day among them',
+    'ask(prompt)': 'with model:, one question to Slash\'s model, at most most_per_run a run (one more stops the run). Answers {ok, text} or {ok: false, refusal} when the allowance is spent or this BrainDog has no model',
+    'store.get(key) / store.set(key, value)': 'with store: true, the add-on\'s own JSON values by key; set(key, null) takes one away. set answers {ok} or {ok: false, refusal} past 1 MB. Kept with the run\'s writes',
+    without_the_header: 'notify, ask and store stop the run, refused, when the header does not say notifies, model or store',
+    in_a_try: 'notify and ask are dry: checked and answered {ok, dry: true}, nothing sent, nothing asked; what store.set keeps is not kept',
   },
   nothing_else: 'there are no other globals: no fetch, require or process. Writes are applied together after the run, and a run that is refused writes none of them',
   limits: {

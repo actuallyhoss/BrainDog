@@ -155,7 +155,10 @@ test('a yank by the signing key marks the version, which still downloads by its 
   const key = await newAuthorKey('Halden');
   const text = addon('1.0.0');
   assert.equal((await serveKennel(post('publisher', { publisher: `key:${key.key_id}`, trusted: true }, operator), deps)).status, 200);
-  const listed = await read(await serveKennel(post('submit', await signedSubmission(text, key)), deps));
+  /* A TRUSTED PUBLISHER'S FIRST VERSION WAITS (it reaches everything new), and the operator lists it. */
+  const waited = await read(await serveKennel(post('submit', await signedSubmission(text, key)), deps));
+  assert.equal(waited.value?.state, 'review', JSON.stringify(waited));
+  const listed = await read(await serveKennel(post('review', { kind: 'pack', id: 'bookshelf', version: '1.0.0', verdict: 'list', reason: '' }, operator), deps));
   assert.equal(listed.value?.state, 'listed', JSON.stringify(listed));
   /* A NEWER VERSION STAYS, so the entry is still in the store with the yanked one marked. */
   assert.equal((await serveKennel(post('submit', await signedSubmission(addon('1.0.1'), key)), deps)).status, 200);
@@ -187,10 +190,13 @@ test('a trusted version whose copy did not land after its listing is served from
   const { blobs, files, fail } = bucket();
   const deps = depsOf(blobs);
   const key = await newAuthorKey('Halden');
-  const text = addon('1.0.0');
   assert.equal((await serveKennel(post('publisher', { publisher: `key:${key.key_id}`, trusted: true }, operator), deps)).status, 200);
+  /* ITS FIRST VERSION WAITS AND IS LISTED BY THE OPERATOR; THE SECOND, REACHING NOTHING NEW, LISTS AT ONCE. */
+  assert.equal((await read(await serveKennel(post('submit', await signedSubmission(addon('1.0.0'), key)), deps))).value?.state, 'review');
+  assert.equal((await read(await serveKennel(post('review', { kind: 'pack', id: 'bookshelf', version: '1.0.0', verdict: 'list', reason: '' }, operator), deps))).value?.state, 'listed');
+  const text = addon('1.0.1');
 
-  fail('kennel/packs/bookshelf/1.0.0.pack.json');
+  fail('kennel/packs/bookshelf/1.0.1.pack.json');
   const body = await signedSubmission(text, key);
   /* QUIET WHILE IT ANSWERS, because the copy that fails is logged, as it is meant to be. */
   const loud = console.error;
@@ -201,9 +207,9 @@ test('a trusted version whose copy did not land after its listing is served from
       console.error = loud;
     });
   assert.equal(listed.value?.state, 'listed', JSON.stringify(listed));
-  assert.ok(!files.has('kennel/packs/bookshelf/1.0.0.pack.json'));
+  assert.ok(!files.has('kennel/packs/bookshelf/1.0.1.pack.json'));
 
-  const file = await serveKennel(get('packs/bookshelf/1.0.0.pack.json'), deps);
+  const file = await serveKennel(get('packs/bookshelf/1.0.1.pack.json'), deps);
   assert.equal(file.status, 200);
   assert.equal(await file.text(), text);
 });

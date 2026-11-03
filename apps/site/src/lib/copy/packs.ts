@@ -1,5 +1,6 @@
 /**
- * The add-on store's words: `/packs`, the catalogue's public face, and `/packs/<id>`, one add-on.
+ * The add-on store's words: `/addons`, the catalogue's public face, `/addons/<id>`, one add-on, and `/addons/by/<who>`,
+ * everything one author has listed.
  *
  * EVERY FACT ON THOSE PAGES IS THE CATALOGUE'S, read at build time (`lib/packs/read.server.ts`), so this
  * file holds only the sentences said around them and never a pack's name, count or version.
@@ -60,34 +61,52 @@ export const packs = {
     /* Rounded down and never below ten: `roundCount` in `packages/declare/src/kennel.ts`, the Kennel's `counts.json`. */
     installs: (n: number) => `On ${n}+ BrainDogs`,
 
+    /** How far a listing is trusted, in the record's words (`TRUST_SAID` in `packages/record/src/methods/addons.ts`). */
+    trust: {
+      braindog: 'Made by BrainDog',
+      reviewed: 'Reviewed by BrainDog',
+      signed: 'Signed by its author, not reviewed',
+      unreviewed: 'Not reviewed',
+    },
+
     /**
-     * THE BAND THAT ENDS THE STORE: anybody can write one. Every line rests on the packs docs: one file
-     * (`06-packs/01-overview.md`), the commands (`02-first-pack.md`) and review (`10-publishing.md`, "Nothing from
-     * outside is listed until a person has looked at it").
+     * THE BAND THAT ENDS THE STORE: anybody can make one, and the quickest way is to ask an agent. Every line rests on the
+     * add-on docs: one file (`06-packs/01-overview.md`), the agent's calls (`17-with-your-agent.md`: it looks in the store,
+     * writes, checks, and asks you on Needs you) and review (`10-publishing.md`, "Nothing from outside is listed until a
+     * person has looked at it").
      */
     make: {
-      title: 'Make your own add-on.',
+      title: 'Build your own.',
       say:
-        'An add-on is one file: the lists, pages and rules it brings. Write it, try it on your own BrainDog, then send ' +
-        'it in. Nothing from outside is listed until a person has looked at it.',
-      first: 'Your first add-on',
+        'When BrainDog does not do something you want, ask your agent. It looks here first, and if nothing fits it writes ' +
+        'an add-on, checks it against your BrainDog and asks you before anything is installed. You can share it, or send it ' +
+        'in for review. Nothing from outside is listed until a person has looked at it.',
+      agent: 'Build one with your agent',
+      agentHref: '/docs/packs/with-your-agent',
+      first: 'Write one yourself',
       firstHref: '/docs/packs/first-pack',
       publish: 'How publishing works',
       publishHref: '/docs/packs/publishing',
-      terminal: 'In a terminal',
-      /* The first page's own commands, in its order (`06-packs/02-first-pack.md`). */
-      steps: [
-        'braindog pack new reading-list',
-        'braindog pack check reading-list',
-        'braindog pack test reading-list',
-        'braindog pack publish reading-list/reading-list.pack.json --kennel',
-      ],
+      terminal: 'Ask your agent',
+      /* What a person says, and the agent's calls in their order (`17-with-your-agent.md`, `skills/braindog/SKILL.md`). */
+      ask: 'BrainDog has no way to track films I want to watch. Make me an add-on for it.',
+      steps: ['addons {q: "films to watch"}', 'addonNew {id: "watch-list", ...}', 'addonCheck {doc}', 'installPack {doc}'],
+      stepsSaid: 'What it does, in order',
+    },
+
+    /** `/addons/by/<who>`: one author's listings. */
+    by_page: {
+      title: (name: string) => `Add-ons by ${name} · BrainDog`,
+      description: (name: string, n: number) => `${many(n, 'add-on', 'add-ons')} by ${name} for BrainDog, each showing what it adds before you add it.`,
+      heading: (name: string) => `Add-ons by ${name}`,
+      lede: (n: number) => `${many(n, 'add-on', 'add-ons')} listed. ${n === 1 ? 'It shows' : 'Each one shows'} what it asks for of yours before anything changes.`,
+      back: 'All add-ons',
     },
 
     detail: {
       title: (name: string) => `${name} · BrainDog add-on`,
       back: 'All add-ons',
-      install: 'Add to your BrainDog',
+      install: 'Add to BrainDog',
       /* The app shows its plan before a write: `apps/web/src/lib/market/PlanSheet.svelte`. */
       installNote: 'Opens BrainDog, which shows what this adds and asks before anything changes.',
       /* SIGN-UP IS OPEN, so `installNote` is for anybody, with a BrainDog or without one. This twin is shown only
@@ -106,7 +125,7 @@ export const packs = {
       addsNothing: 'It adds no list or page of its own. It works on what your BrainDog already holds.',
       /* THE TILE BESIDE THE DRAWING, by name: what a person will find in their BrainDog after adding it. */
       brings: 'What it brings',
-      ruleCount: (n: number) => `${many(n, 'rule', 'rules')} that run on their own`,
+      ruleCount: (n: number) => (n === 1 ? '1 rule that runs on its own' : `${n} rules that run on their own`),
       exampleCount: (n: number) => `${many(n, 'example entry', 'example entries')} to start from`,
       facts: 'About this add-on',
       publisher: 'Made by',
@@ -116,6 +135,12 @@ export const packs = {
       /* `calls_out` in `reachOf` (`packages/declare/src/catalogue.ts`) lists every host a declaration names. */
       noHosts: 'Nothing. It talks to nothing outside your BrainDog.',
       versions: 'Versions',
+      /* THE DECISION, first after the head: the lines worked out from the file (`asksOf`, the record's `reachLines`). */
+      asks: 'What it asks for of yours',
+      asksNote: 'Worked out by BrainDog from the add-on file, not written by its author. Your BrainDog shows these again and asks before anything changes.',
+      asksNothing: 'Nothing of yours: no list of yours, no outside service and no key.',
+      trust: 'Checked',
+      moreBy: (name: string) => `More from ${name}`,
       first: 'First release.',
       /* What each word means is `declaredBump` in `packages/declare/src/catalogue.ts`. */
       bumps: {

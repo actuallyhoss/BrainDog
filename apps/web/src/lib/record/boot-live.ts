@@ -898,6 +898,8 @@ const setupText = (e: EventLine): string => setupSaid(e.target, typeof e.to === 
 /** Where a line goes: the row, the question, or the log for anything that is neither. */
 function hrefOf(e: EventLine): string {
   if (e.register !== null && e.seq !== null) return `/r/${e.register}/${e.seq}`;
+  /* AN ADD-ON'S NOTICE (`ctx.notify`) NAMES ITS ADD-ON, and opens the add-on's page. */
+  if (e.kind === 'note' && e.target_kind === 'pack' && e.target) return `/addons/${encodeURIComponent(e.target)}`;
   const question = /^(?:suggestion:)?(SG\d+)$/u.exec(e.target ?? '');
   if (e.target_kind === 'suggestion' && question) return `/decide/${question[1]}`;
   return '/audit';

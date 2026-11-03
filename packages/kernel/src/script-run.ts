@@ -31,6 +31,7 @@ import { SCRIPT_CHAIN_CEILING, chainOfJob, underChain } from './flow.ts';
 import { instant } from './migrate.ts';
 import type { OutboxRow } from './outbox.ts';
 import { activeScript, type ScriptBody } from './script.ts';
+import { applyNotices, applyStored, scriptOwner } from './addon-state.ts';
 import { attempt } from './tx.ts';
 
 /**
@@ -67,7 +68,8 @@ export type ScriptUsage = { fetches: number; bytes: number; wall_ms: number; cpu
  * the sandbox started. `held` is the host's to say because the allowance is the Directory's, exactly as for a `call`.
  */
 export type ScriptAnswer =
-  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage; ask?: unknown; proposals?: unknown }
+  /* `notices` AND `stored` ARE WHAT `ctx.notify` AND `ctx.store.set` QUEUED (`addon-state.ts`), applied with the writes. `answer` is what a tool's script hands its caller. */
+  | { writes: ScriptWrite[]; log: string; usage: ScriptUsage; ask?: unknown; proposals?: unknown; notices?: unknown; stored?: unknown; answer?: unknown }
   | { refused: { code: string | null; why: string }; log: string; usage: ScriptUsage }
   | { held: { until: number; say: string } };
 
@@ -98,7 +100,9 @@ export type Scripted = {
      * builds a `Scripted` of its own (a trial, a test's double) and leaves it out hands the sandbox `{}`.
      */
     config?: Record<string, Json>;
-    decl: Pick<ScriptBody, 'egress' | 'keys' | 'reads' | 'writes' | 'limits' | 'source'>;
+    /** The pack that owns it, which its notices are counted and its store kept under (`scriptOwner`); `null` for none. */
+    pack?: string | null;
+    decl: Pick<ScriptBody, 'egress' | 'keys' | 'reads' | 'writes' | 'limits' | 'source' | 'notifies' | 'model' | 'store'>;
     record: { id: string; tz: string };
   };
 };
@@ -122,6 +126,11 @@ export type ScriptRunDeps = Pick<ActionDeps, 'sql' | 'recordId' | 'nowMs' | 'min
    * with none here writes what it wrote and says on its line that nobody was asked.
    */
   propose?: (p: { question: string; body_kind: ScriptProposalKind; body: Record<string, unknown>; cause?: string }, actor: string) => Result<{ id: string; joined?: true; widened?: number; answered?: unknown }>;
+  /**
+   * One notice a run sent (`ctx.notify`), routed as an `active` notice: the note always, one push an hour, nothing inside
+   * quiet hours (`digest.ts` `notify`). Absent, a run that notified is refused `NOT_IN_THIS_BUILD`, writing nothing.
+   */
+  tell?: (said: { actor: string; say: string; pack?: string | null | undefined }) => void;
 };
 
 /** How many refused runs in a row pause a script. Design section 2, point 8. */
@@ -463,6 +472,7 @@ export function prepareScript(deps: ScriptRunDeps, job: OutboxRow): Scripted | M
       actor: `script:${script}@v${version}`,
       input: payload.input ?? null,
       config: settingsFor(deps, typeof found.pack === 'string' ? found.pack : null),
+      pack: typeof found.pack === 'string' ? found.pack : null,
       decl: {
         egress: body.egress,
         keys: body.keys,
@@ -470,6 +480,9 @@ export function prepareScript(deps: ScriptRunDeps, job: OutboxRow): Scripted | M
         writes: body.writes,
         ...(body.limits === undefined ? {} : { limits: body.limits }),
         source: body.source,
+        ...(body.notifies === true ? { notifies: true as const } : {}),
+        ...(body.model === undefined ? {} : { model: body.model }),
+        ...(body.store === true ? { store: true as const } : {}),
       },
       record: { id: deps.recordId, tz: deps.tz },
     },
@@ -598,6 +611,9 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   /* THE NEW QUESTIONS' IDS, stamped on the run below, so the scripts read can say whether they still wait. */
   const proposedIds: string[] = [];
   let proposeRefused = -1;
+  /* WHICH OF ITS STORE OR ITS NOTICES WAS REFUSED, if one was, and how many notices went. */
+  let extraRefused: 'store' | 'notices' | null = null;
+  let told = 0;
 
   /* ONE BATCH FOR THE RUN, so the history shows its rows as one change, and one note on each that says which run. */
   const batch = deps.mint();
@@ -663,6 +679,31 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
         proposedIds.push(out.value.id);
       }
     }
+    /* AND WHAT IT KEPT AND WHAT IT TOLD (`ctx.store`, `ctx.notify`), last, in the same savepoint: a store over its size or a
+       notice past the day's count takes the run's writes back with it, as a refused question does. */
+    if (answer.stored !== undefined && answer.stored !== null) {
+      if (decl.store !== true) {
+        extraRefused = 'store';
+        return no('FORBIDDEN', `${script} kept state and its header does not say store: true.`, { at: 'stored' });
+      }
+      const out = applyStored(deps.sql, scriptOwner({ script, pack: s.scripted.pack }), answer.stored, deps.nowMs);
+      if (!out.ok) {
+        extraRefused = 'store';
+        return out;
+      }
+    }
+    if (answer.notices !== undefined && answer.notices !== null) {
+      if (decl.notifies !== true && Array.isArray(answer.notices) && answer.notices.length > 0) {
+        extraRefused = 'notices';
+        return no('FORBIDDEN', `${script} sent a notice and its header does not say notifies: true.`, { at: 'notices' });
+      }
+      const out = applyNotices(deps.sql, { script, pack: s.scripted.pack, actor }, answer.notices, deps.nowMs, deps.tell);
+      if (!out.ok) {
+        extraRefused = 'notices';
+        return out;
+      }
+      told = out.value;
+    }
     return ok(null);
   }));
 
@@ -678,6 +719,8 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
     done();
     const why = 'refusal' in applied ? applied.refusal.fix : 'a row it updates was changed by somebody else first.';
     if (askRefused) return refuse(`${script} wrote nothing and asked nothing: BrainDog refused its question; its log says why.`, why);
+    if (extraRefused === 'store') return refuse(`${script} wrote nothing: what it kept in its store was refused; its log says why.`, why);
+    if (extraRefused === 'notices') return refuse(`${script} wrote nothing and told nobody: its notices were refused; its log says why.`, why);
     if (proposeRefused >= 0) return refuse(`${script} wrote nothing and asked nothing: BrainDog refused question ${proposeRefused + 1} of ${proposals.length} it proposed; its log says why.`, why);
     return refuse(`${script} wrote nothing: write ${failedAt + 1} of ${answer.writes.length} was refused; its log says why.`, why);
   }
@@ -716,13 +759,15 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   /* A QUIET RUN IS STAMPED (last-day-48): one that wrote nothing, asked nothing and stopped nothing, so a feed leaves it
      out (`bookkeeping` in index.ts) and a script that runs every night adds no line to Activity on a night with nothing
      to say. The script's own history keeps it. Stamped as the line is written, never by rewriting it. */
-  const quiet = n === 0 && asked === null && stopped.length === 0 && proposed.asked === 0;
+  const quiet = n === 0 && asked === null && stopped.length === 0 && proposed.asked === 0 && told === 0;
+  /* AND WHAT IT TOLD THE OWNER, IN A COUNT, never the words: the notes themselves are on the bell. */
+  const toldSaid = told === 0 ? '' : told === 1 ? ' It sent you one notice.' : ` It sent you ${told} notices.`;
   const metered = keepLog(
     deps,
     meter(
       deps,
       { ...base, ...spent, outcome: 'ok', failures: 0, ...(quiet ? { quiet: true as const } : {}) },
-      `${named} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one line' : `${n} lines`}.${said}${offered}${stop}`,
+      `${named} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one line' : `${n} lines`}.${said}${offered}${toldSaid}${stop}`,
     ),
     answer.log,
     decl,

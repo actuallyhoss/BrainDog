@@ -18,13 +18,17 @@
  */
 
 import type { Refusal, Result } from '@braindog/ports';
-import { ok } from '@braindog/ports';
-import { conflictFault, installFault, installOrder, keptQuestion, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type InstallOptions, type Pack, type VoiceKey } from '@braindog/declare';
+import { no, ok } from '@braindog/ports';
+import { restoreWithin } from './addon-data.ts';
+import { conflictFault, installFault, installOrder, keptQuestion, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, updatesFromStore, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type InstallOptions, type Pack, type VoiceKey } from '@braindog/declare';
 import { KEY_OPENED_UNATTENDED, KEY_OPENED_UNATTENDED_PASSPHRASE, approvalLines, configReads, configValue, egressChanged, egressOf, personNameOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
 import { normaliseChecked } from './theme-check.ts';
 import { retireMarks, takersFor } from './arrange-retires.ts';
 import { notesKept, type KeptRow } from './arrange-keeps.ts';
+import { fileChecksum, readCatalogueFile } from '@braindog/declare/catalogue';
+import type { PackSource } from '@braindog/declare';
+import { parseGit, repoSaid, resolveRef, rawAddress, shortSha, type GitRead, type ReadAddress } from './git-channel.ts';
 
 /**
  * The record `plannedState` leaves, as `kernel.lint` reads one: each body parsed, and the pack that put it there.
@@ -162,9 +166,32 @@ const WAITING_HOLDER = 'braindog:waiting';
  */
 export async function installHeld(kernel: Kernel, pack: Pack, diff: Diff, host: Host, planHash: string, approve: readonly string[] = [], because?: string, options: InstallOptions = {}): ReturnType<typeof install> {
   const waiting = diff.waiting ?? [];
+  /* AN UPDATE THAT MOVES ENTRIES INSTALLS ONLY WITH ITS MOVE (`addon-data.ts` `rehearseMove`), which the record's
+     `installPack` rehearses and hands in as `within`. Every other way in is refused, so no path lands the new shape over
+     entries still in the old one. */
+  if (diff.migrates !== undefined && options.within === undefined)
+    return no(
+      'PLAN_STALE',
+      `${pack.manifest.title ?? pack.manifest.pack} ${pack.manifest.version} moves your entries on the way (${diff.migrates.says}), so it is installed from its own page, where the move is tried first. Nothing changed.`,
+      { at: 'migrate' },
+    );
+  /* AND ONE REMOVED WITH ITS DATA INSIDE THE WINDOW COMES BACK WITH ITS ENTRIES (`restoreWithin`), in the same transaction. */
+  const back = restoreWithin(kernel, pack.manifest.pack, 'system');
+  const within =
+    back === undefined
+      ? options.within
+      : options.within === undefined
+        ? back
+        : (): Result<unknown> => {
+            const moved = options.within!();
+            return moved.ok ? back() : moved;
+          };
   /* `because` IS WHY AN INSTALL NOBODY PRESSED HAPPENED, for the line history keeps of it (`planAgain`). */
   const more = { waiting, ...(because === undefined ? {} : { because }) };
-  const put = await install(pack, diff, { ...host, remember: (row) => host.remember({ ...row, ...more } as Parameters<Host['remember']>[0]) }, planHash, approve, options);
+  const put = await install(pack, diff, { ...host, remember: (row) => host.remember({ ...row, ...more } as Parameters<Host['remember']>[0]) }, planHash, approve, {
+    ...options,
+    ...(within === undefined ? {} : { within }),
+  });
   if (put.ok) kernel.setPref(WAITING_HOLDER, pack.manifest.pack, waiting.length > 0 ? { ...pack, seeds: [] } : null);
   return put;
 }
@@ -315,6 +342,22 @@ export type ArrangeDeps = {
    * in the press's answer as `said`, so Decide says them as the night does.
    */
   kept?: ((pack: Pack, diff: Diff, packSaid: (id: string) => string) => readonly string[] | void) | undefined;
+  /**
+   * Where an installed add-on came from, the `source` on its `pack` row (`updatesFromStore` reads it), `null` when it has
+   * none. Absent, every add-on is read as the store's, as before.
+   */
+  sourceOf?: ((id: string) => string | null) | undefined;
+  /**
+   * How a `git:` address is read, pinned to the commit its ref points at (`git-channel.ts` `readGit`), and the host's plain
+   * address reader under it, for reading a tag again at the yes. Absent, a proposal from GitHub is refused.
+   */
+  readGit?: ((address: string) => Promise<{ ok: true; value: GitRead } | { ok: false; fix: string }>) | undefined;
+  readAddress?: ReadAddress | undefined;
+  /**
+   * Whether an add-on may go to the store from here, made in this BrainDog, with its title, version and checksum
+   * (`publishable` in `index.ts`). Absent, a publish question is refused.
+   */
+  publishable?: ((id: string) => Promise<Result<{ id: string; title: string; version: string; checksum: string }>>) | undefined;
 };
 
 /** What a proposal found in the host's whole catalogue: each document by pack id, the modules under it, and its entry. */
@@ -572,6 +615,8 @@ function choicesIn(raw: unknown): Result<Body[]> {
 
 export function arranger(d: ArrangeDeps) {
   const { kernel, catalogue } = d;
+  /** Where a document a proposal carries came from, when it was not made here: a GitHub file, pinned to its commit. */
+  const docSource = new WeakMap<Body, PackSource>();
   /**
    * THE PACKS ANOTHER PACK HANDED DECLARATIONS TO, WHICH WERE NEVER INSTALLED: live declarations under the id and no `pack`
    * row. `packStates` reads a pack by what is live under it, so after money-core 1.8.0 handed an HSBC door on, `bank-hsbc-eg`
@@ -589,6 +634,14 @@ export function arranger(d: ArrangeDeps) {
      pack was "not installed here, so it cannot be turned off", and the one way Decide had to stop a door money-core handed
      to `bank-hsbc-eg` was gone; before the arranger read handovers, the same proposal was filed and the door went off. */
   const running = (id: string) => kernel.packStates().find((s) => s.id === id);
+  /**
+   * HELD HERE AND NOT FROM THE STORE: made in this BrainDog, from a link or from GitHub (`updatesFromStore`). The store's
+   * add-on of the same id is someone else's, so it is never this one's update, and a new file for it is its author's.
+   */
+  const ownHeld = (id: string): boolean => stateOf(id) !== undefined && !updatesFromStore(d.sourceOf?.(id) ?? null);
+  /** The files a proposal carried that were made here, so they go in as made here (`paste`) and not as the store's. */
+  const madeHere = new WeakSet<object>();
+
   const entryOf = (id: string): CatalogueEntry | undefined =>
     catalogue.find((e) => e.id === id) ?? catalogue.find((e) => e.kind === 'usecase' && e.id === packIdOf(id));
   /** The version on offer for a pack, from the catalogue or the document sent with the proposal. */
@@ -1022,7 +1075,7 @@ export function arranger(d: ArrangeDeps) {
     if (!doc) return notOffered(id, 'body.packs');
     /* THROUGH THE THEME CHECK, as `installPack` reads a document: a proposal that installs a pack is that pack's
        install, and a palette refused there is refused here in the same words. */
-    const pack = await normaliseChecked(doc, { kind: 'local' });
+    const pack = await normaliseChecked(doc, docSource.get(doc) ?? { kind: madeHere.has(doc) ? 'paste' : 'local' });
     if (!pack.ok) return pack;
     if (pack.value.manifest.pack !== id)
       return refuse('VALUE_MALFORMED', `The document names its pack ${pack.value.manifest.pack}, and the proposal asks for ${id}. Make the two agree.`, 'body.doc');
@@ -1338,6 +1391,17 @@ export function arranger(d: ArrangeDeps) {
     }
 
     if (kind === 'pack') {
+      /* PUBLISH AN ADD-ON MADE HERE TO THE STORE, `{ publish: id }`: an agent's ask through `act publishAddon`. Filed with the
+         version and checksum held now, so the yes publishes what the question showed. It changes nothing in this record;
+         the owner's browser signs the file with their key and sends it on the yes (Decide), and the store reviews it. */
+      if (typeof body.publish === 'string') {
+        if (body.to !== undefined && body.to !== 'store')
+          return refuse('VALUE_MALFORMED', 'A question publishes to the store only. For GitHub, act publishAddon {"id","to":"github"} hands back the line the person runs.', 'body.to');
+        if (!d.publishable) return refuse('PULL_ORIGIN_REFUSED', 'This BrainDog cannot publish add-ons.', 'body.publish');
+        const can = await d.publishable(body.publish);
+        if (!can.ok) return { ok: false, refusal: { ...(can as { refusal: Refusal }).refusal, at: 'body.publish' } };
+        return ok({ publish: can.value.id, to: 'store', title: can.value.title, version: can.value.version, checksum: can.value.checksum });
+      }
       if (typeof body.enable === 'string' || typeof body.disable === 'string') {
         const verb = typeof body.enable === 'string' ? 'enable' : 'disable';
         const id = String(body[verb]);
@@ -1354,6 +1418,33 @@ export function arranger(d: ArrangeDeps) {
          read one through (`readShared`: the size, a credential, a block kind nothing draws), and becomes the install of its
          pack with the document it carries and the modules it names. A token files the question; only the owner installs. */
       let fromFile: { title: string; summary: string; modules: readonly string[] } | null = null;
+      /* A FILE ON GITHUB, `{ source: { kind: "git", ref: "owner/repo@v1.2.0:x.pack.json" } }`: read by the host, pinned to the
+         commit the ref points at now (`git-channel.ts`), and filed as the install of the add-on it holds with that file.
+         Any document sent beside it is not read: what is filed is what GitHub holds at that commit. */
+      let fromGit: { source: PackSource; git: Body } | null = null;
+      if (isMap(body.source) && body.source.kind === 'git') {
+        const raw = typeof body.source.ref === 'string' ? body.source.ref.trim() : '';
+        const address = raw.startsWith('git:') ? raw : `git:${raw}`;
+        const at = parseGit(address);
+        if (at === null) return refuse('VALUE_MALFORMED', 'A GitHub file reads owner/repo@ref:path, such as someone/kit@v1.2.0:watch-list.pack.json.', 'body.source.ref');
+        if (!d.readGit) return refuse('PULL_ORIGIN_REFUSED', 'This host does not read files from GitHub. Download the file and send it as doc.', 'body.source');
+        const got = await d.readGit(address);
+        if (!got.ok) return refuse('PULL_ORIGIN_REFUSED', got.fix, 'body.source.ref');
+        const file = await readCatalogueFile(got.value.text, { kind: 'git', ref: got.value.pinned });
+        if (!file.ok) {
+          const r = 'refusal' in file ? file.refusal : ({ code: 'PACK_MALFORMED', fix: 'This is not an add-on file.' } as Refusal);
+          return { ok: false, refusal: { ...r, at: 'body.source.ref' } };
+        }
+        if (file.value.kind !== 'pack') return refuse('PACK_MALFORMED', `${repoSaid(at)} holds a use case there. Send it as {"file": <its text>} instead.`, 'body.source.ref');
+        const tag = /^[0-9a-f]{40}$/u.test(at.ref) ? (typeof body.tag === 'string' ? body.tag : null) : at.ref;
+        fromGit = {
+          source: { kind: 'git', ref: got.value.pinned },
+          git: { repo: repoSaid(at), commit: got.value.sha, pinned: got.value.pinned, ...(tag === null ? {} : { tag }), checksum: await fileChecksum(got.value.text) },
+        };
+        const doc = file.value.file.doc as Body;
+        docSource.set(doc, fromGit.source);
+        body = { install: file.value.file.pack.manifest.pack, doc };
+      } else if (isMap(body.source)) return refuse('VALUE_MALFORMED', 'source is {"kind":"git","ref":"owner/repo@ref:path"}. Any other file goes as doc.', 'body.source.kind');
       if (body.file !== undefined) {
         if (typeof body.file !== 'string' && !isMap(body.file))
           return refuse('VALUE_MALFORMED', 'file is a .usecase.json file, as its text or its document.', 'body.file');
@@ -1371,24 +1462,35 @@ export function arranger(d: ArrangeDeps) {
       }
       if (typeof body.install !== 'string') return ok(body);
       const asked = body.install;
-      const target = entryOf(asked)?.id ?? asked;
+      /* ONE MADE HERE IS CHANGED BY ITS OWN NEW FILE, never by the store's add-on that shares its id (`ownHeld`). */
+      if (fromFile === null && ownHeld(asked)) {
+        if (!isMap(body.doc))
+          return refuse(
+            'VALUE_MALFORMED',
+            `${asked} was not installed from the store, so the store's add-on of that name is not its update. Propose its new file: {"install":"${asked}","doc":<the file>}.`,
+            'body.install',
+          );
+      }
+      const target = ownHeld(asked) ? asked : (entryOf(asked)?.id ?? asked);
       /* A DOCUMENT IS FOR A PACK THE CATALOGUE LACKS, as the grammar says. One sent for a pack the host offers was filed under the
          catalogue's title and summary, so a propose token could put its own pages, rules and version in front of the owner as
          "Study". What the host offers is installed from the host's own document; a shared file says its own name. */
-      if (fromFile === null && isMap(body.doc) && entryOf(asked) !== undefined)
+      if (fromFile === null && isMap(body.doc) && !ownHeld(asked) && entryOf(asked) !== undefined)
         return refuse(
           'VALUE_MALFORMED',
           `${target} is on offer here, so it is installed from this host's own document. Propose {"install":"${asked}"} without doc.`,
           'body.doc',
         );
       /* AND THE SAME FOR ONE THE HOST'S WHOLE CATALOGUE HOLDS, which the arrangement reading lists as on offer. */
-      const shelfHolds = fromFile === null && isMap(body.doc) && d.shelf ? await d.shelf.fetch(asked) : null;
+      const shelfHolds = fromFile === null && isMap(body.doc) && !ownHeld(asked) && d.shelf ? await d.shelf.fetch(asked) : null;
       if (shelfHolds !== null)
         return refuse(
           'VALUE_MALFORMED',
           `${shelfHolds.ok ? shelfHolds.value.title : target} is in this host's catalogue, so it is installed from the host's own document. Propose {"install":"${asked}"} without doc.`,
           'body.doc',
         );
+      /* WHAT IS LEFT WITH A FILE IS NOT THE STORE'S (the two refusals above saw to that), so it goes in as made here. */
+      if (isMap(body.doc)) madeHere.add(body.doc);
       const docs = new Map<string, Body>(isMap(body.doc) ? [[target, body.doc]] : []);
       const sent = new Map<string, readonly string[]>(fromFile === null ? [] : [[target, fromFile.modules]]);
       /* NOT IN THE SHORT LIST AND NO DOCUMENT SENT: the host's whole catalogue, held to its checksum. */
@@ -1435,6 +1537,7 @@ export function arranger(d: ArrangeDeps) {
         ...((needs) => (needs.length === 0 ? {} : { needs }))(needsOf(planned.value.approve)),
         ...(Object.keys(names).length === 0 ? {} : { names }),
         ...(isMap(body.doc) ? { doc: body.doc } : {}),
+        ...(fromGit === null ? {} : { source: fromGit.source, git: fromGit.git }),
       });
     }
 
@@ -1861,7 +1964,51 @@ export function arranger(d: ArrangeDeps) {
     await step(rowIo(kernel, actor)).catch(() => undefined);
   }
 
+  /**
+   * A GITHUB FILE, AT THE YES, HELD TO WHAT THE QUESTION SHOWED. The checksum filed with the question covers the document
+   * the plan was made from; the file is read again at the pinned commit and must be that file; and when the question came
+   * from a tag, the tag is read again, and a tag moved to a file with other bytes (a force push) is refused
+   * `CHECKSUM_MISMATCH` and nothing goes in. A tag moved to the same bytes installs what was shown.
+   */
+  async function gitHeld(body: Body): Promise<Result<true>> {
+    const git = isMap(body.git) ? body.git : {};
+    const shown = typeof git.checksum === 'string' ? git.checksum : null;
+    const pinned = isMap(body.source) && typeof body.source.ref === 'string' ? parseGit(body.source.ref) : null;
+    const title = typeof body.title === 'string' ? body.title : String(body.install);
+    if (shown === null || pinned === null) return refuse('VALUE_MALFORMED', `${title} came from GitHub and its question does not say which file it showed. Ask for it again.`, 'body.git');
+    if ((await fileChecksum(JSON.stringify(body.doc))) !== shown)
+      return refuse('CHECKSUM_MISMATCH', `${title} is not the file this question showed, so nothing was installed.`, 'body.doc');
+    if (!d.readAddress) return refuse('PULL_ORIGIN_REFUSED', 'This host does not read files from GitHub, so it cannot check this one again. Nothing was installed.', 'body.source');
+    const again = await d.readAddress(rawAddress(pinned));
+    if (!again.ok) return refuse('PULL_ORIGIN_REFUSED', `${title} could not be read again from ${repoSaid(pinned)}, so nothing was installed: ${again.fix}`, 'body.source');
+    if ((await fileChecksum(again.text).catch(() => '')) !== shown)
+      return refuse('CHECKSUM_MISMATCH', `${repoSaid(pinned)} at commit ${shortSha(pinned.ref)} no longer holds the file this question showed, so nothing was installed.`, 'body.source');
+    const tag = typeof git.tag === 'string' ? git.tag : null;
+    if (tag === null) return ok(true);
+    const now = await resolveRef(d.readAddress, { ...pinned, ref: tag });
+    if (!now.ok) return refuse('PULL_ORIGIN_REFUSED', `${now.fix} Nothing was installed.`, 'body.git.tag');
+    if (now.sha === pinned.ref) return ok(true);
+    const moved = await d.readAddress(rawAddress(pinned, now.sha));
+    if (!moved.ok) return refuse('PULL_ORIGIN_REFUSED', `${tag} on ${repoSaid(pinned)} moved and its file could not be read: ${moved.fix} Nothing was installed.`, 'body.git.tag');
+    if ((await fileChecksum(moved.text).catch(() => '')) !== shown)
+      return refuse(
+        'CHECKSUM_MISMATCH',
+        `${tag} on ${repoSaid(pinned)} was moved to commit ${shortSha(now.sha)} with a different file from the one this question showed (commit ${shortSha(pinned.ref)}), so nothing was installed. Somebody changed a published version; ask the author why before installing it.`,
+        'body.git.tag',
+      );
+    return ok(true);
+  }
+
   async function apply(kind: 'pack' | 'settings' | 'arrange', body: Body, actor: string, by: Own = {}): Promise<Result<Body>> {
+    /* A PUBLISH WRITES NOTHING HERE. The yes is the owner's word that the browser sent the file (Decide sends it first);
+       only an add-on still at the version the question showed is answered, so the store has what was read. */
+    if (kind === 'pack' && typeof body.publish === 'string') {
+      const can = d.publishable ? await d.publishable(body.publish) : null;
+      if (can === null || !can.ok) return can ?? refuse('PULL_ORIGIN_REFUSED', 'This BrainDog cannot publish add-ons.', 'body.publish');
+      if (can.value.version !== body.version || can.value.checksum !== body.checksum)
+        return refuse('PLAN_STALE', `${can.value.title} is at ${can.value.version} now, not the ${String(body.version)} this asked about. Ask again to publish the version held now.`, 'body.version');
+      return ok({ said: [`Sent ${can.value.title} ${can.value.version} to the store. BrainDog reviews it before it is listed.`], published: [{ id: can.value.id, version: can.value.version }] });
+    }
     const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[]; me: string[]; rows: string[]; declarations: string[]; said: string[] } = {
       said: [],
       installed: [],
@@ -1907,6 +2054,15 @@ export function arranger(d: ArrangeDeps) {
     const disable = kind === 'pack' && typeof body.disable === 'string' ? [body.disable] : (packs.disable ?? []);
     const approved = Array.isArray(body.approve) ? (body.approve as string[]) : [];
     const docs = new Map<string, Body>(kind === 'pack' && typeof body.install === 'string' && isMap(body.doc) ? [[body.install, body.doc]] : []);
+    /* A FILE THE PROPOSAL CARRIED goes in as made here, unless it is a newer version of one the store keeps current here
+       (Slash's question about a store update carries the store's file). */
+    for (const [id, doc] of docs) if (!entryOf(id) && (stateOf(id) === undefined || ownHeld(id))) madeHere.add(doc);
+    /* A FILE FROM GITHUB IS HELD TO WHAT THE QUESTION SHOWED before anything goes in (`gitHeld`), and kept pinned. */
+    if (kind === 'pack' && isMap(body.doc) && isMap(body.source) && body.source.kind === 'git') {
+      const held = await gitHeld(body);
+      if (!held.ok) return stopped(held);
+      docSource.set(body.doc, { kind: 'git', ref: String(body.source.ref) });
+    }
     const declarations = kind === 'arrange' && Array.isArray(body.declarations) ? (body.declarations as Body[]).filter(isMap) : [];
 
     const steps = Array.isArray(body.plan) ? (body.plan as Body[]) : [];
@@ -2297,6 +2453,12 @@ export function arranger(d: ArrangeDeps) {
    * yes installs it.
    */
   async function askAgain(kind: 'pack' | 'settings' | 'arrange', body: Body): Promise<{ body: Body; said: string } | null> {
+    /* A PUBLISH WHOSE ADD-ON MOVED ON ASKS FOR THE VERSION HELD NOW, so the next yes publishes that one. */
+    if (kind === 'pack' && typeof body.publish === 'string') {
+      const fresh = await prepare('pack', { publish: body.publish });
+      if (!fresh.ok || fresh.value.version === body.version) return null;
+      return { body: fresh.value, said: `${String(fresh.value.title)} is at ${String(fresh.value.version)} now, so this asks to publish ${String(fresh.value.version)}. Read it again, and accept to publish it.` };
+    }
     if (kind !== 'pack' || typeof body.install !== 'string') return null;
     const id = body.install;
     const fresh = await prepare('pack', { install: id, ...(isMap(body.doc) ? { doc: body.doc } : {}) });

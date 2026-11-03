@@ -215,13 +215,15 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { doc: 'json', text: 'text', source: 'json', modules: 'json' } },
   { name: 'fetchShared', group: 'ADMIN', writes: false, what: 'The text of a shared use-case or add-on file at an https address or git:owner/repo@ref:path, read by the host with no credentials. It writes nothing.',
     takes: { url: 'text' } },
+  { name: 'gitUpdates', group: 'ADMIN', writes: true, what: 'Add-ons installed from GitHub whose repository tags a newer version, each asked about on Decide; a tag moved to other bytes is refused.',
+    takes: {} },
   { name: 'fetchUseCase', group: 'ADMIN', writes: false, what: 'The text of a shared use-case file at an https address, read by the host with no credentials. It writes nothing.',
     takes: { url: 'text' } },
   /* THE WHOLE FIRST RUN AS ONE CALL. The browser ran it as a script of a dozen calls, so a closed tab left a
      record part made. ADMIN as `installPack` is: it installs add-ons, and only the owner in a browser may. */
   { name: 'setup', group: 'ADMIN', writes: true, what: 'Make this BrainDog from what its owner accepted, in one call: the add-ons in order, then their name, their words, the settings and what they asked to start with. It answers what was done and what was not, and asked with again it writes only what is missing.' },
   { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved, with the calls-out lines it asks for. In the app, or by your agents while they act without asking.' },
-  { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
+  { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay, or with data: true go to the bin until it is installed again.' },
   { name: 'disablePack', group: 'ADMIN', writes: true, what: 'Turn a pack off. It stays listed, its rows stay, and what leans on it is named first.' },
   { name: 'enablePack', group: 'ADMIN', writes: true, what: 'Turn a pack back on, over the rows it kept.' },
   { name: 'resumeAction', group: 'ADMIN', writes: true, what: 'Start a paused scheduled action again, now. A refused key pauses one, and nothing else restarts it.' },
@@ -281,6 +283,8 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'erase', group: 'ADMIN', writes: true, what: 'Erase a person: every value naming them, in one transaction, and one event that names them only as a hash.' },
   { name: 'deleteRecord', group: 'ADMIN', writes: true, what: 'Delete this BrainDog, with its name typed to confirm. There is no undo.' },
   { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read, named as an event. A person only, and never an event of its own.' },
+  /* A DRAWN VIEW'S WRITE (add-ons phase 4): checked against the block's own `actions:` and written as the viewer. */
+  { name: 'drawnAct', group: 'DATA', writes: true, what: "A row added or changed by a drawn view, only as its block's acts allow, written as you." },
   { name: 'setPref', group: 'DATA', writes: true, what: 'One of your own settings: the rail order, the pages hidden from it, the navigation shape, whether new pages are suggested, or what you dismissed. A person only, and not an event.' },
   /* A PHONE ASKING TO BE TOLD, AND TELLING IT TO STOP. READ+ because they are verbs over no row, as `boot`
      and `whoami` are; POSTs because each keeps or removes a `push_sub` row. Only a person's own, and never an event. */

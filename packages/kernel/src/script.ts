@@ -50,7 +50,7 @@ export type ScriptBody = {
    * lets a rule's `script` step start it. `at` pins `every` to a time of day, `HH:MM` in the record's zone, and needs an
    * `every` of whole days (`every: 1d, at: 09:00` is every day at nine).
    */
-  runs: { every?: string; at?: string; door?: string; rule?: true };
+  runs: { every?: string; at?: string; door?: string; rule?: true; tool?: true; command?: true; row?: true };
   /** Literal `https://` origins, compared as origins. Printed in the install diff, one line per script. */
   egress: string[];
   /** Keychain labels. The host opens each for one request; the sandbox never holds a key's bytes. */
@@ -61,12 +61,32 @@ export type ScriptBody = {
   source: string;
   /** The pack that owns it, when no `pack` row does. Read by the record, as a register's `pack:` is. */
   pack?: string;
+  /**
+   * `true` when it may send the owner a notice (`ctx.notify`): at most `SCRIPT_NOTICES_PER_DAY` a day for its add-on, held by
+   * quiet hours, on the plan as a line the owner approves. Absent, `ctx.notify` stops the run.
+   */
+  notifies?: true;
+  /**
+   * How many times one run may ask Slash's model (`ctx.ask`), on the record's own allowance, at most
+   * `SCRIPT_MODEL_ASKS_MOST`. On the plan as a line the owner approves. Absent, `ctx.ask` stops the run.
+   */
+  model?: { most_per_run: number };
+  /** `true` when it keeps a little state of its own (`ctx.store`): per add-on, JSON values, `SCRIPT_STORE_BYTES` in all. */
+  store?: true;
 };
+
+/** The most notices one add-on's scripts send in a day (`ctx.notify`). Past it a notice is refused as a value the script reads. */
+export const SCRIPT_NOTICES_PER_DAY = 20;
+/** The most a script may ask Slash's model in one run (`model: { most_per_run }`). */
+export const SCRIPT_MODEL_ASKS_MOST = 10;
+/** What one add-on keeps in `ctx.store`, all keys and values together, as UTF-8 JSON. */
+export const SCRIPT_STORE_BYTES = 1024 * 1024;
 
 /* `pack` IS HERE BECAUSE THE RECORD READS IT. The seed installs first-party packs with no `pack` row, owned only by
    `pack:` in each body (`packStates`), and a script in one of them was refused as a key nothing reads. */
-const HEADER = ['script', 'title', 'runs', 'egress', 'keys', 'reads', 'writes', 'limits', 'source', 'pack'] as const;
-const RUNS = ['every', 'at', 'door', 'rule'] as const;
+const HEADER = ['script', 'title', 'runs', 'egress', 'keys', 'reads', 'writes', 'limits', 'source', 'pack', 'notifies', 'model', 'store'] as const;
+/* `tool`, `command` AND `row` SAY WHO ELSE MAY START IT: an agent through its add-on's tool, the command bar, a row's menu. */
+const RUNS = ['every', 'at', 'door', 'rule', 'tool', 'command', 'row'] as const;
 /** A day, in the milliseconds `intervalMs` answers: a time of day repeats only on whole ones. */
 const DAY_MS = 86_400_000;
 const LIMITS = ['cpu_ms', 'fetches', 'wall_ms', 'writes'] as const;
@@ -106,9 +126,9 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
 
   const runs = body.runs as Record<string, unknown> | undefined;
   if (runs === null || typeof runs !== 'object' || Array.isArray(runs) || !RUNS.some((k) => k !== 'at' && runs[k] !== undefined))
-    return bad('DECLARATION_INVALID', `${id} says nothing about when it runs. Write runs: with every:, door: or rule: true.`, 'runs');
+    return bad('DECLARATION_INVALID', `${id} says nothing about when it runs. Write runs: with every:, door:, rule: true, tool: true, command: true or row: true.`, 'runs');
   const odd = Object.keys(runs).find((k) => !(RUNS as readonly string[]).includes(k));
-  if (odd !== undefined) return bad('DECLARATION_INVALID', `${id} runs on ${odd}, and a script runs on every:, door: or rule: true.`, `runs.${odd}`);
+  if (odd !== undefined) return bad('DECLARATION_INVALID', `${id} runs on ${odd}, and a script runs on every:, door:, rule:, tool:, command: or row:.`, `runs.${odd}`);
   if (runs.every !== undefined && typeof runs.every !== 'string')
     return bad('DECLARATION_INVALID', `${id}'s every: is how often it runs, written like 1h or 1d.`, 'runs.every');
   if (runs.every !== undefined) {
@@ -134,6 +154,9 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
     return bad('DECLARATION_INVALID', `${id}'s door is the id of the ingest whose arrivals start it.`, 'runs.door');
   if (runs.rule !== undefined && runs.rule !== true)
     return bad('DECLARATION_INVALID', `${id}'s rule: is true when a rule may run it, and absent when none may.`, 'runs.rule');
+  for (const by of ['tool', 'command', 'row'] as const)
+    if (runs[by] !== undefined && runs[by] !== true)
+      return bad('DECLARATION_INVALID', `${id}'s ${by}: is true when its add-on's ${by === 'row' ? 'row action' : by} may start it, and absent when none may.`, `runs.${by}`);
 
   if (!strings(body.egress)) return bad('DECLARATION_INVALID', `${id}'s egress is a list of https:// origins, empty when it fetches nothing.`, 'egress');
   for (const [i, origin] of body.egress.entries()) {
@@ -191,6 +214,22 @@ export function scriptBody(decl: { id: string; body: Record<string, unknown> }):
       if ((value as number) > most)
         return bad('OUT_OF_BOUNDS', `${id}'s limits.${name} is ${String(value)}; the most a script may ask for is ${most}.`, `limits.${name}`);
     }
+  }
+
+  /* WHAT IT MAY DO BEYOND ROWS, each a promise the host keeps and the plan prints as a line the owner approves. */
+  if (body.notifies !== undefined && body.notifies !== true)
+    return bad('DECLARATION_INVALID', `${id}'s notifies: is true when it may send you a notice, and absent when it may not.`, 'notifies');
+  if (body.store !== undefined && body.store !== true)
+    return bad('DECLARATION_INVALID', `${id}'s store: is true when it keeps a little state of its own, and absent when it keeps none.`, 'store');
+  if (body.model !== undefined) {
+    const model = body.model as Record<string, unknown> | null;
+    const most = model !== null && typeof model === 'object' && !Array.isArray(model) ? model.most_per_run : undefined;
+    const stray = model !== null && typeof model === 'object' && !Array.isArray(model) ? Object.keys(model).find((k) => k !== 'most_per_run') : undefined;
+    if (stray !== undefined) return bad('DECLARATION_INVALID', `${id}'s model: says ${stray}, and it says most_per_run only.`, `model.${stray}`);
+    if (!Number.isInteger(most) || (most as number) < 1)
+      return bad('DECLARATION_INVALID', `${id}'s model: is { most_per_run: N }, how many times one run may ask Slash's model, a whole number from 1.`, 'model');
+    if ((most as number) > SCRIPT_MODEL_ASKS_MOST)
+      return bad('OUT_OF_BOUNDS', `${id}'s model.most_per_run is ${String(most)}; the most a script may ask in one run is ${SCRIPT_MODEL_ASKS_MOST}.`, 'model.most_per_run');
   }
 
   if (typeof body.source !== 'string' || body.source.trim() === '')

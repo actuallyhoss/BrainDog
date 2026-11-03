@@ -36,6 +36,7 @@ import {
   type Installed,
   type PackSource,
   unresolvedFault,
+  updatesFromStore,
 } from '@braindog/declare';
 import { isDuplicate, matchLiterals, normalise as normaliseText, parseDate, scanDates, scanDecimals, scanInts, scanMoney, type CurrencyTable } from '@braindog/extract';
 import { fixOf, no, ok } from '@braindog/ports';
@@ -59,6 +60,7 @@ import {
   ANSWER_KEYS,
   CAUSE,
   NIGHT_FAULT,
+  drawnWrites,
   clearFault,
   canonValue,
   sha256,
@@ -173,6 +175,8 @@ import { grammarOf } from './grammar.ts';
 import { askedFault, declinedInput, describe, pinMoved, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDeclined, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
 import { describedGrammar } from './grammar.ts';
 import { lookLanding, skillBearings, skillDraftInput, skillDraftOf } from './slash.ts';
+import { gitLook, parseGit, readGit, repoSaid, shortSha, type GitOffer } from './git-channel.ts';
+import { fileChecksum } from '@braindog/declare/catalogue';
 import {
   askedOn,
   factsBasis,
@@ -218,6 +222,7 @@ import {
 } from './headlines.ts';
 import { nameOnly, scrubbed, spokenName } from './scrub.ts';
 import { lookRefusedKey, noteRefusal, refusedFor, rehearse } from './compose-rehearse.ts';
+import { BINNED, binOwnRows, ownLists as packLists, rehearseMove, type Binned } from './addon-data.ts';
 import { composeLooks, groupListsOf, keepLook as keepLookOf, keptBy, lookAnswerMost, lookBasis, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
 import {
   BODY_DEPTH,
@@ -2509,6 +2514,12 @@ export type RecordDeps = {
    * `catalogueDrafts`). Slash asks about each on Decide through the same `prepare`; absent, it asks about none.
    */
   catalogueOffers?: ((held: readonly { id: string; version: string; on: boolean }[]) => Promise<readonly CatalogueOffer[]>) | undefined;
+  /**
+   * What the store says of the add-ons held here, at the versions held: the operator's advisories and authors' yanks
+   * (`catalogue-offers.ts` `noticesFromCatalogue`). The record turns off what an advisory disables and asks on Needs
+   * you once for each (`noticesTick`). Absent, it hears none.
+   */
+  catalogueNotices?: ((held: readonly import('./catalogue-offers.ts').HeldPack[]) => Promise<readonly (import('@braindog/declare/kennel').Notice & { on: boolean })[]>) | undefined;
   /** The host's whole catalogue, for the arranger (`catalogue-offers.ts` `shelfFromCatalogue`). Absent, only `catalogue` is offered. */
   catalogueShelf?: CatalogueShelf | undefined;
   /**
@@ -2726,8 +2737,28 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'kept' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed' | 'visuals'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'kept' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueNotices' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning' | 'sealed' | 'visuals'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
+  /**
+   * WHAT IS HELD THAT THE STORE KEEPS CURRENT (`updatesFromStore`): every pack but one made here, from a link or from
+   * GitHub, whose id the store may one day hold for an add-on of its own. Every pass that matches what is held against
+   * the store by id reads it through this, so the store's file never replaces somebody's own.
+   */
+  const storeHeld = <T extends { id: string }>(held: readonly T[]): T[] => {
+    const from = new Map(sql.all<{ id: string; source: string }>('SELECT id, source FROM pack').map((r) => [r.id, r.source]));
+    return held.filter((p) => updatesFromStore(from.get(p.id)));
+  };
+  /**
+   * WHERE A REINSTALL SAYS NOTHING, WHERE IT CAME FROM IS KEPT. `local` is what every put-in-again sends that does not
+   * know (a setting planned again, a part that waited, links laid back), and the `pack` row took it over whatever was
+   * there, so an add-on made here became the store's at its first change of settings. Only a claim, `kennel`, `url`,
+   * `git` or `paste`, moves it.
+   */
+  const keptSource = <R extends { id: string; source: string; ref: string | null }>(row: R): R => {
+    if (row.source !== 'local') return row;
+    const was = sql.one<{ source: string; source_ref: string | null }>('SELECT source, source_ref FROM pack WHERE id = ?', row.id);
+    return was === undefined || updatesFromStore(was.source) ? row : { ...row, source: was.source, ref: was.source_ref };
+  };
   /**
    * The visual pages whose text names whoever an erasure is for, by their SHA-256. A page is kept outside the file, so
    * the kernel's scan of every column never reads it; it is read here, before the erasure's transaction, as the
@@ -3818,7 +3849,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* THE RECORD'S OWN CLOCK AND ZONE, so a seed's `{ day }` counts from the day this record reads and not the machine's,
        nor Greenwich's (AH22): a Guide made at 01:00 in Cairo dated its steps from the day before. */
     today: () => localDays(readableZone(kernel.identity()?.tz))(clock.now()),
-    remember: (row) => kernel.rememberPack({ ...row, by: actorOf(ctx) }),
+    remember: (row) => kernel.rememberPack({ ...keptSource(row), by: actorOf(ctx) }),
     /* AND ITS FILE, kept while a part of it waited (`installHeld`), goes with it. */
     forget: (id) => {
       kernel.forgetPack(id);
@@ -3847,7 +3878,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const { useCase } = await import('@braindog/seed/usecases');
       /* THE RE-PUT IS THE RECORD'S OWN, signed `system` whoever's press set it off, so a same-version one that changed
          nothing stays out of the feed while a person's own reinstall is signed by them (review i, RI1). */
-      const host: Host = { ...packHost(ctx), remember: (row) => kernel.rememberPack({ ...row, by: 'system' }) };
+      const host: Host = { ...packHost(ctx), remember: (row) => kernel.rememberPack({ ...keptSource(row), by: 'system' }) };
       const speaking = speakingNow(kernel);
       const u = speaking === null ? undefined : useCase(speaking.replace(/^usecase-/u, ''));
       const planned = async (doc: Record<string, unknown>) => {
@@ -3858,7 +3889,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return unheld ? ({ ok: false as const, refusal: unheld }) : ok({ pack: pack.value, diff });
       };
       return await relegFirstParty({
-        held: () => kernel.packStates().map((p) => ({ id: p.id, version: p.version, on: p.disabled_at === null })),
+        held: () => storeHeld(kernel.packStates()).map((p) => ({ id: p.id, version: p.version, on: p.disabled_at === null })),
         document: (id) => {
           const own = firstPartyManifest(id as Parameters<typeof firstPartyManifest>[0]).provides.filter((p) => p.startsWith('register.')).map((p) => p.slice('register.'.length));
           const doc = moduleDocument(u ?? null, id, { today: dayOf(clock.now()), holds: new Set([...[...kernel.registers()].map(([list]) => list), ...own]) });
@@ -3890,6 +3921,42 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     }
   };
 
+  /** Whether a question is an ask to publish an add-on to the store (`{ publish }`, `arrange.ts`). */
+  const publishAsk = (row: unknown): boolean => {
+    const r = row as { body_kind?: unknown; body?: unknown } | null | undefined;
+    if (r?.body_kind !== 'pack') return false;
+    let body: unknown = r.body;
+    if (typeof body === 'string')
+      try {
+        body = JSON.parse(body) as unknown;
+      } catch {
+        return false;
+      }
+    return body !== null && typeof body === 'object' && typeof (body as { publish?: unknown }).publish === 'string';
+  };
+  /**
+   * AN ADD-ON THAT MAY GO TO THE STORE FROM HERE: one made in this BrainDog, by the person or an agent. BrainDog's own
+   * parts are in the store already, one from the store is its publisher's, and one from GitHub or a link is its author's
+   * to publish. Answers what a publish question shows: its title, the version and the checksum held now.
+   */
+  const publishable = async (id: string): Promise<Result<{ id: string; title: string; version: string; checksum: string }>> => {
+    const row = sql.one<{ source: string; version: string | null; checksum: string; manifest: string }>('SELECT source, version, checksum, manifest FROM pack WHERE id = ?', id);
+    if (row === undefined) return no('DECLARATION_UNKNOWN', `${id} is not installed here, so there is nothing to publish. act addons {"installed":true} lists what is.`, { at: 'id' });
+    let title = id;
+    try {
+      const m = JSON.parse(row.manifest) as { title?: unknown };
+      if (typeof m.title === 'string' && m.title.trim() !== '') title = m.title.trim();
+    } catch {
+      /* The id stands in for a title. */
+    }
+    const { shippedVersion } = await import('@braindog/seed/packs/quiet');
+    if (row.source === 'local' && shippedVersion(id) !== undefined) return no('FORBIDDEN', `${title} is BrainDog's own, and is in the store already.`, { at: 'id' });
+    if (row.source === 'kennel') return no('FORBIDDEN', `${title} came from the store, so it is listed there already. To publish a change of yours, give it an id of its own.`, { at: 'id' });
+    if (row.source === 'git' || row.source === 'url') return no('FORBIDDEN', `${title} came from a link, so whoever wrote it publishes it. To publish a change of yours, give it an id of its own.`, { at: 'id' });
+    if (row.version === null) return no('VALUE_MALFORMED', `${title} says no version, so it cannot be published. Raise its version and install it again.`, { at: 'id' });
+    return ok({ id, title, version: row.version, checksum: row.checksum });
+  };
+
   /* WHAT AN AGENT OR SLASH MAY ASK TO CHANGE ABOUT THIS RECORD, and how the owner's press applies it (`arrange.ts`). */
   const arrangement = arranger({
     kernel,
@@ -3897,6 +3964,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     installed: () => installedState(),
     host: (actor) => packHost({ principal: { kind: 'person', id: actor, level: 'owner' } }),
     shelf: deps.catalogueShelf,
+    sourceOf: (id) => sql.one<{ source: string }>('SELECT source FROM pack WHERE id = ?', id)?.source ?? null,
+    publishable,
+    ...(deps.readAddress ? { readGit: (address: string) => readGit(deps.readAddress!, address), readAddress: deps.readAddress } : {}),
     kept: (pack, diff, packSaid) => {
       try {
         keptAsk(pack, diff, packSaid);
@@ -4173,7 +4243,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       try {
         const on = new Map(r.usage.packs.map((p) => [p.id, p.on]));
         /* NOT ONE THE RECORD'S OWN PASS KEEPS CURRENT (`nightKeeps`): it is put in or asked about there, once. */
-        drafts = [...drafts, ...catalogueDrafts((await deps.catalogueOffers(kernel.packs().map((p) => ({ ...p, on: on.get(p.id) ?? true })))).filter((o) => !nightKeeps(o)))];
+        drafts = [...drafts, ...catalogueDrafts((await deps.catalogueOffers(storeHeld(kernel.packs()).map((p) => ({ ...p, on: on.get(p.id) ?? true })))).filter((o) => !nightKeeps(o)))];
       } catch {
         dropped.push('The catalogue could not be read, so no update from it was asked about.');
       }
@@ -4984,8 +5054,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     try {
       steps = await updateFirstParty({
         held: () =>
-          kernel
-            .packStates()
+          storeHeld(kernel.packStates())
             .filter((p) => declined[p.id] === undefined || declined[p.id] !== shippedVersion(p.id))
             .map((p) => ({ id: p.id, version: p.version, on: p.disabled_at === null })),
         document: (id) => {
@@ -5049,7 +5118,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            a statement, waits for the person. Never a module or use case the night already keeps, and never one declined. */
         addons: async () => {
           if (!deps.catalogueOffers) return [];
-          const offers = await deps.catalogueOffers(kernel.packStates().map((p) => ({ id: p.id, version: p.version ?? '0.0.0', on: p.disabled_at === null })));
+          const offers = await deps.catalogueOffers(storeHeld(kernel.packStates()).map((p) => ({ id: p.id, version: p.version ?? '0.0.0', on: p.disabled_at === null })));
           return offers.flatMap((o) => {
             const doc = (o.body as { doc?: unknown }).doc;
             if (!nightKeeps(o) || shippedVersion(o.id) !== undefined || declined[o.id] === o.to) return [];
@@ -5130,6 +5199,121 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       firstPartyRunning = false;
     }
   };
+  /**
+   * ADD-ONS FROM GITHUB, ASKED ABOUT WHEN THEIR REPOSITORY TAGS A NEWER VERSION (`git-channel.ts`). Once a day from the
+   * tick, and whenever the owner opens the store (`gitUpdates`). Each newer version is read at its tag's commit and filed
+   * as an update question through `prepare`, the plan Decide shows being the record's own; never put in quietly, since
+   * nobody reviewed it. A version already asked about is not asked again. One asked about whose tag now points at a file
+   * with other bytes is refused `CHECKSUM_MISMATCH` and not asked again: the question already filed stays pinned to the
+   * file it showed, and its yes is held to that file (`arrange.ts` `gitHeld`).
+   */
+  const GIT_HOLDER = 'braindog:git-updates';
+  type GitAsked = { version: string; sha: string; checksum: string; question: string };
+  const gitPass = async (today: string | null): Promise<{ asked: { id: string; question: string; to: string }[]; refused: { id: string; code: 'CHECKSUM_MISMATCH'; fix: string }[]; notes: string[] }> => {
+    const out = { asked: [] as { id: string; question: string; to: string }[], refused: [] as { id: string; code: 'CHECKSUM_MISMATCH'; fix: string }[], notes: [] as string[] };
+    if (!deps.readAddress) return out;
+    const prefs = kernel.prefsOf(GIT_HOLDER) as { day?: unknown; asked?: unknown };
+    if (today !== null && prefs.day === today) return out;
+    const held = sql.all<{ id: string; version: string; source_ref: string | null }>("SELECT id, version, source_ref FROM pack WHERE source = 'git' AND source_ref IS NOT NULL AND disabled_at IS NULL");
+    if (today !== null) kernel.setPref(GIT_HOLDER, 'day', today);
+    if (held.length === 0) return out;
+    const asked = { ...((prefs.asked !== null && typeof prefs.asked === 'object' ? prefs.asked : {}) as Record<string, GitAsked>) };
+    for (const h of held) {
+      const look = await gitLook(deps.readAddress, { id: h.id, version: h.version, source_ref: h.source_ref! }).catch(() => ({ id: h.id, offer: null, note: `${h.id}'s repository could not be read.` }));
+      if (look.note !== null) out.notes.push(look.note);
+      const o: GitOffer | null = look.offer;
+      if (o === null) continue;
+      const was = asked[o.id];
+      if (was !== undefined && was.version === o.to) {
+        if (was.checksum !== o.checksum)
+          out.refused.push({
+            id: o.id,
+            code: 'CHECKSUM_MISMATCH',
+            fix: `${o.title} ${o.tag} on ${repoSaid(parseGit(o.pinned)!)} now points at commit ${shortSha(o.sha)} with a different file from the one already asked about (commit ${shortSha(was.sha)}). It is not asked about again, and the question waiting installs only the file it showed.`,
+          });
+        continue;
+      }
+      const prepared = await arrangement.prepare('pack', { source: { kind: 'git', ref: o.pinned }, tag: o.tag });
+      if (!prepared.ok) {
+        out.notes.push(`${o.title} ${o.to} from GitHub would not plan: ${(prepared as { refusal: Refusal }).refusal.fix}`);
+        continue;
+      }
+      const repo = repoSaid(parseGit(o.pinned)!);
+      const question = `Update ${o.title} from ${o.from} to ${o.to}? From GitHub, ${repo} ${o.tag} (commit ${shortSha(o.sha)}). Not reviewed by BrainDog.`.slice(0, 280);
+      const put = kernel.propose({ question, body_kind: 'pack', body: prepared.value }, 'system');
+      if (!put.ok) {
+        out.notes.push(`${o.title} ${o.to} from GitHub could not be asked about: ${'refusal' in put ? put.refusal.fix : 'it moved while it was asked'}`);
+        continue;
+      }
+      asked[o.id] = { version: o.to, sha: o.sha, checksum: o.checksum, question: put.value.id };
+      out.asked.push({ id: o.id, question, to: o.to });
+    }
+    kernel.setPref(GIT_HOLDER, 'asked', asked);
+    return out;
+  };
+  /**
+   * THE STORE'S KILL SWITCH AND ITS YANKS, HEARD HERE (DESIGN.md §8, PHASES.md Lane H). Once an hour, beside the update
+   * pass, the record reads what the store says of the add-ons it holds (`catalogueNotices`) and, for each notice it has
+   * not acted on:
+   *   - an advisory that disables turns the add-on off (rows kept, `disablePack`) and asks "Turn it back on?" on Needs
+   *     you with the reason, so the owner may turn it back on knowingly;
+   *   - an advisory that warns, or a yank of the version held, asks "Turn it off?" with the reason, and changes nothing.
+   * EACH NOTICE ONCE, kept by its key in the record's own prefs (`NOTICES_HOLDER`): an owner who said yes to turning it
+   * back on is never overruled by the same advisory, and a card is never filed twice. A notice about an add-on that is
+   * already off is left for later and not kept, so turning it on without the card is met by the card.
+   */
+  const NOTICES_HOLDER = 'braindog:store-notices';
+  const NOTICES_LAST = 'last';
+  const NOTICES_EVERY_MS = 3_600_000;
+  let noticesRunning = false;
+  const noticesDue = (): boolean => {
+    if (noticesRunning || !deps.catalogueNotices) return false;
+    const last = kernel.prefsOf(NOTICES_HOLDER)[NOTICES_LAST];
+    return typeof last !== 'number' || clock.now() - last >= NOTICES_EVERY_MS;
+  };
+  const noticesTick = async (force = false): Promise<string[]> => {
+    if (!deps.catalogueNotices || noticesRunning || (!force && !noticesDue())) return [];
+    noticesRunning = true;
+    try {
+      kernel.setPref(NOTICES_HOLDER, NOTICES_LAST, clock.now());
+      const { shippedVersion } = await import('@braindog/seed/packs/quiet');
+      const rows = new Map(sql.all<{ id: string; checksum: string }>('SELECT id, checksum FROM pack').map((r) => [r.id, r.checksum]));
+      const held = kernel
+        .packStates()
+        .filter((p) => p.version !== null || !rows.has(p.id))
+        .map((p) => ({ id: p.id, version: p.version ?? shippedVersion(p.id) ?? '0.0.0', checksum: rows.get(p.id) ?? null, on: p.disabled_at === null }));
+      const notices = await deps.catalogueNotices(held);
+      const done = kernel.prefsOf(NOTICES_HOLDER);
+      const said: string[] = [];
+      const actor = 'system';
+      for (const n of notices) {
+        if (Object.hasOwn(done, n.key) || !n.on) continue;
+        let off = false;
+        if (n.action === 'disable') {
+          const turned = kernel.disablePack(n.id, { actor });
+          off = turned.ok;
+        }
+        const name = `${n.title} ${n.version}`;
+        const question =
+          n.action === 'disable'
+            ? off
+              ? `BrainDog turned off ${name}: ${n.reason} Turn it back on?`
+              : `BrainDog says to turn off ${name}, and it could not be turned off here: ${n.reason} Turn it off?`
+            : n.from === 'yank'
+              ? `${name} was taken back by whoever published it: ${n.reason} Turn it off?`
+              : `BrainDog warns about ${name}: ${n.reason} Turn it off?`;
+        const body = n.action === 'disable' && off ? { enable: n.id } : { disable: n.id };
+        const prepared = await arrangement.prepare('pack', body);
+        const filed = prepared.ok ? kernel.propose({ question, body_kind: 'pack', body: prepared.value }, actor) : prepared;
+        kernel.setPref(NOTICES_HOLDER, n.key, { at: clock.now(), action: n.action, off, ...(filed.ok ? { card: filed.value.id } : {}) });
+        said.push(off ? `${name} was turned off: ${n.reason}` : `${name} is asked about on Decide: ${n.reason}`);
+      }
+      return said;
+    } finally {
+      noticesRunning = false;
+    }
+  };
+
   /** The passes the tick kept, newest last, which a read of the log folds (`passFolder`). */
   const updatePasses = (): UpdatePass[] => passesOf(kernel.prefsOf(FIRST_PARTY_HOLDER)[FIRST_PARTY_LAST]);
 
@@ -7618,6 +7802,41 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * THE READS AN INSTALLED SCRIPT IS HANDED WHEN A PERSON OR AN AGENT STARTS IT (an add-on's tool, command or row action,
+   * `methods/addon-tools.ts`): `scriptTry`'s reads, in its words, the caller's own `list` and `get` narrowed to the
+   * script's `reads:`, a secret field off every row, a filter on one refused. So a tool reads no more than its caller
+   * may and no more than its scheduled run would.
+   */
+  const scriptReadsAs = (script: string, declared: readonly string[], ctx: CallContext) => {
+    const ceiling = ctx.registers === undefined || ctx.registers === '*' ? [...declared] : declared.filter((r) => (ctx.registers as readonly string[]).includes(r));
+    const as: CallContext = { ...ctx, registers: ceiling };
+    return {
+      list: async (register: string, where: unknown, options: unknown = null) => {
+        if (where !== null && (typeof where !== 'object' || Array.isArray(where)))
+          throw new Error(`${script} filtered ${register} with ${JSON.stringify(where)}, and a script filters with a predicate tree, such as {"field":"name","is":"Acme"}, so nothing was read.`);
+        const field = namesSealed(where, register);
+        if (field !== null) throw new Error(`${script} filtered ${register} on ${field}, which is a secret, and a script may not ask what a secret field holds.`);
+        if (
+          options !== null &&
+          (typeof options !== 'object' || Array.isArray(options) || Object.entries(options).some(([k, v]) => !((k === 'includeDeleted' && typeof v === 'boolean') || (k === 'order' && v === 'seq'))))
+        )
+          throw new Error(`${script} listed ${register} with the options ${JSON.stringify(options)}, and a script's list takes {"includeDeleted":true}, {"order":"seq"} or nothing, so nothing was read.`);
+        const deleted = (options as { includeDeleted?: unknown } | null)?.includeDeleted;
+        const bySeq = (options as { order?: unknown } | null)?.order === 'seq';
+        const asked = { ...(typeof deleted === 'boolean' ? { includeDeleted: deleted } : {}), ...(bySeq ? { order: [{ field: 'seq', dir: 'asc' }] } : {}) };
+        const page = await api.list({ register, ...(where === null ? {} : { where }), ...asked } as never, as);
+        if (!page.ok) throw new Error(fixOf(page));
+        return page.value.rows.map(unsealed);
+      },
+      get: async (spoken: string) => {
+        const row = await api.get({ spoken } as never, as);
+        if (!row.ok) throw new Error(fixOf(row));
+        return row.value === null ? null : unsealed(row.value);
+      },
+    };
+  };
+
+  /**
    * Whether a governance row is about a register this caller cannot reach.
    *
    * ONLY A `rowset` NAMES ONE. An `options` body is a question and its answers, a `pattern` is a
@@ -9659,6 +9878,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const by = agentFor(ctx);
     if (by === null || ctx.principal.kind !== 'token') return null;
     if (typeof kind !== 'string' || kind === 'options') return null;
+    /* A PUBLISH WAITS FOR THE OWNER'S OWN YES: the browser signs and sends the file (`publishAsk`). */
+    if (publishAsk(kernel.governanceRow('suggestion', id))) return null;
     const profile = profileOf(ctx);
     if (profile !== null && (profile.lists_write !== null || profile.projects !== null)) return null;
     const found = kernel.findRun(ctx.session ?? {}, ctx.principal.id);
@@ -11649,7 +11870,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const got = kernel.metric(filled, {});
     return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
   };
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.catalogueShelf === undefined ? {} : { catalogueShelf: deps.catalogueShelf }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), agentFor, landNow: (ctx, id) => bypassAccept(ctx, id, 'rowset'), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, previewAs: (args, ctx) => api.previewPage(args as never, ctx) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, spokenAs, sight, admin, team, keychain, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, readsAcross, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), ...(deps.catalogueShelf === undefined ? {} : { catalogueShelf: deps.catalogueShelf }), ...(deps.sealed === undefined ? {} : { sealed: deps.sealed }), ...(deps.visuals === undefined ? {} : { visuals: deps.visuals }), writer: (ctx) => writerOf(ctx), agentFor, landNow: (ctx, id) => bypassAccept(ctx, id, 'rowset'), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, decideAs: (args, ctx) => api.decide(args, ctx), wordOf, wordFault, metricAs: (args, ctx) => api.metric(args, ctx) as Promise<Result<unknown>>, previewAs: (args, ctx) => api.previewPage(args as never, ctx) as Promise<Result<unknown>>, ...(deps.tryScript === undefined ? {} : { tryScript: deps.tryScript }), scriptReadsAs, writeAs: (op, args, ctx) => (op === 'create' ? api.create(args as never, ctx) : op === 'update' ? api.update(args as never, ctx) : api.get(args as never, ctx)) as Promise<Result<unknown>>, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld, openSuggestions: openNow, everyOpen: everyOpenNow, questionSeen: (ctx, row) => (holds(ctx, row) ? null : ((own) => (own === null ? null : `suggestion:${own}`))(nameOf(ctx, 'suggestion', String(row.id)))), pagesNow });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -12216,16 +12437,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (typeof said.url !== 'string' || said.url.trim() === '' || said.url.length > 2048)
       return no('REQUIRED_MISSING', 'url is the https address of a shared file, or git:owner/repo@ref:path.', { at: 'url' });
     const asked = said.url.trim();
-    let url = asked;
-    if (asked.startsWith('git:')) {
-      const git = /^git:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)@([A-Za-z0-9_./-]+):([^\s?#]+)$/u.exec(asked);
-      if (!git) return no('VALUE_MALFORMED', 'A git address reads git:owner/repo@ref:path, such as git:someone/kit@main:kit.usecase.json.', { at: 'url' });
-      const [, owner, repo, ref, path] = git;
-      url = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${String(path).replace(/^\/+/u, '')}`;
-    }
+    if (asked.startsWith('git:') && parseGit(asked) === null)
+      return no('VALUE_MALFORMED', 'A git address reads git:owner/repo@ref:path, such as git:someone/kit@main:kit.usecase.json.', { at: 'url' });
     if (!deps.readAddress)
       return no('PULL_ORIGIN_REFUSED', 'This host does not read addresses. Download the file, then choose it as a file.', { at: 'url' });
-    const read = await deps.readAddress(url);
+    /* A GIT ADDRESS IS PINNED BEFORE IT IS READ (`git-channel.ts`): its ref turned into the commit it points at now, the
+       file read at that commit, and the pinned address answered beside the text, so the install keeps the commit and a
+       branch or tag moved later changes nothing that is in. */
+    if (asked.startsWith('git:')) {
+      const got = await readGit(deps.readAddress, asked);
+      if (!got.ok) return no('PULL_ORIGIN_REFUSED', got.fix, { at: 'url' });
+      const g = got.value;
+      return ok({ url: asked, text: g.text, bytes: g.bytes, pinned: g.pinned, repo: repoSaid(g.at), commit: g.sha, checksum: await fileChecksum(g.text).catch(() => null) });
+    }
+    const read = await deps.readAddress(asked);
     if (!read.ok) return no('PULL_ORIGIN_REFUSED', read.fix, { at: 'url' });
     return ok({ url: asked, text: read.text, bytes: read.bytes });
   };
@@ -13265,12 +13490,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const state = slashDailyState();
         const due =
           (await firstPartyDue(today)) ||
+          noticesDue() ||
           (state.on && (state.last !== today || lookStepOf(today) !== null || headlinesAgainDue(today) || briefAgainDue(clock.now())));
         return { ran: false, why: due ? 'later' : state.on ? 'today' : 'off' };
       }
       /* BRAINDOG'S OWN MODULES FIRST, ONCE A DEPLOY AND ONCE A DAY, whether Slash is on or not (`firstPartyTick`). A check
          that breaks outside its own try (a module of this build that will not load) never costs the day its look. */
       const updates = await firstPartyTick(today).catch(() => ["The check for BrainDog's own updates could not run, and runs again on the next tick."]);
+      /* AND ADD-ONS FROM GITHUB, once a day: a newer tag is asked about, never put in (`gitPass`). */
+      await gitPass(today).catch(() => undefined);
+      /* AND WHAT THE STORE SAYS OF WHAT IS HELD, once an hour, whether Slash is on or not (`noticesTick`). */
+      updates.push(...(await noticesTick().catch(() => ["The store's word on the add-ons here could not be read, and is read again in an hour."])));
       const state = slashDailyState();
       if (!state.on) return { ran: false, why: 'off' };
       /* THE DAY'S LOOK BEGUN ON AN EARLIER TICK GOES ON FROM THE STEP IT KEPT. */
@@ -13588,6 +13818,68 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = admin(ctx, 'read a shared file from the web');
       if (stop) return { ok: false as const, refusal: stop };
       return readSharedAt(args);
+    },
+
+    /**
+     * Add-ons installed from GitHub whose repository tags a newer version, each asked about on Decide (`gitPass`), as the
+     * store page opens and once a day from the tick. Answers what was asked, what was refused and why, and what could not
+     * be read. An owner's in a browser, as `fetchShared` is: it makes this host read GitHub.
+     */
+    async gitUpdates(_args: unknown, ctx: CallContext) {
+      const stop = admin(ctx, 'look for updates on GitHub');
+      if (stop) return { ok: false as const, refusal: stop };
+      return ok(await gitPass(null));
+    },
+
+    /**
+     * PUBLISH AN ADD-ON MADE HERE: `{ id, to?: "store" | "github" }`.
+     *
+     * TO GITHUB IS THE PERSON'S OWN STEP, never through BrainDog: the answer is the line they run from a folder holding
+     * the file (`braindog addon publish --github`, on their own `gh`), so no GitHub credential ever passes through here.
+     * Anybody who reads the whole BrainDog may ask for it.
+     *
+     * TO THE STORE THE FILE GOES SIGNED BY THE KEY THE OWNER'S BROWSER KEEPS, so only the owner in a browser is answered:
+     * with the file, which the app signs and sends. An agent is refused `NEEDS_BROWSER_SESSION`, and `act` files the
+     * question in its place ("Publish Watch list 0.2.0 to the BrainDog store?", `arrange.ts`), which the owner answers on
+     * Decide; even his switch to act without asking does not answer it (`bypassAccept`).
+     */
+    async publishAddon(args: { id?: unknown; to?: unknown } | undefined, ctx: CallContext) {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const takes = ['id', 'to'];
+      const extra = Object.keys(said).find((k) => !takes.includes(k));
+      if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes ${takes.join(', ')}.`, { at: extra, allowed: takes });
+      const id = typeof said.id === 'string' ? said.id.trim() : '';
+      if (id === '') return no('REQUIRED_MISSING', 'Which add-on? Send its id, as act addons {"installed":true} answers it.', { at: 'id' });
+      const to = said.to === undefined ? 'store' : said.to;
+      if (to !== 'store' && to !== 'github') return no('VALUE_MALFORMED', 'to is store or github.', { at: 'to', allowed: ['store', 'github'] });
+      if (!readsEveryList(ctx)) return no('FORBIDDEN', 'An add-on is published by somebody who can read the whole BrainDog.', { at: 'id' });
+      const can = await publishable(id);
+      if (!can.ok) return can;
+      const { title, version } = can.value;
+      if (to === 'github') {
+        const line = 'braindog addon publish --github';
+        return ok({
+          publish: id,
+          to: 'github',
+          title,
+          version,
+          line,
+          steps: [
+            `Save the file in a folder of its own: act addon {"id":"${id}","file":true} hands it back, as ${id}.pack.json.`,
+            `From that folder, run: ${line}`,
+            'It uses your own GitHub sign-in (gh), makes the repository if there is none, tags the version and prints the line anybody installs it from.',
+          ],
+          say: `To put ${title} ${version} on your GitHub, save its file in a folder of its own and run there: ${line}. It uses your own GitHub sign-in; BrainDog never holds it.`,
+        });
+      }
+      if (ctx.principal.kind !== 'person' || ctx.pressedIn !== undefined || ctx.onWord !== undefined || ctx.ordered !== undefined)
+        return no('NEEDS_BROWSER_SESSION', `Publishing to the store signs ${title} with the key the owner's browser keeps. Ask the owner: act publishAddon files the question on Decide.`, { at: 'principal' });
+      const owner = admin(ctx, 'publish an add-on');
+      if (owner) return { ok: false as const, refusal: owner };
+      /* THE OWNER'S BROWSER READS THE FILE (`addon {file: true}`), checks it is this version, signs it and sends it. */
+      return ok({ publish: id, to: 'store', title, version, checksum: can.value.checksum });
     },
 
     /** `fetchShared` under the name it had when only a use case could be read this way. It stays for one release. */
@@ -14469,6 +14761,63 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * keeps the newest `PEN_DISMISSED_MOST` and lets the oldest go, because the pen appends one id at a time and a list
      * that refused its next id would make Dismiss stop working; the list it walks is bounded by the body the host admits.
      */
+    /**
+     * A row added or changed by a drawn block's own view (add-ons phase 4), forwarded by the frame's host page.
+     *
+     * NOTHING THE FRAME SAYS IS TAKEN ON ITS WORD. The block is read here, off the page's live declaration by its
+     * declared index, and the action must be one its `acts:` names (`create:register.<list>` or
+     * `update:register.<list>`). On an add-on's page the list must be one of its own or one its `uses` line names, so a
+     * view never reaches a list its plan did not show. Then the row is written AS THE VIEWER, through `create` or
+     * `update` with the caller's own context, so their ladder, their lens and every check a typed write meets apply.
+     * The frame itself stays `allow-scripts` only, with no network: this method is its one way to the record.
+     */
+    async drawnAct(
+      args: { page: string; block: number; create?: { list: string; fields: Record<string, unknown> }; update?: { ref: string; patch: Record<string, unknown> } },
+      ctx: CallContext,
+    ): Promise<Result<unknown>> {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['page', 'block', 'create', 'update']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.page !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,63}$/u.test(args.page)) return no('REQUIRED_MISSING', 'page is the address of the page the view is on.', { at: 'page' });
+      if (!Number.isInteger(args.block) || args.block < 0) return no('REQUIRED_MISSING', 'block is the declared index of the drawn block on that page.', { at: 'block' });
+      if ((args.create === undefined) === (args.update === undefined)) return no('VALUE_MALFORMED', 'Send create: { list, fields } or update: { ref, patch }, one of the two.', { at: 'create' });
+      const row = sql.one<{ body: string; pack: string | null }>(
+        "SELECT body, coalesce(pack_id, json_extract(body, '$.pack')) AS pack FROM declaration WHERE id = ? AND kind = 'page' AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1",
+        `page.${args.page}`,
+      );
+      const body = row === undefined ? null : (JSON.parse(row.body) as { blocks?: unknown });
+      const block = body !== null && Array.isArray(body.blocks) ? (body.blocks[args.block] as Record<string, unknown> | undefined) : undefined;
+      if (block === undefined || block === null || typeof block !== 'object' || block.kind !== 'drawn')
+        return no('REF_UNKNOWN', `There is no drawn block ${args.block + 1} on ${args.page}.`, { at: 'block' });
+      const { creates, updates } = drawnWrites(block.acts);
+      const list = args.create !== undefined ? args.create.list : (/^([a-z][a-z0-9_-]{0,31})#(\d+)$/u.exec(String(args.update?.ref ?? ''))?.[1] ?? '');
+      const verb = args.create !== undefined ? 'create' : 'update';
+      if (!(verb === 'create' ? creates : updates).includes(list))
+        return no('FORBIDDEN', `This view did not declare ${verb}:register.${list || '?'} in its acts, so nothing was written.`, { at: 'acts' });
+      /* ON AN ADD-ON'S PAGE, ITS OWN LIST OR ONE ITS `uses` LINE NAMES, and nothing else. */
+      if (row?.pack) {
+        const own = sql.one<{ n: number }>("SELECT count(*) AS n FROM declaration WHERE id = ? AND superseded_at IS NULL AND coalesce(pack_id, json_extract(body, '$.pack')) = ?", `register.${list}`, row.pack)?.n ?? 0;
+        const manifest = sql.one<{ manifest: string }>('SELECT manifest FROM pack WHERE id = ?', row.pack)?.manifest;
+        let uses: unknown = undefined;
+        try {
+          uses = manifest === undefined ? undefined : (JSON.parse(manifest) as { uses?: unknown }).uses;
+        } catch {
+          uses = undefined;
+        }
+        const named = Array.isArray(uses) && uses.includes(`register.${list}`);
+        if (Number(own) === 0 && !named && Array.isArray(uses))
+          return no('FORBIDDEN', `${list} is not one of this add-on's own lists and its uses line does not name it, so its view may not write there.`, { at: 'acts' });
+      }
+      if (args.create !== undefined) {
+        if (args.create.fields === null || typeof args.create.fields !== 'object' || Array.isArray(args.create.fields)) return no('VALUE_MALFORMED', 'fields is the new row, field by field.', { at: 'create.fields' });
+        return api.create({ register: list, fields: args.create.fields as Patch, note: `Added from the view on ${args.page}` }, ctx);
+      }
+      const seq = Number(/#(\d+)$/u.exec(String(args.update!.ref))?.[1]);
+      if (args.update!.patch === null || typeof args.update!.patch !== 'object' || Array.isArray(args.update!.patch)) return no('VALUE_MALFORMED', 'patch is what changes, field by field.', { at: 'update.patch' });
+      return api.update({ register: list, seq, patch: args.update!.patch as Patch, note: `Changed from the view on ${args.page}` }, ctx);
+    },
+
     async setPref(args: { key: string; value: unknown }, ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
@@ -15266,6 +15615,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             }
           const filed = await arrangement.prepare(args.body_kind, body);
           if (!filed.ok) return filed;
+          /* A PUBLISH IS ASKED IN ITS OWN WORDS, with the title and the version the yes publishes. */
+          if (args.body_kind === 'pack' && typeof filed.value.publish === 'string')
+            args = { ...args, question: `Publish ${String(filed.value.title)} ${String(filed.value.version)} to the BrainDog store?` };
           const opened = kernel.propose({ ...args, body: filed.value }, { ...writerOf(ctx), sees: (list, id) => sight.mayWrite(ctx, list, id) });
           const asked = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
           /* ANSWERED FROM MEMORY (govern-47): the person already said, so nothing is decided again here. */
@@ -15345,6 +15697,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A QUESTION HANDED TO SOMEBODY IS HERS OR AN OWNER'S TO ANSWER; put off is anybody's. */
       const handed = args.defer === undefined ? kernel.deciderFault(String(args.id), actorOf(ctx), ctx.principal.kind === 'person' && ctx.principal.level === 'owner') : null;
       if (handed !== null) return no('FORBIDDEN', handed, { at: 'id' });
+      /* A YES TO PUBLISH IS THE OWNER'S, IN A BROWSER: the file goes out signed by the key their browser keeps, sent by Decide
+         before the yes. A press in a chat, an agent on his word and his switch to act without asking answer nothing here. */
+      if (args.decide?.option === 'accept' && publishAsk(target) && (ctx.principal.kind !== 'person' || ctx.pressedIn !== undefined || ctx.onWord !== undefined || ctx.ordered !== undefined))
+        return no('NEEDS_BROWSER_SESSION', 'Publishing to the store signs the file with the key the owner\'s browser keeps. Answer this one on Decide in the app.', { at: 'id' });
       /* NO VERDICT IS A MISSING ANSWER, NOT A BAD ONE. With none of the three it fell through to the
          resolve branch and was refused "undefined is not a way to resolve one". */
       if (args.decide === undefined && args.defer === undefined && args.resolved_as === undefined)
@@ -15578,7 +15934,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          from the store would one day replace it. Said here, before the person is asked. */
       const listed = (deps.catalogue ?? []).find((e) => e.id === id) ?? null;
       const shelved = listed === null && deps.catalogueShelf ? await deps.catalogueShelf.fetch(id) : null;
-      if (listed !== null || shelved !== null)
+      /* UNLESS IT IS ONE OF THEIR OWN HELD HERE (`updatesFromStore`): its new version is its author's, whatever the store holds. */
+      const ownHere = storeHeld([{ id }]).length === 0;
+      if (!ownHere && (listed !== null || shelved !== null))
         return said({ code: 'PROVIDES_CONFLICT', fix: `${id} is an add-on in the store, so a file of your own takes another id.`, at: 'pack' });
       const diff = await plan(pack.value, installedState(ctx));
       const unheld = unresolvedFault(diff);
@@ -15597,7 +15955,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(diff.extends.length === 0 ? {} : { extends: diff.extends.map((e) => `${e.id}: ${e.adds.join(', ')}`) }),
         ...((diff.widgets ?? []).length === 0 ? {} : { today_cards: (diff.widgets ?? []).map((w) => w.title) }),
         ...((diff.skills ?? []).length === 0 ? {} : { skills: (diff.skills ?? []).map((s) => s.name) }),
+        ...((diff.tools ?? []).length === 0 ? {} : { tools: (diff.tools ?? []).map((t) => `addon.${id}.${t.name}: ${t.says}${t.writes ? ' (may change rows)' : ''}`) }),
+        ...((diff.commands ?? []).length === 0 ? {} : { commands: (diff.commands ?? []).map((c) => c.title) }),
+        ...((diff.row_actions ?? []).length === 0 ? {} : { row_actions: (diff.row_actions ?? []).map((a) => `${a.title} on ${a.list.replace(/^register\./u, '')} rows`) }),
         ...(diff.calls_out.length === 0 ? {} : { calls_out: diff.calls_out.map((c) => c.line) }),
+        ...(diff.may === undefined ? {} : { may: diff.may.map((m) => m.line) }),
         ...(diff.approve.length === 0 ? {} : { approve: diff.approve }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
         ...(keys.length === 0 ? {} : { keys_missing: keys }),
@@ -15647,7 +16009,47 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          exactly what the sheet showed (first hour audit, E2). The plan made now is the one installed, and only a plan
          that says something else is sent back to be read. */
       const approved = samePlan(args.planHash, diff.planHash) ? diff.planHash : args.planHash;
-      const put = await installHeld(kernel, pack.value, diff, packHost(ctx), approved, (approve ?? []) as string[], undefined, args.retireWithRows === true ? { retireWithRows: true } : {});
+      /* AN UPDATE THAT MOVES ENTRIES TRIES THE MOVE FIRST (`addon-data.ts` `rehearseMove`): in the sandbox, writing nothing,
+         reading the entries as the version held keeps them. Refused there, nothing is installed; otherwise its writes go
+         in the install's own transaction, after the new shape, and a write refused there rolls the whole update back. */
+      let within: (() => Result<unknown>) | undefined;
+      if (diff.migrates !== undefined && from !== null) {
+        if (approved !== diff.planHash) return no('PLAN_STALE', 'What this would install changed after the plan was read, so nothing was installed. Read the plan again.', { at: 'planHash' });
+        const who = kernel.identity();
+        const moving = pack.value.manifest.migrate;
+        const as: CallContext = { ...ctx, registers: moving?.reads ?? [] };
+        const moved = await rehearseMove(
+          {
+            pack: pack.value,
+            heldLists: packLists(kernel.packClaims(pack.value.manifest.pack)),
+            kernel,
+            record: { id: who?.id ?? 'self', tz: who?.tz ?? 'UTC' },
+            config: ((r) => (r.ok ? r.value.values : {}))(kernel.packConfig(pack.value.manifest.pack)),
+            tryScript: deps.tryScript as never,
+            reads: {
+              list: async (register: string, where: unknown, options: unknown = null) => {
+                const deleted = (options as { includeDeleted?: unknown } | null)?.includeDeleted;
+                const page = await this.list({ register, ...(where === null || where === undefined ? {} : { where }), ...(typeof deleted === 'boolean' ? { includeDeleted: deleted } : {}), limit: 500 } as never, as);
+                if (!page.ok) throw new Error(fixOf(page));
+                return page.value.rows;
+              },
+              get: async (spoken: string) => {
+                const row = await this.get({ spoken } as never, as);
+                if (!row.ok) throw new Error(fixOf(row));
+                return row.value;
+              },
+            },
+            asker: actorOf(ctx),
+          },
+          `migrate:${pack.value.manifest.pack}@${pack.value.manifest.version}`,
+        );
+        if (!moved.ok) return moved;
+        within = moved.value.within;
+      }
+      const put = await installHeld(kernel, pack.value, diff, packHost(ctx), approved, (approve ?? []) as string[], undefined, {
+        ...(args.retireWithRows === true ? { retireWithRows: true } : {}),
+        ...(within === undefined ? {} : { within }),
+      });
       if (put.ok) await carryUpdate(deps.catalogue ?? [], kernel, pack.value.manifest.pack, from, actorOf(ctx));
       /* AND WHAT A PAGE THIS UPDATE KEPT GOES WITHOUT IS ASKED ABOUT (`keptAsk`), as the night's update asks it. */
       if (put.ok)
@@ -15676,14 +16078,68 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return tail(put.ok && reworded.length > 0 ? { ...put, value: { ...put.value, said: reworded } } : put);
     },
 
-    /** Take one back out. Its declarations are retired and its rows are kept, which is the point. */
-    async uninstallPack(args: { id: string }, ctx: CallContext) {
+    /**
+     * Take one back out. Its declarations are retired and its rows are kept, which is the point.
+     *
+     * `data: true` IS "REMOVE WITH ITS DATA" (phase 8, `addon-data.ts`): every row of its own lists goes into the bin
+     * under one batch, the tokens of its doors are revoked, and then it is uninstalled, all in one transaction. A list
+     * it `uses` is never touched. The bin is the undo: installing it again inside thirty days puts the rows back in
+     * that install's transaction, and the batch can be undone like any other. The pack row, with the key approvals it
+     * held, goes as on any uninstall, so a reinstall asks for them again.
+     */
+    async uninstallPack(args: { id: string; data?: boolean }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which pack?', { at: 'id' });
-      const gone = await uninstall(args.id, packHost(ctx));
-      if (gone.ok) await legsFollow(ctx);
-      return tail(gone);
+      if (args.data !== undefined && typeof args.data !== 'boolean') return no('VALUE_MALFORMED', 'data is true to remove its entries with it, into the bin.', { at: 'data' });
+      if (args.data !== true) {
+        const gone = await uninstall(args.id, packHost(ctx));
+        if (gone.ok) await legsFollow(ctx);
+        return tail(gone);
+      }
+      const claimed = kernel.packClaims(args.id);
+      if (claimed.length === 0) return tail(await uninstall(args.id, packHost(ctx)));
+      const lists = packLists(claimed);
+      const doors = claimed.filter((d) => d.startsWith('ingest.')).map((d) => d.slice('ingest.'.length));
+      const actor = actorOf(ctx);
+      const batch = mintGrant();
+      const name = (deps.catalogue ?? []).find((e) => e.id === args.id)?.title ?? args.id;
+      class Back extends Error {
+        answer: Result<never>;
+        constructor(answer: Result<never>) {
+          super('rolled back');
+          this.answer = answer;
+        }
+      }
+      let out: Result<{ pack: string; declarations: number; binned: Record<string, number>; kept: number; doors_closed: number; batch: string; rows_kept: Record<string, number>; store_keys?: number }>;
+      try {
+        out = kernel.transaction(() => {
+          const { binned, kept } = binOwnRows(kernel, lists, { actor, batch, note: `Removed with ${name}` });
+          /* ITS DOORS' TOKENS ARE REVOKED, each a `grant.revoke` naming the door, as the mint was a `grant.add`. */
+          let closed = 0;
+          for (const door of doors) {
+            const key = ingestTokenKey(door);
+            if (sql.one<{ value: string }>('SELECT value FROM dog_meta WHERE key = ?', key) === undefined) continue;
+            sql.exec('DELETE FROM dog_meta WHERE key = ?', key);
+            sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind) VALUES (?, ?, ?, 'grant.revoke', ?, 'ingest')", mintGrant(), new Date(clock.now()).toISOString(), actor, `door:${door}`);
+            closed += 1;
+          }
+          const gone = uninstall(args.id, packHost(ctx));
+          if (!gone.ok) throw new Back(gone as Result<never>);
+          const rows = Object.values(binned).reduce((a, n) => a + n, 0);
+          if (rows > 0) kernel.setPref(BINNED, args.id, { batch, rows, lists: binned, at: new Date(clock.now()).toISOString() } satisfies Binned);
+          /* AND WHAT ITS SCRIPTS KEPT (`ctx.store`) GOES INTO THE BIN WITH THE ROWS, and comes back with them on a reinstall
+             inside the window (`restoreWithin`). */
+          const stored = kernel.binAddonStore(args.id);
+          return ok({ ...gone.value, binned, kept, doors_closed: closed, batch, ...(stored > 0 ? { store_keys: stored } : {}) });
+        });
+      } catch (e) {
+        kernel.reload();
+        if (e instanceof Back) return tail(e.answer);
+        throw e;
+      }
+      if (out.ok) await legsFollow(ctx);
+      return tail(out);
     },
 
     /**
@@ -16052,7 +16508,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async packs(ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
-      return ok(kernel.packStates());
+      /* WHERE ONE CAME FROM, WHEN IT IS NOT THE STORE (`updatesFromStore`), so the store page never offers the store's
+         add-on of the same id as its update. One the store keeps current reads as before. */
+      const from = new Map(sql.all<{ id: string; source: string }>('SELECT id, source FROM pack').map((r) => [r.id, r.source]));
+      return ok(kernel.packStates().map((p) => (updatesFromStore(from.get(p.id)) ? p : { ...p, source: from.get(p.id) as string })));
     },
 
     /**

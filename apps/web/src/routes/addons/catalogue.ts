@@ -87,7 +87,9 @@ export type Standing = { kind: 'install' } | { kind: 'update'; from: string } | 
 /** Where this record stands against an entry's latest version: not here, older, the same, newer, or turned off. */
 export async function standingOf(entry: CatalogueEntry, states: readonly PackState[]): Promise<Standing> {
   const { compareVersions, installedIdOf } = await import('@braindog/declare/catalogue');
-  const held = states.find((s) => s.id === installedIdOf(entry));
+  const { updatesFromStore } = await import('@braindog/declare');
+  /* ONE OF THEIR OWN THAT SHARES THE ID IS NOT THIS ENTRY HELD (`updatesFromStore`). */
+  const held = states.find((s) => s.id === installedIdOf(entry) && updatesFromStore(s.source));
   if (!held) return { kind: 'install' };
   if (held.disabled_at !== null) return { kind: 'off', at: held.version };
   if (held.version === null) return { kind: 'update', from: '' };
@@ -304,7 +306,12 @@ async function keepKey(keys: Keys, subject: string, keyId: string): Promise<bool
 
 /* ── asking on Decide ───────────────────────────────────────────────────── */
 
-export type CatalogueProposal = { question: string; body_kind: 'pack'; body: { file: string } | { install: string; doc: Record<string, unknown> } };
+export type CatalogueProposal = {
+  question: string;
+  body_kind: 'pack';
+  /** A GitHub file is asked for by its pinned address, `{ source: { kind: "git", ref } }`, and the record reads it again. */
+  body: { file: string } | { install: string; doc: Record<string, unknown> } | { source: { kind: 'git'; ref: string } };
+};
 
 /**
  * The proposal that asks for a version on Decide: a use case carries its file\'s text, an add-on the id the record holds it

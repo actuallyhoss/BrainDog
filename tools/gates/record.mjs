@@ -362,12 +362,14 @@ const OWNER_CTX = { principal: { kind: 'person', id: 'p_self', level: 'owner' } 
  * makes every script due now and runs one pass, since the record's clock stands still and an hourly script would
  * otherwise run once.
  *
+ * `shared` IS `{ send, resolve? }` FOR READING SHARED FILES, so a walk can stand a fake GitHub behind `fetchShared`.
+ *
  * `variant` MAKES THIS RECORD ONE OF `VARIANTS`, and `variants: true` starts every one of them beside this record and
  * hands their bases back as `variants[name]`. ONE `close()` GIVES ALL OF THEM BACK, which is why they come from this
  * call and not from a second one in the gate: `test/handles.test.mjs` holds every gate to closing what it opened in the
  * `finally` of the `try` it opened it in, and four records under one handle are one close.
  */
-export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false, runs = false, catalogue = false, keys, outside } = {}) {
+export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false, runs = false, catalogue = false, keys, outside, shared } = {}) {
   if (variant !== undefined && !VARIANTS.some((v) => v.name === variant)) throw new Error(`there is no record variant called ${variant}`);
   /* THE CLOUD IS ANOTHER HOST, NOT THIS ONE WITH SOMETHING ADDED, so none of what follows is asked of it. */
   if (variant === 'cloud') return startCloudRecord();
@@ -391,10 +393,14 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
        listed nothing, so an add-on published since the last deploy could not be opened anywhere before that deploy. The
        folder is on this disk, so nothing waits on the network. No gate asks for it: their sweeps measure the seed as it
        ships, and a gate's `/packs/browse` stays the empty store it has always measured. */
-    ...(catalogue ? { catalogue: CATALOGUE } : {}),
+    /* A FOLDER NAMED BY PATH IS SERVED IN ITS PLACE, so a walk can hold a catalogue of its own (the Kennel's advisories). */
+    ...(catalogue ? { catalogue: typeof catalogue === 'string' ? catalogue : CATALOGUE } : {}),
     ...(store === undefined ? {} : { keys: store }),
     /* THE STUB AND NOTHING ELSE. `openKey` is left to the host, so the key a script sends is the one this store opens. */
     ...(outside === undefined ? {} : { actions: { send: toOutside(outside), resolve: PUBLIC } }),
+    /* HOW A SHARED FILE IS READ (`fetchShared`, the GitHub channel): a walk hands a fake GitHub as `{ send }`, and every
+       name is then a public address to the pin, so nothing leaves the machine. */
+    ...(shared === undefined ? {} : { shared: { send: shared.send, resolve: shared.resolve ?? PUBLIC } }),
     ...(key === undefined ? {} : { token: key }),
     ...(origin === undefined ? {} : { origin }),
   });
@@ -487,6 +493,9 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
   /* THE HANDLE IS ALSO WHAT `openPage` AND `routesFor` READ (`recordAt`): the base, the clock, a read and a setting. */
   return {
     ...recordAt(base),
+    /* THE RECORD ITSELF, for a walk that acts as its owner without a door (an e2e script). No gate reads it. */
+    api: running.api,
+    kernel: running.api.kernel,
     variants: Object.fromEntries(others.map((o) => [o.name, o.record.base])),
     close: async () => {
       for (const o of others) await o.record.close();

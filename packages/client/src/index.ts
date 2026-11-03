@@ -664,7 +664,8 @@ export type BriefingCard = { h: string; line: string; row: string | null; cause:
 export type Briefing = { cards: BriefingCard[]; at: string; basis: string; said?: string | null };
 
 /** `packs`: one pack, on or off. `version` is `null` for a pack the seed owns by its bodies. See `PackState` in `@braindog/kernel`. */
-export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
+/** `source` is said only for one the store does not keep current: made here (`paste`), from a link (`url`) or GitHub (`git`). */
+export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[]; source?: string | null };
 
 /** `disablePack` and `enablePack`: the packs that turned, and the declarations that went or came back. */
 export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: boolean; packs: string[]; declarations: string[]; said: string };
@@ -2927,6 +2928,8 @@ export function createClient(options: ClientOptions) {
      * plan to read like a chosen file. Answers `{ url, text, bytes }`.
      */
     fetchShared: (args: { url: string }) => call<unknown>('fetchShared', args as Record<string, unknown>),
+    /** Add-ons from GitHub with a newer tag, each asked about on Decide. Answers `{ asked, refused, notes }`. */
+    gitUpdates: () => call<unknown>('gitUpdates', {}),
     /** `fetchShared` under its old name, kept for one release. */
     fetchUseCase: (args: { url: string }) => call<unknown>('fetchUseCase', args as Record<string, unknown>),
     /** This BrainDog's arrangement as a use-case file, with only the example rows named by list and number. */
@@ -2960,7 +2963,7 @@ export function createClient(options: ClientOptions) {
     installPack: (args: { doc: unknown; source?: { kind: string; ref?: string }; planHash: string; approve?: string[]; retireWithRows?: boolean }) =>
       call<unknown>('installPack', args as Record<string, unknown>),
     /** Take a pack back out. Its declarations go and its rows stay. */
-    uninstallPack: (args: { id: string }) => call<unknown>('uninstallPack', args as Record<string, unknown>),
+    uninstallPack: (args: { id: string; data?: boolean }) => call<unknown>('uninstallPack', args as Record<string, unknown>),
     /** The add-ons taken out within the window a reinstall still puts back, newest first, with the lists that stayed. */
     packsRemoved: () => call<Answer<'packsRemoved'>>('packsRemoved'),
     packConfig: (args: { id: string }) => call<unknown>('packConfig', args as Record<string, unknown>),
@@ -3079,6 +3082,12 @@ export function createClient(options: ClientOptions) {
      */
     setPref: <K extends keyof Prefs>(key: K, value: NonNullable<Prefs[K]> | null) =>
       call<{ key: K; value: NonNullable<Prefs[K]> | null }>('setPref', { key, value }),
+    /**
+     * A row added or changed by a drawn block's view (add-ons phase 4): `page` and `block` say which block, and the record
+     * checks the write against that block's own `acts:` and writes it as the reader.
+     */
+    drawnAct: (args: { page: string; block: number; create?: { list: string; fields: Record<string, unknown> }; update?: { ref: string; patch: Record<string, unknown> } }) =>
+      call<unknown>('drawnAct', args as Record<string, unknown>),
     /** One test notification to each of the reader's own devices, once a minute: how many it went to and the record's line. */
     pushTest: () => call<{ devices: number; line: string }>('pushTest'),
     /**

@@ -1,0 +1,422 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brain.dog/schema/pack.schema.json",
+  "title": "BrainDog add-on",
+  "description": "An add-on file (.pack.json). Made from the lists BrainDog reads; the record's own check decides, run braindog addon check.",
+  "type": "object",
+  "required": [
+    "pack",
+    "version",
+    "summary",
+    "author",
+    "license"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema an editor reads this file with. BrainDog passes over it."
+    },
+    "pack": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$",
+      "description": "The add-on id: lower-case letters, digits and dashes."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Its version, as 1.0.0. A version that takes a list, page or field away is a major."
+    },
+    "title": {
+      "type": "string",
+      "description": "The name the store shows."
+    },
+    "summary": {
+      "type": "string",
+      "description": "What it adds, in one sentence."
+    },
+    "changes": {
+      "description": "changes: see braindog:grammar/pack for what it holds."
+    },
+    "author": {
+      "type": "string",
+      "description": "Who made it."
+    },
+    "license": {
+      "type": "string",
+      "description": "Its licence, such as MIT."
+    },
+    "requires": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "integer"
+        },
+        "primitives": {
+          "type": "integer"
+        },
+        "packs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Other add-ons it needs, by id, with a version range such as >=1.0.0."
+        }
+      }
+    },
+    "provides": {
+      "description": "provides: see braindog:grammar/pack for what it holds."
+    },
+    "declarations": {
+      "type": "array",
+      "description": "What it adds. Each declaration begins with its kind: one of register, page, block, ingest, rule, metric, theme, digest, script, job, look.",
+      "items": {
+        "type": "object",
+        "anyOf": [
+          {
+            "required": [
+              "register"
+            ]
+          },
+          {
+            "required": [
+              "page"
+            ]
+          },
+          {
+            "required": [
+              "block"
+            ]
+          },
+          {
+            "required": [
+              "ingest"
+            ]
+          },
+          {
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "required": [
+              "metric"
+            ]
+          },
+          {
+            "required": [
+              "theme"
+            ]
+          },
+          {
+            "required": [
+              "digest"
+            ]
+          },
+          {
+            "required": [
+              "script"
+            ]
+          },
+          {
+            "required": [
+              "job"
+            ]
+          },
+          {
+            "required": [
+              "look"
+            ]
+          }
+        ],
+        "properties": {
+          "register": {
+            "type": "string",
+            "description": "The register's name."
+          },
+          "page": {
+            "type": "string",
+            "description": "The page's name."
+          },
+          "block": {
+            "type": "string",
+            "description": "The block's name."
+          },
+          "ingest": {
+            "type": "string",
+            "description": "The ingest's name."
+          },
+          "rule": {
+            "type": "string",
+            "description": "The rule's name."
+          },
+          "metric": {
+            "type": "string",
+            "description": "The metric's name."
+          },
+          "theme": {
+            "type": "string",
+            "description": "The theme's name."
+          },
+          "digest": {
+            "type": "string",
+            "description": "The digest's name."
+          },
+          "script": {
+            "type": "string",
+            "description": "The script's name."
+          },
+          "job": {
+            "type": "string",
+            "description": "The job's name."
+          },
+          "look": {
+            "type": "string",
+            "description": "The look's name."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "type"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "description": "The field id: lower-case letters, digits and underscores."
+                },
+                "type": {
+                  "enum": [
+                    "text",
+                    "document",
+                    "int",
+                    "duration",
+                    "decimal",
+                    "money",
+                    "quantity",
+                    "day",
+                    "instant",
+                    "bool",
+                    "enum",
+                    "ref",
+                    "file",
+                    "url",
+                    "email",
+                    "secret",
+                    "list",
+                    "json"
+                  ],
+                  "description": "What the field holds."
+                },
+                "of": {
+                  "enum": [
+                    "text",
+                    "document",
+                    "int",
+                    "duration",
+                    "decimal",
+                    "money",
+                    "quantity",
+                    "day",
+                    "instant",
+                    "bool",
+                    "enum",
+                    "ref",
+                    "file",
+                    "url",
+                    "email",
+                    "secret",
+                    "json"
+                  ],
+                  "description": "A list field: the type of each item."
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "An enum field: its values."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The name a person reads. Left out, the id with underscores as spaces."
+                },
+                "required": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "note",
+                    "quote",
+                    "stat",
+                    "bar",
+                    "gauge",
+                    "chips",
+                    "spec",
+                    "params",
+                    "todo",
+                    "steps",
+                    "timeline",
+                    "board",
+                    "code",
+                    "tree",
+                    "comparison",
+                    "table",
+                    "cards",
+                    "section",
+                    "feed",
+                    "diff",
+                    "sparkline",
+                    "split",
+                    "bridge",
+                    "series",
+                    "forecast",
+                    "agents",
+                    "lines",
+                    "progress",
+                    "queue",
+                    "capture",
+                    "roadmap",
+                    "ring",
+                    "heat",
+                    "inputs",
+                    "kpis",
+                    "calendar",
+                    "link",
+                    "gallery",
+                    "embed",
+                    "lanes",
+                    "form",
+                    "drawn",
+                    "project"
+                  ]
+                },
+                "span": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 12
+                }
+              }
+            }
+          },
+          "source": {
+            "type": "string",
+            "description": "A script: its code, the text of the .js file beside this one. `braindog addon dev` copies it in on each save."
+          },
+          "egress": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^https://"
+            },
+            "description": "A script: the https hosts it may call, each shown to the person."
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A script: the key labels it may send, each only to the host its key opens."
+          }
+        }
+      }
+    },
+    "seeds": {
+      "type": "array",
+      "description": "Example rows written when it is installed.",
+      "items": {
+        "type": "object",
+        "required": [
+          "register",
+          "fields"
+        ],
+        "properties": {
+          "register": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "description": "Its settings form: each key a setting, typed like a field."
+    },
+    "words": {
+      "description": "words: see braindog:grammar/pack for what it holds."
+    },
+    "extends": {
+      "description": "extends: see braindog:grammar/pack for what it holds."
+    },
+    "hands": {
+      "description": "hands: see braindog:grammar/pack for what it holds."
+    },
+    "adds": {
+      "description": "adds: see braindog:grammar/pack for what it holds."
+    },
+    "note": {
+      "type": "string",
+      "description": "A longer note for the listing."
+    },
+    "unlisted": {
+      "type": "boolean",
+      "description": "Kept out of search in the store; installs by its id or link."
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "What it teaches your agents."
+    },
+    "icon": {
+      "type": "string",
+      "description": "An icon name from BrainDog's set, such as board or graduation-cap."
+    },
+    "widgets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id"
+        ]
+      },
+      "description": "Today cards it offers. Installing never places one."
+    },
+    "uses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The places of yours it reads or changes, such as register.ledger. Each is shown to the person before they install."
+    },
+    "migrate": {
+      "description": "migrate: see braindog:grammar/pack for what it holds."
+    },
+    "tools": {
+      "description": "tools: see braindog:grammar/pack for what it holds."
+    },
+    "commands": {
+      "description": "commands: see braindog:grammar/pack for what it holds."
+    },
+    "row_actions": {
+      "description": "row_actions: see braindog:grammar/pack for what it holds."
+    }
+  }
+}

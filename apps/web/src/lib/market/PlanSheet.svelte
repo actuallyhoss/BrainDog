@@ -25,6 +25,7 @@
   import type { IconName } from '../ui/icons.ts';
   import { sheetOf, words } from './plan.ts';
   import { REGISTERS } from '../record/held.ts';
+  import { asksWords } from './asks.ts';
 
   let {
     diff,
@@ -38,6 +39,7 @@
     onrecheck,
     onkey,
     uses,
+    github,
   }: {
     /** The record's `Diff`, a use case's `SharedPlan`, or an array of either for "Update all". */
     diff: unknown;
@@ -68,6 +70,11 @@
      * its own. Approving the plan is agreeing to these; it can reach nothing else. Left out or empty, nothing is drawn.
      */
     uses?: readonly string[] | undefined;
+    /**
+     * WHERE IT COMES FROM, FOR A FILE FROM GITHUB (`asks.ts` `githubOf`): the repository and the commit it is pinned to,
+     * and the one plain warning that nobody reviewed it. Left out for the store's add-ons and files made here.
+     */
+    github?: { repo: string; commit: string } | null | undefined;
   } = $props();
 
   /* WHAT IS TYPED FOR EACH MISSING KEY, never kept past the sheet: emptied as it is sent, whatever comes back (RF4), as
@@ -109,6 +116,13 @@
   const estimate = $derived(sheet ? estimateOf(sheet.callOuts, hosted) : null);
   const calls = $derived(sheet ? sheet.parts.flatMap((p) => p.calls.map((c) => ({ ...c, from: p.title }))) : []);
   const several = $derived((sheet?.parts.length ?? 0) > 1);
+  /* WHAT IT MAY DO BEYOND LISTS AND CALLS (add-ons phase 4): notices, Slash's model, a view that writes. Each new line is
+     one the install asks him to approve, as a call out is, so it is drawn beside the calls. */
+  const mays = $derived(
+    (Array.isArray(diff) ? diff : [diff]).flatMap((d) =>
+      d !== null && typeof d === 'object' && Array.isArray((d as { may?: unknown }).may) ? ((d as { may: { line: string; change: string }[] }).may) : [],
+    ),
+  );
 
   let open = $state(true);
 
@@ -201,6 +215,13 @@
         </section>
       {/if}
 
+      {#if github}
+        <section class="plan-group" aria-labelledby="plan-github-h">
+          <h3 class="plan-h" id="plan-github-h"><IconWell name="code" /><span class="plan-title">{asksWords.github(github.repo, github.commit)}</span></h3>
+          <p class="plan-note">{asksWords.unreviewed}</p>
+        </section>
+      {/if}
+
       {#each sheet.parts as part (part.key)}
         <section class="plan-part" aria-label={part.title}>
           {#if several || part.move}
@@ -239,6 +260,18 @@
           </ul>
           {#if estimate}<p class="plan-note">{estimate}</p>{/if}
           <p class="plan-note">{words.callsNote}</p>
+        </section>
+      {/if}
+
+      {#if mays.length > 0}
+        <section class="plan-group" aria-labelledby="plan-may-h">
+          <h3 class="plan-h" id="plan-may-h"><IconWell name="bell" /><span class="plan-title">{words.may}</span><span class="plan-count num">{mays.length}</span></h3>
+          <ul class="plan-rows">
+            {#each mays as m, i (i)}
+              <li class="plan-row"><span class="plan-text">{m.line}{#if m.change === 'new'}<span class="plan-change">{words.callNew}</span>{/if}</span></li>
+            {/each}
+          </ul>
+          <p class="plan-note">{words.mayNote}</p>
         </section>
       {/if}
 

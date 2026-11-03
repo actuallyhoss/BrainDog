@@ -61,7 +61,7 @@ import { ALARM_RUNS, IN_FLIGHT, actionExecutor, holding, holdingPaged, invocatio
 import { deliveryRun, holdAutomations, noticePass, replayUsage, runsHold, type Replayed } from '@braindog/host/actions';
 import { arrivalRun } from '@braindog/host/actions';
 import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
-import { grantNamed, holdingScript, readOnlyExecute, scriptProposals, scriptReads } from '@braindog/host/script';
+import { grantNamed, holdingScript, readOnlyExecute, scriptAsks, scriptProposals, scriptReads, scriptState } from '@braindog/host/script';
 import { askerOf, scriptTrial } from '@braindog/host/script-try';
 import { serveFirstRead } from '@braindog/host/first-read';
 import { pagedRunner } from '@braindog/host/connector';
@@ -73,10 +73,10 @@ import { alarmScheduler } from './alarm.ts';
 import { fileModelSignMoved } from '@braindog/host/sign-model';
 import { slashDue, slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
 import { PLAN_AGENTS, PLAN_FILES, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
-import { fallbackWire, includedCandidates, includedInference } from './slash.ts';
+import { fallbackWire, includedCandidates, includedInference, kennelNoteModel } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerMeaning, workerModelJobs } from './slash-jobs.ts';
-import { workerCatalogueOffers, workerCatalogueShelf } from './catalogue.ts';
+import { workerCatalogueNotices, workerCatalogueOffers, workerCatalogueShelf } from './catalogue.ts';
 import { kennelRequired, kennelVitals, serveKennel, servesKennel, writeCounts } from './kennel.ts';
 import { recordScratch } from './kennel-scratch.ts';
 /* MAIL ON THE CLOUD: Email Routing's messages into the same door as a forwarder's post. */
@@ -1059,6 +1059,9 @@ export class Record$ extends DurableObject<Env> {
                   grant: t.grantOf,
                   openKey: t.readOnly ? null : openKey,
                   read: t.reads,
+                  /* `ctx.notify` AND `ctx.store` IN A TRIAL: checked against the record, never applied, as on a self-host. */
+                  state: scriptState(api),
+                  trial: true,
                   now: () => Date.now(),
                 },
                 s,
@@ -1072,6 +1075,7 @@ export class Record$ extends DurableObject<Env> {
         catalogue: CATALOGUE,
         /* NEWER VERSIONS IN THE KENNEL AND THE CATALOGUE BUNDLED WITH THE SHELL, for Slash to ask about on Decide, as a self-host's folder gives. */
         catalogueOffers: workerCatalogueOffers(this.env.ASSETS, this.env.BLOBS),
+        catalogueNotices: workerCatalogueNotices(this.env.ASSETS, this.env.BLOBS),
         catalogueShelf: workerCatalogueShelf(this.env.ASSETS, this.env.BLOBS),
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
@@ -2190,6 +2194,9 @@ export class Record$ extends DurableObject<Env> {
             read: scriptReads(api),
             /* `ctx.propose`, as on the self-host: tried against the gate now, filed with the run's writes. */
             propose: scriptProposals(api),
+            /* `ctx.notify` and `ctx.store`, queued and applied with the run's writes; `ctx.ask`, on the record's allowance. */
+            state: scriptState(api),
+            ask: scriptAsks(this.#answers),
             now: () => Date.now(),
           },
           s,
@@ -4142,6 +4149,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
         session: (sid) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).auth({ flow: 'session', sid }) as unknown as Promise<AuthResult<Who>>,
         bearer: bearerDeps(env),
         spend: (asked) => overLimit(env, null, asked, 'write'),
+        preReview: kennelNoteModel(env),
         scratch: {
           open: () => {
             const scratch = env.RECORD.get(env.RECORD.idFromName(`kennel-scratch:${crypto.randomUUID()}`));

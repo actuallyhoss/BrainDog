@@ -95,6 +95,7 @@ import {
   type Trust,
 } from '@braindog/declare/catalogue';
 import { DEFAULT_KENNEL, KENNEL_BASE } from '@braindog/declare/kennel';
+import { PACK_SCHEMA_URL } from '@braindog/declare/pack-schema';
 import { parseYaml } from '@braindog/declare/yaml';
 import { refused, type Result } from '@braindog/ports';
 
@@ -346,6 +347,8 @@ async function createPack(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   const file = `${id}${values.yaml ? '.pack.yaml' : NOUN.pack.suffix}`;
+  /* THE EDITOR'S SCHEMA FIRST, so it suggests keys from the first keystroke (`pack-schema.ts`). The record passes over it. */
+  doc = { $schema: PACK_SCHEMA_URL, ...doc };
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, file), values.yaml ? `${yamlOf(doc)}\n` : `${JSON.stringify(doc, null, 2)}\n`);
   /* A WIDGET-ONLY ADD-ON KEEPS NO ROWS, so its first test only installs it: the record's own sessions, none yet. */
@@ -856,6 +859,8 @@ function parsed(text: string, read: Catalogue['read'], where: string): Catalogue
  */
 async function publish(args: string[], io: AgentIo, kind: EntryKind): Promise<number> {
   const cmd = `braindog ${kind} publish`;
+  /* --GITHUB PUSHES THE FOLDER WITH THE PERSON'S OWN `gh` AND TAGS THE VERSION (`addon-dev.ts`). */
+  if (kind === 'pack' && args.includes('--github')) return (await import('./addon-dev.ts')).publishGithub(args, io);
   const { rest, kennel: toKennel } = takeKennel(args);
   let values: { to?: string | undefined; sign?: string | undefined };
   let positionals: string[];
@@ -981,7 +986,12 @@ const SDK_FILE = /\.(pack|usecase)\.(json|ya?ml)$/iu;
 export async function loadSource(given: string, io: AgentIo): Promise<{ ok: true; text: string; dir: string | null } | { ok: false; fix: string }> {
   let name = given;
   let dir: string | null = null;
-  if (!/^[a-z][a-z0-9+.-]*:\/\//iu.test(given)) {
+  /* `git:owner/repo@ref:path`, THE LINE `addon publish --github` PRINTS, read as the raw file the record's host reads. */
+  if (given.startsWith('git:')) {
+    const raw = (await import('./addon-dev.ts')).gitAddress(given, io.env);
+    if (raw === null) return { ok: false, fix: 'A git line reads git:owner/repo@ref:path, such as git:someone/bookshelf@v1.0.0:bookshelf.pack.json.' };
+    name = raw;
+  } else if (!/^[a-z][a-z0-9+.-]*:\/\//iu.test(given)) {
     const path = resolve(io.cwd, given);
     let folder = false;
     try {
@@ -1366,7 +1376,7 @@ export function sdkVerb(verb: string | undefined, kind: EntryKind = 'usecase'): 
 }
 
 const PACK_USAGE =
-  'braindog addon takes new <id> [--yaml] [--from-page <file.dog>], check <file|dir>, test <dir>, preview <file|dir>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> or --kennel [host] [--sign <key file>], yank <id> <version> --reason <why> [--kennel host], search [words] [--from <catalogue>], or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run] [--trust-key]. install <file> --force or uninstall <id> [--force] takes away a list that still holds items, keeping every one of them.';
+  'braindog addon takes new <id> [--yaml] [--from-page <file.dog>], check <file|dir>, test <dir>, dev <dir> [--port <n>], preview <file|dir>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> or --kennel [host] [--sign <key file>], publish [<dir>] --github [--repo owner/name], yank <id> <version> --reason <why> [--kennel host], search [words] [--from <catalogue>], or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run] [--trust-key]. install <file> --force or uninstall <id> [--force] takes away a list that still holds items, keeping every one of them.';
 
 /**
  * `pack install <file>`: a `.pack.json` from a path or an address, read through the add-on door here first, then asked for
@@ -1400,6 +1410,7 @@ export async function pack(args: string[], io: AgentIo): Promise<number> {
   const [verb, ...rest] = args;
   if (verb === 'check') return checkPack(rest, io);
   if (verb === 'test') return testPack(rest, io);
+  if (verb === 'dev') return (await import('./addon-dev.ts')).dev(rest, io);
   if (verb === 'install') {
     let values: { host?: string | undefined; from?: string | undefined; version?: string | undefined; 'dry-run'?: boolean | undefined; 'trust-key'?: boolean | undefined; force?: boolean | undefined };
     let positionals: string[];

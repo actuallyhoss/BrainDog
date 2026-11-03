@@ -44,6 +44,8 @@
   import Changes from './Changes.svelte';
   import Proposed from './Proposed.svelte';
   import Arranged from './Arranged.svelte';
+  import MadeFor from './MadeFor.svelte';
+  import { agentName, gitOfBody } from '$lib/market/made-here.ts';
   import Applied from './Applied.svelte';
   import { heard } from '$lib/voice.svelte.ts';
   import {
@@ -68,6 +70,8 @@
   import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
   import { everyGovernance, plainOf, readOne, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
+  import { publishAsked, publishAskOf } from '$lib/market/publish-asked.ts';
+  import { kennelFetch } from '$lib/market/publish.ts';
   import { proposer, queueMergeOf, queueWords, type FileAt } from '$lib/page/queue-answer.ts';
   import '$lib/decide/form.css';
   import { cardWords, putsOff, queueOf, spoken } from '$lib/decide/card.ts';
@@ -787,6 +791,19 @@
     }
     sending = key;
     const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind) ? about : null;
+    /* AN ASK TO PUBLISH SENDS THE FILE FIRST, signed in this browser, and is answered yes only once the store took it
+       (`publish-asked.ts`). A refused send leaves the question open with the store's own sentence. */
+    const publishing = accepting ? publishAskOf(accepting.kind, accepting.body) : null;
+    let published: string | null = null;
+    if (publishing !== null) {
+      const sent = await publishAsked(client, publishing, kennelFetch);
+      if (!sent.ok) {
+        sending = null;
+        toasts.push(sent.fix, { intent: 'warn' });
+        return;
+      }
+      published = sent.said;
+    }
     const had = accepting ? sidebarNow() : null;
     const rows = only ?? (a.option === 'accept' && picked ? picked : undefined);
     /* THE PARTS TICKED, on accepting an arrangement some of which is off; every part ticked sends none, the whole. */
@@ -828,6 +845,7 @@
     committed = { ...a, title: shown, reason: said?.trim() ?? '' };
     noteOffered = notedAfter(a.option, rows !== undefined);
     toasts.push(copy.decisionRecorded(shown), { intent: 'good' });
+    if (published !== null) toasts.push(published, { intent: 'good' });
     /* AND WHAT THE PICK LEFT, said as the record says it: how many entries changed since and were not written. */
     if (out.from === 'written' && out.said) toasts.push(out.said, { intent: 'warn' });
     if (accepting && out.from === 'written' && had) {
@@ -1134,6 +1152,10 @@
                 <div class="does-parts">
                   {#if story && !settled}
                     <section class="changed" aria-label={story.lead}>
+                      <!-- AN ADD-ON AN AGENT MADE, its file in the question: who made it, unreviewed, and its scripts whole. -->
+                      {#if about?.kind === 'pack' && ((typeof about.body?.doc === 'object' && about.body.doc !== null) || gitOfBody(about.body) !== null)}
+                        <MadeFor doc={about.body?.doc} by={agentName(askerSaid || nameWords.agent)} git={gitOfBody(about.body)} />
+                      {/if}
                       <Arranged arranged={story} />
                     </section>
                   {/if}

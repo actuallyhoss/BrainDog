@@ -29,12 +29,13 @@
  * (`listedEntries`).
  */
 
+import { mayLinesOf } from './may-lines.ts';
 import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { digest, fillConfig, glyphFault, jcs, readConfig, validateDeclaration, type Json, type PageResult } from '@braindog/kernel';
 
 import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
-import { egressOf, FIRST_PARTY_LISTS, normalise, type Pack, type PackDeclaration, type PackSource } from './index.ts';
+import { egressOf, FIRST_PARTY_LISTS, normalise, updatesFromStore, type Pack, type PackDeclaration, type PackSource } from './index.ts';
 import { CHANGES_MOST, kindUnknownSentence, readChanges, readShared, SHARED_MOST_BYTES, type Shared } from './shared.ts';
 import { MODULE_LISTS, MODULES } from './usecase.ts';
 import { holdsOf, resolveWhen } from './when.ts';
@@ -138,6 +139,14 @@ export type Reach = {
    * when it uses any. Read from the file, so a reviewer and a store say what it can reach whatever its author wrote.
    */
   uses?: { id: string; writes: boolean }[];
+  /** What it may do beyond lists and calls out (phase 4): send notices, ask Slash's model, a view that writes. */
+  may?: string[];
+  /** The tools it gives agents, by what each says, with whether it may change rows. Absent when none. */
+  tools?: { says: string; writes: boolean }[];
+  /** What it puts in the command bar, by title. Absent when nothing. */
+  commands?: string[];
+  /** The actions it puts on rows: the list's id and the action's title. Absent when none. */
+  row_actions?: { list: string; title: string }[];
 };
 
 export type Bump = 'major' | 'minor' | 'patch';
@@ -223,9 +232,10 @@ export type CatalogueEntry = {
 
 /**
  * The closed list of keys an add-on's manifest may say, which the SDK and the Kennel hold a file to. The record itself
- * stays lenient and reads what it knows. `unlisted` flags a pack named for one person or one bank.
+ * stays lenient and reads what it knows. `unlisted` flags a pack named for one person or one bank. `$schema` is the
+ * editor's (`pack-schema.ts`): `braindog addon new` writes it, and `normalise` passes over it.
  */
-export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills', 'icon', 'widgets', 'uses'] as const;
+export const MANIFEST_KEYS = ['$schema', 'pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills', 'icon', 'widgets', 'uses', 'migrate', 'tools', 'commands', 'row_actions'] as const;
 
 export const PREVIEW_FORMAT = 1;
 
@@ -447,6 +457,13 @@ export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
     ...(s.pack?.manifest.widgets?.length ? { widgets: s.pack.manifest.widgets.map((w) => w.title) } : {}),
     ...waitsOf(s.pack),
     ...usesIn(file),
+    ...((): { may?: string[] } => {
+      const may = mayLinesOf(decls, []).map((m) => m.line);
+      return may.length === 0 ? {} : { may };
+    })(),
+    ...(s.pack?.manifest.tools?.length ? { tools: s.pack.manifest.tools.map((t) => ({ says: t.says, writes: t.writes === true })) } : {}),
+    ...(s.pack?.manifest.commands?.length ? { commands: s.pack.manifest.commands.map((c) => c.title) } : {}),
+    ...(s.pack?.manifest.row_actions?.length ? { row_actions: s.pack.manifest.row_actions.map((a) => ({ list: a.list, title: a.title })) } : {}),
   };
 }
 
@@ -930,7 +947,7 @@ export type CatalogueUpdate = {
  */
 export async function catalogueUpdates(
   index: CatalogueIndex,
-  held: readonly { id: string; version: string | null; disabled_at?: string | null }[],
+  held: readonly { id: string; version: string | null; disabled_at?: string | null; source?: string | null }[],
   read: (path: string) => string | null | Promise<string | null>,
 ): Promise<{ updates: CatalogueUpdate[]; refused: { entry: CatalogueEntry; fix: string }[] }> {
   const updates: CatalogueUpdate[] = [];
@@ -938,7 +955,9 @@ export async function catalogueUpdates(
   const statements = await verifiedStatements(index.keys);
   for (const entry of index.entries) {
     const installed = installedIdOf(entry);
-    const state = held.find((h) => h.id === installed);
+    /* ONLY WHAT CAME FROM THE STORE UPDATES FROM IT (`updateChannel`): one made here, from a link or from GitHub that
+       shares the id is someone else's add-on, and the store's file never replaces it. */
+    const state = held.find((h) => h.id === installed && updatesFromStore(h.source));
     const latest = offeredVersion(entry);
     if (!state || !latest || state.version === null || (state.disabled_at ?? null) !== null || compareVersions(state.version, latest.version) >= 0) continue;
     const text = await read(catalogueFile(entry.id, latest.version, entry.kind));

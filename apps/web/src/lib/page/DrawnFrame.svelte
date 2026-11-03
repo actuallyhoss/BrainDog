@@ -20,7 +20,7 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { DRAWN_HEIGHT, DRAWN_LABEL, drawnAsk, drawnDocument, drawnFrameHeight, drawnHeight, drawnPictureDocument, drawnTheme, type DrawnData, type DrawnTheme, type WidgetSize } from 'braindog-render';
+  import { DRAWN_HEIGHT, DRAWN_LABEL, drawnAsk, drawnDocument, drawnFrameHeight, drawnHeight, drawnPictureDocument, drawnTheme, type DrawnAct, type DrawnData, type DrawnTheme, type WidgetSize } from 'braindog-render';
   import { BASE } from '../at.ts';
   import { askAlive, letGo } from './drawn-alive.ts';
   import { keepPicture, keptPicture, pictureKey } from './drawn-pictures.ts';
@@ -34,6 +34,7 @@
     size = null,
     picture = false,
     whose = null,
+    onact = null,
   }: {
     /** The component, as the block declares it. A new one draws a new frame. */
     code: string;
@@ -51,6 +52,12 @@
     picture?: boolean;
     /** Who the pictures are kept for, the person and the BrainDog (`whoseOf`); `null` keeps and draws none. */
     whose?: string | null;
+    /**
+     * A row its view asks to add or change (`braindog.create` / `braindog.update`), handed to the record, which checks it
+     * against the block's own `acts:` and writes as the reader. `null` where nothing writes (a preview, a board): the
+     * view is then answered that it cannot. What comes back is posted to the frame as plain JSON.
+     */
+    onact?: ((act: DrawnAct) => Promise<unknown>) | null;
   } = $props();
 
   /** The hosts' frame document (`DRAWN_FRAME_PATH`), under the app's base. */
@@ -136,6 +143,13 @@
       if (asked === null) return;
       if ('height' in asked) height = asked.height;
       else if ('open' in asked) onopen?.(asked.open);
+      else if ('act' in asked) {
+        const id = asked.act.id;
+        const answer = onact === null ? Promise.resolve({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This view cannot write here.' } }) : onact(asked.act);
+        void answer
+          .catch(() => ({ ok: false, refusal: { code: 'INTERNAL', fix: 'It could not be written. Try again.' } }))
+          .then((said) => post({ braindog: 'done', id, answer: plain(said ?? null) }));
+      }
       else if (picture && alive) {
         if (whose !== null) keepPicture(pictureKey(whose, code, size, themeNow().mode), asked.picture, tall);
         kept = { picture: asked.picture, height: tall };

@@ -19,11 +19,14 @@
  */
 
 import { listedEntries, offeredVersion, type CatalogueEntry as IndexEntry, type CatalogueIndex, type CatalogueVersion, type Reach } from '@braindog/declare/catalogue';
+import { updatesFromStore } from '@braindog/declare';
 import { FIELD_TYPES } from '@braindog/kernel';
+import { mayLinesOfDecl } from '@braindog/declare/may-lines';
 import type { Result } from '@braindog/ports';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
+import { GIT_UNREVIEWED, parseGit, repoSaid, shortSha } from '../git-channel.ts';
 
 type Body = Record<string, unknown>;
 
@@ -83,8 +86,12 @@ export function reachLines(reach: Reach | undefined): string[] {
   if (reads.length > 0) out.push(`Reads yours: ${reads.join(', ')}.`);
   if (reach.rules.length > 0) out.push(`Runs ${reach.rules.length === 1 ? 'an automation' : `${reach.rules.length} automations`} while nobody is looking.`);
   for (const c of reach.calls_out) out.push(c.line);
+  for (const line of reach.may ?? []) out.push(line);
   if (reach.skills.length > 0) out.push(`Teaches your agents: ${reach.skills.join(', ')}.`);
   if ((reach.widgets ?? []).length > 0) out.push(`Today cards to add: ${(reach.widgets ?? []).join(', ')}.`);
+  for (const t of reach.tools ?? []) out.push(`Gives your agents a tool: ${t.says.replace(/\.$/u, '')}${t.writes ? ', and it may change rows' : ''}.`);
+  if ((reach.commands ?? []).length > 0) out.push(`Adds to the command bar: ${(reach.commands ?? []).join(', ')}.`);
+  for (const a of reach.row_actions ?? []) out.push(`Adds an action on ${a.list.replace(/^register\./u, '').replace(/[_-]+/gu, ' ')} rows: ${a.title}.`);
   if ((reach.waits ?? []).length > 0) out.push(`Some parts wait until you hold: ${(reach.waits ?? []).join(', ')}.`);
   if (reach.examples > 0) out.push(`Starts with ${reach.examples} example ${reach.examples === 1 ? 'entry' : 'entries'}.`);
   return out;
@@ -102,6 +109,8 @@ function reachShort(reach: Reach | undefined): string | undefined {
   const hosts = [...new Set(reach.calls_out.map((c) => c.host).filter((h): h is string => h !== null))];
   if (hosts.length > 0) parts.push(`calls ${hosts.join(', ')}`);
   if ((reach.widgets ?? []).length > 0) parts.push('Today cards');
+  if ((reach.tools ?? []).length > 0) parts.push('agent tools');
+  if ((reach.commands ?? []).length > 0 || (reach.row_actions ?? []).length > 0) parts.push('commands');
   if (reach.skills.length > 0) parts.push('agent skills');
   return parts.length === 0 ? undefined : parts.join(', ');
 }
@@ -241,8 +250,20 @@ export function methods(deps: RecordDeps) {
   const entryNamed = (index: CatalogueIndex, id: string): IndexEntry | undefined =>
     index.entries.find((e) => heldId(e) === id) ?? index.entries.find((e) => e.kind === 'usecase' && e.id === id);
 
-  /** A made-here or linked add-on's trust, from where it came: a pasted or local file was made here, a link was not. */
-  const trustOfSource = (source: string | null): AddonTrust => (source === 'url' || source === 'git' || source === 'kennel' ? 'from-a-link' : 'made-here');
+  /**
+   * A made-here or linked add-on's trust, from where it came: a pasted or local file was made here, a link was not.
+   * BRAINDOG'S OWN PARTS ARE BRAINDOG'S: the seed holds its modules (Work, People, Money core, the agents pack, a use
+   * case's pack) as `local` or with no `pack` row, and none has a catalogue entry, so they were answered as made here. An
+   * id this build ships (`shippedVersion`) held from that source is BrainDog's. One the person pasted under the same id is
+   * `paste`, so it stays theirs.
+   */
+  let shipped: ((id: string) => string | undefined) | null = null;
+  const loadShipped = async (): Promise<void> => {
+    if (shipped === null) shipped = (await import('@braindog/seed/packs/quiet')).shippedVersion;
+  };
+  const ownPart = (id: string, source: string | null): boolean => (source === null || source === 'local') && shipped !== null && shipped(id) !== undefined;
+  const trustOfSource = (id: string, source: string | null): AddonTrust =>
+    ownPart(id, source) ? 'braindog' : source === 'url' || source === 'git' || source === 'kennel' ? 'from-a-link' : 'made-here';
 
   /** The live declarations an installed add-on put in this record, each by id, kind and body. */
   const liveOf = (pack: string): { id: string; kind: string; body: Body }[] =>
@@ -276,7 +297,7 @@ export function methods(deps: RecordDeps) {
       const egress = Array.isArray(s.body.egress) ? s.body.egress.filter((e): e is string => typeof e === 'string') : [];
       const keys = Array.isArray(s.body.keys) ? s.body.keys.filter((e): e is string => typeof e === 'string') : [];
       const runs = isMap(s.body.runs) ? s.body.runs : {};
-      const when = typeof runs.every === 'string' ? `every ${runs.every}` : typeof runs.door === 'string' ? `when ${runs.door} is called` : runs.rule === true ? 'when an automation starts it' : 'when started';
+      const when = typeof runs.every === 'string' ? `every ${runs.every}` : typeof runs.door === 'string' ? `when ${runs.door} is called` : runs.rule === true ? 'when an automation starts it' : runs.tool === true ? 'when an agent calls its tool' : runs.command === true ? 'from the command bar' : runs.row === true ? "from a row's menu" : 'when started';
       out.push(
         `Script ${text(s.body.title) ?? s.id}: runs ${when}${egress.length > 0 ? `, may call ${egress.join(', ')}` : ', calls nothing outside'}${keys.length > 0 ? ` with the key ${keys.join(', ')}` : ''}.`,
       );
@@ -291,6 +312,22 @@ export function methods(deps: RecordDeps) {
     if (rules > 0) out.push(`${rules === 1 ? 'An automation' : `${rules} automations`} that run while nobody is looking.`);
     const digests = of('digest').length;
     if (digests > 0) out.push(`${digests === 1 ? 'A digest' : `${digests} digests`} it sends you.`);
+    /* AND WHAT IT MAY DO BEYOND THAT (phase 4): notices, the model, a view that writes, in the plan's own words. */
+    for (const d of live) for (const line of mayLinesOfDecl(d)) out.push(line);
+    if (of('script').some((d) => d.body.store === true)) out.push('Keeps a little state of its own, at most 1 MB, which goes with it when it is removed with its data.');
+    /* WHO MAY START ITS SCRIPTS, read off the manifest this record stores (`addon-tools.ts`). */
+    let m: Body = {};
+    try {
+      const read = JSON.parse(sql.one<{ manifest: string }>('SELECT manifest FROM pack WHERE id = ?', pack)?.manifest ?? '{}') as unknown;
+      if (isMap(read)) m = read;
+    } catch {
+      m = {};
+    }
+    const listOf = (key: string): Body[] => (Array.isArray(m[key]) ? (m[key] as unknown[]).filter(isMap) : []);
+    for (const t of listOf('tools')) out.push(`A tool for your agents, addon.${pack}.${String(t.name)}: ${String(t.says)}${t.writes === true ? ' It may change rows, as whoever calls it.' : ''}`);
+    const commands = listOf('commands').map((c) => String(c.title ?? c.id));
+    if (commands.length > 0) out.push(`In the command bar: ${commands.join(', ')}.`);
+    for (const a of listOf('row_actions')) out.push(`An action on ${String(a.list).replace(/^register\./u, '').replace(/[_-]+/gu, ' ')} rows: ${String(a.title)}.`);
     return out;
   };
 
@@ -333,11 +370,14 @@ export function methods(deps: RecordDeps) {
       const shelf = text(said.shelf);
       const index = await indexOf();
       const held = heldNow();
+      await loadShipped();
 
       const lineOf = (e: IndexEntry): AddonLine => {
         const latest = offeredVersion(e);
         const id = heldId(e);
-        const here = held.get(id);
+        /* ONE OF THE PERSON'S OWN THAT SHARES THE ID IS NOT THIS ONE INSTALLED (`updatesFromStore`). */
+        const mine = held.get(id);
+        const here = mine !== undefined && updatesFromStore(mine.source) ? mine : undefined;
         const reaches = reachShort(latest?.reach);
         return {
           id,
@@ -357,15 +397,15 @@ export function methods(deps: RecordDeps) {
       if (said.installed === true) {
         const lines: AddonLine[] = [];
         for (const [id, h] of held) {
-          const e = index === null ? undefined : entryNamed(index, id);
+          const e = index === null || !updatesFromStore(h.source) ? undefined : entryNamed(index, id);
           if (e !== undefined) lines.push(lineOf(e));
           else
             lines.push({
               id,
               title: h.title ?? id.replace(/-/gu, ' ').replace(/^./u, (c) => c.toUpperCase()),
               summary: h.summary ?? '',
-              by: h.author ?? '',
-              trust: trustOfSource(h.source),
+              by: ownPart(id, h.source) ? 'BrainDog' : (h.author ?? ''),
+              trust: trustOfSource(id, h.source),
               latest: null,
               here: { version: h.version, on: h.on },
             });
@@ -446,8 +486,12 @@ export function methods(deps: RecordDeps) {
       const id = text(said.id);
       if (id === null) return no('REQUIRED_MISSING', 'Which add-on? Send its id, as act addons answers it.', { at: 'id' });
       const index = await indexOf();
-      const entry = index === null ? undefined : entryNamed(index, id);
-      const h = heldNow().get(entry === undefined ? id : heldId(entry));
+      const held = heldNow();
+      await loadShipped();
+      /* ONE HELD HERE THAT DID NOT COME FROM THE STORE IS SAID AS ITSELF, never as the store's add-on of the same id. */
+      const own = held.get(id);
+      const entry = index === null || (own !== undefined && !updatesFromStore(own.source)) ? undefined : entryNamed(index, id);
+      const h = held.get(entry === undefined ? id : heldId(entry));
       if (entry === undefined && h === undefined)
         return no('DECLARATION_UNKNOWN', `No add-on called ${id} is on offer or here. act addons {"q":"<a word>"} searches the store.`, { at: 'id' });
 
@@ -481,15 +525,23 @@ export function methods(deps: RecordDeps) {
             })),
         });
       } else {
-        const trust = trustOfSource(h!.source);
+        const trust = trustOfSource(id, h!.source);
         Object.assign(out, {
           ...(h!.title === null ? {} : { title: h!.title }),
           ...(h!.summary === null ? {} : { summary: h!.summary }),
-          ...(h!.author === null ? {} : { by: h!.author }),
+          ...(ownPart(id, h!.source) ? { by: 'BrainDog' } : h!.author === null ? {} : { by: h!.author }),
           trust,
           trust_said: TRUST_SAID[trust],
           ...(h!.source_ref === null ? {} : { from: h!.source_ref }),
         });
+        /* FROM GITHUB: the repository, the commit it is pinned to, and that nobody reviewed it (`git-channel.ts`). */
+        const git = h!.source === 'git' && h!.source_ref !== null ? parseGit(h!.source_ref) : null;
+        if (git !== null)
+          Object.assign(out, {
+            ...(h!.author === null || h!.author === 'Made in this BrainDog' ? { by: `${repoSaid(git)} on GitHub` } : {}),
+            trust_said: GIT_UNREVIEWED,
+            github: { repo: repoSaid(git), commit: shortSha(git.ref), path: git.path },
+          });
       }
       if (h !== undefined) {
         const here: Body = { version: h.version, on: h.on };
@@ -510,7 +562,9 @@ export function methods(deps: RecordDeps) {
       out.next =
         h === undefined
           ? `Install: act installPack {"id":"${String(out.id)}"} puts it to the person on Decide.`
-          : entry === undefined
+          : entry === undefined && isMap(out.github)
+            ? `A newer tag on ${String(out.github.repo)} is asked about on Decide by itself. To pick a version: act installPack {"source":{"kind":"git","ref":"${String(out.github.repo)}@<tag>:${String(out.github.path)}"}}.`
+            : entry === undefined
             ? `Change it: edit file, raise its version, act addonCheck {"doc":<file>}, then act installPack {"doc":<file>}.`
             : `It is here.${isMap(out.here) && h.on === false ? ' It is off: act enablePack {"id"}.' : ''}`;
       return { ok: true, value: out };

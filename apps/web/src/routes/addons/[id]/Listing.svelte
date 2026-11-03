@@ -49,6 +49,7 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import { glyphOf, ownIcon } from '$lib/market/ListingCard.svelte';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
+  import Report from '$lib/market/Report.svelte';
   import { words as planWords } from '$lib/market/plan.ts';
   import { keyPut, type KeyPut } from '$lib/market/key-put.ts';
   import { keyName } from '$lib/market/key-names.ts';
@@ -628,7 +629,9 @@
           ? words.turnOn(listing?.title ?? '')
           : action?.kind === 'installed'
             ? words.installed
-            : words.install(listing?.title ?? ''),
+            : action?.kind === 'taken'
+              ? words.taken
+              : words.install(listing?.title ?? ''),
   );
   /* ONCE IT IS IN, ITS FIRST PAGE, so one press lands on what it brought (`offer.ts` `firstPageOf`). */
   const opens = $derived(adds ? firstPageOf(adds.pages, declared) : null);
@@ -636,7 +639,7 @@
      said "Installed" and nothing about where an alert goes. What comes in, Texts, takes a bank text pasted in. */
   const pastes = $derived(opens === null && (adds?.reads.includes('texts') ?? false));
   /* SOMETHING TO PRESS: the phone's bar is drawn only then, and never to say "Installed" over the last tile. */
-  const doable = $derived(listing !== null && listing !== undefined && filed === null && (action?.kind !== 'installed' || opens !== null || pastes) && (trust?.kind === 'changed' || !untrusted));
+  const doable = $derived(listing !== null && listing !== undefined && filed === null && ((action?.kind !== 'installed' && action?.kind !== 'taken') || opens !== null || pastes) && (trust?.kind === 'changed' || !untrusted));
 
   const publisherWords = $derived(
     !listing
@@ -677,7 +680,7 @@
     <Button weight="primary" href={at(`/p/${opens.id}`)}>{words.open(opens.title)}</Button>
   {:else if action?.kind === 'installed' && pastes}
     <Button weight="primary" href={at('/settings/ingest#texts')}>{words.pasteText}</Button>
-  {:else if action?.kind === 'installed'}
+  {:else if action?.kind === 'installed' || action?.kind === 'taken'}
     <Button weight="primary" disabled>{label}</Button>
   {:else if trust?.kind === 'changed'}
     <Button disabled={trusting} onclick={() => void trustKey()}>Trust this key</Button>
@@ -780,6 +783,28 @@
         </Tile>
       </div>
 
+      <!-- WHAT IT ASKS FOR, RIGHT AFTER WHAT IT ADDS (store lane E): it is the decision, so it is read before its pages,
+           beside the lead on a desk and next on a phone. In plain words: the lists of yours it reads or changes, what it sends where and with which key,
+           its scripts and its agents' skills, read from the file it would install. Nothing else is within its reach. -->
+      {#if asks}
+        <div class="third-cell calls-cell">
+          <Tile icon="lock" title={asksWords.title}>
+            <ul class="log">
+              {#each asks as line, i (i)}<li class="log-row loud">{line}</li>{/each}
+            </ul>
+            <p class="quiet">{asksWords.note}</p>
+          </Tile>
+        </div>
+      {:else if reach && reach.calls_out.length > 0}
+        <div class="third-cell calls-cell">
+          <Tile icon="globe" title={words.calls} count={reach.calls_out.length}>
+            <ul class="log">
+              {#each reach.calls_out as call, i (i)}<li class="log-row loud">{callSaid(call)}</li>{/each}
+            </ul>
+          </Tile>
+        </div>
+      {/if}
+
       <!-- ITS PAGES, DRAWN: the use case's rail and Home, or an add-on's pages through the real renderer, each on a well of
            the ground's colour inside the tile. A listing with no drawing has no tile for one: what it adds already names
            its pages. A drawing that could not be read says so. -->
@@ -800,27 +825,6 @@
             {:else}
               <p class="quiet">{preview.state === 'refused' ? preview.fix : words.noPreview}</p>
             {/if}
-          </Tile>
-        </div>
-      {/if}
-
-      <!-- WHAT IT ASKS FOR, IN PLAIN WORDS: the lists of yours it reads or changes, what it sends where and with which key,
-           its scripts and its agents' skills, read from the file it would install. Nothing else is within its reach. -->
-      {#if asks}
-        <div class="third-cell calls-cell">
-          <Tile icon="lock" title={asksWords.title}>
-            <ul class="log">
-              {#each asks as line, i (i)}<li class="log-row loud">{line}</li>{/each}
-            </ul>
-            <p class="quiet">{asksWords.note}</p>
-          </Tile>
-        </div>
-      {:else if reach && reach.calls_out.length > 0}
-        <div class="third-cell calls-cell">
-          <Tile icon="globe" title={words.calls} count={reach.calls_out.length}>
-            <ul class="log">
-              {#each reach.calls_out as call, i (i)}<li class="log-row loud">{callSaid(call)}</li>{/each}
-            </ul>
           </Tile>
         </div>
       {/if}
@@ -861,6 +865,10 @@
               <dd>{words.examples(adds ? adds.examples : (reach?.examples ?? 0))}</dd>
             {/if}
           </dl>
+          <!-- SOMEBODY ELSE'S ADD-ON FROM THE STORE CAN BE REPORTED to the person who reviews it (Lane H). -->
+          {#if listing.source === 'kennel' && !ours && listing.kind !== 'module'}
+            <Report kind={listing.kind === 'usecase' ? 'usecase' : 'pack'} id={listing.id} version={latest?.version} />
+          {/if}
         </Tile>
       </div>
     </div>
@@ -954,7 +962,8 @@
       grid-column: 1 / -1;
     }
 
-    .tiles:has(.calls-cell) .versions-cell {
+    /* THE LEAD HOLDS ITS COLUMN WHILE WHAT IT ADDS AND WHAT IT ASKS FOR STACK BESIDE IT. */
+    .tiles:has(.calls-cell) .lead-cell {
       grid-row: span 2;
     }
   }

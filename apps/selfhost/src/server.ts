@@ -58,7 +58,7 @@ import { cutOffReadable, mayPropose } from '@braindog/kernel';
 import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
 import { keyLockout, nearPeer, ONE_PLACE, peerSlowFor, placeOf, proxied, slowedLine, type KeyLockout, type PeerSlow, type Place, type ProxyTrust } from './key-lockout.ts';
-import { catalogueAnswer, catalogueFolder, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
+import { catalogueAnswer, catalogueFolder, catalogueNoticesFrom, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
 import { serveKennelTo, servesKennel, type KennelDeps } from './kennel.ts';
 import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, signCopies, type FileSnapshots } from './snapshots.ts';
@@ -92,7 +92,7 @@ import { pagedRunner } from '@braindog/host/connector';
 import { replayUsage } from '@braindog/host/actions';
 import { serveAsks } from '@braindog/host/slash-answers';
 import { backgroundMeter, queryVector, serveModelJobs } from '@braindog/host/model-jobs';
-import { grantNamed, holdingScript } from '@braindog/host/script';
+import { grantNamed, holdingScript, scriptState } from '@braindog/host/script';
 import { askerOf, scriptTrial, trialSandbox } from '@braindog/host/script-try';
 import { runInQuickJs } from '@braindog/script/quickjs';
 import { outboundHeld, scriptSandbox } from './script.ts';
@@ -1583,7 +1583,7 @@ export async function start(options: {
         resolve: on?.resolve,
         rehearseOnThisMachine: on?.rehearseOnThisMachine,
       });
-      script ??= scriptSandbox(api, { openKey, send: on?.send, resolve: on?.resolve, now: clock.now, clock: options.scriptClock, outbound: on ? 'on' : 'off' });
+      script ??= scriptSandbox(api, { openKey, send: on?.send, resolve: on?.resolve, now: clock.now, clock: options.scriptClock, outbound: on ? 'on' : 'off', answers });
       /* A CONNECTOR PAGES AND THE EXECUTOR ABOVE CANNOT. Without this the kernel finishes the row
          and meters it `dropped`, which is honest but means no self-host ever runs a connector. */
       paged ??= pagedRunner(api, {
@@ -1835,6 +1835,8 @@ export async function start(options: {
                 send: actions.send ?? pinnedSend,
                 pin: pinFor(actions.resolve ?? systemResolve),
                 openKey: actions.openKey ?? keyOpener(api, options.keys, askerOf(d)),
+                /* `ctx.notify` AND `ctx.store` IN A TRIAL: checked against the record, never applied. */
+                state: scriptState(api),
                 now: clock.now,
               }),
               ledger: { mayRun: (r, a, p) => (ledger ? ledger.mayRun(r, a, p) : null), meter: (r, run) => ledger?.meter(r, run) },
@@ -1864,6 +1866,7 @@ export async function start(options: {
        the arranger: the folder first, then the public Kennel (`kennel.ts` `kennelReader`), so an add-on published only
        to the Kennel installs by its id here as on the Cloud. With BRAINDOG_KENNEL=off, the folder alone. */
     catalogueOffers: catalogueOffersFrom(catalogueDir, options.kennel),
+    catalogueNotices: catalogueNoticesFrom(catalogueDir, options.kennel),
     catalogueShelf: catalogueShelfFrom(catalogueDir, options.kennel),
     snapshots: kept,
     destroy,

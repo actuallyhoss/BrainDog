@@ -36,7 +36,10 @@ import { columnsFault, readAddColumn, type PageColumnAddition } from './add-colu
 export { addressFault, addressFaults, listingFault } from './address.ts';
 import { holdsOf, resolveWhen, settleWhen } from './when.ts';
 import { scriptSources, type ScriptSource } from './script-source.ts';
+import { mayLinesOf, type MayLine } from './may-lines.ts';
 import { usesFault, usesSaid } from './uses.ts';
+import { migrateDue, readMigrate, type Migrates, type PackMigrate } from './migrate.ts';
+export { migrateDue, readMigrate, type Migrates, type PackMigrate } from './migrate.ts';
 export { USES_MOST, usesFault, usesFilled, usesOf, usesSaid, type Use } from './uses.ts';
 import { namerOf, writesLine, writesOf, type Writes } from './calls-out-writes.ts';
 export { holdsIn, holdsOf, resolveWhen, settleWhen, type Waiting } from './when.ts';
@@ -91,6 +94,30 @@ const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$/;
 
 export const PACK_SOURCES = ['kennel', 'url', 'git', 'paste', 'local'] as const;
 export type PackSource = { kind: (typeof PACK_SOURCES)[number]; ref?: string };
+
+/**
+ * WHERE AN INSTALLED ADD-ON'S UPDATES COME FROM, read off the `source` its `pack` row keeps (the WordPress `Update URI`
+ * fix). Updates were matched by id alone, so an add-on made here or installed from GitHub as `watch-list` would have
+ * been offered the store's `watch-list` as its update the day somebody published one, and the store's file would have
+ * replaced the person's own.
+ *
+ * - `store`: the store index, by id. `kennel`, and `local`: BrainDog's own modules go in as `local`, and so did every
+ *   store install before the source was written, so `local` stays the store's. No row at all (a pack the seed owns by
+ *   its body) is BrainDog's own too.
+ * - `git`: tags on the repository it came from, never the store.
+ * - `none`: `paste` (made in this BrainDog, by a person or an agent) and `url` (a link pasted once). Nothing is offered;
+ *   a new version is a new file, proposed by whoever made it.
+ *
+ * ONE READER, so the record's night pass, Slash, the store page and the agent's `addons` call all decide alike.
+ */
+export type UpdateChannel = 'store' | 'git' | 'none';
+export function updateChannel(source: string | null | undefined): UpdateChannel {
+  if (source === 'git') return 'git';
+  if (source === 'paste' || source === 'url') return 'none';
+  return 'store';
+}
+/** Whether the store's newer version of an add-on with this id is its update (`updateChannel` is `store`). */
+export const updatesFromStore = (source: string | null | undefined): boolean => updateChannel(source) === 'store';
 
 export type PackDeclaration = { kind: DeclKind; id: string; body: Record<string, Json>; canonical: string };
 /**
@@ -196,6 +223,11 @@ export type Manifest = {
    */
   hands?: Record<string, string>;
   /**
+   * The one script a major version runs, once, to move the entries the older major kept into this shape (`migrate.ts`).
+   * Absent when it moves nothing. In the checksum: what the person approved is the source that runs.
+   */
+  migrate?: PackMigrate;
+  /**
    * Fields and enum values this pack lays on lists other packs own, by list id: `{ 'register.people': { values: { role:
    * ['family'] } } }`. Absent when it lays nothing.
    *
@@ -234,6 +266,12 @@ export type Manifest = {
    * that names a place it did not list here is refused. In the checksum, because it is what a person is asked.
    */
   uses?: string[];
+  /** The tools it gives the record's agents (`pack-actions.ts`). In the checksum: a tool is what an agent may start. */
+  tools?: PackTool[];
+  /** What it puts in the app's command bar. In the checksum. */
+  commands?: PackCommand[];
+  /** The actions it puts on a list's rows. In the checksum. */
+  row_actions?: PackRowAction[];
 };
 
 /**
@@ -252,6 +290,8 @@ export type PageAddition = { page: string; block: Record<string, Json>; after?: 
 export { ADD_COLUMNS_MOST, columnsFault, readAddColumn, type PageColumnAddition } from './add-column.ts';
 import type { PackWidget } from './pack-widgets.ts';
 import { readPackWidgets } from './pack-widgets.ts';
+import { readPackActions, type PackCommand, type PackRowAction, type PackTool } from './pack-actions.ts';
+export { COMMAND_ASK_TYPES, PACK_COMMANDS_MOST, PACK_ROW_ACTIONS_MOST, PACK_TOOLS_MOST, readPackActions, TOOL_ARG_TYPES, type PackActions, type PackCommand, type PackRowAction, type PackTool } from './pack-actions.ts';
 export { PACK_WIDGET_FOR, PACK_WIDGET_GROUPS, PACK_WIDGET_SIZES, PACK_WIDGETS_MOST, readPackWidgets, type PackWidget, type PackWidgetBlank } from './pack-widgets.ts';
 
 /* WHO HOLDS A LIST'S ROWS is `hand.ts`'s, so a page that reads it does not carry the planner. */
@@ -566,6 +606,12 @@ export type Diff = {
    * add. Absent when it ships none. Nothing is placed: a widget goes on Today only when somebody adds it.
    */
   widgets?: { id: string; title: string }[];
+  /** The tools it gives the record's agents, by name, with what each says and whether it may change rows. Absent when none. */
+  tools?: { name: string; says: string; writes: boolean }[];
+  /** What it puts in the command bar, by title. Absent when nothing. */
+  commands?: { id: string; title: string }[];
+  /** The actions it puts on rows, by list and title. Absent when none. */
+  row_actions?: { list: string; title: string }[];
   /** Every rule that would generate rows, with the ceiling it declares. */
   spawns: { rule: string; register: string; bound: number; when: string }[];
   /**
@@ -619,6 +665,11 @@ export type Diff = {
   approve: string[];
   /** Rules that would interrupt somebody rather than wait for the digest. */
   interrupts: string[];
+  /**
+   * What it may do beyond lists and calls out (`may-lines.ts`): send you notices, ask Slash's model, a view that adds or
+   * changes rows. Each `new` line is in `approve` too. Absent when it says none, so every other plan reads as before.
+   */
+  may?: MayLine[];
   /** By construction: a pack declares shape and seeds examples, and has no verb that reads a row. */
   touches: { rows_read: 0; rows_written: 0 };
   /** Rows that would be left under a retired register. Above zero is a refusal at install, unless he pressed it (`InstallOptions`). */
@@ -686,6 +737,11 @@ export type Diff = {
    * (`address.ts`). Absent when it holds none, which is every plan made before the check and every add-on that passes.
    */
   remote?: Refusal;
+  /**
+   * The move of your entries this update runs, inside its own transaction, when the file's `migrate` is due (`migrate.ts`):
+   * the versions and the author's line. Absent when it runs none. Said on the plan as "Moves your entries".
+   */
+  migrates?: Migrates;
   planHash: string;
 };
 
@@ -872,6 +928,9 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   if (!uses.ok) return no<Pack>(uses.refusal.code, uses.refusal.fix, { at: 'uses' });
   const unasked = usesFault(doc);
   if (unasked) return no<Pack>(unasked.code, unasked.fix, { at: 'uses' });
+  /* THE MOVE OF YOUR ENTRIES A MAJOR VERSION CARRIES, read here so the checksum holds its source (`migrate.ts`). */
+  const migrate = readMigrate(doc.migrate);
+  if (!migrate.ok) return { ok: false, refusal: migrate.refusal };
   const manifest: Manifest = {
     pack: id,
     version,
@@ -892,6 +951,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     ...(skills.value.length === 0 ? {} : { skills: skills.value }),
     ...(widgets.value.length === 0 ? {} : { widgets: widgets.value }),
     ...(uses.value === null ? {} : { uses: uses.value }),
+    ...(migrate.value === null ? {} : { migrate: migrate.value }),
   };
 
   /* A PACK WHOSE ONLY CONTENT IS `extends`, `adds` OR `hands` CHANGES SOMETHING (a pack that hands everything it had to another, Roadmap 2.0.0, is the add-on that is part of Work now), so it has no declarations to list and is not
@@ -1053,6 +1113,11 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   }
   if (declarations.length === 0 && manifest.extends === undefined && manifest.adds === undefined && manifest.hands === undefined && manifest.widgets === undefined)
     return malformed(`${id} declares nothing, so installing it would change nothing.`, 'declarations');
+
+  /* WHO MAY START ITS SCRIPTS, read once the scripts are known: each tool, command and row action names one of them. */
+  const actions = readPackActions(doc, declarations);
+  if (!actions.ok) return actions as Result<Pack>;
+  Object.assign(manifest, actions.value);
 
   /**
    * EVERY PLACEHOLDER NAMES A SETTING THIS PACK DECLARES, AND THAT SETTING HAS A DEFAULT. The first
@@ -2208,6 +2273,8 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
   };
   const calls = callsOf(pack, installed);
   const scripts = scriptSources(pack.declarations, installed);
+  /* WHAT IT MAY DO BEYOND ROWS AND CALLS OUT (phase 4): notices, the model, a view that writes. Approved as calls out are. */
+  const may = mayLinesOf(pack.declarations, installed.declarations);
 
   const said: Omit<Diff, 'planHash'> = {
     pack: {
@@ -2236,10 +2303,17 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     seeds: { count: seedsFor(pack, adds).length, registers: seedRows(seedsFor(pack, adds)) },
     ...(pack.manifest.skills === undefined ? {} : { skills: pack.manifest.skills.map((s) => ({ name: s.name, trigger: s.trigger, what: s.what ?? null })) }),
     ...(pack.manifest.widgets === undefined ? {} : { widgets: pack.manifest.widgets.map((w) => ({ id: w.id, title: w.title })) }),
+    ...(pack.manifest.tools === undefined ? {} : { tools: pack.manifest.tools.map((t) => ({ name: t.name, says: t.says, writes: t.writes === true })) }),
+    ...(pack.manifest.commands === undefined ? {} : { commands: pack.manifest.commands.map((c) => ({ id: c.id, title: c.title })) }),
+    ...(pack.manifest.row_actions === undefined ? {} : { row_actions: pack.manifest.row_actions.map((a) => ({ list: a.list, title: a.title })) }),
     spawns: spawnsOf(pack),
     calls_out: calls,
     scripts,
-    approve: approvalLines(calls.filter((c) => c.change !== 'same').map((c) => ({ key: c.grant, line: c.line, key_line: c.key_line }))),
+    approve: [
+      ...approvalLines(calls.filter((c) => c.change !== 'same').map((c) => ({ key: c.grant, line: c.line, key_line: c.key_line }))),
+      ...may.filter((m) => m.change === 'new').map((m) => m.line),
+    ],
+    ...(may.length === 0 ? {} : { may }),
     interrupts: interruptsOf(pack),
     touches: { rows_read: 0, rows_written: 0 },
     orphans,
@@ -2253,6 +2327,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     unresolved,
     base,
     ...(remote === null ? {} : { remote }),
+    ...(migrateDue(pack.manifest.migrate, was, pack.manifest.version) ? { migrates: { from: was as string, to: pack.manifest.version, says: (pack.manifest.migrate as PackMigrate).says } } : {}),
   };
   /* THE INTEGER HALF CATCHES A RECORD THAT MOVED and the hash half catches a PACK that was edited
      between the plan and the install — which no version number can see, and which is exactly what
@@ -3570,7 +3645,15 @@ export function installFault(pack: Pack, diff: Diff, options: InstallOptions = {
  * caller that updates by itself passes it (`installHeld`, the quiet updates, `firstPartyTick`), so an update nobody
  * pressed is refused as before and counted lost.
  */
-export type InstallOptions = { retireWithRows?: boolean };
+export type InstallOptions = {
+  retireWithRows?: boolean;
+  /**
+   * What the caller does inside the install's own transaction, after the declarations, retires and seeds have landed
+   * and before the pack row says the new version: an update's move of entries (`Diff.migrates`), or entries put back
+   * from the bin. A refusal rolls the whole install back, so the version held stays as it was.
+   */
+  within?: () => Result<unknown>;
+};
 
 /**
  * A pattern this version hands on whose door it also stops declaring, and whose `hands` does not send that door to the
@@ -4070,7 +4153,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   if (diff.approve.length > 0 && approve.length === 0)
     return no<Applied>(
       'REQUIRED_MISSING',
-      `${diff.pack.id} calls other services. Approve the ${diff.approve.length === 1 ? 'line' : `${diff.approve.length} lines`} its plan calls out, then install.`,
+      `${diff.pack.id} ${diff.calls_out.some((c) => c.change !== 'same') ? 'calls other services' : 'asks for more than lists and pages'}. Approve the ${diff.approve.length === 1 ? 'line' : `${diff.approve.length} lines`} its plan shows, then install.`,
       { at: 'approve' },
     );
   if (approve.length !== diff.approve.length || approve.some((line, i) => line !== diff.approve[i]))
@@ -4170,6 +4253,14 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         if (row?.ok === true && row.value === null) continue;
         if (row?.ok === true) refreshed += 1;
         remembered.set(seed.key, row?.ok === true ? { ...was, fields: { ...was.fields, ...changes } } : was);
+      }
+
+      /* WHAT THE CALLER DOES INSIDE THE SAME TRANSACTION (`InstallOptions.within`), after the shape has changed and before
+         the pack row says so: a refusal here leaves the version held exactly as it was. */
+      if (options.within !== undefined) {
+        const done = options.within();
+        if (!done.ok) throw new Rolled(done as { ok: false; refusal: Refusal });
+        host.reload();
       }
 
       host.remember({

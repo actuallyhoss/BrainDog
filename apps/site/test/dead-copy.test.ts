@@ -29,8 +29,8 @@ const SRC = new URL('../src/', import.meta.url);
 const HELD_WORDS = new Map<string, (typeof HELD)[number]>([
   ['changelog', '/changelog'],
   ['meta.changelog', '/changelog'],
-  ['packs', '/packs'],
-  ['meta.packs', '/packs'],
+  ['packs', '/addons'],
+  ['meta.packs', '/addons'],
 ]);
 
 /** The area files `copy.ts` spreads into `site`, by the name each exports. */

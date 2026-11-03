@@ -24,7 +24,11 @@ export type Refusal = { code: string; fix: string; at?: string | undefined; allo
 export type Answer<T> = { ok: true; value: T } | { ok: false; refusal: Refusal };
 
 /** One pack, on or off, as `packs` answers. `version` is `null` for a pack the seed owns by its bodies. */
-export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
+/**
+ * `source` is where it came from, said only when the store does not keep it current (`paste`, `url`, `git`): the record
+ * leaves it out for everything the store updates, so its absence reads as the store's.
+ */
+export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[]; source?: string | null };
 
 /** What `disablePack` and `enablePack` answer. */
 export type PackToggle = { id: string; state: 'enabled' | 'disabled'; changed: boolean; packs: string[]; declarations: string[]; said: string };
@@ -48,12 +52,12 @@ export type Source = {
   config(id: string): Promise<Answer<PackConfig>>;
   /** Only the settings that changed. `null` puts one back to its default. */
   setConfig(id: string, values: Record<string, unknown>): Promise<Answer<ConfigSaved>>;
-  /** Take an add-on back out. Its declarations go and its rows stay. */
-  uninstall(id: string): Promise<Answer<Uninstalled>>;
+  /** Take an add-on back out. Its declarations go and its rows stay, or with `data` go to the bin until it is installed again. */
+  uninstall(id: string, data?: boolean): Promise<Answer<Uninstalled>>;
 };
 
-/** What `uninstallPack` answers, with only the key read here. */
-export type Uninstalled = { id: string };
+/** What `uninstallPack` answers, with only the keys read here: with its data, how many entries went to the bin, by list. */
+export type Uninstalled = { id?: string; binned?: Record<string, number>; kept?: number };
 
 /** What a refused switch draws, and what its one button would send. */
 export type Blocked =
@@ -95,7 +99,7 @@ export type Caller = {
   enablePack(args: { id: string }): Promise<Wire<PackToggle>>;
   packConfig(args: { id: string }): Promise<Wire<unknown>>;
   setPackConfig(args: { id: string; values: Record<string, unknown> }): Promise<Wire<unknown>>;
-  uninstallPack(args: { id: string }): Promise<Wire<unknown>>;
+  uninstallPack(args: { id: string; data?: boolean }): Promise<Wire<unknown>>;
 };
 
 /** The client's three arms as two. None of these calls sends a version, so a conflict is only a race. */
@@ -114,7 +118,7 @@ export function live(client: Caller): Source {
     enable: async (id) => said(await client.enablePack({ id })),
     config: async (id) => said(await client.packConfig({ id })) as Answer<PackConfig>,
     setConfig: async (id, values) => said(await client.setPackConfig({ id, values })) as Answer<ConfigSaved>,
-    uninstall: async (id) => said(await client.uninstallPack({ id })) as Answer<Uninstalled>,
+    uninstall: async (id, data) => said(await client.uninstallPack({ id, ...(data === true ? { data: true } : {}) })) as Answer<Uninstalled>,
   };
 }
 

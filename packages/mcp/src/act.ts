@@ -91,14 +91,25 @@ export const ASKS: Readonly<Record<string, (args: Record<string, unknown>) => As
      lacks. Asked with the id alone, the record looked it up in the catalogue and answered that nothing by that name is on
      offer, so an add-on an agent wrote could never reach the person. The record still plans the file itself and refuses
      one sent for an id the store holds (`arrange.ts` `prepare`), so a file cannot pass itself off as a listed add-on. */
+  /* OR A FILE ON GITHUB, `{ source: { kind: "git", ref: "owner/repo@v1.2.0:x.pack.json" } }`: the record reads it, pins it to
+     the commit and plans it (`arrange.ts` `prepare`), and the question says the repository and that nobody reviewed it. */
   installPack: (a) =>
-    ((id, doc) =>
+    map(a.source)?.kind === 'git' && text(map(a.source)?.ref) !== null
+      ? ((ref) => ({ question: `Add the add-on from GitHub at ${ref}? Not reviewed by BrainDog.`, body_kind: 'pack' as const, body: { source: { kind: 'git', ref } }, cause: `act:installPack:git:${ref}` }))(
+          String(text(map(a.source)?.ref)).replace(/^git:/u, ''),
+        )
+      : ((id, doc) =>
       id === null
         ? null
         : { question: `Add ${text(doc?.title) ?? id}?`, body_kind: 'pack', body: { install: id, ...(doc === null ? {} : { doc }) }, cause: `act:installPack:${id}${doc === null ? '' : `@${text(doc.version) ?? ''}:${shortHash(JSON.stringify(doc))}`}` })(
       text(a.id) ?? text(map(a.doc)?.pack) ?? text(map(map(a.doc)?.manifest)?.id) ?? text(map(a.doc)?.id),
       map(a.doc),
     ),
+  /* PUBLISH AN ADD-ON MADE HERE TO THE STORE: the record files it with the title and version held now (`arrange.ts`), and
+     the owner's browser signs and sends the file on the yes. GitHub is never asked: `publishAddon {to: "github"}`
+     answers the line the person runs. */
+  publishAddon: (a) =>
+    ((id) => (id === null || (a.to !== undefined && a.to !== 'store') ? null : { question: `Publish ${id} to the BrainDog store?`, body_kind: 'pack', body: { publish: id, to: 'store' }, cause: `act:publishAddon:${id}` }))(text(a.id)),
   setPackConfig: (a) => {
     const id = text(a.id) ?? text(a.pack);
     const values = map(a.values);

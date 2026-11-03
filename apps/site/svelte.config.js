@@ -34,9 +34,10 @@ export default {
         if (status === 404 && HELD.includes(path)) return;
         throw new Error(message);
       },
-      /* `/packs/[id]` names no page while the packs are held, so it is never reached; anything else unseen still stops the build. */
+      /* `/addons/[id]` and `/addons/by/[who]` name no page while the store is held, so they are never reached; anything
+         else unseen still stops the build. */
       handleUnseenRoutes: ({ routes, message }) => {
-        if (held() && routes.every((r) => r === '/packs/[id]')) return;
+        if (held() && routes.every((r) => r === '/addons/[id]' || r === '/addons/by/[who]')) return;
         throw new Error(message);
       },
     },

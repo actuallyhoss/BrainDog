@@ -385,6 +385,11 @@ export const ADMIN_JS = String.raw`'use strict';
     li.appendChild(el('span', 'what', addsOf(version.reach)));
     li.appendChild(el('span', 'what', usesOf(version.reach)));
     li.appendChild(el('span', 'what', asksOf(version.reach)));
+    /* What the Kennel marked for a second look: a name close to one listed, and what this version reaches that the one
+       before did not. Then the model's note, said as the model's: it reads the file and decides nothing. */
+    (Array.isArray(item.flags) ? item.flags : []).forEach(function (f) { li.appendChild(el('span', 'what', 'Look twice: ' + f)); });
+    (Array.isArray(item.added) ? item.added : []).forEach(function (a) { li.appendChild(el('span', 'what', 'New in this version: ' + a)); });
+    if (item.note && item.note.text) li.appendChild(el('span', 'what', "The model's note, which decides nothing: " + item.note.text));
     li.appendChild(el('span', 'state waiting', 'Waiting for review'));
     var why = el('input');
     why.type = 'text';
@@ -421,6 +426,15 @@ export const ADMIN_JS = String.raw`'use strict';
       list.textContent = '';
       say('addons-said', items.length === 0 ? 'Nothing is waiting.' : '');
       items.forEach(function (item) { list.appendChild(addon(item)); });
+      /* AND WHAT PEOPLE REPORTED, newest first, under the queue: an add-on already listed that someone says is wrong. */
+      var reports = Array.isArray(value.reports) ? value.reports : [];
+      reports.slice(0, 20).forEach(function (r) {
+        var li = el('li');
+        li.appendChild(el('span', 'name', 'Reported: ' + String(r.id) + (r.version ? ' ' + String(r.version) : '')));
+        li.appendChild(el('span', 'what', String(r.why)));
+        li.appendChild(el('span', 'meta', 'By ' + String(r.by) + ', ' + String(r.at).slice(0, 10)));
+        list.appendChild(li);
+      });
     }, failed('addons-said'));
   }
 

@@ -67,6 +67,9 @@ export const words = {
     `Reads ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(ways)} you forward, and files each as it comes in`,
   readsSentIn: 'Reads what you forward, and files each as it comes in',
   changes: 'Changes',
+  /* AN UPDATE THAT MOVES ENTRIES (`Diff.migrates`, phase 8): the author's line, and what happens when it fails. */
+  migrates: 'Moves your entries',
+  migratesLine: (from: string, to: string) => `from ${from} to ${to}, tried first. If any entry will not move, nothing changes and you keep ${from}.`,
   retires: 'Takes away',
   keepsRows: (n: number) => (n === 0 ? 'holds nothing' : n === 1 ? 'the 1 item in it stays in your BrainDog' : `the ${n.toLocaleString('en-GB')} items in it stay in your BrainDog`),
   moves: 'Hands on',
@@ -96,6 +99,11 @@ export const words = {
      the record already has by that name is left as it is. */
   skills: 'Skills it gives your agents',
   skillLine: (trigger: string, what: string) => [what, trigger === '' ? '' : `For: ${trigger}`].filter((x) => x !== '').join(' ') || 'A skill your agents can use',
+  tools: 'Tools it gives your agents',
+  toolLine: (says: string, writes: boolean) => `${says || 'A tool your agents can call'}${writes ? ' It may change rows, as whoever calls it.' : ''}`,
+  commandsAdded: 'In the command bar',
+  rowActions: 'Actions on rows',
+  rowActionOn: (list: string) => `On ${list} rows`,
   spawns: 'Rules that add things',
   spawnLine: (register: string, bound: number, when: string) => `adds to ${register}, at most ${bound.toLocaleString('en-GB')} ${when}`.trim(),
   interrupts: 'Rules that interrupt you',
@@ -111,6 +119,8 @@ export const words = {
   callsNote: 'Approving this approves these once, and none of them runs until you do.',
   touches: 'Installing it reads and changes nothing you have written.',
   uses: 'Once it is in, it may use',
+  may: 'It may also',
+  mayNote: 'Approving this approves these too. Each one is checked every time it runs.',
   usesNote: 'Only these. An add-on cannot reach a list it does not name.',
   needs: (name: string, range: string, has: string | null) => (has ? `Needs ${name} ${range}, and you have ${has}` : `Needs ${name} ${range}, which you do not have`),
   breaks: (name: string, version: string, range: string) => `${name} ${version} needs ${range} of this, which this version is not`,
@@ -134,6 +144,7 @@ export type SectionKey =
   | 'adds'
   | 'changes'
   | 'retires'
+  | 'migrates'
   | 'moves'
   | 'kept'
   | 'stays'
@@ -142,6 +153,9 @@ export type SectionKey =
   | 'settings'
   | 'examples'
   | 'teaches'
+  | 'tools'
+  | 'commands'
+  | 'row-actions'
   | 'spawns'
   | 'interrupts'
   | 'worth';
@@ -399,6 +413,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
         folded.size,
       ),
       ...section('changes', words.changes, list(d.changes).map((c) => row(name(text(c.id)), text(c.summary) || null))),
+      ...section('migrates', words.migrates, isMap(d.migrates) ? [row(text(d.migrates.says), words.migratesLine(text(d.migrates.from), text(d.migrates.to)))] : []),
       ...section('retires', words.retires, retires.filter((r) => typeof r.to !== 'string').map((r) => row(name(text(r.id)), words.keepsRows(count(r.rows))))),
       ...section('moves', words.moves, retires.filter((r) => typeof r.to === 'string').map((r) => row(name(text(r.id)), words.movesTo(name(text(r.to)))))),
       ...section('kept', words.kept, list(d.kept).map((k) => {
@@ -419,6 +434,9 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
       })),
       ...section('examples', words.examples, count(seeds.count) === 0 ? [] : [row(words.examplesLine(count(seeds.count)), seedRows.map((r) => `${name(`register.${text(r.register)}`)} ${words.examplesIn(count(r.rows))}`).join(', ') || null)]),
       ...section('teaches', words.skills, list(d.skills).map((s) => row(text(s.name).replace(/-/gu, ' '), words.skillLine(text(s.trigger), text(s.what))))),
+      ...section('tools', words.tools, list(d.tools).map((t) => row(text(t.name).replace(/[-_]/gu, ' '), words.toolLine(text(t.says), t.writes === true)))),
+      ...section('commands', words.commandsAdded, list(d.commands).map((c) => row(text(c.title)))),
+      ...section('row-actions', words.rowActions, list(d.row_actions).map((a) => row(text(a.title), words.rowActionOn(name(text(a.list)))))),
       ...section('spawns', words.spawns, list(d.spawns).map((s) => row(name(`rule.${text(s.rule)}`), words.spawnLine(name(`register.${text(s.register)}`), count(s.bound), text(s.when))))),
       ...section('interrupts', words.interrupts, strings(d.interrupts).map((r) => row(name(`rule.${r}`)))),
       ...section('worth', words.worth, worth),

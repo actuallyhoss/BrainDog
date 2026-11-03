@@ -77,6 +77,7 @@ import { methods as deviceRenameMethods } from './device-rename.ts';
 import { methods as renameListMethods } from './rename-list.ts';
 import { methods as packsRemovedMethods } from './packs-removed.ts';
 import { methods as addonsMethods } from './addons.ts';
+import { methods as addonToolsMethods } from './addon-tools.ts';
 import { methods as deciderMethods } from './decider.ts';
 import { methods as flowGrammarMethods } from './flow-grammar.ts';
 import { methods as huesMethods } from './hues.ts';
@@ -184,6 +185,12 @@ export type RecordDeps = {
    * before it answers in the names of every list. Absent, nobody is answered.
    */
   readsEveryList?: (ctx: CallContext) => boolean;
+  /** The host's sandbox for one run now, as `scriptTry` hands it a draft (`tryScript` in `index.ts`). Absent, an add-on's tool answers `NOT_IN_THIS_BUILD`. */
+  tryScript?: import('../index.ts').RecordDeps['tryScript'];
+  /** The reads an installed script is handed when a caller starts it, the caller's own narrowed to its `reads:` (`scriptReadsAs` in `index.ts`). */
+  scriptReadsAs?: (script: string, declared: readonly string[], ctx: CallContext) => { list(register: string, where: unknown, options?: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> };
+  /** The record's own `create`, `update` and `get` under a caller's context, so a tool's writes meet that caller's rung. */
+  writeAs?: (op: 'create' | 'update' | 'get', args: Record<string, unknown>, ctx: CallContext) => Promise<Result<unknown>>;
   /**
    * Every installed page as `kernel.pages()` answers, held while the record's version stands (`pagesNow` in `index.ts`).
    * Absent, the kernel is asked.
@@ -320,6 +327,7 @@ export function methods(deps: RecordDeps) {
     ...renameListMethods(deps),
     ...packsRemovedMethods(deps),
     ...addonsMethods(deps),
+    ...addonToolsMethods(deps),
     ...deciderMethods(deps),
     ...flowGrammarMethods(deps),
     ...huesMethods(deps),

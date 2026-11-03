@@ -12,7 +12,7 @@ import { offeredVersion, type CatalogueIndex } from '@braindog/declare/catalogue
 export type Stayed = { list: string; rows: number };
 
 /** One add-on removed inside the window, as `packsRemoved` answers it. `removed_at` is the record's instant. */
-export type Removed = { id: string; title: string; version: string; removed_at: string; stayed: Stayed[]; back: boolean };
+export type Removed = { id: string; title: string; version: string; removed_at: string; stayed: Stayed[]; back: boolean; binned?: number };
 
 /** What the part says of one: when it went, and what of it stays. */
 export type Lines = { id: string; title: string; when: string; stayed: string };
@@ -78,6 +78,7 @@ function rowOf(v: unknown): Removed | null {
     removed_at: v.removed_at,
     stayed,
     back: v.back !== false,
+    ...(typeof v.binned === 'number' && Number.isFinite(v.binned) && v.binned > 0 ? { binned: Math.floor(v.binned) } : {}),
   };
 }
 
@@ -128,6 +129,10 @@ export function versionSaid(removed: string, newest: string | null): string | nu
   if (removed === '' || newest === null || newest === removed) return null;
   return `Version ${removed} is no longer here, so Put back brings ${newest}, the newest there is.`;
 }
+
+/** Said under one removed with its data: where its entries are, and that Put back brings them. */
+export const binnedSaid = (n: number): string =>
+  `${n === 1 ? 'Its 1 entry is' : `Its ${n.toLocaleString('en-GB')} entries are`} in the bin. Put back brings ${n === 1 ? 'it' : 'them'} back too.`;
 
 /** Said under one whose settings and schedules the record no longer keeps: Put back still brings it, as new. */
 export const FRESH = 'Its settings and schedules are no longer kept, so it comes back as new.';
