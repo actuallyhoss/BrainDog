@@ -2744,10 +2744,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const subjects = subjectsOf(given).filter((s) => s.length >= 3);
     if (subjects.length === 0) return [];
     const pages = new Set<string>();
-    for (const line of sql.all<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'note' AND field LIKE 'visual:%' AND to_v IS NOT NULL")) {
+    /* AND THE WORDS OF AN ATTACHED FILE, kept as a page the same way (`attachment.ts`): a brief that names the person
+       goes with its bytes, though its file name names nobody. */
+    for (const line of sql.all<{ field: string; to_v: string }>(
+      "SELECT field, to_v FROM event WHERE kind = 'note' AND (field LIKE 'visual:%' OR field GLOB 'attached:*') AND to_v IS NOT NULL",
+    )) {
       let page: unknown;
       try {
-        page = (JSON.parse(line.to_v) as { page?: unknown }).page;
+        const said = JSON.parse(line.to_v) as { page?: unknown; text?: { sha256?: unknown } };
+        page = line.field.startsWith('attached:') ? said.text?.sha256 : said.page;
       } catch {
         continue;
       }

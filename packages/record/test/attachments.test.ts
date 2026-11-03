@@ -204,3 +204,81 @@ test('A FILE THAT HOLDS A KEY IS REFUSED, and a name is a name: no path, no cont
   assert.equal(got.kind, 'text');
   assert.equal(value<Read>(await api.attachment({ id: got.id }, owner)).name, 'notes.md');
 });
+
+test("AN ERASURE TAKES THE FILE'S BYTES AND ITS WORDS: one named for the person, one whose words name them, and none other", async () => {
+  const { sql, api, files, pages, put, task } = await record();
+  const named = pdf(['Contract terms', 'Signed 2 Nov']);
+  const brief = pdf(['Call notes', 'Mara Quill, 07700 900123']);
+  const other = pdf(['Kiln schedule', 'Cone 6 on Friday']);
+  const byName = value<{ id: string }>(await api.attachFile({ on: task, name: 'mara-quill-contract.pdf', sha256: put(named) }, owner));
+  const byWords = value<{ id: string }>(await api.attachFile({ on: task, name: 'call-notes.pdf', sha256: put(brief) }, owner));
+  const kept = value<{ id: string }>(await api.attachFile({ on: task, name: 'kiln.pdf', sha256: put(other) }, owner));
+  const pageOf = async (id: string): Promise<string> => {
+    const row = sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE id = ?", id)!;
+    return (JSON.parse(row.to_v) as { text: { sha256: string } }).text.sha256;
+  };
+  const pagesBefore = { named: await pageOf(byName.id), brief: await pageOf(byWords.id), other: await pageOf(kept.id) };
+  const weighed = Number(sql.one<{ next: number }>("SELECT next FROM counter WHERE name = 'attachment-bytes'")?.next);
+
+  value(await api.erase({ subjects: ['Mara Quill'], basis: 'Article 17 request' }, owner));
+
+  const queued = sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'erase.r2'").map((r) => JSON.parse(r.payload) as { key: string; page?: boolean });
+  const fileKeys = queued.filter((q) => q.page !== true).map((q) => q.key).sort();
+  const pageKeys = queued.filter((q) => q.page === true).map((q) => q.key).sort();
+  assert.deepEqual(fileKeys, [sha(named), sha(brief)].sort(), 'both files named or naming her are queued to go, and no other');
+  assert.deepEqual(pageKeys, [pagesBefore.named, pagesBefore.brief].sort(), 'and the pages their words were kept in');
+
+  /* THE HOST'S HALF, as both hosts run an `erase.r2` job: the key deleted from the store. */
+  for (const q of queued) (q.page === true ? pages : files).delete(q.key);
+  assert.equal(files.has(sha(other)), true, 'the file that names nobody stays');
+  assert.equal(pages.has(pagesBefore.other), true);
+
+  /* NOTHING IN THE RECORD STILL NAMES HER OR POINTS AT A FILE THAT IS GONE. */
+  const left = value<{ attachments: Listed[] }>(await api.attachments({ on: task }, owner)).attachments;
+  assert.deepEqual(left.map((a) => a.name), ['kiln.pdf']);
+  for (const id of [byName.id, byWords.id]) assert.equal(refused(await api.attachment({ id }, owner)).code, 'REF_UNKNOWN');
+  const lines = sql.all<{ to_v: string | null; note: string | null }>("SELECT to_v, note FROM event WHERE field GLOB 'attached:*'");
+  for (const l of lines) {
+    assert.ok(!`${l.to_v} ${l.note}`.toLowerCase().includes('quill'), `a line still names her: ${l.to_v} ${l.note}`);
+    assert.ok(!(l.to_v ?? '').includes(sha(named)) && !(l.to_v ?? '').includes(sha(brief)), 'a line still names erased bytes');
+  }
+  assert.deepEqual(api.kernel.attachmentTargetsNaming(sha(brief)), [], 'no thing holds the erased bytes, so the door has none to answer');
+  const weighs = Number(sql.one<{ next: number }>("SELECT next FROM counter WHERE name = 'attachment-bytes'")?.next);
+  assert.ok(weighs < weighed, 'the room they took is room again');
+});
+
+test('THE APP\'S UNDO TAKES A FILE ATTACHED OFF AGAIN, puts a removed one back, and takes a rename back', async () => {
+  const { api, put, task } = await record();
+  const got = value<{ id: string; batch: string }>(await api.attachFile({ on: task, name: 'brief.pdf', sha256: put(pdf(['Kept'])) }, owner));
+  const plan = value<{ hash: string; lines: string[] }>(await api.undo({ batch: got.batch, dry: true }, owner));
+  assert.deepEqual(plan.lines, ['Takes the file "brief.pdf" off.']);
+  value(await api.undo({ batch: got.batch, hash: plan.hash }, owner));
+  assert.deepEqual(value<{ attachments: Listed[] }>(await api.attachments({ on: task }, owner)).attachments, [], 'undoing the attach took it off');
+  assert.equal(value<Read>(await api.attachment({ id: got.id }, owner)).gone, true, 'its version stays in its history');
+
+  /* AND UNDOING A REMOVAL PUTS IT BACK. */
+  value(await api.restoreAttachment({ id: got.id }, owner));
+  const removed = value<{ batch: string }>(await api.removeAttachment({ id: got.id }, owner));
+  const again = value<{ hash: string; lines: string[] }>(await api.undo({ batch: removed.batch, dry: true }, owner));
+  assert.deepEqual(again.lines, ['Puts the file "brief.pdf" back.']);
+  value(await api.undo({ batch: removed.batch, hash: again.hash }, owner));
+  assert.deepEqual(value<{ attachments: Listed[] }>(await api.attachments({ on: task }, owner)).attachments.map((a) => [a.name, a.version]), [['brief.pdf', 1]]);
+
+  /* AND A RENAME. */
+  const renamed = value<{ batch: string }>(await api.renameAttachment({ id: got.id, name: 'Kiln brief.pdf' }, owner));
+  const named = value<{ hash: string }>(await api.undo({ batch: renamed.batch, dry: true }, owner));
+  value(await api.undo({ batch: renamed.batch, hash: named.hash }, owner));
+  assert.deepEqual(value<{ attachments: Listed[] }>(await api.attachments({ on: task }, owner)).attachments.map((a) => a.name), ['brief.pdf']);
+});
+
+test("AN AGENT'S OWN UNDO TAKES ITS FILE OFF, and a new version gives way to the one before", async () => {
+  const { api, task } = await record();
+  const first = value<{ id: string; batch: string }>(await api.attachFile({ on: task, name: 'notes.md', text: '# One' }, agent));
+  const second = value<{ id: string; batch: string; version: number }>(await api.attachFile({ on: task, name: 'notes.md', text: '# Two' }, agent));
+  assert.equal(second.version, 2);
+  const back = value<{ put: number; lines: string[] }>(await api.undoOwn({ batch: second.batch }, agent));
+  assert.deepEqual(back.lines, ['Puts the earlier version of the file "notes.md" back.']);
+  assert.equal(value<Read>(await api.attachment({ id: first.id }, agent)).text, '# One');
+  value(await api.undoOwn({ batch: first.batch }, agent));
+  assert.deepEqual(value<{ attachments: Listed[] }>(await api.attachments({ on: task }, agent)).attachments, []);
+});

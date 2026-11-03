@@ -31,6 +31,8 @@
  *
  * AND A VISUAL GOES BACK TO THE VERSION IT STOOD AT. A visual is lines in the log (`visual.ts`), so the undo appends one
  * line saying the version before, or that it is taken away, and never removes a line: a version stays in its history.
+ * AN ATTACHED FILE THE SAME WAY (`attachment.ts`): a file attached goes off again, a file taken off comes back at the
+ * version it stood at, and a rename takes its old name back, each one line on it, its bytes never touched.
  *
  * TWO STEPS AND A HASH, so a person sees what will happen before it does. `undoPlan` reads and writes nothing and
  * answers plain lines in names, never ids, with a hash of exactly what it would do. `undoApply` works the plan out
@@ -63,6 +65,7 @@ import { SESSION, SESSION_PREFIX } from './session.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { attempt } from './tx.ts';
 import { VISUAL_FIELD, isVersion, visualLines, visualSaid, visualState, type VisualLine } from './visual.ts';
+import { ATTACHED_FIELD, attachedLines, attachedSaid, attachedState, isAttachedVersion, type AttachedLine } from './attachment.ts';
 
 /* ── what is asked and what is answered ──────────────────────────────────── */
 
@@ -474,7 +477,7 @@ type Stop = { id: string; state: string; step: UndoStep };
  * `lines` are the ones the plan puts back from, only the row's under `scope.row`; `every` is every line of the scope's
  * batches, which the ladder reads for who made each.
  */
-type Worked = { plan: UndoPlan; work: Work[]; stops: Stop[]; declares: Declared[]; visuals: Pictured[]; keys: string[]; lines: Line[]; every: Line[]; decisions: string[] };
+type Worked = { plan: UndoPlan; work: Work[]; stops: Stop[]; declares: Declared[]; visuals: Pictured[]; files: Filed[]; keys: string[]; lines: Line[]; every: Line[]; decisions: string[] };
 
 /** One declaration an accepted change replaced, and the earlier version the undo installs again as a new one. */
 type Declared = {
@@ -668,7 +671,7 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
       else leftAlone.add(id);
       continue;
     }
-    notes += evs.filter((e) => e.kind === 'note' && !isVisualLine(e)).length;
+    notes += evs.filter((e) => e.kind === 'note' && !isVisualLine(e) && !isAttachedLine(e)).length;
     const changes = evs.filter((e) => e.kind !== 'note');
     if (changes.length === 0) continue;
     if (!row) {
@@ -884,10 +887,11 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
   /* A DECLARATION IS NOBODY'S ONE ROW, so under `row` none goes back and none is spoken of. */
   const declares = only.value === null ? declaredIn(sql, lines, opts, (title, why) => skip(undefined, title, why)) : [];
   const visuals = picturedIn(sql, lines, keys, opts, (title, why) => skip(undefined, title, why));
+  const files = filedIn(sql, lines, keys, opts, (title, why) => skip(undefined, title, why));
 
   /* THE ORDER IT IS WRITTEN IN, and so the order it is read in: rows back first, values next, removals last. */
   work.sort((a, b) => rank(a) - rank(b) || (a.remove && b.remove ? b.made - a.made : 0));
-  const steps = [...work.flatMap((w) => w.steps), ...declares.map((d) => d.step), ...visuals.map((v) => v.step), ...stops.map((s) => s.step)];
+  const steps = [...work.flatMap((w) => w.steps), ...declares.map((d) => d.step), ...visuals.map((v) => v.step), ...files.map((f) => f.step), ...stops.map((s) => s.step)];
   const count = steps.length;
   /* ANY OF ITS BATCHES, since a run's own bookkeeping batches are never put back and so never marked. */
   /* UNDER `row`, ONLY WHEN AN UNDO HAS PUT THAT ROW BACK SINCE: another row's undo marks the batch too, and the mark
@@ -919,9 +923,10 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
       /* ONLY WHEN THERE IS ONE, so a plan with none has the hash it always had. */
       ...(declares.length === 0 ? {} : { declares: declares.map((d) => [d.id, d.installed, d.prior]) }),
       ...(visuals.length === 0 ? {} : { visuals: visuals.map((v) => (v.draft === null ? [v.field, v.head, v.back] : [v.field, v.head, v.back, v.draft])) }),
+      ...(files.length === 0 ? {} : { files: files.map((f) => [f.field, f.head, f.says as Json]) }),
     } as unknown as Json),
   );
-  return ok({ plan: { say, lines: lineList, steps, skipped, notes, hash, already }, work, stops, declares, visuals, keys, lines, every, decisions });
+  return ok({ plan: { say, lines: lineList, steps, skipped, notes, hash, already }, work, stops, declares, visuals, files, keys, lines, every, decisions });
 }
 
 /* ── a visual a change drew ──────────────────────────────────────────────── */
@@ -988,6 +993,76 @@ function picturedIn(sql: Sql, lines: readonly Line[], keys: readonly string[], o
       draft: before.draft,
       keys: [...new Set(mine.map(keyOf))],
       step: { do: back === null && before.draft === null ? 'remove' : 'set', title, label: 'visual', line },
+    });
+  }
+  return out;
+}
+
+/* ── a file a change attached, renamed or took off ───────────────────────── */
+
+/** Whether a line is one of an attachment's (`attachment.ts`), which the plan puts back as a file and never counts as a note. */
+const isAttachedLine = (l: Line): boolean => l.kind === 'note' && typeof l.field === 'string' && l.field.startsWith(ATTACHED_FIELD);
+
+/** One attachment the scope changed, and the lines that put it back where it stood: off, back at a version, its old name. */
+type Filed = { target: string; field: string; head: number; says: Record<string, unknown>[]; keys: string[]; step: UndoStep };
+
+/**
+ * The attachments the scope changed, each back to where it stood before: a file attached goes off, one taken off comes
+ * back at the version it stood at, a new version gives way to the one before, a rename takes the old name back. One
+ * somebody changed since is left with who; one an undo of this scope already put back is passed over in silence.
+ */
+function filedIn(sql: Sql, lines: readonly Line[], keys: readonly string[], opts: UndoOptions, skip: (title: string, why: string) => void): Filed[] {
+  const groups = new Map<string, Line[]>();
+  for (const l of lines) if (isAttachedLine(l) && l.target !== null) groups.set(`${l.target} ${l.field}`, [...(groups.get(`${l.target} ${l.field}`) ?? []), l]);
+  if (groups.size === 0) return [];
+  const undoneBy = new Set(
+    sql.all<{ b: string }>('SELECT by_batch AS b FROM undone WHERE batch IN (SELECT value FROM json_each(?))', JSON.stringify(keys)).map((r) => r.b),
+  );
+  const out: Filed[] = [];
+  for (const [, mine] of groups) {
+    const target = mine[0]!.target!;
+    const field = mine[0]!.field!;
+    if (target.startsWith('entry:') && opts.reads) {
+      const list = sql.one<{ r: string }>('SELECT register AS r FROM entry WHERE id = ?', target.slice('entry:'.length))?.r;
+      if (list !== undefined && !opts.reads(list)) continue;
+    }
+    const all: AttachedLine[] = attachedLines(sql, target, field);
+    const first = mine[0]!.rowid;
+    const last = mine[mine.length - 1]!.rowid;
+    const since = all.filter((l) => l.rowid > last);
+    const title = attachedState(all).name ?? [...all].reverse().map((l) => attachedSaid(l.to_v)).find(isAttachedVersion)?.name ?? 'a file';
+    const same = (a: { standing: string | null; name: string | null }, b: typeof a): boolean => a.standing === b.standing && a.name === b.name;
+    const now = attachedState(all);
+    if (since.length > 0 && !same(now, attachedState(all.filter((l) => l.rowid <= last)))) {
+      if (since.every((l) => l.batch !== null && undoneBy.has(l.batch))) continue;
+      skip(title, `${whoIn(sql, since[since.length - 1]!.actor)} has changed it since`);
+      continue;
+    }
+    const before = attachedState(all.filter((l) => l.rowid < first));
+    if (same(before, now)) continue;
+    /* WHAT PUTS IT BACK, IN ORDER: where it stands, then its name, read as `attachedState` would read the lines after. */
+    const says: Record<string, unknown>[] = [];
+    if (before.standing !== now.standing) says.push(before.standing === null ? { gone: true } : { back: before.standing });
+    if (before.standing !== null && before.name !== null) {
+      const after = attachedState([...all, ...says.map((x, i) => ({ ...all[all.length - 1]!, rowid: Number.MAX_SAFE_INTEGER - says.length + i, id: `undo-${i}`, to_v: jcs(x as Json) }))]);
+      if (after.name !== before.name) says.push({ rename: before.name });
+    }
+    if (says.length === 0) continue;
+    const line =
+      before.standing === null
+        ? `Takes the file ${named(title)} off.`
+        : now.standing === null
+          ? `Puts the file ${named(before.name ?? title)} back.`
+          : before.standing !== now.standing
+            ? `Puts the earlier version of the file ${named(before.name ?? title)} back.`
+            : `Names the file ${named(title)} ${named(before.name ?? title)} again.`;
+    out.push({
+      target,
+      field,
+      head: all[all.length - 1]!.rowid,
+      says,
+      keys: [...new Set(mine.map(keyOf))],
+      step: { do: before.standing === null ? 'remove' : 'set', title, label: 'file', line },
     });
   }
   return out;
@@ -1298,7 +1373,7 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
   return attempt(sql, parts.transaction, () => {
     const got = worked(sql, scope, opts);
     if (!got.ok) return got;
-    const { plan, work, stops, declares, visuals, keys, lines, every, decisions } = got.value;
+    const { plan, work, stops, declares, visuals, files, keys, lines, every, decisions } = got.value;
     if (typeof hash !== 'string' || hash !== plan.hash)
       return no<UndoApplied>('PLAN_STALE', 'Something changed since this undo was shown. Look at it again, then put it back.', { at: 'hash' });
 
@@ -1434,6 +1509,26 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
       );
       done.push(v.step);
       for (const k of v.keys) picturedBack.add(k);
+    }
+
+    /* ── the files, each a line or two: off, or back at the version it stood at, and its old name ── */
+    for (const f of files) {
+      slashMayWrite(actor, 'note');
+      for (const said of f.says)
+        sql.exec(
+          "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, note, batch) VALUES (?, ?, ?, 'note', ?, ?, ?, ?, ?, ?)",
+          parts.mint(),
+          at,
+          actor,
+          f.target,
+          f.target.slice(0, f.target.indexOf(':')),
+          f.field,
+          jcs(said as Json),
+          PUT_BACK,
+          batch,
+        );
+      done.push(f.step);
+      for (const k of f.keys) picturedBack.add(k);
     }
 
     for (const s of stops) {
