@@ -245,6 +245,7 @@ import { analyse, observe, type Analysis, type Observation } from './observe.ts'
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { firstSlotMs } from './slot.ts';
 import { activeScript, clockOfScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
+import { binStore, noticesLeft, restoreStore, storeOf } from './addon-state.ts';
 import { finishScript, prepareScript, resumeScript, tryProposal, type ScriptProposal, type ScriptProposed, type ScriptRunDeps, type ScriptRunner } from './script-run.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
 import { extractPull, type ExtractDecl, type ExtractDeps, type Extraction } from './extract.ts';
@@ -834,7 +835,9 @@ export type { MetricPoint, PageWrote, PulledPage, PulledRow } from './fetched.ts
 export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
 /* `scriptBody` IS THE SHAPE CHECK A DRAFT MEETS BEFORE IT IS TRIED, the one install runs, so `scriptTry` in the record refuses
    what an install would and never runs a body the record could not hold. */
-export { egressChanged, scriptBody } from './script.ts';
+export { egressChanged, scriptBody, SCRIPT_MODEL_ASKS_MOST, SCRIPT_NOTICES_PER_DAY, SCRIPT_STORE_BYTES } from './script.ts';
+export { DRAWN_ACTION, DRAWN_ACTIONS_MOST, drawnActionsFault, drawnWrites } from './kinds/drawn.ts';
+export { binnedStoreHolder, dropStore, noticeOf, noticeSaid, NOTICE_BODY_MOST, NOTICE_TITLE_MOST, scriptOwner, STORE_KEY_MOST, storeAfter, storeHolder, storeKeyFault, type Notice, type Stored } from './addon-state.ts';
 export {
   finishScript,
   prepareScript,
@@ -9402,6 +9405,9 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* THE ONE QUESTION A RUN MAY ASK, filed through the gate's own `propose`: an `options` question whose options
        carry their patches, one open per cause, signed by the run's actor. */
     propose: (p, actor) => openSuggestion(governDeps(), actor, p),
+    /* A NOTICE FROM A SCRIPT (`ctx.notify`) IS AN ACTIVE ONE: the note on the bell always, one push an hour, and nothing
+       that sounds inside quiet hours, which `digestDeps` hands `notify` as the record's own window. */
+    tell: (said) => notify(digestDeps(), { actor: said.actor, say: said.say, level: 'active' }),
   });
 
   /**
@@ -11247,6 +11253,18 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     scriptProposal: (run: { script: string; actor: string; writes: readonly string[] }, p: unknown): Result<{ said: ScriptProposed; queued: ScriptProposal | null }> =>
       tryProposal(scriptRunDeps(), run, p),
+
+    /** How many notices an add-on's scripts may still send today (`ctx.notify`), `owner` as `scriptOwner` names it. A read. */
+    scriptNoticesLeft: (owner: string): number => noticesLeft(sql, owner, clock.now()),
+
+    /** An add-on's own store as it stands (`ctx.store`), `owner` as `scriptOwner` names it. A read. */
+    scriptStore: (owner: string): Record<string, unknown> => storeOf(sql, owner),
+
+    /** An add-on's store into the bin, removed with its data (`uninstallPack {data: true}`). Answers how many keys went. */
+    binAddonStore: (pack: string): number => binStore(sql, pack, clock.now()),
+
+    /** An add-on's binned store back, installed again inside `REMOVED_WINDOW_DAYS`. Answers how many keys came back. */
+    restoreAddonStore: (pack: string): number => restoreStore(sql, pack, clock.now(), REMOVED_WINDOW_DAYS * 86_400_000),
 
     /** Every active scheduled action: its schedule, its key by label, its last run and this month's counts. A read. */
     actions: () => listActions(sql, clock.now()),

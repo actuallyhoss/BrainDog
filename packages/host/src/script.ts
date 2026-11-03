@@ -33,8 +33,13 @@ import {
   cycleAfter,
   grantChosen,
   hostOpened,
+  noticeOf,
   PROPOSALS_PER_RUN,
   PROPOSE_CALLS,
+  SCRIPT_NOTICES_PER_DAY,
+  scriptOwner,
+  storeAfter,
+  storeKeyFault,
   type ActionRequest,
   type CycleLine,
   type Entry,
@@ -85,6 +90,21 @@ export type ScriptRunnerOptions<P> = {
    * script is handed no `ctx.propose`: a trial by an agent (`script-try.ts`) is one, since it files nothing by design.
    */
   propose?: ((s: Scripted) => ScriptProposals) | undefined;
+  /**
+   * The run's `ctx.notify` and `ctx.store` (`scriptState`), over the record's count and store. ABSENT IS A HOST THAT KEEPS
+   * NEITHER, and the script is handed neither; `finishScript` refuses a run that hands back notices with no `tell`.
+   */
+  state?: ((s: Scripted) => ScriptState) | undefined;
+  /**
+   * The run's `ctx.ask`: one question to Slash's model on the record's allowance (`scriptAsks`). ABSENT IS A HOST WITH NO
+   * MODEL, and a script that declares `model:` is handed a `ctx.ask` that answers so, as a value it reads.
+   */
+  ask?: ((s: Scripted) => ScriptAsk) | undefined;
+  /**
+   * `true` for a trial (`script-try.ts`): `ctx.notify` and `ctx.ask` are dry, checked and answered `{ ok, dry: true }`,
+   * sending nothing and spending nothing, and what `ctx.store.set` keeps is never applied, since a trial is never applied.
+   */
+  trial?: boolean | undefined;
   /** The host clock, which `ctx.now()` reads. Absent is `Date.now`. */
   now?: (() => number) | undefined;
   /**
@@ -307,6 +327,88 @@ export function scriptProposals(api: Pick<RecordApi, 'kernel'>): (s: Scripted) =
         return { ok: true, value: tried.value.said as unknown as Json };
       },
       queued: () => [...queue],
+    };
+  };
+}
+
+/** `ctx.ask` for one run: a question to Slash's model, answered `{ ok, text }` or `{ ok: false, refusal }`. */
+export type ScriptAsk = (prompt: string) => Promise<Json>;
+
+/** The longest question a script may ask the model, in characters. */
+export const ASK_CHARS = 4_000;
+
+/**
+ * `ctx.ask` over a host's Slash: the question as an automation's `ask_slash` is asked (`answer` in `@braindog/slash`), in
+ * text, metered on the record's own allowance and refused when it is spent, in Slash's words. `answer` is the host's
+ * `SlashAnswer`, or `undefined` on a host with no model, where every question is answered with a refusal the script reads.
+ */
+export function scriptAsks(answer: ((ask: { run: string; rule: string; step: number; question: string; shape: 'text' }) => Promise<unknown>) | undefined): (s: Scripted) => ScriptAsk {
+  return (s) => {
+    let step = 0;
+    return async (prompt) => {
+      const no = (code: string, fix: string): Json => ({ ok: false, refusal: { code, fix, at: 'ask' } });
+      if (prompt.trim() === '') return no('REQUIRED_MISSING', 'ctx.ask takes the question as text.');
+      if (prompt.length > ASK_CHARS) return no('OUT_OF_BOUNDS', `A question to the model is at most ${ASK_CHARS} characters.`);
+      if (answer === undefined) return no('NOT_IN_THIS_BUILD', 'This BrainDog has no model for Slash to ask, so nothing was asked.');
+      const out = (await answer({ run: s.job.id, rule: `script.${s.scripted.script}`, step: step++, question: prompt, shape: 'text' })) as
+        | { ok: true; value: { text: string } }
+        | { ok: false; refusal?: { code: string; fix: string } };
+      if (out.ok) return { ok: true, text: String(out.value.text) };
+      const r = out.refusal ?? { code: 'INTERNAL', fix: 'Slash did not answer.' };
+      return no(r.code, r.fix);
+    };
+  };
+}
+
+/** `ctx.notify` and `ctx.store` for one run, and what they queued for `finishScript`. */
+export type ScriptState = {
+  notify(said: Json): Promise<Json>;
+  storeGet(key: string): Promise<Json>;
+  storeSet(key: string, value: Json): Promise<Json>;
+  queued(): { notices: Json[]; stored: { key: string; value: Json }[] };
+};
+
+/**
+ * The run's `ctx.notify` and `ctx.store`, on either host: each notice checked (`noticeOf`) and counted against what its
+ * add-on has left today, each store change checked against the 1 MB its add-on keeps (`storeAfter`), and both queued to be
+ * applied with the run's writes. A store read sees this run's own changes first. NOTHING IS WRITTEN HERE: `finishScript`
+ * checks both again and applies them, all or nothing.
+ *
+ * A REFUSAL IS A VALUE THE SCRIPT READS, `{ ok: false, refusal }`, never a throw: the twenty-first notice of a day is
+ * news for the script, not a broken rule. Whether it may notify or keep state at all is the sandbox's to hold, from the
+ * header, before this is asked.
+ */
+export function scriptState(api: Pick<RecordApi, 'kernel'>): (s: Scripted) => ScriptState {
+  return (s) => {
+    const owner = scriptOwner({ script: s.scripted.script, pack: s.scripted.pack ?? null });
+    const notices: Json[] = [];
+    const stored: { key: string; value: Json }[] = [];
+    let store: Record<string, unknown> | null = null;
+    const now = (): Record<string, unknown> => (store ??= api.kernel.scriptStore(owner));
+    const refused = (r: { code: string; fix: string; at?: string | undefined }): Json => ({ ok: false, refusal: { code: r.code, fix: r.fix, ...(r.at === undefined ? {} : { at: r.at }) } });
+    return {
+      notify: async (said) => {
+        const one = noticeOf(said);
+        if (!one.ok) return refused('refusal' in one ? one.refusal : { code: 'VALUE_MALFORMED', fix: 'It is not a notice.' });
+        if (notices.length >= api.kernel.scriptNoticesLeft(owner))
+          return refused({ code: 'OUT_OF_BOUNDS', fix: `An add-on sends at most ${SCRIPT_NOTICES_PER_DAY} notices a day, and this one has sent them. It goes again tomorrow.`, at: 'notice' });
+        notices.push(one.value as unknown as Json);
+        return { ok: true };
+      },
+      storeGet: async (key) => {
+        const fault = storeKeyFault(key);
+        if (fault !== null) throw new Error(fault);
+        const v = now()[key];
+        return v === undefined ? null : (v as Json);
+      },
+      storeSet: async (key, value) => {
+        const after = storeAfter(now(), [{ key, value }]);
+        if (!after.ok) return refused('refusal' in after ? after.refusal : { code: 'OUT_OF_BOUNDS', fix: 'It was not kept.' });
+        store = after.value;
+        stored.push({ key, value });
+        return { ok: true };
+      },
+      queued: () => ({ notices: [...notices], stored: [...stored] }),
     };
   };
 }
@@ -588,6 +690,22 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
     const { decl } = scripted;
     const reads = options.reads?.(s);
     const proposals = options.propose?.(s);
+    /* `ctx.notify`, `ctx.store` AND `ctx.ask`, only for a header that says it may (the sandbox holds that), and dry in a
+       trial: a notice is checked and goes nowhere, and the model is not asked, so a try spends none of the allowance. */
+    const state = options.state?.(s);
+    const asked = options.ask?.(s);
+    const dry = options.trial === true;
+    /* HANDED WHATEVER THE HEADER SAYS, so a script that never said it may hears the sandbox's sentence (`FORBIDDEN`,
+       "its header does not say ...") and not a bare "not a function"; the sandbox holds the header before calling here. */
+    const extra: Partial<CtxHost> = {
+      ...(state !== undefined
+        ? { notify: dry ? async (said: Json) => { const out = (await state.notify(said)) as { ok?: boolean }; return out.ok ? { ok: true, dry: true } : (out as Json); } : state.notify }
+        : {}),
+      ...(state !== undefined ? { storeGet: state.storeGet, storeSet: state.storeSet } : {}),
+      ...(state !== undefined || asked !== undefined
+        ? { ask: dry ? async () => ({ ok: true, dry: true, text: '' }) : (asked ?? (async () => ({ ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog has no model for Slash to ask, so nothing was asked.', at: 'ask' } }))) }
+        : {}),
+    };
     /* `fold` AND `cycle` ARE HANDED BESIDE THE REST, to every script whatever it declares: one `scriptFold` and one
        `scriptCycle` a run, so the counts they keep are this run's. The Worker hands the same from its own turn
        (`apps/worker/src/script.ts`). */
@@ -595,6 +713,7 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
       fetch,
       ...(reads === undefined ? {} : { list: reads.list, get: reads.get }),
       ...(proposals === undefined ? {} : { propose: proposals.propose }),
+      ...extra,
       fold: scriptFold(scripted.script),
       cycle: scriptCycle(scripted.script),
       now: () => new Date(now()).toISOString(),
@@ -613,13 +732,24 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
         writes: decl.writes,
         ...(decl.limits === undefined ? {} : { limits: decl.limits }),
         source: decl.source,
+        ...(decl.notifies === true ? { notifies: true } : {}),
+        ...(decl.model === undefined ? {} : { model: decl.model }),
+        ...(decl.store === true ? { store: true } : {}),
       },
       host,
     );
     if (kept.stop !== null) return { refused: kept.stop, log: answer.log, usage: answer.usage };
     /* WHAT IT PROPOSED GOES BACK BESIDE ITS WRITES, for `finishScript` to file with them; a refused run files none. */
     const queued = proposals?.queued() ?? [];
-    return 'refused' in answer || queued.length === 0 ? answer : { ...answer, proposals: queued };
+    if ('refused' in answer) return answer;
+    /* AND WHAT IT TOLD AND KEPT, beside them, for `finishScript` to check again and apply with them. */
+    const held = state?.queued();
+    return {
+      ...answer,
+      ...(queued.length === 0 ? {} : { proposals: queued }),
+      ...(held === undefined || held.notices.length === 0 ? {} : { notices: held.notices }),
+      ...(held === undefined || held.stored.length === 0 ? {} : { stored: held.stored }),
+    };
   };
 }
 

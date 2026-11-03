@@ -114,6 +114,8 @@ export const words = {
   callsNote: 'Approving this approves these once, and none of them runs until you do.',
   touches: 'Installing it reads and changes nothing you have written.',
   uses: 'Once it is in, it may use',
+  may: 'It may also',
+  mayNote: 'Approving this approves these too. Each one is checked every time it runs.',
   usesNote: 'Only these. An add-on cannot reach a list it does not name.',
   needs: (name: string, range: string, has: string | null) => (has ? `Needs ${name} ${range}, and you have ${has}` : `Needs ${name} ${range}, which you do not have`),
   breaks: (name: string, version: string, range: string) => `${name} ${version} needs ${range} of this, which this version is not`,

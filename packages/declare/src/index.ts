@@ -36,6 +36,7 @@ import { columnsFault, readAddColumn, type PageColumnAddition } from './add-colu
 export { addressFault, addressFaults, listingFault } from './address.ts';
 import { holdsOf, resolveWhen, settleWhen } from './when.ts';
 import { scriptSources, type ScriptSource } from './script-source.ts';
+import { mayLinesOf, type MayLine } from './may-lines.ts';
 import { usesFault, usesSaid } from './uses.ts';
 import { migrateDue, readMigrate, type Migrates, type PackMigrate } from './migrate.ts';
 export { migrateDue, readMigrate, type Migrates, type PackMigrate } from './migrate.ts';
@@ -650,6 +651,11 @@ export type Diff = {
   approve: string[];
   /** Rules that would interrupt somebody rather than wait for the digest. */
   interrupts: string[];
+  /**
+   * What it may do beyond lists and calls out (`may-lines.ts`): send you notices, ask Slash's model, a view that adds or
+   * changes rows. Each `new` line is in `approve` too. Absent when it says none, so every other plan reads as before.
+   */
+  may?: MayLine[];
   /** By construction: a pack declares shape and seeds examples, and has no verb that reads a row. */
   touches: { rows_read: 0; rows_written: 0 };
   /** Rows that would be left under a retired register. Above zero is a refusal at install, unless he pressed it (`InstallOptions`). */
@@ -2248,6 +2254,8 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
   };
   const calls = callsOf(pack, installed);
   const scripts = scriptSources(pack.declarations, installed);
+  /* WHAT IT MAY DO BEYOND ROWS AND CALLS OUT (phase 4): notices, the model, a view that writes. Approved as calls out are. */
+  const may = mayLinesOf(pack.declarations, installed.declarations);
 
   const said: Omit<Diff, 'planHash'> = {
     pack: {
@@ -2279,7 +2287,11 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     spawns: spawnsOf(pack),
     calls_out: calls,
     scripts,
-    approve: approvalLines(calls.filter((c) => c.change !== 'same').map((c) => ({ key: c.grant, line: c.line, key_line: c.key_line }))),
+    approve: [
+      ...approvalLines(calls.filter((c) => c.change !== 'same').map((c) => ({ key: c.grant, line: c.line, key_line: c.key_line }))),
+      ...may.filter((m) => m.change === 'new').map((m) => m.line),
+    ],
+    ...(may.length === 0 ? {} : { may }),
     interrupts: interruptsOf(pack),
     touches: { rows_read: 0, rows_written: 0 },
     orphans,
@@ -4119,7 +4131,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   if (diff.approve.length > 0 && approve.length === 0)
     return no<Applied>(
       'REQUIRED_MISSING',
-      `${diff.pack.id} calls other services. Approve the ${diff.approve.length === 1 ? 'line' : `${diff.approve.length} lines`} its plan calls out, then install.`,
+      `${diff.pack.id} ${diff.calls_out.some((c) => c.change !== 'same') ? 'calls other services' : 'asks for more than lists and pages'}. Approve the ${diff.approve.length === 1 ? 'line' : `${diff.approve.length} lines`} its plan shows, then install.`,
       { at: 'approve' },
     );
   if (approve.length !== diff.approve.length || approve.some((line, i) => line !== diff.approve[i]))

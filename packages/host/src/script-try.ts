@@ -65,7 +65,7 @@ import { scriptRunner, type GrantOf, type ScriptReads, type ScriptRunnerOptions 
  */
 export type ScriptDraft = {
   record: { id: string; tz: string };
-  body: Pick<ScriptDecl, 'egress' | 'keys' | 'reads' | 'writes' | 'limits' | 'source'> & { script: string };
+  body: Pick<ScriptDecl, 'egress' | 'keys' | 'reads' | 'writes' | 'limits' | 'source'> & { script: string; notifies?: true; model?: { most_per_run: number }; store?: true };
   /** What a door would have handed it. `null`, as on a schedule, when the caller says nothing. */
   input?: Json | undefined;
   /** `ctx.config`: the draft's own pack settings, each a chosen value or its default. `{}` for a script no pack owns. */
@@ -154,7 +154,8 @@ const STALE = (label: string): string =>
 export function trialSandbox<P extends object | undefined = undefined>(options: Omit<ScriptRunnerOptions<P>, 'grantOf' | 'reads' | 'readOnly'>): TrialSandbox {
   return (s, trial) => {
     const reads = trial.reads;
-    return scriptRunner<P>({ ...options, grantOf: trial.grantOf, readOnly: trial.readOnly, ...(reads === undefined ? {} : { reads: () => reads }) })(s);
+    /* `trial: true`, SO `ctx.notify` AND `ctx.ask` ARE DRY: a try tells nobody and spends none of the model's allowance. */
+    return scriptRunner<P>({ ...options, trial: true, grantOf: trial.grantOf, readOnly: trial.readOnly, ...(reads === undefined ? {} : { reads: () => reads }) })(s);
   };
 }
 
@@ -235,6 +236,9 @@ export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) =
           writes: [...body.writes],
           ...(body.limits === undefined ? {} : { limits: body.limits }),
           source: body.source,
+          ...(body.notifies === true ? { notifies: true as const } : {}),
+          ...(body.model === undefined ? {} : { model: body.model }),
+          ...(body.store === true ? { store: true as const } : {}),
         },
         record,
       },

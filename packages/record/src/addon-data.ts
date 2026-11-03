@@ -22,7 +22,7 @@
 import type { Result } from '@braindog/ports';
 import { isRefusalCode, no, ok } from '@braindog/ports';
 import type { Pack } from '@braindog/declare';
-import { REMOVED_WINDOW_DAYS, scriptBody, type Kernel } from '@braindog/kernel';
+import { binnedStoreHolder, REMOVED_WINDOW_DAYS, scriptBody, type Kernel } from '@braindog/kernel';
 
 /** Where the batch of a removal with data is kept, by add-on id, in the record's own settings. */
 export const BINNED = 'braindog:binned';
@@ -83,8 +83,12 @@ export function binOwnRows(kernel: Kernel, lists: readonly string[], w: { actor:
  */
 export function restoreWithin(kernel: Kernel, id: string, actor: string): (() => Result<unknown>) | undefined {
   const binned = kernel.prefsOf(BINNED)[id] as Binned | undefined;
-  if (binned === undefined || typeof binned.batch !== 'string') return undefined;
+  /* WHAT ITS SCRIPTS KEPT (`ctx.store`) COMES BACK TOO, binned beside the rows and put back first; an add-on that kept
+     state and had no rows of its own to bin still gets its state back. */
+  const stored = Object.keys(kernel.prefsOf(binnedStoreHolder(id))).length > 0;
+  if (binned === undefined || typeof binned.batch !== 'string') return stored ? () => ok({ restored: 0, store_keys: kernel.restoreAddonStore(id) }) : undefined;
   return () => {
+    if (stored) kernel.restoreAddonStore(id);
     const planned = kernel.undoPlan({ batch: binned.batch });
     if (!planned.ok) return planned;
     if (planned.value.already || planned.value.steps.length === 0) {

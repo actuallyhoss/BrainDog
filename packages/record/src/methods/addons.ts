@@ -21,6 +21,7 @@
 import { listedEntries, offeredVersion, type CatalogueEntry as IndexEntry, type CatalogueIndex, type CatalogueVersion, type Reach } from '@braindog/declare/catalogue';
 import { updatesFromStore } from '@braindog/declare';
 import { FIELD_TYPES } from '@braindog/kernel';
+import { mayLinesOfDecl } from '@braindog/declare/may-lines';
 import type { Result } from '@braindog/ports';
 
 import type { CallContext } from '../index.ts';
@@ -85,6 +86,7 @@ export function reachLines(reach: Reach | undefined): string[] {
   if (reads.length > 0) out.push(`Reads yours: ${reads.join(', ')}.`);
   if (reach.rules.length > 0) out.push(`Runs ${reach.rules.length === 1 ? 'an automation' : `${reach.rules.length} automations`} while nobody is looking.`);
   for (const c of reach.calls_out) out.push(c.line);
+  for (const line of reach.may ?? []) out.push(line);
   if (reach.skills.length > 0) out.push(`Teaches your agents: ${reach.skills.join(', ')}.`);
   if ((reach.widgets ?? []).length > 0) out.push(`Today cards to add: ${(reach.widgets ?? []).join(', ')}.`);
   if ((reach.waits ?? []).length > 0) out.push(`Some parts wait until you hold: ${(reach.waits ?? []).join(', ')}.`);
@@ -293,6 +295,9 @@ export function methods(deps: RecordDeps) {
     if (rules > 0) out.push(`${rules === 1 ? 'An automation' : `${rules} automations`} that run while nobody is looking.`);
     const digests = of('digest').length;
     if (digests > 0) out.push(`${digests === 1 ? 'A digest' : `${digests} digests`} it sends you.`);
+    /* AND WHAT IT MAY DO BEYOND THAT (phase 4): notices, the model, a view that writes, in the plan's own words. */
+    for (const d of live) for (const line of mayLinesOfDecl(d)) out.push(line);
+    if (of('script').some((d) => d.body.store === true)) out.push('Keeps a little state of its own, at most 1 MB, which goes with it when it is removed with its data.');
     return out;
   };
 

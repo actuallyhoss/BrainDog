@@ -116,6 +116,13 @@
   const estimate = $derived(sheet ? estimateOf(sheet.callOuts, hosted) : null);
   const calls = $derived(sheet ? sheet.parts.flatMap((p) => p.calls.map((c) => ({ ...c, from: p.title }))) : []);
   const several = $derived((sheet?.parts.length ?? 0) > 1);
+  /* WHAT IT MAY DO BEYOND LISTS AND CALLS (add-ons phase 4): notices, Slash's model, a view that writes. Each new line is
+     one the install asks him to approve, as a call out is, so it is drawn beside the calls. */
+  const mays = $derived(
+    (Array.isArray(diff) ? diff : [diff]).flatMap((d) =>
+      d !== null && typeof d === 'object' && Array.isArray((d as { may?: unknown }).may) ? ((d as { may: { line: string; change: string }[] }).may) : [],
+    ),
+  );
 
   let open = $state(true);
 
@@ -253,6 +260,18 @@
           </ul>
           {#if estimate}<p class="plan-note">{estimate}</p>{/if}
           <p class="plan-note">{words.callsNote}</p>
+        </section>
+      {/if}
+
+      {#if mays.length > 0}
+        <section class="plan-group" aria-labelledby="plan-may-h">
+          <h3 class="plan-h" id="plan-may-h"><IconWell name="bell" /><span class="plan-title">{words.may}</span><span class="plan-count num">{mays.length}</span></h3>
+          <ul class="plan-rows">
+            {#each mays as m, i (i)}
+              <li class="plan-row"><span class="plan-text">{m.line}{#if m.change === 'new'}<span class="plan-change">{words.callNew}</span>{/if}</span></li>
+            {/each}
+          </ul>
+          <p class="plan-note">{words.mayNote}</p>
         </section>
       {/if}
 

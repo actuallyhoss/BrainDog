@@ -91,6 +91,12 @@ export type ScriptDecl = {
   writes: readonly string[];
   limits?: Partial<ScriptLimits>;
   source: string;
+  /** `true` when it may send its owner a notice (`ctx.notify`). Absent, `ctx.notify` stops the run `FORBIDDEN`. */
+  notifies?: boolean;
+  /** How many times one run may ask Slash's model (`ctx.ask`). Absent, `ctx.ask` stops the run `FORBIDDEN`. */
+  model?: { most_per_run: number };
+  /** `true` when it keeps a little state of its own (`ctx.store`). Absent, `ctx.store` stops the run `FORBIDDEN`. */
+  store?: boolean;
 };
 
 /* ── What crosses the boundary ────────────────────────────────────────────────────────────────── */
@@ -156,6 +162,21 @@ export interface CtxHost {
    * (`scriptProposals` in `@braindog/host/script`). Absent, the script is handed no `ctx.propose`.
    */
   propose?(proposal: Json): Promise<Json>;
+  /**
+   * `ctx.notify`: one notice to the owner, `said` as the script wrote it. The host checks it, counts it against its
+   * add-on's day and queues it to go with the run's writes, answering `{ ok }` or `{ ok: false, refusal }`. Only asked
+   * for a script whose header says `notifies: true`; this package refuses the rest before the host hears of it.
+   */
+  notify?(said: Json): Promise<Json>;
+  /**
+   * `ctx.ask`: one question to Slash's model on the record's allowance, answering `{ ok, text }` or `{ ok: false, refusal }`.
+   * Only asked for a script whose header says `model:`, and at most `most_per_run` times; this package counts them.
+   */
+  ask?(prompt: string): Promise<Json>;
+  /** `ctx.store.get`: the value its add-on kept under `key`, or `null`. Only for a header that says `store: true`. */
+  storeGet?(key: string): Promise<Json>;
+  /** `ctx.store.set`: keep `value` under `key` (`null` takes it away), answering `{ ok }` or `{ ok: false, refusal }`. */
+  storeSet?(key: string, value: Json): Promise<Json>;
   /** The run's instant, from the host clock. The sandbox's own `Date` is not what a row is stamped with. */
   now(): string;
   /**

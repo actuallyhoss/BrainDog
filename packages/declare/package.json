@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./catalogue": "./src/catalogue.ts",
+    "./may-lines": "./src/may-lines.ts",
     "./hand": "./src/hand.ts",
     "./job": "./src/job.ts",
     "./kennel": "./src/kennel.ts",
