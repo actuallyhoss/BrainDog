@@ -56,7 +56,7 @@
 
 .settings-place .switch-row + .switch-row,
 .settings-place .answer-switch + .answer-switch {
-  border-block-start: 1px solid var(--rule);
+  border-block-start: 1px solid var(--sep, var(--rule));
 }
 
 .settings-place .switch-row-words {
@@ -226,7 +226,7 @@
   inset-block-start: 0;
   inset-inline: calc(var(--well) + var(--sp-3)) 0;
   block-size: 1px;
-  background: var(--rule);
+  background: var(--sep, var(--rule));
   pointer-events: none;
 }
 
@@ -402,4 +402,40 @@
   to {
     visibility: visible;
   }
+}
+
+/* THE OPS STYLE'S READING COLUMN (3 Nov): an area beside the chooser runs to 55rem and no wider, as a settings window
+   does, so a switch at a row's end is never a long reach across a wide screen from the words it governs. */
+@media (width >= 900px) {
+  .settings-place[data-area] > .body {
+    max-inline-size: 55rem;
+  }
+}
+
+/* A FIELD IN AN AREA IS A 12PX BOX WITH A HAIRLINE EDGE on the tile's own fill, and focus is the accent's ring on that
+   edge (ops 4.22). Held under `.settings-place`, so it reaches the areas and nothing else. */
+.settings-place .field {
+  background: var(--tile);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-field, 12px);
+  transition:
+    border-color var(--d-state) var(--ease-out),
+    box-shadow var(--d-state) var(--ease-out);
+}
+
+.settings-place .field:focus-within {
+  outline: none;
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--focus-ring, var(--focus));
+}
+
+@media (forced-colors: active) {
+  .settings-place .field:focus-within {
+    outline: 2px solid Highlight;
+  }
+}
+
+/* EVERY BUTTON IN AN AREA IS A CAPSULE (ops: circles and capsules, never rounded squares). */
+.settings-place .btn {
+  border-radius: var(--r-pill, 999px);
 }
