@@ -20,6 +20,8 @@ nonisolated public enum ShellAsk: Sendable, Equatable {
     case drag
     /// The Mac: a double press there, which does what the person set for a title bar (zoom, minimise or nothing).
     case titleBarDoubleClick
+    /// The look the person chose in BrainDog (`data-scheme`): "light", "dark", or "" for the device's own.
+    case scheme(String)
 }
 
 /// The kind of shell a web view is in, which the web reads as `kind` and decides its frame by.
@@ -73,6 +75,9 @@ public final class ShellBridge: NSObject, WKScriptMessageHandler {
             hear(.badge(max(0, (a["n"] as? Int) ?? 0)))
         case "ready":
             hear(.ready)
+        case "scheme":
+            let v = text("v")
+            hear(.scheme(v == "light" || v == "dark" ? v : ""))
         case "haptic":
             if let kind = Haptic(rawValue: text("kind")) { hear(.haptic(kind)) }
         case "share":
