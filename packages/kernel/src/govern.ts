@@ -2567,6 +2567,9 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
   };
 
   if (kind === 'pack') {
+    /* OR AN ADD-ON MADE HERE TO PUBLISH TO THE STORE (`{ publish }`, the record's `arrange.ts`): it changes nothing in the
+       record, and the owner's browser signs and sends the file on the yes. Alone, never beside a verb that installs. */
+    if (body.publish !== undefined && PACK_VERBS.every((v) => body[v] === undefined)) return packId(body.publish, 'body.publish');
     const verbs = PACK_VERBS.filter((v) => body[v] !== undefined);
     if (verbs.length !== 1)
       return {
