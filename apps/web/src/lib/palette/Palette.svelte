@@ -1955,7 +1955,7 @@
 
   /**
    * A CENTRED MODAL, OVER THE SCRIM (the ops palette, 3 Nov): 640 wide or the screen less 16 a side, 12% of the window
-   * from the top, at most 78% of it tall and the list scrolls inside past that. Clear glass at the sheet radius (22),
+   * from the top, at most 78% of it tall and the list scrolls inside past that. Reading glass at the sheet radius (22),
    * its specular edge and the modal shadow: the one floating thing over the page. Its height is its content's.
    *
    * IN OVER `--d-panel` FROM .98 OF ITS SIZE, OUT OVER `--d-panel-out` AS A FADE, never laid out on the way. Under
@@ -1981,7 +1981,7 @@
     max-block-size: min(78vh, calc(100dvh - 12vh - var(--sp-6)));
     margin: 0 auto;
     padding: 0;
-    background: var(--glass-clear, var(--tile));
+    background: var(--glass-regular, var(--tile));
     -webkit-backdrop-filter: var(--glass-filter, none);
     backdrop-filter: var(--glass-filter, none);
     border: 0;

@@ -471,7 +471,7 @@
   }
 
   .step + .step {
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--sep, var(--rule));
   }
 
   .step-body {
