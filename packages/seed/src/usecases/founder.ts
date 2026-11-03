@@ -258,7 +258,7 @@ const NUMBERS_THIS_WEEK: Record<string, unknown>[] = [
     authored: [
       { cells: ['Send numbers from a project', SEND_NUMBERS, 'A project posts each number to its own address here'] },
       { cells: ['Watch a number', WATCH_NUMBER, 'BrainDog asks an address for one number on a schedule'] },
-      { cells: ['Watch a live number', BROWSE_LIVE, 'Add-ons that read a live number for you'] },
+      { cells: ['Watch a live number', BROWSE_LIVE, 'Plugins that read a live number for you'] },
     ],
   },
 ];
@@ -518,7 +518,7 @@ export const FOUNDER = {
      3.9.2 (audit 1 Nov, AP32): Set up a numbers feed and Fix the numbers feed say "Each project sends its numbers to its
      own address, shown on its page.", where they said its page "has the key", with no full stop. Words only, so a patch
      step; 3.9.1 is published. */
-  version: '3.9.2',
+  version: '3.9.3',
   title: 'Solo founder',
   summary: 'Your companies, their revenue and metrics.',
   author: 'BrainDog',
@@ -557,7 +557,7 @@ export const FOUNDER = {
   },
   skills: [
     { name: 'datapoint-reporter', trigger: 'when a project ships a number worth watching, to post it as a datapoint' },
-    { name: 'poll-setup', trigger: 'when a project has an API that answers a number, to fill the live feed add-on for it' },
+    { name: 'poll-setup', trigger: 'when a project has an API that answers a number, to fill the live feed plugin for it' },
   ],
   pack: {
     pack: 'usecase-founder',

@@ -23,6 +23,7 @@ const SUMMARY = 'Its card says what it is for in one short line. Nothing in your
 
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
   personal: [
+    { version: '2.11.1', notes: 'Bring your money in says plugin, as the app now calls them. Nothing you hold changes.' },
     { version: '2.10.0', notes: 'Goals says only the counts you have: "1 goal on the go", not "and 0 habits". Nothing you hold changes.' },
     { version: '2.9.1', notes: 'The Log is called Progress and Put by is called Money saved. Nothing you hold changes.' },
     { version: '2.9.0', notes: 'Goals is in your sidebar from the start, and opens on a box to add a goal or a habit. Nothing you hold changes.' },
@@ -42,6 +43,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.5.1', notes: NAMED('Courses') },
   ],
   founder: [
+    { version: '3.9.3', notes: 'Bring your numbers in says plugins, as the app now calls them. Nothing you hold changes.' },
     { version: '3.9.2', notes: 'The Dashboard says where a project sends its numbers in a plain sentence: to its own address, shown on its page.' },
     { version: '3.9.1', notes: 'The Dashboard comes after Agents in your sidebar, so nothing already there moves. When the sidebar is full, it is under More.' },
     { version: '3.9.0', notes: 'The Dashboard is in your sidebar from the start. Before your first project it asks you to add one; it talks about fixing a numbers feed only once a feed has sent a number. Nothing you hold changes.' },

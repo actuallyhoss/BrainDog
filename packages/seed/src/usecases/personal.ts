@@ -172,7 +172,7 @@ export const PERSONAL = {
      it never asked for. `needs` is People and Money now; Projects comes when a project is said, and until then the install cuts
      Project steps' link to it (`fitted`). Nothing is declared, taken away or reworded, so a record on 2.10.0 keeps all
      it holds; the file it shares changes (`needs`, People and Money), so a version beside 2.10.0, which is published. */
-  version: '2.11.0',
+  version: '2.11.1',
   title: 'Personal',
   summary: 'Your money, bills, savings and goals.',
   author: 'BrainDog',
@@ -521,7 +521,7 @@ export const PERSONAL = {
             authored: [
               { cells: ['Add an account', ADD_ACCOUNT, 'What is in it today, and every figure on Home starts from it'] },
               { cells: ['Forward a bank message', FORWARD_BANK, 'What you spent files itself from the texts your bank sends'] },
-              { cells: ['Find an add-on for your bank', BROWSE_MONEY, 'Balances and payments arrive on their own'] },
+              { cells: ['Find a plugin for your bank', BROWSE_MONEY, 'Balances and payments arrive on their own'] },
             ],
           },
           {

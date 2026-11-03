@@ -1338,6 +1338,34 @@ const DECLARED: Record<string, Version> = {
     declares: '802797948d753d43',
     history: ['`register.project_steps` keeps its link to Projects only where Projects is held: `needs` is People and Money, so a household is not handed Projects (onboarding6); nothing declared moves, no id added or taken away -> 802797948d753d43'],
   },
+  'personal@2.11.1': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson
+      hands.metric.budgets-set.money-core metric.goal-log-held metric.goals-active metric.goals-held
+      metric.habits-active metric.logged-by-goal metric.logged-this-week-by-goal metric.put-by-by-goal
+      metric.put-by-held metric.saved-toward-goals metric.savings-active metric.savings-held metric.steps-done
+      metric.steps-left page.goals page.home-personal page.my-project register.goal_log register.goals
+      register.project_steps register.put_by register.savings_goals setting.holds_obligations setting.holds_people
+      setting.holds_things setting.label_accounts setting.label_books setting.label_categories setting.label_goal_log
+      setting.label_goals setting.label_installments setting.label_obligations setting.label_people
+      setting.label_people__role__accountant setting.label_people__role__client setting.label_people__role__collaborator
+      setting.label_people__role__contractor setting.label_project_steps setting.label_put_by setting.label_recurring
+      setting.label_savings_goals setting.label_things setting.label_things__lane__building
+      setting.label_things__lane__earning setting.label_things__lane__parked setting.label_things__lane__retired
+      setting.label_things__revenue setting.label_transactions setting.lk_10103af7 setting.lk_1d01726f
+      setting.lk_303a3cce setting.lk_4f9bf906 setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a
+      setting.lk_f625eca1 setting.one_accounts setting.one_books setting.one_categories setting.one_goal_log
+      setting.one_goals setting.one_installments setting.one_obligations setting.one_people setting.one_project_steps
+      setting.one_put_by setting.one_recurring setting.one_savings_goals setting.one_things setting.one_transactions
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_due setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_overdue
+      setting.voice_record_empty setting.voice_right_now setting.voice_since_away
+    `,
+    declares: '90f2f87ea4c23171',
+    history: ["`page.home-personal`'s Bring your money in says Find a plugin for your bank, where it said add-on -> 90f2f87ea4c23171"],
+  },
   'founder@1.15.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard
@@ -1939,6 +1967,28 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: 'd2c981f6c0c8949c',
     history: ['`page.dashboard` says a project sends its numbers to its own address, shown on its page, where it said its page has the key (audit 1 Nov, AP32); no id added or taken away -> d2c981f6c0c8949c'],
+  },
+  'founder@3.9.3': {
+    holds: `
+      adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
+      adds.page.relation.6 adds.page.someone.7 extends.register.datapoints.about_service
+      extends.register.datapoints.organisation hands.register.datapoints.portfolio hands.register.organisations.people
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-age metric.datapoints-held metric.datapoints-reported
+      metric.due-this-week metric.lapsing-30d metric.late-money metric.organisations-held metric.project-numbers-7d
+      metric.projects-earning-silent metric.service-numbers page.dashboard page.home-founder page.project
+      setting.label_accounts setting.label_books setting.label_categories setting.label_installments
+      setting.label_obligations setting.label_people setting.label_recurring setting.label_services setting.label_tasks
+      setting.label_things setting.label_tracks setting.label_transactions setting.label_updates setting.one_accounts
+      setting.one_books setting.one_categories setting.one_installments setting.one_obligations setting.one_people
+      setting.one_recurring setting.one_services setting.one_tasks setting.one_things setting.one_tracks
+      setting.one_transactions setting.one_updates setting.shared_version setting.speaks setting.voice_coming_up
+      setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: 'c9d5eb8bd0af5a15',
+    history: ["`page.home-founder`'s Bring your numbers in says Plugins that read a live number for you, where it said add-on -> c9d5eb8bd0af5a15"],
   },
   'founder@3.7.1': {
     holds: `

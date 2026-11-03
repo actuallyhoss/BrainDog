@@ -1,0 +1,1767 @@
+{
+  "usecase": "founder",
+  "version": "3.9.3",
+  "title": "Solo founder",
+  "summary": "Your companies, their revenue and metrics.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "audience": "founder",
+  "tone": "direct, and about the numbers",
+  "signals": [
+    "founder",
+    "founders",
+    "co-founder",
+    "cofounder",
+    "startup",
+    "startups",
+    "saas",
+    "indie hacker",
+    "bootstrapped",
+    "my companies",
+    "companies",
+    "organisations",
+    "organizations",
+    "several businesses",
+    "side projects",
+    "dashboard",
+    "dashboards",
+    "analytics",
+    "metrics",
+    "kpis",
+    "datapoints",
+    "mrr",
+    "arr",
+    "revenue",
+    "users",
+    "signups",
+    "churn",
+    "runway",
+    "balances",
+    "my apps",
+    "my products",
+    "launch",
+    "launched",
+    "shipping"
+  ],
+  "modules": [
+    "portfolio",
+    "people",
+    "money-core",
+    "estate",
+    "work"
+  ],
+  "needs": [
+    "portfolio",
+    "money-core"
+  ],
+  "voice": {
+    "home": "Today",
+    "right_now": "The numbers",
+    "needs_you": "Needs your call",
+    "nothing_needs_you": "Nothing needs your call",
+    "since_away": "While you were building",
+    "lists": "Your things",
+    "working_now": "Agents at work",
+    "coming_up": "Due soon",
+    "overdue": "Late",
+    "nothing_now": "Nothing needs your call. Back to building.",
+    "nothing_waiting": "No call is waiting on you.",
+    "fills_with": "Your numbers, the calls waiting on you and what shipped while you were building show up here as your projects report.",
+    "no_questions": "No call waiting",
+    "inbox_clear": "Nothing new has come in",
+    "pen_waits": "When there is a way to fit this to how you run your projects, it waits here until you keep it or say no."
+  },
+  "labels": {},
+  "pack": {
+    "pack": "usecase-founder",
+    "requires": {
+      "format": 1,
+      "primitives": 1,
+      "packs": {}
+    },
+    "declarations": [
+      {
+        "metric": "datapoints-30d",
+        "name": "Numbers reported, 30 days",
+        "source": "register.datapoints",
+        "where": "at after -30d, source is not example, at before tomorrow",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 1
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "datapoints-held",
+        "name": "Numbers",
+        "source": "register.datapoints",
+        "where": "at before tomorrow",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "organisations-held",
+        "name": "Organisations",
+        "source": "register.organisations",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "due-this-week",
+        "name": "Due this week",
+        "source": "register.obligations",
+        "where": "state is open or part, due after -1d, due before +8d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "late-money",
+        "name": "Late",
+        "source": "register.obligations",
+        "where": "state is open or part, due before today",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "datapoints-7d",
+        "name": "Numbers reported, 7 days",
+        "source": "register.datapoints",
+        "where": "at after -7d, source is not example, at before tomorrow",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "datapoints-reported",
+        "name": "Numbers reported",
+        "source": "register.datapoints",
+        "where": "source is not example, at before tomorrow",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "lapsing-30d",
+        "name": "Lapsing within 30 days",
+        "source": "register.services",
+        "where": "state is lapsing, renews after -31d, renews before +31d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "project-numbers-7d",
+        "name": "Numbers this week",
+        "source": "register.datapoints",
+        "where": "thing is {{it}}, at after -7d, source is not example, at before tomorrow",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "datapoints-age",
+        "name": "Days since a number was reported",
+        "source": "register.datapoints",
+        "where": "source is not example, at before tomorrow",
+        "value": {
+          "age": "at"
+        },
+        "format": "int",
+        "target": {
+          "lte": 6
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "service-numbers",
+        "name": "Server and provider numbers",
+        "source": "register.datapoints",
+        "where": "about_service is set, source is not example, at before tomorrow, at after -90d",
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "gte": 0
+        },
+        "window": "30d",
+        "compare": "none"
+      },
+      {
+        "metric": "projects-earning-silent",
+        "name": "Earning, silent 90 days",
+        "source": "register.things",
+        "where": {
+          "none": [
+            {
+              "field": "lane",
+              "not": "earning"
+            },
+            {
+              "pointed": {
+                "register": "transactions",
+                "by": "thing",
+                "where": {
+                  "all": [
+                    {
+                      "field": "state",
+                      "is": "cleared"
+                    },
+                    {
+                      "field": "direction",
+                      "is": "in"
+                    },
+                    {
+                      "field": "transfer",
+                      "is": false
+                    },
+                    {
+                      "field": "on",
+                      "after": "-90d"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "pointed": {
+                "register": "datapoints",
+                "by": "thing",
+                "where": {
+                  "all": [
+                    {
+                      "field": "at",
+                      "after": "-90d"
+                    },
+                    {
+                      "field": "source",
+                      "not": "example"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "value": {
+          "count": "id"
+        },
+        "format": "int",
+        "target": {
+          "lte": 0
+        },
+        "window": "90d",
+        "compare": "none"
+      },
+      {
+        "page": "home-founder",
+        "title": "Founder overview",
+        "icon": "home",
+        "requires": [
+          "register.datapoints",
+          "register.accounts",
+          "register.obligations",
+          "register.services",
+          "register.books"
+        ],
+        "blocks": [
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "body": "Cash is {{cash-now}} across {{cash-accounts}} account(s), and on what is due it runs out in {{runway-days}} day(s).",
+            "when": {
+              "all": [
+                {
+                  "metric": "books-held",
+                  "lt": 2
+                },
+                {
+                  "metric": "runway-days",
+                  "beyond": false
+                }
+              ]
+            }
+          },
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "body": "Cash is {{cash-now}} across {{cash-accounts}} account(s), and on what is due it lasts the year.",
+            "when": {
+              "all": [
+                {
+                  "metric": "books-held",
+                  "lt": 2
+                },
+                {
+                  "metric": "runway-days",
+                  "beyond": true
+                }
+              ]
+            }
+          },
+          {
+            "kind": "bar",
+            "heading": "What you have, by book",
+            "icon": "book",
+            "span": 12,
+            "source": "metric.cash-by-book",
+            "unset": "In no book",
+            "when": {
+              "metric": "books-held",
+              "gte": 2
+            },
+            "empty": "No account counts as cash yet."
+          },
+          {
+            "kind": "table",
+            "heading": "Gone quiet",
+            "icon": "history",
+            "span": 12,
+            "source": "exceptions",
+            "columns": [
+              {
+                "field": "subject",
+                "label": "What"
+              },
+              {
+                "field": "since",
+                "label": "Last seen"
+              },
+              {
+                "field": "was",
+                "label": "Before"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "link",
+            "heading": "Bring your money in",
+            "icon": "plug",
+            "span": 12,
+            "when": {
+              "metric": "cash-accounts",
+              "lt": 1
+            },
+            "authored": [
+              {
+                "cells": [
+                  "Connect a bank or a payments feed",
+                  "/packs/browse?q=money",
+                  "Balances and payments arrive on their own"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "lines",
+            "heading": "Numbers this week",
+            "icon": "chart-line",
+            "span": 12,
+            "source": "register.datapoints",
+            "columns": [
+              {
+                "field": "at"
+              },
+              {
+                "field": "value"
+              },
+              {
+                "field": "name"
+              },
+              {
+                "field": "unit"
+              },
+              {
+                "field": "amount"
+              },
+              {
+                "field": "thing"
+              }
+            ],
+            "where": "source is not example",
+            "back": 7,
+            "limit": 6,
+            "when": {
+              "metric": "datapoints-7d",
+              "gte": 1
+            }
+          },
+          {
+            "kind": "link",
+            "heading": "Bring your numbers in",
+            "icon": "send",
+            "span": 12,
+            "when": {
+              "metric": "datapoints-reported",
+              "lt": 1
+            },
+            "authored": [
+              {
+                "cells": [
+                  "Send numbers from a project",
+                  "/automations?new=door&preset=numbers",
+                  "A project posts each number to its own address here"
+                ]
+              },
+              {
+                "cells": [
+                  "Watch a number",
+                  "/automations?new=action&preset=watch",
+                  "BrainDog asks an address for one number on a schedule"
+                ]
+              },
+              {
+                "cells": [
+                  "Watch a live number",
+                  "/packs/browse?q=polls",
+                  "Plugins that read a live number for you"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "table",
+            "heading": "Late",
+            "icon": "octagon-alert",
+            "span": 12,
+            "source": "register.obligations",
+            "where": "state is open or part, due before today",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Description",
+                "width": "minmax(14ch,1fr)"
+              },
+              {
+                "field": "party",
+                "label": "Who",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "amount",
+                "label": "Amount",
+                "width": "15ch",
+                "align": "end",
+                "sign": {
+                  "field": "direction",
+                  "minus": "owed_by_me"
+                }
+              },
+              {
+                "field": "due",
+                "label": "Due",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "due",
+                "dir": "asc"
+              }
+            ],
+            "limit": 6,
+            "when": {
+              "metric": "late-money",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "table",
+            "heading": "Due this week",
+            "icon": "calendar-clock",
+            "span": 12,
+            "source": "register.obligations",
+            "where": "state is open or part, due after -1d, due before +8d",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Description",
+                "width": "minmax(14ch,1fr)"
+              },
+              {
+                "field": "party",
+                "label": "Who",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "amount",
+                "label": "Amount",
+                "width": "15ch",
+                "align": "end",
+                "sign": {
+                  "field": "direction",
+                  "minus": "owed_by_me"
+                }
+              },
+              {
+                "field": "due",
+                "label": "Due",
+                "width": "13ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "due",
+                "dir": "asc"
+              }
+            ],
+            "limit": 6,
+            "empty": "Nothing is due this week.",
+            "when": {
+              "metric": "due-this-week",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "table",
+            "heading": "Lapsing",
+            "icon": "clock-alert",
+            "span": 12,
+            "source": "register.services",
+            "where": "state is lapsing, renews after -31d, renews before +31d",
+            "when": {
+              "metric": "lapsing-30d",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "name",
+                "label": "Name",
+                "width": "minmax(16ch,1fr)"
+              },
+              {
+                "field": "renews",
+                "label": "Renews",
+                "width": "15ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "renews",
+                "dir": "asc"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "when": {
+              "metric": "runs-working",
+              "gt": 0
+            },
+            "body": "{{runs-working}} agent(s) are working now."
+          },
+          {
+            "kind": "section",
+            "heading": "Agents at work",
+            "icon": "session",
+            "span": 12,
+            "fold": true,
+            "when": {
+              "metric": "runs-working",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "table",
+            "heading": "Working now",
+            "icon": "session",
+            "span": 12,
+            "source": "sessions.working",
+            "when": {
+              "metric": "runs-working",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "agent",
+                "label": "Agent"
+              },
+              {
+                "field": "doing",
+                "label": "Doing"
+              },
+              {
+                "field": "last_seen",
+                "label": "Last seen"
+              }
+            ],
+            "limit": 6
+          }
+        ]
+      },
+      {
+        "page": "dashboard",
+        "title": "Dashboard",
+        "nav": {
+          "section": "Dashboard",
+          "order": 10,
+          "place": 70
+        },
+        "icon": "observe",
+        "requires": [
+          "register.datapoints",
+          "register.organisations",
+          "register.things"
+        ],
+        "blocks": [
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "when": {
+              "metric": "datapoints-30d",
+              "gte": 1
+            },
+            "body": "Your projects reported {{datapoints-30d}} number(s) in the last thirty days."
+          },
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "when": {
+              "all": [
+                {
+                  "metric": "projects-live",
+                  "lt": 1
+                },
+                {
+                  "metric": "datapoints-30d",
+                  "lt": 1
+                }
+              ]
+            },
+            "body": "Add your first project, and its numbers come here."
+          },
+          {
+            "kind": "capture",
+            "heading": "Name your first project",
+            "icon": "rocket",
+            "span": 12,
+            "register": "things",
+            "where": "lane is building",
+            "when": {
+              "metric": "projects-live",
+              "lt": 1
+            }
+          },
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "when": {
+              "all": [
+                {
+                  "metric": "projects-live",
+                  "gte": 1
+                },
+                {
+                  "metric": "datapoints-reported",
+                  "lt": 1
+                }
+              ]
+            },
+            "body": "No project has sent a number yet."
+          },
+          {
+            "kind": "link",
+            "heading": "Send your numbers",
+            "icon": "send",
+            "span": 12,
+            "when": {
+              "all": [
+                {
+                  "metric": "projects-live",
+                  "gte": 1
+                },
+                {
+                  "metric": "datapoints-reported",
+                  "lt": 1
+                }
+              ]
+            },
+            "authored": [
+              {
+                "cells": [
+                  "Set up a numbers feed",
+                  "/automations?new=door&preset=numbers",
+                  "Each project sends its numbers to its own address, shown on its page."
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "when": {
+              "all": [
+                {
+                  "metric": "datapoints-reported",
+                  "gte": 1
+                },
+                {
+                  "metric": "datapoints-30d",
+                  "lt": 1
+                }
+              ]
+            },
+            "body": "No numbers came in the last thirty days."
+          },
+          {
+            "kind": "table",
+            "heading": "Gone quiet",
+            "icon": "history",
+            "span": 12,
+            "source": "exceptions",
+            "columns": [
+              {
+                "field": "subject",
+                "label": "What"
+              },
+              {
+                "field": "since",
+                "label": "Last seen"
+              },
+              {
+                "field": "was",
+                "label": "Before"
+              }
+            ],
+            "limit": 6,
+            "when": {
+              "all": [
+                {
+                  "metric": "datapoints-reported",
+                  "gte": 1
+                },
+                {
+                  "metric": "datapoints-30d",
+                  "lt": 1
+                }
+              ]
+            }
+          },
+          {
+            "kind": "link",
+            "heading": "Fix the feed",
+            "icon": "send",
+            "span": 12,
+            "when": {
+              "all": [
+                {
+                  "metric": "datapoints-reported",
+                  "gte": 1
+                },
+                {
+                  "metric": "datapoints-30d",
+                  "lt": 1
+                }
+              ]
+            },
+            "authored": [
+              {
+                "cells": [
+                  "Fix the numbers feed",
+                  "/automations?new=door&preset=numbers",
+                  "Each project sends its numbers to its own address, shown on its page."
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "lines",
+            "heading": "Numbers, 30 days",
+            "icon": "chart-line",
+            "span": 12,
+            "source": "register.datapoints",
+            "columns": [
+              {
+                "field": "at"
+              },
+              {
+                "field": "value"
+              },
+              {
+                "field": "name"
+              },
+              {
+                "field": "unit"
+              },
+              {
+                "field": "amount"
+              },
+              {
+                "field": "thing"
+              }
+            ],
+            "where": "source is not example",
+            "back": 30,
+            "limit": 2,
+            "most": 40,
+            "when": {
+              "all": [
+                {
+                  "metric": "datapoints-30d",
+                  "gte": 1
+                },
+                {
+                  "metric": "datapoints-age",
+                  "lt": 7
+                }
+              ]
+            }
+          },
+          {
+            "kind": "lines",
+            "heading": "Numbers, last reported {{datapoints-age}} days ago",
+            "icon": "chart-line",
+            "span": 12,
+            "source": "register.datapoints",
+            "columns": [
+              {
+                "field": "at"
+              },
+              {
+                "field": "value"
+              },
+              {
+                "field": "name"
+              },
+              {
+                "field": "unit"
+              },
+              {
+                "field": "amount"
+              },
+              {
+                "field": "thing"
+              }
+            ],
+            "where": "source is not example",
+            "back": 30,
+            "limit": 2,
+            "most": 40,
+            "when": {
+              "all": [
+                {
+                  "metric": "datapoints-30d",
+                  "gte": 1
+                },
+                {
+                  "metric": "datapoints-age",
+                  "gte": 7
+                }
+              ]
+            }
+          },
+          {
+            "kind": "section",
+            "heading": "Every number and organisation",
+            "icon": "layout-list",
+            "span": 12,
+            "fold": true
+          },
+          {
+            "kind": "table",
+            "heading": "Latest numbers",
+            "icon": "list",
+            "span": 12,
+            "source": "register.datapoints",
+            "where": "at before tomorrow",
+            "when": {
+              "metric": "datapoints-held",
+              "gt": 0
+            },
+            "columns": [
+              {
+                "field": "name",
+                "label": "Measure",
+                "width": "minmax(16ch,1fr)"
+              },
+              {
+                "field": "value",
+                "label": "Value",
+                "width": "14ch",
+                "align": "end"
+              },
+              {
+                "field": "amount",
+                "label": "Amount",
+                "width": "14ch",
+                "align": "end"
+              },
+              {
+                "field": "unit",
+                "label": "Unit",
+                "width": "8ch"
+              },
+              {
+                "field": "organisation",
+                "label": "Organisation",
+                "width": "minmax(10ch,18ch)"
+              },
+              {
+                "field": "source",
+                "label": "Source",
+                "width": "11ch"
+              },
+              {
+                "field": "at",
+                "label": "When",
+                "width": "12ch",
+                "align": "end"
+              }
+            ],
+            "order": [
+              {
+                "field": "at",
+                "dir": "desc"
+              }
+            ],
+            "limit": 10,
+            "empty": "No project has reported a number yet."
+          },
+          {
+            "kind": "table",
+            "heading": "Organisations",
+            "icon": "building",
+            "span": 12,
+            "source": "register.organisations",
+            "when": {
+              "metric": "organisations-held",
+              "gt": 0
+            },
+            "where": "merged_into is empty, retired_on is empty",
+            "columns": [
+              {
+                "field": "name",
+                "label": "Organisation",
+                "width": "minmax(20ch,1fr)"
+              },
+              {
+                "field": "kind",
+                "label": "Kind",
+                "width": "14ch"
+              },
+              {
+                "field": "domain",
+                "label": "Website",
+                "width": "minmax(14ch,22ch)"
+              }
+            ],
+            "empty": "No organisations yet."
+          }
+        ]
+      },
+      {
+        "page": "project",
+        "title": "{{name}}",
+        "for": {
+          "register": "things"
+        },
+        "nav": {
+          "section": "Projects",
+          "order": 10
+        },
+        "icon": "thing",
+        "layout": {
+          "rail": 4
+        },
+        "requires": [
+          "register.things",
+          "register.stages",
+          "register.tasks",
+          "register.session",
+          "register.obligations",
+          "register.services",
+          "register.transactions",
+          "register.datapoints"
+        ],
+        "blocks": [
+          {
+            "kind": "project",
+            "parts": [
+              "hero",
+              "side"
+            ],
+            "heading": "Overview",
+            "icon": "eye",
+            "span": 12
+          },
+          {
+            "kind": "project",
+            "parts": [
+              "numbers",
+              "what-is-open"
+            ],
+            "heading": "Numbers and work",
+            "icon": "chart-line",
+            "span": 12
+          },
+          {
+            "kind": "project",
+            "parts": [
+              "dates",
+              "who-is-on-it",
+              "runs-on",
+              "agents-here",
+              "decisions",
+              "happened"
+            ],
+            "heading": "Dates, people, agents and what happened",
+            "icon": "calendar",
+            "span": 12
+          },
+          {
+            "kind": "note",
+            "lead": true,
+            "span": 12,
+            "says": [
+              {
+                "when": {
+                  "metric": "project-in-review:{{name}}",
+                  "gt": 0
+                },
+                "body": "Work on {{name}} has been handed back, and it waits for you to check it."
+              },
+              {
+                "body": "{{next}}"
+              }
+            ]
+          },
+          {
+            "kind": "queue",
+            "heading": "Waiting on you",
+            "icon": "ask",
+            "span": 12,
+            "source": "governance.open",
+            "where": "about is {{spoken}}",
+            "limit": 3,
+            "when": {
+              "metric": "questions-open:{{spoken}}",
+              "gt": 0
+            },
+            "tiles": true
+          },
+          {
+            "kind": "stat",
+            "heading": "At a glance",
+            "icon": "gauge",
+            "span": 12,
+            "area": "rail",
+            "cells": [
+              {
+                "metric": "project-open:{{name}}",
+                "label": "Open"
+              },
+              {
+                "metric": "project-owed:{{name}}",
+                "label": "Still to come in"
+              },
+              {
+                "metric": "project-cost:{{name}}",
+                "label": "Costs a year"
+              },
+              {
+                "metric": "project-done-7d:{{name}}",
+                "label": "Done this week",
+                "trend": "4w"
+              }
+            ]
+          },
+          {
+            "kind": "cards",
+            "heading": "Where it stands",
+            "icon": "target",
+            "span": 12,
+            "area": "rail",
+            "source": "register.things",
+            "where": "name is {{name}}",
+            "columns": [
+              {
+                "field": "health",
+                "as": "title"
+              },
+              {
+                "field": "progress",
+                "label": "",
+                "as": "ring"
+              },
+              {
+                "field": "aim",
+                "label": "Aiming for",
+                "as": "fact"
+              },
+              {
+                "field": "agent",
+                "label": "Agent",
+                "as": "who"
+              }
+            ],
+            "tones": {
+              "at_risk": "warn",
+              "off_track": "bad"
+            },
+            "limit": 1,
+            "empty": "Nobody has said where {{name}} stands yet.",
+            "when": {
+              "metric": "project-said:{{name}}",
+              "gt": 0
+            }
+          },
+          {
+            "kind": "stat",
+            "heading": "Where it stands",
+            "icon": "target",
+            "span": 12,
+            "area": "rail",
+            "key": "stands-figures",
+            "cells": [
+              {
+                "metric": "project-moved-7d:{{name}}",
+                "label": "Changed this week"
+              },
+              {
+                "metric": "project-worked:{{name}}",
+                "label": "Last worked"
+              },
+              {
+                "metric": "project-numbers-7d:{{name}}",
+                "label": "Numbers this week"
+              }
+            ],
+            "when": {
+              "metric": "project-said:{{name}}",
+              "is": 0
+            }
+          },
+          {
+            "kind": "steps",
+            "heading": "The road",
+            "icon": "flag",
+            "span": 12,
+            "area": "rail",
+            "source": "register.stages",
+            "where": "thing is {{name}}",
+            "columns": [
+              {
+                "field": "name",
+                "label": "Stage"
+              },
+              {
+                "field": "done_when",
+                "label": "Done when"
+              }
+            ],
+            "order": [
+              {
+                "field": "order",
+                "dir": "asc"
+              }
+            ],
+            "limit": 20,
+            "when": {
+              "all": [
+                {
+                  "metric": "project-staged:{{name}}",
+                  "gt": 0
+                },
+                {
+                  "metric": "project-plan-roadmap:{{name}}",
+                  "is": 0
+                }
+              ]
+            },
+            "empty": "{{name}} has no stages yet."
+          },
+          {
+            "kind": "section",
+            "heading": "More about {{name}}",
+            "icon": "notebook-pen",
+            "span": 12,
+            "box": true,
+            "panel": "actions",
+            "fold": true
+          },
+          {
+            "kind": "roadmap",
+            "heading": "The plan",
+            "icon": "milestone",
+            "span": 12,
+            "source": "register.tasks",
+            "where": "thing is {{name}}, by is set, state is not done or dropped",
+            "columns": [
+              {
+                "field": "what",
+                "label": "What"
+              },
+              {
+                "field": "by",
+                "label": "Due"
+              },
+              {
+                "field": "effort",
+                "label": "Effort"
+              }
+            ],
+            "order": [
+              {
+                "field": "by",
+                "dir": "asc"
+              }
+            ],
+            "limit": 50,
+            "when": {
+              "all": [
+                {
+                  "metric": "project-dated:{{name}}",
+                  "gt": 0
+                },
+                {
+                  "metric": "project-plan-path:{{name}}",
+                  "is": 0
+                }
+              ]
+            },
+            "empty": "No task on {{name}} has a day yet."
+          },
+          {
+            "kind": "kpis",
+            "heading": "Key numbers",
+            "icon": "chart-line",
+            "span": 12,
+            "key": "kpis",
+            "source": "kpis",
+            "for": "project"
+          },
+          {
+            "kind": "cards",
+            "heading": "Agents",
+            "icon": "bot",
+            "span": 12,
+            "columns": [
+              {
+                "field": "agent",
+                "as": "title"
+              },
+              {
+                "field": "doing_said",
+                "as": "reply"
+              },
+              {
+                "field": "last_seen",
+                "as": "when"
+              }
+            ],
+            "source": "register.session",
+            "where": "project is {{spoken}}, parent is empty, wrote is not 0",
+            "order": [
+              {
+                "field": "last_seen",
+                "dir": "desc"
+              }
+            ],
+            "limit": 3
+          },
+          {
+            "kind": "note",
+            "document": true,
+            "heading": "Notes",
+            "icon": "notebook-pen",
+            "span": 12,
+            "body": "{{note}}",
+            "empty": "Nothing is written about {{name}} yet. Its note is on the project."
+          },
+          {
+            "kind": "table",
+            "heading": "Bills and invoices",
+            "icon": "receipt",
+            "span": 12,
+            "source": "register.obligations",
+            "where": "thing is {{name}}",
+            "columns": [
+              {
+                "field": "what",
+                "label": "Description",
+                "width": "minmax(14ch,1fr)"
+              },
+              {
+                "field": "amount",
+                "label": "Amount",
+                "width": "15ch",
+                "align": "end",
+                "sign": {
+                  "field": "direction",
+                  "minus": "owed_by_me"
+                }
+              }
+            ],
+            "order": [
+              {
+                "field": "due",
+                "dir": "asc"
+              }
+            ],
+            "limit": 4
+          },
+          {
+            "kind": "cards",
+            "heading": "Services",
+            "icon": "server",
+            "span": 12,
+            "source": "register.services",
+            "where": "thing is {{name}}",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "cost",
+                "as": "figure"
+              },
+              {
+                "field": "cycle",
+                "label": "Every",
+                "as": "fact"
+              },
+              {
+                "field": "note",
+                "label": "Note",
+                "as": "fact"
+              },
+              {
+                "field": "renews",
+                "label": "Renews",
+                "as": "when"
+              }
+            ],
+            "order": [
+              {
+                "field": "renews",
+                "dir": "asc"
+              }
+            ],
+            "limit": 3
+          },
+          {
+            "kind": "section",
+            "heading": "Runs on",
+            "icon": "plug",
+            "span": 12,
+            "box": true
+          },
+          {
+            "kind": "cards",
+            "heading": "Keys",
+            "icon": "key",
+            "span": 4,
+            "source": "runs_on",
+            "about": "{{spoken}}",
+            "where": "kind is key, scope is project",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "scope",
+                "label": "Applies to",
+                "as": "scope"
+              },
+              {
+                "field": "detail",
+                "label": "Opens",
+                "as": "fact"
+              },
+              {
+                "field": "used_agents",
+                "label": "Used by",
+                "as": "who"
+              },
+              {
+                "field": "used_at",
+                "label": "Last used",
+                "as": "when"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "cards",
+            "heading": "Tools and servers",
+            "icon": "plug",
+            "span": 4,
+            "source": "runs_on",
+            "about": "{{spoken}}",
+            "where": "kind is tool, scope is project",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "scope",
+                "label": "Applies to",
+                "as": "scope"
+              },
+              {
+                "field": "detail",
+                "label": "Reached by",
+                "as": "fact"
+              },
+              {
+                "field": "used_agents",
+                "label": "Used by",
+                "as": "who"
+              },
+              {
+                "field": "used_at",
+                "label": "Last used",
+                "as": "when"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "cards",
+            "heading": "Skills",
+            "icon": "skill",
+            "span": 4,
+            "source": "runs_on",
+            "about": "{{spoken}}",
+            "where": "kind is skill, scope is project",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "scope",
+                "label": "Applies to",
+                "as": "scope"
+              },
+              {
+                "field": "detail",
+                "label": "Version",
+                "as": "fact"
+              }
+            ],
+            "limit": 6
+          },
+          {
+            "kind": "cards",
+            "heading": "And from everywhere",
+            "icon": "globe",
+            "span": 12,
+            "source": "runs_on",
+            "about": "{{spoken}}",
+            "where": "kind is not action, scope is global",
+            "columns": [
+              {
+                "field": "name",
+                "as": "title"
+              },
+              {
+                "field": "kind",
+                "label": "What it is",
+                "as": "fact"
+              },
+              {
+                "field": "used_agents",
+                "label": "Used by",
+                "as": "who"
+              },
+              {
+                "field": "used_at",
+                "label": "Last used",
+                "as": "when"
+              }
+            ],
+            "limit": 5
+          },
+          {
+            "kind": "section",
+            "heading": "Send numbers here",
+            "icon": "observe",
+            "span": 12,
+            "panel": "reporting",
+            "fold": true
+          }
+        ]
+      }
+    ],
+    "hands": {
+      "register.organisations": "people",
+      "register.datapoints": "portfolio"
+    },
+    "extends": {
+      "register.datapoints": {
+        "fields": [
+          {
+            "id": "organisation",
+            "label": "Organisation",
+            "type": "ref",
+            "to": "organisations",
+            "index": true
+          },
+          {
+            "id": "about_service",
+            "label": "Service",
+            "type": "ref",
+            "to": "services",
+            "index": true
+          }
+        ]
+      }
+    },
+    "adds": [
+      {
+        "page": "page.relation",
+        "after": "People",
+        "block": {
+          "kind": "lines",
+          "heading": "Numbers, 30 days",
+          "icon": "chart-line",
+          "span": 12,
+          "source": "register.datapoints",
+          "columns": [
+            {
+              "field": "at"
+            },
+            {
+              "field": "value"
+            },
+            {
+              "field": "name"
+            },
+            {
+              "field": "unit"
+            },
+            {
+              "field": "amount"
+            },
+            {
+              "field": "thing"
+            }
+          ],
+          "where": "source is not example, organisation is {{name}}",
+          "back": 30
+        }
+      },
+      {
+        "page": "page.relation",
+        "after": "People",
+        "block": {
+          "kind": "table",
+          "heading": "Latest numbers",
+          "icon": "list",
+          "span": 12,
+          "source": "register.datapoints",
+          "where": "organisation is {{name}}",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Measure",
+              "width": "minmax(16ch,1fr)"
+            },
+            {
+              "field": "value",
+              "label": "Value",
+              "width": "14ch",
+              "align": "end"
+            },
+            {
+              "field": "amount",
+              "label": "Amount",
+              "width": "14ch",
+              "align": "end"
+            },
+            {
+              "field": "unit",
+              "label": "Unit",
+              "width": "8ch"
+            },
+            {
+              "field": "at",
+              "label": "When",
+              "width": "12ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "at",
+              "dir": "desc"
+            }
+          ],
+          "limit": 10
+        }
+      },
+      {
+        "page": "page.relation",
+        "after": "People",
+        "block": {
+          "kind": "section",
+          "heading": "Send numbers here",
+          "icon": "observe",
+          "span": 12,
+          "panel": "reporting"
+        }
+      },
+      {
+        "page": "page.portfolio",
+        "after": "In play",
+        "block": {
+          "kind": "note",
+          "span": 12,
+          "key": "earning-silent",
+          "when": {
+            "metric": "projects-earning-silent",
+            "gt": 0
+          },
+          "body": "{{projects-earning-silent.names}}: marked Earning, but no money in and no number sent in 90 days"
+        }
+      },
+      {
+        "page": "page.estate",
+        "after": "Next ninety days",
+        "block": {
+          "kind": "lines",
+          "heading": "Server and provider numbers",
+          "icon": "chart-line",
+          "span": 12,
+          "source": "register.datapoints",
+          "columns": [
+            {
+              "field": "at"
+            },
+            {
+              "field": "value"
+            },
+            {
+              "field": "name"
+            },
+            {
+              "field": "unit"
+            },
+            {
+              "field": "amount"
+            },
+            {
+              "field": "about_service"
+            }
+          ],
+          "where": "about_service is set, source is not example, at before tomorrow",
+          "back": 90,
+          "limit": 6,
+          "when": {
+            "metric": "service-numbers",
+            "gt": 0
+          }
+        }
+      },
+      {
+        "page": "page.relation",
+        "after": "Notes",
+        "block": {
+          "kind": "section",
+          "heading": "Where it was seen",
+          "icon": "history",
+          "span": 12,
+          "panel": "seen"
+        }
+      },
+      {
+        "page": "page.someone",
+        "after": "Notes",
+        "block": {
+          "kind": "section",
+          "heading": "Where it was seen",
+          "icon": "history",
+          "span": 12,
+          "panel": "seen"
+        }
+      }
+    ]
+  },
+  "skills": [
+    {
+      "name": "datapoint-reporter",
+      "trigger": "when a project ships a number worth watching, to post it as a datapoint"
+    },
+    {
+      "name": "poll-setup",
+      "trigger": "when a project has an API that answers a number, to fill the live feed plugin for it"
+    }
+  ],
+  "nav": [],
+  "links": [],
+  "over": {}
+}
