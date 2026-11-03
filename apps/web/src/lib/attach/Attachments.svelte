@@ -22,6 +22,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import Tile from '$lib/ui/Tile.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
   import { since } from 'braindog-render';
   import { attach, attachWords as words, change, download, iconOf, kindWord, readList, sizeOf, type Listed } from './attached.ts';
 
@@ -36,11 +37,10 @@
   /** Files on their way, each with what it is doing or why it was refused. */
   let going = $state<{ key: number; name: string; fix: string }[]>([]);
   let key = 0;
-  /** The file whose verbs are open, the one being renamed, and the last one removed (its Undo). */
+  /** The file whose verbs are open, and the one being renamed. A removal's Undo rides on its toast. */
   let opened = $state<string | null>(null);
   let renaming = $state<string | null>(null);
   let newName = $state('');
-  let removed = $state.raw<Listed | null>(null);
   let said = $state('');
   /** The file pressed, and whether its viewer is up; the viewer stays mounted once opened, to close the way it came. */
   let pressed = $state.raw<Listed | null>(null);
@@ -83,9 +83,11 @@
       const mine = ++key;
       going = [...going, { key: mine, name: file.name, fix: '' }];
       const out = await attach(apiBase(), on, file);
+      /* DONE IS SAID ONCE AND GOES (3 Nov): "Attached brief.pdf to Tidepool" stayed in the tile after the file was in its
+         list, which already says so. A refusal stays on its own line until it is closed. */
       if (out.ok) {
         going = going.filter((g) => g.key !== mine);
-        said = out.value.said;
+        toasts.push(out.value.said);
       } else going = going.map((g) => (g.key === mine ? { ...g, fix: out.fix } : g));
     }
     await load();
@@ -129,8 +131,11 @@
       return;
     }
     const out = await change(apiBase(), 'renameAttachment', { id: f.id, name });
-    said = out.ok ? out.value : out.fix;
-    if (out.ok) renaming = null;
+    said = out.ok ? '' : out.fix;
+    if (out.ok) {
+      renaming = null;
+      toasts.push(out.value);
+    }
     await load();
   }
 
@@ -141,17 +146,15 @@
       said = out.fix;
       return;
     }
-    removed = f;
     said = '';
+    toasts.push(words.removed(f.name), { undo: () => void undo(f) });
     await load();
   }
 
-  async function undo() {
-    if (removed === null) return;
-    const back = removed;
+  async function undo(back: Listed) {
     const out = await change(apiBase(), 'restoreAttachment', { id: back.id });
-    said = out.ok ? out.value : out.fix;
-    if (out.ok) removed = null;
+    said = out.ok ? '' : out.fix;
+    if (out.ok) toasts.push(out.value);
     await load();
   }
 
@@ -165,15 +168,22 @@
   }
 </script>
 
+<!-- THE ONE VERB, IN THE HEAD (3 Nov): the empty tile was a dashed box, a button and a long line of what it takes, the
+     first thing on a task's page. The verb sits where every tile keeps its controls, the tile says what it takes in one
+     short line only while it is empty, and the box is drawn only under a file being dragged. -->
+{#snippet attachButton()}
+  <Button size="sm" onclick={() => picker?.click()}><Icon name="plus" size="s" />{words.add}</Button>
+{/snippet}
+
 {#snippet body()}
-  <div class="at-drop" data-over={over ? '' : undefined}>
-    <Button size="sm" onclick={() => picker?.click()}>
-      <Icon name="plus" size="s" />
-      {words.add}
-    </Button>
-    <span class="at-hint" id="{uid}-hint">{over ? words.drop : words.dropHint}</span>
-    <input bind:this={picker} class="at-picker" type="file" multiple tabindex="-1" aria-hidden="true" onchange={chosen} />
-  </div>
+  <input bind:this={picker} class="at-picker" type="file" multiple tabindex="-1" aria-hidden="true" onchange={chosen} />
+  {#if over}
+    <p class="at-drop" id="{uid}-hint">{words.drop}</p>
+  {:else if files.length === 0 && going.length === 0 && !said}
+    <p class="at-hint" id="{uid}-hint">{words.dropHint}</p>
+  {:else}
+    <span class="at-sr" id="{uid}-hint">{words.dropHint}</span>
+  {/if}
 
   {#if going.length > 0}
     <ul class="at-going" aria-live="polite">
@@ -188,13 +198,8 @@
     </ul>
   {/if}
 
-  {#if removed}
-    <p class="at-said" role="status">
-      {words.removed(removed.name)}
-      <button type="button" class="at-undo" onclick={() => void undo()}>{words.undo}</button>
-    </p>
-  {:else if said}
-    <p class="at-said" role="status">{said}</p>
+  {#if said}
+    <p class="at-said" role="alert">{said}</p>
   {/if}
 
   {#if files.length > 0}
@@ -254,10 +259,13 @@
   {ondrop}
 >
   {#if tile}
-    <Tile icon="link" title={words.heading} count={files.length || undefined}>{@render body()}</Tile>
+    <Tile icon="link" title={words.heading} count={files.length || undefined} actions={attachButton}>{@render body()}</Tile>
   {:else}
     <section class="at-part" aria-label={words.heading}>
-      <h3 class="at-h">{words.heading}{#if files.length > 0}<span class="at-count">{files.length}</span>{/if}</h3>
+      <div class="at-head">
+        <h3 class="at-h">{words.heading}{#if files.length > 0}<span class="at-count">{files.length}</span>{/if}</h3>
+        {@render attachButton()}
+      </div>
       {@render body()}
     </section>
   {/if}
@@ -288,27 +296,31 @@
     font-weight: 500;
   }
 
-  /* THE DROP ZONE: the verb, and what it takes in words. Under a dragged file it says so and takes the accent's ring. */
-  .at-drop {
+  .at-head {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
-    padding: 8px;
-    border: 1px dashed var(--rule);
-    border-radius: var(--r-ctl);
+    justify-content: space-between;
+    gap: var(--sp-2);
   }
 
-  .at-drop[data-over] {
-    border-style: solid;
-    border-color: var(--accent, var(--ink-2));
+  /* UNDER A DRAGGED FILE, the place to let go: the accent's ring round a line that says so. */
+  .at-drop {
+    margin: 0;
+    padding: var(--sp-3);
+    border: 1px dashed var(--accent, var(--ink-2));
+    border-radius: var(--r-ctl);
     background: var(--tile-2);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+    text-align: center;
   }
 
   .at-hint {
-    flex: 1 1 200px;
+    margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .at-picker {
@@ -361,22 +373,12 @@
     cursor: pointer;
   }
 
+  /* A REFUSAL, in the warning's ink, until the next thing done here. */
   .at-said {
     margin: 0;
-    color: var(--ink-2);
+    color: var(--warn, var(--ink-2));
     font-size: var(--fs-meta);
-  }
-
-  .at-undo {
-    margin-inline-start: 6px;
-    padding: 0;
-    background: none;
-    border: 0;
-    color: var(--ink);
-    font: inherit;
-    font-weight: 600;
-    text-decoration: underline;
-    cursor: pointer;
+    line-height: var(--lead-meta);
   }
 
   .at-row {

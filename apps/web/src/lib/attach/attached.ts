@@ -31,7 +31,7 @@ export const attachWords = {
   heading: 'Attachments',
   add: 'Attach a file',
   drop: 'Drop files here to attach them',
-  dropHint: 'Up to 25 MB each',
+  dropHint: 'Drop files here, up to 25 MB each.',
   sending: (name: string) => `Attaching ${name}`,
   sent: (name: string) => `Attached ${name}.`,
   open: (name: string) => `Open ${name}`,

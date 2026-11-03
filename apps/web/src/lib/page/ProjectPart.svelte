@@ -38,6 +38,7 @@
   import type { ShapeHold } from './shape-hold.svelte.ts';
   import { LEFT_COLUMN, RIGHT_COLUMN, rowLaid } from './project-parts.ts';
   import { happenedSaid } from './project-facts.ts';
+  import { askHref, askWords } from './ask-about.ts';
 
   let { hold, parts }: { hold: ShapeHold; parts: readonly string[] } = $props();
 
@@ -153,12 +154,15 @@
       {@const facts = hold.heroFacts}
       {@const status = hold.status}
       {@const name = hold.name}
+      {@const steps = hold.checklist.filter((c) => !facts.headline.includes(c.text.length > 60 ? c.text.slice(0, 57).trimEnd() : c.text))}
       <section class="hero" aria-label={name} style={slotStyle(hold.hue)} data-quiet={status.quiet || undefined} id="part-overview" data-part="Overview" data-part-icon="eye">
         <div class="h-top">
           <span class="h-well"><ProjectWell mark={hold.mark} {name} hue={hold.hue} size="l" /></span>
           <div class="h-name">
-            <!-- THE PROJECT'S NAME IS THE PAGE'S HEADING, and the sentence under it a paragraph (Q60 of 29 October). -->
-            <h1 class="h-title" dir="auto">{name}</h1>
+            <!-- THE PROJECT'S NAME IS THE PAGE'S HEADING, and the sentence under it a paragraph (Q60 of 29 October). HEARD, NOT
+                 SEEN (3 Nov): the bar over the page already says the name at its largest, and the hero said it again under
+                 it. -->
+            <h1 class="h-title visually-hidden" dir="auto">{name}</h1>
             {#if hold.dateLine || status.health}
               <p class="h-status">
                 <!-- THE LAST FACT, THE DOT AND THE HEALTH WRAP AS ONE, so a phone never ends a line on a stray " · " with
@@ -179,11 +183,14 @@
         {:else if facts.lede}
           <p class="h-say" dir="auto">{facts.lede}</p>
         {/if}
-        {#if hold.checklist.length > 0}
+        <!-- A STEP THE HEADLINE ALREADY NAMES IS NOT LISTED AGAIN UNDER IT (3 Nov): '"Ship webhook retries" is due tomorrow.'
+             stood over "Next step: Ship webhook retries, Wed 4 Nov" and a button to open it, one task three times. The
+             headline says it and the red button opens it. -->
+        {#if steps.length > 0}
           <div class="h-steps">
             <p class="h-lbl">Next step</p>
             <ul class="ck-list">
-              {#each hold.checklist as c, n (n)}
+              {#each steps as c, n (n)}
                 <li class="ck">
                   <span class="ck-box" aria-hidden="true"></span>
                   {#if c.href}<a class="ck-text" href={at(c.href)} dir="auto">{c.text}</a>{:else}<span class="ck-text" dir="auto">{c.text}</span>{/if}
@@ -197,6 +204,10 @@
           <div class="h-acts">
             {#if facts.red}<Button weight="primary" href={facts.red.href}>{facts.red.said}</Button>{/if}
             {#if facts.soft}<Button href={facts.soft.href}>{facts.soft.said}</Button>{/if}
+            <!-- ASK ABOUT THIS (3 Nov): Slash opened with the project named, for a question in his own words. -->
+            {#if hold.register !== '' && hold.seq > 0}
+              <Button href={askHref(`${hold.register}#${hold.seq}`)} data-ask-about aria-label={askWords.askAbout}><Icon name="slash" size="s" /><span class="ask-long">{askWords.askAbout}</span><span class="ask-short" aria-hidden="true">{askWords.askShort}</span></Button>
+            {/if}
             <!-- SEND TO…: the project to Slash or an agent, fetched with the hero and not before. -->
             {#if hold.register !== '' && hold.seq > 0}
               {@const ref = `${hold.register}#${hold.seq}`}
@@ -522,6 +533,21 @@
     display: grid;
   }
 
+  /* ASK ABOUT THIS IN FULL AT A DESK, "ASK" UNDER A THUMB. */
+  .ask-short {
+    display: none;
+  }
+
+  @media (width < 600px) {
+    .ask-long {
+      display: none;
+    }
+
+    .ask-short {
+      display: inline;
+    }
+  }
+
   .h-name {
     display: grid;
     gap: 2px;
@@ -690,6 +716,21 @@
     overflow: hidden;
     line-height: var(--ctl-h);
     text-overflow: ellipsis;
+  }
+
+  /* ASK HOLDS A GLYPH BESIDE ITS WORDS, and is never long enough to cut. */
+  .h-acts :global(.btn[data-ask-about]) {
+    display: inline-flex;
+  }
+
+  /* THE NAME IS HEARD AS THE PAGE'S HEADING AND NOT DRAWN: the bar over the page says it. */
+  .visually-hidden {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   @media (width >= 640px) {

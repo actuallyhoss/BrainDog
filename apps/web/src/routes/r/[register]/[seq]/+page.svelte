@@ -37,6 +37,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { copy } from '$lib/copy.ts';
+  import { askHref, askWords } from '$lib/page/ask-about.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { keepPrivate } from '$lib/record/privacy-write.ts';
   import * as clipboard from '$lib/clipboard.ts';
@@ -1014,8 +1015,21 @@
       return one && named?.href ? [{ key: one.spoken, scope: one, href: named.href }] : [];
     });
   });
-  /* "ASK ABOUT DANA" (3 Nov, Sam): Slash opened with the person in it, by their spoken row. */
-  const askAbout = $derived(meets && row && !self && row.seq !== null ? { href: `/slash?with=${encodeURIComponent(`${id}#${row.seq}`)}`, name: String(row.fields[decl?.title ?? ''] ?? '').trim().split(/\s+/u)[0] || decl?.one || '' } : null);
+  /**
+   * ASK ABOUT IT IN SLASH (3 Nov): one button a page, Slash opened with the row in it. A person's says their name, "Ask
+   * about Dana", and stands where Send to stands on any other row, so `s` presses it; any other row says "Ask about this"
+   * beside Send. Your own row, never.
+   */
+  const askAbout = $derived.by(() => {
+    if (!row || row.seq === null || self) return null;
+    const name = meets ? String(row.fields[decl?.title ?? ''] ?? '').trim().split(/\s+/u)[0] || decl?.one || '' : '';
+    return {
+      href: askHref(`${id}#${row.seq}`),
+      person: Boolean(meets) && name !== '',
+      said: meets && name ? seenWords.askAbout(name) : askWords.askAbout,
+      label: meets && name ? seenWords.askIn(name) : askWords.askAbout,
+    };
+  });
   const lead = $derived.by(() => {
     if (!row || (!meets && !orgRole)) return null;
     /* THE CHIP BEFORE THE SENTENCE ALREADY NAMES THE PROJECTS (3 Nov): "• Ferment & Co, Tidepool  Accountant, on Ferment
@@ -1302,7 +1316,7 @@
       return;
     }
     /* ON A PERSON'S PAGE `s` ASKS ABOUT THEM, the press that stands where Send to stands on any other row. */
-    if (e.key === 's' && askAbout) {
+    if (e.key === 's' && askAbout?.person) {
       e.preventDefault();
       void goto(at(askAbout.href));
       return;
@@ -1569,15 +1583,15 @@
       {#if changes && archived}
         <Button weight="primary" disabled={saving} data-head-primary onclick={() => void setArchived(false)}>{copy.rowRestore}</Button>
       {/if}
-      <!-- ASK ABOUT A PERSON, in Slash with them in it (3 Nov, Sam): the one thing a person's page is opened to send, so it
-           stands where Send to stands on any other row, and `s` presses it. -->
+      <!-- ASK ABOUT IT, in Slash with the row in it (3 Nov, Sam): on a person's page the one thing it is opened to send, so
+           it stands where Send to stands on any other row and `s` presses it; on any other row it sits beside Send. -->
       {#if askAbout && !archived}
-        <Button href={askAbout.href} aria-label={seenWords.askIn(askAbout.name)} data-ask-about
-          ><Icon name="slash" size="s" /><span class="ask-full">{seenWords.askAbout(askAbout.name)}</span><span class="ask-short" aria-hidden="true">{seenWords.askShort}</span></Button
+        <Button href={askAbout.href} aria-label={askAbout.label} data-ask-about
+          ><Icon name="slash" size="s" /><span class="ask-full">{askAbout.said}</span><span class="ask-short" aria-hidden="true">{askWords.askShort}</span></Button
         >
       {/if}
       <!-- SEND TO…: Slash or an agent, the last one in one press and the rest from its arrow (s). -->
-      {#if live && !archived && row.seq !== null && !askAbout}
+      {#if live && !archived && row.seq !== null && !askAbout?.person}
         <SendButton
           bind:this={sender}
           kind={id}
@@ -1649,9 +1663,6 @@
 
         <!-- WHAT IT HOLDS TO LOOK AT: the audits, plans and designs hung on it, each a still or a quiet card until pressed. -->
         {#if live && row.seq !== null}<VisualStrip on="{id}#{row.seq}" tile />{/if}
-
-        <!-- THE FILES PUT ON IT FOR CONTEXT: PDFs, pages saved from Claude, pictures, notes. Loaded with the row, not the app. -->
-        {#if live && row.seq !== null}{#await import('$lib/attach/Attachments.svelte') then { default: Attachments }}<Attachments on="{id}#{row.seq}" tile />{/await}{/if}
 
         <!-- A RUN READS AS ITS HANDOFF, led by its face, what it is doing and where it is, then what the next
              session needs: the next step, what was already tried, newest first, and the notes it left. The one place
@@ -1846,6 +1857,10 @@
             </article>
           </Tile>
         {/each}
+
+        <!-- THE FILES PUT ON IT FOR CONTEXT: PDFs, pages saved from Claude, pictures, notes. Loaded with the row, not the app.
+             UNDER WHAT THE ROW SAYS (3 Nov): an empty drop zone stood over a task's own fields, the first thing on its page. -->
+        {#if live && row.seq !== null}{#await import('$lib/attach/Attachments.svelte') then { default: Attachments }}<Attachments on="{id}#{row.seq}" tile />{/await}{/if}
 
         <!-- WHERE A PERSON WAS SEEN: each place once, newest first, with how often and when, in a person's words. ONE PLACE,
              ONCE, WITH NOTHING ABOUT IT is the head's "Met" fact already (3 Nov), so it is not a card as well. -->
@@ -2951,7 +2966,7 @@
     white-space: nowrap;
   }
 
-  /* "ASK ABOUT DANA" AT A DESK, "ASK" ON A PHONE, the slash glyph before it either way. */
+  /* "ASK ABOUT DANA" OR "ASK ABOUT THIS" AT A DESK, "ASK" ON A PHONE, the slash glyph before it either way. */
   .ask-short {
     display: none;
   }

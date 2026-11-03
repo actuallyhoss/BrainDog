@@ -19,7 +19,8 @@
   the list's 2,000, and a dialog inside a table's cell inherits the cell's line height, which is the row's.
 -->
 <script lang="ts">
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
+  import { rowHref } from '$lib/record/row-href.ts';
   import { labelOf } from '$lib/record/api.ts';
   import { meetsOf, orgRoleOf } from '$lib/record/folk.ts';
   import { REGISTERS } from '$lib/record/held.ts';
@@ -34,6 +35,7 @@
     placesIn,
     scopeFieldOf,
     scopeOf,
+    scopesOf,
     widens,
     words,
     type Landed,
@@ -88,6 +90,17 @@
   const scope = $derived(now?.scope);
   const canMove = $derived(movesIn(register, live));
   const folk = $derived(meetsOf(REGISTERS[register]) !== null || orgRoleOf(REGISTERS[register]) !== null);
+  /* EACH PROJECT THE ROW NAMES, ITS OWN CHIP THAT OPENS ITS PAGE (3 Nov), where one press does not move the row: a person on
+     two projects wore one chip, "Ferment & Co, Tidepool", which opened neither. A row one press moves keeps its one chip,
+     which opens the move. */
+  const chips = $derived(
+    !compact && target && !canMove
+      ? scopesOf(register, target.fields, names).map((s) => {
+          const n = Number(s.ref.split('#')[1]);
+          return { ...s, href: rowHref(s.ref) ?? (Number.isInteger(n) ? `/r/${s.ref.split('#')[0]}/${n}` : null) };
+        })
+      : [],
+  );
 
   let open = $state(false);
   /* `undefined` while the projects are being read, `null` when the record would not list them. */
@@ -187,7 +200,11 @@
      AG23): Ada Vine's page read "Everywhere" in front of "Accountant at Pell & Vine", which nobody could press or
      explain. A key's "Everywhere" stays: there it says which machines may open it. -->
 {#if !compact && scope !== undefined && (scope !== null || canMove || !folk)}
-  <ScopeChip {scope} {size} onmove={canMove ? openMove : undefined} />
+  {#if chips.length > 0}
+    <span class="scope-chips">{#each chips as c (c.ref)}{#if c.href}<a class="scope-link" href={at(c.href)}><ScopeChip scope={c} {size} /></a>{:else}<ScopeChip scope={c} {size} />{/if}{/each}</span>
+  {:else}
+    <ScopeChip {scope} {size} onmove={canMove ? openMove : undefined} />
+  {/if}
 {/if}
 
 {#if canMove && field}
@@ -212,6 +229,28 @@
 {/if}
 
 <style>
+  /* ONE CHIP A PROJECT, side by side and wrapping as words do, each a link to its page with the chip's own hover. */
+  .scope-chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+    vertical-align: middle;
+  }
+
+  .scope-link {
+    display: inline-flex;
+    border-radius: var(--r-ctl);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .scope-link:hover :global(.scope-chip) {
+      background: var(--hover, var(--tile-2));
+      color: var(--ink);
+    }
+  }
+
   /* ROWS WITH SPACE AND NO BOX AROUND THEM, each the whole of its target and 48px tall, which is the
      action sheet's row under a thumb. A hairline between two rows, drawn inset so it runs under the words and never
      under the wash's curve; the row pointed at, and the place the row applies now, take the rounded wash. */

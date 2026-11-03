@@ -132,6 +132,29 @@ export function scopeOf(register: string, fields: Readonly<Record<string, unknow
 }
 
 /**
+ * EACH PROJECT A ROW NAMES, AS ITS OWN CHIP (3 Nov): a person on two projects wore one chip, "Ferment & Co, Tidepool",
+ * which opened neither. Each is its own place, its own mark and hue, and its own ref, so its chip can open its page.
+ * Empty for a list whose rows say nothing about where they apply, or a row that names no project.
+ */
+export function scopesOf(register: string, fields: Readonly<Record<string, unknown>>, names?: Names): (Scope & { ref: string })[] {
+  const field = scopeFieldOf(register);
+  if (!field?.to) return [];
+  const to = field.to;
+  const value = fields[field.id];
+  const said = (Array.isArray(value) ? value : [value]).filter((v): v is number | string => (typeof v === 'number' || typeof v === 'string') && v !== '');
+  return said.map((v) => {
+    const mark = names?.marks?.get(`${to}#${v}`);
+    return {
+      spoken: typeof v === 'number' ? spokenOf(to, v) : v,
+      name: names?.get(`${to}#${v}`) ?? words.someProject,
+      mark: mark && mark.mark !== '' ? mark.mark : null,
+      hue: mark ? hueOf(mark.hue) : null,
+      ref: `${to}#${v}`,
+    };
+  });
+}
+
+/**
  * Whether a move opens a KEY to every project: the list holds a sealed value (`secret`), and the row goes from one
  * project to everywhere. That one move is asked about first, because it hands the key to every machine
  * that holds a grant for all projects, which is more than the person who pressed it may have in mind.
