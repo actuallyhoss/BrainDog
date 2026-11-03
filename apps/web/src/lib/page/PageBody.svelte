@@ -1929,8 +1929,30 @@
   }
 
   .block-slot > :global(.block[data-kind='section'] .sec-title) {
+    gap: var(--sp-2);
     font-size: var(--fs-body);
     line-height: 20px;
+  }
+
+  /* THE ONE CARD HEAD HERE TOO (space pass, 4 Nov): a 28 row, `--card-head-gap` over what the slot holds under it. Tell
+     an agent's head stood 4 over its field, and Agents at work's on its first row; the slot is a block box, so nothing
+     else put air there. */
+  .block-slot > :global(.block[data-kind='section'] .sec) {
+    min-block-size: var(--well);
+  }
+
+  .block-slot > :global(.block.block[data-kind='section']:not(:last-child)) {
+    margin-block-end: var(--card-head-gap);
+  }
+
+  /* AND ITS GLYPH IS BARE, as `Tile`'s and the block bar's are: 18 of quiet ink, no well behind it. A tone colours the
+     glyph, not a fill. */
+  .block-slot > :global(.block[data-kind='section'] .sec-glyph:has(> svg)) {
+    inline-size: var(--head-glyph);
+    block-size: var(--head-glyph);
+    background: none;
+    border-radius: 0;
+    color: var(--ink-3);
   }
 
   .block-slot > :global(.block[data-kind='section'] .sec-toggle) {
@@ -2023,17 +2045,14 @@
      cash. The row names the tone (`blocks.ts` `sectionWell`) and the renderer writes it on the well, naming no colour.
      A section that says none keeps the quiet grey. */
   .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='action']) {
-    background: var(--red-tint);
     color: var(--red);
   }
 
   .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='danger']) {
-    background: var(--red-tint);
     color: var(--red);
   }
 
   .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='earn']) {
-    background: var(--good-tint);
     color: var(--good);
   }
 

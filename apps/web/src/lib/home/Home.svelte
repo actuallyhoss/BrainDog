@@ -2834,6 +2834,12 @@
     gap: var(--sp-3);
   }
 
+  /* THE TILE'S HEAD TAKES 4 BACK FROM A 16 GAP (`Tile.svelte`); on the board the gap is already the head's 12, so it
+     took 4 from 12 and Late's first row stood 8 under its name (space pass, 4 Nov). */
+  .body[data-board] :global(.tile > .tile-head) {
+    margin-block-end: 0;
+  }
+
   .body[data-board] :global(:is(.block-bar > .well, .tile-head > .well, .p-title-row > .well)) {
     inline-size: 18px;
     block-size: 18px;

@@ -985,7 +985,8 @@
     align-items: center;
     gap: var(--sp-3);
     min-block-size: 40px;
-    padding: 0 var(--title-inset, 12px);
+    /* ON THE SAME EDGE AS THE COLUMN HEADS OVER IT (space pass, 4 Nov): "Suggested by agents" stood 12 right of "Money". */
+    padding: 0;
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
@@ -997,9 +998,12 @@
     margin: 0;
   }
 
+  /* ITS GLYPH IS BARE, as every card head's is (rhythm, 3 Nov): 18 of quiet ink, no well behind it. */
   .body :global(.block-slot:has(> .block[data-kind='section']) .well) {
-    background: var(--tile-2);
-    color: var(--ink-2);
+    inline-size: var(--head-glyph);
+    block-size: var(--head-glyph);
+    background: none;
+    color: var(--ink-3);
   }
 
   .body :global(.block-slot:has(> .block[data-kind='section']) > .block) {
