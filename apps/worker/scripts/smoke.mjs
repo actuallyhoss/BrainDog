@@ -307,7 +307,7 @@ export function argsFor(read, said) {
   }
   if (read.ask === 'pack') {
     const on = Array.isArray(said.packs) ? said.packs.find((p) => typeof p?.id === 'string' && p.disabled_at == null) : undefined;
-    return on ? { args: { id: on.id } } : { skip: 'the canary has no add-on switched on' };
+    return on ? { args: { id: on.id } } : { skip: 'the canary has no plugin switched on' };
   }
   if (read.ask === 'page') {
     const first = Array.isArray(said.pages) ? said.pages.map((p) => p?.slug ?? p?.page).find((s) => typeof s === 'string') : undefined;

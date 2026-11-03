@@ -117,11 +117,11 @@ test('every area this build declares has an arm in the page that draws it', () =
 });
 
 test('FIVE GROUPS NAMED BY WHAT THEY HOLD, two by two and Your data the whole width under them, Delete last', () => {
-  assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'How it looks', 'Agents and add-ons', 'People and billing', 'Your data']);
+  assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'How it looks', 'Agents and plugins', 'People and billing', 'Your data']);
   const rows = DEFAULT_GROUPS.map((g) => rowsOf(g).map((r) => r.label));
   assert.deepEqual(rows[0], ['Signing in', 'Notifications', 'Keyboard']);
   assert.deepEqual(rows[1], ['Appearance', 'Pages', 'Time and money']);
-  assert.deepEqual(rows[2], ['Agents', 'Keychain', 'What comes in', 'Add-ons']);
+  assert.deepEqual(rows[2], ['Agents', 'Keychain', 'What comes in', 'Plugins']);
   assert.deepEqual(rows[3], ['People and sharing', 'Usage', 'Billing']);
   assert.deepEqual(rows[4], ['Health', 'Tidy up', 'Backups', 'Export', 'Delete my BrainDog']);
   assert.deepEqual(SETTINGS_INDEX.blocks.map((b) => b.span), [6, 6, 6, 6, 12]);

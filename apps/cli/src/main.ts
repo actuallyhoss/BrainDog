@@ -553,7 +553,7 @@ const GROUPS: [string, [string, string][]][] = [
     ['private-terms', 'Write your private list from your own BrainDog'],
     ['feed propose <file>', 'Ask for each live feed a setup file lists'],
   ]],
-  ['Add-ons', [
+  ['Plugins', [
     ['addon new|check|test|preview|dev', 'Write, check and try a plugin here (also: pack)'],
     ['addon install|uninstall <id>', 'Ask the owner to install a plugin, or remove one'],
     ['addon publish|yank|diff|search', 'Publish, take back, compare or find plugins'],

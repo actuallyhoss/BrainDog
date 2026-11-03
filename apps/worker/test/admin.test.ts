@@ -159,5 +159,5 @@ test('the add-on queue reads and decides through the Kennel review door, which t
   for (const method of ['GET', 'POST']) assert.equal(serveAdmin(at('/api/kennel/v1/review', method)), null, method);
   assert.equal(served(at('/api/kennel/v1/index.json')).status, 404, 'only the review door is passed on');
   assert.match(ADMIN_HTML, /<section class="tile wide" id="addons" aria-labelledby="addons-title">/);
-  for (const words of ['Add-ons waiting for review', 'Approve', 'Decline', 'verdict: verdict', "'/api/kennel/v1/review'", 'Say why in a line']) assert.ok(ADMIN_HTML.includes(words) || ADMIN_JS.includes(words), words);
+  for (const words of ['Plugins waiting for review', 'Approve', 'Decline', 'verdict: verdict', "'/api/kennel/v1/review'", 'Say why in a line']) assert.ok(ADMIN_HTML.includes(words) || ADMIN_JS.includes(words), words);
 });

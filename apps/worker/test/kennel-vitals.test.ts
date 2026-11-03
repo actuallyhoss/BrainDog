@@ -104,7 +104,7 @@ test('a well night says the four signs in order, each marked, with no ids and no
       '✓ Kennel index: all 2 published files match it.',
       '✓ Kennel counts: written 2 hours ago, all 2 rounded.',
       '✓ Kennel review: nothing waiting.',
-      '✓ Kennel publishers: 1 listed add-on is by publishers other than BrainDog.',
+      '✓ Kennel publishers: 1 listed plugin is by publishers other than BrainDog.',
     ],
   );
   for (const s of signs) assert.doesNotMatch(s.line, /—|abcdef0123456789|\brow\b/u);
@@ -174,7 +174,7 @@ test('the publishers sign is red when only BrainDog is listed, and an unlisted p
     files.set('kennel/packs/probe-2026-10-09/1.0.0.pack.json', fileText('probe-2026-10-09', 'Probe shelf'));
   });
   onlyRed(signs, 'outside');
-  assert.equal(by('outside').line, '✗ Kennel publishers: no listed add-on is by anyone but BrainDog yet.');
+  assert.equal(by('outside').line, '✗ Kennel publishers: no listed plugin is by anyone but BrainDog yet.');
 });
 
 test("the nightly walk reads the signs, puts them under the night's line, and a red one other than publishers makes the night a problem", async () => {

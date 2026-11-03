@@ -752,7 +752,7 @@ async function serve(): Promise<void> {
   const trusts = proxyTrustOf(env.BRAINDOG_TRUST_PROXY);
   if (trusts !== null && 'wrong' in trusts) return refuse(trusts.wrong);
   const outbound = outboundOf(env.BRAINDOG_OUTBOUND);
-  if (outbound === null) return refuse('BRAINDOG_OUTBOUND takes on or off. Set it to on to let add-ons send requests to other servers, or unset it to keep them held.');
+  if (outbound === null) return refuse('BRAINDOG_OUTBOUND takes on or off. Set it to on to let plugins send requests to other servers, or unset it to keep them held.');
 
   const running = await start({
     file,
@@ -872,8 +872,8 @@ async function serve(): Promise<void> {
      should not believe the other went with it. */
   say(
     outbound === 'on'
-      ? '  add-ons send requests to other servers (BRAINDOG_OUTBOUND=on). The public add-on registry is read either way; BRAINDOG_KENNEL=off stops that.'
-      : '  add-ons send no requests to other servers, and their scheduled actions are held. Set BRAINDOG_OUTBOUND=on to let them. The public add-on registry is read either way; BRAINDOG_KENNEL=off stops that.',
+      ? '  plugins send requests to other servers (BRAINDOG_OUTBOUND=on). The public plugin registry is read either way; BRAINDOG_KENNEL=off stops that.'
+      : '  plugins send no requests to other servers, and their scheduled actions are held. Set BRAINDOG_OUTBOUND=on to let them. The public plugin registry is read either way; BRAINDOG_KENNEL=off stops that.',
   );
 
   /* AND WHAT IS WRONG WITH THE ORIGIN, WHENEVER SOMETHING IS, rather than only when sign-in is off.

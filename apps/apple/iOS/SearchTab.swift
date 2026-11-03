@@ -90,7 +90,7 @@ struct SearchView: View {
         let more = [
             Spot(id: "/audit", label: Words.activity, icon: "activity", detail: nil),
             Spot(id: "/agents", label: "Agents", icon: "session", detail: nil),
-            Spot(id: "/addons", label: "Add-ons", icon: "packs", detail: nil),
+            Spot(id: "/plugins", label: "Plugins", icon: "packs", detail: nil),
         ]
         out.append((name: Words.more, spots: more))
         return out

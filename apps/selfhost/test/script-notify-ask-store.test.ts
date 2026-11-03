@@ -135,7 +135,7 @@ test('NOTIFY CAP: twenty a day per add-on; the twenty-first is a refusal the scr
     await s.run();
     const line = s.line('loud');
     assert.equal(line.outcome, 'ok', `${line.note} ${line.log}`);
-    assert.match(line.log, /^OUT_OF_BOUNDS An add-on sends at most 20 notices a day/u);
+    assert.match(line.log, /^OUT_OF_BOUNDS A plugin sends at most 20 notices a day/u);
     assert.equal(s.notes('loud').length, SCRIPT_NOTICES_PER_DAY);
     /* AND THE NEXT RUN THE SAME DAY SENDS NONE. */
     await s.run();

@@ -260,7 +260,7 @@
               <p class="addon-title">{a.title}</p>
               {#if a.summary}<p class="agent-sub">{a.summary}</p>{/if}
             </div>
-            <Button href={`/addons/${encodeURIComponent(a.id)}`}>{words.seeAddon(a.title)}</Button>
+            <Button href={`/plugins/${encodeURIComponent(a.id)}`}>{words.seeAddon(a.title)}</Button>
           </li>
         {/each}
       </ul>

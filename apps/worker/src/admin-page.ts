@@ -43,7 +43,7 @@ export const ADMIN_HTML = `<!doctype html>
 </section>
 <div class="grid" id="desk" hidden>
 <section class="tile wide" id="addons" aria-labelledby="addons-title">
-<h2 id="addons-title">Add-ons waiting for review</h2>
+<h2 id="addons-title">Plugins waiting for review</h2>
 <p class="what">Packs people published to the store. Approve lists one for everybody; decline says why to the person who made it.</p>
 <p class="said" id="addons-said" role="status" aria-live="polite"></p>
 <ul class="things" id="addons-list"></ul>
@@ -426,7 +426,7 @@ export const ADMIN_JS = String.raw`'use strict';
       list.textContent = '';
       say('addons-said', items.length === 0 ? 'Nothing is waiting.' : '');
       items.forEach(function (item) { list.appendChild(addon(item)); });
-      /* AND WHAT PEOPLE REPORTED, newest first, under the queue: an add-on already listed that someone says is wrong. */
+      /* AND WHAT PEOPLE REPORTED, newest first, under the queue: a plugin already listed that someone says is wrong. */
       var reports = Array.isArray(value.reports) ? value.reports : [];
       reports.slice(0, 20).forEach(function (r) {
         var li = el('li');

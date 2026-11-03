@@ -35,7 +35,7 @@ struct SettingsRoot: View {
             Area(label: "Pages", line: "Sidebar and bar", glyph: .rows, path: "/settings/navigation"),
             Area(label: "Time and money", line: "Time zone, currency, list names", glyph: .tag, path: "/settings/words"),
         ]),
-        Group(title: "Agents and add-ons", areas: [
+        Group(title: "Agents and plugins", areas: [
             Area(label: "Agents", line: "Connections, permissions, Slash", glyph: .session, path: "/settings/agents"),
             Area(label: "What comes in", line: "Mail and feeds", glyph: .inbox, path: "/settings/ingest"),
             Area(label: "Plugins", line: "Installed, updates", glyph: .packs, path: "/settings/plugins"),

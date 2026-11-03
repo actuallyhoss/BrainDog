@@ -419,7 +419,7 @@ test('a canary that holds nothing to name skips those reads and says so, which i
   const { code, out } = await run({ held: { boot: { registers: [{ id: 'session', count: 0 }] }, packs: [], pages: [] } });
   assert.equal(code, 0, out);
   for (const m of ['schema', 'list', 'previewPage']) assert.match(out, new RegExp(`skip {3}${m}: the canary holds no list`));
-  assert.match(out, /skip {3}packConfig: the canary has no add-on/);
+  assert.match(out, /skip {3}packConfig: the canary has no plugin/);
   assert.match(out, /skip {3}get: the canary has no row to open/);
 });
 

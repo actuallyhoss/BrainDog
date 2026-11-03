@@ -62,7 +62,7 @@ export function requiredIds(doc: Doc): string[] {
   return isMap(requires.packs) ? Object.keys(requires.packs) : [];
 }
 
-const titleOf = (doc: Doc): string => text(doc.title) || text(doc.pack) || 'This add-on';
+const titleOf = (doc: Doc): string => text(doc.title) || text(doc.pack) || 'This plugin';
 
 /** The page declarations a document brings, by their name, with the title each says. */
 function pagesOf(doc: Doc): Map<string, string> {
@@ -89,14 +89,14 @@ async function modulesFor(doc: Doc, also: readonly string[], required: ScratchDe
   for (const id of asked) askedBy.set(id, titleOf(doc));
   while (asked.length > 0) {
     if (found.size + asked.length > SCRATCH_MODULES_MOST)
-      return no('DEPENDENCY_UNRESOLVED', `${titleOf(doc)} stands on more than ${SCRATCH_MODULES_MOST} add-ons counted with what they require, and the Kennel installs at most that many to try it. Require fewer.`, {
+      return no('DEPENDENCY_UNRESOLVED', `${titleOf(doc)} stands on more than ${SCRATCH_MODULES_MOST} plugins counted with what they require, and the Kennel installs at most that many to try it. Require fewer.`, {
         at: 'requires',
       });
     const docs = await required(asked);
     const byId = new Map(docs.filter(isMap).map((d) => [text(d.pack), d] as const));
     const missing = asked.find((id) => !byId.has(id));
     if (missing !== undefined)
-      return no('DEPENDENCY_UNRESOLVED', `${askedBy.get(missing)} requires ${missing}, and neither the Kennel nor BrainDog holds an add-on by that name. Publish ${missing} first, or take it out of requires.`, {
+      return no('DEPENDENCY_UNRESOLVED', `${askedBy.get(missing)} requires ${missing}, and neither the Kennel nor BrainDog holds a plugin by that name. Publish ${missing} first, or take it out of requires.`, {
         at: `requires.packs.${missing}`,
       });
     const next: string[] = [];

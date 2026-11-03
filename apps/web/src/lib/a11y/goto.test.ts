@@ -86,7 +86,7 @@ test('the sheet prints the same list, and the `g` row takes it', () => {
   const rows = [{ href: '/s/money', name: 'Money' }];
   const line = chordOf(gotoOf(rows));
   assert.equal(line.key, 'g then h d i s k p , m');
-  assert.equal(line.label, 'Go to Today, Needs you, Inbox, Search, Keychain, Add-ons, Settings, Money');
+  assert.equal(line.label, 'Go to Today, Needs you, Inbox, Search, Keychain, Plugins, Settings, Money');
   const row = BINDINGS.find((b) => b.id === 'goto')!;
   const was = { key: row.key, label: row.label };
   assert.equal(was.key, 'g then h d i s k p ,', 'before the layout hands a list, the row says the seven');

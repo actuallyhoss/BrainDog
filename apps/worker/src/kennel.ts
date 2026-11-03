@@ -434,7 +434,7 @@ export function kennelReader(deps: Pick<KennelDeps, 'blobs' | 'assets'>): Kennel
     advisories: () => advisoriesOf(deps),
     async version(kind, id, version) {
       const entry = (await index()).entries.find((e) => e.kind === kind && e.id === id);
-      const said = kind === 'pack' ? 'add-on' : 'use case';
+      const said = kind === 'pack' ? 'plugin' : 'use case';
       if (entry === undefined) return no('REF_UNKNOWN', `The catalogue holds no ${said} ${id}.`, { at: 'id' });
       const listed = entry.versions.find((v) => v.version === version);
       if (listed === undefined) return no('REF_UNKNOWN', `The catalogue holds ${entry.title} at ${entry.latest}, not at ${version}.`, { at: 'version' });
@@ -612,8 +612,8 @@ function outsideSign(indexes: Indexes): KennelSign {
   const outside = listedEntries(indexes.merged).filter((e) => e.kind === 'pack' && e.publisher !== undefined && e.publisher.kind !== 'braindog' && offeredVersion(e) !== null);
   /* RED BY DESIGN UNTIL A STRANGER PUBLISHES, AND NOT A FAULT (`nightlyWalk`), so it carries its mark without "Needs a
      look", which a line said every night would teach the operator to skip. */
-  if (outside.length === 0) return { sign: 'outside', ok: false, line: '✗ Kennel publishers: no listed add-on is by anyone but BrainDog yet.' };
-  return well('outside', `Kennel publishers: ${outside.length === 1 ? '1 listed add-on is' : `${String(outside.length)} listed add-ons are`} by publishers other than BrainDog.`);
+  if (outside.length === 0) return { sign: 'outside', ok: false, line: '✗ Kennel publishers: no listed plugin is by anyone but BrainDog yet.' };
+  return well('outside', `Kennel publishers: ${outside.length === 1 ? '1 listed plugin is' : `${String(outside.length)} listed plugins are`} by publishers other than BrainDog.`);
 }
 
 /* ── the three files ────────────────────────────────────────────────────── */

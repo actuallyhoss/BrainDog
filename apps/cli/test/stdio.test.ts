@@ -723,7 +723,7 @@ test('nothing is listed as coming later, and an unknown command is not echoed un
   /* THE HELP IS GROUPED BY WHAT A PERSON DOES, one short line a command; the long text is the command's own --help. */
   const rows = help.stdout.split(/\r?\n/);
   assert.ok(rows.length < 80, `${rows.length} lines`);
-  const groups = ['Sign in:', 'Keys:', 'Agents and sessions:', 'Records:', 'Add-ons:', 'Sync:', 'Other:'];
+  const groups = ['Sign in:', 'Keys:', 'Agents and sessions:', 'Records:', 'Plugins:', 'Sync:', 'Other:'];
   const at = groups.map((g) => rows.indexOf(g));
   assert.ok(at.every((n) => n >= 0) && at.every((n, k) => k === 0 || n > at[k - 1]!), `groups out of order: ${at}`);
   for (const row of rows.filter((l) => l.startsWith('  '))) assert.ok(row.length <= 90, row);
