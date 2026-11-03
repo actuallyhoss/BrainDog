@@ -1743,8 +1743,57 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.1",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "d81138d26e8d12f3d362e8c3b8165146e30d707b4dac38f4524854e3f75e71c4",
+          "bytes": 82704,
+          "published_at": "2026-11-03T18:37:21.081Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Mail"
+            ],
+            "pages": [
+              "Mail"
+            ],
+            "rules": [
+              "Ask about a mail a person is waiting on your reply to",
+              "Ask about a mail that looks like a bill",
+              "Ask about a mail that looks like a receipt",
+              "Ask about a mail from a person with a date in it",
+              "Ask once about many mails at a time",
+              "Take a mail you replied to off Waiting on your reply",
+              "Take a mail that needs no reply off Waiting on your reply",
+              "Clear a mail you said is not a bill",
+              "Clear a mail you said is not a receipt",
+              "Leave the mails you said to leave"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "widgets": [
+              "Mail",
+              "Waiting on your reply"
+            ],
+            "uses": [
+              {
+                "id": "register.people",
+                "writes": true
+              },
+              {
+                "id": "register.organisations",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "Asks far less. A reply only when a person wrote to you directly and asks you something, never for an invitation, its updates, a list or a forward sent for your information. One question a thread, and one an order or invoice, with the amount first. A date never for an invitation or an event already on your calendar. A first look, or an hour with more than five, asks once: 12 mails may need you. Nobody is added to People unless you both wrote lately.",
+          "preview": true
+        },
         {
           "version": "1.1.1",
           "checksum": "b17ed02b5549e2c9e06a68f08757e8d5649742cbb647fe7944ac21f6c432f0b2",
