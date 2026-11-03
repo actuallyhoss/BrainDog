@@ -18,7 +18,8 @@
  */
 
 import type { Refusal, Result } from '@braindog/ports';
-import { ok } from '@braindog/ports';
+import { no, ok } from '@braindog/ports';
+import { restoreWithin } from './addon-data.ts';
 import { conflictFault, installFault, installOrder, keptQuestion, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, updatesFromStore, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type InstallOptions, type Pack, type VoiceKey } from '@braindog/declare';
 import { KEY_OPENED_UNATTENDED, KEY_OPENED_UNATTENDED_PASSPHRASE, approvalLines, configReads, configValue, egressChanged, egressOf, personNameOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
@@ -165,9 +166,32 @@ const WAITING_HOLDER = 'braindog:waiting';
  */
 export async function installHeld(kernel: Kernel, pack: Pack, diff: Diff, host: Host, planHash: string, approve: readonly string[] = [], because?: string, options: InstallOptions = {}): ReturnType<typeof install> {
   const waiting = diff.waiting ?? [];
+  /* AN UPDATE THAT MOVES ENTRIES INSTALLS ONLY WITH ITS MOVE (`addon-data.ts` `rehearseMove`), which the record's
+     `installPack` rehearses and hands in as `within`. Every other way in is refused, so no path lands the new shape over
+     entries still in the old one. */
+  if (diff.migrates !== undefined && options.within === undefined)
+    return no(
+      'PLAN_STALE',
+      `${pack.manifest.title ?? pack.manifest.pack} ${pack.manifest.version} moves your entries on the way (${diff.migrates.says}), so it is installed from its own page, where the move is tried first. Nothing changed.`,
+      { at: 'migrate' },
+    );
+  /* AND ONE REMOVED WITH ITS DATA INSIDE THE WINDOW COMES BACK WITH ITS ENTRIES (`restoreWithin`), in the same transaction. */
+  const back = restoreWithin(kernel, pack.manifest.pack, 'system');
+  const within =
+    back === undefined
+      ? options.within
+      : options.within === undefined
+        ? back
+        : (): Result<unknown> => {
+            const moved = options.within!();
+            return moved.ok ? back() : moved;
+          };
   /* `because` IS WHY AN INSTALL NOBODY PRESSED HAPPENED, for the line history keeps of it (`planAgain`). */
   const more = { waiting, ...(because === undefined ? {} : { because }) };
-  const put = await install(pack, diff, { ...host, remember: (row) => host.remember({ ...row, ...more } as Parameters<Host['remember']>[0]) }, planHash, approve, options);
+  const put = await install(pack, diff, { ...host, remember: (row) => host.remember({ ...row, ...more } as Parameters<Host['remember']>[0]) }, planHash, approve, {
+    ...options,
+    ...(within === undefined ? {} : { within }),
+  });
   if (put.ok) kernel.setPref(WAITING_HOLDER, pack.manifest.pack, waiting.length > 0 ? { ...pack, seeds: [] } : null);
   return put;
 }

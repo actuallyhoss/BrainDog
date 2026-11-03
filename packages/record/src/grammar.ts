@@ -592,6 +592,7 @@ const PACK = {
     adds: 'blocks laid on another add-on\'s page',
     widgets: 'Today cards: [{id, title, says, group, for, block, sizes, size, needs: {lists}, example}]. Installing adds them to the card sheet; the person, or an agent through propose body_kind widget, puts one on Today',
     skills: '[{name, trigger, what?, body}]: steps the person\'s agents follow, at most 8',
+    migrate: '{from: <major>, says, reads: [lists], writes: [lists], source}: on a major version, a script that moves the entries the older major kept into this shape. It is tried first in the sandbox, then its writes land in the update; one refused write and the update does not happen. Own lists only, no egress, no keys. The plan shows says as "Moves your entries"',
     declarations: 'the parts it adds, each written with its kind as its first key',
   },
   declarations: {

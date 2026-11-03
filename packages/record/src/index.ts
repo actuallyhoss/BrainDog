@@ -221,6 +221,7 @@ import {
 } from './headlines.ts';
 import { nameOnly, scrubbed, spokenName } from './scrub.ts';
 import { lookRefusedKey, noteRefusal, refusedFor, rehearse } from './compose-rehearse.ts';
+import { BINNED, binOwnRows, ownLists as packLists, rehearseMove, type Binned } from './addon-data.ts';
 import { composeLooks, groupListsOf, keepLook as keepLookOf, keptBy, lookAnswerMost, lookBasis, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
 import {
   BODY_DEPTH,
@@ -15743,7 +15744,47 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          exactly what the sheet showed (first hour audit, E2). The plan made now is the one installed, and only a plan
          that says something else is sent back to be read. */
       const approved = samePlan(args.planHash, diff.planHash) ? diff.planHash : args.planHash;
-      const put = await installHeld(kernel, pack.value, diff, packHost(ctx), approved, (approve ?? []) as string[], undefined, args.retireWithRows === true ? { retireWithRows: true } : {});
+      /* AN UPDATE THAT MOVES ENTRIES TRIES THE MOVE FIRST (`addon-data.ts` `rehearseMove`): in the sandbox, writing nothing,
+         reading the entries as the version held keeps them. Refused there, nothing is installed; otherwise its writes go
+         in the install's own transaction, after the new shape, and a write refused there rolls the whole update back. */
+      let within: (() => Result<unknown>) | undefined;
+      if (diff.migrates !== undefined && from !== null) {
+        if (approved !== diff.planHash) return no('PLAN_STALE', 'What this would install changed after the plan was read, so nothing was installed. Read the plan again.', { at: 'planHash' });
+        const who = kernel.identity();
+        const moving = pack.value.manifest.migrate;
+        const as: CallContext = { ...ctx, registers: moving?.reads ?? [] };
+        const moved = await rehearseMove(
+          {
+            pack: pack.value,
+            heldLists: packLists(kernel.packClaims(pack.value.manifest.pack)),
+            kernel,
+            record: { id: who?.id ?? 'self', tz: who?.tz ?? 'UTC' },
+            config: ((r) => (r.ok ? r.value.values : {}))(kernel.packConfig(pack.value.manifest.pack)),
+            tryScript: deps.tryScript as never,
+            reads: {
+              list: async (register: string, where: unknown, options: unknown = null) => {
+                const deleted = (options as { includeDeleted?: unknown } | null)?.includeDeleted;
+                const page = await this.list({ register, ...(where === null || where === undefined ? {} : { where }), ...(typeof deleted === 'boolean' ? { includeDeleted: deleted } : {}), limit: 500 } as never, as);
+                if (!page.ok) throw new Error(fixOf(page));
+                return page.value.rows;
+              },
+              get: async (spoken: string) => {
+                const row = await this.get({ spoken } as never, as);
+                if (!row.ok) throw new Error(fixOf(row));
+                return row.value;
+              },
+            },
+            asker: actorOf(ctx),
+          },
+          `migrate:${pack.value.manifest.pack}@${pack.value.manifest.version}`,
+        );
+        if (!moved.ok) return moved;
+        within = moved.value.within;
+      }
+      const put = await installHeld(kernel, pack.value, diff, packHost(ctx), approved, (approve ?? []) as string[], undefined, {
+        ...(args.retireWithRows === true ? { retireWithRows: true } : {}),
+        ...(within === undefined ? {} : { within }),
+      });
       if (put.ok) await carryUpdate(deps.catalogue ?? [], kernel, pack.value.manifest.pack, from, actorOf(ctx));
       /* AND WHAT A PAGE THIS UPDATE KEPT GOES WITHOUT IS ASKED ABOUT (`keptAsk`), as the night's update asks it. */
       if (put.ok)
@@ -15772,14 +15813,65 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return tail(put.ok && reworded.length > 0 ? { ...put, value: { ...put.value, said: reworded } } : put);
     },
 
-    /** Take one back out. Its declarations are retired and its rows are kept, which is the point. */
-    async uninstallPack(args: { id: string }, ctx: CallContext) {
+    /**
+     * Take one back out. Its declarations are retired and its rows are kept, which is the point.
+     *
+     * `data: true` IS "REMOVE WITH ITS DATA" (phase 8, `addon-data.ts`): every row of its own lists goes into the bin
+     * under one batch, the tokens of its doors are revoked, and then it is uninstalled, all in one transaction. A list
+     * it `uses` is never touched. The bin is the undo: installing it again inside thirty days puts the rows back in
+     * that install's transaction, and the batch can be undone like any other. The pack row, with the key approvals it
+     * held, goes as on any uninstall, so a reinstall asks for them again.
+     */
+    async uninstallPack(args: { id: string; data?: boolean }, ctx: CallContext) {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which pack?', { at: 'id' });
-      const gone = await uninstall(args.id, packHost(ctx));
-      if (gone.ok) await legsFollow(ctx);
-      return tail(gone);
+      if (args.data !== undefined && typeof args.data !== 'boolean') return no('VALUE_MALFORMED', 'data is true to remove its entries with it, into the bin.', { at: 'data' });
+      if (args.data !== true) {
+        const gone = await uninstall(args.id, packHost(ctx));
+        if (gone.ok) await legsFollow(ctx);
+        return tail(gone);
+      }
+      const claimed = kernel.packClaims(args.id);
+      if (claimed.length === 0) return tail(await uninstall(args.id, packHost(ctx)));
+      const lists = packLists(claimed);
+      const doors = claimed.filter((d) => d.startsWith('ingest.')).map((d) => d.slice('ingest.'.length));
+      const actor = actorOf(ctx);
+      const batch = mintGrant();
+      const name = (deps.catalogue ?? []).find((e) => e.id === args.id)?.title ?? args.id;
+      class Back extends Error {
+        answer: Result<never>;
+        constructor(answer: Result<never>) {
+          super('rolled back');
+          this.answer = answer;
+        }
+      }
+      let out: Result<{ pack: string; declarations: number; binned: Record<string, number>; kept: number; doors_closed: number; batch: string; rows_kept: Record<string, number> }>;
+      try {
+        out = kernel.transaction(() => {
+          const { binned, kept } = binOwnRows(kernel, lists, { actor, batch, note: `Removed with ${name}` });
+          /* ITS DOORS' TOKENS ARE REVOKED, each a `grant.revoke` naming the door, as the mint was a `grant.add`. */
+          let closed = 0;
+          for (const door of doors) {
+            const key = ingestTokenKey(door);
+            if (sql.one<{ value: string }>('SELECT value FROM dog_meta WHERE key = ?', key) === undefined) continue;
+            sql.exec('DELETE FROM dog_meta WHERE key = ?', key);
+            sql.exec("INSERT INTO event (id, ts, actor, kind, target, target_kind) VALUES (?, ?, ?, 'grant.revoke', ?, 'ingest')", mintGrant(), new Date(clock.now()).toISOString(), actor, `door:${door}`);
+            closed += 1;
+          }
+          const gone = uninstall(args.id, packHost(ctx));
+          if (!gone.ok) throw new Back(gone as Result<never>);
+          const rows = Object.values(binned).reduce((a, n) => a + n, 0);
+          if (rows > 0) kernel.setPref(BINNED, args.id, { batch, rows, lists: binned, at: new Date(clock.now()).toISOString() } satisfies Binned);
+          return ok({ ...gone.value, binned, kept, doors_closed: closed, batch });
+        });
+      } catch (e) {
+        kernel.reload();
+        if (e instanceof Back) return tail(e.answer);
+        throw e;
+      }
+      if (out.ok) await legsFollow(ctx);
+      return tail(out);
     },
 
     /**

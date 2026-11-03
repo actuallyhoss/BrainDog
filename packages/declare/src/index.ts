@@ -37,6 +37,8 @@ export { addressFault, addressFaults, listingFault } from './address.ts';
 import { holdsOf, resolveWhen, settleWhen } from './when.ts';
 import { scriptSources, type ScriptSource } from './script-source.ts';
 import { usesFault, usesSaid } from './uses.ts';
+import { migrateDue, readMigrate, type Migrates, type PackMigrate } from './migrate.ts';
+export { migrateDue, readMigrate, type Migrates, type PackMigrate } from './migrate.ts';
 export { USES_MOST, usesFault, usesFilled, usesOf, usesSaid, type Use } from './uses.ts';
 import { namerOf, writesLine, writesOf, type Writes } from './calls-out-writes.ts';
 export { holdsIn, holdsOf, resolveWhen, settleWhen, type Waiting } from './when.ts';
@@ -219,6 +221,11 @@ export type Manifest = {
    * `moves` reads as though the rows move, when they are the one thing that stays exactly where it was.
    */
   hands?: Record<string, string>;
+  /**
+   * The one script a major version runs, once, to move the entries the older major kept into this shape (`migrate.ts`).
+   * Absent when it moves nothing. In the checksum: what the person approved is the source that runs.
+   */
+  migrate?: PackMigrate;
   /**
    * Fields and enum values this pack lays on lists other packs own, by list id: `{ 'register.people': { values: { role:
    * ['family'] } } }`. Absent when it lays nothing.
@@ -710,6 +717,11 @@ export type Diff = {
    * (`address.ts`). Absent when it holds none, which is every plan made before the check and every add-on that passes.
    */
   remote?: Refusal;
+  /**
+   * The move of your entries this update runs, inside its own transaction, when the file's `migrate` is due (`migrate.ts`):
+   * the versions and the author's line. Absent when it runs none. Said on the plan as "Moves your entries".
+   */
+  migrates?: Migrates;
   planHash: string;
 };
 
@@ -896,6 +908,9 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   if (!uses.ok) return no<Pack>(uses.refusal.code, uses.refusal.fix, { at: 'uses' });
   const unasked = usesFault(doc);
   if (unasked) return no<Pack>(unasked.code, unasked.fix, { at: 'uses' });
+  /* THE MOVE OF YOUR ENTRIES A MAJOR VERSION CARRIES, read here so the checksum holds its source (`migrate.ts`). */
+  const migrate = readMigrate(doc.migrate);
+  if (!migrate.ok) return { ok: false, refusal: migrate.refusal };
   const manifest: Manifest = {
     pack: id,
     version,
@@ -916,6 +931,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     ...(skills.value.length === 0 ? {} : { skills: skills.value }),
     ...(widgets.value.length === 0 ? {} : { widgets: widgets.value }),
     ...(uses.value === null ? {} : { uses: uses.value }),
+    ...(migrate.value === null ? {} : { migrate: migrate.value }),
   };
 
   /* A PACK WHOSE ONLY CONTENT IS `extends`, `adds` OR `hands` CHANGES SOMETHING (a pack that hands everything it had to another, Roadmap 2.0.0, is the add-on that is part of Work now), so it has no declarations to list and is not
@@ -2277,6 +2293,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     unresolved,
     base,
     ...(remote === null ? {} : { remote }),
+    ...(migrateDue(pack.manifest.migrate, was, pack.manifest.version) ? { migrates: { from: was as string, to: pack.manifest.version, says: (pack.manifest.migrate as PackMigrate).says } } : {}),
   };
   /* THE INTEGER HALF CATCHES A RECORD THAT MOVED and the hash half catches a PACK that was edited
      between the plan and the install — which no version number can see, and which is exactly what
@@ -3594,7 +3611,15 @@ export function installFault(pack: Pack, diff: Diff, options: InstallOptions = {
  * caller that updates by itself passes it (`installHeld`, the quiet updates, `firstPartyTick`), so an update nobody
  * pressed is refused as before and counted lost.
  */
-export type InstallOptions = { retireWithRows?: boolean };
+export type InstallOptions = {
+  retireWithRows?: boolean;
+  /**
+   * What the caller does inside the install's own transaction, after the declarations, retires and seeds have landed
+   * and before the pack row says the new version: an update's move of entries (`Diff.migrates`), or entries put back
+   * from the bin. A refusal rolls the whole install back, so the version held stays as it was.
+   */
+  within?: () => Result<unknown>;
+};
 
 /**
  * A pattern this version hands on whose door it also stops declaring, and whose `hands` does not send that door to the
@@ -4194,6 +4219,14 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         if (row?.ok === true && row.value === null) continue;
         if (row?.ok === true) refreshed += 1;
         remembered.set(seed.key, row?.ok === true ? { ...was, fields: { ...was.fields, ...changes } } : was);
+      }
+
+      /* WHAT THE CALLER DOES INSIDE THE SAME TRANSACTION (`InstallOptions.within`), after the shape has changed and before
+         the pack row says so: a refusal here leaves the version held exactly as it was. */
+      if (options.within !== undefined) {
+        const done = options.within();
+        if (!done.ok) throw new Rolled(done as { ok: false; refusal: Refusal });
+        host.reload();
       }
 
       host.remember({

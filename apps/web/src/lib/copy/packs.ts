@@ -29,6 +29,14 @@ export const packs = {
 
   /* packs */
   uninstall: 'Uninstall',
+  /* REMOVE WITH ITS DATA (phase 8): asked once, in a line under the head, with where the entries go and the way back. */
+  removeWithData: 'Remove with its data',
+  removeWithDataAsk: (pack: string) =>
+    `Remove ${pack} and its entries? Everything in its own lists goes to the bin and its web address stops working. Your other lists stay as they are. Install it again within 30 days and its entries come back.`,
+  removeWithDataYes: 'Remove it and its entries',
+  removeWithDataNo: 'Keep it',
+  removedWithData: (pack: string, n: number) =>
+    `${pack} is removed and ${n === 1 ? 'its 1 entry is' : `its ${n.toLocaleString('en-GB')} entries are`} in the bin. Install it again within 30 days to bring ${n === 1 ? 'it' : 'them'} back.`,
   /* TURNING ONE OFF. An add-on that is off stays on the screen, dimmed and labelled, because its
      rows are still in the record. A refused switch says who leans on it and offers the cascade as a
      second press, never as a side effect of the first. */

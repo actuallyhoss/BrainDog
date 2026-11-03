@@ -2963,7 +2963,7 @@ export function createClient(options: ClientOptions) {
     installPack: (args: { doc: unknown; source?: { kind: string; ref?: string }; planHash: string; approve?: string[]; retireWithRows?: boolean }) =>
       call<unknown>('installPack', args as Record<string, unknown>),
     /** Take a pack back out. Its declarations go and its rows stay. */
-    uninstallPack: (args: { id: string }) => call<unknown>('uninstallPack', args as Record<string, unknown>),
+    uninstallPack: (args: { id: string; data?: boolean }) => call<unknown>('uninstallPack', args as Record<string, unknown>),
     /** The add-ons taken out within the window a reinstall still puts back, newest first, with the lists that stayed. */
     packsRemoved: () => call<Answer<'packsRemoved'>>('packsRemoved'),
     packConfig: (args: { id: string }) => call<unknown>('packConfig', args as Record<string, unknown>),

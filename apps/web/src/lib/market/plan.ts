@@ -67,6 +67,9 @@ export const words = {
     `Reads ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(ways)} you forward, and files each as it comes in`,
   readsSentIn: 'Reads what you forward, and files each as it comes in',
   changes: 'Changes',
+  /* AN UPDATE THAT MOVES ENTRIES (`Diff.migrates`, phase 8): the author's line, and what happens when it fails. */
+  migrates: 'Moves your entries',
+  migratesLine: (from: string, to: string) => `from ${from} to ${to}, tried first. If any entry will not move, nothing changes and you keep ${from}.`,
   retires: 'Takes away',
   keepsRows: (n: number) => (n === 0 ? 'holds nothing' : n === 1 ? 'the 1 item in it stays in your BrainDog' : `the ${n.toLocaleString('en-GB')} items in it stay in your BrainDog`),
   moves: 'Hands on',
@@ -134,6 +137,7 @@ export type SectionKey =
   | 'adds'
   | 'changes'
   | 'retires'
+  | 'migrates'
   | 'moves'
   | 'kept'
   | 'stays'
@@ -399,6 +403,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
         folded.size,
       ),
       ...section('changes', words.changes, list(d.changes).map((c) => row(name(text(c.id)), text(c.summary) || null))),
+      ...section('migrates', words.migrates, isMap(d.migrates) ? [row(text(d.migrates.says), words.migratesLine(text(d.migrates.from), text(d.migrates.to)))] : []),
       ...section('retires', words.retires, retires.filter((r) => typeof r.to !== 'string').map((r) => row(name(text(r.id)), words.keepsRows(count(r.rows))))),
       ...section('moves', words.moves, retires.filter((r) => typeof r.to === 'string').map((r) => row(name(text(r.id)), words.movesTo(name(text(r.to)))))),
       ...section('kept', words.kept, list(d.kept).map((k) => {
