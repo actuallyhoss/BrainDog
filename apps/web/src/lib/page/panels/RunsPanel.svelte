@@ -141,24 +141,29 @@
   .runs-list {
     display: flex;
     flex-direction: column;
-    margin: 0;
+    margin: 0 calc(-1 * var(--title-inset, 12px));
     padding: 0;
     list-style: none;
   }
 
-  /* ONE ROW: the mark, what ran, and at the end its project, how it ended and when, a hairline between rows. */
+  /* ONE ROW: the mark, what ran, and at the end its project, how it ended and when. A card row (ops 4.15, 3 Nov): no
+     hairline between rows, the words 12px in so the wash under the pointer reaches the tile's edge, rows 2px apart. */
   .runs-line {
     display: grid;
     grid-template-columns: var(--icon-s) minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--sp-3);
     min-block-size: 40px;
-    padding-block: var(--sp-1);
-    border-block-start: 1px solid var(--rule);
+    margin-block: 1px;
+    padding: var(--sp-1) var(--title-inset, 12px);
+    border-radius: var(--r-ctl);
+    transition: background-color var(--d-state) var(--ease-out);
   }
 
-  .runs-line:first-child {
-    border-block-start: 0;
+  @media (hover: hover) and (pointer: fine) {
+    .runs-line:hover {
+      background-color: var(--row-wash, var(--hover));
+    }
   }
 
   /* WHAT RAN, AT THE ROW'S START: an agent's own mark or the kind's glyph, in one 16px box so the names start level. */
@@ -348,11 +353,12 @@
 
     .runs-more,
     .runs-door {
-      min-block-size: 40px;
-      padding-inline: var(--sp-3);
-      border-radius: var(--r-ctl);
-      background: var(--tile-2);
+      min-block-size: 36px;
+      padding-inline: var(--sp-4);
+      border-radius: var(--r-pill, 999px);
+      background: var(--row-wash-press, var(--tile-2));
       color: var(--ink);
+      font-weight: var(--fw-medium);
     }
   }
 

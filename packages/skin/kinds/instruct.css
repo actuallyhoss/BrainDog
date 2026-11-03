@@ -10,7 +10,7 @@
 @layer components {
   /* ── the composer ────────────────────────────────────────────────────────
      The field first and full width, the choices under it on one line with Send at its end, then what happens next in
-     a sentence. A RECTANGLE, as every field is: radius 8, the field's flat fill, no border; the focus ring is the
+     a sentence. A FIELD AS OPS DRAWS ONE (3 Nov): radius 12, the tile fill and a 1px edge; the focus ring is the
      wrapper's, never a halo. */
   .ins {
     display: grid;
@@ -39,8 +39,9 @@
     max-block-size: 240px;
     padding: var(--sp-3);
     border: 0;
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
+    border-radius: var(--r-field, 12px);
+    background: var(--tile);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
@@ -85,7 +86,7 @@
     min-block-size: var(--ctl-h);
     max-inline-size: 100%;
     padding-inline-start: var(--sp-3);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     background: var(--tile-2);
     color: var(--ink);
     font-size: var(--fs-ctl);
@@ -150,16 +151,16 @@
   .ins-when {
     display: inline-flex;
     gap: 2px;
-    padding: 2px;
-    border-radius: var(--r-ctl);
+    padding: 3px;
+    border-radius: var(--r-pill, 999px);
     background: var(--tile-2);
   }
 
   .ins-when-one {
-    min-block-size: calc(var(--ctl-h) - 4px);
-    padding-inline: var(--sp-2);
+    min-block-size: calc(var(--ctl-h) - 6px);
+    padding-inline: var(--sp-3);
     border: 0;
-    border-radius: var(--r-xs);
+    border-radius: var(--r-pill, 999px);
     background: transparent;
     color: var(--ink-2);
     font: inherit;
@@ -173,6 +174,7 @@
 
   .ins-when-one[aria-checked='true'] {
     background: var(--segment-on, var(--tile));
+    box-shadow: var(--shadow-raised, none);
     color: var(--ink);
     font-weight: var(--fw-semi);
   }
@@ -193,7 +195,7 @@
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-4);
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     background: var(--ink);
     color: var(--tile);
     font: inherit;
@@ -499,7 +501,7 @@
     gap: var(--sp-1);
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-field, 12px);
     background: var(--tile-2);
   }
 
@@ -561,7 +563,7 @@
     min-block-size: var(--btn-h-sm, var(--ctl-h-sm));
     padding: 0 var(--sp-2);
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     background: var(--tile-2);
     color: var(--ink);
     font: inherit;
