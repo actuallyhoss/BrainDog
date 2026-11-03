@@ -135,6 +135,12 @@
       padding-block-start: calc(var(--sp-5) + env(safe-area-inset-top));
     }
 
+    /* A WORKING SCREEN (the talk and its build, side by side) starts under the brand at the page's own step: the upper
+       third is for a single sheet, and on /start it left a 108px gap over the title. */
+    .entry[data-shape='wide'] {
+      row-gap: var(--sp-6);
+    }
+
     .entry-board[data-paired] {
       grid-template-columns: minmax(0, 420px) minmax(0, 320px);
       column-gap: var(--sp-6);

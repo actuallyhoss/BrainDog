@@ -16,6 +16,10 @@
     offline ? words.offline : page.status === 429 ? words.wait(wait) : page.status === 503 ? words.rolling : words.broken,
   );
   const stuck = $derived(said === words.broken);
+
+  /* THE PAGE'S NAME IS THE FAILURE, SO THE CARD UNDER IT SAYS THE NEXT THING (UI pass, 3 Nov): the bar and the card both
+     said "No page here", and "This screen did not load" twice. The card's line is what follows from the name. */
+  const missingWhy = 'The address may have a typo, or the page is gone.';
 </script>
 
 <!-- THE PHONE'S BAR, with the mark, the bell and the face, over the page's own words; on a desk the crumb says it. -->
@@ -39,10 +43,10 @@
     that was never a route.
   -->
   {#if page.status === 404 && !offline}
-    <NotFound />
+    <NotFound title={missingWhy} />
   {:else}
     <!-- NO REQUEST ID HERE: it was a ten-character string a person could do nothing with. The Worker still logs one per call. -->
-    <Empty kind="error" heading title={said.title} body={said.body}>
+    <Empty kind="error" heading title={said.body}>
       {#snippet actions()}
         <Button weight="primary" onclick={() => location.reload()}>{said.action}</Button>
         <!-- THE OTHER WAY ON (first F13): a page that will not load is not the only place to be. -->

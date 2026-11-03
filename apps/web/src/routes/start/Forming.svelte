@@ -70,10 +70,10 @@
 
   const words = {
     title: 'Your BrainDog',
-    forming: 'forming as we talk',
+    /* SAID ONCE, IN THE HEAD (UI pass, 3 Nov): each greyed row said "fills in as we talk" under its name, three times. */
+    forming: 'Forms as we talk',
     today: 'Today',
     todayWhy: 'where each day starts',
-    ghostWhy: 'fills in as we talk',
     from: 'from',
     needs: (who: string) => `needed by ${who}`,
     byHand: 'added by you',
@@ -144,7 +144,7 @@
 {#if bare}
   <div class="bare">{@render body()}</div>
 {:else}
-  <Tile icon="home" title={title ?? words.title} meta={ghost || settled ? undefined : words.forming} data-build {@attach settleOn(title)}>
+  <Tile icon="home" title={title ?? words.title} meta={settled ? undefined : words.forming} data-build {@attach settleOn(title)}>
     {@render body()}
   </Tile>
 {/if}
@@ -174,7 +174,6 @@
           <span class="well"><Icon name={r.icon} size="m" /></span>
           <span class="main">
             <span class="name">{r.name}</span>
-            <span class="why">{words.ghostWhy}</span>
           </span>
         {:else}
           {@const p = r.part}
@@ -227,7 +226,8 @@
     list-style: none;
   }
 
-  /* A ROW: a 32px well, the name and why, and the quiet ✕ at the end. Hairlines between, none under the last. */
+  /* A ROW: a 32px well, the name and why, and the quiet ✕ at the end. Told apart by air, never a rule (ops: no hairline
+     between rows anywhere). */
   .row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -237,10 +237,6 @@
     margin-inline: calc(-1 * var(--sp-2));
     border-radius: var(--r-ctl);
     transition: background-color 1500ms var(--ease-out);
-  }
-
-  .row + .row {
-    box-shadow: inset 0 1px 0 var(--rule);
   }
 
   .row[data-arrived] {
@@ -272,7 +268,7 @@
     place-items: center;
     inline-size: 32px;
     block-size: 32px;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     background: var(--tile-2);
     color: var(--ink-2);
   }
@@ -284,11 +280,16 @@
     padding-block-start: 1px;
   }
 
+  /* A GREYED ROW HAS NO SECOND LINE, so its name sits on the well's middle (32 well, 20 line: 6 down). */
   .name {
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: 22px;
+    line-height: var(--lead-ui);
+  }
+
+  .row[data-ghost] .main {
+    padding-block-start: 6px;
   }
 
   .why {
@@ -335,7 +336,7 @@
     inline-size: 32px;
     block-size: 32px;
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     background: transparent;
     color: var(--ink-3);
     cursor: pointer;
@@ -375,14 +376,22 @@
     line-height: 20px;
   }
 
+  /* THE PARTS IT CAN ALSO KEEP WRAP AS CAPSULES, 6 apart, never a 28px chip riding a 20px line of text. */
+  .left {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
   .back {
     display: inline-flex;
     align-items: center;
     gap: 2px;
     min-block-size: 28px;
-    padding: 0 var(--sp-2);
+    padding: 0 10px 0 var(--sp-3);
     border: 1px solid var(--rule-strong);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     background: var(--tile);
     color: var(--ink-2);
     font: inherit;
@@ -394,8 +403,7 @@
      above, which it overrides. */
   @media (pointer: coarse) {
     .back {
-      min-block-size: var(--tap, 44px);
-      padding-inline: var(--sp-3);
+      min-block-size: 36px;
     }
   }
 

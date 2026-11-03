@@ -61,6 +61,8 @@
     after?: Snippet | undefined;
   } = $props();
 
+  /** Before the first answer, with the first question up: the hello and that question are one message. */
+  const opening = $derived(turns.length === 0 && current !== null && current !== undefined && !thinking);
   let text = $state('');
   let field = $state<HTMLTextAreaElement | undefined>(undefined);
   let nudge = $state(false);
@@ -143,13 +145,17 @@
   <p class="sr" aria-live="polite" aria-atomic="true">{spoken}</p>
 
   <ol class="log" aria-label={chatWords.dog}>
-    <li class="msg dog">
-      <span class="mark" aria-hidden="true"><Mark height={16} /></span>
-      <div class="dog-body">
-        {@render dog(hello, true)}
-        {#if turns.length > 0}{@render dog(turns[0]!.ask.question)}{/if}
-      </div>
-    </li>
+    <!-- THE HELLO AND THE FIRST QUESTION ARE ONE MESSAGE UNDER ONE MARK (UI pass, 3 Nov): drawn as two, the screen opened
+         on the same face twice, one over the other. Until the first answer the hello rides in the asking message. -->
+    {#if !opening}
+      <li class="msg dog">
+        <span class="mark" aria-hidden="true"><Mark height={14} /></span>
+        <div class="dog-body">
+          {@render dog(hello, true)}
+          {#if turns.length > 0}{@render dog(turns[0]!.ask.question)}{/if}
+        </div>
+      </li>
+    {/if}
 
     {#each turns as t, i (i)}
       <li class="msg you" in:arrive={{ rise: 6 }}>
@@ -163,7 +169,7 @@
       <!-- BRAINDOG'S LINE BACK AND ITS NEXT QUESTION, once that question is answered too; the newest stands below. -->
       {#if turns[i + 1]}
         <li class="msg dog">
-          <span class="mark" aria-hidden="true"><Mark height={16} /></span>
+          <span class="mark" aria-hidden="true"><Mark height={14} /></span>
           <div class="dog-body">
             {#if t.ack}{@render dog(t.ack, true)}{/if}
             {@render dog(turns[i + 1]!.ask.question)}
@@ -174,14 +180,15 @@
 
     {#if thinking}
       <li class="msg dog" in:arrive={{ rise: 4 }}>
-        <span class="mark" aria-hidden="true"><Mark height={16} /></span>
+        <span class="mark" aria-hidden="true"><Mark height={14} /></span>
         <span class="typing" aria-hidden="true"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>
       </li>
     {:else if current}
       {#key current}
         <li class="msg dog asking" in:arrive={{ rise: 8 }}>
-          <span class="mark" aria-hidden="true"><Mark height={16} /></span>
+          <span class="mark" aria-hidden="true"><Mark height={14} /></span>
           <div class="dog-body">
+            {#if opening}{@render dog(hello, true)}{/if}
             {#if turns.length > 0 && turns.at(-1)?.ack}{@render dog(turns.at(-1)!.ack!, true)}{/if}
             <p class="question" id="chat-q">{current.question}</p>
             {#if current.choices.length > 0}
@@ -207,7 +214,7 @@
       {/key}
     {:else if done && closing}
       <li class="msg dog" in:arrive={{ rise: 8 }}>
-        <span class="mark" aria-hidden="true"><Mark height={16} /></span>
+        <span class="mark" aria-hidden="true"><Mark height={14} /></span>
         <div class="dog-body">
           {#if turns.at(-1)?.ack}{@render dog(turns.at(-1)!.ack!, true)}{/if}
           {@render dog(closing)}
@@ -295,45 +302,49 @@
     min-inline-size: 0;
   }
 
-  /* BRAINDOG'S MARK, IN A 28PX SQUARE AT THE LINE'S FIRST BASELINE. */
+  /* BRAINDOG'S MARK, IN A 28PX CIRCLE AT THE LINE'S FIRST BASELINE: a face is round (ops: faces and wells are circles). */
   .mark {
     display: inline-grid;
     place-items: center;
     flex: none;
     inline-size: 28px;
     block-size: 28px;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     background: var(--tile-2);
+    box-shadow: inset 0 0 0 1px var(--sep, var(--rule));
   }
 
+  /* THE WORDS START ON THE MARK'S MIDDLE: a 20px first line in a 28px mark is 4 down. */
   .dog-body {
     display: grid;
     gap: var(--sp-2);
     min-inline-size: 0;
-    padding-block-start: 2px;
+    padding-block-start: var(--sp-1);
   }
 
-  /* BIG, READABLE, PLAIN: BrainDog speaks at 17 in ink, and its thanks before a question in the second ink. */
+  /* ON THE TYPE SCALE (UI pass, 3 Nov; it spoke at 17 and asked at 19, neither on it): a line at the row's 15/20 in ink,
+     its thanks before a question at the body's 14 in the second ink, and the question as a section heading, 17/24 600. */
   .dog-line,
   .question {
     margin: 0;
     max-inline-size: 60ch;
     color: var(--ink);
-    font-size: 17px;
-    line-height: 26px;
+    font-size: var(--fs-row);
+    line-height: var(--lead-row);
     text-wrap: pretty;
   }
 
   .dog-line[data-quiet] {
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 24px;
+    line-height: var(--lead-ui);
   }
 
   .question {
-    font-weight: var(--fw-medium);
-    font-size: 19px;
-    line-height: 28px;
+    font-weight: 600;
+    font-size: var(--fs-head);
+    line-height: 24px;
+    letter-spacing: var(--track-head, -0.01em);
   }
 
   /* THE PERSON'S ANSWER: a quiet bubble at the right, the words as typed, never wider than four fifths. */
@@ -344,7 +355,7 @@
   .bubble {
     max-inline-size: min(80%, 36rem);
     padding: var(--sp-2) var(--sp-4);
-    border-radius: var(--r-pop) var(--r-pop) var(--r-xs) var(--r-pop);
+    border-radius: var(--r-tile) var(--r-tile) var(--r-xs) var(--r-tile);
     background: var(--tile-2);
     color: var(--ink);
     font-size: var(--fs-body);
@@ -368,16 +379,16 @@
     padding-block-start: var(--sp-2);
   }
 
-  /* PLAIN BORDERED BUTTONS (Look B): the tile's own fill, a firm edge, 40 tall (44 under a thumb). A tap fills it; a
-     chosen one (several may be) takes the ink edge and a check. */
+  /* CAPSULES (the ops style, 3 Nov: every control is a circle or a capsule; Look B's bordered squares are retired): the
+     tile's own fill, a hairline edge, 36 tall (40 under a thumb). A chosen one (several may be) takes the chosen fill. */
   .pick {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    min-block-size: 40px;
-    padding: 0 var(--sp-4);
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--ctl-pad, 16px);
     border: 1px solid var(--rule-strong);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     background: var(--tile);
     color: var(--ink);
     font: inherit;
@@ -401,13 +412,13 @@
     background: var(--tile-2);
   }
 
-  .pick[aria-pressed='true'],
   .pick[data-suggested] {
-    border-color: var(--ink);
+    border-color: var(--ink-3);
   }
 
   .pick[aria-pressed='true'] {
-    box-shadow: inset 0 0 0 1px var(--ink);
+    background: var(--chosen);
+    border-color: transparent;
   }
 
   .pick:disabled {
@@ -417,7 +428,14 @@
 
   @media (pointer: coarse) {
     .pick {
-      min-block-size: var(--tap, 44px);
+      min-block-size: 40px;
+    }
+  }
+
+  /* ON A PHONE THE ANSWERS TAKE THE WHOLE LINE, under the mark too: kept to the words' column they wrapped one to a row. */
+  @media (width < 640px) {
+    .taps {
+      margin-inline-start: calc(-28px - var(--sp-3));
     }
   }
 
@@ -499,13 +517,17 @@
     padding: var(--sp-2);
     padding-inline-start: var(--sp-4);
     border: 1px solid var(--rule-strong);
-    border-radius: var(--r-pop);
+    border-radius: var(--r-field);
     background: var(--tile);
+    transition:
+      border-color var(--d-state) var(--ease-out),
+      box-shadow var(--d-state) var(--ease-out);
   }
 
+  /* FOCUS IS THE ACCENT'S 2PX RING ON THE BOX, as on every field (ops 4.22): a 2px ink frame read as a black box. */
   .box:focus-within {
-    border-color: var(--ink);
-    box-shadow: inset 0 0 0 1px var(--ink);
+    border-color: transparent;
+    box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
   .field {

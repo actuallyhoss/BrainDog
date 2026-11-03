@@ -1270,7 +1270,7 @@
         </section>
 
         <!-- ── THE BUILD ─────────────────────────────────────────────────── -->
-        <div class="build">
+        <div class="build" data-talking={talkDone ? undefined : ''}>
           <Forming
             parts={buildParts}
             left={proposal ? offParts.map((p) => ({ id: p.id, name: p.name })) : []}
@@ -1389,6 +1389,14 @@
   }
 
   /* WHILE TYPING ON A PHONE the build tile alone says what lit up; the part tiles arrive once the sentence is read. */
+
+  /* AND ON A PHONE, WHILE THE TALK LASTS, THE STRIP AT THE TOP OF IT IS THE BUILD (UI pass, 3 Nov): the same rows drawn
+     again as a tile under the talk said every part twice. The strip opens them whole as a sheet. */
+  @media (width < 900px) {
+    .build[data-talking] > :global([data-build]) {
+      display: none;
+    }
+  }
 
   /* A TILE THAT JUST CAME ON takes the arrival tint and fades back to the tile over a second and a half. */
   @media (prefers-reduced-motion: no-preference) {

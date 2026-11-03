@@ -128,6 +128,8 @@
   import { answer, oneQuestion, words as asked, type Question } from '$lib/start/question.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
+  import Notice from '../signin/Notice.svelte';
+  import { words as entryWords } from '../signin/words.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
@@ -1596,10 +1598,11 @@
           <!-- THE HELD BOX STAYS WHEN THE SCRIPT FAILS: its line and Try again sit in it, side by side, at its height. -->
           <div class="human" role="group" aria-label={copy.signupHuman} bind:this={widget}>
             {#if widgetState === 'failed'}
-              <div class="human-failed">
-                <p class="human-line" role="alert">{checkWords.line}</p>
-                <span class="human-again"><Button onclick={retryTurnstile}>{checkWords.again}</Button></span>
-              </div>
+              <!-- ONE NOTICE, Try again at its end (UI pass, 3 Nov): the line said "Try again." beside a button that said it. -->
+              <Notice tone="bad" role="alert">
+                {entryWords.checkFailed}
+                {#snippet action()}<Button size="sm" onclick={retryTurnstile}>{checkWords.again}</Button>{/snippet}
+              </Notice>
             {/if}
           </div>
         {/if}
@@ -2201,29 +2204,11 @@
     inline-size: 100%;
   }
 
-  /* THE FAILED LINE AND ITS BUTTON IN ONE ROW, so the box keeps the 65px it held for the widget. */
-  .human-failed {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    min-block-size: 65px;
-  }
-
-  .human-line,
   .bad {
     margin: 0;
     color: var(--red);
     font-size: var(--fs-body);
     line-height: 22px;
-  }
-
-  .human-line {
-    flex: 1;
-    min-inline-size: 0;
-  }
-
-  .human-again :global(.btn) {
-    min-block-size: var(--tap);
   }
 
   /* THE READ'S BOT CHECK TAKES NO ROOM until Cloudflare draws something the person must do. */
