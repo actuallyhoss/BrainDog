@@ -1,5 +1,5 @@
 <!--
-  An add-on's actions in a row's menu (`row_actions` in its file): each runs one of its scripts with this row, says the
+  An add-on's actions in a row's menu (`row_actions` in its file), in the list's row menu and on the row's own page: each runs one of its scripts with this row, says the
   add-on's name, and tells what it did in a toast. Nothing is drawn when no add-on that is on acts on this list.
 -->
 <script lang="ts">
@@ -37,6 +37,13 @@
 {/if}
 
 <style>
+  /* ITS OWN RULE, since the menu's is scoped to the menu that draws it: the list's row menu and the row's own page. */
+  .mi-rule {
+    margin: var(--sp-1) 0;
+    border: 0;
+    border-block-start: 1px solid var(--rule);
+  }
+
   .mi-name {
     flex: 1;
   }

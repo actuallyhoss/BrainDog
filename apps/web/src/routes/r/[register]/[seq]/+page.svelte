@@ -60,6 +60,7 @@
   import Chip from '$lib/ui/Chip.svelte';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import Menu from '$lib/ui/Menu.svelte';
+  import AddonRowActions from '$lib/market/AddonRowActions.svelte';
   import ListEditor from '$lib/ui/ListEditor.svelte';
   import { Sparkline, Stacked } from '$lib/viz/index.ts';
   import { fieldWords } from '$lib/record/field-words.ts';
@@ -1576,6 +1577,8 @@
           {#if mine && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setPrivate(!isPrivate)}>{isPrivate ? copy.rowShareAgain : copy.rowKeepPrivate}</button>{/if}
           {#if mergeable}<button type="button" class="mi" role="menuitem" data-merge onclick={() => (mergeOpen = true)}>{copy.mergeWith}</button>{/if}
           {#if changes && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</button>{/if}
+          <!-- AN ADD-ON'S ACTIONS ON THIS LIST, as the list's own row menu offers them; the row is read again after one ran. -->
+          {#if row.id && !archived}<AddonRowActions register={id} row={row.id} onclose={() => {}} ondone={() => void rereadRow()} />{/if}
         </Menu>
       {/if}
     {/snippet}
