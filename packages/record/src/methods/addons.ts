@@ -19,6 +19,7 @@
  */
 
 import { listedEntries, offeredVersion, type CatalogueEntry as IndexEntry, type CatalogueIndex, type CatalogueVersion, type Reach } from '@braindog/declare/catalogue';
+import { updatesFromStore } from '@braindog/declare';
 import { FIELD_TYPES } from '@braindog/kernel';
 import type { Result } from '@braindog/ports';
 
@@ -337,7 +338,9 @@ export function methods(deps: RecordDeps) {
       const lineOf = (e: IndexEntry): AddonLine => {
         const latest = offeredVersion(e);
         const id = heldId(e);
-        const here = held.get(id);
+        /* ONE OF THE PERSON'S OWN THAT SHARES THE ID IS NOT THIS ONE INSTALLED (`updatesFromStore`). */
+        const mine = held.get(id);
+        const here = mine !== undefined && updatesFromStore(mine.source) ? mine : undefined;
         const reaches = reachShort(latest?.reach);
         return {
           id,
@@ -357,7 +360,7 @@ export function methods(deps: RecordDeps) {
       if (said.installed === true) {
         const lines: AddonLine[] = [];
         for (const [id, h] of held) {
-          const e = index === null ? undefined : entryNamed(index, id);
+          const e = index === null || !updatesFromStore(h.source) ? undefined : entryNamed(index, id);
           if (e !== undefined) lines.push(lineOf(e));
           else
             lines.push({
@@ -446,8 +449,11 @@ export function methods(deps: RecordDeps) {
       const id = text(said.id);
       if (id === null) return no('REQUIRED_MISSING', 'Which add-on? Send its id, as act addons answers it.', { at: 'id' });
       const index = await indexOf();
-      const entry = index === null ? undefined : entryNamed(index, id);
-      const h = heldNow().get(entry === undefined ? id : heldId(entry));
+      const held = heldNow();
+      /* ONE HELD HERE THAT DID NOT COME FROM THE STORE IS SAID AS ITSELF, never as the store's add-on of the same id. */
+      const own = held.get(id);
+      const entry = index === null || (own !== undefined && !updatesFromStore(own.source)) ? undefined : entryNamed(index, id);
+      const h = held.get(entry === undefined ? id : heldId(entry));
       if (entry === undefined && h === undefined)
         return no('DECLARATION_UNKNOWN', `No add-on called ${id} is on offer or here. act addons {"q":"<a word>"} searches the store.`, { at: 'id' });
 

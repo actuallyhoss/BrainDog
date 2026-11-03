@@ -132,7 +132,15 @@ export type SharedPlan = {
   enable: string[];
   packs: SharedPack[];
   approve: string[];
+  /**
+   * Where the use case's own file came from, kept on its add-on so its updates come only from there (`updatesFromStore`
+   * in `@braindog/declare`). The modules it brings are BrainDog's own and go in as such.
+   */
+  from?: SharedFrom;
 };
+
+/** Where a shared file was read from, as the record keeps it on the add-on (`pack.source`). */
+export type SharedFrom = { kind: 'kennel' | 'url' | 'git' | 'paste' | 'local'; ref?: string };
 
 /** Plurals English makes without an s, each to its one. */
 const IRREGULAR: Readonly<Record<string, string>> = { people: 'person', children: 'child', men: 'man', women: 'woman', staff: 'staff' };
@@ -252,7 +260,7 @@ export function sharedPlanOf(value: unknown, nav: readonly string[] = [], links:
  */
 export async function planShared(
   client: SharingClient,
-  file: { text: string; source: 'paste' | 'url' | 'local'; ref?: string },
+  file: { text: string; source: SharedFrom['kind']; ref?: string },
   installed: readonly PackState[],
   moduleDoc: (id: string, installed: readonly PackState[], usecase: string) => Promise<Body | null>,
   /** A module already here, in the words and targets of the use case being added, or `null` when it gives it none. */
@@ -285,7 +293,7 @@ export async function planShared(
     return { ok: false, fix: refusal.fix, code: refusal.code };
   }
   const plan = sharedPlanOf(out.value, read.value.usecase.nav, read.value.usecase.links);
-  return plan ? { ok: true, plan } : { ok: false, fix: copy.writeRaced, code: null };
+  return plan ? { ok: true, plan: { ...plan, from: { kind: file.source, ...(file.ref === undefined ? {} : { ref: file.ref }) } } } : { ok: false, fix: copy.writeRaced, code: null };
 }
 
 /** The modules already here that the plan offers in the use case's words and targets, which the person may leave as they are. */
@@ -340,14 +348,16 @@ export async function installShared(client: SharingClient, plan: SharedPlan, rel
   for (const pack of plan.packs) {
     /* A MODULE ALREADY HERE IS UPDATED ONLY WHEN THE PERSON SAID YES under "Update for". */
     if (!relabel && relabelled(plan).includes(pack)) continue;
-    const planned = await client.planPack({ doc: pack.doc, source: { kind: 'local' } });
+    /* THE USE CASE'S OWN ADD-ON KEEPS WHERE ITS FILE CAME FROM; a module is BrainDog's own. */
+    const source = pack.role === 'usecase' && plan.from !== undefined ? plan.from : { kind: 'local' as const };
+    const planned = await client.planPack({ doc: pack.doc, source });
     if (!planned.ok) return { ok: false, done, fix: refusalOf(planned).fix, stale: false };
     const diff = isMap(planned.value) && isMap(planned.value.diff) ? planned.value.diff : null;
     const planHash = typeof diff?.planHash === 'string' ? diff.planHash : '';
     const approve = strings(diff?.approve);
     const unshown = approve.filter((line) => !plan.approve.includes(line));
     if (planHash === '' || unshown.length > 0) return { ok: false, done, fix: copy.shareStale, stale: true };
-    const put = await client.installPack({ doc: pack.doc, source: { kind: 'local' }, planHash, ...(approve.length === 0 ? {} : { approve }) });
+    const put = await client.installPack({ doc: pack.doc, source, planHash, ...(approve.length === 0 ? {} : { approve }) });
     if (!put.ok) {
       const refusal = refusalOf(put);
       return { ok: false, done, fix: refusal.fix, stale: refusal.code === 'PLAN_STALE' };

@@ -89,7 +89,9 @@
   const cue = $derived(
     action?.kind === 'installed'
       ? words.installed
-      : action?.kind === 'update'
+      : action?.kind === 'taken'
+        ? words.taken
+        : action?.kind === 'update'
         ? words.update(action.to)
         : action?.kind === 'turn-on'
           ? words.turnOn(listing.title)

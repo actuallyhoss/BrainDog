@@ -87,7 +87,9 @@ export type Standing = { kind: 'install' } | { kind: 'update'; from: string } | 
 /** Where this record stands against an entry's latest version: not here, older, the same, newer, or turned off. */
 export async function standingOf(entry: CatalogueEntry, states: readonly PackState[]): Promise<Standing> {
   const { compareVersions, installedIdOf } = await import('@braindog/declare/catalogue');
-  const held = states.find((s) => s.id === installedIdOf(entry));
+  const { updatesFromStore } = await import('@braindog/declare');
+  /* ONE OF THEIR OWN THAT SHARES THE ID IS NOT THIS ENTRY HELD (`updatesFromStore`). */
+  const held = states.find((s) => s.id === installedIdOf(entry) && updatesFromStore(s.source));
   if (!held) return { kind: 'install' };
   if (held.disabled_at !== null) return { kind: 'off', at: held.version };
   if (held.version === null) return { kind: 'update', from: '' };

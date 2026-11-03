@@ -15565,7 +15565,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          from the store would one day replace it. Said here, before the person is asked. */
       const listed = (deps.catalogue ?? []).find((e) => e.id === id) ?? null;
       const shelved = listed === null && deps.catalogueShelf ? await deps.catalogueShelf.fetch(id) : null;
-      if (listed !== null || shelved !== null)
+      /* UNLESS IT IS ONE OF THEIR OWN HELD HERE (`updatesFromStore`): its new version is its author's, whatever the store holds. */
+      const ownHere = storeHeld([{ id }]).length === 0;
+      if (!ownHere && (listed !== null || shelved !== null))
         return said({ code: 'PROVIDES_CONFLICT', fix: `${id} is an add-on in the store, so a file of your own takes another id.`, at: 'pack' });
       const diff = await plan(pack.value, installedState(ctx));
       const unheld = unresolvedFault(diff);

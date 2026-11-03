@@ -20,6 +20,7 @@ import { firstPartyModules } from '@braindog/seed/packs/modules';
 import { USE_CASES } from '@braindog/seed/usecases';
 import { USE_CASE_CHANGES, installsOf } from '@braindog/seed/usecases/share';
 
+import { updatesFromStore } from '@braindog/declare';
 import type { PackState } from '../record/packs.ts';
 
 export type ListingKind = 'module' | 'usecase' | 'pack';
@@ -52,7 +53,7 @@ export type Listing = {
 };
 
 /** What a listing's one primary button does on this record. */
-export type Action = { kind: 'install' } | { kind: 'update'; from: string; to: string } | { kind: 'turn-on' } | { kind: 'installed' };
+export type Action = { kind: 'install' } | { kind: 'update'; from: string; to: string } | { kind: 'turn-on' } | { kind: 'installed' } | { kind: 'taken' };
 
 /** The order browse draws in. */
 export type Order = 'for-you' | 'installed' | 'newest';
@@ -267,6 +268,8 @@ export const hostsOf = (l: Pick<Listing, 'versions' | 'latest'>): string[] => [.
 export function actionOf(l: Pick<Listing, 'installedId' | 'latest'>, states: readonly PackState[]): Action {
   const held = states.find((s) => s.id === l.installedId);
   if (!held) return { kind: 'install' };
+  /* ONE OF THEIR OWN BY THIS ID (`updatesFromStore`): the store's is a different add-on, never its update. */
+  if (!updatesFromStore(held.source)) return { kind: 'taken' };
   if (held.disabled_at !== null) return { kind: 'turn-on' };
   if (held.version !== null && compareVersion(held.version, l.latest) < 0) return { kind: 'update', from: held.version, to: l.latest };
   return { kind: 'installed' };

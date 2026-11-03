@@ -159,6 +159,9 @@ export const words = {
   update: (to: string): string => `Update to ${to}`,
   turnOn: (title: string): string => `Turn on ${title}`,
   installed: 'Installed',
+  /* AN ADD-ON OF THEIR OWN HOLDS THIS ID HERE (made here, from a link or from GitHub), so the store's is not its update
+     and cannot go in over it. */
+  taken: 'Yours uses this name',
   /** Once an add-on that reads bank texts is in, where one goes (AH10). */
   pasteText: 'Paste a bank text',
   /* AFTER INSTALL, THE ONE PRESS: its first page, by name. */
