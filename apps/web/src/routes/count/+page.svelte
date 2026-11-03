@@ -71,7 +71,7 @@
     noCash: 'No cash account to count yet',
     noCashBody: 'Add a cash account on Accounts, then count its notes and coins here.',
     toAccounts: 'Go to Accounts',
-    notSetUp: 'Needs the Count the cash add-on',
+    notSetUp: 'Count the cash is an add-on',
     notSetUpBody: 'It counts your cash note by note and files any difference in the Ledger.',
     bare: 'Count from an account',
     bareBody: 'Open Count the cash from Money, or from a cash account, and the count goes to that account.',
@@ -397,13 +397,13 @@
     flex-direction: column;
   }
 
+  /* A NOTE A ROW, TOLD APART BY AIR (ops style): no rule under each. */
   .cc-note {
     display: grid;
     grid-template-columns: 6ch minmax(0, 1fr) auto;
     align-items: center;
     column-gap: var(--sp-3);
-    min-block-size: 56px;
-    border-block-end: 1px solid var(--rule);
+    min-block-size: var(--row-h-2, 56px);
   }
 
   .cc-face {
@@ -430,17 +430,31 @@
     gap: var(--sp-2);
   }
 
+  /* THE STEPPER'S PRESSES ARE CIRCLES (ops style: a control holding one glyph is a circle), 36 drawn with a 44 target
+     under a thumb, on the soft fill. */
   .cc-step {
-    inline-size: 44px;
-    block-size: 44px;
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    inline-size: var(--ctl-page, 36px);
+    block-size: var(--ctl-page, 36px);
+    padding: 0;
     border: 0;
-    border-radius: var(--r-ctl);
-    background: var(--tile-2);
+    border-radius: var(--r-pill);
+    background: var(--soft-fill);
     color: var(--ink);
     font: inherit;
-    font-size: var(--fs-figure);
+    font-size: var(--fs-head);
     line-height: 1;
     cursor: pointer;
+  }
+
+  @media (pointer: coarse) {
+    .cc-step::after {
+      content: '';
+      position: absolute;
+      inset: calc((var(--ctl-page, 36px) - var(--tap, 44px)) / 2);
+    }
   }
 
   .cc-step:disabled {
@@ -452,53 +466,58 @@
      the darker fill for the press's own 70ms and no more. */
   @media (hover: hover) and (pointer: fine) {
     .cc-step:not(:disabled):hover {
-      background: color-mix(in oklab, var(--tile-2) 94%, var(--ink));
+      background: var(--soft-fill-hover);
     }
   }
 
   .cc-step:not(:disabled):active {
-    background: color-mix(in oklab, var(--tile-2) 88%, var(--ink));
+    background: var(--row-wash-press);
     transition: background-color var(--d-press, 70ms) ease-out;
   }
 
-  .cc-step:focus-visible,
-  .cc-n:focus-visible,
-  .cc-box:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 1px;
+  .cc-step:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
   }
 
-  .cc-n {
-    inline-size: 6ch;
-    block-size: 44px;
-    border: 1px solid var(--rule);
-    border-radius: var(--r-ctl);
+  /* THE FIELDS ARE THE OPS FIELD (`.field`): the tile's fill, a 1px edge, radius 12, 36 tall and 44 under a thumb, the
+     ring at 0 when focused. They were 44 at a desk on a faint rule with the row-fill corner. */
+  .cc-n,
+  .cc-box {
+    box-sizing: border-box;
+    border: 0;
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
+    border-radius: var(--r-field);
     background: var(--tile);
     color: var(--ink);
     font: inherit;
     font-size: var(--fs-body);
+  }
+
+  .cc-n:focus-visible,
+  .cc-box:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 0;
+  }
+
+  .cc-n {
+    inline-size: 6ch;
+    block-size: var(--field-h, 36px);
     font-variant-numeric: tabular-nums;
     text-align: center;
   }
 
   .cc-box {
     inline-size: 100%;
-    min-block-size: 44px;
+    min-block-size: var(--field-h, 36px);
     padding-inline: var(--sp-3);
-    border: 1px solid var(--rule);
-    border-radius: var(--r-ctl);
-    background: var(--tile);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--fs-body);
   }
 
   .cc-one-line {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-2);
-    padding-block: var(--sp-3);
-    border-block-end: 1px solid var(--rule);
+    padding-block: var(--sp-2);
   }
 
   .cc-lines {
@@ -514,9 +533,10 @@
     flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-4);
-    /* A TILE, NOT A BOXED CARD (design pass, 1 Nov): no edge round it, its fill alone off the board. */
+    /* A CARD AS EVERY TILE IS NOW (ops style): the tile's fill with its edge and its soft shadow in light. */
     border-radius: var(--r-tile);
     background: var(--tile);
+    box-shadow: var(--card);
   }
 
   .cc-sum dl {

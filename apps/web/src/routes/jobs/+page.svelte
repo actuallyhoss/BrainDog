@@ -516,8 +516,8 @@
     display: inline-grid;
     place-items: center;
     block-size: 24px;
-    border-radius: var(--r-xs);
-    background: var(--tile-2);
+    border-radius: var(--r-pill);
+    background: var(--soft-fill);
     color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-semi);
@@ -701,7 +701,7 @@
     inline-size: 6px;
     block-size: 6px;
     overflow: hidden;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     background: var(--ink-3);
     color: transparent;
     text-indent: 100%;

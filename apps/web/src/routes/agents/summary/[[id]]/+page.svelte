@@ -93,7 +93,7 @@
     max-inline-size: var(--measure);
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lh-body);
   }
 
   .quiet {
@@ -119,28 +119,25 @@
     list-style: none;
   }
 
+  /* LINES TOLD APART BY AIR, never a rule between them (ops style). */
   .said-line {
     display: grid;
-    gap: 2px;
+    gap: var(--row-stack, 2px);
     padding-block: var(--sp-2);
     min-inline-size: 0;
-  }
-
-  .said-line + .said-line {
-    border-block-start: 1px solid var(--rule);
   }
 
   .line-text {
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lead-ui, 20px);
     overflow-wrap: anywhere;
   }
 
   .line-detail {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta, 18px);
   }
 
   .foot {

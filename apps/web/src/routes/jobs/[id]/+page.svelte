@@ -377,7 +377,7 @@
     block-size: 6px;
     margin-inline-end: var(--sp-2);
     overflow: hidden;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill);
     background: var(--ink-3);
     color: transparent;
     text-indent: 100%;
@@ -470,9 +470,7 @@
     min-inline-size: 0;
   }
 
-  .step + .step {
-    border-block-start: 1px solid var(--sep, var(--rule));
-  }
+  /* STEPS TOLD APART BY AIR, never a rule between them (ops style); each keeps its 12 above and below. */
 
   .step-body {
     display: flex;
