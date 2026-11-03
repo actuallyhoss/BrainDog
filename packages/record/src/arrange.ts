@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { conflictFault, installFault, installOrder, keptQuestion, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type InstallOptions, type Pack, type VoiceKey } from '@braindog/declare';
+import { conflictFault, installFault, installOrder, keptQuestion, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, updatesFromStore, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type InstallOptions, type Pack, type VoiceKey } from '@braindog/declare';
 import { KEY_OPENED_UNATTENDED, KEY_OPENED_UNATTENDED_PASSPHRASE, approvalLines, configReads, configValue, egressChanged, egressOf, personNameOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
 import { normaliseChecked } from './theme-check.ts';
@@ -315,6 +315,11 @@ export type ArrangeDeps = {
    * in the press's answer as `said`, so Decide says them as the night does.
    */
   kept?: ((pack: Pack, diff: Diff, packSaid: (id: string) => string) => readonly string[] | void) | undefined;
+  /**
+   * Where an installed add-on came from, the `source` on its `pack` row (`updatesFromStore` reads it), `null` when it has
+   * none. Absent, every add-on is read as the store's, as before.
+   */
+  sourceOf?: ((id: string) => string | null) | undefined;
 };
 
 /** What a proposal found in the host's whole catalogue: each document by pack id, the modules under it, and its entry. */
@@ -589,6 +594,14 @@ export function arranger(d: ArrangeDeps) {
      pack was "not installed here, so it cannot be turned off", and the one way Decide had to stop a door money-core handed
      to `bank-hsbc-eg` was gone; before the arranger read handovers, the same proposal was filed and the door went off. */
   const running = (id: string) => kernel.packStates().find((s) => s.id === id);
+  /**
+   * HELD HERE AND NOT FROM THE STORE: made in this BrainDog, from a link or from GitHub (`updatesFromStore`). The store's
+   * add-on of the same id is someone else's, so it is never this one's update, and a new file for it is its author's.
+   */
+  const ownHeld = (id: string): boolean => stateOf(id) !== undefined && !updatesFromStore(d.sourceOf?.(id) ?? null);
+  /** The files a proposal carried that were made here, so they go in as made here (`paste`) and not as the store's. */
+  const madeHere = new WeakSet<object>();
+
   const entryOf = (id: string): CatalogueEntry | undefined =>
     catalogue.find((e) => e.id === id) ?? catalogue.find((e) => e.kind === 'usecase' && e.id === packIdOf(id));
   /** The version on offer for a pack, from the catalogue or the document sent with the proposal. */
@@ -1022,7 +1035,7 @@ export function arranger(d: ArrangeDeps) {
     if (!doc) return notOffered(id, 'body.packs');
     /* THROUGH THE THEME CHECK, as `installPack` reads a document: a proposal that installs a pack is that pack's
        install, and a palette refused there is refused here in the same words. */
-    const pack = await normaliseChecked(doc, { kind: 'local' });
+    const pack = await normaliseChecked(doc, { kind: madeHere.has(doc) ? 'paste' : 'local' });
     if (!pack.ok) return pack;
     if (pack.value.manifest.pack !== id)
       return refuse('VALUE_MALFORMED', `The document names its pack ${pack.value.manifest.pack}, and the proposal asks for ${id}. Make the two agree.`, 'body.doc');
@@ -1371,24 +1384,35 @@ export function arranger(d: ArrangeDeps) {
       }
       if (typeof body.install !== 'string') return ok(body);
       const asked = body.install;
-      const target = entryOf(asked)?.id ?? asked;
+      /* ONE MADE HERE IS CHANGED BY ITS OWN NEW FILE, never by the store's add-on that shares its id (`ownHeld`). */
+      if (fromFile === null && ownHeld(asked)) {
+        if (!isMap(body.doc))
+          return refuse(
+            'VALUE_MALFORMED',
+            `${asked} was not installed from the store, so the store's add-on of that name is not its update. Propose its new file: {"install":"${asked}","doc":<the file>}.`,
+            'body.install',
+          );
+      }
+      const target = ownHeld(asked) ? asked : (entryOf(asked)?.id ?? asked);
       /* A DOCUMENT IS FOR A PACK THE CATALOGUE LACKS, as the grammar says. One sent for a pack the host offers was filed under the
          catalogue's title and summary, so a propose token could put its own pages, rules and version in front of the owner as
          "Study". What the host offers is installed from the host's own document; a shared file says its own name. */
-      if (fromFile === null && isMap(body.doc) && entryOf(asked) !== undefined)
+      if (fromFile === null && isMap(body.doc) && !ownHeld(asked) && entryOf(asked) !== undefined)
         return refuse(
           'VALUE_MALFORMED',
           `${target} is on offer here, so it is installed from this host's own document. Propose {"install":"${asked}"} without doc.`,
           'body.doc',
         );
       /* AND THE SAME FOR ONE THE HOST'S WHOLE CATALOGUE HOLDS, which the arrangement reading lists as on offer. */
-      const shelfHolds = fromFile === null && isMap(body.doc) && d.shelf ? await d.shelf.fetch(asked) : null;
+      const shelfHolds = fromFile === null && isMap(body.doc) && !ownHeld(asked) && d.shelf ? await d.shelf.fetch(asked) : null;
       if (shelfHolds !== null)
         return refuse(
           'VALUE_MALFORMED',
           `${shelfHolds.ok ? shelfHolds.value.title : target} is in this host's catalogue, so it is installed from the host's own document. Propose {"install":"${asked}"} without doc.`,
           'body.doc',
         );
+      /* WHAT IS LEFT WITH A FILE IS NOT THE STORE'S (the two refusals above saw to that), so it goes in as made here. */
+      if (isMap(body.doc)) madeHere.add(body.doc);
       const docs = new Map<string, Body>(isMap(body.doc) ? [[target, body.doc]] : []);
       const sent = new Map<string, readonly string[]>(fromFile === null ? [] : [[target, fromFile.modules]]);
       /* NOT IN THE SHORT LIST AND NO DOCUMENT SENT: the host's whole catalogue, held to its checksum. */
@@ -1907,6 +1931,9 @@ export function arranger(d: ArrangeDeps) {
     const disable = kind === 'pack' && typeof body.disable === 'string' ? [body.disable] : (packs.disable ?? []);
     const approved = Array.isArray(body.approve) ? (body.approve as string[]) : [];
     const docs = new Map<string, Body>(kind === 'pack' && typeof body.install === 'string' && isMap(body.doc) ? [[body.install, body.doc]] : []);
+    /* A FILE THE PROPOSAL CARRIED goes in as made here, unless it is a newer version of one the store keeps current here
+       (Slash's question about a store update carries the store's file). */
+    for (const [id, doc] of docs) if (!entryOf(id) && (stateOf(id) === undefined || ownHeld(id))) madeHere.add(doc);
     const declarations = kind === 'arrange' && Array.isArray(body.declarations) ? (body.declarations as Body[]).filter(isMap) : [];
 
     const steps = Array.isArray(body.plan) ? (body.plan as Body[]) : [];

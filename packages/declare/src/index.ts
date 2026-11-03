@@ -92,6 +92,30 @@ const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$/;
 export const PACK_SOURCES = ['kennel', 'url', 'git', 'paste', 'local'] as const;
 export type PackSource = { kind: (typeof PACK_SOURCES)[number]; ref?: string };
 
+/**
+ * WHERE AN INSTALLED ADD-ON'S UPDATES COME FROM, read off the `source` its `pack` row keeps (the WordPress `Update URI`
+ * fix). Updates were matched by id alone, so an add-on made here or installed from GitHub as `watch-list` would have
+ * been offered the store's `watch-list` as its update the day somebody published one, and the store's file would have
+ * replaced the person's own.
+ *
+ * - `store`: the store index, by id. `kennel`, and `local`: BrainDog's own modules go in as `local`, and so did every
+ *   store install before the source was written, so `local` stays the store's. No row at all (a pack the seed owns by
+ *   its body) is BrainDog's own too.
+ * - `git`: tags on the repository it came from, never the store.
+ * - `none`: `paste` (made in this BrainDog, by a person or an agent) and `url` (a link pasted once). Nothing is offered;
+ *   a new version is a new file, proposed by whoever made it.
+ *
+ * ONE READER, so the record's night pass, Slash, the store page and the agent's `addons` call all decide alike.
+ */
+export type UpdateChannel = 'store' | 'git' | 'none';
+export function updateChannel(source: string | null | undefined): UpdateChannel {
+  if (source === 'git') return 'git';
+  if (source === 'paste' || source === 'url') return 'none';
+  return 'store';
+}
+/** Whether the store's newer version of an add-on with this id is its update (`updateChannel` is `store`). */
+export const updatesFromStore = (source: string | null | undefined): boolean => updateChannel(source) === 'store';
+
 export type PackDeclaration = { kind: DeclKind; id: string; body: Record<string, Json>; canonical: string };
 /**
  * One example row. `key` is the name the file gives it so another seed can point at it with `{ ref: '<key>' }`; it is
