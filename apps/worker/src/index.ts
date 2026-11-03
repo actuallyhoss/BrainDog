@@ -61,7 +61,7 @@ import { ALARM_RUNS, IN_FLIGHT, actionExecutor, holding, holdingPaged, invocatio
 import { deliveryRun, holdAutomations, noticePass, replayUsage, runsHold, type Replayed } from '@braindog/host/actions';
 import { arrivalRun } from '@braindog/host/actions';
 import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
-import { grantNamed, holdingScript, readOnlyExecute, scriptProposals, scriptReads } from '@braindog/host/script';
+import { grantNamed, holdingScript, readOnlyExecute, scriptAsks, scriptProposals, scriptReads, scriptState } from '@braindog/host/script';
 import { askerOf, scriptTrial } from '@braindog/host/script-try';
 import { serveFirstRead } from '@braindog/host/first-read';
 import { pagedRunner } from '@braindog/host/connector';
@@ -1059,6 +1059,9 @@ export class Record$ extends DurableObject<Env> {
                   grant: t.grantOf,
                   openKey: t.readOnly ? null : openKey,
                   read: t.reads,
+                  /* `ctx.notify` AND `ctx.store` IN A TRIAL: checked against the record, never applied, as on a self-host. */
+                  state: scriptState(api),
+                  trial: true,
                   now: () => Date.now(),
                 },
                 s,
@@ -2191,6 +2194,9 @@ export class Record$ extends DurableObject<Env> {
             read: scriptReads(api),
             /* `ctx.propose`, as on the self-host: tried against the gate now, filed with the run's writes. */
             propose: scriptProposals(api),
+            /* `ctx.notify` and `ctx.store`, queued and applied with the run's writes; `ctx.ask`, on the record's allowance. */
+            state: scriptState(api),
+            ask: scriptAsks(this.#answers),
             now: () => Date.now(),
           },
           s,

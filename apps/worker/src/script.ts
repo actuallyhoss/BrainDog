@@ -39,7 +39,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 import type { ActionRequest, Execute, OpenKey } from '@braindog/host/actions';
-import { addressed, addressSecrets, CYCLE_CHARS, keyRefused, scriptCycle, scriptFold, slashDeclared, type ScriptCycle, type ScriptFold, type ScriptGrant, type ScriptProposals, type ScriptReads } from '@braindog/host/script';
+import { addressed, addressSecrets, CYCLE_CHARS, keyRefused, scriptCycle, scriptFold, slashDeclared, type ScriptAsk, type ScriptCycle, type ScriptFold, type ScriptGrant, type ScriptProposals, type ScriptReads, type ScriptState } from '@braindog/host/script';
 import type { ScriptAnswer, Scripted } from '@braindog/kernel';
 import {
   checkDecl,
@@ -123,6 +123,15 @@ export type ScriptCall =
   | { op: 'cycle'; day: string; line: Json }
   /** `ctx.propose`: a question with rows, tried against the gate and queued by the run's own `scriptProposals`. */
   | { op: 'propose'; proposal: Json }
+  /**
+   * `ctx.notify`, `ctx.ask` AND `ctx.store` (add-ons phase 4), answered in the record's object by the run's own
+   * `scriptState` and `scriptAsks`, as the self-host's runner answers them, and held to the header here as `runInQuickJs`
+   * holds them: a script that never said `notifies: true`, `model:` or `store: true` is refused and the run stops.
+   */
+  | { op: 'notify'; said: Json }
+  | { op: 'ask'; prompt: string }
+  | { op: 'storeGet'; key: string }
+  | { op: 'storeSet'; key: string; value: Json }
   /**
    * The CPU time the platform says a run spent, from `ScriptTail` and never from the sandbox: the two doors the script
    * can reach build their calls with an `op` of their own, so nothing the script writes can send this one.
@@ -239,6 +248,43 @@ export class ScriptRecord extends WorkerEntrypoint<Wired, Linked> {
     if ('error' in reply) throw new Error(reply.error);
     return JSON.stringify(reply.ok);
   }
+
+  /** `ctx.notify`, answered in the record's object, where the run's queue and the add-on's day are kept. */
+  async notify(run: string, said: string): Promise<string> {
+    const reply = await home(this.env, this.ctx.props).script(run, { op: 'notify', said: parsedOrNull(said) });
+    if ('error' in reply) throw new Error(reply.error);
+    return JSON.stringify(reply.ok);
+  }
+
+  /** `ctx.ask`: one question to Slash's model, on the record's allowance. */
+  async ask(run: string, prompt: string): Promise<string> {
+    const reply = await home(this.env, this.ctx.props).script(run, { op: 'ask', prompt: String(prompt) });
+    if ('error' in reply) throw new Error(reply.error);
+    return JSON.stringify(reply.ok);
+  }
+
+  /** `ctx.store.get`: what the add-on kept under a key, this run's own changes first. */
+  async storeGet(run: string, key: string): Promise<string> {
+    const reply = await home(this.env, this.ctx.props).script(run, { op: 'storeGet', key: String(key) });
+    if ('error' in reply) throw new Error(reply.error);
+    return JSON.stringify(reply.ok);
+  }
+
+  /** `ctx.store.set`: queued in the record's object and applied with the run's writes. */
+  async storeSet(run: string, key: string, value: string): Promise<string> {
+    const reply = await home(this.env, this.ctx.props).script(run, { op: 'storeSet', key: String(key), value: parsedOrNull(value) });
+    if ('error' in reply) throw new Error(reply.error);
+    return JSON.stringify(reply.ok);
+  }
+}
+
+/** What the prelude stringified, read back; text that does not parse crosses as `null`, which the record refuses. */
+function parsedOrNull(text: unknown): Json {
+  try {
+    return typeof text === 'string' ? (JSON.parse(text) as Json) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** What the tail is handed: the object, as the two doors are, and the one run its Worker was loaded for. */
@@ -286,6 +332,14 @@ type Turn = {
   cycle: ScriptCycle;
   /** `ctx.propose` for this run and no other, its queue and count kept here; absent on a host that files nothing. */
   propose?: ScriptProposals | undefined;
+  /** `ctx.notify` and `ctx.store` for this run, queued for `finishScript`; absent on a host that keeps neither. */
+  state?: ScriptState | undefined;
+  /** `ctx.ask` for this run; absent on a host with no model, where a declared ask is answered so. */
+  ask?: ScriptAsk | undefined;
+  /** A trial (`scriptTry`, an add-on's tool): `ctx.notify` and `ctx.ask` are dry, as on the self-host. */
+  trial?: boolean | undefined;
+  /** How many times this run asked the model, held to `model.most_per_run`. */
+  asks: number;
   fetches: number;
   bytes: number;
   stop: ScriptRefusal | null;
@@ -323,9 +377,9 @@ export class ScriptRuns {
     return this.#turns.size;
   }
 
-  open(turn: Omit<Turn, 'fold' | 'cycle' | 'fetches' | 'bytes' | 'stop' | 'calls' | 'rows'>): string {
+  open(turn: Omit<Turn, 'fold' | 'cycle' | 'fetches' | 'bytes' | 'stop' | 'calls' | 'rows' | 'asks'>): string {
     const id = crypto.randomUUID();
-    this.#turns.set(id, { ...turn, fold: scriptFold(turn.decl.id), cycle: scriptCycle(turn.decl.id), fetches: 0, bytes: 0, stop: null, calls: 0, rows: 0 });
+    this.#turns.set(id, { ...turn, fold: scriptFold(turn.decl.id), cycle: scriptCycle(turn.decl.id), fetches: 0, bytes: 0, stop: null, calls: 0, rows: 0, asks: 0 });
     this.#cpu.set(id, { ms: null, wake: null });
     return id;
   }
@@ -422,6 +476,34 @@ export class ScriptRuns {
          not a rule broken: a question the record would not take is the script's to say, as on the self-host. */
       if (turn.propose === undefined) return { error: 'This host files no questions from a script.' };
       return { ok: await turn.propose.propose(call.proposal) };
+    }
+    /* `ctx.notify`, `ctx.ask` AND `ctx.store`: THE HEADER IS HELD HERE, in `runInQuickJs`'s words, before the record's
+       object is asked; the day's notices, the allowance and the store's size are `scriptState`'s and `scriptAsks`', and
+       their refusals are values the script reads. A trial is dry, as `scriptRunner` makes it on the self-host. */
+    if (call.op === 'notify') {
+      if (decl.notifies !== true) return refuse({ code: 'FORBIDDEN', why: `${decl.id} sent a notice, and its header does not say notifies: true.` });
+      if (turn.state === undefined) return { error: 'This host sends no notices from a script.' };
+      const out = (await turn.state.notify(call.said)) as { ok?: unknown };
+      return { ok: turn.trial === true && out.ok === true ? { ok: true, dry: true } : (out as Json) };
+    }
+    if (call.op === 'ask') {
+      const most = decl.model?.most_per_run;
+      if (most === undefined) return refuse({ code: 'FORBIDDEN', why: `${decl.id} asked Slash's model, and its header does not say model: { most_per_run }.` });
+      turn.asks += 1;
+      if (turn.asks > most) return refuse({ code: 'OUT_OF_BOUNDS', why: `${decl.id} asked Slash's model more than its ${most} ${most === 1 ? 'time' : 'times'} a run.` });
+      if (turn.trial === true) return { ok: { ok: true, dry: true, text: '' } };
+      if (turn.ask === undefined) return { ok: { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog has no model for Slash to ask, so nothing was asked.', at: 'ask' } } };
+      return { ok: await turn.ask(call.prompt) };
+    }
+    if (call.op === 'storeGet' || call.op === 'storeSet') {
+      if (decl.store !== true)
+        return refuse({ code: 'FORBIDDEN', why: `${decl.id} ${call.op === 'storeGet' ? 'read its store' : 'kept state'}, and its header does not say store: true.` });
+      if (turn.state === undefined) return { error: 'This host keeps no state for a script.' };
+      try {
+        return { ok: call.op === 'storeGet' ? await turn.state.storeGet(call.key) : await turn.state.storeSet(call.key, call.value) };
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
+      }
     }
 
     /* AN ADDRESS HELD IN THE KEYS: the label held to `keys`, the key opened here and read by `addressed`, as on the
@@ -565,6 +647,9 @@ export default class extends WorkerEntrypoint {
       fold: (text) => record.fold(run, text),
       cycle: (day, line) => record.cycle(run, day, line),
       ...(meta.proposes === true ? { propose: (proposal) => record.propose(run, proposal) } : {}),
+      ...(meta.notifies === true ? { notify: (said) => record.notify(run, said) } : {}),
+      ...(meta.asks === true ? { ask: (prompt) => record.ask(run, prompt) } : {}),
+      ...(meta.stores === true ? { storeGet: (key) => record.storeGet(run, key), storeSet: (key, value) => record.storeSet(run, key, value) } : {}),
     };
     if (typeof source.default !== 'function') return { invalid: true, log: '' };
     const ctx = withConfig(prelude(host)(meta), meta.config);
@@ -620,6 +705,12 @@ export type ScriptWiring = {
   read?: ((scripted: Scripted) => ScriptReads) | ScriptReads | undefined;
   /** `ctx.propose` for a run, its queue and count (`scriptProposals`). Absent: the script is handed no `ctx.propose`. */
   propose?: ((scripted: Scripted) => ScriptProposals) | undefined;
+  /** `ctx.notify` and `ctx.store` for a run (`scriptState`). Absent: the script is handed neither. */
+  state?: ((scripted: Scripted) => ScriptState) | undefined;
+  /** `ctx.ask` for a run (`scriptAsks`). Absent with `state` there: a declared ask is answered that there is no model. */
+  ask?: ((scripted: Scripted) => ScriptAsk) | undefined;
+  /** `true` for a trial: notices and the model are dry, and what the store keeps is never applied. */
+  trial?: boolean | undefined;
   now: () => number;
 };
 
@@ -706,7 +797,21 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
 
   const read = typeof wiring.read === 'function' ? wiring.read(s) : wiring.read;
   const propose = wiring.propose?.(s);
-  const run = wiring.runs.open({ decl: full, limits, job: s.job.id, send: wiring.send(decl.egress), grant: wiring.grant, openKey: wiring.openKey ?? null, read, propose });
+  const state = wiring.state?.(s);
+  const asked = wiring.ask?.(s);
+  const run = wiring.runs.open({
+    decl: full,
+    limits,
+    job: s.job.id,
+    send: wiring.send(decl.egress),
+    grant: wiring.grant,
+    openKey: wiring.openKey ?? null,
+    read,
+    propose,
+    ...(state === undefined ? {} : { state }),
+    ...(asked === undefined ? {} : { ask: asked }),
+    ...(wiring.trial === true ? { trial: true } : {}),
+  });
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     /* `load`, NOT `get`: A FRESH WORKER FOR EVERY RUN. `get` caches by id, and the id was `<record>:<script>:v<n>`, so
@@ -732,7 +837,16 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     /* THE DAY IS HANDED IN BESIDE THE INSTANT (`scriptMeta`), as the self-host hands it: `ctx.today()` is the record's
        own day on both hosts, worked out here because the sandbox has no zone table. */
     /* `proposes` SAYS WHETHER THE LOADED MODULE BUILDS A `ctx.propose`, as a self-host's `CtxHost` does by having one. */
-    const meta: Json = { ...scriptMeta({ input: (input ?? null) as Json, now: new Date(started).toISOString(), tz: record.tz }), config: config ?? {}, proposes: propose !== undefined };
+    /* AND WHETHER IT BUILDS `ctx.notify`, `ctx.ask` AND `ctx.store`: whatever the header says, from a host that keeps them,
+       so a script that never said it may hears the header's sentence (`FORBIDDEN`) and not "not a function". */
+    const meta: Json = {
+      ...scriptMeta({ input: (input ?? null) as Json, now: new Date(started).toISOString(), tz: record.tz }),
+      config: config ?? {},
+      proposes: propose !== undefined,
+      notifies: state !== undefined,
+      asks: state !== undefined || asked !== undefined,
+      stores: state !== undefined,
+    };
 
     /* THE DEADLINE IS RACED, NOT ASKED OF THE SANDBOX. A script awaiting a slow provider is not spending CPU, so
        `cpuMs` never ends it; this does, and the run is closed below so whatever it asks for afterwards is refused. */
@@ -779,7 +893,18 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     const answer = askOf(handed.answer);
     /* AND WHAT IT PROPOSED, queued in this object as it asked (`scriptProposals`), for `finishScript` to file. */
     const queued = turn?.propose?.queued() ?? [];
-    return { writes, log, usage: spent, ...(ask === undefined ? {} : { ask }), ...(answer === undefined ? {} : { answer }), ...(queued.length === 0 ? {} : { proposals: queued }) };
+    /* AND WHAT IT TOLD AND KEPT (`scriptState`), for `finishScript` to check again and apply with the writes. */
+    const held = turn?.state?.queued();
+    return {
+      writes,
+      log,
+      usage: spent,
+      ...(ask === undefined ? {} : { ask }),
+      ...(answer === undefined ? {} : { answer }),
+      ...(queued.length === 0 ? {} : { proposals: queued }),
+      ...(held === undefined || held.notices.length === 0 ? {} : { notices: held.notices }),
+      ...(held === undefined || held.stored.length === 0 ? {} : { stored: held.stored }),
+    };
   } finally {
     if (timer !== undefined) clearTimeout(timer);
     wiring.runs.close(run);
