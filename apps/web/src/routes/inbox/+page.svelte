@@ -1213,7 +1213,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    padding: var(--sp-5) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* ── the toolbar ──────────────────────────────────────────────────────── */
@@ -1366,7 +1366,7 @@
   .way-main {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--row-stack);
     min-inline-size: 0;
   }
 
@@ -1374,7 +1374,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-medium);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .way-unsigned {
@@ -1382,7 +1382,7 @@
     margin: 0 0 var(--sp-3);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     text-wrap: pretty;
   }
 
@@ -1390,7 +1390,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1422,7 +1422,7 @@
     margin: 0 0 var(--sp-3);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lh-body);
   }
 
   .did-door + .did-door {
@@ -1434,7 +1434,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
-    line-height: 22px;
+    line-height: var(--lead-ui);
   }
 
   .did {
@@ -1471,7 +1471,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: var(--fw-medium);
-    line-height: 22px;
+    line-height: var(--lead-ui);
   }
 
   .did-counts {
@@ -1485,7 +1485,7 @@
   .did-why {
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lh-body);
   }
 
   .did-plain,
@@ -1554,7 +1554,7 @@
     font-family: var(--font-display);
     font-size: var(--fs-figure);
     font-weight: 600;
-    line-height: 34px;
+    line-height: var(--lead-figure);
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
   }
@@ -1563,7 +1563,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: var(--lead-meta);
     letter-spacing: 0;
   }
 
@@ -1572,7 +1572,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .why {
@@ -1580,7 +1580,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* ── patterns and what could be learned ──────────────────────────────── */
@@ -1603,7 +1603,7 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 6px;
+    gap: var(--sp-2);
   }
 
   /* ── an arrival ───────────────────────────────────────────────────────── */
@@ -1620,7 +1620,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-meta);
     font-weight: var(--fw-semi);
-    line-height: 1.4;
+    line-height: var(--lead-meta);
   }
 
   .day-h:first-child {
@@ -1637,7 +1637,7 @@
     align-items: center;
     padding-inline: var(--sp-3);
     margin-block: 1px;
-    border-radius: 10px;
+    border-radius: var(--r-ctl);
     scroll-margin-block: var(--sp-7);
     transition: background var(--d-state) var(--ease-out);
   }
@@ -1731,7 +1731,7 @@
     overflow: hidden;
     color: var(--ink-3);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1749,7 +1749,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 1.6;
+    line-height: var(--lh-body);
     /* A body is text somebody else wrote, line breaks included, and one unbroken token must not
        push the card wider than the screen. */
     white-space: pre-line;
@@ -1806,7 +1806,7 @@
     inline-size: fit-content;
     max-inline-size: 100%;
     margin-inline: auto;
-    padding: 6px 6px 6px var(--sp-4);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
     /* FLOATING CHROME, SO GLASS (ops 4.12's toast surface): the regular material, its edge and the popover shadow. */
     background: var(--glass-regular, var(--tile));
     backdrop-filter: var(--glass-filter, none);
@@ -1880,10 +1880,6 @@
   }
 
   @media (width < 900px) {
-    .page {
-      padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-
     .batch {
       inset-block-end: calc(var(--tabbar) + var(--sp-3));
     }
@@ -1937,7 +1933,7 @@
     .file-into[data-where='row'] {
       flex-direction: column;
       align-items: stretch;
-      gap: 6px;
+      gap: var(--sp-2);
     }
 
     .file-into[data-where='row'] .file-select {

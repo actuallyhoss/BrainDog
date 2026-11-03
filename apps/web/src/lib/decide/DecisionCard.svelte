@@ -1064,7 +1064,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
-    line-height: 1.4;
+    line-height: var(--lead-meta);
   }
 
   .dc-part-changes > .dc-h {
@@ -1181,7 +1181,7 @@
     margin-block-start: calc(var(--sp-1) * -1);
     font-size: var(--fs-head);
     font-weight: var(--fw-semi);
-    line-height: var(--lh-head);
+    line-height: var(--lead-head);
     /* NO WORD LEFT ALONE ON THE LAST LINE (UI pass 1 Nov): at 390 "…for £14. Keep" broke before a lone "it?". */
     text-wrap: pretty;
   }
@@ -1203,7 +1203,7 @@
   @media (width < 600px) {
     .dc-main > .queue-question {
       font-size: var(--fs-body);
-      line-height: 1.35;
+      line-height: var(--lead-ui);
     }
 
     .dc-main > .dc-hard,
@@ -1281,7 +1281,7 @@
     margin: calc(var(--sp-1) * -1) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* ON THE LEAD THE SUGGESTION IS SAID ON ITS BUTTON, "Accept, suggested", in the button's own ink. */
@@ -1541,7 +1541,7 @@
     border-radius: var(--r-ctl);
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .qa-done > :global(.icon) {
@@ -1590,7 +1590,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 22px;
+    line-height: var(--lead-head);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -1600,7 +1600,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .dr-late {
@@ -1624,10 +1624,10 @@
   }
 
   .dr-asked {
-    margin: 0;
+    margin: var(--sp-1) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .dc-row > .dr-select {
@@ -1668,12 +1668,12 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 1.4;
+    line-height: var(--lead-meta);
   }
 
   @media (pointer: coarse) {
     .dc-actions > :global(.dc-later) {
-      min-block-size: var(--tap);
+      min-block-size: var(--btn-h);
     }
   }
 

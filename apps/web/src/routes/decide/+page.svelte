@@ -667,7 +667,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--tile-gap);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
     min-inline-size: 0;
   }
 
@@ -729,7 +729,7 @@
      title. Now the card itself ends at the measure, and the amount sits at the card's right edge, as an ops row's
      value does, a short reach from its title. */
   .body :global(.block-slot[data-key='decide-lead']) {
-    max-inline-size: calc(var(--measure, 72ch) + 2 * var(--sp-5, 24px));
+    max-inline-size: calc(var(--measure, 72ch) + 2 * var(--tile-pad-lead));
   }
 
   .body :global(.block-slot[data-key='decide-lead'] .dc-row) {
@@ -739,7 +739,7 @@
   /* A MONEY QUESTION'S TITLE IS A QUESTION'S SIZE HERE (T18): 15 beside Quick's 17. Today's tile keeps its 15. */
   .body :global(.dc-row > .dr-title) {
     font-size: var(--fs-head);
-    line-height: 24px;
+    line-height: var(--lead-head);
   }
 
   /* THE PHONE'S SWITCH: one column at a time, the others out of the way until they are chosen. On a wide board the
@@ -860,10 +860,9 @@
   }
 
   /* ON A PHONE A QUESTION'S TILE GIVES ITS WORDS A LITTLE MORE OF THE WIDTH. */
-  @media (width < 600px) {
-    .body :global(.block-slot > .queue > .qa) {
-      padding: var(--sp-4);
-    }
+  /* THE LEAD QUESTION is the page's lead card, so it takes the lead card's inset (24 at a desk, 16 on a phone). */
+  .body :global(.block-slot[data-key='decide-lead'] > .queue > .qa) {
+    padding: var(--tile-pad-lead);
   }
 
   /* THE CURSOR'S RING FOLLOWS THE TILE'S CORNERS, so `j` and `k` land on a question the shape it is. */
@@ -969,7 +968,7 @@
     padding: 0 var(--title-inset, 12px);
     background: none;
     border: 0;
-    border-radius: 10px;
+    border-radius: var(--r-ctl);
     box-shadow: none;
   }
 
@@ -1133,11 +1132,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  @media (width < 900px) {
-    .page {
-      padding: var(--sp-2) var(--gutter) var(--sp-8);
-    }
-  }
 
   /* WHERE THE MENU IS RAISED TO THE SENTENCE (a phone, the questions first under the head), the page keeps the room
      Home keeps over its body. The menu is a tap tall and stands on the body's top edge, so with less room under the
