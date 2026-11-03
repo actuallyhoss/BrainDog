@@ -60,14 +60,14 @@ An audit, a plan, a design or a before and after goes on the thing it is about, 
 
 ## Anything else the app does
 
-`act` makes any call the BrainDog app makes, by its name: settings and time zone, add-ons and their settings,
+`act` makes any call the BrainDog app makes, by its name: settings and time zone, plugins and their settings,
 automations, boards and Today, books and bills, sharing and people, Needs you, export. Read `braindog:calls` for every
 call and what it takes, or, where resources are not read, `act {call:"calls", args:{q:"<a word>"}}`, then
 `act {call:"<name>", args:{...}}`. A name it does not know is refused with the nearest call as `try`.
 
 - It runs with your own grant. What you may not do in the app you may not do here; a change your rung asks about is
   filed on Needs you, as any other.
-- What only the owner does in a browser (an add-on on or off, its settings, a declaration, taking a key out) is asked
+- What only the owner does in a browser (a plugin on or off, its settings, a declaration, taking a key out) is asked
   instead, and lands when the person says yes. Anything else refused that way is theirs: say so.
 - Take back your own write with `act {call:"undoOwn", args:{batch:"<from the receipt>"}}`.
 - Scripts and automations are no list of rows, and are read by name: `list {register:"scripts"}` or
@@ -78,7 +78,7 @@ call and what it takes, or, where resources are not read, `act {call:"calls", ar
 
 ## When BrainDog does not do what they want
 
-An add-on can. Look in the store before saying no, and build one before faking a feature with rows.
+A plugin can. Look in the store before saying no, and build one before faking a feature with rows.
 
 1. `act {call:"addons", args:{q:"<a few words>"}}` searches the store; `act {call:"addon", args:{id}}` reads one:
    who made it, how far it is trusted, and what it asks of theirs. If one fits, `act {call:"installPack", args:{id}}`
@@ -90,7 +90,7 @@ An add-on can. Look in the store before saying no, and build one before faking a
 4. `act {call:"installPack", args:{doc}}` puts it to them on Needs you. Nothing installs until they say yes.
 5. To change it: `act {call:"addon", args:{id, file:true}}`, edit, raise its version, check, and ask again.
 
-An add-on names every list of theirs it reads in `uses`, every host it calls, and a key only by its label.
+A plugin names every list of theirs it reads in `uses`, every host it calls, and a key only by its label.
 
 ## When you can act without asking
 

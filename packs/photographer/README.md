@@ -1,6 +1,6 @@
 # Photographer
 
-An add-on for somebody who photographs weddings, families and small businesses. It is a file and nothing else: three
+A plugin for somebody who photographs weddings, families and small businesses. It is a file and nothing else: three
 lists, three pages and six figures, on top of People, with no script and nothing in BrainDog's own code.
 
 ## What a photographer asks every Monday
@@ -19,7 +19,7 @@ Written before the file, as a photographer would say it on a Monday morning with
 10. Is any of my gear about to fall out of its cover?
 11. Am I about to book two weddings on the same day?
 
-## What the add-on adds
+## What the plugin adds
 
 **Lists.**
 

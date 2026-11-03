@@ -11,14 +11,14 @@ Reads the Ledger and asks once about what it notices. It needs Money.
   Netflix to Repeating, E£219 around the 12th?" Yes writes the monthly line, next due a month after the newest
   payment the Ledger holds that day.
 
-Each flag has its own switch in the add-on's settings, and both start on. Charged twice stops asking about a payee
+Each flag has its own switch in the plugin's settings, and both start on. Charged twice stops asking about a payee
 whose last three answers were "Both real", and goes on watching everyone else. Looks like it repeats switches itself
 off after three "No" in a row. Either says so in one line on the Money watch page; change that line to "Switched on
 again" and it starts over.
 
 How it is built: a script's answer can only change a line that exists, so each thing noticed is first a line in the
-add-on's own list, Money watch. A new line starts the script again to ask about it, and the answer written on the line
-starts it once more to act: mark the mistake void, or add the Repeating line. `twice.js` and `repeats.js` are the scripts; the add-on file carries each as its `source`,
+plugin's own list, Money watch. A new line starts the script again to ask about it, and the answer written on the line
+starts it once more to act: mark the mistake void, or add the Repeating line. `twice.js` and `repeats.js` are the scripts; the plugin file carries each as its `source`,
 and the test holds the two to be the same text.
 
 1.1.0 changed three things. The answer "One is a mistake" no longer carries a change to the Ledger entry read on the

@@ -34,7 +34,7 @@ braindog addon check reading-list
 ```
 
 ```code | What it prints
-Reading list 1.0.0 reads as an add-on: 1 lists, 1 pages and 2 example rows. Nothing was sent.
+Reading list 1.0.0 reads as a plugin: 1 lists, 1 pages and 2 example rows. Nothing was sent.
   By Your name, MIT.
   Installs first: none
   Adds lists: Items; pages: Reading list; rules: none

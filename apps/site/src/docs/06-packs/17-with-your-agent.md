@@ -42,7 +42,7 @@ What a plugin file may hold, and every rule a check holds it to, is in `braindog
 A list of yours the plugin reads without naming it in `uses` is refused, and so is anything in the file that looks like a key. A refusal says what to change:
 
 ```code | What a refusal says
-Not yet: This add-on uses register.transactions without asking. Name every place of yours it reads or changes in uses, so a person sees it before installing: "uses": ["register.transactions"].
+Not yet: This plugin uses register.transactions without asking. Name every place of yours it reads or changes in uses, so a person sees it before installing: "uses": ["register.transactions"].
 ```
 
 ## What you see

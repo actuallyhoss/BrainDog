@@ -36,7 +36,7 @@ export function guide(list) {
     '`tools/gates/test/words.test.mjs`. Change the list and run the script; an edit made here by hand turns the test red.',
     '',
     'The words a person reads name their own things, in plain sentences. Two checks hold it: the `words` gate reads every',
-    'copy file the app ships and every title, heading, label, body and empty text of a page the seed or an add-on',
+    'copy file the app ships and every title, heading, label, body and empty text of a page the seed or a plugin',
     'declares; the page lint reads what a page prints on a real record, and Health shows what it finds.',
     '',
     '## Words a person never reads',

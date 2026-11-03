@@ -1,6 +1,6 @@
 # Starter jobs
 
-Kinds of job a record can run on its owner's own machine, through `braindog runner`. Installing the add-on asks
+Kinds of job a record can run on its owner's own machine, through `braindog runner`. Installing the plugin asks
 the owner in Decide, and each kind runs only once the install is accepted and the machine has allowed it
 (`braindog runner allow job.week-in-review`).
 

@@ -31,7 +31,7 @@ body:
       label: What should happen
       description: >
         If this is a declaration (a list, page, block, door, rule, figure, theme or digest), write it
-        as YAML. A proposal that can ship as an add-on is a proposal that needs no code.
+        as YAML. A proposal that can ship as a plugin is a proposal that needs no code.
     validations:
       required: true
 
@@ -63,7 +63,7 @@ body:
       description: >
         Extensions are data. Where data is not enough, the extension is an agent.
       options:
-        - A declaration: it could ship as an add-on
+        - A declaration: it could ship as a plugin
         - A kernel or write-path change
         - A screen or an interaction
         - An agent-surface change (a tool, a resource, a prompt)

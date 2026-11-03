@@ -37,20 +37,20 @@ subject, who it is from or to, the day, a snippet of at most 160 characters and 
   Gmail's dots and +tags, a known organisation's subdomains), so meeting somebody already there never stops the run.
 - **What 1.2.0 reads that the door did not** comes in the lines it already had: Connect Google says a mail you are only
   copied on is not waiting on your reply, and calls a calendar's mail (an invitation by its sender or type, or a mail
-  about an event your calendar holds) `event` as Gmail's guess, once the add-on knows that word. A script pasted before
+  about an event your calendar holds) `event` as Gmail's guess, once the plugin knows that word. A script pasted before
   keeps working, and the hourly script reads invitations and forwards from their subject and words.
 - A **Mail** page, and two Today widgets: **Mail** (need a reply, unread) and **Waiting on your reply**. Both stay off
-  the board until the first mail arrives; until then the Connect tile on the add-on page is where to start.
+  the board until the first mail arrives; until then the Connect tile on the plugin page is where to start.
 
 ## Connect Google (the simpler way, since 2 Nov)
 
-BrainDog can read Gmail itself once Google is connected: **Connect Google** on this add-on's page, or in Settings, What
+BrainDog can read Gmail itself once Google is connected: **Connect Google** on this plugin's page, or in Settings, What
 comes in. It is Google's own sign-in, read only (`gmail.readonly`, `calendar.readonly`, `contacts.readonly`,
 `userinfo.email`), and BrainDog keeps Google's refresh token sealed on its server, never in a row, a note or an answer.
 Every 15 minutes it reads what changed (Gmail's history, from a two-week start) and posts each mail through this
-add-on's own door, `gmail_in`, as the very lines the script below posts. So the list, the page, the questions, the Today
+plugin's own door, `gmail_in`, as the very lines the script below posts. So the list, the page, the questions, the Today
 widgets and the people met are the same whichever way the mail came, and a mail is never written twice. With Google
-connected, this add-on's page says Connected in place of the paste steps, and the script can be stopped.
+connected, this plugin's page says Connected in place of the paste steps, and the script can be stopped.
 
 The script stays for anybody who would rather not connect Google, and keeps working beside it.
 
@@ -61,15 +61,15 @@ before anybody but its maker can use it, which takes weeks and a security assess
 address was the other choice, and it was turned down: Gmail asks you to confirm a forwarding address with a code, a
 forwarded mail arrives whole (body and attachments), and a forward cannot say whether a mail is unread or answered.
 
-So the add-on takes mail in at a webhook door (`gmail_in`, checked by the token in its address) and the sender is a
+So the plugin takes mail in at a webhook door (`gmail_in`, checked by the token in its address) and the sender is a
 short Google Apps Script you paste into script.google.com once. It runs as you, under your own Google account, every 15
 minutes. It asks Google only for `gmail.readonly` (read your mail), `script.external_request` (post to your BrainDog)
-and `script.scriptapp` (run on a timer). It sends only what a row keeps. No key goes in the add-on, a row or a note:
+and `script.scriptapp` (run on a timer). It sends only what a row keeps. No key goes in the plugin, a row or a note:
 the token is in the door's address, which the record keeps only as a digest, and the address is shown to you once.
 
 ## Connect it (about two minutes)
 
-1. Install the add-on, then open Add-ons, Gmail, and press **Make the address**. The page shows two boxes with your
+1. Install the plugin, then open Plugins, Gmail, and press **Make the address**. The page shows two boxes with your
    address and time zone already filled in.
 2. Open script.google.com, signed in to your Gmail, and press **New project**.
 3. Press **Project Settings** (the gear) and tick **Show "appsscript.json" manifest file in editor**. Go back to
@@ -85,9 +85,9 @@ project, or delete the project. Making a new address in BrainDog stops the old o
 
 ## The files
 
-- `gmail.pack.json`: the add-on.
+- `gmail.pack.json`: the plugin.
 - `gmail.js`: the hourly script, the same text as the pack file's `source`.
-- `apps-script.gs` and `appsscript.json`: the recipe the add-on page shows, the same text as the door's `connect.files`.
+- `apps-script.gs` and `appsscript.json`: the recipe the plugin page shows, the same text as the door's `connect.files`.
   `BRAINDOG_ADDRESS` and `BRAINDOG_TIMEZONE` are filled in by the page.
 
 The pack file is built from these files; when one changes, its text in `gmail.pack.json` changes with it.
@@ -95,6 +95,6 @@ The pack file is built from these files; when one changes, its text in `gmail.pa
 ## The script and its versions
 
 The door reads the same lines from every version of the script, so a script pasted from 1.0.0 keeps working with the
-1.1.0 add-on. The 1.1.0 script differs in two places only: it keeps looking at a mail still waiting or unread after it
+1.1.0 plugin. The 1.1.0 script differs in two places only: it keeps looking at a mail still waiting or unread after it
 is 14 days old, and in `gmail.kind=` it may say `list` for a newsletter. Since 1.1.0 that line is read into `hint`
 (Gmail's guess) and never into `kind`, so Gmail updating a mail later cannot bring back a bill you cleared.

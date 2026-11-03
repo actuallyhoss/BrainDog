@@ -1,7 +1,7 @@
 # People
 
 Clients, contractors and accountants, the organisations they are with, and where each one was seen. Every record starts
-with it, and it is written here as a file anybody can read, the same as any other add-on.
+with it, and it is written here as a file anybody can read, the same as any other plugin.
 
 - **The lists.** A person is their name, their role, the organisation they are with, every address and handle they are
   known by, a note, the day you were last in touch and where they were seen. An organisation is its name, its kind, its

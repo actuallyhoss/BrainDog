@@ -2,7 +2,7 @@
 
 ## What a landlord asks every Monday
 
-Written before the add-on, from the side of somebody who rents out six flats and keeps the rest of their life
+Written before the plugin, from the side of somebody who rents out six flats and keeps the rest of their life
 elsewhere. These are the questions, in the order they come up over a first coffee.
 
 1. **What rent is due this month, and how much has come in so far?** The whole of it, across every flat.
@@ -20,7 +20,7 @@ elsewhere. These are the questions, in the order they come up over a first coffe
 10. **What did the flats make this month once repairs are paid?** Rent in, less repairs out.
 11. **Which of the payments in my bank were rent, and for which flat?**
 
-## What the add-on adds
+## What the plugin adds
 
 - **Four lists.** Properties (a name, an address, a kind and a note); Tenancies (the property, the tenant from People,
   the monthly rent, the day of the month it falls, the start and end days, the deposit and a state); Rent received
@@ -76,7 +76,7 @@ Each is a Monday question the grammar could not say, and the list, field or figu
   figures.
 - **Which bank payments were rent, and for which flat** (question 11). The unit asked for an optional Property link on
   Money's ledger and on what repeats, laid with `extends` and waiting until Money is there. `extends` sits on the
-  add-on's manifest, outside the parts that may wait (`holdingParts` in `packages/declare/src/when.ts` reads
+  plugin's manifest, outside the parts that may wait (`holdingParts` in `packages/declare/src/when.ts` reads
   declarations only), and a list the record lacks leaves the plan unresolved. So it is not laid, and Landlord does not
   ask for Money. Missing: an `extends` that waits on `when: { holds }`.
 - Smaller: **rent that is not monthly** (weekly or quarterly) has no field of its own, so the rent roll reads every

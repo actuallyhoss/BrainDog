@@ -1,7 +1,7 @@
 # Services
 
 Domains, hosting, subscriptions, memberships, insurance and bills: what each costs to keep, and when it renews. Not
-everybody keeps these, so it is an add-on and not part of what every record starts with.
+everybody keeps these, so it is a plugin and not part of what every record starts with.
 
 - **The list.** A service is its name, its type, who it is with, what it costs and how often, the day it renews, its
   status and what it points at. Only the name, the type, how often and the status must be said: a price or a renewal

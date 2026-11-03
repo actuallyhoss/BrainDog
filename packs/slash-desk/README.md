@@ -1,6 +1,6 @@
 # Slash on your machine
 
-An add-on that hands the heavy thinking of composing a page to a machine you enrolled as a runner.
+A plugin that hands the heavy thinking of composing a page to a machine you enrolled as a runner.
 
 - One job kind, "Compose a page on your machine". It takes one thing, the page, and nothing else.
 - It reads the brief and the page through the record's own tools, and proposes one arrangement of the page. It
@@ -11,5 +11,5 @@ An add-on that hands the heavy thinking of composing a page to a machine you enr
 - Nothing starts by itself. You press "Compose" on Slash; the job waits for your machine, and your machine asks you
   once at its terminal before it runs this kind the first time.
 
-Installing the add-on is approving the kind, in the same press as any add-on's plan. Taking it out retires the kind,
+Installing the plugin is approving the kind, in the same press as any plugin's plan. Taking it out retires the kind,
 and a job of it is refused from then on.

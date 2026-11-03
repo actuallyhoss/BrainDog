@@ -25,7 +25,7 @@ contact_links:
     url: https://brain.dog/docs
     about: >
       Using BrainDog, connecting Claude and other agents over MCP or the command line, the HTTP API,
-      and writing add-ons.
+      and writing plugins.
 
   - name: Read the design
     url: https://github.com/actuallyhoss/BrainDog/tree/master/docs

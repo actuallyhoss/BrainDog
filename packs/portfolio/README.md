@@ -1,7 +1,7 @@
 # Projects
 
 What you are building, and the plan for each. Every record that runs things starts with it, and it is written here as
-a file anybody can read, the same as any other add-on.
+a file anybody can read, the same as any other plugin.
 
 - **The list.** A project is its name, one line about it, its status (building, earning, parked or closed), what it
   earned in a year and the year before, how it is going, its next step, how far along it is, the day it aims for and
@@ -26,6 +26,6 @@ a file anybody can read, the same as any other add-on.
 The build still compiles the same lists, page, figures and rule in as a module (`packages/seed/src/modules/portfolio.ts`).
 `portfolio.test.ts` holds this file equal to it, part for part, on a record with Work and without it, and is deleted
 the day the module is. Two things still live only in the seed: the project page, drawn for one project at a time,
-which is `projectTemplate` and `crossPack` and in no add-on yet; and the choice of which neighbours Projects is cut on,
+which is `projectTemplate` and `crossPack` and in no plugin yet; and the choice of which neighbours Projects is cut on,
 which the module makes and this file writes as one `when:`. Domains stays on the list as the module has it until it
-moves to an add-on of its own.
+moves to a plugin of its own.

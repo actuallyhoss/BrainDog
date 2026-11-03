@@ -7,7 +7,7 @@ body:
       value: |
         **Security defects do not go here.** If this is a vulnerability (anything touching
         credentials, the vault, tokens, the operation grant, export integrity, the agent surface or
-        add-on installation), close this and read [SECURITY.md](../blob/master/SECURITY.md) instead.
+        plugin installation), close this and read [SECURITY.md](../blob/master/SECURITY.md) instead.
 
         A good report names the defect. The house convention is to say what was wrong before saying
         what should happen instead.
@@ -40,7 +40,7 @@ body:
     attributes:
       label: How to reproduce it
       description: >
-        The call, the declaration, the add-on, or the click path. Use made-up data: invented names,
+        The call, the declaration, the plugin, or the click path. Use made-up data: invented names,
         `.example` hosts, no real credential and no real amount.
       render: shell
     validations:
@@ -66,7 +66,7 @@ body:
         - CLI (braindog)
         - Self-host (apps/selfhost)
         - Cloud / Worker (apps/worker)
-        - An add-on (pack), or an install diff
+        - A plugin (pack), or an install diff
         - The renderer (braindog-render)
         - Something else / not sure
     validations:

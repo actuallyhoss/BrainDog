@@ -2,7 +2,7 @@
 
 ## What an agency lead asks every Monday
 
-Written first, before the add-on, by somebody who runs a small agency of four people on monthly retainers.
+Written first, before the plugin, by somebody who runs a small agency of four people on monthly retainers.
 
 1. Which clients have used up their hours this month, and which are over?
 2. Which client is furthest over?
@@ -14,7 +14,7 @@ Written first, before the add-on, by somebody who runs a small agency of four pe
 8. Who has not logged their hours?
 9. What are we really earning an hour on each client?
 
-## What the add-on adds
+## What the plugin adds
 
 It asks for People, since a client is one of People's organisations and a timesheet is one of People's people. Nothing
 in BrainDog's core knows about it: it is this one file.

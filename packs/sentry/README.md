@@ -28,7 +28,7 @@ What is breaking in your apps, read from Sentry every hour. Reads only: nothing 
 2. Put the token in your keys under the name Sentry token, opening your region's host:
    `braindog keys put "Sentry token" --opens us.sentry.io` (it reads the token from standard input), or paste it where
    Install asks for it.
-3. Install the add-on and set Organization to the part of your Sentry address before `.sentry.io`. Region is
+3. Install the plugin and set Organization to the part of your Sentry address before `.sentry.io`. Region is
    `us.sentry.io` unless your organization is kept in the EU (`de.sentry.io`).
 4. Within the hour, open Errors. Check that each Sentry project points at the right project of yours under Your
    project, and pick one where it does not.

@@ -18,12 +18,12 @@ reading-list seeds items 9 times, and a list takes at most 8 example rows.
 ```
 
 ```code | A credential anywhere in the file (SECRET_IN_PACK)
-This file holds what looks like a credential at seeds[0].fields.name. An add-on never carries one; take it out and publish it again.
+This file holds what looks like a credential at seeds[0].fields.name. A plugin never carries one; take it out and publish it again.
 ```
 
 ```code | A name BrainDog keeps (PROVIDES_CONFLICT)
-money-core is a name BrainDog keeps for its own modules and starters. Give this add-on another id.
-This add-on declares a list called tasks, which belongs to BrainDog's Work module. Name the list something else.
+money-core is a name BrainDog keeps for its own modules and starters. Give this plugin another id.
+This plugin declares a list called tasks, which belongs to BrainDog's Work module. Name the list something else.
 ```
 
 ```code | A dialect newer than the record (FORMAT_OUT_OF_RANGE, PRIMITIVES_OUT_OF_RANGE)
@@ -31,8 +31,8 @@ reading-list needs format 2 and this BrainDog is at 1. Update BrainDog.
 reading-list needs primitives 9 and this BrainDog renders 1. Update BrainDog, or ask the author for a build against the primitives it renders.
 ```
 
-- **`PACK_OVER_CAP`**, a file past the size a plugin may be: "This file is <n> KB, and an add-on is at most <n> KB. Ship fewer example rows, or split it."
-- **`PACK_MALFORMED`**, a file that is not a plugin at all: "This is not an add-on file: it has no pack in it." A starter gets "This is a use-case file, not an add-on. Publish it as a use case."
+- **`PACK_OVER_CAP`**, a file past the size a plugin may be: "This file is <n> KB, and a plugin is at most <n> KB. Ship fewer example rows, or split it."
+- **`PACK_MALFORMED`**, a file that is not a plugin at all: "This is not a plugin file: it has no pack in it." A starter gets "This is a use-case file, not a plugin. Publish it as a use case."
 
 ## What it needs installed first
 

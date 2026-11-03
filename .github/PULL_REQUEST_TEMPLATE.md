@@ -62,7 +62,7 @@ fixture. If nothing catches it, say so — that is a finding, not an omission to
       hardening change, not a fix for an unreported vulnerability. **A fix for an unreported
       vulnerability does not arrive as a public pull request** — report it privately first.
 - [ ] Which class: key handling · operation grants · export/import integrity · the agent surface ·
-      add-on installation · cross-record isolation · application security.
+      plugin installation · cross-record isolation · application security.
 
 ## Screenshots
 

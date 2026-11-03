@@ -96,7 +96,7 @@ The daily page checks run once a day in one go rather than in slices, since one 
 - Billing: always off. Nothing is charged or counted.
 - Turnstile: off. Self-host has no public sign-up.
 - OAuth: off at a plain http address, unless the server listens on this machine alone. See Connect your agents.
-- Add-ons: they send no requests to other servers until `BRAINDOG_OUTBOUND=on`. The public add-on registry is read
+- Plugins: they send no requests to other servers until `BRAINDOG_OUTBOUND=on`. The public plugin registry is read
   either way; `BRAINDOG_KENNEL=off` stops that.
 
 It may also say:
