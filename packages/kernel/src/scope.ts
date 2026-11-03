@@ -249,7 +249,14 @@ export const SUGGEST_AFTER = 3;
  * Folders any machine has that are never a project ("Start a project for Temp?"): a temporary or scratch
  * folder, the home, desktop, downloads and documents folders, the folder code sits in, and a worktree an agent opened.
  */
-const GENERIC = new Set(['temp', 'tmp', 'desktop', 'downloads', 'documents', 'developer', 'dev', 'code', 'repos', 'src', 'home', 'scratch', 'scratchpad', 'worktree', 'worktrees']);
+const GENERIC = new Set([
+  'temp', 'tmp', 'desktop', 'downloads', 'documents', 'developer', 'dev', 'code', 'repos', 'src', 'home', 'scratch', 'scratchpad', 'worktree', 'worktrees',
+  /* A FOLDER INSIDE A CHECKOUT is never a project (3 Nov: "A run worked in parts. Is that Otters.gg?" and "2 runs worked in
+     bot. Is that Crumb.gg?" came from runs that cd'd into a code folder). */
+  'parts', 'part', 'lib', 'libs', 'bin', 'bot', 'bots', 'app', 'apps', 'packages', 'package', 'pkg', 'packs', 'components', 'routes', 'pages',
+  'scripts', 'script', 'test', 'tests', '__tests__', 'spec', 'build', 'dist', 'out', 'web', 'api', 'server', 'client', 'utils', 'util', 'tools',
+  'docs', 'doc', 'assets', 'static', 'public', 'config', 'internal', 'core', 'shared', 'common', 'modules', 'node_modules', 'vendor', 'loop', 'plans',
+]);
 
 /** Whether a place's name, or the folder its run worked in, is one no person means as a project (`GENERIC`). */
 export function genericPlace(name: string, cwd?: string): boolean {
@@ -257,7 +264,7 @@ export function genericPlace(name: string, cwd?: string): boolean {
   if (GENERIC.has(said) || /^(?:agent-[0-9a-f]{8,}|worktree-.+)$/u.test(said) || /^te?mp(?:[-_.]\w*|\d*)$/u.test(said)) return true;
   if (cwd === undefined) return false;
   const path = cwd.replace(/\\/gu, '/').toLowerCase();
-  return /\/(?:\.claude\/worktrees|\.worktrees|worktrees)\//u.test(path) || /^\/(?:private\/)?(?:tmp|var\/folders)\//u.test(path);
+  return /\/(?:\.claude\/worktrees|\.worktrees|worktrees|[\w.-]*-wt)\//u.test(path) || /^\/(?:private\/)?(?:tmp|var\/folders)\//u.test(path);
 }
 
 /** The words a branch is commonly started with, before a `/`, `-` or `_`: `feature/login`, `fix-rates`, `claude/x`. */
