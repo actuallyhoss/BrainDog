@@ -33,7 +33,7 @@
     align-items: center;
     gap: 10px;
     padding: 12px 18px;
-    border-radius: 999px;
+    border-radius: 24px;
     background: var(--tile);
     font-size: var(--t-site-15);
     /* THE APP'S SEARCH CAPSULE: a hairline and the raised lift (red is kept for the one ask). */

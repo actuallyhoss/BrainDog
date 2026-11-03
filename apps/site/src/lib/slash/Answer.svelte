@@ -187,7 +187,7 @@
   .dt { width: 100%; border-collapse: collapse; font-size: var(--t-site-13-5); }
   .dt th { text-align: start; font-weight: 500; color: var(--muted); font-size: var(--t-site-12); padding: 6px 16px; }
   .dt td { padding: 8px 16px; white-space: nowrap; }
-  .dt thead th { background: linear-gradient(var(--sep), var(--sep)) no-repeat center bottom / calc(100% - 24px) 1px; }
+  .dt thead th { border-block-end: 1px solid var(--sep); }
   .dt .n { text-align: end; font-variant-numeric: tabular-nums; }
   .draft-foot { padding: 10px 16px; color: var(--muted); font-size: var(--t-site-12-5); border-block-start: 1px solid var(--sep); }
   .rule-s { margin: 0; font-size: var(--t-site-18); line-height: 1.55; text-wrap: pretty; }

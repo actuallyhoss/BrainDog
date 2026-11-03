@@ -278,7 +278,7 @@
     gap: 2px;
     margin-inline-start: auto;
     padding: 3px;
-    border-radius: 8px;
+    border-radius: 999px;
     background: var(--rule2);
   }
 
@@ -286,7 +286,7 @@
     min-block-size: var(--ctl-h-sm);
     padding-inline: 14px;
     border: 0;
-    border-radius: 6px;
+    border-radius: 999px;
     background: none;
     color: var(--ink2);
     font: inherit;
@@ -297,6 +297,7 @@
 
   .seg[aria-pressed='true'] {
     background: var(--tile);
+    box-shadow: var(--shadow-raised);
     color: var(--ink);
     font-weight: 600;
   }
@@ -316,6 +317,8 @@
     padding: 20px;
     border-radius: var(--r-tile);
     background: var(--tile);
+    border: 1px solid var(--card-edge);
+    box-shadow: var(--shadow-card);
     color: var(--ink2);
     font-family: var(--font-mono);
     font-size: var(--fs-cap);
@@ -351,6 +354,8 @@
     padding: 20px;
     border-radius: var(--r-tile);
     background: var(--tile);
+    border: 1px solid var(--card-edge);
+    box-shadow: var(--shadow-card);
   }
 
   /* The renderer's own spacing under a block belongs to a page of blocks; in a tile the tile's padding is it. */
@@ -368,7 +373,7 @@
     place-items: center;
     inline-size: var(--well);
     block-size: var(--well);
-    border-radius: var(--r-ctl);
+    border-radius: 50%;
     background: var(--tile-2);
     color: var(--ink2);
   }
