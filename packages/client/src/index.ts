@@ -3340,6 +3340,26 @@ export function createClient(options: ClientOptions) {
      * Keep one file's bytes at the address their hash makes (`PUT /api/files/<sha256>`), with this client's bearer.
      * The host hashes them again and refuses bytes that are not at their own hash.
      */
+    /** One file's bytes by its hash (`GET /api/files/<sha256>`), with this client's bearer, or `null` when the door has none. */
+    getFile: async (sha256: string): Promise<Result<Uint8Array | null>> => {
+      let res: Response;
+      try {
+        res = await doFetch(`${base}/api/files/${sha256}`, { headers: options.token ? { authorization: `Bearer ${options.token}` } : {} });
+      } catch (e) {
+        return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
+      }
+      if (res.status === 404) return { ok: true, value: null };
+      if (!res.ok) {
+        let body: unknown = null;
+        try {
+          body = await res.json();
+        } catch {
+          return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
+        }
+        return answered<Uint8Array | null>(res.status, body);
+      }
+      return { ok: true, value: new Uint8Array(await res.arrayBuffer()) };
+    },
     /* `name` MAKES IT AN ATTACHMENT (`?name=`): any type, up to 25 MB, typed by its bytes and that name. */
     putFile: async (bytes: Uint8Array, name?: string): Promise<Result<{ sha256: string; mime: string; bytes: number }>> => {
       const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', Uint8Array.from(bytes)));

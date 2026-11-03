@@ -287,6 +287,67 @@ export function methods(deps: RecordDeps) {
     },
 
     /**
+     * Every file the caller can see on any thing, every version of each, taken off or not, by its hash: what a pull
+     * (`braindog attach --pull <dir>`) downloads beside the record's own export, which holds the lines. READ+.
+     */
+    async attachmentFiles(_args: unknown, ctx: CallContext): Promise<Result<{ files: { sha256: string; name: string; mime: string; bytes: number; id: string; version: number; on: string; standing: boolean }[] }>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      const files: { sha256: string; name: string; mime: string; bytes: number; id: string; version: number; on: string; standing: boolean }[] = [];
+      for (const whole of kernel.attachmentsEvery()) {
+        const at = onOf(ctx, whole.target);
+        if (at === null) continue;
+        for (const v of whole.versions) files.push({ sha256: v.sha256, name: v.name, mime: v.mime, bytes: v.bytes, id: whole.id, version: v.n, on: at.words, standing: whole.now?.line === v.line });
+      }
+      return ok({ files });
+    },
+
+    /**
+     * After a restore or an import whose files were pushed back (`braindog attach --push <dir>`): every version whose
+     * bytes are here and whose words are not has its words read again from its bytes and kept, under the hash its line
+     * names when they read the same. DATA. Answers how many were mended, and how many files are still missing.
+     */
+    async mendAttachments(_args: unknown, ctx: CallContext): Promise<Result<{ mended: number; missing: number; differ: number; said: string }>> {
+      const stop = scoped(ctx, 'propose');
+      if (stop) return { ok: false, refusal: stop };
+      const held = guard(ctx, 'write');
+      if (held) return { ok: false, refusal: held };
+      const files = store();
+      if (files === undefined || files.getFile === undefined) return no('NOT_IN_THIS_BUILD', 'This BrainDog keeps no files: it has no file store.', { at: 'file' });
+      let mended = 0;
+      let missing = 0;
+      let differ = 0;
+      const seenSha = new Set<string>();
+      for (const whole of kernel.attachmentsEvery())
+        for (const v of whole.versions) {
+          if (seenSha.has(v.sha256)) continue;
+          seenSha.add(v.sha256);
+          const bytes = await files.getFile(v.sha256);
+          if (bytes === null) {
+            missing++;
+            continue;
+          }
+          if (v.text === undefined || (await files.getPage(v.text.sha256)) !== null) continue;
+          const words$ = await attachedText(bytes, v.mime);
+          if (words$ === null) continue;
+          const page = BYTES.encode(words$);
+          const pageSha = hex(await crypto.subtle.digest('SHA-256', Uint8Array.from(page)));
+          /* KEPT ONLY UNDER ITS OWN HASH: words read another way since are not the words the line names. */
+          if (pageSha !== v.text.sha256) {
+            differ++;
+            continue;
+          }
+          await files.putPage(pageSha, page);
+          mended++;
+        }
+      const said =
+        missing === 0
+          ? `Every attached file is here.${mended > 0 ? ` The words of ${mended === 1 ? 'one was' : `${mended} were`} read again.` : ''}`
+          : `${missing === 1 ? 'One attached file is' : `${missing} attached files are`} not here yet. Push them back with braindog attach --push <folder>.`;
+      return ok({ mended, missing, differ, said });
+    },
+
+    /**
      * How much room the record's files take of what it keeps for them, for Settings > Usage: bytes used and the most, the
      * plan whose room it is, and one sentence. READ.
      */

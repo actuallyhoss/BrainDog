@@ -117,6 +117,18 @@ export function extension(parts: KernelParts) {
       return out;
     },
 
+    /** Every attachment the record has had, whole, taken off or not, oldest first: for a pull of every file's bytes. */
+    attachmentsEvery(): AttachedWhole[] {
+      const out: AttachedWhole[] = [];
+      for (const { target, field } of sql.all<{ target: string; field: string }>(
+        `SELECT target, field FROM event WHERE kind = 'note' AND field GLOB '${ATTACHED_FIELD}*' AND target IS NOT NULL GROUP BY target, field ORDER BY min(rowid)`,
+      )) {
+        const whole = wholeOf(ofField(field), target, attachedLines(sql, target, field));
+        if (whole !== null) out.push(whole);
+      }
+      return out;
+    },
+
     /** One attachment whole by its id, or `null`. */
     attachmentOf(id: string): AttachedWhole | null {
       const at = placeOf(id);
