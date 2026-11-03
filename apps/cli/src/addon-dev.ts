@@ -427,6 +427,12 @@ export async function publishGithub(args: string[], io: AgentIo): Promise<number
     io.say(`${basename(found.file)} would be refused: ${door.ok ? 'it is not an add-on.' : said(door)} Run braindog addon check ${positionals[0] ?? '.'} and publish once it passes.`);
     return 1;
   }
+  const remote0 = addressFaults(read.doc);
+  if (remote0.length > 0) {
+    for (const r of remote0) io.say(oneLine(`${r.fix} (${r.code})`));
+    io.say(`${basename(found.file)} would be refused by BrainDog, as said above. Nothing was pushed.`);
+    return 1;
+  }
   const { pack: id, version } = door.value.file.pack.manifest;
   const tag = `v${version}`;
   const dir = found.dir;
@@ -460,7 +466,14 @@ export async function publishGithub(args: string[], io: AgentIo): Promise<number
     }
     io.out(`Started a git repository in ${dir}.`);
   }
-  if (run('git', ['status', '--porcelain']).out !== '') {
+  const dirty = run('git', ['status', '--porcelain']).out !== '';
+  /* A VERSION ALREADY TAGGED IS SAID BEFORE ANYTHING IS COMMITTED, so a refused publish leaves the folder as it was. */
+  const before = run('git', ['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`]);
+  if (before.ok && (dirty || before.out !== run('git', ['rev-parse', 'HEAD']).out)) {
+    io.say(`${tag} is already published, and the folder holds something else now. A published version is never moved: raise the version in ${basename(found.file)} and publish again.`);
+    return 1;
+  }
+  if (dirty) {
     run('git', ['add', '-A']);
     const committed = run('git', ['commit', '-m', `${oneLine(door.value.file.title)} ${version}`]);
     if (!committed.ok) {
@@ -469,12 +482,7 @@ export async function publishGithub(args: string[], io: AgentIo): Promise<number
     }
   }
   const head = run('git', ['rev-parse', 'HEAD']).out;
-  const tagged = run('git', ['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`]);
-  if (tagged.ok && tagged.out !== head) {
-    io.say(`${tag} is already tagged on another commit. A published version is never moved: raise the version in ${basename(found.file)} and publish again.`);
-    return 1;
-  }
-  if (!tagged.ok && !run('git', ['tag', tag]).ok) {
+  if (!before.ok && !run('git', ['tag', tag]).ok) {
     io.say(`git could not tag ${tag}.`);
     return 1;
   }
