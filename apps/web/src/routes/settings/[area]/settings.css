@@ -454,9 +454,14 @@
 /* "HOW", THE ONE DISCLOSURE FOR RARE INSTRUCTIONS (ui pass, 3 Nov): a paragraph and a shell command on every visit read
    as a wall, though they are needed once. The head is a 13px line with a turning chevron, as Keychain's "How it works";
    what it opens sits 8 under it. */
+/* BLOCK, NOT A GRID WITH A GAP: a closed `<details>` keeps its hidden content as a box, and a gap before it stood 8px of
+   air under every closed "How". */
 .settings-place .how {
-  display: grid;
-  gap: var(--sp-2);
+  display: block;
+}
+
+.settings-place .how > :not(summary) {
+  margin-block: var(--sp-2) 0;
 }
 
 .settings-place .how-head {
@@ -492,12 +497,7 @@
   }
 }
 
-.settings-place .how > code {
-  margin: 0;
-}
-
 .settings-place .how > p {
-  margin: 0;
   max-inline-size: var(--measure);
   color: var(--ink-3);
   font-size: var(--fs-meta);
