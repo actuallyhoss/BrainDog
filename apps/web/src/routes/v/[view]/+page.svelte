@@ -617,7 +617,7 @@
   }
 
   .predicate code {
-    padding: 1px 6px;
+    padding: 1px var(--sp-1);
     background: var(--hover);
     border-radius: var(--r-xs);
     color: var(--ink);
