@@ -805,10 +805,13 @@ export const TOOLS: readonly Tool[] = [
         domain: str('Like kiln.example.'),
         role: { type: 'string' },
         where: { type: 'string' },
-        fields: { type: 'object', description: 'Facts as fields, not note: legal_name, discord, nationality...' },
       },
       ['where'],
     ),
+    /* `fields`, SINCE People 4.7.0: a person's facts written to the row met (`person-facts.ts`). Taken and not listed,
+       since the list's ceiling (`budget.test.ts`) had one token left: the skill names it, and `create` and `update`
+       teach it by refusing a note that holds a fact, with the corrected call as the try. */
+    quiet: ['fields'],
     writes: true,
     idempotent: true,
   },
