@@ -20,8 +20,7 @@ export const packs = {
   currencyCommon: 'Common',
   currencyAll: 'All currencies',
   ratesHeading: 'Exchange rates, fetched every day',
-  ratesWhy:
-    'BrainDog can fetch what your currencies are worth from a public address once a day, so money in more than one currency adds up in your home currency. One action fetches every currency your money is in. Open it again when you start using a new currency.',
+  ratesWhy: 'Fetched once a day from a public address, so money in other currencies adds up in your home currency.',
   ratesKeep: 'Keep rates current',
   ratesTurnedOff: 'Exchange rates are no longer fetched. Turn it on again to bring them back.',
   noPacksYet: 'No plugins installed',

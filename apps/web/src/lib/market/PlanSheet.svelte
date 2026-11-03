@@ -396,9 +396,6 @@
     padding-block: var(--sp-2);
   }
 
-  .plan-row + .plan-row {
-    border-block-start: 1px solid var(--rule);
-  }
 
   .plan-key {
     gap: var(--sp-2);

@@ -44,6 +44,9 @@
   import { arrange, orderLists } from '$lib/nav.ts';
   import * as pref from '$lib/pref.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import { words as market } from '$lib/market/words.ts';
+  import { STORE_AT } from '../../addons/moved.ts';
+  import { frame } from '$lib/shell/frame.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -321,11 +324,20 @@
       return null;
     }
   });
+
+  /* THE BAR'S CRUMB IS "Plugins › Share your starter", the store first (3 Nov). */
+  $effect(() => {
+    const up = { label: market.plugins, href: STORE_AT };
+    frame.up = up;
+    return () => {
+      if (frame.up === up) frame.up = null;
+    };
+  });
 </script>
 
 <svelte:head><title>{titleOf(copy.shareSetup)}</title></svelte:head>
 
-<PageHead icon="packs" kicker={copy.packs} back="/settings/addons" title={copy.shareSetup} sentence={mode === 'addon' ? addonWords.sentence : words.what} />
+<PageHead icon="packs" kicker={market.plugins} back={STORE_AT} title={copy.shareSetup} sentence={mode === 'addon' ? addonWords.sentence : words.what} />
 
 <div class="page">
   <Segmented class="modes" role="group" aria-label={addonWords.modeGroup} full>
@@ -338,8 +350,8 @@
   {:else if refused}
     <Empty kind="error" title={refused} />
   {:else}
-    {#if live && speaking === null}<p class="note">{copy.shareNoUseCase}</p>{/if}
-
+    <!-- NO SECOND LINE UNDER THE HEAD'S: "No starter here, so it carries your plugins and placed pages" said again what
+         the sentence above says (3 Nov). -->
     <!-- TWO COLUMNS FROM 1100: what goes in the file on the left, what it changes and how an installer sees it
          on the right; the submit row inside the last tile of the first column, primary first. -->
     <form
@@ -362,11 +374,14 @@
                 <div class="field"><input class="field-input" id="share-version" type="text" inputmode="decimal" autocomplete="off" bind:value={version} oninput={() => (typed = true)} /></div>
                 {#if lastShared}<p class="note">{copy.shareLastShared(lastShared)}</p>{:else if installedVersion}<p class="note">{copy.shareFromInstalled(installedVersion)}</p>{:else}<p class="note">{copy.shareFirstVersion}</p>{/if}
               </div>
+              <!-- WHAT CHANGED SINCE IT WAS LAST SHARED, ONLY WHEN IT WAS: a first version has nothing to compare. -->
+              {#if lastShared || installedVersion}
               <fieldset class="pair steps">
                 <legend class="field-label">{copy.shareStep}</legend>
                 <label class="row-pick"><input type="radio" name="share-step" value="patch" checked={step === 'patch'} onchange={() => ((step = 'patch'), (typed = false))} /><span>{copy.shareStepPatch}</span></label>
                 <label class="row-pick"><input type="radio" name="share-step" value="minor" checked={step === 'minor'} onchange={() => ((step = 'minor'), (typed = false))} /><span>{copy.shareStepMinor}</span></label>
               </fieldset>
+              {/if}
               <div class="pair">
                 <label class="field-label" for="share-summary">{copy.shareSummary}</label>
                 <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" placeholder={copy.shareSummaryHint} bind:value={summary} oninput={() => (wrote = true)} /></div>

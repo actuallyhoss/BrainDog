@@ -1110,15 +1110,23 @@
 
     .lead-cell {
       grid-column: 1;
+      grid-row: 1;
     }
 
+    /* WHAT IT ADDS RUNS DOWN THE RIGHT BESIDE THE LEAD AND THE SETUP UNDER IT (3 Nov): Money's 22 rows stood beside a
+       short lead over 700px of nothing. The setup takes the full width only where nothing stands beside it. */
     .adds-cell {
       grid-column: 2;
+      grid-row: 1 / span 2;
     }
 
     .wide-cell {
-      grid-column: 1 / -1;
+      grid-column: 1;
       grid-row: 2;
+    }
+
+    .tiles:not(:has(> .adds-cell)) > .wide-cell {
+      grid-column: 1 / -1;
     }
   }
 
@@ -1137,18 +1145,21 @@
     }
   }
 
-  /* META WRAPS AS WHOLE ITEMS, with space between them and no separator glyph to lead a wrapped line. */
-  .about {
+  /* ITS STATE, ONE LINE: the switch and its word, then the version in the quiet ink. */
+  .state {
     display: flex;
     flex-wrap: wrap;
-    column-gap: var(--sp-3);
-    margin: 0;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-4);
+    min-inline-size: 0;
+  }
+
+  .state-meta {
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: var(--lead-meta);
   }
 
-  .about:empty,
   .turn-said:empty {
     display: none;
   }
@@ -1207,13 +1218,6 @@
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 22px;
-  }
-  .ways {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-body);
-    font-weight: var(--fw-medium);
-    line-height: var(--lh-body);
   }
 
   /* THE FORM KEEPS THE READING MEASURE, not the page: the page runs the window's width with the rest, and a switch

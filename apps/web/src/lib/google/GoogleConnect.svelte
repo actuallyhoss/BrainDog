@@ -115,7 +115,11 @@
       {/if}
 
       {#if status.connected}
-        <p class="account"><Icon name="mail" size="s" /><span class="address">{status.email || w.yourAccount}</span></p>
+        <!-- THE ACCOUNT AND WHEN IT LAST SYNCED, ONE LINE; then what that sync brought, as figures. -->
+        <p class="account">
+          <Icon name="mail" size="s" /><span class="address">{status.email || w.yourAccount}</span>
+          {#if !status.broken}<span class="synced">{figures || !status.last ? synced : `${synced}: ${status.last.said}`}</span>{/if}
+        </p>
         {#if status.broken}
           <p class="fault" role="status"><Icon name="alert" size="s" /><span>{status.broken}</span></p>
         {:else if figures}
@@ -123,10 +127,7 @@
             {#each figures as f (f.label)}
               <p class="figure"><span class="figure-n num">{f.n}</span><span class="figure-l">{f.label}</span></p>
             {/each}
-            <p class="synced">{synced}</p>
           </div>
-        {:else}
-          <p class="synced">{status.last ? `${synced}: ${status.last.said}.` : synced}</p>
         {/if}
         {#each missing as m (m.id)}
           <p class="wait">{m.said} <a class="tap" href={at(`/plugins/${m.id}?kind=pack`)}>{w.get}</a></p>
@@ -194,8 +195,9 @@
   /* THE ACCOUNT, ONE LINE: its glyph and its address, which may be long and breaks anywhere rather than past the card. */
   .account {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-2);
+    gap: var(--sp-1) var(--sp-2);
     min-inline-size: 0;
     color: var(--ink);
     font: var(--t-ui, 400 14px/20px var(--font-ui));
@@ -246,9 +248,14 @@
     line-height: var(--lead-meta);
   }
 
+  /* WHEN IT LAST SYNCED, AFTER THE ADDRESS: a quiet dot between them, and on its own line where the two do not fit. */
   .synced {
-    margin: 0 0 0 auto;
-    padding-block-end: 2px;
+    font-weight: var(--fw-regular);
+  }
+
+  .synced::before {
+    content: '·';
+    margin-inline-end: var(--sp-2);
   }
 
   .lede {
