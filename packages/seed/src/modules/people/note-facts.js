@@ -13,11 +13,29 @@
  * Nothing is written without the owner's yes, and each question carries the cause `people-fields:<row>`, so a second
  * run joins the one still open and one he said no to is not asked again.
  *
+ * TIDYING WHAT THE FIELDS ALREADY SAY, SINCE People 4.7.1 (4 Nov). 4.7.0 ran on the owner's record and left Codeize's
+ * note opening "Engineer on Otters.gg. Deal: 10% of Otters gross, paid monthly. # Codeize Joins the team ...": the fields
+ * were right, but the note still said the deal once more, still carried his name as a heading, and a paragraph whose
+ * lines were joined to read it came back as one run-on line. So, with `tidy`:
+ * - a lone heading that is the person's own name (`name`, `goes_by`, `legal_name` or one of `aliases`) leaves the note;
+ * - a one-line deal in the opening, "Deal: ...", "Terms: ...", "Pay: ...", leaves when `terms` is held or is being set
+ *   from the note's own `## Deal` part (read first for that reason), and is taken as `terms` when neither says one;
+ * - an opening that is one short sentence, with more of the note after it, is offered as `about` while that is empty.
+ * And always, tidy or not: a line nothing was read from is kept exactly as written, and each line keeps its own place,
+ * so a heading or a paragraph is never folded into the line before it.
+ * A sentence that only says the role again in other words is not looked for: no pattern tells it apart for sure.
+ *
+ * WHY `tidy` IS ITS OWN READING AND NOT THE ONLY ONE. The kernel remembers a no by the cause and the exact patch asked
+ * about (`remembered` in `packages/kernel/src/govern.ts`), so asking a person who said no to 4.7.0's question with a
+ * patch that also tidies the note would ask them again for the same facts. `peopleFields` asks the facts first with the
+ * reading 4.7.0 asked (`tidy` off) under the cause it used, and only a person whose row already holds every fact the note
+ * says is asked, under a cause of its own, to tidy what is left.
+ *
  * NOTHING OUTSIDE ITSELF IS READ BY `noteFacts` OR `peopleFields`, AND NOTHING BUT THEM BY `run`: the three texts are
  * the script (`PEOPLE_FIELDS_SCRIPT.source`), as `kpi-backfill.js` is.
  */
 
-export function noteFacts(note, row) {
+export function noteFacts(note, row, tidy) {
   const NATIONS = {
     afghan: 'Afghan', albanian: 'Albanian', algerian: 'Algerian', american: 'American', argentinian: 'Argentinian', australian: 'Australian',
     austrian: 'Austrian', bahraini: 'Bahraini', bangladeshi: 'Bangladeshi', belgian: 'Belgian', brazilian: 'Brazilian', british: 'British',
@@ -43,6 +61,12 @@ export function noteFacts(note, row) {
   const plain = (s) => s.replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim();
   const patch = {};
   const found = [];
+  /* WHAT LEFT THE NOTE THAT NO FIELD TOOK, because a field already says it: their name as a heading, a one-line deal. */
+  const tidied = [];
+  /* THEIR OWN NAMES, as a heading would say one. */
+  const names = [fields.name, fields.goes_by, fields.legal_name, ...(Array.isArray(fields.aliases) ? fields.aliases : [])]
+    .filter((n) => typeof n === 'string' && n.trim() !== '')
+    .map((n) => n.replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim().toLowerCase());
   /** Sets one field when the row has none, and says whether the sentence it came from may leave the note. */
   const put = (id, value, said) => {
     if (value === '' || value === null || value === undefined) return false;
@@ -71,6 +95,15 @@ export function noteFacts(note, row) {
     const s = plain(raw).replace(/[.;]+$/, '').trim();
     if (s === '') return true;
     let m;
+    /* A ONE-LINE DEAL, "Deal: 10% of Otters gross, paid monthly": said again when the Deal field holds one or the note's
+       `## Deal` part is setting it, so it leaves; the deal itself when nothing else says one. */
+    if (tidy && (m = /^(?:the )?(?:deal|terms|pay)(?: is)?:\s*(.+)$/i.exec(s))) {
+      if (!empty(fields.terms) || patch.terms !== undefined) {
+        tidied.push('deal');
+        return true;
+      }
+      return put('terms', m[1].trim(), 'deal');
+    }
     if ((m = /^(?:legal|full) name(?: is)?:?\s+(.+)$/i.exec(s))) return put('legal_name', m[1].trim(), 'legal name');
     if ((m = /^(?:goes by|called|nickname|preferred name)(?: is)?:?\s+(.+)$/i.exec(s))) return put('goes_by', m[1].replace(/^["']|["']$/g, '').trim(), 'goes by');
     if (Object.hasOwn(NATIONS, s.toLowerCase())) return put('nationality', NATIONS[s.toLowerCase()], 'nationality');
@@ -108,43 +141,83 @@ export function noteFacts(note, row) {
     return false;
   };
 
-  /* THE NOTE IN PARTS: what comes before the first `##`, then each part under its heading. */
+  /* THE NOTE IN PARTS: what comes before the first `##`, then each part under its heading. A heading that is their own
+     name is no part of its own: with `tidy` it leaves, and what follows it is read as the opening is. */
   const text = typeof note === 'string' ? note.replace(/\r\n/g, '\n') : '';
   const lines = text.split('\n');
   const parts = [{ head: null, lines: [] }];
   for (const line of lines) {
+    const own = /^#{1,3}\s+(.+?)\s*#*\s*$/.exec(line);
+    if (tidy && own && names.includes(plain(own[1]).toLowerCase())) {
+      tidied.push('name');
+      if (parts.at(-1).head !== null) parts.push({ head: null, lines: [] });
+      continue;
+    }
     const h = /^#{2,3}\s+(.+?)\s*$/.exec(line);
     if (h) parts.push({ head: h[1], lines: [] });
     else parts.at(-1).lines.push(line);
   }
   const bullet = (l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '').replace(/^\[[ xX]\]\s*/, '').trim();
-  const kept = [];
-  for (const part of parts) {
-    const head = part.head === null ? '' : part.head.toLowerCase();
+  const kept = parts.map(() => null);
+  /* A PART UNDER A HEADING, kept whole unless it is the deal or the paperwork. */
+  const headed = (part, i) => {
+    const head = part.head.toLowerCase();
     if (/^(?:deal|terms|pay|payment|the deal|pay terms)$/.test(head)) {
       const said = part.lines.map(bullet).filter(Boolean).map((l) => plain(l)).join(' ');
-      if (said !== '' && put('terms', said, 'deal')) continue;
+      if (said !== '' && put('terms', said, 'deal')) return;
     }
     if (/^(?:still to do|to do|todo|paperwork|open|outstanding)$/.test(head)) {
       const items = part.lines.map(bullet).map(plain).filter(Boolean);
-      if (items.length > 0 && add('paperwork', items, 'paperwork')) continue;
+      if (items.length > 0 && add('paperwork', items, 'paperwork')) return;
     }
-    if (part.head === null) {
-      /* EACH PARAGRAPH, SENTENCE BY SENTENCE: a sentence read whole leaves, the rest stays in its place. */
-      const out = [];
-      for (const para of part.lines.join('\n').split(/\n{2,}/)) {
-        if (/^\s*(?:[-*•]|\d+[.)])\s/m.test(para)) {
-          out.push(para);
+    kept[i] = [`## ${part.head}`, ...part.lines].join('\n').trim();
+  };
+  /* THE TEXT OUTSIDE THEM, PARAGRAPH BY PARAGRAPH AND LINE BY LINE: a sentence read whole leaves, the rest of its line
+     stays where it was, and a line nothing was read from stays exactly as written. A paragraph with a list in it, a
+     heading or a table row is kept whole. Lines are never joined, so a heading never runs into the line before it. */
+  let opening = null;
+  const open = (part, i) => {
+    const out = [];
+    for (const para of part.lines.join('\n').split(/\n[ \t]*\n/)) {
+      if (para.trim() === '') continue;
+      if (/^\s*(?:[-*•]|\d+[.)])\s/m.test(para)) {
+        out.push(para.replace(/^\n+|\s+$/g, ''));
+        continue;
+      }
+      const left = [];
+      for (const line of para.split('\n')) {
+        if (line.trim() === '' || /^\s*(?:#|\|)/.test(line)) {
+          if (line.trim() !== '') left.push(line.trimEnd());
           continue;
         }
-        const said = para.replace(/\n/g, ' ').split(/(?<=[.;!?])\s+(?=[A-Z*_`"'@+0-9])/);
-        const left = said.filter((x) => !sentence(x));
-        if (left.join(' ').trim() !== '') out.push(left.join(' ').trim());
+        const said = line.trim().split(/(?<=[.;!?])\s+(?=[A-Z*_`"'@+0-9])/);
+        const stay = said.filter((x) => !sentence(x));
+        if (stay.length === said.length) left.push(line.trimEnd());
+        else if (stay.join(' ').trim() !== '') left.push(stay.join(' ').trim());
       }
-      if (out.length > 0) kept.push(out.join('\n\n'));
-      continue;
+      if (left.length > 0) out.push(left.join('\n'));
     }
-    kept.push([`## ${part.head}`, ...part.lines].join('\n').trim());
+    if (i === 0 && out.length > 0) opening = out;
+    if (out.length > 0) kept[i] = out.join('\n\n');
+  };
+  /* IN ORDER, AS 4.7.0 READ THEM; with `tidy`, the parts under a heading first, so the opening's one-line deal knows
+     whether `## Deal` is setting the field. */
+  const order = parts.map((part, i) => i);
+  if (tidy) order.sort((a, b) => Number(parts[a].head === null) - Number(parts[b].head === null) || a - b);
+  for (const i of order) (parts[i].head === null ? open : headed)(parts[i], i);
+
+  /* THE OPENING AS `about`, with `tidy`: the note opens on one short sentence, alone in its paragraph once the facts in
+     it left ("Engineer on Otters.gg."), and more of the note follows it. A note that is only that sentence keeps it, since
+     it is then the note and not a line over it ("Bank transfers to and from her are filed under Family."). */
+  if (tidy && opening !== null && empty(fields.about) && patch.about === undefined) {
+    const line = opening[0].trim();
+    const one = !line.includes('\n') && !/^\s*(?:#|\||[-*•]\s)/.test(line) && line.split(/(?<=[.;!?])\s+(?=[A-Z*_`"'@+0-9])/).length === 1;
+    const more = opening.length > 1 || kept.some((k, i) => i > 0 && k !== null);
+    if (one && /[.!]$/.test(line) && plain(line).split(' ').length <= 10 && plain(line).length <= 80 && more) {
+      patch.about = plain(line);
+      found.push('about');
+      kept[0] = opening.length > 1 ? opening.slice(1).join('\n\n') : null;
+    }
   }
 
   /* AND WHAT ITS HANDLES ALREADY SAY: `discord:<id>` is the Discord id, `github:<login>` the GitHub login. */
@@ -158,34 +231,62 @@ export function noteFacts(note, row) {
       else put(kind === 'twitter' ? 'x' : kind, v, kind);
     }
 
-  const rest = kept.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
-  if (Object.keys(patch).length === 0) return null;
+  const rest = kept.filter((k) => k !== null && k.trim() !== '').join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+  /* WITH `tidy`, A NOTE THAT ONLY LOST WHAT THE FIELDS ALREADY SAY IS STILL A CHANGE TO ASK ABOUT; without it, only a fact is. */
+  if (Object.keys(patch).length === 0 && !(tidy && tidied.length > 0 && rest !== text.trim())) return null;
   if (rest !== text.trim()) patch.note = rest;
-  return { patch, found: [...new Set(found)] };
+  return { patch, found: [...new Set(found)], tidied: [...new Set(tidied)] };
 }
 
 /**
  * One question a person whose note holds facts the fields do not: a rowset that changes their row, worded with what
  * it found. A person merged into another, and the record's own person, are passed over.
+ *
+ * THE FACTS FIRST, AS 4.7.0 ASKED THEM, under `people-fields:<row>`: a person who said no to that question is answered
+ * from memory and not asked again, because the patch is the one they saw. ONLY ONCE THE ROW HOLDS EVERY FACT the note
+ * says is the rest of the note tidied (`tidy`), under `people-notes:<row>`: their name as a heading and a one-line deal
+ * the fields already say leave, and a short opening line becomes their About. So a person who said yes to 4.7.0 is
+ * asked once more, and only when their note still holds something this reads.
  */
 export function peopleFields(people) {
   const out = [];
+  const listed = (l) => (l.length > 4 ? `${l.slice(0, 3).join(', ')} and ${l.length - 3} more` : l.length > 1 ? `${l.slice(0, -1).join(', ')} and ${l.at(-1)}` : l.join(''));
   for (const p of people) {
     const f = p.fields ?? {};
     if (f.merged_into) continue;
-    const read = noteFacts(f.note, f);
-    if (read === null) continue;
     const name = typeof f.name === 'string' && f.name.trim() !== '' ? f.name.trim() : 'this person';
-    const what = read.found.length > 4 ? `${read.found.slice(0, 3).join(', ')} and ${read.found.length - 3} more` : read.found.length > 1 ? `${read.found.slice(0, -1).join(', ')} and ${read.found.at(-1)}` : read.found.join('');
+    const row = (patch) => [{ at: p.id, ...(typeof p.version === 'number' ? { version: p.version } : {}), patch }];
+    const read = noteFacts(f.note, f, false);
+    if (read !== null) {
+      out.push({
+        name,
+        cause: `people-fields:${p.id}`,
+        question: `Keep ${name}'s ${listed(read.found) || 'details'} as fields?`.slice(0, 280),
+        body_kind: 'rowset',
+        body: { register: 'people', rows: row(read.patch), why: 'Read from the note. What it could not read for sure stays in the note.' },
+      });
+      continue;
+    }
+    const tidy = noteFacts(f.note, f, true);
+    if (tidy === null) continue;
+    const said = [];
+    if (typeof tidy.patch.about === 'string') said.push(`keep "${tidy.patch.about}" as ${name}'s About`);
+    if (typeof tidy.patch.terms === 'string') said.push(`keep "${tidy.patch.terms}" as ${name}'s Deal`);
+    const other = tidy.found.filter((x) => x !== 'about' && x !== 'deal');
+    if (other.length > 0) said.push(`keep ${name}'s ${listed(other)} as fields`);
+    const whose = said.length > 0 ? 'their' : `${name}'s`;
+    const gone = [tidy.tidied.includes('name') ? `${whose} name as a heading` : '', tidy.tidied.includes('deal') ? 'the one-line deal the Deal field holds' : ''].filter(Boolean);
+    if (gone.length > 0) said.push(`take ${gone.join(' and ')} out of ${gone[0].startsWith(whose) || said.length > 0 ? 'their' : whose} note`);
+    const question = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said.at(-1)}` : said.join('');
     out.push({
       name,
-      cause: `people-fields:${p.id}`,
-      question: `Keep ${name}'s ${what || 'details'} as fields?`.slice(0, 280),
+      cause: `people-notes:${p.id}`,
+      question: `${question.charAt(0).toUpperCase()}${question.slice(1)}?`.slice(0, 280),
       body_kind: 'rowset',
       body: {
         register: 'people',
-        rows: [{ at: p.id, ...(typeof p.version === 'number' ? { version: p.version } : {}), patch: read.patch }],
-        why: 'Read from the note. What it could not read for sure stays in the note.',
+        rows: row(tidy.patch),
+        why: 'Read from the note. What the fields already say leaves it, and the rest stays as it was written.',
       },
     });
   }
@@ -209,11 +310,11 @@ export default async function run(ctx) {
   }
   const asks = peopleFields(people);
   if (asks.length === 0) {
-    ctx.log('No note holds a fact the fields do not.');
+    ctx.log('No note holds anything the fields do not say.');
     return null;
   }
   if (typeof ctx.propose !== 'function') {
-    ctx.log(`${asks.length === 1 ? 'One person has' : `${asks.length} people have`} facts in their note to keep as fields, and a trial files no questions.`);
+    ctx.log(`${asks.length === 1 ? 'One person has' : `${asks.length} people have`} something in their note to keep as a field, and a trial files no questions.`);
     return null;
   }
   const asked = [];
@@ -225,7 +326,7 @@ export default async function run(ctx) {
     else asked.push(a.name);
   }
   const names = (l) => (l.length > 3 ? `${l.slice(0, 3).join(', ')} and ${l.length - 3} more` : l.length > 1 ? `${l.slice(0, -1).join(', ')} and ${l.at(-1)}` : l.join(''));
-  ctx.log([asked.length > 0 ? `Asked to keep the facts in ${names(asked)}'s notes as fields.` : '', left.length > 0 ? `${names(left)} already asked or answered.` : ''].join(' ').trim());
+  ctx.log([asked.length > 0 ? `Asked about what ${names(asked)}'s notes say.` : '', left.length > 0 ? `${names(left)} already asked or answered.` : ''].join(' ').trim());
   return { asked: asked.length, left: left.length };
 }
 

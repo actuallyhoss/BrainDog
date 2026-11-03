@@ -1009,11 +1009,18 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   line of counts ("1 client organisation, 2 clients in People, 22 other people besides you", "i dont like those briefs
  *   at all, remove them"); the questions it counted are Waiting on you, drawn while one is open (`page.people`). Two
  *   ids added and none taken away, so a minor step.
+ * - people 4.7.1 (fin-notes1104, 4 Nov): 4.7.0 ran on the owner's record and left Codeize's note saying his deal a
+ *   second time ("Deal: 10% of Otters gross, paid monthly.") over his name as a heading. `script.people_fields` now reads
+ *   a note line by line and keeps every line it read nothing from as written, so no heading runs into the line before
+ *   it; and once a person's row holds every fact their note says, it asks once more, under a cause of its own
+ *   (`people-notes:<row>`), to take out their name as a heading and a one-line deal the Deal field holds, and to keep a
+ *   short opening line as About. The facts are still asked as 4.7.0 asked them, so a no to that question stays a no.
+ *   Only the script's source moved, no id, so a patch step that goes in quietly and keeps every row.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.31.1',
-  people: '4.7.0',
+  people: '4.7.1',
   'money-core': '3.38.5',
   estate: '2.8.1',
   work: '1.26.1',

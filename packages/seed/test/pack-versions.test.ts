@@ -4157,6 +4157,22 @@ const DECLARED: Record<string, Version> = {
     ],
   },
 
+  'people@4.7.1': {
+    holds: `
+      metric.organisations-clients metric.organisations-count metric.organisations-from-card-texts metric.organisations-known
+      metric.organisations-not-clients metric.people-clients metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d
+      metric.people-in-touch-90d metric.people-not-clients metric.people-quiet
+      page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders rule.people-fields
+      script.people_fields
+    `,
+    declares: '157dbadd3d1ed44a',
+    history: [
+      'People 4.7.1, fin-notes1104 of 4 November: `script.people_fields` keeps each line of a note it read nothing from as written, and once a row holds every fact its note says, asks to take their name as a heading and a one-line deal out of the note and to keep a short first line as About -> 157dbadd3d1ed44a',
+    ],
+  },
+
   'portfolio@1.31.0': {
     holds: `
       metric.kpi-stale metric.kpis-held metric.project-plan-path metric.project-plan-roadmap metric.project-said metric.project-staged
