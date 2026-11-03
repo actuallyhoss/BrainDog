@@ -76,6 +76,22 @@ call and what it takes, or, where resources are not read, `act {call:"calls", ar
 - Never a key's value, in or out. A key goes in with `braindog keys put <label>`, which reads standard input.
 - A note longer than 280 characters is kept as several, in order, up to 1,400. Past that, send it as a page.
 
+## When BrainDog does not do what they want
+
+An add-on can. Look in the store before saying no, and build one before faking a feature with rows.
+
+1. `act {call:"addons", args:{q:"<a few words>"}}` searches the store; `act {call:"addon", args:{id}}` reads one:
+   who made it, how far it is trusted, and what it asks of theirs. If one fits, `act {call:"installPack", args:{id}}`
+   asks them.
+2. Otherwise read `braindog:grammar/pack` (or `act {call:"arrangement", args:{grammar:"pack"}}`), then
+   `act {call:"addonNew", args:{id, title, fields}}` for a file that installs: a list, a page and a Today card.
+3. Change it to do what they asked and `act {call:"addonCheck", args:{doc}}` until it says Ready. It names each refusal
+   and what installing would add and ask them to approve, and files nothing.
+4. `act {call:"installPack", args:{doc}}` puts it to them on Needs you. Nothing installs until they say yes.
+5. To change it: `act {call:"addon", args:{id, file:true}}`, edit, raise its version, check, and ask again.
+
+An add-on names every list of theirs it reads in `uses`, every host it calls, and a key only by its label.
+
 ## When you can act without asking
 
 What you may do is your person's role and your token's scope, whichever is less. A colleague's agent sees what that
