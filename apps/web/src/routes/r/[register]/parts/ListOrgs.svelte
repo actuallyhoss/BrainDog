@@ -89,7 +89,9 @@
 </script>
 
 <div class="orgs">
-  {#if counted.known + counted.shops > 0}<p class="orgs-said">{seenWords.orgsSaid(counted.known, counted.shops)}</p>{/if}
+  <!-- THE COUNT ONLY WHEN IT SAYS MORE THAN THE TITLE (3 Nov): "12 organisations you work with." stood under "Organisations
+       12" and a sentence that said 12 again. Shops a card text named are the news it carries, so it stays for them. -->
+  {#if counted.shops > 0}<p class="orgs-said">{seenWords.orgsSaid(counted.known, counted.shops)}</p>{/if}
   {#each groups as g (g.key)}
     <section class="band" aria-labelledby="org-{g.key}">
       <h2 class="band-head" id="org-{g.key}">{headOf(g)} <span class="band-n">{g.items.length}</span></h2>
@@ -129,11 +131,22 @@
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
+    padding-block-start: var(--sp-2);
   }
 
   .orgs-said {
     margin: 0;
     color: var(--ink-2);
+  }
+
+  /* TWO COLUMNS FROM 1280, as People's bands (1 Nov, L7): one 1100px column put each name a whole tile away from its day. */
+  @media (width >= 1280px) {
+    .band > .ledger {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--sp-6);
+      align-items: start;
+    }
   }
 
   .band-head {

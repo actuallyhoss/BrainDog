@@ -128,7 +128,8 @@
       {#if detail}<span class="line-detail">{detail}</span>{/if}
     </span>
     <span></span>
-    <span class="line-when">{when(m.day)}</span>
+    <!-- YOUR OWN ROW SAYS NO DAY (3 Nov): "3 Nov" beside your own name read as the last day you were in touch with yourself. -->
+    <span class="line-when">{m.self ? '' : when(m.day)}</span>
   </a>
 {/snippet}
 
@@ -282,10 +283,11 @@
     align-items: center;
     gap: 6px;
     margin-inline-start: calc(var(--well-l) + var(--sp-3));
-    padding: var(--sp-1) var(--sp-3);
+    min-block-size: var(--btn-h-sm, 28px);
+    padding: 0 var(--ctl-pad-sm, 12px);
     background: none;
     border: 0;
-    border-radius: var(--r-pop);
+    border-radius: var(--r-pill, 999px);
     color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-meta);
@@ -295,7 +297,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .fold:hover {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
       color: var(--ink);
     }
   }

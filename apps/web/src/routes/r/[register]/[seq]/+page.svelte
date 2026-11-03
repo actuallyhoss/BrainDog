@@ -1005,16 +1005,20 @@
   };
   const lead = $derived.by(() => {
     if (!row || (!meets && !orgRole)) return null;
+    /* THE CHIP BEFORE THE SENTENCE ALREADY NAMES THE PROJECTS (3 Nov): "• Ferment & Co, Tidepool  Accountant, on Ferment
+       & Co and Tidepool." said them twice in one line, so where the list's scope part is the one the sentence reads, the
+       sentence leaves them to the chip (and the facts still leave the field out, as said). */
+    const chipSays = (field: string | undefined): boolean => field !== undefined && scopeFieldOf(id)?.id === field && projectsOf(field).length > 0;
     if (meets) {
       const role = roleFieldOf(decl);
-      const projects = projectsOf(meets.projects);
+      const projects = chipSays(meets.projects) ? [] : projectsOf(meets.projects);
       const day = lastDayOf(row.fields, meets);
       /* A ROLE OF "Other" SAYS NOTHING (29 October, "Other, on Lanternfish and Copperleaf"), as the list leaves it unsaid. */
       const roleSaid = role && row.fields[role] !== 'other' ? display(id, role, row.fields[role], clock, names) : null;
       const org = meets.org ? namedRef(fieldTo(meets.org), row.fields[meets.org]) : null;
       return {
         parts: whoParts({ role: roleSaid, org, projects }),
-        named: projects.length > 0,
+        named: projects.length > 0 || chipSays(meets.projects),
         /* WHEN, AND ABOUT WHAT (1 Nov, L21): "Last in touch 29 Oct, at Onboarding." where the newest place they were seen
            is that day's. Yourself, never: "Last in touch" over your own name said nothing, so your page says it is you. */
         last: self ? seenWords.isYou : day ? lastSaid(day) : null,
@@ -1023,13 +1027,14 @@
       };
     }
     const people = incoming.filter((g) => meetsOf(REGISTERS[g.register]) !== null).reduce((n, g) => n + g.total, 0);
-    const projects = projectsOf(orgRole?.projects);
+    const chipped = chipSays(orgRole?.projects);
+    const projects = chipped ? [] : projectsOf(orgRole?.projects);
     const pointing = incoming.filter((g) => isProjects(g.register)).reduce((n, g) => n + g.total, 0);
     const kind = orgRole?.kind ? display(id, orgRole.kind, row.fields[orgRole.kind], clock, names) : null;
-    const said = orgSaid({ kind, people, projects: projects.length > 0 ? 0 : pointing });
+    const said = orgSaid({ kind, people, projects: projects.length > 0 || chipped ? 0 : pointing });
     return {
       parts: whoParts({ role: said, org: null, projects }),
-      named: projects.length > 0,
+      named: projects.length > 0 || chipped,
       last: null,
       said: [kind?.trim() && orgRole?.kind ? orgRole.kind : null].filter((x): x is string => Boolean(x)),
     };
