@@ -89,6 +89,7 @@
   import { FILL, asked as pageAsked, maker as pageMaker, paging, pressed as pagePressed, rowTitle as pageRow, whoOf, type Paging } from './new-page.ts';
   import { apply as applyChange, keptNow, lookNow, pageMenu } from './customise-apply.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
+  import { addonActions, addonCommandRows, runAddon, type AddonCommand, type AddonCommandRow } from '../market/addon-actions.ts';
   import { said as voiced } from '../voice.svelte.ts';
   import { spineOf, type SpineCounts } from '../spine.ts';
   import type { List, Recent } from '../record/palette.ts';
@@ -171,6 +172,8 @@
     marked?: true | undefined;
     /** Set on the row that goes back to the conversation with Slash where it was left. */
     resume?: true | undefined;
+    /** An add-on's command (`commands` in its file): what it starts, or the sentence it still needs. */
+    addon?: AddonCommandRow | undefined;
   };
 
   let el = $state<HTMLDialogElement>();
@@ -210,6 +213,11 @@
     },
   );
   const isLive = $derived(shell.live === true);
+  /* THE COMMANDS THE ADD-ONS THAT ARE ON PUT IN THIS BAR, read when it opens on a record (`market/addon-actions.ts`). */
+  let addonCommands = $state<AddonCommand[]>([]);
+  $effect(() => {
+    if (open && isLive) void addonActions().then((a) => (addonCommands = a.commands));
+  });
   /** Whether a model is behind Slash on this host, which the shell asked `/api/version` once. A refused shell's never is. */
   const slashHere = $derived(isLive && shell.slash === true);
 
@@ -1022,6 +1030,9 @@
     }
     /* ADD A WIDGET, and the one Slash would add with its reason, for "add", "widget" or "/w" (`board/palette-rows.ts`). */
     if (isLive) for (const w of widgetRows(q, todayOffer.offer, at('/'))) out.push({ ...w, group: copy.commands });
+    /* AN ADD-ON'S COMMANDS, each saying whose it is, for a line their words start or after ">". */
+    if (isLive && (prefix === null || prefix === '>'))
+      for (const r of addonCommandRows(addonCommands, text)) out.push({ id: r.id, title: r.title, detail: r.detail, href: r.href, group: copy.commands, icon: 'plug', addon: r, ...(r.fill === undefined ? {} : { complete: r.fill }) });
 
     if ((prefix === null && !blank) || prefix === '/') {
       /* EVERY ROW WEARS ITS OWN GLYPH. The commands each carried a real one and then every other row
@@ -1544,7 +1555,20 @@
       q = FILL;
       return void input?.focus();
     }
+    /* AN ADD-ON'S COMMAND THAT STILL NEEDS AN ANSWER writes its sentence into the box, as New page does. */
+    if (row.addon?.fill !== undefined) {
+      q = row.addon.fill;
+      return void input?.focus();
+    }
     open = false;
+    if (row.addon?.start !== undefined) {
+      const start = row.addon.start;
+      void runAddon(start).then((ran) => {
+        toasts.push(ran.say, ran.ok ? { intent: 'good' } : { intent: 'warn' });
+        if (ran.ok) void invalidateAll();
+      });
+      return;
+    }
     /* THE ONE ROW THAT DOES SOMETHING RATHER THAN GO SOMEWHERE. It is checked on the act rather
        than on a flag, so no row's behaviour is described in two places. The standing rule means it
        is only ever offered while there is something to reverse, and the fallback is there for the

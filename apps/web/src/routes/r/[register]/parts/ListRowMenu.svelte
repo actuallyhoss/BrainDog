@@ -12,6 +12,7 @@
   import { copy } from '$lib/copy.ts';
   import { display } from '$lib/record/api.ts';
   import SendItem from '$lib/send/SendItem.svelte';
+  import AddonRowActions from '$lib/market/AddonRowActions.svelte';
   import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
   import RowMenu from '$lib/ui/RowMenu.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -127,6 +128,8 @@
       {/each}
       <hr class="mi-rule" />
     {/if}
+    <!-- WHAT AN ADD-ON DOES WITH THIS ROW (`row_actions` in its file), each saying whose it is. -->
+    {#if row.id}<AddonRowActions {register} row={row.id} {onclose} />{/if}
     <!-- PREVIEW ONLY WITH A MOUSE: on a phone Open does the same, a screen away. -->
     {#if !rowsAsCards()}
       <button class="mi" role="menuitem" type="button" onclick={() => peek(seq)}>

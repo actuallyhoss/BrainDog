@@ -27,6 +27,9 @@ export const asksWords = {
   keys: (keys: readonly string[]): string => `Uses your ${keys.length === 1 ? 'key' : 'keys'} ${and(keys)}`,
   scripts: (n: number): string => (n === 1 ? 'Runs 1 script, inside BrainDog' : `Runs ${n} scripts, inside BrainDog`),
   skills: (n: number): string => (n === 1 ? 'Gives your agents 1 skill' : `Gives your agents ${n} skills`),
+  tools: (n: number): string => (n === 1 ? 'Gives your agents 1 tool' : `Gives your agents ${n} tools`),
+  commands: 'Adds to the command bar',
+  rowActions: (lists: string[]): string => `Adds actions on rows of ${and(lists)}`,
   views: (names: readonly string[]): string => `Sees your ${and(names)}`,
   nothing: 'Only its own lists. It sends nothing out.',
 } as const;
@@ -101,6 +104,12 @@ export function asksLines(doc: unknown, nameOf: Namer, opts: { calls?: boolean }
   if (scripts.length > 0) lines.push(asksWords.scripts(scripts.length));
   const skills = pack && Array.isArray(pack.skills) ? pack.skills.filter(isMap).length : 0;
   if (skills > 0) lines.push(asksWords.skills(skills));
+  /* WHO MAY START ITS SCRIPTS: agents through its tools, the command bar, a row's menu (`pack-actions.ts`). */
+  const tools = pack && Array.isArray(pack.tools) ? pack.tools.filter(isMap).length : 0;
+  if (tools > 0) lines.push(asksWords.tools(tools));
+  if (pack && Array.isArray(pack.commands) && pack.commands.some(isMap)) lines.push(asksWords.commands);
+  const rowLists = pack && Array.isArray(pack.row_actions) ? [...new Set(pack.row_actions.filter(isMap).map((a) => nameOf(str(a.list))))] : [];
+  if (rowLists.length > 0) lines.push(asksWords.rowActions(rowLists));
   return lines;
 }
 

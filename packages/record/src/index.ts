@@ -15600,7 +15600,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...((diff.skills ?? []).length === 0 ? {} : { skills: (diff.skills ?? []).map((s) => s.name) }),
         ...((diff.tools ?? []).length === 0 ? {} : { tools: (diff.tools ?? []).map((t) => `addon.${id}.${t.name}: ${t.says}${t.writes ? ' (may change rows)' : ''}`) }),
         ...((diff.commands ?? []).length === 0 ? {} : { commands: (diff.commands ?? []).map((c) => c.title) }),
-        ...((diff.row_actions ?? []).length === 0 ? {} : { row_actions: (diff.row_actions ?? []).map((a) => `${a.title} on ${a.list}`) }),
+        ...((diff.row_actions ?? []).length === 0 ? {} : { row_actions: (diff.row_actions ?? []).map((a) => `${a.title} on ${a.list.replace(/^register\./u, '')} rows`) }),
         ...(diff.calls_out.length === 0 ? {} : { calls_out: diff.calls_out.map((c) => c.line) }),
         ...(diff.approve.length === 0 ? {} : { approve: diff.approve }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),

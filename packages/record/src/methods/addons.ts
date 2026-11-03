@@ -281,7 +281,7 @@ export function methods(deps: RecordDeps) {
       const egress = Array.isArray(s.body.egress) ? s.body.egress.filter((e): e is string => typeof e === 'string') : [];
       const keys = Array.isArray(s.body.keys) ? s.body.keys.filter((e): e is string => typeof e === 'string') : [];
       const runs = isMap(s.body.runs) ? s.body.runs : {};
-      const when = typeof runs.every === 'string' ? `every ${runs.every}` : typeof runs.door === 'string' ? `when ${runs.door} is called` : runs.rule === true ? 'when an automation starts it' : 'when started';
+      const when = typeof runs.every === 'string' ? `every ${runs.every}` : typeof runs.door === 'string' ? `when ${runs.door} is called` : runs.rule === true ? 'when an automation starts it' : runs.tool === true ? 'when an agent calls its tool' : runs.command === true ? 'from the command bar' : runs.row === true ? "from a row's menu" : 'when started';
       out.push(
         `Script ${text(s.body.title) ?? s.id}: runs ${when}${egress.length > 0 ? `, may call ${egress.join(', ')}` : ', calls nothing outside'}${keys.length > 0 ? ` with the key ${keys.join(', ')}` : ''}.`,
       );
