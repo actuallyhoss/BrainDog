@@ -329,7 +329,7 @@
        its empty state at half the width and left a hole beside it at a desk. -->
   <Tile icon="link" data-wide="" title={copy.sharingShared} count={liveCount + linkCount || undefined}>
     {#snippet actions()}
-      <Button weight="quiet" onclick={() => askSheet()}><Icon name="plus" size="s" />{copy.sharingShare}</Button>
+      <Button weight="quiet" size="sm" onclick={() => askSheet()}><Icon name="plus" size="s" />{copy.sharingShare}</Button>
     {/snippet}
     {#if sections.shared.length === 0 && linkCount === 0}
       <Empty kind="no-data-yet" compact title={copy.sharingNothing} />
@@ -445,11 +445,14 @@
     color: var(--ink);
     font-size: var(--fs-meta);
     font-weight: 600;
+    line-height: var(--lead-meta);
   }
 
+  /* A CONTROL'S HEIGHT, which is 44 under a thumb and 36 under a mouse, so the field and its button match the
+     area's other fields at a desk instead of standing 44 among 36s. */
   .see-as-pick .field-input,
   .group-add .field-input {
-    min-block-size: var(--tap);
+    min-block-size: calc(var(--ctl-h) - 2px);
   }
 
   .hint {
@@ -457,6 +460,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .see-as .hint {
@@ -529,7 +533,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
   }
 
@@ -553,6 +557,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .share-ask {
@@ -572,7 +577,7 @@
   .share :global(.btn),
   .share-do :global(.btn),
   .group-add :global(.btn) {
-    min-block-size: var(--tap);
+    min-block-size: var(--ctl-h);
   }
 
   .group {
@@ -590,6 +595,11 @@
   .group-add .field {
     flex: 1 1 12rem;
     min-inline-size: 0;
+    min-block-size: var(--ctl-h);
+  }
+
+  .see-as-pick.field {
+    min-block-size: var(--ctl-h);
   }
 
   .group-new {

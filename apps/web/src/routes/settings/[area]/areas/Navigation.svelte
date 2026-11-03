@@ -370,13 +370,13 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .pen-fold-line {
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .pen-fold-go {
@@ -385,6 +385,7 @@
     gap: var(--sp-1);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
 
@@ -393,7 +394,7 @@
     max-inline-size: 75ch;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   /* WHERE THE AREA'S CHOICES ARE KEPT, once, as the line under every area that keeps its own is drawn. */
@@ -401,6 +402,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .pen-acts {
@@ -417,6 +419,7 @@
     margin: 0 0 var(--sp-4);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* AT 390 THE PEN IS A LIST OF FULL-WIDTH ROWS, the three presses on their own line under the why, each 44 tall so a

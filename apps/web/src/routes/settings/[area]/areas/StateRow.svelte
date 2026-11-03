@@ -68,7 +68,8 @@
     column-gap: var(--sp-3);
     row-gap: var(--sp-2);
     min-block-size: var(--row-h-2);
-    padding-block: var(--sp-3);
+    /* EQUAL AIR EACH SIDE OF THE HAIRLINE between two rows (`--divider-space`). */
+    padding-block: var(--divider-space);
   }
 
   .state-row.has-action {
@@ -107,12 +108,12 @@
   .state-icon {
     display: inline-flex;
     align-self: start;
-    margin-block-start: -4px;
+    margin-block-start: calc((var(--lead-ui) - var(--well)) / 2);
   }
 
   .state-words {
     display: grid;
-    gap: 2px;
+    gap: var(--row-stack);
     min-inline-size: 0;
   }
 
@@ -121,7 +122,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
   }
 
@@ -129,7 +130,7 @@
     max-inline-size: 75ch;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* THE ACTION ON THE TITLE'S LINE, and a control taller than the line centred on it rather than hanging below it. */
@@ -137,25 +138,15 @@
     display: flex;
     align-items: center;
     justify-content: end;
-    min-block-size: 20px;
-    margin-block: calc((20px - var(--ctl-h)) / 2);
+    min-block-size: var(--lead-ui);
+    margin-block: calc((var(--lead-ui) - var(--ctl-h)) / 2);
   }
 
-  /* ON A PHONE: rows 60 tall, 16px words, and a button on a line of its own under them. */
-  @media (width < 900px) {
-    .state-row {
-      min-block-size: 60px;
-    }
-  }
-
+  /* ON A PHONE: a button on a line of its own under the words. The row keeps the desk's 56 (`--row-h-2`): 60 on a phone
+     made a one-line row taller there than the same row at a desk. */
   @media (width < 640px) {
     .state-row.has-action:not(:has(.state-act :global(.switch))) {
       grid-template-columns: var(--well) minmax(0, 1fr);
-    }
-
-    .state-title {
-      font-size: var(--fs-body);
-      line-height: 22px;
     }
 
     .state-row:not(:has(.state-act :global(.switch))) .state-act {

@@ -151,7 +151,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* A REFUSED PAYMENT IS WORDS IN INK, not a red line: nothing here is late or urgent, it is a thing to try again
@@ -161,7 +161,7 @@
     color: var(--ink);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .own-lead :global(.btn) {
@@ -176,7 +176,7 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .own-form {

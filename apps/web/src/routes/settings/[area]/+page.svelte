@@ -766,7 +766,7 @@
   .settings-index {
     min-inline-size: 0;
     max-inline-size: var(--page-max);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--page-head-gap) var(--gutter) var(--page-bottom);
   }
 
   /* THE LEAD AND THE HEALTH LINE IN ONE CELL, the cell as tall as the taller (`indexSaid`). */
@@ -854,8 +854,8 @@
   .settings-place {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-5);
-    padding-block: var(--sp-5) var(--sp-9);
+    gap: var(--page-head-gap);
+    padding-block: var(--page-top) var(--page-bottom);
     padding-inline: var(--gutter);
   }
 
@@ -864,7 +864,7 @@
   .body {
     display: flex;
     flex-direction: column;
-    gap: var(--inset);
+    gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
@@ -872,6 +872,7 @@
   .mock {
     color: var(--ink-3);
     font-size: var(--fs-cap);
+    line-height: var(--lead-cap);
   }
 
   /* FROM 900PX UP, THE INDEX BESIDE THE AREA, narrower than the rail at 200 with its rows at the meta step, so two
@@ -892,12 +893,14 @@
   }
 
   @media (width < 900px) {
+    /* THE SHELL ALREADY ENDS THE PAGE 16 ABOVE THE FLOATING BAR (`AppFrame` `.body`), so a phone adds 24 of its own
+       and not `--page-bottom`, which counts the bar a second time. */
     .settings-place {
-      padding-block-end: var(--sp-8);
+      padding-block-end: var(--sp-5);
     }
 
     .settings-index {
-      padding: var(--sp-2) var(--gutter) var(--sp-8);
+      padding: var(--page-head-gap) var(--gutter) var(--sp-5);
     }
 
     /* A PHONE IS NOT OFFERED THE KEYBOARD (`place.ts` `ONLY_WIDE`), on the declared index as on the list: its address

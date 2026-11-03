@@ -1110,6 +1110,7 @@
   .who-detail {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1147,6 +1148,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* The ladder is five levels and a sixth answer, so its segments take the least padding in the
@@ -1199,6 +1201,7 @@
     color: var(--ink);
     font-weight: 600;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* AND IT IS SET APART FROM THE LADDER. Five rungs and a sixth thing that is not one of them,
@@ -1223,6 +1226,7 @@
   .ex-word {
     color: var(--ink);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .ex-add {
@@ -1247,6 +1251,7 @@
   .ex-label {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* WHICH ROWS: the field and its value side by side beside the list and level on a wide screen, and on a phone a
@@ -1283,6 +1288,7 @@
     grid-column: 1 / -1;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* The invitations still waiting: a row per address, the control at the end of the line. */
@@ -1290,6 +1296,7 @@
     margin: var(--sp-3) 0 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .invites {
@@ -1321,6 +1328,7 @@
     flex: 1 1 20ch;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .ex-select {
@@ -1339,6 +1347,7 @@
   .ex-level {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* THE INVITATION'S FORM. Its label, field and button are `settings.css`'s field row, which puts the
@@ -1355,6 +1364,7 @@
   .code-label {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* THE INVITATION'S FORM IS ONE COLUMN, capped at a reading width so the address field is not a
@@ -1460,6 +1470,7 @@
     margin: var(--sp-2) 0 0;
     color: var(--red);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* New link and Withdraw stay together at the end of the row, and wrap under it on a phone. */
@@ -1498,6 +1509,7 @@
     color: var(--ink-2);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .hint {
@@ -1505,7 +1517,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   /* THE SHARED PILLS FROM `controls.css`, with the two things `Appearance.svelte` explains beside the
@@ -1547,7 +1559,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .danger :global(.btn) {
@@ -1561,7 +1573,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* THE ROLE CHOICES: one row each, a radio, its name, and its two lines; the chosen one on the raised fill. */
@@ -1604,7 +1616,7 @@
   .role-can,
   .role-cant {
     font-size: var(--fs-meta);
-    line-height: 1.4;
+    line-height: var(--lead-meta);
     color: var(--ink-2);
     text-wrap: pretty;
   }
@@ -1614,6 +1626,7 @@
   .roles-all {
     justify-self: start;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     color: var(--ink-2);
     text-decoration: underline;
     text-underline-offset: 3px;

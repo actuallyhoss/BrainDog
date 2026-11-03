@@ -111,7 +111,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .first-why,
@@ -119,7 +119,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   /* SIDE BY SIDE WHERE THEY FIT, and each the full width of the column on a phone, at the 44px floor. */

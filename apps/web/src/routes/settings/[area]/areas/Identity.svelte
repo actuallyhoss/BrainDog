@@ -716,7 +716,7 @@
     grid-column: 2;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   /* A LINE WITH ITS OWN ACTION: Rename at the end, across both of the line's rows; the form spans the words and it. */
@@ -740,7 +740,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 20px;
+    line-height: var(--lead-ui);
     overflow-wrap: anywhere;
   }
 
@@ -749,6 +749,7 @@
     margin-inline-start: var(--sp-2);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 400;
     white-space: nowrap;
   }
@@ -767,7 +768,7 @@
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
@@ -805,7 +806,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: var(--lead-head);
     overflow-wrap: anywhere;
   }
 
@@ -813,6 +814,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     overflow-wrap: anywhere;
   }
 
@@ -829,6 +831,7 @@
     margin-block-end: var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   /* 16px TEXT IN EVERY INPUT, at every width, so a phone never zooms into the field. */
@@ -845,7 +848,7 @@
     margin: var(--sp-1) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   .identity-bad {

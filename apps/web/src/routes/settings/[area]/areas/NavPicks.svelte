@@ -118,14 +118,18 @@
     }
   }
 
+  /* THE SAME LABEL AS APPEARANCE'S OWN CHOICES above it: 14/20 at 500, its line 4 under it. */
   .choice-name {
-    font-weight: 600;
+    font-weight: 500;
     color: var(--ink);
+    line-height: var(--lead-ui);
   }
 
   .choice-line {
+    margin-block-start: calc(var(--sp-1) - var(--sp-2));
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .segment {
@@ -149,7 +153,7 @@
     align-items: center;
     gap: var(--sp-1);
     min-block-size: var(--ctl-panel, 28px);
-    padding-inline: 12px;
+    padding-inline: var(--ctl-pad-sm);
     background: var(--soft-fill, var(--tile-2));
     border: 0;
     border-radius: var(--r-pill, 999px);

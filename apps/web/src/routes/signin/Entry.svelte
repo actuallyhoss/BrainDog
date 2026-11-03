@@ -152,7 +152,7 @@
     font-size: var(--fs-page);
     font-weight: 600;
     letter-spacing: var(--track-page, -0.021em);
-    line-height: 32px;
+    line-height: var(--lead-page);
     text-wrap: balance;
     overflow-wrap: anywhere;
   }

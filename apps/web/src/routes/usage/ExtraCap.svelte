@@ -109,6 +109,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .extra-said {

@@ -877,12 +877,15 @@
 
   /* THE FOOT OF THE SHEET: a hairline that stops short of nothing, then the one way to a BrainDog of your own, centred
      under the buttons it follows. */
+  /* THE WORDS SIT AS FAR UNDER THE RULE AS THE BUTTON STANDS OVER IT (16), and as far over the sheet's edge as the title
+     stands under it: the link's 44 target is taller than its line, so the padding gives back the half it adds. */
   .new-here {
-    margin: 0;
-    padding-block-start: var(--sp-4);
+    --link-air: calc((var(--tap) - var(--lead-ui)) / 2);
+    margin: 0 0 calc(-1 * var(--link-air));
+    padding-block-start: calc(var(--sp-4) - var(--link-air));
     border-block-start: 1px solid var(--sep, var(--rule));
     font-size: var(--fs-body);
-    line-height: 22px;
+    line-height: var(--lead-ui);
     text-align: center;
   }
 
@@ -983,7 +986,7 @@
     margin: var(--sp-2) 0 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .form :global(.btn) {
@@ -994,6 +997,7 @@
   .field-input#in-key {
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .peek {

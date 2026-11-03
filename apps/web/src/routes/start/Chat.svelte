@@ -515,6 +515,9 @@
     margin: 0;
     padding: 7px 0;
     border: 0;
+    /* THE BOX IS THE FIELD: the shared `.field`'s ring and corner drew a second frame inside it. */
+    border-radius: 0;
+    box-shadow: none;
     background: transparent;
     color: var(--ink);
     font: inherit;
@@ -540,6 +543,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .foot {

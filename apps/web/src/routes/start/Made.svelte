@@ -402,7 +402,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 600;
-    line-height: 24px;
+    line-height: var(--lead-head);
     text-wrap: balance;
   }
 
@@ -502,6 +502,7 @@
     border-radius: var(--r-round);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
@@ -514,7 +515,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
     text-wrap: pretty;
   }
 

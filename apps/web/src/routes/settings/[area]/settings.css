@@ -51,7 +51,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   column-gap: var(--sp-5);
-  padding-block: var(--sp-3);
+  padding-block: var(--divider-space);
 }
 
 .settings-place .switch-row + .switch-row,
@@ -61,7 +61,7 @@
 
 .settings-place .switch-row-words {
   display: grid;
-  gap: var(--sp-1);
+  gap: var(--row-stack);
   min-inline-size: 0;
 }
 
@@ -69,7 +69,7 @@
   color: var(--ink);
   font-size: var(--fs-body);
   font-weight: 500;
-  line-height: 20px;
+  line-height: var(--lead-ui);
 }
 
 .settings-place .switch-row-line {
@@ -77,12 +77,12 @@
   max-inline-size: 75ch;
   color: var(--ink-3);
   font-size: var(--fs-meta);
-  line-height: var(--lh-body);
+  line-height: var(--lead-meta);
 }
 
 /* THE SWITCH'S MIDDLE ON THE TITLE'S LINE, whatever height the pointer gives the switch. */
 .settings-place .switch-row > .switch {
-  margin-block: calc((20px - var(--ctl-h)) / 2);
+  margin-block: calc((var(--lead-ui) - var(--ctl-h)) / 2);
 }
 
 /* THE SWITCH'S MIDDLE ON THE SENTENCE'S FIRST LINE, whatever height the pointer gives the switch. The
@@ -184,7 +184,7 @@
   min-block-size: 20px;
   font-size: var(--fs-body);
   font-weight: 500;
-  line-height: 20px;
+  line-height: var(--lead-ui);
 }
 
 .settings-place .picture[data-on] .picture-name {
@@ -195,6 +195,7 @@
 .settings-place .picture-meta {
   color: var(--ink-3);
   font-size: var(--fs-meta);
+  line-height: var(--lead-meta);
   font-weight: 400;
 }
 
@@ -296,6 +297,7 @@
 .settings-place .field-row-label {
   color: var(--ink-2);
   font-size: var(--fs-meta);
+  line-height: var(--lead-meta);
   font-weight: 500;
 }
 
@@ -343,7 +345,7 @@
   max-inline-size: var(--measure);
   color: var(--ink-3);
   font-size: var(--fs-meta);
-  line-height: var(--lh-body);
+  line-height: var(--lead-meta);
 }
 
 @media (width < 900px) {
@@ -438,4 +440,13 @@
 /* EVERY BUTTON IN AN AREA IS A CAPSULE (ops: circles and capsules, never rounded squares). */
 .settings-place .btn {
   border-radius: var(--r-pill, 999px);
+}
+
+/* NO AIR LEFT HANGING AT A CARD'S END (spacing pass 3 Nov): a hint, a command or a form that ends an area's tile kept the
+   bottom margin it carries for whatever usually follows it, so the tile's last line stood 32 or more off its edge while
+   its first stood 20 under its head. The last thing drawn in a tile, or in the body under its head, takes none; a sheet
+   (a `<dialog>`) after it is not drawn in the tile, so it is passed over. */
+.settings-place .tile > :nth-last-child(1 of :not(dialog, template, [hidden])),
+.settings-place .tile > .section-body > :nth-last-child(1 of :not(dialog, template, [hidden])) {
+  margin-block-end: 0;
 }

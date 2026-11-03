@@ -59,7 +59,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .mini-rail,
@@ -121,6 +121,7 @@
     border-radius: var(--r-pop);
     background: var(--tile-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   @media (width >= 640px) {

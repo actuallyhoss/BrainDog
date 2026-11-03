@@ -995,7 +995,7 @@
     gap: var(--sp-2);
     margin: 0;
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .byline {
@@ -1036,7 +1036,7 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 600;
-    line-height: 20px;
+    line-height: var(--lead-ui);
   }
 
   .ready-k {
@@ -1049,7 +1049,7 @@
     padding-inline-start: var(--sp-4);
     color: var(--ink);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .trust[data-loud] {
@@ -1115,7 +1115,7 @@
     padding-block-start: var(--sp-1);
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .log {
@@ -1132,7 +1132,7 @@
     gap: 2px;
     padding-block: var(--sp-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .v-line {
@@ -1167,6 +1167,7 @@
   .earlier > summary {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     cursor: pointer;
   }
 
@@ -1177,7 +1178,7 @@
   .notes {
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .facts {
@@ -1187,7 +1188,7 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .facts dt {
@@ -1210,6 +1211,7 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
   .told-lines {

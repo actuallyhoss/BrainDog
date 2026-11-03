@@ -149,6 +149,7 @@
   }
   .card-you {
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     color: var(--ink-2);
   }
   .card-line {
@@ -157,7 +158,7 @@
     gap: var(--sp-2);
     align-items: start;
     font-size: var(--fs-meta);
-    line-height: 1.45;
+    line-height: var(--lead-meta);
     color: var(--ink-2);
     text-wrap: pretty;
   }
@@ -184,6 +185,7 @@
     inline-size: 100%;
     border-collapse: collapse;
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
   .matrix th,
   .matrix td {
@@ -254,6 +256,7 @@
   }
   .phone-who {
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     color: var(--ink-2);
   }
   @media (max-width: 720px) {
@@ -284,6 +287,7 @@
   .rung-line {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     text-wrap: pretty;
   }
   .to-people {
@@ -292,6 +296,7 @@
     gap: var(--sp-1);
     color: var(--ink);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: var(--fw-medium);
     text-decoration: none;
   }

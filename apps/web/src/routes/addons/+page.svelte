@@ -497,12 +497,13 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: var(--fw-semi);
-    line-height: 24px;
+    line-height: var(--lead-head);
   }
 
   .part-note {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: var(--fw-regular);
   }
 
@@ -547,7 +548,7 @@
     margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-meta);
-    line-height: 18px;
+    line-height: var(--lead-meta);
   }
 
   .ex-foot {

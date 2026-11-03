@@ -690,7 +690,7 @@
     max-inline-size: 75ch;
     color: var(--ink-3);
     font-size: var(--fs-meta);
-    line-height: var(--lh-body);
+    line-height: var(--lead-meta);
   }
 
   .find {
@@ -796,6 +796,7 @@
     flex: none;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 400;
   }
 
@@ -862,6 +863,7 @@
     padding-inline: var(--sp-2);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
     pointer-events: none;
   }
@@ -910,6 +912,7 @@
     gap: var(--sp-1);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -929,6 +932,7 @@
     border-block-start: 1px solid var(--rule);
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .addons-icons {
@@ -970,6 +974,7 @@
   .rename-label {
     color: var(--ink-2);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
     font-weight: 500;
   }
 
