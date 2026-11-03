@@ -2341,9 +2341,10 @@
 
   /* A META HEADING OVER EACH GROUP: the meta step, at 500, in the lowest text ink. */
   /* A CAPS LABEL OVER EACH GROUP (ops 2.3): 11px at 500, a little tracked, in the lowest text ink, on the rows' text edge. */
+  /* 4 FROM ITS LABEL TO ITS FIRST ROW'S WASH, as margin and not padding: the label's box stood 1px over the row's. */
   .p-group {
-    margin: 0;
-    padding: var(--sp-3) var(--sp-3) var(--sp-1);
+    margin: 0 0 var(--sp-1);
+    padding: var(--sp-3) var(--sp-3) 0;
     color: var(--ink-3);
     font: var(--t-caps, 500 11px / 16px var(--font-ui));
     letter-spacing: var(--track-caps, 0.025em);
@@ -2360,7 +2361,8 @@
     gap: var(--sp-3);
     inline-size: 100%;
     min-block-size: 40px;
-    margin-block: 1px;
+    /* Rows `--sp-0` (2) apart, the menu rows' step (RHYTHM 1): the margins collapse, and at 1px the washes touched. */
+    margin-block: var(--sp-0);
     padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-2);
     border: 0;
     border-radius: var(--r-ctl);
@@ -2706,9 +2708,11 @@
         overlay var(--d-panel-out) allow-discrete;
     }
 
+    /* THE WELL AND CANCEL 8 UNDER THE SHEET'S TOP EDGE: centred in the 56 bar they stood 6 under it. */
     .p-head {
       gap: var(--sp-2);
       min-block-size: 56px;
+      padding-block: var(--sp-2);
       padding-inline: var(--sp-3) var(--sp-2);
       border-block-end: 0;
     }

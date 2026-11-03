@@ -224,6 +224,13 @@
     color: var(--red);
   }
 
+  /* SAYING NOTHING, IT TAKES NO ROOM: the empty line held 28px at the tile's foot (bottom 44-49 against a top of 21-25).
+     It is the tile's last line, so when it speaks only the tile's own foot moves; it stays drawn for `aria-live`. */
+  .said:not([data-wrong]) {
+    min-block-size: 0;
+    margin-block-start: calc(-1 * var(--sp-2));
+  }
+
   .go {
     display: contents;
   }

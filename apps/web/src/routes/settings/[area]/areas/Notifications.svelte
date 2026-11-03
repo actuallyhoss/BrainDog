@@ -349,6 +349,11 @@
     line-height: var(--lh-body);
   }
 
+  /* THE LINE UNDER THE PICKERS ENDS THE TILE: its hint's 12 under it stood the tile's last line 28 off its foot. */
+  .quiet-after > :last-child {
+    margin-block-end: 0;
+  }
+
   .quiet-pickers,
   .quiet-to {
     display: inline-flex;

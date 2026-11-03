@@ -431,8 +431,11 @@
     justify-self: start;
   }
 
+  /* ITS WORD ON THE SHEET'S TEXT EDGE AND ITS WASH 8 IN FROM THE SHEET'S: pulled 12 with its 16 of padding, the word stood
+     4 right of the sentence above it and the wash 4 off the sheet's edge. */
   .share > :global(.btn[data-weight='bare']) {
-    margin-inline-start: calc(-1 * var(--sp-3));
+    padding-inline: var(--sp-2);
+    margin-inline-start: calc(-1 * var(--sp-2));
   }
 
   .once {

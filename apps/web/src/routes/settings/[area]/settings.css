@@ -451,6 +451,13 @@
   margin-block-end: 0;
 }
 
+/* A STATE ROW THAT ENDS A TILE keeps its `--divider-space` above (the hairline's air) but not under it: there is no
+   hairline after it, and the 12 under it stood the tile's last line 37-49 off its edge against 21 at its top. */
+.settings-place .tile > .state-row:nth-last-child(1 of :not(dialog, template, [hidden])),
+.settings-place .tile > .section-body > .state-row:nth-last-child(1 of :not(dialog, template, [hidden])) {
+  margin-block-end: calc(-1 * var(--divider-space));
+}
+
 /* "HOW", THE ONE DISCLOSURE FOR RARE INSTRUCTIONS (ui pass, 3 Nov): a paragraph and a shell command on every visit read
    as a wall, though they are needed once. The head is a 13px line with a turning chevron, as Keychain's "How it works";
    what it opens sits 8 under it. */

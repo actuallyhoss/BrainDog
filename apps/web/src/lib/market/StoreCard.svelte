@@ -233,7 +233,7 @@
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
       gap: var(--sp-1) var(--sp-3);
-      padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+      padding: var(--sp-3) var(--sp-4);
     }
 
     .sc-name,

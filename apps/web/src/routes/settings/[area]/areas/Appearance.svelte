@@ -949,6 +949,12 @@
     background: var(--tile);
   }
 
+  /* THE PREVIEW'S ROWS END ITS TILE: the last row's own block padding stood its well 26 off the foot against 16 at the
+     top, so the list gives that padding back. */
+  .pv-rows {
+    margin-block-end: calc(-1 * var(--row-pad-y));
+  }
+
   .pv-head {
     display: flex;
     align-items: center;

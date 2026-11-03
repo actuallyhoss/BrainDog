@@ -1464,6 +1464,9 @@
     display: flex;
     flex-direction: column;
     margin-block: calc(-1 * var(--sp-3));
+    /* The first switch overhangs its row by half of (its height - the title's line), so the row is pulled up only
+       as far as keeps that overhang `--card-head-gap` under the head (it stood 4px under it). */
+    margin-block-start: calc((var(--ctl-h) - var(--lead-ui)) / 2 - var(--divider-space));
   }
 
   /* THE ROWS THAT OPEN A PANEL: a well, the name over one line, and a chevron, one press each, a hairline between. */

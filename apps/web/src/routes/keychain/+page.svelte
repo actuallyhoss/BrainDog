@@ -1191,10 +1191,12 @@
   }
 
   /* THE COMMAND AN AGENT ADDS A KEY WITH, under the empty list, on a line of its own with Copy. */
+  /* 12 UNDER THE EMPTY STATE'S BUTTON: the section body is a block, so "Or have an agent add one" sat on it at 0. */
   .agent-add {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
+    margin-block-start: var(--sp-3);
     max-inline-size: 640px;
     color: var(--ink-2);
     font-size: var(--fs-meta);

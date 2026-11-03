@@ -116,4 +116,10 @@
   .find input {
     inline-size: 100%;
   }
+
+  /* THE LAST SCOPE ENDS THE TILE: the gap `Keymap` keeps under each scope for the next one hung 24px of air under the
+     tile's last row (bottom 46 against a top of 21). */
+  .find ~ :global(.key-cols > .keys:last-child) {
+    margin-block-end: 0;
+  }
 </style>

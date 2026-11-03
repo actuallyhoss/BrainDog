@@ -102,7 +102,9 @@
     align-items: center;
     gap: var(--sp-2);
     min-inline-size: 0;
-    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+    /* ONE INSET ALL ROUND, so Copy's fill sits 8 from three edges; the words' own 4 (below) puts them 12 in, level with
+       the 12 they stand under the top. */
+    padding: var(--sp-2);
     background: var(--tile-2);
     border-radius: var(--r-ctl);
   }
@@ -111,6 +113,7 @@
     flex: 1;
     min-inline-size: 0;
     padding-block: var(--sp-1);
+    padding-inline-start: var(--sp-1);
     color: var(--ink);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
