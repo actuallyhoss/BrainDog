@@ -2339,7 +2339,7 @@
 /* ON A PHONE THE ACCOUNTS ARE ROWS TOLD APART BY AIR, as every list's rows are: 12 above and below, no hairline. */
 @media (width < 640px) {
   [data-money] .cards-item {
-    padding-block: var(--sp-3);
+    padding: var(--sp-3) 0;
   }
 
   [data-money] .cards-item + .cards-item {
