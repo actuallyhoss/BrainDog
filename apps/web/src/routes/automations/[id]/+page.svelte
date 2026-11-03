@@ -372,7 +372,15 @@
   const againField = $derived(row && row.path === 'inline' && row.enabled ? fieldOf(row.body) : null);
   const saveWord = $derived(busy ? words.saving : !owner ? words.save : row ? editWords.saveChanges : editWords.saveOn);
   /* THE SENTENCE UNDER THE TITLE: the last run and the next, the failed clause red. None for a draft never saved. */
-  const said = $derived(pageSentence(row, now));
+  /* AT A DESK THE RUNS TILE STANDS BESIDE THE STEPS and opens on the last run, so a last run that went well is not said
+     again over it ("Last run just now, done." over "Done, just now"); what is next, a failure or a run in hand still is.
+     On a phone the runs are a tab away, and the head keeps the whole sentence. */
+  const said = $derived.by(() => {
+    const whole = pageSentence(row, now);
+    if (!whole || phone.current || !row?.enabled || row.last?.state !== 'done') return whole;
+    const next = row.next ? words.nextRun(since(row.next, now)) : '';
+    return next === '' ? null : { text: next, needs: '' };
+  });
   /* WHAT IT DOES, WHOLE: the trigger and each step in order, each step said with no title to repeat, so its script is
      named (`sayStep` with no `own`). */
   const whole = $derived(wholeSentence(sayStart(flow.draft, listSaid, ruleNameOf), flow.draft.steps.map((n) => sayInWhole(n))));

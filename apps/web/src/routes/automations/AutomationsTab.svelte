@@ -225,11 +225,14 @@
   <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} {agentPrompt} />
 {:else if from === 'ready'}
   {#if split && bars.length > 0}
-    <div class="tiles">
+    <!-- HOW RUNS ENDED ONLY WHEN SOME DID NOT: with every run finished, the head already says "Nothing failed this
+         month", and a full ring with "182 of 182" and a sentence saying it again was the same fact three times. -->
+    <div class="tiles" data-one={split.ok === split.runs ? '' : undefined}>
       <Tile icon="refresh" title={w.runsMonth} meta={w.runsMonthMeta(split.runs)}>
         <Bars items={bars} subject={w.runsMonthSubject} />
         {#if bars.some((b) => (b.part ?? 0) > 0)}<p class="key">The red part of a bar is its failed runs.</p>{/if}
-        <p class="reading">{monthReading(rows, now)}</p>
+        <!-- THE READING ONLY WHERE IT ADDS: the bars already rank the month, and "nothing failed" is the head's. -->
+        {#if split.ok < split.runs}<p class="reading">{monthReading(rows, now)}</p>{/if}
         <!-- WHY THEY FAILED, ONE PRESS AWAY (1 Nov): the run's own words, three paragraphs of them, stood open under the
              chart and made the tile twice the height of its neighbour. The count and the reading say what is true; the
              reasons open under them. -->
@@ -247,17 +250,20 @@
           </details>
         {/if}
       </Tile>
-      <Tile icon="check" title={w.endedTitle}>
-        <div class="ring">
-          <Ring value={split.ok} max={split.runs} tone="earn" size={112} label={w.endedOf(split.runs)} subject={w.endedSubject} />
-        </div>
-        <p class="reading">{endedReading(rows)}</p>
-      </Tile>
+      {#if split.ok < split.runs}
+        <Tile icon="check" title={w.endedTitle}>
+          <div class="ring">
+            <Ring value={split.ok} max={split.runs} tone="earn" size={112} label={w.endedOf(split.runs)} subject={w.endedSubject} />
+          </div>
+          <p class="reading">{endedReading(rows)}</p>
+        </Tile>
+      {/if}
     </div>
   {/if}
 
   {#if on.length > 0}
-    <Tile class="section" data-surface="tile" title={w.on} count={onCount || undefined} meta={onMoved > 0 ? w.turnedOff(onMoved) : undefined}>
+    <!-- EVERY ONE ON IS THE TITLE'S COUNT, so "On" says it only when some are off. -->
+    <Tile class="section" data-surface="tile" title={w.on} count={off.length > 0 ? onCount || undefined : undefined} meta={onMoved > 0 ? w.turnedOff(onMoved) : undefined}>
       <HubRows rows={on} ontoggle={turn} busy={turning} />
     </Tile>
   {/if}
@@ -283,6 +289,10 @@
   @media (width >= 900px) {
     .tiles {
       grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    }
+
+    .tiles[data-one] {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
