@@ -203,7 +203,7 @@ export async function syncJoin(args: string[], io: JoinIo): Promise<number> {
   };
   const lists = await findLists(call, host);
   if (lists === 'none') {
-    io.say('Install the Setup sync add-on first: its Carry list says what each machine carries.');
+    io.say('Install the Setup sync plugin first: its Carry list says what each machine carries.');
     return 1;
   }
   if (isFail(lists)) return fail(lists);

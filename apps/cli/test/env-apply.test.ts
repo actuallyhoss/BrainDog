@@ -413,14 +413,14 @@ test('WITHOUT THE PROFILES ADD-ON IT SAYS SO ONCE, every profile gets what appli
   const rec = record({ tools: tools(), skills: skills(), profiles: false });
   const run = machine(p, rec);
   assert.equal(await envApply([], run.io), 0, run.all());
-  assert.equal(run.lines.filter((l) => l === 'Install the Profiles add-on to choose per profile; applying what applies everywhere.').length, 1);
+  assert.equal(run.lines.filter((l) => l === 'Install the Profiles plugin to choose per profile; applying what applies everywhere.').length, 1);
   assert.ok(!rec.calls.includes('list profiles'), 'a list in no role was read');
   /* A profiles field means nothing without the list it names. */
   for (const file of Object.values(files(p))) assert.ok(Object.hasOwn(servers(file), 'quill'));
   assert.ok(existsSync(join(p.main, 'skills', 'beta', 'SKILL.md')));
   assert.equal(readFileSync(join(p.main, 'CLAUDE.md'), 'utf8'), MINE);
   assert.equal(readFileSync(join(p.studio, 'CLAUDE.md'), 'utf8'), MINE_CRLF);
-  assert.equal(run.lines.filter((l) => l === '5. Rules: kept per profile by the Profiles add-on, which this BrainDog does not have.').length, 3);
+  assert.equal(run.lines.filter((l) => l === '5. Rules: kept per profile by the Profiles plugin, which this BrainDog does not have.').length, 3);
 });
 
 test('RULES CHANGED IN PROFILES CHANGE THE BLOCK ALONE, and rules taken out leave the person\'s file as it was', async () => {

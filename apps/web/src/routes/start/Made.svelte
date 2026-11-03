@@ -69,7 +69,7 @@
     install: 'Install BrainDog',
     connect: 'Connect this BrainDog',
     /* THE ADD-ONS A TRADE NAMED, offered and never added. */
-    addonsTitle: (n: number) => (n === 1 ? 'An add-on for what you do' : 'Add-ons for what you do'),
+    addonsTitle: (n: number) => (n === 1 ? 'A plugin for what you do' : 'Plugins for what you do'),
     addonsSub: 'Nothing is added until you install it.',
     seeAddon: (title: string) => `See ${title}`,
     /* WHAT `braindog setup` DOES NEXT, so the link and the six digits it prints are expected and not a surprise. */

@@ -498,7 +498,7 @@ export function figureTile(id: string, decl: MetricDecl, reading: Reading): Metr
       /* THE PACK IS WHERE A FIGURE IS DECLARED, and it is the only screen in this product that has
          anything to say about one. A tile that cannot be worked out linking to the money page —
          which is where it is already — was a link back to itself. */
-      href: '/settings/addons',
+      href: '/settings/plugins',
     };
 
   /**

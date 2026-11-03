@@ -89,7 +89,7 @@ export const HELD = {
     ids: ['organisations', 'things'],
     why: "the reporting panel binds a project's key through its organisation and draws the poll form on an organisation.",
   },
-  'apps/web/src/routes/addons/share/+page.svelte': {
+  'apps/web/src/routes/plugins/share/+page.svelte': {
     ids: ['skills'],
     why: "sharing a pack offers the Agents pack's skills.",
   },

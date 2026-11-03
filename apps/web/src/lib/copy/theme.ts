@@ -30,7 +30,7 @@ export const theme = {
   /** The title the editor wears when a theme refused at install opened it with its fixes staged. */
   lookFixAndInstall: 'Fix and install',
   lookStaged: 'The colours that could not be read are selected, and a fix is ready for each. Check them, then install.',
-  lookStagedNone: 'This add-on brought no look to fix.',
+  lookStagedNone: 'This plugin brought no look to fix.',
 
   lookColours: 'Colours',
   lookInLight: 'In light',

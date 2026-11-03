@@ -81,7 +81,7 @@
     allLists: (n: number) => `Show all ${n}`,
     currency: 'Home currency',
     currencyWhy: 'Other currencies add up in this one, at the day’s rate.',
-    noMoney: 'Turn on Money in Add-ons first.',
+    noMoney: 'Turn on Money in Plugins first.',
     /* MONEY IS ON AND KEEPS NO CURRENCY SETTING (the seed's): the currency its sums are in, said as what it is. */
     kept: (code: string) => currencySaid(code),
     renameWith: 'Rename them with a starter.',
@@ -561,7 +561,7 @@
       {#if shell.index.registers.length > 8 && !listsAll}
         <button type="button" class="lists-more tap" onclick={() => (listsAll = true)}>{words.allLists(shell.index.registers.length)}</button>
       {/if}
-      <p class="hint">{words.renameWith} <a class="link tap" href={at('/addons')}>{words.browse}</a></p>
+      <p class="hint">{words.renameWith} <a class="link tap" href={at('/plugins')}>{words.browse}</a></p>
     </Tile>
   {/if}
 

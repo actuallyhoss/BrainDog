@@ -589,7 +589,7 @@ export type BlockChange = { kind: string; kinds: readonly string[] } | { remove:
 
 /** The receipts of the two writes, in the words `block-menu.ts` says them; here the one sentence of refusal. */
 export const changeWords = {
-  notYours: 'Change to and Remove are on pages you made. This page came with an add-on, so hide the block instead.',
+  notYours: 'Change to and Remove are on pages you made. This page came with a plugin, so hide the block instead.',
 };
 
 /**

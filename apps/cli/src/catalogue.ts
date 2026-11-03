@@ -119,7 +119,7 @@ const VERSION = /^\d{1,6}\.\d{1,6}\.\d{1,6}$/u;
 /* `command` IS THE NAME A PERSON TYPES: `starter` and `addon`, whose old names `usecase` and `pack` still work. */
 const NOUN: Record<EntryKind, { a: string; the: string; suffix: string; command: string }> = {
   usecase: { a: 'a starter', the: 'starter', suffix: '.usecase.json', command: 'starter' },
-  pack: { a: 'an add-on', the: 'add-on', suffix: '.pack.json', command: 'addon' },
+  pack: { a: 'a plugin', the: 'plugin', suffix: '.pack.json', command: 'addon' },
 };
 
 /* ── new ────────────────────────────────────────────────────────────────── */
@@ -302,7 +302,7 @@ async function createPack(args: string[], io: AgentIo): Promise<number> {
   const fromWidget = values['from-widget'];
   if (fromWidget !== undefined) {
     if (fromPage !== undefined) {
-      io.say('An add-on starts from a page or from a widget, not both.');
+      io.say('A plugin starts from a page or from a widget, not both.');
       return 1;
     }
     let text: string;
@@ -425,7 +425,7 @@ async function checkPack(args: string[], io: AgentIo): Promise<number> {
   if (read.file.kind !== 'pack') return 1;
   const { pack, title } = printable(read.file.file);
   const count = (k: string) => pack.declarations.filter((d) => d.kind === k).length;
-  io.out(`${title} ${pack.manifest.version} reads as an add-on: ${count('register')} lists, ${count('page')} pages and ${pack.seeds.length} example rows. Nothing was sent.`);
+  io.out(`${title} ${pack.manifest.version} reads as a plugin: ${count('register')} lists, ${count('page')} pages and ${pack.seeds.length} example rows. Nothing was sent.`);
   io.out(`  By ${pack.manifest.author}, ${pack.manifest.license}.`);
   for (const line of reachLines(reachOf(read.file))) io.out(line);
   /* THE FILE AS WRITTEN, read for what the Kennel and an install both refuse by name (`address.ts`): every address
@@ -969,7 +969,7 @@ async function search(args: string[], io: AgentIo, kind: EntryKind): Promise<num
     if (v) for (const line of reachLines(v.reach)) io.out(line);
     io.out(`  ${trustLine(trustOf(known, trustSubject(e), v?.signature, statements, v ? await keysSignedBefore(e, v.version) : []), e.author, source?.on)}`);
   }
-  io.out(`Not from the add-on index. A signature is checked when it is installed, with braindog ${kind} install <id> --from ${from}.`);
+  io.out(`Not from the plugin index. A signature is checked when it is installed, with braindog ${kind} install <id> --from ${from}.`);
   return 0;
 }
 
@@ -1156,7 +1156,7 @@ export async function installFromCatalogue(
     const pack = kind === 'usecase' && at.index.entries.some((e) => e.id === bare && e.kind === 'pack');
     io.say(
       pack
-        ? `${bare} is an add-on, not a starter. Ask for it with propose, body_kind pack and {"install":"${bare}"}, and it installs when the owner says yes.`
+        ? `${bare} is a plugin, not a starter. Ask for it with propose, body_kind pack and {"install":"${bare}"}, and it installs when the owner says yes.`
         : `There is no ${NOUN[kind].the} called ${bare} in this catalogue.${ids.length ? ` It has: ${ids.join(', ')}.` : ''}`,
     );
     return 1;
@@ -1325,7 +1325,7 @@ async function preview(args: string[], io: AgentIo, kind: EntryKind = 'usecase')
     return 1;
   }
   /* THE FILE'S TITLE IS ITS AUTHOR'S, and `preview` reads a file from an address as readily as `check` does. */
-  io.out(`Previewing ${oneLine(read.title)} ${oneLine(read.version)} on a scratch BrainDog. Open http://localhost:${port}/addons/${read.id}?kind=${kind} and press Review the plan. Stop with Ctrl+C; the scratch BrainDog is removed.`);
+  io.out(`Previewing ${oneLine(read.title)} ${oneLine(read.version)} on a scratch BrainDog. Open http://localhost:${port}/plugins/${read.id}?kind=${kind} and press Review the plan. Stop with Ctrl+C; the scratch BrainDog is removed.`);
   const code = await run(['serve'], true);
   rmSync(scratch, { recursive: true, force: true });
   return code;
@@ -1433,7 +1433,7 @@ export async function pack(args: string[], io: AgentIo): Promise<number> {
     const dryRun = values['dry-run'] === true;
     if (!ID.test(given)) {
       if (values.from !== undefined || values.version !== undefined) {
-        io.say('--from and --version pick an add-on from a catalogue by its id, so they do not go with a file.');
+        io.say('--from and --version pick a plugin from a catalogue by its id, so they do not go with a file.');
         return 1;
       }
       return installPackFile(given, values.host, io, dryRun, values.force === true);
@@ -1454,7 +1454,7 @@ export async function pack(args: string[], io: AgentIo): Promise<number> {
     const { force, rest: left } = (await import('./install.ts')).takeForce(rest);
     const [id, ...more] = left;
     if (!id || more.length > 0 || !ID.test(id)) {
-      io.say('braindog addon uninstall takes one add-on id, as in braindog addon uninstall project-brief.');
+      io.say('braindog addon uninstall takes one plugin id, as in braindog addon uninstall project-brief.');
       return 1;
     }
     const { connect } = await import('./skills.ts');

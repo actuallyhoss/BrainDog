@@ -349,7 +349,7 @@ export function sinceIcon(row: Pick<SinceRow, 'key' | 'label'>, listIcon: (list:
     'Decisions replaced': 'decide',
     'Questions asked': 'ask',
     'Questions closed': 'check',
-    'Add-ons changed': 'packs',
+    'Plugins changed': 'packs',
     'Pages changed': 'doc',
     'Things that came in': 'inbox',
     'Access changed': 'people',

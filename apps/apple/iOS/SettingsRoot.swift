@@ -38,7 +38,7 @@ struct SettingsRoot: View {
         Group(title: "Agents and add-ons", areas: [
             Area(label: "Agents", line: "Connections, permissions, Slash", glyph: .session, path: "/settings/agents"),
             Area(label: "What comes in", line: "Mail and feeds", glyph: .inbox, path: "/settings/ingest"),
-            Area(label: "Add-ons", line: "Installed, updates", glyph: .packs, path: "/settings/addons"),
+            Area(label: "Plugins", line: "Installed, updates", glyph: .packs, path: "/settings/plugins"),
             Area(label: "Keychain", line: "Keys for agents", glyph: .vault, path: "/keychain"),
         ]),
         Group(title: "People", areas: [

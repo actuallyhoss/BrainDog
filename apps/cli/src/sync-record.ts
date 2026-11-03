@@ -586,7 +586,7 @@ export async function ready(io: SyncIo, host: string | undefined, verb: string):
   const call = io.call ?? callerFor(to, io.env);
   const lists = await findLists(call, to.key);
   if (lists === 'none') {
-    io.say('Install the Setup sync add-on first: its Carry list says what each machine carries.');
+    io.say('Install the Setup sync plugin first: its Carry list says what each machine carries.');
     return 1;
   }
   if (isFail(lists)) {

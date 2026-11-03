@@ -87,7 +87,7 @@ export async function packFromWidget(id: string, block: Body, options: FromWidge
   const about = (line: string, n: string): boolean => (line.startsWith('Made ') || line.startsWith('Took ')) && (line.includes(` ${n} `) || line.includes(` ${n},`));
   for (let i = lines.length - 1; i >= 0; i--) if (leftNames.some((n) => about(lines[i]!, n))) lines.splice(i, 1);
   if (left.length > 0)
-    lines.push(`Left ${leftNames.length > 0 ? leftNames.join(', ') : left.length === 1 ? 'one thing' : `${left.length} things`} to ${Object.keys(requires).join(', ') || 'the add-ons it needs'}, which already ${left.length === 1 ? 'brings it' : 'bring them'}.`);
+    lines.push(`Left ${leftNames.length > 0 ? leftNames.join(', ') : left.length === 1 ? 'one thing' : `${left.length} things`} to ${Object.keys(requires).join(', ') || 'the plugins it needs'}, which already ${left.length === 1 ? 'brings it' : 'bring them'}.`);
   const said = sizes.length === 1 ? sizes[0]! : `${sizes.slice(0, -1).join(', ')} and ${sizes.at(-1)!}`;
   lines.push(`The widget draws ${said}, and whoever installs it adds it to a board from the sheet.`);
 

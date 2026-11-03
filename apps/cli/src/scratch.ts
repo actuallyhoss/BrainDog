@@ -267,7 +267,7 @@ export async function checkInScratch(file: CatalogueFile, keep = false, now: num
   if (file.kind === 'pack') {
     doc = file.file.doc;
     for (const key of strayKeys(doc))
-      lines.push(`  Warning: ${oneLine(key)} is not a key an add-on's manifest says. BrainDog passes over it, and the Kennel takes only ${MANIFEST_KEYS.join(', ')}.`);
+      lines.push(`  Warning: ${oneLine(key)} is not a key a plugin's manifest says. BrainDog passes over it, and the Kennel takes only ${MANIFEST_KEYS.join(', ')}.`);
   } else {
     doc = file.shared.doc;
     modules = file.shared.usecase.modules;

@@ -51,7 +51,7 @@ export function packFileIn(given: string, cwd: string): { file: string; dir: str
   } catch {
     return { fix: `${given} is not a folder or a file on this machine.` };
   }
-  if (!folder) return PACK_FILE.test(path) ? { file: path, dir: dirname(path) } : { fix: `${given} is not an add-on file: its name ends .pack.json or .pack.yaml.` };
+  if (!folder) return PACK_FILE.test(path) ? { file: path, dir: dirname(path) } : { fix: `${given} is not a plugin file: its name ends .pack.json or .pack.yaml.` };
   const inside = readdirSync(path).filter((f) => PACK_FILE.test(f));
   const own = ['.pack.json', '.pack.yaml', '.pack.yml'].map((s) => `${basename(path)}${s}`).find((f) => inside.includes(f));
   const found = own ?? (inside.length === 1 ? inside[0] : undefined);
@@ -99,7 +99,7 @@ export function readFolder(file: string): { ok: true; text: string; doc: Doc; co
     if (!parsed.ok) return { ok: false, fix: `${basename(file)}: ${said(parsed)}` };
     doc = parsed.value;
   }
-  if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) return { ok: false, fix: `${basename(file)} is not an add-on file: it is not an object.` };
+  if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) return { ok: false, fix: `${basename(file)} is not a plugin file: it is not an object.` };
   const copied: string[] = [];
   const files = scriptFiles(dirname(file), doc as Doc);
   for (const d of Array.isArray((doc as Doc).declarations) ? ((doc as Doc).declarations as Doc[]) : []) {
@@ -124,7 +124,7 @@ export function readFolder(file: string): { ok: true; text: string; doc: Doc; co
 function keepInStep(file: string, read: { text: string; copied: string[]; json: boolean }, io: AgentIo): void {
   if (read.copied.length === 0) return;
   if (!read.json) {
-    io.out(`  ${read.copied.join(', ')} read into the add-on. A YAML file is not written to; copy the script into its source before you publish.`);
+    io.out(`  ${read.copied.join(', ')} read into the plugin. A YAML file is not written to; copy the script into its source before you publish.`);
     return;
   }
   writeFileSync(file, read.text);
@@ -183,7 +183,7 @@ export async function devInstall(file: string, client: PackCalls, io: AgentIo, l
     return 'refused';
   }
   for (const key of Object.keys(read.doc).filter((k) => !(MANIFEST_KEYS as readonly string[]).includes(k)))
-    io.out(`  Warning: ${oneLine(key)} is not a key an add-on says. BrainDog passes over it, and the store refuses it.`);
+    io.out(`  Warning: ${oneLine(key)} is not a key a plugin says. BrainDog passes over it, and the store refuses it.`);
   const remote = addressFaults(read.doc);
   if (remote.length > 0) {
     for (const r of remote) io.say(`  Refused: ${oneLine(`${r.fix} (${r.code})`)}`);
@@ -330,10 +330,10 @@ export async function dev(args: string[], io: AgentIo): Promise<number> {
   }
   const client = at.client as unknown as PackCalls;
   const page = pageOf(first.doc);
-  io.out(`Dev BrainDog for ${oneLine(id)} at ${base}${page === null ? `/addons/${id}` : `/p/${page}`} (the store page is ${base}/addons/${id}).`);
+  io.out(`Dev BrainDog for ${oneLine(id)} at ${base}${page === null ? `/plugins/${id}` : `/p/${page}`} (the store page is ${base}/plugins/${id}).`);
   const last = { text: null as string | null };
   await devInstall(found.file, client, io, last);
-  io.out(`Watching ${found.dir}: save the add-on file or a script and it is installed again. Stop with Ctrl+C; the scratch BrainDog is removed.`);
+  io.out(`Watching ${found.dir}: save the plugin file or a script and it is installed again. Stop with Ctrl+C; the scratch BrainDog is removed.`);
 
   /* ONE INSTALL AT A TIME, AND ONE MORE IF A SAVE LANDS WHILE ONE RUNS, so a burst of saves ends on the last. Writing the
      scripts into the file wakes the watch once more, and that pass finds nothing to copy and plans a reinstall. */
@@ -428,7 +428,7 @@ export async function publishGithub(args: string[], io: AgentIo): Promise<number
   keepInStep(found.file, read, io);
   const door = await readCatalogueFile(read.text);
   if (!door.ok || door.value.kind !== 'pack') {
-    io.say(`${basename(found.file)} would be refused: ${door.ok ? 'it is not an add-on.' : said(door)} Run braindog addon check ${positionals[0] ?? '.'} and publish once it passes.`);
+    io.say(`${basename(found.file)} would be refused: ${door.ok ? 'it is not a plugin.' : said(door)} Run braindog addon check ${positionals[0] ?? '.'} and publish once it passes.`);
     return 1;
   }
   const remote0 = addressFaults(read.doc);
@@ -459,7 +459,7 @@ export async function publishGithub(args: string[], io: AgentIo): Promise<number
   /* THE FOLDER IS ITS OWN REPOSITORY, never a folder inside another one, so what is pushed is the add-on and nothing else. */
   const top = run('git', ['rev-parse', '--show-toplevel']);
   if (top.ok && resolve(top.out) !== resolve(dir)) {
-    io.say(`${dir} is inside the git repository at ${top.out}. Copy the add-on's folder out on its own and publish from there.`);
+    io.say(`${dir} is inside the git repository at ${top.out}. Copy the plugin's folder out on its own and publish from there.`);
     return 1;
   }
   if (!top.ok) {

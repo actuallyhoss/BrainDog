@@ -142,7 +142,7 @@
   {/if}
   {#if fix}<p class="improved-said" role="status">{fix}</p>{/if}
   {#if elsewhere}
-    <p class="improved-said" role="status">{words.improvedOnAddons} <a class="improved-link" href={at('/settings/addons')}>{words.openAddons}</a></p>
+    <p class="improved-said" role="status">{words.improvedOnAddons} <a class="improved-link" href={at('/settings/plugins')}>{words.openAddons}</a></p>
   {/if}
 </article>
 

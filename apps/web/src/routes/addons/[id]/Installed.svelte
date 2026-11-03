@@ -79,7 +79,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
-  import { STORE_AT } from '../moved.ts';
+  import { INSTALLED_AT, STORE_AT } from '../moved.ts';
   import PluginSkeleton from '../PluginSkeleton.svelte';
   import { moduleName } from '@braindog/seed/usecases/names';
   import { SPEAKS } from '$lib/voice.ts';
@@ -271,7 +271,7 @@
   /** The version the store offers past the one held, and where its plan is read: the store's page, or the Updates card for one only this build ships. */
   const newer = $derived(found && installed?.version ? newerThan(found.listing, installed.version) : null);
   const updateAt = $derived(
-    found === null ? null : found.shippedOnly || found.tier === 'link' ? '/settings/addons' : `/plugins/${encodeURIComponent(found.listing.id)}?kind=${found.listing.kind}&update`,
+    found === null ? null : found.shippedOnly || found.tier === 'link' ? INSTALLED_AT : `/plugins/${encodeURIComponent(found.listing.id)}?kind=${found.listing.kind}&update`,
   );  let turning = $state(false);
   /** The record's sentence when it refused the switch; the cascade that answers a dependent is offered on /packs. */
   let turnSaid = $state('');
@@ -298,7 +298,7 @@
       askingData = false;
       const binned = Object.values(out.value?.binned ?? {}).reduce((a, n) => a + n, 0);
       toasts.push(data ? copy.removedWithData(name, binned) : copy.uninstalled(name), { intent: 'good' });
-      void goto(at('/settings/addons'));
+      void goto(at(INSTALLED_AT));
     } finally {
       removing = false;
     }

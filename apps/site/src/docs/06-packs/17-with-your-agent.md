@@ -12,7 +12,7 @@ Say what you want BrainDog to do, in your own words:
 Make me a plugin to track films I want to watch.
 ```
 
-In clients that show MCP prompts, it is also a slash command: the `addon` prompt, Build an add-on. It takes what you want in a few words and walks the agent through the steps below.
+In clients that show MCP prompts, it is also a slash command: the `addon` prompt, Build a plugin. It takes what you want in a few words and walks the agent through the steps below.
 
 ## The four calls
 

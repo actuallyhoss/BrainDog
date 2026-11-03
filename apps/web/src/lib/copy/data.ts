@@ -57,7 +57,7 @@ export const data = {
   },
   feedYou: 'You',
   feedUseCase: (name: string) => `the ${name} starter`,
-  feedPack: (id: string) => `the ${id} add-on`,
+  feedPack: (id: string) => `the ${id} plugin`,
   /* MONEY IN MORE THAN ONE CURRENCY, said under the figure rather than left blank: why it is one amount per currency,
      and once it is added up, as of which day's rates. */
   figureNoHome: 'In more than one currency. Choose a home currency in Money’s settings to add them up.',

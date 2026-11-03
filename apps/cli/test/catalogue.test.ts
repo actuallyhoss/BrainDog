@@ -348,7 +348,7 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   const h = await setup(t);
   assert.equal(await pack(['install', PROJECT_BRIEF, '--dry-run'], h.io), 0, h.said.join('\n'));
   assert.equal(h.seen.length, 0, 'a dry run sent something');
-  assert.match(h.out[0] ?? '', /^Project brief 2\.1\.1 reads as an add-on/u);
+  assert.match(h.out[0] ?? '', /^Project brief 2\.1\.1 reads as a plugin/u);
   /* Since 2.0.0 (brief-48), and so 2.1.1, it needs Work too, for the steps a task ticks, and adds its Plan steps list and three rules. */
   assert.ok(h.out.includes('  Installs first: portfolio, work'), h.out.join('\n'));
   assert.ok(
@@ -372,7 +372,7 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);
   const before = h.seen.length;
   assert.equal(await pack(['install', 'club-1.0.0.usecase.json'], h.io), 1);
-  assert.match(h.said.at(-1) ?? '', /is a starter, not an add-on/u);
+  assert.match(h.said.at(-1) ?? '', /is a starter, not a plugin/u);
   assert.equal(h.seen.length, before);
 });
 
@@ -395,5 +395,5 @@ test('pack install <id> with no --from resolves the id in the catalogue the host
   assert.ok(listed.some((e) => e.id === 'mercury-company'), listed.map((e) => e.id).join(', '));
   for (const { id } of listed) assert.equal(await pack(['install', id, '--dry-run'], h.io), 0, `${id}: ${h.said.join('\n')}`);
   assert.equal(await pack(['install', 'nothing-here', '--dry-run'], h.io), 1);
-  assert.match(h.said.at(-1) ?? '', /There is no add-on called nothing-here in this catalogue\. It has: .*project-brief/u);
+  assert.match(h.said.at(-1) ?? '', /There is no plugin called nothing-here in this catalogue\. It has: .*project-brief/u);
 });

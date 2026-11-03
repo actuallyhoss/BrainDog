@@ -753,7 +753,7 @@ function packText(e: EventLine): string | null {
   const names = (listsOfModule(id) ?? []).map((r) => REGISTERS[r]?.name ?? r);
   /* AN ADD-ON FROM THE STORE BRINGS NO LIST THIS BUILD KNOWS: by its id in words, "Added the Reading list add-on",
      never "the reading-list add-on" (audit 6g, AG6). */
-  if (names.length === 0) return `${verb} the ${nameOfPack(id) === id ? sentence(id.replace(/[-_]+/gu, ' ')) : nameOfPack(id)} add-on`;
+  if (names.length === 0) return `${verb} the ${nameOfPack(id) === id ? sentence(id.replace(/[-_]+/gu, ' ')) : nameOfPack(id)} plugin`;
   if (names.length === 1) return `${verb} the ${names[0]} list`;
   return `${verb} ${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
 }
@@ -899,7 +899,7 @@ const setupText = (e: EventLine): string => setupSaid(e.target, typeof e.to === 
 function hrefOf(e: EventLine): string {
   if (e.register !== null && e.seq !== null) return `/r/${e.register}/${e.seq}`;
   /* AN ADD-ON'S NOTICE (`ctx.notify`) NAMES ITS ADD-ON, and opens the add-on's page. */
-  if (e.kind === 'note' && e.target_kind === 'pack' && e.target) return `/addons/${encodeURIComponent(e.target)}`;
+  if (e.kind === 'note' && e.target_kind === 'pack' && e.target) return `/plugins/${encodeURIComponent(e.target)}`;
   const question = /^(?:suggestion:)?(SG\d+)$/u.exec(e.target ?? '');
   if (e.target_kind === 'suggestion' && question) return `/decide/${question[1]}`;
   return '/audit';

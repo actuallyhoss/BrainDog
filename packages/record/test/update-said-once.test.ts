@@ -58,7 +58,7 @@ test('ONE PASS THAT MOVES TWO ADD-ONS IS ONE LINE THAT OPENS TO ITS STEPS, and t
   assert.equal(more.length, 0);
   assert.equal(pass.actor, 'system');
   assert.equal(pass.pass?.updated, 2);
-  assert.match(pass.pass!.said, /^BrainDog updated 2 add-ons: (Portfolio|Projects)/u);
+  assert.match(pass.pass!.said, /^BrainDog updated 2 plugins: (Portfolio|Projects)/u);
   assert.ok((pass.steps ?? []).length >= 2, 'the steps are under it');
   /* EACH STEP KEEPS ITS OWN LINE, so its own undo, and none of them is said again beside the pass. */
   const ids = new Set(page.events.map((l) => l.id));
@@ -105,9 +105,9 @@ test('A PAGE THAT ENDS ON A PASS STARTS THE NEXT ONE UNDER ALL OF IT', async () 
 
 test('THE PASS SAYS HOW MANY ADD-ONS AND WHETHER WHAT YOU CHANGED WAS KEPT, in plain words', () => {
   const one = passSentence({ updated: ['Projects'], asked: [] });
-  assert.equal(one, 'BrainDog updated one add-on: Projects, and nothing you changed was lost.');
+  assert.equal(one, 'BrainDog updated one plugin: Projects, and nothing you changed was lost.');
   const two = passSentence({ updated: ['Projects', 'Work'], asked: ['Money'] });
-  assert.equal(two, 'BrainDog updated 2 add-ons: Projects and Work. Money waits on Decide, so what you changed is kept.');
+  assert.equal(two, 'BrainDog updated 2 plugins: Projects and Work. Money waits on Decide, so what you changed is kept.');
   for (const s of [one, two, passSentence({ updated: [], asked: ['Money', 'People'] })]) assert.doesNotMatch(s, /—|\brow\b|_/u);
   /* A PASS THAT WROTE NOTHING IS NOT KEPT, nor one that updated and asked nothing, and the oldest go first. */
   const p = (from: number): UpdatePass => ({ from, to: from + 1, at: '2026-10-06', updated: ['Work'], asked: [] });

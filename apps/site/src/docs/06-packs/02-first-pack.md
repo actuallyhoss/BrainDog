@@ -82,7 +82,7 @@ braindog addon preview reading-list
 ```
 
 ```code | What it prints
-Previewing Reading list 1.0.0 on a scratch BrainDog. Open http://localhost:5870/addons/reading-list?kind=pack and press Review the plan. Stop with Ctrl+C; the scratch BrainDog is removed.
+Previewing Reading list 1.0.0 on a scratch BrainDog. Open http://localhost:5870/plugins/reading-list?kind=pack and press Review the plan. Stop with Ctrl+C; the scratch BrainDog is removed.
 ```
 
 `preview` starts a whole BrainDog on your machine with nothing in it but your plugin in its catalogue. Open the address, review the plan, install it, and use its page the way somebody who installs it will. `--port <n>` chooses another port. Starting the scratch BrainDog takes a little while the first time.

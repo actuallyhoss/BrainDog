@@ -328,7 +328,7 @@
        screen without one, because a source is a declaration and arrives the way every
        declaration does (`04 §1`: `ingest` is one of the kinds an add-on carries). So the screen
        says where a new one comes from and links there. -->
-    <p class="hint sources-add">{copy.sourcesAdd} <a class="tap" href={at('/addons')}>{copy.sourcesAddGo}</a></p>
+    <p class="hint sources-add">{copy.sourcesAdd} <a class="tap" href={at('/plugins')}>{copy.sourcesAddGo}</a></p>
   </div>
 </Tile>
 

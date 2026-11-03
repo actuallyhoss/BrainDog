@@ -88,7 +88,7 @@ export async function fetchAdapter(id: string, io: FetchIo): Promise<{ ok: true;
   const got = readCatalogue(doc);
   if (!got.ok) return { ok: false, fix: `The catalogue at ${where} could not be read: ${fixOf(got)}` };
   const entry: CatalogueEntry | undefined = got.value.entries.find((e) => e.kind === 'pack' && e.id === id);
-  if (!entry) return { ok: false, fix: `${id} is in no packs/ folder here, and the catalogue at ${where} holds no add-on called ${id}.` };
+  if (!entry) return { ok: false, fix: `${id} is in no packs/ folder here, and the catalogue at ${where} holds no plugin called ${id}.` };
   const chosen = entry.versions.find((v) => v.version === entry.latest);
   if (!chosen) return { ok: false, fix: `The catalogue lists ${id} at ${entry.latest} and holds no such version.` };
   const title = entry.title.replace(/\s+/gu, ' ').trim() || id;
@@ -111,7 +111,7 @@ export async function fetchAdapter(id: string, io: FetchIo): Promise<{ ok: true;
   if (signature !== null || signed !== undefined) {
     if (signed === undefined) return { ok: false, fix: `${named} is signed and its import adapter is not, so the adapter is not the author's. Nothing was run.` };
     if (signature !== null && signed.key_id !== signature.key_id)
-      return { ok: false, fix: `The import adapter of ${named} is signed by another key than the add-on, so it is not the author's. Nothing was run.` };
+      return { ok: false, fix: `The import adapter of ${named} is signed by another key than the plugin, so it is not the author's. Nothing was run.` };
     const held = await verifySignature(signed, 'adapter', entry.id, chosen.version, hash);
     if (!held.ok) return { ok: false, fix: `The signature on the import adapter of ${named} does not verify, so it was changed after it was signed. Nothing was run.` };
   }

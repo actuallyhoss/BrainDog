@@ -283,7 +283,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
   if (!record.read) {
     io.out(NOT_READ[record.why]);
     if (!dryRun) failed = true;
-  } else if (record.profiles === null) io.out('Install the Profiles add-on to choose per profile; applying what applies everywhere.');
+  } else if (record.profiles === null) io.out('Install the Profiles plugin to choose per profile; applying what applies everywhere.');
   else io.out(record.profiles.length === 0 ? 'Profiles names no profile yet, so each gets what applies everywhere.' : `Profiles names ${and(record.profiles.map((p) => oneLine(p.name)))}, and a tool or skill that names profiles goes to those alone.`);
 
   /* A FOLDER TWO PROFILES REACH, by where it resolves, is written once: ccenv's profiles link to the default's skills. */
@@ -517,7 +517,7 @@ export async function envApply(args: string[], io: EnvApplyIo): Promise<number> 
     /* ── 5. the profile's rules, in a marked block of its CLAUDE.md ──────── */
     const row = record.read && record.profiles !== null ? (record.profiles.find((r) => same(r.name) === same(p.name)) ?? null) : null;
     if (!record.read) io.out('5. Rules: your BrainDog was not read, so CLAUDE.md is left as it is.');
-    else if (record.profiles === null) io.out('5. Rules: kept per profile by the Profiles add-on, which this BrainDog does not have.');
+    else if (record.profiles === null) io.out('5. Rules: kept per profile by the Profiles plugin, which this BrainDog does not have.');
     else if (row === null) io.out(`5. Rules: Profiles has no row for ${oneLine(p.name)}, so its CLAUDE.md is left as it is.`);
     else {
       const claudeMd = join(p.dir, 'CLAUDE.md');

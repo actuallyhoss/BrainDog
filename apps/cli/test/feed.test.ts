@@ -155,7 +155,7 @@ test('A BAD FILE IS REFUSED IN ONE SENTENCE NAMING THE LINE, and nothing is aske
   assert.match((comma as { fix: string }).fix, /^feeds\.json, line 1[67]: this is not JSON/);
   assert.deepEqual(readFeeds('{"id":"x"}', 'feeds.json'), { ok: false, fix: 'feeds.json, line 1: the file is a list of feeds, written between [ and ], each one feed.' });
   const twice = readFeeds(FILE.replace('"id": "pinwheel"', '"id": "oxbow-gg"'), 'feeds.json');
-  assert.deepEqual(twice, { ok: false, fix: 'feeds.json, line 12: oxbow-gg is a feed already on line 2, and one id is one add-on.' });
+  assert.deepEqual(twice, { ok: false, fix: 'feeds.json, line 12: oxbow-gg is a feed already on line 2, and one id is one plugin.' });
   /* The add-on's own refusal that says its fix after a full stop is still one sentence here. */
   const zone = readFeeds(FILE.replace('"tz": "Africa/Cairo"', '"tz": "Mars/Olympus"'), 'feeds.json');
   assert.deepEqual(zone, { ok: false, fix: 'feeds.json, line 12: Mars/Olympus is not a time zone; name one such as Africa/Cairo or Europe/London.' });

@@ -102,7 +102,7 @@
     inSection: (n: number, section: string) => `${n} pages in ${section}`,
     showThem: 'Show',
     none: 'No pages yet',
-    noneWhy: 'They come with add-ons and from Slash.',
+    noneWhy: 'They come with plugins and from Slash.',
     renameTitle: (title: string) => `Rename ${title}`,
     renameLabel: 'Name in your nav',
     renameHint: (own: string) => `Only in your nav. Leave it empty for ${own}.`,
@@ -111,7 +111,7 @@
     unnamed: (own: string) => `${own} has its own name again.`,
     slashTitle: (title: string) => `Change ${title}`,
     addonsOn: (on: number, off: number) =>
-      `${on === 0 ? 'No add-ons on' : on === 1 ? '1 add-on on' : `${on} add-ons on`}${off === 0 ? '' : `, ${off} off`}`,
+      `${on === 0 ? 'No plugins on' : on === 1 ? '1 plugin on' : `${on} plugins on`}${off === 0 ? '' : `, ${off} off`}`,
     manage: 'Manage',
     moreLists: 'More lists',
   };
@@ -555,7 +555,7 @@
       {#if addonIcons.length > 0}<span class="addons-icons" aria-hidden="true">{#each addonIcons as icon (icon)}<Icon name={icon} size="s" />{/each}</span>{/if}
       <span>{words.addonsOn(addonsOn, addons.length - addonsOn)}</span>
       <span class="addons-dot" aria-hidden="true">{' · '}</span>
-      <a class="addons-manage" href={at('/settings/addons')}>{words.manage}</a>
+      <a class="addons-manage" href={at('/settings/plugins')}>{words.manage}</a>
     </p>
   {/if}
 {/snippet}

@@ -116,7 +116,7 @@
     rowsTitle: 'What you wrote',
     rowsLine: (things: string) => `Your entries in ${things}, without the pages.`,
     setupTitle: 'A starter for someone else',
-    setupLine: 'An add-on without your entries.',
+    setupLine: 'A plugin without your entries.',
     /** What the record keeps, when it keeps nothing it can name yet. */
     yourThings: 'your things',
   };
@@ -147,7 +147,7 @@
   <Button disabled={checking} aria-busy={checking} onclick={() => checkInput?.click()}>{words.checkGo}</Button>
 {/snippet}
 {#snippet shareOne()}
-  <Button href="/addons/share" aria-label={copy.shareSetup}>{words.shareGo}</Button>
+  <Button href="/plugins/share" aria-label={copy.shareSetup}>{words.shareGo}</Button>
 {/snippet}
 
 {#if !factsRead}<span data-hold hidden></span>{/if}

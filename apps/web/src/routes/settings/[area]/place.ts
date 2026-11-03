@@ -99,16 +99,17 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
       area('/settings/words', 'Time and money', 'tag', 'Time zone, currency, list names'),
     ],
   },
-  /* WHAT PLUGS INTO THIS BRAINDOG: the agents, the keys they are given, what comes in by mail and feed, and the add-ons. */
+  /* WHAT PLUGS INTO THIS BRAINDOG: the agents, the keys they are given, what comes in by mail and feed, and the plugins. */
   {
-    title: 'Agents and add-ons',
+    title: 'Agents and plugins',
     icon: 'plug',
     areas: [
       area('/settings/agents', 'Agents', 'session', 'Connections, permissions, Slash'),
       area('/settings/ingest', 'What comes in', 'inbox', 'Mail and feeds'),
-      /* ADD-ONS IS AN AREA OF SETTINGS, with the rail beside it, as the store is the place to find more (`/addons`). It
-         was a row opening `/packs`, a page of its own with no Settings rail. */
-      area('/settings/addons', 'Add-ons', 'packs', 'Installed, updates'),
+      /* PLUGINS IS AN AREA OF SETTINGS, with the rail beside it, as the store is the place to find more (`/plugins`). It
+         was a row opening `/packs`, a page of its own with no Settings rail, and was called Add-ons at
+         `/settings/addons` until 3 Nov (`MOVED`). */
+      area('/settings/plugins', 'Plugins', 'packs', 'Installed, updates'),
     ],
     /* ONE NAME FOR IT: the page is Keychain, and this row said Keys. */
     outside: [{ label: 'Keychain', href: '/keychain', icon: 'vault', line: 'Keys for agents', before: 'ingest' }],
@@ -165,6 +166,7 @@ export const MOVED: ReadonlyMap<string, string> = new Map([
   /* BY ITS ADDRESS, as every area here is (`area` above): the area's id is the address less `/settings/`. */
   ['sharing', '/settings/people'.slice(AREA_AT.length)],
   ['health', 'tidy'],
+  ['addons', 'plugins'],
 ]);
 
 /** The area an id names, a moved one by where it lives now. */

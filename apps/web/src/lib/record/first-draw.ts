@@ -46,7 +46,7 @@ export const FIRST_DRAW: readonly FirstRead[] = [
   { method: 'schema', ask: 'list', post: false, by: "the root layout, reading a list's money fields" },
   { method: 'schemas', ask: 'every', post: false, by: "the root layout, every list's declaration asked beside boot" },
   { method: 'list', ask: 'list', post: false, by: "the root layout and Home, reading a list's rows" },
-  { method: 'packConfig', ask: 'pack', post: false, by: "the root layout, reading an add-on's currency" },
+  { method: 'packConfig', ask: 'pack', post: false, by: "the root layout, reading a plugin's currency" },
   { method: 'page', ask: 'page', post: false, by: "Home, drawing the record's own home page" },
   { method: 'get', ask: 'row', post: false, by: 'Home, naming the agent run a block shows' },
   { method: 'previewPage', ask: 'body', post: true, by: 'Home, drawing Today where no home page is declared' },

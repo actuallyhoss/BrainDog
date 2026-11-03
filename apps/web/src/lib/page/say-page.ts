@@ -68,7 +68,7 @@ export const sayWords = {
   rulesOnly: 'This BrainDog has no model set up, so only the usual changes are read: move, hide, show, add a chart, rename, and only or newest first.',
   cannot: 'That is not one I can make from a line. Try "move Bills up", "hide the forecast", "add a chart of spend by month" or "show only open ones".',
   which: (names: readonly string[]) => `Which one: ${listed(names)}? Say it with its name.`,
-  notMine: 'This page came with an add-on, so its blocks stay as they are. You can still move, hide or show them.',
+  notMine: 'This page came with a plugin, so its blocks stay as they are. You can still move, hide or show them.',
   moved: (name: string, where: string) => `${name} ${where}.`,
   moveQ: (name: string, where: string, page: string) => `Move ${name} ${where} on ${page}?`,
   hideQ: (name: string, page: string) => `Hide ${name} on ${page}?`,

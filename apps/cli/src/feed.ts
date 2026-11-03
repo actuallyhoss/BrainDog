@@ -144,7 +144,7 @@ export function readFeeds(text: string, file: string): Read {
     if (shape !== null) return at(line, shape);
     const spec = s as FeedSpec;
     const before = seen.get(spec.id);
-    if (before !== undefined) return at(line, `${spec.id} is a feed already on line ${before}, and one id is one add-on.`);
+    if (before !== undefined) return at(line, `${spec.id} is a feed already on line ${before}, and one id is one plugin.`);
     seen.set(spec.id, line);
     let doc: Record<string, unknown>;
     try {

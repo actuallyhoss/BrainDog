@@ -27,7 +27,7 @@ export const boardWords = {
   edit: 'Edit board',
   arranged: (title: string) => `${title} is arranged.`,
   notKept: 'That was not kept.',
-  addNotMine: 'This page came with an add-on, so a new widget goes on Today instead.',
+  addNotMine: 'This page came with a plugin, so a new widget goes on Today instead.',
   added: (name: string) => `${name} is on the board.`,
 } as const;
 

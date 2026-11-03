@@ -362,7 +362,7 @@ export async function kennel(args: string[], io: AgentIo): Promise<number> {
     if (!got.ok) return refuse(io, got, saidWithCode(got));
     io.out(
       probe
-        ? `${oneLine(publisher)} is trusted as the nightly probe: what they submit is listed at once, and only they may publish add-ons whose ids begin probe-.`
+        ? `${oneLine(publisher)} is trusted as the nightly probe: what they submit is listed at once, and only they may publish plugins whose ids begin probe-.`
         : `${oneLine(publisher)} is trusted: what they submit from now on is listed at once, without waiting for review.`,
     );
     return 0;

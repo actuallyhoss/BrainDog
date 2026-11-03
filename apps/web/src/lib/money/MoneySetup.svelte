@@ -233,7 +233,7 @@
           {/if}
         {:else if read}
           <p class="ms-line">{read.storeFix ?? words.noStore}</p>
-          <div class="ms-actions"><Button href={at('/addons')}>{words.openAddons}</Button></div>
+          <div class="ms-actions"><Button href={at('/plugins')}>{words.openAddons}</Button></div>
         {/if}
       </div>
     {/if}

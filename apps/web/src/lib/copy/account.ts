@@ -20,8 +20,8 @@ export const account = {
   perPerson: 'Kept for you in this BrainDog, on every device you sign in on.',
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
 
-  sourcesAdd: 'Sources come with add-ons or agents.',
-  sourcesAddGo: 'Browse add-ons',
+  sourcesAdd: 'Sources come with plugins or agents.',
+  sourcesAddGo: 'Browse plugins',
 
   /**
    * WHAT A LEVEL MEANS, IN ONE CELL. There were two: a chip printing the enum (`write`) and, three
@@ -31,7 +31,7 @@ export const account = {
    * a person decides who to trust.
    */
   levelMeans: {
-    owner: 'Everything, including people, add-ons, settings and Keys',
+    owner: 'Everything, including people, plugins, settings and Keys',
     decide: 'Sees and changes everything, answers what needs a decision, and invites people',
     write: 'Sees, adds and changes what is here',
     /* `20 §1`: `append` is *"`create`, `propose` and `log` — and no read … an appender sees nothing,
@@ -311,7 +311,7 @@ export const account = {
     runner: 'do work for you on this machine, for ninety days',
     export: 'take one copy of your BrainDog, once, in the next ten minutes',
     import: 'load items into your BrainDog, once, in the next ten minutes',
-    pack: 'install one add-on, once, in the next ten minutes',
+    pack: 'install one plugin, once, in the next ten minutes',
     token: 'make one more key, once, in the next ten minutes',
     vault: 'open the keys of one project, for thirty days',
     vaultAll: 'open the keys that belong to no project, for seven days',
@@ -692,7 +692,7 @@ export const account = {
   theyDid: 'What they did',
   handOverThis: 'this BrainDog',
   handOverTitle: (who: string, record: string) => `Hand ${record} to ${who}?`,
-  handOverThey: (who: string) => `${who} becomes an owner: people, add-ons, settings, Keys, export and deleting it are theirs.`,
+  handOverThey: (who: string) => `${who} becomes an owner: people, plugins, settings, Keys, export and deleting it are theirs.`,
   handOverYou: 'You stay on as Can decide. You keep seeing and changing everything, and lose what only an owner does.',
   handOverBack: (who: string) => `Only ${who} can make you an owner again. You confirm it's you first.`,
   handOverDo: 'Hand it over',

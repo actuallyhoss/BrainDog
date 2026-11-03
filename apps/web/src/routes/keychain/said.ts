@@ -43,8 +43,8 @@ export const words = {
   /** What to do about it, after the record's own sentence. A record grows a Keys register when Agents goes in. */
   /* WHAT WILL BE HERE, NOT THE RECORD'S OWN REFUSAL (empty states, 2 Nov): a new record read "There is no Keys list yet."
      over "There is no register called keys.", two lines about a list and none about keys. */
-  noListHow: 'The keys you hand your agents are kept here, sealed. They come with the Agents add-on.',
-  browse: 'Browse add-ons',
+  noListHow: 'The keys you hand your agents are kept here, sealed. They come with the Agents plugin.',
+  browse: 'Browse plugins',
   /** The Keys section when the record refused the read rather than lacking the list. */
   notYours: 'Your keys could not be listed here.',
   /** The machines half, when the record refused to list them. */

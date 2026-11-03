@@ -53,7 +53,7 @@ export const changeThisWords = {
   cannot: 'That is not one I can make from a line. Ask in the page sheet, or edit how it is built.',
   nothing: 'That would not change anything here.',
   asking: 'Reading it with the model.',
-  notYours: 'This page came with an add-on, so hide the block instead.',
+  notYours: 'This page came with a plugin, so hide the block instead.',
   noList: 'This block reads no list, so there is nothing to sort or filter.',
   chart: (kind: string) => `Showing it as ${article(kind)}.`,
   sorted: (field: string, up: boolean) => `Sorted by ${field}, ${up ? 'lowest' : 'highest'} first.`,

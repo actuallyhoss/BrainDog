@@ -1132,7 +1132,7 @@ export async function forcedPack(
   force = false,
 ): Promise<number> {
   if (verb === 'uninstall') {
-    if (!('id' in given)) return refuse(io, { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Which add-on? Name it by its id.', at: 'id' } }, 'Which add-on? Name it by its id. (REQUIRED_MISSING)');
+    if (!('id' in given)) return refuse(io, { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Which plugin? Name it by its id.', at: 'id' } }, 'Which plugin? Name it by its id. (REQUIRED_MISSING)');
     const gone = await client.uninstallPack({ id: given.id });
     if (!gone.ok) return refuse(io, gone, saidOf(gone));
     /* The answer keys what stays by the list's id, which is no name to print, so the line says the whole count. */
@@ -1140,18 +1140,18 @@ export async function forcedPack(
     io.out(`Removed ${given.id}.${kept === 0 ? '' : ` ${kept === 1 ? 'Its 1 item stays' : `Its ${itemsOf(kept)} stay`}, and installing it again puts its lists back.`}`);
     return 0;
   }
-  if (!('doc' in given)) return refuse(io, { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Which add-on file?', at: 'doc' } }, 'Which add-on file? (REQUIRED_MISSING)');
+  if (!('doc' in given)) return refuse(io, { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Which plugin file?', at: 'doc' } }, 'Which plugin file? (REQUIRED_MISSING)');
   const planned = await client.planPack({ doc: given.doc });
   if (!planned.ok) return refuse(io, planned, saidOf(planned));
   const diff = (planned.value as { diff?: { planHash?: unknown; pack?: { id?: unknown; version?: unknown } } } | null)?.diff;
   if (typeof diff?.planHash !== 'string') {
-    io.say('BrainDog answered no plan for this add-on. Read it again with braindog addon install --dry-run.');
+    io.say('BrainDog answered no plan for this plugin. Read it again with braindog addon install --dry-run.');
     return 1;
   }
   const put = await client.installPack({ doc: given.doc, planHash: diff.planHash, ...(force ? { retireWithRows: true } : {}) });
   if (!put.ok) return refuse(io, put, saidOf(put));
   const removals = removalsOf(diff);
   const what = [diff.pack?.id, diff.pack?.version].filter((p) => typeof p === 'string').join(' ');
-  io.out(force && removals.length > 0 ? forcedLine(removals) : `Installed ${what === '' ? 'the add-on' : what}.`);
+  io.out(force && removals.length > 0 ? forcedLine(removals) : `Installed ${what === '' ? 'the plugin' : what}.`);
   return 0;
 }

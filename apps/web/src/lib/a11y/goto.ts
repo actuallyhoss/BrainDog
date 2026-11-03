@@ -25,7 +25,7 @@ const LEARNT: readonly Goto[] = [
   { key: 'i', href: '/inbox', name: 'Inbox' },
   { key: 's', href: '/search', name: 'Search' },
   { key: 'k', href: '/keychain', name: 'Keychain' },
-  { key: 'p', href: '/settings/addons', name: 'Plugins' },
+  { key: 'p', href: '/settings/plugins', name: 'Plugins' },
   { key: ',', href: '/settings/appearance', name: 'Settings' },
 ];
 

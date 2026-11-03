@@ -39,14 +39,14 @@ export const ROLES: Readonly<Record<Level, RoleWords>> = {
   owner: {
     name: 'Owner',
     noun: 'an owner',
-    can: 'Everything, including people, add-ons, settings, Keys, export and deleting this BrainDog.',
+    can: 'Everything, including people, plugins, settings, Keys, export and deleting this BrainDog.',
     cant: 'Nothing is kept from an owner.',
   },
   decide: {
     name: 'Can decide',
     noun: 'an Admin',
     can: 'See and change everything, answer what needs a decision, and invite people.',
-    cant: "Can't open Keys, change add-ons or settings, export, or make an owner.",
+    cant: "Can't open Keys, change plugins or settings, export, or make an owner.",
   },
   write: {
     name: 'Can edit',
@@ -107,7 +107,7 @@ export const MATRIX: readonly MatrixRow[] = [
   { thing: 'Share a project or a list with someone', holds: { owner: true, decide: true, write: false, append: false, read: false } },
   { thing: 'Connect their own agents', holds: { owner: true, decide: 'Up to their role', write: 'Up to their role', append: 'Up to their role', read: 'Up to their role' } },
   { thing: 'Let their agents act without asking', holds: { owner: 'Their own agents', decide: false, write: false, append: false, read: false } },
-  { thing: 'Add-ons, settings and what runs on its own', holds: { owner: true, decide: false, write: false, append: false, read: false } },
+  { thing: 'Plugins, settings and what runs on its own', holds: { owner: true, decide: false, write: false, append: false, read: false } },
   { thing: 'Keys', holds: { owner: true, decide: false, write: false, append: false, read: false } },
   { thing: 'Export, backups and deleting this BrainDog', holds: { owner: true, decide: false, write: false, append: false, read: false } },
   { thing: 'Make someone an owner, or hand ownership over', holds: { owner: true, decide: false, write: false, append: false, read: false } },

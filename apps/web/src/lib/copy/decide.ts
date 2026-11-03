@@ -160,7 +160,7 @@ export const decide = {
   /* WHAT STOPS: a door an update takes away while messages still come to it, and no add-on takes it over. */
   arrangeStopsH: 'What stops',
   arrangeStopsFiling: (name: string) => `${name} goes. Messages to this address will stop being filed.`,
-  arrangeStopsNote: 'No add-on you can install takes it over. Accept asks a second time.',
+  arrangeStopsNote: 'No plugin you can install takes it over. Accept asks a second time.',
   arrangeStopsAgain: (names: readonly string[]) => `Messages to ${list([...names])} will stop being filed. Press Accept again to go ahead.`,
   arrangeTakenBy: (name: string, pack: string) => `${name} moves to ${pack}, which this same yes adds.`,
   arrangeChangesH: 'What it changes',
@@ -181,7 +181,7 @@ export const decide = {
   arrangeCountKeys: (n: number) => `${n} ${n === 1 ? 'key' : 'keys'}`,
   arrangeCountUpdates: (n: number) => `${n} ${n === 1 ? 'update' : 'updates'}`,
   arrangeCountFeeds: (n: number) => `${n} ${n === 1 ? 'feed' : 'feeds'}`,
-  arrangePacks: 'Add-ons',
+  arrangePacks: 'Plugins',
   arrangeInstalls: (names: readonly string[]) => `Installs ${names.join(', then ')}`,
   /** The same line inside the Packs section, which is why `arranged.ts` guards against printing both. */
   arrangeUpdates: updatesTo,

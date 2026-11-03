@@ -63,8 +63,8 @@ const listed = (all: readonly string[]): string => (all.length === 1 ? all[0]! :
  */
 export function passSentence(pass: Pick<UpdatePass, 'updated' | 'asked'>): string {
   const { updated, asked } = pass;
-  const n = updated.length === 1 ? 'one add-on' : `${updated.length} add-ons`;
-  const did = updated.length > 0 ? `BrainDog updated ${n}: ${listed(updated)}` : "BrainDog checked its own add-ons and changed none";
+  const n = updated.length === 1 ? 'one plugin' : `${updated.length} plugins`;
+  const did = updated.length > 0 ? `BrainDog updated ${n}: ${listed(updated)}` : "BrainDog checked its own plugins and changed none";
   if (asked.length === 0) return updated.length > 0 ? `${did}, and nothing you changed was lost.` : `${did}.`;
   const held = `${listed(asked)} ${asked.length === 1 ? 'waits' : 'wait'} on Decide, so what you changed is kept`;
   return `${did}. ${held}.`;

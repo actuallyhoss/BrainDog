@@ -118,9 +118,11 @@
   /* THE AREA BY ITS ID, NOT ITS ADDRESS: a moved address (`place.ts` `MOVED`) is the area that holds it now. */
   const area = $derived(known?.id ?? param);
 
-  /* THE DESIGN BOOK MOVED TO `/design` (agents F29): its old address goes there, so a link to it still lands. */
+  /* THE DESIGN BOOK MOVED TO `/design` (agents F29): its old address goes there, so a link to it still lands. ADD-ONS IS
+     PLUGINS (3 Nov): `/settings/addons` shows the Plugins area and says its new address, keeping a query (`?from`). */
   $effect(() => {
     if (param === 'look') void goto(at('/design'), { replaceState: true });
+    else if (param === 'addons') void goto(at(`/settings/plugins${page.url.search}${page.url.hash}`), { replaceState: true });
   });
 
   /* ── the index, declared ─────────────────────────────────────────────────
@@ -135,9 +137,9 @@
   /** The groups the chooser draws: the house order until a declared index is read, then that index's. */
   let declaredGroups = $state<readonly AreaGroup[]>(DEFAULT_GROUPS);
   /* A COLLEAGUE'S INDEX LEAVES OUT WHAT ONLY AN OWNER DOES (collab pass, 2 Nov): a contractor shared one project was shown
-     Keychain, What comes in, Add-ons, Billing, Usage, Tidy up, Backups, Export and Delete, each a page of refusals.
+     Keychain, What comes in, Plugins, Billing, Usage, Tidy up, Backups, Export and Delete, each a page of refusals.
      Their addresses still open, so a link still lands, and the record still refuses every write there. */
-  const OWNERS_AREAS: ReadonlySet<string> = new Set(['ingest', 'addons', 'billing', 'tidy', 'backups', 'export', 'delete']);
+  const OWNERS_AREAS: ReadonlySet<string> = new Set(['ingest', 'plugins', 'billing', 'tidy', 'backups', 'export', 'delete']);
   const OWNERS_PLACES: ReadonlySet<string> = new Set(['/keychain', '/usage', '/p/health']);
   const owner = $derived(Boolean((shell.me as { owner?: boolean }).owner) || shell.me.level === 'owner');
   const groups = $derived<readonly AreaGroup[]>(
@@ -283,7 +285,7 @@
   const CHUNKS: Readonly<Record<string, () => Promise<unknown>>> = {
     people: () => import('./areas/Sharing.svelte'),
     agents: () => import('./areas/Agents.svelte'),
-    addons: () => import('./areas/Addons.svelte'),
+    plugins: () => import('./areas/Addons.svelte'),
     tidy: () => import('./areas/Health.svelte'),
   };
   $effect(() => {
@@ -624,8 +626,8 @@
       {:then { default: Agents }}<Agents {shell} {area} />{/await}
     {:else if area === 'ingest'}
       <Ingest {shell} {area} />
-    {:else if area === 'addons'}
-      <!-- BY `import()`: the add-ons' list, its plan sheet and its readers are a chunk only somebody opening it waits for. -->
+    {:else if area === 'plugins'}
+      <!-- BY `import()`: the plugins' list, its plan sheet and its readers are a chunk only somebody opening it waits for. -->
       {#await import('./areas/Addons.svelte') then { default: Addons }}<Addons />{/await}
     {:else if area === 'notifications'}
       <Notifications {shell} {area} />

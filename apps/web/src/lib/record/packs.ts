@@ -284,7 +284,7 @@ export const words = {
   addsLists: 'Lists',
   addsPages: 'Pages',
   /* THE ONE SENTENCE. The record fills `{{config:}}` when a pack is installed, so a saved value waits for that. */
-  when: 'A change takes effect the next time this add-on is installed or updated, unless the setting says it is held at once.',
+  when: 'A change takes effect the next time this plugin is installed or updated, unless the setting says it is held at once.',
   save: 'Save',
   reset: 'Reset',
   /* A BLANK SUM SAYS IT IS BLANK: its currency in front of an empty box read as a value. */
@@ -293,7 +293,7 @@ export const words = {
   noLimit: 'No limit',
   moreLimits: (n: number) => `Show ${n} more ${n === 1 ? 'limit' : 'limits'}`,
   /** Settings still holding the words the add-on ships, folded (L45). */
-  moreSettings: (n: number) => `Show ${n} more ${n === 1 ? 'setting' : 'settings'}, as the add-on ships them`,
+  moreSettings: (n: number) => `Show ${n} more ${n === 1 ? 'setting' : 'settings'}, as the plugin ships them`,
   saved: (names: readonly string[]) => `Saved ${names.join(', ')}.`,
   speaksAlone: 'It is the only starter on, so BrainDog speaks in its words. This becomes a choice when a second one is on.',
   unit: 'Unit',

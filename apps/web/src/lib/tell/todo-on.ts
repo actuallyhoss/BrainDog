@@ -29,14 +29,14 @@ export const PROJECTS_MODULE = 'portfolio';
 type Wire = { ok: true; value: unknown } | { ok: false; refusal?: { fix?: string } };
 const FAILED = 'The to-do list could not be started. Try again.';
 /** Work's plan asks for more than its lists: it goes on in Add-ons, where each part is shown. */
-export const TODO_ELSEWHERE = 'The to-do list asks for more than a list. Turn on Work in Add-ons, where each part is shown.';
+export const TODO_ELSEWHERE = 'The to-do list asks for more than a list. Turn on Work in Plugins, where each part is shown.';
 
 /** What is said when a module will not go on from Tell: it failed, or its plan asks for more than its lists. */
 type Said = { failed: string; elsewhere: string };
 const TODO_SAID: Said = { failed: FAILED, elsewhere: TODO_ELSEWHERE };
 export const PROJECTS_SAID: Said = {
   failed: 'Projects could not be started. Try again.',
-  elsewhere: 'Projects asks for more than a list. Turn it on in Add-ons, where each part is shown.',
+  elsewhere: 'Projects asks for more than a list. Turn it on in Plugins, where each part is shown.',
 };
 
 /** A module on, or the sentence that says why not. `null` when it is on. */

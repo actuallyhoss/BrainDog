@@ -9436,13 +9436,13 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     propose: (p, actor) => openSuggestion(governDeps(), actor, p),
     /* A NOTICE FROM A SCRIPT (`ctx.notify`) IS AN ACTIVE ONE: the note on the bell always, one push an hour, and nothing
        that sounds inside quiet hours, which `digestDeps` hands `notify` as the record's own window. */
-    /* AND IT OPENS ITS ADD-ON'S PAGE, `/addons/<id>`: the note names the add-on (`target_kind: 'pack'`), and the push opens there. */
+    /* AND IT OPENS ITS PLUGIN'S PAGE, `/plugins/<id>`: the note names the add-on (`target_kind: 'pack'`), and the push opens there. */
     tell: (said) => {
       const pack = typeof said.pack === 'string' && said.pack !== '' ? said.pack : null;
       const deps = digestDeps();
       notify(
         pack === null ? deps : { ...deps, note: (actor, text, urgent) => noteEvent(sql, mint, clock.now(), actor, text, urgent, { target: pack, target_kind: 'pack' }) },
-        { actor: said.actor, say: said.say, level: 'active', ...(pack === null ? {} : { url: `/addons/${pack}` }) },
+        { actor: said.actor, say: said.say, level: 'active', ...(pack === null ? {} : { url: `/plugins/${pack}` }) },
       );
     },
   });

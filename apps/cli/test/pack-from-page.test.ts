@@ -154,7 +154,7 @@ test('pack new --from-page refuses a page that names nothing, with its sentence,
   const h = harness(t);
   writeFileSync(join(h.dir, 'empty.dog'), dogText({ page: 'empty', title: 'Empty', requires: [], blocks: [{ kind: 'note', body: 'Nothing here yet.' }] } as unknown as PageBody));
   assert.equal(await pack(['new', 'empty-kit', '--from-page', 'empty.dog'], h.io), 1);
-  assert.match(h.said.join('\n'), /Empty reads no list and no figure, so an add-on made from it would hold nothing\. Give a block a source such as register\.<list>, then try again\./u);
+  assert.match(h.said.join('\n'), /Empty reads no list and no figure, so a plugin made from it would hold nothing\. Give a block a source such as register\.<list>, then try again\./u);
   assert.throws(() => readFileSync(join(h.dir, 'empty-kit', 'empty-kit.pack.json')));
   assert.equal(await pack(['new', 'empty-kit', '--from-page', 'missing.dog'], h.io), 1);
   assert.match(h.said.at(-1) ?? '', /missing\.dog could not be read/u);

@@ -38,7 +38,7 @@
     listWhy: 'Everywhere it is named, for everyone here. Its entries stay as they are.',
     save: 'Change it',
     cancel: 'Leave it',
-    noMoney: 'No add-on here keeps a currency, so there is nothing to change.',
+    noMoney: 'No plugin here keeps a currency, so there is nothing to change.',
     undone: 'Put back as it was.',
   } as const;
 

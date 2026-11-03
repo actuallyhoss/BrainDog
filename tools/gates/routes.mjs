@@ -46,9 +46,9 @@ export const SAMPLE_OF = {
   'web:/automations/[id]': { asks: (s) => s.automations.map((id) => fill('[id]', id)), was: [fill('[id]', 'SG5')] },
   'web:/scripts/[id]': { asks: (s) => s.scripts.map((id) => fill('[id]', id)), was: [fill('[id]', 'no-script')] },
   'web:/jobs/[id]': { asks: (s) => s.jobs.map((id) => fill('[id]', id)), was: [fill('[id]', 'j_none')] },
-  /* ONE PAGE FOR AN ADD-ON SINCE THEY MOVED TO `/addons` (`routes/addons/moved.ts`): an installed one and an entry the
-     catalogue offers are both opened there, as `/packs/<id>` and `/packs/browse/<id>` opened them before. */
-  'web:/addons/[id]': { asks: (s) => [...new Set([...s.addOns, ...s.entries])].map((id) => fill('[id]', id)), was: [fill('[id]', 'people')] },
+  /* ONE PAGE FOR A PLUGIN SINCE THEY MOVED TO `/plugins` (`routes/addons/moved.ts`): an installed one and an entry the
+     catalogue offers are both opened there, as `/addons/<id>`, `/packs/<id>` and `/packs/browse/<id>` opened them before. */
+  'web:/plugins/[id]': { asks: (s) => [...new Set([...s.addOns, ...s.entries])].map((id) => fill('[id]', id)), was: [fill('[id]', 'people')] },
   'web:/v/[view]': { asks: (s) => s.views.map((id) => fill('[view]', id)), was: [fill('[view]', 'obligations.open')] },
   'web:/p/[slug]': { asks: (s) => s.pages.map((slug) => fill('[slug]', slug)), was: [fill('[slug]', 'money')] },
   'web:/r/[register]': { asks: (s) => s.rows.map((r) => fill('[register]', r.register)), was: [fill('[register]', 'obligations')] },
@@ -60,7 +60,7 @@ export const SAMPLE_OF = {
   /* AN OPTIONAL SEGMENT LEFT EMPTY IS THE ROUTE WITHOUT IT: `/agents/summary` is every summary the record sends, which
      is the page a summary's own address draws one tile of. */
   'web:/agents/summary/[[id]]': { fixed: [fill('[[id]]', '')] },
-  'site:/packs/[id]': { fixed: [fill('[id]', 'bank-hsbc-eg')] },
+  'site:/plugins/[id]': { fixed: [fill('[id]', 'bank-hsbc-eg')] },
   'site:/legal/[name]': { fixed: [fill('[name]', 'terms')] },
   'site:/docs/[section]/[slug]': { fixed: [{ ...fill('[section]', 'start'), ...fill('[slug]', 'welcome') }] },
 };

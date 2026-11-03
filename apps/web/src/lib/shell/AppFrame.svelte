@@ -73,7 +73,7 @@
   import { openAsk, openPalette, palette } from '$lib/palette/open.svelte.ts';
   import { frame } from '$lib/shell/frame.svelte.ts';
   import { KEYS_REGISTER } from '$lib/record/keys-register.ts';
-  import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, litOfUp, rowsAsLists, sideModel, sideOrder, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
+  import { FACTS_KEY, IN_MORE, moneyLead, crumbOf, factsKept, homesOf, litOf, litOfUp, rowsAsLists, sideModel, sideOrder, upFirst, type NavPlace, type SideLink, type SideList } from '$lib/shell/side.ts';
   import { openRecord } from '$lib/record/switcher.ts';
   import { MENU, WORK, arrange, flatNav, isHere, listCounts, orderLists, placeOf, tabsOf, type FlatItem } from '$lib/nav.ts';
   import { byUse, keptUses, noteUse } from '$lib/shell/tab-use.ts';
@@ -353,7 +353,7 @@
   const foot = $derived<SideLink[]>([
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' }] : []),
     /* ADD-ONS AND USAGE ARE THE OWNER'S (collab pass, 2 Nov): a colleague can install nothing and pays for nothing. */
-    ...(data.me.owner ? [{ href: '/packs', label: copy.packs, icon: 'plug' } as SideLink, { href: '/usage', label: USAGE, icon: 'observe' } as SideLink] : []),
+    ...(data.me.owner ? [{ href: '/plugins', label: copy.packs, icon: 'plug' } as SideLink, { href: '/usage', label: USAGE, icon: 'observe' } as SideLink] : []),
     { href: '/settings', label: copy.settings, icon: 'settings' },
   ]);
 
@@ -679,7 +679,7 @@
   const crumb = $derived(crumbOf(spot, model, lit, frame.title || null, frame.heading || null, frame.up));
   /* A PAGE ABOUT A ROW LIGHTS THE ROW ITS LIST SITS UNDER (F33): an account's page opened Money with Accounts lit, as its
      crumb says, where it lit nothing and Money stayed shut. */
-  const sideLit = $derived(lit ?? (frame.up?.href ? litOfUp(frame.up.href, model) : null));
+  const sideLit = $derived(frame.up?.href && upFirst(spot, model, lit, frame.up) ? (litOfUp(frame.up.href, model) ?? lit) : lit);
   $effect.pre(() => {
     frame.here = crumb.at(-1)?.label ?? '';
   });

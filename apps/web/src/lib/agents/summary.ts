@@ -27,7 +27,7 @@ export const summaryWords = {
 } as const;
 
 /** Where the offer goes: the store, searched for the add-on that sends the summaries. */
-export const offerHref = `/addons?q=${encodeURIComponent(summaryWords.findIt)}`;
+export const offerHref = `/plugins?q=${encodeURIComponent(summaryWords.findIt)}`;
 
 export type SummaryLine = { key: string; text: string; detail: string | null; at: string | null };
 export type SummarySection = { heading: string; source: string; lines: SummaryLine[]; more: number; href: string | null };

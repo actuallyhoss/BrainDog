@@ -107,6 +107,6 @@ export const words = {
   /** When one of them asks to be read before it goes in: what calls other services, or takes something away. */
   improvedRead: 'One of these asks you to read it first.',
   /** When this build cannot draw the plan here, and Add-ons can. */
-  improvedOnAddons: 'Read these on Add-ons, where each plan is shown whole.',
-  openAddons: 'Open Add-ons',
+  improvedOnAddons: 'Read these on Plugins, where each plan is shown whole.',
+  openAddons: 'Open Plugins',
 } as const;

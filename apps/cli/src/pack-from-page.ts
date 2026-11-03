@@ -206,7 +206,7 @@ function pageOf(given: Body, lines: string[]): Body {
   });
   if (notes > 0)
     lines.push(
-      `${notes === 1 ? 'A note' : `${notes} notes`} on the page held your own words, so ${notes === 1 ? 'it says' : 'each says'} "${NOTE_WORDS}" instead. Write the add-on's own.`,
+      `${notes === 1 ? 'A note' : `${notes} notes`} on the page held your own words, so ${notes === 1 ? 'it says' : 'each says'} "${NOTE_WORDS}" instead. Write the plugin's own.`,
     );
   return page;
 }
@@ -376,7 +376,7 @@ function textLiterals(declarations: Body[], config: Record<string, unknown>): { 
  * names a figure, a script or an automation that was not passed in `held`.
  */
 export async function packFromPage(id: string, dogText: string, options: FromPageOptions = {}): Promise<Result<FromPage>> {
-  if (!PACK_ID.test(id)) return no('VALUE_MALFORMED', `${id} is not an add-on id. Write lower-case letters, digits and dashes, as in reading-club.`, { at: 'id' });
+  if (!PACK_ID.test(id)) return no('VALUE_MALFORMED', `${id} is not a plugin id. Write lower-case letters, digits and dashes, as in reading-club.`, { at: 'id' });
   const version = options.version ?? '1.0.0';
   if (!SEMVER.test(version)) return no('VALUE_MALFORMED', `${version} is not a version. Write one such as 1.0.0.`, { at: 'version' });
   const parsed = parseDog(dogText);
@@ -389,7 +389,7 @@ export async function packFromPage(id: string, dogText: string, options: FromPag
   if (![...reads.keys()].some((r) => r.startsWith('register.') || r.startsWith('metric.')))
     return no(
       'REGISTER_UNRESOLVED',
-      `${pageTitle} reads no list and no figure, so an add-on made from it would hold nothing. Give a block a source such as register.<list>, then try again.`,
+      `${pageTitle} reads no list and no figure, so a plugin made from it would hold nothing. Give a block a source such as register.<list>, then try again.`,
       { at: 'blocks' },
     );
 
@@ -421,7 +421,7 @@ export async function packFromPage(id: string, dogText: string, options: FromPag
       const words = `${WORDS[kind]} ${wordsOf(read.slice(kind.length + 1))}`;
       return no(
         kind === 'metric' ? 'METRIC_UNKNOWN' : 'DECLARATION_UNKNOWN',
-        `${at} names ${words}, and a page file does not say how ${kind === 'metric' ? 'it is counted' : 'it works'}. Make the add-on in the app with Share, An add-on from what you made, which brings it along, or take it out of the file.`,
+        `${at} names ${words}, and a page file does not say how ${kind === 'metric' ? 'it is counted' : 'it works'}. Make the plugin in the app with Share, A plugin from what you made, which brings it along, or take it out of the file.`,
         { at },
       );
     }

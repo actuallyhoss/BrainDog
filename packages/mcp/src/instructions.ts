@@ -60,8 +60,8 @@ export const PROMPTS: readonly Prompt[] = [
      checked until it reads, then asked. A prompt costs the tool list nothing, and a client shows it as a command. */
   {
     name: 'addon',
-    title: 'Build an add-on',
-    description: 'Find an add-on for what BrainDog lacks, or make one, check it, and ask the person to install it.',
+    title: 'Build a plugin',
+    description: 'Find a plugin for what BrainDog lacks, or make one, check it, and ask the person to install it.',
     arguments: [{ name: 'want', description: 'What the person wants BrainDog to do, in a few words.' }],
   },
 ];
@@ -84,7 +84,7 @@ const PROMPT_TEXT: Readonly<Record<string, (args: Record<string, string>) => str
     ].join('\n'),
   addon: (a) =>
     [
-      `Make BrainDog do what it lacks, as an add-on${a.want ? `: ${a.want}` : ''}.`,
+      `Make BrainDog do what it lacks, as a plugin${a.want ? `: ${a.want}` : ''}.`,
       '1. Look in the store first: act, call "addons", args q set to a few words. If one fits, act, call "addon", args id, says who made it and what it asks of theirs; act, call "installPack", args id, then asks them.',
       '2. Otherwise read braindog:grammar/pack (or act, call "arrangement", args grammar "pack"), then act, call "addonNew", args id, title and fields, for a file that installs.',
       '3. Change the file to do what they asked, then act, call "addonCheck", args doc. Fix each refusal it names and check again until it says Ready.',

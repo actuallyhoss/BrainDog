@@ -198,11 +198,11 @@ export const isPublic = (e: Entry): boolean => !e.unlisted && offered(e) !== nul
 export const slugOf = (e: Pick<Entry, 'kind' | 'id'>): string => (e.kind === 'usecase' ? `usecase-${e.id}` : e.id);
 
 /**
- * Where the app installs it: `/addons/<id>?kind=...` on the app's name, the store's own listing in the signed-in
+ * Where the app installs it: `/plugins/<id>?kind=...` on the app's name, the store's own listing in the signed-in
  * person's BrainDog, which shows the plan and asks before it writes. `kind` always rides along, because the app reads a
  * listing with none as a use case.
  */
-export const installPath = (app: string, e: Pick<Entry, 'kind' | 'id'>): string => `${app}/addons/${encodeURIComponent(e.id)}?kind=${e.kind}`;
+export const installPath = (app: string, e: Pick<Entry, 'kind' | 'id'>): string => `${app}/plugins/${encodeURIComponent(e.id)}?kind=${e.kind}`;
 
 /**
  * THE BUNDLED CATALOGUE AND THE KENNEL'S INDEX AS ONE LIST. The bundled one is the build's own (BrainDog's plugins, as

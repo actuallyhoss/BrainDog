@@ -57,7 +57,7 @@ import { createClient } from '@braindog/client';
 import { saidDay } from './said-day.ts';
 
 const USAGE =
-  'braindog import takes <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder or address>] [--host <host>] [--dry-run] [--strict] [--yes], or --map <map.json> <export.json> when the map has sections, or <adapter> <export.json> --draft-setup, or <adapter> --since <day or last>. The adapter is the path of an adapter module, or an add-on by its id: from packs/ here, or else from the catalogue, asked about once. --yes is for a script: it says yes to running an add-on\'s adapter without asking.';
+  'braindog import takes <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder or address>] [--host <host>] [--dry-run] [--strict] [--yes], or --map <map.json> <export.json> when the map has sections, or <adapter> <export.json> --draft-setup, or <adapter> --since <day or last>. The adapter is the path of an adapter module, or a plugin by its id: from packs/ here, or else from the catalogue, asked about once. --yes is for a script: it says yes to running a plugin\'s adapter without asking.';
 
 /** The options only an adapter import takes, which is how `main.ts` tells one from putting a .brainl file back. */
 export const ADAPTER_OPTIONS = ['setup', 'map', 'catalogue', 'dry-run', 'draft-setup', 'since', 'bin-emptied', 'strict'] as const;
