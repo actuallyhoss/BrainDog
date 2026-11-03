@@ -23,10 +23,17 @@
   import { pushCan, pushPorts as ports } from '$lib/ui/push-ports.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
 
   /* THE HOST `boot` NAMED, when it named one. Only the Worker serves the key, so a self-host is not asked: the GET was a
      404 in the console of every self-host that opened Notifications. Absent is a host older than the field, asked. */
-  let { host, onchange }: { host?: 'cloud' | 'self-host' | undefined; onchange?: ((on: boolean) => void) | undefined } = $props();
+  /* `row` (finish 3 Nov): one row of a card that groups others (Settings > Notifications): the glyph, "Notifications on
+     this device", whether it is told, and Turn on or off at the row's end; without it, the tile it always was. */
+  let {
+    host,
+    onchange,
+    row = false,
+  }: { host?: 'cloud' | 'self-host' | undefined; onchange?: ((on: boolean) => void) | undefined; row?: boolean | undefined } = $props();
 
   let offer = $state<Offer>(null);
   let on = $state(false);
@@ -72,7 +79,21 @@
   }
 </script>
 
-{#if offer}
+{#if offer && row}
+  <div class="push-row">
+    <span class="push-icon"><IconWell name="phone" /></span>
+    <span class="push-words">
+      <span class="push-title">{copy.pushTitle}</span>
+      <span class="push-line">{!offer.can ? offer.line : on ? copy.pushIsOn : copy.pushIsOff}</span>
+    </span>
+    {#if offer.can}
+      <span class="push-act">
+        <Button weight={on ? 'quiet' : 'primary'} disabled={busy} onclick={() => void press()}>{busy ? copy.pushAsking : on ? copy.pushTurnOff : copy.pushTurnOn}</Button>
+      </span>
+    {/if}
+  </div>
+  {#if offer.can}<p class="said" role="status" data-intent={bad ? 'bad' : undefined}>{line}</p>{/if}
+{:else if offer}
   <Tile class="section" data-surface="tile" title={copy.pushTitle}>
     <div class="section-body">
       <p class="hint">{copy.pushHow}</p>
@@ -107,6 +128,50 @@
     margin: 0;
     color: var(--tone, var(--ink-2));
     font-size: var(--fs-meta);
+  }
+
+  /* AS A ROW OF A GROUPED CARD, `StateRow`'s anatomy (Settings). */
+  .push-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding-block: var(--sp-2);
+  }
+
+  .push-words {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .push-title {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  .push-line {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+  }
+
+  .said:empty {
+    display: none;
+  }
+
+  @media (width < 520px) {
+    .push-row {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .push-act {
+      grid-column: 2;
+      margin-block-start: var(--sp-2);
+    }
   }
 
   .row-actions {

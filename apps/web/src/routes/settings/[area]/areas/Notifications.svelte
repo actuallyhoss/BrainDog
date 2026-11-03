@@ -21,6 +21,7 @@
   import { ownsRecord } from '../../levels.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
   import SummariesTile from '$lib/agents/SummariesTile.svelte';
   import { KINDS, kindsOff, type PushKind } from '$lib/phone/kinds.ts';
   import { untrack } from 'svelte';
@@ -192,115 +193,102 @@
 <!-- THE RULES THAT TELL YOU ARE AUTOMATIONS': one row to them, where each rule's own page turns its notices off for
      you. A row under what interrupts (G6), where it stood as a tile with no heading, its line in the heading's place. -->
 {#snippet toRules()}<Button weight="quiet" href="/automations">{words.openRules}</Button>{/snippet}
-<Tile icon="bell" title={copy.whenWeInterrupt}>
-  <p class="said-once">{words.interrupts}</p>
-  <StateRow icon="refresh" title={words.tellers} line={words.tellersWhere} action={toRules} />
-</Tile>
-
-<!-- THE SUMMARY THE SENTENCE ABOVE PROMISES: which ones this record sends, each opening its screen, or the add-on that
-     sends the two a day. -->
-<SummariesTile />
-
-
-<Tile icon="moon" title={copy.quietHours}>
-  {#if held.state === 'waiting' || ((held.state === 'refused' || held.state === 'offline') && answered === null)}
-    <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
-  {:else if unserved !== null && answered === null}
-    <div role="status"><StateRow icon="moon" title={words.notHereYet} line={unserved} /></div>
-  {:else if quiet !== null}
-    {#if owner}
-      <div class="quiet">
-        <p class="quiet-said" id="quiet-said">
-          {#if on}
-            <label class="quiet-word" for="quiet-from">{copy.quietHold}</label>
-            <span class="quiet-pickers">
-              <select class="quiet-time" id="quiet-from" value={from} disabled={busy} onchange={(e) => pick('from', e)}>
-                {#each timesWith(from) as t (t)}<option value={t}>{t}</option>{/each}
-              </select>
-              <!-- "TO" AND ITS TIME ARE ONE PIECE, which wraps under the first time where the two will not fit side by side. -->
-              <span class="quiet-to">
-                <label class="quiet-word" for="quiet-to">{copy.quietUntil}</label>
-                <select class="quiet-time" id="quiet-to" value={to} disabled={busy} onchange={(e) => pick('to', e)}>
-                  {#each timesWith(to) as t (t)}<option value={t}>{t}</option>{/each}
-                </select>
-              </span>
-            </span>
-          {:else}
-            {copy.quietOff}
-          {/if}
-        </p>
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          aria-checked={on}
-          aria-label={copy.quietHours}
-          aria-describedby="quiet-said"
-          disabled={busy}
-          onclick={flip}><span class="switch-track"></span></button
-        >
-      </div>
-      <div class="quiet-after">
-        {#if refusal}
-          <p class="quiet-refused" role="alert"><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>
-        {/if}
-        <p class="hint">{copy.quietWhy}</p>
-        {#if quiet.quiet !== null && on && (from !== '21:00' || to !== '08:00')}
-          <Button weight="bare" disabled={busy} onclick={() => void put(null)}>{copy.quietDefault}</Button>
-        {/if}
-      </div>
-    {:else}
-      <StateRow icon="moon" title={on ? copy.quietHeld(from, to) : copy.quietOff} line={`${copy.quietWhy} ${copy.quietOwner}`} />
-    {/if}
-  {/if}
-</Tile>
-<!-- THE ONE CONTROL ON THIS SCREEN THAT IS ABOUT THE DEVICE, NOT THE RECORD. It says whether this browser is rung when
-     something interrupts. It draws nothing until the host hands it a key, so on a host without one it is not here.
-     THE TILE IS THIS WRAPPER, so the toggle's section lies flat inside it and the test sits under the switch in the same
-     tile; a wrapper the toggle drew nothing into is not drawn. -->
 <!-- THE MAC APP'S OWN SWITCH, only in the Mac app: in a browser there is no Mac notification to turn on. -->
 {#snippet macSwitch()}
   <button type="button" class="switch" role="switch" aria-checked={mac} aria-label={words.mac} onclick={flipMac}><span class="switch-track"></span></button>
 {/snippet}
-<!-- NOT IN THE IPHONE APP, whose notifications are the record's pushes (`macNotifications` in `shell.ts`). -->
-{#if isApp && !inIosApp}
-  <Tile>
-    <StateRow icon="monitor" title={words.mac} line={words.macLine} action={macSwitch} />
-  </Tile>
-{/if}
-<div class="push tile">
-  {#if native}
-    <!-- THE APP'S OWN ASK, in the web's push row's words: the permission is native's, the subscription its own. -->
-    <Tile class="section" data-surface="tile" title={copy.pushTitle}>
-      <div class="section-body">
-        <p class="hint">{copy.pushHow}</p>
-        {#if !rung}
-          <div class="row-actions">
-            <Button weight="primary" disabled={nativeBusy} aria-busy={nativeBusy} onclick={() => void turnOnNative()}>{copy.pushTurnOn}</Button>
-          </div>
-        {/if}
-        <p class="said" role="status">{nativeLine}</p>
+<!--
+  ONE CARD OF ROWS (finish 3 Nov): what interrupts, the rules that tell you, the summaries, the quiet hours and this
+  device were four cards of one fact each; they are one group, a row each, as every settings row is drawn (`StateRow`).
+  No heading over it: the page is Notifications, and each row names itself.
+-->
+<Tile class="group">
+  <StateRow icon="bell" title={copy.whenWeInterrupt} line={words.interrupts} />
+  <StateRow icon="refresh" title={words.tellers} line={words.tellersWhere} action={toRules} />
+  <!-- THE SUMMARY THE ROW ABOVE PROMISES: which ones this record sends, each opening its screen, or the add-on that
+       sends the two a day. -->
+  <div class="g-row"><SummariesTile row /></div>
+  <div class="g-row">
+    {#if held.state === 'waiting' || ((held.state === 'refused' || held.state === 'offline') && answered === null)}
+      <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+    {:else if unserved !== null && answered === null}
+      <div role="status"><StateRow icon="moon" title={words.notHereYet} line={unserved} /></div>
+    {:else if quiet !== null}
+      {#if owner}
+        <div class="quiet">
+          <span class="quiet-icon"><IconWell name="moon" /></span>
+          <span class="quiet-words">
+            <span class="quiet-title">{copy.quietHours}</span>
+            <span class="quiet-said" id="quiet-said">
+              {#if on}
+                <label class="quiet-word" for="quiet-from">{copy.quietHold}</label>
+                <span class="quiet-pickers">
+                  <select class="quiet-time" id="quiet-from" value={from} disabled={busy} onchange={(e) => pick('from', e)}>
+                    {#each timesWith(from) as t (t)}<option value={t}>{t}</option>{/each}
+                  </select>
+                  <!-- "TO" AND ITS TIME ARE ONE PIECE, which wraps under the first time where the two will not fit side by side. -->
+                  <span class="quiet-to">
+                    <label class="quiet-word" for="quiet-to">{copy.quietUntil}</label>
+                    <select class="quiet-time" id="quiet-to" value={to} disabled={busy} onchange={(e) => pick('to', e)}>
+                      {#each timesWith(to) as t (t)}<option value={t}>{t}</option>{/each}
+                    </select>
+                  </span>
+                </span>
+              {:else}
+                {copy.quietOff}
+              {/if}
+            </span>
+            <span class="quiet-line">{copy.quietWhy}</span>
+            {#if refusal}
+              <span class="quiet-refused" role="alert"><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</span>
+            {/if}
+            {#if quiet.quiet !== null && on && (from !== '21:00' || to !== '08:00')}
+              <span><Button weight="bare" disabled={busy} onclick={() => void put(null)}>{copy.quietDefault}</Button></span>
+            {/if}
+          </span>
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            aria-checked={on}
+            aria-label={copy.quietHours}
+            aria-describedby="quiet-said"
+            disabled={busy}
+            onclick={flip}><span class="switch-track"></span></button
+          >
+        </div>
+      {:else}
+        <StateRow icon="moon" title={copy.quietHours} line={`${on ? copy.quietHeld(from, to) : copy.quietOff}. ${copy.quietWhy} ${copy.quietOwner}`} />
+      {/if}
+    {/if}
+  </div>
+  <!-- THE ONE ROW ABOUT THE DEVICE, NOT THE RECORD: whether this browser is rung when something interrupts. It draws
+       nothing until the host hands it a key, so on a host without one it is not here. -->
+  <div class="g-row push">
+    {#if native}
+      <!-- THE APP'S OWN ASK, in the web's push row's words: the permission is native's, the subscription its own. -->
+      {#snippet nativeOn()}<Button weight="primary" disabled={nativeBusy} aria-busy={nativeBusy} onclick={() => void turnOnNative()}>{copy.pushTurnOn}</Button>{/snippet}
+      <StateRow icon="phone" title={copy.pushTitle} line={nativeLine || copy.pushHow} action={rung ? undefined : nativeOn} />
+    {:else if props.shell.host === 'self-host'}
+      <StateRow icon="phone" title={copy.pushTitle} line={words.selfPushLine} />
+    {:else}
+      <PushToggle row host={props.shell.host} onchange={turned} />
+    {/if}
+    {#if rung}
+      <div class="push-test">
+        <Button weight="quiet" disabled={testing} onclick={() => void test()}>{testing ? testWords.pressing : testWords.send}</Button>
       </div>
-    </Tile>
-  {:else if props.shell.host === 'self-host'}
-    <!-- Laid flat inside the push wrapper as `PushToggle`'s own tile is, so the wrapper is drawn once, and headed as that
-         tile is, so it is not the one tile on the area with no heading row. -->
-    <Tile class="section" data-surface="tile" icon="phone" title={copy.pushTitle}>
-      <p class="said-once">{words.selfPushLine}</p>
-    </Tile>
-  {:else}
-    <div class="push-switch"><PushToggle host={props.shell.host} onchange={turned} /></div>
+    {/if}
+    <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
+    <p class="said" role="status">
+      {#if rung && tested}{#if testBad}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {/if}{tested}{/if}
+    </p>
+  </div>
+  <!-- NOT IN THE IPHONE APP, whose notifications are the record's pushes (`macNotifications` in `shell.ts`). -->
+  {#if isApp && !inIosApp}
+    <div class="g-row"><StateRow icon="monitor" title={words.mac} line={words.macLine} action={macSwitch} /></div>
   {/if}
-  {#if rung}
-    <div class="push-test">
-      <Button weight="quiet" disabled={testing} onclick={() => void test()}>{testing ? testWords.pressing : testWords.send}</Button>
-    </div>
-  {/if}
-  <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
-  <p class="said" role="status">
-    {#if rung && tested}{#if testBad}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {/if}{tested}{/if}
-  </p>
-</div>
+</Tile>
 {#if rung}
   <Tile icon="phone" title={KINDS.title}>
     <p class="hint">{KINDS.how}</p>
@@ -319,22 +307,67 @@
      (a switch sits beside its sentence, never 700px from it). The pickers sit inside the sentence, so it
      reads "Hold notices from 21:00 to 08:00". The row's measure is the one every settings row keeps, so the switch
      lands where the switches of the other areas land. */
-  .quiet {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: var(--sp-3);
-    min-block-size: var(--row-h-2);
-    padding-block: var(--sp-2);
+  /* A ROW OF THE GROUP THAT IS NOT A `StateRow` (summaries, quiet hours, this device) takes the hairline a `StateRow`
+     draws between two of its own, from the title's edge, with the same air each side. */
+  .g-row {
+    position: relative;
   }
 
-  /* THE FACTS OF WHAT INTERRUPTS, said once, at the body size and kept to 75 characters. */
-  .said-once {
-    margin: 0;
+  .g-row::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: calc(var(--well) + var(--sp-3)) 0;
+    block-size: 1px;
+    background: var(--rule);
+    pointer-events: none;
+  }
+
+  .g-row:has(> :empty:only-child),
+  .g-row:empty {
+    display: none;
+  }
+
+  /* THE QUIET HOURS, AS ONE ROW: the well, the name, the sentence with its two pickers inside it, and the switch at the
+     row's end (a switch sits beside its sentence, never 700px from it). The pickers sit inside the sentence, so it reads
+     "Hold notices from 21:00 to 08:00". */
+  .quiet {
+    display: grid;
+    grid-template-columns: var(--well) minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: var(--sp-3);
+    min-block-size: var(--row-h-2);
+    padding-block: var(--divider-space);
+  }
+
+  .quiet-icon {
+    display: inline-flex;
+    margin-block-start: calc((var(--lead-ui) - var(--well)) / 2);
+  }
+
+  .quiet-words {
+    display: grid;
+    justify-items: start;
+    gap: var(--row-stack);
+    min-inline-size: 0;
     max-inline-size: 75ch;
-    color: var(--ink-2);
+  }
+
+  .quiet-title {
+    color: var(--ink);
     font-size: var(--fs-body);
-    line-height: 22px;
+    font-weight: 500;
+    line-height: var(--lead-ui);
+  }
+
+  .quiet-line {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+  }
+
+  .quiet > .switch {
+    align-self: center;
   }
 
   .quiet-said {
@@ -343,9 +376,9 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--ink);
+    color: var(--ink-2);
     font-size: var(--fs-body);
-    font-weight: 500;
+    font-weight: 400;
     line-height: var(--lh-body);
   }
 
@@ -380,34 +413,22 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* THE DEVICE'S TILE, the one `Section` draws, so the toggle inside it lies flat (`Section`'s own rule for a tile). */
-  .push {
-    min-inline-size: 0;
-    padding: var(--tile-pad);
-    background: var(--tile);
-    border-radius: var(--r-tile);
-  }
-
-  .push:not(:has(section)) {
+  /* THE DEVICE'S ROW, gone where the toggle drew nothing (a host with no key) and nothing else stands in it. */
+  .push:not(:has(.push-row, .state-row)) {
     display: none;
-  }
-
-  /* THE APP'S OWN ASK, laid out as `PushToggle` lays the web's. */
-  .row-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
   }
 
   .push-test {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
-    margin-block-start: var(--sp-2);
+    margin-block: 0 var(--sp-2);
+    padding-inline-start: calc(var(--well) + var(--sp-3));
   }
 
   .said {
-    margin: var(--sp-2) 0 0;
+    margin: 0 0 var(--sp-2);
+    padding-inline-start: calc(var(--well) + var(--sp-3));
     max-inline-size: 75ch;
     color: var(--ink-2);
     font-size: var(--fs-meta);
@@ -439,6 +460,19 @@
   @media (width < 520px) {
     .quiet {
       align-items: start;
+    }
+
+    /* THE SWITCH STAYS ON THE NAME'S LINE, and the sentence and its pickers take the row's width under it. */
+    .quiet-words {
+      grid-column: 2 / 4;
+      grid-row: 1;
+      justify-items: stretch;
+    }
+
+    .quiet > .switch {
+      grid-column: 3;
+      grid-row: 1;
+      align-self: start;
     }
 
     .quiet-said {
