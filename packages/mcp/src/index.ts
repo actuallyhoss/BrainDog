@@ -3484,7 +3484,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           }
           if (ask !== null) {
             const asked = await run.propose!({ question: ask.question, body_kind: ask.body_kind, body: ask.body, cause: ask.cause }, ctx, turn);
-            if (asked.result.ok) return asked;
+            /* AND A QUESTION THE RECORD WOULD NOT FILE SAYS WHY, in its words: an add-on made here asked for by its id is
+               refused with how to send its new file, which "open this from the app" never told the agent. */
+            if (asked.result.ok || !('refusal' in asked.result) || asked.result.refusal?.code !== 'NEEDS_BROWSER_SESSION') return asked;
           }
         }
         return { result: await failed(out, ctx, turn) };
