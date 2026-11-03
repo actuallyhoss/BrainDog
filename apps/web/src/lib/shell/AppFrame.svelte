@@ -1510,10 +1510,13 @@
       return;
     }
 
-    /* `⌘J` OPENS STRAIGHT INTO ASK, where the conversation with Slash was left; with the palette open it moves there. */
+    /* `⌘J` OPENS STRAIGHT INTO ASK, where the conversation with Slash was left; with the palette open it moves there. ON
+       SLASH'S OWN PAGE IT IS THAT PAGE'S FIELD (3 Nov): the palette opened over the composer it stood for. */
     if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'j') {
       e.preventDefault();
-      openAsk();
+      const field = overlays.depth > 0 ? null : document.querySelector<HTMLTextAreaElement>('[data-slash-composer] textarea');
+      if (field && !field.disabled) field.focus();
+      else openAsk();
       return;
     }
 

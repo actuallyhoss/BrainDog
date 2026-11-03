@@ -23,6 +23,7 @@
   import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Notice from '$lib/ui/Notice.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { backLine, connectUrl, figuresOf, googleDisconnect, googleStatus, googleSyncNow, googleWords as w, type GoogleStatus } from './google.ts';
@@ -111,7 +112,7 @@
     {/snippet}
     <div class="section-body google">
       {#if fault}
-        <p class="fault" role="alert"><Icon name="alert" size="s" /><span>{fault}</span></p>
+        <Notice tone="bad">{fault}</Notice>
       {/if}
 
       {#if status.connected}
@@ -124,7 +125,7 @@
           </span>
         </p>
         {#if status.broken}
-          <p class="fault" role="status"><Icon name="alert" size="s" /><span>{status.broken}</span></p>
+          <Notice tone="warn">{status.broken}</Notice>
         {:else if figures}
           <div class="figures" role="group" aria-label={synced}>
             {#each figures as f (f.label)}
@@ -303,25 +304,6 @@
 
   .brings li :global(.icon) {
     color: var(--ink-3);
-  }
-
-  /* A FAILURE IS A FULL-WIDTH LINE, its glyph and its words in the danger tint, never a squeezed column. */
-  .fault {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-ctl);
-    background: var(--red-tint);
-    color: var(--ink);
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta);
-  }
-
-  .fault :global(.icon) {
-    flex: none;
-    margin-block-start: 1px;
-    color: var(--red);
   }
 
   .ask {

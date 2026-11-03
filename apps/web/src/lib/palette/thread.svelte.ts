@@ -15,7 +15,7 @@ import { copy } from '../copy.ts';
 import { history } from '../data/undo.ts';
 import type { QueueQuestion } from '@braindog/kernel';
 import type { Reading } from '@braindog/client';
-import { act, chat, chatWords, keepThread, thread as readThread, type ChatAction, type ChatBody, type PageContext } from './slash-chat.ts';
+import { act, chat, chatWords, keepThread, type ChatAction, type ChatBody, type PageContext } from './slash-chat.ts';
 import { drawProposal, drawReading, pass2Refused, secondPass, slashWords, type DrawnRow } from './slash.ts';
 
 /** How long a receipt offers its Undo. */
@@ -110,15 +110,14 @@ export async function open(id: string, base = apiBase()): Promise<boolean> {
   if (convo.id === id && convo.turns.length > 0) return true;
   clear();
   convo.loading = true;
-  const t = await readThread(base, id);
+  /* READ BACK AS SLASH'S OWN PAGE READS IT (`routes/slash/read-back.ts`, 3 Nov): each row an answer named by its name,
+     where the bare thread door drew "something in Tasks", and each action in the state it was left in, so a card already
+     done no longer offers Do it again. */
+  const t = await import('../../routes/slash/read-back.ts').then((m) => m.readBack(base, id)).catch(() => null);
   convo.loading = false;
   if (!t) return false;
   convo.id = t.id;
-  convo.turns = t.turns.map((turn): LiveTurn =>
-    turn.role === 'you'
-      ? { role: 'you', text: turn.text }
-      : { role: 'slash', steps: [], text: turn.text, figures: {}, actions: turn.actions.map((a) => ({ ...a, state: a.kind === 'done' ? 'done' : 'open' })), go: [], error: null, spent: false, streaming: false },
-  );
+  convo.turns = t.turns;
   return true;
 }
 

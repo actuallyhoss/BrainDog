@@ -683,6 +683,19 @@
     color: var(--ink);
   }
 
+  /* ONE LOOK FOR EVERY "N MORE" THAT LEADS SOMEWHERE (3 Nov): the count the fit writes as a link wears the arrow each
+     widget's own door wears ("6 more →"), so "1 more" under a list and a widget's own door read as one kind of link.
+     A count that leads nowhere stays words, with no arrow. */
+  .board :global(a[data-fit-more]) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .board :global(a[data-fit-more]::after) {
+    content: '→';
+  }
+
   .board-root:not([data-editing]) .board :global([data-board-key] > a[data-fit-more]) {
     position: static;
     order: 1;
