@@ -529,7 +529,9 @@
     if (drawnActs === null) return { ok: false, refusal: { code: 'FORBIDDEN', fix: 'This view cannot write here.' } };
     const { createClient } = await import('@braindog/client');
     const got = await createClient({ base: apiBase() }).drawnAct({ page: drawnActs, block: i, ...('create' in act ? { create: act.create } : { update: act.update }) });
-    if ((got as { ok?: boolean }).ok) await invalidateAll();
+    /* THE PAGE'S OWN READ AGAIN (`writes.reread`), as a capture does: `invalidateAll` reran the load, and the page's blocks
+       are read by the live reader, so a table beside the view kept its rows until the next visit. */
+    if ((got as { ok?: boolean }).ok) await (writes !== null ? writes.reread() : invalidateAll());
     return got;
   }
 
