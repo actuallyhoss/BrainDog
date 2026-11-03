@@ -30,6 +30,9 @@
   const words = {
     label: 'Agents you named',
     waiting: 'Not connected yet',
+    /* THE BUTTON SAYS "CONNECT", the row's name beside it says whom (UI pass, 3 Nov): "Claude" over "Connect Claude"
+       said the name twice on one line. A screen reader hears the whole of it. */
+    connectShort: 'Connect',
     connect: (name: string) => `Connect ${name}`,
   } as const;
 
@@ -115,7 +118,7 @@
           <b class="named-name">{r.name}</b>
           <span class="named-said">{words.waiting}</span>
         </span>
-        <Button size="sm" href="/settings/agents" aria-busy={loading || undefined} onclick={(e) => void openSheet(e, r.kind)}>{words.connect(r.name)}</Button>
+        <Button size="sm" href="/settings/agents" aria-label={words.connect(r.name)} aria-busy={loading || undefined} onclick={(e) => void openSheet(e, r.kind)}>{words.connectShort}</Button>
       </li>
     {/each}
   </ul>
@@ -141,7 +144,6 @@
   /* ONE ROW AN AGENT: its mark, its name over "Not connected yet", and Connect at the end, wrapping under on a phone. */
   .named-row {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
     min-inline-size: 0;
@@ -164,12 +166,20 @@
     min-inline-size: 0;
   }
 
+  /* A ROW'S TITLE AND ITS META LINE, as every list row: 15/20 over 12.5/18, 2 apart. */
+  .named-body {
+    gap: var(--row-stack);
+  }
+
   .named-name {
+    font-size: var(--fs-row);
     font-weight: var(--fw-medium);
+    line-height: var(--lead-row);
   }
 
   .named-said {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 </style>
