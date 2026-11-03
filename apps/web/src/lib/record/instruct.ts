@@ -390,13 +390,19 @@ export type QuietMachine = { machine: string | null; said: string; runs: LiveRun
  *   - `quiet`: silent over an hour, one row a machine ("Windows PC: 3 Claude sessions on D:\, silent for 9 h").
  *   - `looks`: runs whose key only reads, which can write nothing and are never counted.
  */
+/** A run's number from its handle, `883` of `S883`, which only grows: the order runs started in. */
+const runNumber = (r: Pick<LiveRun, 'run'>): number => Number(/(\d+)$/u.exec(r.run)?.[1] ?? 0);
+
 export function openNow(rows: readonly LiveRun[]): { shown: LiveRun[]; idle: LiveRun[]; quiet: QuietMachine[]; looks: LiveRun[] } {
   const leads = leadsOf(rows);
   const looks = leads.filter((r) => r.looks === true);
   const left = leads.filter((r) => r.looks !== true);
   const heard = left.filter((r) => !isSilent(r));
   const idle = heard.filter(wroteNothing);
-  const shown = heard.filter((r) => !wroteNothing(r)).sort((a, b) => Number(isAtWork(b)) - Number(isAtWork(a)) || a.heard_s - b.heard_s);
+  /* A STILL ORDER, THE NEWEST RUN FIRST (3 Nov, "things blinking"): sorted by who was heard last and who is at work this
+     second, every write and every read fifteen seconds apart swapped the rows of a busy record round, and the dots and
+     the times seemed to blink. A run now keeps its place until it starts or ends; its dot says whether it is at work. */
+  const shown = heard.filter((r) => !wroteNothing(r)).sort((a, b) => runNumber(b) - runNumber(a) || a.run.localeCompare(b.run));
   const hosts = [...new Set(rows.map((r) => r.machine).filter((m): m is string => m !== null))];
   const quiet = byMachine(left.filter(isSilent)).map((g) => ({ machine: g.machine, said: machineNamed(g.machine, rows, hosts), runs: g.rows }));
   return { shown, idle, quiet, looks };
