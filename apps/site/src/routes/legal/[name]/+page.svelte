@@ -109,7 +109,7 @@
     color: var(--ink);
     font-size: var(--t-feature);
     line-height: 1.2;
-    letter-spacing: -0.021em;
+    letter-spacing: -0.03em;
   }
 
   .doc-h2:first-child {

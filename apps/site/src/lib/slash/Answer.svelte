@@ -161,7 +161,7 @@
   .when2 { color: var(--muted); font-size: var(--t-site-12); }
   .spark-t { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .sub { display: block; color: var(--muted); font-size: var(--t-site-12-5); margin: 0; }
-  .big { font: 600 27px/1.05 var(--head); letter-spacing: -0.021em; font-variant-numeric: tabular-nums; }
+  .big { font: 600 27px/1.05 var(--head); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
   .spark { width: 140px; height: 44px; overflow: visible; flex: none; }
   .spark { --pf-line: var(--ph); }
   .spark .l { fill: none; stroke: var(--pf-line); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }

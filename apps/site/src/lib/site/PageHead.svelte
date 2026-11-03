@@ -31,7 +31,7 @@
     max-inline-size: 14ch;
     font-size: var(--t-page);
     line-height: 0.95;
-    letter-spacing: -0.021em;
+    letter-spacing: -0.05em;
     text-wrap: balance;
     overflow-wrap: break-word;
     hyphens: auto;

@@ -340,9 +340,6 @@
   body {
     background: var(--ambient);
     background-color: var(--board);
-    /* JAKARTA SETS TIGHT AT TEXT SIZES: a hair of air at 13 to 15 (the Money lane's read, 3 Nov). Titles and figures
-       set their own negative tracking. */
-    letter-spacing: 0.005em;
   }
 
   :where(h1, h2, h3, h4) {

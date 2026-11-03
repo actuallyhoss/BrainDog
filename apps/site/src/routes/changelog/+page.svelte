@@ -343,7 +343,7 @@
   .tile-h {
     font-size: var(--t-site-21);
     line-height: 1.2;
-    letter-spacing: -0.021em;
+    letter-spacing: -0.03em;
   }
 
   .chart-span {
@@ -440,7 +440,7 @@
   .month-title {
     font-size: clamp(28px, 2.6vw, 36px);
     line-height: 1.05;
-    letter-spacing: -0.028em;
+    letter-spacing: -0.04em;
   }
 
   .month-tally {

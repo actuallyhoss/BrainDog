@@ -575,7 +575,7 @@
     display: none;
     margin: 0 2px 12px;
     font: 600 17px/1.2 var(--head);
-    letter-spacing: -0.021em;
+    letter-spacing: -0.03em;
   }
 
   @keyframes swap {

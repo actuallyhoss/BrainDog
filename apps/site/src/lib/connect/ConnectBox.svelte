@@ -186,7 +186,7 @@
     gap: 8px;
     margin: 0 0 10px;
     font: 600 17px/1.2 var(--head);
-    letter-spacing: -0.024em;
+    letter-spacing: -0.035em;
   }
 
   /* Named in words for a screen reader; the tab already says it on screen. */

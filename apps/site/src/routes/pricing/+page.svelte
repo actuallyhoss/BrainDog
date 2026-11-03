@@ -153,7 +153,7 @@
   .pname {
     margin: 0;
     font: 600 var(--t-feature) / 1.1 var(--head);
-    letter-spacing: -0.021em;
+    letter-spacing: -0.03em;
   }
 
   .pname b {

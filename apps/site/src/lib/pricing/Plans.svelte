@@ -96,7 +96,7 @@
   .price {
     margin: 0;
     font: 600 52px/1 var(--head);
-    letter-spacing: -0.021em;
+    letter-spacing: -0.05em;
   }
 
   /* A PAID CARD'S PRICE, read and not shouted: Free's $0 is the one figure at headline size. */

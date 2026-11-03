@@ -171,7 +171,7 @@
   .stile h2 {
     font-size: var(--t-feature);
     line-height: 1.1;
-    letter-spacing: -0.021em;
+    letter-spacing: -0.03em;
   }
 
   .stile p {
@@ -271,7 +271,7 @@
   .facts h2 {
     font-size: var(--t-section);
     line-height: 1.02;
-    letter-spacing: -0.028em;
+    letter-spacing: -0.04em;
     text-wrap: balance;
   }
 

@@ -138,7 +138,7 @@
     margin: 0 0 24px;
     font-size: var(--t-feature);
     line-height: 1.1;
-    letter-spacing: -0.021em;
+    letter-spacing: -0.03em;
   }
 
   .plain {

@@ -113,7 +113,7 @@
     max-inline-size: 18ch;
     font-size: var(--t-display);
     line-height: 0.98;
-    letter-spacing: -0.021em;
+    letter-spacing: -0.05em;
     text-wrap: balance;
   }
 
