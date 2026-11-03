@@ -1747,9 +1747,9 @@
       "versions": [
         {
           "version": "1.2.0",
-          "checksum": "d81138d26e8d12f3d362e8c3b8165146e30d707b4dac38f4524854e3f75e71c4",
-          "bytes": 82704,
-          "published_at": "2026-11-03T18:37:21.081Z",
+          "checksum": "f12dc32d72f505dce6613233ca1989b8064784da3ff1bc945743c3517e4bce38",
+          "bytes": 82686,
+          "published_at": "2026-11-03T18:39:00.062Z",
           "bump": "minor",
           "reach": {
             "modules": [
