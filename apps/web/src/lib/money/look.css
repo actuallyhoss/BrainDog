@@ -1783,3 +1783,355 @@
     grid-area: 1 / 5;
   }
 }
+
+/* ── the ops look (3 Nov) ─────────────────────────────────────────────────── */
+
+/* MONEY IN THE OPS DASHBOARD'S STYLE, IN BRAINDOG'S OWN COLOURS (Sam, 3 Nov: "i dont mean ops encore colors, i mean just
+   the style"; `loop/plans/ops-look-2026-11-03/SPEC.md`). Last in the sheet so it wins a tie with every rule above. What
+   it takes from ops: the stat tile's type (a 13/500 label in the third ink over a 28/600 figure, tabular), the glance
+   strip under the cash (a caps caption, a 17/600 value, hairlines that stop short of the edges), the data table's
+   hairlines (the separator ink, from text edge to text edge, never under a group's first row), circles for icon wells
+   and capsules for every choice, 4px bars on a quiet track. The new tokens come from the foundation lane's style layer;
+   each one carries the value it stands for here, so the sheet reads the same before that layer lands. */
+
+[data-money] {
+  --mo-sep: var(--sep, color-mix(in oklab, var(--ink) 8%, transparent));
+  --mo-wash: var(--row-wash, color-mix(in oklab, var(--ink) 5%, transparent));
+  --mo-track: color-mix(in oklab, var(--ink) 7%, transparent);
+  --mo-soft: var(--soft-fill, color-mix(in oklab, var(--ink) 5%, transparent));
+  --mo-soft-hover: var(--soft-fill-hover, color-mix(in oklab, var(--ink) 9%, transparent));
+  --mo-pill: var(--r-pill, 999px);
+}
+
+/* EVERY FIGURE LINES UP: amounts, counts, dates and percentages in tabular figures, the large ones tightened. */
+[data-money] :is(.cell-figure, .prop-value, .prop-approx, .item-detail, .item-day, .item-day-net, .progress-figure,
+  .split-share, .forecast-chip, .amount, .num, .filters-count, .group-count, .series-line-label, td) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── the cash: a stat tile at the top of the page ── */
+
+[data-money] .block[data-form='lead'] .cell:first-child .cell-label,
+[data-money] .block[data-kind='stat'] .cell .cell-label {
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: var(--fw-medium);
+  line-height: 16px;
+}
+
+[data-money] .block[data-form='lead'] .cell:first-child .cell-figure {
+  margin-block: var(--sp-2) var(--sp-1);
+  font-size: 40px;
+  line-height: 44px;
+  letter-spacing: -0.025em;
+}
+
+[data-money] .block[data-form='lead'] .cell:first-child .cell-note {
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+}
+
+/* THE FIGURES UNDER THE CASH ARE A GLANCE STRIP (ops 4.21): no rule across the tile, one hairline from text edge to
+   text edge over them, a short hairline between them that stops 12px from top and bottom, a caps caption over a
+   value at a section heading's size. */
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) {
+  position: relative;
+  margin-inline: 0;
+  padding: var(--sp-3) var(--sp-4) 2px;
+  border-block-start: 1px solid var(--mo-sep);
+  border-inline-start: 0;
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:nth-child(2) {
+  margin-inline-start: 0;
+  padding-inline-start: 0;
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child):last-child {
+  margin-inline-end: 0;
+  padding-inline-end: 0;
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:nth-child(n + 3)::after {
+  content: '';
+  position: absolute;
+  inset-block: var(--sp-3) 0;
+  inset-inline-start: 0;
+  inline-size: 1px;
+  border-radius: 1px;
+  background: var(--mo-sep);
+  pointer-events: none;
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-label {
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-weight: var(--fw-semi);
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-figure {
+  margin-block-start: 3px;
+  font-size: var(--fs-head);
+  font-weight: var(--fw-semi);
+  line-height: 22px;
+  letter-spacing: -0.01em;
+}
+
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-note {
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+  line-height: 17px;
+}
+
+@container stat (inline-size < 480px) {
+  [data-money] .block[data-form='lead'] .cell:first-child .cell-figure {
+    font-size: 34px;
+    line-height: 38px;
+  }
+
+  /* ON A PHONE THE STRIP STACKS: a hairline over each later fact, from text edge to text edge, none between. */
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) {
+    padding: var(--sp-3) 0;
+    border-block-start: 1px solid var(--mo-sep);
+  }
+
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:nth-child(n + 3)::after {
+    content: none;
+  }
+
+  [data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-figure {
+    margin-block-start: 0;
+    font-size: var(--fs-row, 15px);
+  }
+}
+
+/* ANY OTHER FIGURE ON MONEY IS A STAT TILE'S: 28/600, tight, in ink (ops 4.28). Colour only for what the colour means. */
+[data-money] .block[data-kind='stat']:not([data-form='lead']) .cell-figure {
+  font-size: 28px;
+  font-weight: var(--fw-semi);
+  line-height: 30px;
+  letter-spacing: -0.02em;
+}
+
+[data-money] .block[data-kind='stat']:not([data-form='lead']) .cell-note {
+  color: var(--ink-3);
+  font-size: var(--fs-cap);
+  line-height: 16px;
+}
+
+/* ── rows: the data table's hairlines and wash ── */
+
+/* ONE HAIRLINE BETWEEN ROWS, FROM TEXT EDGE TO TEXT EDGE, in the separator ink: the Ledger's strip as it was, and a due
+   list's now the same, where its border ran out to the tile's edges. The border keeps its pixel, unseen. */
+[data-money] .list[data-kind='timeline'] > .item[data-rich],
+[data-money] .list[data-kind='timeline']:not([data-days]) > .item:not([data-rich]) {
+  border-block-end-color: transparent;
+  background-image: linear-gradient(var(--mo-sep), var(--mo-sep));
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: calc(100% - 2 * var(--sp-3)) 1px;
+}
+
+/* A LIST OF WHAT IS DUE BY DAY KEEPS ITS ONE HAIRLINE BETWEEN DAYS, in the separator ink. */
+[data-money] .list[data-kind='timeline'][data-days]:not(:has(> .item[data-rich])) > :is(.item-day, .item-day + .item) {
+  border-block-start-color: var(--mo-sep);
+}
+
+[data-money] .list[data-kind='timeline'] > .item:last-child,
+[data-money] .list[data-kind='timeline'] > .item:has(+ .item-day),
+[data-money] .list[data-kind='timeline'] > .item:has(+ :not(.item)) {
+  background-image: none;
+}
+
+[data-money] .list[data-kind='timeline'] > .item[data-rich] > .item-title {
+  font-size: var(--fs-row, 15px);
+  font-weight: var(--fw-regular);
+}
+
+[data-money] .list[data-kind='timeline'] > .item[data-rich] > .item-detail {
+  font-size: var(--fs-row, 15px);
+}
+
+[data-money] .list[data-kind='timeline'] > .item[data-rich] > .item-meta {
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+}
+
+/* A DAY OVER ITS LINES IS A GROUP HEAD (ops 4.29): 12px, the day in the second ink, its net quiet at the right. */
+[data-money] .list > .item-day {
+  min-block-size: 32px;
+  align-items: end;
+  padding-block-end: 4px;
+  font-size: var(--fs-cap);
+}
+
+[data-money] .item-day-name {
+  font-weight: var(--fw-semi);
+}
+
+/* ICON WELLS ARE CIRCLES (ops: circles and capsules, never rounded squares). */
+[data-money] :is(.part-chip, .item-chip) {
+  border-radius: var(--mo-pill);
+}
+
+[data-money] .prop-row > .part-chip {
+  inline-size: 32px;
+  block-size: 32px;
+}
+
+[data-money] .item-chip {
+  inline-size: 32px;
+  block-size: 32px;
+}
+
+/* A DUE LINE'S DAY IS A CAPSULE, quiet unless it is late. */
+[data-money] .list[data-kind='timeline'] > .item:not([data-rich]) > .item-marker:not(:empty) {
+  min-inline-size: 68px;
+  min-block-size: 24px;
+  border-radius: var(--mo-pill);
+  background: var(--mo-soft);
+  font-size: var(--fs-cap);
+}
+
+[data-money] .list[data-kind='timeline'] > .item:not([data-rich]) > .item-title {
+  font-weight: var(--fw-regular);
+}
+
+/* HAIRLINES BETWEEN ROWS IN THE SEPARATOR INK, the tile's own rules untouched. The rule is renamed inside the row
+   kinds rather than each border recoloured, so the kinds' own cascade (no line under a group's head, none beside a row
+   under the pointer) stays as it is. */
+[data-money] :is(.table, .table-cards, .list[data-kind='todo'], .prop, .progress, .forecast-next) {
+  --rule: var(--mo-sep);
+}
+
+/* ── bars and progress: 4px on a quiet track (ops 4.18) ── */
+
+[data-money] .prop-row > .prop-track {
+  block-size: 4px;
+  border-radius: var(--mo-pill);
+  background: var(--mo-track);
+}
+
+[data-money] .prop-row > .prop-track::after {
+  border-radius: var(--mo-pill);
+}
+
+[data-money] .progress-track {
+  block-size: 4px;
+  background: var(--mo-track);
+}
+
+[data-money] .prop > .prop-row {
+  padding-block: 10px;
+}
+
+[data-money] .prop-row > :is(.prop-label, .prop-value) {
+  font-size: var(--fs-row, 15px);
+}
+
+[data-money] .prop-row > .prop-value {
+  font-weight: var(--fw-medium);
+}
+
+/* ── the Ledger's filters and search: capsules and a field ── */
+
+[data-money] .filters-group + .filters-group::before,
+[data-money] .filters-group::before {
+  font-size: var(--fs-caps, 11px);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+[data-money] .filters-group .filters-choice,
+[data-money] .filters-group[data-control='segmented'] .filters-choice {
+  min-block-size: 28px;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: var(--mo-pill);
+  background: var(--mo-soft);
+  color: var(--ink-2);
+  font-size: var(--fs-ctl);
+  font-weight: var(--fw-medium);
+}
+
+[data-money] .filters-group button.filters-choice:not([aria-pressed='true']):hover {
+  background: var(--mo-soft-hover);
+  color: var(--ink);
+}
+
+[data-money] .filters-group .filters-choice:is([aria-pressed='true'], [data-on]),
+[data-money] .filters-group button.filters-choice[aria-pressed='true']:hover {
+  background: var(--ink);
+  color: var(--tile);
+}
+
+[data-money] select.filters-more {
+  border-radius: var(--mo-pill);
+}
+
+[data-money] .head-search {
+  min-block-size: 36px;
+  border-radius: var(--r-field, 12px);
+}
+
+/* ── charts: plain, on the card, with round keys ── */
+
+[data-money] .series-swatch {
+  border-radius: var(--mo-pill);
+}
+
+[data-money] .series-line {
+  border-block-start: 1px solid var(--mo-sep);
+}
+
+[data-money] .series-line[data-zero] {
+  border-block-start-color: color-mix(in oklab, var(--ink) 22%, transparent);
+}
+
+[data-money] .series-bar {
+  inline-size: clamp(4px, 40%, 20px);
+}
+
+[data-money] .series-bar[data-dir='out'] {
+  --bar: color-mix(in oklab, var(--ink) 26%, var(--tile));
+}
+
+[data-money] .series-key[data-dir='out'] .series-swatch {
+  background: color-mix(in oklab, var(--ink) 26%, var(--tile));
+}
+
+[data-money] :is(.series-line-label, .series-ticks) {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+/* ── cards: an account, a plan ── */
+
+@media (width >= 640px) {
+  [data-money] .cards-item {
+    border-radius: var(--r-tile, 16px);
+    background: var(--mo-soft);
+  }
+
+  [data-money] .cards-item:has(.cards-title a):hover {
+    background: var(--mo-soft-hover);
+  }
+}
+
+@media (width < 640px) {
+  [data-money] .cards-item + .cards-item {
+    border-color: var(--mo-sep);
+  }
+}
+
+[data-money] .cards-item .cards-title {
+  font-size: var(--fs-row, 15px);
+}
+
+[data-money] .cards-item .cards-when {
+  font-size: var(--fs-cap);
+}

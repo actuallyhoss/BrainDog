@@ -623,10 +623,10 @@
 
   .qa-chip {
     min-block-size: 32px;
-    padding-inline: calc(var(--sp-3) - 1px);
-    border: 1px solid var(--rule);
-    border-radius: var(--r-ctl);
-    background: var(--tile);
+    padding-inline: var(--sp-3);
+    border: 0;
+    border-radius: var(--r-pill, 999px);
+    background: var(--soft-fill, var(--tile-2));
     color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-meta);
@@ -641,8 +641,11 @@
     margin-block-start: var(--sp-1);
     overflow: hidden;
     border-radius: var(--r-pop);
-    background: var(--tile);
-    border: 1px solid var(--rule);
+    background: var(--glass-regular, var(--tile));
+    -webkit-backdrop-filter: var(--glass-filter, none);
+    backdrop-filter: var(--glass-filter, none);
+    box-shadow: var(--glass-edge, inset 0 0 0 1px var(--rule)), var(--elev-popover, none);
+    padding: 4px;
   }
 
   .qa-opt {
@@ -654,8 +657,12 @@
     cursor: pointer;
   }
 
+  .qa-opt {
+    border-radius: var(--r-menu-row, 8px);
+  }
+
   .qa-opt[data-lit] {
-    background: var(--tile-2);
+    background: var(--menu-row-fill, var(--tile-2));
   }
 
   .qa-grow {
@@ -691,7 +698,7 @@
     place-items: center;
     inline-size: 30px;
     block-size: 30px;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     background: var(--chip-tint, var(--tile-2));
     color: var(--chip, var(--ink-2));
   }

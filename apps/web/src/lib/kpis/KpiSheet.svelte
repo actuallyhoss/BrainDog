@@ -757,7 +757,7 @@
     gap: 2px;
     padding: 2px;
     background: var(--tile-2);
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-field, 12px);
   }
 
   .kpi-source {
@@ -766,7 +766,7 @@
     gap: var(--sp-3);
     min-block-size: var(--tap);
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-xs);
+    border-radius: calc(var(--r-field, 12px) - 2px);
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
@@ -782,7 +782,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .kpi-source:not([data-on]):hover {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
     }
   }
 
@@ -851,7 +851,7 @@
     margin-inline-start: calc(-1 * var(--sp-2));
     background: none;
     border: 0;
-    border-radius: var(--r-ctl);
+    border-radius: var(--r-pill, 999px);
     color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-ctl);
@@ -872,7 +872,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .kpi-more:hover {
-      background: var(--hover);
+      background: var(--row-wash, var(--hover));
       color: var(--ink);
     }
   }
