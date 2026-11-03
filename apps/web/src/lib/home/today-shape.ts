@@ -8,12 +8,14 @@
  * columns or two), and the next open with nothing to draw yet stands a card of bars in each of those cells at that
  * height (`TodaySkeleton.svelte`). When the record answers, each card fills its own cell and nothing moves.
  *
- * NO WORD OR FIGURE OF THE RECORD IS KEPT, only boxes: a key, a grid area, a height and a count. Kept in
- * `localStorage`, every read and write in a `try`, and a shape that does not read back whole is no shape. Kept for 30
- * days at most. The shell lane's shared cached-skeleton helper can take this over when it lands.
+ * NO WORD OR FIGURE OF THE RECORD IS KEPT, only boxes: a key, a grid area, a height and a count. Kept in the shared
+ * store of page shapes (`ui/shape.ts`, finish 3 Nov: one way to keep a page's shape), and a shape that does not read
+ * back whole is no shape. Kept for 30 days at most. Its cards are drawn by the shared `ui/SkeletonCard.svelte`.
  *
  * PURE ENOUGH FOR NODE but for `shapeOf`, which reads the board's own boxes.
  */
+
+import { keepPage, pageShape } from '../ui/shape.ts';
 
 /** What a card's inside looks like, so its bars stand where its lines will. */
 export type SkelKind = 'ask' | 'late' | 'faces' | 'cash' | 'feed' | 'figures' | 'figure' | 'list' | 'dates' | 'projects';
@@ -29,7 +31,10 @@ const MOST_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const MOST_CARDS = 40;
 const KINDS: ReadonlySet<string> = new Set(['ask', 'late', 'faces', 'cash', 'feed', 'figures', 'figure', 'list', 'dates', 'projects']);
 
-const keyOf = (base: string, cols: number): string => `bd_today_shape:${base}:${cols}`;
+/** Where it was kept before the shared store (`ui/shape.ts`), read once so a device keeps the shape it had. */
+const oldKeyOf = (base: string, cols: number): string => `bd_today_shape:${base}:${cols}`;
+/** Its page in the shared store of kept shapes (`ui/shape.ts`, `bd_shapes`), per record and board width. */
+const keyOf = (base: string, cols: number): string => `today|${base}|${cols}`;
 
 /** A grid area as the board writes it ("1 / 1 / span 2 / span 2", "3 / 1 / 4 / 5"): numbers, spans and slashes only. */
 const AREA = /^(?:span )?\d{1,3}(?: \/ (?:span )?\d{1,3}){0,3}$/u;
@@ -47,30 +52,35 @@ function cardOf(x: unknown): ShapeCard | null {
 
 /** The shape this device last kept for this record at this many columns, or `null` (none, too old, or not whole). */
 export function readShape(base: string, cols: number, now = Date.now(), store: Pick<Storage, 'getItem'> | undefined = globalThis.localStorage): TodayShape | null {
+  /* THE SHARED STORE FIRST (finish 3 Nov): one way to keep a page's shape (`ui/shape.ts`). */
+  const kept = pageShape(keyOf(base, cols));
+  if (kept !== null) return shapeFrom({ v: VERSION, cols, at: kept.at, cards: (kept.order ?? Object.keys(kept.cards)).map((key) => ({ key, ...kept.cards[key] }) as unknown as ShapeCard) }, cols, now);
   try {
-    const raw = store?.getItem(keyOf(base, cols));
-    if (!raw) return null;
-    const got = JSON.parse(raw) as Partial<TodayShape> | null;
-    if (got === null || got.v !== VERSION || got.cols !== cols || typeof got.at !== 'number' || now - got.at > MOST_AGE_MS || !Array.isArray(got.cards)) return null;
-    if (got.cards.length === 0 || got.cards.length > MOST_CARDS) return null;
-    const cards = got.cards.map(cardOf);
-    if (cards.some((c) => c === null)) return null;
-    return { v: VERSION, cols, at: got.at, cards: cards as ShapeCard[] };
+    const raw = store?.getItem(oldKeyOf(base, cols));
+    return raw ? shapeFrom(JSON.parse(raw) as Partial<TodayShape> | null, cols, now) : null;
   } catch {
     return null;
   }
 }
 
+/** A kept shape read back whole, or `null`: every card checked, nothing past 30 days. */
+function shapeFrom(got: Partial<TodayShape> | null, cols: number, now: number): TodayShape | null {
+  if (got === null || got.v !== VERSION || got.cols !== cols || typeof got.at !== 'number' || now - got.at > MOST_AGE_MS || !Array.isArray(got.cards)) return null;
+  if (got.cards.length === 0 || got.cards.length > MOST_CARDS) return null;
+  const cards = got.cards.map(cardOf);
+  if (cards.some((c) => c === null)) return null;
+  return { v: VERSION, cols, at: got.at, cards: cards as ShapeCard[] };
+}
+
 /** Keep the board's shape, unless it is the same as the one kept (a write a rest is a write too many). */
-export function keepShape(base: string, shape: TodayShape, store: Pick<Storage, 'getItem' | 'setItem'> | undefined = globalThis.localStorage): void {
-  try {
-    if (!store || shape.cards.length === 0) return;
-    const was = readShape(base, shape.cols, shape.at, store);
-    if (was && JSON.stringify(was.cards) === JSON.stringify(shape.cards)) return;
-    store.setItem(keyOf(base, shape.cols), JSON.stringify(shape));
-  } catch {
-    /* blocked or full storage: the next open waits in the plain shape */
-  }
+export function keepShape(base: string, shape: TodayShape): void {
+  if (shape.cards.length === 0) return;
+  const was = readShape(base, shape.cols, shape.at);
+  if (was && JSON.stringify(was.cards) === JSON.stringify(shape.cards)) return;
+  keepPage(keyOf(base, shape.cols), {
+    cards: Object.fromEntries(shape.cards.map((c) => [c.key, { h: c.h, rows: c.rows, kind: c.kind, area: c.area }])),
+    order: shape.cards.map((c) => c.key),
+  });
 }
 
 /** A card's kind, by its key first (Today's own cards) and else by the block kind it draws. */

@@ -88,7 +88,7 @@
   <div class="loads" data-card-body={id} data-late={late ? '' : undefined} {@attach measure}>{@render children()}</div>
 {:else}
   <div class="loads" data-card-body={id} aria-busy="true" style:block-size={kept ? `${kept.h}px` : undefined}>
-    {#if skeleton}{@render skeleton()}{:else}<Skeleton kind={kept?.kind ?? kind} count={kept?.rows ?? rows} />{/if}
+    {#if skeleton}{@render skeleton()}{:else}<Skeleton kind={(kept?.kind ?? kind) as SkeletonKind} count={kept?.rows ?? rows} />{/if}
   </div>
 {/if}
 

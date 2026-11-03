@@ -1,7 +1,8 @@
 <!--
   The plugin screens while they are read: the cards' own shells at the size they land at, so nothing jumps when the
   record answers and nothing is a page-wide spinner (3 Nov, Sam: "proper skeleton loading on cards at their cached
-  sizes"). The shell lane is building one shared system for this; until it lands, this is the plugins' own.
+  sizes"). Each card is the shared one (`ui/SkeletonCard.svelte`, finish 3 Nov), as Today's are: no shimmer, ink at
+  a fixed strength; this file only lays the cards out as the plugin screens land.
 
   THREE SHAPES: the store's shelves (two of four cards, under its real search and chips), a plugin's page as this record holds it
   (the lead beside what it adds, then a wide card, then three), and the store's page for one (the same, with its plan).
@@ -10,6 +11,7 @@
 -->
 <script lang="ts">
   import PageHead from '$lib/ui/PageHead.svelte';
+  import SkeletonCard from '$lib/ui/SkeletonCard.svelte';
   import { words } from '$lib/market/words.ts';
   import { STORE_AT } from './moved.ts';
 
@@ -24,45 +26,18 @@
   {#if kind === 'store'}
     {#each [0, 1] as shelf (shelf)}
       <div class="shelf" aria-hidden="true">
-        <span class="bar head"></span>
+        <span class="head"></span>
         <div class="cards">
-          {#each [0, 1, 2, 3] as c (c)}
-            <div class="surface-card card store-card">
-              <span class="bar glyph"></span>
-              <span class="bar line w60"></span>
-              <span class="bar line w90"></span>
-              <span class="bar line w70"></span>
-            </div>
-          {/each}
+          {#each [0, 1, 2, 3] as c (c)}<div class="store-card"><SkeletonCard kind="store" /></div>{/each}
         </div>
       </div>
     {/each}
   {:else}
     <div class="tiles" aria-hidden="true">
-      <div class="surface-card card lead">
-        <span class="bar line w40 strong"></span>
-        <span class="bar line w90"></span>
-        <span class="bar line w80"></span>
-        <span class="bar line w30"></span>
-        <span class="bar pill btn"></span>
-      </div>
-      <div class="surface-card card side">
-        <span class="bar line w50 strong"></span>
-        {#each [0, 1, 2] as r (r)}<span class="row"><span class="bar dot"></span><span class="bar line w60"></span></span>{/each}
-      </div>
-      <div class="surface-card card wide">
-        <span class="bar line w30 strong"></span>
-        <span class="bar line w70"></span>
-        <span class="bar line w50"></span>
-        <span class="bar pill btn"></span>
-      </div>
-      {#each [0, 1, 2] as c (c)}
-        <div class="surface-card card third">
-          <span class="bar line w40 strong"></span>
-          <span class="bar line w80"></span>
-          <span class="bar line w60"></span>
-        </div>
-      {/each}
+      <div class="lead"><SkeletonCard kind="lead" /></div>
+      <div class="side"><SkeletonCard kind="side" /></div>
+      <div class="wide"><SkeletonCard kind="wide" /></div>
+      {#each [0, 1, 2] as c (c)}<div class="third"><SkeletonCard kind="third" /></div>{/each}
     </div>
   {/if}
 </div>
@@ -101,17 +76,25 @@
     gap: var(--tile-gap);
   }
 
-  .card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    padding: var(--tile-pad);
-    border-radius: var(--r-tile);
-    background: var(--tile);
+  /* EACH CARD AS TALL AS THE ONE IT STANDS FOR LANDS. */
+  .store-card,
+  .lead,
+  .side,
+  .wide,
+  .third {
+    display: grid;
   }
 
   .store-card {
     min-block-size: 156px;
+  }
+
+  .head {
+    display: block;
+    inline-size: 160px;
+    block-size: 16px;
+    border-radius: var(--r-xs);
+    background: color-mix(in oklab, var(--ink) 9%, transparent);
   }
 
   .lead {
@@ -128,66 +111,6 @@
 
   .third {
     min-block-size: 140px;
-  }
-
-  .row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-  }
-
-  /* A BAR WHERE WORDS WILL BE: the soft fill, a slow breath, and still for anybody who asks for less motion. */
-  .bar {
-    display: block;
-    block-size: 12px;
-    border-radius: var(--r-pill);
-    background: var(--soft-fill, var(--tile-2));
-    animation: breathe 1.6s var(--ease-out, ease-out) infinite alternate;
-  }
-
-  .bar.strong {
-    block-size: 14px;
-  }
-
-  .bar.head {
-    inline-size: 160px;
-    block-size: 16px;
-  }
-
-  .bar.glyph,
-  .bar.dot {
-    inline-size: 28px;
-    block-size: 28px;
-    flex: none;
-  }
-
-  .bar.pill.btn {
-    inline-size: 112px;
-    block-size: 28px;
-    margin-block-start: auto;
-  }
-
-  .w30 { inline-size: 30%; }
-  .w40 { inline-size: 40%; }
-  .w50 { inline-size: 50%; }
-  .w60 { inline-size: 60%; }
-  .w70 { inline-size: 70%; }
-  .w80 { inline-size: 80%; }
-  .w90 { inline-size: 90%; }
-
-  @keyframes breathe {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0.55;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .bar {
-      animation: none;
-    }
   }
 
   @media (width >= 640px) {

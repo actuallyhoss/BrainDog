@@ -105,7 +105,7 @@
         style:block-size={`${c.h}px`}
       >
         {#if c.head}<span class="shaped-head"><span class="shaped-glyph"></span><span class="shaped-name"></span></span>{/if}
-        <Skeleton kind={c.kind ?? 'rows'} count={c.rows} />
+        <Skeleton kind={(c.kind ?? 'rows') as SkeletonKind} count={c.rows} />
       </div>
     {/each}
   </div>

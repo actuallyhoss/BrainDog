@@ -43,10 +43,28 @@
   const NAME = ['84px', '108px', '72px', '96px', '120px', '64px'];
   const nameW = $derived(NAME[seed % NAME.length]);
   /* As many lines as the card held, never more than its height can show (the card clips the rest). */
+  /* A PLUGIN'S CARDS (`routes/addons/PluginSkeleton.svelte`): the store's card, and a plugin page's lead, side, wide and third. */
+  const PLUGIN: ReadonlySet<string> = new Set(['store', 'lead', 'side', 'wide', 'third']);
   const lines = $derived(Array.from({ length: Math.max(1, Math.min(rows ?? 1, 8)) }, (_, i) => i));
 </script>
 
-{#if kind === 'projects'}
+{#if PLUGIN.has(kind)}
+  <!-- A PLUGIN'S CARDS (the store's, a plugin's page): no head row, a title bar and lines, a press at the foot. -->
+  <div class="sk sk-plug surface-card" data-kind={kind} style="{area ? `grid-area:${area};` : ''}{h ? `block-size:${h}px` : ''}" aria-hidden="true">
+    {#if kind === 'store'}
+      <span class="o w28"></span><span class="b" style:inline-size="60%"></span><span class="b" style:inline-size="90%"></span><span class="b" style:inline-size="70%"></span>
+    {:else if kind === 'side'}
+      <span class="b t" style:inline-size="50%"></span>
+      {#each [0, 1, 2] as r (r)}<span class="sk-row tight"><span class="o w28"></span><span class="b" style:inline-size="60%"></span></span>{/each}
+    {:else if kind === 'lead'}
+      <span class="b t" style:inline-size="40%"></span><span class="b" style:inline-size="90%"></span><span class="b" style:inline-size="80%"></span><span class="b" style:inline-size="30%"></span><span class="cap press"></span>
+    {:else if kind === 'wide'}
+      <span class="b t" style:inline-size="30%"></span><span class="b" style:inline-size="70%"></span><span class="b" style:inline-size="50%"></span><span class="cap press"></span>
+    {:else}
+      <span class="b t" style:inline-size="40%"></span><span class="b" style:inline-size="80%"></span><span class="b" style:inline-size="60%"></span>
+    {/if}
+  </div>
+{:else if kind === 'projects'}
   <!-- THE PROJECTS ARE CARDS UNDER A HEAD OF THEIR OWN, on the ground, as they draw. -->
   <div class="sk-group" style="{area ? `grid-area:${area};` : ''}{h ? `block-size:${h}px` : ''}" aria-hidden="true">
     <span class="sk-head"><span class="g"></span><span class="b" style:inline-size="72px"></span></span>
@@ -338,6 +356,28 @@
     .sk-group {
       animation: none;
     }
+  }
+
+  .sk-plug {
+    gap: var(--sp-3);
+    align-self: stretch;
+  }
+
+  .sk-plug > .b {
+    block-size: 12px;
+  }
+
+  .sk-plug > .b.t {
+    block-size: 14px;
+  }
+
+  .sk-row.tight {
+    min-block-size: 0;
+  }
+
+  .cap.press {
+    inline-size: 112px;
+    margin-block-start: auto;
   }
 
   /* IN A CELL ALREADY SIZED (a Today card still arriving): the cell is the card. */

@@ -16,7 +16,18 @@
 export type SkeletonKind = 'rows' | 'lines' | 'figure' | 'chips' | 'table';
 
 /** One card as it was last drawn. `x`, `y`, `w` are kept only by a page that keeps its layout (`ShapedPage`). */
-export type CardShape = { h: number; rows?: number | undefined; kind?: SkeletonKind | undefined; x?: number | undefined; y?: number | undefined; w?: number | undefined; head?: boolean | undefined };
+export type CardShape = {
+  h: number;
+  rows?: number | undefined;
+  /** A shared kind (`SkeletonKind`), or a card's own (Today's `ask`, `cash`, ... drawn by `SkeletonCard.svelte`). */
+  kind?: SkeletonKind | (string & {}) | undefined;
+  x?: number | undefined;
+  y?: number | undefined;
+  w?: number | undefined;
+  head?: boolean | undefined;
+  /** The card's cell on a board's grid ("1 / 1 / 2 / 3"), for a board that keeps its cells (Today, `today-shape.ts`). */
+  area?: string | undefined;
+};
 
 /** A page as it was last drawn: its cards, and for a kept layout the box's own width and height. */
 export type PageShape = { at: number; w?: number | undefined; h?: number | undefined; cards: Record<string, CardShape>; order?: string[] | undefined };
