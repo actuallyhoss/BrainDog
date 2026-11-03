@@ -435,7 +435,8 @@ export function thingOf(target: string, title: string | null, nameOf: (list: str
   const pack = /^pack:(.+)$/u.exec(target)?.[1];
   if (pack !== undefined) {
     const usecase = /^usecase-([a-z][a-z0-9-]*)$/u.exec(pack)?.[1];
-    return { text: usecase ? copy.feedUseCase(useCaseName(usecase)) : copy.feedPack(moduleOf(pack)?.name ?? humanize(pack)), href: null, list: null };
+    /* A PLUGIN, in the word a person reads since 3 Nov; the shared feed still says "add-on" (`copy.feedPack`). */
+    return { text: usecase ? copy.feedUseCase(useCaseName(usecase)) : `the ${moduleOf(pack)?.name ?? humanize(pack)} plugin`, href: null, list: null };
   }
   return said === null ? null : { text: said, href: null, list: null };
 }
@@ -1107,7 +1108,8 @@ export const partWords = {
   arrived: 'Mail and messages in',
   keys: 'Keys',
   sharing: 'Sharing',
-  pages: 'Add-ons and pages',
+  /* PLUGINS, as a person calls them since 3 Nov ("Add-ons" are plugins in anything a person reads). */
+  pages: 'Plugins and pages',
   upkeep: 'Record upkeep',
   other: 'Other changes',
 } as const;

@@ -28,7 +28,6 @@
   import { DOM_CAP } from '$lib/record/api.ts';
   import { CapLine } from 'braindog-render/svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Face from '$lib/ui/Face.svelte';
@@ -203,6 +202,11 @@
   };
 
   const kindOf = (k: EventKind) => KIND[k];
+
+  /* THE SKELETON'S WIDTHS, so its lines read as lines of different lengths: twelve fill a desk's first screen. */
+  const SKEL_LINES = ['58%', '72%', '46%', '64%', '38%', '70%', '52%', '61%', '44%', '67%', '49%', '56%'] as const;
+  const SKEL_LANES = ['22%', '18%', '26%'] as const;
+  const SKEL_BARS = ['92%', '84%', '48%', '36%', '30%'] as const;
 
   /**
    * ON A LIVE RECORD THE LOG IS THE RECORD'S, its newest page, and nothing of the sample is mixed into it: the names are
@@ -901,6 +905,45 @@
   </div>
 {/snippet}
 
+{#snippet skeleton()}
+  <div class="board skel" role="status" aria-busy="true">
+    <span class="said">{copy.waiting}</span>
+    {#if !phone}
+      <div class="side" aria-hidden="true">
+        <Tile>
+          <span class="sk sk-head"></span>
+          {#each SKEL_LANES as w, i (i)}<span class="sk-pair"><span class="sk sk-label" style:inline-size={w}></span><span class="sk sk-track"></span></span>{/each}
+        </Tile>
+        <Tile>
+          <span class="sk sk-head"></span>
+          {#each SKEL_BARS as w, i (i)}<span class="sk-pair"><span class="sk sk-label" style:inline-size={w}></span><span class="sk sk-track" style:inline-size={w}></span></span>{/each}
+        </Tile>
+      </div>
+    {/if}
+    <div class="feed" aria-hidden="true">
+      <Tile class="section">
+        <span class="sk sk-head"></span>
+        <div class="section-body">
+          <span class="sk sk-hour"></span>
+          <ul class="ledger">
+            {#each SKEL_LINES as w, i (i)}
+              <li>
+                <div class="line line-tall act">
+                  <span class="sk sk-well"></span>
+                  <span class="line-main"
+                    ><span class="sk sk-title" style:inline-size={w}></span><span class="sk sk-title sk-wrap"></span><span class="sk sk-meta"></span></span
+                  >
+                  <span class="line-when">{#if i % 4 === 0}<span class="sk sk-time"></span>{/if}</span>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      </Tile>
+    </div>
+  </div>
+{/snippet}
+
 <PageHead
   icon="history"
   title={copy.audit}
@@ -921,8 +964,9 @@
       {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
     </Empty>
   {:else if waiting}
-    <!-- Bars while the live log is on its way, rather than a blank page under the title. -->
-    <Waiting />
+    <!-- THE SHAPE OF WHAT IS COMING (3 Nov): a day's card of lines as tall as the lines, and at a desk the two tiles
+         beside it, where the bars of a generic list stood. Drawn on the first read only: a read again keeps what is drawn. -->
+    {@render skeleton()}
   {/if}
 
   <!-- NOT DRAWN UNDER THE BARS (leftovers8): the board stood empty below them, 24px tall, and rose 260px up a phone's
@@ -1093,11 +1137,6 @@
     overflow: hidden;
   }
 
-  /* THE LANES AND THE MONTH ARE TWO SPANS IN ONE TILE, a section's air apart. */
-  :global(.viz) + .month {
-    margin-block-start: var(--sp-2);
-  }
-
   /* A FIGURE WITH ITS NAME AND ITS PART'S COLOUR, two to a row in the side column: the key a stacked bar needs. */
   .legend {
     display: grid;
@@ -1236,6 +1275,7 @@
     gap: var(--sp-0);
     padding: var(--sp-1);
     border-radius: var(--r-tile);
+    background: var(--soft-fill);
   }
 
   .sheet-tools .tools :global(.filters .menu-root),
@@ -1586,5 +1626,100 @@
       line-clamp: 2;
       white-space: normal;
     }
+  }
+
+  /* ── the skeleton ────────────────────────────────────────────────────── */
+
+  /* AFTER 300MS, as every waiting list here: an answer that lands sooner never flashes the shape on the way in. */
+  .skel {
+    animation: skel-in var(--d-state) var(--ease-out) 300ms backwards;
+  }
+
+  @keyframes skel-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .said {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A MARK AT A FIXED STRENGTH OF THE INK, which reads on the card in light and dark alike; no shimmer. */
+  .sk {
+    display: block;
+    background: color-mix(in oklab, var(--ink) 7%, transparent);
+    border-radius: var(--r-xs);
+  }
+
+  /* A CARD'S HEAD: its 28 row and the 12 under it (the tile's own 16 taken back, as `Tile` takes it), a name's length of
+     bar in the middle of the row. */
+  .sk-head {
+    inline-size: 6rem;
+    block-size: var(--sp-3);
+    margin-block: var(--sp-2) calc(var(--sp-2) + var(--card-head-gap) - var(--sp-4));
+  }
+
+  /* THE HOUR'S SUBHEAD AND A TITLE'S SECOND LINE ARE A PHONE'S: at a desk the hour is the time column and a title holds
+     one line. */
+  .sk-hour {
+    inline-size: 3rem;
+    block-size: var(--sp-2);
+    margin-block: var(--sp-3) var(--sp-2);
+  }
+
+  .sk-wrap {
+    inline-size: 40%;
+  }
+
+  @container (width >= 640px) {
+    .sk-hour,
+    .sk-wrap {
+      display: none;
+    }
+  }
+
+  .sk-well {
+    inline-size: var(--well-l);
+    block-size: var(--well-l);
+    border-radius: var(--r-pill);
+  }
+
+  /* A LINE'S TITLE AND META ON THEIR OWN LINE BOXES, so a line of the skeleton is a line of the log's height. */
+  .sk-title {
+    block-size: var(--sp-3);
+    margin-block: var(--sp-1);
+  }
+
+  .sk-meta {
+    inline-size: 32%;
+    block-size: var(--sp-2);
+    margin-block: var(--sp-1) calc(var(--sp-1) + var(--sp-0));
+  }
+
+  .sk-time {
+    inline-size: 5ch;
+    block-size: var(--sp-2);
+  }
+
+  .sk-pair {
+    display: grid;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-4);
+  }
+
+  .sk-label {
+    block-size: var(--sp-2);
+  }
+
+  .sk-track {
+    inline-size: 100%;
+    block-size: var(--sp-2);
+    border-radius: var(--r-pill);
   }
 </style>
