@@ -104,6 +104,10 @@
   /* LATE'S ROOM, in hand before any slot draws (`LateHold.svelte`, nojump 2 Nov): a slot whose Late code has not landed
      draws it in its place, so the tiles under it never move when that code comes. */
   import LateHold from '$lib/home/LateHold.svelte';
+  /* TODAY'S SKELETON IS THE BOARD IT WILL BE (`today-shape.ts`, ui-perfect 3 Nov): each card's cell and height as this
+     device last drew them, kept once the board rests and stood in its cells while the record answers. */
+  import TodaySkeleton from '$lib/home/TodaySkeleton.svelte';
+  import { firstShape, keepShape, readShape, shapeOf } from '$lib/home/today-shape.ts';
   import { landed as tileLanded } from '$lib/home/tile-landed.ts';
   tileLanded.hold = LateHold;
   import { sharedFrom, type SharedOut } from '$lib/home/shared-line.ts';
@@ -602,6 +606,9 @@
       void import('$lib/record/page-drawn.ts').catch(() => null);
       void import('./today-read.ts').catch(() => null);
       void keptFrameCode().catch(() => null);
+      /* AND ARRIVALS' CODE WHEN `boot` ALREADY SAYS SOMETHING LANDED (ui-perfect, 3 Nov): asked only once the page was
+         read, it drew a beat after the board and the board packed again round it, every card under it moving. */
+      if ((data.newsLines?.length ?? 0) > 0) void Promise.all([import('./Landed.svelte'), import('./landed.ts')]).catch(() => null);
       /* AND THE CODE OF THE TILES TODAY'S EARLY ANSWER SHOWS (`tile-code.ts`), which is in the tab long before that read. */
       /* A KEPT TODAY TAKES THE CODE FROM IT TOO (speed4, 2 Nov), though not the reads: the early answer is the record's last
          drawn Today, whose tiles are a kept page's own, and its reader waits on their code (`tilesLanded`). */
@@ -1318,6 +1325,40 @@
   const narrow = new MediaQuery('(width < 720px)', false);
   /** Whether Today was read without the widgets the phone hides (`phone-ask.ts`). */
   const phoneOnly = $derived(isPhoneOnly(got));
+
+  /* ── the skeleton (ui-perfect, 3 Nov) ──────────────────────────────────
+     Sam: "proper skeleton loading ... layouts accurate and cached, and loading on the cards themselves". While Today's
+     board has nothing to draw (no answer yet, or the reader's code not landed), each card it last drew stands in its own
+     cell at its own height as bars (`TodaySkeleton.svelte`), and fills there when the answer lands: nothing moves. The
+     shape is kept per record and per board width once the board has drawn from the record and rested. */
+  const skelCols = $derived(narrow.current ? 2 : 4);
+  const skelShape = $derived(readShape(apiBase(), skelCols) ?? firstShape(skelCols));
+  const boardWaits = $derived(board && !data.refused && (got === null ? !settled : PageView === null));
+  let bodyEl = $state<HTMLElement | null>(null);
+  $effect(() => {
+    if (!board || !settled || fromCopy || got?.from !== 'live' || data.refused || boardModel.editing || boardModel.settling) return;
+    void drawn;
+    void boardModel.shown;
+    const cols = skelCols;
+    const root = bodyEl;
+    if (!root) return;
+    const base = apiBase();
+    const keep = () => {
+      const el = root.querySelector('.board');
+      if (el === null || untrack(() => boardModel.editing)) return;
+      const shape = shapeOf(el, cols);
+      if (shape) keepShape(base, shape);
+    };
+    const t = setTimeout(keep, 1600);
+    const leaving = () => {
+      if (document.visibilityState === 'hidden') keep();
+    };
+    document.addEventListener('visibilitychange', leaving);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('visibilitychange', leaving);
+    };
+  });
   /* AND READ AGAIN WHOLE where they are wanted: the board wider than a phone, or the editor, where a hidden widget is
      taken out of the tray. Read quietly over what is drawn, as a new version is. */
   /* ONCE FOR EACH ANSWER DRAWN: a whole read that fails leaves `got` as it was, and is not asked again until another
@@ -1748,7 +1789,9 @@
 
 <!-- THE READER, the one for a board and for a page laid out by hand. -->
 {#snippet readerPart()}
-  {#if reader && PageView}
+  {#if boardWaits}
+    <TodaySkeleton shape={skelShape} />
+  {:else if reader && PageView}
     {#if board}
       <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} between={amid} {placed} {inside} />
     {:else}
@@ -1852,7 +1895,7 @@
     -->
     <!-- DRAWN FROM THE COPY, IT SAYS WHEN IT IS FROM until the record answers (`kept-frame.ts` lays the same line in). -->
     {#if fromCopy && keptLine}<p class="kept-line" role="status">{keptLine}</p>{/if}
-    <div class="body" data-board={board ? '' : undefined}>
+    <div class="body" data-board={board ? '' : undefined} bind:this={bodyEl}>
       <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
       {#if board}
         <!-- TODAY IS A BOARD OF WIDGETS (the widgets plan of 29 October): each in its cell, and the editor over them. -->
@@ -2072,6 +2115,24 @@
     margin: 0;
     color: var(--ink-3);
     font-size: var(--fs-meta);
+  }
+
+  /* AND IT TAKES NO ROOM (ui-perfect, 3 Nov): in the flow it pushed the board down a line while the copy stood and pulled
+     it back up the moment the record answered, a jump on every open behind a copy. It sits at the end of the greeting's
+     row, level with it, where nothing else is drawn. */
+  .page {
+    position: relative;
+  }
+
+  .page :global(.kept-line) {
+    position: absolute;
+    inset-block-start: calc(var(--sp-5) + 2px);
+    inset-inline-end: var(--gutter);
+    max-inline-size: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 18px;
   }
 
   /* ── the board ─────────────────────────────────────────────────────────
@@ -3022,5 +3083,59 @@
 
   .body[data-board] :global([data-board-key] .list > .item:has(> .item-more)) {
     grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  /* ── the quality pass (ui-perfect, 3 Nov) ─────────────────────────────
+     Nothing said twice, states as chips, figures as figures. */
+
+  /* A NUMBER OFF ITS TARGET IS A STATE, said as a chip: "Off target" three times in orange words read as three warnings
+     of prose. The warn tint, 20 tall, as wide as its words. */
+  .body[data-board] :global(.kpi-why[data-state='off']) {
+    display: inline-flex;
+    align-items: center;
+    inline-size: fit-content;
+    block-size: var(--badge-h, 20px);
+    margin-block-start: var(--sp-1);
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-pill, 999px);
+    background: var(--warn-tint);
+    color: var(--warn);
+    font-size: 11.5px;
+    font-weight: var(--fw-semi);
+    line-height: 1;
+  }
+
+  /* A CARD OF ONE FIGURE IS A STAT TILE: its words small over the figure, the figure at the tile figure's 22/600. Laid as
+     a row, "Coming in" at the left and "$4,160" at the right edge read as a ledger line under "Owed to you". */
+  .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:only-child) {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-1);
+  }
+
+  .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:only-child .cell-label) {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .body[data-board] :global([data-board-key] .block[data-kind='stat'] .grid > .cell:only-child .cell-figure) {
+    justify-self: start;
+    font-size: var(--fs-figure);
+    font-weight: var(--fw-semi);
+    line-height: 26px;
+    letter-spacing: -0.02em;
+    text-align: start;
+  }
+
+  /* A PROJECT'S NUMBER IS SAID ONCE: with Numbers on the board, "412 Beta users" and "25 Sprint hours" stood in both
+     cards. The project card says its next step there instead, which nothing else on Today says. */
+  .body[data-board]:has(:global(.kpi-row)) :global(.block-slot[data-board-key][data-size] .pcard .pc-b.pc-b) {
+    display: none;
+  }
+
+  .body[data-board]:has(:global(.kpi-row)) :global(.block-slot[data-board-key][data-size] .pcard .pc-next.pc-next) {
+    display: flex;
   }
 </style>
