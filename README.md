@@ -11,7 +11,7 @@ stopped. They ask before touching money, keys or deletes.
 BrainDog is open source. Use it hosted at [brain.dog](https://brain.dog), or run it on your own machine.
 
 [Website](https://brain.dog) · [Docs](https://brain.dog/docs) · [Connect your agents](#connect-your-agents) ·
-[Run it yourself](#run-it-yourself) · [Add-ons](#add-ons)
+[Run it yourself](#run-it-yourself) · [Plugins](#plugins-and-starters)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/media/screenshot-dark.png">
@@ -36,7 +36,7 @@ BrainDog is open source. Use it hosted at [brain.dog](https://brain.dog), or run
   the same access, no more. Share one page with a read-only link, with or without money.
 - **Slash.** Press ⌘J (Ctrl J on Windows) and ask BrainDog in plain words. It answers from your own numbers, and a
   change it makes comes with an undo.
-- **Add-ons.** Everything else, from bank feeds to a landlord's rent book. See [Add-ons](#add-ons).
+- **Plugins.** Everything else, from bank feeds to a landlord's rent book. See [Plugins](#plugins-and-starters).
 
 It works in any browser. The iPhone app is in testing on TestFlight, and a Mac app is built from the same project.
 Neither is in the App Store yet.
@@ -96,29 +96,30 @@ braindog attach brief.pdf dashboard.html --to "Fix the login"
 braindog attach --list --to "Fix the login"
 ```
 
-## Add-ons
+## Plugins and starters
 
-Projects, Work, People and Agents are built in. Everything else is an add-on, installed from the app's Add-ons page:
+Projects, Work, People and Agents are built in. Everything else is a plugin, installed from the app's Plugins page:
 Money and its parts (investments, property, insurance, debts, goals, trips, zakat), Stripe, Mercury, Gmail, Calendar,
-Sentry, standups, project briefs and more. A starter is a set of add-ons and example rows for one kind of work, such as
+Sentry, standups, project briefs and more. A starter is a set of plugins and example rows for one kind of work, such as
 a photographer, a landlord or a retainer business.
 
 **Where they come from.**
 
-- **The BrainDog store.** Nothing from outside is listed until a person at BrainDog has reviewed it.
+- **The plugin store.** Nothing from outside is listed until a person at BrainDog has reviewed it.
 - **Any GitHub repo.** The install is pinned to a commit, and updates come from that repo.
-- **Your own BrainDog.** Ask an agent for something BrainDog doesn't do. It writes the add-on, checks it, and asks
+- **Your own BrainDog.** Ask an agent for something BrainDog doesn't do. It writes the plugin, checks it, and asks
   you before it installs.
 
 **What they can do.** Lists, pages, figures and rules. Tools your agents can call, commands, and actions on a row.
 Views they draw themselves. Scripts that notify you, ask a model or keep their own data. You see each of these before
-you install, and an add-on gets only what you approved. Scripts run in a sandbox and reach only the hosts the file
+you install, and a plugin gets only what you approved. Scripts run in a sandbox and reach only the hosts the file
 names.
 
-**If one goes wrong.** BrainDog can switch off a bad version of a store add-on wherever it is installed, and tells you
+**If one goes wrong.** BrainDog can switch off a bad version of a store plugin wherever it is installed, and tells you
 why. Its rows stay.
 
-**Make one.** An add-on is one readable file, so you can read and diff it before it is applied.
+**Make one.** A plugin is one readable file, so you can read and diff it before it is applied. The command line
+still calls it `addon`.
 
 ```sh
 braindog addon new plant-care                    # a folder with the file, a test and a README
@@ -169,13 +170,13 @@ Mail, a model for Slash and a public address are optional and off until you set 
 TypeScript throughout, on Node 24, with no build step for most packages.
 
 - `packages/kernel` is the write path: one way in, an append-only ledger, types, filters, figures and rules.
-- `packages/record` puts the kernel, the declarations and add-ons together into one record over SQLite.
+- `packages/record` puts the kernel, the declarations and plugins together into one record over SQLite.
 - `packages/mcp` serves the record to agents.
-- `packages/script` is the sandbox add-on scripts run in.
+- `packages/script` is the sandbox plugin scripts run in.
 - `packages/render` is the block dialect and its renderers, published on its own as `braindog-render`.
 - `apps/web` is the app, in SvelteKit. Both hosts serve the same build.
 - `apps/worker` is the hosted version on Cloudflare Workers: one Durable Object, with its own SQLite, per record.
-  It also runs the add-on store.
+  It also runs the plugin store.
 - `apps/selfhost` is the same record on one Node process over `node:sqlite`, and the container.
 - `apps/cli` is the `braindog` command line, and `apps/site` is brain.dog.
 - `apps/apple` is the iPhone and Mac app. `apps/desktop` is the older desktop shell, kept for Windows and Linux.
@@ -186,7 +187,7 @@ The design is written down first, in [`docs/`](docs/). [docs/00-README.md](docs/
 
 ## Docs
 
-- [brain.dog/docs](https://brain.dog/docs): using BrainDog, connecting agents, the HTTP API and writing add-ons.
+- [brain.dog/docs](https://brain.dog/docs): using BrainDog, connecting agents, the HTTP API and writing plugins.
 - [`docs/`](docs/): the numbered design and specification documents.
 - [DEPLOYMENT.md](DEPLOYMENT.md): how the hosted version is deployed.
 
