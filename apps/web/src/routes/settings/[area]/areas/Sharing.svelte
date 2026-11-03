@@ -448,9 +448,11 @@
     line-height: var(--lead-meta);
   }
 
+  /* A CONTROL'S HEIGHT, which is 44 under a thumb and 36 under a mouse, so the field and its button match the
+     area's other fields at a desk instead of standing 44 among 36s. */
   .see-as-pick .field-input,
   .group-add .field-input {
-    min-block-size: var(--tap);
+    min-block-size: calc(var(--ctl-h) - 2px);
   }
 
   .hint {
@@ -575,7 +577,7 @@
   .share :global(.btn),
   .share-do :global(.btn),
   .group-add :global(.btn) {
-    min-block-size: var(--tap);
+    min-block-size: var(--ctl-h);
   }
 
   .group {
@@ -593,6 +595,11 @@
   .group-add .field {
     flex: 1 1 12rem;
     min-inline-size: 0;
+    min-block-size: var(--ctl-h);
+  }
+
+  .see-as-pick.field {
+    min-block-size: var(--ctl-h);
   }
 
   .group-new {
