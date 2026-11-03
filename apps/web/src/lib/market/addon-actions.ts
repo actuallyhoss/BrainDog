@@ -99,7 +99,7 @@ export function addonCommandRows(commands: readonly AddonCommand[], line: string
     }
     const parts = answer === null || answer === '' ? [] : asks.length === 1 ? [answer] : answer.split(',').map((p) => p.trim());
     if (parts.length < asks.length || parts.some((p) => p === '')) {
-      out.push({ ...base, title: `${c.title}: ${asks.map((a) => a.label).join(', ')}`, href: null, fill: `${c.title}: ` });
+      out.push({ ...base, title: `${c.title}…`, detail: `${c.addon_title}. Say ${asks.map((a) => a.label.toLowerCase()).join(', ')} after a colon`, href: null, fill: `${c.title}: ` });
       continue;
     }
     const values: Record<string, string | number> = {};
