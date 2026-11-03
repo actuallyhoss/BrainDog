@@ -637,9 +637,9 @@ export const MONEY_BAND: {
     { name: 'Ads', spent: 21_000, of: 35_000, icon: 'tag', period: 'this month' },
   ],
   coming: [
-    { name: 'AWS', when: 'Sat 1', cents: CENTS.awsCard, icon: 'cloud' },
-    { name: 'Dana Reyes', when: 'Fri 7', cents: CENTS.danaInvoice, icon: 'person' },
-    { name: 'Northbound pays', when: 'Wed 12', cents: -CENTS.northboundInvoice, icon: 'cash' },
+    { name: 'Dana Reyes', when: 'Fri 20', cents: CENTS.danaInvoice, icon: 'person' },
+    { name: 'AWS', when: 'Mon 23', cents: CENTS.awsCard, icon: 'cloud' },
+    { name: 'Northbound pays', when: 'Thu 26', cents: -CENTS.northboundInvoice, icon: 'cash' },
   ],
 };
 

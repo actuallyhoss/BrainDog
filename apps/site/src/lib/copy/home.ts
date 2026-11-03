@@ -162,8 +162,9 @@ export const home = {
     title: 'Free while in early access.',
     say: "BrainDog is invite only for now. Ask for an invite and we'll email you when your place is ready. A short chat about your work sets it up.",
     /* The figures are `TABLE.free`'s, said in ONE SENTENCE, NOT A ROW OF STATS (the site's own rule, §47). */
+    /* "built\u2011in" with a hyphen that never breaks, so a phone does not leave "in assistant." alone on a line. */
     figures: (tools: number, questions: number): string =>
-      `Free: every feature, ${tools} connected agents and ${questions} questions a month to the built-in assistant.`,
+      `Free: every feature, ${tools} connected agents and ${questions} questions a month to the built\u2011in assistant.`,
   },
 
   faq: {

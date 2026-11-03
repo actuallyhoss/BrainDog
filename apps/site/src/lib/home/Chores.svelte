@@ -323,11 +323,11 @@
     }
   }
 
-  /* WHAT KEEPS IT YOURS, under both: the floor first and in the ink at 600, then the three promises, four across a desk
-     over a hairline, two by two below 1060 and one under another on a phone. */
+  /* WHAT KEEPS IT YOURS, under both: the floor first, on its own row in the ink at 600, then the three promises, three
+     across a desk over a hairline and one under another below 1060. */
   .keeps {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px 24px;
     margin-block-start: 24px;
     padding-block-start: 20px;
@@ -354,6 +354,12 @@
     font-weight: 600;
   }
 
+  /* THE FLOOR IS TWO SENTENCES SINCE 3 NOVEMBER, so it takes the row's full width and the three promises sit under it. */
+  .keeps .floor {
+    grid-column: 1 / -1;
+    max-inline-size: 56rem;
+  }
+
   /* THE WAY ON TO HOW IT IS KEPT SAFE, the site's one (`.onward`), a tile's gap under the promises. */
   .on {
     margin-block-start: 24px;
@@ -361,7 +367,7 @@
 
   @media (max-width: 1059px) {
     .keeps {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 

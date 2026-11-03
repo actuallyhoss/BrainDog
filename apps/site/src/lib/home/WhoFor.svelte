@@ -8,8 +8,8 @@
   The first step draws the makers it connects, the second the briefing in a terminal, the third the first of Maya's
   questions as Needs you draws it, with its two answers (drawn, not pressable: the desk above is where they work).
 
-  ON A PHONE, THREE PLAIN LINES: each tile is its icon and its way on, one line with an arrow, and the title is
-  said to a screen reader. The cards and their sentences were most of a screen at 390.
+  ON A PHONE, THREE SHORT TILES: each is its icon, the step's title and its way on under it. The cards and their
+  sentences were most of a screen at 390.
 -->
 <script lang="ts">
   import AgentMark from '$lib/AgentMark.svelte';
@@ -219,27 +219,32 @@
       gap: 8px;
     }
 
+    /* THE STEP'S TITLE BESIDE ITS ICON, and the way on under it, so three steps still read as three steps. */
     .ftile {
       display: grid;
       grid-template-columns: 40px minmax(0, 1fr);
+      grid-template-rows: auto auto;
       align-items: center;
       column-gap: 12px;
-      padding-block: 12px;
+      row-gap: 2px;
+      padding-block: 14px;
+    }
+
+    .fwell {
+      grid-row: 1 / 3;
     }
 
     h3 {
-      position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
       margin: 0;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
+      font-size: var(--t-text);
+      font-weight: 600;
+      letter-spacing: -0.01em;
     }
 
     .onward {
-      align-self: center;
-      font-size: var(--t-text);
+      align-self: start;
+      color: var(--ink2);
+      font-size: var(--t-site-14);
     }
   }
 </style>

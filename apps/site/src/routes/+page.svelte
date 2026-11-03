@@ -44,13 +44,16 @@
   import WhoFor from '$lib/home/WhoFor.svelte';
   import Yours from '$lib/home/Yours.svelte';
   import Start from '$lib/site/Start.svelte';
+
+  const title = home.hero.title.split(' ');
 </script>
 
 <Seo title={site.meta.home.title} description={site.meta.home.description} path="/" ld={[organization, website, application]} />
 <section class="hero night" aria-labelledby="hero-title">
   <span class="hero-mark" aria-hidden="true"><Mark tone="line" height={731} /></span>
   <div class="wrap copy">
-    <h1 id="hero-title">{home.hero.title}</h1>
+    <!-- A HYPHENATED WORD STAYS WHOLE ("re-explaining"), so the phone never breaks the headline after "re-". -->
+    <h1 id="hero-title">{#each title as word, i}{#if i > 0}{' '}{/if}{#if word.includes('-')}<span class="whole">{word}</span>{:else}{word}{/if}{/each}</h1>
     <p class="lead sub">{home.hero.sub}</p>
     <div class="ctas">
       <Start />
@@ -112,6 +115,10 @@
     line-height: 0.98;
     letter-spacing: -0.021em;
     text-wrap: balance;
+  }
+
+  .whole {
+    white-space: nowrap;
   }
 
   .lead {
