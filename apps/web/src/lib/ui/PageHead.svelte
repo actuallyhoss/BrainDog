@@ -309,6 +309,18 @@
      to say gives the line back. */
   const held = $derived(sentence === undefined && settled() === undefined);
 
+  /* ON A DESK, A TITLED HEAD WITH NO SENTENCE PUTS ITS BUTTONS IN THE TOP BAR, beside the name the bar already says
+     (space pass, 4 Nov): with the sentence gone, Share and the "⋯" stood alone on a row of their own under the bar. */
+  const inBar = $derived(titled && !narrow.current && !inIosApp && Boolean(actions) && !sentence && !held);
+  $effect(() => {
+    if (!inBar) return;
+    const s = barActions;
+    frame.actions = s;
+    return () => {
+      if (frame.actions === s) frame.actions = null;
+    };
+  });
+
 </script>
 
 <div bind:this={mark} aria-hidden="true"></div>
@@ -402,10 +414,11 @@
         <p class="head-title" aria-hidden="true">{title}{#if counted}<span class="head-title-count num">{(count ?? 0).toLocaleString('en')}</span>{/if}</p>
       </div>
     {/if}
-    {#if actions}<div class="head-actions">{@render actions()}</div>{/if}
+    {#if actions && !inBar}<div class="head-actions">{@render actions()}</div>{/if}
   </div>
 </header>
 {/if}
+{#snippet barActions()}<span class="head-actions desk-bar-actions">{@render actions?.()}</span>{/snippet}
 {#snippet said()}
   {#if parts}{#each parts as part}{#if part.needs}<span class="needs" data-needs>{part.text}</span>{:else if part.fig}<span class="fig">{part.text}</span>{:else}{part.text}{/if}{/each}{:else if typeof sentence !== 'string' && sentence}{@render sentence()}{/if}
 {/snippet}
@@ -693,6 +706,11 @@
     gap: var(--sp-2);
     min-inline-size: 0;
     margin-inline-start: auto;
+  }
+
+  /* IN THE DESK'S TOP BAR, beside the name: the bar's own 16 is the space before it. */
+  .desk-bar-actions {
+    margin-inline-start: 0;
   }
 
   /* A QUIET CONTROL BESIDE THE NAME IS A TILE-COLOURED RECTANGLE ON THE BOARD: no glass, no edge, no shadow. */

@@ -55,6 +55,8 @@ export const frame = $state({
    * they sat above the bar the page itself draws, and the bar was pushed half a screen down.
    */
   banners: null as Snippet | null,
+  /** A titled page's own buttons on a desk when it says no sentence, which the top bar draws beside the name. */
+  actions: null as Snippet | null,
   /** How many page heads are drawn now: with one on a phone, it draws the banners and the shell does not. */
   heads: 0,
 });

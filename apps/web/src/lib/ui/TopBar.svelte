@@ -56,6 +56,8 @@
       {/each}
     </ol>
   </div>
+  <!-- THE PAGE'S OWN BUTTONS BESIDE ITS NAME, where its head says no sentence (`PageHead`'s `inBar`). -->
+  {#if frame.actions}<span class="bar-page">{@render frame.actions()}</span>{/if}
 
   <!-- THE ONE WAY TO ASK, drawn as the field the palette opens out of (`data-palette-from`), its key at rest: `/` finds,
        and ⌘J (Ctrl J off a Mac) opens straight into Ask, which is the key the hint names. -->
@@ -96,6 +98,18 @@
     flex: 1 1 auto;
     min-inline-size: 0;
     view-transition-name: bar-crumb;
+  }
+
+  /* WITH THE PAGE'S BUTTONS BESIDE IT, the name takes its own width and the buttons the rest, up to Ask. */
+  .crumb:has(+ .bar-page) {
+    flex: 0 1 auto;
+  }
+
+  .bar-page {
+    display: flex;
+    flex: 1 0 auto;
+    align-items: center;
+    min-inline-size: 0;
   }
 
   .crumb ol {
