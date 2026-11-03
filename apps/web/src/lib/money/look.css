@@ -2385,3 +2385,69 @@
 [data-money] .list[data-kind='todo'] > .item > .item-more {
   margin-block: calc((var(--lead-meta) - var(--ctl-panel)) / 2);
 }
+
+/* ── UI pass, 3 Nov evening: nothing said twice, no stray helper lines (loop/plans/ui-perfect-2026-11-03/money) ── */
+
+/* OVER TIME ON MONEY'S HOME DRAWS ITS LINE, NOT ITS FIGURE: the hero over it says the same cash at display size, so the
+   tile said "£33,850" a second time one card down. Its note ("Net worth takes this line after its first week") was a
+   helper nobody acts on. Both stay on every other page, where nothing above says them. */
+[data-money]:has(.block[data-kind='stat'][data-form='lead'] .cell-trend-ahead) .block[data-kind='stat']:not([data-form='lead']) .cell:has(> svg.cell-trend) > :is(.cell-figure, .cell-note) {
+  display: none;
+}
+
+/* THE GLANCE STRIP'S LABELS IN SENTENCE CASE, as every stat label on Money is (ops 4.28: label 13/500 in the third
+   ink): "IN, NEXT 30 DAYS" in caps read as a shout with a comma in it. Caps stay for table heads only. */
+[data-money] .block[data-kind='stat'][data-form='lead'] > .grid > .cell:not(:first-child) .cell-label {
+  font: var(--fw-medium, 500) var(--fs-ctl, 13px) / var(--lead-ctl, 20px) var(--font-ui);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-3);
+}
+
+/* A BUDGET WITH NOTHING SPENT SAYS ITS AMOUNT ONCE: "£0 of £7,000" over an empty bar, not "£7,000 left" under it as
+   well. Once something is spent the left line is new arithmetic and comes back. */
+[data-money] .progress-row:has(> .progress-track[style*='--fill: 0.00;']) > .progress-left {
+  display: none;
+}
+
+/* AN ACCOUNT'S FIGURE IS ITS BALANCE: the word "Balance" under every amount in every card said what the card is. */
+[data-money] .block-slot[data-source='register.accounts'] .cards-figure > .cards-label {
+  display: none;
+}
+
+/* ON AN ACCOUNT'S OWN PAGE THE BALANCE TILE HAS NO HEAD: it was the account's name, which is the page's title right
+   above it. The tile opens on "Balance". */
+[data-money]:has(.block-slot[data-self][data-source='register.accounts']) .block-slot:has(> .block[data-kind='stat']):has(+ .block-slot > .block[data-kind='capture']) > .block-bar {
+  display: none;
+}
+
+/* AND THE BOX UNDER IT IS ITS FOOT ON AN INSET HAIRLINE, never a rule across the whole card (ops: dividers start at
+   the text edge and stop short of the box edge). */
+[data-money] .block-slot:has(> .block[data-kind='stat']) + .block-slot:has(> .block[data-kind='capture']) {
+  border-block-start: 0;
+  background-image: linear-gradient(var(--mo-sep, var(--rule)), var(--mo-sep, var(--rule)));
+  background-repeat: no-repeat;
+  background-position: var(--tile-pad, 20px) 0;
+  background-size: calc(100% - 2 * var(--tile-pad, 20px)) 1px;
+}
+
+/* THE LEDGER'S "YOUR FILING RULES FILE LINES LIKE THESE AS THEY COME IN" OVER EVERY LINE: a sentence about another
+   page on top of the list. Filing rules has its own place under Money. */
+[data-money] .block-slot > .document:has(> p > a[href='/p/money-rules']:only-child) {
+  display: none;
+}
+
+/* NEXT MOVEMENTS ARE ROWS TOLD APART BY AIR, as every list's rows are (ops: no rule between rows). */
+[data-money] .forecast-next {
+  --rule: transparent;
+}
+
+/* THE TWO CARDS MEET AS ONE: each one's edge and shadow is cut where they join, so the inset hairline above is the only
+   line between the balance and its box (it was the two card edges and a band of shadow, a thick rule across). */
+[data-money] .block-slot:has(> .block[data-kind='stat']):has(+ .block-slot > .block[data-kind='capture']) {
+  clip-path: inset(-48px -48px 0 -48px);
+}
+
+[data-money] .block-slot:has(> .block[data-kind='stat']) + .block-slot:has(> .block[data-kind='capture']) {
+  clip-path: inset(0 -48px -48px -48px);
+}
