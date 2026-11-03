@@ -2449,5 +2449,7 @@
 }
 
 [data-money] .block-slot:has(> .block[data-kind='stat']) + .block-slot:has(> .block[data-kind='capture']) {
+  /* Pulled up by the board's own gap (16 at a desk, 12 on a phone), so no strip of ground shows between the two. */
+  margin-block-start: calc(-1 * var(--tile-gap, var(--sp-3)));
   clip-path: inset(0 -48px -48px -48px);
 }
