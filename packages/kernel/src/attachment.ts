@@ -415,8 +415,10 @@ function contentText(s: string, fonts: ReadonlyMap<string, CMap>): string {
     } else if (word === 'Td' || word === 'TD') {
       const ty = operands[operands.length - 1];
       const tx = operands[operands.length - 2];
+      /* A MOVE ALONG THE LINE SAYS NOTHING: writers that split a line into runs (Chrome, for kerning) carry their spaces
+         as glyphs, and a space put in here split words ("Gallery ."). Only a move down is a new line. */
       if (typeof ty === 'number' && Math.abs(ty) > 0.5) say('\n');
-      else if (typeof tx === 'number' && tx > 1) say(' ');
+      void tx;
     } else if (word === 'T*' || word === 'ET') say('\n');
     else if (word === 'Tm') say(' ');
     operands.length = 0;
@@ -561,7 +563,8 @@ export async function pdfText(bytes: Uint8Array): Promise<string | null> {
       const data = streams.get(ref);
       if (data !== undefined) text += contentText(data, fonts);
     }
-    const t = tidy(text);
+    /* LIGATURES AS LETTERS (ﬁ is fi), so a word an agent searches for is the word it reads. */
+    const t = tidy(text.normalize('NFKC'));
     if (t !== '') {
       out.push(t);
       total += t.length;

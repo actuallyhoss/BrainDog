@@ -2694,9 +2694,12 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if (typeof args.note === 'string' && FILE_NAME.test(args.note.trim()) && surface.attachFile) {
       const kept = await surface.attachFile({ on: args.spoken.trim(), name: args.note.trim(), text: args.page }, ctx);
       if (!kept.ok) return { result: await failed(kept, ctx, turn) };
-      turn.batch = batchIn(kept.value);
-      const said = isObject(kept.value) && typeof kept.value.said === 'string' ? kept.value.said : 'Attached.';
-      return { result: kept, say: () => said };
+      /* NO UNDO RECEIPT: the record's undo keeps notes, and an attachment is note lines, so `undoOwn` would leave it on.
+         What takes it off is named instead, which an agent may do to a file an agent put. */
+      const v = isObject(kept.value) ? kept.value : {};
+      const said = typeof v.said === 'string' ? v.said : 'Attached.';
+      const off = typeof v.id === 'string' ? ` To take it off: act with call "removeAttachment" and args {"id": "${v.id}"}.` : '';
+      return { result: kept, say: () => `${said}${off}` };
     }
     const title = typeof args.note === 'string' && args.note.trim() !== '' ? { title: args.note.trim() } : {};
     if (args.draft !== undefined && typeof args.draft !== 'boolean') return { result: { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'draft is true for a page to be kept or thrown away, or left out.', at: 'draft' } } };
