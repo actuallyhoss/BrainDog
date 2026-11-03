@@ -167,18 +167,18 @@
 </p>
 
 <style>
-  /* THE PAGE'S HEAD IS THE GREETING, in Lexend 28 as the app draws it, with nothing under it. */
+  /* THE GREETING sits under the page's title, 20/600 as the app draws it now (3 Nov). */
   .greet {
-    margin: 4px 2px 16px;
-    font: 600 28px/1.15 var(--head);
-    letter-spacing: -0.024em;
+    margin: 6px 2px 16px;
+    font: 600 20px/1.2 var(--head);
+    letter-spacing: -0.015em;
   }
 
   /* THE BOARD: one twelve-column grid, each widget at its own width as the app's packer lays them (`lib/board/pack.ts`). */
   .board {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: 12px;
+    gap: 14px;
     align-items: start;
   }
 
@@ -209,7 +209,7 @@
     place-items: center;
     inline-size: 36px;
     padding: 3px 0;
-    border-radius: 8px;
+    border-radius: 10px;
     background: var(--soft);
     line-height: 1.1;
   }
@@ -317,11 +317,12 @@
     align-items: center;
     gap: 6px;
     block-size: 32px;
-    padding: 0 12px;
-    border-radius: 8px;
-    background: var(--tile);
+    padding: 0 14px;
+    border-radius: 999px;
+    background: var(--g-fill);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
     color: var(--ink);
-    font: 500 14px/1 var(--ui);
+    font: 500 13.5px/1 var(--ui);
   }
 
   .bbtn :global(.icon) {
@@ -330,15 +331,9 @@
   }
 
   .count {
-    min-inline-size: 20px;
-    block-size: 20px;
-    padding-inline: 6px;
-    box-sizing: border-box;
-    border-radius: 999px;
-    background: var(--red-fill);
-    color: var(--on-red);
-    font: 600 12px/20px var(--ui);
-    text-align: center;
+    /* THE COUNT IN A CARD'S HEAD is the red figure beside the name, as the app's heads draw it. */
+    color: var(--red);
+    font: 500 14px/20px var(--ui);
   }
 
   .need {
@@ -346,11 +341,9 @@
     align-items: center;
     gap: 12px;
     padding: 12px 0;
-    border-block-start: 1px solid var(--rule);
   }
 
   .need:first-of-type {
-    border-block-start: 0;
     padding-block-start: 0;
   }
 
@@ -370,7 +363,6 @@
     align-items: center;
     gap: 8px;
     padding: 10px 0 0;
-    border-block-start: 1px solid var(--rule);
     color: var(--ink2);
     font-size: var(--t-site-13);
     animation: land 200ms ease-out both;
@@ -439,7 +431,7 @@
     place-items: center;
     inline-size: 40px;
     block-size: 40px;
-    border-radius: 8px;
+    border-radius: 50%;
     background: var(--ph-tint);
     color: var(--ph);
   }

@@ -132,11 +132,12 @@
     gap: 8px;
     width: 100%;
     height: 34px;
-    padding: 0 10px;
-    border-radius: 8px;
-    background: var(--soft);
+    padding: 0 14px;
+    border-radius: 999px;
+    background: var(--g-fill);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
     color: var(--muted);
-    font: 400 14px/1 var(--ui);
+    font: 400 13.5px/1.3 var(--ui);
     transition: box-shadow 0.2s;
   }
 
@@ -153,7 +154,7 @@
   .open .desk-ask-bar {
     background: var(--tile);
     color: var(--ink);
-    border-radius: 12px 12px 0 0;
+    border-radius: 17px 17px 0 0;
     box-shadow: inset 0 0 0 1.5px var(--red);
   }
 
@@ -183,7 +184,8 @@
     background: var(--tile);
     border: 1.5px solid var(--red);
     border-block-start: 0;
-    border-radius: 0 0 12px 12px;
+    border-radius: 0 0 17px 17px;
+    box-shadow: var(--elev-popover);
     overflow: hidden;
   }
 

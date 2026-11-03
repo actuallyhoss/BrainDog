@@ -55,7 +55,7 @@
     display: grid;
     gap: 8px;
     padding: 16px 0;
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 0;
   }
 
   .q:first-of-type {
@@ -81,7 +81,7 @@
     display: grid;
     padding: 8px 12px;
     background: var(--board);
-    border-radius: 8px;
+    border-radius: 12px;
   }
 
   .facts p {

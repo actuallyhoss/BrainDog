@@ -98,8 +98,8 @@
     place-items: center;
     inline-size: 40px;
     block-size: 40px;
-    border-radius: 8px;
-    background: var(--band-slash-tile);
+    border-radius: 50%;
+    background: var(--soft-fill);
     color: var(--red);
     font: 600 20px/1 var(--head);
   }
@@ -118,9 +118,10 @@
     display: flex;
     align-items: center;
     min-block-size: 44px;
-    padding: 0 16px;
-    border-radius: 12px;
-    background: var(--band-slash-tile);
+    padding: 0 18px;
+    border-radius: 999px;
+    background: var(--tile);
+    box-shadow: inset 0 0 0 1px var(--sep), var(--shadow-raised);
     color: var(--ink);
     font-size: var(--t-site-15);
     transition: background var(--d-state) var(--ease-out);
@@ -128,12 +129,12 @@
 
   @media (hover: hover) {
     .try:hover {
-      background: var(--desk-hover);
+      background: linear-gradient(var(--row-wash), var(--row-wash)) var(--tile);
     }
   }
 
   .try[aria-pressed='true'] {
-    box-shadow: inset 0 0 0 1.5px var(--ink);
+    box-shadow: inset 0 0 0 1.5px var(--ink), var(--shadow-raised);
   }
 
   .try:focus-visible {
@@ -146,13 +147,16 @@
     margin: 24px 0 0;
   }
 
-  /* THE BAR AND ITS ANSWER: one width, one plain tile with a hairline and radius 12, the answer attached under the bar. */
+  /* THE BAR AND ITS ANSWER: the app's palette, one card radius 20 with the popover's lift, the answer under the bar. */
   .open {
     --tile: var(--desk-tile);
     --board: var(--desk-board);
     --soft: var(--desk-tile-2);
     --rule2: var(--desk-rule);
     --muted: var(--desk-ink-3);
+    border: 1px solid var(--card-edge);
+    border-radius: 21px;
+    box-shadow: var(--elev-popover);
   }
 
   .bar {
@@ -160,10 +164,10 @@
     align-items: center;
     gap: 10px;
     block-size: 52px;
-    padding: 0 16px;
-    border-radius: 12px 12px 0 0;
+    padding: 0 18px;
+    border-radius: 20px 20px 0 0;
     background: var(--tile);
-    box-shadow: inset 0 0 0 1px var(--rule);
+    box-shadow: inset 0 -1px 0 var(--sep);
     font-size: var(--t-site-16);
   }
 
@@ -201,9 +205,7 @@
     align-content: start;
     padding: 16px;
     background: var(--board);
-    border: 1px solid var(--rule);
-    border-block-start: 0;
-    border-radius: 0 0 12px 12px;
+    border-radius: 0 0 20px 20px;
   }
 
   /* AN ANSWER THE READER ASKED FOR SETTLES IN: each tile fades up 4px over the swap step as it arrives, so the new

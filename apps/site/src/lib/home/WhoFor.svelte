@@ -101,7 +101,7 @@
     place-items: center;
     inline-size: 40px;
     block-size: 40px;
-    border-radius: 8px;
+    border-radius: 50%;
     background: var(--well);
     color: var(--well-ink);
   }
@@ -170,7 +170,7 @@
     gap: 4px;
     padding: 10px 12px;
     background: var(--night);
-    border-radius: 8px;
+    border-radius: 12px;
     font: 400 13px/1.45 var(--mono);
     color: var(--on-night-2);
   }
@@ -186,7 +186,7 @@
     grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 12px;
     padding: 6px 0;
-    border-block-start: 1px solid var(--rule, color-mix(in srgb, var(--ink) 10%, transparent));
+    border-block-start: 0;
     color: var(--ink);
     font-size: var(--t-site-14);
   }

@@ -60,7 +60,7 @@
     justify-content: space-between;
     gap: 12px;
     padding: 6px 0;
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 0;
     font-size: var(--t-site-13);
   }
 

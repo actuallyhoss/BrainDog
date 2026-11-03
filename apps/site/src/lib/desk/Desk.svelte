@@ -224,23 +224,27 @@
 
   /* THE SIDEBAR: the record's name in a head as tall as the bar, the places, then the projects (the app's 27 October
      frame). It and the top bar share one surface; only the work sits on the board. */
+  /* THE SIDEBAR IS A FLOATING CARD (the app since 3 Nov): 10 in from the window, radius 16, the chrome's soft
+     elevation, and no rule against the work. */
   .side {
     grid-row: 1 / -1;
     grid-column: 1;
     min-inline-size: 0;
-    background: var(--desk-nav);
-    border-inline-end: 1px solid var(--rule);
+    margin: 10px 0 10px 10px;
+    padding-block-end: 6px;
+    background: var(--tile);
+    border-radius: 16px;
+    box-shadow: var(--glass-edge), var(--elev-chrome);
   }
 
   .side-head {
     display: flex;
     align-items: center;
     gap: 8px;
-    block-size: 56px;
+    block-size: 50px;
     box-sizing: border-box;
     margin: 0;
-    padding: 0 16px;
-    border-block-end: 1px solid var(--rule);
+    padding: 0 14px;
     color: var(--muted);
   }
 
@@ -267,7 +271,8 @@
 
   .places {
     display: grid;
-    padding: 8px 0 16px;
+    gap: 2px;
+    padding: 2px 0 10px;
   }
 
   .srow {
@@ -278,9 +283,9 @@
     block-size: 32px;
     margin: 0 8px;
     padding: 0 8px;
-    border-radius: 8px;
+    border-radius: 10px;
     color: var(--ink2);
-    font: 500 14px/1 var(--ui);
+    font: 400 14px/1.3 var(--ui);
     white-space: nowrap;
   }
 
@@ -293,9 +298,9 @@
     block-size: 32px;
     margin: 0 8px;
     padding: 0 8px;
-    border-radius: 8px;
+    border-radius: 10px;
     color: var(--ink2);
-    font: 500 14px/1 var(--ui);
+    font: 400 14px/1.3 var(--ui);
     white-space: nowrap;
     cursor: pointer;
     transition: background var(--d-state, 90ms) ease-out;
@@ -320,17 +325,18 @@
 
   .desk-tab:hover {
     color: var(--ink);
-    background: var(--desk-hover);
+    background: var(--row-wash);
   }
 
+  /* THE PAGE SHE IS ON: the chosen fill, the ink at 500 and the accent glyph, as the app's sidebar. */
   .desk-tab[aria-current='page'] {
-    background: var(--desk-nav-on);
+    background: var(--chosen);
     color: var(--ink);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .desk-tab[aria-current='page'] .tab-icon {
-    color: var(--ink);
+    color: var(--red-fill);
   }
 
   .desk-tab:focus-visible {
@@ -372,10 +378,10 @@
     display: flex;
     align-items: baseline;
     gap: 8px;
-    margin: 16px 0 4px;
+    margin: 14px 0 4px;
     padding: 0 16px;
     color: var(--ink);
-    font: 600 14px/1.2 var(--ui);
+    font: 600 13px/1.2 var(--ui);
   }
 
   /* A PROJECT'S MARK: its initial on its own hue, 20px, as the app's sidebar draws it. */
@@ -385,7 +391,7 @@
     place-items: center;
     inline-size: 20px;
     block-size: 20px;
-    border-radius: 5px;
+    border-radius: 6px;
     background: var(--ph-tint);
     color: var(--ph);
     font: 600 11px/1 var(--ui);
@@ -398,10 +404,8 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    min-block-size: 56px;
-    padding: 0 20px;
-    background: var(--desk-nav);
-    border-block-end: 1px solid var(--rule);
+    min-block-size: 60px;
+    padding: 10px 20px 0 24px;
     z-index: var(--z-raise);
   }
 
@@ -417,7 +421,7 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--muted);
-    font: 500 14px/1 var(--ui);
+    font: 500 15px/1.3 var(--ui);
     white-space: nowrap;
   }
 
@@ -426,9 +430,12 @@
     block-size: 14px;
   }
 
+  /* THE PAGE'S NAME IS THE LARGE TITLE on the top line, beside search, the bell and her face (the app's desk bar). */
   .crumb .here {
     color: var(--ink);
+    font-size: 24px;
     font-weight: 600;
+    letter-spacing: -0.021em;
   }
 
   .bell {
@@ -436,9 +443,12 @@
     display: grid;
     flex: none;
     place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
-    color: var(--ink2);
+    inline-size: 34px;
+    block-size: 34px;
+    border-radius: 50%;
+    background: var(--g-fill);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
+    color: var(--ink);
   }
 
   .bell :global(.icon) {
@@ -448,8 +458,8 @@
 
   .bell i {
     position: absolute;
-    inset-block-start: 6px;
-    inset-inline-end: 7px;
+    inset-block-start: 7px;
+    inset-inline-end: 8px;
     inline-size: 6px;
     block-size: 6px;
     border-radius: 50%;
@@ -460,11 +470,12 @@
     display: grid;
     flex: none;
     place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
+    inline-size: 34px;
+    block-size: 34px;
     border-radius: 50%;
-    background: var(--ph-tint);
-    color: var(--ph);
+    background: var(--tile);
+    box-shadow: inset 0 0 0 1px var(--sep);
+    color: var(--ink);
     font: 600 13px/1 var(--ui);
   }
 
@@ -506,7 +517,8 @@
   }
 
   .ptab.on .pt-ic {
-    background: var(--desk-nav-on);
+    background: var(--chosen);
+    color: var(--red-fill);
   }
 
   .pt-w {
@@ -541,12 +553,12 @@
     block-size: 7px;
     border-radius: 50%;
     background: var(--live);
-    box-shadow: 0 0 0 2px var(--desk-nav);
+    box-shadow: 0 0 0 2px var(--tile);
   }
 
   .desk-pane {
     display: none;
-    padding: 20px;
+    padding: 12px 20px 20px 24px;
   }
 
   .desk-pane:focus-visible {
@@ -580,14 +592,16 @@
   .win :global(.grid) {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: 12px;
+    gap: 14px;
   }
 
   .win :global(.t) {
     min-inline-size: 0;
     padding: 20px;
     background: var(--tile);
+    border: 1px solid var(--card-edge);
     border-radius: 16px;
+    box-shadow: var(--shadow-card);
   }
 
   .win :global(.s3) {
@@ -622,11 +636,19 @@
   .win :global(.thd) {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-block-size: 28px;
+    gap: 8px;
+    min-block-size: 24px;
     margin: 0 0 12px;
     color: var(--ink);
-    font: 600 15px/1.2 var(--ui);
+    font: 600 15px/1.3 var(--ui);
+  }
+
+  /* A CARD'S HEAD GLYPH IS BARE (the app, 3 Nov): 18px in the third ink, no well. */
+  .win :global(.thd > .well) {
+    inline-size: 18px;
+    block-size: 18px;
+    background: none;
+    color: var(--muted);
   }
 
   .win :global(.thd .r) {
@@ -642,7 +664,7 @@
     place-items: center;
     inline-size: 28px;
     block-size: 28px;
-    border-radius: 8px;
+    border-radius: 50%;
     background: var(--soft);
     color: var(--ink2);
   }
@@ -675,7 +697,7 @@
 
   .win :global(.big) {
     font: 600 28px/34px var(--head);
-    letter-spacing: -0.024em;
+    letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
   }
 
@@ -709,7 +731,6 @@
     gap: 12px;
     min-inline-size: 0;
     padding: 10px 0;
-    border-block-start: 1px solid var(--rule);
   }
 
   .win :global(.li:first-child) {
@@ -767,17 +788,17 @@
     align-items: center;
     justify-content: center;
     block-size: 32px;
-    padding: 0 12px;
-    border-radius: 8px;
-    background: var(--soft);
+    padding: 0 14px;
+    border-radius: 999px;
+    background: var(--soft-fill);
     color: var(--ink);
-    font: 500 14px/1 var(--ui);
+    font: 500 13.5px/1 var(--ui);
     white-space: nowrap;
     transition: background var(--d-press, 70ms) ease-out;
   }
 
   .win :global(.dbtn:hover) {
-    background: var(--desk-hover);
+    background: var(--soft-fill-hover);
   }
 
   .win :global(.dbtn.red) {
@@ -797,6 +818,7 @@
      (1 Nov), and three red buttons in the picture outshouted it. */
   .win :global(.dbtn.ink) {
     background: var(--ink);
+    box-shadow: var(--shadow-raised);
     color: var(--page);
   }
 
@@ -928,9 +950,8 @@
     }
 
     .app-top {
-      min-block-size: 52px;
-      padding: 0 12px;
-      background: var(--board);
+      min-block-size: 56px;
+      padding: 6px 12px 0 16px;
       border-block-end: 0;
     }
 
@@ -949,16 +970,20 @@
       padding: 4px 12px 76px;
     }
 
+    /* THE PHONE BAR FLOATS: a capsule 10 off each side and the foot, the chrome's soft elevation (the app since 3 Nov). */
     .ptabs {
       position: absolute;
-      inset-block-end: 0;
-      inset-inline: 0;
+      inset-block-end: 10px;
+      inset-inline: 10px;
       z-index: var(--z-raise);
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
-      block-size: 60px;
-      background: var(--desk-nav);
-      border-block-start: 1px solid var(--rule);
+      block-size: 58px;
+      background: color-mix(in oklab, var(--tile) 88%, transparent);
+      -webkit-backdrop-filter: blur(24px) saturate(130%);
+      backdrop-filter: blur(24px) saturate(130%);
+      border-radius: 999px;
+      box-shadow: var(--glass-edge), var(--elev-popover);
     }
 
     .win :global(.grid) {

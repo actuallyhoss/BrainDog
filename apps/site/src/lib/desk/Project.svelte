@@ -114,7 +114,7 @@
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    border-radius: 8px;
+    border-radius: 999px;
     background: var(--tile);
     font-size: var(--t-site-13);
   }

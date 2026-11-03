@@ -108,7 +108,7 @@
     place-items: center;
     inline-size: 40px;
     block-size: 40px;
-    border-radius: 8px;
+    border-radius: 50%;
     background: var(--well);
     color: var(--well-ink);
   }
@@ -142,14 +142,14 @@
     margin: 0;
   }
 
-  /* A PERSON OR A LINE OF THE LINK, as the app's lists draw a row: a hairline over each but the first. */
+  /* A PERSON OR A LINE OF THE LINK, as the app's lists draw a row: told apart by air, no rule between rows. */
   .row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 10px;
     padding: 6px 0;
-    border-block-start: 1px solid var(--rule, color-mix(in srgb, var(--ink) 10%, transparent));
+    border-block-start: 0;
     color: var(--ink);
     font-size: var(--t-site-14);
   }
@@ -200,7 +200,7 @@
   .comment {
     margin-block-start: 10px !important;
     padding: 10px 12px;
-    border-radius: 8px;
+    border-radius: 14px;
     background: color-mix(in srgb, var(--ink) 5%, transparent);
     color: var(--ink);
     font-size: var(--t-site-14);

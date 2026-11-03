@@ -88,7 +88,9 @@
 
   details {
     background: var(--band-faq-tile);
+    border: 1px solid var(--card-edge);
     border-radius: 16px;
+    box-shadow: var(--shadow-card);
   }
 
   summary {

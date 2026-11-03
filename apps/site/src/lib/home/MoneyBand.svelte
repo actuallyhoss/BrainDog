@@ -109,7 +109,9 @@
     grid-template-rows: auto auto;
     margin-block-start: var(--head-gap);
     background: var(--band-slash-tile);
+    border: 1px solid var(--card-edge);
     border-radius: 16px;
+    box-shadow: var(--shadow-card);
     overflow: hidden;
   }
 
@@ -119,13 +121,13 @@
   }
 
   .part + .part + .part {
-    border-inline-start: 1px solid var(--rule);
+    border-inline-start: 1px solid var(--sep);
   }
 
   /* NET WORTH LEADS, the whole row: the figure and how it moved, its line beside it, and what it is made of. */
   .worth {
     grid-column: 1 / -1;
-    border-block-end: 1px solid var(--rule);
+    border-block-end: 1px solid var(--sep);
   }
 
   .wtop {
@@ -186,7 +188,7 @@
     inline-size: 32px;
     block-size: 32px;
     border-radius: 50%;
-    background: var(--band-slash);
+    background: var(--soft-fill);
     color: var(--ink2);
   }
 
@@ -198,9 +200,9 @@
   .phd {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     margin: 0 0 8px;
-    font: 600 15px/1.2 var(--ui);
+    font: 600 15px/1.3 var(--ui);
     letter-spacing: 0;
   }
 
@@ -210,14 +212,27 @@
     place-items: center;
     inline-size: 28px;
     block-size: 28px;
-    border-radius: 8px;
-    background: var(--band-slash);
+    border-radius: 50%;
+    background: var(--soft-fill);
     color: var(--ink2);
   }
 
   .well :global(.icon) {
     inline-size: 16px;
     block-size: 16px;
+  }
+
+  /* A CARD'S HEAD GLYPH IS BARE (the app, 3 Nov): 18px in the third ink, no well. */
+  .phd .well {
+    inline-size: 18px;
+    block-size: 18px;
+    background: none;
+    color: var(--muted);
+  }
+
+  .phd .well :global(.icon) {
+    inline-size: 18px;
+    block-size: 18px;
   }
 
   p {
@@ -229,7 +244,6 @@
     align-items: center;
     gap: 12px;
     padding: 10px 0;
-    border-block-start: 1px solid var(--rule);
     font-size: var(--t-site-14);
   }
 
@@ -294,7 +308,7 @@
     display: block;
     block-size: 6px;
     border-radius: 3px;
-    background: var(--band-slash);
+    background: color-mix(in oklab, var(--ink) 9%, transparent);
     overflow: hidden;
   }
 
@@ -331,7 +345,7 @@
 
     .part + .part + .part {
       border-inline-start: 0;
-      border-block-start: 1px solid var(--rule);
+      border-block-start: 1px solid var(--sep);
     }
 
     .wparts {

@@ -34,6 +34,8 @@
     gap: 24px 48px;
     min-inline-size: 0;
     background: var(--night);
+    border-color: var(--night-rule);
+    box-shadow: none;
     color: var(--on-night);
     --focus: var(--on-night);
   }
