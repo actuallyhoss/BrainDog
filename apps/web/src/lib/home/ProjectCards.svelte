@@ -34,6 +34,7 @@
   import { live } from '$lib/data/live.svelte.ts';
   import { latesOf } from './card-late.ts';
   import { readLastRuns, readMoved, type LastRun } from './card-life.ts';
+  import { settle } from '$lib/ui/same.ts';
   import { flip } from 'svelte/animate';
   import { arrive, depart, settleOn, springy } from '$lib/motion/index.ts';
 
@@ -90,7 +91,7 @@
     untrack(() => {
       void latesOf(apiBase(), list, said.split(',').map(Number))
         .then((got) => {
-          if (said === seqs) lates = got;
+          if (said === seqs) lates = settle(lates, got);
         })
         .catch(() => {});
     });
@@ -109,8 +110,9 @@
       void Promise.all([readLastRuns(base, list, cards.filter((c) => !c.draft)), readMoved(base, list).catch(() => new Map<number, string>())])
         .then(([got, days]) => {
           if (said !== seqs) return;
-          lasts = got;
-          moved = days;
+          /* THE SAME ANSWER KEEPS THE SAME MAPS (`settle`), so a poll that heard nothing new redraws no card. */
+          lasts = settle(lasts, got);
+          moved = settle(moved, days);
         })
         .catch(() => {});
     });

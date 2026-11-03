@@ -79,6 +79,7 @@
   import { waitsNow } from '$lib/home/waits.svelte.ts';
   import { leadOf } from './lead.ts';
   import { columnOrder } from './column-order.ts';
+  import { settle } from '$lib/ui/same.ts';
 
   let { data } = $props();
 
@@ -170,7 +171,7 @@
     try {
       const [out, called] = await Promise.all([storedDecide().then((body) => readDecide(apiBase(), body)), readCalls(client)]);
       /* THE CALLS ARE THE PAGE'S COMPANY, NOT ITS CONDITION: a refusal of them keeps what was drawn before. */
-      if (called.from === 'live') calls = called.value;
+      if (called.from === 'live') calls = settle(calls, called.value);
       /* A HOST THAT CANNOT DRAW THE BODY, OR WAS NOT REACHED, IS A REFUSAL like any other: a later read that is refused
          keeps the page as it was drawn rather than blanking it for one sentence, and the copy's page stays while
          nobody was reached. */
@@ -180,7 +181,8 @@
           fromCopy = false;
         }
       } else if (out.from === 'live' || got === null || (fromCopy && !offlineNow())) {
-        got = out;
+        /* A POLL THAT SAYS WHAT IS DRAWN KEEPS IT (`settle`), so the queue's cards are not drawn again for nothing. */
+        got = settle(got, out);
         fromCopy = false;
         if (out.from === 'live') painted('decide', 'network');
       }

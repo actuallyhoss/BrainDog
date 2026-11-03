@@ -155,6 +155,7 @@
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
+  import { settle } from '$lib/ui/same.ts';
 
   let { data }: { data: Shell } = $props();
 
@@ -927,7 +928,8 @@
       const out = await readBody(slug, spoken, held, true);
       if (slug === declares && out?.from === 'live') {
         if (slug === null) tilesBeside(apiBase());
-        got = out;
+        /* A RE-READ THAT SAYS WHAT IS DRAWN KEEPS WHAT IS DRAWN (`settle`): the cards under it are not handed a new answer. */
+        got = settle(got, out);
         fromCopy = false;
         drewAt = Date.now();
         void Promise.all([before, mark]).then(([said, at]) => keepCopy(slug, out, said ?? untrack(() => news), at, stamp));

@@ -145,7 +145,7 @@
   <span class="pc-a">
     <ProjectWell mark={card.mark} name={title} hue={card.hue} />
     <span class="pc-id">
-      <span class="pc-name" dir="auto">{title}</span>
+      <span class="pc-name own-dir">{title}</span>
       {#if lane || health}
         <span class="pc-meta"
           >{lane}{#if lane && health}{' · '}{/if}{#if health}<span class="pc-health" data-tone={health.tone}><span class="dot" aria-hidden="true"></span>{health.word}</span>{/if}</span
@@ -159,7 +159,7 @@
       {#if figure}
         <!-- SAID SHORT, AS A TILE SAYS A FIGURE: £18,400, never £18,400.00. -->
         {#key figure}<span class="pc-num num" data-arrived={arrived.has('figure') ? '' : undefined}>{figure}</span>{/key}
-        {#if figureLabel}<span class="pc-label" dir="auto" title={labelShort === figureLabel && labelTight === null ? undefined : figureLabel}
+        {#if figureLabel}<span class="pc-label own-dir" title={labelShort === figureLabel && labelTight === null ? undefined : figureLabel}
             >{#if labelTight}<span class="pc-l-long">{labelShort}</span><span class="pc-l-tight">{labelTight}</span>{:else}{labelShort}{/if}</span
           >{/if}
       {:else}
@@ -188,7 +188,7 @@
     </span>
   {/if}
   {#if card.next}
-    <span class="pc-next"><Icon name="arrow" size="m" /><span class="sr">Next step: </span><span class="pc-next-words" dir="auto">{card.next}</span></span>
+    <span class="pc-next"><Icon name="arrow" size="m" /><span class="sr">Next step: </span><span class="pc-next-words own-dir">{card.next}</span></span>
   {/if}
   {#if empty}
     <span class="pc-foot pc-empty"><span class="pc-mark" aria-hidden="true"></span><span class="pc-quiet pc-who">Nothing written yet. <span class="pc-add">Add a next step</span></span></span>

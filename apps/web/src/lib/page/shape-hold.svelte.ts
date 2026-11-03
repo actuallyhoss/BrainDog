@@ -30,6 +30,7 @@ import { rowScreen } from '$lib/record/row-href.ts';
 import { registerHref } from '$lib/record/where.ts';
 import { actor } from '$lib/record/names.ts';
 import { shapeFrom, type ShapeRead, type WorkRow } from './shape-answer.ts';
+import { settle } from '$lib/ui/same.ts';
 import { lanesOf } from '$lib/shell/side.ts';
 import { blocksOf, heroOf, isProject, shapeOf, type Block } from '$lib/record/project.ts';
 import { HEALTH, daySaid, figureOf, hueOf } from '$lib/home/project-cards.ts';
@@ -132,7 +133,8 @@ export class ShapeHold {
       const next = await shapeFrom(apiBase(), said);
       if (next === null || key !== this.key || said !== this.#said || next.key !== key) return;
       if (this.read && this.read.key === key) this.#mark(this.read, next);
-      this.read = next;
+      /* THE SAME SHAPE READ AGAIN KEEPS THE ONE DRAWN (`settle`), so a poll that changed nothing redraws no part. */
+      this.read = settle(this.read, next);
     } catch {
       /* Nothing to draw: the page goes on without the shape, and the hold is let go by `follow`. */
     }

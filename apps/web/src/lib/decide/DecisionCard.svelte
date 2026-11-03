@@ -666,8 +666,8 @@
         >{#each way.shows.swatch as colour}<span class="queue-swatch" style="--swatch:{colour}"></span>{/each}</span
       >{:else if way.shows && 'file' in way.shows}<span class="queue-visual" data-shows="file"><img class="queue-file dc-choice-file" src={way.shows.file.src} alt="" /></span
       >{:else if way.shows}<span class="queue-visual" data-shows="figure"><span class="queue-figure num">{way.shows.figure}</span></span>{/if}
-    <span class="queue-label dc-choice-name" dir="auto">{way.label}</span>
-    {#if way.because && !folded.has(way.because)}<span class="dc-choice-does" dir="auto">{plainReason(way.because)}</span>{/if}
+    <span class="queue-label dc-choice-name own-dir">{way.label}</span>
+    {#if way.because && !folded.has(way.because)}<span class="dc-choice-does own-dir">{plainReason(way.because)}</span>{/if}
     <!-- WHAT IT WOULD CHANGE, drawn small; an option with a swatch, figure or picture of its own keeps that. A change every
          row shares is said once over the list (`fold.ts`), and its row keeps its name. -->
     {#if !way.shows}{@const v = visualOfWay(way)}{#if !(v?.kind === 'change' && ((same !== null && v.before === same) || v.after === way.label)) && !(v?.kind === 'filing' && ((same !== null && v.figure === same) || v.list === way.label))}<OptionVisual visual={v} />{/if}{/if}
@@ -700,7 +700,7 @@
       aria-disabled={kept ? 'true' : undefined}
       aria-describedby={wayTail(card, way, primary ?? leadKey) !== '' ? `${uid}-hard` : undefined}
       onclick={() => press(way)}
-      >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
+      >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span class="own-dir"
         ><span class="dc-btn-name">{amount !== null && way.key === primary ? amountAnswer(way.label, amount) : way.label}</span></span
       >{#if way.recommended}<span class={lead && !compact ? 'dc-rec-in' : 'dc-sr'}>{queueWords.suggestedSaid}</span>{/if}</button
     >
@@ -719,7 +719,7 @@
     <!-- THE ASKER'S OWN LATER IS THE CARD'S ONE QUIET LATER: an answer like any other, drawn bare. -->
     {@const way = answerRow.later}
     <button type="button" class="queue-act dc-btn dc-later" data-weight="bare" id={optId(way.key)} aria-disabled={kept ? 'true' : undefined} onclick={() => press(way)}
-      ><Icon name="clock" size="s" /><span class="dc-later-words" dir="auto">{way.label}</span></button
+      ><Icon name="clock" size="s" /><span class="dc-later-words own-dir">{way.label}</span></button
     >
   {:else if inlined && answerRow.more > 0 && drawn}
     <!-- MORE ANSWERS THAN A ROW HOLDS: the rest, and putting it off, are chosen on the question's own page. -->
@@ -761,9 +761,9 @@
        (polish 8, VERIFY P7): the late word carries the red, once. -->
   <article class="queue-card dc dc-row" aria-busy={busy} data-selected={chosenForAll ? '' : undefined} data-compact={compact ? '' : undefined} bind:this={cardEl} {@attach heard}>
     <span class="dr-well"><IconWell name={row.kind === 'renews' ? 'service' : row.owed ? 'arrowDown' : 'money'} size="l" /></span>
-    <svelte:element this={questionLevel} class="queue-question dr-title" dir="auto"><a class="dc-open tap" href={at(card.href)}><span data-own>{row.title}</span></a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</svelte:element>
+    <svelte:element this={questionLevel} class="queue-question dr-title own-dir"><a class="dc-open tap" href={at(card.href)}><span data-own>{row.title}</span></a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</svelte:element>
     <span class="dr-amount num">{row.amount}</span>
-    <p class="dr-meta"><span class="dr-late" data-kind={row.kind} data-soon={row.kind === 'renews' && row.days <= 7 ? '' : undefined}>{row.late}</span>{#if row.asks}<span class="dr-asks" dir="auto">{' · '}{row.asks}</span>{/if}</p>
+    <p class="dr-meta"><span class="dr-late" data-kind={row.kind} data-soon={row.kind === 'renews' && row.days <= 7 ? '' : undefined}>{row.late}</span>{#if row.asks}<span class="dr-asks own-dir">{' · '}{row.asks}</span>{/if}</p>
     {#if drawn}
       <div class="dc-actions dr-actions" data-inline>
         {@render inlineButtons(row.amount)}
@@ -771,7 +771,7 @@
       </div>
     {/if}
     {#if fix || bulkFix}<p class="qa-fix dr-fix" role="status">{fix || bulkFix}</p>{/if}
-    {#if !compact}<p class="dr-asked" dir="auto"
+    {#if !compact}<p class="dr-asked own-dir"
         ><span class="dc-sr">{card.by.kind === 'rule' ? cardWords.askedByRule : cardWords.askedBy}</span><Face name={card.by.name} kind={card.by.kind} size="s" /><span class="dr-who">{askedName}</span>{#if card.when}<span class="dr-when">{whenSaid}</span>{/if}</p
       >{/if}
     {#if pick && drawn}
@@ -810,7 +810,7 @@
     <div class="dc-main">
       <!-- COMPACT, THE QUESTION IS THE DOOR TO ITS OWN PAGE, where who asked, why and what it moves are read; the band
            is kept on it, unseen, for the keys and the ranking. -->
-      <svelte:element this={questionLevel} class="queue-question" dir="auto" data-clamp={readAll ? undefined : ''} bind:this={titleEl}>
+      <svelte:element this={questionLevel} class="queue-question own-dir" data-clamp={readAll ? undefined : ''} bind:this={titleEl}>
         {#if link || compact}<a class="dc-open tap" href={at(card.href)}><span data-own>{card.question}</span></a>{:else}<span data-own>{card.question}</span>{/if}{#if card.joined}{' '}<span
             class="qa-joined num">{queueWords.joined(card.joined)}</span
           >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
@@ -818,7 +818,7 @@
       <!-- A QUESTION LONGER THAN TWO LINES IS CUT THERE, and read whole on a press. -->
       {#if clamped && !readAll}<button type="button" class="dc-read tap" onclick={() => (readAll = true)}>{cardWords.readAll}</button>{/if}
       <!-- COMPACT, WHO ASKED AND HOW LONG IT HAS WAITED ARE ONE QUIET LINE: the kind of thing, who, and when. -->
-      {#if compact}<p class="dc-meta" dir="auto">{[card.by.name, ...from, whenSaid].filter((s) => s !== '').join(' · ')}</p>{/if}
+      {#if compact}<p class="dc-meta own-dir">{[card.by.name, ...from, whenSaid].filter((s) => s !== '').join(' · ')}</p>{/if}
       {#if !compact}
         <!-- WHO ASKED AND WHEN, one quiet line UNDER the question at every width, so every card starts with its sentence:
             the face and name, and the app it ran in where it has a name. "Asked by" is said to a screen reader, where the eye reads
@@ -826,21 +826,21 @@
              words instead. -->
         <p class="queue-by">
           <span class="dc-sr">{cardWords.askedBy}</span>
-          <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who" dir="auto" title={card.by.name}>{card.by.name}</span>
-          {#each from as part, i (i)}<span class="dc-from" dir="auto">{part}</span>{/each}
+          <Face name={card.by.name} kind={card.by.kind} size="s" /><span class="queue-who own-dir" title={card.by.name}>{card.by.name}</span>
+          {#each from as part, i (i)}<span class="dc-from own-dir">{part}</span>{/each}
           <span class="queue-when">{card.when}</span>
           {#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
           {#if ladder}<button type="button" class="dc-info" aria-expanded={ladderOpen} aria-controls="{uid}-ladder" title={cardWords.whyAsks} onclick={() => (ladderOpen = !ladderOpen)}
               ><Icon name="info" size="s" /><span class="dc-sr">{cardWords.whyAsks}</span></button
             >{/if}
         </p>
-        {#if ladder && ladderOpen}<p class="qa-later dc-ladder" id="{uid}-ladder" dir="auto">{card.why}</p>{/if}
+        {#if ladder && ladderOpen}<p class="qa-later dc-ladder own-dir" id="{uid}-ladder">{card.why}</p>{/if}
       {/if}
-      {#if decidesLine}<p class="qa-later" dir="auto">{decidesLine}</p>{/if}
-      {#if !compact && card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
+      {#if decidesLine}<p class="qa-later own-dir">{decidesLine}</p>{/if}
+      {#if !compact && card.later}<p class="qa-later own-dir">{card.later}</p>{/if}
       <!-- HOW LONG IT WAITS: under why, in the side, where whoever asked wrote one; here, under the question,
            where nobody did. -->
-      {#if !compact && (!card.why || ladder) && card.lapses}<p class="dc-lapses" dir="auto">{card.lapses}</p>{/if}
+      {#if !compact && (!card.why || ladder) && card.lapses}<p class="dc-lapses own-dir">{card.lapses}</p>{/if}
       <!-- WHAT THE QUESTION HOLDS TO LOOK AT, a still or a quiet card under it, opened full width on a press. -->
       <VisualStrip on={question.id} {compact} />
       {#if card.merge && !compact}
@@ -871,7 +871,7 @@
       {:else if listed}
         <!-- THE ANSWERS, A LIST TO CHOOSE FROM: each a full-width choice with its name and what it does, the suggested
              one saying so in the accent's words. A press chooses; Decide answers (`form.css`). -->
-        {#each foldLines as line (line)}<p class="dc-fold" dir="auto">{line}</p>{/each}
+        {#each foldLines as line (line)}<p class="dc-fold own-dir">{line}</p>{/each}
         <ul class="queue-options dc-choices" data-long={card.ways.length > 6 ? '' : undefined} data-across={across ? '' : undefined} role={drawn ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
           {#each card.ways as way, i (way.key)}
             {@const marked = way.recommended}
@@ -908,7 +908,7 @@
              key may press carries `data-enter`: nothing hard to undo, nothing that moves money. Where the choices
              themselves decide, only Not now is here, and with neither the row is not drawn (`form.css`). DECIDE NEVER
              LOOKS SWITCHED OFF (VERIFY H9): pressed with nothing chosen, it puts the focus on the first answer. -->
-        {#if moneyAbove}<p class="dc-money dc-money-above num" dir="auto">{card.money}</p>{/if}
+        {#if moneyAbove}<p class="dc-money dc-money-above num own-dir">{card.money}</p>{/if}
         <div class="dc-actions" data-inline={inline ? '' : undefined}>
           {#if inline}
             <!-- ONE PRESS DECIDES: the suggested answer, or the first, filled with the accent, the rest quiet. Its name is
@@ -933,8 +933,8 @@
         <!-- WHAT THE FILLED ANSWER DOES, one line under the row, where its answers each carry one: "File them" says
              what filing does before the press, as its rectangle did. -->
         <!-- THE CARE A HARD ANSWER ASKS FOR, A LINE UNDER THE ROW: on the button it wrapped to two lines at 390. -->
-        {#if inline && hardLine}<p class="dc-hard" id="{uid}-hard" dir="auto"><span class="dc-hard-word">{hardLine}.</span>{#if hardReason}{' '}{hardReason}{/if}</p>{/if}
-        {#if inline && !compact && primaryDoes}<p class="dc-does" dir="auto">{primaryDoes}</p>{/if}
+        {#if inline && hardLine}<p class="dc-hard own-dir" id="{uid}-hard"><span class="dc-hard-word">{hardLine}.</span>{#if hardReason}{' '}{hardReason}{/if}</p>{/if}
+        {#if inline && !compact && primaryDoes}<p class="dc-does own-dir">{primaryDoes}</p>{/if}
       {/if}
       {#if phase === 'asking' && chosen}
         <form class="qa-reason" onsubmit={submit}>
@@ -967,8 +967,8 @@
         {#if card.why && !ladder}
           <div class="dc-part dc-part-why" role="group" aria-labelledby="{uid}-why-h">
             <h4 class="dc-h" id="{uid}-why-h">{cardWords.why}</h4>
-            <p class="queue-why" dir="auto">{card.why}</p>
-            {#if card.lapses}<p class="dc-lapses" dir="auto">{card.lapses}</p>{/if}
+            <p class="queue-why own-dir">{card.why}</p>
+            {#if card.lapses}<p class="dc-lapses own-dir">{card.lapses}</p>{/if}
           </div>
         {/if}
         <!-- WHAT IT CHANGES: what accepting the lead does, the money it writes, what changes from what to what, and the
@@ -976,8 +976,8 @@
              replaces another is struck, with the arrow to what it becomes. -->
         {#if changesSaid}
           <div class="dc-part dc-part-changes" role="group" aria-labelledby="{uid}-changes">
-            <h4 class="dc-h" id="{uid}-changes" dir="auto">{#if card.list}{cardWords.changesIn(card.list)}{:else}{cardWords.changes}{/if}</h4>
-            {#if card.does}<p class="dc-does" dir="auto">{card.does}</p>{/if}
+            <h4 class="dc-h own-dir" id="{uid}-changes">{#if card.list}{cardWords.changesIn(card.list)}{:else}{cardWords.changes}{/if}</h4>
+            {#if card.does}<p class="dc-does own-dir">{card.does}</p>{/if}
             {#if (card.money && !moneyAbove) || card.lines.length > 0}
               <ul class="dc-moves">
                 {#if card.money && !moneyAbove}<li class="dc-money num">{card.money}</li>{/if}
@@ -985,9 +985,9 @@
                   <li class="dc-shift">
                     {#if s.what}<span class="dc-what">{s.what}</span>{/if}
                     {#if s.said !== null}
-                      <span dir="auto">{s.said}</span>
+                      <span class="own-dir">{s.said}</span>
                     {:else}
-                      <span class="dc-before" dir="auto">{stateWord(s.before)}</span><span class="dc-to"><Icon name="arrow" size="s" /><span class="dc-said">{cardWords.to}</span></span><span dir="auto">{stateWord(s.after)}</span>
+                      <span class="dc-before own-dir">{stateWord(s.before)}</span><span class="dc-to"><Icon name="arrow" size="s" /><span class="dc-said">{cardWords.to}</span></span><span class="own-dir">{stateWord(s.after)}</span>
                     {/if}
                   </li>
                 {/each}

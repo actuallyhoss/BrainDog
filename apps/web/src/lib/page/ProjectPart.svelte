@@ -163,7 +163,7 @@
             <!-- THE PROJECT'S NAME IS THE PAGE'S HEADING, and the sentence under it a paragraph (Q60 of 29 October). HEARD, NOT
                  SEEN (3 Nov): the bar over the page already says the name at its largest, and the hero said it again under
                  it. -->
-            <h1 class="h-title visually-hidden" dir="auto">{name}</h1>
+            <h1 class="h-title visually-hidden own-dir">{name}</h1>
             {#if hold.dateLine || status.health}
               <p class="h-status">
                 <!-- THE LAST FACT, THE DOT AND THE HEALTH WRAP AS ONE, so a phone never ends a line on a stray " · " with
@@ -178,11 +178,11 @@
                them (`page-buttons.svelte.ts`). -->
           {#if lent?.buttons}<div class="h-page-acts" {@attach take(lent)}>{@render lent.buttons()}</div>{/if}
         </div>
-        <p class="h-head" dir="auto">{facts.headline}</p>
+        <p class="h-head own-dir">{facts.headline}</p>
         {#if hold.modelLine}
-          <p class="h-say" title={WROTE} dir="auto">{hold.modelLine}</p>
+          <p class="h-say own-dir" title={WROTE}>{hold.modelLine}</p>
         {:else if facts.lede}
-          <p class="h-say" dir="auto">{facts.lede}</p>
+          <p class="h-say own-dir">{facts.lede}</p>
         {/if}
         <!-- A STEP THE HEADLINE ALREADY NAMES IS NOT LISTED AGAIN UNDER IT (3 Nov): '"Ship webhook retries" is due tomorrow.'
              stood over "Next step: Ship webhook retries, Wed 4 Nov" and a button to open it, one task three times. The
@@ -194,7 +194,7 @@
               {#each steps as c, n (n)}
                 <li class="ck">
                   <span class="ck-box" aria-hidden="true"></span>
-                  {#if c.href}<a class="ck-text" href={at(c.href)} dir="auto">{c.text}</a>{:else}<span class="ck-text" dir="auto">{c.text}</span>{/if}
+                  {#if c.href}<a class="ck-text own-dir" href={at(c.href)}>{c.text}</a>{:else}<span class="ck-text own-dir">{c.text}</span>{/if}
                   {#if c.chip}<span class="ck-chip num" data-late={c.late ? '' : undefined}>{c.chip}</span>{/if}
                 </li>
               {/each}
@@ -244,7 +244,7 @@
         {/if}
         {#if side.lines.length > 0}
           <dl class="kv">
-            {#each side.lines as l, n (n)}<div class="kv-row"><dt dir="auto">{l.k}</dt><dd class="num">{l.v}</dd></div>{/each}
+            {#each side.lines as l, n (n)}<div class="kv-row"><dt class="own-dir">{l.k}</dt><dd class="num">{l.v}</dd></div>{/each}
           </dl>
         {/if}
       </Tile>
@@ -256,7 +256,7 @@
               <li class="stop" data-tone={st.tone}>
                 <span class="st-dot" aria-hidden="true"></span>
                 <span class="st-day num">{st.day}</span>
-                <a class="st-words" href={at(st.href)}><span class="st-title" dir="auto">{st.title}</span>{#if st.sub}<span class="st-sub">{st.sub}</span>{/if}</a>
+                <a class="st-words" href={at(st.href)}><span class="st-title own-dir">{st.title}</span>{#if st.sub}<span class="st-sub">{st.sub}</span>{/if}</a>
               </li>
             {/each}
           </ol>
@@ -269,7 +269,7 @@
         {#if side.year}<p class="s-year">{side.year}</p>{/if}
         {#if side.lines.length > 0}
           <dl class="kv">
-            {#each side.lines as l, n (n)}<div class="kv-row"><dt><a href={at(l.href)} dir="auto">{l.k}</a></dt><dd class="num">{l.v}</dd></div>{/each}
+            {#each side.lines as l, n (n)}<div class="kv-row"><dt><a class="own-dir" href={at(l.href)}>{l.k}</a></dt><dd class="num">{l.v}</dd></div>{/each}
           </dl>
         {/if}
         {#if hold.owner}
@@ -312,7 +312,7 @@
       <ul class="n-cells">
         {#each nums.cells as c (c.label)}
           <li class="n-cell" data-stale={c.stale ? '' : undefined}>
-            <span class="n-label" dir="auto">{c.label}</span>
+            <span class="n-label own-dir">{c.label}</span>
             <span class="n-fig num">{c.figure}</span>
             {#if c.trail}
               <svg class="n-trail" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"><path d={c.trail.area} class="n-area" /><path d={c.trail.line} class="n-line" vector-effect="non-scaling-stroke" /></svg>
@@ -322,7 +322,7 @@
           </li>
         {/each}
       </ul>
-      {#if nums.plan}<p class="n-plan num" dir="auto">{nums.plan}</p>{/if}
+      {#if nums.plan}<p class="n-plan num own-dir">{nums.plan}</p>{/if}
     </Tile>
   {:else if part === 'what-is-open' && hold.workLists}
     {@const w = hold.workLists}
@@ -340,7 +340,7 @@
               {#each w.yours.slice(0, SHOWN) as r (r.seq)}
                 <li class="w-row" data-arrived={arrived.has(`row:${r.seq}`) ? '' : undefined}>
                   <span class="w-tick" aria-hidden="true"></span>
-                  <a class="w-words" href={at(hold.stopHref(r.seq) ?? '')}><span class="w-title" dir="auto">{r.title}</span><span class="w-sub" data-red={r.red ? '' : undefined}>{r.sub}</span></a>
+                  <a class="w-words" href={at(hold.stopHref(r.seq) ?? '')}><span class="w-title own-dir">{r.title}</span><span class="w-sub" data-red={r.red ? '' : undefined}>{r.sub}</span></a>
                 </li>
               {/each}
             </ul>
@@ -354,7 +354,7 @@
               {#each w.agents.slice(0, SHOWN) as r (r.seq)}
                 <li class="w-row" data-arrived={arrived.has(`row:${r.seq}`) ? '' : undefined}>
                   <AgentFace agent={r.agent} run="" live={r.live} size="xs" />
-                  <a class="w-words" href={at(hold.stopHref(r.seq) ?? '')}><span class="w-title" dir="auto">{r.title}</span><span class="w-sub">{r.sub}</span></a>
+                  <a class="w-words" href={at(hold.stopHref(r.seq) ?? '')}><span class="w-title own-dir">{r.title}</span><span class="w-sub">{r.sub}</span></a>
                 </li>
               {/each}
             </ul>
@@ -369,7 +369,7 @@
         {#each hold.dates as d, n (n)}
           <li class="li" data-tone={d.tone}>
             <span class="li-when num">{d.day}</span>
-            {#if d.href}<a class="li-text" href={at(d.href)} dir="auto">{d.text}</a>{:else}<span class="li-text" dir="auto">{d.text}</span>{/if}
+            {#if d.href}<a class="li-text own-dir" href={at(d.href)}>{d.text}</a>{:else}<span class="li-text own-dir">{d.text}</span>{/if}
           </li>
         {/each}
       </ul>
@@ -381,8 +381,8 @@
         {#each people.slice(0, 4) as p (p.key)}
           <li class="p-row">
             <Face name={p.title} size="m" />
-            {#if p.href}<a class="p-words" href={at(p.href)}><span class="p-name" dir="auto">{p.title}</span>{#if p.detail}<span class="p-sub" dir="auto">{p.detail}</span>{/if}</a>
-            {:else}<span class="p-words"><span class="p-name" dir="auto">{p.title}</span>{#if p.detail}<span class="p-sub" dir="auto">{p.detail}</span>{/if}</span>{/if}
+            {#if p.href}<a class="p-words" href={at(p.href)}><span class="p-name own-dir">{p.title}</span>{#if p.detail}<span class="p-sub own-dir">{p.detail}</span>{/if}</a>
+            {:else}<span class="p-words"><span class="p-name own-dir">{p.title}</span>{#if p.detail}<span class="p-sub own-dir">{p.detail}</span>{/if}</span>{/if}
           </li>
         {/each}
       </ul>
@@ -396,7 +396,7 @@
           <li class="r-row" data-tone={l.tone}>
             <Icon name={l.icon} size="s" />
             <span class="r-words">
-              {#if l.href}<a class="r-name" href={at(l.href)} dir="auto">{l.name}</a>{:else}<span class="r-name" dir="auto">{l.name}</span>{/if}
+              {#if l.href}<a class="r-name own-dir" href={at(l.href)}>{l.name}</a>{:else}<span class="r-name own-dir">{l.name}</span>{/if}
               {#if l.sub}<span class="r-kind">{l.sub}</span>{/if}
             </span>
             {#if l.right}<span class="r-right num">{l.right}</span>{/if}
@@ -431,8 +431,8 @@
                 <li class="a-row">
                   <AgentFace agent={s.agent} run={`S${s.seq}`} live={s.open ? 'working' : 'stopped'} size="xs" />
                   <span class="a-words" title={actor(s.agent).name}>
-                    <span class="a-name" dir="auto">{unsourced(s.title, actor(s.agent).name)}<span class="a-when">, {s.when}</span></span>
-                    <span class="a-sub" dir="auto">{s.ended}{#if s.said}{' · '}{s.said}{/if}</span>
+                    <span class="a-name own-dir">{unsourced(s.title, actor(s.agent).name)}<span class="a-when">, {s.when}</span></span>
+                    <span class="a-sub own-dir">{s.ended}{#if s.said}{' · '}{s.said}{/if}</span>
                   </span>
                 </li>
               {/each}
@@ -450,7 +450,7 @@
       <ul class="li-list">
         {#each read.decided as d, n (n)}
           <li class="li">
-            <span class="li-text" dir="auto">{d.question}{#if d.answer}<span class="li-sub">{d.answer}</span>{/if}</span>
+            <span class="li-text own-dir">{d.question}{#if d.answer}<span class="li-sub">{d.answer}</span>{/if}</span>
           </li>
         {/each}
       </ul>
@@ -461,7 +461,7 @@
         {#each hold.happened as h, n (n)}
           <li class="li" data-tone={h.tone}>
             <span class="li-when num">{h.day}</span>
-            <span class="li-text" dir="auto">{h.text}{#if h.by}<span class="li-sub">{h.by}</span>{/if}</span>
+            <span class="li-text own-dir">{h.text}{#if h.by}<span class="li-sub">{h.by}</span>{/if}</span>
           </li>
         {/each}
       </ul>

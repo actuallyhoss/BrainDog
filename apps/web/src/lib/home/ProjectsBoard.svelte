@@ -78,13 +78,13 @@
           <p class="b-date">{b.date}</p>
           {#if lent?.buttons}<div class="b-page-acts" {@attach take(lent)}>{@render lent.buttons()}</div>{/if}
         </div>
-        <h2 class="b-head" dir="auto">{b.headline}</h2>
-        {#if b.lede}<p class="b-lede" dir="auto">{b.lede}</p>{/if}
+        <h2 class="b-head own-dir">{b.headline}</h2>
+        {#if b.lede}<p class="b-lede own-dir">{b.lede}</p>{/if}
         {#if b.acts.late || b.acts.feed || b.acts.asks}
           <div class="b-acts">
             {#if b.acts.late}<Button weight="primary" href={b.acts.late.href}>{b.acts.late.said}</Button>{/if}
             {#if b.acts.feed}<Button href={b.acts.feed.href}>{b.acts.feed.said}</Button>{/if}
-            {#if b.acts.asks}<a class="b-ask" href={at(b.acts.asks.href)} dir="auto">{b.acts.asks.said}</a>{/if}
+            {#if b.acts.asks}<a class="b-ask own-dir" href={at(b.acts.asks.href)}>{b.acts.asks.said}</a>{/if}
           </div>
         {/if}
         <!-- THIS WEEK IN THE LEAD (the lists review, L30): beside the earning tile the lead stood 150px taller than its
@@ -97,7 +97,7 @@
                 <p class="b-lead-week-head"><span class="strong">{x.title}</span> <span class="num">{x.t.count}</span> {x.t.said}</p>
                 <ul class="wk-lines">
                   {#each x.t.lines as l, n (n)}
-                    <li>{#if l.day}<b class="num">{l.day}</b>{/if}<a href={at(l.href)} dir="auto"><span class="strong">{l.project}</span> · {l.text}</a></li>
+                    <li>{#if l.day}<b class="num">{l.day}</b>{/if}<a class="own-dir" href={at(l.href)}><span class="strong">{l.project}</span> · {l.text}</a></li>
                   {/each}
                 </ul>
                 {#if x.t.more > 0}<p class="small wk-more">and {x.t.more} more</p>{/if}
@@ -120,7 +120,7 @@
           <ul class="kv">
             {#each b.earning.lines as l (l.name)}
               <li>
-                <a class="kv-k" href={at(l.href)}><span class="sw" style={slotStyle(l.hue)}></span><span class="kv-name" dir="auto">{l.name}</span>{#if l.status}<span class="small kv-status" data-warn={l.warn ? '' : undefined}>{l.status}</span>{/if}</a>
+                <a class="kv-k" href={at(l.href)}><span class="sw" style={slotStyle(l.hue)}></span><span class="kv-name own-dir">{l.name}</span>{#if l.status}<span class="small kv-status" data-warn={l.warn ? '' : undefined}>{l.status}</span>{/if}</a>
                 <span class="kv-v num">{l.said}</span>
               </li>
             {/each}
@@ -153,12 +153,12 @@
             {#each g.rows as r (r.key)}
               {@const s = trail(r)}
               <li class="row" data-quiet={g.id === 'quiet' ? '' : undefined} {@attach ownMenu((p) => ((menuRow = r), (point = p)))} in:arrive out:depart animate:flip={springy()}>
-                <a class="r-name" href={at(r.href)}><ProjectWell mark={r.mark} name={r.name} hue={r.hue} /><span class="r-title" dir="auto">{r.name}</span></a>
-                <p class="r-next" dir="auto" data-none={r.next === '' ? '' : undefined}>{r.next || 'No next step'}</p>
+                <a class="r-name" href={at(r.href)}><ProjectWell mark={r.mark} name={r.name} hue={r.hue} /><span class="r-title own-dir">{r.name}</span></a>
+                <p class="r-next own-dir" data-none={r.next === '' ? '' : undefined}>{r.next || 'No next step'}</p>
                 <div class="r-chip">{#if r.chip}<span class="chip" data-tone={r.chip.tone}>{#if r.chip.tone === 'late'}<span class="dot"></span>{/if}{r.chip.text}</span>{/if}</div>
                 <div class="r-num" style={slotStyle(r.hue)}>
                   {#if r.number.kind === 'kpi'}
-                    <div class="n-words"><span class="n-fig num" data-stale={r.number.stale ? '' : undefined}>{r.number.figure}</span><span class="small" dir="auto">{r.number.sub}</span></div>
+                    <div class="n-words"><span class="n-fig num" data-stale={r.number.stale ? '' : undefined}>{r.number.figure}</span><span class="small own-dir">{r.number.sub}</span></div>
                     {#if s}<svg class="trail" data-stale={r.number.stale ? '' : undefined} viewBox="0 0 {W} {H}" width={W} height={H} aria-hidden="true"><path d={s.area} class="sp-area" /><path d={s.line} class="sp-line" /><circle cx={s.end[0]} cy={s.end[1]} r="2.2" class="sp-end" /></svg>{/if}
                   {:else if r.number.kind === 'aim'}
                     <div class="n-words"><span class="muted">{r.number.said}</span><span class="small">{r.number.sub}</span></div>
@@ -188,7 +188,7 @@
         {#if b.parked.length > 0}
           <ul class="chips">
             {#each b.parked as p (p.href)}
-              <li in:arrive out:depart animate:flip={springy()}><a class="pchip" href={at(p.href)}><ProjectWell mark={p.mark} name={p.name} hue={p.hue} /><span dir="auto">{p.name}</span>{#if p.due}<span class="small" data-warn="">{p.due}</span>{/if}</a></li>
+              <li in:arrive out:depart animate:flip={springy()}><a class="pchip" href={at(p.href)}><ProjectWell mark={p.mark} name={p.name} hue={p.hue} /><span class="own-dir">{p.name}</span>{#if p.due}<span class="small" data-warn="">{p.due}</span>{/if}</a></li>
             {/each}
           </ul>
         {/if}
@@ -210,7 +210,7 @@
     {#if t.lines.length > 0}
       <ul class="wk-lines">
         {#each t.lines as l, n (n)}
-          <li>{#if l.day}<b class="num">{l.day}</b>{/if}<a href={at(l.href)} dir="auto"><span class="strong">{l.project}</span> · {l.text}</a></li>
+          <li>{#if l.day}<b class="num">{l.day}</b>{/if}<a class="own-dir" href={at(l.href)}><span class="strong">{l.project}</span> · {l.text}</a></li>
         {/each}
       </ul>
       {#if t.more > 0}<p class="small wk-more">and {t.more} more</p>{/if}

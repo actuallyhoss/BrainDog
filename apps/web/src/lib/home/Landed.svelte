@@ -68,7 +68,7 @@
           <span class="l-at num">{r.at}</span>
           <span class="l-face"><Face name={faceOf(r)} kind={r.kind} run={r.run} size="s" /></span>
           {#if 'group' in r}
-            <span class="l-what" dir="auto">
+            <span class="l-what own-dir">
               <button type="button" class="l-open tap" data-free aria-expanded={open.has(r.key)} aria-label={groupSaid(r)} onclick={() => toggle(r.key)}
                 ><span class="l-said" aria-hidden="true">{words.filed(r.who)} <b class="l-count num">{r.rows.length.toLocaleString('en-GB')}</b> {words.into} <b class="l-list">{r.to}</b></span><Icon name="chevronDown" size="s" /></button
               >
@@ -81,7 +81,7 @@
               </ul>
             {/if}
           {:else}
-            <span class="l-what" dir="auto">
+            <span class="l-what own-dir">
               {#if r.href}<a class="l-name" href={at(r.href)}>{r.name}</a>{:else}<b class="l-name">{r.name}</b>{/if}
               {#if r.note}<span class="l-note">{r.note}</span>{/if}
               <span class="l-who">{r.who}</span>

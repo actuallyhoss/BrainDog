@@ -66,7 +66,7 @@ test('A VALUE WHERE THERE WAS NONE IS SAID IN WORDS, never a struck "nothing" an
 
   /* THE CARD DRAWS THE PHRASE, and strikes only what is replaced. */
   const drawn = source('./DecisionCard.svelte');
-  assert.match(drawn, /\{#if s\.said !== null\}\s*<span dir="auto">\{s\.said\}<\/span>\s*\{:else\}\s*<span class="dc-before"/u, 'the struck value is drawn where there was none before');
+  assert.match(drawn, /\{#if s\.said !== null\}\s*<span class="own-dir">\{s\.said\}<\/span>\s*\{:else\}\s*<span class="dc-before own-dir"/u, 'the struck value is drawn where there was none before');
   assert.doesNotMatch(drawn, /#each card\.shifts/u, 'the card draws the bare before and after again');
 
   /* THE WHOLE CHANGE, ON ITS OWN PAGE, the same way. */
