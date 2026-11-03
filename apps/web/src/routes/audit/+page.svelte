@@ -65,7 +65,6 @@
   /* WHAT THE LOG SAYS, IN WORDS AND IN FIGURES: the sentence, the bands, a row by its title and list, a burst as one
      line, and the three tiles' counts and readings. `lines.ts` holds each rule and why. */
   import {
-    awaySaid,
     newestFirst,
     oneDecision,
     below,
@@ -594,17 +593,10 @@
    */
   const lanes = $derived(lanesOf(kept, clock, me, names));
   const tally = $derived(tallyOf(matched, me, names, listSaid));
-  /* THE SAME COUNT OVER EVERYTHING READ, whatever the chips narrow, for the line under the title (`awaySaid`). */
-  const whole = $derived(tallyOf(kept, me, names, listSaid));
-  /* The line under the title, below `whole`, which it reads. */
   /* THE LIVE LOG IS STILL ON ITS WAY, and the page draws its bars. */
   const waiting = $derived(Boolean(route.data.live) && !refused && (!live || !sideRead));
-  /* NOT SAID FROM THE FIRST SIXTY WHILE THE WHOLE LOG IS COMING (leftovers8): "More than 60 changes since you were last
-     here. Agents made 13 of the newest 60." took two lines on a phone and became "195 changes ... Agents made 8." a beat
-     later, one line, and the page under it moved twice. */
-  const lead = $derived(
-    waiting ? undefined : (unseen ? awaySaid(unseen.actors, me, names, unseen.capped, unseen.byWho, { total: whole.total, agents: whole.groups.find((g) => g.group === 'agent')?.count ?? 0 }) : '') || undefined,
-  );
+  /* NO LINE UNDER THE TITLE, SINCE 3 Nov ("i dont like those briefs at all, remove them"): "195 changes since you were
+     last here. Agents made 5." counted what the log marks as new and what Who worked counts beside it. */
   const busy = $derived(busyOf(kept, clock));
   const topKinds = $derived(
     tally.parts.slice(0, 5).map((k) => ({
@@ -949,7 +941,7 @@
   title={copy.audit}
   count={narrowed ? matched.length : undefined}
   total={narrowed ? kept.length : undefined}
-  sentence={lead}
+  silent
   actions={actors.length > 1 || kinds.length > 1 || days.length > 1 || list || offerAll ? (phone ? filterOpen : tools) : undefined}
 />
 

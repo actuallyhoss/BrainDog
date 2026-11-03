@@ -631,6 +631,10 @@
     !!live &&
       (live.page.page.nav?.section?.toLowerCase() === 'money' || /^money(-|$)/u.test(live.page.page.page ?? '') || moneyLooks.moneyPack(String((live.page.page as { pack?: unknown }).pack ?? ''))),
   );
+  /* A PAGE A PACK OR THE RECORD DECLARES SAYS NOTHING ABOUT PAGES IN GENERAL EITHER (3 Nov): with its count line gone,
+     Agents opened on "One screen that gathers what you keep an eye on" over its own tiles. The line is for a page somebody
+     is making, which has no place in the rail yet. */
+  const declaredPage = $derived(!!live && !!(live.page.page.nav || (live.page.page as { requires?: unknown }).requires));
   const headlined = $derived(!!live && (about !== null || fromPack || judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs)).some((b) => b.drawn && b.kind === 'note' && b.lead === true)));
 
   /**
@@ -1152,7 +1156,7 @@
     title={live.page.page.title}
     headless={projectPage && !arranging && !showSource}
     sentence={projectPage ? '' : (blank ?? undefined)}
-    define={headlined || blank !== null ? undefined : 'page'}
+    define={headlined || declaredPage || blank !== null ? undefined : 'page'}
     below={headBelow && !tiled ? declaredBelow : undefined}
     {tiled}
   >
@@ -1258,8 +1262,11 @@
   {/snippet}
 
   <!-- THE LINE THE PAGE OPENS ON, drawn once: in the header's row, or handed to the body to sit under its sentence. -->
+  <!-- DRAWN WHEREVER IT IS CALLED (3 Nov): the lead tile and a phone call it under the name, and a desk page with no
+       sentence over it at the start of the buttons' row, where it was asked for and drew nothing once Work's count line
+       went. -->
   {#snippet lineInHead()}
-    {#if headLine && (tiled || !wide.current)}<HeadCapture block={headLine.block} oncapture={(register, text, inherited) => void writes.captureLine(register, text, inherited)} />{/if}
+    {#if headLine}<HeadCapture block={headLine.block} oncapture={(register, text, inherited) => void writes.captureLine(register, text, inherited)} />{/if}
     <!-- UNDER "JUST YOU SO FAR", the one way to bring everybody in at once. -->
     {#if peopleEmpty}<p class="people-import">Have a contacts file from your phone, Google or Outlook? <a href={at('/add/contacts')}>Import contacts</a></p>{/if}
   {/snippet}
@@ -1301,7 +1308,10 @@
   <!-- THE RENDERER'S STRIP, one group a field, "All" first, the rest behind one select (`braindog-render` `Filters`).
        Under the headline on a page that opens on one, and between the head and the first tile otherwise. -->
   {#snippet narrow()}<Filters {filters} {chosen} {onfilter} />{/snippet}
-  {#if strip && !led}
+  <!-- A PAGE WITH NO SENTENCE BUT A CAPTURE LINE ON A PHONE hands its strip to the body too (3 Nov), which draws the line
+       first and the strip under it, as the lead tile does: drawn here, the strip stood over the line once Work's count
+       sentence went. -->
+  {#if strip && !led && !(headLine && !wide.current)}
     <div class="page-filters">{@render narrow()}</div>
   {/if}
   {#if !tiled && moneyPage && bookHere && about?.register === bookHere.list}<div class="page-filters">{@render bookScope()}</div>{/if}
@@ -1351,7 +1361,7 @@
         leadEnd={besideLead && !buttonsTaken && !placed ? pageButtons : null}
         captured={placed ? -1 : (headLine?.at ?? -1)}
         under={((headLine && (tiled || !wide.current)) || peopleEmpty) && !shapeWaits && !placed ? lineInHead : null}
-        strip={strip && led && !shapeWaits && !placed ? narrow : null}
+        strip={strip && (led || (headLine && !wide.current)) && !shapeWaits && !placed ? narrow : null}
         host={hosting && !shapeWaits ? host : null}
         pick={hosting ? picked : null}
         {onwalk}

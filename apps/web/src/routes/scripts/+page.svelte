@@ -7,10 +7,8 @@
   so is the page drawn; a record that holds none is drawn the same body by `previewPage`, and keeping a change to it is
   its first write (`home-arrange.ts`, as Today and Decide are kept). `braindog page pull scripts` reads what it holds.
 
-  THE TITLE ROW SAYS HOW MANY, HOW MUCH THEY RAN THIS MONTH, AND WHAT HAS STOPPED, from the rows the page drew
-  (`reading.ts` `sentenceOf`): the month is the sum of each row's own count, never recounted from history, and the red
-  phrases are a paused script and a refused last run. So the page's own line is the head's, and is not drawn again as a
-  tile under it.
+  THE TITLE ROW SAYS HOW MANY AND NOTHING MORE, SINCE 3 Nov ("i dont like those briefs at all, remove them"): "3 scripts
+  ran 41 times this month, on their clocks; 1 is paused" said what each row's runs and its paused mark say.
 
   A ROW OPENS THE SCRIPT, where its facts, recent runs, versions and Resume are (`ScriptCard`).
 -->
@@ -33,7 +31,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { copy } from '$lib/copy.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
-  import { sentenceOf, troubleOf } from './reading.ts';
+  import { troubleOf } from './reading.ts';
   import HubTabs from '../automations/HubTabs.svelte';
   import { MediaQuery } from 'svelte/reactivity';
 
@@ -121,7 +119,6 @@
       };
     }),
   );
-  const told = $derived(live && rows.length > 0 ? sentenceOf(rows) : null);
   /* THE PAGE'S OWN LINE IS THE HEAD'S, so it is not drawn again as a tile under it. */
   /* THE ONES THAT RAN COME FIRST, the latest on top, and "Not run yet" closes the list. */
   const ranAt = (e: { fields: Record<string, unknown> }): number => (typeof e.fields.last_at === 'string' ? Date.parse(e.fields.last_at) || 0 : 0);
@@ -160,11 +157,10 @@
 
 <!-- THE SENTENCE IN ITS PIECES, the paused count and a refused last run in red. One line of markup, so no space is set
      between a piece and its punctuation. -->
-{#snippet sentence()}{#each told ?? [] as p, i (i)}{#if p.tone === 'needs'}<span data-needs>{p.text}</span>{:else}{p.text}{/if}{/each}{/snippet}
 
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's. -->
 <!-- THE COUNT IS THE SENTENCE'S FIRST WORDS ("24 scripts ran..."), so the title does not say it again beside the name. -->
-<PageHead icon="code" title={words.heading} count={live && !told ? rows.length : undefined} sentence={told ? sentence : undefined} heldLines={1}>
+<PageHead icon="code" title={words.heading} count={live ? rows.length : undefined} silent>
   {#snippet actions()}
     <!-- THE ONE PRIMARY: its word, and on a phone the 44px button with the plus. -->
     <Button weight="primary" href="/scripts/new" aria-label={words.newScript} data-circle><Icon name="plus" size="s" /><span class="new-word">{words.newScript}</span></Button>

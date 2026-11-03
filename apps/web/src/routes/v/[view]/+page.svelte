@@ -510,7 +510,7 @@
          titles this tab happened to have learnt. -->
     <!-- THE LIST'S FIGURES OVER THE VIEW'S ROWS, at every width and in every body, as the list draws them over its own. -->
     {#if entries.length > 1}
-      <ListSummary {decl} entries={shown} now={clock} byState headSaid={saying} titleOf={titleSaid} />
+      <ListSummary {decl} entries={shown} now={clock} byState titleOf={titleSaid} />
     {/if}
     {#if entries.length > 0 && rowsAsCards()}
       <RowCards {register} entries={shown} now={clock} {names} />

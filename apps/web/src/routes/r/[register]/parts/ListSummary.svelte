@@ -37,14 +37,13 @@
   import StateDot from '$lib/ui/StateDot.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { valueSaid } from '$lib/voice.ts';
-  import { byStateOf, dotOf, drawsBar, figureParts, figureSaid, figureSplit, isLate, stateReading, wholeMoney, type Figured } from './list.ts';
+  import { byStateOf, dotOf, drawsBar, figureParts, figureSaid, figureSplit, isLate, wholeMoney, type Figured } from './list.ts';
 
   let {
     decl,
     entries,
     now,
     byState,
-    headSaid = false,
     titleOf,
   }: {
     decl: RegisterDecl;
@@ -53,8 +52,6 @@
     now: number;
     /** Whether the split by state may be drawn: the list is whole and unfiltered. */
     byState: boolean;
-    /** Whether the sentence under the list's title is drawn, which already says what is open and what is late. */
-    headSaid?: boolean;
     /** A row's title as the list says it, for the largest rows. */
     titleOf: (e: Entry) => string;
   } = $props();
@@ -171,7 +168,9 @@
   const reading = $derived(
     fig?.latest !== undefined
       ? words.newest(labelOf(fig.field), dayShort(fig.latest), decl.one ?? 'row')
-      : [holding, states ? stateReading(decl, states, entries, now, stateLabel, headSaid) : null, split?.reading ?? null].filter(Boolean).join(' '),
+      : /* ONLY WHAT THE FIGURE IS OVER, SINCE 3 Nov ("i dont like those briefs at all, remove them"): "Most are still open;
+           1 is late." and "Kiln holds the most, 9 of 27." said in a sentence what the lines beside it draw. */
+        (holding ?? ''),
   );
   const one = $derived(sides.length === 1 && sides[0]!.label === null ? sides[0]! : null);
   const lead = $derived(fig !== null || reading !== '');

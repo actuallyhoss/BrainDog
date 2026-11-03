@@ -85,7 +85,6 @@
     laneFieldOf,
     nextSort,
     readDefault,
-    readingOf,
     headCount,
     shownSaid,
     sameDefault,
@@ -103,7 +102,6 @@
     writeDefault,
     type Keep,
     type ListDefault,
-    type Reading,
     type Receipt,
     type View,
   } from './parts/list.ts';
@@ -120,7 +118,7 @@
   import ListKpis from './parts/ListKpis.svelte';
   import { peopleOrder, setPeopleOrder } from './parts/people-order.svelte.ts';
   import { swapUp } from '$lib/page/swap-up.ts';
-  import { lastDayOf, meetsOf, mergedAway, orgRoleOf } from './folk.ts';
+  import { meetsOf, mergedAway, orgRoleOf } from './folk.ts';
   import { readingOf as readingsOf, valueSaid } from '$lib/record/reading.ts';
   import { amountField, signedSaid, wayField, wayOf } from '$lib/record/money-way.ts';
   import ListBoard from './parts/ListBoard.svelte';
@@ -1359,11 +1357,6 @@
     if (!m) return 0;
     return result.entries.filter((e) => (m.self && e.fields[m.self] === true) || mergedAway(e.fields, decl)).length;
   });
-  /** You are a row of this list, drawn and not counted, so its line says "besides you" (AM17). */
-  const youListed = $derived.by(() => {
-    const m = meetsOf(decl);
-    return m?.self !== undefined && result.entries.some((e) => e.seq > 0 && e.fields[m.self!] === true);
-  });
   const denominator = $derived(Math.max(0, (narrowed || q ? result.matched : result.total) - notCounted));
 
   /**
@@ -1488,35 +1481,9 @@
     );
   });
 
-  /**
-   * THE SENTENCE UNDER THE TITLE: what is open, what is late in red, and when the next thing falls due
-   * (`readingOf`). It counts the rows in hand, so it says nothing while the list is still being paged.
-   */
-  /* WHO HAS GONE QUIET LONGEST, on a list of people that says when each was last in touch (`meets`): a month or more
-     since, or nobody. The sentence leads with them (L1). */
-  const quietest = $derived.by((): { name: string; day: string } | null => {
-    const m = meetsOf(decl);
-    if (!m || !decl) return null;
-    let best: { name: string; day: string } | null = null;
-    for (const e of standing) {
-      if (m.self && e.fields[m.self] === true) continue;
-      const day = lastDayOf(e.fields, m);
-      const name = String(e.fields[decl.title] ?? '').trim();
-      if (day && name && (!best || day < best.day)) best = { name, day };
-    }
-    return best && now - Date.parse(`${best.day}T12:00:00Z`) > 30 * 86_400_000 ? best : null;
-  });
-  /* NOT UNTIL THE NEW ROWS LAND (skills pass follow-up, 2 Nov): a slice pressed made the list filtered at once while the
-     count in hand was still the old answer's, so the head said "27 of 27 match." for a frame before "1 of 27 matches.".
-     While a new question is out the sentence already drawn stays, on this list only. */
-  let readingWas: { list: string; said: Reading | null } | null = null;
-  const reading = $derived.by((): Reading | null => {
-    if (readFor !== question) return readingWas?.list === id ? readingWas.said : null;
-    const said = readingOf(decl, standing, now, { whole, filtered: narrowed || q !== '', matched: Math.max(0, result.matched - notCounted), total: Math.max(0, result.total - notCounted), besides: youListed, quiet: quietest });
-    readingWas = { list: id, said };
-    return said;
-  });
-
+  /* NO SENTENCE UNDER THE TITLE, SINCE 3 Nov ("i dont like those briefs at all, remove them"): "16 open, 1 late, the next
+     due tomorrow." said again what the head's count, the toolbar's Late and Due soon chips and the rows' red days say,
+     and on a list of people "June Park quiet since July" what each row's last-in-touch day says. */
   /** A row's title as the list says it, for the summary tile's largest rows. */
   const titleSaid = (e: Entry): string => (decl ? display(id, decl.title, e.fields[decl.title], now, result.names ?? undefined) : null) ?? copy.thisRow;
 
@@ -3391,7 +3358,6 @@
   <ListEditor bind:open={makeOpen} register={null} {owner} name={nameFromId(id)} onmade={made} />
 {:else}
   <!-- THE SENTENCE, cut round the phrase that needs him, which `PageHead` draws in red (`data-needs`). -->
-  {#snippet readingSaid()}{reading?.before}{#if reading?.needs}<span data-needs>{reading.needs}</span>{/if}{reading?.after}{/snippet}
 
   <!-- THE SCREEN NARROWS BESIDE THE DOCKED PANEL, AND NEVER GOES UNDER IT. `--dock-w` is what an open docked
        panel takes from the window's end edge, and nothing otherwise; the head's and the list's own gutter already
@@ -3414,7 +3380,7 @@
     title={id === KEYS_REGISTER ? copy.keychain : decl.name}
     count={head}
     total={denominator}
-    sentence={reading ? readingSaid : undefined}
+    silent
     actions={id === KEYS_REGISTER || (adds && arriving) ? headActions : undefined}
   />
   {#if proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={refresh} />{/if}
@@ -3450,7 +3416,7 @@
          And only on a list long enough to sift: five rows are read faster than a chart of them, and the tile would be
          the figure of what the eye already has. -->
     {#if whole && !arriving && siftable && standing.length > 0}
-      <ListSummary {decl} entries={standing} {now} byState={!narrowed && q === ''} headSaid={reading !== null} titleOf={titleSaid} />
+      <ListSummary {decl} entries={standing} {now} byState={!narrowed && q === ''} titleOf={titleSaid} />
     {/if}
 
     <!--

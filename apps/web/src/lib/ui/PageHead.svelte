@@ -99,6 +99,7 @@
     tiled = false,
     named = false,
     heldLines = 2,
+    silent = false,
     heldText,
   }: {
     title: string;
@@ -145,6 +146,11 @@
     named?: boolean | undefined;
     /** How many lines a sentence on its way holds on a phone: Today's says three things, so it holds three. */
     heldLines?: number | undefined;
+    /**
+     * NO SENTENCE IS ON ITS WAY (3 Nov): a list's head says none since its count sentence went, so it holds no room
+     * while the screen reads, and nothing under the name moves up when the rows land.
+     */
+    silent?: boolean | undefined;
     /**
      * The words the sentence on its way is most like, where a page knows them before its read: set in the held line,
      * unseen, so it holds the room those words take at this width, and never less than `heldLines`.
@@ -307,7 +313,7 @@
 
   /* A SENTENCE ON ITS WAY HOLDS ITS ROOM, and only while the screen is still reading: a page that settles with nothing
      to say gives the line back. */
-  const held = $derived(sentence === undefined && settled() === undefined);
+  const held = $derived(!silent && sentence === undefined && settled() === undefined);
 
   /* ON A DESK, A TITLED HEAD WITH NO SENTENCE PUTS ITS BUTTONS IN THE TOP BAR, beside the name the bar already says
      (space pass, 4 Nov): with the sentence gone, Share and the "⋯" stood alone on a row of their own under the bar. */
