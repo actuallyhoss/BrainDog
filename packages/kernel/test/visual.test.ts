@@ -71,3 +71,14 @@ test('A VISUAL WITH A SHADOW ROOT IN ITS MARKUP IS REFUSED, and the words alone 
   assert.ok('fault' in visualPage('<div><template shadowrootmode="open"><p>x</p></template></div>', new Set()));
   assert.ok(!('fault' in visualPage('<div><p>a shadow root is a word here</p></div>', new Set())));
 });
+
+test('A SCRIPT LOADED FROM ELSEWHERE IS SAID AT LOG TIME, with the fix, instead of drawing blank', () => {
+  const said = fault('<canvas id="c"></canvas><script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script><script>new Chart(c, {})</script>');
+  assert.match(said, /its script loads https:\/\/cdnjs\.cloudflare\.com/u);
+  assert.match(said, /draw blank/u);
+  assert.match(said, /braindog attach/u);
+  assert.match(fault("<script src='//unpkg.com/d3'></script>"), /its script loads \/\/unpkg\.com\/d3/u);
+  /* A SCRIPT WRITTEN INTO THE PAGE IS KEPT AS IT WAS. */
+  const out = visualPage('<svg id="s"></svg><script type="module">document.getElementById("s").setAttribute("width", "10")</script>', new Set());
+  assert.ok('page' in out, JSON.stringify(out));
+});
