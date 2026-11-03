@@ -187,18 +187,23 @@ function waits(doc: File): { at: string; holds: unknown }[] {
 
 const kindOf = (d: Body): string => ['rule', 'script', 'ingest', 'register', 'page', 'metric'].find((k) => typeof d[k] === 'string') ?? 'something else';
 
-test('THE FILE IS DATA AND ONLY ITS OWN: no script, two lists, three pages, eight figures over those lists, three rules', () => {
+test('THE FILE IS ITS OWN: one script that reaches nowhere, two lists, three pages, eight figures over those lists, four rules', () => {
   const doc = file();
   assert.equal(doc.pack, 'people');
   const kinds = doc.declarations.map(kindOf);
   assert.deepEqual(
-    Object.fromEntries(['register', 'page', 'metric', 'rule'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    /* EIGHT SINCE 4.2.0: organisations you work with apart from shops from card texts (`organisations-known`). */
-    { register: 2, page: 3, metric: 8, rule: 3 },
-    'two lists, three pages, eight figures and three rules',
+    Object.fromEntries(['register', 'page', 'metric', 'rule', 'script'].map((k) => [k, kinds.filter((x) => x === k).length])),
+    /* EIGHT SINCE 4.2.0: organisations you work with apart from shops from card texts (`organisations-known`). FOUR RULES
+       AND ONE SCRIPT SINCE 4.7.0: `script.people_fields` offers the facts in a person's note as fields, and
+       `rule.people-fields` is its Run now. */
+    { register: 2, page: 3, metric: 8, rule: 4, script: 1 },
+    'two lists, three pages, eight figures, four rules and one script',
   );
-  assert.ok(!kinds.includes('script') && !kinds.includes('something else'), 'the file declares a script, or something that is none of the four');
-  assert.doesNotMatch(JSON.stringify(doc.declarations), /"script":|"egress"|"hosts"/u, 'a step that runs a script or reaches out');
+  assert.ok(!kinds.includes('something else'), 'the file declares something that is none of the five');
+  /* THE SCRIPT READS AND WRITES PEOPLE ALONE AND REACHES NOWHERE. */
+  const script = doc.declarations.find((d) => typeof d.script === 'string')!;
+  assert.deepEqual([script.script, script.reads, script.writes, script.egress, script.keys], ['people_fields', ['people'], ['people'], [], []]);
+  assert.doesNotMatch(JSON.stringify(doc.declarations.filter((d) => d !== script)), /"egress"|"hosts"/u, 'a part that reaches out');
 
   /* NO FIGURE OVER A LIST IT DOES NOT OWN, and every block over Projects or Money waits for it. */
   for (const d of doc.declarations) if (typeof d.metric === 'string') assert.match(String(d.source), /^register\.(people|organisations)$/u, `${String(d.name)} reads a list that is not People's`);
@@ -207,7 +212,7 @@ test('THE FILE IS DATA AND ONLY ITS OWN: no script, two lists, three pages, eigh
       if (b.source === `register.${PROJECTS}` || b.source === `register.${MONEY}`)
         assert.deepEqual(b.when, { holds: [String(b.source).slice('register.'.length)] }, `"${String(b.heading)}" reads a list People does not own and does not wait for it`);
   /* AND THE RULES ARE ON PEOPLE'S OWN LISTS: whoever writes in, whoever sends the mail, whoever a payment was with. */
-  assert.deepEqual(doc.declarations.filter((d) => typeof d.rule === 'string').map((d) => d.rule), ['meet-senders', 'meet-sender-organisations', 'meet-payees']);
+  assert.deepEqual(doc.declarations.filter((d) => typeof d.rule === 'string').map((d) => d.rule), ['meet-senders', 'meet-sender-organisations', 'meet-payees', 'people-fields']);
 
   assert.doesNotMatch(JSON.stringify(doc), /—/u, 'an em dash in words a person reads');
 });
