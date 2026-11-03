@@ -62,7 +62,7 @@
   import { openInPlace, type Opening } from './group-open.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
-  import type { Row, WidgetSize } from 'braindog-render';
+  import type { DrawnAct, Row, WidgetSize } from 'braindog-render';
   import { refOfHref } from '$lib/send/send.ts';
   import AddStep from './AddStep.svelte';
   import Hole from './Hole.svelte';
@@ -91,7 +91,7 @@
   import { partsOf } from './kinds/project.ts';
   import { MediaQuery } from 'svelte/reactivity';
   import { drawnOf } from './kinds/drawn.ts';
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { landed } from '$lib/home/tile-landed.ts';
   import { partLanded } from './part-landed.ts';
 
@@ -521,6 +521,17 @@
     const to = rowHref(ref);
     if (to !== null) void goto(inApp(to));
   }
+  /* AND A ROW ITS VIEW ADDS OR CHANGES (add-ons phase 4), on a page that writes and is not being arranged: the record
+     checks it against this block's own `actions:` by its declared index and writes it as the reader, then the page is
+     read again so the new row shows. A board's widget and a preview write nothing. */
+  const drawnActs = $derived(writes !== null && !arranging && widget === null && menuSlug !== null ? menuSlug : null);
+  async function actDrawn(act: DrawnAct): Promise<unknown> {
+    if (drawnActs === null) return { ok: false, refusal: { code: 'FORBIDDEN', fix: 'This view cannot write here.' } };
+    const { createClient } = await import('@braindog/client');
+    const got = await createClient({ base: apiBase() }).drawnAct({ page: drawnActs, block: i, ...('create' in act ? { create: act.create } : { update: act.update }) });
+    if ((got as { ok?: boolean }).ok) await invalidateAll();
+    return got;
+  }
 
   /* THE TILE'S HEADING ROW, THE SAME ON EVERY TILE: its glyph, or its kind's where it names none, and
      how many it holds where it is a list a person counts (`tile-head.ts`). */
@@ -940,7 +951,7 @@
   }} />
 {:else if sketch && !block.refusals.length}
   <!-- A DRAWN COMPONENT, in its sandbox: never in the page, and handed only its own rows and the theme. -->
-  {#await import('./DrawnFrame.svelte') then { default: DrawnFrame }}<DrawnFrame code={sketch.code} data={sketch.data} start={sketch.start} title={headingText} onopen={openDrawn} size={widget} picture={widget !== null} whose={drawnWhose} />{/await}
+  {#await import('./DrawnFrame.svelte') then { default: DrawnFrame }}<DrawnFrame code={sketch.code} data={sketch.data} start={sketch.start} title={headingText} onopen={openDrawn} onact={drawnActs === null ? null : actDrawn} size={widget} picture={widget !== null} whose={drawnWhose} />{/await}
 {:else if drawn.refusal}
   {@const act = drawn.refusal.action}
   <Empty compact kind={drawn.refusal.kind} title={drawn.refusal.title} body={drawn.refusal.body} lines={drawn.refusal.lines} icon={drawn.refusal.authored ? icon : undefined}>

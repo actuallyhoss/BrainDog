@@ -245,7 +245,7 @@ import { analyse, observe, type Analysis, type Observation } from './observe.ts'
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
 import { firstSlotMs } from './slot.ts';
 import { activeScript, clockOfScript, egressChanged, fireScript, firstDueMs, scriptDeps } from './script.ts';
-import { noticesLeft, storeOf } from './addon-state.ts';
+import { binStore, noticesLeft, restoreStore, storeOf } from './addon-state.ts';
 import { finishScript, prepareScript, resumeScript, tryProposal, type ScriptProposal, type ScriptProposed, type ScriptRunDeps, type ScriptRunner } from './script-run.ts';
 import { applyPage, writePoints, type MetricPoint, type PageWrote, type PulledPage } from './fetched.ts';
 import { extractPull, type ExtractDecl, type ExtractDeps, type Extraction } from './extract.ts';
@@ -812,7 +812,8 @@ export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
 /* `scriptBody` IS THE SHAPE CHECK A DRAFT MEETS BEFORE IT IS TRIED, the one install runs, so `scriptTry` in the record refuses
    what an install would and never runs a body the record could not hold. */
 export { egressChanged, scriptBody, SCRIPT_MODEL_ASKS_MOST, SCRIPT_NOTICES_PER_DAY, SCRIPT_STORE_BYTES } from './script.ts';
-export { dropStore, noticeOf, noticeSaid, NOTICE_BODY_MOST, NOTICE_TITLE_MOST, scriptOwner, STORE_KEY_MOST, storeAfter, storeHolder, storeKeyFault, type Notice, type Stored } from './addon-state.ts';
+export { DRAWN_ACTION, DRAWN_ACTIONS_MOST, drawnActionsFault, drawnWrites } from './kinds/drawn.ts';
+export { binnedStoreHolder, dropStore, noticeOf, noticeSaid, NOTICE_BODY_MOST, NOTICE_TITLE_MOST, scriptOwner, STORE_KEY_MOST, storeAfter, storeHolder, storeKeyFault, type Notice, type Stored } from './addon-state.ts';
 export {
   finishScript,
   prepareScript,
@@ -11234,6 +11235,12 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** An add-on's own store as it stands (`ctx.store`), `owner` as `scriptOwner` names it. A read. */
     scriptStore: (owner: string): Record<string, unknown> => storeOf(sql, owner),
+
+    /** An add-on's store into the bin, removed with its data (`uninstallPack {data: true}`). Answers how many keys went. */
+    binAddonStore: (pack: string): number => binStore(sql, pack, clock.now()),
+
+    /** An add-on's binned store back, installed again inside `REMOVED_WINDOW_DAYS`. Answers how many keys came back. */
+    restoreAddonStore: (pack: string): number => restoreStore(sql, pack, clock.now(), REMOVED_WINDOW_DAYS * 86_400_000),
 
     /** Every active scheduled action: its schedule, its key by label, its last run and this month's counts. A read. */
     actions: () => listActions(sql, clock.now()),

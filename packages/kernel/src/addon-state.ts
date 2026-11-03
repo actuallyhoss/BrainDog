@@ -184,3 +184,37 @@ export function dropStore(sql: Sql, owner: string): number {
   sql.exec('DELETE FROM pref WHERE person_id = ?', storeHolder(owner));
   return n;
 }
+
+/** Where a store removed with its add-on waits, so installing it again inside the window puts it back. */
+export const binnedStoreHolder = (owner: string): string => `addon-binned:${owner}`;
+
+/**
+ * An add-on's store into the bin with its rows (`uninstallPack {data: true}`, phase 8): every key moved under
+ * `binnedStoreHolder`, stamped when, replacing whatever an older removal left there. Answers how many keys went.
+ */
+export function binStore(sql: Sql, owner: string, nowMs: number): number {
+  const from = storeHolder(owner);
+  const to = binnedStoreHolder(owner);
+  sql.exec('DELETE FROM pref WHERE person_id = ?', to);
+  const n = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM pref WHERE person_id = ?', from)?.n ?? 0);
+  sql.exec('UPDATE pref SET person_id = ?, updated_at = ? WHERE person_id = ?', to, instant(nowMs), from);
+  return n;
+}
+
+/**
+ * A binned store back under its add-on, when it went in within `windowMs`: what installing it again does, as its rows
+ * come back. Older than the window it is dropped instead, as the bin's sweep drops rows. Answers how many keys came back.
+ */
+export function restoreStore(sql: Sql, owner: string, nowMs: number, windowMs: number): number {
+  const from = binnedStoreHolder(owner);
+  const at = sql.one<{ at: string | null }>('SELECT max(updated_at) AS at FROM pref WHERE person_id = ?', from)?.at ?? null;
+  if (at === null) return 0;
+  if (nowMs - Date.parse(at) > windowMs) {
+    sql.exec('DELETE FROM pref WHERE person_id = ?', from);
+    return 0;
+  }
+  const n = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM pref WHERE person_id = ?', from)?.n ?? 0);
+  sql.exec('DELETE FROM pref WHERE person_id = ?', storeHolder(owner));
+  sql.exec('UPDATE pref SET person_id = ?, updated_at = ? WHERE person_id = ?', storeHolder(owner), instant(nowMs), from);
+  return n;
+}

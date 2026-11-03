@@ -55,6 +55,34 @@ const RULES: readonly { test: RegExp; fix: string }[] = [
 
 const BYTES = new TextEncoder();
 
+/** The most actions a drawn block declares. */
+export const DRAWN_ACTIONS_MOST = 8;
+
+/**
+ * One action a drawn block's view may ask its host for (add-ons phase 4): add a row to a list, change a row of one, or
+ * call one of its add-on's tools. Declared here and nowhere else: the host checks what the frame asks against this list,
+ * against the add-on's own lists and its `uses` writes, and against the viewer's own ladder, then writes as the viewer.
+ */
+export const DRAWN_ACTION = /^(?:(?:create|update):register\.[a-z][a-z0-9_-]{0,31}|tool:[a-z][a-z0-9_.-]{0,63})$/u;
+
+/** What is wrong with a drawn block's `actions:`, or `null`. */
+export function drawnActionsFault(actions: unknown): string | null {
+  if (actions === undefined) return null;
+  if (!Array.isArray(actions) || actions.some((a) => typeof a !== 'string'))
+    return 'actions: is a list of what its view may ask, such as ["create:register.films", "update:register.films"].';
+  if (actions.length > DRAWN_ACTIONS_MOST) return `A drawn block declares at most ${DRAWN_ACTIONS_MOST} actions.`;
+  const wrong = (actions as string[]).find((a) => !DRAWN_ACTION.test(a));
+  if (wrong !== undefined) return `${JSON.stringify(wrong.slice(0, 80))} is not an action a view may ask. Write create:register.<list>, update:register.<list> or tool:<name>.`;
+  return null;
+}
+
+/** The lists a drawn block's view may add rows to and change rows of, from its `actions:`. */
+export function drawnWrites(actions: unknown): { creates: string[]; updates: string[] } {
+  const list = Array.isArray(actions) ? actions.filter((a): a is string => typeof a === 'string' && DRAWN_ACTION.test(a)) : [];
+  const of = (verb: string) => list.filter((a) => a.startsWith(`${verb}:register.`)).map((a) => a.slice(`${verb}:register.`.length));
+  return { creates: of('create'), updates: of('update') };
+}
+
 /** What is wrong with a component's code, finishing "This component cannot be drawn because", or `null`. */
 export function drawnCodeFault(code: string): string | null {
   if (BYTES.encode(code).length > DRAWN_CODE_MOST) return `it is longer than ${DRAWN_CODE_MOST / 1024} KB. A drawn component is one small visual; split it or draw less.`;
@@ -84,6 +112,8 @@ export const drawn: KindModule = {
       /* THE CODE IS NOT REPEATED IN THE SENTENCE: a refusal is logged, and code somebody pasted can carry anything. */
       if (fault) return invalid(`This component cannot be drawn because ${fault}`, 'code');
     }
+    const actionsFault = drawnActionsFault(block.actions);
+    if (actionsFault !== null) return invalid(actionsFault, 'actions');
     const height = block.height;
     if (height !== undefined && !(typeof height === 'number' && Number.isInteger(height) && height >= HEIGHT_LEAST && height <= HEIGHT_MOST))
       return { code: 'OUT_OF_BOUNDS', fix: `height: is where a drawn block starts, a whole number of pixels from ${HEIGHT_LEAST} to ${HEIGHT_MOST}.`, at: 'height' };

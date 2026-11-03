@@ -70,7 +70,7 @@ export const DRAWN_RULES: readonly { test: RegExp; fix: string }[] = [
   { test: /\b(?:top|parent|opener)\s*\.\s*(?:location|document)\b|\bwindow\.open\s*\(/u, fix: 'it reaches for the page around it, and a drawn component cannot. To open one of its rows it calls braindog.open with the row.' },
 ];
 
-import { isBag, type DrawnData } from './drawn-data.ts';
+import { isBag, type DrawnData, type DrawnValue } from './drawn-data.ts';
 
 export { DRAWN_ROWS_MOST, drawnData, type DrawnData, type DrawnRow, type DrawnValue } from './drawn-data.ts';
 
@@ -190,14 +190,24 @@ const BRIDGE = `(function () {
     theme: start.theme,
     size: start.size || null,
     on: function (fn) { if (typeof fn === 'function') { handlers.push(fn); tell(fn); } },
-    open: function (ref) { if (typeof ref === 'string') parent.postMessage({ braindog: 'open', ref: ref }, '*'); }
+    open: function (ref) { if (typeof ref === 'string') parent.postMessage({ braindog: 'open', ref: ref }, '*'); },
+    create: function (list, fields) { return ask({ braindog: 'create', list: String(list), fields: fields || {} }); },
+    update: function (ref, patch) { return ask({ braindog: 'update', ref: String(ref), patch: patch || {} }); }
   };
+  var waiting = {};
+  var asked = 0;
+  function ask(m) {
+    asked += 1;
+    m.id = 'a' + asked;
+    return new Promise(function (resolve) { waiting[m.id] = resolve; parent.postMessage(m, '*'); });
+  }
   window.braindog = bd;
   paint(start.theme);
   addEventListener('message', function (e) {
     if (e.source !== parent) return;
     var m = e.data;
     if (!m || typeof m !== 'object') return;
+    if (m.braindog === 'done' && typeof m.id === 'string' && waiting[m.id]) { var r = waiting[m.id]; delete waiting[m.id]; r(m.answer); return; }
     if (m.braindog === 'picture') { try { parent.postMessage({ braindog: 'picture', picture: picture() }, '*'); } catch (e) {} return; }
     if (m.braindog === 'data') bd.data = m.data;
     else if (m.braindog === 'theme') { bd.theme = m.theme; paint(m.theme); }
@@ -236,7 +246,20 @@ export function drawnDocument(code: string, start: { data: DrawnData; theme: Dra
 }
 
 /** What a frame asked, once checked: to stand at a height, to open one of the rows it was handed, or its picture. */
-export type DrawnAsk = { height: number } | { open: string } | { picture: string };
+export type DrawnAsk =
+  | { height: number }
+  | { open: string }
+  | { picture: string }
+  /* A ROW ADDED OR CHANGED BY ITS VIEW (add-ons phase 4): the host forwards it to the record, which checks it against the
+     block's declared `actions:`, the add-on's own lists and `uses` writes, and the viewer's ladder, then writes as the
+     viewer. `id` is the frame's own, to answer it by. */
+  | { act: DrawnAct };
+
+/** One write a view asked for, checked for shape: add a row to a list, or change one of the rows it was handed. */
+export type DrawnAct = { id: string; create: { list: string; fields: Record<string, DrawnValue> } } | { id: string; update: { ref: string; patch: Record<string, DrawnValue> } };
+
+/** The most a view's write may weigh, as JSON. */
+export const DRAWN_ACT_MOST = 32 * 1024;
 
 /** The most a component's picture may weigh, in characters: a drawing, not a page. */
 export const DRAWN_PICTURE_MOST = 256 * 1024;
@@ -283,6 +306,22 @@ export function drawnAsk(message: unknown, refs: ReadonlySet<string>): DrawnAsk 
   if (message.braindog === 'height') return typeof message.height === 'number' && Number.isFinite(message.height) ? { height: drawnHeight(message.height) } : null;
   if (message.braindog === 'open') return typeof message.ref === 'string' && refs.has(message.ref) ? { open: message.ref } : null;
   if (message.braindog === 'picture') return typeof message.picture === 'string' && message.picture.length <= DRAWN_PICTURE_MOST ? { picture: message.picture } : null;
+  if ((message.braindog === 'create' || message.braindog === 'update') && typeof message.id === 'string' && /^a\d{1,9}$/u.test(message.id)) {
+    const body = message.braindog === 'create' ? message.fields : message.patch;
+    if (!isBag(body)) return null;
+    let text = '';
+    try {
+      text = JSON.stringify(body);
+    } catch {
+      return null;
+    }
+    if (text.length > DRAWN_ACT_MOST) return null;
+    const plain = JSON.parse(text) as Record<string, DrawnValue>;
+    if (message.braindog === 'create')
+      return typeof message.list === 'string' && /^[a-z][a-z0-9_-]{0,31}$/u.test(message.list) ? { act: { id: message.id, create: { list: message.list, fields: plain } } } : null;
+    /* A ROW IS CHANGED ONLY WHEN IT IS ONE THE HOST HANDED IN, as a row is opened only then. */
+    return typeof message.ref === 'string' && refs.has(message.ref) ? { act: { id: message.id, update: { ref: message.ref, patch: plain } } } : null;
+  }
   return null;
 }
 

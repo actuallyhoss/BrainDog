@@ -342,6 +342,8 @@ export type RecordSurface = {
   digestToday(args: never, ctx: never): Promise<Result<unknown>>;
   markRead(args: { upTo?: number | string } | undefined, ctx: never): Promise<Result<unknown>>;
   setPref(args: never, ctx: never): Promise<Result<unknown>>;
+  /** OPTIONAL as `scriptTry` is: a drawn view's write, checked against its block's actions (add-ons phase 4). */
+  drawnAct?(args: never, ctx: never): Promise<Result<unknown>>;
   subscribePush(args: never, ctx: never): Promise<Result<unknown>>;
   unsubscribePush(args: never, ctx: never): Promise<Result<unknown>>;
   log(args: never, ctx: never): Promise<Result<unknown>>;
@@ -467,6 +469,8 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     digestToday: (a, ctx) => api.digestToday(a as never, ctx as never),
     markRead: (a, ctx) => api.markRead(a as { upTo?: number | string } | undefined, ctx as never),
     setPref: (a, ctx) => api.setPref(a as never, ctx as never),
+    drawnAct: async (a, ctx) =>
+      api.drawnAct ? api.drawnAct(a as never, ctx as never) : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot write from a drawn view yet.' } },
     subscribePush: (a, ctx) => api.subscribePush(a as never, ctx as never),
     unsubscribePush: (a, ctx) => api.unsubscribePush(a as never, ctx as never),
     log: (a, ctx) => api.log(a as never, ctx as never),

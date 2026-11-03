@@ -281,6 +281,8 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'erase', group: 'ADMIN', writes: true, what: 'Erase a person: every value naming them, in one transaction, and one event that names them only as a hash.' },
   { name: 'deleteRecord', group: 'ADMIN', writes: true, what: 'Delete this BrainDog, with its name typed to confirm. There is no undo.' },
   { name: 'markRead', group: 'DATA', writes: true, what: 'How far you have read, named as an event. A person only, and never an event of its own.' },
+  /* A DRAWN VIEW'S WRITE (add-ons phase 4): checked against the block's own `actions:` and written as the viewer. */
+  { name: 'drawnAct', group: 'DATA', writes: true, what: "A row added or changed by a drawn view, only as its block's actions allow, written as you." },
   { name: 'setPref', group: 'DATA', writes: true, what: 'One of your own settings: the rail order, the pages hidden from it, the navigation shape, whether new pages are suggested, or what you dismissed. A person only, and not an event.' },
   /* A PHONE ASKING TO BE TOLD, AND TELLING IT TO STOP. READ+ because they are verbs over no row, as `boot`
      and `whoami` are; POSTs because each keeps or removes a `push_sub` row. Only a person's own, and never an event. */

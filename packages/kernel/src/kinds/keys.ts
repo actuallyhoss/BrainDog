@@ -15,7 +15,7 @@ export const KIND_KEYS = {
   embed: [],
   lanes: ['hours', 'tones'],
   form: ['verb', 'register', 'fields', 'submit', 'after'],
-  drawn: ['code', 'height'],
+  drawn: ['code', 'height', 'actions'],
   project: ['parts'],
 } as const satisfies Readonly<Record<string, readonly string[]>>;
 

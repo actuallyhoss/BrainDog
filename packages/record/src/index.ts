@@ -59,6 +59,7 @@ import {
   ANSWER_KEYS,
   CAUSE,
   NIGHT_FAULT,
+  drawnWrites,
   clearFault,
   canonValue,
   sha256,
@@ -14436,6 +14437,63 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * keeps the newest `PEN_DISMISSED_MOST` and lets the oldest go, because the pen appends one id at a time and a list
      * that refused its next id would make Dismiss stop working; the list it walks is bounded by the body the host admits.
      */
+    /**
+     * A row added or changed by a drawn block's own view (add-ons phase 4), forwarded by the frame's host page.
+     *
+     * NOTHING THE FRAME SAYS IS TAKEN ON ITS WORD. The block is read here, off the page's live declaration by its
+     * declared index, and the action must be one its `actions:` names (`create:register.<list>` or
+     * `update:register.<list>`). On an add-on's page the list must be one of its own or one its `uses` line names, so a
+     * view never reaches a list its plan did not show. Then the row is written AS THE VIEWER, through `create` or
+     * `update` with the caller's own context, so their ladder, their lens and every check a typed write meets apply.
+     * The frame itself stays `allow-scripts` only, with no network: this method is its one way to the record.
+     */
+    async drawnAct(
+      args: { page: string; block: number; create?: { list: string; fields: Record<string, unknown> }; update?: { ref: string; patch: Record<string, unknown> } },
+      ctx: CallContext,
+    ): Promise<Result<unknown>> {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false as const, refusal: stop };
+      const extra = stray((args ?? {}) as Record<string, unknown>, ['page', 'block', 'create', 'update']);
+      if (extra) return { ok: false as const, refusal: extra };
+      if (typeof args?.page !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,63}$/u.test(args.page)) return no('REQUIRED_MISSING', 'page is the address of the page the view is on.', { at: 'page' });
+      if (!Number.isInteger(args.block) || args.block < 0) return no('REQUIRED_MISSING', 'block is the declared index of the drawn block on that page.', { at: 'block' });
+      if ((args.create === undefined) === (args.update === undefined)) return no('VALUE_MALFORMED', 'Send create: { list, fields } or update: { ref, patch }, one of the two.', { at: 'create' });
+      const row = sql.one<{ body: string; pack: string | null }>(
+        "SELECT body, coalesce(pack_id, json_extract(body, '$.pack')) AS pack FROM declaration WHERE id = ? AND kind = 'page' AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1",
+        `page.${args.page}`,
+      );
+      const body = row === undefined ? null : (JSON.parse(row.body) as { blocks?: unknown });
+      const block = body !== null && Array.isArray(body.blocks) ? (body.blocks[args.block] as Record<string, unknown> | undefined) : undefined;
+      if (block === undefined || block === null || typeof block !== 'object' || block.kind !== 'drawn')
+        return no('REF_UNKNOWN', `There is no drawn block ${args.block + 1} on ${args.page}.`, { at: 'block' });
+      const { creates, updates } = drawnWrites(block.actions);
+      const list = args.create !== undefined ? args.create.list : (/^([a-z][a-z0-9_-]{0,31})#(\d+)$/u.exec(String(args.update?.ref ?? ''))?.[1] ?? '');
+      const verb = args.create !== undefined ? 'create' : 'update';
+      if (!(verb === 'create' ? creates : updates).includes(list))
+        return no('FORBIDDEN', `This view did not declare ${verb}:register.${list || '?'} in its actions, so nothing was written.`, { at: 'actions' });
+      /* ON AN ADD-ON'S PAGE, ITS OWN LIST OR ONE ITS `uses` LINE NAMES, and nothing else. */
+      if (row?.pack) {
+        const own = sql.one<{ n: number }>("SELECT count(*) AS n FROM declaration WHERE id = ? AND superseded_at IS NULL AND coalesce(pack_id, json_extract(body, '$.pack')) = ?", `register.${list}`, row.pack)?.n ?? 0;
+        const manifest = sql.one<{ manifest: string }>('SELECT manifest FROM pack WHERE id = ?', row.pack)?.manifest;
+        let uses: unknown = undefined;
+        try {
+          uses = manifest === undefined ? undefined : (JSON.parse(manifest) as { uses?: unknown }).uses;
+        } catch {
+          uses = undefined;
+        }
+        const named = Array.isArray(uses) && uses.includes(`register.${list}`);
+        if (Number(own) === 0 && !named && Array.isArray(uses))
+          return no('FORBIDDEN', `${list} is not one of this add-on's own lists and its uses line does not name it, so its view may not write there.`, { at: 'actions' });
+      }
+      if (args.create !== undefined) {
+        if (args.create.fields === null || typeof args.create.fields !== 'object' || Array.isArray(args.create.fields)) return no('VALUE_MALFORMED', 'fields is the new row, field by field.', { at: 'create.fields' });
+        return api.create({ register: list, fields: args.create.fields as Patch, note: `Added from the view on ${args.page}` }, ctx);
+      }
+      const seq = Number(/#(\d+)$/u.exec(String(args.update!.ref))?.[1]);
+      if (args.update!.patch === null || typeof args.update!.patch !== 'object' || Array.isArray(args.update!.patch)) return no('VALUE_MALFORMED', 'patch is what changes, field by field.', { at: 'update.patch' });
+      return api.update({ register: list, seq, patch: args.update!.patch as Patch, note: `Changed from the view on ${args.page}` }, ctx);
+    },
+
     async setPref(args: { key: string; value: unknown }, ctx: CallContext) {
       const stop = guard(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
@@ -15565,6 +15623,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...((diff.widgets ?? []).length === 0 ? {} : { today_cards: (diff.widgets ?? []).map((w) => w.title) }),
         ...((diff.skills ?? []).length === 0 ? {} : { skills: (diff.skills ?? []).map((s) => s.name) }),
         ...(diff.calls_out.length === 0 ? {} : { calls_out: diff.calls_out.map((c) => c.line) }),
+        ...(diff.may === undefined ? {} : { may: diff.may.map((m) => m.line) }),
         ...(diff.approve.length === 0 ? {} : { approve: diff.approve }),
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
         ...(keys.length === 0 ? {} : { keys_missing: keys }),
@@ -15716,7 +15775,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           this.answer = answer;
         }
       }
-      let out: Result<{ pack: string; declarations: number; binned: Record<string, number>; kept: number; doors_closed: number; batch: string; rows_kept: Record<string, number> }>;
+      let out: Result<{ pack: string; declarations: number; binned: Record<string, number>; kept: number; doors_closed: number; batch: string; rows_kept: Record<string, number>; store_keys?: number }>;
       try {
         out = kernel.transaction(() => {
           const { binned, kept } = binOwnRows(kernel, lists, { actor, batch, note: `Removed with ${name}` });
@@ -15733,7 +15792,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (!gone.ok) throw new Back(gone as Result<never>);
           const rows = Object.values(binned).reduce((a, n) => a + n, 0);
           if (rows > 0) kernel.setPref(BINNED, args.id, { batch, rows, lists: binned, at: new Date(clock.now()).toISOString() } satisfies Binned);
-          return ok({ ...gone.value, binned, kept, doors_closed: closed, batch });
+          /* AND WHAT ITS SCRIPTS KEPT (`ctx.store`) GOES INTO THE BIN WITH THE ROWS, and comes back with them on a reinstall
+             inside the window (`restoreWithin`). */
+          const stored = kernel.binAddonStore(args.id);
+          return ok({ ...gone.value, binned, kept, doors_closed: closed, batch, ...(stored > 0 ? { store_keys: stored } : {}) });
         });
       } catch (e) {
         kernel.reload();

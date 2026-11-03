@@ -3079,6 +3079,12 @@ export function createClient(options: ClientOptions) {
      */
     setPref: <K extends keyof Prefs>(key: K, value: NonNullable<Prefs[K]> | null) =>
       call<{ key: K; value: NonNullable<Prefs[K]> | null }>('setPref', { key, value }),
+    /**
+     * A row added or changed by a drawn block's view (add-ons phase 4): `page` and `block` say which block, and the record
+     * checks the write against that block's own `actions:` and writes it as the reader.
+     */
+    drawnAct: (args: { page: string; block: number; create?: { list: string; fields: Record<string, unknown> }; update?: { ref: string; patch: Record<string, unknown> } }) =>
+      call<unknown>('drawnAct', args as Record<string, unknown>),
     /** One test notification to each of the reader's own devices, once a minute: how many it went to and the record's line. */
     pushTest: () => call<{ devices: number; line: string }>('pushTest'),
     /**

@@ -18,7 +18,7 @@
 
 import type { ScriptRunner } from '@braindog/kernel';
 import type { Ledger } from '@braindog/host/actions';
-import { grantNamed, scriptProposals, scriptReads, scriptRunner } from '@braindog/host/script';
+import { grantNamed, scriptAsks, scriptProposals, scriptReads, scriptRunner, scriptState } from '@braindog/host/script';
 import type { RecordApi } from '@braindog/record';
 import { runInQuickJs } from '@braindog/script/quickjs';
 
@@ -81,6 +81,8 @@ export function scriptSandbox(
     /** The sandbox's meter clock (`CtxHost.clock`). Absent is the machine's; a test that is not about limits hands one that stands still. */
     clock?: (() => number) | undefined;
     outbound?: 'on' | 'off' | undefined;
+    /** Slash's answer to a question, where this host has a model (`slashAnswersFor`): what `ctx.ask` asks through. */
+    answers?: ((ask: { run: string; rule: string; step: number; question: string; shape: 'text' }) => Promise<unknown>) | undefined;
   },
 ): ScriptRunner {
   const sandboxed: typeof runInQuickJs = (decl, host) => runInQuickJs(decl, options.clock === undefined ? host : { ...host, clock: options.clock });
@@ -94,6 +96,9 @@ export function scriptSandbox(
       reads: scriptReads(api),
       /* `ctx.propose`: a question with rows, tried against the gate now and filed with the run's writes. */
       propose: scriptProposals(api),
+      /* `ctx.notify` and `ctx.store`, queued and applied with the run's writes; `ctx.ask`, on the record's allowance. */
+      state: scriptState(api),
+      ask: scriptAsks(options.answers),
       now: options.now,
     });
   if (options.outbound !== 'off') return runner(sandboxed);

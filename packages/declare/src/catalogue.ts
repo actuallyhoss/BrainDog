@@ -29,6 +29,7 @@
  * (`listedEntries`).
  */
 
+import { mayLinesOf } from './may-lines.ts';
 import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { digest, fillConfig, glyphFault, jcs, readConfig, validateDeclaration, type Json, type PageResult } from '@braindog/kernel';
@@ -138,6 +139,8 @@ export type Reach = {
    * when it uses any. Read from the file, so a reviewer and a store say what it can reach whatever its author wrote.
    */
   uses?: { id: string; writes: boolean }[];
+  /** What it may do beyond lists and calls out (phase 4): send notices, ask Slash's model, a view that writes. */
+  may?: string[];
 };
 
 export type Bump = 'major' | 'minor' | 'patch';
@@ -447,6 +450,10 @@ export function reachOf(file: Shared | PackFile | CatalogueFile): Reach {
     ...(s.pack?.manifest.widgets?.length ? { widgets: s.pack.manifest.widgets.map((w) => w.title) } : {}),
     ...waitsOf(s.pack),
     ...usesIn(file),
+    ...((): { may?: string[] } => {
+      const may = mayLinesOf(decls, []).map((m) => m.line);
+      return may.length === 0 ? {} : { may };
+    })(),
   };
 }
 

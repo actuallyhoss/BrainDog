@@ -33,6 +33,7 @@ export const USES_MOST = 64;
 const KERNEL_LISTS: ReadonlySet<string> = new Set(['session']);
 const LIST = /^[a-z][a-z0-9_]*$/u;
 const REGISTER_ID = /^register\.([a-z][a-z0-9_]*)$/u;
+const DRAWN_WRITE = /^(?:create|update):register\.[a-z][a-z0-9_]*$/u;
 const METRIC_ID = /^metric\.([a-z0-9][a-z0-9_-]*)$/u;
 const PAGE_ID = /^page\.([a-z0-9][a-z0-9_-]*)$/u;
 /**
@@ -105,6 +106,8 @@ function readUses(doc: unknown): { uses: Use[]; filled: string[] } {
     if (depth > DEEPEST) return;
     if (typeof v === 'string') {
       if (REGISTER_ID.test(v)) note(v, 'list', writes);
+      /* A DRAWN VIEW'S ACTION (`create:register.films`) CHANGES THAT LIST (add-ons phase 4). */
+      else if (DRAWN_WRITE.test(v)) note(v.slice(v.indexOf(':') + 1), 'list', true);
       else if (METRIC_ID.test(v)) note(v, 'figure', false);
       return;
     }
