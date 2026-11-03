@@ -36,6 +36,8 @@ export type AddonAnswer = {
   /** Where a linked add-on was read from: `git:owner/repo@ref:path` or an https address. */
   from?: string;
   latest?: string | null;
+  /** For an add-on from GitHub: the repository, the short commit it is pinned to and the file (lane B). */
+  github?: { repo: string; commit: string; path?: string };
   here?: { version: string | null; on: boolean; may?: string[] };
 };
 
@@ -43,6 +45,7 @@ export const madeWords = {
   shelf: 'Made by you',
   shelfNote: 'by you or your agents, here only',
   linked: 'From a link',
+  onGithub: 'See its repository on GitHub',
   linkedNote: 'installed from GitHub or a file, not reviewed',
   card: (version: string | null): string => (version === null ? 'Made here' : `Made here, ${version}`),
   cardLinked: (version: string | null): string => (version === null ? 'Not reviewed' : `Not reviewed, ${version}`),
@@ -63,7 +66,10 @@ export const madeWords = {
   fromUrl: (host: string): string => `From a link on ${host}`,
   fromFile: 'From a file',
   notReviewed: 'Not reviewed',
-  notReviewedLine: 'BrainDog has not looked at this. Anyone can publish on GitHub. It can only do what is listed here.',
+  /* THE SAME SENTENCE THE RECORD AND THE PLAN SHEET SAY (`git-channel.ts` GIT_UNREVIEWED, `asks.ts`). */
+  notReviewedLine: 'Not reviewed by BrainDog. Anyone can publish on GitHub. It can only do what is listed below.',
+  linkUnreviewed: 'Not reviewed by BrainDog. It can only do what is listed below.',
+  fromGitAt: (repo: string, commit: string): string => `From GitHub: ${repo}, commit ${commit}`,
   reviewed: 'Reviewed by BrainDog',
   braindog: 'Made by BrainDog',
   signed: 'Signed by its author, not reviewed',
@@ -134,17 +140,18 @@ export function originOf(a: AddonAnswer, maker: string | null): { line: string; 
           return null;
         }
       })();
-      const line = git ? `${madeWords.fromGit(git.repo)} ${madeWords.atCommit(shortRef(git.ref))}` : host ? madeWords.fromUrl(host) : madeWords.fromFile;
-      return { line, note: madeWords.notReviewedLine, badge: madeWords.notReviewed, tone: 'warn' };
+      const gh = a.github ?? (git ? { repo: git.repo, commit: shortRef(git.ref) } : null);
+      const line = gh ? madeWords.fromGitAt(gh.repo, gh.commit) : host ? madeWords.fromUrl(host) : madeWords.fromFile;
+      return { line, note: gh ? madeWords.notReviewedLine : madeWords.linkUnreviewed, badge: madeWords.notReviewed, tone: 'warn' };
     }
     case 'reviewed':
       return { line: a.by ? `By ${a.by}` : madeWords.reviewed, note: null, badge: madeWords.reviewed, tone: 'good' };
     case 'braindog':
       return { line: madeWords.braindog, note: null, badge: madeWords.braindog, tone: 'good' };
     case 'signed':
-      return { line: a.by ? `By ${a.by}` : madeWords.signed, note: madeWords.notReviewedLine, badge: madeWords.signed, tone: 'warn' };
+      return { line: a.by ? `By ${a.by}` : madeWords.signed, note: madeWords.linkUnreviewed, badge: madeWords.signed, tone: 'warn' };
     default:
-      return { line: a.by ? `By ${a.by}` : madeWords.notReviewed, note: madeWords.notReviewedLine, badge: madeWords.notReviewed, tone: 'warn' };
+      return { line: a.by ? `By ${a.by}` : madeWords.notReviewed, note: madeWords.linkUnreviewed, badge: madeWords.notReviewed, tone: 'warn' };
   }
 }
 
@@ -179,6 +186,21 @@ export function waitingOf(rows: readonly OpenRow[], held: ReadonlySet<string>): 
     const title = /^Add (.+)\?$/u.exec(q)?.[1] ?? m[1]!;
     return [{ id: m[1]!, question: r.id, title, version: m[2] === '' ? null : m[2]! }];
   });
+}
+
+/**
+ * The repository and short commit a `pack` question's body names for an add-on from GitHub: `git` as the record plans it
+ * (`arrange.ts` `prepare`), else the `source` an agent asked with. `null` for any other question.
+ */
+export function gitOfBody(body: unknown): { repo: string; commit: string | null } | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const b = body as { git?: { repo?: unknown; commit?: unknown }; source?: { kind?: unknown; ref?: unknown } };
+  if (b.git && typeof b.git.repo === 'string') return { repo: b.git.repo, commit: typeof b.git.commit === 'string' ? shortRef(b.git.commit) : null };
+  if (b.source?.kind === 'git' && typeof b.source.ref === 'string') {
+    const g = gitOf(b.source.ref.startsWith('git:') ? b.source.ref : `git:${b.source.ref}`);
+    return g ? { repo: g.repo, commit: shortRef(g.ref) } : null;
+  }
+  return null;
 }
 
 /** The file's name when it is downloaded. */

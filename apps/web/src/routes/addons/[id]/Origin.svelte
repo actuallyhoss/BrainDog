@@ -88,6 +88,9 @@
     <div class="origin">
       <p class="origin-line"><span class="pill-badge" data-tone={origin.tone ?? undefined}>{origin.badge}</span><span>{origin.line}</span></p>
       {#if origin.note}<p class="origin-note">{origin.note}</p>{/if}
+      {#if answer.github}
+        <p class="origin-note"><a class="repo" href={`https://github.com/${answer.github.repo}`} target="_blank" rel="noopener noreferrer">{madeWords.onGithub}<Icon name="external" size="s" /></a></p>
+      {/if}
     </div>
   </Tile>
 {/if}
@@ -113,7 +116,10 @@
       <p class="origin-note">{madeWords.shareNote}</p>
       <div class="share-do">
         <Button size="sm" disabled={busy} onclick={() => void download()}><Icon name="download" size="s" />{madeWords.download}</Button>
-        <Button size="sm" aria-expanded={githubOpen} onclick={() => (githubOpen = !githubOpen)}><Icon name="code" size="s" />{madeWords.github}</Button>
+        <!-- ONE ALREADY ON SOMEBODY'S GITHUB IS SHARED BY ITS OWN LINK, not pushed again. -->
+        {#if answer?.trust === 'made-here'}
+          <Button size="sm" aria-expanded={githubOpen} onclick={() => (githubOpen = !githubOpen)}><Icon name="code" size="s" />{madeWords.github}</Button>
+        {/if}
         {#if answer?.trust === 'made-here'}
           <Button size="sm" disabled={busy} onclick={() => void submit()}><Icon name="packs" size="s" />{madeWords.submit}</Button>
         {/if}
@@ -156,6 +162,13 @@
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
+  }
+
+  .repo {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--link, var(--ink));
   }
 
   .may {

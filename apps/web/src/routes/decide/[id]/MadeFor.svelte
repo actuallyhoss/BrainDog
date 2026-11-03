@@ -6,15 +6,17 @@
 <script lang="ts">
   import { hostsOf, madeWords, scriptsOf } from '$lib/market/made-here.ts';
 
-  let { doc, by }: { doc: unknown; by: string } = $props();
+  let { doc, by, git = null }: { doc: unknown; by: string; git?: { repo: string; commit: string | null } | null } = $props();
 
   const scripts = $derived(scriptsOf(doc));
   const hosts = $derived(hostsOf(scripts.flatMap((s) => s.egress)));
+  const head = $derived(git ? (git.commit ? madeWords.fromGitAt(git.repo, git.commit) : madeWords.fromGit(git.repo)) : madeWords.madeFor(by));
 </script>
 
-<section class="made-for" aria-label={madeWords.madeFor(by)}>
-  <p class="mf-head"><span class="pill-badge" data-tone="warn">{madeWords.notReviewed}</span><span class="mf-who">{madeWords.madeFor(by)}</span></p>
-  <p class="mf-line">{madeWords.madeForLine}{#if hosts.length > 0}{' '}{madeWords.calls(hosts)}{/if}</p>
+<!-- FROM GITHUB IT SAYS THE REPOSITORY AND THE COMMIT, and that nobody reviewed it; made here, who made it. -->
+<section class="made-for" aria-label={head}>
+  <p class="mf-head"><span class="pill-badge" data-tone="warn">{madeWords.notReviewed}</span><span class="mf-who">{head}</span></p>
+  <p class="mf-line">{git ? madeWords.notReviewedLine : madeWords.madeForLine}{#if hosts.length > 0}{' '}{madeWords.calls(hosts)}{/if}</p>
   {#each scripts as s, i (i)}
     <details class="mf-fold">
       <summary>{madeWords.script(s.title)}</summary>
