@@ -61,6 +61,7 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         #endif
         let controller = WKUserContentController()
         controller.addUserScript(ShellBridge.script(kind: kind, inset: kind == .mac ? MacBar.room : 0, textScale: Self.textScale))
+        controller.addUserScript(Look.script)
         config.userContentController = controller
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
@@ -187,6 +188,8 @@ public final class WebScreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKDo
         case .places(let tabs):
             places = tabs
             onAsk?(ask)
+        case .scheme(let v):
+            Look.shared.heard(v)
         case .haptic(let kind):
             kind.play()
         case .signedOut:

@@ -23,6 +23,7 @@ struct BrainDogApp: App {
     var body: some Scene {
         WindowGroup {
             Root()
+                .modifier(FollowLook())
                 .onOpenURL { url in Task { await Links.open(url) } }
                 .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                     if let url = activity.webpageURL { Task { await Links.open(url) } }
