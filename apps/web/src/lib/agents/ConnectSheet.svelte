@@ -113,12 +113,18 @@
 
   /* ONE ASK AT A TIME: a record slower than two seconds is not asked again before it answers. */
   let asking = false;
+  /* WHETHER THE RECORD HAS ANSWERED ONCE. Until it has, the live row is a bar the shape of its line: it said "Waiting
+     for its first call" and then, two seconds later, "Waiting for a new call. Claude last called 20 min ago", a
+     sentence that changed under the eye on every first open. After that a poll keeps what it has (a failed ask keeps
+     the last answer), so the row never goes back to the bar. */
+  let asked = $state(false);
   async function tick() {
     now = Date.now();
     if (asking) return;
     asking = true;
     const said = await listen(made !== null);
     asking = false;
+    asked = true;
     if (said) heard = heardOf(said.rows, said.keys, made);
     now = Date.now();
   }
@@ -270,9 +276,13 @@
             {/if}
             <!-- THE LIVE ROW, its state said by its mark as well as its words, never by colour alone. -->
             {#if row}
-              <p class="live" role="status" data-state={row.state}>
-                <span role="img" aria-label={mark.label}>{mark.glyph}</span>
-                {row.said}
+              <p class="live" role="status" data-state={asked ? row.state : 'asking'}>
+                {#if asked}
+                  <span role="img" aria-label={mark.label}>{mark.glyph}</span>
+                  {row.said}
+                {:else}
+                  <span class="live-bar" aria-hidden="true"></span>
+                {/if}
               </p>
             {/if}
           </div>
@@ -620,5 +630,27 @@
 
   .live[data-state='connected'] > span {
     color: var(--red);
+  }
+
+  /* THE LIVE ROW BEFORE THE FIRST ANSWER: one bar on the line's own height, as `Waiting.svelte` draws its bars, and
+     only after 300ms, so an answer that lands sooner never shows it. */
+  .live[data-state='asking'] {
+    align-items: center;
+    min-block-size: calc(var(--fs-body) * var(--lh-body));
+  }
+
+  .live-bar {
+    display: block;
+    inline-size: min(280px, 70%);
+    block-size: 10px;
+    background: color-mix(in oklab, var(--ink) 9%, transparent);
+    border-radius: var(--r-xs);
+    animation: live-bar-in var(--d-state) var(--ease-out) 300ms backwards;
+  }
+
+  @keyframes live-bar-in {
+    from {
+      opacity: 0;
+    }
   }
 </style>

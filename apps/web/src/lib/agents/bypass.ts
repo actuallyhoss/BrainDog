@@ -22,7 +22,8 @@ export const bypassWords = {
   /* ONE SHORT LINE EACH (UI pass, 3 Nov): the on line listed nine kinds of change in one sentence, two lines on a desk and
      four on a phone. "Anything you can" says it; what still needs him is one press away. */
   on: 'They do anything you can, without asking. Each change names its agent and can be undone.',
-  off: 'They ask before deletes, money, keys, add-ons and settings.',
+  /* "PLUGINS" IS WHAT A PERSON READS (3 Nov), where the code still says add-on. */
+  off: 'They ask before deletes, money, keys, plugins and settings.',
   more: 'What still needs you',
   /* `NEVER_BYPASS` IS THREE DOORS NOW (2 Nov), and the keychain's rule beside them. */
   still: "Three things stay only yours: giving this BrainDog to someone else, deleting the whole BrainDog (or erasing a person for good), and reading a key's value. An agent also never makes or changes an owner, and paying stays in Billing. Your colleagues' agents are never covered: they ask, and never do more than their person may.",

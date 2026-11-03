@@ -417,7 +417,7 @@
           <div class="switch-row-words">
             <span class="switch-row-title">Stop switch</span>
             <p class="switch-row-line" id="{ids}-hooks-line">
-              {#if hooks}Stop also halts it on your machine, not only here.{:else}Claude Code only. Stop still refuses {who}'s changes here.{/if}
+              {#if hooks}Stop also halts it on your machine, not only here.{:else}Claude Code only. Here, Stop refuses its changes.{/if}
             </p>
           </div>
           {@render sw(hooks && d.enforce.hooks, 'Stop switch', () => (d.enforce = { ...d.enforce, hooks: !d.enforce.hooks }), !hooks, `${ids}-hooks-line`)}
@@ -426,7 +426,7 @@
           <div class="switch-row-words">
             <span class="switch-row-title">Live push</span>
             <p class="switch-row-line" id="{ids}-channel-line">
-              {#if hooks}Your words reach it mid-step. Needs a start flag.{:else}Claude Code only. {who} hears you at its next step.{/if}
+              {#if hooks}Your words reach it mid-step. Needs a start flag.{:else}Claude Code only. It hears you at its next step.{/if}
             </p>
           </div>
           {@render sw(hooks && d.enforce.channel, 'Live push', () => (d.enforce = { ...d.enforce, channel: !d.enforce.channel }), !hooks, `${ids}-channel-line`)}
