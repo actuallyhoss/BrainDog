@@ -14,7 +14,7 @@ export const FILM_VIEW = `<div class="films">
   button { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--rule); background: var(--tile); color: var(--ink); }
 </style>
 <script>
-  braindog.on(function (data) { document.getElementById('count').textContent = data.rows.length + ' films'; });
+  braindog.on(function () { document.getElementById('count').textContent = 'Press to add a film to your list.'; });
   document.getElementById('add').onclick = function () {
     braindog.create('films', { name: 'Picked in the view' }).then(function (answer) {
       document.getElementById('said').textContent = answer && answer.ok ? 'Added.' : (answer && answer.refusal ? answer.refusal.fix : 'Not added.');
@@ -54,7 +54,8 @@ export function createDrawnSample(): Record<string, unknown> {
         nav: { section: 'Films', order: 50 },
         requires: ['register.films'],
         blocks: [
-          { kind: 'drawn', heading: 'Add from the view', source: 'register.films', columns: [{ field: 'name' }], code: FILM_VIEW, height: 160, acts: ['create:register.films'] },
+          /* NO SOURCE, SO IT IS DRAWN ON AN EMPTY LIST TOO: a block over a list with no rows is drawn as that list's empty state. */
+          { kind: 'drawn', heading: 'Add from the view', code: FILM_VIEW, height: 160, acts: ['create:register.films'] },
           { kind: 'drawn', heading: 'A picture only', code: '<p>Just a picture.</p>', height: 48 },
           { kind: 'table', heading: 'Films', source: 'register.films', columns: [{ field: 'name' }] },
         ],
