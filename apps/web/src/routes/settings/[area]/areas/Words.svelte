@@ -407,7 +407,12 @@
     {#if money && owner}
       <div class="pick">
         <IconWell name="money" />
-        <label class="pick-label" for="w-currency">{words.currency}</label>
+        <!-- THE HELP IS THE ROW'S SECOND LINE, UNDER ITS NAME (ui pass, 3 Nov): it stood 40px under the row, indented, a
+             sentence belonging to nothing. -->
+        <span class="pick-words">
+          <label class="pick-label" for="w-currency">{words.currency}</label>
+          {#if !asking}<span class="pick-help" id="w-currency-help">{words.currencyWhy}</span>{/if}
+        </span>
         <select id="w-currency" bind:this={picker} value={heldIn} disabled={busy} aria-describedby={asking ? 'w-stranded' : undefined} onchange={(e) => pickCurrency(e.currentTarget.value)}>
           {#if offersNone}<option value="">{copy.currencyNone}</option>{/if}
           <optgroup label={copy.currencyCommon}>{#each choices.common as c (c.code)}<option value={c.code}>{c.label}</option>{/each}</optgroup>
@@ -422,8 +427,6 @@
             <Button weight="bare" onclick={keepCurrency}>{words.keep(heldIn)}</Button>
           </div>
         </div>
-      {:else}
-        <p class="hint">{words.currencyWhy}</p>
       {/if}
     {:else}
       <StateRow icon="money" title={words.currency} line={money ? (heldIn ? currencySaid(heldIn) : copy.currencyNone) : !on ? words.noMoney : keptIn ? words.kept(keptIn) : copy.currencyNone} />
@@ -587,6 +590,21 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
+    line-height: var(--lead-ui);
+  }
+
+  .pick-words {
+    display: grid;
+    gap: var(--row-stack, 2px);
+    min-inline-size: 0;
+    padding-block: var(--row-pad-y, 8px);
+  }
+
+  .pick-help {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+    text-wrap: pretty;
   }
 
   .hint {

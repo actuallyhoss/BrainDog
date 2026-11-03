@@ -64,7 +64,8 @@
 </script>
 
 {#if !gone}
-  <Tile class="section" data-surface="tile" title={words.title}>
+  <!-- THE ONE CARD HEAD, WITH ITS GLYPH (ui pass, 3 Nov): it was the only card in Settings with a bare name. -->
+  <Tile icon="link" class="section" data-surface="tile" title={words.title}>
     <div class="section-body">
       {#if step.at === 'idle'}
         <div class="u-line">

@@ -126,7 +126,11 @@
 {#if owner}
   <div class="pick">
     <IconWell name="globe" />
-    <label class="pick-label" for="zone-pick">{words.zone}</label>
+    <!-- THE HELP UNDER THE NAME, as the currency row's (ui pass, 3 Nov). -->
+    <span class="pick-words">
+      <label class="pick-label" for="zone-pick">{words.zone}</label>
+      <span class="pick-help">{words.zoneWhy}</span>
+    </span>
     <select id="zone-pick" value={zoneHeld} disabled={zoneBusy} onchange={(e) => void putZone(e.currentTarget.value, false, e.currentTarget)}>
       {#if device && device !== zoneHeld}<option value={device}>{words.zoneDevice(zoneSaid(device))}</option>{/if}
       <option value="UTC">UTC</option>
@@ -138,7 +142,6 @@
   {#if zoneRefusal}
     <p class="hint" role="alert"><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {zoneRefusal}</p>
   {/if}
-  <p class="hint">{words.zoneWhy}</p>
 {:else}
   <StateRow icon="globe" title={zoneSaid(zoneHeld)} line={`${words.zoneWhy} ${words.zoneOwner}`} />
 {/if}
@@ -164,6 +167,21 @@
     color: var(--ink);
     font-size: var(--fs-body);
     font-weight: 500;
+    line-height: var(--lead-ui);
+  }
+
+  .pick-words {
+    display: grid;
+    gap: var(--row-stack, 2px);
+    min-inline-size: 0;
+    padding-block: var(--row-pad-y, 8px);
+  }
+
+  .pick-help {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
+    text-wrap: pretty;
   }
 
   .hint {
