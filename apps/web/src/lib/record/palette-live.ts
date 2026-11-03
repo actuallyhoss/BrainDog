@@ -34,7 +34,9 @@ const NOTHING: SearchResult = { hits: [], total: 0, groups: [] };
 /** A reader for one tab. `base` is the record's own (`apiBase`), so its asks share the screen's kept ones. */
 export function paletteReader(base: string, io?: Fetch): Reader {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
-  const search = searcher(base, io);
+  /* BY THE WORDS ALONE, and what a search reaches besides rows asked as the palette opens (slash1104). */
+  const search = searcher(base, io, { words: true });
+  search.warm();
   return {
     async find(q, limit) {
       const out = await search.find(q).catch(() => null);

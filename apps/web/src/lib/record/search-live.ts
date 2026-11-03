@@ -221,29 +221,45 @@ export function answered(value: unknown): Answer {
   return { hits: value.hits as Hit[], matched, ...(meaning ? { meaning } : {}) };
 }
 
-export type Searcher = { find(q: string): Promise<Found> };
+export type Searcher = {
+  find(q: string): Promise<Found>;
+  /** Ask now for what a search reaches besides rows, so the first letters typed do not wait on it. */
+  warm(): void;
+};
 
-/** A search for one tab. `base` is the page's own origin; the app never holds a token. */
-export function searcher(base: string, io?: Fetch): Searcher {
+/** How long a search as somebody types waits for the questions and pages before it answers with its rows alone. */
+const OTHERS_WAIT_MS = 200;
+
+/**
+ * A search for one tab. `base` is the page's own origin; the app never holds a token.
+ *
+ * `words` IS THE PALETTE'S: by the words alone, never waiting on a model for what the query means, and never more
+ * than `OTHERS_WAIT_MS` on the questions and pages the first time (slash1104). `/search` keeps both.
+ */
+export function searcher(base: string, io?: Fetch, { words = false }: { words?: boolean } = {}): Searcher {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   let others: Promise<Others> | null = null;
+  /* EVERY OPEN QUESTION AND EVERY DECISION, a page at a time: `boot` sends twenty questions, and one page of
+     decisions stopped at the newest two hundred. */
+  const othersNow = (): Promise<Others> =>
+    (others ??= Promise.all([client.boot(), everyGovernance(client, { status: 'open' }), everyGovernance(client, { register: 'decision' })]).then(
+      ([b, o, d]) => othersOf(b as Wire, d as Wire, o as Wire),
+      () => NO_OTHERS,
+    ));
   const asked = new Map<string, Promise<void>>();
   return {
+    warm: () => void othersNow(),
     async find(q) {
       /* NOTHING TO ASK, SO NOTHING IS SENT. The same folding the record's index uses decides it. */
       if (!terms(q)) return { from: 'live', value: NOTHING };
-      const out = await client.search(q, LIMIT);
+      const out = await client.search(q, LIMIT, words ? { words: true } : {});
       if (out.ok) {
         const answer = answered(out.value);
-        /* EVERY OPEN QUESTION AND EVERY DECISION, a page at a time: `boot` sends twenty questions, and one page of
-           decisions stopped at the newest two hundred. */
-        others ??= Promise.all([client.boot(), everyGovernance(client, { status: 'open' }), everyGovernance(client, { register: 'decision' })]).then(
-          ([b, o, d]) => othersOf(b as Wire, d as Wire, o as Wire),
-          () => NO_OTHERS,
-        );
+        const reached = othersNow();
         /* A LIST THIS BUILD DOES NOT SHIP IS NAMED BY THE RECORD, so a course is grouped under Courses and not its id. */
         await Promise.all([...new Set(answer.hits.map((h) => h.register))].map((r) => learn(client.schema, r, asked)));
-        const value = groupsOf(q, answer.hits, await others, answer.matched);
+        const known = words ? await Promise.race([reached, new Promise<Others>((r) => setTimeout(() => r(NO_OTHERS), OTHERS_WAIT_MS))]) : await reached;
+        const value = groupsOf(q, answer.hits, known, answer.matched);
         return { from: 'live', value, ...(answer.meaning ? { meaning: answer.meaning } : {}) };
       }
       return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'Something changed while it was being read.' };

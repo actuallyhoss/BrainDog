@@ -2744,8 +2744,9 @@ export function createClient(options: ClientOptions) {
      */
     countBy: (args: { register: string; by: string; where?: unknown }) =>
       call<{ register: string; by: string; counts: { value: unknown; n: number }[]; matched: number; more?: { values: number; n: number }; capped?: true }>('countBy', args as Record<string, unknown>),
-    search: (q: string, limit?: number) =>
-      call<{ register: string; seq: number; title: string }[]>('search', { q, ...(limit === undefined ? {} : { limit }) }),
+    /** `words`: by the words alone, never waiting on a model for what the query means (the palette, as somebody types). */
+    search: (q: string, limit?: number, opts: { words?: boolean } = {}) =>
+      call<{ register: string; seq: number; title: string }[]>('search', { q, ...(limit === undefined ? {} : { limit }), ...(opts.words === true ? { words: true } : {}) }),
     history: (register: string, seq: number) => call<unknown[]>('history', { register, seq }),
     /** What points at one row, held to the lists this caller may read. `limit` is rows across the whole answer. */
     backlinks: (args: { register: string; seq: number; limit?: number; cursor?: string }) =>

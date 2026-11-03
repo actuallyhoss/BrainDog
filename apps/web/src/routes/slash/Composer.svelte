@@ -19,6 +19,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import { refOfHref } from '$lib/send/send.ts';
+  import { early, keep } from '$lib/record/search-kept.ts';
+  import type { SearchHit } from '$lib/record/api.ts';
   import { ATTACH_MOST, type Chip } from './with.ts';
 
   let {
@@ -85,7 +87,13 @@
   const listNamed = $derived(new Map(lists.map((l) => [l.id, l.name] as const)));
   const listOf = (ref: string): string => listNamed.get(ref.split('#')[0] ?? '') ?? '';
 
-  const reader = () => import('$lib/record/palette-live.ts').then((m) => m.paletteReader(apiBase()));
+  /* ONE READER A RECORD, not one a letter: each was a new client and a new search, so nothing it read was kept. */
+  let reading: { base: string; r: Promise<import('$lib/record/palette-live.ts').Reader> } | null = null;
+  const reader = () => {
+    const base = apiBase();
+    if (reading?.base !== base) reading = { base, r: import('$lib/record/palette-live.ts').then((m) => m.paletteReader(base)) };
+    return reading.r;
+  };
 
   onMount(() => {
     if (autofocus && matchMedia('(pointer: fine)').matches) field?.focus({ preventScroll: true });
@@ -119,6 +127,15 @@
     const t = token;
     if (t === null || !open) return;
     const mine = ++asked;
+    /* WHAT WAS KEPT ANSWERS AT ONCE (`search-kept.ts`), and the record's answer replaces it a beat later. */
+    if (t.q.length > 1) {
+      const kept = early(apiBase(), t.q, 8);
+      if (kept !== null) {
+        const taken = new Set(untrack(() => chips.map((c) => c.ref)));
+        hits = asHits(kept.value.hits).filter((h) => !taken.has(h.ref)).slice(0, 7);
+        found = true;
+      }
+    }
     const wait = setTimeout(
       () => {
         void reader().then(async (r) => {
@@ -128,10 +145,8 @@
             next = recent.map((x) => ({ ref: x.target, label: x.title, detail: x.list, icon: String(x.icon ?? 'rows') }));
           } else {
             const out = await r.find(t.q, 8);
-            next = out.value.hits.flatMap((h): Hit[] => {
-              const ref = refOfHref(h.href);
-              return ref ? [{ ref, label: h.title, detail: listOf(ref) || h.detail, icon: String(h.icon ?? 'rows') }] : [];
-            });
+            if (out.fix === null) keep(apiBase(), t.q, out.value);
+            next = asHits(out.value.hits);
           }
           if (mine !== asked) return;
           const taken = new Set(untrack(() => chips.map((c) => c.ref)));
@@ -144,6 +159,13 @@
     );
     return () => clearTimeout(wait);
   });
+
+  function asHits(found: readonly SearchHit[]): Hit[] {
+    return found.flatMap((h): Hit[] => {
+      const ref = refOfHref(h.href);
+      return ref ? [{ ref, label: h.title, detail: listOf(ref) || h.detail, icon: String(h.icon ?? 'rows') }] : [];
+    });
+  }
 
   function pick(h: Hit) {
     const t = token;

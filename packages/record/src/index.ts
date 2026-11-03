@@ -18455,7 +18455,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * gets a short page whenever the matches were mostly in a register they cannot see, and cannot
      * tell that from there having been no matches.
      */
-    async search(args: { q: string; limit?: number }, ctx: CallContext) {
+    async search(args: { q: string; limit?: number; words?: boolean }, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop } as Result<never>;
       /* WHAT THEY MAY READ, AND NOT WHAT THEIR CEILING REACHES. This handed `ctx.registers` down
@@ -18511,7 +18511,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          written in it, so the nearest rows to "923.47" are the ones that say it. */
       const unmeant = masked && /\p{N}/u.test(said) ? new Set(registers) : sight.unmeant(ctx);
       const meant = unmeant.size === 0 ? found.hits : found.hits.filter((h) => !unmeant.has(h.register));
-      const byWords = await byMeaning(sql, deps.meaning, String(args.q ?? ''), meant, registers.length === every.length && unmeant.size === 0 ? {} : { registers: registers.filter((r) => !unmeant.has(r)) });
+      /* `words`, AS SOMEBODY TYPES: no model is asked, and the answer says it searched by its words (slash1104). */
+      const wordsOnly = args.words === true;
+      const byWords = await byMeaning(sql, wordsOnly ? undefined : deps.meaning, String(args.q ?? ''), meant, registers.length === every.length && unmeant.size === 0 ? {} : { registers: registers.filter((r) => !unmeant.has(r)) });
       const searched = unmeant.size === 0 ? byWords : { ...byWords, hits: [...byWords.hits, ...found.hits.filter((h) => unmeant.has(h.register))] };
       /* EVERY HIT ASKED AT ONCE (`sight.rows`): a hit by meaning (`near.ts`) is drawn from outside the words' query, so
          it is held here even though the words' hits already were. */
@@ -18532,7 +18534,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         /* THE TOTAL IS NARROWED THE SAME WAY: `fts.searchMatched` counts the live rows of each list this caller may
            read that her grant's `where` admits, in the query the hits come from. */
         matched: found.matched,
-        meaning: searched.meaning,
+        meaning: wordsOnly && deps.meaning !== undefined ? 'words' : searched.meaning,
         comments,
       });
     },

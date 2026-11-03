@@ -30,6 +30,8 @@ export const SIGNED_OUT_KEYS = [
   /* the shell (`boot-copy.ts`) and the sidebar's list beside it (`side-copy.ts`) */
   'braindog.boot-copy',
   'braindog.side-copy',
+  /* the rows the palette's search found, by their names, so the next letters answer at once (`search-kept.ts`) */
+  'braindog.find-copy',
   /* the sidebar's week, counts, projects' order and lists' facts (`side-read.ts`, `side.ts`, `project-order.ts`) */
   'bd_side_week',
   'bd_side_counts',

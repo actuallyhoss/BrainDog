@@ -97,6 +97,7 @@
   import type { Hits, Reader } from '../record/palette-live.ts';
   import type { Metric } from '../record/api.ts';
   import { latest } from './latest.ts';
+  import { early, keep, merged } from '../record/search-kept.ts';
   import { palette as opener } from './open.svelte.ts';
   import { untrack } from 'svelte';
   import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
@@ -577,12 +578,28 @@
   /**
    * THE RECORD'S HITS, FOR THE TEXT THEY ANSWER, and never for any other.
    *
-   * A live search is a request, so the list is drawn from `found` only while `found.text` is what the box says. Typing
-   * on past it hides the old hits at once, and `latest` drops the answer to any question the box has moved on from, so
-   * a slow reply to `fen` can never land over `fenwick`.
+   * A live search is a request, so the list is drawn from `found` only while `found.text` is what the box says, and
+   * `latest` drops the answer to any question the box has moved on from, so a slow reply to `fen` can never land over
+   * `fenwick`. UNTIL IT LANDS, WHAT WAS KEPT ANSWERS (`search-kept.ts`, slash1104): every letter waited 120 ms and a
+   * round trip (160 ms to 3 s on app.brain.dog) with its rows gone and "Looking…" alone in the panel.
    */
   let found = $state<{ text: string; hits: Hits } | null>(null);
-  const asking = latest((text: string) => reader().then((r) => r.find(text, RECORD_CAP)), 120);
+  /* EVERY ANSWER IS KEPT, the ones to a query typed past too: `fe` landing while the box says `fenw` still holds the
+     rows `fenw` is drawn from at once. `keptTick` draws again when it lands. */
+  let keptTick = $state(0);
+  const asking = latest(
+    (text: string) =>
+      reader()
+        .then((r) => r.find(text, RECORD_CAP))
+        .then((answer) => {
+          if (answer.fix === null) {
+            keep(apiBase(), text, answer.value);
+            keptTick += 1;
+          }
+          return answer;
+        }),
+    80,
+  );
 
   /**
    * WHAT THE NAME IN THE BOX IS, FOR THE NAME IT ANSWERS (`about.ts`): the record's `about` read, asked once the
@@ -817,9 +834,20 @@
    * What the search answered for the text in the box, or `null` while the record has not answered it yet, and always
    * with no record to ask.
    */
+  /* WHAT WAS KEPT, AT ONCE: this very query answered before, or the rows kept whose names answer it. */
+  const kept = $derived.by(() => {
+    void keptTick;
+    return searching && isLive && found?.text !== parsed.text ? early(apiBase(), parsed.text, RECORD_CAP) : null;
+  });
+  /* THE ORDER LAST DRAWN, so rows kept that grow while typing take their places after the ones already drawn. */
+  let drawnLast: Hits['value'] | null = null;
   const hits = $derived.by((): Hits | null => {
     if (!searching || !isLive) return null;
-    return found?.text === parsed.text ? found.hits : null;
+    if (found?.text === parsed.text) return found.hits;
+    if (kept === null) return null;
+    const value = merged(drawnLast, kept.value);
+    drawnLast = value;
+    return { value, fix: null };
   });
 
   /** The name the record is asked about, or `null`: never with no record, and never a sentence the palette acts on. */
@@ -859,7 +887,7 @@
   });
 
   /** A live query the record has not answered yet. The panel stays quiet rather than saying nothing matched. */
-  const pending = $derived(searching && isLive && hits === null);
+  const pending = $derived(searching && isLive && found?.text !== parsed.text && kept?.exact !== true);
 
   $effect(() => {
     if (!open || !isLive || !searching) {
@@ -867,8 +895,28 @@
       return;
     }
     const text = parsed.text;
-    asking.ask(text, (answer) => (found = { text, hits: answer }));
+    asking.ask(text, (answer) => {
+      /* IN THE ORDER ALREADY DRAWN, so the answer landing moves none of the rows that stay. */
+      const shown = untrack(() => hits);
+      found = { text, hits: answer.fix === null ? { value: merged(shown?.value ?? null, answer.value), fix: null } : answer };
+      drawnLast = found.hits.value;
+    });
     return () => asking.cancel();
+  });
+
+  /**
+   * WHERE THE RECORD'S ROWS WILL LAND, WHILE NOTHING KEPT ANSWERS: two rows' shapes, never a word. Only after 150 ms, so
+   * an answer that comes quickly draws no flash of bars, and gone the frame anything answers.
+   */
+  let waitedLong = $state(false);
+  const shaped = $derived(pending && (hits === null || hits.value.hits.length === 0));
+  $effect(() => {
+    if (!shaped) {
+      waitedLong = false;
+      return;
+    }
+    const t = setTimeout(() => (waitedLong = true), 150);
+    return () => clearTimeout(t);
   });
 
   $effect(() => {
@@ -1868,8 +1916,14 @@
     <SlashThread bind:this={threadView} here={behind} base={apiBase()} onask={(question) => asked(question)} onleave={() => (open = false)} />
   {:else}
   <div class="p-body">
-    <!-- LOOKING, AT ONCE: the same frame as the keystroke, where the first answer will land, and gone when it does. -->
-    {#if pending}<p class="p-looking" role="status">{copy.looking}</p>{/if}
+    <!-- WAITING HAS A SHAPE, NOT A WORD (slash1104): what was kept is drawn at once, and only when nothing kept answers
+         does the place of the first rows show, as rows, after 150 ms. The word is for a screen reader alone. -->
+    {#if pending}<span class="p-sr" role="status">{copy.looking}</span>{/if}
+    {#if shaped && waitedLong}
+      <div class="p-skel-list" aria-hidden="true">
+        {#each [0.62, 0.44] as w}<div class="p-skel"><span class="p-skel-glyph"></span><span class="p-skel-bar" style:inline-size="{w * 100}%"></span></div>{/each}
+      </div>
+    {/if}
     {#if askless && flat.length > 0}<p class="p-needs">{copy.askNeedsModel} <a class="tap" href={at('/settings/agents')} onclick={() => (open = false)}>{copy.askConnect}</a>.</p>{/if}
     <div id="palette-list" role="listbox" aria-label={copy.paletteLabel} aria-busy={pending}>
       {#if askRow && askLeads}{@render result(askRow)}{/if}
@@ -2360,11 +2414,60 @@
     }
   }
 
-  .p-looking {
-    margin: 0;
-    padding: var(--sp-2) var(--sp-3);
-    color: var(--ink-3);
-    line-height: var(--lead-ui, 20px);
+  .p-sr {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* A ROW'S SHAPE: the row's own height, its glyph's square and one bar where the title goes. Still, no breath. */
+  .p-skel-list {
+    animation: p-skel-in 160ms var(--ease-out) backwards;
+  }
+
+  .p-skel {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: 40px;
+    margin-block: 1px;
+    padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-2);
+  }
+
+  @media (pointer: coarse) {
+    .p-skel {
+      min-block-size: var(--tap);
+    }
+  }
+
+  .p-skel-glyph {
+    flex: none;
+    inline-size: 18px;
+    block-size: 18px;
+    border-radius: 5px;
+    background: color-mix(in oklab, var(--ink) 6%, transparent);
+  }
+
+  .p-skel-bar {
+    block-size: 10px;
+    border-radius: var(--r-pill);
+    background: color-mix(in oklab, var(--ink) 8%, transparent);
+  }
+
+  @keyframes p-skel-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .p-skel-glyph,
+    .p-skel-bar {
+      background: GrayText;
+    }
   }
 
   .p-none {
