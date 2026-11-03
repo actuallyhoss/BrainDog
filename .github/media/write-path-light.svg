@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="830" height="300" viewBox="0 0 830 300"
      role="img" aria-labelledby="wp-title wp-desc"
-     font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12.5" fill="#575850">
+     font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12.5" fill="#3B4048">
   <title id="wp-title">BrainDog: the write path</title>
   <desc id="wp-desc">A write whose op_id has been seen replays its first result and stops. Inside one
 synchronous transaction: resolve, lock, pinned, coerce, validate and transition run first, and
@@ -9,53 +9,53 @@ outbox. A refusal is recorded by observe, outside the transaction so it survives
 and wake run last, outside it.</desc>
 
   <!-- The light scheme, in the generated tokens from packages/skin/house.css:
-       bg #F3F3E9, s1 #FBFCF1, line #C5C5BD, ink #2A2A24, dim #575850, faint #6A6A63,
-       danger #BB3F39, accent #CF413A. The accent paints chrome only, never
+       bg #F3F4F6, s1 #FFFFFF, line #D5D9DF, ink #101114, dim #3B4048, faint #5F6670,
+       danger #C2362F, accent #CF413A. The accent paints chrome only, never
        text (13-UI section 2.1b). Nothing here loads over the network. -->
 
   <clipPath id="wp-panel"><rect width="830" height="300" rx="10"/></clipPath>
   <g clip-path="url(#wp-panel)">
-    <rect width="830" height="300" fill="#F3F3E9"/>
+    <rect width="830" height="300" fill="#F3F4F6"/>
     <rect width="830" height="3" fill="#CF413A"/>
   </g>
-  <rect x=".5" y=".5" width="829" height="299" rx="9.5" fill="none" stroke="#C5C5BD"/>
+  <rect x=".5" y=".5" width="829" height="299" rx="9.5" fill="none" stroke="#D5D9DF"/>
 
-  <text x="28" y="40" font-size="16" font-weight="600" fill="#2A2A24">The write path</text>
-  <text x="802" y="40" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="11.5" fill="#6A6A63" text-anchor="end">docs/30-BLUEPRINT.md §4</text>
+  <text x="28" y="40" font-size="16" font-weight="600" fill="#101114">The write path</text>
+  <text x="802" y="40" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="11.5" fill="#5F6670" text-anchor="end">docs/30-BLUEPRINT.md §4</text>
 
-  <text x="28" y="72" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" fill="#2A2A24"><tspan fill="#6A6A63">0 </tspan>REPLAY</text>
+  <text x="28" y="72" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" fill="#101114"><tspan fill="#5F6670">0 </tspan>REPLAY</text>
   <text x="204" y="72">an op_id already seen returns its first result, and stops here</text>
 
-  <rect x="28.5" y="92.5" width="773" height="121" rx="7" fill="#FBFCF1" stroke="#C5C5BD"/>
-  <rect x="44" y="85" width="164" height="14" fill="#F3F3E9"/>
-  <text x="50" y="96" font-size="11.5" fill="#6A6A63">one synchronous transaction</text>
+  <rect x="28.5" y="92.5" width="773" height="121" rx="7" fill="#FFFFFF" stroke="#D5D9DF"/>
+  <rect x="44" y="85" width="164" height="14" fill="#F3F4F6"/>
+  <text x="50" y="96" font-size="11.5" fill="#5F6670">one synchronous transaction</text>
 
-  <g font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" fill="#2A2A24">
-    <text x="50.0" y="126"><tspan fill="#6A6A63">1 </tspan>RESOLVE</text>
-    <text x="182.5" y="126"><tspan fill="#6A6A63">2 </tspan>LOCK</text>
-    <text x="292.5" y="126"><tspan fill="#6A6A63">2b </tspan>PINNED</text>
-    <text x="425.0" y="126"><tspan fill="#6A6A63">3 </tspan>COERCE</text>
-    <text x="550.0" y="126"><tspan fill="#6A6A63">4 </tspan>VALIDATE</text>
-    <text x="690.0" y="126"><tspan fill="#6A6A63">5 </tspan>TRANSITION</text>
+  <g font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" fill="#101114">
+    <text x="50.0" y="126"><tspan fill="#5F6670">1 </tspan>RESOLVE</text>
+    <text x="182.5" y="126"><tspan fill="#5F6670">2 </tspan>LOCK</text>
+    <text x="292.5" y="126"><tspan fill="#5F6670">2b </tspan>PINNED</text>
+    <text x="425.0" y="126"><tspan fill="#5F6670">3 </tspan>COERCE</text>
+    <text x="550.0" y="126"><tspan fill="#5F6670">4 </tspan>VALIDATE</text>
+    <text x="690.0" y="126"><tspan fill="#5F6670">5 </tspan>TRANSITION</text>
   </g>
 
-  <line x1="50" y1="154" x2="780" y2="154" stroke="#C5C5BD" stroke-dasharray="2 4"/>
-  <rect x="278.9" y="145" width="272.2" height="18" fill="#FBFCF1"/>
+  <line x1="50" y1="154" x2="780" y2="154" stroke="#D5D9DF" stroke-dasharray="2 4"/>
+  <rect x="278.9" y="145" width="272.2" height="18" fill="#FFFFFF"/>
   <text x="415.0" y="158" text-anchor="middle">nothing above this line has written a row</text>
 
-  <g font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" fill="#2A2A24">
-    <text x="50.0" y="190"><tspan fill="#6A6A63">6 </tspan>PERSIST</text>
-    <text x="162.9" y="190"><tspan fill="#6A6A63">6b </tspan>PAIRS</text>
-    <text x="268.3" y="190"><tspan fill="#6A6A63">7 </tspan>PROJECT</text>
-    <text x="381.2" y="190"><tspan fill="#6A6A63">8 </tspan>EVENT</text>
-    <text x="479.2" y="190"><tspan fill="#6A6A63">9 </tspan>RULES</text>
-    <text x="577.1" y="190"><tspan fill="#6A6A63">10 </tspan>SCHEDULE</text>
-    <text x="705.0" y="190"><tspan fill="#6A6A63">12a </tspan>OUTBOX</text>
+  <g font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" fill="#101114">
+    <text x="50.0" y="190"><tspan fill="#5F6670">6 </tspan>PERSIST</text>
+    <text x="162.9" y="190"><tspan fill="#5F6670">6b </tspan>PAIRS</text>
+    <text x="268.3" y="190"><tspan fill="#5F6670">7 </tspan>PROJECT</text>
+    <text x="381.2" y="190"><tspan fill="#5F6670">8 </tspan>EVENT</text>
+    <text x="479.2" y="190"><tspan fill="#5F6670">9 </tspan>RULES</text>
+    <text x="577.1" y="190"><tspan fill="#5F6670">10 </tspan>SCHEDULE</text>
+    <text x="705.0" y="190"><tspan fill="#5F6670">12a </tspan>OUTBOX</text>
   </g>
 
-  <text x="28" y="248" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" fill="#BB3F39"><tspan fill="#6A6A63">R </tspan>OBSERVE</text>
+  <text x="28" y="248" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" fill="#C2362F"><tspan fill="#5F6670">R </tspan>OBSERVE</text>
   <text x="204" y="248">a refusal is written too, outside the transaction so it survives the rollback</text>
 
-  <text x="28" y="272" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" fill="#2A2A24"><tspan fill="#6A6A63">11 </tspan>ARM<tspan fill="#6A6A63">   12b </tspan>WAKE</text>
-  <text x="204" y="272">outside the transaction, and awaited — the only I/O, and the last statement</text>
+  <text x="28" y="272" font-family="ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace" fill="#101114"><tspan fill="#5F6670">11 </tspan>ARM<tspan fill="#5F6670">   12b </tspan>WAKE</text>
+  <text x="204" y="272">outside the transaction, and awaited: the only I/O, and the last statement</text>
 </svg>
