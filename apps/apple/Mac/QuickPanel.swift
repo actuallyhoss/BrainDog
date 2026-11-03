@@ -464,7 +464,7 @@ struct QuickPanelView: View {
             .padding(.horizontal, Space.s2)
             .padding(.bottom, Space.s3)
         } else if model.query.trimmingCharacters(in: .whitespaces).count >= 2, !model.searching {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Space.s1) {
                 Text(Words.nothingFound(model.query)).font(Typeface.body).foregroundStyle(Palette.ink)
                 Text(Words.nothingFoundNext).font(Typeface.meta).foregroundStyle(Palette.ink3)
             }

@@ -23,7 +23,7 @@ struct AccountSheet: View {
                     Button(Words.done) { dismiss() }.buttonStyle(.bare)
                 }
 
-                VStack(alignment: .leading, spacing: Space.s2) {
+                VStack(alignment: .leading, spacing: Space.sectionHeadGap) {
                     Text(Words.yourBrainDogs).font(Typeface.caps).textCase(.uppercase).tracking(0.3).foregroundStyle(Palette.ink3)
                         .padding(.leading, Space.tilePad)
                         .accessibilityAddTraits(.isHeader)

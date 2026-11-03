@@ -151,7 +151,7 @@ public struct AttachView: View {
 
             Text(model.query.trimmingCharacters(in: .whitespaces).count >= 2 ? Words.attachFound : Words.attachRecent)
                 .font(Typeface.caption).foregroundStyle(Palette.ink3).accessibilityAddTraits(.isHeader)
-                .padding(.top, Space.s1)
+                .padding(.top, Space.s2)
 
             let shown = model.shown
             if shown.isEmpty {

@@ -290,7 +290,7 @@ public struct SignInView: View {
     }
 }
 
-/// A labelled field: the label in meta ink-3 above, the field 44 tall in a tile well at radius 12 with a 1px rule edge.
+/// A labelled field: the label in meta ink-3 4 above (`--sp-1`), the field 44 tall in a tile well at radius 12 with a 1px rule edge.
 struct Field<Content: View>: View {
     let label: String
     let content: Content
@@ -301,7 +301,7 @@ struct Field<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
+        VStack(alignment: .leading, spacing: Space.s1) {
             Text(label).font(Typeface.meta).foregroundStyle(Palette.ink3)
             content
                 .textFieldStyle(.plain)
