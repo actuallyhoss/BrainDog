@@ -57,7 +57,7 @@
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from './Entry.svelte';
   import Human from './Human.svelte';
-  import { widgetWords } from '../signup/turnstile.ts';
+  import Notice from './Notice.svelte';
   import { signupMode, type SignupMode } from '$lib/signup-door.ts';
 
   const here = support();
@@ -215,6 +215,12 @@
             : null,
   );
 
+  /* WHAT EACH LINE MEANS, as the notice's tint: it worked, it did not, or it only tells. */
+  const noteTone = $derived(view.name === 'signed-out' && view.note === 'out' ? 'good' : view.name === 'signed-out' && view.note === 'unsupported' ? 'warn' : 'note');
+  const addedTone = $derived(
+    view.name !== 'signed-in' ? 'note' : view.add === 'added' ? 'good' : view.add === 'failed' ? 'bad' : 'note',
+  );
+
   const added = $derived(
     view.name !== 'signed-in'
       ? null
@@ -339,7 +345,7 @@
   function land(always: boolean): void {
     const was = document.activeElement;
     if (!always && was !== null && was !== document.body && was.isConnected) return;
-    const to = col?.querySelector<HTMLElement>('.act h1, .act .empty-title') ?? col?.querySelector<HTMLElement>('h1') ?? null;
+    const to = col?.querySelector<HTMLElement>('.act h1, .act .empty-title, .act .notice-title') ?? col?.querySelector<HTMLElement>('h1') ?? null;
     if (to === null) return;
     if (!to.hasAttribute('tabindex')) to.setAttribute('tabindex', '-1');
     to.focus();
@@ -444,9 +450,19 @@
     void run('key', () => exchangeKey(typed), enter('key'));
   }
 
+  /* SEND PRESSED BEFORE THE CHECK ANSWERED: the label stays put (it no longer flips while the check loads), and the
+     check's own slot says what is left to do. */
+  let nudged = $state(false);
+  $effect(() => {
+    if (!waitsForCheck) nudged = false;
+  });
+
   function send(e: SubmitEvent) {
     e.preventDefault();
-    if (waitsForCheck) return;
+    if (waitsForCheck) {
+      nudged = true;
+      return;
+    }
     sendTo(email.trim());
   }
 
@@ -526,9 +542,6 @@
     return () => clearInterval(t);
   });
 
-  /** What the line under the ways in says: only the ways that are drawn. */
-  const lede = $derived(doors ? copy.signInLede(doors.magic, doors.google === true, doors.passkey) : null);
-
   /** Who may sign up here, for the foot's one line; `null` until the host says, and then no line is drawn. */
   let mode = $state<SignupMode | null>(null);
   /** Whether the first 400ms have passed with the host still out, so "Getting sign-in ready" may show. */
@@ -555,7 +568,7 @@
 {#snippet addDoor(lead: boolean)}
   {#if view.name === 'signed-in' && view.add !== 'absent' && view.add !== 'added'}
     <Button weight={lead ? 'primary' : 'quiet'} onclick={addPasskey} aria-busy={view.add === 'asking'}>
-      <Icon name="key" size="m" />{view.add === 'asking' ? copy.addingPasskey : copy.addPasskeyHere}
+      <Icon name="key" size="l" />{view.add === 'asking' ? copy.addingPasskey : copy.addPasskeyHere}
     </Button>
   {/if}
 {/snippet}
@@ -564,8 +577,18 @@
      not under its button: the explainer went (first F7). -->
 {#snippet passkeyDoor(lead: boolean)}
   <Button weight={lead ? 'primary' : 'quiet'} onclick={withPasskey} aria-busy={asking === 'passkey'}>
-    <Icon name="key" size="m" />{asking === 'passkey' ? copy.waitingForPasskey : copy.withPasskey}
+    <Icon name="key" size="l" />{asking === 'passkey' ? copy.waitingForPasskey : copy.withPasskey}
   </Button>
+{/snippet}
+
+<!-- WHOSE ACCOUNT A LINK OPENS, as a label over the address and one short line under it (UI pass, 3 Nov): it was one
+     long sentence with the address in its middle. -->
+{#snippet whose(kind: 'magic' | 'claim', email: string)}
+  <div class="whose">
+    <span class="whose-label">{words.linkIsFor(kind)}</span>
+    <p class="address"><Icon name="mail" size="m" /><span>{email}</span></p>
+    <span class="whose-label">{words.notYou}</span>
+  </div>
 {/snippet}
 
 <!-- THE ENTRY FRAME EVERY WAY IN SHARES (`Entry.svelte`): the brand on the ground, one sheet under it, this column in it. -->
@@ -574,11 +597,8 @@
     <!-- THE TASK AS THE HEADING, where a way in is offered (or about to be): a state screen ("Check your email", "You're
          signed in", "BrainDog did not answer") is its own heading instead, and draws no title over it (first F7). A spent
          link leads with what happened, its ways in under it (audit f, AF17). -->
-    {#if view.name === 'loading' || (doors && !noDoor && view.name !== 'link-expired')}
-      <div class="intro">
-        <h1 class="entry-title">{copy.signInTitle}</h1>
-        {#if doors && lede}<p class="entry-lede">{lede}</p>{/if}
-      </div>
+    {#if view.name === 'loading' || (doors && !noDoor)}
+      <h1 class="entry-title">{copy.signInTitle}</h1>
     {/if}
 
     <div class="act">
@@ -609,31 +629,31 @@
         <div class="said"><Empty kind="no-permission" heading title={copy.notConfiguredTitle} body={copy.notConfiguredWhy} /></div>
       {:else if view.name === 'insecure'}
         <div class="said"><Empty kind="no-permission" heading title={copy.insecureTitle} body={copy.insecureWhy} /></div>
+      {:else if view.name === 'locked' && doors}
+        <Notice tone="warn" icon="clock" title={words.sendPaused(view.minutes)}>{words.sendPausedWhy}</Notice>
       {:else if view.name === 'locked'}
         <div class="said"><Empty kind="no-permission" title={copy.lockedTitle(view.minutes)} body={copy.lockedWhy} /></div>
       {:else if view.name === 'rejected'}
         <!-- THE REFUSAL OPENS ABOVE THE FORM (`opens`, 180ms by height), so the field slides down to make room rather
              than jumping under the pointer. -->
-        <div class="said" in:opens>
-          <Empty
-            kind="error"
-            title={view.closed ? copy.closedTitle : (view.fix ?? copy.rejectedTitle)}
-            body={view.closed ? copy.closedNext : keyRefused ? copy.keyRefusedNext : copy.rejectedNext(wayCount(view.ways) > 1)}
-          />
+        <div in:opens>
+          <Notice tone="bad" role="alert" title={view.closed ? copy.closedTitle : (view.fix ?? copy.rejectedTitle)}>
+            {view.closed ? copy.closedNext : keyRefused ? copy.keyRefusedNext : wayCount(view.ways) > 1 ? words.tryAgain : copy.rejectedNext(false)}
+          </Notice>
         </div>
       {:else if view.name === 'link-expired'}
-        <div class="said">
-          <Empty kind="error" heading title={copy.linkExpiredTitle} body={copy.linkExpiredWhy(view.link, view.ways?.magic === true)} />
-        </div>
+        <Notice tone="bad" title={copy.linkExpiredTitle}>{view.ways?.magic === true || view.link === 'claim' ? words.expiredWhy(view.link) : copy.linkExpiredWhy(view.link, false)}</Notice>
       {:else if view.name === 'link-sent'}
         <div class="calm" role="status">
           <IconWell name="check" size="card" tone="earn" />
           <h1 class="entry-title">{copy.linkSentTitle}</h1>
-          <p class="calm-body">{copy.linkSentBody(view.email)}</p>
+          <!-- THE ADDRESS ON ITS OWN LINE (UI pass, 3 Nov): it was buried mid-sentence, and it is the one thing to check. -->
+          <p class="address"><Icon name="mail" size="m" /><span>{view.email}</span></p>
+          <p class="calm-body">{words.sentWhy}</p>
           {#if isApp}<p class="calm-body">{words.appLinkSent}</p>{/if}
-          <!-- THE SECOND LINE, a minute on (`SENT_LATE`): the screen cannot know a letter failed, so it says what fixes one. -->
-          {#if view.late}<p class="calm-body">{copy.linkSentLater}</p>{/if}
         </div>
+        <!-- THE SECOND LINE, a minute on (`SENT_LATE`): the screen cannot know a letter failed, so it says what fixes one. -->
+        {#if view.late}<Notice>{copy.linkSentLater}</Notice>{/if}
         <div class="doors">
           {#if view.late}
             {@const to = view.email}
@@ -649,9 +669,9 @@
           <h1 class="entry-title">{handing === 'sent' ? words.handoffSentTitle : words.handoffTitle}</h1>
           <p class="calm-body">{handing === 'sent' ? words.handoffSentWhy : words.handoffWhy}</p>
           <!-- WHOSE ACCOUNT, here too: `?app=` must not be a way past the line a stranger's link is read by. -->
-          {#if linkEmail !== null && linkEmail.token === link.token}<p class="calm-who">{copy.linkOpens(link.kind, linkEmail.email)}</p>{/if}
+          {#if linkEmail !== null && linkEmail.token === link.token}{@render whose(link.kind, linkEmail.email)}{/if}
         </div>
-        {#if handing === 'failed'}<p class="status" role="status">{words.handoffFailed}</p>{/if}
+        {#if handing === 'failed'}<Notice tone="bad">{words.handoffFailed}</Notice>{/if}
         <div class="doors">
           {#if handing !== 'failed'}
             <Button weight={handing === 'sent' ? 'quiet' : 'primary'} onclick={handBack} aria-busy={handing === 'asking'}>
@@ -670,7 +690,7 @@
         <div class="calm">
           <IconWell name="link" size="card" />
           <h1 class="entry-title">{view.link.kind === 'claim' ? copy.claimLandingTitle : copy.linkLandingTitle}</h1>
-          {#if linkEmail !== null && linkEmail.token === view.link.token}<p class="calm-who">{copy.linkOpens(view.link.kind, linkEmail.email)}</p>{/if}
+          {#if linkEmail !== null && linkEmail.token === view.link.token}{@render whose(view.link.kind, linkEmail.email)}{/if}
         </div>
         <div class="doors">
           <Button weight="primary" onclick={spend} aria-busy={view.asking}>
@@ -685,11 +705,11 @@
           <h1 class="entry-title">{copy.signedInTitle}</h1>
           <p class="calm-who">{view.who.email}</p>
         </div>
-        {#if added}<p class="status" role="status">{added}</p>{/if}
+        {#if added}<Notice tone={addedTone}>{added}</Notice>{/if}
         <!-- A LINK PASTED OVER THIS SCREEN IS SAID HERE, because the address no longer says it: `takeLink` cleared the
              fragment, and before this line the tab read "You are signed in" as if nothing had come. It is kept in
              state, so Sign out lands on it rather than on the ways in (`stateOf` lands on `out` with a link). -->
-        {#if view.link}<p class="status" role="status">{copy.linkWaitsSignedIn}</p>{/if}
+        {#if view.link}<Notice icon="link">{copy.linkWaitsSignedIn}</Notice>{/if}
         <div class="doors">
           {#if view.lead === 'add'}
             {@render addDoor(true)}
@@ -705,16 +725,20 @@
             {view.out === 'asking' ? copy.signingOut : copy.signOut}
           </Button>
         </div>
-        {#if view.out === 'failed'}<p class="status" role="status">{copy.signOutFailed}</p>{/if}
+        {#if view.out === 'failed'}<Notice tone="bad">{copy.signOutFailed}</Notice>{/if}
       {:else if noDoor}
         <!-- THE FIRST RUN, AND NOTHING CAN SIGN ANYBODY IN YET. The claim link is the way through,
              and it is in the terminal of whoever provisioned the record rather than in an inbox. -->
         <div class="said"><Empty kind="no-permission" heading title={copy.firstDoorTitle} body={copy.firstDoorWhy} /></div>
       {/if}
 
-      {#if note}<p class="status" role="status">{note}</p>{/if}
-      {#if host?.magic === 'down' && !noDoor && (doors || view.name === 'signed-out')}<p class="status" role="status">{noMail ? copy.firstDoorMailDown : copy.mailDown}</p>{/if}
-      {#if fromGoogle && doors}<p class="status" role="status">{copy.googleSaid[fromGoogle]}</p>{/if}
+      {#if note}<Notice tone={noteTone}>{note}</Notice>{/if}
+      {#if host?.magic === 'down' && !noDoor && (doors || view.name === 'signed-out')}
+        <Notice tone="warn" icon="mail">{noMail ? copy.firstDoorMailDown : doors && (doors.google || doors.passkey) ? words.mailDown : copy.mailDown}</Notice>
+      {/if}
+      {#if fromGoogle && doors}
+        <Notice tone={fromGoogle === 'cancelled' ? 'note' : 'bad'}>{fromGoogle === 'unknown' ? words.googleUnknown : copy.googleSaid[fromGoogle]}</Notice>
+      {/if}
 
       <!-- ONE BLOCK FOR EVERY STATE THAT OFFERS A WAY IN, so moving between signed out, asking and
            rejected never remounts it: an open server-key block stays open, and a typed email stays.
@@ -741,9 +765,9 @@
                     bind:this={emailField}
                   />
                 </span>
-                {#if siteKey !== null}<Human {siteKey} bind:answer={human} bind:this={humanBox} />{/if}
+                {#if siteKey !== null}<Human {siteKey} nudged={nudged} bind:answer={human} bind:this={humanBox} />{/if}
                 <Button weight={doors.lead === 'magic' ? 'primary' : 'quiet'} type="submit" aria-busy={asking === 'send'}>
-                  {asking === 'send' ? copy.sendingLink : waitsForCheck ? widgetWords('ready').send : copy.emailLink}
+                  {asking === 'send' ? copy.sendingLink : copy.emailLink}
                 </Button>
               </form>
             {:else}
@@ -837,12 +861,6 @@
     flex-direction: column;
     gap: var(--sp-6);
     min-inline-size: 0;
-  }
-
-  .intro {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
   }
 
   .act {
@@ -946,6 +964,36 @@
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
+  }
+
+  /* AN ADDRESS, ON ITS OWN LINE: the row title's size in ink, a quiet mail glyph before it. */
+  .address {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-row);
+    font-weight: 500;
+    line-height: var(--lead-row);
+    overflow-wrap: anywhere;
+  }
+
+  .address :global(svg) {
+    flex: none;
+    color: var(--ink-3);
+  }
+
+  .whose {
+    display: grid;
+    gap: var(--sp-1);
+    margin-block-start: var(--sp-1);
+  }
+
+  .whose-label {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .calm-body {

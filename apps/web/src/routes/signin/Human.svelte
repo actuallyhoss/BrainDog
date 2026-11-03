@@ -8,8 +8,11 @@
   import { copy } from '$lib/copy.ts';
   import Button from '$lib/ui/Button.svelte';
   import { loadWidget, widgetWords, type WidgetState } from '../signup/turnstile.ts';
+  import Notice from './Notice.svelte';
+  import { words as entryWords } from './words.ts';
 
-  let { siteKey, answer = $bindable(null) }: { siteKey: string; answer?: string | null } = $props();
+  /* `nudged`: Send was pressed before the check answered, so the slot says what is left to do (the label no longer does). */
+  let { siteKey, answer = $bindable(null), nudged = false }: { siteKey: string; answer?: string | null; nudged?: boolean } = $props();
 
   type Turnstile = { render: (el: HTMLElement, options: Record<string, unknown>) => string; reset: (id: string) => void; remove: (id: string) => void };
   const turnstileOf = (): Turnstile | null => (globalThis as { turnstile?: Turnstile }).turnstile ?? null;
@@ -106,43 +109,61 @@
   });
 </script>
 
-<div class="human" role="group" aria-label={copy.signupHuman}>
+<!-- THE SLOT HOLDS THE WIDGET'S 65PX FROM THE FIRST FRAME, so nothing under it moves when it arrives; while it loads the
+     slot says so in one quiet line, and once it failed it is one notice with Try again at its end (UI pass, 3 Nov: the
+     line said "Try again." beside a button that said it again, squeezed into half the column). -->
+<div class="human" role="group" aria-label={copy.signupHuman} data-phase={phase}>
   <div class="slot" class:slot-off={phase === 'failed'} bind:this={slot}></div>
+  {#if phase === 'loading'}<p class="waiting" aria-hidden="true">{entryWords.checkLoading}</p>{/if}
   {#if phase === 'failed'}
-    <div class="failed">
-      <p class="human-line" role="alert">{words.line}</p>
-      <span class="again"><Button onclick={() => void draw()}>{words.again}</Button></span>
-    </div>
+    <Notice tone="bad" role="alert">
+      {entryWords.checkFailed}
+      {#snippet action()}<Button size="sm" onclick={() => void draw()}>{words.again}</Button>{/snippet}
+    </Notice>
+  {:else if nudged}
+    <p class="nudge" role="status">{entryWords.checkFirst}</p>
   {/if}
 </div>
 
 <style>
+  /* 8 UNDER THE FIELD: the widget's frame stood flush on the field's edge. */
   .human {
+    position: relative;
+    display: grid;
+    gap: var(--sp-2);
     min-block-size: 65px;
     inline-size: 100%;
+    margin-block-start: var(--sp-2);
+  }
+
+  .slot {
+    min-block-size: 65px;
   }
 
   .slot-off {
     display: none;
   }
 
-  .failed {
+  /* WHILE CLOUDFLARE'S FRAME IS ON ITS WAY: the slot's own soft box with one quiet line, where the frame will stand. */
+  .waiting {
+    position: absolute;
+    inset: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: var(--sp-3);
-    min-block-size: 65px;
-  }
-
-  .human-line {
-    flex: 1;
-    min-inline-size: 0;
+    block-size: 65px;
     margin: 0;
-    color: var(--red);
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
+    padding-inline: var(--sp-4);
+    border-radius: var(--r-field);
+    background: var(--soft-fill);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
-  .again :global(.btn) {
-    min-block-size: 44px;
+  .nudge {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 </style>

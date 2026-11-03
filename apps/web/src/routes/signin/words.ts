@@ -31,4 +31,26 @@ export const words = {
   handoffAgain: 'Open the app again',
   handoffFailed: 'The link could not be handed to the app. Sign in here instead, or ask for a new link in the app.',
   handoffHere: 'Sign in in this browser instead',
+
+  /* THE UI PASS (3 Nov): the screen's own lines where `copy` said a fact the screen already shows. */
+  /** The link-sent screen: the address stands on its own line, so this says only what happens. */
+  sentWhy: 'If this address can sign in here, a link is on its way. It works once, for 15 minutes.',
+  /** Over the address a link opens, so whose account it is reads as a fact and not a sentence to parse. */
+  linkIsFor: (kind: 'magic' | 'claim') => (kind === 'claim' ? 'This link is for' : 'This link signs in as'),
+  notYou: 'Not your address? Close this page.',
+  /** A spent link, said over the ways in, which are the way on. */
+  expiredWhy: (kind: 'magic' | 'claim') => (kind === 'claim' ? 'Ask whoever set up your account for a new one.' : 'A link works once, for 15 minutes.'),
+  /** A refusal over the ways in: the other ways are drawn under it, so it does not point at them. */
+  tryAgain: 'Try again.',
+  /** Email links paused while the other ways still work: the paused thing named, and why. */
+  sendPaused: (minutes: number) => `Email links are paused for ${minutes === 1 ? 'a minute' : `${minutes} minutes`}`,
+  sendPausedWhy: 'There were too many tries.',
+  /** Mail down while other ways are drawn: it names no way, the buttons do. */
+  mailDown: 'Mail is not going out right now. Try a link again in a few minutes.',
+  /** Google's way back for an address nobody signs in with: the foot already offers a BrainDog of your own. */
+  googleUnknown: 'Nobody here signs in with that Google address.',
+  /** The check that you are a person, while its widget loads, when it did not load, and when Send was pressed first. */
+  checkLoading: 'Checking that you are a person',
+  checkFailed: 'The check that you are a person did not load.',
+  checkFirst: 'Finish the check above first.',
 } as const;
