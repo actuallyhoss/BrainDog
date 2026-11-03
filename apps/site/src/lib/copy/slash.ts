@@ -24,10 +24,10 @@ const FREE = TABLE.free.credits;
 
 export const slashPage = {
   head: {
-    title: 'Slash knows your whole business.',
+    title: 'Ask BrainDog in plain words.',
     lead:
-      'Press ⌘J anywhere in BrainDog and talk to it in plain words. Slash reads what you keep, answers with your numbers ' +
-      'and makes the changes you ask for, each with an undo. Anything with money, keys, sharing or deletes waits for your yes.',
+      "Slash is the assistant built into BrainDog. Press ⌘J on any page and ask what you owe, who hasn't paid or how a " +
+      'project is doing. It answers from your own numbers, shows what it read, and makes the changes you ask for with an undo.',
   },
   /** The label a screen reader hears on each list of examples. */
   examples: 'Try typing',
@@ -37,7 +37,7 @@ export const slashPage = {
     title: 'Ask',
     body: [
       "Ask the way you'd ask someone who knows your business. Slash reads your projects, money, people " +
-        'and notes, and answers with your numbers in a few lines. Ask a follow-up and it carries on from there.',
+        'and notes, and answers in a few lines with your numbers. Follow up and it carries on.',
       'Every figure opens what it came from, and under the answer you see what Slash read. When nothing in ' +
         'BrainDog answers, it says so instead of guessing.',
     ],
@@ -52,9 +52,9 @@ export const slashPage = {
   make: {
     title: 'Make',
     body: [
-      'Ask for a change, a page, a list or a rule, and Slash makes it from what is already in BrainDog. You see ' +
-        'what it changed and where it went.',
-      'Everything it makes carries its name and has an undo. Anything with money, keys, sharing or deletes waits for your yes first.',
+      'Ask for a change, a page, a list or a rule, and Slash makes it from what is already there. You see what ' +
+        'changed and where.',
+      'Everything it makes carries its name and an undo. Money, keys, sharing and deletes come back to you as a question first.',
     ],
   },
   tally: {
@@ -66,14 +66,14 @@ export const slashPage = {
     after: "When the month's questions run out, Slash says when they come back. Everything else keeps working.",
   },
   agents: {
-    title: 'Slash and your AI tools',
-    say: `Slash lives inside BrainDog. Your AI tools live in ${APPS_AND}. Both read the same BrainDog.`,
-    head: ['Slash', 'Your AI tools'],
+    title: 'Slash and your agents',
+    say: `Slash lives inside BrainDog. Your agents live in ${APPS_AND}. Both read the same BrainDog.`,
+    head: ['Slash', 'Your agents'],
     lines: [
       ['Where', 'In BrainDog. Press ⌘J', 'In the apps you connect'],
       ['What it reads', 'Your BrainDog', 'What you allowed it'],
       ['What it writes', 'Changes you ask for, each with an undo', 'Notes and changes, each with an undo'],
-      ['Who pays', 'Your included questions, or your own key', "Your AI tool's own plan"],
+      ['Who pays', 'Your included questions, or your own key', "Your agent's own plan"],
     ],
   },
   faq: {
@@ -87,7 +87,7 @@ export const slashPage = {
          answer is said of Slash, and the agents get their own half, where "always wait" read as true of them as well. */
       {
         q: 'Can it move money or delete things?',
-        a: 'Not without your yes. A change to money, keys, sharing or a delete comes back as a card for you to press, even when you asked for it. Your own AI tools can be allowed more, in Settings under Agents.',
+        a: 'Not without your yes. A change to money, keys, sharing or a delete comes back as a card for you to press, even when you asked for it. Your own agents can be allowed more, in Settings under Agents.',
       },
       { q: 'Can I use my own AI key?', a: 'Yes, in Settings under Agents. Questions on your own key have no monthly limit.' },
       { q: 'Can I turn it off?', a: 'Yes. Set the monthly limit to zero and Slash stays quiet. Finding still works.' },

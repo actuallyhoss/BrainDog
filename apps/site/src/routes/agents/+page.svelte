@@ -1,8 +1,10 @@
 <!--
-  Connect your AI tools: the door the launch is built around, rewritten in the redesign so anyone reads it: the night head with the page's name, one line and the connect box; then
-  what an AI tool gets and what it can't do, each line with its icon in a well; then the brief an AI tool starts with,
-  played in a terminal on the made-up record; then a row of plain links for developers (the MCP address is the connect
-  box's, said once there: plan F18); then the early access strip.
+  Connect your agents: the door the launch is built around, rewritten in the redesign so anyone reads it: the night
+  head with the page's name, one line and the connect box; then the briefing a session starts with, played in a
+  terminal on the made-up record (first since the 3 November story: the picture explains it faster than the list);
+  then what every session starts with and how an agent earns your trust, each line with its icon in a well; then the
+  agents working now with Pause and Stop beside them; then a row of plain links for developers (the MCP address is the
+  connect box's, said once there: plan F18); then the early access strip.
 
   Every word is `copy/agents.ts`'s and every connect step is `lib/connect/apps.ts`'s. With scripting off the page is
   whole: each app's lines are in the HTML one under another, and the terminal shows every line at once. The skill an agent installs is still served at `/agents/braindog/SKILL.md`,
@@ -14,7 +16,8 @@
   import ConnectBox from '$lib/connect/ConnectBox.svelte';
   import { agents } from '$lib/copy/agents.ts';
   import { site } from '$lib/copy.ts';
-  import { TERM } from '$lib/demo/maya.ts';
+  import { TERM, TODAY } from '$lib/demo/maya.ts';
+  import AgentMark from '$lib/AgentMark.svelte';
   import Term from '$lib/desk/Term.svelte';
   import type { IconName } from '$lib/icons.ts';
   import Icon from '$lib/Icon.svelte';
@@ -23,10 +26,20 @@
 
   const a = agents.agents;
 
-  /* One glyph a line, in the lists' order: the brief, a person, the undo; then a key, money, the clock of the trail. */
-  const GETS: readonly IconName[] = ['today', 'person', 'code', 'undo'];
-  /* A key; money; people, which the switch never covers; the clock of the trail. */
-  const CANNOT: readonly IconName[] = ['lock', 'card', 'users', 'clock'];
+  /* One glyph a line, in the lists' order: where things stand, who else is working, the lessons, the keys by name;
+     then the question, the undo that drops it back, the floor that never climbs, the name on every change. */
+  const GETS: readonly IconName[] = ['today', 'users', 'book', 'key'];
+  const CANNOT: readonly IconName[] = ['decide', 'undo', 'lock', 'history'];
+
+  /* THE DRAWN AGENTS PAGE: Pause and Stop answer on the drawing, as the home page's questions do, so a button that
+     looks pressable does something. Nothing leaves the page. */
+  let said = $state<Record<string, 'paused' | 'stopped' | undefined>>({});
+  const pause = (id: string): void => {
+    said[id] = said[id] === 'paused' ? undefined : 'paused';
+  };
+  const stop = (id: string): void => {
+    said[id] = 'stopped';
+  };
 
 </script>
 
@@ -36,6 +49,16 @@
     <ConnectBox />
   </div>
 </PageHead>
+
+<section class="wrap brief">
+  <div class="ftile split">
+    <div>
+      <h2 class="band-h2">{a.brief.title}</h2>
+      <p class="band-say">{a.brief.say}</p>
+    </div>
+    <Term lines={TERM} />
+  </div>
+</section>
 
 <section class="wrap lists">
   <div>
@@ -56,13 +79,30 @@
   </div>
 </section>
 
-<section class="wrap brief">
+<section class="wrap watch">
   <div class="ftile split">
     <div>
-      <h2 class="band-h2">{a.brief.title}</h2>
-      <p class="band-say">{a.brief.say}</p>
+      <h2 class="band-h2">{a.watch.title}</h2>
+      <p class="band-say">{a.watch.say}</p>
     </div>
-    <Term lines={TERM} />
+    <div class="now" role="group" aria-label={a.watch.label}>
+      <p class="thd"><span class="well"><Icon name="agent" /></span>{a.watch.head}<span class="r num">{TODAY.working.length}</span></p>
+      <ul>
+        {#each TODAY.working as w (w.agent)}
+          {@const state = said[w.agent]}
+          <li class:held={state}>
+            <span class="face"><AgentMark id={w.agent} size={16} /></span>
+            <span class="grow"><b>{w.what}</b><span>{state === 'stopped' ? a.watch.stopped : state === 'paused' ? a.watch.paused : w.sub}</span></span>
+            {#if state !== 'stopped'}
+              <span class="acts">
+                <button type="button" class="btn line sm" onclick={() => pause(w.agent)}><Icon name={state === 'paused' ? 'play' : 'pause'} size="s" />{state === 'paused' ? a.watch.resume : a.watch.pause}</button>
+                <button type="button" class="btn line sm" onclick={() => stop(w.agent)}>{a.watch.stop}</button>
+              </span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </div>
   </div>
 </section>
 
@@ -89,7 +129,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 48px 56px;
-    padding-block-start: var(--first-pad);
+    padding-block-start: var(--band-pad);
   }
 
   .lists h2,
@@ -141,7 +181,121 @@
   }
 
   .brief {
+    padding-block-start: var(--first-pad);
+  }
+
+  .watch {
     padding-block-start: var(--band-pad);
+  }
+
+  /* THE DRAWN AGENTS PAGE: one white card in the paper tile, as the drawings on the other pages are, with the desk's
+     head row, faces and two lines a row. */
+  .now {
+    padding: 20px 22px;
+    border-radius: var(--r-tile);
+    background: var(--desk-tile);
+    box-shadow: var(--shadow-card);
+    color: var(--ink);
+  }
+
+  .thd {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font: 600 15px/1.3 var(--ui);
+  }
+
+  .thd .well {
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+  }
+
+  .thd .well :global(.icon) {
+    inline-size: 18px;
+    block-size: 18px;
+  }
+
+  .thd .r {
+    margin-inline-start: auto;
+    color: var(--muted);
+    font-size: var(--t-site-13);
+    font-weight: 500;
+  }
+
+  .now ul {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .now li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-block-size: 56px;
+    padding: 10px 0;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .now li:first-child {
+    border-block-start: 0;
+  }
+
+  .face {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    border-radius: 50%;
+    background: var(--desk-tile-2);
+  }
+
+  /* The live dot, gone once the agent is paused or stopped. */
+  .face::after {
+    content: '';
+    position: absolute;
+    inset-block-end: -1px;
+    inset-inline-end: -1px;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 50%;
+    background: var(--live);
+    box-shadow: 0 0 0 2px var(--desk-tile);
+  }
+
+  .held .face::after {
+    display: none;
+  }
+
+  .grow {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .grow b {
+    display: block;
+    font-weight: 600;
+  }
+
+  .grow span {
+    display: block;
+    color: var(--muted);
+    font-size: var(--t-site-13);
+  }
+
+  .acts {
+    display: flex;
+    flex: none;
+    gap: 8px;
+  }
+
+  .acts .btn {
+    gap: 6px;
   }
 
   .split {
@@ -172,6 +326,19 @@
   }
 
   @media (max-width: 760px) {
+    .now {
+      padding: 16px;
+    }
+
+    .now li {
+      flex-wrap: wrap;
+    }
+
+    .acts {
+      inline-size: 100%;
+      padding-inline-start: 40px;
+    }
+
     .dev .onwards {
       flex-direction: column;
       align-items: flex-start;

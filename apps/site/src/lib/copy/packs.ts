@@ -12,14 +12,14 @@ export const packs = {
     meta: {
       title: 'Add-ons · BrainDog',
       description:
-        'Add-ons give your BrainDog new lists, pages and rules for the work you do. Each one shows what it adds ' +
-        'before you add it.',
+        'Add-ons bring new pages and rules into BrainDog: Stripe, Mercury, Sentry, Calendar and more. Each one shows ' +
+        'what it adds before anything changes.',
     },
     /* THE STORE'S NAME AS A STRANGER READS IT: "add-ons", the word the app's browse uses (`apps/web/src/lib/market/
        words.ts`). "Pack" stays the word in the docs, where the file format is. */
     title: 'Add-ons',
     /* What an add-on is rests on `packages/declare/src/catalogue.ts`: `reachOf` counts the lists, pages, rules and hosts. */
-    lede: 'New lists, pages and rules for the work you do, from Stripe and Mercury to Sentry, Calendar and Weather. Each one shows what it adds before anything changes.',
+    lede: 'Connect the services your projects run on, and your agents see them too: Stripe and Mercury balances, Sentry errors, Calendar and more. Each add-on shows what it adds before anything changes.',
 
     search: 'Search add-ons',
     searchHint: 'Rent, invoices, Stripe',
