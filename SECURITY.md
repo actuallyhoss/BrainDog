@@ -198,7 +198,7 @@ dies in ten minutes and reaches exactly one method once. In scope:
 ### 4 · The agent surface (`10`, `44`, [ADR-008](docs/16-DECISIONS.md), [ADR-010](docs/16-DECISIONS.md))
 
 The record is an MCP server, so the agent surface is a first-class attack surface rather than an
-add-on.
+afterthought.
 
 - **A tool or resource that returns a secret.** There is no such tool: not scoped, *absent*. One
   that can be made to return `ciphertext`, a `hint` that is really the value, or a plaintext through
@@ -218,14 +218,20 @@ add-on.
   classifier is a control here.
 - Rate limiting that can be bypassed per token or per record.
 
-### 5 · Add-on installation (`04 §7`, `42`, [ADR-048](docs/16-DECISIONS.md))
+### 5 · Plugin installation (`04 §7`, `42`, [ADR-048](docs/16-DECISIONS.md))
 
-An add-on (a pack, in the code) is data. The safety argument is an **enumeration**, so anything that adds an entry
+A plugin (a pack, in the code) is data. The safety argument is an **enumeration**, so anything that adds an entry
 to the "a pack CAN" column is a security defect by definition.
 
-- **Any code execution reached from a declaration outside the script sandbox.** An add-on's scripts
-  run in `packages/script`'s QuickJS sandbox with only the calls it hands them; escaping it, or
-  running code from any other declaration, is the top of this list.
+- **Any code execution reached from a declaration outside the script sandbox.** A plugin's scripts
+  run in `packages/script`'s QuickJS sandbox on a self-host, and in a Worker of their own for each run
+  on the Cloud, with only the calls they are handed; escaping either, or running code from any other
+  declaration, is the top of this list.
+- **Reach past what was approved.** A plugin's tools, commands, row actions, drawn views, notices,
+  model asks and stored data are listed before it is installed, and it gets only what the owner
+  approved. One of them running without that approval, a drawn view or an attached HTML page reaching
+  the app's origin, its cookies or the network, or an agent starting a plugin's tools past the daily
+  ceiling, is in scope.
 - **The diff lying.** `installPack` must apply the plan `planPack` showed, and refuse a different
   one. An install that adds, changes or retires something the diff did not print, or writes a row
   that is not a declared `example` seed, is in scope.
@@ -234,8 +240,12 @@ to the "a pack CAN" column is a security defect by definition.
 - **`SECRET_IN_PACK`**: a key-shaped literal or a spelled `Authorization` header at any depth,
   getting past the refusal.
 - **`REMOTE_ASSET`**: a font, image, script, iframe or link reaching a remote origin. A pack's only
-  permitted outbound is a declared `source:` with a **literal origin, no placeholders**, one
-  preflight maximum, printed statically in the install diff.
+  permitted outbound is a declared `source:`, or a script's call to a host its file names, each with a
+  **literal origin, no placeholders**, and printed statically in the install diff.
+- **Where updates come from.** A plugin made in a record or installed from GitHub taking the store's
+  file of the same id as its update, a GitHub install that moves off the commit it was pinned to, a
+  signature check that passes over altered bytes, or a store advisory that switches off a file that is
+  not the store's own.
 - Uninstall that **destroys rows** instead of retiring declarations.
 
 ### 6 · Cross-record isolation (`12 §2`)
@@ -251,7 +261,9 @@ CSP (`style-src-attr 'unsafe-inline'` for the renderer's one custom property is 
 exception), the one escape function, link safety, CSRF, and the asset store: type from bytes never
 from the header, **SVG refused with `415`**, the 64-hex path regex that stops traversal, `nosniff`,
 `sandbox`, the 2 MB cap checked twice, and `CHECKSUM_MISMATCH` on a client-named hash that does not
-match the bytes.
+match the bytes. An attachment (a put that names its file) is typed from its bytes and then its name,
+up to 25 MB; an SVG is shown only as a picture, and an HTML file is served inert and drawn only in its
+own sandboxed frame.
 
 ### 8 · Dependencies
 

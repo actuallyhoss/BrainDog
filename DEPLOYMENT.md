@@ -174,6 +174,8 @@ key fails the first deploy of an environment while the secret is unset.
 | `STRIPE_SECRET_KEY` | secret | every billing door answers `NOT_IN_THIS_BUILD` naming it | `sk_test_...` while `BILLING` is `test`, `sk_live_...` only once the owner says so |
 | `STRIPE_WEBHOOK_SECRET` | secret | the webhook refuses | the `whsec_...` Stripe shows for the endpoint `https://app.brain.dog/account/billing/webhook` |
 | `TURNSTILE_SECRET` | secret | sign-up runs on the Directory's lockouts alone | the secret half of `TURNSTILE_SITE_KEY`; `signup.start` checks the widget's answer with it |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | secrets | the sign-in page offers no Google, and Connect Google says it is not set up here | one Google OAuth web client for both: sign-in with Google (redirect `https://<PUBLIC_HOST>/auth/google/callback`) and Connect Google (redirect `https://<PUBLIC_HOST>/api/google/callback`, Gmail, Calendar and Contacts read only). Refresh tokens are sealed under each record's connector key, so `KEK` must be bound too |
+| `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_KEY` | secrets | no push reaches the iPhone app; a browser's push is unaffected | all three: the key id Apple shows, the team (`MG86668Z52`) and the whole `AuthKey_<id>.p8` file |
 | `BILLING` | variable | `''`: billing is off, sign-up says it is not open, nothing is charged or capped | `test` or `live`, and it must agree with `STRIPE_SECRET_KEY`'s prefix or every billing door refuses, naming both |
 | `STRIPE_PRICE_HOSTED`, `STRIPE_PRICE_PLUS` | variables | that plan is not sold | the `price_...` of Hosted ($12 a month) and of Cloud Plus, from the same Stripe mode as the key |
 | `TURNSTILE_SITE_KEY` | variable | no widget on the sign-up page | the public half of the Turnstile widget |
@@ -213,7 +215,7 @@ required but the data directory.
 | `BRAINDOG_TOKEN` | no server key | a private single-user instance's owner bearer |
 | `BRAINDOG_SMTP_URL`, `BRAINDOG_MAIL_FROM` | no mail: no sign-in links, no invitation proof, notification mail waits in the outbox | `smtps://user:pass@host:465`, or `smtp://...:587` with STARTTLS required, and the sender |
 | `BRAINDOG_BACKUP_AT` | `03:20` | the UTC time of day the nightly copy falls due |
-| `BRAINDOG_OUTBOUND` | `off`: add-ons send no requests to other servers, and their scheduled actions are held | `on`: add-ons may send them. The public add-on registry has its own switch, `BRAINDOG_KENNEL` |
+| `BRAINDOG_OUTBOUND` | `off`: plugins send no requests to other servers, and their scheduled actions are held | `on`: plugins may send them. The public plugin store has its own switch, `BRAINDOG_KENNEL` |
 | `BRAINDOG_ORIGIN` | `http://localhost:<port>` | the public origin: sign-in links, the passkeys' relying party, the CSRF check |
 | `BRAINDOG_HOST` | `127.0.0.1` without a token, `0.0.0.0` with one | the interface to listen on |
 | `BRAINDOG_TRUST_PROXY` | the socket's address is the caller's | the proxies' addresses (best), or `1`: anything on loopback or a private network is a proxy, so the whole LAN is; the caller it wrote into `X-Forwarded-For` is counted. The header is ignored from any other peer |
