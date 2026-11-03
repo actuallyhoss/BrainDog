@@ -1756,7 +1756,7 @@
     color: var(--ink);
     font-size: var(--fs-head);
     font-weight: 400;
-    line-height: 1.45;
+    line-height: var(--lh-body);
     letter-spacing: 0;
     text-wrap: pretty;
   }
@@ -1784,8 +1784,8 @@
     max-inline-size: 24em;
     font-size: var(--fs-hero);
     font-weight: var(--fw-semi);
-    line-height: 40px;
-    letter-spacing: -0.02em;
+    line-height: var(--lead-hero);
+    letter-spacing: var(--track-figure);
     text-wrap: balance;
   }
 
@@ -1889,7 +1889,7 @@
   @media (width < 640px) {
     .block-slot[data-lead]:has(> :global(.block[data-kind='note'][data-form='lead'])) :global(.block p) {
       font-size: var(--fs-hero-phone);
-      line-height: 34px;
+      line-height: var(--lead-page);
     }
   }
 

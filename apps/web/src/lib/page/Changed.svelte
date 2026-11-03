@@ -69,7 +69,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-body);
     font-weight: 500;
-    line-height: 1.4;
+    line-height: var(--lead-ui);
   }
 
   /* SOMETHING IN IT IS NEW SINCE THE READER LAST LOOKED: a small dot in ink, never the red that means late. */
