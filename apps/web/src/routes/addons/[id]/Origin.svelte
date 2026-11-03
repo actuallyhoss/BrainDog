@@ -171,7 +171,7 @@
     display: flex;
     align-items: flex-start;
     gap: var(--sp-2);
-    padding: 8px 12px;
+    padding-block: 6px;
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 20px;
@@ -184,7 +184,7 @@
   }
 
   .foot {
-    padding: var(--sp-2) 12px 0;
+    padding-block-start: var(--sp-2);
   }
 
   .share-do {

@@ -47,6 +47,9 @@ export const madeWords = {
   card: (version: string | null): string => (version === null ? 'Made here' : `Made here, ${version}`),
   cardLinked: (version: string | null): string => (version === null ? 'Not reviewed' : `Not reviewed, ${version}`),
   open: 'Open',
+  decide: 'Decide',
+  waiting: 'Waiting on you',
+  waitingLine: 'An agent made this and asks to add it. Read its plan on Decide.',
   fromLink: 'Install from GitHub or a file',
   /* WHERE IT CAME FROM, the tile on an add-on's own page. */
   origin: 'Where it came from',
@@ -160,6 +163,23 @@ export function makerOf(rows: readonly AskedRow[], id: string): string | null {
 
 /** "An agent" said inside a sentence. */
 export const agentName = (name: string): string => (/^(An|A) /u.test(name) ? name.charAt(0).toLowerCase() + name.slice(1) : name);
+
+/** One open question as `governance` answers it, with the keys read for an add-on waiting to be installed. */
+export type OpenRow = { id?: unknown; body_kind?: unknown; cause?: unknown; question?: unknown };
+
+/**
+ * The add-ons an agent made and asked to install that wait on Decide: a `pack` question whose cause carries a file
+ * (`act:installPack:<id>@<version>:<hash>`), named as the question names it ("Add Film night?" is Film night).
+ */
+export function waitingOf(rows: readonly OpenRow[], held: ReadonlySet<string>): { id: string; question: string; title: string; version: string | null }[] {
+  return rows.flatMap((r) => {
+    const m = typeof r.cause === 'string' ? /^act:installPack:([a-z0-9-]+)@([^:]*):/u.exec(r.cause) : null;
+    if (r.body_kind !== 'pack' || m === null || typeof r.id !== 'string' || held.has(m[1]!)) return [];
+    const q = typeof r.question === 'string' ? r.question : '';
+    const title = /^Add (.+)\?$/u.exec(q)?.[1] ?? m[1]!;
+    return [{ id: m[1]!, question: r.id, title, version: m[2] === '' ? null : m[2]! }];
+  });
+}
 
 /** The file's name when it is downloaded. */
 export const fileName = (id: string, version: string | null | undefined): string => `${id}${version ? `-${version}` : ''}.pack.json`;

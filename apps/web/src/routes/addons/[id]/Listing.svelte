@@ -780,6 +780,28 @@
         </Tile>
       </div>
 
+      <!-- WHAT IT ASKS FOR, RIGHT AFTER WHAT IT ADDS (store lane E): it is the decision, so it is read before its pages,
+           beside the lead on a desk and next on a phone. In plain words: the lists of yours it reads or changes, what it sends where and with which key,
+           its scripts and its agents' skills, read from the file it would install. Nothing else is within its reach. -->
+      {#if asks}
+        <div class="third-cell calls-cell">
+          <Tile icon="lock" title={asksWords.title}>
+            <ul class="log">
+              {#each asks as line, i (i)}<li class="log-row loud">{line}</li>{/each}
+            </ul>
+            <p class="quiet">{asksWords.note}</p>
+          </Tile>
+        </div>
+      {:else if reach && reach.calls_out.length > 0}
+        <div class="third-cell calls-cell">
+          <Tile icon="globe" title={words.calls} count={reach.calls_out.length}>
+            <ul class="log">
+              {#each reach.calls_out as call, i (i)}<li class="log-row loud">{callSaid(call)}</li>{/each}
+            </ul>
+          </Tile>
+        </div>
+      {/if}
+
       <!-- ITS PAGES, DRAWN: the use case's rail and Home, or an add-on's pages through the real renderer, each on a well of
            the ground's colour inside the tile. A listing with no drawing has no tile for one: what it adds already names
            its pages. A drawing that could not be read says so. -->
@@ -800,27 +822,6 @@
             {:else}
               <p class="quiet">{preview.state === 'refused' ? preview.fix : words.noPreview}</p>
             {/if}
-          </Tile>
-        </div>
-      {/if}
-
-      <!-- WHAT IT ASKS FOR, IN PLAIN WORDS: the lists of yours it reads or changes, what it sends where and with which key,
-           its scripts and its agents' skills, read from the file it would install. Nothing else is within its reach. -->
-      {#if asks}
-        <div class="third-cell calls-cell">
-          <Tile icon="lock" title={asksWords.title}>
-            <ul class="log">
-              {#each asks as line, i (i)}<li class="log-row loud">{line}</li>{/each}
-            </ul>
-            <p class="quiet">{asksWords.note}</p>
-          </Tile>
-        </div>
-      {:else if reach && reach.calls_out.length > 0}
-        <div class="third-cell calls-cell">
-          <Tile icon="globe" title={words.calls} count={reach.calls_out.length}>
-            <ul class="log">
-              {#each reach.calls_out as call, i (i)}<li class="log-row loud">{callSaid(call)}</li>{/each}
-            </ul>
           </Tile>
         </div>
       {/if}
@@ -954,7 +955,8 @@
       grid-column: 1 / -1;
     }
 
-    .tiles:has(.calls-cell) .versions-cell {
+    /* THE LEAD HOLDS ITS COLUMN WHILE WHAT IT ADDS AND WHAT IT ASKS FOR STACK BESIDE IT. */
+    .tiles:has(.calls-cell) .lead-cell {
       grid-row: span 2;
     }
   }

@@ -60,7 +60,7 @@
   import { asksWords } from '$lib/market/asks.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { CORE_PACK } from '@braindog/declare';
-  import { heldMine, madeWords, type AddonLine } from '$lib/market/made-here.ts';
+  import { heldMine, madeWords, waitingOf, type AddonLine, type OpenRow } from '$lib/market/made-here.ts';
 
   const store = words.store;
 
@@ -74,6 +74,8 @@
   let questions = $state.raw<string[] | null>(null);
   /** What this record holds as the record says it (`addons {installed: true}`), for Made by you; `null` until read. */
   let mine = $state.raw<AddonLine[] | null>(null);
+  /** The open questions whole, for an add-on an agent made that waits on Decide. */
+  let openRows = $state.raw<OpenRow[]>([]);
 
   let query = $state(page.url.searchParams.get('q') ?? '');
   /** The chip picked: the starters, one shelf, or everything. */
@@ -97,6 +99,7 @@
     const found = (mine ?? []).filter((l) => q === '' || `${l.title} ${l.summary}`.toLowerCase().includes(q));
     return chip === null ? heldMine(found, OURS) : { made: [], linked: [] };
   });
+  const waiting = $derived(chip === null && query.trim() === '' ? waitingOf(openRows, new Set((mine ?? []).map((l) => l.id))) : []);
 
   /** Four to a shelf until Show all, a search or a chip. */
   const FOLDED_AT = 4;
@@ -234,6 +237,7 @@
         .then((out) => (signs = out.ok && Array.isArray(out.value?.signs) ? (out.value.signs as SignRead[]) : null)),
       client.governance({ register: 'suggestion', status: 'open', limit: 50 }).then((out) => {
         const rows = out.ok && Array.isArray(out.value) ? (out.value as { question?: unknown }[]) : [];
+        openRows = rows as OpenRow[];
         questions = rows.flatMap((r) => (typeof r.question === 'string' ? [r.question] : []));
       }),
     ]);
@@ -308,10 +312,13 @@
   {#if settled}
   <Swap key={chip}>
   <div class="shelves">
-  {#if held.made.length > 0}
+  {#if held.made.length + waiting.length > 0}
     <section class="part" aria-labelledby="store-mine">
       <h2 class="part-h" id="store-mine">{madeWords.shelf}<span class="part-note">{madeWords.shelfNote}</span></h2>
       <ul class="cards">
+        {#each waiting as w (w.question)}
+          <StoreCard title={w.title} line={madeWords.waitingLine} href={`/decide/${encodeURIComponent(w.question)}`} icon="ask" hue={SHELF_SLOTS.starters} cue={madeWords.decide} badge={{ text: madeWords.waiting, tone: 'warn' }} />
+        {/each}
         {#each held.made as l (l.id)}
           <StoreCard title={l.title} line={l.summary} href={`/addons/${encodeURIComponent(l.id)}`} icon="code" hue={SHELF_SLOTS.starters} cue={madeWords.open} held badge={{ text: madeWords.card(l.here?.version ?? null), tone: 'info' }} />
         {/each}
