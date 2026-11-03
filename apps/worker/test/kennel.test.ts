@@ -122,7 +122,7 @@ test('the index is the bundled catalogue and what R2 lists; a signed file waits,
   assert.deepEqual(said.value, { state: 'review', kind: 'pack', id: 'bookshelf', version: '1.0.0' });
   assert.equal((await serveKennel(get('packs/bookshelf/1.0.0.pack.json'), deps)).status, 404, 'a waiting file is served before review');
 
-  assert.equal((await serveKennel(get('review'), deps)).status, 401);
+  assert.equal((await serveKennel(get('review'), deps)).status, 404);
   const waiting = await read(await serveKennel(get('review', operator), deps));
   assert.equal((waiting.value?.pending as unknown[]).length, 1);
   const shown = await read(await serveKennel(get('review?kind=pack&id=bookshelf&version=1.0.0', operator), deps));

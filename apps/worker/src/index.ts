@@ -107,8 +107,8 @@ import { HEALTHZ, healthz, type Night } from './health.ts';
 import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
 import { NOT_A_PERSON, turnstilePassed, turnstileSiteKey } from './turnstile.ts';
 import { cookieDomain, withSignedIn } from './signed-in.ts';
-import { isAdminHost, serveAdmin } from './admin.ts';
-import { applyDoor, opsApplications, opsInvite, type OpsApplyDeps } from './apply.ts';
+import { bearerSent, operatorEmails, operatorOf, type OperatorSeen } from './operator.ts';
+import { applyDoor, notHere, opsApplications, opsInvite, type OpsApplyDeps } from './apply.ts';
 import { seenDoor, servesSeen } from './seen.ts';
 import { stepDoor, servesStep } from './step.ts';
 import { opsFunnel } from './funnel.ts';
@@ -297,6 +297,12 @@ type Env = {
   SUPPORT_FORWARD?: string;
   /** Where a `crash`, `refuse`, `model` or `night` line is mailed, at most once a kind in 15 minutes (`opsAlert`). Unset, and none is. */
   OPS_ALERT_TO?: string;
+  /**
+   * The operator's own addresses, comma separated: signed in as one of them, the app shows Admin and its session opens
+   * the operator's doors with no key (`operator.ts`). A var and not a secret, since an address is not one. Unset, and
+   * only `PROVISION_KEY` as a bearer opens them.
+   */
+  OPERATOR_EMAILS?: string;
   /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
   PUBLIC_HOST?: string;
   /** `yes` counts the site's visits by day, page and where they came from (`seen.ts`). Unset, and `/api/seen` counts nothing. His to set. */
@@ -4061,10 +4067,6 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     const sized = await guardBody(request);
     if (sized instanceof Response) return sized;
     request = sized;
-    if (isAdminHost(request, env.PUBLIC_HOST)) {
-      const page = serveAdmin(request);
-      if (page) return page;
-    }
     /* THE OLD HOST FIRST, AND ONLY FOR A PAGE LOAD. `legacyRedirect` answers
        `null` for every path this Worker serves itself, the build id and sign-in included, so an agent, a webhook
        sender and a stale tab on `app.brain.dog` are served where they stand. Unset `LEGACY_HOSTS` is no host at all. */
@@ -4105,11 +4107,14 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     if (servesKeychain(url.pathname)) return keyDoor(request, env);
     /* THE KENNEL, THE REGISTRY EVERY HOST READS ADD-ONS FROM (`kennel.ts`), before any record door because it is nobody's
        record: its reads are public, and a write names who asks by an author's key, a bearer, or this host's session. */
-    if (servesKennel(url.pathname))
-      return serveKennel(request, {
+    if (servesKennel(url.pathname)) {
+      /* THE REVIEW DOOR ALSO OPENS TO THE OPERATOR'S OWN SESSION, for the Admin page (`operator.ts`). */
+      const seen = KENNEL_REVIEW.test(url.pathname) ? await operatorSeen(request, env) : NOBODY;
+      return withCookie(await serveKennel(request, {
         blobs: env.BLOBS,
         assets: env.ASSETS,
         operator: env.PROVISION_KEY,
+        byOperator: seen.operator,
         origin: `https://${env.PUBLIC_HOST ?? ''}`,
         session: (sid) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).auth({ flow: 'session', sid }) as unknown as Promise<AuthResult<Who>>,
         bearer: bearerDeps(env),
@@ -4130,7 +4135,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
           },
           required: (ids) => kennelRequired({ blobs: env.BLOBS, assets: env.ASSETS }, ids, new Date()),
         },
-      });
+      }), seen.cookie);
+    }
     /* A RECORD'S FILES, AT EITHER ADDRESS (`files.ts`): the bytes go to `BLOBS` and never through the record's
        object, and who may is asked of the same session and bearer doors `recordApi` asks, in its order. */
     if (servesFiles(url.pathname))
@@ -4889,19 +4895,25 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     }
     return null;
   };
-  if (OPS_INVITE.test(new URL(request.url).pathname)) return opsInvite(request, opsApplyDeps(env));
-  if (OPS_APPLICATIONS.test(new URL(request.url).pathname)) return opsApplications(request, opsApplyDeps(env));
+  /* THE ADMIN PAGE'S DOORS OPEN TO THE OPERATOR'S OWN SESSION AS WELL AS TO THE KEY (`operator.ts`). Asked once, here,
+     and only for them; a rotation the Directory made while reading the session rides back on the answer. */
+  const path = new URL(request.url).pathname;
+  const seen = OPS_ME.test(path) || OPS_INVITE.test(path) || OPS_APPLICATIONS.test(path) || OPS_FUNNEL.test(path) ? await operatorSeen(request, env) : NOBODY;
+  if (OPS_ME.test(path)) return withCookie(await opsMe(request, env, seen), seen.cookie);
+  if (OPS_INVITE.test(path)) return withCookie(await opsInvite(request, opsApplyDeps(env, seen)), seen.cookie);
+  if (OPS_APPLICATIONS.test(path)) return withCookie(await opsApplications(request, opsApplyDeps(env, seen)), seen.cookie);
   /* THE OPERATOR'S FUNNEL (`funnel.ts`): the Directory's week totals and each open record's firsts, as counts only. */
-  if (OPS_FUNNEL.test(new URL(request.url).pathname))
-    return opsFunnel(request, {
+  if (OPS_FUNNEL.test(path))
+    return withCookie(await opsFunnel(request, {
       key: (env.PROVISION_KEY ?? '').trim(),
+      operator: seen.operator,
       readLimit: (r) => overLimit(env, null, r, 'read'),
       unauthorized: () => saidUnauthorized('operator', 'This route takes the operator key.'),
       read: (since) => directory.seen({ flow: 'funnel.read', since }),
       records: async (cursor) => directory.listRecords(cursor),
       firsts: (record) => env.RECORD.get(env.RECORD.idFromName(record)).firsts(),
       now: () => Date.now(),
-    });
+    }), seen.cookie);
   /* THE OPERATOR'S GIFT OF A PLAN (`ops-plan.ts`): a record found by its name or id with who owns it, and the plan set
      through the same `setPlan` billing uses, so the record's own object hears of it. */
   if (OPS_PLAN.test(new URL(request.url).pathname))
@@ -5006,10 +5018,11 @@ const OPS_FUNNEL = /^\/+account\/+ops\/+funnel\/*$/;
  * address (a POST is already counted in `account()`), the one 401, the Directory's two groups, and the `invite.ready`
  * letter, sent from `AUTH_MAIL_FROM` and awaited, so the answer can say whether it went.
  */
-function opsApplyDeps(env: Env): OpsApplyDeps {
+function opsApplyDeps(env: Env, seen: OperatorSeen): OpsApplyDeps {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   return {
     key: (env.PROVISION_KEY ?? '').trim(),
+    operator: seen.operator,
     origin: `https://${env.PUBLIC_HOST ?? ''}`,
     readLimit: (request) => overLimit(env, null, request, 'read'),
     unauthorized: () => saidUnauthorized('operator', 'This route takes the operator key.'),
@@ -5018,6 +5031,39 @@ function opsApplyDeps(env: Env): OpsApplyDeps {
     mail: (to, vars) => sendMail(env, 'invite.ready', to, vars),
     now: () => Date.now(),
   };
+}
+
+/** Whether the app should show Admin: `GET /account/ops/me`, with the forgiveness the others have. */
+const OPS_ME = /^\/+account\/+ops\/+me\/*$/;
+
+/** The Kennel's review door, which the Admin page lists and decides through. */
+const KENNEL_REVIEW = /^\/+api\/+kennel\/+v1\/+review\/*$/;
+
+/** Nobody's session: what a door that never asks is handed. */
+const NOBODY: OperatorSeen = { operator: false };
+
+/** Whether this request is the operator's own session (`operator.ts`), asked of the Directory as every door asks it. */
+function operatorSeen(request: Request, env: Env): Promise<OperatorSeen> {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  return operatorOf(request, {
+    emails: operatorEmails(env.OPERATOR_EMAILS),
+    origin: `https://${env.PUBLIC_HOST ?? ''}`,
+    signIn: (env.SESSION_SECRET ?? '').length >= 32,
+    session: (sid) => directory.auth({ flow: 'session', sid }) as unknown as Promise<AuthResult<Who>>,
+  });
+}
+
+/**
+ * `GET /account/ops/me`: `{ operator: true }` to the operator, by session or by key, so the app draws Admin in its
+ * sidebar and palette; the same 404 an unknown path gets to anybody else, so nobody learns there is anything here.
+ */
+async function opsMe(request: Request, env: Env, seen: OperatorSeen): Promise<Response> {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return notHere();
+  if (seen.operator) return json({ ok: true, value: { operator: true } }, 200);
+  const key = (env.PROVISION_KEY ?? '').trim();
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
+  if (key !== '' && bearerSent(request) && (await sameKey(bearer, key))) return json({ ok: true, value: { operator: true } }, 200);
+  return notHere();
 }
 
 /** The operator's door to the `model` mail, with the slashes every other door here forgives. */

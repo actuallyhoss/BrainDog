@@ -1,6 +1,6 @@
 /**
- * `GET /account/ops/funnel`: the last eight weeks of the way in, a week to a line, for the Funnel section of
- * admin.brain.dog (LAUNCH 103 job 9).
+ * `GET /account/ops/funnel`: the last eight weeks of the way in, a week to a line, for the Funnel card of the
+ * Admin page in the app (LAUNCH 103 job 9).
  *
  * SIX STEPS, EACH READ WHERE IT IS ALREADY KEPT. Visits, applications, invites used, people and records made are the
  * Directory's, answered as week totals by `funnel.read`. A record's first agent and first brief are the record's own
@@ -9,14 +9,14 @@
  *
  * COUNTS AND NOTHING ELSE. No person, address, name or record leaves this door: a week is its Monday and six numbers.
  *
- * Guarded as `/account/ops/invite` is: 404 with no `PROVISION_KEY`, 401 on a wrong key or none, a read counted by
- * address. ITS OWN FILE, FREE OF `cloudflare:`, so every decision runs in a test over fakes; `index.ts` mounts it.
+ * Guarded as `/account/ops/invite` is: the operator's session or the key as a bearer, anyone else the 404 an unknown
+ * path gets, 401 on a wrong key, a read counted by address. ITS OWN FILE, FREE OF `cloudflare:`, so every decision runs in a test over fakes; `index.ts` mounts it.
  */
 
 import { sameKey } from '@braindog/host/auth';
 import type { FunnelWeek as DirectoryWeek } from '@braindog/record/directory';
 
-import { NOSNIFF } from './admin.ts';
+import { NOSNIFF } from './files.ts';
 
 /** How many weeks the funnel shows, this one included. */
 export const FUNNEL_WEEKS = 8;
@@ -43,8 +43,10 @@ export type Funnel = { weeks: FunnelWeek[]; asked: number; more: boolean; missed
 
 /** What `index.ts` hands the door. Every one is a value or a function, so a test builds it over fakes. */
 export type FunnelDeps = {
-  /** `PROVISION_KEY`, trimmed; empty, and this door does not exist. */
+  /** `PROVISION_KEY`, trimmed; empty, and no bearer opens this door. */
   key: string;
+  /** Whether this request is the operator's own signed-in session (`operator.ts`). */
+  operator?: boolean | undefined;
   /** A read's count by address (`overLimit` with `read`), or `null` to go on. */
   readLimit: (request: Request) => Promise<Response | null>;
   /** The one 401 (`saidUnauthorized`), which logs why and answers nothing of it. */
@@ -165,13 +167,13 @@ export async function funnelOf(deps: FunnelDeps): Promise<Funnel | null> {
 
 /** `GET /account/ops/funnel`. */
 export async function opsFunnel(request: Request, deps: FunnelDeps): Promise<Response> {
-  if (deps.key === '') return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog has no operator key, so it has no operator doors.' } }, 404);
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
+  if (bearer === '' ? deps.operator !== true : deps.key === '') return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'Nothing is here.' } }, 404);
   if (request.method !== 'GET' && request.method !== 'HEAD')
     return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/ops/funnel is read with GET.' } }, 405, [['allow', 'GET, HEAD']]);
   const over = await deps.readLimit(request);
   if (over !== null) return over;
-  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
-  if (bearer === '' || !(await sameKey(bearer, deps.key))) return deps.unauthorized();
+  if (bearer !== '' && !(await sameKey(bearer, deps.key))) return deps.unauthorized();
   const funnel = await funnelOf(deps);
   if (funnel === null) return json({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'The counts could not be read. Try again in a minute.' } }, 503);
   return json({ ok: true, value: funnel }, 200);

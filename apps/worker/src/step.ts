@@ -13,7 +13,7 @@
 
 import { STEPS, type Step } from '@braindog/record/directory';
 
-import { NOSNIFF } from './admin.ts';
+import { NOSNIFF } from './files.ts';
 
 export { STEPS, type Step };
 

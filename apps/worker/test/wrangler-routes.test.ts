@@ -210,9 +210,8 @@ test('THE FILE IS PUSH C: both environments on the app\'s own name, the site\'s 
        its API doors are served. Read from `apps/site/wrangler.jsonc` as it is at this commit, not from the fixture. */
     assert.deepEqual(siteBinding(worker, site, name, builtDoors(worker, name)), { names: [flip.old], why: null }, `${name}: the site does not hand ${flip.old} to this app`);
     /* THE WORKER HOLDS THE APP'S NAME AS A CUSTOM DOMAIN AND NOTHING ELSE, as it did through the one-domain move: the
-       flip back writes no route either. Production also holds admin.brain.dog, the owner's admin page (src/admin.ts), a
-       name the site never binds. */
-    assert.deepEqual(customDomains(block), name === 'production' ? [flip.host, 'admin.brain.dog'] : [flip.host], `${name}: this Worker's Custom Domains`);
+       flip back writes no route either. The owner's admin is a page in the app (`/admin`), so there is no admin host. */
+    assert.deepEqual(customDomains(block), [flip.host], `${name}: this Worker's Custom Domains`);
     /* THE RP ID IS THE PARENT FROM THE FIRST DEPLOY, and a flip does not move it, so a passkey made on the old name is
        offered on the new one. */
     assert.equal(block.vars?.RP_ID, RP[name], `${name}: RP_ID`);

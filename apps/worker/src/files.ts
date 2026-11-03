@@ -61,6 +61,12 @@ export const FILE_HEADERS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * `nosniff` under its header's name, read off the headers every file goes out with, so the worker writes that header
+ * once and every small JSON door sends it in the same words.
+ */
+export const NOSNIFF: readonly [string, string][] = Object.entries(FILE_HEADERS).filter(([, value]) => value === 'nosniff');
+
+/**
  * The type a file's first bytes say it is, or `null` for anything this store does not take.
  *
  * READ FROM THE BYTES THEMSELVES, and each signature is the one its format's own specification fixes: PNG's eight bytes,

@@ -39,7 +39,7 @@ async function door(env: Record<string, unknown> = {}) {
 
 const codeIn = (link: string): string => link.slice(link.indexOf('#code=') + '#code='.length);
 
-test('THE OPERATOR DOORS NEED THE KEY: 404 with none set, 401 on a wrong one or none', async () => {
+test('THE OPERATOR DOORS NEED THE KEY: 404 with none set or none sent, 401 on a wrong one', async () => {
   const off = await door({ PROVISION_KEY: '' });
   try {
     assert.equal((await off.call('/account/ops/applications')).status, 404);
@@ -50,7 +50,7 @@ test('THE OPERATOR DOORS NEED THE KEY: 404 with none set, 401 on a wrong one or 
   const c = await door();
   try {
     assert.equal((await c.call('/account/ops/applications', undefined, 'wrong')).status, 401);
-    assert.equal((await c.call('/account/ops/applications', undefined, '')).status, 401);
+    assert.equal((await c.call('/account/ops/applications', undefined, '')).status, 404);
     assert.equal((await c.call('/account/ops/applications', { decline: 'x' }, 'wrong')).status, 401);
     const said = (await c.call('/account/ops/applications', undefined, 'wrong')).out;
     assert.deepEqual(said, { ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'unauthorized' } });

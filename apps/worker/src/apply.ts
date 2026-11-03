@@ -1,14 +1,15 @@
 /**
  * Asking for an invitation, and the operator's three doors that answer it (since 17 October sign-up is invite only:
- * the owner invites through admin.brain.dog, a person only learns it is invite only on pressing sign up, and anyone
+ * the owner invites from the Admin page in the app, a person only learns it is invite only on pressing sign up, and anyone
  * can apply).
  *
  * `POST /auth/apply` IS A STRANGER'S, and is answered only while sign-up is by invitation: `{ name, email, use?, link?,
  * turnstile? }` keeps one application per address in the Directory (`apply.submit`) and answers `{}` whether it was new,
  * updated or already decided, so it tells nobody who has asked. It mails nobody.
  *
- * `/account/ops/applications` AND `/account/ops/invite` ARE THE OPERATOR'S, behind the provision key as every operator
- * door is: 404 with no `PROVISION_KEY`, 401 on a wrong key or none, a GET counted by address. An invitation mints one
+ * `/account/ops/applications` AND `/account/ops/invite` ARE THE OPERATOR'S: opened by the operator's own session (the
+ * Admin page, `operator.ts`) or by the provision key as a bearer. Anyone else is the 404 an unknown path gets, a wrong
+ * key is 401, and a GET is counted by address. An invitation mints one
  * code, mails its link (`invite.ready`, awaited, so the answer can say whether it went), and answers the link as well,
  * so the operator can send it by hand when the mail could not go.
  *
@@ -20,7 +21,7 @@ import { sameKey } from '@braindog/host/auth';
 import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall } from '@braindog/record/directory';
 import type { Refusal, Result } from '@braindog/ports';
 
-import { NOSNIFF } from './admin.ts';
+import { NOSNIFF } from './files.ts';
 import { SIGNUP_CLOSED, type SignupMode } from './launch.ts';
 import { NOT_A_PERSON } from './turnstile.ts';
 
@@ -120,8 +121,10 @@ export async function applyDoor(request: Request, deps: ApplyDoorDeps): Promise<
 
 /** What `index.ts` hands the operator's doors. */
 export type OpsApplyDeps = {
-  /** `PROVISION_KEY`, trimmed; empty, and these doors do not exist. */
+  /** `PROVISION_KEY`, trimmed; empty, and no bearer opens these doors. */
   key: string;
+  /** Whether this request is the operator's own signed-in session (`operator.ts`), which opens them with no key. */
+  operator?: boolean | undefined;
   /** `https://<PUBLIC_HOST>`, the origin an invitation's link opens. */
   origin: string;
   /** A GET's count by address (`overLimit` with `read`), or `null` to go on. */
@@ -138,6 +141,9 @@ export type OpsApplyDeps = {
 const json = (body: unknown, status: number, extra: [string, string][] = []): Response =>
   new Response(JSON.stringify(body), { status, headers: [['content-type', 'application/json; charset=utf-8'], ['cache-control', 'no-store'], ...extra] });
 
+/** The answer to anyone who is not the operator: the same 404 an unknown path gets, saying nothing of what is here. */
+export const notHere = (): Response => json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'Nothing is here.' } }, 404);
+
 const malformed = (door: string): Response =>
   json({ ok: false, refusal: { code: 'BODY_MALFORMED', fix: `${door} takes a JSON object, sent as application/json.` } }, 400);
 
@@ -146,15 +152,16 @@ const malformed = (door: string): Response =>
  * JSON object a POST sent.
  */
 async function guarded(request: Request, deps: OpsApplyDeps, door: string): Promise<Response | 'get' | Record<string, unknown>> {
-  if (deps.key === '') return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog has no operator key, so it has no operator doors.' } }, 404);
+  /* NOBODY BUT THE OPERATOR SEES THESE DOORS: no bearer and not the operator's session is the 404 any unknown path is. */
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
+  if (bearer === '' ? deps.operator !== true : deps.key === '') return notHere();
   if (request.method !== 'GET' && request.method !== 'POST')
     return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `${door} is read with GET and written with POST.` } }, 405, [['allow', 'GET, POST']]);
   if (request.method === 'GET') {
     const over = await deps.readLimit(request);
     if (over !== null) return over;
   }
-  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
-  if (bearer === '' || !(await sameKey(bearer, deps.key))) return deps.unauthorized();
+  if (bearer !== '' && !(await sameKey(bearer, deps.key))) return deps.unauthorized();
   if (request.method === 'GET') return 'get';
   if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return malformed(door);
   let body: unknown = null;

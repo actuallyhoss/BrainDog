@@ -21,7 +21,7 @@
 
 import { SEEN_CAME, SEEN_PAGES, type SeenCame, type SeenPage } from '@braindog/record/directory';
 
-import { NOSNIFF } from './admin.ts';
+import { NOSNIFF } from './files.ts';
 
 export { SEEN_CAME, SEEN_PAGES, type SeenCame, type SeenPage };
 

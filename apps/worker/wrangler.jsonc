@@ -422,7 +422,10 @@
            `tools/canary/enrol.mjs`, run by him, makes
            the record `ops` through the public sign-up and prints the one line that fills this. The loop never fills
            it by hand, since a record it named would be a canary nobody enrolled. */
-        "OPS_RECORD": ""
+        "OPS_RECORD": "",
+        /* THE OPERATOR, BY ADDRESS (`src/operator.ts`), as production's comment says: the app's Admin page and the
+           operator's doors open to this address's own session. */
+        "OPERATOR_EMAILS": "admin@brain.dog"
       },
 
       "durable_objects": {
@@ -548,12 +551,9 @@
          `brain.dog` stays a legacy host for at least the 90 days a token lives and until every `/in/`
          address handed out on it is re-minted.
 
-         `admin.brain.dog` IS THE OWNER'S ADMIN PAGE (`src/admin.ts`), its own Custom Domain, made by
-         the next deploy once the owner chose it; Cloudflare Access can be put in front of it later with no code change. */
-      "routes": [
-        { "pattern": "app.brain.dog", "custom_domain": true },
-        { "pattern": "admin.brain.dog", "custom_domain": true }
-      ],
+         THE OWNER'S ADMIN IS A PAGE IN THE APP (`/admin`), shown to the address in `OPERATOR_EMAILS` below,
+         so there is no admin host any more. */
+      "routes": [{ "pattern": "app.brain.dog", "custom_domain": true }],
 
       "vars": {
         /* THE CSRF ORIGIN, THE MAGIC LINK'S ORIGIN AND THE DEVICE FLOW'S HOST, ALL AT ONCE, and
@@ -616,6 +616,9 @@
         /* WHERE A `crash` OR `refuse` LINE IS MAILED, at most once a kind in 15 minutes (`opsAlert` in `src/mail.ts`).
            Production only: empty or absent is no mail, which is what alpha wants. */
         "OPS_ALERT_TO": "admin@brain.dog",
+        /* THE OPERATOR, BY ADDRESS (`src/operator.ts`): signed in as this, the app shows Admin in the sidebar and its
+           session opens `/account/ops/*` and the Kennel's review with no key. Comma separated. Not a secret. */
+        "OPERATOR_EMAILS": "admin@brain.dog",
         /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
            the default is a refusal: with no `KEK` bound, `/auth/provision` answers
            `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a
@@ -651,7 +654,7 @@
            with no bot check keyed, the strikes are tightened until it is. The site's `LAUNCH.signup` mirrors this value,
            and a site test holds them equal and fails when this line is missing.
            INVITE ONLY FROM 17 OCTOBER: a new address needs a code, minted at
-           admin.brain.dog or by an application the owner invites, and the site still says "Start free". */
+           the app's Admin page or by an application the owner invites, and the site still says "Start free". */
         "SIGNUP": "invite",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET, as alpha's comment says. */
         "TURNSTILE_SITE_KEY": "0x4AAAAAAFvL6vpxsuMhToz5",

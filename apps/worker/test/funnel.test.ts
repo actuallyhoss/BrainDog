@@ -44,10 +44,11 @@ test('weeks are ISO weeks from Monday, named by their Monday either way', () => 
   assert.equal(msOf(null), null);
 });
 
-test('the guard is the operator door\'s: 404 with no key, GET only, 401 on a wrong key, the read limit first', async () => {
+test('the guard is the operator door\'s: 404 with no key or none sent, GET only, 401 on a wrong key, the read limit first', async () => {
   assert.equal((await opsFunnel(at(), deps({ key: '' }))).status, 404);
   assert.equal((await opsFunnel(at(undefined, 'POST'), deps())).status, 405);
-  assert.equal((await opsFunnel(at({}), deps())).status, 401);
+  assert.equal((await opsFunnel(at({}), deps())).status, 404);
+  assert.equal((await opsFunnel(at({}), deps({ operator: true }))).status, 200);
   assert.equal((await opsFunnel(at({ authorization: 'Bearer wrong' }), deps())).status, 401);
   assert.equal((await opsFunnel(at(), deps({ readLimit: async () => new Response(null, { status: 429 }) }))).status, 429);
   const out = await opsFunnel(at(), deps());

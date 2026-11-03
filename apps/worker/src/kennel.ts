@@ -106,6 +106,12 @@ export type KennelDeps = {
   blobs?: KennelBucket | undefined;
   assets?: Assets | undefined;
   operator?: string | undefined;
+  /**
+   * Whether this request is the operator's own signed-in session (`operator.ts`), with no bearer: it opens the review list
+   * and its verdicts, which the Admin page in the app reads and decides through, as the key does. Anyone else with no
+   * bearer is told nothing is there.
+   */
+  byOperator?: boolean | undefined;
   /** `https://<PUBLIC_HOST>`, the one origin a signed-in write may come from. */
   origin: string;
   /** The Directory's `session` flow. */
@@ -973,8 +979,13 @@ export async function drawnPreview(deps: Pick<KennelDeps, 'blobs' | 'scratch'>, 
 
 /** The operator's doors: what waits, one waiting file whole, a verdict on one, and whether a publisher lists at once. */
 async function operated(request: Request, deps: KennelDeps, ask: 'review' | 'verdict' | 'publisher', now: () => Date): Promise<Response> {
-  if (deps.operator === undefined || deps.operator === '') return refusedWith(501, NO_OPERATOR);
-  if (!(await isOperator(request, deps.operator))) return refusedWith(401, OPERATOR);
+  const bySession = deps.byOperator === true && ask !== 'publisher';
+  if (!bySession) {
+    if (ask !== 'publisher' && (request.headers.get('authorization') ?? '').trim() === '')
+      return refusedWith(404, { code: 'ROUTE_UNKNOWN', fix: 'Nothing is here.' });
+    if (deps.operator === undefined || deps.operator === '') return refusedWith(501, NO_OPERATOR);
+    if (!(await isOperator(request, deps.operator))) return refusedWith(401, OPERATOR);
+  }
   const blobs = deps.blobs;
   if (blobs === undefined) return refusedWith(501, NO_BUCKET);
 

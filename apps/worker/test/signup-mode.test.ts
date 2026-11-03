@@ -116,7 +116,7 @@ test('THE OPERATOR DOOR: 404 with no key set, 401 with a wrong one, and a list t
   assert.equal((await off.ask('/account/ops/invite', { method: 'POST', body: '{}', bearer: OPERATOR })).status, 404);
   const c = await host('invite');
   assert.equal((await c.ask('/account/ops/invite', { method: 'POST', body: '{}', bearer: 'wrong' })).status, 401);
-  assert.equal((await c.ask('/account/ops/invite', { method: 'POST', body: '{}' })).status, 401);
+  assert.equal((await c.ask('/account/ops/invite', { method: 'POST', body: '{}' })).status, 404);
   assert.equal((await c.ask('/account/ops/invite', { method: 'POST', body: JSON.stringify({ count: 51 }), bearer: OPERATOR })).status, 422);
   const codes = await c.mint({ note: 'the lane', count: 2 });
   assert.equal(codes.length, 2);
