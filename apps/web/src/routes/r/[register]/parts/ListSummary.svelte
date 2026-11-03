@@ -351,7 +351,7 @@
   .reading[data-alone] {
     color: var(--ink-2);
     font-size: var(--fs-row, var(--fs-head));
-    line-height: 22px;
+    line-height: var(--lead-row);
     font-variant-numeric: tabular-nums;
   }
 
@@ -511,7 +511,8 @@
     font-family: var(--font-display);
     font-size: calc(var(--fs-figure) - 2px);
     font-weight: var(--fw-semi);
-    line-height: 28px;
+    letter-spacing: var(--track-figure);
+    line-height: var(--lead-figure);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }

@@ -387,7 +387,7 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--ctl-page, 36px);
-    padding: 0 14px;
+    padding: 0 var(--ctl-pad, 16px);
     background: var(--soft-fill, var(--tile-2));
     border: 0;
     border-radius: var(--r-pill, var(--r-ctl));
@@ -483,7 +483,7 @@
   .filter-values {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--sp-0);
   }
 
   /* A FULL-WIDTH ROW, NOT A CHIP: a column of rows with the boxes aligned is a shape the eye runs down. */
@@ -492,7 +492,7 @@
     align-items: center;
     gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: 36px;
+    min-block-size: var(--ctl-h, 36px);
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
