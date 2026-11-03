@@ -67,7 +67,7 @@ import { no, ok } from '@braindog/ports';
 import { madeByIn, shapeIn } from './change-kind.ts';
 import { foldFill, identityFloor, type FoldFilled, type Offered } from './mentions.ts';
 import { instant } from './coerce.ts';
-import { FOLD_HOPS, holderOf, holders, nameKey, noteMention, sourceKeys } from './entities.ts';
+import { FOLD_HOPS, buried, holderOf, holders, nameKey, noteMention, sourceKeys } from './entities.ts';
 import type { Proposal } from './govern.ts';
 import { UNVERIFIED } from './ingest.ts';
 import { pairsFor, type Judged, type JudgedBand, type Pair } from './resolve.ts';
@@ -153,6 +153,8 @@ export type Met = {
   confidence?: number;
   question?: string;
   mention?: boolean;
+  /** No row, because the owner deleted the one with this address or handle and only he brings them back. */
+  deleted?: boolean;
   undo?: string;
   person: string | null;
   linked: boolean;
@@ -580,6 +582,14 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
     const offered = offerArrival(deps, list, s, keys, project);
     if (offered !== null) return offered;
   }
+  /* SOMEBODY THE OWNER DELETED IS NOT MET AGAIN (`buried`), but by the owner at his own keyboard: a key's meeting is
+     refused, saying so, and anything else is a mention with no row, as a sender nobody needs is. */
+  if (!hit && deps.typed !== true && buried(deps.sql, { register: list.register, role: 'meets', fields: list.fields }, keys) !== null) {
+    if (deps.token === true)
+      return no<Met>('HUMAN_ONLY', 'The owner deleted the person with that address or handle, so only he brings them back (Undo, or adding them by hand). Nothing was written; leave them out.', { at: 'email' });
+    noteMention(deps.sql, { name: s.name ?? nameFromKeys(keys), kind: 'person', project, source: s.source, at: instant(deps.nowMs) });
+    return ok({ ...mention(), deleted: true });
+  }
   const org = orgFor(deps, s, keys);
   let written: Result<Row>;
   let linked = false;
@@ -752,6 +762,8 @@ export function meetContact(deps: PeopleDeps, args: ContactArgs): Result<Contact
   const spoken = name === undefined ? '' : nameKey(name);
   if (spoken.includes(' ') && mine.some((r) => namesOf(list, r).includes(spoken))) return left;
 
+  /* SOMEBODY THE OWNER DELETED IS NOT ADDED BACK FROM HIS ADDRESS BOOK (`buried`): only he brings them back. */
+  if (buried(deps.sql, { register: list.register, role: 'meets', fields: list.fields }, keys) !== null) return left;
   const why = args.use ?? (namedIn(deps, list, name, theirs.map((m) => m.address), args.skip ?? []) ? 'named' : undefined);
   if (why === undefined) return left;
   const first = theirs[0];
@@ -1070,6 +1082,13 @@ function meetOrg(deps: PeopleDeps, s: Said, rerouted: boolean): Result<Met> {
     /* `only: 'known'` ADDS NO ORGANISATION EITHER: one the record keeps is met above, by a key or its name. NOR DOES A
        MACHINE THAT SIGNED A COMMIT (`jenkins@client.example`): anybody may sign as one, and the domain it would claim is
        asked about from the people there instead (`askDomainOrgs`), under a name and not a hostname. */
+    /* AN ORGANISATION THE OWNER DELETED IS NOT MET AGAIN (`buried`), but by him at his own keyboard. */
+    if (deps.typed !== true && buried(deps.sql, { register: orgs.register, role: 'org', fields: orgs.fields }, keys) !== null) {
+      if (deps.token === true)
+        return no<Met>('HUMAN_ONLY', 'The owner deleted the organisation with that domain or key, so only he brings it back (Undo, or adding it by hand). Nothing was written; leave it out.', { at: 'domain' });
+      noteMention(deps.sql, { name: name ?? '', kind: 'organisation', project, source: s.source, at: instant(deps.nowMs) });
+      return ok({ ...mention(), deleted: true });
+    }
     if (!keepable || name === undefined || s.only === 'known' || (rerouted && s.commit)) {
       noteMention(deps.sql, { name: name ?? '', kind: 'organisation', project, source: s.source, at: instant(deps.nowMs) });
       return ok(mention());

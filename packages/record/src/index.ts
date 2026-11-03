@@ -1994,6 +1994,8 @@ export type Meeting = {
   confidence?: number;
   question?: string;
   mention?: boolean;
+  /** No row, because the owner deleted the one with this address or handle and only he brings them back. */
+  deleted?: boolean;
   /** The batch that undoes a merge the strong rules made, for the Undo beside "Merged rohanmehta into Rohan Mehta". */
   undo?: string;
 };

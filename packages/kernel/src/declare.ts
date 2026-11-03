@@ -54,7 +54,7 @@ import { AGENT_ROLES, HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, typ
 import { BYDAY, FREQ, shiftFrom } from './schedule.ts';
 import { pairsFault } from './pairs.ts';
 /* THE VALUES `delete:` TAKES, from the file that keeps the rule, so the check and the reader hold one list. */
-import { DELETE_RULES } from './referenced.ts';
+import { DELETE_RULES, ON_DELETE } from './referenced.ts';
 import { spanMs } from './keychain.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
 import { boardFault, widgetFault } from './board.ts';
@@ -4843,12 +4843,14 @@ function prefixHolder(self: string, prefix: string, installed?: Known): { who: s
  *               takes it out, so a stored field never says it.
  *   `parts_of`  a `json` field of parts, each a patch over its row, adding up to the money field it names
  *               (`partsKeysFault`, `row-parts.ts`): one payment over three categories.
+ *   `on_delete` `unlink`, on a `ref` or a `list<ref>`: a link the record drew itself (a mail's sender), cleared when the
+ *               row it names is deleted rather than keeping it (`ON_DELETE`, `referenced.ts`; `unlinkKeysFault`).
  */
 const FIELD_KEYS = [
   'id', 'type', 'of', 'values', 'required', 'index', 'unique', 'immutable', 'default', 'retired',
   'redact', 'transitions', 'remind', 'repeat', 'scope', 'min', 'max', 'required_when', 'by',
   'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'derive', 'labels', 'currency_from', 'currency_fixed', 'when',
-  'hidden_from_agents', 'parts_of',
+  'hidden_from_agents', 'parts_of', 'on_delete',
 ] as const;
 
 /**
@@ -4950,6 +4952,19 @@ function partsKeysFault(id: string, fields: readonly Record<string, unknown>[]):
       return bad('DECLARATION_INVALID', `${id}.${String(f.id)}: parts_of names a money field of ${id}, the amount its parts add up to.`, at);
   }
   if (marked.length > 1) return bad('DECLARATION_INVALID', `${id} splits its rows one way: give parts_of to one field.`, `${String(marked[1]!.id)}.parts_of`);
+  return null;
+}
+
+/** `on_delete`, `unlink` and only on a `ref` or a `list<ref>`: the one thing a delete may do to a link but keep the row. */
+function unlinkKeysFault(id: string, fields: readonly Record<string, unknown>[]): Refusal | null {
+  for (const f of fields) {
+    if (f.on_delete === undefined) continue;
+    const at = `${String(f.id)}.on_delete`;
+    if (!(ON_DELETE as readonly unknown[]).includes(f.on_delete))
+      return bad('DECLARATION_INVALID', `${id}.${String(f.id)}: on_delete takes ${ON_DELETE.join(', ')}.`, at, ON_DELETE);
+    if (!(f.type === 'ref' || (f.type === 'list' && f.of === 'ref')))
+      return bad('DECLARATION_INVALID', `${id}.${String(f.id)} is a ${String(f.type)}, and on_delete is for a ref or a list of refs.`, at);
+  }
   return null;
 }
 
@@ -6221,6 +6236,8 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
   if (coded) return coded;
   const split = partsKeysFault(id, fields as unknown as Record<string, unknown>[]);
   if (split) return split;
+  const loose = unlinkKeysFault(id, fields as unknown as Record<string, unknown>[]);
+  if (loose) return loose;
 
   /* A SPOKEN PREFIX NAMES ONE REGISTER, or `LN7` names two rows (`02 §2`). `#` is the default every
      register shares, which is why it never resolves bare and is not checked here. */

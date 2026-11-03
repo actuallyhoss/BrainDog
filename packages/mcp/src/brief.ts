@@ -1098,6 +1098,8 @@ export type MetSaid = {
   /** How they were matched, in words: `email`, `GitHub handle`, `name and address or organisation`. */
   how?: string;
   mention?: boolean;
+  /** Left out, because the owner deleted the one with this address or handle. */
+  deleted?: boolean;
   /** The question a doubtful match opened, `SG7`, and its words where the answer read them. */
   question?: string;
   asked?: string;
@@ -1132,6 +1134,7 @@ export type MetSaid = {
  */
 export function metBrief(met: MetSaid, look: Look): string {
   const it = met.kind === 'organisation';
+  if (met.deleted === true) return `Left out ${met.said ? clip(met.said, 60) : it ? 'the organisation' : 'the person'}: ${look.decider} deleted ${it ? 'it' : 'them'}, and only ${look.decider} brings ${it ? 'it' : 'them'} back`;
   if (met.mention === true && met.person === undefined) {
     const who = met.said ? clip(met.said, 60) : it ? 'the organisation' : 'the person';
     return `Noted ${who}${met.on ? ` on ${clip(met.on, 40)}` : ''}; add ${it ? 'a domain or bank payee to add it' : 'an email or handle to add them'}`;

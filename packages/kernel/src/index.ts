@@ -237,7 +237,7 @@ import { carryPins } from './pairs.ts';
 import { linkPatternFault, pruneFirings } from './rules.ts';
 import { REST_DAYS_SETTING, runway, type Horizon, type Leg, type Runway } from './forecast.ts';
 import { WALK_SOURCE } from './money-figures.ts';
-import { referencedBy } from './referenced.ts';
+import { referencedBy, unlinksOf } from './referenced.ts';
 import { createJob, sweepJobs } from './jobs.ts';
 import { mailPatterns, openRowset, unfile } from './ingest.ts';
 import { answerAsked, arrive, day, exponentOf, fileAsSecond, offerAgain, patternReport, propose, rerunHeld, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders, type PatternReport } from './ingest.ts';
@@ -310,7 +310,7 @@ import { slashMayWrite } from './slash.ts';
 import { meetPatternedSender, readMailArrival, tasksList, type MailOutcome } from './mail-arrival.ts';
 import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet as meetPerson, meetContact as meetCard, resolveJob, type ContactArgs, type ContactMet, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
-import { foldChain, foldEnd, foldedCarry, holderOf, keyLists, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
+import { foldChain, foldEnd, foldedCarry, buried, holderOf, keyLists, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { clashes, foldPlan as sameFoldPlan, sameDoor, type FoldGroup, type SameGroup } from './same.ts';
 import { ROWSET_LIST_SQL, builtInFigure, openSteps, readOpenQuestions } from './built-in-figures.ts';
 import { openExceptions } from './exceptions.ts';
@@ -5189,6 +5189,24 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const foldField = keyedHere === undefined ? undefined : mergeFieldOf(keyedHere);
       const door_ = mergeDoor(register, current, merged, patch, touched, keyedHere, foldField, door, w.reads, writerPerson(w));
       if (door_) return { ok: false, refusal: door_ };
+      /* ── somebody the owner deleted, made again (`buried`, `entities.ts`) ──
+         A create carrying an address or a handle a deleted person or organisation holds is the owner's alone: he adds
+         them by hand or brings the row back with Undo. An agent is refused, saying so. A script, a door or a sync is
+         answered with the deleted row and nothing written, since one refusal would take back a script's whole run and
+         the next run would only try again. */
+      if (current === null && keyedHere !== undefined && !door.decided && !door.merge && !(w.principal?.kind !== 'token' && w.actor.startsWith('p_'))) {
+        const gone = buried(sql, keyedHere, rowKeys(keyedHere, merged));
+        if (gone !== null) {
+          if (w.principal?.kind === 'token')
+            return no<Entry>(
+              'HUMAN_ONLY',
+              `${keyedHere.role === 'meets' ? 'Somebody' : 'An organisation'} with that ${keyedHere.role === 'meets' ? 'address or handle' : 'domain or key'} was deleted by the owner, so only he brings them back (Undo, or adding them by hand). Nothing was written; leave them out.`,
+              { at: 'fields' },
+            );
+          const row = byId(gone.id, true);
+          if (row) return ok(row);
+        }
+      }
       /* ── a second row saying what a first says, on a list declaring `same:` (`same.ts`) ──
          Refused for every write, a rule's, a flow's or an ingest's too, as a second person is; an accepted rowset is the
          owner's own word and the record's merge is its own, so both pass, and an import never comes this way. */
@@ -5217,6 +5235,16 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (deleting && patch.deleted_at !== null && current !== null && current.deleted_at === null) {
         const held = referencedBy(parts, register, current.id, w.reads);
         if (held) return { ok: false, refusal: held };
+        /* AND A LINK THE RECORD DREW ITSELF IS CLEARED (`on_delete: unlink`, `referenced.ts`), in the delete's own batch,
+           so Undo puts each one back with the row. */
+        const loose = unlinkAll(register, current.id, w);
+        if (!loose.ok) return loose as Result<never>;
+        w = loose.value;
+      }
+      /* A ROW COMING BACK TAKES BACK THE LINKS ITS DELETE CLEARED, wherever nobody has filled them since. */
+      if (deleting && patch.deleted_at === null && current !== null && current.deleted_at !== null) {
+        const relinked = relink(current.id, w);
+        if (!relinked.ok) return relinked as Result<Entry>;
       }
 
       /* ── persist ── */
@@ -6914,6 +6942,63 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        `keyedOf` is the merge door's, people and organisations alone, and the door must not see the others. */
     const list = keyLists(registers.values()).find((l) => l.register === after.register);
     if (list) rekey(sql, list, before, after, w.actor, instant(clock.now()));
+  }
+
+  /**
+   * The links to a row being deleted that its delete clears (`on_delete: unlink`, `referenced.ts`), written in the
+   * delete's own batch, minted here when the delete has none, so Undo takes the delete and every clearing back as one.
+   * Answers the context the delete goes on with.
+   */
+  function unlinkAll(register: string, id: string, w: WriteContext): Result<WriteContext> {
+    const loose = unlinksOf(parts, register, id);
+    if (loose.length === 0) return ok(w);
+    const as: WriteContext = w.batch === undefined ? { ...w, batch: mint() } : w;
+    const named = titleOfRow(id);
+    for (const r of loose) {
+      const row = byId(r.id);
+      if (!row) continue;
+      const cleared: Patch = {};
+      for (const f of r.fields) {
+        const v = row.fields[f];
+        cleared[f] = Array.isArray(v) ? v.filter((x) => x !== id) : null;
+      }
+      const out = write(r.register, r.id, cleared, { actor: as.actor, cascade: false, note: `Unlinked from ${named ?? 'one deleted'} as it was deleted.`, batch: as.batch! });
+      if (!out.ok) return out as Result<never>;
+    }
+    return ok(as);
+  }
+
+  /**
+   * The links a row's last delete cleared (`on_delete: unlink`, `referenced.ts`), pointed back at it as it comes back:
+   * each one still empty, never one somebody filled since. Read from the delete's own batch in the log.
+   */
+  function relink(id: string, w: WriteContext): Result<null> {
+    const gone = sql.one<{ batch: string | null; id: string }>(
+      "SELECT batch, id FROM event WHERE target = ? AND kind = 'delete' ORDER BY rowid DESC LIMIT 1",
+      `entry:${id}`,
+    );
+    if (!gone) return ok(null);
+    const lines = sql.all<{ target: string; field: string; from_v: string | null }>(
+      "SELECT target, field, from_v FROM event WHERE batch = ? AND kind = 'edit' AND target <> ? AND field IS NOT NULL AND from_v IS NOT NULL AND instr(from_v, ?) > 0",
+      gone.batch ?? gone.id,
+      `entry:${id}`,
+      id,
+    );
+    for (const line of lines) {
+      const row = byId(line.target.replace(/^entry:/u, ''));
+      if (!row) continue;
+      const decl = registers.get(row.register);
+      const field = decl?.fields.find((f) => f.id === line.field && !f.retired && (f as Readonly<Record<string, unknown>>).on_delete === 'unlink');
+      if (!field) continue;
+      const now = row.fields[field.id];
+      let back: Json | undefined;
+      if (field.type === 'ref' && (now === undefined || now === null || now === '')) back = id;
+      else if (field.type === 'list' && (now === undefined || Array.isArray(now)) && !(Array.isArray(now) && now.includes(id))) back = [...(Array.isArray(now) ? now : []), id] as Json;
+      if (back === undefined) continue;
+      const out = write(row.register, row.id, { [field.id]: back }, { actor: w.actor, cascade: false, note: 'Linked again as it came back.', ...(w.batch === undefined ? {} : { batch: w.batch }) });
+      if (!out.ok) return out as Result<never>;
+    }
+    return ok(null);
   }
 
   /**

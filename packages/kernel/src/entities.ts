@@ -460,6 +460,39 @@ export function holderOf(sql: Pick<Sql, 'one'>, key: string): { register: string
   return r ? { register: r.register, id: r.row_id } : null;
 }
 
+/** How many deleted rows of a list `buried` reads, newest deleted first. */
+export const BURIED_READ = 2000;
+
+/**
+ * THE TOMBSTONE: the deleted row of `list` that answers to any of `keys`, or `null`. A person or an organisation the owner
+ * deleted keeps every address and handle on its deleted row, and while that row is deleted nobody but the owner by hand
+ * makes it again: not a script, a door, a sync or an agent (`writing` in `index.ts`, `meet` and `meetContact` in
+ * `people.ts`). Undo brings the row itself back, so the tombstone goes with it, and an erase takes it for good.
+ *
+ * A ROW MERGED AWAY IS A TOMBSTONE ONLY WHERE ITS CHAIN ENDS IN A DELETED ROW. Merged into somebody still here, its keys
+ * answer to them (`rekey`), and a meeting by its address finds them.
+ *
+ * Measured on 3 November: Sam deleted five people the Gmail script had made, and an older copy of the script still
+ * running made all five again an hour later, as new rows, because a deleted row's keys are freed (`rekey`).
+ */
+export function buried(sql: Pick<Sql, 'one' | 'all'>, list: KeyedList, keys: readonly string[]): { id: string } | null {
+  const want = new Set(keys);
+  if (want.size === 0) return null;
+  const field = mergeFieldOf(list);
+  const rows = sql.all<{ id: string; fields: string }>(
+    'SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT ?',
+    list.register,
+    BURIED_READ,
+  );
+  for (const r of rows) {
+    const fields = parsed(r.fields);
+    const into = field === undefined ? undefined : textOf(fields[field]);
+    if (into !== undefined && liveRow(sql, foldEnd(sql, field!, into))) continue;
+    if (rowKeys(list, fields).some((k) => want.has(k))) return { id: r.id };
+  }
+  return null;
+}
+
 /** Say where the keys a meet just gave a row came from, in place of the write path's plain stamp. */
 export function sourceKeys(sql: Pick<Sql, 'exec'>, row: string, keys: readonly string[], source: string): void {
   for (const key of keys) sql.exec('UPDATE entity_key SET source = ? WHERE key = ? AND row_id = ?', source, key, row);

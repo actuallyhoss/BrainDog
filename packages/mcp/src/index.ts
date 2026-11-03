@@ -3478,6 +3478,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         ...(how === null ? {} : { how }),
         ...(typeof raw.confidence === 'number' ? { confidence: raw.confidence } : {}),
         ...(mention ? { mention: true } : {}),
+        ...(raw.deleted === true ? { deleted: true } : {}),
         ...(question === null ? {} : { question }),
         ...(raw.linked === true ? { linked: true } : {}),
         ...(mergedFrom === null ? {} : { merged_from: mergedFrom }),

@@ -41,6 +41,61 @@ import type { KernelParts } from './parts.ts';
 export const DELETE_RULES = ['refuse_while_referenced'] as const;
 
 /**
+ * What a `ref` field says becomes of it when the row it names is deleted: `on_delete: unlink`.
+ *
+ * A LINK THE RECORD DREW ITSELF IS NOT A REASON TO KEEP A ROW. A mail's sender (`gmail_mail.who`) is the Gmail script's
+ * guess at who wrote it, and while it pointed at a person the owner wanted gone, his delete was refused: "12 entries in
+ * Mail still point at this one". A field declaring `on_delete: unlink` is not counted by `referencedBy`; the delete
+ * clears it on every row that names the deleted one (`unlinksOf`, written by the delete in its own batch), and Undo, or
+ * bringing the row back, points each one back while it is still empty. A link a person chose, a task's owner or a
+ * payment's account, keeps the refusal, since it carries meaning nobody should lose by a delete.
+ */
+export const ON_DELETE = ['unlink'] as const;
+
+type RefField = { id: string; type: string; of?: string; to?: string; retired?: boolean };
+
+/** Whether a field of another list is a link the delete clears rather than one that keeps the row. */
+const unlinks = (f: RefField): boolean => (f as Readonly<Record<string, unknown>>).on_delete === ON_DELETE[0];
+
+/**
+ * Every live row of every list whose `on_delete: unlink` fields name `entry` of `register`, with those fields: what a
+ * delete clears. The row being deleted is left out.
+ */
+export function unlinksOf(parts: KernelParts, register: string, entry: string): { register: string; id: string; fields: string[] }[] {
+  const out: { register: string; id: string; fields: string[] }[] = [];
+  for (const row of parts.declarations()) {
+    if (row.kind !== 'register') continue;
+    const from = parts.register(row.id.slice('register.'.length));
+    if (from === undefined) continue;
+    const keys = from.fields
+      .filter((f) => (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) && f.to === register && !f.retired && unlinks(f) && FIELD_ID.test(f.id))
+      .map((f) => f.id);
+    if (keys.length === 0) continue;
+    for (const r of parts.sql.all<{ id: string; fields: string }>(
+      `SELECT e.id, e.fields FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND e.id <> ? AND EXISTS (
+         SELECT 1 FROM json_each(e.fields) AS f WHERE f.key IN (SELECT value FROM json_each(?))
+           AND (f.value = ? OR (f.type = 'array' AND EXISTS (SELECT 1 FROM json_each(f.value) AS r WHERE r.value = ?)))
+       )`,
+      from.id,
+      entry,
+      JSON.stringify(keys),
+      entry,
+      entry,
+    )) {
+      let fields: Record<string, unknown> = {};
+      try {
+        fields = JSON.parse(r.fields) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      const named = keys.filter((k) => fields[k] === entry || (Array.isArray(fields[k]) && (fields[k] as unknown[]).includes(entry)));
+      if (named.length > 0) out.push({ register: from.id, id: r.id, fields: named });
+    }
+  }
+  return out;
+}
+
+/**
  * How many referring lists the sentence names one by one. The rest are counted together, so a row that a great many
  * lists point at still gets one sentence a person reads to the end.
  */
@@ -100,7 +155,7 @@ export function referencedBy(parts: KernelParts, register: string, entry: string
     /* A RETIRED FIELD IS LEFT OUT, as `backlinks` leaves it out: nobody can see it or change it any more, so counting
        it would keep the row for ever with nothing a person could do about it. */
     const keys = from.fields
-      .filter((f) => (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) && f.to === register && !f.retired && FIELD_ID.test(f.id))
+      .filter((f) => (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) && f.to === register && !f.retired && !unlinks(f) && FIELD_ID.test(f.id))
       .map((f) => f.id);
     if (keys.length === 0) continue;
 
