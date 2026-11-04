@@ -1,19 +1,22 @@
 <!--
-  What Slash spent, on `/usage`: the page's Slash section.
+  What Slash spent, on `/usage`: one small tile beside the month's other limits, opening to the whole of it.
 
-  TWO ALLOWANCES, APART. His asks against his cap, then the background work's own month (the daily look, an
-  automation's question, a digest's prose, a pattern drafted for the inbox), because one never spends the other.
-  Each is a tile with its ring and the line that reads it, then one line for each thing the asks were for ("Read what
-  arrived: 4", "Page headlines: 9"), the most spent first, and the asks by day are a third, as bars. Under the tiles, on the ground, each day's lines: what was asked, when, what it cost and a
-  link to what it filed. The rules are `slash-asks.ts`, which the tests hold; this draws what they answer.
+  TWO ALLOWANCES, APART. His asks against his cap and the background work's own month (the daily look, an automation's
+  question, a digest's prose, a pattern drafted for the inbox), because one never spends the other. That is all the tile
+  says shut, a ring each.
 
-  RUNNING OUT SAYS SO, and `SlashOut` offers the two ways on beside the sentence.
+  DETAILS OPENS IT WHERE IT STANDS, across the page's width: one line for each thing the asks were for ("Read what
+  arrived: 4", "Page headlines: 9"), the most spent first, the asks by day as bars, and each day's lines, what was asked,
+  when, what it cost and a link to what it filed. Eight lines, then "Show all". This was a section of its own, and a busy
+  month made it the longest thing on the page by four screens. The rules are `slash-asks.ts`, which the tests hold; this draws what they answer.
+
+  RUNNING OUT SAYS SO, shut or open, and `SlashOut` offers the two ways on beside the sentence.
 
   THE OWNER'S, AND ONLY WHERE A MODEL IS. The ledger's door answers the owner alone, and a host with no model has nothing to
   count, so the page mounts this for the owner and it draws nothing on a host without Slash. A failed read draws nothing
   either: the page's own read above already says when the record cannot be reached, and this is one section of it.
 
-  ONE COLUMN AT 390. The tiles stack, and a line's question wraps above its cost rather than pushing the figure off the edge.
+  ONE COLUMN AT 390, the rings side by side, and a line's question wraps above its cost rather than pushing the figure off the edge.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
@@ -33,6 +36,7 @@
     words,
   } from '$lib/ui/slash-asks.ts';
   import SlashOut from '$lib/ui/SlashOut.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Bars from '$lib/viz/Bars.svelte';
   import Ring from '$lib/viz/Ring.svelte';
@@ -45,9 +49,13 @@
   const said = {
     asks: 'Your questions',
     background: 'Background work',
-    of: (cap: number) => `of ${cap.toLocaleString('en-GB')}`,
+    of: (used: number, cap: number) => `${used.toLocaleString('en-GB')} of ${cap.toLocaleString('en-GB')}`,
     busiest: (label: string, n: number) => `Busiest ${label === 'Today' || label === 'Yesterday' ? label.toLowerCase() : `on ${label}`}, with ${n === 1 ? '1 question' : `${n.toLocaleString('en-GB')} questions`}.`,
     asksSubject: 'Questions by day',
+    details: 'Details',
+    hide: 'Hide details',
+    all: (n: number) => `Show all ${n.toLocaleString('en-GB')}`,
+    fewer: 'Show fewer',
   } as const;
 
   let status = $state<SlashStatus | null>(null);
@@ -97,58 +105,58 @@
      drew "0 of 20" and "0 of 600" in two tiles over a sentence saying nothing was asked. */
   const quiet = $derived(!!status && !!spent && status.asks.used === 0 && (background?.used ?? 0) === 0 && spent.days.length === 0 && !atCap(status));
   const bars = $derived(spent ? spent.days.map((d) => ({ label: d.label, value: d.asks, tone: busiest && d.day === busiest.day ? 'ink' : undefined })) : []);
+
+  let open = $state(false);
+  let whole = $state(false);
+  /* EIGHT LINES, NEWEST FIRST, under their days, and eight days of bars, until "Show all". */
+  const TOP = 8;
+  const lineCount = $derived(spent ? spent.days.reduce((n, d) => n + d.lines.length, 0) : 0);
+  const daysShown = $derived.by(() => {
+    if (!spent || whole) return spent?.days ?? [];
+    let left = TOP;
+    return spent.days.flatMap((d) => {
+      if (left <= 0) return [];
+      const lines = d.lines.slice(0, left);
+      left -= lines.length;
+      return [{ ...d, lines }];
+    });
+  });
+  const barsShown = $derived(whole ? bars : bars.slice(0, TOP));
+  const longer = $derived(lineCount > TOP || bars.length > TOP);
 </script>
 
+{#snippet meter(name: string, used: number, cap: number | null, shut: string, summary: string)}
+  <li class="spent-meter">
+    {#if cap !== null}
+      <Ring value={used} max={cap} tone={toneOf(used, cap)} size={72} {summary} />
+    {:else}
+      <span class="spent-figure num">{used.toLocaleString('en-GB')}</span>
+    {/if}
+    <span class="spent-said-beside">
+      <span class="spent-name">{name}</span>
+      <span class="spent-amount num">{shut}</span>
+    </span>
+  </li>
+{/snippet}
+
 {#if status && spent}
-  <Tile class="section" data-surface="tile" title={words.title}>
-    <div class="section-body">
-      {#if !quiet}<div class="spent-tiles">
-        {#if mine}
-          <Tile icon="slash" title={said.asks}>
-            {#if metered(status)}
-              <div class="spent-ring">
-                <Ring value={status.asks.used} max={status.asks.cap} tone={toneOf(status.asks.used, status.asks.cap)} size={112} label={said.of(status.asks.cap)} summary={mine} />
-              </div>
-            {:else}
-              <p class="spent-figure num">{status.asks.used.toLocaleString('en-GB')}</p>
-            {/if}
-            <p class="spent-reading">{mine}</p>
-            {#if mineFor.length > 0}
-              <ul class="spent-for" aria-label={words.forWhat}>
-                {#each mineFor as line (line)}<li>{line}</li>{/each}
-              </ul>
-            {/if}
-          </Tile>
-        {/if}
-
-        {#if background}
-          <Tile icon="observe" title={said.background}>
-            {#if background.cap !== null}
-              <div class="spent-ring">
-                <Ring value={background.used} max={background.cap} tone={toneOf(background.used, background.cap)} size={112} label={said.of(background.cap)} summary={background.line} />
-              </div>
-            {:else}
-              <p class="spent-figure num">{background.used.toLocaleString('en-GB')}</p>
-            {/if}
-            <p class="spent-reading">{background.line}</p>
-            {#if backgroundFor.length > 0}
-              <ul class="spent-for" aria-label={words.forWhat}>
-                {#each backgroundFor as line (line)}<li>{line}</li>{/each}
-              </ul>
-            {/if}
-          </Tile>
-        {/if}
-
-        <!-- ONLY WHEN HE ASKED ANYTHING: a day of background work alone is a zero bar, and bars of zeroes say nothing. -->
-        {#if busiest && busiest.asks > 0}
-          <Tile icon="history" title={words.byDay}>
-            <Bars items={bars} subject={said.asksSubject} />
-            <p class="spent-reading">{said.busiest(busiest.label, busiest.asks)}{#if !spent.whole}{' '}{words.partial}{/if}</p>
-          </Tile>
-        {/if}
-      </div>{/if}
-
-      {#if !spent.whole && !(busiest && busiest.asks > 0)}<p class="spent-said spent-gap">{words.partial}</p>{/if}
+  <Tile class="section" data-surface="tile" icon="slash" title={words.title} data-open={open ? '' : undefined}>
+    {#snippet actions()}
+      {#if !quiet}
+        <button type="button" class="spent-toggle tap" aria-expanded={open} onclick={() => (open = !open)}>{open ? said.hide : said.details}</button>
+      {/if}
+    {/snippet}
+    <div class="section-body spent-body">
+      {#if !quiet}
+        <ul class="spent-meters">
+          {#if mine}
+            {@render meter(said.asks, status.asks.used, metered(status) ? status.asks.cap : null, metered(status) ? said.of(status.asks.used, status.asks.cap) : mine, mine)}
+          {/if}
+          {#if background}
+            {@render meter(said.background, background.used, background.cap, background.cap !== null ? said.of(background.used, background.cap) : background.line, background.line)}
+          {/if}
+        </ul>
+      {/if}
 
       {#if atCap(status)}
         <div class="spent-out">
@@ -157,50 +165,218 @@
         </div>
       {/if}
 
-      {#if spent.days.length === 0}
-        <p class="spent-said">{words.none}</p>
-      {:else}
-        {#each spent.days as d (d.day)}
-          <section class="spent-day" aria-label={d.label}>
-            <h3 class="spent-h">{d.label}<span class="spent-h-n num">{d.lines.length}</span></h3>
-            <ul class="ledger spent-list">
-              {#each d.lines as l (l.id)}
-                <li>
-                  <div class="line line-tall spent-row">
-                    <span class="line-main">
-                      <span class="line-title spent-what" dir="auto">{l.what}</span>
-                      <span class="line-detail">{l.refused ? `${l.when}, ${words.refused}` : l.when}</span>
-                    </span>
-                    <span class="line-when spent-cost">{costSaid(l.cost, l.background)}</span>
-                    {#if l.href}<a class="spent-filed tap" href={at(l.href)}>{words.filed}</a>{/if}
-                  </div>
-                </li>
+      {#if quiet}<p class="spent-said">{words.none}</p>{/if}
+
+      {#if open}
+        <div class="spent-open">
+          <div class="spent-side">
+            {#if mine}
+              <div>
+                <p class="spent-reading">{mine}</p>
+                {#if mineFor.length > 0}
+                  <ul class="spent-for" aria-label={words.forWhat}>
+                    {#each mineFor as line (line)}<li>{line}</li>{/each}
+                  </ul>
+                {/if}
+              </div>
+            {/if}
+            {#if background}
+              <div>
+                <p class="spent-reading">{background.line}</p>
+                {#if backgroundFor.length > 0}
+                  <ul class="spent-for" aria-label={words.forWhat}>
+                    {#each backgroundFor as line (line)}<li>{line}</li>{/each}
+                  </ul>
+                {/if}
+              </div>
+            {/if}
+            <!-- ONLY WHEN HE ASKED ANYTHING: a day of background work alone is a zero bar, and bars of zeroes say nothing. -->
+            {#if busiest && busiest.asks > 0}
+              <div class="spent-days">
+                <h3 class="spent-h">{words.byDay}</h3>
+                <Bars items={barsShown} subject={said.asksSubject} />
+                <p class="spent-reading">{said.busiest(busiest.label, busiest.asks)}</p>
+              </div>
+            {/if}
+            {#if !spent.whole}<p class="spent-said">{words.partial}</p>{/if}
+          </div>
+
+          <div class="spent-lines">
+            {#if spent.days.length === 0}
+              <p class="spent-said">{words.none}</p>
+            {:else}
+              {#each daysShown as d (d.day)}
+                <section class="spent-day" aria-label={d.label}>
+                  <h3 class="spent-h">{d.label}<span class="spent-h-n num">{spent.days.find((x) => x.day === d.day)?.lines.length ?? d.lines.length}</span></h3>
+                  <ul class="ledger spent-list">
+                    {#each d.lines as l (l.id)}
+                      <li>
+                        <div class="line spent-row">
+                          <span class="line-main">
+                            <span class="line-title spent-what" dir="auto">{l.what}</span>
+                            <span class="line-detail">{l.refused ? `${l.when}, ${words.refused}` : l.when}</span>
+                          </span>
+                          <span class="line-when spent-cost">{costSaid(l.cost, l.background)}</span>
+                          {#if l.href}<a class="spent-filed tap" href={at(l.href)}>{words.filed}</a>{/if}
+                        </div>
+                      </li>
+                    {/each}
+                  </ul>
+                </section>
               {/each}
-            </ul>
-          </section>
-        {/each}
+              {#if longer}
+                <button type="button" class="spent-more tap" aria-expanded={whole} onclick={() => (whole = !whole)}
+                  ><Icon name="chevronDown" size="s" />{whole ? said.fewer : said.all(lineCount)}</button
+                >
+              {/if}
+            {/if}
+          </div>
+        </div>
       {/if}
     </div>
   </Tile>
 {/if}
 
 <style>
-  /* THE TILES, 12 apart: one column on a phone, and as many as fit from there, each at least a ring's width and its line. */
-  .spent-tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
-    gap: var(--inset);
-    margin-block-end: var(--sp-5);
+  .spent-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
   }
 
-  .spent-ring {
+  /* A RING AND ITS WORDS BESIDE IT: stacked in the small tile, side by side wherever two fit. */
+  .spent-meters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .spent-meter {
     display: flex;
-    justify-content: center;
+    align-items: center;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .spent-meter :global(.viz-ring) {
+    flex: 0 0 72px;
+  }
+
+  .spent-said-beside {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  .spent-name {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: var(--lead-ui, 20px);
+  }
+
+  .spent-amount {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* "Background" IS WIDER THAN THE ROOM BESIDE A RING ON A PHONE, at the body's size. */
+  @media (width < 640px) {
+    .spent-meter {
+      gap: var(--sp-2);
+    }
+
+    .spent-name {
+      font-size: var(--fs-meta);
+      line-height: var(--lead-meta, 18px);
+    }
+  }
+
+  .spent-toggle,
+  .spent-more {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-block-size: var(--ctl-panel);
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: var(--lead-meta);
+    cursor: pointer;
+  }
+
+  .spent-more {
+    align-self: flex-start;
+    margin-block-start: var(--sp-2);
+    padding-inline: var(--sp-3);
+    background: var(--soft-fill);
+    border-radius: var(--r-pill);
+    font-size: var(--fs-ctl);
+    line-height: var(--lead-ctl, 20px);
+  }
+
+  .spent-more :global(svg) {
+    transition: rotate var(--d-state, 120ms) var(--ease-out, ease-out);
+  }
+
+  .spent-more[aria-expanded='true'] :global(svg) {
+    rotate: 180deg;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .spent-toggle:hover {
+      color: var(--ink);
+    }
+
+    .spent-more:hover {
+      background: var(--soft-fill-hover);
+      color: var(--ink);
+    }
+  }
+
+  /* OPEN: what the asks were for and the days down one side, each day's lines down the other. */
+  .spent-open {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-5);
+    padding-block-start: var(--sp-2);
+  }
+
+  @media (width >= 900px) {
+    .spent-open {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    }
+  }
+
+  .spent-side,
+  .spent-lines,
+  .spent-days {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  .spent-side {
+    gap: var(--sp-4);
+  }
+
+  .spent-days {
+    gap: var(--sp-2);
   }
 
   /* THE FIGURE, for his asks on his own key, where there is no cap for a ring to measure against. */
   .spent-figure {
-    margin: 0;
+    flex: none;
+    min-inline-size: 40px;
     color: var(--ink);
     font-family: var(--font-display);
     font-size: var(--fs-figure);
@@ -212,7 +388,7 @@
 
   /* THE ONE LINE THAT READS THE CHART, at the foot of its tile. */
   .spent-reading {
-    margin: auto 0 0;
+    margin: 0;
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: calc(20px * var(--type, 1));
@@ -237,7 +413,6 @@
     flex-direction: column;
     align-items: flex-start;
     gap: var(--sp-2);
-    margin-block-end: var(--sp-5);
   }
 
   .spent-said {
@@ -246,10 +421,6 @@
     color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: calc(20px * var(--type, 1));
-  }
-
-  .spent-gap {
-    margin-block-end: var(--sp-4);
   }
 
   /* OUT OF ASKS NEEDS HIM: the words carry it, in red at 500 so the colour is never a hairline. */
@@ -280,7 +451,8 @@
 
   /* A LINE: the question and when over each other, the cost at the end, and the way to what it filed after it. */
   .spent-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-auto-flow: column;
   }
 
   .spent-what {

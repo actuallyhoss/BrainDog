@@ -23,6 +23,9 @@ export const said = {
   byProject: words.byProject,
   projects: 'Projects',
   asks: 'Slash questions',
+  /* THE ONE LIST OF WHAT RAN: the month's, or the slice's when a project is open. */
+  ran: 'What ran',
+  ranIn: (g: Pick<Group, 'key' | 'name'>) => (g.key === '' ? 'What ran in no project' : `What ran in ${g.name}`),
   runs: (n: number) => (n === 1 ? 'run' : 'runs'),
   runsSaid: (n: number) => (n === 1 ? '1 run' : `${n.toLocaleString('en-GB')} runs`),
   asksOf: (max: number) => `of ${max.toLocaleString('en-GB')} questions`,
@@ -157,21 +160,7 @@ export function weeksSaid(view: UsageView): string | null {
   return view.weeks.length === 1 ? `${runs}, all in ${busiest.label}.` : `${runs}; the busiest week was ${busiest.label}.`;
 }
 
-/**
- * The month's projects as parts of one bar, most runs first: the top project in ink and the rest greys. `null` under
- * two projects with runs, when one bar would only say "all of it".
- *
- * GREYS, NOT PROJECT COLOURS. A group carries a name and a scope and no colour, so a colour here would be made up.
- */
-export function projectParts(groups: readonly Group[]): { label: string; value: number; tone: string }[] | null {
-  const ran = groups.filter((g) => g.totals.runs > 0).sort((a, b) => b.totals.runs - a.totals.runs);
-  if (ran.length < 2) return null;
-  const tied = ran[0]!.totals.runs === ran[1]!.totals.runs;
-  const GREYS = ['g2', 'g3', 'g4'] as const;
-  return ran.map((g, i) => ({ label: groupName(g), value: g.totals.runs, tone: i === 0 && !tied ? 'ink' : GREYS[(tied ? i : i - 1) % GREYS.length]! }));
-}
-
-/** The line under the project bar: which project ran most of it, or which share the top. */
+/** The line under the projects: which project ran most of it, or which share the top. */
 export function projectsSaid(groups: readonly Group[]): string | null {
   const ran = groups.filter((g) => g.totals.runs > 0).sort((a, b) => b.totals.runs - a.totals.runs);
   if (ran.length < 2) return null;

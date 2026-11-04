@@ -8,6 +8,9 @@
   THE WORKER DECIDES, NOT THIS: a press asks `/account/billing/extra`, and its refusal is the sentence under the field.
   Drawn only where `extraOffered` says the host sells it and the record is paid for, so nothing here is a door that is
   not there.
+
+  ONE LINE AND ONE PRESS UNTIL IT IS WANTED: what stands now and a button at the foot of the allowance tile, and the field
+  opens under them. The form stood open on every visit, a third of the tile for something changed once a year.
 -->
 <script lang="ts">
   import Button from '$lib/ui/Button.svelte';
@@ -19,6 +22,7 @@
     record,
     on,
     cap,
+    said,
     onset,
   }: {
     record: string;
@@ -26,6 +30,8 @@
     on: boolean;
     /** The cap that stands, in cents; 0 when off. */
     cap: number;
+    /** The month's own line on extra usage, what it has come to so far, which says more than the cap alone. */
+    said?: string | null | undefined;
     /** Called once the Worker kept the change, so the page reads the month again. */
     onset: () => void;
   } = $props();
@@ -40,12 +46,16 @@
     turnOn: 'Turn on',
     save: 'Save cap',
     turnOff: 'Turn off',
+    change: 'Change cap',
+    close: 'Cancel',
   } as const;
 
   const id = $derived(`extra-cap-${record}`);
   let typed = $state('');
   let error = $state<string | null>(null);
   let busy = $state(false);
+  let open = $state(false);
+  const line = $derived(on ? (said ?? words.on(centsSaid(cap))) : said ? `${words.off} ${said}` : words.off);
 
   $effect(() => {
     typed = cap > 0 ? (cap % 100 === 0 ? String(cap / 100) : (cap / 100).toFixed(2)) : '';
@@ -60,6 +70,7 @@
       error = out.refusal.fix;
       return;
     }
+    open = false;
     onset();
   }
 
@@ -74,8 +85,12 @@
 </script>
 
 <div class="extra-cap">
-  <p class="extra-said">{on ? words.on(centsSaid(cap)) : words.off}</p>
-  {#if !on}<p class="extra-how">{words.offHow}</p>{/if}
+  <div class="extra-row">
+    <p class="extra-said">{line}</p>
+    <Button weight="quiet" size="sm" aria-expanded={open} onclick={() => (open = !open)}>{open ? words.close : on ? words.change : words.turnOn}</Button>
+  </div>
+  {#if open}
+  {#if !on}<p class="extra-said">{words.offHow}</p>{/if}
   <form
     class="extra-form"
     onsubmit={(e) => {
@@ -93,6 +108,7 @@
       {#if on}<Button weight="quiet" disabled={busy} onclick={() => void keep(0)}>{words.turnOff}</Button>{/if}
     </div>
   </form>
+  {/if}
 </div>
 
 <style>
@@ -100,20 +116,20 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
-    padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--rule);
   }
 
-  .extra-said,
-  .extra-how {
-    margin: 0;
-    color: var(--ink-2);
-    font-size: var(--fs-meta);
-    line-height: var(--lead-meta);
+  .extra-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
   }
 
   .extra-said {
-    color: var(--ink);
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta);
   }
 
   .extra-form {

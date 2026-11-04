@@ -4,17 +4,15 @@
   A MONTH AT A TIME, this one first, with a switcher for the year before it in the toolbar. `?project=` is one
   project's slice, which is where its "Runs on" links.
 
-  THE FIGURES ARE TILES, EACH WITH ITS CHART AND THE LINE THAT READS IT. The month's allowance leads:
-  its four meters as rings, amber once one is near its limit and red once actions wait on it, with the binding meter's
-  own sentence under them. Then the runs by week as bars, the projects as one stacked bar, the days as a heat grid, and
-  Slash's asks as a ring where the answer carries an allowance of them. A chart with nothing behind it is no tile at
-  all: with no allowance, the Slash line sits under the month's allowance instead.
+  THE FIRST SCREEN SAYS WHETHER A LIMIT IS NEAR AND WHAT IS USING IT, AND THE REST IS UNDER IT, three rows of tiles that
+  wrap to one column on a phone. A chart with nothing behind it is no tile at all, and a row with no tile takes no room.
 
-  THE LISTS SIT ON THE GROUND UNDER THEM: a row a project and a row an action, busiest first, or one project's actions
-  under it when the page is its slice; then the deliveries and arrivals, then Slash's own section, `SlashUsage`.
+  THE LIMITS: the month's allowance, its four meters as rings, amber once one is near its limit and red once actions
+  wait on it, with the plan's limits and extra usage under them (`ExtraCap`), and beside it Slash and the room for files.
+  WHAT USED THEM: the projects, and the one list of what ran. A project's row is a filter on that list, `?project=`, and
+  no project's actions are listed anywhere else. THE REST OF THE MONTH: the weeks, the days, the deliveries and arrivals.
 
-  THE PLAN'S LIMITS IN ONE SENTENCE under the rings, and extra usage under it: the month's running amount against the
-  cap, and on a paid record of a host that sells it, the cap itself to set (`ExtraCap`).
+  LONG LISTS STOP AT EIGHT, busiest first, with "Show all" opening them where they stand. A list never scrolls inside itself.
 
   THE LEDGER FIRST. `GET /account/usage` is the Directory's count, and there is ONE allowance, the Directory's, read
   from its answer. A host without the route (404), or no host, falls back to the record's own run events, which say
@@ -26,23 +24,23 @@
   out of reach: the reader's own build of the month returns it, and a boundary round the board catches the rest. Its two empty answers keep their own
   sentences: a host with nothing to count, and a month with no runs, which says so once rather than over zeroes.
 
-  DELIVERIES AND ARRIVALS LAST, from a second read of the same ledger (`countedOf` below): what the outbox sent and what
+  DELIVERIES AND ARRIVALS, from a second read of the same ledger (`countedOf` below): what the outbox sent and what
   reached a door, counted and never limited, so they sit under everything the allowance is about rather than inside it.
 -->
 <script lang="ts">
+  import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import { MediaQuery } from 'svelte/reactivity';
   import { apiBase, at } from '$lib/at.ts';
   import { bytes } from 'braindog-render';
   import { humanize } from '$lib/record/names.ts';
   import { titleOf } from '$lib/title.ts';
-  import { countsOf, monthRange, monthsBeside, monthWords, readUsage, words, type Named, type UsageView } from '$lib/record/actions.ts';
+  import { countsOf, monthRange, monthsBeside, monthWords, readUsage, words, type UsageView } from '$lib/record/actions.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import IconWell from '$lib/ui/IconWell.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -53,10 +51,9 @@
   import { lineIn } from '$lib/motion';
   import HeatGrid from '$lib/viz/HeatGrid.svelte';
   import Ring from '$lib/viz/Ring.svelte';
-  import Stacked from '$lib/viz/Stacked.svelte';
   import { homeCurrency } from '$lib/record/api.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
-  import { asksOf, byProject, daysSaid, earlierOf, groupName, heatOf, offCloud, projectParts, projectsSaid, placeOf, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
+  import { asksOf, byProject, daysSaid, earlierOf, groupName, heatOf, offCloud, projectsSaid, placeOf, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
   import { extraOffered, hostedHere, readBilling, type BillingAnswer } from '../settings/billing.ts';
   import ExtraCap from './ExtraCap.svelte';
   import { inIosApp } from '$lib/shell.ts';
@@ -133,32 +130,69 @@
     return extraOffered(answer?.records.find((b) => b.record === record) ?? null, answer);
   };
 
-  /* A ROW AN ACTION, BUSIEST FIRST, each with the project it runs in, so the month's heaviest work reads from the top. */
+  /* WITH SEVERAL RECORDS BOTH NAMES START WITH THE RECORD'S, and a row said it twice: "studio · Pull servers · studio · Marsh". */
+  const placeBeside = (place: string, name: string): string => {
+    const cut = place.indexOf(' · ');
+    return cut > 0 && name.startsWith(place.slice(0, cut + 3)) ? place.slice(cut + 3) : place;
+  };
+
+  /* THE ONE LIST OF WHAT RAN, BUSIEST FIRST: the month's, or the project's when the page is its slice, each row naming the
+     project it ran in only where the list holds more than one. The bar is the share of the busiest row, one ink. */
   const actionRows = $derived(
     groups
-      .flatMap((g) => g.actions.map((a) => ({ ...a, project: placeOf(g) })))
+      .flatMap((g) => g.actions.map((a) => ({ ...a, project: sliced.length > 0 ? '' : placeBeside(placeOf(g), a.name) })))
       .sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name)),
   );
-  /* A BAR A ROW, AND THE TOP FIVE (G26): nineteen rows of "36 runs" were a table to read; the bars read at a glance, and
-     the rest wait behind "14 more". The bar is the share of the busiest action, one ink. */
-  const TOP = 5;
+  /* EIGHT ROWS TO A LIST (the owner's 34 scripts were a page of their own); the rest open where they stand. */
+  const TOP = 8;
   let allActions = $state(false);
+  let allProjects = $state(false);
+  let allCounted = $state(false);
+  /* ANOTHER PROJECT OR MONTH IS ANOTHER LIST, and starts short. */
+  $effect(() => {
+    void project;
+    void month;
+    allActions = false;
+  });
   const mostRuns = $derived(Math.max(1, ...actionRows.map((a) => a.runs)));
   const actionsShown = $derived(allActions ? actionRows : actionRows.slice(0, TOP));
-  /* WHETHER A ROW A PROJECT SAYS ANYTHING: not when every run was in none. */
-  const split = $derived(byProject(groups));
-  /* A ROW A PROJECT, BUSIEST FIRST, linking to its slice. Everywhere has no slice and no link. */
-  const projectRows = $derived([...groups].sort((a, b) => b.totals.runs - a.totals.runs || groupName(a).localeCompare(groupName(b))));
-  const parts = $derived(view ? projectParts(view.groups) : null);
+  /* WHAT THE SLICE CAME TO, which is where a project's requests, data and run time are said. */
+  const sliceTotals = $derived(
+    sliced.reduce(
+      (sum, g) => ({
+        runs: sum.runs + g.totals.runs,
+        requests: sum.requests + g.totals.requests,
+        bytes: sum.bytes + g.totals.bytes,
+        ms: sum.ms + (g.totals.ms ?? 0),
+        failures: sum.failures + g.totals.failures,
+      }),
+      { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0 },
+    ),
+  );
+  /* A ROW A PROJECT, BUSIEST FIRST, the month's whichever slice is open. Not for a month that ran in none, or in one alone,
+     where the list of what ran already says it. */
+  const projectRows = $derived(view ? [...view.groups].sort((a, b) => b.totals.runs - a.totals.runs || groupName(a).localeCompare(groupName(b))) : []);
+  const split = $derived(view !== null && byProject(view.groups) && view.groups.length > 1);
+  const mostProject = $derived(Math.max(1, ...projectRows.map((g) => g.totals.runs)));
+  /* THE OPEN SLICE STAYS IN THE LIST, whatever its place in it. */
+  const isOpen = (scope: string): boolean => sliced.length > 0 && scope === project;
+  const projectsShown = $derived(allProjects ? projectRows : projectRows.filter((g, i) => i < TOP || isOpen(g.scope)));
+  /* ON A PHONE THE LIST A PROJECT'S ROW FILTERS IS A SCREEN BELOW IT, so a press would seem to do nothing: the page goes to
+     the list. Beside it, at a desk, it stays where it is. */
+  let pressedProject = false;
+  afterNavigate(() => {
+    if (!pressedProject) return;
+    pressedProject = false;
+    const list = document.getElementById('use-what');
+    if (list && list.getBoundingClientRect().top > window.innerHeight * 0.6) list.scrollIntoView({ block: 'start' });
+  });
   /* WHETHER THE WEEKS TILE IS DRAWN: only where a day of a run is known (see the tile). */
   const weekly = $derived(view !== null && view.totals.runs > 0 && view.days.length > 0 && !(view.records.length > 0 && view.records.every((r) => r.meters.length === 0)));
-  /* AND WHETHER ANY TILE IS: an empty row of tiles still took its gaps, a band of nothing between the months and the list
-     (audit 6f AF22), on a month whose runs were all rules', which no day is kept for. */
-  const tiled = $derived(view !== null && (view.records.length > 0 || weekly || parts !== null || heat !== null));
+  /* AND WHERE: beside the limits where nothing else would stand there at full width, a month gone or a month with no allowance
+     tile, and with the days otherwise. */
+  const weeksFirst = $derived(view !== null && (!view.current || view.records.length === 0));
   /** Whether the allowance tile says the empty month itself: drawn, with limits, and nothing used against any of them. */
-  const idleTile = $derived(
-    tiled && view !== null && view.current && view.records.some((r) => r.meters.length > 0) && view.records.every((r) => ringsOf(r).every((m) => m.share === 0)),
-  );
+  const idleTile = $derived(view !== null && view.current && view.records.some((r) => r.meters.length > 0) && view.records.every((r) => ringsOf(r).every((m) => m.share === 0)));
 
   /**
    * THIS PAGE'S OWN WORDS. The rest are `actions.ts`'s
@@ -172,15 +206,13 @@
     idle: 'Each run of an automation or an agent counts here.',
     idleRules: 'Automations count here each time they run.',
     connect: 'Connect an agent',
-    moreActions: (n: number) => `Show ${n} more`,
+    all: (n: number) => `Show all ${n.toLocaleString('en-GB')}`,
     fewer: 'Show fewer',
   } as const;
 
   const said = {
     counted: 'Deliveries and arrivals',
     countedWhy: 'Not held by the monthly limit.',
-    sent: 'Sent',
-    arrived: 'Arrived',
     sentCount: (n: string) => `${n} sent`,
     arrivedCount: (n: string, size: string) => `${n} arrived · ${size}`,
   };
@@ -233,36 +265,33 @@
   /* ASKED ONLY OF THE OWNER'S LEDGER, the one answer that carries these rows, and again when the month changes. */
   const counted = read(() => (view && view.from === 'ledger' && view.owner ? `${apiBase(page.url)} ${view.month} counted` : null), countedOf);
 
-  /** The rows as two lists, what was sent and what arrived, each named by its kind in words. */
-  const countedRows = $derived.by(() => {
-    const rows = counted.value ?? [];
-    const named = (prefix: string): Counted[] => rows.filter((c) => c.action.startsWith(prefix)).sort((a, b) => b.runs - a.runs);
-    return {
-      sent: named('deliver:').map((c) => ({ key: c.action, name: humanize(c.action.slice('deliver:'.length)), counts: said.sentCount(n(c.runs)) })),
-      arrived: named('in:').map((c) => ({ key: c.action, name: humanize(c.action.slice('in:'.length)), counts: said.arrivedCount(n(c.runs), bytes(c.bytes)) })),
-    };
-  });
-
-  /* THE TWO LISTS UNDER ONE HEADING, each led by the way it went: out of the record, or into it. */
-  const countedGroups = $derived<{ key: string; title: string; icon: IconName; rows: { key: string; name: string; counts: string }[] }[]>([
-    { key: 'sent', title: said.sent, icon: 'arrowUp', rows: countedRows.sent },
-    { key: 'arrived', title: said.arrived, icon: 'arrowDown', rows: countedRows.arrived },
-  ]);
+  /** The rows as one list, the busiest first, each kind named in words and led by the way it went: out of the record, or into it. */
+  const countedRows = $derived(
+    (counted.value ?? [])
+      .flatMap((c): { key: string; name: string; counts: string; icon: IconName; runs: number }[] =>
+        c.action.startsWith('deliver:')
+          ? [{ key: c.action, name: humanize(c.action.slice('deliver:'.length)), counts: said.sentCount(n(c.runs)), icon: 'arrowUp', runs: c.runs }]
+          : c.action.startsWith('in:')
+            ? [{ key: c.action, name: humanize(c.action.slice('in:'.length)), counts: said.arrivedCount(n(c.runs), bytes(c.bytes)), icon: 'arrowDown', runs: c.runs }]
+            : [],
+      )
+      .sort((a, b) => b.runs - a.runs),
+  );
+  const countedShown = $derived(allCounted ? countedRows : countedRows.slice(0, TOP));
 </script>
 
 <svelte:head><title>{titleOf(words.usage)}</title></svelte:head>
 
-{#snippet list(rows: Named[])}
-  <ul class="ledger use-list">
-    {#each rows as r (r.name)}
-      <li>
-        <div class="line use-row" data-faint={r.faint ? '' : undefined}>
-          <span class="line-title">{r.name}</span>
-          <span class="line-when use-counts">{countsOf(r)}</span>
-        </div>
-      </li>
-    {/each}
-  </ul>
+{#snippet more(open: boolean, total: number, toggle: () => void)}
+  <button type="button" class="use-more tap" aria-expanded={open} onclick={toggle}><Icon name="chevronDown" size="s" />{open ? usageWords.fewer : usageWords.all(total)}</button>
+{/snippet}
+
+{#snippet weeks(v: UsageView)}
+  <Tile icon="history" title={reading.weeks}>
+    <p class="figure num">{n(v.totals.runs)}<span class="figure-unit">{reading.runs(v.totals.runs)}</span></p>
+    <Bars items={weekBars(v)} subject={words.overTime} />
+    <p class="reading">{weeksSaid(v)}</p>
+  </Tile>
 {/snippet}
 
 {#snippet months()}
@@ -301,18 +330,17 @@
     <!-- A THROW WHILE DRAWING THE BOARD IS THIS SCREEN'S FAULT, said as one with the reason under Details, and never the
          offline sentence: by this point the record has answered. -->
     <svelte:boundary onerror={(e) => console.error(e)}>
-      {#if tiled}<div class="tiles">
-        <!-- THE ALLOWANCE LEADS, one tile a record the person owns: the four meters as rings, each with its own line under
-             it, and the binding meter's sentence as the line that reads them. A plan with no limit has no rings; its tile
-             holds the month's runs by week instead, so the week bars are not drawn twice. The plan is named beside the
-             record's name when there are several, or the tile drew no plan at all for an owner of more than one. -->
+      <!-- THE LIMITS. -->
+      <div class="band limits">
+        <!-- ONE TILE A RECORD THE PERSON OWNS: the four meters as rings, each with its own line under it. A plan with no limit
+             has no rings; its tile holds the month's runs by week instead, so the week bars are not drawn twice. The plan is
+             named beside the record's name when there are several. -->
         {#each view.records as r (r.name)}
           {@const rings = ringsOf(r)}
           {@const bound = rings.find((m) => m.binding)}
           {@const used = rings.some((m) => m.share > 0)}
           <Tile
             data-wide=""
-            lead
             icon="observe"
             title={!hosted ? reading.monthTitle(view.current, view.month) : view.current ? reading.allowance : reading.allowanceIn(monthWords(view.month))}
             meta={view.records.length > 1 ? [r.name, r.plan].filter(Boolean).join(' · ') : (r.plan ?? undefined)}
@@ -327,8 +355,10 @@
                 {#each rings as m (m.key)}
                   <li class="ring">
                     <Ring value={m.share} max={1} tone={m.tone} size={72} format={() => m.figure} summary={`${m.line}. ${m.said}`} />
-                    <span class="ring-name">{m.name}</span>
-                    <span class="ring-line num">{m.amount}</span>
+                    <span class="ring-said">
+                      <span class="ring-name">{m.name}</span>
+                      <span class="ring-line num">{m.amount}</span>
+                    </span>
                   </li>
                 {/each}
               </ul>
@@ -344,10 +374,18 @@
               {#if view.totals.runs > 0}<Bars items={weekBars(view)} subject={words.overTime} />{/if}
               <p class="reading">{words.noLimit}</p>
             {/if}
-            <!-- THE SLASH LINE HERE when there is no allowance of asks to draw a ring against, which is every host today. -->
-            {#if r.slash && !asksOf(r) && !(rings.length > 0 && !used)}<p class="slash-line">{r.slash}</p>{/if}
-            <!-- THE PLAN'S LIMITS IN ONE SENTENCE, then extra usage: its running amount, and the cap where one may be set. -->
-            {#if r.planLine}<p class="aside-line">{r.planLine}</p>{/if}
+            <div class="allow-foot">
+              <!-- THE SLASH LINE when there is no allowance of asks to draw a ring against, which is every host today. -->
+              {#if r.slash && !asksOf(r) && !(rings.length > 0 && !used)}<p class="aside-line">{r.slash}</p>{/if}
+              <!-- THE PLAN'S LIMITS IN ONE SENTENCE, then extra usage: its running amount, and the cap where one may be set. -->
+              {#if r.planLine}<p class="aside-line">{r.planLine}</p>{/if}
+              <!-- NEITHER IN THE IPHONE APP (App Store 3.1.1): what extra usage costs and the cap on it are bought at brain.dog. -->
+              {#if r.extraUse && capOffered(r.record) && !inIosApp}
+                <ExtraCap record={r.record} on={r.extraUse.on} cap={r.extraUse.cap} said={r.extra} onset={usage.reread} />
+              {:else if r.extra && !inIosApp}
+                <p class="aside-line">{r.extra}</p>
+              {/if}
+            </div>
             <!-- THE WAY TO START AN EMPTY MONTH, last in the tile, under what the month's limits are. -->
             {#if rings.length > 0 && !used && view.current}
               <div class="idle-act">
@@ -355,50 +393,33 @@
                 {:else}<Button weight="quiet" href="/settings/agents">{usageWords.connect}</Button>{/if}
               </div>
             {/if}
-            <!-- NEITHER IN THE IPHONE APP (App Store 3.1.1): what extra usage costs and the cap on it are bought at brain.dog. -->
-            {#if r.extra && !inIosApp}<p class="aside-line">{r.extra}</p>{/if}
-            {#if r.extraUse && capOffered(r.record) && !inIosApp}
-              <ExtraCap record={r.record} on={r.extraUse.on} cap={r.extraUse.cap} onset={usage.reread} />
-            {/if}
           </Tile>
         {/each}
 
-        <!-- ONLY WHERE A DAY OF A RUN IS KNOWN: an automation's runs are counted for the month and not by day, and a figure
-             over bars of nothing read as runs that happened on no day. -->
-        {#if weekly}
-          <Tile icon="history" title={reading.weeks}>
-            <p class="figure num">{n(view.totals.runs)}<span class="figure-unit">{reading.runs(view.totals.runs)}</span></p>
-            <Bars items={weekBars(view)} subject={words.overTime} />
-            <p class="reading">{weeksSaid(view)}</p>
-          </Tile>
-        {/if}
-
-        {#if parts}
-          <Tile icon="board" title={reading.byProject} count={parts.length}>
-            <Stacked {parts} subject={reading.byProject} />
-            <p class="reading">{projectsSaid(view.groups)}</p>
-          </Tile>
-        {/if}
-
-        {#if heat}
-          <Tile icon="calendar" title={reading.days}>
-            <HeatGrid rows={heat.rows} cols={heat.cols} values={heat.values} subject={reading.days} />
-            <p class="reading">{daysSaid(view)}</p>
-          </Tile>
-        {/if}
+        {#if weekly && weeksFirst}{@render weeks(view)}{/if}
 
         {#each view.records as r (r.name)}
           {@const c = asksOf(r)}
           {#if c && r.slash}
             <Tile icon="slash" title={reading.asks} meta={view.records.length > 1 ? r.name : undefined}>
-              <div class="ring-solo"><Ring value={c.used} max={c.max} tone={c.tone} size={112} label={reading.asksOf(c.max)} summary={r.slash} /></div>
-              <p class="reading">{r.slash}</p>
+              <div class="meter">
+                <Ring value={c.used} max={c.max} tone={c.tone} size={72} summary={r.slash} />
+                <p class="meter-line">{r.slash}</p>
+              </div>
             </Tile>
           {/if}
         {/each}
-      </div>{/if}
 
-      <!-- A MONTH WITH NO RUNS SAYS SO ONCE, in place of the lists it would have. -->
+        <!-- SLASH, THIS MONTH AND THE OWNER'S ONLY: the ledger's door answers the owner alone, and the status door says this
+             month's count and nothing of a month gone. It draws nothing on a host without a model. -->
+        {#if view.current && view.owner}
+          <SlashUsage month={view.month} />
+        {/if}
+        <!-- THE ROOM FOR ATTACHED FILES, THIS RECORD'S: how much its files take of what its plan keeps for them. -->
+        {#if view.current}<FilesRoom />{/if}
+      </div>
+
+      <!-- WHAT USED THEM. A MONTH WITH NO RUNS SAYS SO ONCE, in place of the lists it would have. -->
       {#if view.totals.runs === 0 && idleTile}
         <!-- SAID IN THE ALLOWANCE TILE, above. -->
       {:else if view.totals.runs === 0}
@@ -413,108 +434,93 @@
             {:else}<Button weight="quiet" href="/settings/agents">{usageWords.connect}</Button>{/if}
           {/snippet}
         </Empty>
-      {:else if sliced.length === 0}
-        <!-- A ROW A PROJECT, then A ROW AN ACTION, each with its counts beside it; a project's row opens its slice. -->
-        {#if split}<Tile class="section" data-surface="tile" icon="board" title={words.byProject} count={projectRows.length || undefined}>
-          <div class="section-body">
-            <ul class="ledger use-list">
-              {#each projectRows as g (g.key)}
-                <li>
-                  <div class="line use-row" data-faint={g.faint ? '' : undefined}>
-                    {#if g.scope !== ''}
-                      <a class="line-title tap" href={at(`/usage?month=${view.month}&project=${encodeURIComponent(g.scope)}`)}>{groupName(g)}</a>
-                    {:else}
-                      <span class="line-title">{groupName(g)}</span>
-                    {/if}
-                    <span class="line-when use-counts">{countsOf(g.totals)}</span>
-                  </div>
-                </li>
-              {/each}
-            </ul>
-          </div>
-        </Tile>{/if}
-        <Tile class="section" data-surface="tile" icon="rows" title={words.byAction} count={actionRows.length || undefined}>
-          <div class="section-body">
-            <ul class="ledger use-list use-bars">
-              {#each actionsShown as a, i (`${a.project} ${a.name} ${i}`)}
-                <li in:lineIn>
-                  <div class="line use-row use-bar-row" data-faint={a.faint ? '' : undefined}>
-                    <span class="line-title">{a.name}{#if a.project}<span class="use-in">{` · ${a.project}`}</span>{/if}</span>
-                    <span class="use-bar" aria-hidden="true"><span class="use-bar-fill" style:inline-size={`${Math.max(2, (a.runs / mostRuns) * 100)}%`}></span></span>
-                    <span class="line-when use-counts">{countsOf(a)}</span>
-                  </div>
-                </li>
-              {/each}
-            </ul>
-            {#if actionRows.length > TOP}
-              <button type="button" class="use-more tap" aria-expanded={allActions} onclick={() => (allActions = !allActions)}
-                ><Icon name="chevronDown" size="s" />{allActions ? usageWords.fewer : usageWords.moreActions(actionRows.length - TOP)}</button
-              >
-            {/if}
-          </div>
-        </Tile>
       {:else}
-        <!-- ONE PROJECT'S SLICE, ITS ACTIONS UNDER IT; the link beside the heading shows every project again. -->
-        <Tile class="section" data-surface="tile" icon="projects" title={sliced.length > 0 ? words.only(sliced[0]?.name ?? '') : reading.projects} count={(sliced.length > 0 ? 0 : groups.length) || undefined}>
-          {#snippet actions()}
-            {#if sliced.length > 0}<a class="use-all tap" href={at(`/usage?month=${view.month}`)}>{words.allProjects}</a>{/if}
-          {/snippet}
-          <div class="section-body">
-            <div class="use-groups">
-              {#each groups as g (g.key)}
-                <div class="use-group" data-faint={g.faint ? '' : undefined}>
-                  <h3 class="use-group-h">
-                    <IconWell name={g.faint ? 'globe' : 'board'} size="l" />
-                    <span class="use-group-name">{groupName(g)}</span>
-                    <span class="use-counts num">{countsOf(g.totals)}</span>
-                  </h3>
-                  {@render list(g.actions)}
-                </div>
-              {/each}
+        <div class="band uses">
+          <!-- A ROW A PROJECT IS A FILTER ON THE LIST BESIDE IT: pressing one opens its slice, pressing it again shuts it. -->
+          {#if split}
+            <Tile class="section" data-surface="tile" icon="board" title={words.byProject} count={projectRows.length} meta={projectsSaid(view.groups) ?? undefined}>
+              <div class="section-body use-body">
+                <ul class="ledger use-list use-bars use-projects">
+                  {#each projectsShown as g (g.key)}
+                    <li>
+                      <a
+                        class="line use-row use-bar-row use-project"
+                        data-faint={g.faint ? '' : undefined}
+                        data-selected={isOpen(g.scope) ? '' : undefined}
+                        aria-current={isOpen(g.scope) ? 'true' : undefined}
+                        data-sveltekit-noscroll
+                        onclick={() => (pressedProject = true)}
+                        href={at(isOpen(g.scope) ? `/usage?month=${view.month}` : `/usage?month=${view.month}&project=${encodeURIComponent(g.scope)}`)}
+                      >
+                        <span class="line-title">{groupName(g)}</span>
+                        <span class="use-bar" aria-hidden="true"><span class="use-bar-fill" style:inline-size={`${Math.max(2, (g.totals.runs / mostProject) * 100)}%`}></span></span>
+                        <span class="line-when use-counts">{reading.runsSaid(g.totals.runs)}</span>
+                      </a>
+                    </li>
+                  {/each}
+                </ul>
+                {#if projectRows.length > TOP}{@render more(allProjects, projectRows.length, () => (allProjects = !allProjects))}{/if}
+              </div>
+            </Tile>
+          {/if}
+          <Tile id="use-what" class="section use-what" data-surface="tile" icon="rows" title={sliced.length > 0 ? reading.ranIn(sliced[0] ?? { key: '', name: '' }) : reading.ran} count={actionRows.length || undefined}>
+            {#snippet actions()}
+              {#if sliced.length > 0}<a class="use-all tap" data-sveltekit-noscroll href={at(`/usage?month=${view.month}`)}>{words.allProjects}</a>{/if}
+            {/snippet}
+            <div class="section-body use-body">
+              {#if sliced.length > 0}<p class="use-why">{countsOf(sliceTotals)}</p>{/if}
+              <ul class="ledger use-list use-bars">
+                {#each actionsShown as a, i (`${a.project} ${a.name} ${i}`)}
+                  <li in:lineIn>
+                    <div class="line use-row use-bar-row" data-faint={a.faint ? '' : undefined}>
+                      <span class="line-title">{a.name}{#if a.project}<span class="use-in">{` · ${a.project}`}</span>{/if}</span>
+                      <span class="use-bar" aria-hidden="true"><span class="use-bar-fill" style:inline-size={`${Math.max(2, (a.runs / mostRuns) * 100)}%`}></span></span>
+                      <span class="line-when use-counts">{countsOf(a)}</span>
+                    </div>
+                  </li>
+                {/each}
+              </ul>
+              {#if actionRows.length > TOP}{@render more(allActions, actionRows.length, () => (allActions = !allActions))}{/if}
             </div>
-          </div>
-        </Tile>
+          </Tile>
+        </div>
       {/if}
 
-      <!-- DELIVERIES AND ARRIVALS, EACH KIND ONE ROW: the name and its count beside it, wrapping under it on a phone. A
-           month with neither draws nothing, since there is nothing the owner can do about a zero here. -->
-      {#if countedRows.sent.length > 0 || countedRows.arrived.length > 0}
-        <Tile class="section" data-surface="tile" icon="mail" title={said.counted}>
-          <div class="section-body">
-            <p class="use-why">{said.countedWhy}</p>
-            <div class="use-groups">
-              {#each countedGroups as g (g.key)}
-                {#if g.rows.length > 0}
-                  <div class="use-group">
-                    <h3 class="use-group-h">
-                      <IconWell name={g.icon} size="l" />
-                      <span class="use-group-name">{g.title}</span>
-                    </h3>
-                    <ul class="ledger use-list">
-                      {#each g.rows as r (r.key)}
-                        <li>
-                          <div class="line use-row">
-                            <span class="line-title">{r.name}</span>
-                            <span class="line-when use-counts">{r.counts}</span>
-                          </div>
-                        </li>
-                      {/each}
-                    </ul>
-                  </div>
-                {/if}
-              {/each}
-            </div>
-          </div>
-        </Tile>
-      {/if}
+      <!-- THE REST OF THE MONTH. -->
+      <div class="band rest">
+        <!-- ONLY WHERE A DAY OF A RUN IS KNOWN: an automation's runs are counted for the month and not by day, and a figure
+             over bars of nothing read as runs that happened on no day. -->
+        {#if weekly && !weeksFirst}{@render weeks(view)}{/if}
 
-      <!-- SLASH'S SECTION, THIS MONTH AND THE OWNER'S ONLY: the ledger's door answers the owner alone, and the status door
-           says this month's count and nothing of a month gone. It draws nothing on a host without a model. -->
-      {#if view.current && view.owner}
-        <SlashUsage month={view.month} />
-      {/if}
-      <!-- THE ROOM FOR ATTACHED FILES, THIS RECORD'S: how much its files take of what its plan keeps for them. -->
-      {#if view.current}<FilesRoom />{/if}
+        {#if heat}
+          <Tile icon="calendar" title={reading.days}>
+            <HeatGrid rows={heat.rows} cols={heat.cols} values={heat.values} subject={reading.days} />
+            <p class="reading">{daysSaid(view)}</p>
+          </Tile>
+        {/if}
+
+        <!-- DELIVERIES AND ARRIVALS, EACH KIND ONE ROW, the busiest first. A month with neither draws nothing, since there is
+             nothing the owner can do about a zero here. -->
+        {#if countedRows.length > 0}
+          <Tile class="section" data-surface="tile" icon="mail" title={said.counted}>
+            <div class="section-body use-body">
+              <ul class="ledger use-list use-counted">
+                {#each countedShown as r (r.key)}
+                  <li>
+                    <div class="line use-row use-kind">
+                      <Icon name={r.icon} size="s" />
+                      <span class="line-title">{r.name}</span>
+                      <span class="line-when use-counts">{r.counts}</span>
+                    </div>
+                  </li>
+                {/each}
+              </ul>
+              {#if countedRows.length > TOP}{@render more(allCounted, countedRows.length, () => (allCounted = !allCounted))}{/if}
+              <p class="reading use-foot">{said.countedWhy}</p>
+            </div>
+          </Tile>
+        {/if}
+      </div>
       {#snippet failed(_error, reset)}
         <!-- A SENTENCE UNDER DETAILS, NEVER THE EXCEPTION: the thrown message reaches the console through `onerror`. -->
         <ReadState state="fault" screen={words.usage} refusal={words.usageThrew} onretry={reset} />
@@ -556,28 +562,65 @@
     text-decoration: none;
   }
 
-  /* THE TILES: one column on a phone, two from a tablet's width, three from a desk's, 12 apart. The
-     allowance takes two columns wherever there are two. */
-  .tiles {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--tile-gap);
+  /* A ROW OF TILES THAT WRAPS, so one that draws nothing leaves no hole and the rest take its room, and a phone is one
+     column. Tiles beside each other are one height. A row with no tile takes no gap (audit 6f AF22). */
+  .band {
+    display: flex;
+    flex-wrap: wrap;
     align-items: stretch;
+    gap: var(--tile-gap);
   }
 
-  @container (inline-size >= 600px) {
-    .tiles {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+  .band:not(:has(> :global(.tile))) {
+    display: none;
+  }
 
-    .tiles > :global([data-wide]) {
-      grid-column: span 2;
+  .band > :global(.tile) {
+    flex: 1 1 280px;
+  }
+
+  .limits > :global(.tile) {
+    flex: 1 1 240px;
+  }
+
+  /* A SMALL TILE ALONE ON ITS ROW STAYS SMALL, rather than one ring or one heat grid in 1100px of white. */
+  @media (width >= 640px) {
+    .limits > :global(.tile) {
+      max-inline-size: 420px;
     }
   }
 
-  @container (inline-size >= 960px) {
-    .tiles {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+  @media (width >= 640px) {
+    .rest > :global(.tile) {
+      max-inline-size: 640px;
+    }
+  }
+
+  .limits > :global(.tile[data-wide]) {
+    flex: 2 1 520px;
+    max-inline-size: none;
+  }
+
+  /* SLASH OPEN TAKES THE ROW UNDER THE OTHERS. */
+  .limits > :global(.tile[data-open]) {
+    flex: 1 1 100%;
+    order: 1;
+    max-inline-size: none;
+  }
+
+  .uses > :global(.tile) {
+    flex: 1 1 300px;
+  }
+
+  .uses > :global(.use-what) {
+    flex: 2 1 520px;
+    scroll-margin-block-start: var(--sp-8);
+  }
+
+  /* ROWS TIGHTEN AT A DESK, where eight of them and the limits above have to share a screen. A thumb keeps its 44. */
+  @media (width >= 640px) and (pointer: fine) {
+    .uses {
+      --row-h: 36px;
     }
   }
 
@@ -620,12 +663,16 @@
     margin-block-start: var(--sp-3);
   }
 
-  .slash-line {
-    margin: 0;
-    max-inline-size: var(--measure);
-    color: var(--ink-2);
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
+  /* THE PLAN'S LINES AND EXTRA USAGE, at the tile's foot and close together. */
+  .allow-foot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin-block-start: auto;
+  }
+
+  .allow-foot:empty {
+    display: none;
   }
 
   .aside-line {
@@ -635,10 +682,10 @@
     line-height: var(--lead-meta, 18px);
   }
 
-  /* FOUR RINGS IN A ROW, and two by two where four do not fit. Each ring's name and figures sit under it. */
+  /* FOUR RINGS IN A ROW, each with its name and figures under it, and two by two on a phone. */
   .rings {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
     gap: var(--sp-4) var(--sp-3);
     margin: 0;
     padding: 0;
@@ -657,6 +704,31 @@
     margin-block-end: var(--sp-2);
   }
 
+  .ring-said {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+  }
+
+  /* ON A PHONE TWO BY TWO WITH THE WORDS BESIDE EACH RING: under it they cost a hundred pixels a row. */
+  @media (width < 640px) {
+    .rings {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ring {
+      flex-direction: row;
+      align-items: center;
+      gap: var(--sp-2);
+    }
+
+    .ring :global(.viz-ring) {
+      flex: 0 0 72px;
+      margin-block-end: 0;
+    }
+  }
+
   .ring-name {
     color: var(--ink);
     font-size: var(--fs-body);
@@ -671,40 +743,34 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .ring-solo {
-    display: flex;
-    justify-content: center;
-  }
-
-  /* THE LISTS ON THE GROUND: a project's heading with its well and its counts, and its actions under it as 44px rows. */
-  .use-groups {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-4);
-  }
-
-  .use-group-h {
+  /* A RING WITH ITS LINE BESIDE IT, for a tile too small for the line under it. */
+  .meter {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    min-block-size: var(--row-h);
+  }
+
+  .meter :global(.viz-ring) {
+    flex: 0 0 72px;
+  }
+
+  .meter-line {
     margin: 0;
-    font-size: var(--fs-body);
-    font-weight: 600;
-    line-height: var(--lead-ui, 20px);
-  }
-
-  .use-group-name {
-    flex: 1 1 auto;
-    min-inline-size: 0;
-    overflow: hidden;
-    color: var(--ink);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .use-group[data-faint] .use-group-name {
     color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: var(--lead-meta, 18px);
+  }
+
+  /* THE LISTS: a section's rows, and at their foot whatever opens or reads them, level across a row of tiles. */
+  .use-body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-block-size: 0;
+  }
+
+  .use-foot {
+    padding-block-start: var(--sp-3);
   }
 
   .use-counts {
@@ -716,15 +782,6 @@
     font-weight: 400;
     line-height: var(--lead-meta, 18px);
     font-variant-numeric: tabular-nums;
-  }
-
-  /* AN ACTION'S ROW STARTS WHERE THE TILE'S NAME DOES, past its heading well, so the list reads as that heading's own.
-     It was the 32 of a row's well under a 28 heading well (8 off the name), and on a tile with no well a 44 indent
-     under nothing. */
-  /* THE HEADING'S GLYPH IS BARE AT 18 NOW (Tile, ops style), not a 28 well, so the name stands 18 + 12 in and the rows
-     pull out by the text edge from there: they were 10 past the name. */
-  .use-list {
-    margin-inline-start: calc(var(--head-glyph) + var(--sp-3) - var(--title-inset, 12px));
   }
 
   .use-row {
@@ -741,19 +798,17 @@
     color: var(--ink-2);
   }
 
-  /* A BAR A ROW (G26): the name, its bar, its figure at the end. The bar is one ink on the well's fill, at a third of
-     the row from 900 up, and under the name on a phone. */
+  /* A BAR A ROW (G26): the name, its bar, its figure at the end. Under 640 the row has no bar, its words go under its name. */
   .use-bar-row {
-    grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.6fr) 4.5rem;
+    grid-template-columns: minmax(0, 1fr) minmax(3rem, 0.3fr) max-content;
     column-gap: var(--sp-4);
   }
 
-  /* THE FIGURE'S COLUMN IS AS WIDE AS ITS LONGEST FIGURE, the same on every row: at 4.5rem "101 runs · under a minute"
-     ran back under the bar's end (live verify, 2 Nov). The rows share one grid, so the bars still start and end level. */
+  /* THE FIGURE'S COLUMN IS AS WIDE AS ITS LONGEST FIGURE, the same on every row, so the bars start and end level. */
   @media (width >= 640px) {
     .use-bars {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.6fr) max-content;
+      grid-template-columns: minmax(0, 1fr) minmax(3rem, 0.3fr) max-content;
       column-gap: var(--sp-4);
     }
 
@@ -772,6 +827,28 @@
   .use-bar-row .use-counts {
     justify-content: flex-end;
     text-align: end;
+  }
+
+  /* A ROW A PROJECT PRESSES AS ONE, and is told as the slice that is open by the rows' own selection. */
+  .use-project .line-title {
+    color: var(--ink);
+  }
+
+  .use-project[data-faint] .line-title {
+    color: var(--ink-2);
+  }
+
+  /* A KIND OF DELIVERY OR ARRIVAL: which way it went, its name, its count. A row nobody presses can be small. */
+  .use-kind {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: var(--sp-2);
+    min-block-size: 28px;
+    padding-block: var(--sp-1);
+    color: var(--ink-3);
+  }
+
+  .use-kind .line-title {
+    color: var(--ink);
   }
 
   .use-bar {
@@ -793,8 +870,7 @@
     background: var(--ink-3);
   }
 
-  /* THE REST OF THE LIST BEHIND ONE PRESS: a 28 capsule on the rows' text edge, its chevron turning once they show. It was
-     "8 more" in the meta size, 18px tall, read as a stray caption under the bars. */
+  /* THE REST OF THE LIST BEHIND ONE PRESS: a 28 capsule on the rows' text edge, its chevron turning once they show. */
   .use-more {
     display: inline-flex;
     align-items: center;
@@ -802,7 +878,6 @@
     gap: var(--sp-1);
     min-block-size: var(--ctl-panel);
     margin-block-start: var(--sp-2);
-    margin-inline-start: calc(var(--head-glyph) + var(--sp-3) - var(--title-inset, 12px));
     padding-inline: var(--sp-3);
     background: var(--soft-fill);
     border: 0;
@@ -830,41 +905,13 @@
     }
   }
 
-  @media (width < 640px) {
-    .use-row.use-bar-row {
-      grid-template-columns: minmax(0, 1fr) auto;
-      column-gap: var(--sp-3);
-      row-gap: var(--sp-1);
-    }
-
-    .use-row.use-bar-row .line-title {
-      grid-column: 1 / -1;
-    }
-
-    .use-row.use-bar-row .use-bar {
-      grid-column: 1;
-      grid-row: 2;
-      align-self: center;
-    }
-
-    .use-row.use-bar-row .use-counts {
-      grid-column: 2;
-      grid-row: 2;
-      white-space: nowrap;
-    }
-
-    .use-more {
-      margin-inline-start: 0;
-    }
-  }
-
   /* THE PROJECT AN ACTION RUNS IN, quieter than its name. */
   .use-in {
     color: var(--ink-3);
   }
 
   .use-why {
-    margin: 0 0 var(--sp-3);
+    margin: 0 0 var(--sp-2);
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
@@ -888,36 +935,48 @@
     }
   }
 
-  /* ON A PHONE A ROW'S COUNTS WRAP UNDER ITS NAME rather than squeezing it, and an action's row starts at the gutter. */
+  /* ON A PHONE A ROW IS ITS NAME WITH ITS COUNTS UNDER IT, WRAPPING, AND NO BAR: the order already says which ran most, and
+     the bar beside the counts squeezed both. A project's row is one line, its name and its runs. */
   @media (width < 640px) {
-    /* THE LIST'S OWN PULL OUT BY THE TEXT EDGE STAYS, so a row's words start on the card's edge with "8 more" under them;
-       a 0 here put the rows 12 in and left "8 more" 12 short of them. */
-    .use-list {
-      margin-inline-start: calc(-1 * var(--title-inset, 12px));
+    .use-bar {
+      display: none;
     }
 
-    .use-row {
+    .use-bar-row {
       grid-template-columns: minmax(0, 1fr);
-      gap: var(--row-stack, 2px);
-    }
-
-    .use-row .line-when {
-      grid-column: 1;
-      grid-row: 2;
-      justify-content: flex-start;
-      white-space: normal;
-    }
-
-    .use-group-h {
-      flex-wrap: wrap;
       row-gap: var(--row-stack, 2px);
     }
 
-    /* ONLY A PROJECT'S HEADING SETS ITS COUNTS PAST A WELL: an action's row has none, and its "36 runs" sat indented under
-       its name as if under a missing icon (audit 6f AF22). */
-    .use-group-h .use-counts {
-      flex-basis: 100%;
-      padding-inline-start: calc(var(--well-l) + var(--sp-3));
+    .use-bar-row .line-title,
+    .use-bar-row .use-counts {
+      grid-column: 1;
+    }
+
+    .use-bar-row .use-counts {
+      grid-row: 2;
+      justify-content: flex-start;
+      text-align: start;
+      white-space: normal;
+    }
+
+    .use-project {
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: var(--sp-3);
+    }
+
+    .use-project .use-counts {
+      grid-column: 2;
+      grid-row: 1;
+      white-space: nowrap;
+    }
+
+    .use-kind {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .use-kind .use-counts {
+      grid-column: 3;
+      grid-row: 1;
     }
   }
 </style>

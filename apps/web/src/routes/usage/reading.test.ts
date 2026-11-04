@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { daysOf, namesOf, usageFromActions, usageFromLedger, words, type AccountUsage, type Allowed, type Group, type UsageView } from '../../lib/record/actions.ts';
-import { asksOf, byProject, daysSaid, earlierOf, groupName, placeOf, heatOf, offCloud, projectParts, projectsSaid, ringsOf, said, sentenceOf, weekBars, weeksSaid } from './reading.ts';
+import { asksOf, byProject, daysSaid, earlierOf, groupName, placeOf, heatOf, offCloud, projectsSaid, ringsOf, said, sentenceOf, weekBars, weeksSaid } from './reading.ts';
 
 const t = (runs: number, held = 0) => ({ runs, requests: runs * 2, bytes: runs * 1_000, ms: runs * 10, failures: 0, held });
 
@@ -96,13 +96,9 @@ test('the weeks: the latest bar in ink and a line naming the busiest week', () =
 
 const group = (name: string, runs: number): Group => ({ key: name, scope: name, name, faint: false, totals: { runs, requests: 0, bytes: 0, failures: 0 }, actions: [] });
 
-test('by project: the top project in ink, the rest greys, and no bar under two projects that ran', () => {
-  const parts = projectParts([group('Kiln', 20), group('Everywhere', 60), group('Idle', 0)]);
-  assert.deepEqual(parts?.map((p) => [p.label, p.tone]), [['Everywhere', 'ink'], ['Kiln', 'g2']]);
+test('by project: the line names who ran most', () => {
   assert.equal(projectsSaid([group('Kiln', 20), group('Everywhere', 60)]), 'Everywhere ran 75% of them.');
   assert.equal(projectsSaid([group('Kiln', 30), group('Loom', 30)]), 'Kiln and Loom ran 50% each.');
-  assert.equal(projectParts([group('Kiln', 30), group('Loom', 30)])?.some((p) => p.tone === 'ink'), false, 'a tie highlights nobody');
-  assert.equal(projectParts([group('Kiln', 20), group('Idle', 0)]), null);
 });
 
 test('the heat grid: weeks from Monday, nothing drawn for days outside the month or not yet come', () => {
@@ -159,7 +155,6 @@ test('X22: the actions in no project are "Not in a project", never "Everywhere"'
   const g = (key: string, name: string, runs: number): Group => ({ key, scope: key, name, faint: key === '', totals: { ...t(runs), ms: 0 }, actions: [] });
   assert.equal(groupName(g('', 'Everywhere', 3)), 'Not in a project');
   assert.equal(groupName(g('rec_1:kiln', 'Kiln', 3)), 'Kiln');
-  assert.deepEqual(projectParts([g('', 'Everywhere', 3), g('rec_1:kiln', 'Kiln', 1)])?.map((p) => p.label), ['Not in a project', 'Kiln']);
 });
 
 test('X22: the month before is offered only from the month the record was made', () => {
