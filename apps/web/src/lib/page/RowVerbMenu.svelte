@@ -68,7 +68,7 @@
     {@const r = m.row}
     {#if m.mode === 'row'}
       <SendItem kind={r.register} attach={[{ ref: `${r.register}#${r.seq}`, label: titleOf(entry, shape) }]} />
-      <a class="mi" role="menuitem" href={inApp(`/r/${r.register}/${r.seq}`)}><Icon name="external" size="s" /><span class="mi-name">{words.open}</span></a>
+      <a class="mi" role="menuitem" href={inApp(`/r/${r.register}/${r.seq}`)}><Icon name="arrow" size="s" /><span class="mi-name">{words.open}</span></a>
       {#if mayWrite}
         {#if shape.state && shape.tickTo}
           <button class="mi" role="menuitem" type="button" onclick={() => host.toggle(r)}>
@@ -90,32 +90,32 @@
       {/if}
     {:else if m.mode === 'due'}
       {#each daysFor(host.today()) as d (d.day)}
-        <button class="mi" role="menuitem" type="button" onclick={() => host.setDue(r, d.day)}><span class="mi-name">{d.label}</span></button>
+        <button class="mi" role="menuitem" type="button" onclick={() => host.setDue(r, d.day)}><Icon name="calendar" size="s" /><span class="mi-name">{d.label}</span></button>
       {/each}
-      <button class="mi" role="menuitem" type="button" onclick={pickDay}><span class="mi-name">{words.pickDay}…</span></button>
+      <button class="mi" role="menuitem" type="button" onclick={pickDay}><Icon name="calendar" size="s" /><span class="mi-name">{words.pickDay}…</span></button>
       {#if shape.due && dayIn(entry.fields[shape.due])}
         <hr class="mi-rule" />
-        <button class="mi" role="menuitem" type="button" onclick={() => host.setDue(r, null)}><span class="mi-name">{words.noDue}</span></button>
+        <button class="mi" role="menuitem" type="button" onclick={() => host.setDue(r, null)}><Icon name="close" size="s" /><span class="mi-name">{words.noDue}</span></button>
       {/if}
     {:else if m.mode === 'move'}
       {#each movesFor(entry, shape) as v (v)}
-        <button class="mi" role="menuitem" type="button" onclick={() => host.setState(r, v)}><span class="mi-name">{words.moveTo(shape.said[v] ?? v)}</span></button>
+        <button class="mi" role="menuitem" type="button" onclick={() => host.setState(r, v)}><Icon name="arrow" size="s" /><span class="mi-name">{words.moveTo(shape.said[v] ?? v)}</span></button>
       {/each}
     {:else if m.mode === 'project' && shape.project}
       {@const now = projectOf(entry.fields, shape)}
       {#each refOptions(shape.project.to).filter((p) => p.value !== now) as p (p.value)}
-        <button class="mi" role="menuitem" type="button" onclick={() => host.setProject(r, p.value, p.label)}><span class="mi-name">{words.fileTo(p.label)}</span></button>
+        <button class="mi" role="menuitem" type="button" onclick={() => host.setProject(r, p.value, p.label)}><Icon name="projects" size="s" /><span class="mi-name">{words.fileTo(p.label)}</span></button>
       {/each}
       {#if now !== null}
         <hr class="mi-rule" />
-        <button class="mi" role="menuitem" type="button" onclick={() => host.setProject(r, null, words.noProject)}><span class="mi-name">{words.unfile}</span></button>
+        <button class="mi" role="menuitem" type="button" onclick={() => host.setProject(r, null, words.noProject)}><Icon name="close" size="s" /><span class="mi-name">{words.unfile}</span></button>
       {/if}
     {/if}
   {:else if m?.far}
     <!-- A ROW THIS PAGE READ FROM ANOTHER LIST, with none of its own fields here: sending it, its page and its link. -->
     {@const r = m.row}
     <SendItem kind={r.register} attach={[{ ref: `${r.register}#${r.seq}`, label: m.far }]} />
-    <a class="mi" role="menuitem" href={inApp(`/r/${r.register}/${r.seq}`)}><Icon name="external" size="s" /><span class="mi-name">{words.open}</span></a>
+    <a class="mi" role="menuitem" href={inApp(`/r/${r.register}/${r.seq}`)}><Icon name="arrow" size="s" /><span class="mi-name">{words.open}</span></a>
     <button class="mi" role="menuitem" type="button" onclick={() => void putLink(r.register, r.seq)}><Icon name="link" size="s" /><span class="mi-name">{copy.copyLink}</span></button>
   {/if}
 </RowMenu>

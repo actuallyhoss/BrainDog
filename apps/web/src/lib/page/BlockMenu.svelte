@@ -73,7 +73,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { actionsFor, editOf, hideBody, laidAfter, laidOf, placeOf, saidOf, words, type Action, type ChangeAt, type Edit, type Laid, type MenuBlock } from './block-menu.ts';
+  import { actionsFor, editOf, hideBody, laidAfter, laidOf, placeOf, rowIcon, saidOf, words, type Action, type ChangeAt, type Edit, type Laid, type MenuBlock } from './block-menu.ts';
   import { layoutOf } from './layout.ts';
   import { CHANGE_EVENT, takeLine } from './slash-entry.ts';
   import { retireLook, writeLook } from './look.ts';
@@ -325,12 +325,13 @@
     type="button"
     class="bm-item"
     {role}
+    data-tone={a.id === 'remove' ? 'bad' : undefined}
     aria-checked={role === 'menuitemradio' ? a.current === true : undefined}
     aria-disabled={a.disabled ? 'true' : undefined}
     title={a.why}
     onclick={() => void press(a)}
   >
-    {#if a.kind}<svg class="bm-picture" viewBox="0 0 24 24" aria-hidden="true">{#each PICTURES[a.kind] ?? PICTURES.table ?? [] as part, i (i)}<path d={part.d} stroke-width={part.w} />{/each}</svg>{/if}
+    {#if a.kind}<span class="mi-slot"><svg class="bm-picture" viewBox="0 0 24 24" aria-hidden="true">{#each PICTURES[a.kind] ?? PICTURES.table ?? [] as part, i (i)}<path d={part.d} stroke-width={part.w} />{/each}</svg></span>{:else}<Icon name={rowIcon(a.id)} size="s" />{/if}
     <span class="bm-label">{a.label}</span>
     {#if a.current}<Icon name="check" size="s" />{/if}
     {#if a.why}<span class="bm-why">{a.why}</span>{/if}

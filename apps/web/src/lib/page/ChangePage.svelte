@@ -57,6 +57,7 @@
   } from './look.ts';
   import { words as pageWords } from './words.ts';
   import { CHANGE_PAGE_EVENT } from './slash-entry.ts';
+  import { answerVerbs } from '$lib/things/page-verbs.ts';
   import type { SayBlock, SayIn, SayList } from './say-page.ts';
 
   let {
@@ -345,6 +346,18 @@
     settingOpen = true;
   }
 
+  /* THE SAME VERBS, ASKED FROM A LINK TO THIS PAGE (`things/menu-of.ts`): pressed on a right-click elsewhere, done here. */
+  $effect(() =>
+    answerVerbs({
+      change: mayChange ? () => (open = true) : null,
+      keepLayout: mayPin ? () => void pin(!pinned) : null,
+      source: source === 'here' ? () => toggle(!showSource) : source ? toSource : null,
+      arrange: onarrange,
+      board: board && mayPin ? () => void toBoard(!board.on) : null,
+      currency: here && mayPin && here.currency !== undefined ? () => changeSetting({ kind: 'currency', code: here.currency ?? null }) : null,
+    }),
+  );
+
   /** Whether the menu holds anything at this width; one that would open on nothing is not drawn. */
   const offers = $derived(extra.length > 0 || mayChange || mayPin || source !== null || (onarrange !== null && wide.current) || (board !== null && mayPin) || (here !== null && mayPin));
 </script>
@@ -367,7 +380,7 @@
          screen reader as the group's name. -->
     <div role="group" aria-label={history ?? undefined}>
       <button type="button" class="mi" role="menuitem" onclick={() => void pin(!pinned)}
-        ><Icon name={pinned ? 'slash' : 'lock'} size="s" />{pinned ? pageWords.unpin : pageWords.pin}</button
+        ><Icon name={pinned ? 'lock-open' : 'lock'} size="s" />{pinned ? pageWords.unpin : pageWords.pin}</button
       >
       {#if history}<p class="change-history" aria-hidden="true">{history}</p>{/if}
     </div>
@@ -381,7 +394,7 @@
         <div role="group" aria-label="Hidden">
           {#each hidden as h (h.key)}
             <button type="button" class="mi change-hidden" role="menuitem" aria-label={`Show ${h.heading}`} onclick={() => void show(h)}
-              ><span class="change-hidden-name">{h.heading}</span><span class="change-show" aria-hidden="true">Show</span></button
+              ><Icon name="eye" size="s" /><span class="change-hidden-name">{h.heading}</span><span class="change-show" aria-hidden="true">Show</span></button
             >
           {/each}
         </div>
@@ -411,7 +424,7 @@
   {/if}
   {#if board && mayPin}
     <button type="button" class="mi" role="menuitem" onclick={() => void toBoard(!board.on)}
-      ><Icon name={board.on ? 'rows' : 'grid'} size="s" />{board.on ? boardOff : boardOn}</button
+      ><Icon name={board.on ? 'rows' : 'board'} size="s" />{board.on ? boardOff : boardOn}</button
     >
   {/if}
 </Menu>

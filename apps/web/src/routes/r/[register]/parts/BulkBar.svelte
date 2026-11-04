@@ -193,7 +193,7 @@
     <Menu label={copy.setState(stateLabel)}>
       {#snippet trigger()}<span class="picked-verb"><Icon name="edit" size="s" />{copy.setState(stateLabel)}<Icon name="chevronDown" size="s" /></span>{/snippet}
       {#each states as state}
-        <button role="menuitem" type="button" onclick={() => setPickedState(state)}>
+        <button role="menuitem" type="button" onclick={() => setPickedState(state)}><Icon name="check" size="s" />
           <span class="mi-name">{saidInLine(decl?.state ?? '', state)}</span>
         </button>
       {/each}

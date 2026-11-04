@@ -267,13 +267,13 @@
     <Menu label={words.menu(menuView.name)} bind:open={menuOpen} at={menu?.at ?? null}>
       {#if menuRun.stopped}
         <button type="button" role="menuitem" onclick={() => void hold(menuRun.run, 'resume', '')}><Icon name="play" size="m" /><span class="mi-name">{words.resume}</span></button>
-        {#if menuRun.stopped === 'pause'}<button type="button" role="menuitem" onclick={() => ask('stop')}><Icon name="square" size="m" /><span class="mi-name">{words.stop}</span></button>{/if}
+        {#if menuRun.stopped === 'pause'}<button type="button" role="menuitem" onclick={() => ask('stop')}><Icon name="stop" size="m" /><span class="mi-name">{words.stop}</span></button>{/if}
       {:else}
-        <button type="button" role="menuitem" onclick={() => aim.say(menuRun.run)}><Icon name="edit" size="m" /><span class="mi-name">{words.tell}</span></button>
+        <button type="button" role="menuitem" onclick={() => aim.say(menuRun.run)}><Icon name="ask" size="m" /><span class="mi-name">{words.tell}</span></button>
         <button type="button" role="menuitem" onclick={() => ask('pause')}><Icon name="pause" size="m" /><span class="mi-name">{words.pause}</span></button>
-        <button type="button" role="menuitem" onclick={() => ask('stop')}><Icon name="square" size="m" /><span class="mi-name">{words.stop}</span></button>
+        <button type="button" role="menuitem" onclick={() => ask('stop')}><Icon name="stop" size="m" /><span class="mi-name">{words.stop}</span></button>
       {/if}
-      {#if menuView.href}<a role="menuitem" href={at(menuView.href)}><Icon name="arrow-right" size="m" /><span class="mi-name">{words.open}</span></a>{/if}
+      {#if menuView.href}<a role="menuitem" href={at(menuView.href)}><Icon name="arrow" size="m" /><span class="mi-name">{words.open}</span></a>{/if}
     </Menu>
   {/if}
 {:else if drawn === 0}

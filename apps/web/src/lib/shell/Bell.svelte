@@ -23,6 +23,9 @@
   bell opens so none of it is on a screen's first load, and read only while the panel is open.
 -->
 <script lang="ts">
+  import { ownMenu } from '../ui/context-menu.ts';
+  import Menu from '../ui/Menu.svelte';
+  import { VERB_ICONS } from '../things/verbs.ts';
   import { tick } from 'svelte';
   import { page } from '$app/state';
   import { apiBase, at } from '../at.ts';
@@ -243,6 +246,9 @@
     const ok = await markAll(apiBase(), frame.upTo).catch(() => false);
     if (!ok && frame.readTo === newest) frame.readTo = was;
   }
+  /* THE BELL AT THE POINTER: open it, or go to what it says and how. */
+  let bellMenu = $state.raw<{ x: number; y: number; height: number } | null>(null);
+  const bellWords = { open: 'Open notifications', settings: 'Notification settings' } as const;
 </script>
 
 <!-- THE SHEET IS A MODAL OF ITS OWN, focused on its Close as it opens, so its arrows are heard from the window. -->
@@ -327,10 +333,14 @@
   </footer>
 {/snippet}
 
+<Menu label={words.named(fresh)} open={bellMenu !== null} at={bellMenu} onclose={() => (bellMenu = null)}>
+  <button role="menuitem" type="button" onclick={() => void show()}><Icon name="bell" size="s" /><span class="mi-name">{bellWords.open}</span></button>
+  <a role="menuitem" href={at('/settings/notifications')}><Icon name={VERB_ICONS.settings} size="s" /><span class="mi-name">{bellWords.settings}</span></a>
+</Menu>
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- NO BELL FOR SOMEBODY WHO MAY ONLY ADD (collab pass 3): the record refuses her its news, and an open bell asked for it. -->
 {#if !addOnly}
-<div class="bell" data-phone={phone ? '' : undefined} bind:this={root} onfocusout={onFocusOut}>
+<div class="bell" data-phone={phone ? '' : undefined} bind:this={root} onfocusout={onFocusOut} {@attach ownMenu((a) => (bellMenu = a))}>
   <button
     bind:this={button}
     type="button"

@@ -22,6 +22,7 @@
  * back at the version the write left it at.
  */
 
+import type { IconName } from '../ui/icons.ts';
 import { copy } from '../copy.ts';
 import { STEPS, spanLabel, spanOf, stepsFor, type Area } from '../record/arrange.ts';
 import type { LiveLook } from '../record/page-live.ts';
@@ -40,6 +41,30 @@ const BLOCK_KEY = /^[a-z][a-z0-9_-]{0,47}$/u;
 export const lookKey = (key: unknown): key is string => typeof key === 'string' && BLOCK_KEY.test(key);
 
 /** The block a menu is for, as its head knows it. `kindName` is its kind in a person's words, lower case. */
+/**
+ * THE GLYPH OF EACH ROW: the block's menu says what it does the way every menu does (`things/verbs.ts`). A width, a kind and a key
+ * number's own rows by the id's first word.
+ */
+const ROW_ICONS: Readonly<Record<string, IconName>> = {
+  up: 'arrowUp',
+  down: 'arrowDown',
+  main: 'arrow',
+  rail: 'arrow',
+  width: 'rows',
+  kind: 'grid',
+  today: 'today',
+  this: 'ask',
+  change: 'edit',
+  show: 'eye',
+  hide: 'eye-off',
+  remove: 'trash',
+  'kpi-pin': 'pin',
+  'kpi-hide': 'eye-off',
+  'kpi-auto': 'refresh',
+  'kpi-lead': 'arrowUp',
+};
+export const rowIcon = (id: string): IconName => ROW_ICONS[id] ?? ROW_ICONS[id.split('-')[0]!] ?? 'more';
+
 export type MenuBlock = { key: string; kind: string; columns: number; span: number; name: string; kindName?: string };
 
 /** Where the block stands: who is reading, its column (`null` on a page with no side column), its ends, and the widths it may take. */

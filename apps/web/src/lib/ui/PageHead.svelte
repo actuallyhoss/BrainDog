@@ -64,6 +64,7 @@
   import { slotOf } from './face.ts';
   import Define from './Define.svelte';
   import { at, here } from '../at.ts';
+  import { page as pageState } from '$app/state';
   import { copy } from '../copy.ts';
   import { openPalette } from '../palette/open.svelte.ts';
   import { inIosApp } from '../shell.ts';
@@ -78,6 +79,11 @@
   import type { Noun } from '$lib/define.svelte.ts';
   import type { IconName } from './icons.ts';
   import { untrack, type Snippet } from 'svelte';
+
+  /* THE TITLE STANDS FOR THE PAGE: a right-click on it opens the page's own "…" (the first of the head's, the list's or the
+     page's menu), and where the page has none, the link's verbs for its address. */
+  const PAGE_MENU = '.menu-trigger:has(.head-more, .change-more, .tool-more, .more-trigger)';
+  const pageAddress = $derived(pageState.url.pathname + pageState.url.search);
 
   let {
     title,
@@ -397,7 +403,7 @@
     {:else}
       <!-- The `dir="auto"` is on a SPAN around the title, not on the `h1`: the title came from whoever typed it, the glyph
            beside it is ours, and the attribute on the `h1` would resolve the direction of our own glyph too. -->
-      <div class="name-row">
+      <div class="name-row" data-thing={pageAddress} data-menu-host={PAGE_MENU}>
         <h1 class="page-name" tabindex="-1" bind:this={heading}
           >{#if well}<span class="name-well">{@render well()}</span
             >{:else if icon}<span class="name-icon" style={hue === undefined ? undefined : `--slot-ink:var(--cat-${slotOf(hue)})`} data-hue={hue === undefined ? undefined : ''}

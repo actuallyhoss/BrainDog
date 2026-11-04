@@ -943,7 +943,7 @@
           {@const origin = cameFrom.get(k.id)}
           {@const href = rowPath(k)}
           {@const u = lastBy.get(k.id)}
-          <li class="who key" data-selected={shown && shown.id === k.id ? '' : undefined} in:lineIn out:dismiss animate:flip={settle()}>
+          <li data-menu-host class="who key" data-selected={shown && shown.id === k.id ? '' : undefined} in:lineIn out:dismiss animate:flip={settle()}>
             <div class="line line-tall">
               <span class="line-mark"><IconWell name="key" size="l" /></span>
               <span class="line-main">
@@ -998,12 +998,12 @@
                     {/snippet}
                     {#if origin}<p class="mi-note">{tileWords.cameFromSaid(origin)}</p>{/if}
                     {#if action?.act === 'reveal'}
-                      <button type="button" class="mi" role="menuitem" disabled={revealing === k.id} onclick={() => void revealKey(k)}>{words.reveal}</button>
+                      <button type="button" class="mi" role="menuitem" disabled={revealing === k.id} onclick={() => void revealKey(k)}><Icon name="eye" size="s" />{words.reveal}</button>
                     {/if}
-                    <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}>{k.sealed ? words.replace : tileWords.sealValue}</button>
-                    <button type="button" class="mi" role="menuitem" onclick={() => (accessFor = k)}>{accessWords.access}</button>
+                    <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}><Icon name="refresh" size="s" />{k.sealed ? words.replace : tileWords.sealValue}</button>
+                    <button type="button" class="mi" role="menuitem" onclick={() => (accessFor = k)}><Icon name="people" size="s" />{accessWords.access}</button>
                     {#if k.grant && k.sealed}
-                      <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</button>
+                      <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}><Icon name="ban" size="s" />{copy.revokeKey}</button>
                     {/if}
                   </Menu>
                 </span>

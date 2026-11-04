@@ -61,6 +61,9 @@
   import { keepWeek, keptRead, keptWeek, readFolk, readOpenWork, readSide, readWeek, type SideRead, type SideRow, type Week } from './side-read.ts';
   import { keptPerson } from './side-copy.ts';
   import { settle } from '../ui/same.ts';
+  import { ownMenu } from '../ui/context-menu.ts';
+  import Menu from '../ui/Menu.svelte';
+  import { VERB_ICONS, thingWords } from '../things/verbs.ts';
 
   let {
     base,
@@ -113,6 +116,7 @@
     tabbed?: readonly string[];
   } = $props();
 
+  let sideMenu = $state.raw<{ x: number; y: number; height: number } | null>(null);
   const phone = $derived(mode === 'phone');
   /* THE PHONE'S MENU LISTS WHAT THE TAB BAR DOES NOT (ui-perfect, 3 Nov): Today and Needs you stood in the Menu right above
      their own tabs. A tab's place that has places under it (Money's lists) stays, as the way to them. */
@@ -486,6 +490,12 @@
   });
 </script>
 
+<!-- THE SIDEBAR'S EMPTY SPACE: its own arrangement, a right-click away. Its rows are links, each with its thing's menu. -->
+<Menu label={words.side} open={sideMenu !== null} at={sideMenu} onclose={() => (sideMenu = null)}>
+  <a role="menuitem" href={at('/settings/navigation')}><Icon name={VERB_ICONS.settings} size="s" /><span class="mi-name">{thingWords.customise}</span></a>
+  {#if !panel}<button role="menuitem" type="button" onclick={() => ontoggle?.()}><Icon name={VERB_ICONS.hide} size="s" /><span class="mi-name">{shown ? words.hide : words.show}</span></button>{/if}
+</Menu>
+
 {#snippet mark(p: SideProject)}
   {@const m = markFor(p)}
   <span class="s-pm" style={slotStyle(p.hue)} aria-hidden="true">{#if m.glyph}<Icon name={m.glyph} size="s" />{:else}{m.letter}{/if}</span>
@@ -512,7 +522,7 @@
       {/if}
     </a>
     {#if !phone}
-      <button type="button" class="s-pin tap" tabindex="-1" onkeydown={fromPin} data-on={p.pinned ? '' : undefined} aria-pressed={p.pinned} aria-label={p.pinned ? words.unpin(name) : words.pin(name)} title={p.pinned ? words.unpin(name) : words.pin(name)} onclick={() => pin(p)}>
+       <button type="button" class="s-pin tap" data-thing={p.href} tabindex="-1" onkeydown={fromPin} data-on={p.pinned ? '' : undefined} aria-pressed={p.pinned} aria-label={p.pinned ? words.unpin(name) : words.pin(name)} title={p.pinned ? words.unpin(name) : words.pin(name)} onclick={() => pin(p)}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4.75h6l-1 5.5 3.25 3.5H6.75L10 10.25zM12 13.75v5.5" /></svg>
       </button>
     {/if}
@@ -734,7 +744,7 @@
     </ul>
   </nav>
 {:else}
-  <aside class="s-side" data-panel={panel ? '' : undefined} aria-label={panel ? words.menu : words.side}>
+  <aside class="s-side" data-panel={panel ? '' : undefined} aria-label={panel ? words.menu : words.side} {@attach ownMenu((a) => (sideMenu = a))}>
     <!-- THE HEAD, ON THE BAR'S LINE: the product's mark and name, and the button that hides the column. -->
     <div class="s-shead">
       <Brand />

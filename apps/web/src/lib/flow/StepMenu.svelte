@@ -96,7 +96,7 @@
       {#each groups as group (group.label)}
         <p class="group" role="none">{group.label}</p>
         {#each group.verbs as verb (verb)}
-          <button type="button" class="mi" role="menuitem" title={helpOf(verb)} onclick={() => onpick(verb)}>{labelOf(verb)}</button>
+          <button type="button" class="mi" role="menuitem" title={helpOf(verb)} onclick={() => onpick(verb)}><Icon name="plus" size="s" />{labelOf(verb)}</button>
         {/each}
       {/each}
     </Menu>

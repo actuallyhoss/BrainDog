@@ -69,7 +69,7 @@
           </span>
         {/snippet}
         {#each strip.more as tab (tab.href)}
-          <a class="mi" role="menuitem" href={at(tab.href)} aria-current={tab.current ? 'page' : undefined}>{tab.title}</a>
+          <a class="mi" role="menuitem" href={at(tab.href)} aria-current={tab.current ? 'page' : undefined}><Icon name="doc" size="s" />{tab.title}</a>
         {/each}
       </Menu>
     </div>

@@ -99,7 +99,7 @@
       <Menu label={w.add}>
         {#snippet trigger()}<span class="add"><Icon name="plus" size="s" /><span>{w.add}</span></span>{/snippet}
         {#each addable as option (option.text)}
-          <button type="button" class="mi" role="menuitem" onclick={() => onchange(addStep(steps, option.text))}>{option.label}</button>
+          <button type="button" class="mi" role="menuitem" onclick={() => onchange(addStep(steps, option.text))}><Icon name="plus" size="s" />{option.label}</button>
         {/each}
       </Menu>
     {/if}

@@ -36,6 +36,7 @@
   last run and the next, and a failed last run is its red phrase.
 -->
 <script lang="ts">
+  import { answerVerbs } from '$lib/things/page-verbs.ts';
   /* A VERSION'S CHANGES ARE THE DIFF KIND'S LINES (`kinds/diff.css`), with this screen's own rules over them. */
   import '@braindog/skin/kinds/diff.css';
   import { createClient } from '@braindog/client';
@@ -633,6 +634,17 @@
     toasts.push(out.value.enabled ? editWords.turnedOn : editWords.turnedOff);
   }
 
+  /* THE SAME VERBS, ASKED FROM A LINK TO THIS RULE (`things/menu-of.ts`): pressed on a right-click elsewhere, done here. */
+  $effect(() =>
+    row
+      ? answerVerbs({
+          rename: () => flow.select('trigger'),
+          toggle: owner ? () => void switchTo(!row?.enabled) : null,
+          remove: owner ? () => (removeSheet = true) : null,
+        })
+      : undefined,
+  );
+
   function duplicate() {
     menuOpen = false;
     if (!row) return;
@@ -752,19 +764,19 @@
           <Menu label={editWords.more(title)} align="end" bind:open={menuOpen}>
             {#snippet trigger()}<span class="more-trigger"><Icon name="more" size="m" /><span class="vh">{editWords.more(title)}</span></span>{/snippet}
             {#if phone.current}
-              <button type="button" class="mi" role="menuitem" onclick={() => ((menuOpen = false), flow.select('trigger'))}>{editWords.rename}</button>
+              <button type="button" class="mi" role="menuitem" onclick={() => ((menuOpen = false), flow.select('trigger'))}><Icon name="edit" size="s" />{editWords.rename}</button>
             {/if}
             {#if owner}
-              <button type="button" class="mi" role="menuitem" disabled={switching} onclick={() => void switchTo(!row?.enabled)}>{row.enabled ? editWords.turnOff : editWords.turnOn}</button>
+              <button type="button" class="mi" role="menuitem" disabled={switching} onclick={() => void switchTo(!row?.enabled)}><Icon name={row.enabled ? 'pause' : 'play'} size="s" />{row.enabled ? editWords.turnOff : editWords.turnOn}</button>
             {/if}
             {#if tellsQuietly(row.body)}
               <button type="button" class="mi" role="menuitem" disabled={telling} onclick={() => ((menuOpen = false), void flipTell(row!.id))}
-                >{mutedList.includes(actorOf(row.id)) ? tellWords.start : tellWords.stop}</button
+                ><Icon name="bell" size="s" />{mutedList.includes(actorOf(row.id)) ? tellWords.start : tellWords.stop}</button
               >
             {/if}
-            <button type="button" class="mi" role="menuitem" onclick={duplicate}>{editWords.duplicate}</button>
+            <button type="button" class="mi" role="menuitem" onclick={duplicate}><Icon name="copy" size="s" />{editWords.duplicate}</button>
             {#if owner}
-              <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => ((menuOpen = false), (removeSheet = true))}>{editWords.remove}</button>
+              <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => ((menuOpen = false), (removeSheet = true))}><Icon name="trash" size="s" />{editWords.remove}</button>
             {/if}
           </Menu>
         {/if}

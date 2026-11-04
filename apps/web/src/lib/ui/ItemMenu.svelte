@@ -1,53 +1,86 @@
 <!--
   The menu of an item that has verbs and no "…" drawn: `Menu` at a rect, opened where the item was right-clicked or
-  held, or at the item from `⇧F10`. The item carries `ownMenu` (`context-menu.ts`), which hands this the point. Each
-  item is one of the thing's own verbs, so the menu adds no capability: it gathers the ones it already has where the
-  pointer is. It leads with "Send to…" for a thing that can be sent (a row, by its page's address, or what the caller
-  names), then Open for an item with a page of its own; the caller's verbs follow, and Copy link ends it.
+  held, or at the item from `⇧F10`. The item carries `ownMenu` (`context-menu.ts`), which hands this the point. It holds the
+  caller's own verbs first, the ones only this item has where it is drawn; and for an item with a page of its own, the same
+  menu that page's "…" has (`things/menu-of.ts`), read as it opens, with Open, Open in new tab and Copy link leading.
 -->
 <script lang="ts">
+  import { page } from '$app/state';
   import type { Snippet } from 'svelte';
-  import { at as inApp } from '../at.ts';
-  import { putHref } from '../clipboard.ts';
-  import { copy } from '../copy.ts';
-  import SendItem from '../send/SendItem.svelte';
-  import { refOfHref, refs } from '../send/send.ts';
-  import Icon from './Icon.svelte';
+  import { here } from '../at.ts';
+  import { inIosApp, inMacApp } from '../shell.ts';
+  import type { Shell } from '../record/boot-live.ts';
+  import { itemsOf, linkItems, needsRead, type ThingFrom, type ThingItem } from '../things/menu-of.ts';
+  import { thingOf } from '../things/thing.ts';
+  import ThingItems from '../things/ThingItems.svelte';
+  import { things } from '../things/asks.svelte.ts';
   import Menu from './Menu.svelte';
 
   let {
     label,
     at = $bindable(null),
     href = null,
-    send,
+    omit = [],
     children,
   }: {
     label: string;
     /** Where it opens; null while it is closed. */
     at?: { x: number; y: number; height: number } | null;
-    /** The thing's own page, in the app's terms (`/jobs/…`): Open and Copy link. */
+    /** The thing's own page, in the app's terms (`/jobs/…`): the link's verbs and that page's items. */
     href?: string | null | undefined;
-    /** What "Send to…" attaches, by its ref (`list#4`, `decide:…`, `run:…`); left out, a row's or a run's page names
-        it, and `null` says there is nothing to send. */
-    send?: string | null | undefined;
+    /** Items of the thing's menu this item says its own way (`state`: its own Mark done), by id or the part before `:`. */
+    omit?: readonly string[];
     children?: Snippet | undefined;
   } = $props();
 
-  const RUN = /^\/jobs\/([^/?#]+)$/u;
-  const sent = $derived.by(() => {
-    const run = href ? RUN.exec(href) : null;
-    const ref = send !== undefined ? send : run ? refs.run(decodeURIComponent(run[1]!)) : href ? refOfHref(href) : null;
-    /* A ROW'S KIND IS ITS LIST, and a question's or a run's is the word before its colon. */
-    return ref ? { kind: ref.split(/[#:]/u)[0]!, attach: [{ ref, label }] } : null;
+  /** How long the menu holds back for its read before it opens with what it has. */
+  const HOLD = 220;
+
+  let drawn = $state.raw<{ x: number; y: number; height: number } | null>(null);
+  let items = $state.raw<ThingItem[]>([]);
+  let status = $state<'ready' | 'reading' | 'failed'>('ready');
+  let turn = 0;
+
+  async function read(to: string, mine: number): Promise<void> {
+    const from: ThingFrom = { sidebar: false, wide: matchMedia('(width >= 900px)').matches, oneWindow: inIosApp || inMacApp, pathname: here(location.pathname) || '/' };
+    const link = linkItems(thingOf(to).href, from);
+    items = link;
+    status = 'reading';
+    things.wanted = true;
+    try {
+      const rest = (await itemsOf(to, page.data as unknown as Shell, from, label)).filter((i) => !omit.includes(i.id) && !omit.includes(i.id.split(':')[0]!));
+      if (mine !== turn) return;
+      items = [...link, ...rest];
+      status = 'ready';
+    } catch {
+      if (mine === turn) status = 'failed';
+    }
+  }
+
+  $effect(() => {
+    const spot = at;
+    const to = href;
+    const mine = ++turn;
+    if (!spot) {
+      drawn = null;
+      return;
+    }
+    if (!to) {
+      items = [];
+      status = 'ready';
+      drawn = spot;
+      return;
+    }
+    const reading = read(to, mine);
+    void (needsRead(thingOf(to)) ? Promise.race([reading, new Promise((go) => setTimeout(go, HOLD))]) : Promise.resolve()).then(() => {
+      if (mine === turn) drawn = spot;
+    });
   });
 </script>
 
-<Menu {label} open={at !== null} {at} onclose={() => (at = null)}>
-  {#if sent}<SendItem kind={sent.kind} attach={sent.attach} />{/if}
-  {#if href}<a role="menuitem" href={inApp(href)}><Icon name="external" size="s" /><span class="mi-name">{copy.openRow}</span></a>{/if}
-  {@render children?.()}
+<Menu {label} open={drawn !== null} at={drawn} onclose={() => (at = null)}>
+  {#if children}{@render children()}{#if href}<hr />{/if}{/if}
   {#if href}
-    {@const to = href}
-    <button role="menuitem" type="button" onclick={() => void putHref(to)}><Icon name="link" size="s" /><span class="mi-name">{copy.copyLink}</span></button>
+    <ThingItems {items} {status} onagain={() => href && void read(href, ++turn)} onclose={() => (at = null)} />
   {/if}
 </Menu>

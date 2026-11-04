@@ -388,6 +388,7 @@
           aria-rowindex={n + 2}
           aria-selected={selected ? selected.has(row.key) : undefined}
           data-menu-host={onmenu ? 'self' : menuHost?.(row.key)}
+          data-menu-thing={row.href ?? undefined}
           {@attach onmenu && pointed((p) => onmenu(row.key, p))}
           data-line={n}
           data-intent={row.tone}

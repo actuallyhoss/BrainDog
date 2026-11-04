@@ -20,6 +20,11 @@
   import StateDot from '$lib/ui/StateDot.svelte';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import { dotOf } from './list.ts';
+  import { inIosApp, inMacApp } from '$lib/shell.ts';
+  import { isProject } from '$lib/record/project.ts';
+  import { saidRowPages } from '$lib/record/row-href.ts';
+  import { isPinnedAt, pinHref, pinWords, togglePin } from '$lib/shell/pin-project.ts';
+  import { VERB_ICONS, linkWords } from '$lib/things/verbs.ts';
 
   let {
     open,
@@ -71,6 +76,14 @@
     share?: ((seq: number) => void) | undefined;
   } = $props();
 
+  /* THE ADDRESS A PIN IS KEPT AT, on a row of the list of projects. */
+  const projectHref = $derived.by(() => {
+    if (!row || !isProject(decl)) return null;
+    const seq = row.seq;
+    const own = saidRowPages().pages.find((p) => p.about?.register === register && p.about?.seq === seq);
+    return own ? pinHref(own.slug) : null;
+  });
+
   /* THE STATE THE ROW IS IN NAMES ITS FIELD ("Status: Open"), so it never reads as the menu's first verb, Open. */
   const stateName = $derived.by(() => {
     const f = decl?.fields.find((x) => x.id === decl.state);
@@ -86,10 +99,25 @@
     <!-- A glyph per verb. The rail's menu has always had them and this one never did, so four
          rows of identical grey text carried the whole distinction between opening a row and
          throwing it away. -->
-    <a class="mi" role="menuitem" href={at(`/r/${register}/${seq}`)}>
-      <Icon name="external" size="s" />
+    <a class="mi" role="menuitem" data-link-verb href={at(`/r/${register}/${seq}`)}>
+      <Icon name={VERB_ICONS.open} size="s" />
       <span class="mi-name">{copy.openRow}</span><Kbd keys="↵" />
     </a>
+    {#if !(inIosApp || inMacApp)}
+      <a class="mi" role="menuitem" data-link-verb href={at(`/r/${register}/${seq}`)} target="_blank" rel="noopener">
+        <Icon name={VERB_ICONS.newTab} size="s" />
+        <span class="mi-name">{linkWords.newTab}</span>
+      </a>
+    {/if}
+    <!-- A PROJECT'S ROW PINS AS THE PROJECT DOES, wherever it is drawn. -->
+    {#if projectHref}
+      {@const pinned = isPinnedAt(projectHref, `${register}#${seq}`)}
+      {@const name = display(register, decl.title, row.fields[decl.title]) ?? copy.thisRow}
+      <button class="mi" role="menuitem" type="button" onclick={() => void togglePin(projectHref, name, `${register}#${seq}`)}>
+        <Icon name={VERB_ICONS.pin} size="s" />
+        <span class="mi-name">{pinned ? pinWords.unpin : pinWords.pin}</span>
+      </button>
+    {/if}
     <!-- THE REGISTER'S OWN STATES, WHICH THIS MENU DID NOT CARRY.
          Five verbs, and the one a person reaches for most on a list of obligations was not among
          them: the only way to move a row's state was to select it and use the bulk bar, which is
@@ -148,13 +176,13 @@
       <Icon name="copy" size="s" />
       <span class="mi-name">{copy.copyId}</span><Kbd keys="y" />
     </button>
-    <button class="mi" role="menuitem" type="button" onclick={() => copyLink(seq)}>
-      <Icon name="link" size="s" />
+    <button class="mi" role="menuitem" type="button" data-link-verb onclick={() => copyLink(seq)}>
+      <Icon name={VERB_ICONS.copyLink} size="s" />
       <span class="mi-name">{copy.copyLink}</span><Kbd keys="⇧Y" />
     </button>
     {#if share}
       <button class="mi" role="menuitem" type="button" onclick={() => share?.(seq)}>
-        <Icon name="external" size="s" />
+        <Icon name={VERB_ICONS.share} size="s" />
         <span class="mi-name">{copy.shareOpen}</span>
       </button>
     {/if}
@@ -166,7 +194,7 @@
     {/if}
     {#if archive}
       <hr class="mi-rule" />
-      <button class="mi" role="menuitem" type="button" onclick={() => archive?.(seq)}>
+      <button class="mi" role="menuitem" type="button" data-tone="bad" onclick={() => archive?.(seq)}>
         <Icon name="archive" size="s" />
         <span class="mi-name">{copy.archive}</span><Kbd keys="⌫" />
       </button>

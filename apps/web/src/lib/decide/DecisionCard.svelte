@@ -248,7 +248,7 @@
 
   /* THE CARD'S VERBS AT THE POINTER: a right-click or a held thumb on it, or `⇧F10` (`ownMenu`). */
   let point = $state<{ x: number; y: number; height: number } | null>(null);
-  const heard = ownMenu((p) => (point = p));
+  const heard = ownMenu((p) => (point = p), card.href);
   const chosenForAll = $derived(pick?.has(question.id) ?? false);
   const bulkFix = $derived(pick?.fixes.get(question.id) ?? '');
   const optId = (key: string): string => idOf?.(key) ?? `${uid}-opt-${key}`;
@@ -729,7 +729,7 @@
 
 <!-- ASK ME LATER (today F11): a quiet clock and its words at the row's end, opening the question's own page at the step
      that puts it off. The clock alone floated under the answers on every card and said nothing until it was pressed. -->
-<ItemMenu label={card.question} bind:at={point} href={card.href} send={sendRefs.question(question.id)}>
+<ItemMenu label={card.question} bind:at={point} href={card.href}>
   {#if notNow && !kept}<a role="menuitem" href={at(`${card.href}?defer`)}><Icon name="clock" size="s" /><span class="mi-name">{queueWords.notNow}</span></a>{/if}
   {#if pick && drawn && !kept}<button role="menuitemcheckbox" type="button" aria-checked={chosenForAll} onclick={() => pick?.toggle(question)}><Icon name="check" size="s" /><span class="mi-name">{copy.select}</span></button>{/if}
 </ItemMenu>

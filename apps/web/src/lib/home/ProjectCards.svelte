@@ -25,7 +25,6 @@
   import { rowWriter } from '$lib/record/rows-write.ts';
   import Button from '$lib/ui/Button.svelte';
   import ItemMenu from '$lib/ui/ItemMenu.svelte';
-  import { refOfHref } from '$lib/send/send.ts';
   import { ownMenu } from '$lib/ui/context-menu.ts';
   import { shownName } from '$lib/shell/side.ts';
   import { agentsOn, slotStyle, takenBackFree, type ProjectCard as Card } from './project-cards.ts';
@@ -166,7 +165,7 @@
     </header>
     <ul class="cards">
       {#each inLane as c (c.key)}
-        <li data-forming="project" data-project={c.key} data-draft-card={c.draft ? '' : undefined} {@attach ownMenu((p) => ((menuCard = c), (point = p)))} {@attach settleOn(c.draft)} in:arrive out:depart animate:flip={springy()}>
+        <li data-forming="project" data-project={c.key} data-draft-card={c.draft ? '' : undefined} {@attach ownMenu((p) => ((menuCard = c), (point = p)), c.href)} {@attach settleOn(c.draft)} in:arrive out:depart animate:flip={springy()}>
           {#if c.draft}
             <div class="draft" style={slotStyle(c.hue)}>
               <a class="d-open" href={at(c.href)}>
@@ -197,13 +196,11 @@
 {/if}
 
 <!-- A CARD'S VERBS AT THE POINTER: a right-click or a held thumb on it, or `⇧F10` (`ownMenu`). -->
-<ItemMenu label={menuCard ? shownName(menuCard.name) : words.all} bind:at={point} href={menuCard?.href} send={menuCard ? refOfHref(menuCard.row) : null}>
-  {#if menuCard}
+<ItemMenu label={menuCard ? shownName(menuCard.name) : words.all} bind:at={point} href={menuCard?.href}>
+  {#if menuCard?.draft}
     {@const c = menuCard}
-    {#if c.draft}
-      <button role="menuitem" type="button" onclick={() => keep(c)}><Icon name="check" size="s" /><span class="mi-name">{words.keep}</span></button>
-      {#if takenBackFree(c, Date.now())}<button role="menuitem" type="button" onclick={() => notOne(c)}><Icon name="close" size="s" /><span class="mi-name">{words.notOne}</span></button>{/if}
-    {/if}
+    <button role="menuitem" type="button" onclick={() => keep(c)}><Icon name="check" size="s" /><span class="mi-name">{words.keep}</span></button>
+    {#if takenBackFree(c, Date.now())}<button role="menuitem" type="button" onclick={() => notOne(c)}><Icon name="close" size="s" /><span class="mi-name">{words.notOne}</span></button>{/if}
   {/if}
 </ItemMenu>
 

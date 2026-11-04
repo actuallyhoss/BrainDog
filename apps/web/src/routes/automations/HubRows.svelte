@@ -87,14 +87,14 @@
   /* A RULE'S VERBS AT THE POINTER: a right-click or a held thumb on its row, or `⇧F10` (`ownMenu`). */
   let menuRow = $state<HubRow | null>(null);
   let point = $state<{ x: number; y: number; height: number } | null>(null);
-  const heard = (r: HubRow) => ownMenu((p) => ((menuRow = r), (point = p)));
+  const heard = (r: HubRow) => ownMenu((p) => ((menuRow = r), (point = p)), r.path);
 </script>
 
 <ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.path}>
   {#if menuRow?.toggle && ontoggle}
     {@const r = menuRow}
     {@const t = menuRow.toggle}
-    <button role="menuitemcheckbox" type="button" aria-checked={t.on} disabled={busy !== null} onclick={() => ontoggle(r.key, !t.on)}><Icon name="check" size="s" /><span class="mi-name">{t.label}</span></button>
+    <button role="menuitemcheckbox" type="button" aria-checked={t.on} disabled={busy !== null} onclick={() => ontoggle(r.key, !t.on)}><Icon name={t.on ? 'pause' : 'play'} size="s" /><span class="mi-name">{t.label}</span></button>
   {/if}
   {#if menuRow?.fix}
     <a role="menuitem" href={at(menuRow.fix.path)}><Icon name="arrow" size="s" /><span class="mi-name">{menuRow.fix.label}</span></a>

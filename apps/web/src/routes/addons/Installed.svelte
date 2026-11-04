@@ -722,7 +722,7 @@
           {@const name = nameOf(state.id)}
           <!-- OFF IS SAID, NEVER ABSENT. Its rows are still in the record, and this row is the only way back to them. A row
                a refusal is waiting on keeps its verbs showing (`data-needs`). -->
-          <li class="addon-row" data-off={off ? '' : undefined} data-needs={block ? '' : undefined} in:lineIn out:dismiss animate:flip={springy()}>
+          <li class="addon-row" data-menu-host data-off={off ? '' : undefined} data-needs={block ? '' : undefined} in:lineIn out:dismiss animate:flip={springy()}>
             <div class="line addon">
               <span class="line-mark"><IconWell name={iconFor(state.id) ?? glyphOf(byId.get(state.id)?.pages, page.data.nav ?? [])} size="l" /></span>
               <a class="addon-main" href={at(`/plugins/${state.id}`)}>
@@ -736,7 +736,7 @@
                   <a class="mi" role="menuitem" href={at(`/plugins/${state.id}`)}><Icon name="settings" size="s" />{packWords.settings}</a>
                   <button type="button" class="mi" role="menuitem" onclick={() => showAdds(state.id)}><Icon name="eye" size="s" />{copy.installDiff}</button>
                   <!-- ON AND OFF IN THE "⋯", never a bare switch on the row: what stops it is said under the row. -->
-                  <button type="button" class="mi" role="menuitem" aria-label={copy.packSwitch(name)} disabled={busy !== null} onclick={() => turn(state.id, off)}><Icon name={off ? 'check' : 'close'} size="s" />{off ? words.turnOn : words.turnOff}</button>
+                  <button type="button" class="mi" role="menuitem" aria-label={copy.packSwitch(name)} disabled={busy !== null} onclick={() => turn(state.id, off)}><Icon name={off ? 'play' : 'pause'} size="s" />{off ? words.turnOn : words.turnOff}</button>
                   <!-- EVERY ADD-ON UNINSTALLS, one from the store as a built-in does (AG2): the record keeps its rows either way. -->
                   <button type="button" class="mi" role="menuitem" data-tone="bad" disabled={busy !== null} onclick={() => uninstall(state.id, name)}><Icon name="trash" size="s" />{copy.uninstall}</button>
                 </Menu>

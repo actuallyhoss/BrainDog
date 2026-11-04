@@ -119,7 +119,7 @@
     {#if shown.length > 0}<ul class="runs-list">
       {#each shown as { line, n } (line.key)}
         {@const project = line.project ? (projects.get(line.project)?.name ?? null) : null}
-        <li class="runs-line" data-bad={line.bad ? '' : undefined} {@attach line.path && ownMenu((p) => ((menuLine = line), (point = p)))}>
+        <li class="runs-line" data-bad={line.bad ? '' : undefined} {@attach line.path && ownMenu((p) => ((menuLine = line), (point = p)), line.path)}>
           <span class="runs-mark">{#if line.agent}<AgentMark kind={agentKindOf(line.agent)} size="s" />{:else}<Icon name={kindIcon(line.kind)} size="s" />{/if}</span>
           {#if line.path}<a class="runs-name" href={at(line.path)} title={line.name}>{line.name}</a>{:else}<span class="runs-name" title={line.name}>{line.name}</span>{/if}
           <span class="runs-end">

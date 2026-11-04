@@ -39,7 +39,11 @@
   import { tick, untrack } from 'svelte';
   import type { Snippet } from 'svelte';
   import { settled } from './panel.ts';
-  import { menuAt, type MenuAt } from './context-menu.ts';
+  import { menuAt, pressedDialog, takePressedLink, type MenuAt } from './context-menu.ts';
+  import { at as inApp, here as inside } from '../at.ts';
+  import { linkWords } from '../things/verbs.ts';
+  import { inIosApp, inMacApp } from '../shell.ts';
+  import Icon from './Icon.svelte';
   import Sheet from './Sheet.svelte';
 
   let {
@@ -105,6 +109,16 @@
   /** Whether this opening has been told closed, so a close reached two ways is said once. */
   let told = true;
 
+  /**
+   * THE LINK THIS OPENING CAME FROM (`context-menu.ts`): a host's menu opened from its link gains what the browser's menu
+   * would have offered there, ahead of its own items, and an item of its own saying the same (`data-link-verb`) stands
+   * down, so there is one Open. In a native app one window is all there is, so a new tab would be one more Open.
+   */
+  let link = $state<string | null>(null);
+  const oneWindow = inIosApp || inMacApp;
+  let clip: typeof import('../clipboard.ts') | null = null;
+  const onPage = (href: string): boolean => (inside(location.pathname) + location.search).split('#')[0] === href;
+
   function ended() {
     if (told) return;
     told = true;
@@ -122,6 +136,10 @@
         if (!shown) sheet = matchMedia(SHEET).matches;
         /* A MENU WITH NO BUTTON GIVES FOCUS BACK TO WHAT HAD IT, as one with a button gives it to the button. */
         if (told && anchored) back = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        if (told) {
+          link = takePressedLink();
+          if (link) void import('../clipboard.ts').then((m) => (clip = m));
+        }
         if (spot) {
           if (kept !== spot) fitted = null;
           kept = spot;
@@ -168,7 +186,17 @@
     });
   });
 
-  const items = () => [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]') ?? [])];
+  const items = () =>
+    [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]') ?? [])].filter((el) => el.getClientRects().length > 0 || sheet);
+
+  /* A MENU AT THE POINTER WHOSE ITEMS ARRIVE AFTER IT (a thing's, read as it opened) is placed again as it grows, so it never
+     runs off the screen. */
+  $effect(() => {
+    if (!open || !list || !floating || sheet) return;
+    const seen = new ResizeObserver(() => untrack(fit));
+    seen.observe(list);
+    return () => seen.disconnect();
+  });
 
   /** The gap the panel keeps from the edge of the screen. Eight, so a clamped menu reads as near the edge, not welded. */
   const GUTTER = 8;
@@ -276,9 +304,11 @@
   });
 
   /** A list at the pointer is drawn at the end of the page, so no card, scroller or stacking context around its button
-      can clip it or put it under a neighbour. */
+      can clip it or put it under a neighbour; or at the end of the dialog it was opened in, since a modal dialog makes
+      everything outside it inert and draws over it. */
   function lifted(node: HTMLElement) {
-    document.body.appendChild(node);
+    const home = root?.closest('dialog[open]') ?? (anchored ? pressedDialog() : null) ?? pressedDialog() ?? document.body;
+    home.appendChild(node);
     return () => node.remove();
   }
 
@@ -360,7 +390,15 @@
       : undefined}
     onkeydown={onListKey}
     onclick={onListClick}
+    data-link={link ? '' : undefined}
   >
+    {#if link}
+      {@const to = link}
+      {#if !onPage(to)}<a role="menuitem" href={inApp(to)}><Icon name="arrow" size="s" /><span class="mi-name">{linkWords.open}</span></a>{/if}
+      {#if !oneWindow}<a role="menuitem" href={inApp(to)} target="_blank" rel="noopener"><Icon name="external" size="s" /><span class="mi-name">{linkWords.newTab}</span></a>{/if}
+      <button role="menuitem" type="button" onclick={() => void clip?.putHref(to)}><Icon name="link" size="s" /><span class="mi-name">{linkWords.copyLink}</span></button>
+      <hr />
+    {/if}
     {@render children()}
     <!-- A MENU ITEM, SO THE ARROWS REACH IT AND THE MENU'S ROLE HOLDS ONLY ITEMS: the list's click closes the menu on it. -->
     {#if form === 'sheet'}<button type="button" class="menu-cancel" role="menuitem">{words.cancel}</button>{/if}
@@ -371,7 +409,7 @@
   {#if sheet}
     <Sheet kind="menu" title={label} bind:open onclose={ended}>{@render rows('sheet')}</Sheet>
   {:else if shown}
-    {@render rows('pop')}
+    <div {@attach lifted}>{@render rows('pop')}</div>
   {/if}
 {:else}
   <div class="menu-root" bind:this={root}>
@@ -585,6 +623,25 @@
   .menu :global([role^='menuitem'] > .mi-name) {
     flex: 1;
     min-inline-size: 0;
+  }
+
+  /* THE COLUMN THE WORDS START ON HOLDS WHICHEVER ITEM HAS WHAT: an add-on's or a record's item with no glyph of its own
+     keeps the slot empty rather than starting further left. Every item the app itself draws has one (`menu-items` gate). */
+  .menu :global([role^='menuitem']:not(.menu-cancel):not(:has(> .icon:first-child, > .mi-dot, > .mi-box, > .mi-slot, > .you-tile))::before) {
+    content: '';
+    flex: none;
+    inline-size: calc(var(--icon-m) + 4px);
+  }
+
+  /* A HOST'S OWN OPEN AND COPY LINK STAND DOWN when the menu already leads with the link's three. */
+  .menu[data-link] :global([data-link-verb]) {
+    display: none;
+  }
+
+  /* A GOING VERB LOOKS IT: last in the menu, in the warning's ink. */
+  .menu :global([role^='menuitem'][data-tone='bad']),
+  .menu :global([role^='menuitem'][data-tone='bad'] > .icon:first-child) {
+    color: var(--red);
   }
 
   .menu :global([role^='menuitem'] > .kbd-run) {

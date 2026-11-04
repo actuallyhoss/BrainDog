@@ -2140,10 +2140,10 @@
     <footer class="p-foot p-ask-foot" id="palette-ask-foot">
       <Menu label={sendWords.sheet}>
         {#snippet trigger()}<span class="p-to">{#if askTo.to === 'target' && askTo.t.live}<span class="p-live" aria-hidden="true"></span>{/if}{askLabel}<Icon name="chevronDown" size="s" /></span>{/snippet}
-        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'quick'} onclick={() => (askTo = { to: 'slash', mode: 'quick' })}>{sendWords.slash} · {sendWords.quick}</button>
-        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'deep'} onclick={() => (askTo = { to: 'slash', mode: 'deep' })}>{sendWords.slash} · {sendWords.deep}</button>
+        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'quick'} onclick={() => (askTo = { to: 'slash', mode: 'quick' })}><Icon name="slash" size="s" />{sendWords.slash} · {sendWords.quick}</button>
+        <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'deep'} onclick={() => (askTo = { to: 'slash', mode: 'deep' })}><Icon name="slash" size="s" />{sendWords.slash} · {sendWords.deep}</button>
         {#each switchable as t (t.id)}
-          <button type="button" role="menuitemradio" aria-checked={askTo.to === 'target' && askTo.t.id === t.id} onclick={() => (askTo = { to: 'target', t })}><span class="mi-name">{t.label}</span></button>
+          <button type="button" role="menuitemradio" aria-checked={askTo.to === 'target' && askTo.t.id === t.id} onclick={() => (askTo = { to: 'target', t })}><Icon name="session" size="s" /><span class="mi-name">{t.label}</span></button>
         {/each}
       </Menu>
       <button type="button" class="p-at tap" aria-label={threadWords.mention} title={threadWords.mention} onmousedown={(e) => e.preventDefault()} onclick={() => mentionField?.typeAt()}>@</button>
@@ -2220,6 +2220,7 @@
     type="button"
     class="p-row"
     role="option"
+    data-thing={row.href ?? undefined}
     id={optionId(row.id)}
     aria-selected={index === cursor && !looseFor(row)}
     tabindex={-1}

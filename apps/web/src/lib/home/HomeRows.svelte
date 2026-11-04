@@ -89,7 +89,7 @@
   {#if line.amount}<span class="hl-amount num" data-dir={line.amount.dir}>{said(line.amount.text)}</span>{/if}
 {/snippet}
 
-<ItemMenu label={menuLine?.title ?? ''} bind:at={point} href={menuLine?.href}>
+<ItemMenu label={menuLine?.title ?? ''} bind:at={point} href={menuLine?.href} omit={['state']}>
   {#if menuLine && menuLine.tick !== undefined && ontick && !isDone(menuLine)}
     {@const line = menuLine}
     <button role="menuitem" type="button" onclick={() => tick(line)}><Icon name="check" size="s" /><span class="mi-name">{words.markDone(line.title)}</span></button>
@@ -99,7 +99,7 @@
 {#if rows.kind === 'late'}
   <ul class="home-late">
     {#each late as line (line.key)}
-      <li class="hl" data-row={line.key} data-late={line.late ? '' : undefined} data-done={isDone(line) ? '' : undefined} {@attach ownMenu((p) => ((menuLine = line), (point = p)))}>
+      <li class="hl" data-row={line.key} data-late={line.late ? '' : undefined} data-done={isDone(line) ? '' : undefined} {@attach ownMenu((p) => ((menuLine = line), (point = p)), line.href)}>
         {#if line.tick !== undefined && ontick}
           <button
             type="button"

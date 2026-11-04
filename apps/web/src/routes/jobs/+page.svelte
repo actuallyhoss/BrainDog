@@ -339,7 +339,7 @@
                   {@const state = statusOf(r.status, r.lost, r.cancel)}
                   {@const outcome = outcomeOf(r)}
                   {@const took = tookOf(r, now)}
-                  <li data-live={isLive(r.status) ? '' : undefined} {@attach ownMenu((p) => ((menuRun = { name: runName(r), href: `/jobs/${encodeURIComponent(r.id)}` }), (point = p)))}>
+                  <li data-live={isLive(r.status) ? '' : undefined} {@attach ownMenu((p) => ((menuRun = { name: runName(r), href: `/jobs/${encodeURIComponent(r.id)}` }), (point = p)), `/jobs/${encodeURIComponent(r.id)}`)}>
                     <!-- THE WHOLE ROW IS THE LINK, and its name is the run's: the kind, then the outcome and the facts. -->
                     <a class="line line-tall run" href={at(`/jobs/${encodeURIComponent(r.id)}`)}>
                       <IconWell name={iconOf(r)} size="l" tone={outcome === 'running' ? 'live' : undefined} />

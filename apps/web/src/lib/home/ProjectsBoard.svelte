@@ -204,13 +204,13 @@
               {#if sec.id === 'quiet'}
                 <ul class="lines">
                   {#each sec.rows as r (r.key)}
-                    <li class="line" style={slotStyle(r.hue)} {@attach ownMenu((p) => ((menuRow = r), (point = p)))} in:arrive out:depart animate:flip={springy()}>{@render quietRow(r)}</li>
+                    <li class="line" style={slotStyle(r.hue)} {@attach ownMenu((p) => ((menuRow = r), (point = p)), r.href)} in:arrive out:depart animate:flip={springy()}>{@render quietRow(r)}</li>
                   {/each}
                 </ul>
               {:else}
                 <ul class="cards">
                   {#each sec.rows as r (r.key)}
-                    <li class="card" style={slotStyle(r.hue)} {@attach ownMenu((p) => ((menuRow = r), (point = p)))} in:arrive out:depart animate:flip={springy()}>{@render card(r)}</li>
+                    <li class="card" style={slotStyle(r.hue)} {@attach ownMenu((p) => ((menuRow = r), (point = p)), r.href)} in:arrive out:depart animate:flip={springy()}>{@render card(r)}</li>
                   {/each}
                 </ul>
               {/if}
@@ -262,13 +262,7 @@
   <div class="b-reading" data-board-reading><Waiting rows={4} /></div>
 {/if}
 
-<ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.href} send={menuRow?.key ?? null}>
-  {#if menuRow}
-    {@const m = menuRow}
-    {@const on = isPinnedAt(m.href, m.key)}
-    <button role="menuitem" type="button" onclick={() => void togglePin(m.href, m.name, m.key)}><Icon name="pin" size="s" /><span class="mi-name">{on ? pinWords.unpin : pinWords.pin}</span></button>
-  {/if}
-</ItemMenu>
+<ItemMenu label={menuRow?.name ?? ''} bind:at={point} href={menuRow?.href} />
 
 {#snippet tile(title: string, icon: 'clock' | 'calendar' | 'activity' | 'globe', tone: 'late' | 'warn' | 'plain', t: Board['week']['late'], moreHref: string | null)}
   <section class="tile" aria-label={title} data-tone={tone}>

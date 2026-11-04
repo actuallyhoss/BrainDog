@@ -78,6 +78,7 @@
   import { toldNow } from '$lib/home/told-now.svelte.ts';
   import { toldNeedOf } from '$lib/record/told-live.ts';
   import { words } from './words.ts';
+  import { answerVerbs } from '$lib/things/page-verbs.ts';
   import { waitsNow } from '$lib/home/waits.svelte.ts';
   import { leadOf } from './lead.ts';
   import { columnOrder } from './column-order.ts';
@@ -492,6 +493,8 @@
     asking = false;
     void reread();
   }
+  /* THE SAME VERBS, ASKED FROM A LINK TO THIS PAGE (`things/menu-of.ts`): pressed on a right-click elsewhere, done here. */
+  $effect(() => answerVerbs({ ask: answerable ? () => (asking = true) : null, select: answerable ? () => (selecting = true) : null }));
 
   $effect(() => {
     if (live) drew('ready');

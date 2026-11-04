@@ -41,6 +41,8 @@
   import { askAboutHref } from '$lib/query/slash.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { keepPrivate } from '$lib/record/privacy-write.ts';
+  import { rowVerbs } from '$lib/things/menu-of.ts';
+  import { VERB_ICONS, thingWords } from '$lib/things/verbs.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { currencyFor, dirOf, display, homeCurrency, iconFor, identityOf, labelOf, readableFields, spokenRow, toneOf } from '$lib/record/api.ts';
@@ -1698,14 +1700,16 @@
               ><Icon name="more" size="l" /><span class="head-vh">{copy.moreOn(rowNameSaid(id, String(row.fields[decl.title] ?? '')) || decl.one)}</span></span
             >
           {/snippet}
-          {#if changes && !archived}<button type="button" class="mi" role="menuitem" onclick={editTitle}>{copy.editRow}</button>{/if}
-          {#if changes && !archived && handFor(decl) !== null}<button type="button" class="mi" role="menuitem" data-hand-row onclick={() => (handOpen = true)}>{copy.handTo}</button>{/if}
-          <button type="button" class="mi" role="menuitem" onclick={() => clipboard.putLink(id, row.seq)}>{copy.copyLink}</button>
-          {#if live && !archived && sharable}<button type="button" class="mi" role="menuitem" data-share-row onclick={() => (sharingOpen = true)}>{copy.shareOpen}</button>{/if}
-          <!-- ONLY THE ROW'S MAKER: the record refuses anybody else, so the verb is not offered to them. -->
-          {#if mine && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setPrivate(!isPrivate)}>{isPrivate ? copy.rowShareAgain : copy.rowKeepPrivate}</button>{/if}
-          {#if mergeable}<button type="button" class="mi" role="menuitem" data-merge onclick={() => (mergeOpen = true)}>{copy.mergeWith}</button>{/if}
-          {#if changes && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</button>{/if}
+          <!-- THE ROW'S VERBS, THE ONE LIST EVERY LINK TO THIS ROW ALSO DRAWS (`things/menu-of.ts` `rowVerbs`). -->
+          {#each rowVerbs({ list: id, decl, changes, archived, mine, sharable, live }) as v (v)}
+            {#if v === 'rename'}<button type="button" class="mi" role="menuitem" onclick={editTitle}><Icon name={VERB_ICONS.rename} size="s" />{thingWords.rename}</button>
+            {:else if v === 'hand'}<button type="button" class="mi" role="menuitem" data-hand-row onclick={() => (handOpen = true)}><Icon name={VERB_ICONS.hand} size="s" />{copy.handTo}</button>
+            {:else if v === 'copyLink'}<button type="button" class="mi" role="menuitem" data-link-verb onclick={() => clipboard.putLink(id, row.seq)}><Icon name={VERB_ICONS.copyLink} size="s" />{copy.copyLink}</button>
+            {:else if v === 'share'}<button type="button" class="mi" role="menuitem" data-share-row onclick={() => (sharingOpen = true)}><Icon name={VERB_ICONS.share} size="s" />{copy.shareOpen}</button>
+            {:else if v === 'private'}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setPrivate(!isPrivate)}><Icon name={VERB_ICONS.private} size="s" />{isPrivate ? copy.rowShareAgain : copy.rowKeepPrivate}</button>
+            {:else if v === 'merge'}<button type="button" class="mi" role="menuitem" data-merge onclick={() => (mergeOpen = true)}><Icon name={VERB_ICONS.merge} size="s" />{copy.mergeWith}</button>
+            {:else if v === 'archive'}<button type="button" class="mi" role="menuitem" data-tone="bad" disabled={saving} onclick={() => void setArchived(true)}><Icon name={VERB_ICONS.archive} size="s" />{copy.rowArchive}</button>{/if}
+          {/each}
           <!-- AN ADD-ON'S ACTIONS ON THIS LIST, as the list's own row menu offers them; the row is read again after one ran. -->
           {#if row.id && !archived}<AddonRowActions register={id} row={row.id} onclose={() => {}} ondone={() => void rereadRow()} />{/if}
         </Menu>
@@ -1856,10 +1860,10 @@
                 <Menu label={fieldWords.add}>
                   {#snippet trigger()}<span class="add-field"><Icon name="plus" size="s" /><span>{fieldWords.add}</span></span>{/snippet}
                   {#each addable as f (f.id)}
-                    <button type="button" class="mi" role="menuitem" onclick={() => startEdit(f)}>{labelOf(f)}</button>
+                    <button type="button" class="mi" role="menuitem" onclick={() => startEdit(f)}><Icon name={VERB_ICONS.add} size="s" />{labelOf(f)}</button>
                   {/each}
                   {#if live && proposes}
-                    <button type="button" class="mi" role="menuitem" onclick={() => (fieldsOpen = true)}>{rowWords.newField(decl.one)}</button>
+                    <button type="button" class="mi" role="menuitem" onclick={() => (fieldsOpen = true)}><Icon name={VERB_ICONS.fields} size="s" />{rowWords.newField(decl.one)}</button>
                   {/if}
                 </Menu>
               {/if}

@@ -14,6 +14,7 @@
   without Done changes nothing.
 -->
 <script lang="ts">
+  import Icon from '$lib/ui/Icon.svelte';
   import { untrack } from 'svelte';
   import { kindsFor, WIDGET_SIZES, type WidgetSize } from 'braindog-render';
   import { apiBase } from '$lib/at.ts';
@@ -262,7 +263,7 @@
       {#if menu}
         <div class="in-menu" role="menu" aria-label={words.choose(menu.part.text || 'a window')}>
           {#each menu.options as o (o.label)}
-            <button type="button" role="menuitem" class="in-opt" onclick={() => choose(o.value)}>{o.label}</button>
+            <button type="button" role="menuitem" class="in-opt" onclick={() => choose(o.value)}><Icon name="tag" size="s" />{o.label}</button>
           {/each}
         </div>
       {/if}

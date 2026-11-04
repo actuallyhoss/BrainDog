@@ -35,7 +35,7 @@
   import { untrack } from 'svelte';
   import { apiBase, at as inApp } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import { kpiActionsFor, kpiSaidOf, kpiWritesOf, runKpiWrites, undoKpiWrites, type KpiAction, type KpiDone } from '$lib/page/block-menu.ts';
+  import { kpiActionsFor, kpiSaidOf, kpiWritesOf, rowIcon, runKpiWrites, undoKpiWrites, type KpiAction, type KpiDone } from '$lib/page/block-menu.ts';
   import type { KpiAnswered } from '$lib/page/kpis-in.ts';
   import { homeCurrency } from '$lib/record/api.ts';
   import { spokenOf } from '$lib/record/row-href.ts';
@@ -292,7 +292,7 @@
       <Menu label={copy.kpiMenu(k.name)} align="end" bind:open={() => menus[k.key] === true, (v) => (menus[k.key] = v)}>
         {#snippet trigger()}<span class="kb-mark"><Icon name="more" size="s" /><span class="kb-hidden">{copy.kpiMenu(k.name)}</span></span>{/snippet}
         {#each acts as a (a.id)}
-          <button type="button" class="kb-item" role="menuitem" onclick={() => void press(a, k)}>{a.label}</button>
+          <button type="button" class="kb-item" role="menuitem" onclick={() => void press(a, k)}><Icon name={rowIcon(a.id)} size="s" />{a.label}</button>
         {/each}
       </Menu>
     </span>

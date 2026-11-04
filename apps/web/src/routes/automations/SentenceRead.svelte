@@ -8,6 +8,7 @@
   A part with nothing else to offer is plain words, so the sentence is not a row of buttons that do nothing.
 -->
 <script lang="ts">
+  import Icon from '$lib/ui/Icon.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import type { SentenceParts } from '$lib/flow/source.ts';
   import { applyOption, composeSentence, isCurrent, sentenceWords as w, swapStep } from './sentence.ts';
@@ -35,7 +36,7 @@
       <Menu label={w.pick(part.text)}>
         {#snippet trigger()}<span class="part">{part.text}</span>{/snippet}
         {#each part.options as option, i (i)}
-          <button type="button" class="mi" role="menuitem" aria-current={isCurrent(parts.trigger, option) ? 'true' : undefined} onclick={() => onchange(composeSentence(applyOption(parts.trigger, option), parts.actions))}>{option.label}</button>
+          <button type="button" class="mi" role="menuitem" aria-current={isCurrent(parts.trigger, option) ? 'true' : undefined} onclick={() => onchange(composeSentence(applyOption(parts.trigger, option), parts.actions))}><Icon name="clock" size="s" />{option.label}</button>
         {/each}
       </Menu>
     {:else}
@@ -49,7 +50,7 @@
       <Menu label={w.pick(action)}>
         {#snippet trigger()}<span class="part">{action}</span>{/snippet}
         {#each parts.options as option, i (i)}
-          <button type="button" class="mi" role="menuitem" aria-current={option.text === action ? 'true' : undefined} onclick={() => onchange(composeSentence(texts, swapStep(parts.actions, at, option.text)))}>{option.label}</button>
+          <button type="button" class="mi" role="menuitem" aria-current={option.text === action ? 'true' : undefined} onclick={() => onchange(composeSentence(texts, swapStep(parts.actions, at, option.text)))}><Icon name="play" size="s" />{option.label}</button>
         {/each}
       </Menu>
     {:else}

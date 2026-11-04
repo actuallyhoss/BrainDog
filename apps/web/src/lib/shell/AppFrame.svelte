@@ -49,7 +49,8 @@
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { inField, notTheShells } from '$lib/a11y/typed.ts';
   import { watchKeyboard } from '$lib/a11y/keyboard.ts';
-  import { watchMenus } from '$lib/ui/context-menu.ts';
+  import { hearThings, watchMenus } from '$lib/ui/context-menu.ts';
+  import { things } from '$lib/things/asks.svelte.ts';
   import TopBar from '$lib/ui/TopBar.svelte';
   import { assets } from '$app/paths';
 
@@ -1562,6 +1563,14 @@
 
   /* A RIGHT-CLICK, A HELD THUMB OR `⇧F10` ON AN ITEM WITH A "…" OPENS THAT MENU (`context-menu.ts`), once for every screen. */
   $effect(() => watchMenus());
+  /* A RIGHT-CLICK ON ANYTHING THAT STANDS FOR A THING: the shell's one menu, its own chunk, drawn the first time (`things/ThingMenu.svelte`). */
+  $effect(() =>
+    hearThings((ask) => {
+      things.wanted = true;
+      things.ask = ask;
+      return true;
+    }),
+  );
 
   /** When a key was last typed in a field, in event time: read before any screen's own handler can move the focus. */
   let typedAt = Number.NEGATIVE_INFINITY;
@@ -1905,6 +1914,7 @@
 <!-- "CONFIRM IT'S YOU", ASKED IN PLACE (`lib/reauth`): a call refused for a stale sign-in is proved again here and sent
      once more, on every surface the frame draws, the bare ones included. -->
 <StepUp />
+{#if things.wanted}{#await import('$lib/things/ThingMenu.svelte') then { default: ThingMenu }}<ThingMenu />{/await}{/if}
 
 <!-- Debounced elsewhere; a live region that announces on every keystroke is unusable (13 §7). -->
 <div class="sr-only" role="status" aria-live="polite"></div>

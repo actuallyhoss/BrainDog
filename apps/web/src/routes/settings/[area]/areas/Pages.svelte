@@ -489,7 +489,7 @@
   {@const title = navPrefs.labelOf(p.href, p.own)}
   {@const hidden = p.inNav && navPrefs.isHidden(p.href)}
   {@const first = navPrefs.home === p.href || (p.href === '/' && navPrefs.home === null)}
-  <li class="page-row" data-hidden={hidden ? '' : undefined} in:lineIn>
+  <li class="page-row" data-menu-host data-hidden={hidden ? '' : undefined} in:lineIn>
     <div class="line" class:line-tall={first || hidden || title !== p.own || p.section !== undefined || p.app === true}>
       <span class="line-mark"><IconWell name={p.icon} size="l" /></span>
       <span class="line-main">
@@ -527,19 +527,19 @@
               <span class="page-more"><Icon name="more" size="s" /><span class="vh">{words.more(title)}</span></span>
             {/snippet}
             {#if owner && p.slug !== null}
-              <a class="mi wide-only" role="menuitem" href={at(p.href)}>{words.layout}</a>
-              <button type="button" class="mi" role="menuitem" onclick={() => startChange(p)}>{words.slash}</button>
+              <a class="mi wide-only" role="menuitem" href={at(p.href)}><Icon name="grid" size="s" />{words.layout}</a>
+              <button type="button" class="mi" role="menuitem" onclick={() => startChange(p)}><Icon name="ask" size="s" />{words.slash}</button>
             {/if}
             {#if p.inNav && !p.app && !hidden}
-              <button type="button" class="mi mi-phone" role="menuitem" disabled={edge(p.href, -1)} onclick={() => move(p.href, -1)}>{words.upWord}</button>
-              <button type="button" class="mi mi-phone" role="menuitem" disabled={edge(p.href, 1)} onclick={() => move(p.href, 1)}>{words.downWord}</button>
+              <button type="button" class="mi mi-phone" role="menuitem" disabled={edge(p.href, -1)} onclick={() => move(p.href, -1)}><Icon name="arrowUp" size="s" />{words.upWord}</button>
+              <button type="button" class="mi mi-phone" role="menuitem" disabled={edge(p.href, 1)} onclick={() => move(p.href, 1)}><Icon name="arrowDown" size="s" />{words.downWord}</button>
             {/if}
             {#if p.inNav && !p.app}
-              <button type="button" class="mi" role="menuitem" onclick={() => startRename(p)}>{words.rename}</button>
+              <button type="button" class="mi" role="menuitem" onclick={() => startRename(p)}><Icon name="edit" size="s" />{words.rename}</button>
             {/if}
-            <button type="button" class="mi" role="menuitem" onclick={() => toggleFirst(p)}>{first ? words.notFirst : words.first}</button>
+            <button type="button" class="mi" role="menuitem" onclick={() => toggleFirst(p)}><Icon name="home" size="s" />{first ? words.notFirst : words.first}</button>
             {#if p.inNav && !p.app && !hidden}
-              <button type="button" class="mi mi-phone" role="menuitem" onclick={() => toggleHidden(p, title)}>{words.hide}</button>
+              <button type="button" class="mi mi-phone" role="menuitem" onclick={() => toggleHidden(p, title)}><Icon name="eye-off" size="s" />{words.hide}</button>
             {/if}
           </Menu>
         </span>{/if}

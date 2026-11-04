@@ -126,6 +126,8 @@
   import ViewSwitch from './parts/ViewSwitch.svelte';
   import ListTable from './parts/ListTable.svelte';
   import ListRowMenu from './parts/ListRowMenu.svelte';
+  import { answerVerbs } from '$lib/things/page-verbs.ts';
+  import { thingWords as verbWords } from '$lib/things/verbs.ts';
   import ShareLazy from '$lib/sharing/ShareLazy.svelte';
   import { canShare } from '$lib/sharing/may-share.ts';
   import type { Subject } from '$lib/sharing/share-state.ts';
@@ -3259,6 +3261,16 @@
 
   /* This screen's own words: the head's overflow, named with the list it is about. */
   const headWords = { more: (list: string) => `More for ${list}`, whole: 'Add one with all its fields', sortRecent: 'Sort by most recent', sortAz: 'Sort A to Z' } as const;
+  /* THE SAME VERBS, ASKED FROM A LINK TO THIS LIST (`things/menu-of.ts`): pressed on a right-click elsewhere, done here. */
+  $effect(() =>
+    answerVerbs({
+      display: () => (displayOpen = true),
+      whole: adds && !arriving ? () => (createOpen = true) : null,
+      share: shares ? shareList : null,
+      fields: proposes ? () => (fieldsOpen = true) : null,
+      rename: owner && id !== KEYS_REGISTER ? () => (renameOpen = true) : null,
+    }),
+  );
   /* The toolbar's own "⋯": how the list is shown, and keeping what is on screen. */
 
   /* THE ADD SHEET'S EXAMPLE, from the list itself: the newest row's name, so the line shows what a name here looks like. */
@@ -3516,13 +3528,13 @@
             {#if shares && filters.length > 0}
               <button type="button" role="menuitem" data-share-view onclick={shareView}><Icon name="user-plus" size="s" />{copy.shareThisView}</button>
             {/if}
-            {#if adds && !arriving}<button type="button" role="menuitem" data-new-row onclick={() => (createOpen = true)}><Icon name="edit" size="s" />{headWords.whole}</button>{/if}
+            {#if adds && !arriving}<button type="button" role="menuitem" data-new-row onclick={() => (createOpen = true)}><Icon name="plus" size="s" />{headWords.whole}</button>{/if}
             {#if handedToMe}<a role="menuitem" href={at(handedToMe)}><Icon name="user-check" size="s" />{copy.handedToMe}</a>{/if}
             <!-- SHARE THE LIST, with somebody here, a group or an email, an owner's or an Admin's. -->
             {#if shares}<button type="button" role="menuitem" data-share-list onclick={shareList}><Icon name="user-plus" size="s" />{copy.shareSheetTitle(decl.name)}</button>{/if}
             {#if proposes}<button type="button" role="menuitem" data-fields-open onclick={() => (fieldsOpen = true)}><Icon name="rows" size="s" />{sheetWords.open}</button>{/if}
             <!-- ITS NAME, CHANGED HERE (`SettingHere.svelte`): the record's `renameList`, with an Undo, no trip to Settings. -->
-            {#if owner && id !== KEYS_REGISTER}<button type="button" role="menuitem" onclick={() => (renameOpen = true)}><Icon name="edit" size="s" />Rename this list</button>{/if}
+            {#if owner && id !== KEYS_REGISTER}<button type="button" role="menuitem" onclick={() => (renameOpen = true)}><Icon name="edit" size="s" />{verbWords.renameList}</button>{/if}
           </Menu>
           <!-- NOT WHILE THE LIST HOLDS NOTHING (empty states, 2 Nov): its empty state leads with its own Add (AH28), and the
                two drew the same offer twice, a red one in the head and a second under the sentence. -->

@@ -534,10 +534,7 @@ export function standOf(decl: RegisterDecl | undefined, value: string, late: boo
  * says part of it is done ("Part paid") the half-filled ring, and every other open state the hollow ring. NEVER RED: a
  * row's lateness is said where the date is, in the word "late" beside a red dot, and not in its state's colour.
  */
-export function dotOf(decl: RegisterDecl | undefined, value: string): 'open' | 'part' | 'done' {
-  if (decl?.done?.includes(value)) return 'done';
-  return /^part(?:$|[_\s-])/iu.test(value) ? 'part' : 'open';
-}
+export { dotOf } from '../../../../lib/things/state-dot.ts';
 
 /** Whether a row is in one of the list's finished states ("Paid", "Done"). */
 export const isDone = (decl: RegisterDecl | undefined, e: Entry): boolean =>

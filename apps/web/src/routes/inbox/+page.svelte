@@ -758,7 +758,7 @@
             onclick={() => {
               selecting = !selecting;
               if (!selecting) picked = new Set();
-            }}>{copy.decideSelect}</button
+            }}><Icon name="check" size="s" />{copy.decideSelect}</button
           >
         </Menu>
     {/if}

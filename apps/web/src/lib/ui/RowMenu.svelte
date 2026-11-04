@@ -23,6 +23,7 @@
   import type { Entry, RegisterDecl } from '../record/schema.ts';
   import Icon from './Icon.svelte';
   import Menu from './Menu.svelte';
+  import { VERB_ICONS } from '../things/verbs.ts';
 
   type Handed = { register: string; row: Entry; decl: RegisterDecl; onhanded?: ((entry: Entry) => void) | undefined };
 
@@ -66,7 +67,7 @@
         handOpen = true;
       }}
     >
-      <Icon name="people" size="m" />
+      <Icon name={VERB_ICONS.hand} size="s" />
       <span class="mi-name">{copy.handTo}</span>
     </button>
   {/if}

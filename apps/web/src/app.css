@@ -63,6 +63,13 @@
     scroll-padding-block-start: calc(env(safe-area-inset-top, 0px) + var(--sp-3));
   }
 
+  /* A HELD THUMB ON A LINK OPENS THE THING'S MENU (`context-menu.ts`), not the system's preview of it. */
+  @media (pointer: coarse) {
+    a[href] {
+      -webkit-touch-callout: none;
+    }
+  }
+
   /* IN THE APPS THE PAGE IS AN APP'S SCREEN, NOT A DOCUMENT. On the iPhone a long press on a row, a label or a button does
      not start selecting words or offer a link's callout, and a press never flashes a grey box; what a person reads or
      types at length (a paragraph, a note, a field, code) still selects. */

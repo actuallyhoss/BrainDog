@@ -151,7 +151,7 @@
         data-row={line.key}
         data-bill={bill ? '' : undefined}
         data-done={done.has(line.key) ? '' : undefined}
-        {@attach ownMenu((p) => ((menuLine = line), (point = p)))}
+        {@attach ownMenu((p) => ((menuLine = line), (point = p)), line.href)}
       >
         {#if !bill && verb}
           <!-- A TASK IS A QUIET TICK at the line's start: the row's own verb is its name for a screen reader. A box, as
@@ -185,7 +185,7 @@
   {#if more > 0 && (open || hidden === 0)}<p class="late-past">{words.past(more)}</p>{/if}
 </Tile>
 
-<ItemMenu label={menuLine?.title ?? heading} bind:at={point} href={menuLine?.href}>
+<ItemMenu label={menuLine?.title ?? heading} bind:at={point} href={menuLine?.href} omit={['state']}>
   {#if menuLine}
     {@const line = menuLine}
     {@const verb = verbOf(line, writes)}

@@ -240,12 +240,12 @@
       {#snippet trigger()}
         <span class="more-trigger"><Icon name="more" size="s" /><span class="vh">{words.moreFor(said)}</span></span>
       {/snippet}
-      <button type="button" class="mi" role="menuitem" onclick={() => flow.select(node.key)}>{words.edit}</button>
-      {#if at > 0}<button type="button" class="mi" role="menuitem" onclick={() => void move('up', true)}>{words.moveUp}</button>{/if}
-      {#if at < count - 1}<button type="button" class="mi" role="menuitem" onclick={() => void move('down', true)}>{words.moveDown}</button>{/if}
-      <button type="button" class="mi" role="menuitem" onclick={() => void move('in', true)}>{words.moveIn}</button>
-      {#if list !== ROOT}<button type="button" class="mi" role="menuitem" onclick={() => void move('out', true)}>{words.moveOut}</button>{/if}
-      <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => flow.remove(node.key)}>{words.remove}</button>
+      <button type="button" class="mi" role="menuitem" onclick={() => flow.select(node.key)}><Icon name="edit" size="s" />{words.edit}</button>
+      {#if at > 0}<button type="button" class="mi" role="menuitem" onclick={() => void move('up', true)}><Icon name="arrowUp" size="s" />{words.moveUp}</button>{/if}
+      {#if at < count - 1}<button type="button" class="mi" role="menuitem" onclick={() => void move('down', true)}><Icon name="arrowDown" size="s" />{words.moveDown}</button>{/if}
+      <button type="button" class="mi" role="menuitem" onclick={() => void move('in', true)}><Icon name="chevron" size="s" />{words.moveIn}</button>
+      {#if list !== ROOT}<button type="button" class="mi" role="menuitem" onclick={() => void move('out', true)}><Icon name="back" size="s" />{words.moveOut}</button>{/if}
+      <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => flow.remove(node.key)}><Icon name="trash" size="s" />{words.remove}</button>
     </Menu>
   </div>
 

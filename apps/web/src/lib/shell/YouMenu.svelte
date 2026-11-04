@@ -33,7 +33,7 @@
   }
 </script>
 
-<div class="you" data-phone={phone ? '' : undefined}>
+<div class="you" data-menu-host data-phone={phone ? '' : undefined}>
   <Menu label={name} align="end">
     {#snippet trigger()}
       <span class="you-hit"><span class="you-face"><span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span><span class="sr-only">{words.account}</span></span></span>
@@ -52,13 +52,13 @@
         {#if word !== null}<span class="you-level">{word}</span>{/if}
       </button>
     {/each}
-    {#if frame.refused}<span class="you-mi" role="menuitem" aria-disabled="true">{frame.refused}</span>{/if}
+    {#if frame.refused}<span class="you-mi" role="menuitem" aria-disabled="true"><Icon name="alert" size="s" />{frame.refused}</span>{/if}
     {#if frame.record || others.length > 0 || frame.refused}<hr />{/if}
     <a class="you-mi" role="menuitem" href={at('/settings')}><Icon name="settings" size="s" />{words.settings}</a>
     <a class="you-mi" role="menuitem" href={at('/settings/signing-in')}><Icon name="key" size="s" />{words.signing}</a>
     <!-- THE KEYS ARE A KEYBOARD'S: a phone is not offered them. -->
     {#if !phone}<button type="button" class="you-mi" role="menuitem" onclick={() => (frame.keys = true)}><Icon name="keyboard" size="s" />{words.keys}</button>{/if}
-    <button type="button" class="you-mi" role="menuitem" onclick={signOut}><Icon name="lock" size="s" />{copy.signOut}</button>
+    <button type="button" class="you-mi" role="menuitem" onclick={signOut}><Icon name="log-out" size="s" />{copy.signOut}</button>
   </Menu>
 </div>
 
