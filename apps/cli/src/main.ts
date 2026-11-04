@@ -530,10 +530,10 @@ const GROUPS: [string, [string, string][]][] = [
     ['statusline', "Draw Claude Code's status line"],
     ['session <verb>', 'Read or change the run this folder is in'],
     ['context', 'Print the card: this run, the next step, what waits'],
-    ['skills sync|off', "Keep this machine's skills in step with your BrainDog, after one yes"],
+    ['skills sync|off', "Keep this machine's skills in step, after one yes"],
     ['tools scan|write', 'Record MCP servers, or show the entries to write'],
     ['token create', 'Mint a token for an agent'],
-    ['bypass on|off', 'Open the switch that lets your agents act without asking'],
+    ['bypass on|off', 'Open the switch that lets agents act without asking'],
     ['runner <verb>', 'Run approved jobs on this machine'],
   ]],
   ['Records', [
