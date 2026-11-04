@@ -307,7 +307,7 @@
   .at-drop {
     margin: 0;
     padding: var(--sp-3);
-    border: 1px dashed var(--accent, var(--ink-2));
+    border: 1px dashed var(--on);
     border-radius: var(--r-ctl);
     background: var(--tile-2);
     color: var(--ink-2);
