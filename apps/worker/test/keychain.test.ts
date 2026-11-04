@@ -131,10 +131,12 @@ test('THE ROOT KEY IS READ ONLY FROM env.KEK: the doors and the alarm get keys o
      post names a key, so a malformed `KEK` fails that one post and not the email beside it. */
   assert.match(source, /leasedOpener\([\s\S]{0,200}?\(\) => keyStoreOf\(env\.KEK\)/, 'the outbox reads KEK some other way than through leasedOpener');
   /* AND THE SHARE LINKS (`shareKey`) AND THE KEYCHAIN PASSPHRASE (`passphraseRoot`, built once for both of
-     the object's `serveApi` calls) READ IT TOO. */
+     the object's `serveApi` calls) READ IT TOO, AND SO DOES CONNECT GOOGLE (`#googleKeys`, 9d732d022), to seal and open the
+     refresh token under the record's connector key, and answering null where a malformed `KEK` would otherwise throw. */
+  assert.match(source, /async #googleKeys\(api: RecordApi\) \{\s*const store = await keyStoreOf\(this\.env\.KEK\)\.catch\(\(\) => null\);/, 'Connect Google reads KEK some other way than through keyStoreOf');
   assert.equal(
     (source.match(/env\.KEK\b/g) ?? []).length,
-    10,
-    'something other than the two doors, the half they share, provisioning, the alarm, the connector runner, the export signer, the outbox signer, the share links and the keychain password reads KEK',
+    11,
+    'something other than the two doors, the half they share, provisioning, the alarm, the connector runner, the export signer, the outbox signer, the share links, the keychain password and Connect Google reads KEK',
   );
 });
