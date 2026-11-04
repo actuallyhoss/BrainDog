@@ -183,9 +183,26 @@ function categorised(rows: Entry[], categories: Entry[]): Entry[] {
     if (seqOf.has(key)) contested.add(key);
     else seqOf.set(key, c.seq);
   }
+  /* AND THE RULE THAT FILED IT, SINCE money-core 3.17.0: the steps after a category's own "Matches" find a filing rule
+     that is on and goes the line's way, and write its category with the rule itself into `filed_by`. The seed's rules read
+     the payee by how it starts, which is all this mirrors; one that fits writes over what the category's "Matches" filed. */
+  const filingRule = (row: Entry): Entry | undefined => {
+    const payee = row.fields.counterparty_text;
+    if (typeof payee !== 'string' || payee === '') return undefined;
+    return FILING_RULES.find(
+      (r) =>
+        r.fields.state === 'on' &&
+        r.fields.reads === 'payee' &&
+        r.fields.match_by === 'starts' &&
+        (r.fields.direction === row.fields.direction || r.fields.direction === 'either') &&
+        payee.toLowerCase().startsWith(String(r.fields.match).toLowerCase()),
+    );
+  };
   return rows.map((row) => {
     const already = row.fields[field];
     if (row.fields.state !== 'cleared' || row.fields.transfer !== false || (already !== undefined && already !== null && already !== '')) return row;
+    const rule = filingRule(row);
+    if (rule) return { ...row, fields: { ...row.fields, [field]: rule.fields.category as number, filed_by: rule.seq } };
     const key = String(row.fields[from] ?? '');
     const seq = contested.has(key) ? undefined : seqOf.get(key);
     return seq === undefined ? row : { ...row, fields: { ...row.fields, [field]: seq } };
@@ -200,6 +217,7 @@ export const TASKS: Entry[] = entriesOf('tasks');
 /* THE CATEGORIES ARE THE LIST THE LEDGER FILES A LINE UNDER, read off the ledger's own link as the app reads it
    (`money/ledger.ts`), so the sample names no list the ledger does not point at. */
 const CATEGORIES: Entry[] = entriesOf(String((SEED_REGISTERS.transactions?.fields ?? []).find((f) => f.id === 'category')?.to ?? ''));
+const FILING_RULES: Entry[] = entriesOf('filing_rules');
 
 /**
  * MONEY'S LEDGER WAS IN THE SEED AND NOT IN THIS INDEX, which is the whole of the bug.
@@ -221,6 +239,7 @@ export const ROWS: Record<string, Entry[]> = {
   obligations: OBLIGATIONS,
   accounts: entriesOf('accounts'),
   categories: CATEGORIES,
+  filing_rules: FILING_RULES,
   transactions: filedItself(categorised(entriesOf('transactions'), CATEGORIES), CATEGORIES),
   recurring: entriesOf('recurring'),
   installments: entriesOf('installments'),

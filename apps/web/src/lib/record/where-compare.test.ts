@@ -105,7 +105,7 @@ test('THE PROBE: every sentence measured as refused now answers, in both engines
     ['installments', 'number more than 3'],
     ['installments', 'number between 1 and 5'],
     ['obligations', 'amount is at least GBP 2400'],
-    ['obligations', 'what contains rent'],
+    ['obligations', 'what contains audit'],
   ] as const) {
     const said = await agree(register, sentence);
     assert.equal(said.refused, null, `${register}: ${sentence}`);

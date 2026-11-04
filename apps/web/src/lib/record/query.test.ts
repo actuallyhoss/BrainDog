@@ -9,6 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Kernel } from '@braindog/kernel';
@@ -318,8 +319,16 @@ for (const register of Object.keys(REGISTERS)) {
     for (const column of columnsFor(register)) {
       const field = column.field;
 
-      const up = list(register, { sort: { field, dir: 'asc' } }).entries;
-      const down = list(register, { sort: { field, dir: 'desc' } }).entries;
+      /* A LINK IS PUT IN THE NAMES' ORDER BY THE SCREEN. The record orders the id it stores, and `data/record.ts` orders an
+         answer that came whole through `sortRows`, by what the cell shows; this reader is the record's half alone. Past one
+         page the record's order is what is drawn, which the sweep cannot say anything about (see the test below). */
+      const linked = REGISTERS[register]?.fields.find((f) => f.id === field)?.type === 'ref';
+      const drawn = (dir: 'asc' | 'desc'): Entry[] => {
+        const answer = list(register, { sort: { field, dir } }).entries;
+        return linked ? sortRows(register, answer, field, dir) : answer;
+      };
+      const up = drawn('asc');
+      const down = drawn('desc');
 
       /* NOTHING IS DROPPED AND NOTHING IS INVENTED. A sort is a permutation; the fastest way to
          hide a comparator that throws is to return the rows it managed. */
@@ -369,6 +378,14 @@ for (const register of Object.keys(REGISTERS)) {
     }
   });
 }
+
+test('A LIST THAT CAME WHOLE IS PUT IN THE ORDER ITS CELLS READ, on the live path as on this one', () => {
+  const live = readFileSync(new URL('../data/record.ts', import.meta.url), 'utf8');
+  assert.match(live, /if \(a\.sort && out\.value\.cursor === null && entries\.length === out\.value\.matched\)\n\s+entries = sortRows\(register, entries, a\.sort\.field, a\.sort\.dir, names\);/u);
+  const names = (dir: 'asc' | 'desc') => sortRows('transactions', list('transactions').entries, 'account', dir).map((e) => display('transactions', 'account', e.fields.account));
+  const said = [...new Set(names('asc'))].filter((n) => n);
+  assert.deepEqual(said, ['Company card', 'Studio current account', 'Tax reserve'], 'by the name on screen, not by which account was made first');
+});
 
 test('a column whose values differ actually reorders the list', () => {
   /* THE OTHER HALF OF THE SAME QUESTION. Every assertion above is satisfied by a sort that returns

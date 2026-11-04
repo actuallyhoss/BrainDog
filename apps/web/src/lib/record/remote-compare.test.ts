@@ -149,10 +149,11 @@ test('the two chips measured before the fix open on a record the rows the sample
   assert.deepEqual(amount.record, amount.sample);
   assert.equal((amount.record as number[]).length, 25, 'the seed moved, so the measurement in the header is stale');
 
-  const rent = await address('obligations', 'f=what:contains:rent');
-  assert.deepEqual(rent.record, rent.sample);
-  /* TWO SINCE money-core 3.0.0, whose seed writes fewer obligations than the one the header measured three over. */
-  assert.equal((rent.record as number[]).length, 2, 'the seed moved, so the measurement in the header is stale');
+  /* A WORD OF THE SEED'S BILLS IN ANOTHER CASE. "Studio rent" left the bills in 29cc2072d, since the rent is a repeating
+     item now, so `rent`, the word the header measured, names none; "Audit fee" is two of them. */
+  const word = await address('obligations', 'f=what:contains:audit');
+  assert.deepEqual(word.record, word.sample);
+  assert.equal((word.record as number[]).length, 2, 'the seed moved, so the measurement in the header is stale');
 
   /* `between` OVER A DAY ARRIVES AS ONE CHIP ONLY WHEN SOMEBODY TYPES IT, since `compile` makes a
      range of days two clauses and so two chips. Typed, it is still the range. */
