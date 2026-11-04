@@ -96,8 +96,8 @@ const WORKER_INDEX = /[\\/]apps[\\/]worker[\\/]src[\\/]index\.ts$/;
 const SEAM: Rewrite[] = [
   {
     file: WORKER_INDEX,
-    from: 'override async fetch(request: Request): Promise<Response> {\n    const out = await this.#answer(request);',
-    to: "override async fetch(request: Request): Promise<Response> {\n    (globalThis as { inDoSkew?: number }).inDoSkew = Number(request.headers.get('x-in-do-clock-days') ?? 0) * 86_400_000;\n    const out = await this.#answer(request);",
+    from: 'override async fetch(request: Request): Promise<Response> {\n    /* NOTHING THROWS OUT OF THE OBJECT',
+    to: "override async fetch(request: Request): Promise<Response> {\n    (globalThis as { inDoSkew?: number }).inDoSkew = Number(request.headers.get('x-in-do-clock-days') ?? 0) * 86_400_000;\n    /* NOTHING THROWS OUT OF THE OBJECT",
   },
   {
     file: WORKER_INDEX,
