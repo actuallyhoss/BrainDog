@@ -11,6 +11,7 @@
     "./packs/lists": "./src/modules/lists.ts",
     "./packs/metrics": "./src/modules/metrics.ts",
     "./packs/modules": "./src/module-info.ts",
+    "./packs/note-facts": "./src/modules/people/note-facts.js",
     "./packs/quiet": "./src/packs/quiet.ts",
     "./packs/scripts": "./src/modules/scripts.ts",
     "./usecases": "./src/usecases/index.ts",

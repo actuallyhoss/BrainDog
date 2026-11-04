@@ -11,8 +11,8 @@
  */
 
 import type { Refusal } from '@braindog/ports';
+import { noteFacts } from '@braindog/record';
 
-import { noteFacts } from '../../seed/src/modules/people/note-facts.js';
 import { callOf } from './words.ts';
 
 type Args = Record<string, unknown>;
