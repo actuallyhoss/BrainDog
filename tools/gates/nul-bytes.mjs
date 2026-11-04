@@ -42,7 +42,7 @@
  * corruption.
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, lstatSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -104,7 +104,10 @@ function walk(dir, out = []) {
   for (const name of entries) {
     if (skipDir(name) || SKIP.has(name)) continue;
     const full = join(dir, name);
-    if (statSync(full).isDirectory()) walk(full, out);
+    /* A LINK IS NOT THIS TREE'S FILE: followed, one that holds a link to itself threw ELOOP and read nothing at all. */
+    const here = lstatSync(full);
+    if (here.isSymbolicLink()) continue;
+    if (here.isDirectory()) walk(full, out);
     else out.push(full);
   }
   return out;
