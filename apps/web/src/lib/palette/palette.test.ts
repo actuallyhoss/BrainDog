@@ -106,10 +106,10 @@ test('A ROW THAT CANNOT RUN RIGHT NOW IS ABSENT, NOT GREYED OUT', () => {
 });
 
 test('THE ROW THAT MAKES SOMETHING is declared, admitted, and there only while the query is a whole sentence', () => {
-  /* TWENTY-ONE, with Slash conversations; twenty with Import a statement; nineteen before it, and sixteen before the three money rows; it was fifteen: `New page` joined the add row and `Customise` (`new-page.test.ts`). The
+  /* TWENTY-TWO, with Import contacts; twenty-one with Slash conversations; twenty with Import a statement; nineteen before it, and sixteen before the three money rows; it was fifteen: `New page` joined the add row and `Customise` (`new-page.test.ts`). The
      count is exact on purpose, because a row added or lost here is a change to what every screen can reach, and it
      should arrive with the line that says so. */
-  assert.equal(COMMANDS.length, 21, `the palette declares ${COMMANDS.length} rows`);
+  assert.equal(COMMANDS.length, 22, `the palette declares ${COMMANDS.length} rows`);
   const add = COMMANDS.find((c) => c.id === 'c-add');
   assert.ok(add, 'no row adds anything');
   assert.equal(admits(add), null, `the add row is refused: ${admits(add)}`);
@@ -464,15 +464,18 @@ test('a look row and its toast say where the change is kept: this record, this d
     assert.doesNotMatch(s ?? '', /\u2014/u, 'an em dash in a look line');
 });
 
-test("the palette is solid over a scrim, centred, with no glass anywhere (frame F6, 2.A.15)", () => {
+test("the palette is clear glass at the sheet radius over a scrim, centred, and the solid tile where it cannot blur or less transparency is asked for (ops look, 440f496b4)", () => {
   const code = readFileSync(new URL('./Palette.svelte', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
   const style = code.slice(code.indexOf('<style>'));
-  /* NO GLASS: not the skin's blur, not Safari's, not a literal. */
-  assert.doesNotMatch(style, /backdrop-filter/u, 'the palette still blurs what is behind it');
-  assert.doesNotMatch(style, /--glass/u, 'the palette still reads a glass token');
-  /* THE SCRIM UNDER IT, and no shadow on it: separation is the scrim and one hairline. */
+  /* GLASS ONLY ON THE SKIN'S TOKENS, the tile under each one where the skin has none, and the modal shadow on its edge. */
+  assert.match(style, /\.palette \{[^}]*background: var\(--glass-regular, var\(--tile\)\);[^}]*backdrop-filter: var\(--glass-filter, none\);/u);
+  assert.match(style, /\.palette \{[^}]*box-shadow: var\(--glass-edge, inset 0 0 0 1px var\(--rule-strong\)\), var\(--elev-modal, none\);/u);
+  /* WHERE IT CANNOT BLUR, OR LESS TRANSPARENCY IS ASKED FOR, NOTHING BEHIND IT READS THROUGH. */
+  assert.match(style, /@supports not \(backdrop-filter: blur\(1px\)\) \{\s*\.palette \{\s*background: var\(--tile\);/u);
+  assert.match(style, /@media \(prefers-reduced-transparency: reduce\) \{\s*\.palette \{\s*background: var\(--tile\);\s*backdrop-filter: none;/u);
+  /* THE SCRIM UNDER IT. */
   assert.match(style, /\.palette::backdrop \{[^}]*background: var\(--scrim\);/u);
   assert.doesNotMatch(style, /box-shadow: var\(--e\d\)/u);
-  /* CENTRED, 640 WIDE OR THE SCREEN LESS 16 A SIDE, 96 FROM THE TOP. */
-  assert.match(style, /\.palette \{[^}]*inset-block-start: 96px;[^}]*inline-size: min\(640px, calc\(100vw - 2 \* var\(--sp-4\)\)\);[^}]*margin: 0 auto;/u);
+  /* CENTRED, 640 WIDE OR THE SCREEN LESS 16 A SIDE, 12% FROM THE TOP. */
+  assert.match(style, /\.palette \{[^}]*inset-block-start: 12vh;[^}]*inline-size: min\(640px, calc\(100vw - 2 \* var\(--sp-4\)\)\);[^}]*margin: 0 auto;/u);
 });

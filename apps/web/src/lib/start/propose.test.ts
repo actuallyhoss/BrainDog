@@ -193,7 +193,7 @@ test("MARIAM'S SENTENCE: her as you, her words lit where she typed them, the sho
   assert.equal(p.places.find((x) => x.name === 'Orders')?.phrase, 'a small candle shop');
   assert.equal(p.places.find((x) => x.name === 'Clients')?.phrase, 'Mariam', 'People, called Clients, is there because she is');
   assert.equal(p.places.find((x) => x.name === 'Money')?.phrase, 'who owes me');
-  assert.ok(p.modules.includes('portfolio'), 'Projects is still installed, since Money stands on it');
+  assert.ok(!p.modules.includes('portfolio'), 'Projects does not come with Money: a project is only a link since money-core took it as one (4b137c806)');
   assert.equal(p.currency, null, 'no currency typed and none from the device');
   /* NO COUNT AND NO ENTRY SHE DID NOT TYPE: a place is its name and the words that turned it on, and nothing is filled. */
   for (const x of p.places) assert.deepEqual(Object.keys(x).sort(), ['at', 'id', 'kind', 'name', 'phrase']);
@@ -222,8 +222,8 @@ test('EVERY PLACE SAYS THE WORDS THAT TURNED IT ON, and a part that only comes w
   const money = p.places.find((x) => x.id === 'money-core');
   assert.equal(money?.phrase, 'charge');
   assert.deepEqual(money?.at, [2, 8]);
-  assert.equal(p.places.find((x) => x.id === 'portfolio'), undefined, 'Projects comes only because Money stands on it, so it is not listed');
-  assert.ok(p.modules.includes('portfolio'), 'and it is still installed');
+  assert.equal(p.places.find((x) => x.id === 'portfolio'), undefined, 'nobody spoke of a project, so it is not listed');
+  assert.ok(!p.modules.includes('portfolio'), 'and it does not come with Money, which only links to a project (4b137c806)');
   /* A PART LEANED ON IS LISTED WHERE A PHRASE OF THEIRS ASKED FOR IT. */
   const asked = propose('I charge 500 a month for coaching and track my projects', CTX);
   assert.ok(asked.places.some((x) => x.id === 'portfolio' && x.phrase !== null), 'a part asked for by name is listed');
@@ -376,7 +376,7 @@ test('A USE CASE TAKEN BESIDE ANOTHER CLAIMS ITS WORDS: a student with a small s
   const p = propose("I'm a student and I run a small shop", CTX);
   assert.equal(p.usecase, 'student');
   assert.deepEqual(p.also, ['shop']);
-  assert.deepEqual(linesOf(p), ['student > Courses, Assignments, Study sessions and Reading list', 'a small shop > Orders and Products']);
+  assert.deepEqual(linesOf(p), ['student > Courses', 'a small shop > Orders and Products']);
   for (const name of ['Orders', 'Products']) assert.equal(p.places.find((x) => x.name === name)?.phrase, 'a small shop', `${name} says the words that turned it on`);
   assert.equal(p.places.find((x) => x.id === 'portfolio'), undefined, 'the shop holds the phrase, so it asks for no Projects');
 });

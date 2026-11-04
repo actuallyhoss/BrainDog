@@ -69,14 +69,15 @@ test('AN ENTRY IS PROPOSED ONLY WHEN THE SENTENCE FILLS IT COMPLETELY', () => {
   assert.ok(invoice.party !== undefined && invoice.party < full.rows.indexOf(invoice), 'the client does not come before the invoice');
 });
 
-test('A MODULE NOTHING POINTED AT DOES NOT ARRIVE, and what one leans on still does', () => {
+test('A MODULE NOTHING POINTED AT DOES NOT ARRIVE, and one only linked to does not either', () => {
   /* The maths student's Projects, which the reader answers for any sentence at all. */
   assert.ok(!said('I keep losing track of my coursework deadlines').modules.includes('portfolio'));
-  /* Money leans on a project, so Projects comes with it. The person an invoice is to is a link and not a dependency
-     since money-core 3.0.0 (`LINKS` in `packages/seed/src/packs/first-party.ts`), so People does not arrive with it
-     when the sentence named nobody. */
+  /* Money leans on nothing now. The person an invoice is to is a link and not a dependency since money-core 3.0.0, and the
+     project it is for since 4b137c806 (`LINKS` in `packages/seed/src/packs/first-party.ts`), so neither People nor Projects
+     arrives with it when the sentence named neither. */
   const money = said('I send invoices').modules;
-  for (const m of ['portfolio', 'money-core']) assert.ok(money.includes(m), `${m} did not come with Money`);
+  assert.ok(money.includes('money-core'), 'money-core did not come with Money');
+  assert.ok(!money.includes('portfolio'), 'Projects came with Money, though the project a bill is for is only a link');
   assert.ok(!money.includes('people'), 'People came with Money, though who an invoice is to is only a link');
 });
 
