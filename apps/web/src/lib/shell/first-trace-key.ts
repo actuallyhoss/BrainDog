@@ -19,8 +19,10 @@ const kindOf = (inner: string): string | null => {
 export async function firstTrace(address: string): Promise<unknown | null> {
   try {
     const { here } = await import('../at.ts');
-    const [path] = address.split('?');
-    const kind = kindOf(here(path ?? '/').replace(/\/$/u, ''));
+    const [path, query] = address.split('?');
+    const inner = here(path || '/').replace(/\/$/u, '');
+    /* THE ROOT WITH A QUERY IS ANOTHER SCREEN (`/?work`, `/?menu`), and not Today. */
+    const kind = inner === '' && query ? null : kindOf(inner);
     if (kind === null) return null;
     const { default: all } = await import('./first-traces.json');
     const band = innerWidth < 900 ? 'p' : 'w';

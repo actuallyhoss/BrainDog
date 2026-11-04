@@ -49,6 +49,9 @@ export function saveCopy(base: string, shell: Shell, now: number = Date.now(), s
 export function dropCopy(store: Store | null = here()): void {
   try {
     store?.removeItem(COPY_KEY);
+    /* AND THE PAGES' KEPT OUTLINES (`shell/page-trace.ts`): boxes only, and still this person's pages. */
+    const held = (globalThis as { localStorage?: Storage }).localStorage;
+    if (held && store === held) for (const k of Object.keys(held)) if (k.startsWith('bd_tr')) held.removeItem(k);
   } catch {
     /* nothing to drop */
   }

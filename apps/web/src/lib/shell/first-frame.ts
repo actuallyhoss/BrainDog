@@ -9,7 +9,7 @@
  * WHEN THE SCREEN SAYS IT HAS DRAWN (`data-screen`) the outline goes, and at rest the page is read for next time
  * (`page-trace.ts`, its own chunk, so nothing on the way to the first screen pays for it).
  *
- * A PAGE WITH NOTHING KEPT draws the shape a typical record's page has (`first-traces.ts`, its own chunk).
+ * A PAGE WITH NOTHING KEPT draws the shape a typical record's page has (`first-traces.json`, its own chunk).
  */
 import { firstTrace } from './first-trace-key.ts';
 
@@ -110,10 +110,25 @@ async function readPage(address: string): Promise<void> {
   if (main === null || addressNow() !== address) return;
   /* ONLY A PAGE THAT DREW: a refusal or an error is not its shape, and a page read offline may be a part of itself. */
   if (main.getAttribute('data-screen') === 'refused' || document.querySelector('.offline-line') !== null) return;
+  /* NOR WHILE SEEING THE RECORD AS SOMEBODY ELSE: nothing kept is drawn or kept then (`+layout.ts`). */
+  try {
+    if (sessionStorage.getItem('braindog.see-as') !== null) return;
+  } catch {
+    return;
+  }
   const { keepTrace, traceNow } = await import('./page-trace.ts');
   if (addressNow() !== address) return;
   const trace = traceNow();
   if (trace !== null && trace.r.length > 0) keepTrace(address, trace);
+}
+
+/** With no frame to stand, the page is still read at rest. */
+function settleOnly(address: string): void {
+  const wait = (): void => {
+    if (document.querySelector(MAIN_DRAWN) !== null) return settle(address);
+    readTimer = setTimeout(wait, 500);
+  };
+  wait();
 }
 
 const addressNow = (): string => location.pathname.replace(/\/$/u, '') + location.search;
@@ -127,7 +142,8 @@ export function pageOpened(first: boolean): void {
   clearTimeout(readTimer);
   stop();
   const f = door();
-  if (f === undefined) return;
+  /* A FRAME THAT HAS GONE (a page with no shell came first) draws nothing, and a page's waits are its own again. */
+  if (f === undefined || document.getElementById('ff') === null) return settleOnly(address);
   if (first === false && document.querySelector(MAIN_DRAWN) !== null) return settle(address);
   const has = first ? document.querySelector('#ff .ff-page > * > *') !== null : f.draw(address);
   if (!has) {
