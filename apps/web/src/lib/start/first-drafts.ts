@@ -27,6 +27,7 @@
 import { AGENTS_PACK } from '@braindog/seed/packs';
 import { moduleOfList } from '@braindog/seed/packs/modules';
 import { moduleName } from '@braindog/seed/usecases/names';
+import { exponentOf } from 'braindog-render';
 import type { TellList, Told } from '../tell/read.ts';
 import { PEOPLE } from '../who.ts';
 import type { SetupOffer, SetupReply } from './ask.ts';
@@ -70,15 +71,6 @@ export type FirstDraft = {
   rename?: { list: string; was: string; name: string };
 };
 
-/** How many places after the point a currency keeps (2 for pounds, 0 for yen). */
-function decimalsOf(currency: string): number {
-  try {
-    return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
-  } catch {
-    return 2;
-  }
-}
-
 /** The field types a draft may ask for in place, as the card can take them: a date, words, or a number. */
 const ASKABLE: Readonly<Record<string, 'day' | 'text' | 'number'>> = { day: 'day', text: 'text', int: 'number', decimal: 'number', number: 'number' };
 
@@ -92,7 +84,7 @@ export function filled(d: FirstDraft, value: string | number): FirstDraft {
   if (n.type === 'money') {
     const units = Number(v.replace(/[,\s]/gu, ''));
     if (v === '' || !Number.isFinite(units) || units <= 0 || !n.currency) return d;
-    const value = { amount: Math.round(units * 10 ** decimalsOf(n.currency)), currency: n.currency };
+    const value = { amount: Math.round(units * 10 ** exponentOf(n.currency)), currency: n.currency };
     const { needs: _done, ...rest } = d;
     return { ...rest, amount: { minor: value.amount, currency: value.currency }, rows: d.rows.map((r, i) => (i === n.row ? { ...r, fields: { ...r.fields, [n.field]: value } } : r)) };
   }
