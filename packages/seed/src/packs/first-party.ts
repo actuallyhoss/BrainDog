@@ -999,6 +999,8 @@ const signalsOf = (id: FirstPartyId): readonly string[] =>
  *   (`page.all-numbers`). estate 2.8.1: Services says only what it costs a month, which no tile says whole, and not the
  *   questions Waiting on you counts (`page.estate`). money-core 3.38.5: Filing rules drops what the rules filed in 30
  *   days, said by each rule under it (`page.money-rules`).
+ * - money-core 3.38.6 (4 Nov, test triage): `categories.correction` and `transactions.corrects` read "A correction and
+ *   not spending". A comma ends a clause, so the record could not read a sentence about the name it prints.
  * - people 4.7.0 (fin-people1104, 3 Nov, Sam: "instead of just long text, i want them to be parsed as fields ... his
  *   name should be a field, discord username a field"): `register.people` gains a field for each fact a note used to
  *   say (`legal_name`, `goes_by`, `relation`, `titles`, `about`, `nationality`, `country`, `city`, `timezone`, `birthday`,
@@ -1023,7 +1025,7 @@ export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   core: '1.3.1',
   portfolio: '1.31.2',
   people: '4.7.1',
-  'money-core': '3.38.5',
+  'money-core': '3.38.6',
   estate: '2.8.1',
   work: '1.26.1',
 };

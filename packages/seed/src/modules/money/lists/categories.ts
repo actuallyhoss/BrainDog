@@ -151,7 +151,7 @@ export const CATEGORIES_REGISTER: MoneyRegister = {
      * leaves out what is filed under it, through the Ledger's `corrects` (`./transactions.ts`), while what each account
      * holds still counts it. Asked once of a category whose name says so (`scripts/category-correction.js`).
      */
-    { id: 'correction', label: 'A correction, not spending', type: 'bool', default: false },
+    { id: 'correction', label: 'A correction and not spending', type: 'bool', default: false },
     { id: 'state', label: 'Status', type: 'enum', values: ['live', 'retired'], default: 'live', index: true, required: true },
     { id: 'note', type: 'text' },
   ],

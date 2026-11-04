@@ -225,6 +225,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '2.0.0', notes: 'Role no longer offers registrar. A row that holds it keeps it as its own word.' },
   ],
   'money-core': [
+    { version: '3.38.6', notes: 'A category or line marked as a correction reads "A correction and not spending", so a filter on it can be typed back.' },
     { version: '3.38.5', notes: 'Filing rules no longer opens on a count of what the rules filed in 30 days. Each rule still says it.' },
     {
       version: '3.38.4',

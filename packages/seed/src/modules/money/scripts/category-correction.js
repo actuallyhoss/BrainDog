@@ -4,7 +4,7 @@
  * A count of the cash files what it cannot explain under Discrepancy (the Count the cash add-on), and an import brings
  * a ledger's own balance fixes under a name like it. Such a line is the gap between what the record thought an account
  * held and what it held, not money spent, and Reports led "Spending by category" with Discrepancy at a tenth of
- * everything. Spending leaves out what is filed under a category ticked "A correction, not spending" (`correction`,
+ * everything. Spending leaves out what is filed under a category ticked "A correction and not spending" (`correction`,
  * read on each line as `corrects`), and nobody had ticked it.
  *
  * WHEN A LINE IS FILED UNDER A CATEGORY WHOSE NAME SAYS IT IS A CORRECTION, the category is asked about once, by name:

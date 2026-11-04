@@ -35,7 +35,7 @@ export const CATEGORY_STAYS_RULES: Record<string, unknown>[] = [
    * A CATEGORY OF CORRECTIONS ASKS ONCE WHETHER TO LEAVE IT OUT OF SPENDING (live check of 30 October, 20,
    * `scripts/category-correction.js`): a line filed under a category whose name says it holds corrections (a count's
    * Discrepancy) starts the question, once a category, and the sweep reads the thirteen months Reports reads. Yes is
-   * `category-correction-yes`, which ticks the category's "A correction, not spending".
+   * `category-correction-yes`, which ticks the category's "A correction and not spending".
    */
   {
     rule: 'category-correction-asks',
