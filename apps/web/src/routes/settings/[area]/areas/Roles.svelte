@@ -113,6 +113,9 @@
   }
   .matrix-wrap {
     overflow-x: auto;
+    /* THE BOX SCROLLS AND THE PAGE DOES NOT: without this the table's width held the column open, and at 900 to 940 the
+       whole document scrolled sideways. */
+    contain: inline-size;
     border-radius: var(--r-ctl);
   }
   .matrix {

@@ -26,6 +26,7 @@
   import Notice from '$lib/ui/Notice.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { page } from '$app/state';
   import { backLine, connectUrl, figuresOf, googleDisconnect, googleStatus, googleSyncNow, googleWords as w, type GoogleStatus } from './google.ts';
 
   let {
@@ -59,7 +60,9 @@
   });
 
   async function load() {
-    status = await googleStatus();
+    /* ONLY THE CLOUD HAS THESE DOORS. A self-host answered 404 on every open, one red line in the console for a question
+       with a known answer. */
+    status = (page.data as { host?: string }).host === 'self-host' ? null : await googleStatus();
     read = true;
     onstatus?.(status);
   }

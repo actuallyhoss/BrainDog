@@ -402,6 +402,19 @@
   }
 
   /* A TIME IS NEVER CUT: "21:00" and the select's mark need eight characters, whatever the row has left. */
+  @media (pointer: coarse) {
+    .quiet-time.quiet-time {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* AT 320 THE LINE TAKES TWO: nine characters of time and the word "to" outran it by 13px. */
+  @media (width < 340px) {
+    .quiet-pickers.quiet-pickers {
+      flex-wrap: wrap;
+    }
+  }
+
   .quiet-time {
     min-inline-size: 10ch;
     min-block-size: var(--ctl-h);

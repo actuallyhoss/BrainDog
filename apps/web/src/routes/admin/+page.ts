@@ -5,7 +5,9 @@
  */
 import { error, type LoadEvent } from '@sveltejs/kit';
 
-export async function load({ fetch }: Pick<LoadEvent, 'fetch'>): Promise<void> {
+export async function load({ fetch, parent }: Pick<LoadEvent, 'fetch' | 'parent'>): Promise<void> {
+  /* A SELF-HOST HAS NO OPERATOR: not found without asking, and without a red line in the console. */
+  if (((await parent()) as { host?: string }).host === 'self-host') error(404, 'Not found');
   const res = await fetch('/account/ops/me', { headers: { accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' }).catch(() => null);
   if (res === null || !res.ok) {
     /* AN ANSWER NOBODY READS IS A REQUEST STILL OUT, as Chromium counts it. */
