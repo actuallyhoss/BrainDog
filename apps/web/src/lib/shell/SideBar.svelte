@@ -439,11 +439,10 @@
 
   /* A PAGE ROW NOW, SO IT IS THERE WITH NO PROJECT YET (4 Nov): it is how the first one gets made, and the rail shows it too. */
   const showProjects = $derived(model.projects !== null);
-  /* THE PAGE IDEAS ARE A ROW OF THEIR OWN AFTER THE PLACES (plan F1): in the foot beside Settings, "2 page ideas / Review"
-     read like a setting, and as a quiet line under Projects they read as the projects' (4 Nov), which they are not: they
-     are about the whole record's pages. They stay in the foot only where no projects are drawn, and wait for the first
-     read to say which, so the row never starts in the foot and moves up. */
-  const penUnder = $derived(pen !== null && showProjects && read !== null && split !== null);
+  /* THE PAGE IDEAS ARE A ROW OF THEIR OWN AT THE COLUMN'S FOOT, JUST ABOVE THE DIVIDER (Sam, 4 Nov): about the whole record's
+     pages, so neither under Projects, where they read as the projects', nor in the foot beside Settings, where they read
+     like a setting. They wait for the first read, so the row never appears and then moves. */
+  const penShown = $derived(pen !== null && answered);
   /* THE PROJECTS' ROW: lit on the page, and on a project not pinned here, whose way back it is. A pinned project lights its
      own row under it. Its own lists stand open while you are in them, or on the phone once its button was pressed. */
   const projectsLit = $derived.by(() => {
@@ -629,8 +628,8 @@
 {/snippet}
 
 {#snippet penPart()}
-  {#if penUnder && pen}
-    <ul class="s-list">
+  {#if penShown && pen}
+    <ul class="s-list s-pen">
       <li in:placeIn={{ hold: settling() }}>
         <a class="s-row s-link tap" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><Icon name="alert" size="m" /><span class="s-name">{pen.label}</span></a>
       </li>
@@ -665,11 +664,6 @@
 {#snippet footPart()}
   <ul class="s-list s-end">
     {#each model.foot as l (l.href)}
-      {#if l.href === '/settings' && pen && answered && !penUnder}
-        <li>
-          <a class="s-row s-link tap" href={at(pen.href)} aria-current={isLit(pen.href) ? 'page' : undefined}><Icon name="alert" size="m" /><span class="s-name">{pen.label}</span></a>
-        </li>
-      {/if}
       {@render link(l, false)}
     {/each}
   </ul>
@@ -691,7 +685,7 @@
         </ul>
       </nav>
     {/if}
-    {#if (placed && model.more.length > 0) || penUnder}
+    {#if (placed && model.more.length > 0) || penShown}
       <div class="s-tile">
         {@render morePart()}
         {@render penPart()}
@@ -1266,6 +1260,19 @@
   /* AND NEVER RIGHT UNDER WHAT COMES BEFORE IT, however long the column runs. */
   .s-scroll > :has(+ .s-end) {
     margin-block-end: var(--sp-5);
+  }
+
+  /* THE PAGE IDEAS TAKE THE SPARE ROOM ABOVE THEM, so they sit on the divider rather than under the last place. */
+  .s-pen {
+    margin-block-start: auto;
+  }
+
+  .s-scroll > .s-pen:has(+ .s-end) {
+    margin-block-end: var(--sp-2);
+  }
+
+  .s-pen + .s-end {
+    margin-block-start: 0;
   }
 
   /* ── The narrow rail ── */
