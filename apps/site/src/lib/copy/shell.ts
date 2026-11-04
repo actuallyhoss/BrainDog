@@ -23,7 +23,7 @@ export const shell = {
       description: LAUNCH.billing
         ? 'Free to start with 3 connected agents. Cloud and Cloud Plus add more agents, more questions and, on Cloud Plus, your team.'
         : 'BrainDog is free while invite only: every feature, 3 connected agents and 20 questions to the built-in assistant a ' +
-          'month. Paid plans come later, priced at launch.',
+          'month. Paid plans come later.',
     },
     agents: {
       title: 'Connect your agents · BrainDog',
