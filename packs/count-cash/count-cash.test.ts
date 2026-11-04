@@ -104,9 +104,11 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
      2.0.0 BESIDE THE PUBLISHED 1.4.2: a count can carry notes and coins, say how its difference is recorded, and no
      longer needs a typed total. Fields added and one made optional, so a major.
      2.0.1 BESIDE THE PUBLISHED 2.0.0: the way into the counter on an account's page follows What moved, the table the
-     page now has where it had Last moves. One word in an add, so a patch. */
-  assert.equal(file.value.pack.manifest.version, '3.0.4');
-  assert.match(PACK.changes, /A count can now be made by note and coin/);
+     page now has where it had Last moves. One word in an add, so a patch.
+     3.0.5 BESIDE THE PUBLISHED 3.0.4: the three on Money follow Cash now does not add up, since Heads up, which they
+     followed, left Money at money-core 3.34.0 (aaf8e24df) and they had fallen to the foot of the page. A patch. */
+  assert.equal(file.value.pack.manifest.version, '3.0.5');
+  assert.match(PACK.changes, /back under Cash now on Money/);
   const counts = PACK.declarations.find((d) => d.register === 'cash_counts') as { fields: { id: string }[] };
   assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'denominations', 'filed', 'lines', 'difference', 'said', 'note']);
 });

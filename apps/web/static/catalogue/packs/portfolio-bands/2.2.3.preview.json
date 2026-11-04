@@ -1,0 +1,128 @@
+{
+  "format": 1,
+  "made_at": "2026-11-04T14:03:31.335Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "band"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "empty": "Nothing is worked out yet. The bands are worked out once a day from each project's latest reading of what it takes a month and of its forecast a year out.",
+          "heading": "A month: now, next and later",
+          "kind": "split",
+          "source": "register.revenue_bands",
+          "span": 12,
+          "key": "k0iqp3nu",
+          "rows": [
+            {
+              "id": "01M6KDYG479QFB4EJJ1XB8B04X",
+              "register": "revenue_bands",
+              "seq": 3,
+              "fields": {
+                "band": "later",
+                "amount": {
+                  "amount": 1500000,
+                  "currency": "USD"
+                },
+                "at": "2026-11-01T09:00:00.000Z"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-04T14:03:31.335Z",
+              "updated_at": "2026-11-04T14:03:31.335Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6KDYG479QFB4EJJ1SEBF7NP",
+              "register": "revenue_bands",
+              "seq": 2,
+              "fields": {
+                "band": "next",
+                "amount": {
+                  "amount": 900000,
+                  "currency": "USD"
+                },
+                "at": "2026-11-01T09:00:00.000Z"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-04T14:03:31.335Z",
+              "updated_at": "2026-11-04T14:03:31.335Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6KDYG479QFB4EJJ1QTJ5YND",
+              "register": "revenue_bands",
+              "seq": 1,
+              "fields": {
+                "band": "now",
+                "amount": {
+                  "amount": 600000,
+                  "currency": "USD"
+                },
+                "at": "2026-11-01T09:00:00.000Z"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-04T14:03:31.335Z",
+              "updated_at": "2026-11-04T14:03:31.335Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 3,
+          "refusals": [],
+          "wholeRead": {
+            "rows": [
+              {
+                "label": "later",
+                "rows": 1,
+                "value": 1500000,
+                "unit": "USD"
+              },
+              {
+                "label": "next",
+                "rows": 1,
+                "value": 900000,
+                "unit": "USD"
+              },
+              {
+                "label": "now",
+                "rows": 1,
+                "value": 600000,
+                "unit": "USD"
+              }
+            ],
+            "total": 3000000,
+            "unit": "USD"
+          }
+        }
+      ],
+      "icon": "thing",
+      "nav": {
+        "order": 6,
+        "section": "Projects"
+      },
+      "page": "bands",
+      "requires": [
+        "register.revenue_bands",
+        "register.things",
+        "register.datapoints"
+      ],
+      "title": "Revenue bands",
+      "read_at": "2026-11-04T14:03:31.335Z",
+      "zone": "UTC",
+      "look": {
+        "look": "bands",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

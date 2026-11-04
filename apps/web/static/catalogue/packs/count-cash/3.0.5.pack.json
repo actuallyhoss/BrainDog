@@ -1,0 +1,296 @@
+{
+  "pack": "count-cash",
+  "version": "3.0.5",
+  "icon": "hand-coins",
+  "title": "Count the cash",
+  "summary": "Count the cash note by note and coin by coin, or by its total, and BrainDog keeps it as a balance check and files the difference from what it expected, as lines you describe or as Discrepancy.",
+  "changes": "The box to count the cash, the last count and the way into the counter are back under Cash now on Money, where they had fallen to the foot of the page.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "money-core": ">=3.0.0 <4.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "register": "cash_counts",
+      "name": "Cash counts",
+      "one": "count",
+      "holds": "what was actually in a cash box or an account when somebody counted it, and how far the books were out",
+      "title": "on",
+      "fields": [
+        {
+          "id": "account",
+          "label": "Account",
+          "type": "ref",
+          "to": "accounts",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "counted",
+          "label": "Counted",
+          "type": "money",
+          "required": false
+        },
+        {
+          "id": "on",
+          "label": "Counted on",
+          "type": "day",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "denominations",
+          "label": "Notes and coins",
+          "type": "json"
+        },
+        {
+          "id": "filed",
+          "label": "Record the difference",
+          "type": "enum",
+          "values": [
+            "lines",
+            "discrepancy"
+          ],
+          "labels": {
+            "lines": "As lines",
+            "discrepancy": "As Discrepancy"
+          }
+        },
+        {
+          "id": "lines",
+          "label": "Lines",
+          "type": "json"
+        },
+        {
+          "id": "difference",
+          "label": "Out by",
+          "type": "money"
+        },
+        {
+          "id": "said",
+          "label": "What happened",
+          "type": "text"
+        },
+        {
+          "id": "note",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "rule": "count_cash",
+      "name": "Write the difference of each count",
+      "on": {
+        "written": {
+          "register": "cash_counts",
+          "op": [
+            "create"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "script": {
+            "id": "count_cash",
+            "as": "queued"
+          }
+        }
+      ]
+    },
+    {
+      "script": "count_cash",
+      "title": "The difference of a cash count",
+      "runs": {
+        "rule": true
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "cash_counts",
+        "accounts",
+        "balances",
+        "transactions",
+        "categories"
+      ],
+      "writes": [
+        "transactions",
+        "balances",
+        "cash_counts"
+      ],
+      "source": "/**\n * Count the cash: the count written as a balance check, and the counted amount less what the record rolls the account\n * to on that day written as a dated transaction.\n *\n * STARTED BY THE PACK'S AUTOMATION ON EACH NEW COUNT, which hands it the count's id. A count is a row a person writes,\n * because a question to a person offers a closed list of answers and an amount is not one.\n *\n * A COUNT IS A BALANCE CHECK. It says what the account held on a day, which is what a row of money-core's `balances`\n * is, so it is written there, and Cash now restarts the account from it and adds only what moved after it. The\n * account's own balance is what a person typed, and this script never writes over it.\n *\n * THE DIFFERENCE IS AGAINST THE ROLLED FIGURE, NOT THE ACCOUNT'S TYPED BALANCE. The balance on the account is what\n * somebody said on its `as_of`, and every movement after that day has moved the money since. Subtracting the count from\n * the typed balance would count those movements twice, once in the ledger and once in the difference. So the figure a\n * count is compared with is the one Cash now reads: the newest thing anybody said the account held on or before the\n * count's day (the account's own balance, a balance check, or a bank message's balance after a movement, the account's\n * own winning a tie), plus every cleared movement after it up to that day.\n *\n * THE DIFFERENCE IS STILL A TRANSACTION. A gap nobody can account for is money that went somewhere, and every figure\n * over the ledger (spent this month, in and out) should see it. It is dated the day of the count, and a check on that\n * day already says what the account held after it, so Cash now does not add it a second time.\n *\n * WHICH BOOK. The check and the difference are filed in the account's own book when it has one (money-core 3.1.0), so\n * a book's page shows them beside the account they are about.\n *\n * WHAT IT REFUSES TO GUESS. A count in another currency than the account's is said on the count and nothing else is\n * written, because two currencies are never subtracted. A count dated before the day the account's own balance is from is kept and\n * changes nothing, because that balance already says more than an older count can correct. A count that agrees writes\n * no transaction and still writes the check, since the balance was checked on that day.\n *\n * AN ENTRY IN ANOTHER CURRENCY IS NOT LEFT OUT QUIETLY (1.3.0). This script works the roll out in its own code and\n * cannot convert, where the record's own roll converts a cleared entry in another currency at the day's rate. Leaving\n * such an entry out filed a difference equal to it, money the Ledger already held. So an account that holds one since\n * its last statement is not compared: the count is kept, it says so in What happened, and no check and no\n * difference are written. This lasts until a script can read the record's own figure for a day.\n *\n * THE WAY OUT IS SAID ON THE COUNT (1.3.1). The sentence under What happened ends by naming it: type the account's\n * balance, then count again. Without it a box with one sale in another currency read as uncounted for good.\n *\n * WHICH BALANCE IS SAID TOO (1.3.2). \"The account's balance\" read as the cash just counted, and a box typed to the\n * count agrees with the next count for good, so the gap the count was for is never written. The sentence now asks for\n * the figure the bank or the statement shows, and says it is not the cash in the box.\n *\n * A COUNT IN ANOTHER CURRENCY SAYS SO ON THE COUNT TOO (1.3.3). Counted in one currency against an account held or\n * last stated in another, the run wrote its reason to its own log and nothing a person reads, so the count stood with\n * no difference and no word. Both of those paths now write What happened, naming the two currencies and the way out:\n * count in the account's currency. Still no check and no difference for such a count.\n *\n * A COUNT THAT FILES SAYS WHERE IT WENT (1.4.0). Money shows the newest count, how far out it was and What happened,\n * so a count whose difference went into the Ledger says so there. A count that agrees files nothing and says nothing.\n *\n * COUNTED BY NOTE AND COIN (2.0.0). A count may carry `denominations`, `{ currency, notes: { \"200\": 3, \"0.25\": 4 } }`, the\n * note or coin's face value in the currency's main unit and how many of it were counted. The total is worked out here\n * from the sets below, and a value outside the currency's set is refused in words rather than guessed at. A count that\n * names both a total and notes must agree. A count with no notes is read exactly as before, so every older count stays\n * readable and nothing about it changes.\n *\n * THE DIFFERENCE, RECORDED ONE OF TWO WAYS (2.0.0). `filed` is `discrepancy`, the whole difference as one entry\n * under the Discrepancy category, or `lines`, where the person has said what part of it was what in `lines`\n * (`[{ what, amount, category?, note? }]`, amounts in the main unit) and whatever is left becomes one Discrepancy entry.\n * A count that says neither is filed as it always was, as one \"Cash count difference\" entry.\n */\n\nconst WHAT = 'Cash count difference';\n/** The name of the category the unexplained part of a difference is filed under. */\nconst DISCREPANCY = 'Discrepancy';\n\n/**\n * The notes and coins each currency has, by face value in its main unit (2.0.0). A currency not listed is counted by\n * typing its total, as before.\n */\nconst NOTE_SETS = {\n  EGP: ['200', '100', '50', '20', '10', '5', '1', '0.5', '0.25'],\n  USD: ['100', '50', '20', '10', '5', '2', '1', '0.5', '0.25', '0.1', '0.05', '0.01'],\n  EUR: ['500', '200', '100', '50', '20', '10', '5', '2', '1', '0.5', '0.2', '0.1', '0.05', '0.02', '0.01'],\n  GBP: ['50', '20', '10', '5', '2', '1', '0.5', '0.2', '0.1', '0.05', '0.02', '0.01'],\n  SAR: ['500', '200', '100', '50', '20', '10', '5', '2', '1', '0.5', '0.25', '0.1', '0.05'],\n  AED: ['1000', '500', '200', '100', '50', '20', '10', '5', '1', '0.5', '0.25'],\n};\n/** Every currency in the sets counts in hundredths. */\nconst MINOR = 100;\nconst minor = (main) => Math.round(Number(main) * MINOR);\n\n/** What a count whose notes cannot be read says under What happened, with the way out. */\nconst BAD_NOTES = (why) => `The notes and coins could not be read, so nothing was filed: ${why} Count again.`;\nconst BAD_LINES = (why) => `The lines for the difference could not be used, so nothing was filed: ${why} Count again.`;\n\n/**\n * The total of a count's notes and coins in hundredths, with how it reads, or the reason it cannot be read.\n * `{ total, currency, said }` or `{ why }`.\n */\nfunction totalOf(denominations, fallback) {\n  if (denominations === null || typeof denominations !== 'object' || Array.isArray(denominations)) return { why: 'they are not a list of values and numbers.' };\n  const currency = typeof denominations.currency === 'string' && denominations.currency !== '' ? denominations.currency : fallback;\n  const set = NOTE_SETS[currency];\n  const notes = denominations.notes;\n  if (notes === null || typeof notes !== 'object' || Array.isArray(notes)) return { why: 'there are no notes in them.' };\n  if (set === undefined) return { why: `${currency} has no set of notes here, so type its total.` };\n  let total = 0;\n  const parts = [];\n  for (const key of Object.keys(notes).sort((x, y) => minor(y) - minor(x))) {\n    const n = notes[key];\n    if (!set.some((v) => minor(v) === minor(key))) return { why: `${key} is not a ${currency} note or coin.` };\n    if (typeof n !== 'number' || !Number.isInteger(n) || n < 0) return { why: `${n} of ${key} is not a whole number.` };\n    if (n === 0) continue;\n    total += n * minor(key);\n    parts.push(`${n} × ${Number(key)}`);\n  }\n  return { total, currency, said: parts.length === 0 ? 'No notes or coins.' : `Counted ${parts.join(', ')}.` };\n}\n\n/** The lines of a difference, as entries, and what is left, or the reason they cannot be used. */\nfunction linesOf(lines, difference) {\n  if (!Array.isArray(lines)) return { why: 'they are not a list.' };\n  const out = [];\n  let sum = 0;\n  for (const l of lines) {\n    if (l === null || typeof l !== 'object' || typeof l.what !== 'string' || l.what.trim() === '') return { why: 'every line needs words for what it was.' };\n    const amount = minor(l.amount);\n    if (!Number.isFinite(amount) || amount <= 0) return { why: `${l.what} needs an amount above nothing.` };\n    sum += amount;\n    out.push({ what: l.what.trim(), amount, category: typeof l.category === 'string' ? l.category : '', note: typeof l.note === 'string' ? l.note : '' });\n  }\n  if (sum > Math.abs(difference)) return { why: 'together they are more than the difference.' };\n  return { entries: out, rest: Math.abs(difference) - sum };\n}\n\n/** The id of the category with this name, or nothing. */\nasync function categoryId(ctx, name) {\n  if (name === '') return null;\n  const rows = await ctx.record.list('categories', { all: [{ field: 'name', is: name }] });\n  return rows.length === 0 ? null : rows[0].id;\n}\n/**\n * What a count says when its account was not compared, and the way out (1.3.1): a balance typed on the account after\n * the entry is a newer statement, so the next count rolls from it and is compared. The balance to type is the one the\n * bank or the statement shows (1.3.2), never the cash just counted, which would hide the gap. The account's name is in\n * the run's log beside it.\n */\nconst NOT_COMPARED = 'This account holds an entry in another currency, so it was not compared. On the account, type the balance its bank or statement shows, not the cash in the box, then count again.';\n\n/** What a count in another currency than its account says under What happened (1.3.3), with the way out. */\nconst otherCurrency = (counted, held) => `This count is in ${counted} and the account is in ${held}, so it was not compared. Count in the account's currency.`;\n\n/** What a count whose difference was written into the Ledger says under What happened (1.4.0). */\nconst FILED = 'Filed as one entry in the Ledger.';\n\n/** The most rows one `ctx.record.list` answers, the record's own page. A full page may have left rows out. */\nconst PAGE = 50;\n/** The first day a window reaches back to when nothing stated the account before the count. */\nconst EARLIEST = '1900-01-01';\n\nconst DAY_MS = 86_400_000;\nconst dayNumber = (day) => Math.floor(Date.parse(`${day}T00:00:00.000Z`) / DAY_MS);\nconst dayOf = (n) => new Date(n * DAY_MS).toISOString().slice(0, 10);\n\n/** Rows of `register` about one account whose `field` is after `from` and on or before `to`, with `more` leaves. */\nconst inWindow = (ctx, register, account, field, from, to, more) =>\n  ctx.record.list(register, {\n    all: [{ field: 'account', is: account }, { field, gt: from }, { field, lte: to }, ...more],\n  });\n\n/**\n * Every such row, however many there are. A window whose page comes back full is cut in two by day and each half asked\n * again, so an account with a busy month is read whole rather than as its first page.\n */\nasync function allInWindow(ctx, register, account, field, from, to, more) {\n  const rows = await inWindow(ctx, register, account, field, from, to, more);\n  if (rows.length < PAGE) return rows;\n  const low = dayNumber(from);\n  const high = dayNumber(to);\n  if (high - low <= 1) throw new Error(`More than ${PAGE} rows of ${register} fall on ${to} for one account, so the count could not be compared and nothing was written.`);\n  const mid = dayOf(Math.floor((low + high) / 2));\n  return [...(await allInWindow(ctx, register, account, field, from, mid, more)), ...(await allInWindow(ctx, register, account, field, mid, to, more))];\n}\n\n/** The newest statement a list holds about one account after `from` and on or before `to`, or `null`. */\nasync function newestIn(ctx, register, account, field, balance, from, to) {\n  const rows = await allInWindow(ctx, register, account, field, from, to, [{ field: balance, present: true }]);\n  let best = null;\n  for (const r of rows) {\n    const day = String(r.fields[field]).slice(0, 10);\n    const money = r.fields[balance];\n    if (money === null || typeof money !== 'object') continue;\n    if (best === null || day > best.day || (day === best.day && r.seq > best.seq)) best = { day, money, seq: r.seq };\n  }\n  return best;\n}\n\n/**\n * What Cash now would say the account held on `day`: the newest statement on or before it, and every cleared movement\n * after that statement up to the day, in the statement's currency. No `amount` where a statement is in another\n * currency than `currency`, and `foreign` where a cleared movement since the statement is, which this script cannot\n * convert: the caller says either and writes no difference.\n */\nasync function rolledOn(ctx, account, day, currency) {\n  const own = account.fields.balance;\n  const ownDay = typeof account.fields.as_of === 'string' ? account.fields.as_of.slice(0, 10) : null;\n  const floor = ownDay ?? EARLIEST;\n  /* STRICTLY AFTER THE ACCOUNT'S OWN DAY, because on a tie the account's own statement wins, as it does in Cash now. */\n  const checked = await newestIn(ctx, 'balances', account.id, 'as_of', 'balance', floor, day);\n  const said = await newestIn(ctx, 'transactions', account.id, 'on', 'balance_after', floor, day);\n  let start = own !== null && typeof own === 'object' && ownDay !== null ? { day: ownDay, money: own } : null;\n  for (const s of [checked, said]) if (s !== null && (start === null || s.day > start.day)) start = s;\n  if (start !== null && start.money.currency !== currency) return { currency: start.money.currency };\n\n  const moves = await allInWindow(ctx, 'transactions', account.id, 'on', start === null ? EARLIEST : start.day, day, [{ field: 'state', is: 'cleared' }]);\n  let amount = start === null ? 0 : start.money.amount;\n  for (const m of moves) {\n    const money = m.fields.amount;\n    if (money === null || typeof money !== 'object') continue;\n    if (money.currency !== currency) return { currency, foreign: true };\n    amount += m.fields.direction === 'out' ? -money.amount : money.amount;\n  }\n  return { currency, amount };\n}\n\nexport default async function run(ctx) {\n  const count = await ctx.record.get(String(ctx.input.id));\n  if (count === null) {\n    ctx.log('The count that started this run is gone, so nothing was written.');\n    return;\n  }\n  const account = await ctx.record.get(String(count.fields.account));\n  if (account === null) {\n    ctx.log('The account this count is for is gone, so nothing was written.');\n    return;\n  }\n  const name = String(account.fields.name);\n  const held = account.fields.balance;\n  const day = String(count.fields.on);\n  const heldCurrency = held !== null && typeof held === 'object' ? held.currency : 'EGP';\n\n  /* NOTES AND COINS, when the count has them: the total is theirs, and a total typed beside them must agree. */\n  let counted = count.fields.counted;\n  let breakdown = '';\n  const has = count.fields.denominations !== undefined && count.fields.denominations !== null;\n  if (has) {\n    const read = totalOf(count.fields.denominations, counted !== null && typeof counted === 'object' ? counted.currency : heldCurrency);\n    if (read.why !== undefined) {\n      ctx.log(`The notes and coins of this count could not be read: ${read.why}`);\n      ctx.update(`cash_counts#${count.seq}`, { said: BAD_NOTES(read.why) }, count.version);\n      return;\n    }\n    if (counted !== null && typeof counted === 'object' && (counted.currency !== read.currency || counted.amount !== read.total)) {\n      const why = 'the total typed is not what the notes and coins add up to.';\n      ctx.log(`The notes and coins of this count do not match its total, so nothing was written.`);\n      ctx.update(`cash_counts#${count.seq}`, { said: BAD_NOTES(why) }, count.version);\n      return;\n    }\n    counted = { amount: read.total, currency: read.currency };\n    breakdown = read.said;\n  }\n  if (counted === null || typeof counted !== 'object') {\n    ctx.log('This count has neither a total nor notes and coins, so nothing was written.');\n    ctx.update(`cash_counts#${count.seq}`, { said: BAD_NOTES('there is no total and no notes.') }, count.version);\n    return;\n  }\n  const countedNow = has ? { counted } : {};\n  const say = (text) => (breakdown === '' ? text : text === undefined ? breakdown : `${breakdown} ${text}`);\n\n  if (held !== null && typeof held === 'object' && counted.currency !== held.currency) {\n    ctx.log(`This count is counted in ${counted.currency} and ${name} is held in ${held.currency}, and two currencies are not subtracted, so no difference was written.`);\n    ctx.update(`cash_counts#${count.seq}`, { ...countedNow, said: say(otherCurrency(counted.currency, held.currency)) }, count.version);\n    return;\n  }\n  if (typeof account.fields.as_of === 'string' && account.fields.as_of > day) {\n    ctx.log(`${name}'s balance is from ${account.fields.as_of}, after this count of ${day}, so the count is kept and nothing else was written.`);\n    if (has) ctx.update(`cash_counts#${count.seq}`, { ...countedNow, said: say(undefined) }, count.version);\n    return;\n  }\n\n  const rolled = await rolledOn(ctx, account, day, counted.currency);\n  if (rolled.foreign === true) {\n    ctx.log(`${name} holds an entry in another currency than ${counted.currency} since it was last stated, so this count was not compared and no difference was written.`);\n    ctx.update(`cash_counts#${count.seq}`, { ...countedNow, said: say(NOT_COMPARED) }, count.version);\n    return;\n  }\n  if (rolled.amount === undefined) {\n    ctx.log(`This count is counted in ${counted.currency} and ${name} was last said to hold ${rolled.currency}, and two currencies are not subtracted, so no difference was written.`);\n    ctx.update(`cash_counts#${count.seq}`, { ...countedNow, said: say(otherCurrency(counted.currency, rolled.currency)) }, count.version);\n    return;\n  }\n\n  const book = typeof account.fields.book === 'string' && account.fields.book !== '' ? { book: account.fields.book } : {};\n  const difference = counted.amount - rolled.amount;\n  const direction = difference > 0 ? 'in' : 'out';\n  const entry = (what, amount, category, note) => ({\n    what,\n    on: day,\n    direction,\n    amount: { amount, currency: counted.currency },\n    account: account.id,\n    state: 'cleared',\n    note,\n    ...(category === null ? {} : { category }),\n    ...book,\n  });\n  const fromCount = `From the cash count of ${day}.`;\n\n  /* HOW THE DIFFERENCE IS RECORDED. Unsaid is the single entry an older count always got. */\n  let filedAs = FILED;\n  if (difference !== 0) {\n    if (count.fields.filed === 'lines') {\n      const split = linesOf(count.fields.lines ?? [], difference);\n      if (split.why !== undefined) {\n        ctx.log(`The lines for this count's difference could not be used: ${split.why}`);\n        ctx.update(`cash_counts#${count.seq}`, { ...countedNow, said: say(BAD_LINES(split.why)) }, count.version);\n        return;\n      }\n      for (const l of split.entries) ctx.write('transactions', entry(l.what, l.amount, await categoryId(ctx, l.category), l.note === '' ? fromCount : l.note));\n      if (split.rest > 0) ctx.write('transactions', entry(DISCREPANCY, split.rest, await categoryId(ctx, DISCREPANCY), fromCount));\n      const n = split.entries.length;\n      filedAs = n === 0 ? 'Filed as Discrepancy in the Ledger.' : split.rest > 0 ? `Filed as ${n} ${n === 1 ? 'line' : 'lines'} and the rest as Discrepancy in the Ledger.` : `Filed as ${n} ${n === 1 ? 'line' : 'lines'} in the Ledger.`;\n    } else if (count.fields.filed === 'discrepancy') {\n      ctx.write('transactions', entry(DISCREPANCY, Math.abs(difference), await categoryId(ctx, DISCREPANCY), fromCount));\n      filedAs = 'Filed as Discrepancy in the Ledger.';\n    } else {\n      ctx.write('transactions', entry(WHAT, Math.abs(difference), null, fromCount));\n    }\n  }\n  ctx.write('balances', {\n    account: account.id,\n    balance: { amount: counted.amount, currency: counted.currency },\n    as_of: day,\n    source: `Cash count of ${day}`,\n    ...book,\n  });\n  const filed = difference === 0 ? (breakdown === '' ? {} : { said: breakdown }) : { said: say(filedAs) };\n  ctx.update(`cash_counts#${count.seq}`, { ...countedNow, difference: { amount: difference, currency: counted.currency }, ...filed }, count.version);\n}\n"
+    },
+    {
+      "page": "cash-counts",
+      "title": "Cash counts",
+      "nav": {
+        "section": "Money",
+        "order": 40
+      },
+      "icon": "money",
+      "requires": [
+        "register.cash_counts"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "Any difference is filed in the Ledger."
+        },
+        {
+          "kind": "table",
+          "heading": "Counts",
+          "span": 12,
+          "source": "register.cash_counts",
+          "columns": [
+            {
+              "field": "on",
+              "label": "Counted on",
+              "width": "13ch"
+            },
+            {
+              "field": "account",
+              "label": "Account",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "counted",
+              "label": "Counted",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "difference",
+              "label": "Out by",
+              "width": "15ch",
+              "align": "end"
+            },
+            {
+              "field": "filed",
+              "label": "Recorded",
+              "width": "14ch"
+            },
+            {
+              "field": "said",
+              "label": "What happened",
+              "width": "minmax(18ch,2fr)"
+            }
+          ],
+          "order": [
+            {
+              "field": "on",
+              "dir": "desc"
+            }
+          ],
+          "empty": "Nothing counted yet."
+        }
+      ]
+    }
+  ],
+  "adds": [
+    {
+      "page": "page.money",
+      "after": "Cash now does not add up",
+      "note": "Where a person counts the cash, drawn while a balance on Money is old, the same while as the line on the oldest balance.",
+      "block": {
+        "kind": "capture",
+        "heading": "Count the cash",
+        "icon": "plus",
+        "span": 12,
+        "area": "main",
+        "register": "cash_counts",
+        "when": {
+          "metric": "balances-stale",
+          "gt": 0
+        }
+      }
+    },
+    {
+      "page": "page.money",
+      "after": "Cash now does not add up",
+      "note": "The newest count of the past week: the day, how far out the record was and what happened. Drawn only while there is one, so Money holds no old count.",
+      "block": {
+        "kind": "cards",
+        "heading": "The last count",
+        "span": 12,
+        "area": "main",
+        "source": "register.cash_counts",
+        "where": "on after -7d",
+        "columns": [
+          {
+            "field": "on",
+            "label": "Counted on",
+            "as": "title"
+          },
+          {
+            "field": "difference",
+            "label": "Out by",
+            "as": "figure"
+          },
+          {
+            "field": "said",
+            "label": "What happened",
+            "as": "fact"
+          }
+        ],
+        "order": [
+          {
+            "field": "on",
+            "dir": "desc"
+          },
+          {
+            "field": "seq",
+            "dir": "desc"
+          }
+        ],
+        "limit": 1
+      }
+    },
+    {
+      "page": "page.money",
+      "after": "Cash now does not add up",
+      "note": "A way into the full-screen counter from Money, always drawn, since cash is counted when a person decides to and not only when a balance is old.",
+      "block": {
+        "kind": "link",
+        "heading": "Count cash",
+        "icon": "money",
+        "span": 12,
+        "area": "main",
+        "authored": [
+          {
+            "cells": [
+              "Count the cash by note and coin",
+              "/count?list=cash_counts",
+              "Pick the account, count each note, and say how any difference is recorded"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "page": "page.money-account",
+      "after": "What moved",
+      "note": "The same counter from an account's page, opened on that account.",
+      "block": {
+        "kind": "link",
+        "heading": "Count cash",
+        "icon": "money",
+        "span": 12,
+        "authored": [
+          {
+            "cells": [
+              "Count this account's cash",
+              "/count?list=cash_counts&account={{seq}}",
+              "Note by note, then the difference"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,10 +1,10 @@
 {
   "pack": "portfolio-bands",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "icon": "chart-bar",
   "title": "Revenue bands",
   "summary": "What your projects take a month now, and the room left in their forecasts next and later, worked out every day and drawn as one bar.",
-  "changes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own. The month now finds the cards on the new Projects board.",
+  "changes": "The three bands are back under the projects on Projects, where they had fallen to the foot of the page when the bar they followed went.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -135,7 +135,7 @@
     },
     {
       "page": "page.portfolio",
-      "after": "How they are going",
+      "after": "In play",
       "block": {
         "kind": "split",
         "heading": "A month: now, next and later",

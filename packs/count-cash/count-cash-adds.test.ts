@@ -53,6 +53,8 @@ const TEXT = readFileSync(new URL('./count-cash.pack.json', import.meta.url), 'u
 const shipped = (): Record<string, unknown> => JSON.parse(TEXT) as Record<string, unknown>;
 
 const COUNT = 'Count the cash';
+/** The block on Money the three follow. */
+const ANCHOR = 'Cash now does not add up';
 const LAST = 'The last count';
 const FILED = 'Filed as one entry in the Ledger.';
 
@@ -94,17 +96,17 @@ const blockOf = (page: Page, heading: string): Block => {
 const ledger = (sql: Sql): { what: string; direction: string; amount: { amount: number; currency: string }; account: string }[] =>
   sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'transactions' AND deleted_at IS NULL ORDER BY seq").map((r) => JSON.parse(r.fields));
 
-test('1.4.1 ADDS TWO BLOCKS TO MONEY WITH HEADS UP, IN THE MAIN COLUMN, and a way into the counter on Money and on an account, and the plan finds the pages on a record holding money-core', async () => {
+test('3.0.5 ADDS TWO BLOCKS TO MONEY UNDER CASH NOW, IN THE MAIN COLUMN, and a way into the counter on Money and on an account, and the plan finds the pages on a record holding money-core', async () => {
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
-  assert.equal(file.value.pack.manifest.version, '3.0.4');
+  assert.equal(file.value.pack.manifest.version, '3.0.5');
   const adds = shipped().adds as { page: string; after: string; block: { kind: string; heading: string; area?: string; when?: unknown; where?: string } }[];
   assert.deepEqual(
     adds.map((a) => [a.page, a.after, a.block.kind, a.block.heading, a.block.area]),
     [
-      ['page.money', 'Heads up', 'capture', COUNT, 'main'],
-      ['page.money', 'Heads up', 'cards', LAST, 'main'],
-      ['page.money', 'Heads up', 'link', 'Count cash', 'main'],
+      ['page.money', ANCHOR, 'capture', COUNT, 'main'],
+      ['page.money', ANCHOR, 'cards', LAST, 'main'],
+      ['page.money', ANCHOR, 'link', 'Count cash', 'main'],
       ['page.money-account', 'What moved', 'link', 'Count cash', undefined],
     ],
   );
@@ -135,17 +137,18 @@ test('A COUNT ON MONEY: EGP 120,400.00 against a till rolled to EGP 119,900.00 r
     await api.create({ register: 'accounts', fields: { name: 'Front till', kind: 'cash', balance: { amount: 11_990_000, currency: 'EGP' }, as_of: '2026-10-01', liquid: true } }, owner),
   );
 
-  /* THE TILL WAS LAST SAID TO HOLD WHAT IT HOLDS TWO WEEKS AGO, so the box to count it in is on Money, right after
-     Heads up, whose line on the oldest balance is drawn beside it, and no count has been written yet. */
+  /* THE TILL WAS LAST SAID TO HOLD WHAT IT HOLDS TWO WEEKS AGO, so the box to count it in is on Money, under Cash now, by
+     the line on the oldest balance, and no count has been written yet. AN ANCHOR THAT IS GONE PUTS THE BOX AT THE FOOT OF
+     THE PAGE, under every list, which is what 3.0.4 did from money-core 3.34.0 (aaf8e24df), so it is read as a place. */
   const old = await money(api);
-  const at = headings(old).indexOf('Heads up');
-  assert.ok(at >= 0, `Money has no Heads up: ${headings(old).join(', ')}`);
+  const at = headings(old).indexOf(ANCHOR);
+  assert.ok(at >= 0, `Money has no ${ANCHOR}: ${headings(old).join(', ')}`);
   assert.deepEqual(headings(old).slice(at + 1, at + 3), [COUNT, LAST]);
-  /* AND IN THE ONE COLUMN, SINCE money-core 3.29.0 gave Money's home no side column: Heads up stands among the tiles,
-     so the two follow it there and are never a form squeezed into a narrow column. The box keeps `area: main`, which
+  assert.ok(headings(old).indexOf(COUNT) < headings(old).indexOf('Coming up'), 'the box fell under the lists');
+  /* AND IN THE ONE COLUMN, SINCE money-core 3.29.0 gave Money's home no side column. The box keeps `area: main`, which
      a page with no rail reads as the page itself. */
   assert.ok(!old.blocks.some((b) => b.area === 'rail'), "Money's home has a side column again");
-  assert.deepEqual([blockOf(old, 'Heads up').area, blockOf(old, COUNT).area, blockOf(old, LAST).area], [undefined, 'main', 'main']);
+  assert.deepEqual([blockOf(old, ANCHOR).area, blockOf(old, COUNT).area, blockOf(old, LAST).area], [undefined, 'main', 'main']);
   const box = blockOf(old, COUNT);
   assert.deepEqual([box.added, box.drawn ?? true, box.refusals], ['count-cash', true, []]);
   /* AND THE LAST COUNT IS LEFT OUT WHILE THERE IS NONE, rather than a tile with nothing in it. */

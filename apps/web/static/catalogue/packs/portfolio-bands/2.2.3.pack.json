@@ -1,0 +1,157 @@
+{
+  "pack": "portfolio-bands",
+  "version": "2.2.3",
+  "icon": "chart-bar",
+  "title": "Revenue bands",
+  "summary": "What your projects take a month now, and the room left in their forecasts next and later, worked out every day and drawn as one bar.",
+  "changes": "The three bands are back under the projects on Projects, where they had fallen to the foot of the page when the bar they followed went.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "portfolio": "^1.0.0"
+    }
+  },
+  "config": {
+    "now": {
+      "type": "list",
+      "max": 20,
+      "default": [
+        "Monthly recurring revenue"
+      ],
+      "label": "What a project takes a month today",
+      "note": "The name of the reading that says it, one a line when the same number has arrived under more than one. A reading counts when it is named this, or this, a comma and the project."
+    },
+    "base": {
+      "type": "list",
+      "max": 20,
+      "default": [
+        "Monthly recurring revenue in a year"
+      ],
+      "label": "What a project is forecast to take a month a year out",
+      "note": "The name of that reading, one a line. No name may be on both sides, or begin with a name on the other side and a comma, or the run stops and says so."
+    }
+  },
+  "declarations": [
+    {
+      "register": "revenue_bands",
+      "name": "Revenue bands",
+      "one": "band",
+      "holds": "what the projects take a month now, and the room in their forecasts next and later, one row a band and a currency",
+      "title": "band",
+      "fields": [
+        {
+          "id": "band",
+          "label": "Band",
+          "type": "enum",
+          "values": [
+            "now",
+            "next",
+            "later"
+          ],
+          "labels": {
+            "now": "Now",
+            "next": "Next",
+            "later": "Later"
+          },
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "amount",
+          "label": "A month",
+          "type": "money",
+          "required": true
+        },
+        {
+          "id": "at",
+          "label": "Worked out",
+          "type": "instant"
+        }
+      ]
+    },
+    {
+      "script": "portfolio-bands",
+      "title": "Revenue bands, worked out",
+      "runs": {
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "things",
+        "datapoints",
+        "revenue_bands"
+      ],
+      "writes": [
+        "revenue_bands"
+      ],
+      "source": "/**\n * The revenue bands: what the projects take a month now, and the room left in their forecasts next and later.\n *\n * THE RULE. `now` is every project's latest monthly revenue, retired\n * ones that still pay included. A project's headroom is `max(0, base - now)`, where `base` is its base-case forecast\n * of monthly revenue a year out. Headroom on a project being earned from or built is `next`; on one that is parked it\n * is `later`; a retired project has none. One amount per currency, because two currencies are never added.\n *\n * WHICH LANE IS WHICH BAND IS THE TABLE BELOW, and it is the one place to change it. The lanes are Portfolio's own\n * four (`packages/seed/src/modules/portfolio.ts`), so the table names nothing a particular record or import brought.\n *\n * WHICH READING IS `now` AND WHICH IS `base` IS THE OWNER'S, NOT THIS FILE'S. They are the pack's two `list` settings,\n * set on its page and read from `ctx.config` on every run, so a record whose readings are named anything else sets its\n * own names and nobody edits this file. A first cut compiled in the two labels one importer wrote, and a record whose\n * readings were named anything else ran every day and wrote three zeros. Each side is a list, because one number can\n * arrive under an old name and a new one, and a reading is matched on the name whole or on the name followed by \", \"\n * and the project, which is how a record names a reading when the Dashboard draws one tile a name. The project itself\n * is the `thing` the reading points at.\n *\n * NAMES THAT WOULD DRAW THE WRONG BAR STOP THE RUN WITH A SENTENCE (`measuresOf`), because a setting says what each\n * name is and never how the two sides stand to each other. Each of these would run every day, say `ok`, and draw the\n * wrong bar:\n *   - a side with no name matches nothing, so every band is zero;\n *   - one name on both sides is counted as `now` and never as `base`, because `bandsOf` asks `now` first;\n *   - a name that is another's name, a comma and more (`Takings` and `Takings, forecast`) is the same trap one step\n *     removed: a forecast reading named `Takings, forecast, Kiln` begins `Takings, `, which is how a reading of\n *     `Takings` names its project;\n *   - and either of those in another case, because the record's `starts` folds ASCII case, so a list asked for\n *     `takings` answers every reading of `Takings` as well.\n */\n\nconst LANES = { earning: 'next', building: 'next', parked: 'later' };\nconst BANDS = ['now', 'next', 'later'];\nconst REGISTER = 'revenue_bands';\n\n/* THE RECORD ANSWERS ONE PAGE OF FIFTY, most recently written first, and `ctx.record.list` cannot ask for more. So\n   readings are asked for one project and one measure at a time, where the fifty newest hold the latest, and a full page\n   of projects is said in the run's log, because a band summed over the first fifty projects is short by the rest and\n   nothing else would say so. ONE MEASURE A LIST, NOT BOTH: the first cut asked for both in one list, and on a self-host\n   fifty daily readings of `now` written after a base typed once pushed the base off the page, so `later` fell to 0 on\n   a run that said `ok` (`bands.test.ts`, the whole path). A `starts` on the bare measure also took the bear and bull\n   cases an import writes beside the base, which are never used, so each name is matched whole or with its\n   \", <project>\" after it. */\nconst PAGE = 50;\nconst named = (measures) => ({ any: measures.flatMap((m) => [{ field: 'name', is: m }, { field: 'name', starts: `${m}, ` }]) });\n\n/* ISO 4217'S MINOR DIGITS, where they are not two. An older reading is a decimal in whole units and a band is money in\n   minor units, and the sandbox has no `Intl` to ask. A reading whose `amount` is money is in minor units already and\n   never goes through this table. */\nconst DIGITS = { BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0, PYG: 0, RWF: 0, UGX: 0, UYI: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0, BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3, CLF: 4, UYW: 4 };\nconst minor = (value, currency) => Math.round(value * 10 ** (DIGITS[currency] ?? 2));\n\nconst measureOf = (name, measures) => measures.some((m) => name === m || name.startsWith(`${m}, `));\n\n/* THE NAMES ARE COMPARED AS THE RECORD COMPARES THEM, and its `starts` folds ASCII case. Compared as exact text,\n   `Takings` and `takings` passed, and the list asked for the forecast answered every reading of today as well: fifty of\n   them written after a forecast typed once took `later` from 800,000 to 0 on a run that said nothing. */\nconst fold = (s) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());\n\n/**\n * The two sides of names from the settings, each trimmed and said once, or a thrown sentence saying why they would draw\n * the wrong bar. Thrown, so the run fails with that sentence and writes nothing, rather than writing a bar that is wrong.\n */\nexport function measuresOf(config) {\n  const side = (name) => {\n    const given = config?.[name];\n    const list = (Array.isArray(given) ? given : typeof given === 'string' ? [given] : []).map((n) => String(n).trim()).filter((n) => n !== '');\n    if (list.length === 0) throw new Error(`The bands need at least one ${name} name, set on this pack's page, or every band is zero.`);\n    return [...new Set(list)];\n  };\n  const now = side('now');\n  const base = side('base');\n  for (const a of now)\n    for (const b of base) {\n      if (a === b) throw new Error(`${a} is named as both now and base, so it would be counted as now and never as the forecast.`);\n      if (fold(a) === fold(b))\n        throw new Error(`${a} and ${b} are one name to the record, which matches a name whatever its case, so the forecast is read beside every reading of today and fifty of those push it out of what the run reads.`);\n      const [short, long] = a.length < b.length ? [a, b] : [b, a];\n      if (fold(long).startsWith(`${fold(short)}, `))\n        throw new Error(`${long} begins with ${short} and a comma, which is how a reading of ${short} names its project, so the two cannot be told apart.`);\n    }\n  return { now, base };\n}\n\n/** The reading's `amount` when it is money: a whole number of minor units and a currency of three letters. */\nconst amountOf = (r) => {\n  const a = r.fields.amount;\n  if (a === null || typeof a !== 'object' || !Number.isInteger(a.amount) || typeof a.currency !== 'string') return null;\n  const currency = a.currency.trim().toUpperCase();\n  return /^[A-Z]{3}$/.test(currency) ? { amount: a.amount, currency } : null;\n};\n\n/** The reading's currency, its amount's when it has one, or `null` when its unit is not three letters and it cannot be money. */\nconst currencyOf = (r) => {\n  const money = amountOf(r);\n  if (money !== null) return money.currency;\n  const unit = String(r.fields.unit ?? '').trim().toUpperCase();\n  return /^[A-Z]{3}$/.test(unit) ? unit : null;\n};\n\n/* THE READING IN MINOR UNITS: its amount as it stands, or its decimal value turned by the digits table. */\nconst minorOf = (r, currency) => amountOf(r)?.amount ?? minor(r.fields.value, currency);\n\n/** The later of two readings: by when it was true, then by when it was written. */\nconst later = (a, b) => {\n  if (a === undefined) return b;\n  const x = String(a.fields.at ?? '');\n  const y = String(b.fields.at ?? '');\n  return y > x || (y === x && String(b.updated_at) > String(a.updated_at)) ? b : a;\n};\n\n/**\n * The three bands per currency, in minor units, from the projects, their readings and the two sides of names\n * `measuresOf` answered, and what could not be counted. Pure, so the rule is one function a reader can check without\n * the record around it.\n */\nexport function bandsOf(things, readings, { now: NOW, base: BASE }) {\n  const latest = new Map();\n  for (const r of readings) {\n    /* THE SEED'S EXAMPLE ROWS ARE LEFT OUT, as every dashboard over datapoints leaves them out. */\n    if (r.fields.source === 'example' || (amountOf(r) === null && typeof r.fields.value !== 'number')) continue;\n    const name = String(r.fields.name ?? '');\n    const kind = measureOf(name, NOW) ? 'now' : measureOf(name, BASE) ? 'base' : null;\n    if (kind === null) continue;\n    const key = `${r.fields.thing}|${kind}`;\n    latest.set(key, later(latest.get(key), r));\n  }\n\n  const bands = {};\n  const said = [];\n  const add = (currency, band, amount) => {\n    bands[currency] ??= { now: 0, next: 0, later: 0 };\n    bands[currency][band] += amount;\n  };\n  for (const t of things) {\n    const name = String(t.fields.name ?? t.id);\n    const now = latest.get(`${t.id}|now`);\n    const base = latest.get(`${t.id}|base`);\n    const nowIn = now === undefined ? null : currencyOf(now);\n    const baseIn = base === undefined ? null : currencyOf(base);\n    if (now !== undefined && nowIn === null) said.push(`${name}'s monthly revenue is in ${JSON.stringify(now.fields.unit ?? '')}, which is not a currency, so it is not counted.`);\n    if (nowIn !== null) add(nowIn, 'now', minorOf(now, nowIn));\n\n    const band = LANES[t.fields.lane];\n    if (band === undefined || base === undefined) continue;\n    if (baseIn === null) {\n      said.push(`${name}'s base case is in ${JSON.stringify(base.fields.unit ?? '')}, which is not a currency, so it adds no headroom.`);\n      continue;\n    }\n    if (nowIn !== null && nowIn !== baseIn) {\n      said.push(`${name} takes ${nowIn} today and is forecast in ${baseIn}, and two currencies are not subtracted, so it adds no headroom.`);\n      continue;\n    }\n    const taking = nowIn === null ? 0 : minorOf(now, nowIn);\n    add(baseIn, band, Math.max(0, minorOf(base, baseIn) - taking));\n  }\n  return { bands, said };\n}\n\nexport default async function run(ctx) {\n  const measures = measuresOf(ctx.config);\n  const things = await ctx.record.list('things');\n  if (things.length >= PAGE)\n    ctx.log(`The record answered a full page of ${PAGE} projects and may hold more, so the bands may be short by the rest.`);\n\n  const readings = [];\n  for (const t of things)\n    for (const side of [measures.now, measures.base]) readings.push(...(await ctx.record.list('datapoints', { all: [{ field: 'thing', is: t.id }, named(side)] })));\n\n  const { bands, said } = bandsOf(things, readings, measures);\n  for (const line of said) ctx.log(line);\n\n  /* ONE ROW A BAND AND A CURRENCY, UPDATED IN PLACE, so the split draws today's bar and not every day's bars summed.\n     A band that has not moved is not written again, and a currency no project holds any more goes to zero rather than\n     standing at whatever it last was. */\n  const held = new Map();\n  for (const r of await ctx.record.list(REGISTER)) {\n    const amount = r.fields.amount;\n    if (amount && typeof amount.currency === 'string') held.set(`${amount.currency}|${r.fields.band}`, r);\n  }\n  const currencies = [...new Set([...Object.keys(bands), ...[...held.keys()].map((k) => k.split('|')[0])])].sort();\n  const at = ctx.now();\n  for (const currency of currencies) {\n    for (const band of BANDS) {\n      const amount = { amount: bands[currency]?.[band] ?? 0, currency };\n      const row = held.get(`${currency}|${band}`);\n      if (row === undefined) {\n        if (bands[currency] !== undefined) ctx.write(REGISTER, { band, amount, at });\n      } else if (row.fields.amount.amount !== amount.amount) {\n        ctx.update(`${REGISTER}#${row.seq}`, { amount, at }, row.version);\n      }\n    }\n  }\n}\n"
+    },
+    {
+      "page": "bands",
+      "title": "Revenue bands",
+      "nav": {
+        "section": "Projects",
+        "order": 6
+      },
+      "icon": "thing",
+      "requires": [
+        "register.revenue_bands",
+        "register.things",
+        "register.datapoints"
+      ],
+      "blocks": [
+        {
+          "kind": "split",
+          "heading": "A month: now, next and later",
+          "span": 12,
+          "source": "register.revenue_bands",
+          "columns": [
+            {
+              "field": "band"
+            },
+            {
+              "field": "amount"
+            }
+          ],
+          "empty": "Nothing is worked out yet. The bands are worked out once a day from each project's latest reading of what it takes a month and of its forecast a year out."
+        }
+      ]
+    }
+  ],
+  "adds": [
+    {
+      "page": "page.portfolio",
+      "into": "board",
+      "column": {
+        "metric": "revenue-bands-month:{{name}}",
+        "label": "This month",
+        "as": "figure"
+      },
+      "note": "The month on each card in play: the key is the one Portfolio's In play cards answer."
+    },
+    {
+      "page": "page.portfolio",
+      "after": "In play",
+      "block": {
+        "kind": "split",
+        "heading": "A month: now, next and later",
+        "icon": "activity",
+        "span": 12,
+        "source": "register.revenue_bands",
+        "columns": [
+          {
+            "field": "band"
+          },
+          {
+            "field": "amount"
+          }
+        ]
+      },
+      "note": "No empty line, so the bands are drawn only while one is worked out."
+    }
+  ]
+}

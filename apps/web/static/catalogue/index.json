@@ -1217,8 +1217,60 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "3.0.4",
+      "latest": "3.0.5",
       "versions": [
+        {
+          "version": "3.0.5",
+          "checksum": "dd11186c19fdb424c9eaeae61bc573dd8e5d20b8ffe28acebb99281ac7d0c740",
+          "bytes": 27942,
+          "published_at": "2026-11-04T14:03:31.335Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.accounts",
+                "writes": false
+              },
+              {
+                "id": "register.balances",
+                "writes": true
+              },
+              {
+                "id": "register.transactions",
+                "writes": true
+              },
+              {
+                "id": "register.categories",
+                "writes": false
+              },
+              {
+                "id": "page.money",
+                "writes": true
+              },
+              {
+                "id": "page.money-account",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "The box to count the cash, the last count and the way into the counter are back under Cash now on Money, where they had fallen to the foot of the page.",
+          "preview": true
+        },
         {
           "version": "3.0.4",
           "checksum": "eca21f8fdaec6b6e86394aece7b23d3723278e2fc8ed2d182e13ac11dc743620",
@@ -6896,8 +6948,46 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.2.2",
+      "latest": "2.2.3",
       "versions": [
+        {
+          "version": "2.2.3",
+          "checksum": "32bdb1589c44285c0e1a81f1bc01be6cca5a754e815f3740a07fad9bef5b9431",
+          "bytes": 15720,
+          "published_at": "2026-11-04T14:03:31.335Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio"
+            ],
+            "lists": [
+              "Revenue bands"
+            ],
+            "pages": [
+              "Revenue bands"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "uses": [
+              {
+                "id": "register.things",
+                "writes": false
+              },
+              {
+                "id": "register.datapoints",
+                "writes": false
+              },
+              {
+                "id": "page.portfolio",
+                "writes": true
+              }
+            ]
+          },
+          "notes": "The three bands are back under the projects on Projects, where they had fallen to the foot of the page when the bar they followed went.",
+          "preview": true
+        },
         {
           "version": "2.2.2",
           "checksum": "e55c0cc6e1b71e3b4faf0b3b1569b8843a1539b6156a01905a40391cff362220",

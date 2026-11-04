@@ -611,8 +611,10 @@ const NOT_DRAWN = 'until a card reads its figure off a figure (packages/kernel/s
 test('2.2.0 IS 2.1.0 WITH TWO ADDITIONS TO PROJECTS, and nothing else moved', () => {
   const was = JSON.parse(readFileSync(new URL('../../apps/web/static/catalogue/packs/portfolio-bands/2.1.0.pack.json', import.meta.url), 'utf8')) as Record<string, unknown>;
   const now = template();
-  /* 2.2.2 SINCE 27 October: the column goes into Projects' board, the key In play answers since Portfolio 1.30.0. */
-  assert.equal(now.version, '2.2.2');
+  /* 2.2.2 SINCE 27 October: the column goes into Projects' board, the key In play answers since Portfolio 1.30.0. 2.2.3
+     SINCE 4 November: the bands follow In play, since How they are going, which they followed, left Projects at Portfolio
+     1.31.2 (fdc1b185b) and they had fallen to the foot of the page. */
+  assert.equal(now.version, '2.2.3');
   assert.equal(was.adds, undefined);
   const { version: _v, changes: _c, adds: _a, icon: _i, ...rest } = now;
   const { version: _w, changes: _d, ...before } = was;
@@ -620,15 +622,14 @@ test('2.2.0 IS 2.1.0 WITH TWO ADDITIONS TO PROJECTS, and nothing else moved', ()
   assert.ok(String(now.changes).length <= 500);
   assert.deepEqual(addsOf(now).map((a) => [a.page, a.into ?? null, a.after ?? null]), [
     ['page.portfolio', blockKeyOf(projectsPage().find((b) => b.heading === 'In play')), null],
-    ['page.portfolio', null, 'How they are going'],
+    ['page.portfolio', null, 'In play'],
   ]);
 });
 
-test('THE MONTH GOES ON THE IN PLAY CARDS AND THE BANDS UNDER HOW THEY ARE GOING, as Projects is read, and go when the pack goes', () => {
+test('THE MONTH GOES ON THE IN PLAY CARDS AND THE BANDS UNDER THEM, as Projects is read, and go when the pack goes', () => {
   const own = projectsPage();
   const inPlay = own.findIndex((b) => b.heading === 'In play');
-  const going = own.findIndex((b) => b.heading === 'How they are going');
-  assert.ok(inPlay >= 0 && going >= 0, 'Portfolio no longer draws In play or How they are going');
+  assert.ok(inPlay >= 0, 'Portfolio no longer draws In play');
   const adds = additionsOf([{ id: 'portfolio-bands', manifest: JSON.stringify(template()) }], 'page.portfolio');
   assert.equal(adds.length, 2);
   const laid = withAdds(own, adds);
@@ -636,7 +637,7 @@ test('THE MONTH GOES ON THE IN PLAY CARDS AND THE BANDS UNDER HOW THEY ARE GOING
   /* HELD OFF THE CARDS WHILE NOTHING READS A CARD'S FIGURE OFF A FIGURE (`fits` in page-adds.ts): a column that drew
      nothing took the place of the newest number a card with a short trend says. PGS-C29 job 2 reads it, and this turns. */
   assert.deepEqual(cards.columns, MONTH_LAID ? [...own[inPlay]!.columns!, { metric: 'revenue-bands-month:{{name}}', label: 'This month', as: 'figure' }] : own[inPlay]!.columns);
-  const at = laid.findIndex((l) => l.block.heading === 'How they are going');
+  const at = laid.findIndex((l) => l.block.heading === 'In play');
   const split = laid[at + 1]!;
   assert.equal(split.added, 'portfolio-bands');
   assert.deepEqual([split.block.kind, split.block.heading, split.block.source], ['split', 'A month: now, next and later', 'register.revenue_bands']);
@@ -671,11 +672,11 @@ async function projectsWithBands(): Promise<{ read: () => Promise<PageRead>; uni
   return { read, uninstall, close: () => sql.close(), portfolioBody };
 }
 
-test('INSTALLED BESIDE PORTFOLIO, the bands are drawn after How they are going, and uninstalled they are gone', async () => {
+test('INSTALLED BESIDE PORTFOLIO, the bands are drawn after In play, and uninstalled they are gone', async () => {
   const r = await projectsWithBands();
   const before = r.portfolioBody();
   const headings = (await r.read()).blocks.map((b) => [b.heading ?? null, b.added ?? null]);
-  const at = headings.findIndex(([h]) => h === 'How they are going');
+  const at = headings.findIndex(([h]) => h === 'In play');
   assert.deepEqual(headings[at + 1], ['A month: now, next and later', 'portfolio-bands']);
   assert.equal(r.portfolioBody(), before, 'the bands were written into Portfolio\'s page');
   await r.uninstall();

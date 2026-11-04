@@ -1,10 +1,10 @@
 {
   "pack": "count-cash",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "icon": "hand-coins",
   "title": "Count the cash",
   "summary": "Count the cash note by note and coin by coin, or by its total, and BrainDog keeps it as a balance check and files the difference from what it expected, as lines you describe or as Discrepancy.",
-  "changes": "Its description is in plainer words. Nothing it does has changed.",
+  "changes": "The box to count the cash, the last count and the way into the counter are back under Cash now on Money, where they had fallen to the foot of the page.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -195,8 +195,8 @@
   "adds": [
     {
       "page": "page.money",
-      "after": "Heads up",
-      "note": "Where a person counts the cash, drawn while a balance on Money is old, the same while as Heads up's line on the oldest balance. In the main column, since a form is too wide for the side column Heads up may stand in.",
+      "after": "Cash now does not add up",
+      "note": "Where a person counts the cash, drawn while a balance on Money is old, the same while as the line on the oldest balance.",
       "block": {
         "kind": "capture",
         "heading": "Count the cash",
@@ -212,7 +212,7 @@
     },
     {
       "page": "page.money",
-      "after": "Heads up",
+      "after": "Cash now does not add up",
       "note": "The newest count of the past week: the day, how far out the record was and what happened. Drawn only while there is one, so Money holds no old count.",
       "block": {
         "kind": "cards",
@@ -253,7 +253,7 @@
     },
     {
       "page": "page.money",
-      "after": "Heads up",
+      "after": "Cash now does not add up",
       "note": "A way into the full-screen counter from Money, always drawn, since cash is counted when a person decides to and not only when a balance is old.",
       "block": {
         "kind": "link",

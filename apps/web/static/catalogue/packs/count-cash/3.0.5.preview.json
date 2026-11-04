@@ -1,0 +1,127 @@
+{
+  "format": 1,
+  "made_at": "2026-11-04T14:03:31.335Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "body": "Any difference is filed in the Ledger.",
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "columns": [
+            {
+              "field": "on",
+              "label": "Counted on",
+              "width": "13ch"
+            },
+            {
+              "field": "account",
+              "label": "Account",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "align": "end",
+              "field": "counted",
+              "label": "Counted",
+              "width": "15ch"
+            },
+            {
+              "align": "end",
+              "field": "difference",
+              "label": "Out by",
+              "width": "15ch"
+            },
+            {
+              "field": "filed",
+              "label": "Recorded",
+              "width": "14ch"
+            },
+            {
+              "field": "said",
+              "label": "What happened",
+              "width": "minmax(18ch,2fr)"
+            }
+          ],
+          "empty": "Nothing counted yet.",
+          "heading": "Counts",
+          "kind": "table",
+          "order": [
+            {
+              "dir": "desc",
+              "field": "on"
+            }
+          ],
+          "source": "register.cash_counts",
+          "span": 12,
+          "key": "k02ah0bg",
+          "rows": [
+            {
+              "id": "01M6KDYG477TK3RNGRDRVAYVCJ",
+              "register": "cash_counts",
+              "seq": 1,
+              "fields": {
+                "account": "01M6KDYG477TK3RNGRA170EAWP",
+                "counted": {
+                  "amount": 24000,
+                  "currency": "USD"
+                },
+                "on": "2026-11-02",
+                "note": "Petty cash tin"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-04T14:03:31.335Z",
+              "updated_at": "2026-11-04T14:03:31.335Z",
+              "deleted_at": null
+            },
+            {
+              "id": "01M6KDYG477TK3RNGRDY5G04DY",
+              "register": "cash_counts",
+              "seq": 2,
+              "fields": {
+                "account": "01M6KDYG477TK3RNGRA170EAWP",
+                "counted": {
+                  "amount": 31000,
+                  "currency": "USD"
+                },
+                "on": "2026-10-05"
+              },
+              "state": null,
+              "version": 1,
+              "created_at": "2026-11-04T14:03:31.335Z",
+              "updated_at": "2026-11-04T14:03:31.335Z",
+              "deleted_at": null
+            }
+          ],
+          "matched": 2,
+          "refusals": []
+        }
+      ],
+      "icon": "money",
+      "nav": {
+        "order": 40,
+        "section": "Money"
+      },
+      "page": "cash-counts",
+      "requires": [
+        "register.cash_counts"
+      ],
+      "title": "Cash counts",
+      "read_at": "2026-11-04T14:03:31.335Z",
+      "zone": "UTC",
+      "look": {
+        "look": "cash-counts",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}
