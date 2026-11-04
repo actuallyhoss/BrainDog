@@ -273,14 +273,7 @@ const EXEMPT = {
     why: 'the public site is prose about the product, not code that runs a record (9 hits).',
     words: {
       egypt: 'the changelog entry at `routes/changelog/entries.ts:569` says `Egyptian pounds` about a currency fix that shipped.',
-      gold: 'the copy and the demo say what a person can add to Money, "investments and gold" and the demo\'s "Gold, 40 g": the add-on as a visitor reads it, never a branch on one.',
       quartz: '`legalName` in `lib/site/seo.ts` and the docs\' line "BrainDog is made by Quartz Apps LLC": the company that makes BrainDog, as the mail footer names it.',
-    },
-  },
-  'apps/worker/src/mail.ts': {
-    why: 'the footer of every mail names who sends it, as the legal pages do (1 hit).',
-    words: {
-      quartz: '`SENDER`, "BrainDog is run by Quartz Apps LLC.": the company that runs BrainDog, printed under every letter as its sender, never a branch on a use case.',
     },
   },
   'packages/seed/src/changelog.ts': {

@@ -38,6 +38,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
+import { isIP } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, resolve as resolvePath, sep } from 'node:path';
 import { argv, env } from 'node:process';
@@ -56,9 +57,9 @@ import { budget } from './lib.mjs';
    draws it here as a variant; until then it is handed on from this door, so a gate and the look reach both records
    through one module, and the runner reads `lived.mjs` as the library it is rather than a gate nobody registered. */
 export { buildLived, openLived } from './lived.mjs';
-/* THE OUTSIDE WORLD A RECORD'S SCRIPTS ASK, stubbed (`outside.mjs`), handed on from here for the same reason: a walk that
+/* THE OUTSIDE WORLD A RECORD'S SCRIPTS ASK, stubbed (`tools/stubs/outside.mjs`), handed on from here for the same reason: a walk that
    starts a record with `keys` and `outside` reaches the stub and its keys through this one door. */
-export { KEYS as STUB_KEYS, SENTRY_ORG, startOutside } from './outside.mjs';
+export { KEYS as STUB_KEYS, SENTRY_ORG, startOutside } from '../stubs/outside.mjs';
 
 /**
  * The app's own catalogue folder, the one the build ships beside the shell: every add-on as it was last published, read
@@ -326,13 +327,14 @@ export function scratchKeyFile(file) {
 
 /**
  * Where a script's request goes when the record is given `outside`: the stub's base, then the host it asked, then its
- * path, so the stub (`outside.mjs`) answers as that service. Nothing leaves the machine.
+ * path, so the stub (`tools/stubs/outside.mjs`) answers as that service. Nothing leaves the machine.
  */
 const toOutside = (outside) => async (url, init) =>
   fetch(`${outside}/${url.host}${url.pathname}${url.search}`, { method: init.method, headers: init.headers, ...(init.body === undefined ? {} : { body: init.body }), redirect: 'manual' });
 
 /** Every host a script asks is a public address to the pin, since `toOutside` sends it to the stub whatever it is. */
-const PUBLIC = async () => [{ address: '93.184.215.14', family: 4 }];
+const PUBLIC_ADDRESS = '93.184.215.14';
+const PUBLIC = async () => [{ address: PUBLIC_ADDRESS, family: isIP(PUBLIC_ADDRESS) }];
 
 /** The owner as the keychain's own door reads them: a person, the owner, in no chat. `p_self` is `IDENTITY`'s owner. */
 const OWNER_CTX = { principal: { kind: 'person', id: 'p_self', level: 'owner' } };
@@ -357,7 +359,7 @@ const OWNER_CTX = { principal: { kind: 'person', id: 'p_self', level: 'owner' } 
  * `keys` OPENS A KEY STORE ON A SCRATCH FILE AND PUTS STUB KEYS IN IT: `{ file, put: [{ label, opens, value }] }`. The file
  * is held to `scratchKeyFile` (never the real vault), the record is made with its three wrapped keys as `init` makes them,
  * and each key goes in through the keychain's own deposit door as the owner, so a script opens it exactly as on a real
- * self-host. `outside` IS A STUB'S BASE (`outside.mjs`): outbound is turned on and every request a script sends goes
+ * self-host. `outside` IS A STUB'S BASE (`tools/stubs/outside.mjs`): outbound is turned on and every request a script sends goes
  * there and nowhere else, its host kept in the path, and the belt runs each second. The handle then has `again()`, which
  * makes every script due now and runs one pass, since the record's clock stands still and an hourly script would
  * otherwise run once.
@@ -381,7 +383,7 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
     port,
     host: '127.0.0.1',
     now: NOW,
-    pollMs: catalogue || outside !== undefined ? 1_000 : 0,
+    pollMs: catalogue || outside !== undefined ? budget('record').pollMs : 0,
     sessionKey: new Uint8Array(randomBytes(32)),
     /* NO PUBLIC KENNEL. Left to the environment, the record read `https://app.brain.dog/api/kennel/v1/` for every catalogue
        index and preview, so a screen waited on another host for up to five seconds a file: `/packs/browse` asks for a
@@ -511,11 +513,11 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
           /* EVERY SCRIPT DUE AT THE RECORD'S NOW, AND ONE PASS. The clock stands at `NOW`, so a script that ran once is
              next due an hour after a moment that never comes. */
           again: async () => {
-            running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script'", new Date(NOW - 1_000).toISOString());
+            running.sql.exec("UPDATE schedule SET due_at = ? WHERE kind = 'script'", new Date(NOW - budget('record').pollMs).toISOString());
             /* AND PASSES UNTIL NO RUN IS LEFT WAITING: a pass leases a few, and the seed's own scripts queue a couple of
                hundred runs the first time, so one pass would leave an add-on's run behind them. */
             const waiting = () => running.sql.one("SELECT count(*) AS n FROM outbox WHERE kind = 'script.run' AND state IN ('pending', 'leased')")?.n ?? 0;
-            for (let i = 0; i < 400; i++) {
+            for (let i = 0; i < budget('record').scriptPasses; i++) {
               await running.poll();
               if (waiting() === 0) break;
             }

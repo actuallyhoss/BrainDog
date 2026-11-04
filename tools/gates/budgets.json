@@ -67,7 +67,11 @@
   },
   "record": {
     "//": "`record.mjs` on the command line: the port the seed is served on for `vite dev` and `vite preview` to proxy `/api` to. 8787 because `wrangler dev` listens there, so the app finds a record at the same address whichever host is running. The gates never use it: each starts its own record on port 0.",
-    "port": 8787
+    "port": 8787,
+    "//pollMs": "How often a record started with a catalogue or an outside stub runs its schedule, and how far before `NOW` a walk sets a script due so one pass finds it.",
+    "pollMs": 1000,
+    "//scriptPasses": "The most passes `again` runs to empty the outbox of script runs: a pass leases a few, and the seed's own scripts queue a couple of hundred the first time.",
+    "scriptPasses": 400
   },
   "ready": {
     "//": "How long a screen has to say what it settled into, shared by the four gates that open a browser. Absence past it is a FINDING and never a skip: the wait this replaces ended in `.catch(() => {})`, so a page that had drawn nothing was measured anyway and the gate reported green over it.",
