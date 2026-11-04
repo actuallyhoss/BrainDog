@@ -1,10 +1,10 @@
 <!--
-  Three of the five settings, drawn under Theme and Density in Appearance: Navigation (the top bar or one menu button),
-  the phone bar (the pages after Today), and Words (a row to the area that names lists and the currency).
+  Getting around, in Appearance: Navigation (the sidebar, or one button that opens it as a panel) and the phone bar (the
+  pages after Today).
 
-  FIVE SETTINGS, AND EVERYTHING ELSE SAID ON THE PAGE. Theme, density, navigation, the phone bar and words are what a
-  person sets here; the rest is said where it shows, with a preview and an undo. The side rail is no longer a shape:
-  a rail an older build kept reads as no choice, and the top bar is drawn (`nav-prefs.svelte.ts`).
+  THE SIDEBAR'S STORED WORD IS `bar`, from when the top bar held the places. The word stays on the record and the screen
+  says what is on it. The side rail is no longer a shape: a rail an older build kept reads as no choice, and the sidebar is
+  drawn (`nav-prefs.svelte.ts`).
 
   EACH IS THE PERSON'S OWN ON A RECORD (`nav.shape`, `nav.tabs`), kept by `navPrefs`, so a choice on the laptop holds on
   the phone; the shell redraws from the same field the moment it is set.
@@ -25,7 +25,7 @@
   const words = {
     nav: 'Navigation',
     navLine: 'On a laptop',
-    bar: 'Top bar',
+    bar: 'Sidebar',
     menu: 'One button',
     phone: 'Phone bar',
     phoneLine: (most: number) => `Today, then up to ${most} more`,
@@ -45,7 +45,7 @@
     const before = navPrefs.chosen;
     void navPrefs.setShape(next).then((saved) => {
       if (saved.from === 'refused') return said(saved);
-      toasts.push(next === 'bar' ? 'The top bar is back.' : 'Your pages are behind one button now.', {
+      toasts.push(next === 'bar' ? 'The sidebar is back.' : 'Your pages are behind one button now.', {
         undo: () => void navPrefs.setShape(before).then(said),
       });
     });
@@ -76,9 +76,9 @@
   <span class="choice-name" id="choice-nav">{words.nav}</span>
   <span class="choice-line">{words.navLine}</span>
   <Segmented full role="group" aria-labelledby="choice-nav">
-    {#each [['bar', words.bar, 'rows'], ['menu', words.menu, 'more']] as const as [v, label, icon] (v)}
+    {#each [['bar', words.bar], ['menu', words.menu]] as const as [v, label] (v)}
       <button type="button" class="segment" aria-pressed={navPrefs.shape === v} data-on={navPrefs.shape === v ? '' : undefined} onclick={() => pickShape(v)}
-        ><Icon name={icon} size="s" />{label}</button
+        >{#if v === 'bar'}<svg class="side-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.75" y="4.75" width="16.5" height="14.5" rx="3" /><path d="M9.25 4.75v14.5" /></svg>{:else}<Icon name="rows" size="s" />{/if}{label}</button
       >
     {/each}
   </Segmented>
@@ -137,6 +137,17 @@
     align-items: center;
     justify-content: center;
     gap: var(--sp-2);
+  }
+
+  /* THE SIDEBAR'S OWN GLYPH, the one on the button that hides it, at a segment's glyph size. */
+  .side-glyph {
+    inline-size: var(--icon-s, 14px);
+    block-size: var(--icon-s, 14px);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .picks {

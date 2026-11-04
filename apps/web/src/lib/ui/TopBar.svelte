@@ -13,6 +13,9 @@
   ITS START IS THE WORK'S START: the bar pads its start by the page's gutter, so the crumb and the first tile under it
   share one edge at every width. BELOW 900px THIS IS NOT DRAWN: each page's head carries the phone's bar. ON `/search`
   THE ASK FIELD IS NOT DRAWN: the page's own field is.
+
+  WITH NO SIDEBAR (the "One button" navigation) THE BAR'S START IS THE MENU: one button, its count of what needs you, and
+  then the same crumb, field, bell and face. It opens every place as a panel (`AppFrame.svelte`).
 -->
 <script lang="ts">
   import { at, here as inside } from '../at.ts';
@@ -23,25 +26,39 @@
   import { frame } from '../shell/frame.svelte.ts';
   import type { Crumb } from '../shell/side.ts';
   import YouMenu from '../shell/YouMenu.svelte';
+  import Count from './Count.svelte';
   import Icon from './Icon.svelte';
   import Kbd from './Kbd.svelte';
 
   let {
     crumb = [],
     onfind,
+    onmenu,
+    menuOpen = false,
+    waiting = 0,
   }: {
     /** Where you are, place first: each step a link back but the last. */
     crumb?: readonly Crumb[];
     onfind?: (() => void) | undefined;
+    /** Given only where there is no sidebar: opens the panel that holds every place. */
+    onmenu?: (() => void) | undefined;
+    menuOpen?: boolean;
+    /** What needs the person, said on the button, since the row that says it is behind it. */
+    waiting?: number;
   } = $props();
 
-  const words = { where: 'You are here' } as const;
+  const words = { where: 'You are here', menu: 'Menu', needs: (n: number) => `${n.toLocaleString('en-GB')} need you` } as const;
 
   /* THE ASK FIELD STANDS DOWN ON THE SEARCH PAGE, which draws the field itself (money F12). */
   const searching = $derived(inside(page.url.pathname) === '/search');
 </script>
 
 <nav class="topbar" aria-label={words.where}>
+  {#if onmenu}
+    <button type="button" class="bar-menu tap" data-nav-menu aria-haspopup="dialog" aria-expanded={menuOpen} aria-controls="nav-panel" aria-keyshortcuts="[" title={`${words.menu} ([)`} onclick={() => onmenu?.()}>
+      <Icon name="rows" size="m" /><span>{words.menu}</span>{#if waiting > 0}<Count n={waiting} size="s" label={words.needs(waiting)} />{/if}
+    </button>
+  {/if}
   <div class="crumb">
     <ol>
       {#each crumb as step, i (i)}
@@ -88,6 +105,40 @@
     block-size: calc(56px + var(--window-inset));
     padding-block-start: var(--window-inset);
     padding-inline: var(--gutter);
+  }
+
+  /* THE ONE BUTTON: a glass capsule like the field across from it, a page control's height, on the work's own edge. */
+  .bar-menu {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex: none;
+    block-size: var(--ctl-page);
+    padding-inline: var(--ctl-pad-sm) var(--ctl-pad);
+    border: 0;
+    background: var(--g-fill);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
+    box-shadow: inset 0 0 0 0.5px var(--g-line);
+    border-radius: var(--r-pill);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    line-height: var(--lead-ctl);
+    cursor: pointer;
+    transition: background-color var(--d-state) var(--ease-out);
+  }
+
+  /* WITH A COUNT THE CAPSULE'S END IS THE COUNT'S, as near its edge as the glyph is at the start. */
+  .bar-menu:has(:global(.badge)) {
+    padding-inline-end: var(--sp-2);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .bar-menu:hover {
+      background: var(--g-fill-hover);
+    }
   }
 
   /* THE CRUMB: the place in the quiet ink, a small chevron, where you are in ink at 600. One line; a long name ends in
@@ -262,6 +313,7 @@
   }
 
   @media (forced-colors: active) {
+    .bar-menu,
     .bar-ask {
       border: 1px solid CanvasText;
     }

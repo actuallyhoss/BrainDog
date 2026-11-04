@@ -66,7 +66,6 @@ export const narrow = new MediaQuery('(width < 900px)', false);
 
 /**
  * WHETHER THE BAR SAYS THE PAGE'S NAME, which is then not said a second time on the page (29 October, his word: "the
- * title showing twice"). On a phone the head's own bar always does; on a desk the top bar does, and the menu shape has
- * no bar, so there the page keeps its name.
+ * title showing twice"). On a phone the head's own bar always does; on a desk the top bar does, on either navigation.
  */
 export const barTitled = (): boolean => narrow.current || frame.crumbed;

@@ -1,8 +1,10 @@
 <!--
   Settings > Appearance: how BrainDog looks to this person, in one section, and the record's own look under it.
 
-  FIVE SETTINGS (`d8`): theme, density, navigation, the phone bar and words. Text size, colour, contrast, screenshot mode
-  and the record's own look are folded under them, one press away; everything else is said on the page itself.
+  EVERYTHING A PERSON SETS IS SHOWN (4 Nov, Sam: "remove the dropdowns from the appearance page, make them all shown").
+  Three groups in one card, beside the preview: how it reads (scheme, text size, density, colour, look, contrast), getting
+  around (navigation, the phone bar), and screenshot mode. Only the record's own look stays folded under it: it is
+  everybody's, and long.
 
   THE PERSON'S LOOK FOLLOWS THEM (`35`). Scheme, text size, density, contrast and accent are kept by the record as their
   own `look.*` prefs, so every device they open this record on looks the same; the cookie is only the first-paint copy
@@ -14,7 +16,8 @@
   text size, the density and the colour were four sections, the scheme drawn as three large pictures of the app, and a
   person changing how the product reads scrolled past a screen of chrome to find the next choice. They are one column of
   short choices now, beside a preview that is the app itself in small: drawn from the same tokens every screen reads, so
-  every press changes it the moment it is made, in the scheme, size, row height and colour chosen. NO TOAST SAYS IT
+  every press changes it the moment it is made, in the scheme, size, room and colour chosen. It stays in view beside the
+  choices as the column scrolls, from the width where it stands beside them. NO TOAST SAYS IT
   (motion F15): the whole screen already shows the change, and the control beside it is its undo. Only a refusal speaks.
 
   ONE WAY TO MORE CONTRAST (agents F26): the More contrast switch. "High contrast" is no longer a look beside House.
@@ -74,8 +77,6 @@
     light: 'Light',
     dark: 'Dark',
     houseRed: 'House red',
-    more: 'Text size, colour and look',
-    moreSeeing: 'Contrast and screenshots',
   };
 
   /* A THEME REFUSED AT INSTALL, handed over by the add-on screen's Fix and install. Taken once, so a reload of this
@@ -341,12 +342,29 @@
   <div class="section-body looks-host">
     <div class="looks">
       <div class="choices">
+        <!-- HOW IT READS: scheme, size, room, colour, look and contrast. -->
+        <div class="group">
         <div class="choice">
           <span class="choice-name" id="choice-scheme">{copy.scheme}</span>
           <Segmented full role="group" aria-labelledby="choice-scheme">
             {#each SCHEMES as [v, label, icon] (v)}
               <button type="button" class="segment" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}
                 ><Icon name={icon} size="s" />{label}</button
+              >
+            {/each}
+          </Segmented>
+        </div>
+
+        <div class="choice">
+          <span class="choice-name" id="choice-text">{copy.textSize}</span>
+          <Segmented full role="group" aria-labelledby="choice-text">
+            {#each TEXTS as [v, label] (v)}
+              <button
+                type="button"
+                class="segment"
+                aria-pressed={text === v}
+                data-on={text === v ? '' : undefined}
+                onclick={() => set('text', v)}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
               >
             {/each}
           </Segmented>
@@ -363,49 +381,6 @@
                 data-on={density === v ? '' : undefined}
                 onclick={() => set('density', v)}
                 ><span class="spacing" data-density={v} aria-hidden="true"><span></span><span></span><span></span></span>{label}</button
-              >
-            {/each}
-          </Segmented>
-        </div>
-
-        <!-- NAVIGATION, THE PHONE BAR AND WORDS: the other three of the five (`d8`). -->
-        <NavPicks shell={props.shell} />
-
-        <!-- EVERYTHING ELSE, FOLDED: five settings are shown, and the rest is one press away, never gone. -->
-        <details class="more">
-          <summary>{words.more}</summary>
-          <div class="more-body">
-        <!-- EVERY LOOK THE RECORD HOLDS, ONE PRESS EACH: House, High contrast, the record's own, one for each add-on. The
-             one drawn now carries a tick as well as its fill, so the state is never colour alone. -->
-        {#if answered && choices.length > 1}
-          <div class="choice">
-            <span class="choice-name" id="choice-look">{lookWords.title}</span>
-            <span class="choice-line">{accent === null ? lookWords.line : lookWords.ownOnTop}</span>
-            <div class="look-picks" role="group" aria-labelledby="choice-look">
-              {#each choices as c (c.id)}
-                <button
-                  type="button"
-                  class="look-pick"
-                  aria-pressed={c.on}
-                  data-on={c.on ? '' : undefined}
-                  disabled={picking}
-                  onclick={() => void pickLook(c.id)}>{#if c.on}<Icon name="check" size="s" />{/if}{c.name}</button
-                >
-              {/each}
-            </div>
-          </div>
-        {/if}
-
-        <div class="choice">
-          <span class="choice-name" id="choice-text">{copy.textSize}</span>
-          <Segmented full role="group" aria-labelledby="choice-text">
-            {#each TEXTS as [v, label] (v)}
-              <button
-                type="button"
-                class="segment"
-                aria-pressed={text === v}
-                data-on={text === v ? '' : undefined}
-                onclick={() => set('text', v)}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
               >
             {/each}
           </Segmented>
@@ -452,8 +427,59 @@
           {#if accentName}<p class="swatch-name">{accentName}</p>{/if}
           {#if accentWrong}<p class="wrong" role="alert">{accentWrong}</p>{/if}
         </div>
+
+
+        <!-- EVERY LOOK THE RECORD HOLDS, ONE PRESS EACH: House, High contrast, the record's own, one for each add-on. The
+             one drawn now carries a tick as well as its fill, so the state is never colour alone. -->
+        {#if answered && choices.length > 1}
+          <div class="choice">
+            <span class="choice-name" id="choice-look">{lookWords.title}</span>
+            <span class="choice-line">{accent === null ? lookWords.line : lookWords.ownOnTop}</span>
+            <div class="look-picks" role="group" aria-labelledby="choice-look">
+              {#each choices as c (c.id)}
+                <button
+                  type="button"
+                  class="look-pick"
+                  aria-pressed={c.on}
+                  data-on={c.on ? '' : undefined}
+                  disabled={picking}
+                  onclick={() => void pickLook(c.id)}>{#if c.on}<Icon name="check" size="s" />{/if}{c.name}</button
+                >
+              {/each}
+            </div>
           </div>
-        </details>
+        {/if}
+
+        <!--
+      THE PALETTE THAT COULD NOT BE TURNED ON.
+
+      `packages/theme` solves a second palette against a higher contrast floor, `theme.mjs` writes
+      it into `house.css` behind `html[data-theme='hc']`, and `theme.mjs --check` byte-compares it
+      on every build. Nothing in `apps/web/src` ever set that attribute, so sixteen checks' worth
+      of generated work was unreachable by the reader it exists for.
+
+      WHAT WAS IN ITS WAY WAS THE ACCENT. `data-theme` carried two meanings and only one of them
+      was ever read: `house.css` has four `data-theme` selectors and all four say `hc`, while
+      `accent.ts` builds its palette into an adopted stylesheet and needs no attribute at all. The
+      one being written was the one nothing read.
+
+      A SWITCH AND NOT A SEGMENT, because it is one thing that is on or off, and `13 §5.1` wants
+      the state said in something other than styling: `aria-checked` carries it.
+    -->
+        <div class="group-row">
+          <StateRow icon="eye" title={copy.contrast} line={copy.contrastHint} action={contrastSwitch} />
+        </div>
+        </div>
+
+        <!-- GETTING AROUND: the navigation and the phone bar. -->
+        <div class="group">
+          <NavPicks shell={props.shell} />
+        </div>
+
+        <!-- A DISPLAY MODE FOR A SHOULDER, not a redaction: the sentence says both halves, so nobody takes it for a lock. -->
+        <div class="group group-rows">
+          <StateRow icon="eye" title={copy.shot} line={copy.shotHint} action={shotSwitch} />
+        </div>
       </div>
 
       <!--
@@ -500,28 +526,6 @@
       </div>
     </div>
 
-    <!--
-      THE PALETTE THAT COULD NOT BE TURNED ON.
-
-      `packages/theme` solves a second palette against a higher contrast floor, `theme.mjs` writes
-      it into `house.css` behind `html[data-theme='hc']`, and `theme.mjs --check` byte-compares it
-      on every build. Nothing in `apps/web/src` ever set that attribute, so sixteen checks' worth
-      of generated work was unreachable by the reader it exists for.
-
-      WHAT WAS IN ITS WAY WAS THE ACCENT. `data-theme` carried two meanings and only one of them
-      was ever read: `house.css` has four `data-theme` selectors and all four say `hc`, while
-      `accent.ts` builds its palette into an adopted stylesheet and needs no attribute at all. The
-      one being written was the one nothing read.
-
-      A SWITCH AND NOT A SEGMENT, because it is one thing that is on or off, and `13 §5.1` wants
-      the state said in something other than styling: `aria-checked` carries it.
-    -->
-    <details class="more">
-      <summary>{words.moreSeeing}</summary>
-    <StateRow icon="eye" title={copy.contrast} line={copy.contrastHint} action={contrastSwitch} />
-    <!-- A DISPLAY MODE FOR A SHOULDER, not a redaction: the sentence says both halves, so nobody takes it for a lock. -->
-    <StateRow icon="eye" title={copy.shot} line={copy.shotHint} action={shotSwitch} />
-    </details>
   </div>
 </Tile>
 
@@ -531,7 +535,7 @@
 -->
 <!-- THE FOLD'S NAME IS THE CARD'S (ui pass, 3 Nov): open, it read "How your BrainDog looks" twice, the summary over a card
      headed the same. -->
-<details class="more record-look">
+<details class="record-look">
   <summary>{copy.lookTitle}</summary>
 <Tile class="section" data-surface="tile">
   <div class="section-body">
@@ -542,10 +546,9 @@
 </details>
 
 <style>
-  /* THE FOLDS: one quiet line each, opened by a press, so the five settings are what the area shows. */
-  /* A FOLD'S LINE IS A CONTROL'S HEIGHT (36), the words in its middle; it takes no margin of its own, so the column's gap
-     alone sets it off from the choice above, and two folds stand as far apart as a fold from the choices. */
-  .more > summary {
+  /* THE ONE FOLD LEFT, THE RECORD'S LOOK: one quiet line, opened by a press. Its line is a control's height (36), the words
+     in its middle. */
+  .record-look > summary {
     cursor: pointer;
     color: var(--ink-3);
     font-size: var(--fs-meta);
@@ -554,19 +557,13 @@
     padding-block: calc((var(--ctl-h) - var(--lead-meta)) / 2);
   }
 
-  /* UNDER A THUMB A FOLD'S LINE IS A 44px TARGET (`--tap`), its words still one line in the middle of it. */
+  /* UNDER A THUMB ITS LINE IS A 44px TARGET (`--tap`), its words still one line in the middle of it. */
   @media (pointer: coarse) {
-    .more > summary {
+    .record-look > summary {
       box-sizing: border-box;
       min-block-size: var(--tap);
       padding-block: max(var(--sp-2), calc((var(--tap) - 1lh) / 2));
     }
-  }
-
-  .more-body {
-    display: grid;
-    gap: var(--sp-5);
-    padding-block-start: var(--sp-3);
   }
 
   .record-look {
@@ -584,7 +581,7 @@
   }
 
   /* ONE COLUMN ON A PHONE, THE PREVIEW FIRST: a person sees what they are changing before the choices that change it.
-     From 1280px up the choices stand beside it, and the preview stays in view while they are pressed. */
+     Where the area has room the choices stand beside it, and the preview stays in view while they are pressed. */
   .looks {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -621,7 +618,7 @@
       grid-auto-flow: column;
       grid-auto-columns: 280px;
       position: sticky;
-      inset-block-start: var(--sp-6);
+      inset-block-start: var(--page-top);
     }
   }
 
@@ -631,11 +628,36 @@
     }
   }
 
+  /* THREE GROUPS, A HAIRLINE BETWEEN THEM: choices in a group stand a section's small step apart, and the groups twice that. */
   .choices {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
     min-inline-size: 0;
+  }
+
+  .group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+  }
+
+  .group + .group {
+    padding-block-start: var(--sp-5);
+    border-block-start: 1px solid var(--sep);
+  }
+
+  /* A SWITCH'S ROW BRINGS ITS OWN AIR (`--divider-space`, `StateRow`), so the group's gap takes that back. */
+  .group-row,
+  .group-rows {
+    margin-block: calc(-1 * var(--divider-space));
+  }
+
+  .group + .group-rows {
+    margin-block-end: calc(-1 * var(--divider-space));
+    margin-block-start: 0;
+    padding-block-start: var(--sp-3);
   }
 
   .choice {

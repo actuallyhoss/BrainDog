@@ -88,7 +88,6 @@
   import { spineOf } from '$lib/spine.ts';
   import { said } from '$lib/voice.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
-  import Icon from '$lib/ui/Icon.svelte';
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import Pull from '$lib/ui/Pull.svelte';
@@ -515,7 +514,9 @@
 
   /* THE SIDEBAR IS THE BAR SHAPE'S: the full column beside the work from 1,280 (`sideOn`), and narrower, or hidden, its
      56px rail of the places (`railOn`), never nothing. From the rail the full sidebar opens as a drawer over the page
-     from the left (`sideOver`), never from the right, and the menu shape's one button opens the same drawer. */
+     from the left (`sideOver`), never from the right. THE STORED WORD `bar` IS THE SIDEBAR: the setting says Sidebar now,
+     and a kept word stays as it is. The menu shape has neither: the page takes the whole width, and the one button in
+     the top bar opens the same sidebar as a floating panel (`sideOver`, `data-panel`). */
   /* NONE OF THE THREE IN THE IPHONE APP, at any width: native's tabs and its search tab are the way to every place. */
   let sideOver = $state(false);
   const sideOn = $derived(!ios && navPrefs.shape === 'bar' && !narrow && deskWide && sideShown);
@@ -591,6 +592,59 @@
     const now = sideShown ? sideWidth : RAIL_W;
     if (el) slide(el, getComputedStyle(el).direction === 'rtl' ? now - was : was - now);
   }
+
+  /* THE DRAWER AND THE PANEL TAKE THE KEYBOARD WHILE THEY ARE OPEN: the work and the bar behind are inert, focus goes to the
+     row of the page you are on, and it comes back to what opened them, unless a page was chosen, when it goes where
+     every move sends it (`afterNavigate`). Attached to the panel, so it runs each time the panel is drawn. */
+  let overOpener: HTMLElement | null = null;
+  function overFocus(el: HTMLElement): () => void {
+    overOpener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+    let gone = false;
+    const land = (): boolean => {
+      const to = el.querySelector<HTMLElement>('.s-row[aria-current="page"]') ?? el.querySelector<HTMLElement>('nav a[href]');
+      to?.focus({ preventScroll: true });
+      return to != null;
+    };
+    /* ITS CODE MAY STILL BE ON THE WAY THE FIRST TIME, so it is asked again once the rows are there. */
+    const wait = land() ? null : new MutationObserver(() => {
+      if (!gone && land()) wait?.disconnect();
+    });
+    wait?.observe(el, { childList: true, subtree: true });
+    return () => {
+      gone = true;
+      wait?.disconnect();
+      const back = overLeft ? null : (overOpener ?? document.querySelector<HTMLElement>('[data-nav-menu]'));
+      overOpener = null;
+      overLeft = false;
+      /* AFTER THE WORK STOPS BEING INERT, a tick away. */
+      if (back) void tick().then(() => back.focus({ preventScroll: true }));
+    };
+  }
+  /* CHOOSING A PAGE CLOSES IT, the page you are already on too, which is no move for `beforeNavigate` to hear. */
+  function overChose(e: MouseEvent): void {
+    const link = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>('a[href]') : null;
+    if (!link) return;
+    overLeft = link.href !== location.href;
+    /* THE PAGE YOU ARE ON IS NO MOVE AT ALL: nothing is reloaded, and focus goes back to the button. */
+    if (!overLeft) e.preventDefault();
+    sideOver = false;
+  }
+  /* AND TAB GOES ROUND INSIDE IT: the skip link and the toasts stand outside the shell's inert parts. */
+  function overTab(e: KeyboardEvent): void {
+    if (e.key !== 'Tab' || !(e.currentTarget instanceof HTMLElement)) return;
+    const stops = [...e.currentTarget.querySelectorAll<HTMLElement>('a[href], button, [tabindex="0"]')].filter((el) => el.tabIndex >= 0 && el.offsetParent !== null);
+    const first = stops[0];
+    const last = stops.at(-1);
+    if (!first || !last) return;
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === e.currentTarget)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+  let overLeft = false;
 
   /* WHERE THE AGENTS PLACE IS, wherever the rail put it: the place that carries the live dot. */
   const agentsAt = $derived(agentsHref([...rail.places, ...rail.rest], data.pages));
@@ -741,8 +795,8 @@
       (data.me.email ?? '').trim(),
   );
 
-  /* `g 1`–`9` COUNT WHAT IS ON SCREEN: the places, in the order drawn, the sidebar's on the bar shape. */
-  const numbered = $derived(navPrefs.shape === 'bar' ? sidePlaces : rail.places);
+  /* `g 1`–`9` COUNT THE PLACES IN THE ORDER THE SIDEBAR DRAWS THEM: the panel behind the one button is the same list. */
+  const numbered = $derived(sidePlaces);
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
      and `app.html` has always read this cookie before first paint, so a remembered fold costs no
      flash. Nothing wrote it until now. */
@@ -878,6 +932,7 @@
     if (newScreen(nav.from?.url, nav.to?.url)) leaving();
     /* The dev timing hook measures the next screen from here (`timing.ts`); off, it does nothing. */
     timingOpened();
+    overLeft = sideOver;
     sideOver = false;
     keepPlace(nav);
   });
@@ -1468,7 +1523,8 @@
     frame.news = data.whatsNew ?? [];
     frame.asks = open;
     frame.upTo = data.upTo ?? null;
-    frame.crumbed = shape === 'bar';
+    /* EVERY SHAPE DRAWS THE TOP BAR, so the bar says the page's name on every shape. */
+    frame.crumbed = true;
   });
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
@@ -1690,18 +1746,13 @@
         </div>
       {/if}
       {#if !ios}
-      <div class="bar-slot">
+      <div class="bar-slot" inert={overOn}>
         {#if shape === 'bar'}
           <TopBar {crumb} onfind={openPalette} />
         {:else}
-          <!--
-            THE MENU SHAPE IS ONE BUTTON AND NOTHING ELSE, which is the whole of what it promises:
-            the smallest chrome there is, for somebody who lives in the palette. It opens the sidebar
-            over the page from the left, the one place that holds what the record owns.
-          -->
-          <button type="button" class="menu-open tap" aria-expanded={sideOver} onclick={() => void toggleSide()}>
-            <Icon name="more" size="m" /><span>{copy.more}</span>
-          </button>
+          <!-- THE MENU SHAPE IS THE SAME BAR WITH ONE BUTTON AT ITS START, and no sidebar: where you are, search, the bell
+               and the face stay where they always are, and the button opens every place as a panel. -->
+          <TopBar {crumb} onfind={openPalette} onmenu={() => void toggleSide()} menuOpen={overOn} waiting={open} />
         {/if}
       </div>
       {/if}
@@ -1709,7 +1760,8 @@
         <!-- UNDER 1,280, OR ON THE MENU SHAPE, THE FULL SIDEBAR SLIDES IN FROM THE LEFT over its rail and the page; a press
              beside it, Esc or a move closes it. -->
         <button type="button" class="side-scrim" aria-label={copy.close} tabindex="-1" onclick={() => (sideOver = false)}></button>
-        <div class="side-over" style:--side-col={`${sideWidth}px`}>
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions, a11y_click_events_have_key_events: it only hears a link chosen and Tab; a link's own key is a click -->
+        <div class="side-over" id="nav-panel" role="dialog" aria-modal="true" tabindex="-1" aria-label="Menu" data-panel={shape === 'menu' ? '' : undefined} style:--side-col={`${sideWidth}px`} {@attach overFocus} onclick={overChose} onkeydown={overTab}>
           {#if SideBar}
             <SideBar
               base={apiBase(page.url)}
@@ -1722,6 +1774,7 @@
               pen={sidePen}
               placed={listsPlaced}
               width={sideWidth}
+              panel={shape === 'menu'}
               ontoggle={() => (sideOver = false)}
             />
           {/if}
@@ -1748,7 +1801,7 @@
     {#key page.url.pathname}
     <!-- NOTHING THAT WRITES IS PRESSED WHILE THE SCREEN IS A SAVED COPY (`held.svelte.ts`): the quiet mark is up, a screen
          draws what it kept and asks again, or the shell is the last copy. Links still go. -->
-    <main id="main" class="body" data-screen={settled()} {@attach holdIn(() => presses.held || data.stale === true)}>
+    <main id="main" class="body" data-screen={settled()} inert={overOn} {@attach holdIn(() => presses.held || data.stale === true)}>
       <!-- THE QUIET MARK, over the work while something drawn from the local copy is asked again (`CopyMark.svelte`). -->
       {#if CopyMark}<CopyMark />{/if}
       <Pull />
@@ -1784,21 +1837,6 @@
        left edge in the Home Screen app, and the two asks. Its own chunk, a moment after the shell has drawn. -->
   {#if phoneWays}
     {#await import('$lib/phone/Phone.svelte') then { default: Phone }}<Phone waiting={open} path={page.url.pathname} host={data.host} />{/await}
-  {/if}
-
-  <!--
-    THE SEARCH BUTTON OF A DESKTOP WITH NO RAIL, and nowhere else.
-
-    The rail carries search as a row at its foot, and below 900px it is the 44px button in each
-    screen's head bar. The top bar and the menu shapes have neither, so from 900px up they keep this
-    one: a magnifier in a quiet raised circle at the bottom corner, which opens the palette, the one
-    surface that reaches anything in the record. Below 900px the rule under it hides it, because the
-    tab bar is the navigation there whatever the shape says.
-  -->
-  {#if shape === 'menu' && !ios}
-    <button type="button" class="launcher tap" onclick={openPalette} aria-label={copy.paletteLabel}>
-      <Icon name="search" size="l" />
-    </button>
   {/if}
 
   {#if Palette}<Palette bind:open={palette.open} nav={operator.yes ? [...data.nav, adminEntry] : data.nav} places={goPlaces} />{/if}
@@ -1993,16 +2031,14 @@
     overflow: hidden;
   }
 
-  /* THE OTHER TWO SHAPES ARE ONE COLUMN WITH A STRIP ON TOP, and the strip is `auto` for the same
-     reason the rail's column is: its height is its own declaration, and this grid never has to know
-     which of the two is in it. */
+  /* BOTH SHAPES ARE THE BAR OVER THE WORK, and the strip is `auto` for the same reason the rail's column is: its height is
+     its own declaration. The bar shape then gives the sidebar a column from 900px; the menu shape's stays 0. */
   .shell[data-shape='bar'],
   .shell[data-shape='menu'] {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
   }
 
-  /* The menu's strip sits on the ground, lined up with the work under it. */
   .bar-slot {
     box-sizing: border-box;
     inline-size: 100%;
@@ -2013,7 +2049,8 @@
   /* THE TOP BAR RUNS ACROSS THE WORK'S COLUMN ONLY, from the sidebar's edge, on the nav's surface with one hairline
      under it, on the line of the hairline under the sidebar's head: the two are one surface, in light and in dark. The
      Mac app's title bar is paid here, once: the work under the bar pays none. */
-  .shell[data-shape='bar'] .bar-slot {
+  .shell[data-shape='bar'] .bar-slot,
+  .shell[data-shape='menu'] .bar-slot {
     position: relative;
     z-index: var(--z-palette);
     grid-column: 1 / -1;
@@ -2026,7 +2063,8 @@
     border-block-end: 0;
   }
 
-  .shell[data-shape='bar'] .body {
+  .shell[data-shape='bar'] .body,
+  .shell[data-shape='menu'] .body {
     --shell-inset: 0px;
     --shell-lead: 0px;
   }
@@ -2035,15 +2073,18 @@
      the work take the column after it, so the bar's start follows the sidebar's edge wherever it is dragged. Below
      900px there is no bar and no sidebar, and the rule further down gives the work the one column. */
   @media (width >= 900px) {
-    .shell[data-shape='bar'] {
+    .shell[data-shape='bar'],
+    .shell[data-shape='menu'] {
       grid-template-columns: var(--side-col, 0px) minmax(0, 1fr);
     }
 
-    .shell[data-shape='bar'] .bar-slot {
+    .shell[data-shape='bar'] .bar-slot,
+    .shell[data-shape='menu'] .bar-slot {
       grid-column: 2 / -1;
     }
 
-    .shell[data-shape='bar'] .body {
+    .shell[data-shape='bar'] .body,
+    .shell[data-shape='menu'] .body {
       grid-column: 2;
       grid-row: 2;
     }
@@ -2067,52 +2108,10 @@
   /* A DOCKED PANEL STANDS UNDER THE BAR, not under its edge. On a phone it is the bottom sheet (`Panel.svelte`,
      `PHONE`), which hangs from the screen's foot and is left alone. */
   @media (width >= 900px) {
-    .shell[data-shape='bar'] :global(dialog.dock) {
+    .shell[data-shape='bar'] :global(dialog.dock),
+    .shell[data-shape='menu'] :global(dialog.dock) {
       inset-block: calc(56px + var(--shell-inset, 0px) + var(--inset)) var(--inset);
       block-size: auto;
-    }
-  }
-
-  /* One control, at the start of the strip, at the size every other target in the shell is. */
-  .menu-open {
-    position: relative;
-    isolation: isolate;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--tap);
-    padding-inline: var(--sp-3) var(--sp-4);
-    background: none;
-    border: 0;
-    /* A rectangle, as every button is. */
-    border-radius: var(--r-ctl);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--fs-body);
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  /* THE SURFACE ON A PSEUDO-ELEMENT: an opaque tile with one hairline, no glass, and a step of ink
-     under a pointer. */
-  .menu-open::before,
-  .launcher::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    background: var(--tile);
-    border: 1px solid var(--rule-strong);
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  /* ONLY UNDER A POINTER THAT HOVERS (skills pass follow-up, 2 Nov): on a phone a tap left the fill latched on the menu
-     button until the next tap elsewhere. */
-  @media (hover: hover) and (pointer: fine) {
-    .menu-open:hover::before,
-    .launcher:hover::before {
-      background: color-mix(in srgb, var(--ink) 5%, var(--tile));
     }
   }
 
@@ -2194,37 +2193,9 @@
     }
   }
 
-  /* THE ROOM THE SEARCH BUTTON IN THE BOTTOM CORNER NEEDS, and only on the shape that draws it: a floating button over
-     the last row of a list hides exactly the thing a long list is scrolled to the bottom to see. Every other shape
-     ends where the page's own foot does (48px under its last tile), not 68px further down (Today polish, 21 Oct). */
-  @media (width >= 900px) {
-    .shell[data-shape='menu'] .body {
-      padding-block-end: calc(var(--tap) + var(--sp-5));
-    }
-  }
-
   /* Below 900px the rail becomes a tab bar; above it, the tab bar does not exist. */
   .tab-slot {
     display: none;
-  }
-
-  /* A TILE WITH A MAGNIFIER, floating over the page in the corner, 44 across. */
-  .launcher {
-    position: fixed;
-    inset-block-end: calc(env(safe-area-inset-bottom) + var(--inset) * 2);
-    inset-inline-end: calc(var(--inset) * 2);
-    z-index: var(--z-hint);
-    isolation: isolate;
-    display: grid;
-    place-items: center;
-    inline-size: var(--tap);
-    block-size: var(--tap);
-    padding: 0;
-    background: none;
-    border: 0;
-    border-radius: var(--r-ctl);
-    color: var(--ink);
-    cursor: pointer;
   }
 
   @media (width < 900px) {
@@ -2254,12 +2225,6 @@
 
     .tab-slot {
       display: block;
-    }
-
-    /* The tab bar is the navigation below 900px whatever the shape, and each screen's head bar
-       carries search, so the corner button goes with the strip it stood in for. */
-    .launcher {
-      display: none;
     }
   }
 
@@ -2291,20 +2256,9 @@
       grid-template-columns: auto minmax(0, 1fr) var(--dock-col, 0px);
     }
 
-    .shell[data-shape='menu'] {
-      grid-template-columns: minmax(0, 1fr) var(--dock-col, 0px);
-    }
-
-    .shell[data-shape='menu'] .bar-slot {
-      grid-area: 1 / 1;
-    }
-
-    .shell[data-shape='menu'] .body {
-      grid-area: 2 / 1;
-    }
-
     /* THE SIDEBAR, THE WORK UNDER THE BAR, and the docked panel's column at the end, the bar over both. */
-    .shell[data-shape='bar'] {
+    .shell[data-shape='bar'],
+    .shell[data-shape='menu'] {
       grid-template-columns: var(--side-col, 0px) minmax(0, 1fr) var(--dock-col, 0px);
     }
 
@@ -2335,6 +2289,13 @@
     inline-size: min(var(--side-col, 248px), calc(100vw - 2 * var(--tap)));
     background: var(--nav);
     animation: side-in var(--d-panel) var(--ease-out);
+  }
+
+  /* THE ONE BUTTON'S PANEL IS THE SIDEBAR'S OWN CARD, floating: the window's inset all round and no band behind it. */
+  .side-over[data-panel] {
+    inset-block: calc(var(--window-inset) + var(--shell-inset, 0px)) var(--window-inset);
+    inset-inline-start: var(--window-inset);
+    background: none;
   }
 
   :global([dir='rtl']) .side-over {

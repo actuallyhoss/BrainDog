@@ -77,6 +77,7 @@
     onwidth,
     tabbed = [],
     ontoggle,
+    panel = false,
   }: {
     /** Where the record answers. */
     base: string;
@@ -106,6 +107,8 @@
     onwidth?: ((n: number, done: boolean) => void) | undefined;
     /** Hide or show the full column (`[` does the same). */
     ontoggle?: (() => void) | undefined;
+    /** Drawn as the "One button" navigation's panel: its head closes it, and it has no edge to drag. */
+    panel?: boolean;
     /** On the phone's Menu: the places the tab bar already carries, by address. */
     tabbed?: readonly string[];
   } = $props();
@@ -122,6 +125,7 @@
     nav: 'Places',
     side: 'Sidebar',
     menu: 'Menu',
+    close: 'Close',
     add: 'Add a project',
     late: 'late',
     working: 'An agent is at work',
@@ -736,13 +740,17 @@
     </ul>
   </nav>
 {:else}
-  <aside class="s-side" aria-label={words.side}>
+  <aside class="s-side" data-panel={panel ? '' : undefined} aria-label={panel ? words.menu : words.side}>
     <!-- THE HEAD, ON THE BAR'S LINE: the product's mark and name, and the button that hides the column. -->
     <div class="s-shead">
       <Brand />
-      <button type="button" class="s-hide tap" aria-pressed={shown} aria-keyshortcuts="[" aria-label={shown ? words.hide : words.show} title={`${shown ? words.hide : words.show} ([)`} onclick={() => ontoggle?.()}>
-        <svg class="s-side-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.75" y="4.75" width="16.5" height="14.5" rx="3" /><path d="M9.25 4.75v14.5" /></svg>
-      </button>
+      {#if panel}
+        <button type="button" class="s-hide tap" aria-keyshortcuts="[ Escape" aria-label={words.close} title={words.close} onclick={() => ontoggle?.()}><Icon name="close" size="m" /></button>
+      {:else}
+        <button type="button" class="s-hide tap" aria-pressed={shown} aria-keyshortcuts="[" aria-label={shown ? words.hide : words.show} title={`${shown ? words.hide : words.show} ([)`} onclick={() => ontoggle?.()}>
+          <svg class="s-side-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.75" y="4.75" width="16.5" height="14.5" rx="3" /><path d="M9.25 4.75v14.5" /></svg>
+        </button>
+      {/if}
     </div>
     <nav class="s-scroll" aria-label={words.nav} bind:this={rows} {@attach litSlide('.s-row[aria-current="page"]', { fill: 'var(--chosen)' })}>
       <ul class="s-list">
@@ -753,6 +761,7 @@
       {@render penPart()}
       {@render footPart()}
     </nav>
+    {#if !panel}
     <!-- THE EDGE, DRAGGED. A separator with its value is a widget, so it takes focus and the arrows move it too. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div
@@ -767,6 +776,7 @@
       onpointerdown={drag}
       onkeydown={nudge}
     ></div>
+    {/if}
   </aside>
 {/if}
 
@@ -788,6 +798,13 @@
     box-shadow: var(--glass-edge), var(--elev-chrome);
     border-radius: var(--r-chrome);
     border-inline-end: 0;
+  }
+
+  /* AS THE ONE BUTTON'S PANEL IT FLOATS OVER THE WORK, so the film is the thick one and the shadow a sheet's: the words
+     behind it never read through its rows. */
+  .s-side[data-panel] {
+    background: var(--glass-sheet);
+    box-shadow: var(--glass-edge), var(--elev-modal);
   }
 
   /* THE HEAD: 56 tall, its hairline on the bar's, the switcher at the start and the hide button at the end. */
