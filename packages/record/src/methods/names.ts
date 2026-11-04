@@ -6,7 +6,7 @@
  * answer took 60 to 100 ms when the thread was free and 5 to 8 s when it was not, and nothing a device asks can tell
  * which. What the device holds answers in a millisecond whichever it is, and the record's own answer still comes behind it.
  *
- * ONLY FOR A CALLER WHO READS EVERY LIST, WHOLE. Anybody else gets `whole: false` and no rows, and searches the record
+ * ONLY FOR A PERSON WHO READS EVERY LIST, WHOLE. An agent's or a key's read goes through search, which marks what it hands back. Anybody else gets `whole: false` and no rows, and searches the record
  * as before: a grant's `where`, a hidden field, a hidden amount and a private row are all things this read would have
  * to answer one row at a time, and that is what it is here to avoid. The owner's private rows are his own to see, and
  * somebody else's kept private are left out in the query, as a search leaves them out.
@@ -26,6 +26,10 @@ import type { RecordDeps } from './index.ts';
 
 export const NAMES_PER_LIST = 1000;
 
+/* THE KEYCHAIN'S LABELS STAY OFF THE DEVICE (4 Nov). Never a secret, but a list of what opens what, on every browser he signs in
+   on, buys little: a search for a key still finds it through the record. */
+const NOT_KEPT: ReadonlySet<string> = new Set(['credentials']);
+
 /** One name: the row's number in its list, its title, then what tells it apart when the record could say. */
 export type NameRow = [seq: number, title: string, on?: string, minor?: number, currency?: string];
 export type NameList = { id: string; name: string; icon: string | null; rows: NameRow[] };
@@ -37,12 +41,12 @@ export function methods(deps: RecordDeps) {
     async names(_args: Record<string, unknown>, ctx: CallContext): Promise<Result<Names>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      if (deps.readsEveryList?.(ctx) !== true || sight.amountsHidden(ctx) || Object.keys(ctx.wheres ?? {}).length > 0 || Object.keys(ctx.hides ?? {}).length > 0) return ok({ whole: false, lists: [] });
+      if (ctx.principal.kind !== 'person' || deps.readsEveryList?.(ctx) !== true || sight.amountsHidden(ctx) || Object.keys(ctx.wheres ?? {}).length > 0 || Object.keys(ctx.hides ?? {}).length > 0) return ok({ whole: false, lists: [] });
       const viewer = viewerOfRead(ctx);
       const lists: NameList[] = [];
       for (const [id, decl] of kernel.registers()) {
         const title = decl.title;
-        if (!title || decl.series === true) continue;
+        if (!title || decl.series === true || NOT_KEPT.has(id)) continue;
         const read = sql.all<{ seq: number | null; fields: string; updated_at: string }>(
           `SELECT seq, fields, updated_at FROM entry
             WHERE register = ? AND deleted_at IS NULL${viewer === undefined ? '' : ' AND id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)'}
