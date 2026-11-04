@@ -4,7 +4,8 @@
   layout itself until 30 Oct, so a stranger's first visit waited for the whole shell before seeing a field (E14). The
   global stylesheets and the Mac app's title-bar room stay in the root layout, which both frames share.
 
-  The shell: a skip link, the sidebar with the top bar beside it (or the side rail somebody kept), the tab bar, the
+  The shell: a skip link, the sidebar with the top bar beside it (or the top bar alone, its one button opening the
+  sidebar as a panel, on the One button navigation), the tab bar, the
   palette, the toast stack, and one polite live region. THE SIDEBAR HOLDS EVERY PLACE, the window's full height on the
   left; the top bar runs across the work's column only and says where you are and lets you ask. The two are one surface
   (`--nav`), and only the work sits on the board.
@@ -915,7 +916,7 @@
    *
    * AND IT REDRAWS WHEN IT IS SET, because the control that sets it is INSIDE the thing it changes: `/settings/navigation`
    * is a screen in this shell, and this shell mounts once for the life of the tab. Reading the field rather than the
-   * cookie is what makes choosing Top bar move the navigation at once instead of on the next reload.
+   * cookie is what makes choosing Sidebar move the navigation at once instead of on the next reload.
    */
   const shape = $derived(navPrefs.shape);
 

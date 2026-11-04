@@ -52,7 +52,9 @@ export type Pref = {
    */
   contrast?: boolean | undefined;
   /**
-   * WHERE THE NAVIGATION LIVES: the rail, a top bar, or nothing but a button.
+   * WHERE THE NAVIGATION LIVES. TODAY: `bar` draws the sidebar beside the top bar (the screen calls it Sidebar), and `menu`
+   * draws the top bar alone, with one button that opens the sidebar as a panel. The word `bar` stays as it was kept. The
+   * history of the choice follows.
    *
    * `undefined` IS THE RAIL, the floating glass card, which `19 §3` makes the default in bold and
    * which was made the default again after a spell of the top bar leading. The three

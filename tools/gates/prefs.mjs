@@ -230,12 +230,13 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       /* 1440 BY 900, WHICH IS THIS GATE'S VIEWPORT AND IS WHY THIS CASE CAN BE MEASURED AT ALL. The
          tab bar stays below 900px whatever the shape says, so the same values there are one
          answer twice, correctly. */
+      /* BOTH DRAW THE TOP BAR NOW; THE MENU SHAPE ADDS THE ONE BUTTON TO ITS START, so the second number is the answer. */
       /* `undefined` IS THE TOP BAR, the default (the owner's choice 1, 20 October: the bar of 19 October), so the first value
          is "unset" rather than `'bar'`. A device's own `'bar'` is not a value here: older builds wrote it into the cookie
          on every boot, so `deviceChose` (nav-prefs.svelte.ts) reads it as nobody's choice, which draws the bar twice. The
          menu is a device's own choice. */
       values: [{}, { shape: 'menu' }],
-      probe: () => [document.querySelectorAll('nav.topbar').length, document.querySelectorAll('button.menu-open').length].join(' '),
+      probe: () => [document.querySelectorAll('nav.topbar').length, document.querySelectorAll('button.bar-menu').length].join(' '),
     },
     {
       /**
@@ -323,7 +324,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       what: "which navigation the shell draws when the record keeps the shape, over the cookie's copy (contracts §7.3)",
       route: '/',
       values: [{ shape: 'menu', '@record': {} }, { shape: 'menu', '@record': { 'nav.shape': 'bar' } }],
-      probe: () => [document.querySelectorAll('nav.topbar').length, document.querySelectorAll('button.menu-open').length].join(' '),
+      probe: () => [document.querySelectorAll('nav.topbar').length, document.querySelectorAll('button.bar-menu').length].join(' '),
     },
     {
       /** `pen.suggest`: the switch as the record keeps it, and the pen or the empty state it draws, over the cookie's copy. */

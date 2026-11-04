@@ -95,7 +95,7 @@ export type Saved = { from: 'kept' } | { from: 'device' } | { from: 'refused'; f
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
-/** Where the navigation lives when nobody said: the top bar of 19 October (chosen 20 October), from 900px up. */
+/** Where the navigation lives when nobody said: `bar`, which draws the sidebar now and is called that on screen, from 900px up. */
 const SHAPE_DEFAULT: NavShape = 'bar';
 
 /**

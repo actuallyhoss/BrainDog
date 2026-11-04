@@ -1588,7 +1588,7 @@
       returnTo =
         had instanceof HTMLElement && had !== document.body
           ? had
-          : ([...document.querySelectorAll<HTMLElement>('[data-palette-from], .launcher')].find((f) => f.checkVisibility()) ?? null);
+          : ([...document.querySelectorAll<HTMLElement>('[data-palette-from]')].find((f) => f.checkVisibility()) ?? null);
       dismissed = false;
       placeOn(el);
       instantIf(el);
