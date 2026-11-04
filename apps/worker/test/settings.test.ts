@@ -85,6 +85,7 @@ const PROVISION: Door = { path: '/auth/provision', method: 'POST', body: { slug:
 const SIGNUP: Door = { path: '/auth/signup/start', method: 'POST', body: { email: PEOPLE[5]!.email } };
 const PUSH: Door = { path: '/api/push/key' };
 const GOOGLE: Door = { path: '/auth/google/start' };
+const EXTRA: Door = { path: '/account/billing/extra', method: 'POST', body: { record: REC, cap: 1000 }, as: 'owner' };
 
 /** One case a setting. The sentence in a `todo` is the refusal the door should give, word for word, and where. */
 const CASES: Record<string, Case> = {
@@ -134,6 +135,13 @@ const CASES: Record<string, Case> = {
   STRIPE_PRICE_PLUS: { kind: 'refuses', door: CHECKOUT({ plan: 'plus', slug: 'kiln-yard' }), env: { ...STRIPE, ...PRICES } },
   STRIPE_PRICE_PACK_100: { kind: 'refuses', door: CHECKOUT({ pack: 'credits-100', record: REC }), env: { ...STRIPE, ...PRICES } },
   STRIPE_PRICE_PACK_500: { kind: 'refuses', door: CHECKOUT({ pack: 'credits-500', record: REC }), env: { ...STRIPE, ...PRICES } },
+  STRIPE_PRICE_EXTRA: { kind: 'refuses', door: EXTRA, env: { ...STRIPE, ...PRICES, STRIPE_METER_EXTRA: 'meter_test_extra' } },
+  STRIPE_METER_EXTRA: { kind: 'refuses', door: EXTRA, env: { ...STRIPE, ...PRICES, STRIPE_PRICE_EXTRA: 'price_test_extra' } },
+  STRIPE_TAX: { kind: 'quiet', door: HEALTH, why: 'anything but on asks Stripe to add no tax, the owner’s switch once Stripe Tax is set up' },
+  FIRST_READ_DAILY: { kind: 'quiet', door: { path: '/auth/signup/read', method: 'POST', body: { said: 'I run a small pottery studio.', today: '2026-10-14' } }, why: 'unset is his no to a model reading a stranger’s words: the door answers that it is off, and the page reads by rules' },
+  APNS_KEY_ID: { kind: 'quiet', door: PUSH, why: 'any one of the three empty sends nothing to the iPhone app, and web push is unchanged' },
+  APNS_TEAM_ID: { kind: 'quiet', door: PUSH, why: 'any one of the three empty sends nothing to the iPhone app, and web push is unchanged' },
+  APNS_KEY: { kind: 'quiet', door: PUSH, why: 'any one of the three empty sends nothing to the iPhone app, and web push is unchanged' },
   SIGNUP: {
     kind: 'todo',
     door: SIGNUP,
