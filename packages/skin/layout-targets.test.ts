@@ -50,9 +50,9 @@ test('a card that is only a name is a thumb tall under a coarse pointer', () => 
   assert.ok(css.includes(`${close} {\n    padding-block: var(--sp-2);`), 'the close-set card is still the rule the floor is written for');
   const rule = ruleIn(css, close);
   assert.ok(rule, 'the close-set card has a rule under (pointer: coarse)');
-  /* The hairline over a card is outside the title's `inset: 0` box, so the floor is a thumb and that one pixel. */
-  assert.match(rule, /min-block-size:\s*calc\(var\(--tap\) \+ 1px\)/u);
-  assert.match(css, /\.cards-item \{[^}]*border-block-start: 1px solid/u);
+  /* NO HAIRLINE OVER A CARD SINCE 3c51d91db, so nothing stands outside the title's `inset: 0` box and the floor is a thumb. */
+  assert.match(rule, /min-block-size:\s*var\(--tap\);/u);
+  assert.doesNotMatch(css, /\.cards-item \{[^}]*border-block-start/u);
   /* The whole card is the target only through the title's own `::before`. */
   assert.match(css, /\.cards-title a::before \{[^}]*position: absolute;[^}]*inset: 0;/u);
   assert.match(css, /\.cards-item \{[^}]*position: relative;/u);

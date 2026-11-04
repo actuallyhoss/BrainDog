@@ -346,7 +346,7 @@ test('and the checks would SAY so — a floor nothing measures is not a floor', 
 
 /* ── the shape of the result, and not only its refusals ─────────────────── */
 
-test('EVERY CHECK REPORTS, PASS OR FAIL: 292 rows per scheme, counted here and nowhere quoted', () => {
+test('EVERY CHECK REPORTS, PASS OR FAIL: 324 rows per scheme, counted here and nowhere quoted', () => {
   /**
    * 39 §6.1 SPECIFIED 90 RESULTS PER SCHEME AND THE CODE RETURNED 6 IN DARK AND 4 IN LIGHT.
    *
@@ -376,6 +376,10 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 292 rows per scheme, counted here and n
    *
    * 206 UNTIL 2026-10-20, when the frame arrived (the UI pass, SPEC 1): check T holds every name the stylesheet paints
    * with, one row for their shape, one per pair in `FRAME_PAIRS` and one for red words beside body ink.
+   *
+   * 292 UNTIL 2 NOV, when bars filled in their own colours and the chosen and the link got roles of their own
+   * (`23213b002`, `fa3f844df`): eighteen rows for the eight slots' fills and warn's on the tile and the track, and
+   * fourteen for the words on a chosen thing, a selection's words, a link on six grounds and the ticked box.
    */
   const PER_CHECK: Record<string, number> = {
     A: 24, // three inks that are not `faint`, each on eight grounds
@@ -396,15 +400,16 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 292 rows per scheme, counted here and n
     R: 8, //  the accent fill against the eight grounds it can be painted on
     S: 25, // the working accent: its label at rest and on hover, the fill on three grounds, its words on eight grounds
     //        and two tints, three inks and five state words on the first tint, and two inks on the second
-    T: 86, // the frame: one row for the shape of its names, then its pairs (body text on nine grounds and a selection;
+    T: 118, // the frame: one row for the shape of its names, then its pairs (body text on nine grounds and a selection;
     //        second text on eight and a selection; quiet text on eight; good, warn and info each on five grounds, the
     //        red tint and their own tint; red as words on six and as a mark; the eight slots on the tile and their tint;
-    //        the toast; the label on three fills; the fill on two grounds; the running dot on two; the ring on two; the
+    //        the eight slots' fills and warn's on the tile and the track; three words on a chosen thing and two on a
+    //        selection of one; a link on six grounds; the ticked box on two and its tick; the toast; the label on three fills; the fill on two grounds; the running dot on two; the ring on two; the
     //        off switch and its knob; the floating edge), then red words beside body ink
   };
   const PER_SCHEME = Object.values(PER_CHECK).reduce((a, b) => a + b, 0);
-  assert.equal(PER_SCHEME, 292, 'the per-letter table no longer sums to the number the checks report');
-  assert.equal(FRAME_PAIRS.length, 84, 'the frame holds a different number of pairs than the table above says');
+  assert.equal(PER_SCHEME, 324, 'the per-letter table no longer sums to the number the checks report');
+  assert.equal(FRAME_PAIRS.length, 116, 'the frame holds a different number of pairs than the table above says');
 
   for (const built of [HOUSE, HIGH_CONTRAST])
     for (const scheme of ['dark', 'light'] as const) {
@@ -950,8 +955,8 @@ test('THE BOARD: exact colours, no glass, no light, a flat tile', () => {
 });
 
 test('THE FRAME (UI pass, 20 Oct): his values exactly, the two reds as decided, and high contrast re-solved', () => {
-  /* SPEC 1.1: frame 3.1's surfaces, inks and status, the reds as decided (fill #CF413A light and #C2362F dark,
-     always a white label; red as words and marks #C2362F light, C1, and #EA645B dark). */
+  /* SPEC 1.1: frame 3.1's surfaces, inks and status, the reds as decided (fill #CF413A light, always a white label; red
+     as words and marks #C2362F light, C1). IN DARK A TOUCH QUIETER SINCE 2 NOV (`fa3f844df`): fill #BA4239, words #E16C63. */
   for (const scheme of ['light', 'dark'] as const)
     for (const [role, value] of Object.entries(HOUSE_FRAME[scheme])) assert.equal(HOUSE.frame[scheme][role as FrameRole] ?? HOUSE.frame[scheme].scrim, value, `house ${scheme} ${role}`);
   assert.deepEqual(
@@ -960,7 +965,7 @@ test('THE FRAME (UI pass, 20 Oct): his values exactly, the two reds as decided, 
   );
   assert.deepEqual(
     (['red-fill', 'red-fill-hover', 'red-fill-press', 'on-red', 'red'] as const).map((r) => HOUSE.frame.dark[r]),
-    ['#C2362F', '#CF3F37', '#B02F29', '#FFFFFF', '#EA645B'],
+    ['#BA4239', '#C64A41', '#A83A32', '#FFFFFF', '#E16C63'],
   );
   /* Dark red as words on the tile: at least 4.5 (the plan's own check). */
   assert.ok(contrast(fromHex(HOUSE.frame.dark.red), fromHex(HOUSE.frame.dark.tile)) >= 4.5);
