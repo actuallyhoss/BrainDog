@@ -762,11 +762,20 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   const quiet = n === 0 && asked === null && stopped.length === 0 && proposed.asked === 0 && told === 0;
   /* AND WHAT IT TOLD THE OWNER, IN A COUNT, never the words: the notes themselves are on the bell. */
   const toldSaid = told === 0 ? '' : told === 1 ? ' It sent you one notice.' : ` It sent you ${told} notices.`;
+  /* AND THE QUESTIONS IT OPENED, BY ID (2 Nov fix pass). The line says "which waits on Decide" as it was when the run
+     ended, and the scripts read showed that for days after the question was answered. With the ids on the run, the
+     read (`script-rows.ts`) words the line by each question's state as it is when somebody reads it. Stamped as the line
+     is written, never by rewriting it. */
+  const askedId = put !== null && put.answered === undefined && !put.joined ? put.id : null;
+  const questions =
+    askedId !== null || proposedIds.length > 0
+      ? { questions: { ...(askedId !== null ? { asked: askedId } : {}), ...(proposedIds.length > 0 ? { proposed: proposedIds } : {}) } }
+      : {};
   const metered = keepLog(
     deps,
     meter(
       deps,
-      { ...base, ...spent, outcome: 'ok', failures: 0, ...(quiet ? { quiet: true as const } : {}) },
+      { ...base, ...spent, outcome: 'ok', failures: 0, ...(quiet ? { quiet: true as const } : {}), ...questions },
       `${named} ran and wrote ${n === 0 ? 'nothing' : n === 1 ? 'one line' : `${n} lines`}.${said}${offered}${toldSaid}${stop}`,
     ),
     answer.log,
@@ -774,16 +783,6 @@ export function finishScript(deps: ScriptRunDeps, s: Scripted, answer: ScriptAns
   );
   /* AND THE STOP AS A NUMBER ON THE RUN, so the stopped-chains sign (`signs-flow.ts`) does not hang on the line's words. */
   if (stopped.length > 0) deps.sql.exec("UPDATE event SET to_v = json_set(to_v, '$.stopped', ?) WHERE id = ?", stopped.length, metered.event);
-  /* AND THE QUESTIONS IT OPENED, BY ID (2 Nov fix pass). The line says "which waits on Decide" as it was when the run
-     ended, and the scripts read showed that for days after the question was answered. With the ids on the run, the
-     read (`script-rows.ts`) words the line by each question's state as it is when somebody reads it. */
-  const askedId = put !== null && put.answered === undefined && !put.joined ? put.id : null;
-  if (askedId !== null || proposedIds.length > 0)
-    deps.sql.exec(
-      "UPDATE event SET to_v = json_set(to_v, '$.questions', json(?)) WHERE id = ?",
-      JSON.stringify({ ...(askedId !== null ? { asked: askedId } : {}), ...(proposedIds.length > 0 ? { proposed: proposedIds } : {}) }),
-      metered.event,
-    );
   return metered;
 }
 

@@ -927,6 +927,8 @@ type Usage = {
    * made, so a feed leaves it out (`bookkeeping` in index.ts) and the log is never rewritten to say so.
    */
   quiet?: true;
+  /** The ids of the questions a script's run opened, for the read that words its line by each one's state now. */
+  questions?: { asked?: string; proposed?: string[] };
 };
 
 /**
@@ -1011,6 +1013,7 @@ export function meter(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, usage: U
       usage: counted,
       ...(usage.answer === undefined ? {} : { answer: keptAnswer(usage.answer) }),
       ...(usage.quiet ? { quiet: 1 } : {}),
+      ...(usage.questions === undefined ? {} : { questions: usage.questions }),
     }),
     say.slice(0, 280),
   );
