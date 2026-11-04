@@ -49,7 +49,6 @@
     countsEntry,
     countsKept,
     factOf,
-    holdsProjects,
     leadOf,
     shownName,
     splitOf,
@@ -434,7 +433,8 @@
     onwidth?.(widthOf(width + (rtl && Math.abs(step) === 16 ? -step : step)), true);
   }
 
-  const showProjects = $derived(model.projects !== null && (read === null ? !answered : holdsProjects(read)));
+  /* A PAGE ROW NOW, SO IT IS THERE WITH NO PROJECT YET (4 Nov): it is how the first one gets made, and the rail shows it too. */
+  const showProjects = $derived(model.projects !== null);
   /* THE PAGE IDEAS ARE A ROW OF THEIR OWN AFTER THE PLACES (plan F1): in the foot beside Settings, "2 page ideas / Review"
      read like a setting, and as a quiet line under Projects they read as the projects' (4 Nov), which they are not: they
      are about the whole record's pages. They stay in the foot only where no projects are drawn, and wait for the first

@@ -640,7 +640,7 @@ The checks, in 04 §5's row order. B = one declaration alone · C = the Registry
 16. `TRANSITION_ILLEGAL` — C. `move: v`: with `transitions` declared on `state`, the states `when` pins (`{ field: state, is | in }`
     in the root `all:`) must each allow `→ v`; with none pinned, some state must. `v ∉ values` → `ENUM_VALUE_UNKNOWN`.
 17. `GROUP_BY_TWICE` — B. `group_by` is a list.
-18. `GROUP_BY_CARDINALITY` — C/D. `enum`: `values.length > 50`. `ref`: `installed.rows[target] > 50`. Text: unbounded, render truncates.
+18. `GROUP_BY_CARDINALITY` — C/D. `enum`: `values.length > 50`. `ref`: `installed.rows[target] > 50`, unless the record already holds this metric with the same `group_by`, so rows added since never block an update. Text: unbounded, render truncates.
 19. `RATIO_MIXED_SOURCE` — B. A `where` or `source` key inside an operand (§4.9).
 20. `RATIO_MIXED_CURRENCY` — C/D. `ratio` of two money operands: each pinned or single-valued in `units`, and equal; else refuse.
 21. `QUANTITY_MIXED_UNIT` — C/D. As 7 over `quantity` fields and `unit`.

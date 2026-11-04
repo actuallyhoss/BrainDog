@@ -5147,6 +5147,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const name = (id: string): string => titled.get(id) ?? moduleName(id);
     const listed = (lose: readonly string[] | undefined): string =>
       lose === undefined || lose.length === 0 ? 'change what you made' : lose.length === 1 ? lose[0]! : `${lose.slice(0, -1).join(', ')} and ${lose.at(-1)!}`;
+    /* A MODULE THAT CANNOT GO IN IS SAID WHERE IT CAN BE SEEN (4 Nov): Money's updates were refused every night on one record
+       for weeks and nothing outside the record's own pref said so. */
+    for (const st of steps) if (st.did === 'refused') console.error(`first-party update refused: ${st.pack} ${st.to}: ${st.why ?? 'its plan was refused'}`);
     const said = steps.map((st) =>
       st.did === 'updated'
         ? `${name(st.pack)} was updated to ${st.to}.`

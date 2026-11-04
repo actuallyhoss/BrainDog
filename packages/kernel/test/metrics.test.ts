@@ -1092,6 +1092,20 @@ test('A GROUPED FIGURE KEEPS ITS WHOLE AND CARRIES ITS PARTS, a missing bucket a
   sql.close();
 });
 
+test('A FIGURE SPLIT BY A LIST THAT GREW IS STILL UPDATED; only a new split is asked about the list', async () => {
+  const { k, sql } = await record();
+  const rules = { id: 'register.rules', kind: 'register', body: { id: 'rules', name: 'Rules', title: 'name', fields: [{ id: 'name', type: 'text' }] } } as never;
+  const lines = { id: 'register.lines', kind: 'register', body: { id: 'lines', name: 'Lines', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'rule', type: 'ref', to: 'rules' }] } } as never;
+  const split = (id: string, name: string) => ({ id: `metric.${id}`, kind: 'metric', body: { metric: id, name, source: 'register.lines', value: { count: 'id' }, group_by: 'rule', format: 'int', target: { gte: 0 }, window: '30d' } }) as never;
+  assert.ok((await k.install([rules, lines, split('by-rule', 'By rule')])).ok);
+  for (let i = 0; i < 51; i++) assert.ok(k.create('rules', { name: `Rule ${i}` }, { actor: 'p_1' }).ok);
+  const again = await k.install([split('by-rule', 'By its rule')]);
+  assert.ok(again.ok, 'rows the person added since do not block an update of a split the record holds');
+  const fresh = await k.install([split('by-rule-too', 'By rule too')]);
+  assert.equal(refusal(fresh).code, 'GROUP_BY_CARDINALITY');
+  sql.close();
+});
+
 test('A PREDICATE THE REGISTER CANNOT ANSWER IS REFUSED, not run as if it matched nothing', async () => {
   const { k, sql } = await record();
   const out = refusal(k.metric({ ...OVERDUE, where: { field: 'colour', is: 'red' } as never }));

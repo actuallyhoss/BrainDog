@@ -3129,7 +3129,17 @@ function makeKernel(raw: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             : field?.type === 'ref' && typeof field.to === 'string'
               ? Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL', field.to)?.n ?? 0)
               : 0;
-        if (n > GROUP_CAP)
+        /* AN UPDATE IS NOT REFUSED FOR THE ROWS A PERSON ADDED SINCE (4 Nov). A figure split by a ref to a list is fine at
+           install and the list then grows: Money's split by filing rule met a record with 67 rules, so every later Money
+           update was refused on that record, each night, for a figure that reads fine (a read cuts to the ceiling and says
+           how many more). Only a split this record does not hold yet is asked about the list's size. */
+        const heldSplit =
+          field?.type === 'ref' &&
+          (() => {
+            const was = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0', decl.id);
+            return was !== undefined && was !== null && (JSON.parse(was.body) as { group_by?: unknown }).group_by === body.group_by;
+          })();
+        if (n > GROUP_CAP && !heldSplit)
           return {
             code: 'GROUP_BY_CARDINALITY',
             fix: `${decl.id}: group_by ${body.group_by} has ${n} possible values; the ceiling is ${GROUP_CAP}.`,
