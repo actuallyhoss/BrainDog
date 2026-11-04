@@ -92,7 +92,7 @@ test('a page with the note about rates saves its arrangement against the blocks 
 
 test('the part keeps the declared blocks apart from what the reader added', () => {
   assert.match(scripts, /const declaredOnly = \(blocks: readonly LiveBlock\[\]\)(?:: LiveBlock\[\])? => blocks\.filter\(\(b\) => !b\.synthetic\);/u);
-  const laid = scripts.slice(scripts.indexOf('const laidFrom'), scripts.indexOf('const own'));
+  const laid = scripts.slice(scripts.indexOf('const laidFrom'), scripts.indexOf('const own = $derived'));
   assert.match(laid, /declaredOnly\(/u, 'what the page is laid out from is what it declares');
   assert.match(scripts, /const own = \$derived<LiveBlock\[\]>\(live \? \[\.\.\.laidFrom, \.\.\.extra\.map\(\(b\) => added\(b, laidFrom\)\)\] : \[\]\);/u, 'declared, then added, and nothing between them');
 });

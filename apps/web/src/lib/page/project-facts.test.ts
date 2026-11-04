@@ -233,9 +233,9 @@ test('sessions say how each ended, and what happened folds the record edits into
 test('a run is said from when it was last heard: working, gone quiet, or how it ended (AG14)', () => {
   const run = (at: number, state: string) => ({ agent: 'claude', at: new Date(at).toISOString(), state, closedAs: '', next: '', notes: [] });
   assert.equal(runSaid(run(NOW - 5 * 60_000, 'active'), NOW), 'Claude is working on it now');
-  assert.equal(runSaid(run(NOW - 2 * 3_600_000, 'active'), NOW), 'Claude went quiet 2 h ago');
-  assert.equal(runSaid(run(NOW - 2 * 3_600_000, 'idle'), NOW), 'Claude went quiet 2 h ago');
-  assert.equal(runSaid(run(NOW - 2 * 3_600_000, 'done'), NOW), 'Claude worked on it 2 h ago, and the session stopped without a note');
+  assert.equal(runSaid(run(NOW - 2 * 3_600_000, 'active'), NOW), 'Claude went quiet 2h ago');
+  assert.equal(runSaid(run(NOW - 2 * 3_600_000, 'idle'), NOW), 'Claude went quiet 2h ago');
+  assert.equal(runSaid(run(NOW - 2 * 3_600_000, 'done'), NOW), 'Claude worked on it 2h ago, and the session stopped without a note');
 });
 
 test('an aim whose month has gone by says so and where it stands (AG24)', () => {

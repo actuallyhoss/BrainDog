@@ -78,5 +78,5 @@ test('the counter opens only onto a list the record holds, and a record without 
   const page = readFileSync(new URL('../../routes/count/+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /const ready = \$derived\(counterReady\(into, lists\)\)/u);
   assert.match(page, /!ready \? null :/u);
-  assert.match(page, /\{#if !ready\}\s*<Empty /u);
+  assert.match(page, /\{#if !ready && installed && into === null\}\s*<Empty [^>]*>[\s\S]*?\{:else if !ready\}\s*<Empty /u);
 });

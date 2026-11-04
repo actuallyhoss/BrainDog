@@ -335,7 +335,7 @@ const SLOT = readFileSync(new URL('./BlockSlot.svelte', import.meta.url), 'utf8'
 const CARD = readFileSync(new URL('./QueueAnswer.svelte', import.meta.url), 'utf8');
 
 test('A HOME DRAWS ITS BLOCKS THROUGH THE EMPTY RULE AND WALKS ROWS, and a page at its own address still walks blocks', () => {
-  assert.match(BODY, /const quiet = \$derived\(judgedWith\(blocks, held, \(bs\) => emptyHidden\(bs, mode === 'page'\)\)\);/, 'a page at its own address keeps one sentence where it would say nothing');
+  assert.match(BODY, /const quiet = \$derived\(\s*judgedWith\(blocks, held, \(bs\) => emptyHidden\(bs, mode === 'page'\)\)/, 'a page at its own address keeps one sentence where it would say nothing');
   assert.match(BODY, /const drawable = \$derived\(mode === 'preview' \|\| arranging \? arranged\(blocks\) : quiet\);/, 'every page being read hides its empty blocks; authoring draws them all, the record\'s marks undone');
   assert.match(BODY, /if \(mode === 'home'\) return homeKey\(e\);/);
   for (const key of ["case 'j':", "case 'k':", "case 'x':", "case 'Enter':", "case 'n':", 'optionOf(e.key)'])
@@ -367,7 +367,7 @@ test('A QUESTION CARD IS A ROW THE CURSOR REACHES, AND ITS NUMBER KEYS PRESS ITS
 });
 
 test('"N MORE" HANDS THE FOCUS TO THE FIRST ROW THAT OPENED, so a keyboard is not dropped to the page when the button goes', () => {
-  assert.equal((SLOT.match(/onclick=\{\(e\) => void unfold\(e, /g) ?? []).length, 4, 'every fold goes through unfold: a table, a segment, Home`s own list and a queue');
+  assert.equal((SLOT.match(/onclick=\{\(e\) => \(?(?:fold \? )?void unfold\(e, /g) ?? []).length, 4, 'every fold goes through unfold: a table, a segment, Home`s own list and a queue');
   assert.match(SLOT, /\[from\];/);
   assert.match(SLOT, /to\.focus\(\)/);
 });

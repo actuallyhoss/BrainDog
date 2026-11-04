@@ -205,7 +205,7 @@ test('Home stamps through `readMarkOf` with what its last page read held, and as
   assert.match(text, /news \? readMarkOf\(news\.upTo \?\? data\.upTo, news\.unseen, news\.held\) : readMarkOf\(data\.upTo, data\.upTo === null \? 0 : 1\)/u, 'the leave in this file’s `homeMark` is no longer Home’s');
   /* BOTH READS OF THE PAGE, the first and the one a new version of the record starts: each asks what is new before its
      page read goes out, so the cursor kept is never newer than the page it is kept beside. */
-  const reads = [...text.matchAll(/newsNow\(\)[\s\S]{0,120}?\breadBody\(/gu)];
+  const reads = [...text.matchAll(/const before = [^;\n]*newsNow\(\)[\s\S]*?\breadBody\(/gu)];
   assert.equal(reads.length, 2, 'a read of Home’s page does not ask what is new before it');
   assert.equal(text.match(/\bkeepNews\(before, mine(?:, key)?\)/gu)?.length, 2, 'what was new is kept beside a page that was not drawn');
   assert.equal(text.match(/\.whatsNew\(/gu)?.length, 1, 'Home asks what is new in a second place');

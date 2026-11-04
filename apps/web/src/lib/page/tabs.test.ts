@@ -127,7 +127,8 @@ test('A PAGE OVER A LIST WITH NO ROW YET STAYS OFF THE RAIL UNTIL THE FIRST ONE'
       registers: [{ id: 'clients', name: 'Clients', count }],
       now: '2026-09-25T12:00:00.000Z',
       pages: [{ ...page('clients', 'Clients', { section: 'Work', order: 10 }), list: 'clients' }],
-    } as unknown as Boot).nav.map((e) => e.href);
+    } as unknown as Boot).nav.filter((e) => !e.cut).map((e) => e.href);
+  /* Off the rail means `cut`: a page that waits is still carried for the sidebar's More and the palette (9cc614088). */
   assert.deepEqual(over(0), []);
   assert.deepEqual(over(1), ['/p/clients']);
 });
