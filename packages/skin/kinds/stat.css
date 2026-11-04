@@ -67,6 +67,13 @@
     background: none;
   }
 
+  /* AND A FINGER LEAVES NO WASH BEHIND: hover stays on what was last touched. */
+  @media (hover: none) {
+    .block[data-kind='stat'][data-form='lead'] a.cell:hover {
+      background: none;
+    }
+  }
+
   .block[data-kind='stat'][data-form='lead'] a.cell:active .cell-figure {
     opacity: 0.6;
     scale: 0.97;

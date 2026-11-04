@@ -992,6 +992,11 @@
     padding-inline-end: calc(var(--sp-2) + 20px);
   }
 
+  /* AT THE LARGEST WORDS AND THE MOST ROOM THE ROW GIVES THE NAME ITS OWN RESERVE: "Ferment & Co" ended in an ellipsis, 6 short. */
+  :global(html[data-text='md'][data-density='roomy']) .s-proj {
+    padding-inline-end: 24px;
+  }
+
   /* THE ONE LIT ROW: the nav's chosen fill, the words in ink at 600. */
   .s-row[aria-current='page'] {
     background: var(--chosen);

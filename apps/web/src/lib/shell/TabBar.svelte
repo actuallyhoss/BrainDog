@@ -160,11 +160,10 @@
     }
   }
 
-  /* AT LARGE ON THE NARROWEST PHONES the word gets the size that fits the tab: 320 over five leaves 57 for a 12.65 caption. */
+  /* AT LARGE ON THE NARROWEST PHONES the word gets the size that fits the tab: 320 over five leaves 58 for a 12.65 caption. */
   @media (width < 360px) {
     :global(html[data-text='md']) .tab {
-      font-size: calc(11px * 1.04);
-      letter-spacing: -0.005em;
+      font-size: 11.2px;
     }
   }
 
