@@ -17,7 +17,6 @@
 
   let { questions = home.faq.questions, title = home.faq.title }: { questions?: readonly Asked[]; title?: string } = $props();
 
-  const q = $derived({ ...home.faq, questions, title });
   /** How many questions are drawn before More questions. */
   const FIRST = 3;
 </script>
@@ -35,16 +34,16 @@
 <section class="band band--faq" aria-labelledby="faq-title">
   <div class="wrap reveal cols">
     <div class="c4 side">
-      <h2 id="faq-title" class="band-h2">{q.title}</h2>
-      <p class="aside">{q.aside} <a href="mailto:{q.email}">{q.email}</a>.</p>
+      <h2 id="faq-title" class="band-h2">{title}</h2>
+      <p class="aside">{home.faq.aside} <a href="mailto:{home.faq.email}">{home.faq.email}</a>.</p>
     </div>
     <div class="c8 qs">
-      {#each q.questions.slice(0, FIRST) as item, i (item.q)}{@render asked(item, i === 0)}{/each}
-      {#if q.questions.length > FIRST}
+      {#each questions.slice(0, FIRST) as item, i (item.q)}{@render asked(item, i === 0)}{/each}
+      {#if questions.length > FIRST}
         <details class="rest">
-          <summary class="rest-open">{q.more}<Icon name="chevron-down" /></summary>
+          <summary class="rest-open">{home.faq.more}<Icon name="chevron-down" /></summary>
           <div class="rest-qs">
-            {#each q.questions.slice(FIRST) as item (item.q)}{@render asked(item, false)}{/each}
+            {#each questions.slice(FIRST) as item (item.q)}{@render asked(item, false)}{/each}
           </div>
         </details>
       {/if}

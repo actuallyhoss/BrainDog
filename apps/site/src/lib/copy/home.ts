@@ -11,7 +11,7 @@
  * THE DRAWINGS' NAMES AND FIGURES ARE NOT HERE. Maya Okafor's record is one file, `lib/demo/maya.ts`, and every band
  * draws from it. The early access figures are `lib/plans.ts`, read by the page and never typed.
  */
-import { DOCS, SECURITY } from '../links.ts';
+import { DOCS, SECURITY, SUPPORT_EMAIL } from '../links.ts';
 import { LAUNCH } from '../launch.ts';
 
 /** Where a developer reads how to connect: the docs' first page for AI tools. */
@@ -171,6 +171,10 @@ export const home = {
 
   faq: {
     title: 'Questions',
+    /* The disclosure the questions after the first three sit behind. */
+    more: 'More questions',
+    aside: 'Anything else? Write to',
+    email: SUPPORT_EMAIL,
     questions: [
       {
         q: 'How is this different from the memory in my AI app?',
