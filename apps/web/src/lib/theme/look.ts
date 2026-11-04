@@ -534,6 +534,9 @@ export function declarationOf(draft: Draft, id: string = OWN): Record<string, un
   };
 }
 
+const SPACES = [4, 8, 12, 16, 24, 32, 48, 64, 96];
+const DENSE: Record<Density, number> = { compact: 0.75, comfortable: 1, roomy: 1.25 };
+
 /** A palette as inline custom properties, for the specimen, which is drawn in the edited look and nothing else. */
 export function varsOf(palette: Record<string, string>, draft: Draft): string {
   const r = CORNERS[draft.corners];
@@ -543,5 +546,7 @@ export function varsOf(palette: Record<string, string>, draft: Draft): string {
     `--r-pop: ${r.md}px`,
     `--r-tile: ${r.lg}px`,
     `--row-h: ${ROW_H[draft.density]}px`,
+    /* THE WHOLE SCALE, as the saved density draws it (`data-density` in `style.css`), since the specimen spaces itself by it. */
+    ...SPACES.map((px, i) => `--sp-${i + 1}: ${px * DENSE[draft.density]}px`),
   ].join('; ');
 }

@@ -147,6 +147,7 @@ test('a flag name is never also a preference', () => {
     scheme: true,
     text: true,
     density: true,
+    lookDensity: true,
     theme: true,
     contrast: true,
     shape: true,

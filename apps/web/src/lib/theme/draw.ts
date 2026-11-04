@@ -121,7 +121,24 @@ export function drawSaved(look: Look | null): void {
   paint();
 }
 
+/**
+ * THE DENSITY A LOOK SAVES IS THE READER'S WHOLE DENSITY, for somebody who has not picked their own: it moved the row height and
+ * nothing else, so a Compact look left every card, gap and margin at Comfortable. `data-density` is the one switch
+ * for the scale (`style.css`), so this sets that, and keeps it for the next first paint. By the height the look draws, as
+ * `densityOf` in `look.ts` reads it; written out here so the editor's module stays out of what every screen loads.
+ */
+function followDensity(): void {
+  if (typeof document === 'undefined') return;
+  const held = pref.read();
+  if (held.density !== undefined) return;
+  const row = current ? Number.parseFloat(current.light[ROW] ?? '') : Number.NaN;
+  const said = row < 40 ? 'compact' : row > 48 ? 'roomy' : undefined;
+  document.documentElement.setAttribute('data-density', said ?? 'comfortable');
+  if (held.lookDensity !== said) pref.write({ lookDensity: said });
+}
+
 function paint(): void {
+  followDensity();
   if (!adoptable()) return;
   if (current === null) {
     if (sheet) sheet.replaceSync('');

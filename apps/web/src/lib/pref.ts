@@ -31,6 +31,11 @@ export type Pref = {
   text?: 'sm' | 'base' | 'md' | undefined;
   density?: 'compact' | 'comfortable' | 'roomy' | undefined;
   /**
+   * THE DENSITY THE RECORD'S LOOK SETS, for somebody who has not picked one (`theme/draw.ts`), kept beside theirs so the
+   * first paint (`app.html`) draws it and the page does not move when `boot` answers.
+   */
+  lookDensity?: 'compact' | 'roomy' | undefined;
+  /**
    * A record's own accent, once a record has one.
    *
    * IT IS NOT AN ATTRIBUTE. `accent.ts` builds a whole palette from it and adopts a stylesheet, so
@@ -221,6 +226,7 @@ const SHAPE: Record<string, (v: unknown) => boolean> = {
   scheme: (v) => v === 'light' || v === 'dark',
   text: (v) => v === 'sm' || v === 'base' || v === 'md',
   density: (v) => v === 'compact' || v === 'comfortable' || v === 'roomy',
+  lookDensity: (v) => v === 'compact' || v === 'roomy',
   theme: (v) => typeof v === 'string',
   contrast: (v) => typeof v === 'boolean',
   shape: (v) => v === 'rail' || v === 'bar' || v === 'menu',
@@ -484,7 +490,7 @@ export function forget(): void {
   if (typeof document === 'undefined') return;
   for (const key of ['scheme', 'text', 'density'] as const) document.documentElement.removeAttribute(`data-${key}`);
   document.documentElement.removeAttribute('data-theme');
-  write({ scheme: undefined, text: undefined, density: undefined, contrast: undefined, theme: undefined, unsent: undefined, who: undefined });
+  write({ scheme: undefined, text: undefined, density: undefined, lookDensity: undefined, contrast: undefined, theme: undefined, unsent: undefined, who: undefined });
 }
 
 /**

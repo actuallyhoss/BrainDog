@@ -142,7 +142,7 @@
          stylesheet, and there is no CSS rule anywhere that reads a `data-theme` other than `hc`. It
          cost something, though. `house.css` matches `html[data-theme='hc']` for a whole generated
          palette solved against a higher contrast floor, and an accent overwrote it. -->
-    <script>try{var p=JSON.parse(decodeURIComponent((document.cookie.match(/(?:^|; )bd_pref=([^;]*)/)||[])[1]||'{}')),d=document.documentElement;p.scheme&&d.setAttribute('data-scheme',p.scheme),d.setAttribute('data-text',p.text||'base'),d.setAttribute('data-density',p.density||'comfortable'),p.contrast&&d.setAttribute('data-theme','hc')}catch(e){}</script>
+    <script>try{var p=JSON.parse(decodeURIComponent((document.cookie.match(/(?:^|; )bd_pref=([^;]*)/)||[])[1]||'{}')),d=document.documentElement;p.scheme&&d.setAttribute('data-scheme',p.scheme),d.setAttribute('data-text',p.text||'base'),d.setAttribute('data-density',p.density||p.lookDensity||'comfortable'),p.contrast&&d.setAttribute('data-theme','hc')}catch(e){}</script>
 
     <!--
       THE RECORD'S FIRST ANSWER IS ASKED FOR HERE, BESIDE THE FIRST CHUNKS, NOT AFTER THEM. The shell's one
