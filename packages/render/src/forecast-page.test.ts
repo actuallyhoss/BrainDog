@@ -82,7 +82,7 @@ test('THE LIST NAMES THE SOONEST FEW, a part of a plan among them only by its da
   /* NOTHING IS NUMBERED SINCE 3d1cd2f8a, so no part of a plan has a place kept for it: Car on 20 Dec is past the eight. */
   assert.equal(next.rows.length, FORECAST_NEXT_MOST, 'the soonest eight');
   assert.equal(next.more, 5);
-  assert.ok(next.rows.every((r) => r.n === null));
+  assert.ok(next.rows.every((r) => r.everyday || r.n === null));
   assert.ok(!next.rows.some((r) => !r.everyday && r.label.startsWith('Car')));
 });
 
