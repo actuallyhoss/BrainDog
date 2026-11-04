@@ -87,6 +87,7 @@
   let stale = $state(false);
   let cursor = $state(0);
   let asked = 0;
+  let namesAsked = false;
   let shown: SearchResult | null = null;
 
   const wanting = $derived(trigger !== null && shut !== trigger.start && !disabled);
@@ -268,7 +269,9 @@
       if ((e.key === 'Enter' && !e.shiftKey && holdsEnter) || (e.key === 'Tab' && !e.shiftKey && offers.length > 0 && !full)) {
         e.preventDefault();
         e.stopPropagation();
-        const o = stale ? undefined : offers[cursor];
+        /* THE ROWS ON SCREEN ARE FOR EARLIER LETTERS: Enter waits for the answer rather than pick one of them. */
+        if (stale && !full) return;
+        const o = offers[cursor];
         if (o && !full) pick(o);
         else if (answered || full) shut = trigger?.start ?? null;
         return;
@@ -282,6 +285,17 @@
     }
     if (tokenKey(e)) return;
     onkey?.(e);
+  }
+
+  /* A PHONE'S KEYBOARD SAYS NOTHING USEFUL ON KEYDOWN (Android sends 229 for every key): Backspace reaches us here instead. */
+  function onbeforeinput(e: InputEvent) {
+    if (!box || composing || !e.cancelable || e.inputType !== 'deleteContentBackward') return;
+    const s = box.selectionStart ?? 0;
+    if (s !== box.selectionEnd) return;
+    const m = endingAt(mentions, s);
+    if (!m) return;
+    e.preventDefault();
+    replace(m.start, m.end, '');
   }
 
   /** Whether a mention took the key: it goes whole, and arrows step over it. */
@@ -363,7 +377,10 @@
       const again = rows.findIndex((o) => o.ref === was);
       cursor = again >= 0 ? again : 0;
     };
-    void readerFor(base).then((r) => r.names());
+    if (!namesAsked) {
+      namesAsked = true;
+      void readerFor(base).then((r) => r.names());
+    }
     if (letters === '') {
       const kept = lastLately(base);
       if (kept) show(tell(kept));
@@ -445,6 +462,7 @@
     autocomplete="off"
     spellcheck="true"
     {onkeydown}
+    {onbeforeinput}
     {oninput}
     onscroll={follow}
     onclick={settle}
