@@ -456,8 +456,8 @@
       <div class="quiet"><Empty kind="no-data-yet" glyph="search" title={copy.searchWaiting} body={copy.searchWhere} /></div>
     {/if}
   {:else if shown === 'waiting'}
-    <!-- Bars until the first answer, holding the shape the results will take. -->
-    <Waiting />
+    <!-- Bars until the first answer, holding the shape the results took last. -->
+    <Waiting shape="search" />
   {:else if shown === 'refused' && answer?.from === 'refused'}
     <Empty kind="error" title={answer.fix}>
       {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
@@ -688,7 +688,7 @@
   /* A SEARCH FIELD IS A CAPSULE (ops look 9), 44 tall across the page, its glyph on the text edge. */
   .search-field {
     min-block-size: 44px;
-    padding-inline: 16px;
+    padding-inline: var(--sp-4);
     border-radius: var(--r-pill);
   }
 

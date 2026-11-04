@@ -802,9 +802,9 @@
     <!-- Bars before the first answer, and nothing from a host that has no inbox to read. -->
     <!-- NOT ON A PHONE, where the head is the sentence alone and gives its held line back when the inbox has nothing to
          say: the bars stood under it and moved up 60px. The page lands where it stays instead. -->
-    {#if !answered && !phone}<Waiting />{/if}
+    {#if !answered && !phone}<Waiting shape="inbox" />{/if}
   {:else if !refused && INBOX.length === 0 && !tallied}
-    <Waiting />
+    <Waiting shape="inbox" />
   {:else if !refused && never}
     <!-- ONE TILE, AND THE ONE THING TO DO: nothing has reached this record's inbox by any way, so the ways in, the
          rules' figure and what waits would each say nothing, three times. -->
@@ -973,7 +973,7 @@
   {#if seriesFix}
     <Empty kind="error" compact title={seriesFix} />
   {:else if series === null}
-    <Waiting />
+    <Waiting shape="inbox" />
   {:else if series.items.length === 0}
     {#if series.state === 'matched'}
       <Empty kind="no-data-yet" compact title={words.noneFiled} body={words.noneFiledWhy} />

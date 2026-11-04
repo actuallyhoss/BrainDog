@@ -14,6 +14,7 @@
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import { type Component } from 'svelte';
   import { page } from '$app/state';
   import { createClient, type EngineHealth, type SlashStatus } from '@braindog/client';
@@ -434,6 +435,8 @@
       <!-- WHO DRAFTS, ONCE, AT THE FOOT: a fact about the host, linked to where a model is set up or changed. -->
       <p class="slash-drafts"><a class="slash-drafts-link" href={at(outOfAsks.settings)}>{drafts}</a></p>
     {/if}
+  {:else}
+    <Waiting shape="slash" />
   {/if}
 </div>
 {/if}
