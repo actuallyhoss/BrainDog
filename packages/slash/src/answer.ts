@@ -176,7 +176,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
       core.turnedAway('read', s.tier, CHARGE.purpose);
       return no(
         'SLASH_BUDGET_SPENT',
-        `rule.${ask.rule} asked Slash at step ${step}, and this month's asks are spent until ${firstOf(core.resets())}. Raise the monthly limit, or wait.`,
+        `rule.${ask.rule} asked Slash at step ${step}, and this month's Slash questions are used until ${firstOf(core.resets())}. Raise the monthly limit, or wait.`,
       );
     }
 

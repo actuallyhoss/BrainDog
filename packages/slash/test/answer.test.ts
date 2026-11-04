@@ -98,7 +98,7 @@ test('(2) AT A CAP OF 1 WITH ONE READ MADE, `answer` calls no model and says the
     assert.equal(codeOf(out), 'SLASH_BUDGET_SPENT', JSON.stringify(out));
     assert.equal(
       fixOf(out),
-      'rule.rate asked Slash at step 2, and this month\'s asks are spent until 1 December. Raise the monthly limit, or wait.',
+      'rule.rate asked Slash at step 2, and this month\'s Slash questions are used until 1 December. Raise the monthly limit, or wait.',
     );
     assert.equal(inference.seen.length, 1, 'the refused answer still called the model');
     assert.equal(slash.status().asks.used, 1);
