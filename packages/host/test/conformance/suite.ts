@@ -71,7 +71,7 @@ export class Failed extends Error {
  * `{ arraybuffer }` (so the BLOB shape is part of the comparison, `storageSql`'s `bytesIn`), a bigint, a non-finite
  * number and minus zero are named, and object keys are sorted so key order is not a difference.
  */
-export function plain(v: unknown): unknown {
+export function plainJson(v: unknown): unknown {
   if (v instanceof Uint8Array) return { bytes: Array.from(v) };
   if (v instanceof ArrayBuffer) return { arraybuffer: Array.from(new Uint8Array(v)) };
   if (typeof v === 'bigint') return { bigint: v.toString() };
@@ -81,10 +81,10 @@ export function plain(v: unknown): unknown {
     return v;
   }
   if (v === undefined) return { undefined: true };
-  if (Array.isArray(v)) return v.map(plain);
+  if (Array.isArray(v)) return v.map(plainJson);
   if (v !== null && typeof v === 'object') {
     const out: Record<string, unknown> = {};
-    for (const key of Object.keys(v).sort()) out[key] = plain((v as Record<string, unknown>)[key]);
+    for (const key of Object.keys(v).sort()) out[key] = plainJson((v as Record<string, unknown>)[key]);
     return out;
   }
   return v;
@@ -94,14 +94,14 @@ export function plain(v: unknown): unknown {
 const show = (v: unknown): string => {
   let s: string;
   try {
-    s = JSON.stringify(plain(v)) ?? String(v);
+    s = JSON.stringify(plainJson(v)) ?? String(v);
   } catch {
     s = String(v);
   }
   return s.length > 400 ? `${s.slice(0, 400)}... (${s.length} characters)` : s;
 };
 
-const same = (a: unknown, b: unknown): boolean => JSON.stringify(plain(a)) === JSON.stringify(plain(b));
+const same = (a: unknown, b: unknown): boolean => JSON.stringify(plainJson(a)) === JSON.stringify(plainJson(b));
 
 /** The assert both hosts run under. */
 export const portableAssert: Assert = {
@@ -147,7 +147,7 @@ export function codeOf(fn: () => unknown): string {
 /** One case on one host, never throwing: a failed assert and an unexpected throw both come back as `fail`. */
 export async function runCase(c: Case, host: Host, t: Assert = portableAssert): Promise<Outcome> {
   try {
-    const trace = plain(await c.run(host, t));
+    const trace = plainJson(await c.run(host, t));
     return { id: c.id, status: 'pass', trace };
   } catch (e) {
     const message =

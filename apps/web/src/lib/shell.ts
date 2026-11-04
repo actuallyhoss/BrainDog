@@ -305,11 +305,11 @@ let placed = '';
 export function shellPlaces(tabs: readonly { key: string; href: string; label: string; icon: string }[]): void {
   const s = shell();
   if (!s?.places) return;
-  const plain: ShellPlace[] = tabs.map((t) => ({ key: t.key, href: t.href, label: t.label, icon: t.icon }));
-  const said = JSON.stringify(plain);
+  const places: ShellPlace[] = tabs.map((t) => ({ key: t.key, href: t.href, label: t.label, icon: t.icon }));
+  const said = JSON.stringify(places);
   if (said === placed) return;
   placed = said;
-  s.places(plain);
+  s.places(places);
 }
 
 /**

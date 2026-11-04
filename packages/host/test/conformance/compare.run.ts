@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CASES, HOSTS, plain, sameTrace, todoOn } from './cases.ts';
+import { CASES, HOSTS, plainJson, sameTrace, todoOn } from './cases.ts';
 import { readResults, resultsFile } from './results.ts';
 
 const runs = HOSTS.map((host) => ({ host, results: readResults(host) }));
@@ -41,6 +41,6 @@ for (const c of CASES) {
       const failed = [left, right].map((o, i) => (o.status === 'pass' ? null : `${runs[i]!.host}: ${o.message ?? 'failed'}`)).filter(Boolean);
       assert.fail(`not compared, because it failed on a host:\n${failed.join('\n')}`);
     }
-    assert.ok(sameTrace(left.trace, right.trace), `the hosts saw different things:\n${a?.host}: ${JSON.stringify(plain(left.trace))}\n${b?.host}: ${JSON.stringify(plain(right.trace))}`);
+    assert.ok(sameTrace(left.trace, right.trace), `the hosts saw different things:\n${a?.host}: ${JSON.stringify(plainJson(left.trace))}\n${b?.host}: ${JSON.stringify(plainJson(right.trace))}`);
   });
 }
