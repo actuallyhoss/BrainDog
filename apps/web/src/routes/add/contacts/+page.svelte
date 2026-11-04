@@ -20,6 +20,7 @@
   import Button from '$lib/ui/Button.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import { titleOf } from '$lib/title.ts';
+  import { closed, opened } from '$lib/ui/screen.svelte.ts';
 
   const base = $derived(apiBase(page.url));
   const home = $derived(at('/p/people', page.url.pathname));
@@ -27,7 +28,16 @@
   /* ── who is here already ── */
   let held = $state.raw<{ people: HeldPerson[]; orgs: HeldOrg[] } | null>(null);
   let heldFailed = $state(false);
+  /* A CALL THE SCREEN WAITS ON, so `data-screen` says when it has settled and the a11y gate can audit it. */
   async function readHeld(): Promise<void> {
+    const at = opened();
+    try {
+      await readHeldNow();
+    } finally {
+      closed(true, at);
+    }
+  }
+  async function readHeldNow(): Promise<void> {
     const client = createClient({ base });
     const [people, orgs] = await Promise.all([walkRows(client, 'people'), walkRows(client, 'organisations')]);
     if (people === null) {

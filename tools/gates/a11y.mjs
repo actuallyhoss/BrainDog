@@ -748,7 +748,9 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
                * than described. A `.btn` reading `Uninstall` or `Stop the run` is not telling you it is
                * destructive with colour. It is telling you with the verb. A `.count` or `.badge` is a
                * number, and the tint is emphasis on a fact already written out. A `.toast` is a whole
-               * sentence in a live region: "Nothing was written" says what happened, and the amber agrees.
+               * sentence in a live region: "Nothing was written" says what happened, and the amber agrees. A row's
+               * `.item-stands` on a person's page is the word itself ("Part paid", "Late"), its glyph hidden so it is
+               * not said twice; a tone with no word draws the glyph as an image, which this rule reads anyway.
                *
                * IT WAS WRITTEN AS `button, a[href], .count, .badge` AND EXEMPTED THE SURFACE IT WAS FOR.
                * Every phone card is `<a class="card" href=… data-intent=…>`, so all sixteen rows on
@@ -764,7 +766,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
               const unnamed = await page.evaluate(() => {
                 const out = [];
                 for (const el of document.querySelectorAll('[data-intent]')) {
-                  if (el.matches('.btn, .count, .badge, .toast')) continue;
+                  if (el.matches('.btn, .count, .badge, .toast, .item-stands')) continue;
                   if (el.querySelector('[role="img"][aria-label]')) continue;
                   /* A NESTED INTENT IS ONE INTENT. `Block` puts `data-intent` on the figure AND on its own
                      figcaption; the glyph is in the caption, so the figure is named through it. */

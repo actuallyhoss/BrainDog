@@ -35,7 +35,11 @@ class Operator {
     this.#asked = person;
     this.yes = kept(person);
     void fetch('/account/ops/me', { headers: { accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' })
-      .then((res) => this.#keep(person, res.ok))
+      .then((res) => {
+        /* THE STATUS IS THE ANSWER, and a body nobody reads is a request still out, as Chromium counts it. */
+        void res.body?.cancel();
+        this.#keep(person, res.ok);
+      })
       .catch(() => undefined);
   }
 

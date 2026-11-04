@@ -7,5 +7,9 @@ import { error, type LoadEvent } from '@sveltejs/kit';
 
 export async function load({ fetch }: Pick<LoadEvent, 'fetch'>): Promise<void> {
   const res = await fetch('/account/ops/me', { headers: { accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' }).catch(() => null);
-  if (res === null || !res.ok) error(404, 'Not found');
+  if (res === null || !res.ok) {
+    /* AN ANSWER NOBODY READS IS A REQUEST STILL OUT, as Chromium counts it. */
+    void res?.body?.cancel();
+    error(404, 'Not found');
+  }
 }

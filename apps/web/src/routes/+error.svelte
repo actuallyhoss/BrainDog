@@ -6,6 +6,7 @@
   import Button from '$lib/ui/Button.svelte';
   import NotFound from '$lib/ui/NotFound.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import { titleOf } from '$lib/title.ts';
 
   /* WHICH FAILURE THIS IS decides the one line and the one button. A failed fetch has no status of its own, so the
      browser saying it is offline outranks it; a 429 may carry the seconds to wait as `retry_after`. */
@@ -21,6 +22,9 @@
      said "No page here", and "This screen did not load" twice. The card's line is what follows from the name. */
   const missingWhy = 'The address may have a typo, or the page is gone.';
 </script>
+
+<!-- A TAB AND A SCREEN READER ARE TOLD WHERE THEY ARE, HERE TOO: a page that failed in its load left the title empty. -->
+<svelte:head><title>{titleOf(page.status === 404 && !offline ? words.missing : said.title)}</title></svelte:head>
 
 <!-- THE PHONE'S BAR, with the mark, the bell and the face, over the page's own words; on a desk the crumb says it. -->
 <PageHead title={page.status === 404 && !offline ? words.missing : said.title} headless />

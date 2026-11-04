@@ -28,7 +28,11 @@ async function ask(path: string, method: 'GET' | 'POST'): Promise<GoogleStatus |
       headers: { accept: 'application/json', ...(method === 'POST' ? { 'content-type': 'application/json' } : {}) },
       ...(method === 'POST' ? { body: '{}' } : {}),
     });
-    if (!answer.ok) return null;
+    if (!answer.ok) {
+      /* AN ANSWER NOBODY READS IS A REQUEST STILL OUT, as Chromium counts it. */
+      void answer.body?.cancel();
+      return null;
+    }
     const body = (await answer.json()) as { ok?: boolean; value?: GoogleStatus };
     return body.ok === true && body.value ? body.value : null;
   } catch {
