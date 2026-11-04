@@ -152,7 +152,7 @@ const arrives = (page, words, timeout) => page.getByText(words, { exact: true })
 /** Projects at one width: the headline a screen reader has, the earning tile, the sections, and the parked behind the switch. Nothing here decides. */
 async function readProjects(page, seen, timeout) {
   seen.earning = await arrives(page, EARNING, timeout);
-  seen.headline = (await page.locator('h2.sr-only').first().textContent({ timeout: 1000 }).catch(() => null)) ?? null;
+  seen.headline = (await page.locator('h2.sr-only').first().textContent({ timeout }).catch(() => null)) ?? null;
   const heads = page.locator('.b-main .b-sec-head');
   seen.groups = (await heads.first().isVisible().catch(() => false)) ? (await heads.allTextContents()).map((t) => t.trim()) : null;
   const main = page.locator('.b-main');
@@ -162,8 +162,8 @@ async function readProjects(page, seen, timeout) {
   seen.parked = false;
   if (seen.listed[parked] === true) return;
   const press = page.getByRole('group', { name: VIEWS }).getByRole('button', { name: new RegExp(`^${PARKED}`, 'u') });
-  await press.click({ timeout: 2000 }).catch(() => {});
-  seen.parked = await main.getByText(parked, { exact: true }).first().waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false);
+  await press.click({ timeout }).catch(() => {});
+  seen.parked = await main.getByText(parked, { exact: true }).first().waitFor({ state: 'visible', timeout }).then(() => true, () => false);
 }
 
 /** A project's page at one width: whether Tools and servers is drawn, and whether it names the project's own tool. */
