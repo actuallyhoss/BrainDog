@@ -141,7 +141,7 @@ screen's own control calls; a Release build has none of it.
 |---|---|---|
 | `Packages/BrainDogKit/Sources/BrainDogKit/Resources/Colours.xcassets`, `Look/Tokens.generated.swift`, `Assets.xcassets` colours | `packages/theme` (`HOUSE.frame`) | `tools/tokens.mjs` |
 | `Resources/Icons.xcassets`, `Look/Glyph.generated.swift` | `apps/web/src/lib/ui/icons.ts`, `packages/skin/mark.ts` | `tools/icons.mjs` |
-| `BrainDog.icon` (Icon Composer) | `packages/skin/mark.ts`, the palette | `tools/app-icon.mjs` |
+| `BrainDog.icon` (Icon Composer), the white mark on the red | `packages/skin/mark.ts`, the palette | `tools/app-icon.mjs` |
 | `Resources/tell-core.js` | `apps/web/src/lib/tell/native.ts` (the web's reader) | `tools/tell-core.mjs` |
 
 Each takes `--check` and fails when its output is not what its source makes now. A view never writes a colour.

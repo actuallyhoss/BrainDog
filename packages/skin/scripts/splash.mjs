@@ -1,13 +1,13 @@
 /**
- * The iPhone launch pictures and Android's maskable icon, drawn with `icons.mjs`'s pen.
+ * The iPhone launch pictures, drawn with `icons.mjs`'s pen.
  *
  * A LAUNCH PICTURE IS THE APP'S FIRST FRAME: the board in its scheme with the mark in the middle, 120 points wide, so
  * opening BrainDog from the Home Screen goes from the picture to the app with nothing jumping. Light on the light board
  * in the house red, dark on the dark board in the dark frame's red. The sizes are `apps/web/src/lib/phone/splash.ts`,
  * which also writes the links, so the two cannot disagree.
  *
- * THE MASKABLE ICON keeps the mark inside the middle 80% circle every Android launcher's mask leaves whole: the mark is
- * 56% of the width, where the plain icons' 72% would lose its corners to a round mask.
+ * ANDROID'S MASKABLE ICON IS A KEPT FILE NOW, the red with the mark in white the owner chose (`icons.mjs` says why), and
+ * not drawn here. It keeps the mark inside the middle 80% circle every Android launcher's mask leaves whole.
  *
  * RUN BY HAND, as `icons.mjs` is: `node packages/skin/scripts/splash.mjs`. Part of no build.
  */
@@ -74,7 +74,3 @@ for (const s of SCREENS) {
     console.log(`  wrote apps/web/static/${fileOf(s, scheme)}, ${file.length} bytes`);
   }
 }
-
-const maskable = picture(512, 512, 512, layered(512, 0.56), schemes.light.ground, schemes.light.ink);
-await writeFile(join(statics, 'icon-maskable-512.png'), maskable);
-console.log(`  wrote apps/web/static/icon-maskable-512.png, ${maskable.length} bytes`);

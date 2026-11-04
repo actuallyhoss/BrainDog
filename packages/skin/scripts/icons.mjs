@@ -1,6 +1,10 @@
 /**
- * The two PNG icons Android asks an installed web app for, 192 and 512 pixels square, drawn from `MARK`, and the tab's
- * 16 and 32 with `favicon.ico` made of them, drawn from `MARK_SMALL`.
+ * `favicon.ico`, the tab's 16 and 32 pixels drawn from `MARK_SMALL`, and the pen `splash.mjs` draws with.
+ *
+ * IT WRITES NO `icon-*.png` ANY MORE. The app's icon is the red with the mark in white, drawn larger, which the owner
+ * chose (9252bff31) and which was drawn once: `icon-16`, `-32`, `-192`, `-512`, `-maskable-512` and `apple-touch-icon` in
+ * `apps/web/static`, the last and `icon-512` in `apps/site/static`, are kept files. This wrote a pale tile over four of them
+ * each time it ran. To change them, draw them again and keep what is chosen; `BrainDog.icon` is `apps/apple/tools/app-icon.mjs`.
  *
  * AN IMAGE TOOL IS NOT A DEPENDENCY THIS REPOSITORY HAS, and the mark is two filled paths, so this draws them itself.
  * The path data is read into outlines, each curve is cut into short straight edges, and each pixel is covered by
@@ -8,9 +12,8 @@
  * row the coverage is read exactly from the crossings; down it, from the sampled rows. The PNG is written with
  * `node:zlib`, which is all the format needs beyond its checksum.
  *
- * ON THE HOUSE GROUND AND IN THE HOUSE ACCENT, as `apple-touch-icon.png` is drawn, because a launcher fills a
- * transparent icon with a colour of its own choosing. Both come from `@braindog/theme`, as the favicon's colour does in
- * `theme.mjs`, so a palette change reaches these files when this is run again.
+ * THE FAVICON'S COLOUR COMES FROM `@braindog/theme`, as `theme.mjs`'s does, so a palette change reaches it when this is
+ * run again.
  *
  * RUN BY HAND, once after the mark or the palette changes: `node packages/skin/scripts/icons.mjs`. It is part of no
  * build, because a build never writes into `static/`.
@@ -25,9 +28,6 @@ import { HOUSE } from '@braindog/theme';
 import { MARK, MARK_SMALL } from '../mark.ts';
 
 const root = join(import.meta.dirname, '..', '..', '..');
-
-/** The sizes Android's install asks for, each written to `apps/web/static/icon-<size>.png`. */
-const SIZES = [192, 512];
 
 /** How much of the icon's width the mark takes. The rest is ground, so the mark is not cut by a launcher's mask. */
 const FILL = 0.72;
@@ -231,30 +231,6 @@ export function chunk(type, data) {
   return Buffer.concat([head, data, sum]);
 }
 
-/** An 8-bit RGB PNG of the mark over the ground: each row a filter byte of 0, then its pixels. */
-function png(size, alpha, ground, ink) {
-  const stride = size * 3 + 1;
-  const raw = Buffer.alloc(size * stride);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const a = Math.min(1, alpha[y * size + x]);
-      const at = y * stride + 1 + x * 3;
-      for (let k = 0; k < 3; k++) raw[at + k] = Math.round(ground[k] * (1 - a) + ink[k] * a);
-    }
-  }
-  const header = Buffer.alloc(13);
-  header.writeUInt32BE(size, 0);
-  header.writeUInt32BE(size, 4);
-  header[8] = 8;
-  header[9] = 2;
-  return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk('IHDR', header),
-    chunk('IDAT', deflateSync(raw, { level: 9 })),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-}
-
 /**
  * EACH PATH IS COVERED ON ITS OWN AND LAID OVER THE ONE BEFORE, as SVG paints two paths in one group. Wound together,
  * a path drawn the other way round inside another would cancel it and leave a hole the favicon does not have.
@@ -337,23 +313,10 @@ function pixels(size) {
 
 /* WRITTEN ONLY WHEN RUN, so `splash.mjs` can draw with the same pen without writing these files again. */
 if (process.argv[1] === import.meta.filename) {
-  const ground = bytes(HOUSE.schemes.light.bg);
-  const ink = bytes(HOUSE.schemes.light.accent);
-  for (const size of SIZES) {
-    const path = join(root, 'apps', 'web', 'static', `icon-${size}.png`);
-    const file = png(size, layered(size), ground, ink);
-    await writeFile(path, file);
-    console.log(`  wrote apps/web/static/icon-${size}.png, ${file.length} bytes`);
-  }
-
   /* THE TAB'S OWN, IN THE FAVICON'S RED (`theme.mjs` writes `mark.svg` in the same), into both apps' static folders: the
      site answers brain.dog/favicon.ico and the app its own path. */
   const red = bytes(HOUSE.frame.light['red-fill']);
   const tab = TAB.map((size) => ({ size, file: pngClear(size, pixels(size), red) }));
-  for (const { size, file } of tab) {
-    await writeFile(join(root, 'apps', 'web', 'static', `icon-${size}.png`), file);
-    console.log(`  wrote apps/web/static/icon-${size}.png, ${file.length} bytes`);
-  }
   const icon = ico(tab);
   for (const app of ['web', 'site']) {
     await writeFile(join(root, 'apps', app, 'static', 'favicon.ico'), icon);
