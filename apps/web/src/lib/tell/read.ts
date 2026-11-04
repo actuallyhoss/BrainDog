@@ -459,7 +459,7 @@ const minor = (a: Amount, currency: string): number | null => minorOf(a.digits, 
 /* ── names ────────────────────────────────────────────────────────────── */
 
 /* A capitalised word in any script, and up to three of them: `Nadia`, `Nadia Samir`, `O'Neill`. */
-const CAP = "\\p{Lu}[\\p{L}\\p{M}'’-]*";
+const CAP = "\\p{Lu}[\\p{L}\\p{M}'’-]*(?:\\.(?:com|net|org|io|co|ai|app)\\b)?";
 const NAME = `${CAP}(?:\\s+${CAP}){0,2}`;
 /* Words that open a clause in capitals without being anybody. */
 const NOT_A_NAME = new Set([
@@ -661,7 +661,8 @@ const iconOf = (l: TellList): string => l.icon ?? 'rows';
 
 /* Commas and full stops that end a clause, never inside a figure ("1,200.50"; "paid 900, Omar wants" still parts); and
    "and" before a new act: "wants 3 jars and paid 900". */
-const CLAUSE = /[,.](?!\d)|[;!?\n]|\s+(?:and|&)\s+(?=(?:she|he|they|i|we)?\s*(?:paid|pays|sent|transferred|received|got|wants?|ordered|needs?)\b)/iu;
+/* A SITE'S NAME IS ONE THING, never two clauses at its dot: "Booking.com 900" was "Booking" and "com 900", and no reader saw the platform. */
+const CLAUSE = /,(?!\d)|\.(?!\d|(?:com|net|org|io|co|ai|app)\b)|[;!?\n]|\s+(?:and|&)\s+(?=(?:she|he|they|i|we)?\s*(?:paid|pays|sent|transferred|received|got|wants?|ordered|needs?)\b)/iu;
 const INTRODUCED = /^(?:(?:hi|hello|hey)\b[\s,.!]*)?(?:i['’]?m|i am|my name is|this is)\s/iu;
 const ORDER = /^(?:wants?|would like|ordered|orders|needs?|asked for|is getting|booked|reserved|(?:can|could) (?:i|we) (?:get|have)|i['’]?d like|i would like|i want|i['’]?ll take)\s+(?:to (?:order|get|buy|have)\s+)?/iu;
 const PAID = /^(?:paid|pays|sent|transferred)\b\s*/iu;

@@ -1024,6 +1024,8 @@ test('"ISN\'T PAID", "WILL GET PAID" AND "HALF PAID" ARE NEVER PAID IN FULL (RO1
 });
 
 test('A FIGURE AFTER A PLATFORM THAT PAYS HIM IS ASKED WHICH WAY, never money spent (RO2)', () => {
+  /* A site's name keeps its dot: it was two clauses, "Booking" and "com 900", and the line became a task. */
+  assert.deepEqual(tellRead('Paid 900 at Booking.com', founder).left, []);
   for (const s of ['App Store 1,200 USD', 'Apple 1,200', 'YouTube 3,000', 'Airbnb 4,500', 'Amazon 2,000', 'Booking.com 900', 'Stripe 1,200', 'Gumroad 300']) {
     const told = tellRead(s, founder);
     assert.deepEqual(told.rows, [], s);
