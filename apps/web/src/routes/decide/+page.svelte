@@ -28,6 +28,8 @@
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
+  import { closedNow } from '$lib/record/answers-closed.svelte.ts';
+  import { pageWithout } from '$lib/record/answers-out.ts';
   import { titleOf } from '$lib/title.ts';
   import { untrack } from 'svelte';
   import { page as route } from '$app/state';
@@ -406,7 +408,9 @@
 
   /* ── the page as Decide draws it ─────────────────────────────────────────── */
 
-  const live = $derived(got?.from === 'live' ? got : null);
+  /* AN ANSWER THIS BROWSER GAVE IS NOT DRAWN BACK (`answers-out.ts`): from the copy, from what this tab kept, or offline,
+     nothing kept may be newer than it. */
+  const live = $derived(got?.from === 'live' ? pageWithout(got, closedNow(apiBase(), fromCopy || offlineNow())) : null);
   /* THE SENTENCE'S COUNTS ARE `boot`'S (`waits`), the number the rail's badge and Today's header say, and late is
      the record's own mark (`lateDays`). An older host sends neither and the queue's counts stand. */
   const shaped = $derived(live ? decideDrawn(blocksMineFirst(live.page.blocks, shell.me?.person ?? null), live.now, askerOf, waitsNow(), shell.lateDays ?? null) : null);
@@ -440,7 +444,7 @@
         )
       : null,
   );
-  const drawn = $derived<Opened | null>(!cardIn ? null : got && got.from === 'live' && columned ? { ...got, page: { page: got.page.page, blocks: columned } } : got);
+  const drawn = $derived<Opened | null>(!cardIn ? null : got && got.from === 'live' && columned ? { ...got, page: { page: got.page.page, blocks: columned } } : (live ?? got));
   /* NOTHING TO DRAW AT ALL: the head says so, and the other queue is offered when something waits in it. */
   const cleared = $derived(shaped !== null && !shaped.drawsAny);
   /* THE HEAD'S LINE IS THE RECORD'S, and there is none with no question waiting: the head is then the page's name, and

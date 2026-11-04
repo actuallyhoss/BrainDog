@@ -872,7 +872,7 @@
     <!-- THE HERO'S BAR IS NO HEADING outside arranging (Q60 of 29 October): its "Overview" stood as an H2 before the
          project's own name, the page's H1. It still names the region. Nor is a titled part's (`titled`, Q11). -->
     <svelte:element this={parts?.includes('hero') && !arranging ? 'p' : titled ? 'span' : level === 3 ? 'h3' : 'h2'} class="block-name"
-      ><span id="{ids}h-{i + 1}">{#if titled && typeof (desk as { heading?: unknown } | null)?.heading === 'string'}{(desk as { heading: string }).heading}{:else}<Text nodes={inline(block.heading, { icon })} opts={{ icon }} />{/if}</span>{#if count !== null && !titled}<span class="block-count num"><Figure value={count} /></span>{/if}</svelte:element
+      ><span id="{ids}h-{i + 1}">{#if titled && typeof (desk as { heading?: unknown } | null)?.heading === 'string'}{(desk as { heading: string }).heading}{:else}<Text nodes={inline(block.heading, { icon })} opts={{ icon }} />{/if}</span>{#if count !== null && !titled}<span class="block-count num" data-needs-n={block.kind === 'queue' ? '' : undefined}><Figure value={count} /></span>{/if}</svelte:element
     >
     {#if source}
       <!-- THE LIST'S NAME, not its id, and A DOOR THAT WAITS FOR THE POINTER (secondary controls appear on
@@ -1017,7 +1017,7 @@
         {n}
         {compact}
       />{/if}{/each}
-    {#if asked.more > 0}<a class="queue-more" href={inApp('/decide')}>{compact ? queueWords.moreOnDecide(asked.more) : queueMore(asked.more)}</a>{/if}
+    {#if asked.more > 0}<a class="queue-more" data-needs-n href={inApp('/decide')}>{compact ? queueWords.moreOnDecide(asked.more) : queueMore(asked.more)}</a>{/if}
   </div>
   {#if most !== null}<button type="button" class="block-more tap" data-queue-more onclick={(e) => void unfold(e, most)}>{words.more(every.length - most)}</button>{/if}
 {:else if board}

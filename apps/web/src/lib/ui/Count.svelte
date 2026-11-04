@@ -33,7 +33,7 @@
   const said = $derived(n > 99 ? '99+' : String(n));
 </script>
 
-{#if n > 0}<span class="badge num" data-size={size} role={label ? 'img' : undefined} aria-label={label}><Figure value={said} /></span>{/if}
+{#if n > 0}<span class="badge num" data-needs-n data-size={size} role={label ? 'img' : undefined} aria-label={label}><Figure value={said} /></span>{/if}
 
 <style>
   .badge {

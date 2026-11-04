@@ -53,6 +53,8 @@
 <script lang="ts">
   import { idle } from '$lib/ui/idle.ts';
   import { apiBase, at as inApp, slugOf } from '$lib/at.ts';
+  import { closedNow } from '$lib/record/answers-closed.svelte.ts';
+  import { pageWithout } from '$lib/record/answers-out.ts';
   import { madeOf } from '$lib/home/made-counts.ts';
   import { stillShown, type WidgetSize } from 'braindog-render';
   import { recordToday, recordZone } from '$lib/record/zone.ts';
@@ -508,6 +510,8 @@
   /** Whether an answer was read without the widgets the phone hides (`phone-ask.ts`). */
   const isPhoneOnly = (o: Opened | null): boolean => o?.from === 'live' && (o.page.page as { phoneOnly?: unknown }).phoneOnly === true;
   let fromCopy = $state(false);
+  /** Whether what is drawn is Today as the record last drew it, which an answer given since is not in. */
+  let answerBehind = $state(false);
   /* AND IT SAYS WHEN IT IS FROM while the record is asked again (`kept-frame.ts`), once that is more than a minute ago:
      what the copy holds is the money as the record last answered, and an old figure is never shown without saying so. */
   let keptLine = $state<string | null>(null);
@@ -743,7 +747,9 @@
     await tiles.tilesLanded(answered);
     const { blocks: kept, ...declOwn } = decl;
     declaredBlocks = Array.isArray(kept) ? (kept as Record<string, unknown>[]) : [];
-    besideOf(base, h, await (beside ?? Promise.resolve(null)));
+    const told = (await (beside ?? Promise.resolve(null))) as TodayAnswer | null;
+    answerBehind = told?.behind === true;
+    besideOf(base, h, told);
     tilesBeside(base);
     return {
       from: 'live',
@@ -832,7 +838,9 @@
       tiles.askReads(answered, { base, owner: data.me?.owner === true });
       /* AND THE TILES' CODE IN HAND, so they draw with the page and not a frame after it, moving what is under them. */
       await tiles.tilesLanded(answered);
-      besideOf(base, h, await (beside ?? Promise.resolve(null)));
+      const told = (await (beside ?? Promise.resolve(null))) as TodayAnswer | null;
+      answerBehind = told?.behind === true;
+      besideOf(base, h, told);
       const at = drawn.now;
       const blocks = withLeft(drawn.blocks, body.blocks, left, (b) => leftBlock(b, at) as unknown as LiveBlock);
       return {
@@ -1026,7 +1034,9 @@
     void reread();
   }
 
-  const live = $derived(got?.from === 'live' ? got : null);
+  /* AN ANSWER THIS BROWSER GAVE IS NOT DRAWN BACK (`answers-out.ts`), whichever store this page came from: from a copy, from
+     what this tab kept, from the record's last drawing or offline, nothing kept may be newer than it. */
+  const live = $derived(got?.from === 'live' ? pageWithout(got, closedNow(apiBase(), fromCopy || fromMemory || answerBehind || data.offline === true)) : null);
 
   /* WHAT WAITS AND WHO IS WORKING, AS `boot` SAYS IT: the rail's badge and this header say one number, and the
      working tile lists the runs `boot` says are working. `null` from a host older than the field. */
@@ -1346,7 +1356,7 @@
   /** A block's cell on the board, by its index in what the reader is handed. */
   const placed = (i: number) => (board ? boardModel.placeOf(boardKeyOf(drawn?.from === 'live' ? (drawn.page.blocks[i] as Desked<LiveBlock>) : undefined)) : null);
   const drawn = $derived.by((): Opened | null => {
-    if (!got || got.from !== 'live' || !desked) return got;
+    if (!got || got.from !== 'live' || !desked) return live ?? got;
     const blocks = desked.blocks;
     if (railed(blocks)) return { ...got, page: { page: got.page.page, blocks } };
     const { layout: _rail, ...flat } = got.page.page;

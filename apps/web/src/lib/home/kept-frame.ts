@@ -17,12 +17,16 @@
  * over a copy (`words.updating`) is laid in where Today draws it, with the time it was taken, so a figure is never shown
  * old without saying so. The words are made here, from the copy's own, because `app.html` holds no words.
  *
+ * IT NEVER DRAWS BACK WHAT THIS BROWSER JUST CLOSED. An answer since it was taken is taken out of it as it is painted
+ * (`record/answers-out.ts`, `app.html`).
+ *
  * NOTHING IN IT RUNS OR LOADS: scripts, frames and media are left out, every `id` is renamed so nothing finds the
  * picture for the screen, and `data-screen` is dropped so nothing reads it as drawn.
  */
 
-import { BASE } from '../at.ts';
+import { apiBase, BASE } from '../at.ts';
 import { COPY, KEPT, when, words } from '../data/offline.ts';
+import { closedIds } from '../record/answers-out.ts';
 
 /** Where in the copy the picture is kept: one, the last Today drawn. `app.html` spells the same address. */
 export const FRAME_PATH = '~today-frame';
@@ -47,6 +51,9 @@ export type Frame = {
   dark: boolean;
   at: number;
   html: string;
+  /** The record it is of, as `apiBase()` says it, and the answers its counts already leave out (`answers-out.ts`). */
+  base: string;
+  gone: string[];
   /** The rules on the root and the body, and faces; and every other rule, which `app.html` scopes to the picture. */
   root: string;
   css: string;
@@ -105,6 +112,11 @@ export function frameOf(doc: Document, now: number): Frame | null {
   if (doc.querySelector('dialog[open], [aria-modal="true"], [role="menu"]') !== null) return null;
   const copy = root.cloneNode(true) as Element;
   for (const el of copy.querySelectorAll(LEFT_OUT)) el.remove();
+  /* A QUESTION ANSWERED IS NOT KEPT, not as its card and not as the answered line standing in its place, and the counts
+     drawn now already leave it out, which `gone` tells `app.html` (`answers-out.ts`). */
+  const base = apiBase();
+  const gone = [...closedIds(base, true, now, true)];
+  for (const id of gone) for (const el of copy.querySelectorAll(`[data-row="q:${id}"]`)) el.remove();
   for (const el of copy.querySelectorAll('[id]')) {
     el.setAttribute('data-kept-id', el.id);
     el.removeAttribute('id');
@@ -132,6 +144,8 @@ export function frameOf(doc: Document, now: number): Frame | null {
     look: ['scheme', 'text', 'density', 'theme'].map((a) => html.getAttribute(`data-${a}`) ?? '').join(' '),
     dark: matchMedia('(prefers-color-scheme: dark)').matches,
     at: now,
+    base,
+    gone,
     html: copy.innerHTML,
     root: rules.root.join('\n'),
     css: rules.scoped.join('\n'),

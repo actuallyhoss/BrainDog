@@ -37,6 +37,9 @@
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
   import type { ComponentProps, Snippet } from 'svelte';
   import { apiBase } from '../at.ts';
+  import { closedNow } from '../record/answers-closed.svelte.ts';
+  import { pageWithout } from '../record/answers-out.ts';
+  import { copyMark } from '../data/copy-mark.svelte.ts';
   import { titleOf } from '$lib/title.ts';
   /* THE KINDS ONLY A DECLARED PAGE DRAWS, with the screen that draws them rather than in the sheet every screen waits
      on (`blocks-kinds.css`). Before the charts, in the order the rules had when they were one sheet. */
@@ -209,10 +212,12 @@
   const visit = $derived(`${slug}?${route.url.search}`);
   const live = $derived.by(() => {
     if (got?.from !== 'live') return null;
+    /* AN ANSWER THIS BROWSER GAVE IS NOT DRAWN BACK ON ANY PAGE WITH A QUEUE (`answers-out.ts`). */
+    const clean = pageWithout(got, closedNow(apiBase(), copyMark.on));
     const before = drawn;
-    if (mode !== 'page' || before === null || before.visit !== visit || wroteAt() < before.since) return got;
-    const blocks = heldOrder(got.page.blocks, blockKeys(got.page.blocks), before.keys);
-    return blocks === got.page.blocks ? got : { ...got, page: { ...got.page, blocks: [...blocks] } };
+    if (mode !== 'page' || before === null || before.visit !== visit || wroteAt() < before.since) return clean;
+    const blocks = heldOrder(clean.page.blocks, blockKeys(clean.page.blocks), before.keys);
+    return blocks === clean.page.blocks ? clean : { ...clean, page: { ...clean.page, blocks: [...blocks] } };
   });
   $effect.pre(() => {
     if (!live) return;
