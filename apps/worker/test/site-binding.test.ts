@@ -61,12 +61,16 @@ const BOUND: readonly string[] = ENVIRONMENTS;
    `if (url.pathname.startsWith('/hooks/')) return buildId(env);` put into `route()`, and another with
    `url.pathname === '/status'`, left all five tests green, because neither is a call on the path and so neither was a
    branch here. `BARE` is every line of `route()` that still names `url.pathname` once its calls are taken out, and the
-   first test fails on the first of them, so a branch in another shape is written as a predicate or given a door here. */
+   first test fails on the first of them, so a branch in another shape is written as a predicate or given a door here.
+
+   THE ONE LINE TAKEN OUT BY NAME IS NOT A BRANCH: `isDrawnFrame(url.pathname)` is the branch, and the answer it returns
+   reads the path to tell a page frame from an attached one (07d611b46). It is taken out whole, so any other use of the
+   path, on this line or any other, still fails. */
 const index = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
 const routeSource = /\nasync function route\([^]*?\n\}\r?\n/.exec(index)?.[0] ?? '';
 const CALL = /([A-Za-z_$][\w$]*(?:\.test)?)\(url\.pathname\)/g;
 const ASKED = [...new Set([...routeSource.matchAll(CALL)].map((m) => m[1] ?? ''))];
-const BARE = routeSource.replace(CALL, '').match(/[^\n]*url\.pathname[^\n]*/g) ?? [];
+const BARE = routeSource.replace(CALL, '').replace('return drawnFrame(request.method, url.pathname);', '').match(/[^\n]*url\.pathname[^\n]*/g) ?? [];
 
 /* THE DOORS, ONE OR MORE SAMPLE PATHS PER BRANCH OF `route()`. `/mcp/` is here because an MCP client configured with the
    slash reached the site's 404 page when measured, while `servesMcp` accepts it. `/healthz/` is not, as the
@@ -87,6 +91,8 @@ const DOOR_OF: { [asked: string]: string[] } = {
      door here, so the site's own entry already carries it. */
   servesFiles: ['/api/files/abc123'],
   servesKennel: ['/api/kennel/v1/index.json'],
+  /* Inside the Kennel's branch: the review door also opens to the operator's own session (e065d3e78). */
+  'KENNEL_REVIEW.test': ['/api/kennel/v1/review'],
   servesOAuth: ['/oauth/token', '/oauth/authorize'],
   servesOAuthMeta: ['/.well-known/oauth-authorization-server', '/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'],
   /* The drawn components' frame document, at the root beside the app's own pages. */
