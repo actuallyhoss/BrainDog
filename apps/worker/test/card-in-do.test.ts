@@ -177,7 +177,13 @@ async function boot(rewrites: Rewrite[]): Promise<Worker> {
       bindings: { PUBLIC_HOST: HOST, SESSION_SECRET, PROVISION_KEY, PROVISION_WITHOUT_KEYS: 'yes', BRAINDOG_BUILD: '' },
     }),
   );
-  return { mf, base: (await mf.ready).origin };
+  /* A WORKER THAT WILL NOT COME UP IS STOPPED HERE: its `mf` goes no further, so nothing else could dispose it. */
+  try {
+    return { mf, base: (await mf.ready).origin };
+  } catch (e) {
+    await mf.dispose();
+    throw e;
+  }
 }
 
 /** One record on a Worker: provisioned, claimed, set up with Solo founder, holding Kiln, and a key for the agent. */
@@ -293,7 +299,13 @@ before(async () => {
   const rewrite = mutant === undefined ? undefined : MUTANTS[mutant];
   if (mutant !== undefined && rewrite === undefined) throw new Error(`CARD_MUTANT names no mutant: ${mutant}`);
   const extra = rewrite === undefined ? [] : [rewrite];
-  [shipped, aged] = await Promise.all([boot(extra), boot([...SEAM, ...extra])]);
+  /* ONE BOOT FAILING MUST NOT STRAND THE OTHER. `Promise.all` rejected on the first failure and assigned neither, so the
+     Worker that did come up was disposed by nobody, its workerd child held this process open for ever, and the suite
+     sat at 0% CPU printing nothing for the files after this one. Each is kept as it lands, so `after` stops it. */
+  const [one, two] = await Promise.allSettled([boot(extra), boot([...SEAM, ...extra])]);
+  if (one.status === 'fulfilled') shipped = one.value;
+  if (two.status === 'fulfilled') aged = two.value;
+  for (const booted of [one, two]) if (booted.status === 'rejected') throw booted.reason;
 });
 
 after(async () => {
