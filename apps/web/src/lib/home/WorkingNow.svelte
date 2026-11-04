@@ -284,7 +284,18 @@
   /* THE ⋯ WAITS FOR THE ROW UNDER A MOUSE: on every row at rest it was a column of marks nobody was reading. A thumb
      still sees it, and a keyboard brings it with focus. */
   @media (hover: hover) and (pointer: fine) {
+    /* AND IT WAITS BEFORE THE TIME, NOT AFTER IT (4 Nov): at the row's end its empty 28 and a gap held "heard 12 min ago"
+       40px short of the card's edge, where "All agents" ends over it. Now the time is the row's end, the ⋯ fades in in a
+       space kept for it beside the time, and nothing moves. Held to the name's line (22) so it does not make it taller. */
+    .run {
+      grid-template-areas:
+        'face who do time'
+        'face doing doing doing'
+        'face holds holds holds';
+    }
+
     .run .r-do {
+      margin-block: -3px;
       opacity: 0;
     }
 

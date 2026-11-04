@@ -2138,6 +2138,15 @@
         'face doing doing do';
     }
 
+    /* A NARROW WINDOW UNDER A MOUSE: the ⋯ still waits for the row, so it still waits before the time (`WorkingNow`). */
+    @media (hover: hover) and (pointer: fine) {
+      .body[data-board] :global([data-working] .run) {
+        grid-template-areas:
+          'face who do time'
+          'face doing doing doing';
+      }
+    }
+
     .body[data-board] :global([data-working] .run :is(.r-holds, .r-project)) {
       display: none;
     }
@@ -2254,10 +2263,18 @@
   /* NEEDS YOU AND ITS FOOT ARE ONE TILE (today F3): the foot under its questions, at the tile's foot. */
   .body[data-board] :global(.block-slot[data-board-key='needs-you'] > [data-needs-foot]) {
     margin-block-start: auto;
-    padding-block-start: var(--sp-1);
+    /* THE RULE HAS ITS STEP OF AIR ON BOTH SIDES (rhythm, 4 Nov, `--divider-space`): over it this padding, under it the
+       44 tall line's own 12 round its 20 of words. It sat on "One vital sign needs a look" with 4 between them. */
+    padding-block: var(--divider-space) 0;
     /* THE TILE ALREADY HOLDS ITS INSET (audit 6f AF21): the foot's own put "BrainDog handled 1 today" and its rule 20px in
        from the questions' rules above it. */
     padding-inline: 0;
+  }
+
+  /* THE LAST LINE'S AIR IS THE TILE'S PADDING, NOT MORE ON TOP OF IT (rhythm: a card's bottom equals its top). The foot's
+     16 and the line's 12 stood on the tile's own padding, 40px under "BrainDog handled 1 today". Its press still reaches. */
+  .body[data-board] :global(.block-slot[data-board-key='needs-you'] > [data-needs-foot]:not([data-alone])) {
+    margin-block-end: calc(-1 * var(--divider-space));
   }
 
   /* NEEDS YOU HOLDS TWO QUESTIONS ON A LAPTOP'S LARGE (Q17): each question without its well, so its buttons sit on its
@@ -2269,24 +2286,16 @@
     .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large'] .dc-row > .dr-actions) {
       grid-row: 2;
       grid-column: 3;
+      align-self: start;
       justify-self: end;
       margin: 0;
     }
 
+    /* ITS FIRST LINE LEVEL WITH THE BUTTON, as Late's day line (`LateNow`), so one that wraps runs on below and not 9 above. */
     .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large'] .dc-row > .dr-meta) {
       grid-column: 2;
-      align-self: center;
-    }
-  }
-
-  .body[data-board] :global(.block-slot[data-board-key='needs-you'] > [data-needs-foot]) {
-    padding-block-start: 0;
-  }
-
-  /* 32 TALL UNDER A MOUSE ONLY: under a thumb a line of the foot is a target, and keeps its 44. */
-  @media (pointer: fine) {
-    .body[data-board] :global(.block-slot[data-board-key='needs-you'] > [data-needs-foot] .nf-line) {
-      min-block-size: 32px;
+      align-self: start;
+      padding-block: calc((var(--btn-h) - var(--lead-meta)) / 2);
     }
   }
 
@@ -2315,14 +2324,12 @@
     padding-block-end: var(--sp-3);
   }
 
+  /* JUST ITS LINE OF WORDS UNDER A MOUSE, so the air over the foot's rule is the foot's alone; under a thumb its 44 below. */
   .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line) {
+    min-block-size: 20px;
     padding-block-start: 0;
     font-size: var(--fs-meta);
     line-height: 20px;
-  }
-
-  .body[data-board] :global(.board[data-cols='4'] .block-slot[data-board-key='needs-you'][data-size='large']) {
-    padding-block-end: var(--sp-3);
   }
 
   .body[data-board] :global(.board-part) {
@@ -2459,8 +2466,9 @@
     }
   }
 
+  /* A STEP UNDER "8 MORE IN NEEDS YOU": two small lines, a paragraph apart. */
   .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line) {
-    margin-block-start: var(--sp-1);
+    margin-block-start: var(--sp-2);
   }
 
 
@@ -2476,7 +2484,17 @@
     /* AND IT STARTS WHERE "7 MORE IN NEEDS YOU" ENDS: that link's 44 reaches 12 under its words, and the red line began 8
        inside it, so the more was 36 tall to a thumb (F34). */
     .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line) {
+      min-block-size: var(--tap);
       margin-block-start: var(--sp-3);
+    }
+
+    /* ITS 44 ALREADY HOLDS THE 12 OVER THE RULE, and last in the tile, its air is the tile's padding, as the foot's is. */
+    .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line + [data-needs-foot]) {
+      padding-block-start: 0;
+    }
+
+    .body[data-board] :global(.block-slot[data-board-key='needs-you'] > .signs-line:last-child) {
+      margin-block-end: calc(-1 * var(--divider-space));
     }
   }
 

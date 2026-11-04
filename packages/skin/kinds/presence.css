@@ -440,7 +440,14 @@
   /* MORE WAITS FOR THE POINTER: on a row a mouse reaches it fades in on hover or focus, so a list of runs reads as a
      list and not as a column of dots. Under a thumb there is no hover, so it is always there. */
   @media (hover: hover) and (pointer: fine) {
+    /* AND IT WAITS BEFORE THE TIME (4 Nov): at the row's end its empty 28 held "heard 12 min ago" 40px short of where
+       Recent runs' "just now" ends under it. The time is the row's end, and nothing moves as More fades in beside it. */
+    .pres[data-line] .pres-where {
+      grid-area: 1 / 4;
+    }
+
     .pres[data-line] .pres-more {
+      grid-area: 1 / 3;
       opacity: 0;
       transition: opacity var(--d-state) var(--ease-out);
     }

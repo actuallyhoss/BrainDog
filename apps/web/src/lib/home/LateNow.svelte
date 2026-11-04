@@ -278,8 +278,17 @@
   .ln-acts {
     display: flex;
     grid-area: acts;
+    align-self: start;
     justify-content: flex-end;
     gap: var(--sp-2);
+  }
+
+  /* THE DAY LINE'S FIRST LINE IS LEVEL WITH THE BUTTON (4 Nov), held by the button's height and not by centring the two
+     boxes: a day line that wrapped beside its buttons centred as a block, and its second line sat 9px under their centre.
+     Any wrap now runs on below, and the button stays. */
+  .ln:has(> .ln-acts > :global(*)) > .ln-when {
+    align-self: start;
+    padding-block: calc((var(--btn-h-sm) - var(--lead-meta)) / 2);
   }
 
   /* A TASK'S QUIET TICK: an empty ring at the line's start that fills with the check under the pointer, never
@@ -345,6 +354,11 @@
     .ln-acts {
       justify-content: flex-start;
       padding-block-start: var(--sp-1);
+    }
+
+    /* AND ON ITS OWN ROW THE DAY LINE HAS NO BUTTON TO LINE UP WITH. */
+    .ln:has(> .ln-acts > :global(*)) > .ln-when {
+      padding-block: 0;
     }
   }
 
