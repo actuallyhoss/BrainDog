@@ -104,7 +104,8 @@ const cashOf = (api: Api, id: string): Body => rows(api, 'zakat_cash').find((r) 
 
 test('THE FILE IS 2.0.0, NEEDS Investments and gold, and its script is work.js byte for byte, reaching only what it says', () => {
   const doc = file();
-  assert.equal(doc.version, '2.0.2');
+  /* 2.0.3 SINCE 1 November (c1737f949): its first step, and where to set the gold rate. */
+  assert.equal(doc.version, '2.0.3');
   assert.deepEqual((doc.requires as { packs: Body }).packs, { 'money-core': '>=2.0.0', holdings: '>=2.0.0' });
   const s = decl(doc, 'script', 'zakat_work');
   assert.equal(s.source, readFileSync(WORK_FILE, 'utf8'), 'zakat.pack.json and work.js disagree; copy work.js into the source');
@@ -115,7 +116,7 @@ test('THE FILE IS 2.0.0, NEEDS Investments and gold, and its script is work.js b
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['zakat', '2.0.2']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['zakat', '2.0.3']);
 });
 
 test('WITHOUT INVESTMENTS AND GOLD IT IS NOT INSTALLED: the add-on asks for it', async () => {
@@ -136,7 +137,7 @@ test('INSTALLED WITH INVESTMENTS AND GOLD: three lists, three rules, a script, f
   for (const id of ['register.zakat_basis', 'register.zakat_cash', 'register.zakat_paid', 'script.zakat_work', 'page.zakat', 'rule.zakat_inputs', 'rule.zakat_rate', 'rule.zakat_metals', 'metric.zakat-due'])
     assert.ok(ids.includes(id), `${id} is not added`);
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'zakat')?.version, '2.0.2');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'zakat')?.version, '2.0.3');
   close();
 });
 

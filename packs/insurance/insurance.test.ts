@@ -99,7 +99,7 @@ test('BEFORE THE ADD-ON: a record has no policies list and no Insurance page', a
 
 test('THE FILE: one list, a rule and its script, two pages, and no kernel change, on money-core 3', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version, doc.author], ['insurance', '2.0.2', 'BrainDog']);
+  assert.deepEqual([doc.pack, doc.version, doc.author], ['insurance', '2.0.6', 'BrainDog']);
   assert.deepEqual((doc.requires as Body).packs, { 'money-core': '>=3.0.0 <4.0.0' });
   const kinds = (key: string) => doc.declarations.filter((d) => key in d).map((d) => d[key]);
   assert.deepEqual(kinds('register'), ['policies', 'illustration_years']);
@@ -123,7 +123,7 @@ test('INSTALLED FROM THE FILE with nothing refused, and it needs money-core', as
   assert.ok(diff.adds.some((a) => a.id === 'page.insurance'));
   assert.ok(diff.adds.some((a) => a.id === 'register.policies'));
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'insurance')?.version, '2.0.2');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'insurance')?.version, '2.0.6');
   sql.close();
 });
 

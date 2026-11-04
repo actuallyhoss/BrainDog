@@ -64,7 +64,7 @@
       "rule": "Values: a day ahead is drawn as the day and how far off it is",
       "page": "Values",
       "selector": ".typed[data-form=\"date\"]",
-      "text": "24 Dec 2030 · in "
+      "text": "24 Dec 2030, in "
     },
     {
       "rule": "Values: a day is a link to the calendar on its day",
@@ -140,7 +140,7 @@
       "zone": "UTC",
       "at": "2026-10-14T22:30:00Z",
       "selector": ".typed[data-form=\"day\"]",
-      "text": "15 Oct 2026 · in 1 day"
+      "text": "15 Oct, in 1 day"
     },
     {
       "rule": "Values: at the same moment in Cairo, east of Greenwich, the same day is already today",
@@ -149,7 +149,7 @@
       "zone": "Africa/Cairo",
       "at": "2026-10-14T22:30:00Z",
       "selector": ".typed[data-form=\"day\"]",
-      "text": "15 Oct 2026 · today"
+      "text": "15 Oct, today"
     },
     {
       "rule": "Values: a quantity is a number with its unit",
@@ -388,7 +388,7 @@
       "page": "Counts on Rule sheet",
       "block": "Its own values",
       "selector": ".document .typed[data-form=\"day\"]",
-      "text": "1 Dec 2026"
+      "text": "1 Dec"
     },
     {
       "rule": "Own values: no field of the project draws as a hole or as a word nobody knows",

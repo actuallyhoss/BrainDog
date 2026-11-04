@@ -65,7 +65,7 @@ const metric = async (api: Api, id: string): Promise<Reading> => said<Reading>(a
 
 test('THE FILE: savings-circle 1.0.0 on money-core, fields laid on Plans, one rule and its script, one page', () => {
   const doc = shipped();
-  assert.deepEqual([doc.pack, doc.version, doc.license], ['savings-circle', '1.2.0', 'Apache-2.0']);
+  assert.deepEqual([doc.pack, doc.version, doc.license], ['savings-circle', '1.2.1', 'Apache-2.0']);
   const kinds = (k: string) => doc.declarations.filter((d) => k in d).map((d) => d[k]);
   assert.deepEqual(kinds('register'), []);
   assert.deepEqual(kinds('page'), ['savings-circles']);

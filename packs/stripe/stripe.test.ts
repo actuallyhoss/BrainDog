@@ -206,7 +206,8 @@ test('THE PACK CARRIES stripe.js AS ITS SOURCE, byte for byte, and asks for one 
      3.1.0 has the `books` the `book` setting (1.2.0) files each row in. 3.31.0 SINCE 1.5.0, whose accounts declare the
      `no_feed` the script marks each row it keeps with. */
   const doc = JSON.parse(TEXT) as { version: string; requires: { packs: Record<string, string> }; config: Record<string, unknown> };
-  assert.equal(doc.version, '1.5.0');
+  /* 1.5.1 SINCE 2 November (1767124b5): a refused key is said by its name in the keychain. 1.5.2 SINCE 3 November (7c5f888b3): plugin in its words. */
+  assert.equal(doc.version, '1.5.2');
   assert.deepEqual(doc.requires.packs, { 'money-core': '>=3.31.0 <4.0.0' });
   assert.deepEqual(Object.keys(doc.config), ['grant', 'book']);
   assert.deepEqual([DEFAULTS.grant, DEFAULTS.book], ['stripe', 0]);
@@ -216,7 +217,7 @@ test('THE PACK CARRIES stripe.js AS ITS SOURCE, byte for byte, and asks for one 
   assert.deepEqual([kind?.type, kind?.values, kind?.labels], ['enum', ['available', 'pending', 'in_transit'], { available: 'Available', pending: 'Pending', in_transit: 'In transit' }]);
   /* A CHANGES LINE A PERSON READS: plain words, no dash, no id. */
   const changes = (doc as unknown as { changes: string }).changes;
-  assert.match(changes, /fed by the bank/);
+  assert.match(changes, /Says plugin where it said add-on/);
   assert.equal(/\u2014|books#|\brows?\b/.test(changes), false, changes);
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
@@ -452,7 +453,7 @@ test('A KEY STRIPE REFUSES STOPS THE RUN WITH A SENTENCE AND WRITES NOTHING, whi
   /* `null` BECAUSE IT IS THE SCRIPT'S OWN ERROR and not a rule of the sandbox's. `script-run.ts` counts three refused
      runs in a row and pauses the script, which is the pull's 401 pause said by the only means a script has. */
   assert.equal(a.refused.code, null);
-  assert.match(a.refused.why, /Stripe refused the key labelled "stripe" \(401\)/);
+  assert.match(a.refused.why, /Stripe refused the key "Stripe \(read only\)" \(401\)/);
 });
 
 /* ── The settings, read on every run (1.4.0) ───────────────────────────────────────────────────── */

@@ -56,12 +56,13 @@ test('THE PACK CARRIES weather.js, CALLS ONLY OPEN-METEO, AND OFFERS TWO WIDGETS
   assert.deepEqual(SCRIPT.egress, ['https://geocoding-api.open-meteo.com', 'https://api.open-meteo.com']);
   assert.deepEqual(SCRIPT.keys, []);
   assert.deepEqual(PACK.widgets.map((w) => [w.id, w.size, w.sizes.includes(w.size)]), [
-    ['weather-today', 'small', true],
+    /* WIDE SINCE 1.2.2 (265db20f8): a card must, and Small could not be added at that size. */
+    ['weather-today', 'wide', true],
     ['weather-week', 'tall', true],
   ]);
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
-  assert.equal(PACK.version, '1.2.1');
+  assert.equal(PACK.version, '1.2.2');
 });
 
 test('A PLACE IS LOOKED UP, AND EACH DAY IS ONE ROW, its sky in words', async () => {

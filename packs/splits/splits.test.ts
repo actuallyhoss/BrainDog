@@ -64,7 +64,7 @@ const metric = async (api: Api, id: string): Promise<Reading> => said<Reading>(a
 
 test('THE FILE: splits 1.0.0 on money-core, two lists, one script for two rules, two pages, two fields on the Ledger', () => {
   const doc = shipped();
-  assert.deepEqual([doc.pack, doc.version, doc.license], ['splits', '1.2.1', 'Apache-2.0']);
+  assert.deepEqual([doc.pack, doc.version, doc.license], ['splits', '1.3.1', 'Apache-2.0']);
   const kinds = (k: string) => doc.declarations.filter((d) => k in d).map((d) => d[k]);
   assert.deepEqual(kinds('register'), ['splits', 'split_people']);
   assert.deepEqual(kinds('page'), ['splits', 'split-person']);
@@ -73,7 +73,10 @@ test('THE FILE: splits 1.0.0 on money-core, two lists, one script for two rules,
   assert.equal(script.source, readFileSync(new URL('./splits.js', import.meta.url), 'utf8'), 'the pack file and splits.js disagree');
   const added = (doc.extends['register.transactions'] as { fields: Body[] }).fields;
   assert.deepEqual(added.map((f) => [f.id, f.index]), [['shared_with', undefined], ['split_share', undefined]]);
-  assert.ok(!/\bow(e|es|ed|ing)\b/i.test(JSON.stringify(doc)), 'no word about owing');
+  /* WHO OWES WHOM IS SAID IN PLAIN WORDS SINCE 1.2.0 (f3806b918), where it said comes back and goes back. Held here so the
+     words do not drift back to the stored ones. */
+  const ways = (doc.declarations.find((d) => d.register === 'split_people')!.fields as Body[]).find((f) => f.id === 'way')!;
+  assert.deepEqual(ways.labels, { to_me: 'Owes you', to_them: 'You owe them', square: 'Square' });
 });
 
 test('BEFORE THE PACK: there is no splits list', async () => {

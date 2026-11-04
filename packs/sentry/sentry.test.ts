@@ -49,7 +49,7 @@ const decl = (): ScriptDecl => ({ id: SCRIPT.script, version: 1, egress: SCRIPT.
 const host = (): CtxHost =>
   ({
     fetch: async (req: unknown) => {
-      const url = new URL(String((typeof req === 'string' ? JSON.parse(req) : req) as { url: string }['url']));
+      const url = new URL(((typeof req === 'string' ? JSON.parse(req) : req) as { url: string }).url);
       const body = url.pathname.endsWith('/projects/') ? PROJECTS : url.pathname.endsWith('/events/') ? { data: [{ project: 'marsh-bot', 'count()': 40, 'count_unique(user)': 25 }] } : url.searchParams.get('project') === '12' ? [ISSUE] : [];
       return { status: 200, headers: { 'X-Hits': Array.isArray(body) ? String(body.length) : '0' }, body: JSON.stringify(body) };
     },

@@ -142,7 +142,7 @@ const SPREAD_MS = 15 * 60_000;
 test('THE FILE IS 2.0.0, Investments and gold, and every field and kind 1.4.2 held is still there as it was', () => {
   const doc = file();
   const old = v142();
-  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.4.0', 'Investments and gold']);
+  assert.deepEqual([doc.pack, doc.version, doc.title], ['holdings', '3.7.2', 'Investments and gold']);
   assert.equal(old.version, '1.4.2', 'the frozen 1.4.2 moved');
   assert.equal(v100().version, '1.0.0', 'the frozen 1.0.0 moved');
   assert.deepEqual(doc.requires, old.requires);
@@ -221,25 +221,25 @@ test('THE SCRIPTS IN THE FILE ARE cost.js, twin.js AND feed.js, byte for byte, e
 const ADDS = [
   'metric.gold-grams', 'metric.gold-held', 'metric.gold-rate-on', 'metric.gold-rates-current', 'metric.gold-rates-old', 'metric.holding-buys',
   'metric.holdings-at-cost', 'metric.holdings-by-kind', 'metric.holdings-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-gain',
-  'metric.holdings-gain-pct', 'metric.holdings-gained', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-unpriced', 'metric.holdings-value',
+  'metric.holdings-gain-pct', 'metric.holdings-gained', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-uncosted', 'metric.holdings-unpriced', 'metric.holdings-unvalued', 'metric.holdings-value', 'metric.holdings-worth-costed',
   'page.holding', 'page.holdings', 'register.gold_rates', 'register.holding_buys', 'register.holdings',
   'rule.gold_rate_old', 'rule.holdings_buy', 'rule.holdings_cost', 'rule.holdings_price_old', 'rule.holdings_rate', 'script.holdings_cost', 'script.holdings_gold_feed',
   'script.holdings_twin',
 ];
 
-test('INSTALLED FROM THE FILE: three lists, five rules, three scripts, eighteen figures and two pages, and nothing refused', async () => {
+test('INSTALLED FROM THE FILE: three lists, five rules, three scripts, twenty-one figures and two pages, and nothing refused', async () => {
   const { api, close } = await money();
   const diff = await planOf(api, file());
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), ADDS);
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.4.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.7.2');
   close();
 });
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.4.0']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '3.7.2']);
 });
 
 test('NO FILE OF THIS ADD-ON NAMES A CURRENCY IN A FORMAT, so every amount reads in the money somebody chose', () => {
@@ -500,7 +500,8 @@ test('THE PAGE READS LIKE THE MOCK: a line, what you hold with its gain, the gol
   assert.equal(page.title, 'Investments and gold');
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
   const on = page.blocks.filter(drawn);
-  assert.deepEqual([on[0]!.kind, (on[0] as { lead?: boolean }).lead], ['note', true]);
+  /* WHAT YOU HOLD LEADS, SINCE 3.7.0 (685d1a053), where a line over it did. */
+  assert.deepEqual([on[0]!.kind, on[0]!.heading, (on[0] as { lead?: boolean }).lead], ['stat', 'What you hold', true]);
 
   /* WHAT YOU HOLD, ONE TILE: worth now, paid in, the gain and its percent. The certificate stands at what it cost, so
      the note says one of four does. */
@@ -508,13 +509,14 @@ test('THE PAGE READS LIKE THE MOCK: a line, what you hold with its gain, the gol
   assert.equal(tiles.length, 1, 'the tile was drawn twice');
   const cell = (m: string): Reading => tiles[0]!.readings!.find((r) => r.metric === m)!.reading;
   /* 30 g OF 21k AT 4,550 (136,500), 10 g OF 24k AT 5,200 (52,000), 100 SHARES AT 320 (32,000), THE CERTIFICATE AT 100,000. */
-  assert.deepEqual([cell('holdings-value').value, cell('holdings-value').unit], [32_050_000, 'EGP']);
+  /* WORTH NOW LEAVES OUT WHAT HAS NO COST, SINCE 3.6.0 (1767124b5), and all four here have one, so it is the whole. */
+  assert.deepEqual([cell('holdings-worth-costed').value, cell('holdings-worth-costed').unit], [32_050_000, 'EGP']);
   /* PAID: 76,400 AND 42,000 FOR THE 21k, 48,000 FOR THE BAR, 25,000 FOR THE FUND, 100,000 FOR THE CERTIFICATE. */
   assert.equal(cell('holdings-cost').value, 29_140_000);
   /* THE GAIN IS OVER WHAT SOMETHING PRICED, the certificate left out: 136,500 - 118,400, 52,000 - 48,000, 32,000 - 25,000. */
   assert.equal(cell('holdings-gain').value, 1_810_000 + 400_000 + 700_000);
   assert.equal(Math.round(cell('holdings-gain-pct').value! * 1000) / 1000, Math.round((2_910_000 / 19_140_000) * 1000) / 1000);
-  const note = tiles[0]!.readings!.find((r) => r.metric === 'holdings-value')!.note!.replace(/\{\{([a-z-]+)\}\}/gu, (_, id: string) => String(tiles[0]!.values?.[id]));
+  const note = tiles[0]!.readings!.find((r) => r.metric === 'holdings-worth-costed')!.note!.replace(/\{\{([a-z-]+)\}\}/gu, (_, id: string) => String(tiles[0]!.values?.[id]));
   assert.equal(note, '1 of 4 at what they cost');
 
   /* THE GOLD RATE IN USE, a row a karat said. */
@@ -607,7 +609,7 @@ async function upgraded(doc: Doc, rows: readonly Body[] = HELD): Promise<Awaited
   const diff = await planOf(made.api, file());
   assert.deepEqual(diff.conflicts, [], 'the update met a conflict');
   said(await put(made.api, file()));
-  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.4.0');
+  assert.equal(made.api.kernel.packs().find((p) => p.id === 'holdings')?.version, '3.7.2');
   return { ...made, ids, before };
 }
 
@@ -672,7 +674,6 @@ test('THE CATCH-UP READS PAST THE FIRST PAGE OF FIFTY, so sixty unvalued holding
 /* ── a price said, and its day (1.4.0) ────────────────────────────────────────────────────────────────────────────── */
 
 const SIXTY_AGO = '2026-07-27';
-const epochDay = (d: string): number => Math.round(Date.parse(`${d}T00:00:00Z`) / 86_400_000);
 
 test('A PRICE WRITTEN WITH NO DAY IS STAMPED WITH TODAY, a day somebody typed is kept, and a changed price is dated again', async () => {
   const { api, close } = await inPounds();
@@ -693,15 +694,16 @@ test('THE PAGE SAYS THE OLDEST PRICE, AND OVER THIRTY DAYS OLD IT WARNS IN WORDS
   const id = hold(api, { label: 'Lot 1', kind: 'commodity', qty: 1, unit_cost: egp(100_000), price: egp(150_000), priced_on: '2026-08-26' });
   await settle(api);
   const blocks = async (): Promise<Block[]> => (await pageOf(api)).blocks;
-  const tile = (bs: Block[]): Block | undefined => bs.find((b) => b.heading === 'Priced on');
+  /* PRICES ARE FROM IS A LINE AND NOT A TILE, SINCE 3.7.0 (685d1a053). */
+  const line = (bs: Block[]): Block | undefined => bs.find((b) => b.kind === 'note' && /^Prices are from/u.test(String(b.body)));
   const warn = (bs: Block[]): Block | undefined => bs.find((b) => (b as { tone?: string }).tone === 'warn' && /^Priced on/u.test(String(b.body)));
   let bs = await blocks();
-  assert.deepEqual([drawn(tile(bs)!), drawn(warn(bs)!)], [true, false]);
-  assert.equal(tile(bs)!.readings![0]!.reading.value, epochDay('2026-08-26'));
+  assert.deepEqual([drawn(line(bs)!), drawn(warn(bs)!)], [true, false]);
+  assert.equal(line(bs)!.values?.['holdings-priced-on'], '2026-08-26');
   edit(api, 'holdings', id, { priced_on: '2026-08-25' });
   await settle(api);
   bs = await blocks();
-  assert.deepEqual([drawn(tile(bs)!), drawn(warn(bs)!)], [false, true]);
+  assert.deepEqual([drawn(line(bs)!), drawn(warn(bs)!)], [false, true]);
   assert.match(String(warn(bs)!.body), /\{\{bad:over 30 days ago\}\}/u);
   close();
 });

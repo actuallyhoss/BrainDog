@@ -155,7 +155,7 @@ test('STRIPE AND MERCURY ON ONE RECORD: one account a Mercury account, none coun
     good(scripts.mercury);
     const refusedStripe = lastRun(scripts.stripe);
     assert.equal(refusedStripe.outcome, 'refused', refusedStripe.note);
-    assert.match(refusedStripe.log ?? '', /Stripe refused the key labelled "stripe" \(401\)/);
+    assert.match(refusedStripe.log ?? '', /Stripe refused the key "Stripe \(read only\)" \(401\)/);
     const second = accountsIn(running.sql);
     assert.deepEqual(second.filter((r) => r.stripe !== null), stripeBefore);
     assert.deepEqual(

@@ -43,7 +43,8 @@ test('THE PACK CARRIES ITS THREE SCRIPTS BYTE FOR BYTE, and each calls nobody an
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'property');
-  assert.equal(file.value.pack.manifest.version, '1.0.2');
+  /* 1.0.3 SINCE 1 November (d68fb4080): what to add while it is empty. */
+  assert.equal(file.value.pack.manifest.version, '1.0.3');
   assert.deepEqual(PACK.requires.packs, { 'money-core': '>=3.29.0 <4.0.0' });
 });
 

@@ -79,7 +79,8 @@ const read = (api: Api, id: string): Body => api.kernel.get(id)!.fields as Body;
 test('THE FILE DECLARES THE LIST, THE TWO RULES, THE SCRIPT, THE FIGURES AND THE PAGE', () => {
   const doc = file();
   assert.equal(doc.pack, 'goals');
-  assert.equal(doc.version, '2.1.0');
+  /* 2.2.0 SINCE 1 November (d68fb4080): what to add while it is empty, with `goals-count`. 2.2.1 SINCE 3 November (3ea2e541c). */
+  assert.equal(doc.version, '2.2.1');
   const list = doc.declarations.find((d) => d.register === 'money_goals')!;
   const ids = (list.fields as Body[]).map((f) => f.id);
   /* THE WORDS PERSONAL'S SAVINGS GOALS USES, kept so the two read alike. */
@@ -103,10 +104,10 @@ test('BEFORE THE PACK THE RECORD HAS NO GOALS, AND THE FILE INSTALLS WITH NOTHIN
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(
     diff.adds.map((a) => a.id).sort(),
-    ['metric.goals-behind', 'metric.goals-have-by-name', 'metric.goals-held', 'metric.goals-need', 'metric.goals-reached', 'metric.goals-saving', 'page.goals', 'register.money_goals', 'rule.goals_pace', 'rule.goals_pace_on_balance', 'script.goals_pace'],
+    ['metric.goals-behind', 'metric.goals-count', 'metric.goals-have-by-name', 'metric.goals-held', 'metric.goals-need', 'metric.goals-reached', 'metric.goals-saving', 'page.goals', 'register.money_goals', 'rule.goals_pace', 'rule.goals_pace_on_balance', 'script.goals_pace'],
   );
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'goals')?.version, '2.1.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'goals')?.version, '2.2.1');
   sql.close();
 });
 

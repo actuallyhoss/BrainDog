@@ -70,7 +70,8 @@ test('THE PACK CARRIES ITS TWO SCRIPTS AS THEIR SOURCE, byte for byte; neither f
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'certificates');
-  assert.equal(file.value.pack.manifest.version, '2.0.2');
+  /* 2.0.3 SINCE 1 November (d68fb4080): what to add while it is empty. 2.0.4 SINCE 3 November (3ea2e541c): plugin in its words. */
+  assert.equal(file.value.pack.manifest.version, '2.0.4');
 });
 
 test('THE SCRIPT STEPS A PAYOUT BY THE WALK’S OWN LEG, written into its source as data', () => {

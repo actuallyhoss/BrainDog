@@ -62,10 +62,11 @@ const ADDRESS = LABEL;
 test('THE PACK CARRIES calendar.js, CALLS ONLY GOOGLE AND OUTLOOK, AND KEEPS THE LINK IN THE KEYS', async () => {
   assert.equal(SCRIPT.source, SOURCE);
   assert.deepEqual(SCRIPT.egress, ['https://calendar.google.com', 'https://outlook.office365.com', 'https://outlook.live.com']);
-  assert.deepEqual(PACK.widgets.map((w) => w.id), ['calendar-next', 'calendar-today']);
+  assert.deepEqual(PACK.widgets.map((w) => w.id), ['calendar-next', 'calendar-today', 'calendar-invites']);
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
-  assert.equal(PACK.version, '2.0.1');
+  /* 2.1.0 SINCE 3 November (23aeeb9b4): invitations and their widget. 2.1.3 SINCE 3 November (3ea2e541c): plugin in its words. */
+  assert.equal(PACK.version, '2.1.3');
   /* ITS PAGE IS `events`: BrainDog's own Calendar is `page.calendar` on every record, and 1.x declared the same id, so the
      plan said "Calendar is already here, from BrainDog" and the add-on could never be installed. */
   assert.deepEqual(PACK.declarations.filter((d) => typeof d.page === 'string').map((d) => d.page), ['events']);

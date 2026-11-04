@@ -86,9 +86,9 @@ test('BEFORE THE ADD-ON: no profiles, no places, and Tools and Skills have no Pr
   sql.close();
 });
 
-test('THE FILE: profiles 1.2.1 on Agents 1.13 and People 3, two personal lists, two figures, two automations, a page and four additions to Agents', () => {
+test('THE FILE: profiles 1.4.0 on Agents 1.13 and People 3, two personal lists, two figures, two automations, a page and four additions to Agents', () => {
   const doc = file() as { pack: string; version: string; requires: { packs: unknown }; declarations: Record<string, unknown>[]; seeds: unknown[]; adds: { page: string }[] };
-  assert.deepEqual([doc.pack, doc.version], ['profiles', '1.3.0']);
+  assert.deepEqual([doc.pack, doc.version], ['profiles', '1.4.0']);
   assert.deepEqual(doc.requires.packs, { agents: '^1.13.0', people: '>=3.3.0 <5.0.0' });
   assert.deepEqual(doc.adds.map((a) => a.page), ['page.agents', 'page.agents', 'page.agents', 'page.agents']);
   const lists = doc.declarations.filter((d) => d.register !== undefined && d.rule === undefined);
