@@ -113,6 +113,8 @@ export function tablesWritten(text: string): string[] | null {
        Another schema's table (`temp.x`, an attached file) is one this cannot be sure of. */
     const t = tableAt(statement.slice(m[0].length));
     if (t === null || (t.schema !== null && t.schema.toLowerCase() !== 'main')) return null;
+    /* A SCHEMA WITH NOTHING NAMED AFTER IT (`"main". VALUES`): the next word is SQL, not a table this can be sure of. */
+    if (t.schema !== null && /^(?:VALUES|SELECT|DEFAULT|SET)$/iu.test(t.name)) return null;
     out.add(t.name.toLowerCase());
   }
   return [...out];
