@@ -66,4 +66,4 @@ Agents are covered in [Agents](/docs/agents/connect).
 
 ## The palette, without Slash
 
-The palette does more than ask. Press / or Ctrl+K (⌘K) and it searches every list, every decision and every page by the words in them, jumps to a page, opens a row by its number, and runs actions. ? shows the keyboard, which is help and not Slash.
+The palette does more than ask. Press Ctrl+K (⌘K) and it searches every list, every decision and every page by the words in them, jumps to a page, opens a row by its number, and runs actions. ? shows the keyboard, which is help and not Slash.

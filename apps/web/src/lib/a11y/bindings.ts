@@ -78,7 +78,7 @@ export const SCROLL_KEYS = ['Space', 'PageDown', 'PageUp'] as const;
 
 export const BINDINGS: Binding[] = [
   { id: 'palette', scope: 'document', key: '⌘K', label: 'Open the search', bare: false },
-  { id: 'palette-slash-key', scope: 'document', key: '/', label: 'Search from anywhere', bare: true },
+  { id: 'palette-slash-key', scope: 'document', key: '/', label: 'Ask Slash from anywhere', bare: true },
   /* SLASH NAMED ONCE FOR WHAT IT IS (AG33): nothing on the sheet said Slash is BrainDog's assistant. */
   { id: 'palette-ask', scope: 'document', key: '⌘J', label: "Ask Slash, BrainDog's assistant", bare: false },
   /* `g s` IS BACK, BECAUSE SEARCH BECAME A PLACE YOU GO. This row printed it while nothing bound

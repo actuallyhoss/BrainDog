@@ -1547,6 +1547,13 @@
     if (!e.metaKey && !e.ctrlKey && inField(e.target)) typedAt = e.timeStamp;
   }
 
+  /* ASK SLASH FROM A KEY: on Slash's own page its field, and anywhere else the palette in Ask. */
+  function askSlash() {
+    const field = overlays.depth > 0 ? null : document.querySelector<HTMLTextAreaElement>('[data-slash-composer] textarea');
+    if (field && !field.disabled) field.focus();
+    else openAsk();
+  }
+
   function onkeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
 
@@ -1575,9 +1582,7 @@
        SLASH'S OWN PAGE IT IS THAT PAGE'S FIELD (3 Nov): the palette opened over the composer it stood for. */
     if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'j') {
       e.preventDefault();
-      const field = overlays.depth > 0 ? null : document.querySelector<HTMLTextAreaElement>('[data-slash-composer] textarea');
-      if (field && !field.disabled) field.focus();
-      else openAsk();
+      askSlash();
       return;
     }
 
@@ -1637,9 +1642,10 @@
       void toggleSide();
       return;
     }
+    /* `/` ASKS, AS `⌘J` DOES, AND `⌘K` IS THE SEARCH (Sam, 4 Nov). */
     if (e.key === '/') {
       e.preventDefault();
-      openPalette();
+      askSlash();
       return;
     }
     // `?` is help. It is never "ask the assistant".

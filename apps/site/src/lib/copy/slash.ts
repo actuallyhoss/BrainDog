@@ -43,7 +43,7 @@ export const slashPage = {
   find: {
     title: 'Find',
     body: [
-      "Press / and type a few letters. People, projects, invoices, notes and your agents' work show up at once.",
+      "Press ⌘K and type a few letters. People, projects, invoices, notes and your agents' work show up at once.",
       'It also jumps to any page and runs actions. Finding is free and never spends a question.',
     ],
   },
