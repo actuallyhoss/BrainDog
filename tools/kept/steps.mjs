@@ -199,10 +199,10 @@ export async function putKey(ctx, { label, opens, value }) {
   ctx.secrets.push(value);
   const put = () => api(ctx, 'keys/put', { label, opens, kind: 'api_token', value, sealed_under: 'connector' });
   let out = await put();
-  /* A RECORD WITH NO KEYS LIST HAS NOT TURNED ITS AGENTS ON, which is where a key's row lives (`credentials`). It is
+  /* A RECORD WITH NO KEYS LIST HAS NOT TURNED ITS AGENTS ON, which is where a key's row lives, and the refusal says "no Keychain yet". It is
      turned on through the record's own setup door, from what the host offers, as a person turns it on, and said. */
   let turnedOn = false;
-  if (out.said?.refusal?.code === 'REGISTER_UNKNOWN' && /credentials/u.test(String(out.said.refusal.fix ?? ''))) {
+  if (out.said?.refusal?.code === 'REGISTER_UNKNOWN' && /Keychain/u.test(String(out.said.refusal.fix ?? ''))) {
     const on = await api(ctx, 'setup', { again: true, packs: { install: [AGENTS] } });
     if (on.said?.ok !== true || (on.said.value?.failed ?? []).length > 0) return { ok: false, fix: hide(ctx, `the record holds no keys list, and turning its agents on was refused: ${fixOf(on)}`) };
     turnedOn = true;
@@ -279,9 +279,14 @@ export function harnessOf(c, stand = standIn()) {
       globalThis.fetch = stand.fetch;
       try {
         /* DUE ONCE, RUNG UNTIL IT IS DONE: a poll's first ring queues its fetch and a later one delivers it, so the alarm
-           is rung a few times over one move of the clock, and each thing that was due runs once. */
+           is rung a few times over one move of the clock, and each thing that was due runs once. A ring leases a few
+           script runs, and a founder's own scripts queue ahead of an add-on's, so it is rung until no run waits. */
         sql?.exec("UPDATE schedule SET due_at = ? WHERE state = 'pending'", new Date(Date.now() - 1_000).toISOString());
-        for (let i = 0; i < 4; i++) {
+        const queued = () => {
+          const rows = sql?.exec("SELECT count(*) AS n FROM outbox WHERE kind = 'script.run' AND state IN ('pending', 'leased')");
+          return Number((rows?.toArray?.() ?? [...(rows ?? [])])[0]?.n ?? 0);
+        };
+        for (let i = 0; i < 4 || (queued() > 0 && i < 40); i++) {
           await c.cloud.record(found.record).alarm();
           await c.cloud.settle();
         }
