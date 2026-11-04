@@ -1288,7 +1288,7 @@ test('NO FOURTH COPY: nothing outside the two tables works a currency exponent o
      `02 §3` rule 1 allows, and everyone else imports. Destructuring an import reads
      `const { exponentOf` and does not match. */
   const DECLARES = /(?:function|const|let|var)\s+exponentOf\b/u;
-  const DECLARE_ALLOWED = ['packages/kernel/src/ingest.ts', 'packages/render/src/format.ts'];
+  const DECLARE_ALLOWED = ['packages/kernel/src/exponent.ts', 'packages/render/src/format.ts'];
 
   const found: string[] = [];
   for (const path of sources(root)) {
@@ -1299,7 +1299,7 @@ test('NO FOURTH COPY: nothing outside the two tables works a currency exponent o
     if (READS_CLDR.test(text) && !CLDR_ALLOWED.includes(rel))
       found.push(`${rel} reads a currency's minor unit off Intl.resolvedOptions(). That is CLDR, which says what a country expects to SEE; money() divides by what ISO 4217 says a record STORES, and they differ on IQD and MGA. Import exponentOf from 'braindog-render' (an app or the renderer) or from './ingest.ts' (inside the kernel).`);
     if (DECLARES.test(text) && !DECLARE_ALLOWED.includes(rel))
-      found.push(`${rel} declares its own exponentOf. 02 §3 rule 1 allows two copies of that table, packages/kernel/src/ingest.ts and packages/render/src/format.ts, and no third. Import exponentOf from 'braindog-render' or from '@braindog/kernel' instead of writing one.`);
+      found.push(`${rel} declares its own exponentOf. 02 §3 rule 1 allows two copies of that table, packages/kernel/src/exponent.ts and packages/render/src/format.ts, and no third. Import exponentOf from 'braindog-render' or from '@braindog/kernel' instead of writing one.`);
   }
   assert.deepEqual(found, [], `\n${found.join('\n')}\n`);
 });
