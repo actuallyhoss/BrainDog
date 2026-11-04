@@ -89,6 +89,6 @@
   }
 
   .said.bad {
-    color: var(--bad, var(--ink));
+    color: var(--red);
   }
 </style>
