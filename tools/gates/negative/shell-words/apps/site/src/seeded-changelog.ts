@@ -3,9 +3,8 @@
    entry in `OUT` names. */
 export const body = 'A hundred Egyptian pounds and two and a half dollars were written down as one number.';
 
-/* AND THE TWO WORDS ITS ENTRY HAS HELD SINCE: the copy's "investments and gold" and the company's name, as the site
-   says them. Without them the entry's `gold` and `quartz` exempt nothing here, and the gate says so. */
-export const money = 'Add your accounts, investments and gold.';
+/* AND THE ONE WORD ITS ENTRY HAS HELD SINCE: the company's name, as the site says it. Without it the entry's `quartz`
+   exempts nothing here, and the gate says so. `gold` left the entry when the site stopped saying it (d3f6acbd9). */
 export const maker = 'BrainDog is made by Quartz Apps LLC.';
 
 /* THE LEAK. Before the entry was narrowed it exempted all ten words for the whole site, and this line

@@ -1,7 +1,7 @@
 {
   "gate": "words",
   "rule": "a word for how the app is built in a page an add-on declares",
-  "expect": "pack: .*say add-on",
+  "expect": "pack: .*say plugin",
   "findings": 1,
   "total": 1,
   "why": "AN ADD-ON'S PACK FILE IS JSON, AND ITS HEADING SAYS PACK. Three decoys do not count: the add-on's id and a list's id and source, which no page prints, and \"Pack and send\", the verb, which is plain. A reader that took a key's value or the verb would count two or more."
