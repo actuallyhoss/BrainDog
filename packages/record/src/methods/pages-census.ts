@@ -142,7 +142,9 @@ function shared(deps: RecordDeps) {
       drawn += 1;
       let answer: PageResult;
       try {
-        const got = kernel.page(p.slug, undefined, { hostSources, viewer: viewerOfRead(ctx) });
+        /* THE PAGE AS `page` READS IT FOR HER where the record hands that in (`pageFor`): each block held by the record's own
+           rule, with what it reads beside its source, so a census counts exactly the pages `pages` lists her. */
+        const got = deps.pageFor?.(ctx, p.slug) ?? kernel.page(p.slug, undefined, { hostSources, viewer: viewerOfRead(ctx) });
         if (!got.ok) {
           out.undrawn.push(p.title);
           continue;
@@ -152,7 +154,7 @@ function shared(deps: RecordDeps) {
         out.undrawn.push(p.title);
         continue;
       }
-      const held: PageResult = { ...answer, blocks: answer.blocks.map((b) => shown(ctx, b)) };
+      const held: PageResult = deps.pageFor !== undefined ? answer : { ...answer, blocks: answer.blocks.map((b) => shown(ctx, b)) };
       /* OVER EVERY BLOCK, as `drawnWithheld` in `index.ts` asks it, so a census counts exactly the pages `pages` lists. */
       if (whollyWithheld(held.blocks)) continue;
       const dashes = lintAnswer(held, null).filter((f) => DASH_RULES.has(f.rule)).length;

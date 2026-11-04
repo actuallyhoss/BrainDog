@@ -15,7 +15,7 @@
 
 import type { Clock, Refusal, Sql, no } from '@braindog/ports';
 import type { Result } from '@braindog/ports';
-import type { Kernel } from '@braindog/kernel';
+import type { Kernel, PageResult } from '@braindog/kernel';
 import { nudgeAction } from '@braindog/kernel';
 
 import type { Directory } from '../directory.ts';
@@ -114,6 +114,8 @@ export type RecordDeps = {
   scoped: (ctx: CallContext, need: Need) => Refusal | null;
   /** Whether the caller may read one list's rows: what `list` asks, asked of every list an answer reads. */
   readable: (ctx: CallContext, register: string) => Refusal | null;
+  /** A page as one caller is shown it, each block held as `page` holds it (`index.ts`, `drawnWithheld` reads the same). */
+  pageFor?: (ctx: CallContext, slug: string) => Result<PageResult>;
   /**
    * What one thing a comment may be on is called to this caller (a row by its spoken id, a question or a decision as
    * `nameOf` hands it), or `null` when she may not see it or it is not there (`index.ts`, `sightOf`).
