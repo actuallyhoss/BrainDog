@@ -463,7 +463,10 @@ export async function answer(a: LiveAction, accept: boolean, base = apiBase()): 
     a.state = 'dismissed';
     return;
   }
-  Object.assign(a, landed({ ...a, ...(out.undo ? { undo: out.undo } : {}) }, out.receipt ?? a.title));
+  Object.assign(a, landed({ ...a, ...(out.undo ? { undo: out.undo } : {}), ...(out.sent ? { sent: out.sent, href: undefined } : {}) }, out.receipt ?? a.title));
+  /* A CHOICE OF WHO TAKES IT WAS ANSWERED: it went to this one, so the others are put away (the record has declined them). */
+  if (a.group !== undefined)
+    for (const t of convo.turns) if (t.role === 'slash') for (const other of t.actions) if (other !== a && other.group === a.group && other.state === 'open') other.state = 'dismissed';
 }
 
 /** Put back what an action did, by its batch, the way every other Undo in the app does. */

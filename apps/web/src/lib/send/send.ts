@@ -35,7 +35,7 @@ export type SendState = 'sent' | 'seen' | 'working' | 'done' | 'needs_you' | 'de
 export type Receipt = { batch: string; said: string };
 
 /** One instruction as the record holds it. `at` is milliseconds since the epoch. */
-export type Sent = { id: string; state: SendState; progress?: string | undefined; reply?: string | undefined; receipts: Receipt[]; at: number };
+export type Sent = { id: string; state: SendState; progress?: string | undefined; reply?: string | undefined; receipts: Receipt[]; at: number; run?: string | undefined };
 
 /** Slash's two ways of answering, and Auto, where Slash picks. */
 export type Mode = 'quick' | 'deep' | 'auto';
@@ -201,6 +201,8 @@ export function sentOf(v: unknown): Sent | null {
     state: v.state as SendState,
     ...(str(v.progress) ? { progress: v.progress as string } : {}),
     ...(str(v.reply) ? { reply: v.reply as string } : {}),
+    /* THE RUN THAT HAS IT, ELSE THE ONE IT WAS SENT TO. */
+    ...(str(v.taken_by) || str(v.to_run) ? { run: (str(v.taken_by) ?? str(v.to_run)) as string } : {}),
     receipts,
     at: Number.isFinite(at) ? at : Date.now(),
   };
@@ -308,6 +310,8 @@ export function refOfHref(href: string): string | null {
 
 /** The address a ref opens at, where it is a row. */
 export function hrefOfRef(ref: string): string | null {
+  const run = /^run:S([1-9][0-9]*)$/u.exec(ref);
+  if (run) return `/r/session/${run[1]}`;
   const m = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u.exec(ref);
   return m ? `/r/${m[1]}/${m[2]}` : null;
 }

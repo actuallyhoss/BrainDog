@@ -17,6 +17,7 @@
   import { keepScroll, scrollOf } from './conversations.svelte.ts';
   import { now as nowLines, starters, threadWords, type NowLine, type PageContext } from './slash-chat.ts';
   import { convo } from './thread.svelte.ts';
+  import AgentsNow from './AgentsNow.svelte';
 
   let {
     here,
@@ -107,6 +108,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="t" bind:this={scroller} {onscroll} onclick={leave}>
+  <AgentsNow {base} />
   {#if convo.turns.length === 0 && !convo.loading}
     <p class="t-head">{said?.lines ? threadWords.now : threadWords.try}</p>
     <ul class="t-starts">

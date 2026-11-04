@@ -57,6 +57,7 @@ import type {
   ChatMode,
   ChatRan,
   ChatRun,
+  ChatSent,
   ChatThread,
   ChatThreads,
   ChatTool,
@@ -848,6 +849,36 @@ export const chats = (core: Core): Chat => {
       return;
     }
 
+    /* A SENTENCE PLAINLY ABOUT THE AGENTS IS ANSWERED FROM THE RECORD, before any model is held or asked: no ask spent, the
+       first words waiting on nothing else, and nothing an agent wrote passing through a model (`direct` in the tools). */
+    if (!rethink && tools.direct) {
+      let quick: ChatRan | null = null;
+      try {
+        quick = await tools.direct(message, { attach: input.attach ?? [], mentions: input.mentions ?? [], ...(input.page === undefined ? {} : { page: input.page }) });
+      } catch {
+        quick = null;
+      }
+      if (quick !== null) {
+        const at = threadFor(input.thread, person);
+        emit({ type: 'thread', id: at.id });
+        addTurn(at.id, 'you', message, [], input.mentions);
+        if (quick.step !== undefined) emit({ type: 'step', text: quick.step });
+        const did: ChatAction[] = [];
+        for (const a of quick.actions ?? (quick.action === undefined ? [] : [quick.action])) {
+          const { op, ...shown } = a;
+          const action: ChatAction = { id: ulid(clock.now()), ...shown };
+          if (action.kind === 'ask') sql.exec('INSERT INTO slash_act (id, thread, person, title, op, ts) VALUES (?, ?, ?, ?, ?, ?)', action.id, at.id, person, action.title, JSON.stringify(op ?? {}), now());
+          did.push(action);
+        }
+        const drawn = await linked(quick.text, tools);
+        if (drawn.text !== '') emit({ type: 'delta', text: drawn.text, ...(drawn.figures.length === 0 ? {} : { figures: drawn.figures }) });
+        for (const action of did) emit({ type: 'action', ...action });
+        addTurn(at.id, 'slash', drawn.text, did);
+        emit({ type: 'done', spent: { asks: 0, left: left() }, ...(drawn.figures.length === 0 ? {} : { figures: drawn.figures }) });
+        return;
+      }
+    }
+
     const why = deepNo(deep);
     const brain: DeepInference | null = why === null && deep !== undefined && 'inference' in deep ? deep.inference : null;
     if (mode === 'deep' && brain === null) {
@@ -977,8 +1008,8 @@ export const chats = (core: Core): Chat => {
         }
         figures.push(...numbersIn(out.text), ...(out.figures ?? []));
         done.push({ tool: c.name, args: c.args, text: out.text });
-        if (out.action !== undefined) {
-          const { op, ...shown } = out.action;
+        for (const one of out.actions ?? (out.action === undefined ? [] : [out.action])) {
+          const { op, ...shown } = one;
           const action: ChatAction = { id: ulid(clock.now()), ...shown };
           if (action.kind === 'ask')
             sql.exec(
@@ -1260,7 +1291,7 @@ export const chats = (core: Core): Chat => {
 
   const act: Chat['act'] = async (id, accept, ctx, tools) => {
     open();
-    const row = sql.one<{ person: string; op: string; state: string }>('SELECT person, op, state FROM slash_act WHERE id = ?', id);
+    const row = sql.one<{ person: string; op: string; state: string; thread: string }>('SELECT person, op, state, thread FROM slash_act WHERE id = ?', id);
     if (row === undefined || row.person !== who(ctx)) return no('REF_UNKNOWN', 'There is nothing waiting under that name. It may have been answered already.', { at: 'id' });
     if (row.state !== 'open') return no('ALREADY_KNOWN', `You ${row.state === 'accepted' ? 'said yes to' : 'turned down'} this already.`, { at: 'id' });
     if (!accept) {
@@ -1286,8 +1317,12 @@ export const chats = (core: Core): Chat => {
       sql.exec("UPDATE slash_act SET state = 'open' WHERE id = ?", id);
       return no(codeOf(applied) || 'INTERNAL', fixOf(applied) || 'That could not be done.');
     }
-    sql.exec('UPDATE slash_act SET receipt = ?, undo = ? WHERE id = ?', applied.value.receipt, applied.value.undo?.batch ?? null, id);
-    return ok({ ok: true, receipt: applied.value.receipt, ...(applied.value.undo === undefined ? {} : { undo: applied.value.undo }) });
+    /* WHAT WENT TO AN AGENT IS KEPT WITH THE WRITE IT WAS, so the thread read back can follow it, and the other cards of the
+       choice are answered: it went to this one. */
+    const sentTo = applied.value.sent;
+    sql.exec('UPDATE slash_act SET receipt = ?, undo = ?, op = ? WHERE id = ?', applied.value.receipt, applied.value.undo?.batch ?? null, JSON.stringify(sentTo === undefined ? op : { ...op, sent: sentTo }), id);
+    if (typeof op['group'] === 'string') sql.exec("UPDATE slash_act SET state = 'declined' WHERE thread = ? AND person = ? AND id != ? AND state = 'open' AND json_extract(op, '$.group') = ?", row.thread, row.person, id, op['group']);
+    return ok({ ok: true, receipt: applied.value.receipt, ...(applied.value.undo === undefined ? {} : { undo: applied.value.undo }), ...(sentTo === undefined ? {} : { sent: sentTo }) });
   };
 
   /** Whether a row still marked as being written has gone too long with nothing written to it (`ANSWER_QUIET_MS`). */
@@ -1301,7 +1336,7 @@ export const chats = (core: Core): Chat => {
     if (!theirs(id, ctx)) return no('REF_UNKNOWN', NO_CONVERSATION, { at: 'id' });
     const held = new Map(
       sql
-        .all<{ id: string; state: string; receipt: string | null; undo: string | null }>('SELECT id, state, receipt, undo FROM slash_act WHERE thread = ?', id)
+        .all<{ id: string; state: string; receipt: string | null; undo: string | null; op: string }>('SELECT id, state, receipt, undo, op FROM slash_act WHERE thread = ?', id)
         .map((a) => [a.id, a] as const),
     );
     const turns = sql.all<{ role: 'you' | 'slash'; text: string; actions: string; ts: string }>('SELECT role, text, actions, ts FROM slash_turn WHERE thread = ? ORDER BY n', id).map((t) => {
@@ -1320,7 +1355,14 @@ export const chats = (core: Core): Chat => {
           const h = held.get(a.id);
           if (h === undefined) return a;
           const state = h.state === 'accepted' ? 'accepted' : h.state === 'declined' ? 'declined' : 'open';
-          return { ...a, state, ...(h.undo === null ? {} : { undo: { batch: h.undo } }), ...(h.receipt === null ? {} : { detail: h.receipt }) } as ChatAction;
+          let sentTo: ChatSent | undefined;
+          try {
+            const op: unknown = JSON.parse(h.op);
+            if (isRecord(op) && isRecord(op['sent'])) sentTo = op['sent'] as ChatSent;
+          } catch {
+            sentTo = undefined;
+          }
+          return { ...a, state, ...(h.undo === null ? {} : { undo: { batch: h.undo } }), ...(h.receipt === null ? {} : { detail: h.receipt }), ...(sentTo === undefined ? {} : { sent: sentTo }) } as ChatAction;
         }),
       };
     });

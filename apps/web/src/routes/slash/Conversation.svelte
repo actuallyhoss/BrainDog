@@ -29,6 +29,7 @@
   import Said from './Said.svelte';
   import Spoken from '$lib/mention/Spoken.svelte';
   import type { SentMention } from '$lib/mention/mention.ts';
+  import SentLine from '$lib/palette/SentLine.svelte';
   import { actionSaid, iconOfRef } from './with.ts';
 
   let {
@@ -62,7 +63,7 @@
     const t = convo.turns.at(-1);
     return t?.role === 'slash' ? t : undefined;
   });
-  const pending = $derived(last?.actions.findLast((a) => a.kind === 'ask' && a.state === 'open') ?? null);
+  const pending = $derived(last?.actions.findLast((a) => a.kind === 'ask' && a.state === 'open' && a.group === undefined) ?? null);
   let Card = $state<typeof DecisionCardType | null>(null);
   let card = $state<ReturnType<typeof DecisionCardType> | null>(null);
   const legacyCard = $derived(!pending && last?.legacy?.card && !last.streaming ? last.legacy.card : null);
@@ -210,6 +211,7 @@
               {/if}
               {#if a.kind === 'ask' && a.state === 'open' && a.detail && a.detail !== a.title}<p class="act-why" dir="auto">{why(a.detail)}</p>{/if}
               {#if a.note}<p class="act-note" role="status">{a.note}</p>{/if}
+              {#if a.sent}<SentLine sent={a.sent} {base} />{/if}
               {#if (a.kind === 'ask' && (a.state === 'open' || (a.state === 'busy' && !a.receipt))) || undoable(a)}
                 <div class="act-do">
                   {#if a.kind === 'ask' && (a.state === 'open' || (a.state === 'busy' && !a.receipt))}

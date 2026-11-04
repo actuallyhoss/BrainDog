@@ -13,7 +13,15 @@
 import type { LiveAction, LiveTurn } from '$lib/palette/thread.svelte.ts';
 import type { SentMention } from '$lib/mention/mention.ts';
 import { chatWords, figuresOf } from '$lib/palette/slash-chat.ts';
+import { machineSaid } from '$lib/record/machine-name.ts';
 import { nameOfFields, rowOfRef } from './with.ts';
+
+const RUN_AGENT: Readonly<Record<string, string>> = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor', gemini: 'Gemini', copilot: 'Copilot', windsurf: 'Windsurf' };
+const runName = (f: Record<string, unknown>): string => {
+  const who = RUN_AGENT[str(f.agent) ?? ''] ?? 'An agent';
+  const host = str(f.host);
+  return host ? `${who} on ${machineSaid(host)}` : who;
+};
 
 const REFS = /\{\{ref:([a-z][a-z0-9_]*#[1-9][0-9]*)\}\}/gu;
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -36,7 +44,9 @@ export async function namesOf(base: string, refs: readonly string[], most = 24, 
       if (!row) return;
       try {
         const got = await client.get(row.register, row.seq);
-        const name = got.ok && isObj(got.value) ? nameOfFields(isObj(got.value.fields) ? got.value.fields : null) : null;
+        const fields = got.ok && isObj(got.value) && isObj(got.value.fields) ? got.value.fields : null;
+        /* A RUN'S LINK SAYS WHO IT IS, as it did when the answer was first drawn: its agent and its computer. */
+        const name = row.register === 'session' && fields ? runName(fields) : nameOfFields(fields);
         if (name) {
           out.set(ref, name);
           known?.set(ref, name);
@@ -70,7 +80,7 @@ function actionOf(a: unknown): LiveAction | null {
   if (!id || !title || (a.kind !== 'done' && a.kind !== 'ask')) return null;
   const batch = isObj(a.undo) ? str(a.undo.batch) : undefined;
   const detail = str(a.detail);
-  const base = { id, kind: a.kind, title, ...(detail ? { detail } : {}), ...(batch ? { undo: { batch } } : {}), ...(str(a.href) ? { href: a.href as string } : {}) } as const;
+  const base = { id, kind: a.kind, title, ...(detail ? { detail } : {}), ...(batch ? { undo: { batch } } : {}), ...(str(a.href) ? { href: a.href as string } : {}), ...(isObj(a.sent) && str(a.sent.id) ? { sent: a.sent as LiveAction['sent'] } : {}), ...(str(a.group) ? { group: a.group as string } : {}) } as LiveAction;
   if (a.kind === 'done') return { ...base, state: 'done', receipt: detail ?? title };
   if (a.state === 'accepted') return { ...base, state: 'done', receipt: detail ?? title };
   if (a.state === 'declined') return { ...base, state: 'dismissed' };

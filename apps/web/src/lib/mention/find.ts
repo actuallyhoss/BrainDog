@@ -12,6 +12,8 @@ export type Offer = { ref: string; label: string; list: string; icon: string; to
 
 /** The most rows the list holds. */
 export const OFFERS_MOST = 8;
+/** The most runs among them: an @ is for rows too. */
+const RUNS_MOST = 3;
 
 /** ONE READER A RECORD, whichever field asks, so what one read is kept for the other. */
 let reading: { base: string; r: Promise<Reader> } | null = null;
@@ -30,6 +32,23 @@ export async function readLately(base: string, lists: readonly { id: string; nam
   lately.set(base, out);
   return tell(out);
 }
+
+/** The runs an @ can name: those there now, whose letters match, as `run:S12`, what Slash and an agent both read. */
+export function runOffers(rows: readonly { run: string; who: string; project: string | null; doing: string | null }[], letters: string): Offer[] {
+  const words = letters.toLocaleLowerCase().split(/\s+/u).filter((w) => w !== '');
+  const has = (hay: string, w: string): boolean => hay.split(/[^\p{L}\p{N}]+/u).some((h) => h.startsWith(w));
+  /* TWO ON ONE PROJECT READ THE SAME, so each says what it is on. */
+  return rows
+    .filter((r) => {
+      const hay = `${r.who} ${r.project ?? ''} ${r.doing ?? ''} ${r.run}`.toLocaleLowerCase();
+      return words.every((w) => has(hay, w) || w === 'agent' || w === 'run');
+    })
+    .slice(0, RUNS_MOST)
+    .map((r) => ({ ref: `run:${r.run}`, label: `${r.who}${r.project ? ` on ${r.project}` : ''}`, list: 'Running now', icon: 'agent', ...(r.doing ? { told: r.doing } : {}) }));
+}
+
+/** Rows of runs at the head of what an @ offers, with room left for what the record has. */
+export const withRuns = (runs: readonly Offer[], rows: readonly Offer[]): Offer[] => [...runs, ...rows].slice(0, OFFERS_MOST);
 
 /** ROWS OF ONE NAME ARE TOLD APART, by their day and amount where they have them, else by their number. */
 export function tell(rows: readonly (Offer & { hit?: SearchHit })[]): Offer[] {

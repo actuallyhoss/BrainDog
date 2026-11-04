@@ -27,7 +27,14 @@ export type ChatAction = {
   detail?: string;
   undo?: { batch: string };
   href?: string;
+  /** A message that went to an agent, to follow in the thread (`SentLine.svelte`). */
+  sent?: ChatSent;
+  /** Cards of one choice: one is taken, and Enter takes none, since which one is the question. */
+  group?: string;
 };
+
+/** A message that went to an agent: the instruction, who it went to, its words, and the run where it went to one. */
+export type ChatSent = { id: string; to: string; said?: string; run?: string };
 
 export type Spent = { asks: number; left: number | null };
 
@@ -178,6 +185,8 @@ function actionOf(v: Record<string, unknown>): ChatAction | null {
     ...(str(v.detail) ? { detail: v.detail as string } : {}),
     ...(batch ? { undo: { batch } } : {}),
     ...(str(v.href) ? { href: v.href as string } : {}),
+    ...(isObj(v.sent) && str(v.sent.id) && str(v.sent.to) ? { sent: v.sent as ChatSent } : {}),
+    ...(str(v.group) ? { group: v.group as string } : {}),
   };
 }
 
@@ -273,13 +282,14 @@ export async function chat(
 }
 
 /** Accept or dismiss one action Slash asked about. The receipt is the record's sentence for what it did. */
-export async function act(base: string, id: string, accept: boolean): Promise<{ ok: true; receipt?: string; undo?: { batch: string } } | { ok: false; text: string }> {
+export async function act(base: string, id: string, accept: boolean): Promise<{ ok: true; receipt?: string; undo?: { batch: string }; sent?: ChatSent } | { ok: false; text: string }> {
   try {
     const res = await fetch(`${base}/api/slash/act`, { method: 'POST', headers: json, body: JSON.stringify({ id, accept }) });
     const body: unknown = await res.json().catch(() => null);
     if (!res.ok || !isObj(body) || body.ok === false) return { ok: false, text: fixIn(body)?.text ?? chatWords.refused };
     const batch = isObj(body.undo) ? str(body.undo.batch) : undefined;
-    return { ok: true, ...(str(body.receipt) ? { receipt: body.receipt as string } : {}), ...(batch ? { undo: { batch } } : {}) };
+    const sent = isObj(body.sent) && str(body.sent.id) ? (body.sent as ChatSent) : undefined;
+    return { ok: true, ...(str(body.receipt) ? { receipt: body.receipt as string } : {}), ...(batch ? { undo: { batch } } : {}), ...(sent ? { sent } : {}) };
   } catch {
     return { ok: false, text: chatWords.unreached };
   }

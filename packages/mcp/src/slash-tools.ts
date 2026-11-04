@@ -19,6 +19,7 @@ import { codeOf, fixOf, type Result, type Sql } from '@braindog/ports';
 import { kindsOfWrite, madeByIn, shapeIn, type Floor, type ListShape } from '@braindog/kernel';
 
 import { tools as agentTools, type McpSurface } from './index.ts';
+import { AGENT_TOOLS, agentReads, type AgentSurface, type DirectWith, type SentReceipt } from './slash-agents.ts';
 
 type Args = Record<string, unknown>;
 type Answer<T = unknown> = Promise<Result<T>>;
@@ -27,12 +28,14 @@ type Answer<T = unknown> = Promise<Result<T>>;
 export type SlashTool = { name: string; args: string; about: string; writes?: boolean };
 
 /** What a write did, or would do on a yes, as the engine shows it. `op` is the write itself, kept and never shown. */
-export type SlashToolAction = { kind: 'done' | 'ask'; title: string; detail?: string; undo?: { batch: string }; href?: string; op?: Args };
+export type SlashToolAction = { kind: 'done' | 'ask'; title: string; detail?: string; undo?: { batch: string }; href?: string; op?: Args; sent?: SentReceipt; group?: string };
 
 export type SlashToolRan = {
   text: string;
   outside?: string | null;
   action?: SlashToolAction;
+  /** Several held at once: a choice of who takes a message, each its own card. */
+  actions?: SlashToolAction[];
   navigate?: { href: string; label: string };
   step?: string;
 };
@@ -43,7 +46,9 @@ export type SlashToolRun = { askOnly: boolean; asked: boolean; said: string; out
 export type SlashChatTools = {
   list: readonly SlashTool[];
   call(name: string, args: Args, run: SlashToolRun): Promise<SlashToolRan>;
-  apply(op: Args): Promise<Result<{ receipt: string; undo?: { batch: string }; href?: string }>>;
+  apply(op: Args): Promise<Result<{ receipt: string; undo?: { batch: string }; href?: string; sent?: SentReceipt }>>;
+  /** A sentence plainly about the agents, answered from the record with no model, or `null` for the model to read (`agentsDirect`). */
+  direct(message: string, sent: DirectWith): Promise<SlashToolRan | null>;
   ref(id: string): Promise<{ ref: string; label: string } | null>;
   /** Up to three short lines of what matters now, for an empty palette: no model is asked. */
   now(): Promise<{ text: string; href?: string }[]>;
@@ -66,9 +71,11 @@ export const SENT_REF = /^(?:[a-z][a-z0-9_]*#[1-9][0-9]*|(?:decide|run|sign):[A-
 const MONEY_WORDS = /\b(spen[dt]|spending|cash|runway|money|owed?|owes|owing|paid|cost|costs|income|earn\w*|revenue|budget\w*|balance|afford|burn|profit|receivables?|payables?)\b|[£$€]/iu;
 const LATE_WORDS = /\b(late|overdue|due|today|this week|urgent|behind|missed)\b/iu;
 const WAIT_WORDS = /\b(wait\w*|decide|decisions?|approve|on my plate)\b/iu;
+const AGENT_WORDS = /\b(agents?|sessions?|who(?:'s| is) (?:working|running|on)|any(?:one|body)\b[^?]*\b(?:busy|working|on)|stuck|at work)\b/iu;
+const SINCE_WORDS = /\b(?:since|changed?)\b.*\b(this morning|today|yesterday|last night|this week|last week|\d+\s*(?:hours?|h|days?|d)(?:\s+ago)?)\b/iu;
 /* A MESSAGE THAT ASKS FOR SOMETHING DONE, by its first word: "add", "mark", "draft", "take me". */
 const DOING_WORDS =
-  /^\s*(?:please\s+)?(add|create|make|put|log|record|note|remind|schedule|set|change|update|edit|rename|move|mark|close|finish|complete|assign|draft|write|build|start|open|go|take me|show me|file|book|save)\b/iu;
+  /^\s*(?:please\s+)?(add|create|make|put|log|record|note|remind|schedule|set|change|update|edit|rename|move|mark|close|finish|complete|assign|draft|write|build|start|open|go|take me|show me|file|book|save|tell|ask|message|ping|send)\b/iu;
 const WHO = /\bwho(?:'s| is| was)\s+([A-Z][\p{L}'.-]+(?:\s+[A-Z][\p{L}'.-]+)*)/u;
 
 /**
@@ -79,6 +86,9 @@ const WHO = /\bwho(?:'s| is| was)\s+([A-Z][\p{L}'.-]+(?:\s+[A-Z][\p{L}'.-]+)*)/u
 export function slashPrefetch(message: string): { tool: string; args: Args }[] {
   if (DOING_WORDS.test(message)) return [];
   const out: { tool: string; args: Args }[] = [];
+  if (AGENT_WORDS.test(message)) out.push({ tool: 'agents', args: {} });
+  const since = SINCE_WORDS.exec(message);
+  if (since) out.push({ tool: 'changes', args: { since: since[1]! } });
   const who = WHO.exec(message);
   if (who) out.push({ tool: 'search', args: { q: who[1]! } });
   if (MONEY_WORDS.test(message)) out.push({ tool: 'figures', args: { words: message } });
@@ -99,6 +109,8 @@ export type SlashToolDeps = {
   sql: Sql;
   /** The asker, as the record names a person: who a row another person made is another's to. */
   person: string | null;
+  /** The record's clock, which says who is running now. Left out, the wall clock. */
+  now?: () => number;
 };
 
 /* EACH LINE SAYS WHEN TO REACH FOR IT AND SHOWS ONE CALL, measured on the included model: told only what a tool is, it
@@ -111,9 +123,10 @@ const TOOLS: readonly SlashTool[] = [
   { name: 'open', args: 'id', about: 'One row whole, by its id (tasks#3) or its name; or one figure by its id (cash-now)' },
   { name: 'list', args: 'list, where?, limit?', about: 'Rows of one list, newest first. where filters by field ids: {"field":"state","is":"open"}, or several: {"all":[{"field":"state","is":"open"},{"field":"due","before":"today"}]}. Tests: is, not, in, gt, lt, before, after, contains' },
   { name: 'lists', args: 'list', about: "One list's fields: their ids and the values they take, for list's where, add and change" },
-  { name: 'changes', args: 'about?', about: 'What changed lately and who changed it. With about, a row\'s id or name: what changed on that row' },
+  { name: 'changes', args: 'about?, since?', about: 'What changed lately and who changed it. With about, a row\'s id or name: what changed on that row. With since: what changed since "this morning", "yesterday", "3 hours"' },
   { name: 'waiting', args: '', about: 'The questions waiting for their answer in Decide' },
   { name: 'pages', args: '', about: 'The pages of this BrainDog' },
+  ...AGENT_TOOLS,
   { name: 'add', args: 'list, fields', about: 'Add a row: the list id and its fields by field id, days as YYYY-MM-DD, money as a plain number (25.50). add("tasks", {"what":"Call the bank","due":"2026-11-02"})', writes: true },
   { name: 'change', args: 'id, fields', about: 'Change fields of one row by its id, money as a plain number (25.50): change("tasks#3", {"state":"done"})', writes: true },
   { name: 'person', args: 'name, email?, note?', about: 'Add a person they know', writes: true },
@@ -236,9 +249,13 @@ export function slashOutsideLists(sql: Sql): Set<string> {
  */
 export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolDeps): SlashChatTools {
   const agent = agentTools(surface);
+  const reach = agentReads(surface as unknown as AgentSurface<C>, ctx, deps.now);
   let outside: Set<string> | null = null;
   const outsideOf = (lists: readonly string[]): string | null => {
     outside ??= slashOutsideLists(deps.sql);
+    /* A RUN'S ROW OR AN INSTRUCTION'S IS WHAT AN AGENT WROTE, however it was reached: `agents` and `ran` mark it, and so do
+       search, open and list, which can reach the same words. */
+    if (lists.some((l) => l === 'session' || l === 'instructions')) return 'what an agent wrote';
     const hit = lists.find((l) => outside!.has(l));
     return hit === undefined ? null : `rows that arrived from outside BrainDog (${hit})`;
   };
@@ -378,6 +395,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
   const apply = async (op: Args): Promise<Result<{ receipt: string; undo?: { batch: string }; href?: string }>> => {
     const doing = text(op['do']);
     const note = typeof op['note'] === 'string' ? op['note'] : undefined;
+    if (doing === 'tell') return reach.sendNow(op);
     if (doing === 'add' || doing === 'change') {
       const register = text(op['list']);
       const out =
@@ -457,6 +475,46 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
     const named = titleOf(fields);
     const title = `Add ${named ? `“${named}” ` : 'a row '}to ${list.name}`;
     return { ...(await decided(title, { do: 'add', list: list.id, fields, note: noteOf(run.said) }, waitsFor(run, floor))), step: `Adding to ${list.name}` };
+  };
+
+  /* THE ACTIVITY'S OWN LAST LINES ARE CALLS OF A TOOL SLASH'S MODEL DOES NOT HAVE, written for an agent ("activity {...} has
+     them"), and the model read them out or tried them. What it needs is said in words. */
+  const plainActivity = (said: string): string =>
+    said
+      .split('\n')
+      .filter((l) => !/^More: activity\b/u.test(l))
+      .map((l) => l.replace(/^Left out: (.*?)\.\s+activity \{.*$/u, 'Agents also wrote to their own runs: $1. The agents tool says what they are doing.'))
+      .join('\n');
+
+  /** The edge of what a person means by "this morning" or "3 hours", in the record's day, or `null` for words it does not read. */
+  const edgeOf = async (said: string): Promise<{ at: number; words: string } | null> => {
+    const t = (deps.now ?? Date.now)();
+    const words = said.trim().toLowerCase();
+    const span = /^(\d+)\s*(hours?|h|days?|d)\b/u.exec(words);
+    if (span) return { at: t - Number(span[1]) * (span[2]!.startsWith('h') ? 3_600_000 : 86_400_000), words };
+    const boot = await surface.boot(ctx);
+    const named: unknown = boot.ok ? (boot.value as { zone?: unknown }).zone : undefined;
+    const zone = typeof named === 'string' && named !== '' ? named : 'UTC';
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(t));
+    const of = (k: string): number => Number(parts.find((p) => p.type === k)?.value ?? 0);
+    const dayStart = t - (of('hour') * 3_600_000 + of('minute') * 60_000 + of('second') * 1000);
+    if (words === 'this morning' || words === 'today') return { at: dayStart, words };
+    if (words === 'yesterday' || words === 'last night') return { at: dayStart - 86_400_000, words };
+    if (words === 'this week' || words === 'last week') return { at: dayStart - 7 * 86_400_000, words };
+    return null;
+  };
+
+  /** What changed since then: the record's own lines, and the runs heard from since, which the record's lines leave out. */
+  const changesSince = async (since: string): Promise<SlashToolRan> => {
+    const edge = await edgeOf(since);
+    const step = 'Reading what changed';
+    if (edge === null) return { text: plainActivity(await read('activity', { limit: 15 })), step };
+    const wide = await agent.answer('activity', { limit: 100 }, ctx);
+    const rows = wide.result.ok && isObject(wide.result.value) && Array.isArray(wide.result.value.rows) ? wide.result.value.rows.filter(isObject) : [];
+    const count = rows.filter((r) => typeof r['ts'] === 'string' && Date.parse(r['ts']) >= edge.at).length;
+    const said = count === 0 ? `Nothing changed in the record's own rows since ${edge.words}.` : plainActivity(await read('activity', { limit: count }));
+    const did = await reach.ranSince(edge.at);
+    return { text: did === '' ? said : `${said}\n${did}`, ...(did === '' ? {} : { outside: 'what agents wrote about their own work' }), step };
   };
 
   const call = async (name: string, args: Args, run: SlashToolRun): Promise<SlashToolRan> => {
@@ -539,8 +597,20 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
       }
       case 'waiting':
         return { text: await read('governance', { register: 'suggestion', status: 'open', limit: 15 }), step: 'Checking what waits on you' };
+      case 'agents':
+        return reach.agentsNow(text(args['about'] ?? args['project']));
+      case 'ran':
+        return reach.ran(text(args['about'] ?? args['project'] ?? args['run']));
+      case 'told':
+        return reach.told();
+      case 'tell':
+        return reach.sendFrom(text(args['to'] ?? args['target']), text(args['message'] ?? args['note']), run);
+      case 'handover':
+        return reach.handover(text(args['about'] ?? args['project']), text(args['note']), {});
       case 'changes': {
         const about = text(args['about'] ?? args['id']);
+        const since = text(args['since']);
+        if (about === '' && since !== '') return changesSince(since);
         if (about !== '') {
           /* ONE ROW'S OWN HISTORY, its changes after the row's own lines, and the record's recent lines that name it. */
           const row = await rowOf(about);
@@ -560,7 +630,7 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
             step: `Reading what changed on ${clip(named || about, 40)}`,
           };
         }
-        return { text: await read('activity', { limit: 15 }), step: 'Reading what changed' };
+        return { text: plainActivity(await read('activity', { limit: 15 })), step: 'Reading what changed' };
       }
       case 'pages': {
         const pages = await surface.pages(ctx);
@@ -663,7 +733,9 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
 
   const ref = async (id: string): Promise<{ ref: string; label: string } | null> => {
     const row = await rowOf(id);
-    return row === null || row.seq === null ? null : { ref: `${row.register}#${row.seq}`, label: titleOf(row.fields) };
+    if (row === null || row.seq === null) return null;
+    /* A RUN IS SAID AS WHO IT IS AND ON WHICH COMPUTER: its own id is never what a person calls it. */
+    return { ref: `${row.register}#${row.seq}`, label: row.register === 'session' ? reach.nameOfRun(row.fields) : titleOf(row.fields) };
   };
 
   /**
@@ -711,7 +783,8 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
     if (kind[1] === 'decide') return { text: await read('governance', { register: 'suggestion', id }), step: 'Reading the question in Decide' };
     if (kind[1] === 'run') {
       const spoken = /^[1-9][0-9]*$/u.test(id) ? `session#${id}` : id;
-      return { text: await read('get', { spoken }), step: 'Reading the run' };
+      /* WHAT A RUN WROTE IS AN AGENT'S WORDS, so a turn that reads one asks before it does anything. */
+      return { text: await read('get', { spoken }), outside: 'what an agent wrote', step: 'Reading the run' };
     }
     if (!surface.signs) return { text: 'This BrainDog does not read its vital signs here.' };
     const out = await surface.signs({}, ctx);
@@ -726,5 +799,5 @@ export function slashTools<C>(surface: SlashSurface<C>, ctx: C, deps: SlashToolD
     };
   };
 
-  return { list: TOOLS, call, apply, ref, now, context, prefetch: slashPrefetch, attached };
+  return { list: TOOLS, call, apply, ref, now, context, prefetch: slashPrefetch, attached, direct: reach.direct };
 }

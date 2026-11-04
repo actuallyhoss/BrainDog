@@ -23,7 +23,8 @@
   import { keptRead } from '../shell/side-read.ts';
   import type { SearchResult } from '../record/api.ts';
   import { ATTACH_MOST } from '../../routes/slash/with.ts';
-  import { lastLately, OFFERS_MOST, offersOf, readerFor, readLately, tell, type Offer } from './find.ts';
+  import { agentsNow, ordered, readAgents } from '../palette/agents-now.svelte.ts';
+  import { lastLately, OFFERS_MOST, offersOf, readerFor, readLately, runOffers, tell, withRuns, type Offer } from './find.ts';
   import MentionList from './MentionList.svelte';
   import { editOf, endingAt, foundAgain, labelOf, piecesOf, shifted, snapped, startingAt, stillThere, tokenOf, triggerAt, type Mention, type Trigger } from './mention.ts';
 
@@ -368,10 +369,14 @@
     const mine = ++asked;
     const base = apiBase();
     const lists = untrack(() => registers);
+    /* WHO IS RUNNING COMES FIRST WHERE THE LETTERS FIT, from what the panel read; a first @ reads it and draws again. */
+    const running = (): Offer[] => runOffers(untrack(() => ordered(agentsNow.rows, Date.now())), letters);
+    let lastRows: Offer[] = [];
     const show = (rows: Offer[]) => {
       if (mine !== asked) return;
+      lastRows = rows;
       const was = untrack(() => offers[cursor]?.ref);
-      offers = rows;
+      offers = withRuns(running(), rows);
       answered = true;
       stale = false;
       const again = rows.findIndex((o) => o.ref === was);
@@ -381,6 +386,9 @@
       namesAsked = true;
       void readerFor(base).then((r) => r.names());
     }
+    void readAgents(base).then(() => {
+      if (mine === asked && answered) show(lastRows);
+    });
     if (letters === '') {
       const kept = lastLately(base);
       if (kept) show(tell(kept));

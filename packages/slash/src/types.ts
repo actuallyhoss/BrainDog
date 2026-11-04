@@ -509,7 +509,13 @@ export type ChatAction = {
   undo?: { batch: string } | undefined;
   href?: string | undefined;
   state?: 'open' | 'accepted' | 'declined' | undefined;
+  /** A message that went to an agent: the instruction to read back, who it went to, and the run where it went to one. */
+  sent?: ChatSent | undefined;
+  /** Cards of one choice: only one of them is taken, and Enter takes none, since which one is the question. */
+  group?: string | undefined;
 };
+
+export type ChatSent = { id: string; to: string; said?: string | undefined; run?: string | undefined };
 
 /** The events of one turn, in the order they happen, one a line on the wire. */
 export type ChatEvent =
@@ -544,6 +550,8 @@ export type ChatRan = {
   text: string;
   outside?: string | null | undefined;
   action?: (Omit<ChatAction, 'id' | 'state'> & { op?: Record<string, unknown> | undefined }) | undefined;
+  /** Several held at once: a choice, each its own card. */
+  actions?: readonly (Omit<ChatAction, 'id' | 'state'> & { op?: Record<string, unknown> | undefined })[] | undefined;
   navigate?: { href: string; label: string } | undefined;
   figures?: readonly number[] | undefined;
   /** The words the step says while it runs, "Reading Money". */
@@ -560,7 +568,12 @@ export type ChatRun = { askOnly: boolean; asked: boolean; said: string; outside:
 export type ChatTools = {
   list: readonly ChatTool[];
   call(name: string, args: Record<string, unknown>, run: ChatRun): Promise<ChatRan>;
-  apply(op: Record<string, unknown>): Promise<Result<{ receipt: string; undo?: { batch: string } | undefined; href?: string | undefined }>>;
+  apply(op: Record<string, unknown>): Promise<Result<{ receipt: string; undo?: { batch: string } | undefined; href?: string | undefined; sent?: ChatSent | undefined }>>;
+  /**
+   * A sentence plainly about the agents, answered from the record with no model and no ask spent, or `null` for the model
+   * to read. Nothing an agent wrote reaches a model this way, and the first words wait only on the record.
+   */
+  direct?(message: string, sent: { attach?: readonly string[] | undefined; mentions?: readonly ChatMention[] | undefined; page?: { row?: string | undefined } | undefined }): Promise<ChatRan | null>;
   /** An id a result printed, as the `register#seq` a link is drawn from and the row's own name, or `null`. */
   ref?(id: string): Promise<{ ref: string; label: string } | null>;
   /** The lists the asker may read, named with their ids and counts in one line, which the model is shown before it calls anything. */

@@ -45,7 +45,7 @@ export function rowOfRef(ref: string): { register: string; seq: number } | null 
 }
 
 /** The field a row is called by, the first of these it holds as words. */
-const NAMES = ['name', 'title', 'what', 'subject', 'label', 'summary', 'question', 'text', 'note'] as const;
+const NAMES = ['name', 'title', 'what', 'subject', 'label', 'summary', 'question', 'text', 'doing', 'note'] as const;
 
 /** A row's name, from its fields, or `null` when none of them is words. */
 export function nameOfFields(fields: Readonly<Record<string, unknown>> | null | undefined): string | null {

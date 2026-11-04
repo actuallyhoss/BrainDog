@@ -113,6 +113,7 @@
   import { draftOf, keepDraft, kept as talks, matching } from './conversations.svelte.ts';
   import { threadsKey } from './slash-chat.ts';
   import MentionField from '../mention/MentionField.svelte';
+  import AgentsNow from './AgentsNow.svelte';
   import { factsOf } from '../record/told-apart.ts';
   import { sentOf, type Mention, type SentMention } from '../mention/mention.ts';
   import { sendWords, targets as readTargets, type Target } from '../send/send.ts';
@@ -363,9 +364,10 @@
     convo.turns.push({
       role: 'slash',
       steps: [],
-      text: out.ok ? sendWords.sentInPalette(out.label) : '',
+      /* WHAT WENT TO AN AGENT IS FOLLOWED HERE (`SentLine`): whether it arrived, what it is at, what came back. */
+      text: out.ok ? (out.convo.id === null ? sendWords.sentInPalette(out.label) : '') : '',
       figures: {},
-      actions: [],
+      actions: out.ok && out.convo.id !== null ? [{ id: out.convo.id, kind: 'done', title: sendWords.sentTo(out.label), state: 'done', sent: { id: out.convo.id, to: out.label, said } }] : [],
       go: out.ok && row ? [{ href: `/r/${row.replace('#', '/')}`, label: sendWords.open }] : [],
       error: out.ok ? null : out.text,
       spent: false,
@@ -2164,6 +2166,7 @@
     </div>
   {:else}
   <div class="p-body">
+    {#if q.trim() === '' && isLive}<div class="p-agents"><AgentsNow base={apiBase()} onleave={() => (open = false)} /></div>{/if}
     <!-- WAITING HAS A SHAPE, NOT A WORD (slash1104): what was kept is drawn at once, and only when nothing kept answers
          does the place of the first rows show, as rows, after 150 ms. The word is for a screen reader alone. -->
     {#if pending}<span class="p-sr" role="status">{copy.looking}</span>{/if}
