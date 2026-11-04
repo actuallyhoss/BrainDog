@@ -34,7 +34,7 @@ BrainDog is open source. Use it hosted at [brain.dog](https://brain.dog), or run
 - **Attachments.** Put PDFs, pictures, documents and HTML pages on a project or a task. Agents read them.
 - **Team.** Invite people with one of five roles: Owner, Can decide, Can edit, Can add or Can view. Their agents get
   the same access, no more. Share one page with a read-only link, with or without money.
-- **Slash.** Press ⌘J (Ctrl J on Windows) and ask BrainDog in plain words. It answers from your own numbers, and a
+- **Slash.** Press `/` or ⌘J (Ctrl J on Windows) and ask BrainDog in plain words. It answers from your own numbers, and a
   change it makes comes with an undo.
 - **Plugins.** Everything else, from bank feeds to a landlord's rent book. See [Plugins](#plugins-and-starters).
 
