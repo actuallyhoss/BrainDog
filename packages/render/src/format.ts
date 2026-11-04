@@ -391,8 +391,8 @@ export function totalSaid(text: string): string {
 /**
  * A FIGURE STANDING ON ITS OWN, AS A HEADLINE SAYS IT: `GBP 33,850.00` is `£33,850`, `EGP 412,300.00` is `EGP 412,300`.
  *
- * A headline is read at a glance, so `.00` under it is width that says nothing a round figure does not; a fraction that
- * is not all zeros is part of the amount and stays (`£33,850.50`). ONE MARK OF CURRENCY, NEVER TWO: a figure written
+ * A headline is read at a glance, so `.00` under it is width that says nothing a round figure does not; and it is said as
+ * a total (`totalSaid`), whole from a thousand up, to the cent under it (`£999.50`). ONE MARK OF CURRENCY, NEVER TWO: a figure written
  * with a symbol and its code after it, `$4,800.00 USD` or `E£43,700.00 EGP`, is said by the code it names, as the
  * unambiguous symbol where there is one (`US$4,800`) and as the code in front where there is not (`EGP 43,700`).
  *
@@ -403,17 +403,26 @@ export function totalSaid(text: string): string {
 export function headlineFigure(text: string, home?: Home): string {
   return text
     .split(/(\s·\s)/u)
-    .map((part, i) => (i % 2 === 1 ? part : totalSaid(writtenOnce(part, home, 'read')?.text ?? headlineOne(part))))
+    .map((part, i) => {
+      if (i % 2 === 1) return part;
+      /* ONLY MONEY IS SAID AS A TOTAL. Run over whatever came back, `Q3 −1,299.00` lost its pence and a bare `1,200.50`,
+         which names no currency and may be a weight or a score, was rounded, against the sentence above. */
+      const w = writtenOnce(part, home, 'read');
+      if (w) return totalSaid(w.text);
+      const one = headlineOne(part);
+      return one === null ? part : totalSaid(one);
+    })
     .join('');
 }
 
-function headlineOne(text: string): string {
+/** One amount as a headline says it, or `null` when the text is not one figure that names a currency. */
+function headlineOne(text: string): string | null {
   const p = figureParts(text);
-  if (!p) return text;
+  if (!p) return null;
   const coded = /^[A-Z]{3}[ \u00a0]$/u.test(p.unit) ? p.unit.trim() : '';
   const code = p.code.trim() || coded;
   /* A FIGURE WITH NO CURRENCY IN IT IS NOT ONE THIS FUNCTION SAYS. */
-  if (code === '' && p.unit === '') return text;
+  if (code === '' && p.unit === '') return null;
   const body = `${grouped(p.whole)}${/^0*$/u.test(p.minor) ? '' : `.${p.minor}`}`;
   if (code === '') return `${p.sign}${p.unit}${p.inner}${body}`;
   const plus = p.sign === '+' ? '+' : '';
