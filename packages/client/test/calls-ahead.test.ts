@@ -1,8 +1,8 @@
 /**
  * A call asked ahead of the screen that draws it (`ClientOptions.ahead`) is out like any other and told apart
  * (`onCallsOut`'s second count), so the app's rest can leave it out while its quiet mark waits for it (speed-f SF1). A
- * wave is asked ahead only when every read in it was, and only once it is sent: a read that joins a wave still filling
- * makes the request the screen's.
+ * client asked ahead fills a wave of its own (speed-g SG1), counted only once it is sent, so a screen's read never holds
+ * it and it never holds the screen's.
  */
 
 import { test } from 'node:test';
@@ -54,7 +54,7 @@ test('A CALL ASKED AHEAD IS OUT AND TOLD APART; THE SCREEN\'S OWN IS NOT', async
   }
 });
 
-test('A WAVE IS ASKED AHEAD ONLY WHEN EVERY READ IN IT WAS', async () => {
+test('READS ASKED AHEAD GO AS ONE WAVE, AND A SCREEN\'S OWN READ FILLS ANOTHER', async () => {
   const c = counted();
   batchReads(true);
   try {
@@ -71,8 +71,9 @@ test('A WAVE IS ASKED AHEAD ONLY WHEN EVERY READ IN IT WAS', async () => {
     const ahead = createClient({ base: 'https://c.example', fetch: h.fetch, ahead: true });
     const own = createClient({ base: 'https://c.example', fetch: h.fetch });
     const mixed = Promise.all([ahead.presence(), own.instructionList({ limit: 5 })]);
-    await until(() => h.waiting() === 1);
-    assert.deepEqual(c.now(), [1, 0], "a wave carrying the screen's own read was counted as asked ahead");
+    /* TWO REQUESTS: joined, the asked-ahead answer waited for the screen's read and the whole request was the screen's. */
+    await until(() => h.waiting() === 2);
+    assert.deepEqual(c.now(), [2, 1], "the screen's own read and the one asked ahead were not told apart");
     h.open();
     await mixed;
     assert.deepEqual(c.now(), [0, 0]);
