@@ -102,7 +102,7 @@ function hostAt(url) {
     try {
       out = await res.json();
     } catch {
-      out = { ok: false, refusal: { code: 'UNREADABLE', fix: `${path} answered ${res.status} with no JSON` } };
+      out = { ok: false, refusal: { code: 'BODY_MALFORMED', fix: `${path} answered ${res.status} with no JSON` } };
     }
     return { status: res.status, out, cookie: res.headers.getSetCookie?.() ?? [] };
   };

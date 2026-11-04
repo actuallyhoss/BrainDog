@@ -192,7 +192,7 @@ export function methods(deps: RecordDeps) {
       const live = scriptOf(addon, script);
       if (live === null) return no('NOT_FOUND', `${held.title}'s script ${script} is not installed here any more. Reinstall the plugin.`, { at: 'addon' });
       if (sql.one<{ state: string }>("SELECT state FROM schedule WHERE kind = 'script' AND key = ?", script)?.state === 'paused')
-        return no('PAUSED', `${held.title}'s ${script} is paused, so nothing ran. Resume it on the Scripts page.`, { at: 'addon' });
+        return no('RUN_PAUSED', `${held.title}'s ${script} is paused, so nothing ran. Resume it on the Scripts page.`, { at: 'addon' });
       if (!deps.tryScript || !deps.scriptReadsAs || !deps.writeAs) return no('NOT_IN_THIS_BUILD', 'This BrainDog cannot start a plugin yet, so nothing ran.');
 
       const who = kernel.identity();
@@ -223,8 +223,8 @@ export function methods(deps: RecordDeps) {
         asker: String((p.kind === 'token' ? p.person : p.id) ?? ''),
       })) as Body;
 
-      if (isMap(ran.held)) return no('HELD', `${held.title}'s ${started} did not run: ${String(ran.held.say ?? 'this month’s runs are used up')}.`, { at: 'addon' });
-      if (isMap(ran.refused)) return no(String(ran.refused.code ?? 'SCRIPT_REFUSED'), `${held.title}'s ${started} stopped: ${String(ran.refused.why ?? '')}`, { at: 'addon' });
+      if (isMap(ran.held)) return no('RATE_LIMITED', `${held.title}'s ${started} did not run: ${String(ran.held.say ?? 'this month’s runs are used up')}.`, { at: 'addon' });
+      if (isMap(ran.refused)) return no(String(ran.refused.code ?? 'INTERNAL'), `${held.title}'s ${started} stopped: ${String(ran.refused.why ?? '')}`, { at: 'addon' });
       const writes = Array.isArray(ran.writes) ? ran.writes.filter(isMap) : [];
       if (!writesAllowed && writes.length > 0) return no('FORBIDDEN', `${held.title}'s ${started} asked to change rows, and it did not say it writes, so nothing was changed.`, { at: 'tool' });
 
