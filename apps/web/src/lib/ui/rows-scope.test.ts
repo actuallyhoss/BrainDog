@@ -34,6 +34,8 @@ const TODAY = new Set([
   'r/[register]/parts/ListPeople.svelte',
   /* THE ORGANISATIONS LIST (29 October) draws its rows as People does, the global tall line on purpose. */
   'r/[register]/parts/ListOrgs.svelte',
+  /* THE LIST OF AGENT RUNS (4360c5ae6) is `rows.css`'s ledger on purpose too, as its own comment says. */
+  'r/[register]/parts/ListRuns.svelte',
   'search/+page.svelte',
   'settings/[area]/areas/Appearance.svelte',
   'settings/[area]/areas/Backups.svelte',

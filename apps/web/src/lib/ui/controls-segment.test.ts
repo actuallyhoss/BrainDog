@@ -26,19 +26,24 @@ test('the chosen segment is raised, in the ink at 600, on every track', () => {
   assert.match(plain.body, /font-weight:\s*var\(--fw-semi\)/u);
 });
 
-test('the track is the well, a segment sits at radius 4 inside it, and the others are the second ink', () => {
+/* THE OPS STYLE (16c348089, ops-look SPEC 3.2): the track and every segment are capsules, the track on the soft fill. */
+test('the track is the well, a segment is a capsule inside it, and the others are the second ink', () => {
   const track = rules.find((r) => r.selector === '.segmented');
-  assert.match(track?.body ?? '', /background:\s*var\(--tile-2\)/u);
-  assert.match(track?.body ?? '', /border-radius:\s*var\(--r-ctl\)/u);
+  assert.match(track?.body ?? '', /background:\s*var\(--soft-fill\)/u);
+  assert.match(track?.body ?? '', /border-radius:\s*var\(--r-pill\)/u);
   const segment = rules.find((r) => r.selector === '.segment');
-  assert.match(segment?.body ?? '', /border-radius:\s*var\(--r-xs\)/u);
+  assert.match(segment?.body ?? '', /border-radius:\s*var\(--r-pill\)/u);
   assert.match(segment?.body ?? '', /color:\s*var\(--ink-2\)/u);
   assert.match(segment?.body ?? '', /font-size:\s*var\(--fs-ctl\)/u);
 });
 
-test('no rule draws a hairline or a shadow on a segment', () => {
-  for (const r of rules.filter((x) => /\.segment/u.test(x.selector)))
-    assert.doesNotMatch(r.body, /box-shadow/u, `${r.selector} casts or rings a segment`);
+/* SPEC 3.3: `--shadow-raised` is the segmented thumb's. What is chosen is raised by that tier, and nothing else casts. */
+test('only what is chosen is raised, by the tier, and no other rule draws a hairline or a shadow on a segment', () => {
+  const raises = new Set(['.segment[data-on]', '.segmented[data-thumb]::before']);
+  for (const r of rules.filter((x) => /\.segment/u.test(x.selector))) {
+    if (raises.has(r.selector)) assert.match(r.body, /box-shadow:\s*var\(--shadow-raised\), inset 0 0 0 0\.5px var\(--g-sel-line\);/u, `${r.selector} is not the raised tier`);
+    else assert.doesNotMatch(r.body, /box-shadow:(?!\s*none)/u, `${r.selector} casts or rings a segment`);
+  }
 });
 
 test('the thumb is the selection, and no rule is left for a second chosen one', () => {

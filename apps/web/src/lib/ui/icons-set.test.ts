@@ -144,7 +144,7 @@ test('a core glyph the app never drew resolves, and draws at mount without waiti
 test('the rail places resolve by their own names', () => {
   for (const name of ['today', 'work', 'projects', 'money', 'activity', 'decide', 'settings', 'search', 'slash', 'plus'])
     assert.equal(iconFor(name, 'doc'), name);
-  assert.equal(Object.keys(PATHS).length, 69);
+  assert.equal(Object.keys(PATHS).length, 70, 'the sidebar\'s pin (5e5c85667)');
 });
 
 test('the people glyphs Settings leads with draw at mount, in the app\'s hand, without waiting on the set', () => {
@@ -177,8 +177,8 @@ test('every glyph in the set is a name the check accepts, so the list the app ca
   const set = await loadSet();
   const refused = Object.keys(set).filter((name) => iconFor(name, 'doc') !== name);
   assert.deepEqual(refused, []);
-  /* 187 since `mail` moved into the core, for the Inbox's own glyph (frame F15). */
-  assert.equal(Object.keys(set).length, 187);
+  /* 186 since `pin` moved into the core (7a8d2b0ac), as `mail` did for the Inbox's own glyph (frame F15). */
+  assert.equal(Object.keys(set).length, 186);
 });
 
 test('IconWell is a span.well holding the icon, its tone on the well', () => {

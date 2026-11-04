@@ -273,19 +273,26 @@ test('NO OVERLAY OR CHROME WRITES A DURATION OR A CURVE OF ITS OWN', () => {
     const text = readFileSync(new URL(file, import.meta.url), 'utf8');
     const style = file.endsWith('.css') ? text : (text.match(/<style>([\s\S]*)<\/style>/u)?.[1] ?? '');
     const code = style.replace(/\/\*[\s\S]*?\*\//gu, '');
-    assert.doesNotMatch(code, /\b\d+(\.\d+)?m?s\b/u, `${file} writes a duration of its own`);
+    /* A ZERO IS NO DURATION: `PageHead` clears a delay with `0s` (e183b9630), a step the scale has nothing to say about. */
+    assert.doesNotMatch(code, /\b(?!0m?s\b)\d+(\.\d+)?m?s\b/u, `${file} writes a duration of its own`);
     assert.doesNotMatch(code, /cubic-bezier\(|linear\(/u, `${file} writes a curve of its own`);
   }
 });
 
 /**
- * AND NO OVERLAY OR CHROME BLURS WHAT IS BEHIND IT (SPEC 1.9): the glass is gone, in both spellings, and a floating layer
- * is the opaque tile with a 1px edge. `lib/no-glass.test.ts` holds the whole app to it; this names the overlays.
+ * GLASS ONLY ON FLOATING CHROME, THROUGH THE FILMS (04d4cf6d4, ops-look SPEC 1 rule 1): the toast, the sidebar card, the
+ * phone bar and the glass controls wear `--glass-filter` or `--g-bf`, which reduced transparency takes off. The panel,
+ * the frame and the controls' sheet draw none. `frame-gates.test.ts` holds the whole app to it; this names the overlays.
  */
-test('no overlay or chrome blurs what is behind it', () => {
-  const files = ['Panel.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', '../shell/TabBar.svelte', '../shell/SideBar.svelte', '../shell/AppFrame.svelte'];
-  for (const file of files) {
+test('no overlay or chrome blurs what is behind it but through the films, and the solid ones not at all', () => {
+  for (const file of ['Panel.svelte', 'controls.css', '../shell/AppFrame.svelte']) {
     const code = readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
-    assert.doesNotMatch(code, /backdrop-filter|--glass/u, `${file} still blurs or names the glass`);
+    assert.doesNotMatch(code, /backdrop-filter|--glass/u, `${file} blurs or names the glass`);
+  }
+  for (const file of ['Toasts.svelte', 'Button.svelte', 'PageHead.svelte', '../shell/TabBar.svelte', '../shell/SideBar.svelte']) {
+    const code = readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
+    const films = [...code.matchAll(/backdrop-filter:\s*([^;]+);/gu)].map((m) => m[1]!.trim());
+    assert.ok(films.length > 0, `${file} is read as glass and holds none, so this checks nothing`);
+    for (const film of films) assert.match(film, /^(?:none|var\(--(?:glass-filter|g-bf)\))$/u, `${file} writes a blur of its own`);
   }
 });

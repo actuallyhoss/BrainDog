@@ -177,14 +177,25 @@ test('and of two offers it is the newest, because undo is a stack', (t) => {
   const reg = register();
   reg.archive('alpha');
   reg.archive('beta');
+  /* ONE ACTION, ONE TOAST (4fccd4e19, AO13): a toast that offers an Undo takes the place of the one before it. */
   toasts.push('Archived obligations#1', { undo: () => reg.restore('alpha') });
   toasts.push('Archived obligations#2', { undo: () => reg.restore('beta') });
+  assert.equal(toasts.items.length, 1, 'two Undo buttons stacked, and which took back what was not clear');
 
   toasts.undoLast();
   assert.deepEqual(reg.archived, ['alpha'], 'the older archive was undone first, so the thing just done is still done');
 
   toasts.undoLast();
-  assert.deepEqual(reg.archived, [], 'the second press did not reach the offer underneath the one it just spent');
+  assert.deepEqual(reg.archived, ['alpha'], 'a second press reached an offer that had been taken off the screen');
+
+  /* AN UNDO KEPT OFF THE BUTTON (`offer: false`, "Put back" on the row) STILL STACKS: each press the newest. */
+  toasts.push('Archived obligations#1', { undo: () => reg.restore('alpha'), offer: false });
+  reg.archive('beta');
+  toasts.push('Archived obligations#2', { undo: () => reg.restore('beta'), offer: false });
+  toasts.undoLast();
+  assert.deepEqual(reg.archived, ['alpha'], 'the older was undone first');
+  toasts.undoLast();
+  assert.deepEqual(reg.archived, [], 'the second press did not reach the one underneath');
 });
 
 /* ── 4. the window closing ───────────────────────────────────────────────── */
@@ -278,12 +289,13 @@ test('AN EVICTED TOAST TAKES ITS COUNTDOWN WITH IT, rather than expiring later o
   /* The pushes are spread over the clock so that the first toast's window closes on its own, a clear
      second before the windows of the toasts that pushed it off the end. Pushed together they would
      all expire in the same tick and the evicted one's countdown would be indistinguishable. */
-  toasts.push('Archived obligations#1', { undo: () => {} });
+  /* WORDS OFF THE BUTTON, since a toast that offers an Undo takes the place of the last one (4fccd4e19): these stack. */
+  toasts.push('Archived obligations#1', { undo: () => {}, offer: false, life: LIFE });
   t.mock.timers.tick(1_000);
-  const live = [2, 3, 4].map((n) => toasts.push(`Archived obligations#${n}`, { undo: () => {} }));
+  const live = [2, 3, 4].map((n) => toasts.push(`Archived obligations#${n}`, { undo: () => {}, offer: false, life: LIFE }));
   t.mock.timers.tick(1_000);
   /* The fifth is what puts the first over the cap. */
-  toasts.push('Archived obligations#5', { undo: () => {} });
+  toasts.push('Archived obligations#5', { undo: () => {}, offer: false, life: LIFE });
   assert.equal(toasts.items.length, 4);
 
   /**

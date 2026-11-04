@@ -44,7 +44,7 @@ test('a swap in place draws still, and is lifted once it has been drawn', async 
 
 test('the typed line is swapped in place only when the record has answered it', () => {
   const page = readFileSync(fileURLToPath(new URL('../../routes/r/[register]/+page.svelte', import.meta.url)), 'utf8');
-  assert.match(page, /const out = await writes\(\)\.create\(id, fields\);\n\s+\/\*[^]*?\*\/\n\s+if \(out\.ok && asked === was\) swapInPlace\(\);\n\s+unline\(\);/u);
+  assert.match(page, /const \{ out, made: madePerson \} = await orderWrite\(writes\(\), id, fields, person\);\n[^]*?\s+\/\*[^]*?\*\/\n\s+if \(out\.ok && asked === was\) swapInPlace\(\);\n\s+unline\(\);/u);
 });
 
 /* A PLACE'S FIRST DRAW, WHERE ONE STILL ARRIVES, IS IN ORDER AND STILL BY 450ms (fluid F6): six at most, 40ms apart. TODAY

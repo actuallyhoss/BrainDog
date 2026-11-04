@@ -38,6 +38,6 @@ test('an empty list of scheduled fetches says nothing feeds the record only when
   assert.match(ingest, /\{#each feeds as feed \(feed\.id\)\}/u, 'the feeds are not listed');
   /* A DOORS READ REFUSED, as a reader without ADMIN is, holds `null`, which is what the screen asks: nothing is known. */
   assert.equal(settle({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'no' } }).value, null);
-  /* AND EVERY OTHER WAY IN THE SCREEN LISTS (`wayRows`) IS SOMETHING THAT FEEDS IT too. */
-  assert.match(ingest, /<Actions project=\{null\} others=\{feeds\.length > 0 \|\| wayRows\.length > 0 \|\| !anOwner \|\| doors\.value === null\} \/>/u);
+  /* AND EVERY OTHER WAY IN THE SCREEN LISTS (`wayRows`) IS SOMETHING THAT FEEDS IT too, and until those are read (d7c351ebe) nothing is said. */
+  assert.match(ingest, /<Actions project=\{null\} others=\{!waysRead \|\| feeds\.length > 0 \|\| wayRows\.length > 0 \|\| !anOwner \|\| doors\.value === null\} \/>/u);
 });

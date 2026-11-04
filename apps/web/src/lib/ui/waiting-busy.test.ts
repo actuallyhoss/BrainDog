@@ -30,7 +30,9 @@ const ROOT = /^\s*<div\b[^>]*>/.exec(SKELETON)?.[0] ?? '';
 
 test('the skeleton is one block, and it is a status', () => {
   assert.match(MARKUP, /^\s*<div class="waiting"/);
-  assert.match(MARKUP, /<Skeleton kind="rows" count=\{rows\} label=\{copy\.waiting\} \/>/u);
+  assert.match(MARKUP, /<Skeleton kind="rows" count=\{count\} label=\{copy\.waiting\} \/>/u);
+  /* WHAT THE LAST WAIT KEPT, OR THE ASKED ROWS (769f08a51). */
+  assert.match(read('Waiting.svelte'), /const count = \$derived\(kept\?\.rows \?\? rows\);/u);
   assert.match(ROOT, /\brole="status"/);
 });
 
