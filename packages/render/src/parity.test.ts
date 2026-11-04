@@ -778,7 +778,7 @@ test('A DAY THIS YEAR DROPS ITS YEAR AND AN AMOUNT OF NOTHING IS NOT SAID, on a 
   assert.match(timeline, /Wildcard certificate<\/span><span class="item-detail"><\/span>/u, 'not −£0');
   const rows = tree(toHTML([spec], opts));
   assert.match(rows, /<span class="row-value num">20 Sep<\/span>/u);
-  assert.match(rows, /<span class="row-value num"><\/span><span class="row-note">1 Jul<\/span>/u, 'money that moved by nothing says nothing, not a dash');
+  assert.match(rows, /<span class="row-value"><\/span><span class="row-note">1 Jul<\/span>/u, 'money that moved by nothing says nothing, not a dash');
   assert.match(rows, /<span class="row-value num">GBP 0\.00<\/span>/u, 'a balance of nothing is still said');
 });
 
@@ -965,7 +965,11 @@ test('THE FILTER STRIP IS ONE TREE IN BOTH RENDERERS read-only, and buttons and 
   for (const chosen of [{}, { project: '7' }, { whose: 'mine' }]) {
     const svelte = tree(render(Filters, { props: { filters: FILTERS, chosen } }).body);
     assert.equal(svelte, tree(filtersHTML(FILTERS, chosen)), JSON.stringify(chosen));
-    assert.doesNotMatch(svelte, /<button|<select|Nothing to choose/u, 'a field with one value is not drawn');
+    assert.doesNotMatch(svelte, /<button|<select/u, 'read-only: nothing to press');
+    /* A FIELD WITH ONE VALUE IS NOT DRAWN, BUT FOR WHILE ANOTHER CHOICE NARROWS THE PAGE (25dc205f2): the row holds its
+       place so the page does not jump, and says the one value every line shown shares. */
+    if (Object.keys(chosen).length === 0) assert.doesNotMatch(svelte, /Nothing to choose/u, 'a field with one value is not drawn');
+    else assert.match(svelte, /aria-label="Nothing to choose"[^>]*>(?:(?!filters-group).)*All(?:(?!filters-group).)*Only/u, 'its row stays while the page is narrowed');
   }
   const read = tree(filtersHTML(FILTERS, { project: '7' }));
   assert.deepEqual([...read.matchAll(/<span class="filters-choice"( data-on)?>([^<]*)/gu)].slice(0, 7).map((m) => `${m[2]}${m[1] ? '*' : ''}`), ['All', 'Oxbow', 'Nook', 'Kiln', 'Site', 'Quiet*', 'All*'], 'the choice is drawn wherever it sits, and a field with none chosen is on All');
@@ -973,7 +977,7 @@ test('THE FILTER STRIP IS ONE TREE IN BOTH RENDERERS read-only, and buttons and 
 
   const live = tree(render(Filters, { props: { filters: FILTERS, chosen: { whose: 'mine' }, onfilter: () => {} } }).body);
   const pressed = [...live.matchAll(/<button aria-pressed="(true|false)" class="filters-choice" type="button">([^<]*)/gu)].map((m) => `${m[2]}${m[1] === 'true' ? '*' : ''}`);
-  assert.deepEqual(pressed, ['All*', 'Oxbow', 'Nook', 'Kiln', 'Site', 'Driftwood', 'All', 'Mine*', 'Agents']);
+  assert.deepEqual(pressed, ['All*', 'Oxbow', 'Nook', 'Kiln', 'Site', 'Driftwood', 'All', 'Mine*', 'Agents', 'All*', 'Only'], 'the one-value row stays while Mine narrows the page');
   assert.match(live, /<select aria-label="Project" class="filters-more"><option value>2 more<\/option><option value="6">Estate<\/option><option value="7">Quiet<\/option><\/select>/u);
   assert.match(live, /aria-label="Project" class="filters-group" data-control="chips"/u, 'seven values are chips');
   assert.match(live, /aria-label="Whose" class="filters-group" data-control="segmented"/u);

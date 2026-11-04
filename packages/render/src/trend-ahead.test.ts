@@ -46,7 +46,7 @@ test('CASH AHEAD LISTS EACH PART OF A PLAN WITH ITS DAY, and neither it nor the 
   /* NO NUMBERED DISCS AND NO DOT A MOVEMENT (3d1cd2f8a): the line is the answer, and every movement is a row of the list. */
   assert.doesNotMatch(html, /class="forecast-drop|class="forecast-mark|forecast-next-n/u);
   assert.match(html, /<li class="forecast-next-item" data-dir="in"><span class="forecast-next-dot" aria-hidden="true"><\/span><span class="forecast-next-day">31 Oct<\/span><span class="forecast-next-label">Pay<\/span>/u);
-  assert.match(html, /<li class="forecast-next-item" data-dir="out"><span class="forecast-next-dot" aria-hidden="true"><\/span><span class="forecast-next-day">5 Jan 2027<\/span><span class="forecast-next-label">Car, part 4 of 12<\/span><span class="forecast-next-amount num">−EGP 90,000</u);
+  assert.match(html, /<li class="forecast-next-item" data-dir="out"><span class="forecast-next-dot" aria-hidden="true"><\/span><span class="forecast-next-day">5 Jan 2027<\/span><span class="forecast-next-label">Car, part 4 of 12<\/span><span class="forecast-next-amount num">−EGP\u00a090,000</u);
   assert.match(html, /<span class="forecast-next-dot" aria-hidden="true"><\/span><span class="forecast-next-day">13 Jan 2027<\/span><span class="forecast-next-label">House, part 2 of 30<\/span>/u);
   /* A WALK WITH NO PLAN IN IT NUMBERS NOTHING, and still lists what moves. */
   const none = toHTML(parse('```forecast\nopening | 2026-10-27 | Cash now | EGP 1,000.00\nstep | 2026-11-01 | Rent | EGP −100.00\nhorizon | 30 |  | \n```', { page: true }));
