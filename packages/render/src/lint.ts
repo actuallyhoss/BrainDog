@@ -237,6 +237,14 @@ const RANDOM_IDS = [
 const ISO = /\b\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}|\s\d{2}:\d{2}:\d{2})(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g;
 /* Seconds or milliseconds since 1970, between 2001 and 2040, standing alone (not a phone number's tail, not grouped). */
 const EPOCH = /(?<![\d+.,:-])\b(?:\d{10}|\d{13})\b(?![\d.,:])/g;
+/**
+ * A CELL OF SOMEBODY'S WORDS QUOTES THEM, TIME AND ALL. A mail's subject that reads "Your secure link is here | 2026-11-03
+ * 17:04:56" is what the sender wrote, and the page can do nothing about it; the sign said Mail printed a raw time for as
+ * long as that mail was among the last forty. A cell that holds nothing but the time is still read: that is a date typed
+ * as text. A note or a page's own HTML is read whole, since its writer can mend it.
+ */
+const quotedCell = (v: View): boolean => v.part.theirs === true && v.part.html === undefined;
+const wholeInstant = (line: string): boolean => new RegExp(`^\\s*(?:${ISO.source})\\s*$`).test(line);
 const isEpoch = (s: string): boolean => {
   const n = Number(s) / (s.length === 13 ? 1000 : 1);
   return n >= 978_307_200 && n < 2_208_988_800;
@@ -467,7 +475,7 @@ const RULES: readonly RuleSpec[] = [
     copy: false,
     says: 'A time printed raw, as an ISO instant or seconds since 1970, where a date in words goes.',
     /* Ten digits in his own words are as likely a phone or an order number: there, only a figure slot is read for one. */
-    find: (v) => [...all(v.lines, ISO), ...all(v.part.theirs ? v.figures : v.lines, EPOCH).filter((h) => isEpoch(h.raw))],
+    find: (v) => [...all(quotedCell(v) ? v.lines.filter(wholeInstant) : v.lines, ISO), ...all(v.part.theirs ? v.figures : v.lines, EPOCH).filter((h) => isEpoch(h.raw))],
     said: (n) => many(n, 'Prints a raw time where a date in words goes.', 'Prints # raw times where dates in words go.'),
   },
   {
