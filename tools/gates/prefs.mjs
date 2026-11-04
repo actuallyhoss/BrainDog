@@ -296,9 +296,10 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
          "at the end of its section, never inserted mid-list", and the menu is up / down / to top /
          hide. Three pages from three different sections would reorder three buckets of one, which
          changes nothing and would fail this gate for being a bad test rather than a bad build. */
-      /* TWO OF MONEY'S PAGES, PUT IN THE OPPOSITE ORDER: the projects' own pages are the sidebar's rows of the projects
-         list now, and not pages in the nav, so the section that moves is one the nav lists. */
-      values: [{}, { nav: ['/p/money-reports', '/p/money-forecast'] }],
+      /* TWO OF WORK'S PAGES, PUT IN THE OPPOSITE ORDER: the projects' own pages are the sidebar's rows of the projects
+         list now, and not pages in the nav, and Money is one row in Settings > Navigation with its pages inside it, so the
+         section that moves is one the nav lists. */
+      values: [{}, { nav: ['/p/roadmap', '/p/work-board'] }],
       probe: () => [...document.querySelectorAll('#main .page-row a.page-link')].map((a) => a.getAttribute('href')).join(' '),
     },
 
@@ -354,7 +355,12 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
         { '@record': { 'nav.shape': 'menu' } },
         (drew) => ({ '@record': { 'nav.shape': 'menu', 'pen.dismissed': drew.split('\n').filter(Boolean) } }),
       ],
-      probe: () => [...document.querySelectorAll('#main [data-pen]')].map((row) => row.getAttribute('data-pen')).join('\n'),
+      /* THE OFFERS SIT BEHIND THEIR FOLD (b3f6319b9), so the probe opens it, as a person does. */
+      probe: async () => {
+        document.querySelector('#main .pen-fold')?.click();
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        return [...document.querySelectorAll('#main [data-pen]')].map((row) => row.getAttribute('data-pen')).join('\n');
+      },
     },
     {
       /**
@@ -385,7 +391,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       record: true,
       what: 'the names the nav draws its pages under (Settings > Navigation)',
       route: '/settings/navigation',
-      values: [{ '@record': {} }, { '@record': { 'nav.labels': { '/p/money-ledger': 'The day book' } } }],
+      values: [{ '@record': {} }, { '@record': { 'nav.labels': { '/p/money': 'The day book' } } }],
       probe: () =>
         [...document.querySelectorAll('#main .page-row a.page-link')].map((a) => (a.textContent ?? '').replace(/\s+/g, ' ').trim()).join(' | '),
     },
