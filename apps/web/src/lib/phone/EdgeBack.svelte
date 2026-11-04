@@ -111,7 +111,7 @@
     block-size: 40px;
     border-radius: var(--r-round);
     background: var(--tile);
-    box-shadow: 0 2px 10px rgb(0 0 0 / 0.16);
+    box-shadow: var(--elev-chrome);
     color: var(--ink-3);
     opacity: var(--pull);
     transform: translateX(calc(var(--pull) * 28px - 20px)) scale(calc(0.7 + var(--pull) * 0.3));

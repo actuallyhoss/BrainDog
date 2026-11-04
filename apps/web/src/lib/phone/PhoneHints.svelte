@@ -152,7 +152,7 @@
     border: 1px solid var(--rule);
     border-radius: var(--r-tile);
     background: var(--tile);
-    box-shadow: var(--shadow-pop, 0 8px 24px rgb(0 0 0 / 0.12));
+    box-shadow: var(--elev-popover);
   }
 
   /* THE KEYBOARD TAKES THE BOTTOM OF THE SCREEN, and a card over the keys would cover what is being typed. */

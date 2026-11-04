@@ -406,8 +406,8 @@
     position: absolute;
     inset: 0 calc(-1 * var(--sp-3));
     z-index: -1;
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: var(--g-bf);
+    backdrop-filter: var(--g-bf);
     -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--sp-5));
     mask-image: linear-gradient(to bottom, transparent, #000 var(--sp-5));
   }
