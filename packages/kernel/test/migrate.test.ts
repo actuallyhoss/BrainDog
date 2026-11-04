@@ -380,7 +380,7 @@ test('every table is placed in a section, and every section holds tables', async
   // in code: a table nobody placed would travel or not travel by accident.
   const { sql } = await open();
   const rows = sql.all<{ table_name: string; section: string }>('SELECT table_name, section FROM dog_section');
-  assert.equal(rows.length, 62);
+  assert.equal(rows.length, 63);
   /* FIVE, not four: `origin` is its own section because a `.brain` can be exported without the raw
      inbound material an ingest kept — an email body is a customer's mail, not their record. */
   assert.deepEqual(

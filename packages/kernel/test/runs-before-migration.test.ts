@@ -46,7 +46,7 @@ async function migrate36(r: Awaited<ReturnType<typeof withRuns>>): Promise<void>
   r.sql.exec('DELETE FROM migration WHERE version >= 36');
   const { result } = await applyMigrations(r.sql, r.clock);
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
+  assert.deepEqual(result.value.applied, [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48]);
 }
 
 const runs = (r: Awaited<ReturnType<typeof withRuns>>) =>

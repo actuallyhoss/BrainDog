@@ -71,7 +71,7 @@ test('MIGRATION 25 KEEPS DO AND TELL FOR WHAT EACH WRITE TOKEN DID IN THE LAST T
   sql.exec('DELETE FROM migration WHERE version >= 25');
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result as never));
-  assert.deepEqual(result.value.applied, [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
+  assert.deepEqual(result.value.applied, [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48]);
 
   /* ADDING AND MARKING DONE CARRY ON; the costed task (money) and the delete ask, and so does every other token. */
   assert.deepEqual(ladder(sql), [

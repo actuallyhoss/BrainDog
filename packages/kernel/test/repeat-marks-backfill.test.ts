@@ -34,7 +34,7 @@ async function migrate35(r: Awaited<ReturnType<typeof before35>>): Promise<void>
   r.sql.exec('DELETE FROM migration WHERE version >= 35');
   const { result } = await applyMigrations(r.sql, r.clock);
   assert.ok(result.ok, JSON.stringify(result));
-  assert.deepEqual(result.value.applied, [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
+  assert.deepEqual(result.value.applied, [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48]);
 }
 
 const arrivals = (r: Awaited<ReturnType<typeof before35>>) => r.sql.all('SELECT id, state, reason FROM inbox_raw ORDER BY rowid');

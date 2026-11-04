@@ -54,7 +54,7 @@ test('MIGRATION 38 RUNS ONCE over a record at 37: one new column, every other co
 
   const first = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(first.result.ok, fixOf(first.result));
-  assert.deepEqual(first.result.value.applied, [38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
+  assert.deepEqual(first.result.value.applied, [38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48]);
   assert.equal(first.result.value.kernel, MIGRATIONS.length);
   assert.equal(first.result.value.format, 1, 'a nullable column on pack is not a new file format');
 
@@ -84,7 +84,7 @@ test('MIGRATION 38 APPLIES AGAIN OVER ITSELF, as the tests that rewind the ledge
   sql.exec('DELETE FROM migration WHERE version >= 38');
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result));
-  assert.deepEqual(result.value.applied, [38, 39, 40, 41, 42, 43, 44, 45, 46, 47]);
+  assert.deepEqual(result.value.applied, [38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48]);
   assert.deepEqual({ columns: columns(sql), indexes: indexes(sql) }, shape);
   assert.deepEqual(rows(), was);
   assert.equal(sql.all("SELECT name FROM sqlite_master WHERE name = 'pack_next'").length, 0);
