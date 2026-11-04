@@ -79,6 +79,12 @@ export const URL_HEADER = 'x-braindog-url';
  */
 export const ADDRESS_HEADER = 'x-braindog-address';
 export const ADDRESS_STAND_IN = 'https://address.braindog.invalid/';
+/**
+ * What says an answer from `ScriptOutbound` is the host's no, not a provider's: the module below throws its words inside
+ * the script, as a fetch that was refused. NOT THROWN IN `ScriptOutbound`: a no is what the host is for, and the run
+ * keeps it, but an exception there is an `error` in the Worker's logs, so a Calendar with no link rang hourly for nothing.
+ */
+export const REFUSED_HEADER = 'x-braindog-refused';
 
 /** A run that made this many calls into the record's object, or was answered this many rows, writes a `script-work` line. */
 const SCRIPT_WORK_CALLS = 100;
@@ -184,7 +190,10 @@ export class ScriptOutbound extends WorkerEntrypoint<Wired, Linked> {
       key: request.headers.get(KEY_HEADER),
       address: request.headers.get(ADDRESS_HEADER),
     });
-    if ('error' in reply) throw new Error(reply.error);
+    if ('error' in reply) {
+      console.info(`script fetch: ${reply.error}`);
+      return new Response(reply.error, { headers: { [REFUSED_HEADER]: '1' } });
+    }
     return Response.json(reply.ok);
   }
 }
@@ -637,6 +646,7 @@ export default class extends WorkerEntrypoint {
         if (typeof given.address === 'string') {
           headers.set('${ADDRESS_HEADER}', given.address);
           const r = await fetch('${ADDRESS_STAND_IN}', { method: 'GET', headers });
+          if (r.headers.has('${REFUSED_HEADER}')) throw new Error(await r.text());
           return r.text();
         }
         headers.set('${URL_HEADER}', encodeURIComponent(String(url)));
@@ -644,6 +654,7 @@ export default class extends WorkerEntrypoint {
         const method = typeof given.method === 'string' ? given.method.toUpperCase() : 'GET';
         const body = typeof given.body === 'string' && method !== 'GET' && method !== 'HEAD' ? given.body : undefined;
         const r = await fetch(url, { method, headers, body });
+        if (r.headers.has('${REFUSED_HEADER}')) throw new Error(await r.text());
         return r.text();
       },
       write: (register, fields) => { writes.push({ op: 'create', register, fields: JSON.parse(fields) }); },

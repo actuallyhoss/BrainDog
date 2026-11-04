@@ -24,6 +24,7 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -242,6 +243,27 @@ test('a second run of the same version gets a Worker of its own and counts only 
   assert.equal(first.answer.writes?.length, 1);
   assert.equal(second.answer.writes?.length, 1);
   assert.equal(second.answer.usage?.fetches, 1, 'the second run counted its own fetch, not the first run\'s as well');
+});
+
+test('A KEY THE KEYCHAIN DOES NOT HOLD IS SAID TO THE SCRIPT AS A REFUSED FETCH, and the gateway throws nothing, so no error is logged', async () => {
+  /* CALENDAR'S WAY OF ENDING QUIETLY reads these words off the error: `is not in the keychain` in `packs/calendar`. */
+  const { answer, sent } = await run(
+    `
+export default async function run(ctx) {
+  try { await ctx.fetch(null, { address: 'Calendar link' }); ctx.log('sent'); } catch (e) { ctx.log(String(e.message)); }
+  ctx.write('series.gold', { value: 1 });
+}`,
+    { keys: ['Calendar link'] },
+  );
+  assert.equal(answer.refused, undefined, JSON.stringify(answer.refused));
+  assert.equal(answer.log, 'The key "Calendar link" is not in the keychain, so nothing was sent. Put the link in your keys under that name.');
+  assert.equal(answer.writes?.length, 1, 'the script went on, as it chose to');
+  assert.deepEqual(sent, []);
+  /* AND A NO LEAVES THE GATEWAY AS AN ANSWER: thrown there, every one is an `error` line in the Worker's logs. */
+  const source = readFileSync(new URL('../src/script.ts', import.meta.url), 'utf8');
+  const gateway = source.slice(source.indexOf('class ScriptOutbound'), source.indexOf('class ScriptRecord'));
+  assert.doesNotMatch(gateway, /throw new Error\(reply\.error\)/u);
+  assert.match(gateway, /console\.info/u);
 });
 
 test('ctx.fetch to an origin outside egress refuses the whole run even when the script catches it', async () => {
