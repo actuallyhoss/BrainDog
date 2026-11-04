@@ -398,6 +398,14 @@
     input?.focus();
   }
 
+  /** Ask, from the button beside Find's field: the words typed stay in the field, to send or to change. */
+  function moveToAsk() {
+    backTo = q;
+    modeWas = 'ask';
+    opener.mode = 'ask';
+    input?.focus();
+  }
+
   /** The conversation where it was left, from Find's "Continue" row. */
   function toAsk() {
     backTo = q;
@@ -683,7 +691,7 @@
   /** The screens a row opens, whose code is fetched as the panel opens. */
   const PRELOADED = ['/p/x', '/r/x', '/r/x/1', '/search', '/decide/x'];
   /** How long the highlight rests on a row before its page is read ahead. */
-  const AHEAD_MS = 140;
+  const AHEAD_MS = 200;
   /** The page a row opens, by its slug, or `null` for a row that opens anything else. */
   const pageSlugOf = (href: string): string | null => {
     const m = /^\/p\/([^/?#]+)$/u.exec(href);
@@ -993,7 +1001,11 @@
   let ahead: string | null = null;
   $effect(() => {
     const href = open && isLive ? flat[cursor]?.href : null;
-    const slug = href ? pageSlugOf(href) : null;
+    /* A ROW'S ADDRESS GOES TO ITS PAGE, as the row's screen would send it (`r/[register]/[seq]/+page.ts`). */
+    const rowAt = href ? /^\/r\/([^/]+)\/(\d+)$/u.exec(href) : null;
+    const rowList = rowAt ? decodeURIComponent(rowAt[1]!) : null;
+    const own = rowAt && rowList !== null && opensOnPage(REGISTERS[rowList]) ? ownPage(rowList, Number(rowAt[2]), new URLSearchParams()) : null;
+    const slug = pageSlugOf(own ?? href ?? '');
     if (slug === null || ahead !== null) return;
     const base = apiBase();
     const t = setTimeout(() => {
@@ -1939,7 +1951,7 @@
         aria-controls="palette-list"
         aria-activedescendant={activeId}
         aria-label={copy.paletteLabel}
-        placeholder={slashHere ? copy.palettePlaceholder : copy.paletteFind}
+        placeholder={slashHere ? threadWords.findOrAsk : copy.paletteFind}
         spellcheck="false"
         autocomplete="off"
       />
@@ -1949,6 +1961,9 @@
       <!-- FIND, ONE PRESS BACK (or ⌘K), and NEW once there is a conversation to start again from. -->
       {#if convo.turns.length > 0}<button type="button" class="p-mode tap" aria-label={threadWords.freshLabel} onclick={fresh}><Icon name="plus" size="s" /><span>{threadWords.fresh}</span></button>{/if}
       <button type="button" class="p-mode tap" aria-label={threadWords.findLabel} onclick={toFind}><Icon name="search" size="s" /><span>{threadWords.find}</span></button>
+    {:else if slashHere}
+      <!-- ASK, ONE PRESS FROM FIND (or ⌘J), as Find is one press from Ask. What is typed goes with it, not yet sent. -->
+      <button type="button" class="p-mode tap" aria-label={threadWords.askLabel} title={threadWords.askLabel} onclick={moveToAsk}><Icon name="ask" size="s" /><span>{threadWords.askMode}</span></button>
     {/if}
     <!--
       A WAY OUT A THUMB CAN REACH.
