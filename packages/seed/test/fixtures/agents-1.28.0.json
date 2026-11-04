@@ -1,0 +1,1517 @@
+{
+  "pack": "agents",
+  "version": "1.28.0",
+  "summary": "What your agents learn, the skills they use, the keys they are handed and the tools they run.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {}
+  },
+  "declarations": [
+    {
+      "register": "learnings",
+      "name": "Learnings",
+      "one": "learning",
+      "icon": "learning",
+      "pack": "agents",
+      "role": "learnings",
+      "fade": {
+        "field": "confirmed_on",
+        "after": "90d"
+      },
+      "seq_prefix": "LN",
+      "holds": "what an agent found out the hard way, with the failure that taught it. Record one only when it changes what a session does, holds beyond this one case, a session without it would get something wrong, and it has no other home",
+      "title": "lesson",
+      "state": "state",
+      "done": [
+        "superseded",
+        "reverted"
+      ],
+      "same": {
+        "fields": [
+          "lesson"
+        ],
+        "within": "project",
+        "fold": "text"
+      },
+      "mobile": [
+        "lesson",
+        "kind",
+        "topic"
+      ],
+      "fields": [
+        {
+          "id": "lesson",
+          "label": "Lesson",
+          "type": "text",
+          "required": true,
+          "min": 12,
+          "max": 400,
+          "search": true
+        },
+        {
+          "id": "because",
+          "label": "Because",
+          "type": "text",
+          "required": true,
+          "min": 24,
+          "max": 600,
+          "search": true
+        },
+        {
+          "id": "kind",
+          "label": "Kind",
+          "type": "enum",
+          "values": [
+            "method",
+            "fact",
+            "rule"
+          ],
+          "labels": {
+            "rule": "Rule"
+          },
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "project",
+          "label": "Where it applies",
+          "type": "ref",
+          "to": "things",
+          "index": true,
+          "scope": {
+            "widen": "person"
+          }
+        },
+        {
+          "id": "topic",
+          "label": "Skill or topic it bears on",
+          "type": "text",
+          "index": true
+        },
+        {
+          "id": "confirmed_on",
+          "label": "Last confirmed",
+          "type": "day",
+          "index": true
+        },
+        {
+          "id": "supersedes",
+          "label": "Replaces",
+          "type": "ref",
+          "to": "learnings"
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "active",
+            "superseded",
+            "reverted"
+          ],
+          "default": "active",
+          "required": true,
+          "index": true,
+          "transitions": {
+            "active": {
+              "to": [
+                "superseded",
+                "reverted"
+              ],
+              "requires": [
+                "why"
+              ]
+            },
+            "superseded": {
+              "to": [
+                "active"
+              ],
+              "by": "decide"
+            },
+            "reverted": {
+              "to": [
+                "active"
+              ],
+              "by": "decide"
+            }
+          }
+        },
+        {
+          "id": "why",
+          "label": "Why it changed",
+          "type": "text",
+          "min": 24
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "skills",
+      "name": "Skills",
+      "one": "skill",
+      "icon": "skill",
+      "pack": "agents",
+      "role": "skills",
+      "holds": "what a session can do here, the moment to reach for it, and its text, versioned",
+      "title": "name",
+      "state": "state",
+      "done": [
+        "retired"
+      ],
+      "same": {
+        "fields": [
+          "name"
+        ],
+        "within": "project",
+        "fold": "exact"
+      },
+      "mobile": [
+        "name",
+        "trigger",
+        "rev",
+        "because"
+      ],
+      "fields": [
+        {
+          "id": "name",
+          "label": "Name",
+          "type": "text",
+          "required": true,
+          "max": 64,
+          "index": true,
+          "search": true
+        },
+        {
+          "id": "trigger",
+          "label": "When to use it",
+          "type": "text",
+          "required": true,
+          "max": 400,
+          "search": true
+        },
+        {
+          "id": "what",
+          "label": "What it is",
+          "type": "text",
+          "max": 400
+        },
+        {
+          "id": "kind",
+          "label": "Kind",
+          "type": "enum",
+          "values": [
+            "skill",
+            "command"
+          ],
+          "default": "skill",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "project",
+          "label": "Where it applies",
+          "type": "ref",
+          "to": "things",
+          "index": true,
+          "scope": {
+            "widen": "person",
+            "same": "nearer"
+          }
+        },
+        {
+          "id": "body",
+          "label": "Text",
+          "type": "document",
+          "required": true,
+          "by": "decide"
+        },
+        {
+          "id": "rev",
+          "label": "Version",
+          "type": "int",
+          "default": 1,
+          "required": true,
+          "by": "decide"
+        },
+        {
+          "id": "managed",
+          "label": "Written by the record",
+          "type": "bool",
+          "default": true
+        },
+        {
+          "id": "source",
+          "label": "Source",
+          "type": "url"
+        },
+        {
+          "id": "because",
+          "label": "Learnings behind it",
+          "type": "list",
+          "of": "ref",
+          "to": "learnings"
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "active",
+            "retired"
+          ],
+          "default": "active",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "credentials",
+      "name": "Keys",
+      "one": "key",
+      "icon": "key",
+      "pack": "agents",
+      "role": "keys-index",
+      "holds": "what each key opens and where it applies; the key itself is sealed in the Keychain or kept somewhere named",
+      "title": "label",
+      "state": "state",
+      "done": [
+        "retired"
+      ],
+      "same": {
+        "fields": [
+          "label"
+        ],
+        "within": "project",
+        "fold": "text",
+        "keep": "sealed"
+      },
+      "mobile": [
+        "label",
+        "opens",
+        "project"
+      ],
+      "fields": [
+        {
+          "id": "label",
+          "label": "Name",
+          "type": "text",
+          "required": true,
+          "max": 120,
+          "search": true
+        },
+        {
+          "id": "opens",
+          "label": "What it opens",
+          "type": "text",
+          "required": true,
+          "max": 280,
+          "search": true
+        },
+        {
+          "id": "provider",
+          "label": "Provider",
+          "type": "text",
+          "index": true,
+          "search": true
+        },
+        {
+          "id": "account",
+          "label": "Account",
+          "type": "text",
+          "max": 280,
+          "search": true
+        },
+        {
+          "id": "kind",
+          "label": "Kind",
+          "type": "enum",
+          "values": [
+            "api_token",
+            "password",
+            "ssh_key",
+            "recovery_codes",
+            "note"
+          ],
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "project",
+          "label": "Where it applies",
+          "type": "ref",
+          "to": "things",
+          "index": true,
+          "scope": {
+            "widen": "person"
+          }
+        },
+        {
+          "id": "value",
+          "label": "Locked value",
+          "type": "secret"
+        },
+        {
+          "id": "where",
+          "label": "Kept at",
+          "type": "text",
+          "max": 280
+        },
+        {
+          "id": "origin",
+          "label": "Came from",
+          "type": "text",
+          "max": 280
+        },
+        {
+          "id": "note",
+          "label": "Note",
+          "type": "text"
+        },
+        {
+          "id": "verified",
+          "label": "Last known to work",
+          "type": "day"
+        },
+        {
+          "id": "expires",
+          "label": "Expires",
+          "type": "day",
+          "deadline": true,
+          "remind": [
+            "-14d",
+            "-2d"
+          ]
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "live",
+            "stale",
+            "invalid",
+            "missing",
+            "retired"
+          ],
+          "default": "live",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "register": "tools",
+      "name": "Tools",
+      "one": "tool",
+      "icon": "plug",
+      "pack": "agents",
+      "role": "tools",
+      "holds": "every MCP server, command line and integration an agent uses, how it starts, and the keys it needs by name",
+      "title": "name",
+      "state": "state",
+      "done": [
+        "retired"
+      ],
+      "same": {
+        "fields": [
+          "name"
+        ],
+        "within": "project",
+        "fold": "text"
+      },
+      "mobile": [
+        "name",
+        "kind",
+        "project"
+      ],
+      "fields": [
+        {
+          "id": "name",
+          "label": "Name",
+          "type": "text",
+          "required": true,
+          "max": 64,
+          "index": true,
+          "search": true
+        },
+        {
+          "id": "kind",
+          "label": "Kind",
+          "type": "enum",
+          "values": [
+            "mcp",
+            "cli",
+            "integration"
+          ],
+          "labels": {
+            "mcp": "MCP server",
+            "cli": "Command line",
+            "integration": "Integration"
+          },
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "transport",
+          "label": "How it runs",
+          "type": "enum",
+          "values": [
+            "stdio",
+            "http"
+          ],
+          "labels": {
+            "stdio": "Runs on your machine",
+            "http": "Reached over the web"
+          },
+          "required_when": {
+            "field": "kind",
+            "is": "mcp"
+          }
+        },
+        {
+          "id": "command",
+          "label": "Command",
+          "type": "text",
+          "max": 512,
+          "required_when": {
+            "field": "transport",
+            "is": "stdio"
+          }
+        },
+        {
+          "id": "args",
+          "label": "Arguments",
+          "type": "list",
+          "of": "text"
+        },
+        {
+          "id": "endpoint",
+          "label": "Address",
+          "type": "text",
+          "max": 512,
+          "required_when": {
+            "field": "transport",
+            "is": "http"
+          }
+        },
+        {
+          "id": "needs",
+          "label": "Keys it needs",
+          "type": "list",
+          "of": "text"
+        },
+        {
+          "id": "trigger",
+          "label": "When to use it",
+          "type": "text",
+          "max": 400,
+          "search": true
+        },
+        {
+          "id": "project",
+          "label": "Where it applies",
+          "type": "ref",
+          "to": "things",
+          "index": true,
+          "scope": {
+            "widen": "person",
+            "same": "nearer"
+          }
+        },
+        {
+          "id": "hosts",
+          "label": "Seen on",
+          "type": "list",
+          "of": "text"
+        },
+        {
+          "id": "seen",
+          "label": "Last seen",
+          "type": "instant",
+          "index": true
+        },
+        {
+          "id": "origin",
+          "label": "Came from",
+          "type": "text",
+          "max": 280
+        },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [
+            "active",
+            "stale",
+            "invalid",
+            "retired"
+          ],
+          "default": "active",
+          "required": true,
+          "index": true
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
+        }
+      ]
+    },
+    {
+      "metric": "learnings-by-week",
+      "name": "Learnings added, by week",
+      "source": "register.learnings",
+      "where": "created_at after -182d",
+      "value": {
+        "count": "id"
+      },
+      "group_by": "created_at",
+      "bucket": "week",
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "keys-by-week",
+      "name": "Keys added, by week",
+      "source": "register.credentials",
+      "where": "created_at after -182d",
+      "value": {
+        "count": "id"
+      },
+      "group_by": "created_at",
+      "bucket": "week",
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tools-by-week",
+      "name": "Tools added, by week",
+      "source": "register.tools",
+      "where": "created_at after -182d",
+      "value": {
+        "count": "id"
+      },
+      "group_by": "created_at",
+      "bucket": "week",
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "learnings-faded",
+      "name": "Faded learnings",
+      "source": "register.learnings",
+      "where": {
+        "all": [
+          {
+            "field": "state",
+            "is": "active"
+          },
+          {
+            "any": [
+              {
+                "field": "confirmed_on",
+                "before": "-90d"
+              },
+              {
+                "all": [
+                  {
+                    "field": "confirmed_on",
+                    "empty": true
+                  },
+                  {
+                    "field": "created_at",
+                    "before": "-90d"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "runs-left-next",
+      "name": "Runs that left a next step",
+      "source": "register.session",
+      "where": "state is idle or handoff, next is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "runs-today",
+      "name": "Runs that stopped today",
+      "source": "register.session",
+      "where": "state is not active, last_seen is today, parent is empty, wrote is not 0",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "runs-heard-today",
+      "name": "Runs heard from today",
+      "source": "register.session",
+      "where": "last_seen is today",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "runs-earlier",
+      "name": "Runs last heard from before today",
+      "source": "register.session",
+      "where": "last_seen before today, parent is empty, wrote is not 0",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "learnings-active",
+      "name": "Learnings in use",
+      "source": "register.learnings",
+      "where": "state is active",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "skills-active",
+      "name": "Skills in use",
+      "source": "register.skills",
+      "where": "state is active",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "skill-learnings",
+      "name": "Learnings that bear on a skill",
+      "source": "register.learnings",
+      "where": "topic is {{it}}, state is active",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "keys-sealed",
+      "name": "Keys sealed in the Keychain",
+      "source": "register.credentials",
+      "where": "state is not retired, value is set",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "keys-nowhere",
+      "name": "Keys with no value and nowhere they are kept",
+      "source": "register.credentials",
+      "where": "state is not retired, value is empty, where is empty",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "keys-expired",
+      "name": "Keys past their day",
+      "source": "register.credentials",
+      "where": "state is live, expires before today",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tools-unseen",
+      "name": "Tools not seen in a month",
+      "source": "register.tools",
+      "where": {
+        "all": [
+          {
+            "field": "state",
+            "is": "active"
+          },
+          {
+            "any": [
+              {
+                "field": "seen",
+                "before": "-30d"
+              },
+              {
+                "all": [
+                  {
+                    "field": "seen",
+                    "empty": true
+                  },
+                  {
+                    "field": "created_at",
+                    "before": "-30d"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "lte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "runs-unplaced",
+      "name": "Runs in no project, last two weeks",
+      "source": "register.session",
+      "where": "last_seen after -14d, project is empty",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "learnings-arrived",
+      "name": "Learnings that arrived, last 30 days",
+      "source": "register.learnings",
+      "where": {
+        "all": [
+          {
+            "field": "created_at",
+            "after": "-30d"
+          },
+          {
+            "any": [
+              {
+                "field": "confirmed_on",
+                "empty": true
+              },
+              {
+                "field": "confirmed_on",
+                "after": "-31d"
+              }
+            ]
+          }
+        ]
+      },
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "learnings-charted",
+      "name": "Learnings from two weeks ago or more, last six months",
+      "source": "register.learnings",
+      "where": "created_at after -182d, created_at before -14d",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "skills-changed",
+      "name": "Skills that changed, last 30 days",
+      "source": "events.skills",
+      "value": {
+        "count": "changed",
+        "field": "rev"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "compare": "none",
+      "window": "30d"
+    },
+    {
+      "metric": "skills-changed-by-week",
+      "name": "Skills that changed, by week",
+      "source": "events.skills",
+      "value": {
+        "count": "changed",
+        "field": "rev"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "compare": "none",
+      "window": "182d",
+      "group_by": "at",
+      "bucket": "week"
+    },
+    {
+      "metric": "agent-door-called",
+      "name": "Agent runs that made a call",
+      "sign": "called",
+      "target": {
+        "gte": 0
+      },
+      "source": "record.door",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "window": "7d",
+      "compare": "none"
+    },
+    {
+      "metric": "agent-door-builds-behind",
+      "name": "Agent runs on an older build",
+      "sign": "behind",
+      "target": {
+        "lte": 0
+      },
+      "source": "record.door",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "window": "7d",
+      "compare": "none"
+    },
+    {
+      "metric": "agent-door-internal",
+      "name": "Agent door answers that failed inside",
+      "sign": "internal",
+      "target": {
+        "lte": 0
+      },
+      "source": "record.door",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "window": "7d",
+      "compare": "none"
+    },
+    {
+      "metric": "agent-hook-slowest",
+      "name": "Slowest start hook, in milliseconds",
+      "sign": "hookSlowestMs",
+      "target": {
+        "gte": 0
+      },
+      "source": "record.door",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "window": "7d",
+      "compare": "none"
+    },
+    {
+      "metric": "agent-card-words",
+      "name": "Most words on one agent card",
+      "sign": "cardWordsMost",
+      "target": {
+        "gte": 0
+      },
+      "source": "record.door",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "window": "7d",
+      "compare": "none"
+    },
+    {
+      "page": "agents",
+      "title": "Agents",
+      "nav": {
+        "section": "Agents",
+        "order": 10,
+        "place": 60
+      },
+      "icon": "session",
+      "requires": [
+        "register.session",
+        "register.learnings",
+        "register.skills",
+        "register.tools",
+        "register.credentials"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "runs-working",
+            "gt": 0
+          },
+          "body": "{{runs-working}} working, {{runs-waiting}} open and quiet, {{handoffs-open}} step(s) up next"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "metric": "runs-working",
+                "is": 0
+              },
+              {
+                "metric": "runs-waiting",
+                "gt": 0
+              }
+            ]
+          },
+          "body": "Nobody working right now, {{runs-waiting}} open and quiet, {{handoffs-open}} step(s) up next"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "all": [
+              {
+                "metric": "runs-working",
+                "is": 0
+              },
+              {
+                "metric": "runs-waiting",
+                "is": 0
+              }
+            ]
+          },
+          "body": "Nobody working right now. {{handoffs-open}} step(s) up next"
+        },
+        {
+          "kind": "section",
+          "heading": "Tell an agent",
+          "icon": "edit",
+          "span": 12,
+          "panel": "instruct"
+        },
+        {
+          "kind": "section",
+          "heading": "Working now",
+          "icon": "session",
+          "span": 12,
+          "panel": "presence"
+        },
+        {
+          "kind": "section",
+          "heading": "Up next",
+          "icon": "arrow",
+          "span": 12,
+          "panel": "left-steps"
+        },
+        {
+          "kind": "section",
+          "heading": "Recent runs",
+          "icon": "clock",
+          "span": 12,
+          "panel": "run-list"
+        },
+        {
+          "kind": "section",
+          "key": "kept",
+          "heading": "Accepted unchanged",
+          "icon": "circle-check",
+          "span": 12,
+          "panel": "kept"
+        },
+        {
+          "kind": "note",
+          "key": "brain-link",
+          "span": 12,
+          "body": "[How the brain changed](/p/brain) · [Learnings](/r/learnings) · [Skills](/r/skills) · [Tools](/r/tools) · [Keys](/r/credentials)"
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "when": {
+            "metric": "keys-nowhere",
+            "is": 1
+          },
+          "body": "1 key has no value. [Add it in the Keychain](/keychain)"
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "when": {
+            "metric": "keys-nowhere",
+            "gt": 1
+          },
+          "body": "{{keys-nowhere}} keys have no value. [Add them in the Keychain](/keychain)"
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "when": {
+            "metric": "keys-expired",
+            "is": 1
+          },
+          "body": "1 key is past its day. Renew or retire it."
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "when": {
+            "metric": "keys-expired",
+            "gt": 1
+          },
+          "body": "{{keys-expired}} keys are past their day. Renew or retire each."
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "when": {
+            "metric": "tools-unseen",
+            "gt": 0
+          },
+          "body": "{{tools-unseen}} tool(s) not used for a month. Retire any you no longer need."
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "when": {
+            "metric": "keys-in-text",
+            "is": 1
+          },
+          "body": "A key is written in plain text in 1 place. Move it to the Keychain."
+        },
+        {
+          "kind": "note",
+          "tone": "warn",
+          "span": 12,
+          "when": {
+            "metric": "keys-in-text",
+            "gt": 1
+          },
+          "body": "Keys are written in plain text in {{keys-in-text}} places. Move each to the Keychain."
+        }
+      ]
+    },
+    {
+      "page": "skill",
+      "title": "{{name}}",
+      "for": {
+        "register": "skills",
+        "where": "state is active"
+      },
+      "icon": "skill",
+      "requires": [
+        "register.skills",
+        "register.learnings"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{trigger}}"
+        },
+        {
+          "kind": "diff",
+          "heading": "Versions",
+          "icon": "history",
+          "span": 12,
+          "source": "register.skills",
+          "row": "{{spoken}}",
+          "field": "body",
+          "versions": 5,
+          "empty": "One version so far."
+        },
+        {
+          "kind": "cards",
+          "heading": "Learnings behind this version",
+          "icon": "learning",
+          "span": 12,
+          "source": "register.learnings",
+          "where": "id is {{because}}",
+          "columns": [
+            {
+              "field": "lesson",
+              "as": "title"
+            },
+            {
+              "field": "confirmed_on",
+              "as": "when"
+            }
+          ],
+          "limit": 8
+        },
+        {
+          "kind": "cards",
+          "heading": "Learnings that bear on it",
+          "icon": "lightbulb",
+          "span": 12,
+          "source": "register.learnings",
+          "where": "topic is {{name}}, state is active",
+          "columns": [
+            {
+              "field": "lesson",
+              "as": "title"
+            },
+            {
+              "field": "kind",
+              "label": "Kind",
+              "as": "fact"
+            },
+            {
+              "field": "project",
+              "label": "Where it applies",
+              "as": "scope"
+            },
+            {
+              "field": "confirmed_on",
+              "as": "when"
+            }
+          ],
+          "order": [
+            {
+              "field": "seq",
+              "dir": "desc"
+            }
+          ],
+          "limit": 8,
+          "when": {
+            "metric": "skill-learnings:{{name}}",
+            "gt": 0
+          }
+        }
+      ]
+    },
+    {
+      "page": "brain",
+      "title": "How the brain changed",
+      "icon": "learning",
+      "requires": [
+        "register.learnings"
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "key": "line",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "learnings-arrived",
+            "gt": 0
+          },
+          "body": "{{learnings-arrived}} learning(s) arrived this month, {{learnings-active}} in use in all, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded"
+        },
+        {
+          "kind": "note",
+          "key": "line-quiet",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "learnings-arrived",
+            "is": 0
+          },
+          "body": "Nothing new this month, {{learnings-active}} learning(s) in use in all, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded"
+        },
+        {
+          "kind": "series",
+          "key": "by-week",
+          "heading": "Learnings that arrived and skills that changed, by week",
+          "icon": "chart-column",
+          "span": 12,
+          "series": [
+            {
+              "metric": "learnings-by-week",
+              "label": "Learnings"
+            },
+            {
+              "metric": "skills-changed-by-week",
+              "label": "Skills changed"
+            }
+          ],
+          "back": 24,
+          "when": {
+            "metric": "learnings-charted",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "cards",
+          "key": "changed",
+          "heading": "What changed",
+          "icon": "history",
+          "span": 12,
+          "source": "register.learnings",
+          "columns": [
+            {
+              "field": "lesson",
+              "as": "title"
+            },
+            {
+              "field": "topic",
+              "label": "Bears on",
+              "as": "fact"
+            },
+            {
+              "field": "supersedes",
+              "label": "Replaces",
+              "as": "fact"
+            },
+            {
+              "field": "confirmed_on",
+              "label": "Last confirmed",
+              "as": "when"
+            }
+          ],
+          "order": [
+            {
+              "field": "created_at",
+              "dir": "desc"
+            }
+          ],
+          "limit": 12
+        },
+        {
+          "kind": "section",
+          "key": "timeline",
+          "heading": "Over time",
+          "icon": "history",
+          "span": 12,
+          "panel": "evolution"
+        },
+        {
+          "kind": "section",
+          "key": "faded",
+          "heading": "Faded",
+          "icon": "clock",
+          "span": 12,
+          "source": "register.learnings",
+          "where": {
+            "all": [
+              {
+                "field": "state",
+                "is": "active"
+              },
+              {
+                "any": [
+                  {
+                    "field": "confirmed_on",
+                    "before": "-90d"
+                  },
+                  {
+                    "all": [
+                      {
+                        "field": "confirmed_on",
+                        "empty": true
+                      },
+                      {
+                        "field": "created_at",
+                        "before": "-90d"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "limit": 1,
+          "when": {
+            "metric": "learnings-faded",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "cards",
+          "key": "faded-learnings",
+          "span": 12,
+          "source": "register.learnings",
+          "where": {
+            "all": [
+              {
+                "field": "state",
+                "is": "active"
+              },
+              {
+                "any": [
+                  {
+                    "field": "confirmed_on",
+                    "before": "-90d"
+                  },
+                  {
+                    "all": [
+                      {
+                        "field": "confirmed_on",
+                        "empty": true
+                      },
+                      {
+                        "field": "created_at",
+                        "before": "-90d"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "columns": [
+            {
+              "field": "lesson",
+              "as": "title"
+            },
+            {
+              "field": "confirmed_on",
+              "label": "Last confirmed",
+              "as": "when"
+            }
+          ],
+          "order": [
+            {
+              "field": "created_at",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "when": {
+            "metric": "learnings-faded",
+            "gt": 0
+          }
+        }
+      ]
+    },
+    {
+      "page": "run",
+      "title": "{{doing}}",
+      "for": {
+        "register": "session"
+      },
+      "icon": "session",
+      "requires": [
+        "register.session"
+      ],
+      "blocks": [
+        {
+          "kind": "section",
+          "heading": "What it did",
+          "icon": "history",
+          "span": 12,
+          "panel": "run"
+        }
+      ]
+    }
+  ]
+}

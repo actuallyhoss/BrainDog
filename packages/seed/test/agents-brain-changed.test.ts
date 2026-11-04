@@ -95,7 +95,7 @@ test('IT OPENS ON NO LINE OF COUNTS SINCE 1.34.0, the chart and the lists under 
   assert.equal(PAGE.blocks.find((b) => String(b.body ?? '').includes('{{learnings-arrived}}')), undefined);
 });
 
-test('THE BLOCKS: a chart by week drawn only from three points, What changed newest first with the failure, and Faded with its count', () => {
+test('THE BLOCKS: a chart by week drawn only from three points, each learning once on the timeline, and Faded with its count', () => {
   const by = (key: string): Declared => PAGE.blocks.find((b) => b.key === key)!;
   const chart = by('by-week');
   assert.deepEqual([chart.kind, chart.heading], ['series', 'Learnings that arrived and skills that changed, by week']);
@@ -106,11 +106,11 @@ test('THE BLOCKS: a chart by week drawn only from three points, What changed new
   assert.deepEqual(chart.when, { metric: 'learnings-charted', gt: 0 });
   assert.equal(AGENTS_METRICS['learnings-charted']!.where, 'created_at after -182d, created_at before -14d');
 
-  const changed = by('changed');
-  assert.deepEqual([changed.kind, changed.heading, changed.source], ['cards', 'What changed', 'register.learnings']);
-  assert.deepEqual(changed.order, [{ field: 'created_at', dir: 'desc' }]);
-  assert.deepEqual(changed.columns!.slice(0, 2), [{ field: 'lesson', as: 'title' }, { field: 'topic', label: 'Bears on', as: 'fact' }], 'since 1.21.0 a card is its line, and what taught it is on its page');
-  assert.ok(changed.columns!.some((c) => c.field === 'supersedes'), 'a learning that replaced another does not say which');
+  /* EACH LEARNING ONCE, ON THE TIMELINE, SINCE 1.31.0 (3a04e7020), where a list of cards over the same learnings stood; and
+     NO LINE OF COUNTS OVER THE PAGE SINCE 1.34.0 (7438cc7e8). */
+  assert.deepEqual(PAGE.blocks.map((b) => b.key), ['by-week', 'timeline', 'faded', 'faded-learnings']);
+  const timeline = by('timeline') as Declared & { panel?: string };
+  assert.deepEqual([timeline.kind, timeline.heading, timeline.panel], ['section', 'Over time', 'evolution']);
 
   const faded = by('faded');
   assert.deepEqual([faded.kind, faded.heading, faded.source], ['section', 'Faded', 'register.learnings']);
@@ -123,7 +123,7 @@ test('THE BLOCKS: a chart by week drawn only from three points, What changed new
   assert.equal(PAGE.blocks.indexOf(cards), PAGE.blocks.indexOf(faded) + 1);
 });
 
-test('ON A FRESH RECORD IT INSTALLS CLEAN, and draws its line and no empty chart or Faded', async () => {
+test('ON A FRESH RECORD IT INSTALLS CLEAN, and draws no empty chart or Faded', async () => {
   const { k, sql } = await fresh();
   const page = k.pages().find((p) => p.slug === 'brain');
   assert.ok(page, k.pages().map((p) => p.slug).join(', '));
@@ -132,8 +132,7 @@ test('ON A FRESH RECORD IT INSTALLS CLEAN, and draws its line and no empty chart
   for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.key}: ${JSON.stringify(b.refusals)}`);
   assert.deepEqual(blocks.map((b) => b.key), PAGE.blocks.map((b) => b.key), 'a block answers under another key');
   assert.deepEqual([reading(k, 'learnings-arrived'), reading(k, 'learnings-faded'), reading(k, 'learnings-charted')], [0, 0, 0]);
-  assert.deepEqual([keyed(blocks, 'line').drawn, keyed(blocks, 'line-quiet').drawn], [false, undefined], 'the quiet line is not the one drawn');
-  for (const key of ['by-week', 'changed', 'faded', 'faded-learnings']) assert.equal(keyed(blocks, key).drawn, false, `${key} is drawn over nothing`);
+  for (const key of ['by-week', 'faded', 'faded-learnings']) assert.equal(keyed(blocks, key).drawn, false, `${key} is drawn over nothing`);
   /* AND THE AGENTS PAGE STILL READS, its link among its blocks. */
   const agents = value<{ blocks: Drawn[] }>(k.page('agents')).blocks;
   assert.deepEqual(agents.find((b) => b.key === 'brain-link')?.refusals, []);
@@ -168,7 +167,6 @@ test('SIX LEARNINGS OVER FOUR WEEKS, ONE NOT CONFIRMED IN A HUNDRED DAYS: the ch
 
   const blocks = opened(k);
   for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.key}: ${JSON.stringify(b.refusals)}`);
-  assert.deepEqual([keyed(blocks, 'line').drawn, keyed(blocks, 'line-quiet').drawn], [undefined, false]);
 
   /* THE CHART'S WEEKS: four of them, the oldest first, since a week before the first learning is trimmed. */
   const chart = keyed(blocks, 'by-week');
@@ -177,12 +175,6 @@ test('SIX LEARNINGS OVER FOUR WEEKS, ONE NOT CONFIRMED IN A HUNDRED DAYS: the ch
   assert.equal(chart.bars?.keys.length, 4, chart.bars?.keys.join(', '));
   assert.deepEqual(chart.bars?.values, [[2, 1, 1, 2], [null, null, null, null]]);
 
-  /* WHAT CHANGED, the newest first, each with the failure that taught it. */
-  const changed = keyed(blocks, 'changed');
-  assert.equal(changed.matched, 6);
-  assert.deepEqual(changed.rows.map((r) => r.fields.lesson), [1, 2, 3, 4, 5, 6].map((n) => `Lesson ${n}: check the thing before it ships.`));
-  assert.match(String(changed.rows[0]!.fields.because), /^Failure 1: /u);
-
   /* FADED: the one, counted on the heading and drawn under it. */
   assert.equal(keyed(blocks, 'faded').matched, 1);
   const faded = keyed(blocks, 'faded-learnings');
@@ -190,7 +182,7 @@ test('SIX LEARNINGS OVER FOUR WEEKS, ONE NOT CONFIRMED IN A HUNDRED DAYS: the ch
   sql.close();
 });
 
-test('A CHART OF FEWER THAN THREE WEEKS IS NOT DRAWN: learnings of this week and last say it in the line alone', async () => {
+test('A CHART OF FEWER THAN THREE WEEKS IS NOT DRAWN: learnings of this week and last are counted and draw no chart', async () => {
   const { k, sql } = await fresh();
   for (const back of [1, 8]) {
     const row = value<{ id: string }>(k.create('learnings', { lesson: `Lesson from ${back} days back, kept.`, because: 'It went wrong once and took a morning to put right.', kind: 'fact' }, AS));
@@ -199,6 +191,5 @@ test('A CHART OF FEWER THAN THREE WEEKS IS NOT DRAWN: learnings of this week and
   const blocks = opened(k);
   assert.equal(reading(k, 'learnings-arrived'), 2);
   assert.equal(keyed(blocks, 'by-week').drawn, false, 'two points were drawn as a chart');
-  assert.equal(keyed(blocks, 'changed').matched, 2);
   sql.close();
 });
