@@ -73,9 +73,9 @@ test('under a failure the provider’s own words are said as the provider’s, a
 
 test('a second model is said with its counts once one was needed, and never at none', () => {
   const twice = withHealth('answering', { doubleShare: 0.05, doubleOf: { twice: 2, asks: 40 } });
-  assert.deepEqual(engineLines(twice, NOON), ['Needed a second model for 2 of 40 asks.']);
+  assert.deepEqual(engineLines(twice, NOON), ['Needed a second model for 2 of 40 questions.']);
   assert.deepEqual(engineLines(withHealth('answering', { doubleShare: 0, doubleOf: { twice: 0, asks: 40 } }), NOON), []);
-  assert.deepEqual(engineLines(withHealth('answering', { doubleShare: 1, doubleOf: { twice: 1, asks: 1 } }), NOON), ['Needed a second model for 1 of 1 ask.']);
+  assert.deepEqual(engineLines(withHealth('answering', { doubleShare: 1, doubleOf: { twice: 1, asks: 1 } }), NOON), ['Needed a second model for 1 of 1 question.']);
 });
 
 test('all three lines together, in order, and nothing at all from an older host or with no model', () => {
@@ -85,7 +85,7 @@ test('all three lines together, in order, and nothing at all from an older host 
     doubleShare: 0.25,
     doubleOf: { twice: 1, asks: 4 },
   });
-  assert.deepEqual(engineLines(all, NOON), ['Answered by quill-2 2 days ago.', 'The provider said: Upstream timed out.', 'Needed a second model for 1 of 4 asks.']);
+  assert.deepEqual(engineLines(all, NOON), ['Answered by quill-2 2 days ago.', 'The provider said: Upstream timed out.', 'Needed a second model for 1 of 4 questions.']);
   assert.deepEqual(engineLines(engine('not_answering', 'Slash’s model is not answering.'), NOON), [], 'an older host hands none of the fields');
   assert.deepEqual(engineLines(withHealth('off', { answeredBy: { model: 'quill-2', at: local(9, 14) } }), NOON), []);
   assert.deepEqual(engineLines(null, NOON), []);

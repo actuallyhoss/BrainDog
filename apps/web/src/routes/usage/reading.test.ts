@@ -174,7 +174,8 @@ test('X22: the month before is offered only from the month the record was made',
 
 test('the page keeps the sample and the clock out of its words', () => {
   const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
-  assert.doesNotMatch(page, /\bNOW\b|'sample'/u);
+  /* ITS WORDS AND CODE: a comment in capitals says NOW and draws nothing. */
+  assert.doesNotMatch(page.replace(/<!--[\s\S]*?-->/gu, '').replace(/\/\*[\s\S]*?\*\//gu, ''), /\bNOW\b|'sample'/u);
 });
 
 test('A MONTH OF RUNS SAYS THAT RULES ACTING ON CHANGES ARE NOT AMONG THEM, where one acted (finish F53)', () => {

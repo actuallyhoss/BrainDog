@@ -242,7 +242,7 @@ test('THE CODE RIDES WITH THE START, and a refusal at code is the host\'s own se
   assert.equal('code' in (none.sent[0]?.body ?? {}), false, 'no code is sent when there is none');
   const fix = 'Sign-up here is by invitation, so open the link you were sent to sign up.';
   const no = await startSignup({ email: 'sami@example.com', slug: 'kiln' }, host({ ok: false, refusal: { code: 'FORBIDDEN', fix, at: 'code' } }, 403).io);
-  assert.deepEqual(no, { ok: false, kind: 'refused', fix, at: 'code' });
+  assert.deepEqual(no, { ok: false, kind: 'refused', fix, at: 'code', code: 'FORBIDDEN' });
 });
 
 test('"MAKE IT AGAIN" WAITS ON THE ACCOUNT\'S OWN YES: canMake true only when the host says so', async () => {
@@ -268,21 +268,22 @@ const plain = (line: string) => {
   assert.doesNotMatch(line, /\b(row|entity|list item)\b/i, `${line} names the machinery`);
 };
 
-test('STEP 1: ONE FIELD WITH ONE EXAMPLE IN IT, NO CHIP CLOUD, and three promises, "Yours to export or move, any time" among them', () => {
+/* STEPS 1 TO 3 ARE ONE CONVERSATION SINCE 1 NOV (56fa8292b), and its turns the only reading the page asks (a5ab06c83). */
+test('STEP 1: THE PAGE OPENS ON THE CONVERSATION\'S FIRST QUESTION, NO CHIP CLOUD, and three promises, "Yours to export or move, any time" among them', () => {
   assert.equal(firstRun.whoPlaceholder, "I'm Mariam. I run a candle shop and want to keep track of orders, stock and what I owe suppliers.");
   assert.equal(words.promises.length, 3);
   assert.deepEqual([...words.promises], ['Free, with no card', 'Nothing is saved until you keep it', 'Yours to export or move, any time']);
   for (const line of [...words.promises, words.lede, firstRun.whoPlaceholder]) plain(line);
   assert.doesNotMatch(PAGE, /firstRun\.whoChips/, 'the starter chips are back (first F6)');
-  assert.match(PAGE, /placeholder=\{firstRun\.whoPlaceholder\}/, 'the field holds no example');
+  assert.match(PAGE, /let asking = \$state\.raw<ChatAsk \| null>\(firstAsk\(\)\);/, 'the page does not open on the first question');
+  assert.match(PAGE, /\{:else if step === 'describe'\}[\s\S]*?<Chat turns=\{chatTurns\} current=\{asking\}[\s\S]*?\{:else if step === 'keep'\}/, 'the first step is not the conversation');
   assert.match(PAGE, /words\.promises/, 'the page draws no promises');
 });
 
-test('STEP 2: HER WORDS ARE LIT FROM WHERE THE READING SAYS THEY ARE, and the press says "That\'s me"', () => {
+test('STEP 2: THE READING STANDS ON WHERE IT SAYS THE WORDS ARE, the build forms beside the conversation, and the press that ends it goes on to Keep', () => {
   assert.equal(words.next, "That's me");
   assert.match(PAGE, /litIn\(sentence, read\?\.heard/, 'the marks are not cut from heard[].at');
-  assert.match(PAGE, /words\.you\b/, 'her name is not said as you');
-  assert.match(PAGE, /words\.takeOut/, 'a line cannot be taken out');
+  assert.match(PAGE, /<Chat [^\n]*onenough=\{\(\) => void keep\(\)\}/, 'the conversation cannot be ended to go on to Keep');
   for (const line of [words.heardTap, words.you, words.becomeInstead, words.takeOut]) plain(line);
 });
 
@@ -293,8 +294,9 @@ test('STEP 3: ONE QUESTION AT MOST, each answer saying what it means, and the li
   assert.equal(q.choices.length, 3);
   for (const c of q.choices) assert.ok(c.means && c.means.length > 0, `${c.label} does not say what it means`);
   assert.equal(q.only, 'That is the only question. Everything else came from what you wrote.');
-  /* ONE QUESTION ON SCREEN: the step draws `q`, one object, and nothing under the field asks a second. */
-  assert.equal((PAGE.match(/id="first-q"/g) ?? []).length, 1, 'more than one question is drawn');
+  /* ONE QUESTION ON SCREEN: the conversation draws `current`, one object, and nothing beside it asks a second. */
+  assert.equal((PAGE.match(/<Chat\b/g) ?? []).length, 1, 'more than one conversation is drawn');
+  assert.doesNotMatch(PAGE, /id="first-q"/, 'the one-question step is back beside the conversation');
   assert.doesNotMatch(PAGE, /asking && open ===/, 'the old questions under the field are back');
   /* NOTHING TO ASK IS STRAIGHT ON: a name, no amount and no orders. */
   assert.equal(oneQuestion(propose("I'm Sami and I run a few companies", CTX), "I'm Sami and I run a few companies"), null);
@@ -308,7 +310,7 @@ test('STEP 4: WHAT WAS SAID IS SENT WITH THE START, so the link carries it to an
   assert.equal(typeof sent, 'string', 'no said in the start');
   assert.equal(saidFromLink(sent as string)?.said, MARIAM);
   assert.equal(words.send, 'Email me a link');
-  assert.equal(words.openHere, 'Open it on this phone. From then on its lock signs you in.');
+  assert.equal(words.openHere, "Open the link on this phone. After that, this phone's lock signs you in.");
   for (const line of [words.openHere, words.openHereWide, words.lockTitle]) plain(line);
 });
 

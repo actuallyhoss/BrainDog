@@ -63,7 +63,7 @@ test('the credits left are said when there are some, and never as nought', () =>
   const none = answer([row({ credits: 0 })], { packs: PACKS });
   assert.equal(packsOf(none.records[0]!, none).left, null);
   const big = answer([row({ credits: 1500 })]);
-  assert.equal(packsOf(big.records[0]!, big).left, 'Credits from packs: 1,500');
+  assert.equal(packsOf(big.records[0]!, big).left, "Extra questions from packs: 1,500. They do not run out at the month's end.");
 });
 
 test('buying asks the checkout door for the record and the pack, and no plan, and goes only to an https page', async () => {

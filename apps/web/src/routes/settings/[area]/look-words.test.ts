@@ -40,7 +40,7 @@ test('Words asks for a singular without "a" or "an", titles the lists "Your list
   assert.equal(src.match(/<Tile icon="rows" title=\{words\.lists\}/gu)?.length, 3);
   assert.doesNotMatch(src, /title=\{said\('lists'\)\}/u);
   /* THE PICK WAITS ON WHAT IT WOULD STRAND, and only then is it sent. */
-  assert.match(src, /strandedBy\(packs, code, next\)/u);
+  assert.match(src, /strandedBy\(packs, heldIn, next\)/u);
   assert.match(src, /onchange=\{\(e\) => pickCurrency\(e\.currentTarget\.value\)\}/u);
   for (const s of [...words.matchAll(/`([^`]*)`|'([^']*)'/gu)].map((m) => m[1] ?? m[2] ?? '')) assert.doesNotMatch(s, /—/u, `an em dash in "${s}"`);
 });

@@ -90,7 +90,13 @@ test('THE PAGE BUILDS WITH THIS, not a copy of it', () => {
   const page = readFileSync(new URL('./Signup.svelte', import.meta.url), 'utf8');
   assert.match(page, /import \{[^}]*\baccepting\b[^}]*\} from '\.\/build\.ts'/u);
   assert.match(page, /await accepting\(/u);
-  assert.doesNotMatch(page, /currencyChoices\(/u, 'the page picks a currency of its own beside accepting()');
+  /* THE PAGE SAYS THE GUESS ON THE KEEP STEP AND KEEPS IT FOR A RECORD WITH NO MONEY YET (e8ffa25df), and those are its only
+     uses: where Money is kept it sends no guess, so what the record is made in is `accepting()`'s. */
+  assert.equal(page.match(/currencyChoices\(/gu)?.length, 3, 'the page picks a currency of its own beside accepting()');
+  assert.match(page, /const moneyNow = \$derived\(currencyPick \?\? read\?\.currency \?\? \(sentence\.trim\(\) === '' \? null : currencyChoices\(sentence, deviceOf\(\)\)\.suggested\)\);/u);
+  assert.match(page, /const moneyAsk = \$derived\(!setOpen \? null : currencyChoices\(sentence, deviceOf\(\)\)\);/u);
+  assert.match(page, /keepCurrencyGuess\([^\n]*asked\.currency \?\? draft\?\.currency \?\? currencyChoices\(draft\?\.said \?\? '', deviceOf\(\)\)\.suggested\);/u);
+  assert.match(page, /currency: money === null \? moneyNow : \(currencyPick \?\? read\?\.currency \?\? null\),/u, 'a guess goes to the build where Money is kept');
   /* WHAT THE SCREEN LIGHTS is chosen by the same `picked` the build uses, not by a second copy of the choice. */
   assert.match(page, /\bpicked\(read, chosen\)/u);
   assert.doesNotMatch(page, /\.also\.flatMap\(/u, 'the page chooses the use cases beside it on its own');

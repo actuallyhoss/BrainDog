@@ -56,9 +56,10 @@ test('THE KEYS PANEL SAYS WHAT THE RECORD SAID, and where the record holds no su
   const absent = tellOf(saidOf(REGISTER_UNKNOWN));
   assert.equal(absent?.kind, 'no-data-yet');
   assert.equal(absent?.title, words.noList);
-  /* The record's own sentence, and then the one thing a person can do about it. */
-  assert.match(absent?.body ?? '', /There is no register called credentials\./u);
-  assert.match(absent?.body ?? '', /Settings › Agents/u);
+  /* WHAT THE PANEL IS FOR, AND THE ONE THING THAT TURNS IT ON (11e8dba29), never the record's word for a list. */
+  assert.equal(absent?.body, words.noListHow);
+  assert.match(absent?.body ?? '', /the Agents plugin/u);
+  assert.doesNotMatch(absent?.body ?? '', /register|credentials/iu);
 });
 
 test('A REFUSAL ABOUT ACCESS IS DRAWN AS ONE, not as an empty list', () => {

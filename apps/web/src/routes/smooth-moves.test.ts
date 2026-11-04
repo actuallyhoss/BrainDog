@@ -72,5 +72,6 @@ test('an answer taken leaves no receipt fade of its own', () => {
 test('a figure that goes fades quickly, and not at all when asked for less motion', () => {
   const figure = read('../lib/ui/Figure.svelte');
   assert.match(figure, /out:leave/u);
-  assert.match(figure, /duration: still\(\) \? 0 : ms\('--d-exit', 90\)/u);
+  /* OR A COUNTING FIGURE'S OWN ROLL, which leaves nothing to fade (3bbe843f1). */
+  assert.match(figure, /duration: still\(\) \|\| counting\(figure\.textContent \?\? '', said\) \? 0 : ms\('--d-exit', 90\)/u);
 });

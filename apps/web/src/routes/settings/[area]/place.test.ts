@@ -122,11 +122,11 @@ test('FIVE GROUPS NAMED BY WHAT THEY HOLD, two by two and Your data the whole wi
   assert.deepEqual(rows[0], ['Signing in', 'Notifications', 'Keyboard']);
   assert.deepEqual(rows[1], ['Appearance', 'Pages', 'Time and money']);
   assert.deepEqual(rows[2], ['Agents', 'Keychain', 'What comes in', 'Plugins']);
-  assert.deepEqual(rows[3], ['People and sharing', 'Usage', 'Billing']);
+  assert.deepEqual(rows[3], ['People and sharing', 'Who can do what', 'Usage', 'Billing']);
   assert.deepEqual(rows[4], ['Health', 'Tidy up', 'Backups', 'Export', 'Delete my BrainDog']);
   assert.deepEqual(SETTINGS_INDEX.blocks.map((b) => b.span), [6, 6, 6, 6, 12]);
   const hrefs = SETTINGS_INDEX.blocks.flatMap((b) => (b.authored ?? []).map((r) => r.cells[1]));
-  for (const at of ['/keychain', '/settings/addons', '/usage']) assert.ok(hrefs.includes(at), at);
+  for (const at of ['/keychain', '/settings/plugins', '/usage']) assert.ok(hrefs.includes(at), at);
   assert.ok(!DEFAULT_GROUPS.some((g) => g.areas.some((a) => a.id === 'look')), 'the design book is a setting again');
   const route = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(route, /param === 'look'\) void goto\(at\('\/design'\)/u, 'a link to the design book no longer lands');

@@ -42,10 +42,10 @@ test('the two sentences about where a look is kept agree with the code, which ke
   assert.doesNotMatch(line, /settings above/u, 'the line still claims every setting on the screen');
 });
 
-test('the sub-nav draws "here" as the rail does: the tile under the row and the glyph in ink', () => {
+test('the sub-nav draws "here" as the rail does: the chosen tint under the row (bfa6829fa) and the glyph in ink', () => {
   const index = strip(readFileSync(new URL('./[area]/SettingsIndex.svelte', import.meta.url), 'utf8'));
   const here = /\.area-row\[aria-current='page'\] \{([^}]*)\}/u.exec(index)?.[1] ?? '';
-  assert.match(here, /background: var\(--tile\);/u);
+  assert.match(here, /background: var\(--chosen\);/u);
   assert.doesNotMatch(here, /--red-tint/u, 'the current area still wears the tinted wash');
   const glyph = /\.area-row\[aria-current='page'\] \.area-icon :global\(\.well\.well\) \{([^}]*)\}/u.exec(index)?.[1] ?? '';
   assert.match(glyph, /background: transparent;/u);
