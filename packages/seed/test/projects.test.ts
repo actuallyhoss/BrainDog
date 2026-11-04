@@ -115,7 +115,8 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
   assert.ok(byHealth.ok, sayOf(byHealth));
   const parts = byHealth.value.groups ?? [];
   assert.equal(parts.reduce((n, g) => n + Number(g.value), 0), THINGS.filter(inPlay).length, 'every project in play is a part');
-  assert.deepEqual((block(overview, 'How they are going') as { tones?: unknown }).tones, { on_track: 'good', at_risk: 'warn', off_track: 'bad' }, 'the record hands each part its intent to the page');
+  /* NO BAR OF THEM SINCE portfolio 1.31.2 (fdc1b185b): each card in play says its own health, and the bar said it again. The figure stays, for what else reads it. */
+  assert.ok(!overview.blocks.some((b) => b.heading === 'How they are going'), 'How they are going is drawn again');
   assert.deepEqual(names(parkedOf(overview)), ['Tallow']);
 
   /* WHO HOLDS IT IS ON ITS CARD (proj F5), where a table With an agent said it again. */
@@ -337,24 +338,19 @@ test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a ca
   assert.deepEqual(lane.values.map((v) => lane.labels?.[v]), ['Building', 'Earning', 'Parked', 'Closed']);
   const blocks = page.blocks as { kind: string; heading?: string; span?: number; when?: unknown; lead?: boolean }[];
   assert.ok(!blocks.some((b) => b.heading === 'Right now'), 'Right now is drawn beside the line that says its figure');
-  /* SINCE portfolio 1.11.0 the row is one track of how they are going, the whole width: Where they are said the line
-     again beside it. */
-  const row = blocks.filter((b) => ['Where they are', 'How they are going'].includes(String(b.heading)));
-  /* AND SINCE portfolio 1.30.0 WHERE THEY ARE IS GONE: the board's date line counts the lanes. */
-  assert.deepEqual(row.map((b) => [b.heading, b.span]), [['How they are going', 12]], 'a split is not one whole tile');
-  /* ONLY PAST FOUR IN PLAY, SINCE portfolio 1.12.0: three projects drew three equal thirds, which the line and the cards
-     already say. */
-  assert.equal(JSON.stringify(row[0]!.when), JSON.stringify({ all: [{ metric: 'projects-live', gt: 4 }, { metric: 'projects-with-health', gt: 0 }] }), 'the track draws over a few projects, or over none that says');
+  /* SINCE portfolio 1.11.0 the row was one track of how they are going; SINCE portfolio 1.30.0 WHERE THEY ARE IS GONE (the board's date line
+     counts the lanes), and SINCE 1.31.2 (fdc1b185b) SO IS THE TRACK: each card in play says its own health. */
+  assert.deepEqual(blocks.filter((b) => ['Where they are', 'How they are going'].includes(String(b.heading))).map((b) => b.heading), [], 'a track is drawn over the cards');
   /* NO STRIP UNDER THE LINE SINCE BATCH 6: "In play 3, Earning 2" was a whole row for what the line says. */
   assert.ok(!blocks.some((b) => b.heading === 'In play and earning'), 'the strip is drawn again');
-  /* THE ADD A PROJECT BOX COMES BEFORE THEM, SINCE portfolio 1.27.0, drawn only while none is in play. */
-  assert.equal(blocks.find((b) => !b.lead && b.kind !== 'capture')?.heading, 'How they are going', 'the track is not the first under the line');
+  /* THE ADD A PROJECT BOX COMES BEFORE THE BOARD, SINCE portfolio 1.27.0, drawn only while none is in play. */
+  assert.equal(blocks.find((b) => !b.lead && b.kind !== 'capture')?.heading, 'In play', 'the board is not the first under the line');
 
   const k = await seeded();
-  const going = () => opened(k, 'portfolio').blocks.find((b) => b.heading === 'How they are going')!;
-  assert.equal(going().drawn, false, 'the track is drawn over three projects');
   for (const name of ['Bindery', 'Lantern']) assert.ok(k.create('things', { name, lane: 'building', health: 'on_track' } as never, { actor: 'p_test' }).ok);
-  assert.notEqual(going().drawn, false, 'the track is not drawn over five projects');
+  const board = opened(k, 'portfolio').blocks;
+  assert.ok(!board.some((b) => b.heading === 'How they are going'), 'a track is drawn over five projects');
+  assert.equal(block({ blocks: board } as never, 'In play').rows.find((r) => r.fields.name === 'Lantern')?.fields.health, 'on_track', 'a card in play does not carry its health');
 });
 
 test('A PROJECT PAGE OPENS ON ONE LINE, its next step unless work waits to be checked, and says the step once', async () => {

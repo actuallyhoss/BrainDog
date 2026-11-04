@@ -155,7 +155,8 @@ test('WITH NO PROJECT IS BELOW THE FOLD, in a fold of its own, and Work keeps at
   const at = blocks.findIndex((b) => b.heading === 'With no project');
   assert.ok(at > 0, 'Work declares no With no project');
   assert.deepEqual(blocks[at], { ...WITH_NO_PROJECT }, 'Work’s tile is not the one a Home can take');
-  assert.equal(WITH_NO_PROJECT.where, 'state is not backlog or done or dropped, thing is empty', 'the tile and the figure ask different questions');
+  /* AND NO CLIENT, SINCE THE COMMIT THAT LET A TASK BE FOR A CLIENT ALONE: one for a client has a home. */
+  assert.equal(WITH_NO_PROJECT.where, 'state is not backlog or done or dropped, thing is empty, client is empty', 'the tile and the figure ask different questions');
   assert.equal((METRICS['tasks-no-project'] as { where?: string }).where, WITH_NO_PROJECT.where);
   const over = blocks[at - 1]!;
   assert.deepEqual([over.kind, over.heading, over.fold, over.when], ['section', 'Needs a project', true, { metric: 'tasks-no-project', gt: 0 }]);

@@ -109,13 +109,16 @@ test('THREE PROJECTS ARE THE BOARD, and a record with only finished ones still d
   assert.ok(drawn(headed(projects(done.k), 'In play')), 'the board is not drawn over a finished project');
 });
 
-test('WITH NO HEALTH SET THERE IS NO HEALTH SPLIT, and the first project that says how it is going draws it', async () => {
+/* NO SPLIT AT ALL SINCE portfolio 1.31.2 (fdc1b185b): how a project is going is said on its own card, once it says, and a bar said it again. */
+test('NO HEALTH SPLIT, WITH HEALTH SET OR NOT, and the first project that says how it is going carries it on its card', async () => {
   const { k } = await fresh();
   const made = SIX.map(([name, lane]) => add(k, name, lane));
-  assert.equal(drawn(headed(projects(k), 'How they are going')), false, 'a split of Not said yet is drawn');
+  assert.ok(!projects(k).some((b) => b.heading === 'How they are going'), 'a split of Not said yet is drawn');
   const set = k.update('things', made[3]!, { health: 'at_risk' } as never, PERSON);
   assert.ok(set.ok, sayOf(set));
-  assert.ok(drawn(headed(projects(k), 'How they are going')), 'the split waits after a project said how it is going');
+  assert.ok(!projects(k).some((b) => b.heading === 'How they are going'), 'a split is drawn once a project says how it is going');
+  const said = (headed(projects(k), 'In play') as unknown as { rows: { fields: Record<string, unknown> }[] }).rows.filter((r) => r.fields.health === 'at_risk');
+  assert.equal(said.length, 1, 'the card of the project that said it does not say it');
 });
 
 test('NO STRIP SAYS IN PLAY AND EARNING, and the record still saves the two nights', async () => {
@@ -152,6 +155,5 @@ test('SIX TILES AT MOST BEFORE THE FOLD, drawn on a record with every one of the
     return !boxed && b.lead !== true;
   });
   assert.ok(above.length <= 6, `${above.length} tiles before the fold: ${above.map((b) => b.heading ?? b.kind).join(', ')}`);
-  for (const heading of ['How they are going', 'In play'])
-    assert.ok(above.some((b) => b.heading === heading), `${heading} is not before the fold`);
+  assert.ok(above.some((b) => b.heading === 'In play'), 'In play is not before the fold');
 });

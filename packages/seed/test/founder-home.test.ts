@@ -23,7 +23,6 @@ import { DUE_THIS_WEEK } from '../src/modules/money.ts';
 import { MODULE_ORDER, modulesFor, signalsIn, standsOn, useCase, useCaseDocument, type UseCase } from '../src/usecases/index.ts';
 import { carriedDocument, claimedBy, dayOf, fitted, moduleDocument } from '../src/usecases/install.ts';
 import { DOMAINS, PROJECTS } from '../../../fixtures/names.ts';
-import { useCaseThingsUndone } from './things-before.ts';
 
 const TODAY = dayOf(NOW);
 
@@ -241,100 +240,29 @@ test('WORDS THAT NAME DOMAINS BRING SERVICES ON THE FIRST DAY, and Today keeps L
  * so every field 2.6.0 declared is still on the list. A record on 2.7.0 taking the update with every reading kept is
  * `portfolio-kpis.test.ts`'s.
  */
-/** The Dashboard's line while no number came: 3.8.0's, and 2.6.0's as it was published. */
-const NO_NUMBERS_38 = 'No numbers came in the last thirty days.';
-const NO_NUMBERS_26 = "No project has reported a number in the last thirty days. A project's page has the key it sends them with.";
 test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfolio with its two links laid back', () => {
+  /* BOTH AS PUBLISHED, SINCE THE SEED HAS GONE ON TEN VERSIONS: this rebuilt 3.0.0 from today's source by undoing each later change by hand, and
+     each one since 3.8.2 left it red (a sentence, a nav place, the Dashboard's first acts). The catalogue holds both frozen, and `usecase-versions.test.ts`
+     holds every version since. */
   type List = { register?: string; fields?: { id: string }[] };
-  const frozen = JSON.parse(readFileSync(join(import.meta.dirname, '../../../apps/web/static/catalogue/usecases/founder/2.6.0.usecase.json'), 'utf8')) as { version: string; pack: { declarations: List[] } };
-  const next = useCaseDocument('founder', TODAY)! as { declarations: unknown[]; hands: Record<string, string>; extends: Record<string, { fields: { id: string }[] }> };
+  type Page = { page?: string; blocks?: { kind?: string }[] };
+  type Published = { version: string; pack: { declarations: (List & Page)[] } };
+  const published = (v: string): Published => JSON.parse(readFileSync(join(import.meta.dirname, `../../../apps/web/static/catalogue/usecases/founder/${v}.usecase.json`), 'utf8')) as Published;
+  const frozen = published('2.6.0');
+  const three = published('3.0.0');
+  const next = useCaseDocument('founder', TODAY)! as { declarations: List[]; hands: Record<string, string>; extends: Record<string, { fields: { id: string }[] }> };
   assert.equal(frozen.version, '2.6.0');
+  assert.equal(three.version, '3.0.0');
   /* AND A PROJECT'S KEY NUMBERS ON ITS PAGE, folded into the unreleased 3.0.0 (the KPI plan of 21 October, K3-C): the
      one block it adds, under the questions, and nothing else of the page moved. */
-  type Page = { page?: string; blocks?: { kind?: string }[] };
-  const project = (next.declarations as Page[]).find((d) => d.page === 'project')!;
+  const project = three.pack.declarations.find((d) => d.page === 'project')!;
   assert.deepEqual(project.blocks!.filter((b) => b.kind === 'kpis'), [{ kind: 'kpis', heading: 'Key numbers', icon: 'chart-line', span: 12, key: 'kpis', source: 'kpis', for: 'project' }]);
-  /* AND ITS ROAD, SINCE founder 3.2.0 (portfolio 1.23.0): the stages block, its list on the page's requires, the two
-     plan blocks' kept shape on their `when:`, and its two opening notes as one note of two sentences, each laid back here
-     as 2.6.0 drew it, so nothing else of the page moved. */
-  type Block = { kind?: string; heading?: string; says?: { when?: unknown; body: string }[]; when?: unknown; [k: string]: unknown };
-  const asBefore = (blocks: Block[]): Block[] =>
-    blocks.flatMap((b): Block[] => {
-      if (b.kind === 'kpis' || (b.kind === 'steps' && b.heading === 'The road')) return [];
-      /* AND THE PROJECT'S SHAPE AS BLOCKS, SINCE founder 3.3.0: its two blocks, and More about declared folded
-         as it was drawn, laid back here too. */
-      if (b.kind === 'project') return [];
-      if (b.kind === 'section' && b.box === true && b.fold === true) {
-        const { fold: _fold, ...rest } = b;
-        return [rest as Block];
-      }
-      if ((b.kind === 'feed' && b.heading === 'What changed') || (b.kind === 'cards' && b.heading === 'Agents')) return [{ ...b, span: 6 }];
-      if (b.kind === 'note' && b.lead === true && Array.isArray(b.says)) {
-        const { says, ...rest } = b;
-        return [
-          { ...rest, when: says[0]!.when, body: says[0]!.body },
-          { ...rest, when: { metric: 'project-in-review:{{name}}', is: 0 }, body: says[1]!.body },
-        ] as Block[];
-      }
-      const all = (b.when as { all?: unknown[] } | undefined)?.all;
-      if (b.kind === 'roadmap' && Array.isArray(all)) return [{ ...b, when: all[0] }];
-      /* AND FOUNDER 3.4.0 (Z20 of 25 October): Last worked read the tasks alone, and the numbers were headed thirty
-         days, laid back here as 2.6.0 drew them. */
-      if (b.kind === 'lines' && b.heading === 'Numbers') return [{ ...b, heading: 'Numbers, 30 days' }];
-      /* AND FOUNDER 3.8.2 (31 October, AG22): what keeps it running was headed Keeping it alive. */
-      if (b.kind === 'cards' && b.heading === 'Services' && b.source === 'register.services') return [{ ...b, heading: 'Keeping it alive' }];
-      if (b.kind === 'stat' && Array.isArray(b.cells))
-        return [{ ...b, cells: (b.cells as { metric?: string }[]).map((c) => (c.metric === 'project-worked:{{name}}' ? { ...c, metric: 'project-last-worked:{{name}}' } : c)) }];
-      return [b];
-    });
-  /* AND THE PLAN AND WHERE NUMBERS ARE SENT, MOVED SINCE founder 3.7.0: the plan under More about, and Send numbers here
-     folded last, laid back here where 2.6.0 drew them, just over More about. */
-  const inPlace = (blocks: Block[]): Block[] => {
-    const plan = blocks.filter((b) => b.kind === 'roadmap');
-    const send = blocks.filter((b) => b.heading === 'Send numbers here').map(({ fold: _fold, ...rest }) => rest as Block);
-    const rest = blocks.filter((b) => b.kind !== 'roadmap' && b.heading !== 'Send numbers here');
-    const at = rest.findIndex((b) => b.heading === 'More about {{name}}');
-    return [...rest.slice(0, at), ...plan, ...send, ...rest.slice(at)];
-  };
-  /* AND THE DASHBOARD'S TWO CHARTS SINCE founder 3.4.0: the one headed with its age taken out, and the other's
-     gate on the age. */
-  const dashboardBefore = (blocks: Block[]): Block[] =>
-    blocks.flatMap((b): Block[] => {
-      /* AND 3.8.0 (Q51 of 29 October): while no number came, the line says so shortly, then what went quiet and the way
-         to fix the feed, laid back here as 2.6.0 said it, one line and nothing under it. */
-      const quiet = (b.when as { metric?: string; lt?: number } | undefined)?.metric === 'datapoints-30d' && (b.when as { lt?: number }).lt === 1;
-      if (quiet && b.lead !== true) return [];
-      if (quiet && b.body === NO_NUMBERS_38) return [{ ...b, body: NO_NUMBERS_26 }];
-      /* AND 3.5.0: the Organisations table leaves out the ones put away. */
-      if (b.kind === 'table' && b.heading === 'Organisations') return [{ ...b, where: 'merged_into is empty' }];
-      if (b.kind !== 'lines') return [b];
-      if (String(b.heading).startsWith('Numbers, last reported')) return [];
-      const all = (b.when as { all?: unknown[] } | undefined)?.all;
-      /* AND THE SHAPE NUMBERS' PAGE DRAWS, two charts and forty listed (3.5.0). */
-      const { limit: _limit, most: _most, ...rest } = b as Block & { limit?: unknown; most?: unknown };
-      return [Array.isArray(all) ? { ...rest, when: all[0] } : rest] as Block[];
-    });
-  /* AND EVERY PROJECT HAS ITS PAGE, PARKED AND FINISHED ONES TOO, since 3.1.0 (things, not rows): undone here. */
-  const less = (useCaseThingsUndone(next as never).declarations as (Page & { requires?: string[]; metric?: string })[])
-    .filter((d) => d.metric !== 'datapoints-age')
-    .map((d) =>
-      d.page === 'project'
-        ? { ...d, ...(d.requires ? { requires: d.requires.filter((r) => r !== 'register.stages') } : {}), blocks: inPlace(asBefore(d.blocks as Block[])) }
-        : d.page === 'dashboard'
-          ? { ...d, blocks: dashboardBefore(d.blocks as Block[]) }
-          : /* AND 3.8.0: the add-on's page is Founder overview, where Today is the app's own board. */
-            d.page === 'home-founder' && (d as { title?: string }).title === 'Founder overview'
-            ? { ...d, title: 'Today' }
-            : d,
-    );
-  /* THE TWO BLOCKS THAT WENT FOR THE SHAPE (founder 3.3.0): Handed back or blocked, and Money by month. And the three
-     that went for its parts (founder 3.7.0): the Numbers lines for the numbers part, What changed for what happened, and
-     Where it was seen for the agents part, each saying the same thing a second time. */
-  const WENT = new Set(['Handed back or blocked', 'Money by month', 'Numbers, 30 days', 'What changed', 'Where it was seen']);
-  const was26 = frozen.pack.declarations
-    .filter((d) => d.register !== 'datapoints')
-    .map((d) => ((d as Page).page === 'project' ? { ...d, blocks: ((d as Page).blocks as Block[]).filter((b) => !WENT.has(String(b.heading))) } : d));
+  const less = three.pack.declarations.map((d) => (d.page === 'project' ? { ...d, blocks: d.blocks!.filter((b) => b.kind !== 'kpis') } : d));
+  const was26 = frozen.pack.declarations.filter((d) => d.register !== 'datapoints');
   assert.deepEqual(less, was26, '3.0.0 declares what the published 2.6.0 declares, but Numbers and the Key numbers block');
+  /* AND TODAY'S STILL HOLDS EVERY LIST 2.6.0 DECLARED, SO NO RECORD LOST ONE. */
+  const lists = (doc: readonly List[]) => doc.flatMap((d) => (d.register === undefined ? [] : [d.register]));
+  assert.deepEqual(lists(was26).filter((l) => !lists(next.declarations).includes(l)), [], 'a list 2.6.0 declared has gone');
   assert.equal(next.hands['register.datapoints'], 'portfolio');
   const was = frozen.pack.declarations.find((d) => d.register === 'datapoints')!.fields!;
   const laid = next.extends['register.datapoints']!.fields;
