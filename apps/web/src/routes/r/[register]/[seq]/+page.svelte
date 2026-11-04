@@ -2669,7 +2669,7 @@
     inline-size: var(--tap);
     block-size: 32px;
     /* THE GLYPH ENDS ON THE CARD'S TEXT EDGE, its hit box running on past it: centred in a 44 box it stood 36 in from a
-       desk card's edge and 31 from a phone's, 16 and 11 inside the edge everything else on the card keeps. */
+       desk card's edge and 32 from a phone's, 16 inside the edge everything else on the card keeps. */
     margin-inline-end: calc((var(--icon-s, 14px) - var(--tap)) / 2);
     padding: 0;
     background: none;
