@@ -73,6 +73,7 @@ export const threadWords = {
   open: 'Open',
   dismissed: 'Left as it is.',
   placeholder: 'Ask Slash anything',
+  mention: 'Mention a row',
   followUp: 'Ask a follow-up',
   fresh: 'New',
   freshLabel: 'Start a new conversation',
@@ -206,6 +207,8 @@ export type ChatBody = {
   page?: PageContext;
   mode?: 'quick' | 'deep' | 'auto';
   attach?: string[];
+  /** Which letters of `message` name which row, kept with the turn so its bubble draws them on any device. */
+  mentions?: { at: number; len: number; ref: string }[];
   rethink?: boolean;
 };
 

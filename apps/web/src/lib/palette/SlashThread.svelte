@@ -18,6 +18,7 @@
   import { arrive, lineIn, listMotion } from '$lib/motion/index.ts';
   import { at } from '../at.ts';
   import Cited from '../ui/Cited.svelte';
+  import Spoken from '../mention/Spoken.svelte';
   import Icon from '../ui/Icon.svelte';
   import Kbd from '../ui/Kbd.svelte';
   import SlashOut from '../ui/SlashOut.svelte';
@@ -149,7 +150,7 @@
     <ol class="t-turns" role="log" aria-live="polite" aria-busy={convo.busy} aria-label={threadWords.label} {@attach listMotion('li', { leave: false })}>
       {#each convo.turns as turn, i (i)}
         {#if turn.role === 'you'}
-          <li class="t-you" dir="auto">{turn.text}</li>
+          <li class="t-you" dir="auto"><Spoken text={turn.text} mentions={turn.mentions} /></li>
         {:else}
           <li class="t-slash">
             {#if turn.steps.length > 0}
@@ -309,6 +310,7 @@
     background: var(--tile-2);
     color: var(--ink);
     overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
 
   .t-slash {

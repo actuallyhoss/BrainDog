@@ -15,6 +15,8 @@ import { copy } from '../copy.ts';
 import { history } from '../data/undo.ts';
 import type { QueueQuestion } from '@braindog/kernel';
 import type { Reading } from '@braindog/client';
+import type { SentMention } from '../mention/mention.ts';
+import { ATTACH_MOST } from '../../routes/slash/with.ts';
 import { act, chat, chatWords, keepThread, type ChatAction, type ChatBody, type PageContext } from './slash-chat.ts';
 import { drawProposal, drawReading, pass2Refused, secondPass, slashWords, type DrawnRow } from './slash.ts';
 
@@ -56,7 +58,7 @@ export type SlashTurn = {
   route?: string | undefined;
   legacy?: Legacy;
 };
-export type YouTurn = { role: 'you'; text: string };
+export type YouTurn = { role: 'you'; text: string; mentions?: readonly SentMention[] | undefined };
 export type LiveTurn = YouTurn | SlashTurn;
 
 export const convo = $state({
@@ -124,16 +126,28 @@ export async function open(id: string, base = apiBase()): Promise<boolean> {
 const fresh = (): SlashTurn => ({ role: 'slash', steps: [], text: '', figures: {}, actions: [], go: [], error: null, spent: false, streaming: true });
 
 /** How an ask is sent: Quick or Deep, and the rows it is about. Left out, the host's own way. */
-export type AskWith = { mode?: 'quick' | 'deep' | 'auto' | undefined; attach?: readonly string[] | undefined };
+export type AskWith = { mode?: 'quick' | 'deep' | 'auto' | undefined; attach?: readonly string[] | undefined; mentions?: readonly SentMention[] | undefined };
+
+/**
+ * THE ROWS A MESSAGE GOES WITH, nearest first, since a quick answer reads only the first few: the ones it mentions, then
+ * those it is sent from (the page behind), then those mentioned earlier in the thread, which stay with it as attached
+ * rows always have. Each once, and no more than the door takes.
+ */
+export function sentWith(mentions: readonly SentMention[] = [], from: readonly string[] = []): string[] {
+  const earlier = convo.turns.flatMap((t) => (t.role === 'you' ? [...(t.mentions ?? [])].reverse().map((m) => m.ref) : [])).reverse();
+  return [...new Set([...mentions.map((m) => m.ref), ...from, ...earlier])].slice(0, ATTACH_MOST);
+}
 
 /** Ask one question in this thread, with the page it was asked on. */
 export async function ask(message: string, page: PageContext, base = apiBase(), how: AskWith = {}): Promise<void> {
   const said = message.trim();
   if (said === '' || convo.busy) return;
-  convo.turns.push({ role: 'you', text: said }, fresh());
+  const mentions = how.mentions ?? [];
+  const attach = sentWith(mentions, how.attach);
+  convo.turns.push({ role: 'you', text: said, ...(mentions.length > 0 ? { mentions: [...mentions] } : {}) }, fresh());
   convo.busy = true;
   if (missing) return twoPass(said, base);
-  return stream_({ ...(convo.id ? { thread: convo.id } : {}), message: said, page, ...(how.mode ? { mode: how.mode } : {}), ...(how.attach && how.attach.length > 0 ? { attach: [...how.attach] } : {}) }, said, base);
+  return stream_({ ...(convo.id ? { thread: convo.id } : {}), message: said, page, ...(how.mode ? { mode: how.mode } : {}), ...(attach.length > 0 ? { attach } : {}), ...(mentions.length > 0 ? { mentions: [...mentions] } : {}) }, said, base);
 }
 
 /** Whether the last answer is finished and whole, so it can be asked again harder. */

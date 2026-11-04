@@ -1,31 +1,21 @@
 <!--
   The one place a question to Slash is typed, on the Slash page.
 
-  A FIELD THAT GROWS, THE ROWS IT IS ABOUT AS CHIPS ABOVE IT, AND ONE SEND. Enter sends, Shift+Enter is a new line.
-  Each chip is a row the ask is sent with (`attach`), drawn as the app's capsule with its list's glyph, and taken off by
-  its ×, or by Backspace in an empty field.
-
-  @ ATTACHES A ROW. Typed as a word of its own, it opens a list under the field (over it, when the field is docked at
-  the foot of a conversation): the rows changed last while nothing follows the @, the rows that answer as letters are
-  typed. Arrows move, Enter or Tab picks, Esc closes, a tap picks. The @ and its letters leave the sentence and the row
-  becomes a chip. The @ button does the same for a thumb.
+  A FIELD THAT GROWS AND ONE SEND. Enter sends, Shift+Enter is a new line. @ IS INLINE (`$lib/mention`, the same field as
+  the panel's): type it anywhere and a list opens at it, and the row picked goes in the sentence as a mention. Its
+  letters are the row: delete them and it is gone. The @ button types one for a thumb.
 
   WITH NOTHING TYPED, ENTER AND ESC ARE THE WAITING CARD'S (`onempty`): Enter does what Slash asks, Esc leaves it.
 -->
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
-  import { page } from '$app/state';
-  import { apiBase } from '$lib/at.ts';
+  import { onMount } from 'svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import type { IconName } from '$lib/ui/icons.ts';
-  import { refOfHref } from '$lib/send/send.ts';
-  import { early, keep } from '$lib/record/search-kept.ts';
-  import type { SearchHit } from '$lib/record/api.ts';
-  import { ATTACH_MOST, type Chip } from './with.ts';
+  import MentionField from '$lib/mention/MentionField.svelte';
+  import { sentOf, type Mention, type SentMention } from '$lib/mention/mention.ts';
 
   let {
     value = $bindable(''),
-    chips = $bindable([]),
+    mentions = $bindable([]),
     busy = false,
     disabled = false,
     docked = false,
@@ -37,7 +27,7 @@
     needs = null,
   }: {
     value?: string;
-    chips?: Chip[];
+    mentions?: Mention[];
     /** An answer is on its way: the send waits for it. */
     busy?: boolean;
     /** No model behind Slash: nothing can be asked. */
@@ -45,7 +35,7 @@
     /** At the foot of a conversation, so the @ list opens upward. */
     docked?: boolean;
     placeholder: string;
-    onsend: (text: string) => void;
+    onsend: (text: string, mentions: readonly SentMention[]) => void;
     /** Enter or Esc with nothing typed. True when it was taken. */
     onempty?: ((key: 'enter' | 'escape') => boolean) | undefined;
     autofocus?: boolean;
@@ -58,200 +48,44 @@
   const words = {
     label: 'Ask Slash',
     send: 'Ask',
-    attach: 'Add a row as context',
-    remove: (name: string) => `Take ${name} off`,
-    recent: 'Changed lately',
-    found: 'Matches',
-    none: (q: string) => `Nothing called “${q}”`,
-    full: `Up to ${ATTACH_MOST} rows`,
+    mention: 'Mention a row',
     keys: 'to ask',
     newline: 'new line',
   } as const;
 
-  type Hit = { ref: string; label: string; detail: string; icon: string };
+  let field = $state<ReturnType<typeof MentionField> | null>(null);
+  let box = $state<HTMLTextAreaElement | HTMLInputElement>();
 
-  let field = $state<HTMLTextAreaElement>();
-  /** The @ word being typed: where its @ is and the letters after it. */
-  let token = $state<{ start: number; q: string } | null>(null);
-  /** An @ list closed with Esc stays closed until its word changes. */
-  let shut = $state<string | null>(null);
-  let hits = $state<Hit[]>([]);
-  let found = $state(false);
-  let cursor = $state(0);
-  let asked = 0;
-
-  const open = $derived(token !== null && shut !== `${token.start}:${token.q}` && !disabled);
-  const full = $derived(chips.length >= ATTACH_MOST);
   const canSend = $derived(!disabled && !busy && value.trim().length >= 2);
-  const lists = $derived(((page.data as { index?: { registers?: { id: string; name: string; icon: string; count: number }[] } }).index?.registers ?? []).map((r) => ({ ...r })));
-  const listNamed = $derived(new Map(lists.map((l) => [l.id, l.name] as const)));
-  const listOf = (ref: string): string => listNamed.get(ref.split('#')[0] ?? '') ?? '';
-
-  /* ONE READER A RECORD, not one a letter: each was a new client and a new search, so nothing it read was kept. */
-  let reading: { base: string; r: Promise<import('$lib/record/palette-live.ts').Reader> } | null = null;
-  const reader = () => {
-    const base = apiBase();
-    if (reading?.base !== base) reading = { base, r: import('$lib/record/palette-live.ts').then((m) => m.paletteReader(base)) };
-    return reading.r;
-  };
 
   onMount(() => {
-    if (autofocus && matchMedia('(pointer: fine)').matches) field?.focus({ preventScroll: true });
+    if (autofocus && matchMedia('(pointer: fine)').matches) box?.focus({ preventScroll: true });
   });
 
   /** Focus the field, the caret at its end. */
   export function focus(): void {
-    field?.focus({ preventScroll: true });
-    const n = field?.value.length ?? 0;
-    field?.setSelectionRange(n, n);
+    field?.focusEnd();
   }
 
-  /* THE FIELD GROWS WITH WHAT IS TYPED, up to six lines, then scrolls. */
-  $effect(() => {
-    void value;
-    if (!field) return;
-    field.style.blockSize = 'auto';
-    field.style.blockSize = `${Math.min(field.scrollHeight, 6 * 22 + 20)}px`;
-  });
-
-  /** The @ word under the caret, if there is one. */
-  function readToken() {
-    if (!field) return;
-    const before = value.slice(0, field.selectionStart ?? value.length);
-    const m = /(^|\s)@([^\s@]{0,40})$/u.exec(before);
-    token = m ? { start: before.length - m[2]!.length - 1, q: m[2]! } : null;
-  }
-
-  /* THE ROWS FOR THE @ WORD: changed lately with no letters, else what answers them, a beat after the last key. */
-  $effect(() => {
-    const t = token;
-    if (t === null || !open) return;
-    const mine = ++asked;
-    /* WHAT WAS KEPT ANSWERS AT ONCE (`search-kept.ts`), and the record's answer replaces it a beat later. */
-    if (t.q.length > 1) {
-      const kept = early(apiBase(), t.q, 8);
-      if (kept !== null) {
-        const taken = new Set(untrack(() => chips.map((c) => c.ref)));
-        hits = asHits(kept.value.hits).filter((h) => !taken.has(h.ref)).slice(0, 7);
-        found = true;
-      }
-    }
-    const wait = setTimeout(
-      () => {
-        void reader().then(async (r) => {
-          let next: Hit[];
-          if (t.q === '') {
-            const recent = await r.recent(lists as never, 8).catch(() => []);
-            next = recent.map((x) => ({ ref: x.target, label: x.title, detail: x.list, icon: String(x.icon ?? 'rows') }));
-          } else {
-            const out = await r.find(t.q, 8);
-            if (out.fix === null) keep(apiBase(), t.q, out.value);
-            next = asHits(out.value.hits);
-          }
-          if (mine !== asked) return;
-          const taken = new Set(untrack(() => chips.map((c) => c.ref)));
-          hits = next.filter((h) => !taken.has(h.ref)).slice(0, 7);
-          found = true;
-          cursor = 0;
-        });
-      },
-      t.q === '' ? 0 : 110,
-    );
-    return () => clearTimeout(wait);
-  });
-
-  function asHits(found: readonly SearchHit[]): Hit[] {
-    return found.flatMap((h): Hit[] => {
-      const ref = refOfHref(h.href);
-      return ref ? [{ ref, label: h.title, detail: listOf(ref) || h.detail, icon: String(h.icon ?? 'rows') }] : [];
-    });
-  }
-
-  function pick(h: Hit) {
-    const t = token;
-    if (t === null || full) return;
-    const after = value.slice(t.start + 1 + t.q.length);
-    const head = value.slice(0, t.start);
-    value = (head.endsWith(' ') && after.startsWith(' ') ? head + after.slice(1) : head + after).replace(/^\s+/u, '');
-    chips = [...chips, { ref: h.ref, label: h.label, icon: h.icon }];
-    token = null;
-    hits = [];
-    found = false;
-    const caret = Math.min(head.length, value.length);
-    queueMicrotask(() => {
-      field?.focus();
-      field?.setSelectionRange(caret, caret);
-    });
-  }
-
-  function drop(ref: string) {
-    chips = chips.filter((c) => c.ref !== ref);
-    field?.focus();
-  }
-
-  /** The @ button: an @ at the caret, a word of its own, so the list opens as if it were typed. */
-  function atButton() {
-    if (!field || disabled) return;
-    const at = field.selectionStart ?? value.length;
-    const pad = at > 0 && !/\s$/u.test(value.slice(0, at)) ? ' ' : '';
-    value = `${value.slice(0, at)}${pad}@${value.slice(at)}`;
-    const caret = at + pad.length + 1;
-    shut = null;
-    queueMicrotask(() => {
-      field?.focus();
-      field?.setSelectionRange(caret, caret);
-      readToken();
-    });
+  /** A row named from outside: a mention at the head of the sentence. */
+  export function put(row: { ref: string; label: string; icon: string }): void {
+    field?.put(row);
   }
 
   function send() {
     if (!canSend) return;
-    token = null;
-    onsend(value.trim());
+    const said = sentOf(value, mentions);
+    onsend(said.text, said.mentions);
   }
 
-  function onkeydown(e: KeyboardEvent) {
-    if (e.isComposing) return;
-    if (open && (hits.length > 0 || e.key === 'Escape')) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        cursor = (cursor + 1) % Math.max(1, hits.length);
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        cursor = (cursor - 1 + hits.length) % Math.max(1, hits.length);
-        return;
-      }
-      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
-        const h = hits[cursor];
-        if (h) {
-          e.preventDefault();
-          pick(h);
-          return;
-        }
-      }
-      if (e.key === 'Escape' && token) {
-        e.preventDefault();
-        e.stopPropagation();
-        shut = `${token.start}:${token.q}`;
-        return;
-      }
-    }
+  function onkey(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (value.trim() === '') onempty?.('enter');
       else send();
       return;
     }
-    if (e.key === 'Escape' && value.trim() === '' && onempty?.('escape')) {
-      e.preventDefault();
-      return;
-    }
-    if (e.key === 'Backspace' && value === '' && chips.length > 0) {
-      e.preventDefault();
-      chips = chips.slice(0, -1);
-    }
+    if (e.key === 'Escape' && value.trim() === '' && onempty?.('escape')) e.preventDefault();
   }
 </script>
 
@@ -265,45 +99,26 @@
     send();
   }}
 >
-  {#if chips.length > 0}
-    <ul class="chips" aria-label="Sent with the question">
-      {#each chips as c (c.ref)}
-        <li class="chip" data-loading={c.loading ? '' : undefined}>
-          <Icon name={c.icon as IconName} size="s" />
-          <span class="chip-name" dir="auto">{c.label}</span>
-          <button type="button" class="chip-x tap" aria-label={words.remove(c.label)} onclick={() => drop(c.ref)}><Icon name="close" size="s" /></button>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-  <textarea
-    bind:this={field}
-    bind:value
-    class="input"
-    rows="1"
-    aria-label={words.label}
-    aria-autocomplete="list"
-    aria-controls="slash-at-list"
-    aria-activedescendant={open && hits[cursor] ? `slash-at-${cursor}` : undefined}
-    {placeholder}
-    {disabled}
-    enterkeyhint="send"
-    autocomplete="off"
-    spellcheck="true"
-    {onkeydown}
-    oninput={readToken}
-    onclick={readToken}
-    onkeyup={(e) => {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') readToken();
-    }}
-    onblur={() => setTimeout(() => (token = null), 150)}
-  ></textarea>
+  <div class="input">
+    <MentionField
+      bind:this={field}
+      bind:field={box}
+      bind:value
+      bind:mentions
+      label={words.label}
+      {placeholder}
+      {disabled}
+      above={docked}
+      lines={6}
+      {onkey}
+    />
+  </div>
   <div class="foot">
     {#if needs}
       <span class="grow"></span>
       <a class="needs tap" href={needs.href}>{needs.label}<Icon name="arrow" size="s" /></a>
     {:else}
-      <button type="button" class="at tap" aria-label={words.attach} title={words.attach} disabled={disabled || full} onclick={atButton}>@</button>
+      <button type="button" class="at tap" aria-label={words.mention} title={words.mention} {disabled} onmousedown={(e) => e.preventDefault()} onclick={() => field?.typeAt()}>@</button>
       {#if hint}<span class="hint">{hint}</span>{/if}
       <span class="grow"></span>
       <span class="keys" aria-hidden="true"><kbd>↵</kbd> {words.keys}<span class="sep"></span><kbd>⇧↵</kbd> {words.newline}</span>
@@ -313,38 +128,10 @@
     {/if}
   </div>
 
-  {#if open && (hits.length > 0 || found)}
-    <div class="pick" role="presentation">
-      <p class="pick-head caps-label">{full ? words.full : token?.q === '' ? words.recent : words.found}</p>
-      {#if hits.length > 0 && !full}
-        <ul class="pick-list" id="slash-at-list" role="listbox" aria-label={words.attach}>
-          {#each hits as h, i (h.ref)}
-            <li id={`slash-at-${i}`} role="option" aria-selected={i === cursor}>
-              <button
-                type="button"
-                class="pick-row tap"
-                tabindex="-1"
-                data-cursor={i === cursor ? '' : undefined}
-                onmouseenter={() => (cursor = i)}
-                onmousedown={(e) => e.preventDefault()}
-                onclick={() => pick(h)}
-              >
-                <span class="pick-glyph"><Icon name={h.icon as IconName} size="s" /></span>
-                <span class="pick-name" dir="auto">{h.label}</span>
-                {#if h.detail}<span class="pick-in">{h.detail}</span>{/if}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {:else if !full && token && token.q !== ''}
-        <p class="pick-none">{words.none(token.q)}</p>
-      {/if}
-    </div>
-  {/if}
 </form>
 
 <style>
-  /* ONE SURFACE: the chips, the field and its foot, the tile's fill with the field's edge, the focus ring on the whole. */
+  /* ONE SURFACE: the field and its foot, the tile's fill with the field's edge, the focus ring on the whole. */
   .composer {
     position: relative;
     display: flex;
@@ -370,89 +157,12 @@
     box-shadow: none;
   }
 
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: calc(6px * var(--dense, 1));
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* A CHIP IS THE APP'S CAPSULE: 28 tall, the soft fill, the list's glyph, the name, and its ×. */
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    max-inline-size: 100%;
-    block-size: var(--ctl-panel, 28px);
-    padding-inline: 10px 2px;
-    background: var(--soft-fill);
-    border-radius: var(--r-pill);
-    color: var(--ink);
-    font-size: var(--fs-ctl);
-    font-weight: var(--fw-medium);
-    line-height: 1;
-  }
-
-  .chip :global(svg) {
-    flex: none;
-    color: var(--ink-3);
-  }
-
-  .chip[data-loading] .chip-name {
-    color: var(--ink-3);
-  }
-
-  .chip-name {
-    min-inline-size: 0;
-    max-inline-size: 22ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .chip-x {
-    display: grid;
-    place-items: center;
-    inline-size: 24px;
-    block-size: 24px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--r-pill);
-    background: none;
-    color: var(--ink-3);
-    cursor: pointer;
-  }
-
-  @media (hover: hover) {
-    .chip-x:hover {
-      background: var(--row-wash-press, var(--row-wash));
-      color: var(--ink);
-    }
-  }
-
   .input {
-    display: block;
-    inline-size: 100%;
-    min-block-size: 22px;
-    margin: 0;
-    padding: 2px 0;
-    border: 0;
-    border-radius: 0;
-    outline: 0;
-    box-shadow: none;
-    background: none;
-    color: var(--ink);
-    font: inherit;
+    --mf-line: calc(22px * var(--type, 1));
+    --mf-pad: 2px;
+    display: flex;
     font-size: var(--fs-row, 15px);
-    line-height: calc(22px * var(--type, 1));
-    resize: none;
-    overflow-y: auto;
-  }
-
-  .input::placeholder {
-    color: var(--ink-3);
+    line-height: var(--mf-line);
   }
 
   /* SIXTEEN UNDER A THUMB, so a phone does not zoom into the field. */
@@ -604,95 +314,6 @@
   @media (prefers-reduced-motion: reduce) {
     .spin {
       animation-duration: 2.4s;
-    }
-  }
-
-  /* THE @ LIST, a menu on glass: under the field, or over it when the field is at the foot of a conversation. */
-  .pick {
-    position: absolute;
-    inset-inline: 0;
-    inset-block-start: calc(100% + 6px);
-    z-index: 20;
-    max-inline-size: 440px;
-    padding: var(--sp-1);
-    background: var(--glass-regular, var(--tile));
-    backdrop-filter: var(--glass-filter, none);
-    border-radius: var(--r-pop, 12px);
-    box-shadow: var(--glass-edge, none), var(--elev-popover, 0 8px 24px rgb(0 0 0 / 0.16));
-  }
-
-  .composer[data-docked] .pick {
-    inset-block: auto calc(100% + 6px);
-  }
-
-  .pick-head {
-    margin: 0;
-    padding: calc(6px * var(--dense, 1)) var(--sp-2) var(--sp-1);
-    color: var(--ink-3);
-  }
-
-  .pick-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .pick-row {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    inline-size: 100%;
-    min-block-size: 36px;
-    padding-inline: var(--sp-2);
-    border: 0;
-    border-radius: var(--r-menu-row, 8px);
-    background: none;
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--fs-ctl);
-    text-align: start;
-    cursor: pointer;
-  }
-
-  .pick-row[data-cursor] {
-    background: var(--menu-row-fill, var(--row-wash));
-  }
-
-  .pick-glyph {
-    display: grid;
-    flex: none;
-    place-items: center;
-    color: var(--ink-3);
-  }
-
-  .pick-name {
-    flex: 1;
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .pick-in {
-    flex: none;
-    max-inline-size: 40%;
-    overflow: hidden;
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .pick-none {
-    margin: 0;
-    padding: var(--sp-2);
-    color: var(--ink-3);
-    font-size: var(--fs-meta);
-  }
-
-  @media (pointer: coarse) {
-    .pick-row {
-      min-block-size: 44px;
     }
   }
 </style>

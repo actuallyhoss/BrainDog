@@ -22,9 +22,11 @@
   import { listName } from '$lib/record/names.ts';
   import { copy } from '$lib/copy.ts';
   import { threadWords } from '$lib/palette/slash-chat.ts';
-  import { answer, convo, rethink, rethinkable, undo, UNDO_MS, type LiveAction, type SlashTurn } from '$lib/palette/thread.svelte.ts';
+  import { answer, convo, rethink, rethinkable, undo, UNDO_MS, type LiveAction, type YouTurn, type SlashTurn } from '$lib/palette/thread.svelte.ts';
   import type DecisionCardType from '$lib/decide/DecisionCard.svelte';
   import Said from './Said.svelte';
+  import Spoken from '$lib/mention/Spoken.svelte';
+  import type { SentMention } from '$lib/mention/mention.ts';
   import { actionSaid, iconOfRef } from './with.ts';
 
   let {
@@ -36,7 +38,7 @@
     /** Each list's glyph, by its id. */
     icons: ReadonlyMap<string, string>;
     /** Ask a question again, after one that did not go through. */
-    onretry: (question: string) => void;
+    onretry: (question: string, mentions?: readonly SentMention[]) => void;
   } = $props();
 
   const words = {
@@ -105,10 +107,10 @@
   const stepsSaid = (steps: readonly string[]): string => [...new Set(steps.map((s) => s.replace(/^Reading /u, '').replace(/…$/u, '')))].join(' · ');
 
   /** The question a turn answered, for "Ask again". */
-  function askedBefore(i: number): string | null {
+  function askedBefore(i: number): YouTurn | null {
     for (let j = i - 1; j >= 0; j--) {
       const t = convo.turns[j];
-      if (t?.role === 'you') return t.text;
+      if (t?.role === 'you') return t;
     }
     return null;
   }
@@ -131,7 +133,7 @@
 <ol class="turns" role="log" aria-live="polite" aria-busy={convo.busy} aria-label={threadWords.label}>
   {#each convo.turns as turn, i (i)}
     {#if turn.role === 'you'}
-      <li class="you"><p class="you-said" dir="auto">{turn.text}</p></li>
+      <li class="you"><p class="you-said" dir="auto"><Spoken text={turn.text} mentions={turn.mentions} /></p></li>
     {:else}
       <li class="slash" data-streaming={turn.streaming ? '' : undefined}>
         <span class="mark" aria-hidden="true"><Icon name="slash" size="s" /></span>
@@ -230,7 +232,7 @@
               <Icon name="alert" size="s" />
               <p class="err-said">{turn.error}</p>
               {#if !turn.spent && askedBefore(i) && turn === last}
-                <button type="button" class="btn tap" onclick={() => onretry(askedBefore(i) ?? '')}>{words.again}</button>
+                <button type="button" class="btn tap" onclick={() => onretry(askedBefore(i)?.text ?? '', askedBefore(i)?.mentions ?? [])}>{words.again}</button>
               {/if}
             </div>
             {#if turn.spent}<SlashOut />{/if}

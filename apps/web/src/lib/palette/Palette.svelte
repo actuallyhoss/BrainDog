@@ -106,10 +106,12 @@
   import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
   import { asksFirst, capLine, inOrder, offersSlash, slashWords } from './slash.ts';
   import SlashThread from './SlashThread.svelte';
-  import { ask as askThread, askingAs, clear as clearThread, convo, open as threadOn, rethink, rethinkable } from './thread.svelte.ts';
+  import { ask as askThread, askingAs, clear as clearThread, convo, open as threadOn, rethink, rethinkable, sentWith } from './thread.svelte.ts';
   import { threadsKey } from './slash-chat.ts';
-  import AttachPicker from '../send/AttachPicker.svelte';
-  import { sendWords, targets as readTargets, type Attached, type Target } from '../send/send.ts';
+  import MentionField from '../mention/MentionField.svelte';
+  import { factsOf } from '../record/told-apart.ts';
+  import { sentOf, type Mention, type SentMention } from '../mention/mention.ts';
+  import { sendWords, targets as readTargets, type Target } from '../send/send.ts';
   import Menu from '../ui/Menu.svelte';
   import { backCloses } from '../ui/back.svelte.ts';
   import { pageOf, threadWords, type PageContext } from './slash-chat.ts';
@@ -183,7 +185,7 @@
   };
 
   let el = $state<HTMLDialogElement>();
-  let input = $state<HTMLInputElement>();
+  let input = $state<HTMLInputElement | HTMLTextAreaElement>();
   let q = $state('');
   let cursor = $state(0);
 
@@ -295,14 +297,14 @@
   let askTo = $state<{ to: 'slash'; mode: 'quick' | 'deep' } | { to: 'target'; t: Target }>({ to: 'slash', mode: 'quick' });
   let sendTargets = $state<Target[] | null>(null);
   let targetsAsked = false;
-  /** THE ROWS ATTACHED WITH @, sent with every ask until they are taken off or the conversation starts again. */
-  let attached = $state<Attached[]>([]);
-  let attaching = $state(false);
+  /** THE ROWS MENTIONED IN THE FIELD (`$lib/mention`): `@Name` in the words, and which row those letters are. */
+  let drafted = $state<Mention[]>([]);
+  let mentionField = $state<ReturnType<typeof MentionField> | null>(null);
   const switchable = $derived(sendTargets?.filter((t) => t.kind === 'mac' || t.kind === 'session') ?? []);
   const firstMac = $derived(sendTargets?.find((t) => t.kind === 'mac') ?? null);
   const askLabel = $derived(askTo.to === 'slash' ? `${sendWords.slash} · ${askTo.mode === 'deep' ? sendWords.deep : sendWords.quick}` : askTo.t.label);
-  /** What every ask is about: the row behind the palette, then what was attached with @. */
-  const attachNow = (): string[] => [...new Set([...(behind.row ? [behind.row] : []), ...attached.map((a) => a.ref)])];
+  /** What an ask is about besides its own mentions: the row behind the palette. The thread adds what was mentioned before. */
+  const behindNow = (): string[] => (behind.row ? [behind.row] : []);
   const lastTurn = $derived(convo.turns.at(-1));
   const routedMac = $derived(lastTurn?.role === 'slash' && !lastTurn.streaming && lastTurn.route === 'mac' && firstMac !== null);
   const harder = $derived(askTo.to === 'slash' && rethinkable());
@@ -320,17 +322,17 @@
     askingAs(threadsKey(apiBase(), shell.me?.person));
   });
 
-  function asked(question: string) {
-    if (askTo.to === 'target') return void toTarget(askTo.t, question);
-    void askThread(question, behind, apiBase(), { mode: askTo.mode, attach: attachNow() });
+  function asked(question: string, mentions: readonly SentMention[] = []) {
+    if (askTo.to === 'target') return void toTarget(askTo.t, question, mentions);
+    void askThread(question, behind, apiBase(), { mode: askTo.mode, attach: behindNow(), mentions });
   }
 
   /** A message to a machine or a session: sent, and said in the thread as one line with the way to its row. */
-  async function toTarget(t: Target, said: string) {
+  async function toTarget(t: Target, said: string, mentions: readonly SentMention[] = []) {
     if (convo.busy) return;
     const { deliver } = await import('../send/convos.svelte.ts');
-    const rows = attachNow();
-    convo.turns.push({ role: 'you', text: said });
+    const rows = sentWith(mentions, behindNow());
+    convo.turns.push({ role: 'you', text: said, ...(mentions.length > 0 ? { mentions: [...mentions] } : {}) });
     const out = await deliver({ kind: behind.row?.split('#')[0] ?? 'page', target: t.id, label: t.label, targetKind: t.kind, mode: 'auto', note: said, fallback: said, attach: rows, mayChange: false });
     const row = rows.find((r) => /^[a-z][a-z0-9_]*#[1-9][0-9]*$/u.test(r));
     convo.turns.push({
@@ -349,24 +351,10 @@
   /** Slash could not answer Deep here and named a machine: the same question, sent to it. */
   function toMac() {
     const t = firstMac;
-    const question = [...convo.turns].reverse().find((x) => x.role === 'you')?.text;
-    if (!t || !question) return;
+    const last = convo.turns.findLast((x) => x.role === 'you');
+    if (!t || !last) return;
     askTo = { to: 'target', t };
-    void toTarget(t, question);
-  }
-
-  /** @ IN THE FIELD, typed as a word of its own, opens the row search to attach one; the @ itself is not kept. */
-  function onaskinput() {
-    if (/(^|\s)@$/u.test(q)) {
-      q = q.slice(0, -1);
-      attaching = true;
-    }
-  }
-
-  function attachOne(a: Attached) {
-    if (!attached.some((x) => x.ref === a.ref)) attached = [...attached, a];
-    attaching = false;
-    input?.focus();
+    void toTarget(t, last.text, last.mentions);
   }
 
   /** A question from Find: a new conversation, asked at once, with the field cleared for the next one. */
@@ -376,16 +364,18 @@
     opener.mode = 'ask';
     clearThread();
     q = '';
+    drafted = [];
     asked(question);
     queueMicrotask(() => input?.focus());
   }
 
   /** The follow-up field, sent. */
   function send() {
-    const said = q.trim();
-    if (said === '' || convo.busy) return;
+    const { text, mentions } = sentOf(q, drafted);
+    if (text === '' || convo.busy) return;
     q = '';
-    asked(said);
+    drafted = [];
+    asked(text, mentions);
   }
 
   /** Back to Find, with what its field said before the question. */
@@ -417,8 +407,7 @@
 
   function fresh() {
     clearThread();
-    attached = [];
-    attaching = false;
+    drafted = [];
     q = '';
     input?.focus();
   }
@@ -676,18 +665,6 @@
   const GROUP_CAP = 6;
   /** The most rows of one name a group keeps apart, each with its day and amount, before they fold into a count. */
   const TOLD_APART = 4;
-  /** A row's day and amount in a line: "12 Oct 2025 · £450". This year's day says no year. */
-  const factsOf = (hit: { on?: string; amount?: { amount: number; currency: string } }): string | undefined => {
-    const parts: string[] = [];
-    if (hit.on && /^\d{4}-\d{2}-\d{2}/u.test(hit.on)) {
-      const when = new Date(`${hit.on.slice(0, 10)}T12:00:00Z`);
-      const year = new Date().getUTCFullYear() === when.getUTCFullYear();
-      parts.push(when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC', ...(year ? {} : { year: 'numeric' }) }));
-    }
-    if (hit.amount) parts.push(moneyWhole(hit.amount.amount, hit.amount.currency, homeCurrency())?.text ?? '');
-    const line = parts.filter(Boolean).join(' · ');
-    return line === '' ? undefined : line;
-  };
   /** The screens a row opens, whose code is fetched as the panel opens. */
   const PRELOADED = ['/p/x', '/r/x', '/r/x/1', '/search', '/decide/x'];
   /** How long the highlight rests on a row before its page is read ahead. */
@@ -1938,19 +1915,19 @@
     <span class="p-field">
     {#if inAsk}<span class="p-ask-mark" aria-hidden="true"><Icon name="slash" size="m" /></span>{:else}<Icon name="search" size="m" />{/if}
     {#if inAsk}
-      <!-- THE FOLLOW-UP FIELD: a plain field, since in Ask there is no list for it to point into. -->
-      <input
-        bind:this={input}
-        bind:value={q}
-        {onkeydown}
-        oninput={onaskinput}
-        class="p-input"
-        type="text"
-        aria-label={threadWords.placeholder}
-        aria-describedby={waitingCard || asksLeft !== null ? "palette-ask-foot" : undefined}
-        placeholder={convo.turns.length > 0 ? threadWords.followUp : threadWords.placeholder}
-        autocomplete="off"
-      />
+      <!-- THE FOLLOW-UP FIELD: words, and rows mentioned with @ among them (`$lib/mention`). It grows as Slack's does. -->
+      <span class="p-ask-input">
+        <MentionField
+          bind:this={mentionField}
+          bind:field={input}
+          bind:value={q}
+          bind:mentions={drafted}
+          label={threadWords.placeholder}
+          describedby={waitingCard || asksLeft !== null ? 'palette-ask-foot' : undefined}
+          placeholder={convo.turns.length > 0 ? threadWords.followUp : threadWords.placeholder}
+          onkey={onkeydown}
+        />
+      </span>
     {:else}
       <input
         bind:this={input}
@@ -2033,9 +2010,6 @@
     <!-- WHO IT GOES TO, WHAT IS ATTACHED, AND ONCE AN ANSWER IS WHOLE, THINK HARDER; then, quiet, what Enter does while a
          card waits and the asks left this month once there is a number to say. -->
     <footer class="p-foot p-ask-foot" id="palette-ask-foot">
-      {#if attaching}
-        <div class="p-attach"><AttachPicker onpick={attachOne} onclose={() => ((attaching = false), input?.focus())} taken={attachNow()} /></div>
-      {/if}
       <Menu label={sendWords.sheet}>
         {#snippet trigger()}<span class="p-to">{#if askTo.to === 'target' && askTo.t.live}<span class="p-live" aria-hidden="true"></span>{/if}{askLabel}<Icon name="chevronDown" size="s" /></span>{/snippet}
         <button type="button" role="menuitemradio" aria-checked={askTo.to === 'slash' && askTo.mode === 'quick'} onclick={() => (askTo = { to: 'slash', mode: 'quick' })}>{sendWords.slash} · {sendWords.quick}</button>
@@ -2044,10 +2018,7 @@
           <button type="button" role="menuitemradio" aria-checked={askTo.to === 'target' && askTo.t.id === t.id} onclick={() => (askTo = { to: 'target', t })}><span class="mi-name">{t.label}</span></button>
         {/each}
       </Menu>
-      {#each attached as a (a.ref)}
-        <span class="p-attached"><span class="p-attached-name" dir="auto">{a.label}</span><button type="button" class="p-attached-x tap" aria-label={sendWords.remove(a.label)} onclick={() => (attached = attached.filter((x) => x.ref !== a.ref))}><Icon name="close" size="s" /></button></span>
-      {/each}
-      <button type="button" class="p-at tap" aria-label={sendWords.attach} title={sendWords.attach} aria-expanded={attaching} onclick={() => (attaching = !attaching)}>@</button>
+      <button type="button" class="p-at tap" aria-label={threadWords.mention} title={threadWords.mention} onmousedown={(e) => e.preventDefault()} onclick={() => mentionField?.typeAt()}>@</button>
       {#if harder}<button type="button" class="p-harder tap" onclick={() => void rethink(apiBase())}>{sendWords.thinkHarder}</button>{/if}
       {#if routedMac && firstMac}<button type="button" class="p-harder tap" onclick={toMac}>{sendWords.toMac(firstMac.label)}</button>{/if}
       {#if waitingCard}<span class="p-keys-hint">{threadWords.enterDoes}</span>{/if}
@@ -2373,6 +2344,38 @@
     color: var(--ink-3);
   }
 
+  /* ASK'S FIELD, ONE LINE THE SAME HEIGHT AS FIND'S, so nothing moves between them, and then it grows with the sentence. */
+  .p-ask-input {
+    --mf-line: var(--lead-row, 20px);
+    --mf-pad: calc((var(--ctl-h) - var(--lead-row, 20px)) / 2);
+    display: flex;
+    flex: 1;
+    min-inline-size: 0;
+    color: var(--ink);
+    font-size: var(--fs-row, 15px);
+    line-height: var(--mf-line);
+    letter-spacing: -0.005em;
+  }
+
+  /* A LONG SENTENCE GROWS DOWN: the glyph and the buttons stay on its first line. */
+  .palette[data-mode='ask'] .p-head {
+    align-items: flex-start;
+    padding-block: calc((56px - var(--ctl-h)) / 2);
+  }
+
+  .palette[data-mode='ask'] .p-field {
+    align-items: flex-start;
+  }
+
+  .palette[data-mode='ask'] .p-ask-mark {
+    margin-block-start: calc((var(--ctl-h) - var(--icon-m, 20px)) / 2);
+  }
+
+  .palette[data-mode='ask'] .p-mode,
+  .palette[data-mode='ask'] .p-close {
+    margin-block-start: calc((var(--ctl-h) - var(--ctl-panel, 28px)) / 2);
+  }
+
   /* A SHARED PHOTO: a 48px picture at the control radius, the line beside it, and a 44px way to take it off. */
   .p-shared {
     display: flex;
@@ -2683,12 +2686,7 @@
     margin-inline-start: auto;
   }
 
-  /* THE FOOTER'S CONTROLS (`$lib/send`): who Ask talks to as a quiet menu, the rows attached as small rectangles, and @. */
-  .p-attach {
-    flex: 1 1 100%;
-    order: 1;
-  }
-
+  /* THE FOOTER'S CONTROLS (`$lib/send`): who Ask talks to as a quiet menu, and @. */
   .p-to {
     display: inline-flex;
     align-items: center;
@@ -2709,25 +2707,7 @@
     border-radius: var(--r-round);
   }
 
-  .p-attached {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: var(--btn-h-sm);
-    padding-inline-start: var(--sp-3);
-    background: var(--row-wash-press, var(--tile-2));
-    border-radius: var(--r-pill, 999px);
-    color: var(--ink);
-  }
-
-  .p-attached-name {
-    overflow: hidden;
-    max-inline-size: 160px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .p-attached-x,
-  .p-at,
+    .p-at,
   .p-harder {
     display: inline-grid;
     place-items: center;
@@ -2750,7 +2730,6 @@
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .p-attached-x:hover,
     .p-at:hover,
     .p-harder:hover {
       background: var(--row-wash, var(--hover));
@@ -2760,8 +2739,6 @@
 
   @media (pointer: coarse) {
     .p-to,
-    .p-attached,
-    .p-attached-x,
     .p-at,
     .p-harder {
       min-block-size: var(--tap);
@@ -2884,6 +2861,29 @@
     .p-input {
       min-block-size: var(--tap);
       font-size: max(16px, var(--fs-body));
+    }
+
+    .p-ask-input {
+      --mf-pad: calc((var(--tap) - var(--lead-row, 20px)) / 2);
+      font-size: max(16px, var(--fs-body));
+    }
+
+    .palette[data-mode='ask'] .p-head {
+      padding-block: var(--sp-2);
+    }
+
+    /* THE WELL HOLDS A SENTENCE: a pill at one line, and at three lines a box with those same round ends. */
+    .palette[data-mode='ask'] .p-field {
+      border-radius: calc(var(--tap) / 2);
+    }
+
+    .palette[data-mode='ask'] .p-ask-mark {
+      margin-block-start: calc((var(--tap) - var(--icon-m, 20px)) / 2);
+    }
+
+    .palette[data-mode='ask'] .p-mode,
+    .palette[data-mode='ask'] .p-close {
+      margin-block-start: 0;
     }
 
     .p-close {

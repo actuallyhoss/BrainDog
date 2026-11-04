@@ -6,7 +6,7 @@
   at its foot. The thread is the palette's own (`thread.svelte.ts`), so ⌘J goes on with it anywhere.
 
   THE ADDRESS SAYS WHICH: `/slash` is a new one, `/slash?t=<id>` a conversation (read back from the record, its rows
-  named, `read-back.ts`), and `/slash?with=people%2320` opens with those rows attached as chips (`with.ts`), the field
+  named, `read-back.ts`), and `/slash?with=people%2320` opens with those rows mentioned in the sentence (`with.ts`), the field
   focused: the "Ask about this" link every row page can give (`askAboutHref` in `$lib/query/slash.ts`). `?q=` puts a
   question in the field, to send or change.
 
@@ -34,7 +34,8 @@
   import Conversation from './Conversation.svelte';
   import ThreadList from './ThreadList.svelte';
   import { readBack, namesOf } from './read-back.ts';
-  import { iconOfRef, withOf, type Chip } from './with.ts';
+  import { iconOfRef, withOf } from './with.ts';
+  import type { Mention, SentMention } from '$lib/mention/mention.ts';
 
   const words = {
     title: 'Slash',
@@ -56,7 +57,7 @@
   const modelHere = $derived(page.data.slash === true);
   const desk = new MediaQuery('(width >= 1100px)', true);
 
-  /* EACH LIST'S GLYPH, by its id, for the chips and the rows an answer names. */
+  /* EACH LIST'S GLYPH, by its id, for the rows mentioned and the rows an answer names. */
   const icons = $derived(
     new Map(((page.data as { index?: { registers?: { id: string; icon: string }[] } }).index?.registers ?? []).map((r) => [r.id, String(r.icon)] as const)),
   );
@@ -142,8 +143,8 @@
     replaceState(at(`/slash?t=${encodeURIComponent(id)}`), {});
   });
 
-  /* THE ROWS AN ADDRESS ATTACHES (`?with=`), drawn at once as chips and named as their rows are read. */
-  let chips = $state<Chip[]>([]);
+  /* THE ROWS AN ADDRESS ATTACHES (`?with=`): mentions at the head of the sentence, once their names are read. */
+  let mentions = $state<Mention[]>([]);
   let withSeen = '';
   let composer = $state<ReturnType<typeof Composer> | null>(null);
   $effect(() => {
@@ -152,14 +153,16 @@
     if (key === withSeen) return;
     withSeen = key;
     if (refs.length === 0) return;
-    const had = new Set(chips.map((c) => c.ref));
+    const had = new Set(mentions.map((m) => m.ref));
     const added = refs.filter((r) => !had.has(r));
-    chips = [...chips, ...added.map((ref) => ({ ref, label: ref.replace('#', ' '), icon: iconOfRef(ref, icons), loading: true }))];
     queueMicrotask(() => composer?.focus());
     void namesOf(base, added).then((names) => {
-      chips = chips.map((c) => (added.includes(c.ref) ? { ...c, label: names.get(c.ref) ?? c.label, loading: false } : c));
+      for (const ref of [...added].reverse()) composer?.put({ ref, label: names.get(ref) ?? ref.replace('#', ' '), icon: iconOfRef(ref, icons) });
+      composer?.focus();
     });
   });
+  /* ROWS A STARTER WAS PRESSED WITH: its words do not mention them, so they stay with the conversation by name. */
+  let carried: string[] = [];
 
   let draft = $state('');
   /* A QUESTION AN ADDRESS CARRIES (`?q=`), put in the field to send or change, never sent for him. */
@@ -177,8 +180,10 @@
   /** Where the ask is sent from: the page he came from, so "this" means what he was looking at. */
   const here = (): PageContext => from ?? { path: '/slash', title: words.title };
 
-  async function send(text: string) {
+  /** `sent` is what the field's sentence mentions; a starter has no sentence, and goes with what the field held. */
+  async function send(text: string, sent?: readonly SentMention[]) {
     if (convo.busy) return;
+    if (sent === undefined) carried = [...new Set([...carried, ...mentions.map((m) => m.ref)])];
     if (!live || gone) {
       clear();
       live = true;
@@ -186,20 +191,22 @@
       minted = true;
     }
     draft = '';
+    mentions = [];
     pinned = true;
-    await ask(text, here(), base, { attach: chips.map((c) => c.ref) });
+    await ask(text, here(), base, { attach: carried, mentions: sent ?? [] });
     loadThreads();
   }
 
   function fresh() {
     clear();
-    chips = [];
+    mentions = [];
+    carried = [];
     draft = '';
     withSeen = '';
     void goto(at('/slash')).then(() => composer?.focus());
   }
 
-  /* WHAT IS WAITING, from the record (`now`), and three questions fitted to where he came from or to the first chip. */
+  /* WHAT IS WAITING, from the record (`now`), and three questions fitted to where he came from or to the first mention. */
   let waiting = $state<NowLine[] | null>(null);
   $effect(() => {
     if (!modelHere) return;
@@ -207,9 +214,9 @@
     void nowLines(base, stop.signal).then((lines) => (waiting = lines));
     return () => stop.abort();
   });
-  const first = $derived(chips[0]);
+  const first = $derived(mentions[0]);
   const tries = $derived(
-    first && !first.loading
+    first
       ? starters({ path: `/r/${first.ref.replace('#', '/')}`, title: first.label, row: first.ref })
       : starters(from ?? { path: '/' }),
   );
@@ -264,21 +271,21 @@
         {:else if gone}
           <p class="gone">{threadWords.gone}</p>
         {:else}
-          <Conversation bind:this={conversation} {base} {icons} onretry={(q) => void send(q)} />
+          <Conversation bind:this={conversation} {base} {icons} onretry={(q, sent) => void send(q, sent)} />
         {/if}
       </div>
       <div class="dock">
         <Composer
           bind:this={composer}
           bind:value={draft}
-          bind:chips
+          bind:mentions
           docked
           busy={convo.busy}
           disabled={!modelHere}
           needs={modelHere ? null : { label: words.connect, href: at('/settings/agents') }}
           placeholder={modelHere ? words.followUp : words.needs}
           hint={left}
-          onsend={(q) => void send(q)}
+          onsend={(q, sent) => void send(q, sent)}
           onempty={(k) => (k === 'enter' ? (conversation?.enter() ?? false) : (conversation?.escape() ?? false))}
         />
       </div>
@@ -286,14 +293,14 @@
       <Composer
         bind:this={composer}
         bind:value={draft}
-        bind:chips
+        bind:mentions
         autofocus
         busy={convo.busy}
         disabled={!modelHere}
         needs={modelHere ? null : { label: words.connect, href: at('/settings/agents') }}
         placeholder={modelHere ? words.placeholder : words.needs}
         hint={left}
-        onsend={(q) => void send(q)}
+        onsend={(q, sent) => void send(q, sent)}
       />
 
       {#if modelHere}

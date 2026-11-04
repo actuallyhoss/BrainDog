@@ -11,6 +11,7 @@
  */
 
 import type { LiveAction, LiveTurn } from '$lib/palette/thread.svelte.ts';
+import type { SentMention } from '$lib/mention/mention.ts';
 import { nameOfFields, rowOfRef } from './with.ts';
 
 const REFS = /\{\{ref:([a-z][a-z0-9_]*#[1-9][0-9]*)\}\}/gu;
@@ -52,6 +53,8 @@ export function figuresFor(text: string, names: ReadonlyMap<string, string>): Re
   return out;
 }
 
+const isSent = (m: unknown): m is SentMention => isObj(m) && typeof m.at === 'number' && typeof m.len === 'number' && typeof m.ref === 'string';
+
 function actionOf(a: unknown): LiveAction | null {
   if (!isObj(a)) return null;
   const id = str(a.id);
@@ -82,7 +85,7 @@ export async function readBack(base: string, id: string): Promise<{ id: string; 
   const names = await namesOf(base, refs);
   const turns = raw.map((t): LiveTurn => {
     const text = t.text as string;
-    if (t.role === 'you') return { role: 'you', text };
+    if (t.role === 'you') return { role: 'you', text, ...(Array.isArray(t.mentions) ? { mentions: t.mentions.filter(isSent) } : {}) };
     const actions = Array.isArray(t.actions) ? t.actions.flatMap((a) => actionOf(a) ?? []) : [];
     return { role: 'slash', steps: [], text, figures: figuresFor(text, names), actions, go: [], error: null, spent: false, streaming: false };
   });

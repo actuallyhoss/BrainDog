@@ -1,5 +1,5 @@
 /**
- * The rows a link to Slash attaches, and the words a chip and a starter are drawn with.
+ * The rows a link to Slash attaches, and the words a mention and a starter are drawn with.
  *
  * THE CONTRACT OTHER PAGES LINK TO: `/slash?with=<ref>[,<ref>...]`, a ref being a row's spoken id (`people#20`) or a
  * question, a run or a vital sign by its id (`decide:<id>`, `run:<id>`, `sign:<id>`), the forms the chat door takes
@@ -56,9 +56,6 @@ export function nameOfFields(fields: Readonly<Record<string, unknown>> | null | 
   }
   return null;
 }
-
-/** One thing attached to the ask: its ref, the name on its chip and its glyph. */
-export type Chip = { ref: string; label: string; icon: string; loading?: boolean };
 
 /** The glyph of what a ref is, from its list's own icon, else the kind's. */
 export function iconOfRef(ref: string, icons: ReadonlyMap<string, string>): string {

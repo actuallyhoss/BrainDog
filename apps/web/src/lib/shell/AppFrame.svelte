@@ -1612,6 +1612,10 @@
        toast stack is no longer the whole undo history: `lib/data/undo.ts` holds the last sixty batches this tab wrote, and
        `undo-replay.ts` takes back the newest of them when no toast offers one (02 §8 makes the unit a `batch`). */
     if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      /* IN A FIELD WITH WORDS IN IT, OR ONE TYPED IN SINCE IT WAS LAST CLEARED, ⌘Z TAKES BACK THE TYPING (mention1104). It
+         took back the last change to the record instead, whatever was being typed; an empty field still hands it on. */
+      const field = document.activeElement as HTMLInputElement | null;
+      if (typing() && (field?.value || field?.dataset?.edited !== undefined)) return;
       e.preventDefault();
       if (!toasts.undoLast())
         void import('$lib/data/undo-replay.ts').then(async (m) => {
