@@ -150,8 +150,8 @@
 {/if}
 
 {#snippet body()}
-  <ol class="rows">
-    <li class="row" data-forming="today">
+  <ol class="places">
+    <li class="place" data-forming="today">
       <span class="well"><Icon name="sun" size="m" /></span>
       <span class="main">
         <span class="name">{words.today}</span>
@@ -162,7 +162,7 @@
       <!-- ONE ELEMENT FOR THE ROW WHETHER GREYED OR HEARD: a greyed place the answer turns on keeps its element and comes
            up to full ink, rather than being thrown away and drawn again. -->
       <li
-        class="row"
+        class="place"
         data-ghost={r.ghost ? '' : undefined}
         data-forming={r.ghost ? 'ghost' : undefined}
         data-arrived={!r.ghost && fresh.includes(r.key) ? '' : undefined}
@@ -219,7 +219,7 @@
     min-inline-size: 0;
   }
 
-  .rows {
+  .places {
     display: grid;
     margin: 0;
     padding: 0;
@@ -228,7 +228,7 @@
 
   /* A ROW: a 32px well, the name and why, and the quiet ✕ at the end. Told apart by air, never a rule (ops: no hairline
      between rows anywhere). */
-  .row {
+  .place {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: start;
@@ -239,7 +239,7 @@
     transition: background-color 1500ms var(--ease-out);
   }
 
-  .row[data-arrived] {
+  .place[data-arrived] {
     background: var(--arrived);
     transition: none;
   }
@@ -255,11 +255,11 @@
   /* GREYED UNTIL HEARD, IN THE QUIET INK, NOT SEE-THROUGH: at 45% opacity the name read at 3:1 and its line at 1.9:1
      (axe, skills pass 2 Nov). The words take `--ink-3` (4.5:1 on the tile) and the well fades back; a place the answer
      turns on comes up to full ink over `--form-in` where it stands. */
-  .row[data-ghost] .name {
+  .place[data-ghost] .name {
     color: var(--ink-3);
   }
 
-  .row[data-ghost] .well {
+  .place[data-ghost] .well {
     opacity: 0.5;
   }
 
@@ -288,7 +288,7 @@
     line-height: var(--lead-ui);
   }
 
-  .row[data-ghost] .main {
+  .place[data-ghost] .main {
     padding-block-start: calc(6px * var(--dense, 1));
   }
 
@@ -354,7 +354,7 @@
       opacity: 0;
     }
 
-    .row:hover .out,
+    .place:hover .out,
     .out:focus-visible {
       opacity: 1;
     }
