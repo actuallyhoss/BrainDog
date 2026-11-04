@@ -49,13 +49,18 @@ export const ownLists = (claimed: readonly string[]): string[] => claimed.filter
  * IN PASSES, as clearing the examples does: a row another of its own rows links to is refused while that one stands. A
  * row still refused when a pass bins nothing is kept, and counted.
  */
-export function binOwnRows(kernel: Kernel, lists: readonly string[], w: { actor: string; batch: string; note: string }): { binned: Record<string, number>; kept: number } {
+export function binOwnRows(
+  kernel: Kernel,
+  lists: readonly string[],
+  w: { actor: string; batch: string; note: string },
+  pageOf: (list: string, cursor: string | null) => ReturnType<Kernel['list']>,
+): { binned: Record<string, number>; kept: number } {
   const binned: Record<string, number> = {};
   let left: { list: string; id: string }[] = [];
   for (const list of lists) {
     binned[list] = 0;
     for (let cursor: string | null = null; ; ) {
-      const page = kernel.list({ register: list, limit: 500, cursor });
+      const page = pageOf(list, cursor);
       if (!page.ok) break;
       left.push(...page.value.rows.map((r) => ({ list, id: r.id })));
       if (page.value.cursor === null || page.value.rows.length === 0) break;
@@ -117,6 +122,8 @@ export type MoveRehearsal = {
     | ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; config: Record<string, never>; input: unknown; reads: { list(register: string, where: unknown, options?: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; stale: boolean; asker: string }) => Promise<unknown>)
     | undefined;
   reads: { list(register: string, where: unknown, options?: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> };
+  /** The list a row named by its spoken id is on, or `null`: what a write the move answered is held to. */
+  listOf: (spoken: string) => string | null;
   asker: string;
 };
 
@@ -174,7 +181,7 @@ export async function rehearseMove(r: MoveRehearsal, actor: string): Promise<Res
   const writes = Array.isArray(answer.writes) ? answer.writes : [];
   /* EACH WRITE AGAIN, ON THE HOST'S SIDE: a create into one of its new lists named in `writes`, an update to a row in one. */
   for (const w of writes) {
-    const list = w.op === 'create' ? w.register : (r.kernel.get(w.spoken)?.register ?? null);
+    const list = w.op === 'create' ? w.register : r.listOf(w.spoken);
     if (list === null || !m.writes.includes(list))
       return no('OUT_OF_BOUNDS', `${id}'s move would write ${w.op === 'create' ? w.register : w.spoken}, outside the lists it names, so nothing was installed.`, { at: 'migrate.writes' });
   }
@@ -184,7 +191,7 @@ export async function rehearseMove(r: MoveRehearsal, actor: string): Promise<Res
       const out =
         w.op === 'create'
           ? r.kernel.write(w.register, null, (w.fields ?? {}) as never, { actor, batch, note: m.says, cascade: false })
-          : r.kernel.write(r.kernel.get(w.spoken)?.register ?? '', w.spoken, (w.patch ?? {}) as never, {
+          : r.kernel.write(r.listOf(w.spoken) ?? '', w.spoken, (w.patch ?? {}) as never, {
               actor,
               batch,
               note: m.says,

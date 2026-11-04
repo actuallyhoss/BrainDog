@@ -9841,7 +9841,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       sql.one<{ n: number }>("SELECT 1 AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.name') = ? LIMIT 1", READINGS, name) !== undefined;
     const asRow = isHandle(text) ? (spokenAs(text) ?? text) : text;
     const row = ctx !== undefined && readable(ctx, KPIS) !== null ? null : kernel.get(asRow);
-    const kpi = row !== null && row !== undefined && row.register === KPIS ? row : null;
+    const kpi = row !== null && row !== undefined && row.register === KPIS && (ctx === undefined || sight.admits(ctx, row)) ? row : null;
     if (kpi === null && held(text)) return said;
     const measure = kpi === null ? text : [kpi.fields.measure, kpi.fields.name].find((v): v is string => typeof v === 'string' && v.trim() !== '')?.trim() ?? '';
     if (measure === '') return said;
@@ -11179,9 +11179,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the merge soft-deleted. Answered as it is, `merged_into` and all, so an agent holding the old handle (`P9`) can follow
    * it to the row that was kept instead of meeting nothing. Any other deleted row is still nothing.
    */
-  const folded = (said: string): Entry | null => {
+  const folded = (said: string, ctx: CallContext): Entry | null => {
     const row = kernel.get(said, { includeDeleted: true });
-    if (!row) return null;
+    if (!row || !sight.admits(ctx, row)) return null;
     const into = [kernel.meetsList(), orgsList()].find((l) => l?.register === row.register)?.fields.merged_into;
     return into !== undefined && text(row.fields[into]) !== null ? row : null;
   };
@@ -13037,13 +13037,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               `No register you can read numbers its rows ${/^[A-Z]+/.exec(said)?.[0] ?? said}. A suggestion (SG) or a decision (D) is read with governance.`,
               { at: 'spoken', ...(/^(?:SG|D)[1-9][0-9]*$/u.test(said) ? { try: `governance ${JSON.stringify({ id: said })}` } : {}) },
             );
-          const owned = kernel.get(said) ?? folded(said);
+          const owned = kernel.get(said) ?? folded(said, ctx);
           {
             const out = readFrom(ctx, ok(markedRow(ctx, owned && owned.register === owner.id && sight.admits(ctx, owned) ? owned : null)));
             return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
           }
         }
-        const row = kernel.get(said) ?? folded(said);
+        const row = kernel.get(said) ?? folded(said, ctx);
         {
           const out = readFrom(ctx, ok(markedRow(ctx, row && !readable(ctx, row.register) && sight.admits(ctx, row) ? row : null)));
           return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
@@ -16291,6 +16291,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             record: { id: who?.id ?? 'self', tz: who?.tz ?? 'UTC' },
             config: ((r) => (r.ok ? r.value.values : {}))(kernel.packConfig(pack.value.manifest.pack)),
             tryScript: deps.tryScript as never,
+            listOf: this.listOf,
             reads: {
               list: async (register: string, where: unknown, options: unknown = null) => {
                 const deleted = (options as { includeDeleted?: unknown } | null)?.includeDeleted;
@@ -16379,7 +16380,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       let out: Result<{ pack: string; declarations: number; binned: Record<string, number>; kept: number; doors_closed: number; batch: string; rows_kept: Record<string, number>; store_keys?: number }>;
       try {
         out = kernel.transaction(() => {
-          const { binned, kept } = binOwnRows(kernel, lists, { actor, batch, note: `Removed with ${name}` });
+          const { binned, kept } = binOwnRows(kernel, lists, { actor, batch, note: `Removed with ${name}` }, (list, cursor) => kernel.list({ register: list, limit: 500, cursor }));
           /* ITS DOORS' TOKENS ARE REVOKED, each a `grant.revoke` naming the door, as the mint was a `grant.add`. */
           let closed = 0;
           for (const door of doors) {
@@ -16534,7 +16535,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (across) return true;
           if (typeof a.writes !== 'string' || a.writes === '' || !kernel.register(a.writes)) return false;
           const home = a.project_row ? kernel.get(a.project_row.id)?.register : undefined;
-          return whole(a.writes) && (home === undefined || whole(home));
+          return [a.writes, ...(home === undefined ? [] : [home])].every((list) => readable(ctx, list) === null && sight.whole(ctx, list) && kernel.scope(ctx, list) === undefined);
         }),
       );
     },
@@ -18786,7 +18787,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return sight.amountsHidden(ctx);
     },
 
-    /** The list a row named by its spoken id is on, `tasks#3` or `TK3`, or `null`: what the MCP door's firewall reads a row by. */
+    /** The list a row named by its spoken id is on, `tasks#3` or `TK3`, or `null`: what the MCP door's firewall reads a row by, and what a plugin's move is held to. */
     listOf(spoken: string): string | null {
       return kernel.get(spoken, { includeDeleted: true })?.register ?? null;
     },
