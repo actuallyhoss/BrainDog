@@ -952,7 +952,7 @@ const beforeKpis = (doc: Body): Body => ({
  */
 type Frozen = { version: string; whole: Body; onRecord: Body };
 type FrozenFile = { modules: Record<string, Frozen>; usecases: Record<string, Body> };
-const frozenFile = (name: string): FrozenFile => JSON.parse(readFileSync(new URL(`./fixtures/released/${name}`, import.meta.url), 'utf8')) as FrozenFile;
+const frozenFile = (name: string): FrozenFile => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')) as FrozenFile;
 const FROZEN_LATEST = frozenFile('review-2-after-2026-10-07.json');
 const FROZEN_BEFORE = frozenFile('review-2-before-2026-10-07.json');
 const LATEST: Record<string, Frozen & { released: string }> = {

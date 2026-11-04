@@ -25,8 +25,7 @@ import type { Result } from '@braindog/ports';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { FIRST_PARTY_VERSIONS, NOW, firstPartyManifest } from '../src/index.ts';
-import { useCase, useCaseDocument } from '../src/usecases/index.ts';
-import { counted } from '../src/usecases/counted.ts';
+import { useCase } from '../src/usecases/index.ts';
 import { dayOf, homePageOf, moduleDocument } from '../src/usecases/install.ts';
 
 type Body = Record<string, unknown>;
@@ -90,26 +89,8 @@ const fingerprint = (d: Body): string =>
 /** The fingerprint `usecase-versions.test.ts` records for the Personal 2.3.1 that shipped. */
 const RELEASED_2_3_1 = '268bbef9b5df127a';
 
-/**
- * Personal 2.3.1, from this build's document with 2.5.0's first things to press and 2.4.0's one change undone: no `hands`, and the count back where it
- * stood, first of the nine counts, straight before `savings-active`.
- */
-function personal231(): Body {
-  const now = useCaseDocument('personal', TODAY) as Body;
-  const { hands: _hands, ...rest } = now;
-  /* AND 2.5.0'S FIRST THINGS TO PRESS ON HOME, with the figure and the list they read (personal-and-guide-99). */
-  const firstActs = ['Bring your money in', 'Name something you are saving for', 'Name something you are making'];
-  const declarations = (now.declarations as Body[]).flatMap((d) =>
-    d.metric === 'savings-held' || d.metric === 'log-streak'
-      ? []
-      : d.page === 'home-personal'
-        ? [{ ...d, requires: (d.requires as string[]).filter((r) => r !== 'register.savings_goals'), blocks: (d.blocks as Body[]).filter((b) => !firstActs.includes(String(b.heading))) }]
-        : d.metric === 'savings-active'
-          ? [counted('budgets-set', 'Budgets set', 'register.categories', 'state is live, direction is out, budget is set'), d]
-          : [d],
-  );
-  return { ...rest, version: '2.3.1', declarations, seeds: [] };
-}
+/** Personal 2.3.1 as the commit before 7e791810a held it: the document it shipped, with no example rows. It was rebuilt here by undoing each later version, and went red on 2.9.1. */
+const personal231 = (): Body => ({ ...(JSON.parse(readFileSync(new URL('./fixtures/personal-2.3.1.json', import.meta.url), 'utf8')) as Body), seeds: [] });
 
 /** A record on what is deployed: the three modules as released, then Personal 2.3.1, and a budget and a goal of its own. */
 async function onReleased(): Promise<{ k: Kernel; sql: NodeSql }> {
@@ -117,7 +98,7 @@ async function onReleased(): Promise<{ k: Kernel; sql: NodeSql }> {
   const k = await openRecord(sql, fixedClock(NOW));
   for (const file of ['portfolio-1.16.0', 'people-3.3.0', 'money-core-3.16.0']) await put(k, sql, released(file));
   const before = personal231();
-  assert.equal(fingerprint(before), RELEASED_2_3_1, 'the Personal rebuilt here is not the 2.3.1 that shipped');
+  assert.equal(fingerprint(before), RELEASED_2_3_1, 'the frozen Personal is not the 2.3.1 that shipped');
   await put(k, sql, before);
   assert.equal(k.packs().find((p) => p.id === 'usecase-personal')?.version, '2.3.1');
   assert.equal(k.packs().find((p) => p.id === 'money-core')?.version, '3.16.0');
