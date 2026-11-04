@@ -53,11 +53,9 @@ const ABOVE_THE_FOLD = 6;
    3.34.0, whose This month stat went into the line. */
 /* SINCE money-core 3.34.0 A BOOK'S PAGE AND ACCOUNTS NEED NO ALLOWANCE: What you have and the line that the money lasts
    the year left the book, and the Balance bar left Accounts. */
-/* AND AN ACCOUNT'S PAGE BY ONE, SINCE money-core 3.34.0: its hero is one of two stats, the balance once while the bank
-   and the lines agree and the two figures while they differ, and only one of them is ever drawn. */
-/* AND REPORTS BY ONE: Health is drawn as one of its stats, by whether some cash is in another currency, and only one
-   of them is ever drawn. */
-const OVER: Record<string, number> = { money: 3, 'money-budgets': 1, 'money-account': 1, 'money-reports': 1 };
+/* AND REPORTS BY ONE: its Totals, In and out, Health, Promised each month, and the three over the month picked. Totals and
+   Health are each drawn as one of several stats, and only one of each is ever drawn. */
+const OVER: Record<string, number> = { money: 3, 'money-budgets': 1, 'money-reports': 1 };
 
 test('THE SWEEP READS EVERY DECLARED PAGE, so a page left out is not a page passed', () => {
   assert.ok(pages.length >= 25, `only ${pages.length} pages were read`);
@@ -102,7 +100,9 @@ test(`NO PAGE SHOWS MORE THAN ${ABOVE_THE_FOLD} TILES BEFORE THE REST IS FOLDED 
         return boxed;
       }
       return !boxed && !b.lead && !standsIn(b);
-    });
+      /* A STAT DECLARED SEVERAL WAYS UNDER ONE HEADING IS ONE TILE, as `money-budgets-reports-payees.test.ts` counts it: Reports' Totals are
+         ten by the month picked and whether more went out than in (3.38.4, ceeaf6193), and only one is ever drawn. */
+    }).filter((b, at, all) => b.kind !== 'stat' || b.heading === undefined || all.findIndex((o) => o.kind === 'stat' && o.heading === b.heading) === at);
     assert.ok(above.length <= ABOVE_THE_FOLD + (OVER[slug] ?? 0), `${slug} shows ${above.length} tiles before its fold: ${above.map((b) => b.heading ?? b.kind).join(', ')}`);
     /* AND AN ALLOWANCE NOBODY NEEDS ANY MORE IS TAKEN OUT, not left for the next tile to use. */
     if (OVER[slug] !== undefined) assert.equal(above.length, ABOVE_THE_FOLD + OVER[slug], `${slug} no longer needs to be let over ${ABOVE_THE_FOLD}`);

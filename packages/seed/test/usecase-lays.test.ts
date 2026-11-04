@@ -341,6 +341,22 @@ const LAID: Record<string, Laid> = {
     declares: '192a7f45d2533b26',
     history: ['3.9.2 lays what 3.9.1 laid, word for word: only the Dashboard\'s feed lines changed -> 192a7f45d2533b26'],
   },
+  /* 3.10.0, THE COUNT LINES GONE (62fb09138): what it lays did not move. */
+  'founder@3.10.0': {
+    lays: [
+      'adds page.relation after People: Numbers, 30 days',
+      'adds page.relation after People: Latest numbers',
+      'adds page.relation after People: Send numbers here',
+      'adds page.portfolio after In play: ',
+      'adds page.estate after Next ninety days: Server and provider numbers',
+      'adds page.relation after Notes: Where it was seen',
+      'adds page.someone after Notes: Where it was seen',
+      'hands register.organisations to people',
+      'hands register.datapoints to portfolio',
+    ],
+    declares: '192a7f45d2533b26',
+    history: ['3.10.0 lays what 3.9.2 laid, word for word: only its own pages dropped their count lines -> 192a7f45d2533b26'],
+  },
   /* PERSONAL LAYS FOR THE FIRST TIME AT 2.4.0 (budgets-set-73, integrate 73): the count of budgets set goes to Money,
      which declares it since money-core 3.17.0. 2.3.1, released, laid nothing and has no entry. */
   'personal@2.4.0': {
@@ -387,6 +403,12 @@ const LAID: Record<string, Laid> = {
     lays: ['hands metric.budgets-set to money-core'],
     declares: '5719e519311f68f0',
     history: ['2.9.1 lays what 2.9.0 laid, word for word: only the names of the Log and Put by changed (AH21) -> 5719e519311f68f0'],
+  },
+  /* 2.12.0, BY WAY OF 2.10.0, 2.11.0 AND 2.11.1, the last version since the table was kept (62fb09138). */
+  'personal@2.12.0': {
+    lays: ['hands metric.budgets-set to money-core'],
+    declares: '5719e519311f68f0',
+    history: ['2.12.0 lays what 2.9.1 laid, word for word: Goals\' lines, what it stands on and its count lines moved, and nothing it lays -> 5719e519311f68f0'],
   },
 };
 

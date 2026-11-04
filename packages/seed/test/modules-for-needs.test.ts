@@ -164,7 +164,8 @@ const homeOf = (k: Kernel): Page => {
 test('ON A RECORD HOLDING ONLY WHAT IT NEEDS, ITS PAGES GO IN without the blocks over lists it does not hold', async () => {
   const { k, own } = await made(pottery());
   value(own);
-  assert.deepEqual(leanedOn(modulesFor(pottery())), ['portfolio', 'money-core'], 'Money brings the Projects it points at, and nothing else');
+  /* MONEY BRINGS NOTHING SINCE 4b137c806 (31 October): which project a bill is for is a link, cut where Projects is not held. */
+  assert.deepEqual(leanedOn(modulesFor(pottery())), ['money-core'], 'Money brought something it only links to');
   assert.ok(held(k).includes('transactions') && !held(k).includes('people') && !held(k).includes('tasks'), `the record holds ${held(k).join(', ')}`);
   const home = homeOf(k);
   assert.deepEqual(home.requires, ['register.pieces'], 'the lists it does not hold leave the page with the blocks that read them');

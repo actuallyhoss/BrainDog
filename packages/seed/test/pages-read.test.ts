@@ -94,7 +94,10 @@ test('A TEMPLATE IS ONE DECLARATION AND ONE PAGE PER ROW, slugged by the row it 
 
   const kiln = page(k, 'kiln');
   assert.match(kiln.title as string, /Kiln/, 'the title still carries its placeholder');
-  const survivors = new Set(JSON.stringify(kiln).match(/\{\{\w*\}\}/g) ?? []);
+  /* A BLOCK'S `figures` ARE EACH FIGURE AS THE RECORD DECLARES IT, its hole and all, keyed by its id with no parameter (`figuresOf`, 9e03fe8e7): a host fills `{{it}}` from the id in the cell. What must carry none is what the page reads out. */
+  const said = JSON.stringify(kiln, (key, v: unknown) => (key === 'figures' ? undefined : v));
+  assert.ok(said.includes('At a glance'), 'the page was read to nothing, so this proves nothing');
+  const survivors = new Set(said.match(/\{\{\w*\}\}/g) ?? []);
   assert.deepEqual([...survivors], [], 'a placeholder survived into the page');
   sql.close();
 });
@@ -144,28 +147,21 @@ test('A BLOCK COMES BACK WITH ROWS AND A COUNT OF WHAT MATCHED, which are differ
 
 test('a `stat` block comes back with readings, each in its own currency', async () => {
   const { k, sql } = await seeded();
-  /* A BOOK'S PAGE, SINCE money-core 3.4.0: Money's own leads with a line and no tile, and a book's leads with the money
-     in it, so the sample's current account is filed in a book here and that book's page is read. */
-  const book = k.create('books', { name: 'Studio' } as never, { actor: 'p_test' });
-  assert.ok(book.ok, sayOf(book));
-  const current = k.list({ register: 'accounts', where: 'name is Studio current account', limit: 1 });
-  assert.ok(current.ok && current.value.rows[0], 'the sample has no current account');
-  assert.ok(k.update('accounts', current.value.rows[0].id, { book: (book.value as { id: string }).id }, { actor: 'p_test' }).ok);
-  const stat = page(k, 'studio').blocks.find((b) => b.kind === 'stat')!;
+  /* MONEY'S HERO, SINCE money-core 3.34.0 took What you have off a book's page (aaf8e24df), so a book leads on Cash ahead and Money on its figure. */
+  const stat = page(k, 'money').blocks.find((b) => b.kind === 'stat' && b.lead === true)!;
   assert.ok(stat.readings && stat.readings.length >= 1);
 
   /* THE MONEY THERE IS, which the page leads with. */
-  for (const metric of ['book-cash']) {
+  for (const metric of ['cash-now']) {
     const cell: NonNullable<typeof stat.readings>[number] = stat.readings.find((r) => r.metric.split(':')[0] === metric)!;
     assert.ok(cell?.reading, cell?.refusal ? `${cell.refusal.code}: ${cell.refusal.fix}` : `${metric}: no reading`);
     assert.ok((cell.reading.value ?? 0) > 0, `${metric} read nothing`);
     assert.equal(cell.reading.unit, 'GBP');
   }
 
-  /* A RECORD THAT HAS NEVER SNAPSHOTTED HAS NO LINE, and the figure still reads. The sample's ninety
-     days are the browser's; a record's series starts the day its figure is declared. */
-  const cash = stat.readings.find((r) => r.metric.startsWith('book-cash'))!;
-  assert.equal(cash.trend, undefined);
+  /* THE LINE IS THE FIGURE'S OWN NIGHTS, the sample's since it holds them from the moment it is made (`cashPoints`). */
+  const cash = stat.readings.find((r) => r.metric.startsWith('cash-now'))!;
+  assert.ok(Array.isArray(cash.trend) && cash.trend.length > 0, 'the sample holds its nights and Cash now draws no line');
   assert.equal(stat.lead, true);
   sql.close();
 });

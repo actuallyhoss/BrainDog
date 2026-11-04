@@ -73,8 +73,10 @@ test('EVERY LIST OF WHAT MOVED SIGNS ITS AMOUNT BY THE WAY THE MONEY WENT, on Mo
     assert.equal(way!.labels?.[signed[0]!.sign!.minus], 'Money out');
     assert.equal(way!.labels?.in, 'Money in');
   }
-  /* MONEY'S IS THE TILE ITSELF, so the two cannot drift. */
-  assert.deepEqual(MOVED[0]![1], MOVED[1]![1]);
+  /* MONEY'S IS THE TILE ITSELF, so the two cannot drift, WITH NO LINE OVER IT SINCE money-core 3.34.0 (aaf8e24df): "143 came in today." read as news on a record a minute old. */
+  const { body: said, ...tile } = MOVED[1]![1] as Declared & { body?: string };
+  assert.equal(said, '{{filed-today}} came in today.');
+  assert.deepEqual(MOVED[0]![1], tile);
 });
 
 test('MONEY OUT AND MONEY IN OF ONE AMOUNT ON ONE DAY READ DIFFERENTLY, on Money and on a book', async () => {

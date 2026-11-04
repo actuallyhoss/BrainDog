@@ -184,7 +184,8 @@ test('A PERSONAL RECORD FROM BEFORE THE LOG KEEPS ITS PROGRESS: each typed amoun
     const diff = await plan(pack, state);
     value(await install(pack, diff, host, diff.planHash));
   };
-  for (const m of modulesFor(u, ['people'])) {
+  /* A RECORD THIS OLD WAS GIVEN PROJECTS WITH PERSONAL, UNTIL 2.11.0 (2cb750068). */
+  for (const m of modulesFor(u, ['people', 'portfolio'])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
     await put(moduleDocument(u, m, { today: TODAY, holds, examples: true }));

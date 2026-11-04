@@ -186,9 +186,21 @@ test('AND EVERY `where:` RESOLVES AGAINST THE REGISTER IT NAMES', async () => {
         ? block.where.replace(/\{\{(\w+)\}\}/g, (_, key: string) => (key === 'spoken' ? `${template.register}#1` : key === 'seq' ? '1' : holeOf(key)))
         : block.where;
 
+      /* WRITTEN AS A TREE, BY A BAND THAT CANNOT SAY ITS CUT AS ONE SENTENCE (Work's Not this week, work 1.21.0, 4d5f2fe2e): every leaf a field of this list. */
+      if (typeof said !== 'string') {
+        const leaves = (p: unknown): { field: string }[] => {
+          const g = p as { all?: unknown[]; any?: unknown[]; none?: unknown[]; field?: string };
+          return g.field !== undefined ? [{ field: g.field }] : [...(g.all ?? []), ...(g.any ?? []), ...(g.none ?? [])].flatMap(leaves);
+        };
+        assert.ok(leaves(said).length > 0, `${slug} · ${block.heading ?? block.kind} reads no field`);
+        for (const l of leaves(said)) if (!Object.hasOwn(schemaOf(k, register).fields, l.field)) bad.push(`${slug} · ${block.heading ?? block.kind}: no field ${l.field}`);
+        continue;
+      }
       const out = parseWhere(said, schemaOf(k, register), {
         nowMs: NOW,
         refByTitle: (to, title) => {
+          /* WHO IS READING, WHICH A PAGE'S READ FILLS IN, as Work's "yours" says it (`othersOf` in the kernel, 4d5f2fe2e). */
+          if (title === 'someone else') return 'e_nobody';
           /* A ROW BY ITS SPOKEN ID, `accounts#1`, as a page about it names it (`{{spoken}}`), and the record reads it. */
           if (title === `${to}#1`) return k.get(title)?.id ?? null;
           const seq = (ROWS[to] ?? []).findIndex((r) => r[REGISTERS[to]!.title] === title);

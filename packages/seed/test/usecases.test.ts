@@ -113,7 +113,8 @@ test('THE PROPOSAL SAYS WHICH PAGES AND SECTIONS IT MAKES', () => {
   ]);
   assert.deepEqual(pagesOf(useCase('guide')!), [{ page: 'guide', title: 'Guide', section: 'Guide' }]);
   assert.deepEqual(pagesOf(useCase('personal')!), [{ page: 'goals', title: 'Goals', section: 'Goals' }]);
-  assert.deepEqual(pagesOf(useCase('shop')!), [{ page: 'orders', title: 'Orders', section: 'Orders' }]);
+  /* AND PRODUCTS, ITS OWN PLACE ON THE RAIL SINCE shop 1.5.0 (1fdbdf110). */
+  assert.deepEqual(pagesOf(useCase('shop')!), [{ page: 'orders', title: 'Orders', section: 'Orders' }, { page: 'products', title: 'Products', section: 'Products' }]);
   assert.deepEqual(pagesOf(useCase('business')!), []);
   assert.deepEqual(modulesFor(useCase('student')!, ['people']), ['core', 'people']);
   assert.deepEqual(modulesFor(useCase('founder')!, ['estate']), ['core', 'portfolio', 'money-core', 'estate']);

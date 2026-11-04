@@ -180,9 +180,7 @@ test('HOME IS CALLED TODAY in the voice, and the founder\'s own page Founder ove
 
 /* WHERE IT IS KEPT, SINCE money-core 3.29.0: how much there is is the hero's under the line, and every line ends on the
    part that is late, a sentence the app leaves out while none is. */
-/* AND WHAT IS TO PAY ON THE CARD AFTER IT, since money-core 3.20.0, left out whole with no card that says it. */
-/* AND SINCE money-core 3.33.0 (AF4) WHAT IS LATE LEADS ONLY WHILE IT IS: nothing is late here, so the card alone. */
-const LATE = '{{card-to-pay}} to pay on the card, as of {{card-to-pay-on}}.';
+/* AND SINCE money-core 3.33.0 (AF4) WHAT IS LATE LEADS ONLY WHILE IT IS. NO WORD OF THE CARD SINCE 3.38.4 (ceeaf6193): its own tile says it. */
 test('MONEY WITH TWO BOOKS OPENS ON WHERE ITS MONEY IS KEPT, and with one book on how long it lasts', async () => {
   const k = await founder();
   type Lead = Drawn & { lead?: boolean; body?: string; values?: Record<string, unknown> };
@@ -193,17 +191,14 @@ test('MONEY WITH TWO BOOKS OPENS ON WHERE ITS MONEY IS KEPT, and with one book o
 
   const own = book('Household');
   account('Everyday', own, 'GBP');
-  /* ONE ACCOUNT WITH MONEY ON IT AND NOTHING DUE LASTS THE YEAR, and since money-core 3.17.0 the line says so
-     (`HEADLINE_LASTS`): one lead still, the line of what there is stepping aside for it. */
-  assert.deepEqual(leads().map((b) => b.body), [`Lasts the year on what is due. ${LATE}`]);
+  /* ONE ACCOUNT WITH MONEY ON IT AND NOTHING DUE HAS NOTHING TO LAST AGAINST: the line asks for a bill, one lead still (`NOTHING_DUE`). */
+  assert.deepEqual(leads().map((b) => b.body), ['Add a bill to see how long it lasts.']);
 
   account('Studio dollars', book('Studio'), 'USD');
   const two = leads();
   /* KEPT IN HOW MANY BOOKS, SINCE money-core 3.34.0: it said how many accounts, and counted the books. */
-  assert.deepEqual(two.map((b) => b.body), [`Kept in {{books-held}} books. ${LATE}`], 'one lead');
-  /* NO CARD SAYS WHAT IS TO PAY ON IT: the sum reads nought and its day reads nothing, so the card's sentence goes whole. */
+  assert.deepEqual(two.map((b) => b.body), ['Kept in {{books-held}} books.'], 'one lead');
   assert.deepEqual(two[0]!.values, {
-    'card-to-pay': 0,
     'books-held': 2,
   });
   /* AND THE PAGE IS STILL WITHIN WHAT A PAGE DECLARES. */

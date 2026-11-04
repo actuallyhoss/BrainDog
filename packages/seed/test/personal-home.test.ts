@@ -73,7 +73,8 @@ async function put(k: Kernel, doc: unknown): Promise<void> {
 async function personal(version?: string): Promise<Kernel> {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   const u = useCase('personal')!;
-  for (const m of modulesFor(u, ['people'])) {
+  /* PROJECTS COMES WHEN A PROJECT IS SAID, SINCE 2.11.0 (2cb750068), so this is a person who said one too: what they are making has a list to go in. */
+  for (const m of modulesFor(u, ['people', 'portfolio'])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
     await put(k, moduleDocument(u, m, { today: TODAY, holds }));
@@ -108,7 +109,7 @@ test('PERSONAL HOME DECLARES THREE FIRST ACTS, each with the condition it waits 
   const money = headed(blocks, MONEY_IN) as Block;
   assert.equal(money.kind, 'link');
   assert.deepEqual(money.when, { metric: 'cash-accounts', lt: 1 });
-  assert.deepEqual(money.authored?.map((r) => r.cells[0]), ['Add an account', 'Forward a bank message', 'Find an add-on for your bank']);
+  assert.deepEqual(money.authored?.map((r) => r.cells[0]), ['Add an account', 'Forward a bank message', 'Find a plugin for your bank']);
   for (const r of money.authored ?? []) assert.match(r.cells[1] ?? '', /^\/[a-z]/u, `${r.cells[0]} leads to a page of this record`);
 
   const saving = headed(blocks, SAVING) as Block;
@@ -204,17 +205,19 @@ const namedLists = (k: Kernel): string[] => {
 
 const SAID = 'I want my bills and my savings under control';
 
-test("FROM THE SENTENCE ALONE A PERSON'S FIRST DAY HOLDS MONEY, THE PROJECTS IT POINTS AT AND PERSONAL'S OWN LISTS, and no other", async () => {
+/* A HOUSEHOLD IS NOT GIVEN PROJECTS SINCE 2.11.0 (2cb750068), AND STANDS ON PEOPLE: its roles are laid on People's list, and every sign-up asks a name.
+   Until a project is said the install cuts Project steps' link to it (`fitted`), and the list stands by itself. */
+test("FROM THE SENTENCE ALONE A PERSON'S FIRST DAY HOLDS MONEY, PEOPLE AND PERSONAL'S OWN LISTS, and no other", async () => {
   const u = useCase('personal')!;
-  assert.deepEqual(standsOn(u), ['portfolio', 'money-core'], 'Money, and the Projects its bills and project steps point at');
+  assert.deepEqual(standsOn(u), ['people', 'money-core'], 'Money, and the People its roles are laid on');
   const { k, modules, lists } = await fresh(SAID);
-  assert.deepEqual(modules, ['portfolio', 'money-core']);
-  assert.deepEqual(k.packs().map((p) => p.id).sort(), ['money-core', 'portfolio', 'usecase-personal']);
-  assert.deepEqual(lists, [...listsOf('portfolio'), ...listsOf('money-core'), ...OWN].sort());
-  assert.ok(!lists.includes('people'), 'nobody was named, so People is offered later and not installed');
+  assert.deepEqual(modules, ['people', 'money-core']);
+  assert.deepEqual(k.packs().map((p) => p.id).sort(), ['money-core', 'people', 'usecase-personal']);
+  assert.deepEqual(lists, [...listsOf('people'), ...listsOf('money-core'), ...OWN].sort());
+  assert.ok(!lists.includes('things'), 'nobody said a project, so Projects is offered later and not installed');
 });
 
-test("ITS HOME NAMES ONLY THE LISTS IT HOLDS, opens on the money, and draws all three first acts with nothing refused", async () => {
+test("ITS HOME NAMES ONLY THE LISTS IT HOLDS, opens on the money, and draws the first acts it has a list for with nothing refused", async () => {
   const { k, lists } = await fresh(SAID);
   assert.deepEqual(namedLists(k).filter((l) => !lists.includes(l)), [], 'Home names a list the record does not hold');
   const home = drawnOn(k);
@@ -222,13 +225,23 @@ test("ITS HOME NAMES ONLY THE LISTS IT HOLDS, opens on the money, and draws all 
   /* THE FIRST TILE IS THE LINE SAID FROM MONEY'S FIGURES. */
   const first = home.find((b) => b.drawn !== false);
   assert.ok(first && first.kind === 'note' && first.heading === undefined, `Home opens on ${first?.kind} ${first?.heading}`);
-  for (const h of [MONEY_IN, SAVING, MAKING]) assert.notEqual(headed(home, h).drawn, false, `${h} is not drawn on a fresh record`);
+  for (const h of [MONEY_IN, SAVING]) assert.notEqual(headed(home, h).drawn, false, `${h} is not drawn on a fresh record`);
+  /* WITH NO PROJECTS THERE IS NOWHERE FOR A THING BEING MADE TO GO, so the line for it leaves with the list. */
+  assert.ok(!home.some((b) => b.heading === MAKING), 'Home offers a project on a record with no Projects');
+});
+
+test("A PROJECT SAID BRINGS PROJECTS, and Home gains the line for it", async () => {
+  const { k, modules } = await fresh('I want my bills under control and I have a project on the go');
+  assert.deepEqual(modules, ['portfolio', 'people', 'money-core']);
+  const home = drawnOn(k);
+  for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+  assert.notEqual(headed(home, MAKING).drawn, false, 'a person who said a project is not offered the line for it');
 });
 
 test("WORDS THAT POINT AT PEOPLE BRING PEOPLE, with Personal's own roles laid on it", async () => {
   const said = `I want my bills under control, and my accountant ${PEOPLE[3]!.name} to see them`;
   const { k, modules, lists } = await fresh(said);
-  assert.deepEqual(modules, ['portfolio', 'people', 'money-core']);
+  assert.deepEqual(modules, ['people', 'money-core']);
   assert.ok(lists.includes('people'));
   const people = k.declarations().find((d) => d.id === 'register.people');
   assert.ok(people && String(people.body).includes('"family"'), "Personal's roles are laid on People");
@@ -236,21 +249,19 @@ test("WORDS THAT POINT AT PEOPLE BRING PEOPLE, with Personal's own roles laid on
 });
 
 /**
- * A RECORD MADE BEFORE KEEPS EVERYTHING IT HOLDS. 2.6.0 declares what the published 2.5.0 declares, word for word (the
- * frozen file in the catalogue), so a record on 2.5.0 takes it as a version and nothing else, planned in the order the
- * record plans an update (`planFile` in `packages/record/src/usecase.ts`): what it stands on and lacks, then its pack cut
- * to what the record holds.
+ * A RECORD MADE BEFORE KEEPS EVERYTHING IT HOLDS. A record on the published 2.5.0 (the frozen file in the catalogue) takes
+ * today's version, planned in the order the record plans an update (`planFile` in `packages/record/src/usecase.ts`): what it
+ * stands on and lacks, then its pack cut to what the record holds. WHAT CHANGED SINCE IS WORDS AND THE LINES ON GOALS (2.9.1,
+ * 2.10.0, 2.12.0), so no list and no page goes, where until 2.8.0 this could say word for word nothing had changed.
  */
-test('A RECORD ON 2.5.0 TAKES 2.8.0 AND LOSES NOTHING, in the order the record plans an update', async () => {
-  const frozen = JSON.parse(readFileSync(join(import.meta.dirname, '../../../apps/web/static/catalogue/usecases/personal/2.5.0.usecase.json'), 'utf8')) as { version: string; pack: { declarations: unknown; extends: unknown } };
+test('A RECORD ON 2.5.0 TAKES TODAY\'S VERSION AND LOSES NOTHING, in the order the record plans an update', async () => {
+  const frozen = JSON.parse(readFileSync(join(import.meta.dirname, '../../../apps/web/static/catalogue/usecases/personal/2.5.0.usecase.json'), 'utf8')) as { version: string; pack: { declarations: unknown[]; extends?: unknown } };
   const u = useCase('personal')!;
   const next = carriedDocument(u, TODAY, null)!;
   assert.equal(frozen.version, '2.5.0');
-  /* 2.7.0 ADDED ONE FIGURE, days in a row logged, and 2.8.0 TAKES IT AWAY AGAIN (audit 6g, AG12: no game score), so what
-     it declares is the published 2.5.0's, word for word. */
-  assert.ok(!(next.declarations as { metric?: string }[]).some((d) => d.metric === 'log-streak'), '2.8.0 still counts a streak');
-  assert.deepEqual([next.declarations, next.extends], [frozen.pack.declarations, frozen.pack.extends], '2.8.0 declares what the published 2.5.0 declares');
-  assert.equal(useCaseDocument('personal', TODAY)?.version, '2.8.0');
+  /* 2.7.0 ADDED ONE FIGURE, days in a row logged, and 2.8.0 TOOK IT AWAY AGAIN (audit 6g, AG12: no game score). */
+  assert.ok(!(next.declarations as { metric?: string }[]).some((d) => d.metric === 'log-streak'), 'today\'s version still counts a streak');
+  assert.equal(useCaseDocument('personal', TODAY)?.version, next.version);
 
   const k = await personal('2.5.0');
   const lists = held(k).sort();
@@ -263,10 +274,10 @@ test('A RECORD ON 2.5.0 TAKES 2.8.0 AND LOSES NOTHING, in the order the record p
   const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
   const diff = await plan(pack, stateOf(k));
   assert.equal(diff.installed_version, '2.5.0');
-  assert.deepEqual({ adds: diff.adds.length, changes: diff.changes.length, retires: diff.retires.length, conflicts: diff.conflicts.length }, { adds: 0, changes: 0, retires: 0, conflicts: 0 });
+  assert.deepEqual({ retires: diff.retires.length, conflicts: diff.conflicts.length }, { retires: 0, conflicts: 0 });
   value(await install(pack, diff, hostFor(k), diff.planHash));
 
-  assert.equal(k.packs().find((p) => p.id === 'usecase-personal')?.version, '2.8.0');
+  assert.equal(k.packs().find((p) => p.id === 'usecase-personal')?.version, next.version);
   assert.deepEqual(held(k).sort(), lists, 'every list is still held');
   assert.deepEqual(k.declarations().filter((d) => d.kind === 'page').map((d) => d.id).sort(), pages, 'every page is still there');
   assert.equal(k.count('savings_goals'), 1, 'the goal is still there');

@@ -284,7 +284,8 @@ test('HOME IS NOT ON THE RAIL: a use case declares its Home page with no nav', (
 test('THE AGENTS PACK IS A MODULE ONBOARDING CAN ADD, with what it needs said and no example rows', async () => {
   const manifest = moduleManifest('agents');
   assert.ok(manifest, 'agents is a module');
-  assert.deepEqual([...manifest.requires], ['register.things']);
+  /* PROJECTS IS NOT NEEDED SINCE Agents 1.32.0 (31f31f175): where it is held, a skill links to it. `agents-pack.test.ts` holds the link. */
+  assert.deepEqual([...manifest.requires], []);
   assert.ok(manifest.provides.includes('register.skills'));
   assert.equal(moduleManifest('usecase-team'), null);
   const { k, sql } = await record();
